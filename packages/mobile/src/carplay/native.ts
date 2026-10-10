@@ -81,7 +81,7 @@ export function isPhoneInForeground(): boolean {
  * ignores source patches, so iOS routes through the CarPlay module instead.
  */
 export function setAppColorScheme(scheme: "light" | "dark" | "unspecified"): void {
-  if (carPlayNative) {
+  if (typeof carPlayNative?.setColorScheme === "function") {
     carPlayNative.setColorScheme(scheme);
     return;
   }

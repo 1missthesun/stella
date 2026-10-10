@@ -21,7 +21,7 @@ import {
   releaseRecordingAudioSession,
   type RecordingAudioLease,
 } from "./mobile-audio-session";
-import { stopReadAloudForDictation } from "./read-aloud";
+import { stopReadAloudForDictation, waitForReadAloudRelease } from "./read-aloud";
 import {
   DICTATION_MAX_PCM_BYTES,
   DICTATION_SAMPLE_RATE,
@@ -275,6 +275,11 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return false;
       }
 
+      await waitForReadAloudRelease();
+      if (!mountedRef.current) {
+        operationInFlightRef.current = false;
+        return false;
+      }
       phase = "audio-session";
       const lease = await acquireRecordingAudioSession();
       if (lease === null) {

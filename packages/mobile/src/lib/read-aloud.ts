@@ -78,6 +78,18 @@ export type ReadAloudState = {
 };
 
 let playbackState: ReadAloudState | null = null;
+
+// expo-audio deactivates the shared session shortly after a player is torn
+// down. Starting the microphone inside that window reads a 0 Hz input format
+// and the recorder aborts the app, so dictation waits this long after speech.
+const SESSION_RELEASE_MS = 400;
+let lastPlayerReleasedAt = 0;
+
+/** Resolves once a just-stopped clip has released the audio session. */
+export async function waitForReadAloudRelease() {
+  const remaining = lastPlayerReleasedAt + SESSION_RELEASE_MS - Date.now();
+  if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+}
 let playbackAbort: AbortController | null = null;
 
 const abortPlaybackWork = () => {
@@ -221,6 +233,7 @@ export function stopReadAloud() {
   const player = currentPlayer;
   currentPlayer = null;
   if (player) {
+    lastPlayerReleasedAt = Date.now();
     try {
       player.pause();
       player.remove();
@@ -386,6 +399,7 @@ async function playHlsResilient(
       player = null;
       if (currentPlayer === p) currentPlayer = null;
       if (!p) return;
+      lastPlayerReleasedAt = Date.now();
       try {
         p.pause();
       } catch {

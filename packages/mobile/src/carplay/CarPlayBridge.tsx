@@ -331,7 +331,7 @@ function CarPlayVoiceLoop({
   );
 
   useEffect(() => {
-    carPlayNative?.setBackgroundActivity(phase !== "idle");
+    carPlayNative?.setBackgroundActivity(phase === "thinking");
   }, [phase]);
 
   useEffect(

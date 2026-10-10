@@ -103,7 +103,9 @@ export function SidebarPanel({
           <Pressable
             accessibilityRole="button"
             accessibilityState={{ selected: onAccount }}
-            accessibilityLabel={name ? `${name}, ${accountLabel}` : accountLabel}
+            accessibilityLabel={
+              name ? `${name}, ${accountLabel}` : accountLabel
+            }
             onPress={() => onSelectTab("settings")}
             style={({ pressed }) => [styles.account, pressed && styles.pressed]}
             testID="mobile-sidebar-nav-settings"
@@ -148,21 +150,40 @@ export function SidebarPanel({
             </View>
           </Pressable>
         </Rise>
-
       </ScrollView>
-      <LinearGradient
-        pointerEvents="none"
-        colors={[
-          colors.background,
-          colors.background,
-          fadeHex(colors.background, 0),
-        ]}
-        locations={[0, insets.top / (insets.top + 14), 1]}
-        style={[styles.topFade, { height: insets.top + 14 }]}
-      />
+      <SidebarTopFade />
     </View>
   );
 }
+
+export function SidebarTopFade() {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  return (
+    <LinearGradient
+      pointerEvents="none"
+      colors={[
+        colors.background,
+        colors.background,
+        fadeHex(colors.background, 0),
+      ]}
+      locations={[0, insets.top / (insets.top + 14), 1]}
+      style={[fadeStyles.topFade, { height: insets.top + 14 }]}
+    />
+  );
+}
+
+const fadeStyles = StyleSheet.create({
+  topFade: {
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+});
+
+export const SIDEBAR_BRAND_TOP = BRAND_TOP;
+export const SIDEBAR_BRAND_ROW = BRAND_ROW;
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
@@ -252,11 +273,5 @@ const makeStyles = (colors: Colors) =>
       fontFamily: fonts.display.semiBold,
       fontSize: 27,
       letterSpacing: -0.6,
-    },
-    topFade: {
-      left: 0,
-      position: "absolute",
-      right: 0,
-      top: 0,
     },
   });

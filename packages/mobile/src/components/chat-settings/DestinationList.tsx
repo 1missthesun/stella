@@ -3,14 +3,12 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
   type AlertButton,
 } from "react-native";
 import { useIsFocused } from "expo-router";
-import { Icon, type IconName } from "../Icon";
 import {
   listExecutionDevices,
   type AutomaticExecutionTarget,
@@ -28,6 +26,7 @@ import { useT } from "../../i18n";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
 import {
   applyRemoteExecution,
   enableRemoteExecution,
@@ -38,7 +37,7 @@ import {
   type ComputerRowStatusKind,
 } from "../settings/computer-rows";
 
-/** Live presence goes stale quickly; refresh while the sheet is on screen. */
+/** Live presence goes stale quickly; refresh while the panel is open. */
 const EXECUTION_DEVICE_POLL_MS = 15_000;
 
 const STATUS_KEYS: Readonly<Record<ComputerRowStatusKind, string>> = {
@@ -51,8 +50,9 @@ const STATUS_KEYS: Readonly<Record<ComputerRowStatusKind, string>> = {
 };
 
 /**
- * Where the chat's turns run, as one horizontal row of chips: Cloud, then
- * every computer on the account.
+ * Where the chat's turns run, one row per place: Cloud, then every computer
+ * on the account, in the sidebar's large type with its accent dot on the one
+ * in use.
  *
  * The list is the account's device list rather than this phone's pairings, so
  * a computer the owner has never paired with this phone still appears. A chip
@@ -63,12 +63,14 @@ const STATUS_KEYS: Readonly<Record<ComputerRowStatusKind, string>> = {
  * There is no pairing step: a computer signed in to the account is listed
  * here, and picking it attaches this phone to it on the spot.
  */
-export function DestinationChips({
+export function DestinationList({
   control,
   signedIn,
+  open,
 }: {
   control: ComputerControl | null;
   signedIn: boolean;
+  open: boolean;
 }) {
   const colors = useColors();
   const t = useT();
@@ -91,12 +93,12 @@ export function DestinationChips({
     void refreshPaired();
   }, [refreshPaired, chatPaired]);
 
-  // Presence is a poll while the sheet is on screen, and only ever a read:
+  // Presence is a poll while the panel is open, and only ever a read:
   // nothing here may move a computer's consent, however often it runs.
   const canListDevices = control !== null || signedIn;
   const [refreshToken, setRefreshToken] = useState(0);
   useEffect(() => {
-    if (!focused || !canListDevices) return;
+    if (!focused || !open || !canListDevices) return;
     let active = true;
     const controller = new AbortController();
     const read = () => {
@@ -121,7 +123,7 @@ export function DestinationChips({
       controller.abort();
       clearInterval(timer);
     };
-  }, [focused, canListDevices, refreshToken]);
+  }, [focused, open, canListDevices, refreshToken]);
 
   // A paired computer missing from the owner's device list reads as offline
   // forever. The two id spaces can drift, so log each distinct miss once.
@@ -157,7 +159,8 @@ export function DestinationChips({
     });
   const statusTextFor = (row: ComputerRow) => {
     if (busy?.deviceId === row.deviceId) {
-      if (busy.kind === "enabling") return t("mobile.settings.computer.enabling");
+      if (busy.kind === "enabling")
+        return t("mobile.settings.computer.enabling");
       if (busy.kind === "connecting") {
         return t("mobile.settings.computer.connecting");
       }
@@ -242,7 +245,9 @@ export function DestinationChips({
       });
     }
     buttons.push({
-      text: buttons.length ? t("mobile.common.cancel") : t("mobile.common.done"),
+      text: buttons.length
+        ? t("mobile.common.cancel")
+        : t("mobile.common.done"),
       style: "cancel",
     });
     Alert.alert(label, statusTextFor(row), buttons);
@@ -251,51 +256,40 @@ export function DestinationChips({
   const cloudSelected = !selectedRow;
 
   return (
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.scroller}
-        contentContainerStyle={styles.row}
-      >
-        <Chip
-          icon="globe"
-          label={t("mobile.settings.computer.cloud")}
-          selected={cloudSelected}
-          available
-          disabled={!control}
-          onPress={() => choose({ mode: "cloud" })}
-          styles={styles}
-          colors={colors}
-        />
+    <View>
+      <Place
+        label={t("mobile.settings.computer.cloud")}
+        selected={cloudSelected}
+        available
+        disabled={!control}
+        onPress={() => choose({ mode: "cloud" })}
+        styles={styles}
+        colors={colors}
+      />
 
-        {rows.map((row) => {
-          const working = busy?.deviceId === row.deviceId;
-          const label = labelFor(row);
-          return (
-            <Chip
-              key={row.deviceId}
-              icon="monitor"
-              label={label}
-              statusText={statusTextFor(row)}
-              selected={selectedRow?.deviceId === row.deviceId}
-              available={row.available}
-              working={working}
-              disabled={!control || working}
-              onPress={() =>
-                row.available ? selectComputer(row) : explain(row)
-              }
-              onLongPress={() => explain(row)}
-              styles={styles}
-              colors={colors}
-            />
-          );
-        })}
-      </ScrollView>
+      {rows.map((row) => {
+        const working = busy?.deviceId === row.deviceId;
+        return (
+          <Place
+            key={row.deviceId}
+            label={labelFor(row)}
+            statusText={statusTextFor(row)}
+            selected={selectedRow?.deviceId === row.deviceId}
+            available={row.available}
+            working={working}
+            disabled={!control || working}
+            onPress={() => (row.available ? selectComputer(row) : explain(row))}
+            onLongPress={() => explain(row)}
+            styles={styles}
+            colors={colors}
+          />
+        );
+      })}
+    </View>
   );
 }
 
-function Chip({
-  icon,
+function Place({
   label,
   statusText,
   selected,
@@ -307,7 +301,6 @@ function Chip({
   styles,
   colors,
 }: {
-  icon: IconName;
   label: string;
   statusText?: string;
   selected: boolean;
@@ -319,11 +312,6 @@ function Chip({
   styles: ReturnType<typeof makeStyles>;
   colors: Colors;
 }) {
-  const tint = selected
-    ? colors.accentForeground
-    : available
-      ? colors.text
-      : colors.textMuted;
   return (
     <Pressable
       onPress={onPress}
@@ -332,79 +320,92 @@ function Chip({
       accessibilityRole="button"
       accessibilityLabel={statusText ? `${label}, ${statusText}` : label}
       accessibilityState={{ selected, disabled }}
-      style={({ pressed }) => [
-        styles.chip,
-        selected && styles.chipSelected,
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.place, pressed && styles.pressed]}
     >
-      <Icon name={icon} size={16} color={tint} />
-      <Text
-        style={[
-          styles.chipLabel,
-          { color: tint },
-          selected && styles.chipLabelSelected,
-        ]}
-        numberOfLines={1}
-      >
-        {label}
-      </Text>
-      {working ? (
-        <ActivityIndicator size="small" color={colors.textMuted} />
-      ) : statusText !== undefined && !selected ? (
-        <View
-          style={[
-            styles.dot,
-            { backgroundColor: available ? colors.ok : colors.textWeaker },
-          ]}
-        />
+      <View style={styles.labelLine}>
+        <Text
+          style={[styles.label, !available && styles.labelUnavailable]}
+          numberOfLines={1}
+          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+        >
+          {label}
+        </Text>
+        {selected ? <View style={styles.current} /> : null}
+        {working ? (
+          <ActivityIndicator size="small" color={colors.textMuted} />
+        ) : null}
+      </View>
+      {statusText !== undefined ? (
+        <View style={styles.statusLine}>
+          <View
+            style={[
+              styles.dot,
+              { backgroundColor: available ? colors.ok : colors.textWeaker },
+            ]}
+          />
+          <Text
+            style={styles.status}
+            numberOfLines={1}
+            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+          >
+            {statusText}
+          </Text>
+        </View>
       ) : null}
     </Pressable>
   );
 }
 
-const CHIP_HEIGHT = 40;
-
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
-    scroller: {
-      flexGrow: 0,
-      marginHorizontal: -16,
-    },
-    row: {
-      gap: 8,
-      paddingHorizontal: 16,
-    },
-    chip: {
-      alignItems: "center",
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderRadius: 12,
-      borderWidth: StyleSheet.hairlineWidth,
-      flexDirection: "row",
-      gap: 7,
-      height: CHIP_HEIGHT,
-      paddingHorizontal: 13,
-    },
-    chipSelected: {
-      backgroundColor: colors.accent,
-      borderColor: colors.accent,
-    },
-    chipLabel: {
-      fontFamily: fonts.sans.medium,
-      fontSize: 14,
-      letterSpacing: -0.2,
-      maxWidth: 170,
-    },
-    chipLabelSelected: {
-      fontFamily: fonts.sans.semiBold,
-    },
-    dot: {
-      borderRadius: 3.5,
-      height: 7,
-      width: 7,
+    place: {
+      justifyContent: "center",
+      minHeight: 50,
+      paddingVertical: 6,
     },
     pressed: {
-      opacity: 0.6,
+      opacity: 0.55,
+      transform: [{ scale: 0.98 }],
+    },
+    labelLine: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+      minWidth: 0,
+    },
+    label: {
+      color: colors.text,
+      flexShrink: 1,
+      fontFamily: fonts.sans.bold,
+      fontSize: 26,
+      letterSpacing: -0.9,
+      lineHeight: 32,
+    },
+    labelUnavailable: {
+      color: colors.textMuted,
+    },
+    current: {
+      backgroundColor: colors.accent,
+      borderRadius: 4,
+      height: 8,
+      marginTop: 3,
+      width: 8,
+    },
+    statusLine: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 7,
+      marginTop: 1,
+    },
+    dot: {
+      borderRadius: 3,
+      height: 6,
+      width: 6,
+    },
+    status: {
+      color: colors.textMuted,
+      flexShrink: 1,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 14,
     },
   });

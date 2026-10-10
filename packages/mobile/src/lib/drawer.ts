@@ -11,16 +11,25 @@ import {
   type WithSpringConfig,
 } from "react-native-reanimated";
 
+export type DrawerSide = "start" | "end";
+
 export const drawerProgress = makeMutable(0);
+export const drawerSign = makeMutable(1);
 
-type DrawerState = { open: boolean; live: boolean };
+type DrawerState = { open: boolean; live: boolean; side: DrawerSide };
 
-let state: DrawerState = { open: false, live: false };
+let state: DrawerState = { open: false, live: false, side: "start" };
 const listeners = new Set<() => void>();
 
 function setState(next: Partial<DrawerState>) {
   const merged = { ...state, ...next };
-  if (merged.open === state.open && merged.live === state.live) return;
+  if (
+    merged.open === state.open &&
+    merged.live === state.live &&
+    merged.side === state.side
+  ) {
+    return;
+  }
   state = merged;
   for (const listener of listeners) listener();
 }
@@ -34,6 +43,7 @@ function subscribe(listener: () => void) {
 
 const readOpen = () => state.open;
 const readLive = () => state.live;
+const readSide = () => state.side;
 
 export function useDrawerOpen(): boolean {
   return useSyncExternalStore(subscribe, readOpen, readOpen);
@@ -41,6 +51,10 @@ export function useDrawerOpen(): boolean {
 
 export function useDrawerLive(): boolean {
   return useSyncExternalStore(subscribe, readLive, readLive);
+}
+
+export function useDrawerSide(): DrawerSide {
+  return useSyncExternalStore(subscribe, readSide, readSide);
 }
 
 const OPEN: WithSpringConfig = { stiffness: 340, damping: 31, mass: 1 };
@@ -66,6 +80,18 @@ function setLive(live: boolean) {
   setState({ live });
 }
 
+function begin(side: DrawerSide) {
+  setState({ live: true, side });
+}
+
+function claimSide(side: DrawerSide) {
+  if (state.side === side) return;
+  if (state.live) cancelAnimation(drawerProgress);
+  drawerProgress.value = 0;
+  drawerSign.value = side === "start" ? 1 : -1;
+  setState({ side });
+}
+
 function rested() {
   if (!state.open) setLive(false);
 }
@@ -81,8 +107,9 @@ function settleDrawer(open: boolean, velocity = 0) {
   );
 }
 
-export function openDrawer() {
+export function openDrawer(side: DrawerSide = "start") {
   Keyboard.dismiss();
+  claimSide(side);
   setOpen(true);
   settleDrawer(true);
 }
@@ -92,8 +119,8 @@ export function closeDrawer() {
   settleDrawer(false);
 }
 
-export function isDrawerOpen(): boolean {
-  return state.open;
+export function isDrawerOpen(side?: DrawerSide): boolean {
+  return state.open && (side === undefined || state.side === side);
 }
 
 export function useDrawerMetrics() {
@@ -117,7 +144,12 @@ export function drawerVeil(progress: number) {
   return t <= 0 ? 0 : t >= 1 ? 1 : veilCurve(t);
 }
 
-export const DRAWER_BLUR = { knee: 0.15, kneeAmount: 0.38, end: 0.9, tail: 1.5 };
+export const DRAWER_BLUR = {
+  knee: 0.15,
+  kneeAmount: 0.38,
+  end: 0.9,
+  tail: 1.5,
+};
 
 export function drawerBlur(progress: number) {
   "worklet";
@@ -140,32 +172,43 @@ function rubber(over: number) {
 
 const dismissKeyboard = () => Keyboard.dismiss();
 
-export function useDrawerPan(direction: "open" | "close", enabled = true) {
+export function useDrawerPan(
+  direction: "open" | "close",
+  side: DrawerSide,
+  enabled = true,
+) {
   const { travel } = useDrawerMetrics();
   const origin = useSharedValue(0);
+  const sign = side === "start" ? 1 : -1;
+  const toward = direction === "open" ? sign : -sign;
   return useMemo(
     () =>
       Gesture.Pan()
         .enabled(enabled)
-        .activeOffsetX(direction === "open" ? 12 : -12)
+        .activeOffsetX(toward > 0 ? 12 : -12)
         .failOffsetY([-14, 14])
         .onStart((e) => {
           cancelAnimation(drawerProgress);
-          origin.value = drawerProgress.value - e.translationX / travel;
-          runOnJS(setLive)(true);
+          if (drawerSign.value !== sign) {
+            drawerSign.value = sign;
+            drawerProgress.value = 0;
+          }
+          origin.value =
+            drawerProgress.value - (sign * e.translationX) / travel;
+          runOnJS(begin)(side);
           if (direction === "open") runOnJS(dismissKeyboard)();
         })
         .onUpdate((e) => {
-          const raw = origin.value + e.translationX / travel;
+          const raw = origin.value + (sign * e.translationX) / travel;
           drawerProgress.value =
             raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
         })
         .onEnd((e) => {
-          const v = e.velocityX / travel;
+          const v = (sign * e.velocityX) / travel;
           const open = drawerProgress.value + v * 0.2 > 0.5;
           runOnJS(setOpen)(open);
           settleDrawer(open, v);
         }),
-    [direction, enabled, travel, origin],
+    [direction, side, sign, toward, enabled, travel, origin],
   );
 }

@@ -2105,6 +2105,8 @@
       "title": "Memory"
     },
     "modelPicker": {
+      "accountKey": "Account",
+      "accountKeyTitle": "Connected on your Stella account. This computer uses that key.",
       "actions": {
         "addKey": "Add key",
         "cancel": "Cancel",

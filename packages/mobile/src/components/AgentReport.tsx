@@ -15,6 +15,8 @@ export type AgentReportPopoverProps = {
   reference: AgentReplyRef;
   conversationId: string;
   colors: Colors;
+  /** The report as the conversation recorded it, when the backend has none. */
+  journalReport?: string;
   /** Window point of the tap that opened the report; the popover points at it. */
   anchor: ReportAnchor | null;
   onClose: () => void;
@@ -32,56 +34,69 @@ type ReportThread = {
   status: string;
 } | null;
 
-/** Live text of a task's report, or a placeholder while it loads or runs. */
+type ReportLookup =
+  | { kind: "loading" }
+  | { kind: "failed" }
+  | { kind: "loaded"; text: string; running: boolean };
+
+const threadReportText = (thread: ReportThread): string => {
+  if (thread?.resultJson) {
+    try {
+      const parsed: unknown = JSON.parse(thread.resultJson);
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        "finalText" in parsed &&
+        typeof parsed.finalText === "string" &&
+        parsed.finalText.trim()
+      ) {
+        return parsed.finalText;
+      }
+    } catch {
+      return thread.resultJson;
+    }
+  }
+  return thread?.errorMessage?.trim() || "";
+};
+
+/**
+ * A task's report: the backend's record of the thread when it has one, else
+ * the text the conversation itself carried back (`journalReport`). Agents a
+ * cloud chat runs on Stella's own models report only into the conversation,
+ * so for them the journal is the report.
+ */
 function useAgentReport(
   conversationId: string,
   threadId: string,
-): string | null {
-  const [report, setReport] = useState<string | null>(null);
+  journalReport: string | undefined,
+): string {
+  const [lookup, setLookup] = useState<ReportLookup>({ kind: "loading" });
   useEffect(() => {
-    setReport(null);
-    const render = (thread: ReportThread) => {
-      try {
-        let text = thread?.errorMessage || "";
-        if (thread?.resultJson) {
-          try {
-            const parsed: unknown = JSON.parse(thread.resultJson);
-            if (
-              parsed &&
-              typeof parsed === "object" &&
-              "finalText" in parsed &&
-              typeof parsed.finalText === "string"
-            ) {
-              text = parsed.finalText;
-            }
-          } catch {
-            text = thread.resultJson;
-          }
-        }
-        setReport(
-          text ||
-            (thread?.status === "running"
-              ? "Working…"
-              : "No report is available yet."),
-        );
-      } catch {
-        setReport("Couldn’t load the report. Close and reopen it to retry.");
-      }
-    };
+    setLookup({ kind: "loading" });
     try {
       return getBackendClient().watch(
         "agentThreads.get",
         { conversationId, threadId },
-        render,
-        () =>
-          setReport("Couldn’t load the report. Close and reopen it to retry."),
+        (thread: ReportThread) =>
+          setLookup({
+            kind: "loaded",
+            text: threadReportText(thread),
+            running: thread?.status === "running",
+          }),
+        () => setLookup({ kind: "failed" }),
       );
     } catch {
-      setReport("Couldn’t load the report. Close and reopen it to retry.");
+      setLookup({ kind: "failed" });
       return undefined;
     }
   }, [conversationId, threadId]);
-  return report;
+  if (lookup.kind === "loaded" && lookup.text) return lookup.text;
+  if (journalReport?.trim()) return journalReport;
+  if (lookup.kind === "loading") return "Loading report…";
+  if (lookup.kind === "failed") {
+    return "Couldn’t load the report. Close and reopen it to retry.";
+  }
+  return lookup.running ? "Working…" : "No report is available yet.";
 }
 
 function over(color: string, base: Rgba): Rgba {
@@ -148,6 +163,7 @@ export function AgentReportContent({
   reference,
   conversationId,
   colors,
+  journalReport,
   onClose,
   width,
   maxHeight,
@@ -155,12 +171,17 @@ export function AgentReportContent({
   reference: AgentReplyRef;
   conversationId: string;
   colors: Colors;
+  journalReport?: string;
   onClose: () => void;
   width: number;
   maxHeight: number;
 }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const report = useAgentReport(conversationId, reference.threadId);
+  const report = useAgentReport(
+    conversationId,
+    reference.threadId,
+    journalReport,
+  );
   return (
     <View style={[styles.content, { width, maxHeight }]}>
       <View style={styles.head}>
@@ -181,7 +202,7 @@ export function AgentReportContent({
         contentContainerStyle={styles.bodyContent}
       >
         <AssistantMarkdown
-          text={report ?? "Loading report…"}
+          text={report}
           colors={colors}
           selectable
           fill={false}

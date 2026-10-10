@@ -5,7 +5,10 @@ import {
   type JournalMessageRecord,
   type JournalRecord,
 } from "@stella/contracts/conversation-protocol";
-import { lifecycleWakeTask } from "@stella/contracts/conversation-journal-projection";
+import {
+  lifecycleWakeOutcome,
+  lifecycleWakeTask,
+} from "@stella/contracts/conversation-journal-projection";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -207,11 +210,25 @@ export const collectJournalTasks = (
     });
   };
 
-  const settle = (id: string, status: MobileTask["status"], at: number) => {
+  const settle = (
+    id: string,
+    status: MobileTask["status"],
+    at: number,
+    outcome: { resultText?: string; errorMessage?: string } = {},
+  ) => {
     const existing = tasks.get(id);
     if (!existing || existing.status !== "running") return;
     const { statusText: _statusText, ...rest } = existing;
-    tasks.set(id, { ...rest, status, completedAt: at, updatedAt: at });
+    const resultText = outcome.resultText?.trim();
+    const errorMessage = outcome.errorMessage?.trim();
+    tasks.set(id, {
+      ...rest,
+      status,
+      completedAt: at,
+      updatedAt: at,
+      ...(resultText ? { resultText } : {}),
+      ...(errorMessage ? { errorMessage } : {}),
+    });
   };
 
   for (const record of records) {
@@ -254,6 +271,9 @@ export const collectJournalTasks = (
             ? "error"
             : "canceled",
         record.createdAtMs,
+        event.type === "agent-completed"
+          ? { resultText: event.payload.result }
+          : { errorMessage: event.payload.error },
       );
       continue;
     }
@@ -264,7 +284,15 @@ export const collectJournalTasks = (
       const task = lifecycleWakeTask(text);
       const status = wakeStatus(text);
       if (!task || !status || carded.has(task.threadId)) continue;
-      settle(task.threadId, status, record.createdAtMs);
+      const outcome = lifecycleWakeOutcome(text);
+      settle(
+        task.threadId,
+        status,
+        record.createdAtMs,
+        outcome?.kind === "completed"
+          ? { resultText: outcome.body }
+          : { errorMessage: outcome?.body },
+      );
       continue;
     }
 

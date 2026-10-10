@@ -745,6 +745,9 @@ export function ChatPane({
   );
   const closeReplyFocus = useCallback(() => setReplyFocus(null), []);
   const closeReport = useCallback(() => setOpenReport(null), []);
+  const openReportTask = openReport
+    ? activityTasks?.find((task) => task.id === openReport.ref.threadId)
+    : undefined;
   useEffect(() => {
     setReplyFocus(null);
     setOpenReport(null);
@@ -2004,6 +2007,7 @@ export function ChatPane({
             reference={openReport.ref}
             anchor={openReport.anchor}
             conversationId={conversationId}
+            journalReport={openReportTask?.resultText ?? openReportTask?.errorMessage}
             colors={colors}
             onClose={closeReport}
             topInset={topInset}

@@ -73,6 +73,12 @@ const withOwnershipFallbacks = (
   ...(next.parentAgentId === undefined && existing.parentAgentId !== undefined
     ? { parentAgentId: existing.parentAgentId }
     : {}),
+  ...(!isRunningTask(next) && !next.resultText && existing.resultText
+    ? { resultText: existing.resultText }
+    : {}),
+  ...(!isRunningTask(next) && !next.errorMessage && existing.errorMessage
+    ? { errorMessage: existing.errorMessage }
+    : {}),
 });
 
 const withRunningFallbacks = (

@@ -31,6 +31,7 @@ export function AgentReportPopover({
   reference,
   conversationId,
   colors,
+  journalReport,
   onClose,
   topInset = 0,
 }: AgentReportPopoverProps) {
@@ -81,6 +82,7 @@ export function AgentReportPopover({
             reference={reference}
             conversationId={conversationId}
             colors={colors}
+            journalReport={journalReport}
             onClose={onClose}
             width={width - RIM * 2}
             maxHeight={maxHeight}

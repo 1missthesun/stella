@@ -6,13 +6,10 @@
  *    relaunch, which the card offers rather than nags about.
  *  - The optional Chrome extension, which brings the user's browser logins
  *    into Stella and lets it act inside their own tabs.
- *  - Signed-in users only: the cloud Memory preference, which the server
- *    requires an explicit acknowledgement for before Stella's first run.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { Button } from "@/ui/button";
-import { Switch } from "@/ui/switch";
-import { AppWindowMac, Check, Eye, Globe, KeyRound } from "@/ui/icons";
+import { AppWindowMac, Check, Eye, Globe } from "@/ui/icons";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { getPlatform } from "@/platform/electron/platform";
 import { useT } from "@/shared/i18n";
@@ -21,7 +18,6 @@ import {
   type DesktopPermissionKind,
   type DesktopPermissionStatus,
 } from "@/global/permissions/use-desktop-permissions";
-import { useCloudMemoryPreference } from "@/features/cloud/use-cloud-memory-preference";
 import { STELLA_BROWSER_EXTENSION_STORE_URL } from "@stella/contracts/browser-extension";
 import type { OnboardingChatAnswer } from "../onboarding-chat-flow";
 
@@ -56,16 +52,10 @@ const PERMISSION_ROWS: {
 type ExtrasCardProps = {
   active: boolean;
   answered: OnboardingChatAnswer | undefined;
-  isAuthenticated: boolean;
   onAnswer: (answer: OnboardingChatAnswer) => void;
 };
 
-export function ExtrasCard({
-  active,
-  answered,
-  isAuthenticated,
-  onAnswer,
-}: ExtrasCardProps) {
+export function ExtrasCard({ active, answered, onAnswer }: ExtrasCardProps) {
   const t = useT();
   const isMac = getPlatform() === "darwin";
   const permissionsEnabled = isMac && answered === undefined;
@@ -75,18 +65,7 @@ export function ExtrasCard({
     initialStatus: INITIAL_PERMISSION_STATUS,
     restartKinds: ["screen"],
   });
-  const memory = useCloudMemoryPreference();
-  const showMemory = isAuthenticated && !memory.disabled;
-  const [memoryChoice, setMemoryChoice] = useState<boolean | null>(null);
-  const [saving, setSaving] = useState(false);
   const [extensionOpened, setExtensionOpened] = useState(false);
-
-  useEffect(() => {
-    if (!memory.preference) return;
-    setMemoryChoice((current) =>
-      current === null ? memory.preference!.memoryEnabled : current,
-    );
-  }, [memory.preference]);
 
   const handleEnable = useCallback(
     (kind: DesktopPermissionKind) => {
@@ -97,33 +76,10 @@ export function ExtrasCard({
     [permissions],
   );
 
-  const handleContinue = useCallback(async () => {
-    if (
-      showMemory &&
-      memory.preference &&
-      memoryChoice !== null &&
-      memory.status === "synced"
-    ) {
-      const needsSave =
-        memory.preference.revision === 0 ||
-        memory.preference.memoryEnabled !== memoryChoice;
-      if (needsSave) {
-        setSaving(true);
-        const saved = await memory.setMemoryEnabled(memoryChoice, {
-          force: memory.preference.revision === 0,
-        });
-        setSaving(false);
-        if (!saved) return;
-      }
-    }
-    onAnswer("done");
-  }, [memory, memoryChoice, onAnswer, showMemory]);
-
   if (answered !== undefined) {
     const parts: string[] = [];
     if (isMac) parts.push(t("onboarding.chat.extras.settledPermissions"));
     if (extensionOpened) parts.push(t("onboarding.chat.extras.settledExtension"));
-    if (showMemory) parts.push(t("onboarding.chat.extras.settledMemory"));
     return (
       <div className="obc-card" data-settled>
         <span className="obc-card__settled-icon">
@@ -143,11 +99,7 @@ export function ExtrasCard({
     );
   }
 
-  const rowCount = (isMac ? PERMISSION_ROWS.length : 0) + 1 + (showMemory ? 1 : 0);
-  const continueDisabled =
-    !active ||
-    saving ||
-    (showMemory && (memory.status === "loading" || memory.status === "saving"));
+  const rowCount = (isMac ? PERMISSION_ROWS.length : 0) + 1;
 
   return (
     <div className="obc-card">
@@ -238,47 +190,6 @@ export function ExtrasCard({
           )}
         </div>
 
-        {showMemory ? (
-          <div className="obc-row-item">
-            <span className="obc-row-item__icon">
-              <KeyRound size={16} />
-            </span>
-            <span className="obc-row-item__text">
-              <span className="obc-row-item__title">
-                {t("onboarding.chat.extras.memoryTitle")}
-              </span>
-              <span className="obc-row-item__desc">
-                {memory.status === "error"
-                  ? t(
-                      memory.issue === "save"
-                        ? "settings.errors.saveMemory"
-                        : "settings.errors.loadMemory",
-                    )
-                  : t("onboarding.chat.extras.memoryDesc")}
-              </span>
-            </span>
-            {memory.status === "error" ? (
-              <Button
-                type="button"
-                size="small"
-                variant="ghost"
-                onClick={() => void memory.retry()}
-              >
-                {t("common.tryAgain")}
-              </Button>
-            ) : (
-              <Switch
-                checked={memoryChoice ?? false}
-                disabled={
-                  !active || !memory.preference || memory.status !== "synced"
-                }
-                onCheckedChange={(next) => setMemoryChoice(Boolean(next))}
-                hideLabel
-                label={t("onboarding.chat.extras.memoryTitle")}
-              />
-            )}
-          </div>
-        ) : null}
       </div>
 
       {isMac && permissions.restartRecommended ? (
@@ -303,15 +214,15 @@ export function ExtrasCard({
         <Button
           type="button"
           variant="primary"
-          disabled={continueDisabled}
-          onClick={() => void handleContinue()}
+          disabled={!active}
+          onClick={() => onAnswer("done")}
         >
-          {saving ? t("common.loading") : t("common.continue")}
+          {t("common.continue")}
         </Button>
         <Button
           type="button"
           variant="ghost"
-          disabled={!active || saving}
+          disabled={!active}
           onClick={() => onAnswer("skipped")}
         >
           {t("onboarding.chat.extras.skip")}

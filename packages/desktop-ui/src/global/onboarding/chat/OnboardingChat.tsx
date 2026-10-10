@@ -340,7 +340,6 @@ export function OnboardingChat({ isAuthenticated, onComplete }: OnboardingChatPr
           <ExtrasCard
             active={active}
             answered={answered}
-            isAuthenticated={isAuthenticated}
             onAnswer={(kind) => answer(step, kind)}
           />
         );

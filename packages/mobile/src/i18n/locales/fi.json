@@ -2648,6 +2648,14 @@
         "eyebrow": "Live-esikatselu",
         "openInBrowser": "Avaa selaimessa",
         "reload": "Lataa uudelleen"
+      },
+      "folder": {
+        "back": "Takaisin",
+        "onDevice": "Laitteella {device}",
+        "failedTitle": "Tätä kansiota ei voitu avata",
+        "failedBody": "Tämän kansion sisältöä ei voitu näyttää.",
+        "emptyTitle": "Tämä kansio on tyhjä",
+        "truncated": "Vain ensimmäiset {count} näytetään."
       }
     },
     "displayPanel": {

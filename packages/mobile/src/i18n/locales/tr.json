@@ -2648,6 +2648,14 @@
         "eyebrow": "Canlı önizleme",
         "openInBrowser": "Tarayıcıda aç",
         "reload": "Yeniden yükle"
+      },
+      "folder": {
+        "back": "Geri",
+        "onDevice": "{device} üzerinde",
+        "failedTitle": "Bu klasör açılamadı",
+        "failedBody": "Bu klasörün içeriği gösterilemedi.",
+        "emptyTitle": "Bu klasör boş",
+        "truncated": "Yalnızca ilk {count} öğe gösteriliyor."
       }
     },
     "displayPanel": {

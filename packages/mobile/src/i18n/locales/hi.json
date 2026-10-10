@@ -2648,6 +2648,14 @@
         "eyebrow": "लाइव पूर्वावलोकन",
         "openInBrowser": "ब्राउज़र में खोलें",
         "reload": "फिर से लोड करें"
+      },
+      "folder": {
+        "back": "वापस",
+        "onDevice": "{device} पर",
+        "failedTitle": "यह फ़ोल्डर नहीं खुल सका",
+        "failedBody": "इस फ़ोल्डर की सामग्री नहीं दिखाई जा सकी।",
+        "emptyTitle": "यह फ़ोल्डर खाली है",
+        "truncated": "केवल पहले {count} दिखाए जा रहे हैं।"
       }
     },
     "displayPanel": {

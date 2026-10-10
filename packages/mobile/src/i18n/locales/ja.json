@@ -2630,6 +2630,14 @@
         "eyebrow": "ライブプレビュー",
         "openInBrowser": "ブラウザで開く",
         "reload": "再読み込み"
+      },
+      "folder": {
+        "back": "戻る",
+        "onDevice": "{device} 上",
+        "failedTitle": "このフォルダを開けませんでした",
+        "failedBody": "このフォルダの内容を表示できませんでした。",
+        "emptyTitle": "このフォルダは空です",
+        "truncated": "最初の {count} 件のみ表示しています。"
       }
     },
     "displayPanel": {

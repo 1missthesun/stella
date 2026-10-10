@@ -2630,6 +2630,14 @@
         "eyebrow": "실시간 미리보기",
         "openInBrowser": "브라우저에서 열기",
         "reload": "새로 고침"
+      },
+      "folder": {
+        "back": "뒤로",
+        "onDevice": "{device}에 있음",
+        "failedTitle": "이 폴더를 열 수 없습니다",
+        "failedBody": "이 폴더의 내용을 표시할 수 없습니다.",
+        "emptyTitle": "이 폴더는 비어 있습니다",
+        "truncated": "처음 {count}개만 표시됩니다."
       }
     },
     "displayPanel": {

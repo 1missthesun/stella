@@ -1,7 +1,7 @@
 import type { ChatMessage } from "../types";
 
 const SETTLE_MS = 700;
-const REPEAT_WINDOW_MS = 3 * 60_000;
+const REPEAT_WINDOW_MS = 15_000;
 
 export type QueuedReply = { id: string; text: string };
 
@@ -33,8 +33,11 @@ export class ReplyQueue {
     this.settling.delete(message.id);
   }
 
+  /** Marks every reply that already has text; a row still filling in stays new. */
   markAllKnown(messages: readonly ChatMessage[]) {
-    for (const message of messages) this.markKnown(message);
+    for (const message of messages) {
+      if (message.role === "assistant" && message.text.trim()) this.markKnown(message);
+    }
   }
 
   clear() {

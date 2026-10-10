@@ -6,6 +6,10 @@ export function CloudFileSource({ path, children }: { path: string; children: Re
   const id = useId();
   const source = useMemo(() => ({
     key: `drive:${id}:${path}`,
+    async mediaUrl() {
+      const { url } = await backendClient.call("drive.fileUrl", { path });
+      return url;
+    },
     async read(_filePath: string, maxBytes = 32 * 1024 * 1024) {
       const { url } = await backendClient.call("drive.fileUrl", { path });
       const response = await fetch(url, { headers: { Range: `bytes=0-${maxBytes}` } });

@@ -4,7 +4,12 @@ import type {
   ImgHTMLAttributes,
 } from "react";
 import { memo, useMemo, useRef } from "react";
-import { Streamdown, defaultRemarkPlugins } from "streamdown";
+import {
+  Streamdown,
+  defaultRehypePlugins,
+  defaultRemarkPlugins,
+} from "streamdown";
+import type { PluggableList, Plugin } from "unified";
 import { cn } from "@/shared/lib/utils";
 import {
   remarkStellaFileLinks,
@@ -65,19 +70,53 @@ type MarkdownImageProps = ImgHTMLAttributes<HTMLImageElement> & {
 const DEFAULT_REMARK_PLUGINS = Object.values(defaultRemarkPlugins);
 
 /*
- * `stella://file/...` references are rewritten by `remarkStellaFileLinks`
- * into custom `<stella-file>` elements (a plain `<a href="stella://…">`
- * would be stripped by rehype-sanitize's protocol allow-list). Streamdown's
- * `allowedTags` prop threads the tag + attributes through its sanitize
- * schema — but ONLY when the `rehypePlugins` prop is left at Streamdown's
- * own default array (it compares by identity), which is why no
- * `rehypePlugins` prop is passed below; the defaults (raw / sanitize /
- * harden) apply either way.
+ * `stella://file/...` and `stella://app/...` references are rewritten by
+ * `remarkStellaFileLinks` into custom `<stella-file>` / `<stella-app>`
+ * elements (a plain `<a href="stella://…">` would be stripped by
+ * rehype-sanitize's protocol allow-list), so the sanitize schema must let
+ * those tags and attributes through.
+ *
+ * Streamdown only merges its `allowedTags` prop into the schema while the
+ * `rehypePlugins` prop is its own default array, and its default harden step
+ * marks every link it cannot keep (a relative path, `ftp:`, `file:`, or any
+ * scheme sanitize dropped) as "label [blocked]". Chat builds the same
+ * raw / sanitize / harden pipeline itself so such a link renders as its
+ * plain label instead.
  */
 const ALLOWED_TAGS: Record<string, string[]> = {
   [STELLA_FILE_TAG]: [...STELLA_FILE_TAG_ATTRIBUTES],
   [STELLA_APP_TAG]: [...STELLA_APP_TAG_ATTRIBUTES],
 };
+
+type SanitizeSchema = {
+  tagNames?: string[] | null;
+  attributes?: Record<string, unknown[]> | null;
+};
+type HardenOptions = Record<string, unknown>;
+
+const [sanitizePlugin, sanitizeSchema] =
+  defaultRehypePlugins.sanitize as unknown as [
+    Plugin<[SanitizeSchema]>,
+    SanitizeSchema,
+  ];
+const [hardenPlugin, hardenOptions] =
+  defaultRehypePlugins.harden as unknown as [
+    Plugin<[HardenOptions]>,
+    HardenOptions,
+  ];
+
+const REHYPE_PLUGINS: PluggableList = [
+  defaultRehypePlugins.raw,
+  [
+    sanitizePlugin,
+    {
+      ...sanitizeSchema,
+      tagNames: [...(sanitizeSchema.tagNames ?? []), ...Object.keys(ALLOWED_TAGS)],
+      attributes: { ...sanitizeSchema.attributes, ...ALLOWED_TAGS },
+    },
+  ],
+  [hardenPlugin, { ...hardenOptions, linkBlockPolicy: "text-only" }],
+];
 
 /*
  * Disable Streamdown's built-in "Open external link?" confirmation modal.
@@ -309,6 +348,7 @@ export const Markdown = memo(function Markdown({
           tableMaxHeight={UNBOUNDED_STREAMDOWN_HEIGHT}
           className={cn("markdown", className)}
           remarkPlugins={remarkPlugins}
+          rehypePlugins={REHYPE_PLUGINS}
           components={components}
           allowedTags={ALLOWED_TAGS}
           linkSafety={LINK_SAFETY}

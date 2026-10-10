@@ -34,7 +34,10 @@
  * A usage limit is reported to the user and never switches accounts.
  */
 
-import type { CloudExecutionSelection } from "../agent-engine.js";
+import type {
+  CloudExecutionSelection,
+  LegacyCloudExecutionSelection,
+} from "../agent-engine.js";
 
 export const ENGINE_PROVIDERS = ["anthropic", "chatgpt"] as const;
 export type EngineProvider = (typeof ENGINE_PROVIDERS)[number];
@@ -87,8 +90,19 @@ export type ChatGptSharedRegistration = {
 };
 
 export type EngineSettings = {
-  /** The saved selection, whether or not its engine is still connected. */
-  execution: CloudExecutionSelection;
+  /**
+   * The saved selection, whether or not its engine is still connected.
+   * Clients that know `selection` read that instead: when the account runs
+   * on a provider key, this stays the last selection older clients
+   * understand, so they keep what they had rather than misreading it.
+   */
+  execution: LegacyCloudExecutionSelection;
+  /**
+   * The saved selection, including a model on an account provider key
+   * (`engine: "provider"`). Absent from servers older than provider keys;
+   * fall back to `execution`.
+   */
+  selection?: CloudExecutionSelection;
   /** When the account last saved a selection; null until the first save. */
   selectedAt: number | null;
   /** Every connected account, grouped by provider in connection order. */

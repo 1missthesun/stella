@@ -39,6 +39,7 @@ import { RUNTIME_PRIVATE_TASK_LIFECYCLE_CUSTOM_TYPE } from "../storage/shared.js
 import type { ComputerAgentCloudRecords } from "./computer-agent-cloud-records.js";
 import {
   getPlacementCancellation,
+  isPlacementLocalAgentId,
   persistPlacementCancellation,
 } from "./execution-placement-local-ownership.js";
 
@@ -457,6 +458,10 @@ export const createAgentOrchestration = (
       ) {
         persistSuppressedLifecycleMarker(context, event);
       }
+      return;
+    }
+    if (!isParentOwned && isPlacementLocalAgentId(event.agentId)) {
+      persistSuppressedLifecycleMarker(context, event);
       return;
     }
     const deliveryEventId = event.eventId?.trim();

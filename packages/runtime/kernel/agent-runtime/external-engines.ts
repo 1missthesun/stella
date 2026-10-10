@@ -462,7 +462,16 @@ const STELLA_HISTORY_NEW_ROWS_NOTE =
 const hashHistoryEntry = (role: string, text: string): string =>
   crypto.createHash("sha1").update(`${role}\n${text}`).digest("hex");
 
-type StellaHistoryEntry = { hash: string; line: string };
+const shownTextHashes = (text: string): string[] => [
+  hashHistoryEntry("user", text),
+  hashHistoryEntry("runtimeInternal", text),
+];
+
+type StellaHistoryEntry = {
+  hashes: string[];
+  line: string;
+  runtimeAt?: number;
+};
 
 const buildStellaHistoryBlock = (
   entries: StellaHistoryEntry[],
@@ -497,8 +506,14 @@ const toStellaHistoryEntries = (
       const text = contentToText(message.content);
       if (!text) return null;
       return {
-        hash: hashHistoryEntry(message.role, text),
+        hashes:
+          message.role === "user" || message.role === "runtimeInternal"
+            ? shownTextHashes(text)
+            : [hashHistoryEntry(message.role, text)],
         line: `<history_message index="${index + 1}" role="${message.role}">\n${text}\n</history_message>`,
+        ...(message.role === "runtimeInternal"
+          ? { runtimeAt: message.timestamp }
+          : {}),
       };
     })
     .filter((entry): entry is StellaHistoryEntry => entry !== null);
@@ -515,7 +530,7 @@ const historyEntryHashesWrittenSince = (args: {
         .loadThreadMessages(args.threadKey)
         .filter((row) => row.timestamp >= args.since),
     }),
-  ).map((entry) => entry.hash);
+  ).flatMap((entry) => entry.hashes);
 
 export type ExternalStellaHistoryDelivery = {
   entryHashes: string[];
@@ -527,6 +542,7 @@ export const buildExternalStellaHistoryDelivery = (args: {
   opts: BaseRunOptions;
   promptMessages: RuntimePromptMessage[];
   deliveredEntryHashes?: ReadonlySet<string>;
+  runtimeRowsSince?: number;
 }): ExternalStellaHistoryDelivery => {
   const empty: ExternalStellaHistoryDelivery = {
     entryHashes: [],
@@ -555,11 +571,20 @@ export const buildExternalStellaHistoryDelivery = (args: {
     return empty;
   }
   const delivered = args.deliveredEntryHashes;
+  const since = args.runtimeRowsSince;
   const undelivered = delivered
-    ? entries.filter((entry) => !delivered.has(entry.hash))
+    ? entries.filter(
+        (entry) =>
+          !entry.hashes.some((hash) => delivered.has(hash)) &&
+          !(
+            since !== undefined &&
+            entry.runtimeAt !== undefined &&
+            entry.runtimeAt < since
+          ),
+      )
     : entries;
   return {
-    entryHashes: entries.map((entry) => entry.hash),
+    entryHashes: entries.flatMap((entry) => entry.hashes),
     full: buildStellaHistoryBlock(entries, STELLA_HISTORY_NOTE),
     undelivered:
       undelivered.length === entries.length
@@ -580,6 +605,7 @@ type ClaudeHistoryDelivery = {
   sessionId: string;
   hashes: string[];
   staleAfterCompaction: boolean;
+  updatesSince?: number;
 };
 
 const claudeHistoryDeliveries = new Map<string, ClaudeHistoryDelivery>();
@@ -631,9 +657,25 @@ const loadClaudeHistoryDelivery = (
     sessionId: record.sessionId,
     hashes: record.hashes,
     staleAfterCompaction: record.staleAfterCompaction === true,
+    ...(typeof record.updatesSince === "number" &&
+    Number.isFinite(record.updatesSince)
+      ? { updatesSince: record.updatesSince }
+      : {}),
   };
   claudeHistoryDeliveries.set(sessionKey, state);
   return state;
+};
+
+const readClaudeUpdatesSince = (
+  stellaDataDir: string | undefined,
+  sessionKey: string,
+  resumableSessionId: string | undefined,
+): number | undefined => {
+  if (!resumableSessionId) return undefined;
+  const state = loadClaudeHistoryDelivery(stellaDataDir, sessionKey);
+  return state?.sessionId === resumableSessionId
+    ? state.updatesSince
+    : undefined;
 };
 
 const saveClaudeHistoryDelivery = (
@@ -683,11 +725,17 @@ const recordClaudeHistoryDelivery = (args: {
   sessionId: string;
   entryHashes: readonly string[];
   staleAfterCompaction: boolean;
+  updatesSince?: number;
 }): void => {
   const previous = loadClaudeHistoryDelivery(
     args.stellaDataDir,
     args.sessionKey,
   );
+  const updatesSince =
+    previous?.sessionId === args.sessionId &&
+    previous.updatesSince !== undefined
+      ? previous.updatesSince
+      : args.updatesSince;
   const merged =
     previous && previous.sessionId === args.sessionId
       ? [...previous.hashes, ...args.entryHashes]
@@ -706,6 +754,7 @@ const recordClaudeHistoryDelivery = (args: {
     sessionId: args.sessionId,
     hashes: newest,
     staleAfterCompaction: args.staleAfterCompaction,
+    ...(updatesSince !== undefined ? { updatesSince } : {}),
   });
 };
 
@@ -773,6 +822,7 @@ export type ExternalThreadUpdatesDelta = {
   coveredCount: number;
   /** True when the size budget cut the batch short; more backlog remains. */
   truncated: boolean;
+  deliveredTextHashes: string[];
 };
 
 /**
@@ -814,6 +864,7 @@ export const buildExternalThreadUpdatesDelta = (args: {
    * are delivered by that block, not re-injected.
    */
   deliveredContextTexts?: string[];
+  seen?: { textHashes: ReadonlySet<string>; since?: number };
 }): ExternalThreadUpdatesDelta => {
   const candidates = args.store
     .loadRawThreadMessagesWithEntryTypes(args.threadKey)
@@ -830,6 +881,7 @@ export const buildExternalThreadUpdatesDelta = (args: {
       lastEntryId: null,
       coveredCount: 0,
       truncated: false,
+      deliveredTextHashes: [],
     };
   }
   const afterIndex = args.afterEntryId
@@ -842,6 +894,7 @@ export const buildExternalThreadUpdatesDelta = (args: {
       lastEntryId: candidates[candidates.length - 1]?.entryId ?? null,
       coveredCount: 0,
       truncated: false,
+      deliveredTextHashes: [],
     };
   }
   const promptTexts = new Set(
@@ -852,9 +905,16 @@ export const buildExternalThreadUpdatesDelta = (args: {
   const contextTexts = (args.deliveredContextTexts ?? []).filter(
     (text) => text.trim().length > 0,
   );
-  const isRowCoveredElsewhere = (text: string): boolean =>
+  const seen = args.seen;
+  const isRowCoveredElsewhere = (
+    row: { timestamp: number },
+    text: string,
+  ): boolean =>
     promptTexts.has(text) ||
-    contextTexts.some((context) => context.includes(text));
+    contextTexts.some((context) => context.includes(text)) ||
+    (seen !== undefined &&
+      ((seen.since !== undefined && row.timestamp < seen.since) ||
+        shownTextHashes(text).some((hash) => seen.textHashes.has(hash))));
   // Middle elision for a report beyond its rendering budget: the head
   // carries the task framing and the TAIL carries outcomes and blockers, so
   // both must survive; only the middle may be elided, marked. The result
@@ -892,8 +952,9 @@ export const buildExternalThreadUpdatesDelta = (args: {
   const FOOTER = "</stella_thread_updates>";
   const WITHHELD_NOTE =
     "[Some NEWER updates were withheld to fit this turn; they will be delivered in order on later turns. The newest update is included below so it is never withheld.]";
-  const LATEST_MARKER =
-    "[Newest update, delivered ahead of the withheld ones above; it will be re-delivered in order on a later turn.]";
+  const LATEST_MARKER = seen
+    ? "[Newest update, delivered ahead of the withheld ones above.]"
+    : "[Newest update, delivered ahead of the withheld ones above; it will be re-delivered in order on a later turn.]";
   // Reserve envelope + marker space so the serialized block (not just the
   // report text) honors the budget; the latest-section reserve keeps a small
   // triggering row from pushing the block past it.
@@ -923,7 +984,7 @@ export const buildExternalThreadUpdatesDelta = (args: {
   let truncated = false;
   for (const [index, row] of undelivered.entries()) {
     const text = row.content.trim();
-    if (!text || isRowCoveredElsewhere(text)) {
+    if (!text || isRowCoveredElsewhere(row, text)) {
       coveredCount += 1;
       coveredLastEntryId = row.entryId ?? coveredLastEntryId;
       coveredEndIndex = index;
@@ -971,7 +1032,7 @@ export const buildExternalThreadUpdatesDelta = (args: {
     ) {
       const row = undelivered[index]!;
       const text = row.content.trim();
-      if (!text || isRowCoveredElsewhere(text)) {
+      if (!text || isRowCoveredElsewhere(row, text)) {
         continue;
       }
       latestRow = { text, customType: row.customMessage!.customType };
@@ -982,7 +1043,13 @@ export const buildExternalThreadUpdatesDelta = (args: {
     coveredLastEntryId ??
     (args.afterEntryId && afterIndex >= 0 ? args.afterEntryId : null);
   if (prefixRows.length === 0 && !latestRow) {
-    return { message: null, lastEntryId, coveredCount, truncated };
+    return {
+      message: null,
+      lastEntryId,
+      coveredCount,
+      truncated,
+      deliveredTextHashes: [],
+    };
   }
   // Render under ONE global cap on the complete serialized message. All
   // fixed parts (envelope, notes, markers, wrappers, joiners) are charged
@@ -1050,6 +1117,10 @@ export const buildExternalThreadUpdatesDelta = (args: {
     lastEntryId,
     coveredCount,
     truncated,
+    deliveredTextHashes: [
+      ...prefixRows,
+      ...(latestRow ? [latestRow] : []),
+    ].flatMap((row) => shownTextHashes(row.text)),
   };
 };
 
@@ -1390,6 +1461,7 @@ const buildClaudeHostedPrompt = (args: {
   watermarkTracker: ReturnType<typeof createExternalDeltaWatermarkTracker>;
   initialDeliveredEntryId: string | undefined;
   alwaysCarryReseedDelta: boolean;
+  updatesSince?: number;
 }): ClaudeHostedPrompt => {
   const recordedHistoryHashes =
     args.deliversHistoryIncrementally && args.reuseDeliveredHistory
@@ -1412,6 +1484,9 @@ const buildClaudeHostedPrompt = (args: {
     ...(deliveredHistoryHashes
       ? { deliveredEntryHashes: deliveredHistoryHashes }
       : {}),
+    ...(args.updatesSince !== undefined
+      ? { runtimeRowsSince: args.updatesSince }
+      : {}),
   });
   const historyPromptMessage = history.full;
   const resumedHistoryPromptMessage = args.deliversHistoryIncrementally
@@ -1420,6 +1495,16 @@ const buildClaudeHostedPrompt = (args: {
   const promptHistoryMessage = args.sessionId
     ? resumedHistoryPromptMessage
     : historyPromptMessage;
+  const seen = args.deliversHistoryIncrementally
+    ? {
+        textHashes: args.sessionId
+          ? (deliveredHistoryHashes ?? new Set<string>())
+          : new Set<string>(),
+        ...(args.updatesSince !== undefined
+          ? { since: args.updatesSince }
+          : {}),
+      }
+    : undefined;
   const cursor = args.watermarkTracker.cursor;
   const threadUpdatesDelta = buildExternalThreadUpdatesDelta({
     store: args.opts.store,
@@ -1429,6 +1514,7 @@ const buildClaudeHostedPrompt = (args: {
     ...(promptHistoryMessage
       ? { deliveredContextTexts: [promptHistoryMessage.text] }
       : {}),
+    ...(seen ? { seen } : {}),
   });
   const fallbackDelta =
     args.alwaysCarryReseedDelta || (args.sessionId && historyPromptMessage)
@@ -1441,6 +1527,14 @@ const buildClaudeHostedPrompt = (args: {
           promptMessages: args.promptMessages,
           ...(historyPromptMessage
             ? { deliveredContextTexts: [historyPromptMessage.text] }
+            : {}),
+          ...(seen
+            ? {
+                seen: {
+                  textHashes: new Set<string>(),
+                  ...(seen.since !== undefined ? { since: seen.since } : {}),
+                },
+              }
             : {}),
         })
       : null;
@@ -1461,9 +1555,25 @@ const buildClaudeHostedPrompt = (args: {
   return {
     prompt,
     ...(resumeFallbackPrompt ? { resumeFallbackPrompt } : {}),
-    historyEntryHashes: history.entryHashes,
+    historyEntryHashes: [
+      ...history.entryHashes,
+      ...(args.deliversHistoryIncrementally
+        ? [
+            ...promptMessageHistoryHashes(args.promptMessages),
+            ...threadUpdatesDelta.deliveredTextHashes,
+          ]
+        : []),
+    ],
   };
 };
+
+const promptMessageHistoryHashes = (
+  promptMessages: readonly RuntimePromptMessage[],
+): string[] =>
+  promptMessages
+    .map((message) => message.text.trim())
+    .filter((text) => text.length > 0)
+    .flatMap(shownTextHashes);
 
 /**
  * Relays Claude Code's tool calls into Stella. Stella tools run through the
@@ -1704,6 +1814,10 @@ const runClaudeTurnsUntilDrained = async (args: {
   }) => ClaudeHostedPrompt;
   assistantUpdateBuffer: ReturnType<typeof createExternalAssistantUpdateBuffer>;
   watermarkTracker: ReturnType<typeof createExternalDeltaWatermarkTracker>;
+  steeringUpdatesSeen?: (deliveredThisRun: readonly string[]) => {
+    textHashes: ReadonlySet<string>;
+    since?: number;
+  };
 }): Promise<{
   finalResult: ClaudeTurnResult | null;
   latestAttempt: boolean;
@@ -1772,6 +1886,7 @@ const runClaudeTurnsUntilDrained = async (args: {
     // One thread-updates delta is in flight at a time. Two built from the same
     // cursor would overlap, and counting both would claim rows as delivered
     // that never were; rows left out here ride the next delta instead.
+    const seen = args.steeringUpdatesSeen?.(historyEntryHashes);
     const delta = deltaInFlight
       ? null
       : buildExternalThreadUpdatesDelta({
@@ -1781,6 +1896,7 @@ const runClaudeTurnsUntilDrained = async (args: {
             ? { afterEntryId: watermarkTracker.cursor }
             : {}),
           promptMessages,
+          ...(seen ? { seen } : {}),
         });
     const accepted = inject({
       text: buildClaudePromptFromMessages(
@@ -1793,6 +1909,13 @@ const runClaudeTurnsUntilDrained = async (args: {
         if (delta) {
           watermarkTracker.noteMainlineDelta(delta);
           deltaInFlight = false;
+        }
+        if (seen) {
+          historyEntryHashes = [
+            ...historyEntryHashes,
+            ...promptMessageHistoryHashes(promptMessages),
+            ...(delta?.deliveredTextHashes ?? []),
+          ];
         }
         publishQueuedUserMessageStarts({
           entries,
@@ -2070,6 +2193,13 @@ const runClaudeHostedTurn = async (
   const watermarkTracker = createExternalDeltaWatermarkTracker(
     initialDeliveredEntryId,
   );
+  const updatesSince = deliversHistoryIncrementally
+    ? (readClaudeUpdatesSince(
+        args.opts.stellaDataDir,
+        sessionKey,
+        resumableSessionId,
+      ) ?? turnStartedAt)
+    : undefined;
   const promptContext = {
     opts: args.opts,
     threadKey,
@@ -2077,6 +2207,7 @@ const runClaudeHostedTurn = async (
     deliversHistoryIncrementally,
     watermarkTracker,
     initialDeliveredEntryId,
+    ...(updatesSince !== undefined ? { updatesSince } : {}),
   };
   const firstPrompt = buildClaudeHostedPrompt({
     ...promptContext,
@@ -2186,6 +2317,21 @@ const runClaudeHostedTurn = async (
       }),
     assistantUpdateBuffer,
     watermarkTracker,
+    ...(deliversHistoryIncrementally
+      ? {
+          steeringUpdatesSeen: (deliveredThisRun: readonly string[]) => ({
+            textHashes: new Set([
+              ...(readClaudeHistoryDelivery(
+                args.opts.stellaDataDir,
+                sessionKey,
+                resumableSessionId,
+              ) ?? []),
+              ...deliveredThisRun,
+            ]),
+            ...(updatesSince !== undefined ? { since: updatesSince } : {}),
+          }),
+        }
+      : {}),
   });
 
   const { finalResult, latestAttempt } = drained;
@@ -2215,6 +2361,7 @@ const runClaudeHostedTurn = async (
           }),
         ],
         staleAfterCompaction: drained.compactedSincePromptBuild || reseeded,
+        ...(updatesSince !== undefined ? { updatesSince } : {}),
       });
     }
     const resolvedWatermark = watermarkTracker.resolve();

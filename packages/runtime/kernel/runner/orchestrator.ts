@@ -572,9 +572,15 @@ export const createOrchestratorController = (
 
   setFollowUpReplyFlusher(flushPendingFollowUpReplies);
 
+  const pendingTurnEventIds = new Set<string>();
+
   const sendMessage = async (input: RuntimeSendMessageInput): Promise<void> => {
     const text = input.text.trim();
     if (!text) {
+      return;
+    }
+    const eventId = input.eventId?.trim() || undefined;
+    if (eventId && pendingTurnEventIds.has(eventId)) {
       return;
     }
     const callbacks = resolveRuntimeMessageCallbacks(
@@ -626,35 +632,61 @@ export const createOrchestratorController = (
       return;
     }
 
-    await executeOrQueueSystemOrchestratorTurn({
-      hasActiveRun: Boolean(context.state.activeOrchestratorRunId),
-      queueOrchestratorTurn,
-      execute: async () => {
-        const promptMessages: NonNullable<ChatPayload["promptMessages"]> = [
-          buildRuntimeSendPromptMessage(input, text),
-        ];
-        await startStreamingOrchestratorTurn(
-          {
-            conversationId: input.conversationId,
-            userPrompt: "",
-            promptMessages,
-            agentType: input.agentType ?? AGENT_IDS.ORCHESTRATOR,
-            ...(input.ownerGeneration
-              ? {
-                  storageMode: "cloud" as const,
-                  ownerGeneration: input.ownerGeneration,
-                }
-              : {}),
-            userMessageId: `message:${crypto.randomUUID()}`,
-            uiVisibility: UI_VISIBILITY_VISIBLE,
-            ...(input.responseTarget
-              ? { responseTarget: input.responseTarget }
-              : {}),
+    const release = () => {
+      if (eventId) pendingTurnEventIds.delete(eventId);
+    };
+    const turnCallbacks: typeof callbacks = eventId
+      ? {
+          ...callbacks,
+          onEnd: (event) => {
+            release();
+            callbacks.onEnd(event);
           },
-          callbacks,
-        );
-      },
-    });
+          onError: (event) => {
+            if (event.fatal) release();
+            callbacks.onError(event);
+          },
+          onInterrupted: (event) => {
+            release();
+            callbacks.onInterrupted?.(event);
+          },
+        }
+      : callbacks;
+    if (eventId) pendingTurnEventIds.add(eventId);
+    try {
+      await executeOrQueueSystemOrchestratorTurn({
+        hasActiveRun: Boolean(context.state.activeOrchestratorRunId),
+        queueOrchestratorTurn,
+        execute: async () => {
+          const promptMessages: NonNullable<ChatPayload["promptMessages"]> = [
+            buildRuntimeSendPromptMessage(input, text),
+          ];
+          await startStreamingOrchestratorTurn(
+            {
+              conversationId: input.conversationId,
+              userPrompt: "",
+              promptMessages,
+              agentType: input.agentType ?? AGENT_IDS.ORCHESTRATOR,
+              ...(input.ownerGeneration
+                ? {
+                    storageMode: "cloud" as const,
+                    ownerGeneration: input.ownerGeneration,
+                  }
+                : {}),
+              userMessageId: `message:${crypto.randomUUID()}`,
+              uiVisibility: UI_VISIBILITY_VISIBLE,
+              ...(input.responseTarget
+                ? { responseTarget: input.responseTarget }
+                : {}),
+            },
+            turnCallbacks,
+          );
+        },
+      });
+    } catch (error) {
+      release();
+      throw error;
+    }
   };
 
   const sendUserMessage = async (

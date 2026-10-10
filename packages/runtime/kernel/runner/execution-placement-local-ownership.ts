@@ -8,6 +8,9 @@ export type PlacementLocalExecutionKind = "agent" | "chat";
 const expectedPrefix = (kind: PlacementLocalExecutionKind) =>
   kind === "agent" ? "placement-agent:" : "placement-chat:";
 
+export const isPlacementLocalAgentId = (threadId: string): boolean =>
+  threadId.trim().startsWith(expectedPrefix("agent"));
+
 export const normalizePlacementExecutionId = (
   kind: PlacementLocalExecutionKind,
   executionId: string,

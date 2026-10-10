@@ -7,7 +7,7 @@
  *
  * - An image shows the small JPEG made where the file entered the drive
  *   (`.thumbnails/<drive path>.jpg`, see `chat-evidence-thumbnails`), or one
- *   the paired computer renders on request. Only when neither exists is the
+ *   the computer that has it renders on request. Only when neither exists is the
  *   whole file pulled down and handed to `expo-image` as a `file://` URI.
  * - A video's poster frame comes from `expo-video-thumbnails`, which reads the
  *   frame with AVFoundation. For a drive file it reads the signed URL directly,
@@ -27,7 +27,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { extractPreviewBars } from "@siteed/audio-studio";
-import { cloudWorldDrivePath } from "@stella/contracts/cloud-world-paths";
+import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import { EVIDENCE_PEAK_COUNT } from "@stella/contracts/chat-evidence";
 import {
   EVIDENCE_THUMBNAIL_CONTENT_TYPE,
@@ -37,11 +37,16 @@ import {
 } from "@stella/contracts/chat-evidence-thumbnails";
 import type { EvidenceSourceKind } from "@stella/contracts/chat-evidence-naming";
 import { resolveCloudDriveFile } from "./use-cloud-drive-file-uri";
+import { assertReadableOnPairedComputer } from "./desktop-artifact-data";
 import {
+  downloadLinkedFile,
+  isLinkedFileMissingError,
+  linkedSourceIsFolder,
+  linkedSourceSize,
   locateDeviceFile,
-  readDesktopArtifactThumbnail,
-  readLinkedArtifactFile,
-} from "./desktop-artifact-data";
+  readLinkedThumbnail,
+  resolveLinkedFile,
+} from "./linked-device-files";
 import type { StoredPhoneAccess } from "./phone-access";
 import { evidenceBasename } from "./chat-evidence-sources";
 
@@ -131,14 +136,14 @@ const writeManifest = (contentKey: string, preview: EvidencePreview): void => {
 };
 
 /**
- * A chat path that names a drive file: a cloud world link, or the
- * drive-relative form a phone's own upload carries. Anything absolute is a
- * path on the paired computer.
+ * A chat path that names a drive file: a `stella://drive/...` or cloud world
+ * link, or the drive-relative form a phone's own upload carries. Anything
+ * absolute is a path on the paired computer.
  */
 const drivePathFor = (filePath: string): string | null => {
   const trimmed = filePath.trim();
-  const world = cloudWorldDrivePath(trimmed);
-  if (world) return world;
+  const linked = driveLinkPath(trimmed);
+  if (linked) return linked;
   if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null;
   if (trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed)) return null;
   return trimmed.replace(/^\.\//, "");
@@ -167,8 +172,8 @@ type LocalSource = { uri: string; sizeBytes: number; identity: string };
 
 /**
  * The file on this device, downloaded natively when it lives in the drive and
- * streamed through the paired computer when it does not. The download is the
- * platform's, not ours: bytes go straight to disk without passing through JS.
+ * read in ranges from whichever computer has it when it does not, written to
+ * disk range by range rather than held whole.
  */
 const localSourceFor = async (
   request: EvidencePreviewRequest,
@@ -181,17 +186,29 @@ const localSourceFor = async (
   if (remote) {
     await File.downloadFileAsync(remote.url, target, { idempotent: true });
   } else {
-    const result = await readLinkedArtifactFile(
+    assertReadableOnPairedComputer(request.filePath);
+    const source = await resolveLinkedFile(
       request.access,
       request.conversationId,
       request.filePath,
-    );
-    if (result.missing) throw new Error("File is no longer available.");
-    if (result.sizeBytes > MAX_DEVICE_READ_BYTES) {
-      throw new Error("File is too large to preview on this device.");
+    ).catch((error: unknown) => {
+      throw isLinkedFileMissingError(error)
+        ? new Error("File is no longer available.")
+        : error;
+    });
+    if (linkedSourceIsFolder(source)) throw new Error("A folder has no preview.");
+    const expected = linkedSourceSize(source);
+    const reusable =
+      expected !== null && expected > 0 && target.exists && target.size === expected;
+    if (!reusable) {
+      await downloadLinkedFile(
+        source,
+        request.conversationId,
+        request.filePath,
+        target,
+        { maxBytes: MAX_DEVICE_READ_BYTES },
+      );
     }
-    target.create({ overwrite: true, intermediates: true });
-    target.write(result.bytes);
   }
   const info = target.info({ md5: true });
   const sizeBytes = info.size ?? remote?.sizeBytes ?? 0;
@@ -231,12 +248,16 @@ const deviceThumbnailFor = async (
     const copy = await driveThumbnailFor(location.drivePath).catch(() => null);
     if (copy) return copy;
   }
-  const access = request.access;
-  if (!access || (location && location.deviceId !== access.desktopDeviceId)) {
+  const source = await resolveLinkedFile(
+    request.access,
+    request.conversationId,
+    request.filePath,
+  ).catch(() => null);
+  if (!source || source.kind !== "device" || linkedSourceIsFolder(source)) {
     return null;
   }
-  const result = await readDesktopArtifactThumbnail(
-    access,
+  const result = await readLinkedThumbnail(
+    source,
     request.conversationId,
     request.filePath,
   ).catch(() => null);

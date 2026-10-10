@@ -1541,7 +1541,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2445,7 +2445,17 @@
     "browser": {
       "connected": "Navegador conectado",
       "connecting": "Aguardando a extensão…",
-      "newTab": "Abrir uma nova aba"
+      "dismiss": "Fechar",
+      "emptyBody": "Entre em um site aqui uma vez e a Stella mantém você conectado, para você e seus agentes.",
+      "emptyBodyConnected": "Os sites abrem com os logins do seu navegador.",
+      "emptyTitle": "Navegador da Stella",
+      "newTab": "Abrir uma nova aba",
+      "openErrorTitle": "Não foi possível abrir o navegador",
+      "pageErrorTitle": "Não foi possível carregar esta página",
+      "reconnectExtension": "Reconectar extensão",
+      "serviceMissing": "O serviço do navegador está ausente. Reinstale a Stella para usar este navegador.",
+      "signInHint": "Entre nos sites aqui uma vez. A Stella se lembra.",
+      "useMyLogins": "Usar os logins do meu navegador"
     },
     "capture": {
       "failedDescription": "Algo deu errado ao fazer a captura. Tente novamente.",
@@ -2664,6 +2674,14 @@
         "eyebrow": "Prévia ao vivo",
         "openInBrowser": "Abrir no navegador",
         "reload": "Recarregar"
+      },
+      "folder": {
+        "back": "Voltar",
+        "onDevice": "Em {device}",
+        "failedTitle": "Não foi possível abrir esta pasta",
+        "failedBody": "Não foi possível mostrar o conteúdo desta pasta.",
+        "emptyTitle": "Esta pasta está vazia",
+        "truncated": "Apenas os primeiros {count} são mostrados."
       }
     },
     "displayPanel": {

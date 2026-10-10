@@ -26,8 +26,9 @@ type CookieMirrorOptions = {
     onEvent: (event: StellaBrowserBridgeEvent) => void,
   ) => () => void;
   /**
-   * Waits out any in-flight connection and, when no seed has completed yet,
-   * drives one, so a Google sign-in navigation never runs on unseeded cookies.
+   * Best-effort and bounded: when the extension is present, waits for the first
+   * seed so a Google sign-in navigation does not run on unseeded cookies. When
+   * it is absent, returns at once and the navigation proceeds signed out.
    */
   awaitConnection: () => Promise<void>;
   /** The tab partitioned cookies are restored through after a seed. */
@@ -45,6 +46,7 @@ const MIN_COOKIE_MIRROR_INTERVAL_MS = 5_000;
 // reseed already ran within this window, so rapid navigations don't each pull a
 // full cookie export.
 const DEFAULT_NAVIGATION_RESEED_THROTTLE_MS = 5_000;
+const EXTENSION_PROBE_TIMEOUT_MS = 1_500;
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
@@ -380,9 +382,23 @@ export class CookieMirror {
       ) {
         this.reseedRequested = false;
         try {
-          const extensionConnected = await this.options
-            .getExtensionStatus()
-            .catch(() => false);
+          const extensionConnected = await new Promise<boolean>((resolve) => {
+            const timer = setTimeout(
+              () => resolve(false),
+              EXTENSION_PROBE_TIMEOUT_MS,
+            );
+            timer.unref?.();
+            this.options.getExtensionStatus().then(
+              (connected) => {
+                clearTimeout(timer);
+                resolve(connected);
+              },
+              () => {
+                clearTimeout(timer);
+                resolve(false);
+              },
+            );
+          });
           if (!extensionConnected || this.disposed) continue;
           const cookies = await this.exportCookies();
           if (this.disposed || !this.browserSession) continue;

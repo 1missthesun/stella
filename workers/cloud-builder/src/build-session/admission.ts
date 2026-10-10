@@ -16,7 +16,8 @@ import {
 import type { ExactTurnCancellation } from "../execution-placement-turn-cancellation.js";
 import {
   snapshotAllowsCloudSandbox,
-  snapshotAllowsExecutionEngine,
+  executionUnavailableMessage,
+  snapshotAllowsExecution,
 } from "../owner-gate.js";
 import {
   startTurnExecution,
@@ -242,17 +243,14 @@ export const admitAgentTurnThroughOwnerGate = async (
   }
   if (
     turn.execution &&
-    !snapshotAllowsExecutionEngine(snapshot, turn.execution.engine)
+    !snapshotAllowsExecution(snapshot, turn.execution)
   ) {
     if (!turn.gateAdmittedByCaller) await host.releaseOwnerGate(turn);
     return {
       ok: false,
       response: json(
         {
-          error:
-            turn.execution.engine === "anthropic"
-              ? "Connect Claude before using that cloud execution route."
-              : "Connect ChatGPT before using that cloud execution route.",
+          error: executionUnavailableMessage(turn.execution),
         },
         409,
       ),

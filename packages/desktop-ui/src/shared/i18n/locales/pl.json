@@ -1551,7 +1551,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2456,7 +2456,17 @@
     "browser": {
       "connected": "Przeglądarka połączona",
       "connecting": "Oczekiwanie na rozszerzenie…",
-      "newTab": "Otwórz nową kartę"
+      "dismiss": "Zamknij",
+      "emptyBody": "Zaloguj się tutaj do witryny raz, a Stella utrzyma Twoje zalogowanie, dla Ciebie i Twoich agentów.",
+      "emptyBodyConnected": "Witryny otwierają się z logowaniami z Twojej przeglądarki.",
+      "emptyTitle": "Przeglądarka Stella",
+      "newTab": "Otwórz nową kartę",
+      "openErrorTitle": "Nie udało się otworzyć przeglądarki",
+      "pageErrorTitle": "Nie udało się załadować tej strony",
+      "reconnectExtension": "Połącz ponownie rozszerzenie",
+      "serviceMissing": "Brak usługi przeglądarki. Zainstaluj ponownie Stellę, aby korzystać z tej przeglądarki.",
+      "signInHint": "Zaloguj się tutaj do witryn raz. Stella to zapamięta.",
+      "useMyLogins": "Użyj logowań z mojej przeglądarki"
     },
     "capture": {
       "failedDescription": "Coś poszło nie tak przy robieniu zrzutu ekranu. Spróbuj ponownie.",
@@ -2680,6 +2690,14 @@
         "eyebrow": "Podgląd na żywo",
         "openInBrowser": "Otwórz w przeglądarce",
         "reload": "Odśwież"
+      },
+      "folder": {
+        "back": "Wstecz",
+        "onDevice": "Na urządzeniu {device}",
+        "failedTitle": "Nie udało się otworzyć tego folderu",
+        "failedBody": "Nie udało się wyświetlić zawartości tego folderu.",
+        "emptyTitle": "Ten folder jest pusty",
+        "truncated": "Wyświetlono tylko pierwsze {count}."
       }
     },
     "displayPanel": {

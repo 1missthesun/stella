@@ -37,7 +37,11 @@ import type {
 import type { AgentStreamEvent } from "../agent-stream.js";
 import type { AuthSessionSnapshot } from "../auth-session.js";
 import type { StellaBrowserBridgeStatus } from "../browser-bridge-status.js";
-import type { EvidenceCardSet } from "../chat-evidence.js";
+import type {
+  DriveEvidenceSource,
+  EvidenceCard,
+  EvidenceCardSet,
+} from "../chat-evidence.js";
 import type {
   ChatGptProfileSummary,
   ChatGptProfilesState,
@@ -180,6 +184,7 @@ import {
   IPC_CHAT_CONTEXT_SET,
   IPC_CHAT_CONTEXT_UPDATED,
   IPC_CHAT_EVIDENCE_CARDS,
+  IPC_CHAT_EVIDENCE_DRIVE_CARDS,
   IPC_CHAT_OPEN_SIDEBAR,
   IPC_CHATGPT_CANCEL_SIGN_IN,
   IPC_CHATGPT_LIST_MODELS,
@@ -264,9 +269,12 @@ import {
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
+  IPC_DISPLAY_LIST_FOLDER,
   IPC_DISPLAY_MEDIA_SOURCE,
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
+  IPC_DISPLAY_OPEN_SHARE_LINK,
   IPC_DISPLAY_READ_FILE,
+  IPC_DISPLAY_STAT_PATH,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
   IPC_DISPLAY_UPDATE,
@@ -511,6 +519,29 @@ export type DisplayReadFileResult =
       path: string;
       reason?: DeviceFileMissingReason;
     };
+
+export type DisplayPathStat = {
+  kind: "file" | "directory";
+  sizeBytes: number;
+  mimeType: string;
+  modifiedAt: number;
+  /** Set when the path is on another of the user's computers. */
+  deviceId?: string;
+  deviceName?: string;
+};
+
+export type DisplayFolderListing = {
+  path: string;
+  entries: Array<{
+    name: string;
+    path: string;
+    kind: "file" | "directory";
+    sizeBytes: number;
+    modifiedAt: number;
+  }>;
+  truncated: boolean;
+  deviceName?: string;
+};
 
 export type CanvasHtmlEntry = {
   filePath: string;
@@ -925,6 +956,14 @@ export type IpcInvokeContract = {
     [payload: { filePath: string }],
     DeviceFileSource
   >;
+  [IPC_DISPLAY_STAT_PATH]: Invoke<
+    [payload: { filePath: string; conversationId?: string | null }],
+    DisplayPathStat
+  >;
+  [IPC_DISPLAY_LIST_FOLDER]: Invoke<
+    [payload: { filePath: string; conversationId?: string | null }],
+    DisplayFolderListing
+  >;
   [IPC_DISPLAY_LIST_CANVAS_HTML]: Invoke<[], CanvasHtmlEntry[]>;
   [IPC_DISPLAY_OPEN_SHARED_CANVAS]: Invoke<
     [payload: { url: string }],
@@ -957,6 +996,10 @@ export type IpcInvokeContract = {
   [IPC_CHAT_EVIDENCE_CARDS]: Invoke<
     [payload: { filePaths: string[] }],
     EvidenceCardSet
+  >;
+  [IPC_CHAT_EVIDENCE_DRIVE_CARDS]: Invoke<
+    [payload: { files: DriveEvidenceSource[] }],
+    EvidenceCard[]
   >;
 
   // Remote execution / app source
@@ -1786,6 +1829,7 @@ export type IpcSendContract = {
 export type IpcEventContract = {
   [IPC_MEMORY_SYNC_STATUS]: MemorySyncStatus;
   [IPC_DISPLAY_UPDATE]: unknown;
+  [IPC_DISPLAY_OPEN_SHARE_LINK]: { url: string };
   [IPC_OFFICE_PREVIEW_UPDATE]: OfficePreviewSnapshot;
   [IPC_UI_STATE]: UiState;
   [IPC_CHAT_OPEN_SIDEBAR]: void;

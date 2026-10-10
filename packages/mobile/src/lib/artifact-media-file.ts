@@ -40,6 +40,28 @@ export type ArtifactMediaFile = {
   remove: () => void;
 };
 
+export function createArtifactMediaFile(
+  mimeType: string,
+  sourcePath: string,
+): ArtifactMediaFile & { file: File } {
+  sequence += 1;
+  const file = new File(
+    Paths.cache,
+    `stella-artifact-${Date.now()}-${sequence}.${extensionFor(sourcePath, mimeType)}`,
+  );
+  return {
+    file,
+    uri: file.uri,
+    remove: () => {
+      try {
+        if (file.exists) file.delete();
+      } catch {
+        return;
+      }
+    },
+  };
+}
+
 /**
  * Write `bytes` to a uniquely named cache file, taking its extension from
  * `sourcePath` when it has one and falling back to `mimeType`.

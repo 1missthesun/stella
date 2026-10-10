@@ -1541,7 +1541,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2445,7 +2445,17 @@
     "browser": {
       "connected": "Navegador conectado",
       "connecting": "Esperando la extensión…",
-      "newTab": "Abrir una pestaña nueva"
+      "dismiss": "Cerrar",
+      "emptyBody": "Inicia sesión en un sitio aquí una vez y Stella mantendrá tu sesión, para ti y tus agentes.",
+      "emptyBodyConnected": "Los sitios se abren con los inicios de sesión de tu navegador.",
+      "emptyTitle": "Navegador de Stella",
+      "newTab": "Abrir una pestaña nueva",
+      "openErrorTitle": "No se pudo abrir el navegador",
+      "pageErrorTitle": "No se pudo cargar esta página",
+      "reconnectExtension": "Volver a conectar la extensión",
+      "serviceMissing": "Falta el servicio del navegador. Reinstala Stella para usar este navegador.",
+      "signInHint": "Inicia sesión en los sitios aquí una vez. Stella lo recuerda.",
+      "useMyLogins": "Usar los inicios de sesión de mi navegador"
     },
     "capture": {
       "failedDescription": "Algo salió mal al hacer la captura. Inténtalo de nuevo.",
@@ -2664,6 +2674,14 @@
         "eyebrow": "Vista previa en vivo",
         "openInBrowser": "Abrir en el navegador",
         "reload": "Recargar"
+      },
+      "folder": {
+        "back": "Atrás",
+        "onDevice": "En {device}",
+        "failedTitle": "No se pudo abrir esta carpeta",
+        "failedBody": "No se pudo mostrar el contenido de esta carpeta.",
+        "emptyTitle": "Esta carpeta está vacía",
+        "truncated": "Solo se muestran los primeros {count}."
       }
     },
     "displayPanel": {

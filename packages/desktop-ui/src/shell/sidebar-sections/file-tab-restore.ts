@@ -31,6 +31,7 @@ const localPathFor = (payload: DisplayTabPayload): string | null => {
     case "markdown":
     case "file-artifact":
     case "pdf":
+    case "folder":
       return payload.filePath;
     case "office":
       return payload.previewRef.sourcePath;
@@ -75,6 +76,7 @@ export const payloadFileUnavailableMessage = async (
     !source ||
     source.kind === "local" ||
     source.kind === "drive" ||
+    source.kind === "device" ||
     source.kind === "unreachable"
   ) {
     return null;

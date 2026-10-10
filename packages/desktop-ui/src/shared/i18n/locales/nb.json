@@ -1531,7 +1531,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2434,7 +2434,17 @@
     "browser": {
       "connected": "Nettleser tilkoblet",
       "connecting": "Venter på utvidelsen …",
-      "newTab": "Åpne en ny fane"
+      "dismiss": "Lukk",
+      "emptyBody": "Logg inn på et nettsted her én gang, så holder Stella deg innlogget, for deg og agentene dine.",
+      "emptyBodyConnected": "Nettsteder åpnes med innloggingene fra nettleseren din.",
+      "emptyTitle": "Stella-nettleser",
+      "newTab": "Åpne en ny fane",
+      "openErrorTitle": "Kunne ikke åpne nettleseren",
+      "pageErrorTitle": "Kunne ikke laste inn siden",
+      "reconnectExtension": "Koble til utvidelsen på nytt",
+      "serviceMissing": "Nettlesertjenesten mangler. Installer Stella på nytt for å bruke denne nettleseren.",
+      "signInHint": "Logg inn på nettsteder her én gang. Stella husker det.",
+      "useMyLogins": "Bruk innloggingene fra nettleseren min"
     },
     "capture": {
       "failedDescription": "Noe gikk galt under skjermbildetakingen. Prøv igjen.",
@@ -2648,6 +2658,14 @@
         "eyebrow": "Direkte forhåndsvisning",
         "openInBrowser": "Åpne i nettleser",
         "reload": "Last inn på nytt"
+      },
+      "folder": {
+        "back": "Tilbake",
+        "onDevice": "På {device}",
+        "failedTitle": "Kunne ikke åpne denne mappen",
+        "failedBody": "Innholdet i denne mappen kunne ikke vises.",
+        "emptyTitle": "Denne mappen er tom",
+        "truncated": "Bare de første {count} vises."
       }
     },
     "displayPanel": {

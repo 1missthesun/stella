@@ -24,6 +24,10 @@ export const DEVICE_REQUEST_METHODS = [
    * instead; a computer that cannot make one sends the file itself.
    */
   "file.read",
+  /** `{ filePath, conversationId }` -> JSON `DeviceFileStat`. */
+  "file.stat",
+  /** `{ filePath, conversationId }` -> JSON `DeviceFolderListing`. */
+  "file.list",
   /** `{ filePath, conversationId }` or `{ sessionId, conversationId }` -> HTML. */
   "officePreview.render",
   /** `{ conversationId }` -> the computer's voice instructions and tools. */
@@ -68,6 +72,26 @@ export const deviceRequestStartTimeoutMs = (
 /** How long the gate waits between response chunks once one has started. */
 export const DEVICE_REQUEST_IDLE_TIMEOUT_MS = 30_000;
 
+/**
+ * Read-only file requests. Any phone paired with one of the owner's
+ * computers, and any of the owner's computers, may ask any of the owner's
+ * computers for these: a linked file lives on whichever computer made it,
+ * not necessarily the one the phone was paired with. The computer that has
+ * the file still applies its own file-access policy.
+ */
+export const DEVICE_FILE_REQUEST_METHODS = [
+  "file.read",
+  "file.stat",
+  "file.list",
+  "officePreview.render",
+] as const satisfies readonly DeviceRequestMethod[];
+
+export const isDeviceFileRequestMethod = (
+  value: unknown,
+): value is (typeof DEVICE_FILE_REQUEST_METHODS)[number] =>
+  typeof value === "string" &&
+  (DEVICE_FILE_REQUEST_METHODS as readonly string[]).includes(value);
+
 export type DeviceRequestBody = {
   requestId: string;
   method: DeviceRequestMethod;
@@ -82,13 +106,54 @@ export const buildDeviceRequestChallenge = (input: {
   method: DeviceRequestMethod;
   /** Lowercase hex sha256 of the exact params JSON sent. */
   paramsHash: string;
+  /**
+   * The computer asked, when it is not the one the proof is scoped to (a
+   * phone reading a file another of the owner's computers has). Committing
+   * to it keeps a proof from being replayed against a third computer.
+   */
+  targetDeviceId?: string;
 }): string =>
   [
     DEVICE_REQUEST_CHALLENGE_VERSION,
     input.requestId,
     input.method,
     input.paramsHash,
+    ...(input.targetDeviceId ? [input.targetDeviceId] : []),
   ].join(":");
+
+/**
+ * One of the owner's computers asking another for a file: signed with the
+ * asking computer's registered Ed25519 device key, the same key its
+ * presence socket proves.
+ */
+export const DEVICE_REQUEST_DEVICE_PROOF_VERSION =
+  "stella-device-request-proof-v1" as const;
+
+export const DEVICE_REQUEST_DEVICE_HEADERS = {
+  deviceId: "x-stella-requester-device-id",
+  signature: "x-stella-requester-proof",
+  issuedAt: "x-stella-requester-proof-issued-at",
+} as const;
+
+export const DEVICE_REQUEST_DEVICE_PROOF_MAX_SKEW_MS = 5 * 60_000;
+
+export const buildDeviceRequestDeviceProofMessage = (input: {
+  requesterDeviceId: string;
+  targetDeviceId: string;
+  challenge: string;
+  issuedAt: number;
+}): string =>
+  [
+    DEVICE_REQUEST_DEVICE_PROOF_VERSION,
+    input.requesterDeviceId,
+    input.targetDeviceId,
+    input.challenge,
+    String(input.issuedAt),
+  ].join("\0");
+
+/** What a relayed request names as its asker when a computer asked. */
+export const deviceRequesterLabel = (deviceId: string): string =>
+  `device:${deviceId}`;
 
 export const deviceRequestParamsHash = (paramsJson: string): Promise<string> =>
   sha256Hex(paramsJson);

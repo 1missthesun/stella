@@ -19,7 +19,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 import {
   cloudWorldDriveName,
-  cloudWorldDrivePath,
+  driveLinkPath,
   isCloudWorkspacePath,
 } from "@stella/contracts/cloud-world-paths";
 import {
@@ -27,7 +27,7 @@ import {
   showOpenPathError,
 } from "@/features/chat/lib/open-local-path";
 import { useOpenConversationFile } from "@/features/cloud/use-cloud-drive-open";
-import type { ConversationFileEntry } from "@/features/workspace-display/derive-conversation-files";
+import { cloudDriveEntry } from "@/features/workspace-display/derive-conversation-files";
 import { basenameOf } from "@/features/workspace-display/path-to-viewer";
 import { useT } from "@/shared/i18n";
 
@@ -38,9 +38,10 @@ type StellaFileLinkProps = {
 };
 
 /**
- * A link into the cloud world's drive (`/workspace/world/drive/...`) names a
- * drive file, never one on this machine: it opens through the same
- * owner-scoped drive path the sidebar and completion pills use.
+ * A drive link (`stella://drive/...`, or a cloud turn's
+ * `/workspace/world/drive/...`) names a drive file, never one on this
+ * machine: it opens through the same owner-scoped drive path the sidebar and
+ * completion pills use.
  */
 const CloudDriveFileLink = ({
   drivePath,
@@ -50,24 +51,19 @@ const CloudDriveFileLink = ({
   display: string;
 }) => {
   const openFile = useOpenConversationFile();
-  const entry = useMemo<ConversationFileEntry>(() => {
-    const name = cloudWorldDriveName(drivePath);
-    return {
-      path: drivePath,
-      timestamp: 0,
-      payload: {
-        kind: "media",
-        asset: { kind: "download", filePath: `/${drivePath}`, label: name },
-        createdAt: 0,
-      },
-      cloudDriveFile: {
-        path: drivePath,
-        name,
-        sizeBytes: 0,
-        contentType: "application/octet-stream",
-      },
-    };
-  }, [drivePath]);
+  const entry = useMemo(
+    () =>
+      cloudDriveEntry(
+        {
+          path: drivePath,
+          name: cloudWorldDriveName(drivePath),
+          sizeBytes: 0,
+          contentType: "application/octet-stream",
+        },
+        Date.now(),
+      ),
+    [drivePath],
+  );
   const open = useCallback(() => {
     void openFile(entry);
   }, [entry, openFile]);
@@ -93,7 +89,7 @@ const CloudDriveFileLink = ({
 export const StellaFileLink = ({ path, label }: StellaFileLinkProps) => {
   const filePath = typeof path === "string" ? path : "";
   const rawLabel = typeof label === "string" ? label.trim() : "";
-  const drivePath = filePath ? cloudWorldDrivePath(filePath) : null;
+  const drivePath = filePath ? driveLinkPath(filePath) : null;
   if (drivePath) {
     return (
       <CloudDriveFileLink

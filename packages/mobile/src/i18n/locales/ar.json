@@ -1571,7 +1571,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2478,7 +2478,17 @@
     "browser": {
       "connected": "المتصفح متصل",
       "connecting": "في انتظار الإضافة…",
-      "newTab": "فتح علامة تبويب جديدة"
+      "dismiss": "إغلاق",
+      "emptyBody": "سجّل الدخول إلى موقع هنا مرة واحدة وستبقيك Stella مسجّلًا، لك ولوكلائك.",
+      "emptyBodyConnected": "تُفتح المواقع بتسجيلات الدخول من متصفحك.",
+      "emptyTitle": "متصفح Stella",
+      "newTab": "فتح علامة تبويب جديدة",
+      "openErrorTitle": "تعذّر فتح المتصفح",
+      "pageErrorTitle": "تعذّر تحميل هذه الصفحة",
+      "reconnectExtension": "إعادة توصيل الإضافة",
+      "serviceMissing": "خدمة المتصفح غير موجودة. أعد تثبيت Stella لاستخدام هذا المتصفح.",
+      "signInHint": "سجّل الدخول إلى المواقع هنا مرة واحدة، وستتذكر Stella ذلك.",
+      "useMyLogins": "استخدام بيانات تسجيل الدخول من متصفحي"
     },
     "capture": {
       "failedDescription": "حدث خطأ ما أثناء التقاط الشاشة. حاول مرة أخرى.",
@@ -2712,6 +2722,14 @@
         "eyebrow": "معاينة مباشرة",
         "openInBrowser": "افتح في المتصفح",
         "reload": "إعادة تحميل"
+      },
+      "folder": {
+        "back": "رجوع",
+        "onDevice": "على {device}",
+        "failedTitle": "تعذّر فتح هذا المجلد",
+        "failedBody": "تعذّر عرض محتويات هذا المجلد.",
+        "emptyTitle": "هذا المجلد فارغ",
+        "truncated": "يتم عرض أول {count} فقط."
       }
     },
     "displayPanel": {

@@ -8,8 +8,11 @@
  * carries its owner's tag and `visibility: private` in its metadata, and the
  * serving worker opens it only for a browser holding that owner's view cookie,
  * which it trades for a grant from `shares.viewLink`
- * (`workers/shared/canvas-view-grant.ts`). R2 metadata cannot change in place,
- * so a visibility change rewrites the object.
+ * (`workers/shared/canvas-view-grant.ts`). A browser without that cookie gets
+ * the worker's "private" page, which sends the owner to `/canvas/open` on the
+ * object's `owner-site` (`CANVAS_OWNER_SITE_URL`) to sign in and come back
+ * with a grant. R2 metadata cannot change in place, so a visibility change
+ * rewrites the object.
  *
  * The row is the owner's locator for the object. It is written before the
  * object, so every object that may exist has a row, and each row has a
@@ -97,6 +100,17 @@ const baseUrlOf = (env: Cloudflare.Env): string => {
   return base;
 };
 
+/** The website origin a private canvas's owner signs in through, when set. */
+const ownerSiteOf = (env: Cloudflare.Env): string | null => {
+  const value = env.CANVAS_OWNER_SITE_URL?.trim();
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+};
+
 const viewSecretOf = (env: Cloudflare.Env): string | null => {
   const value = (env as unknown as Record<string, unknown>).CANVAS_SHARE_VIEW_SECRET;
   const trimmed = typeof value === "string" ? value.trim() : "";
@@ -131,6 +145,7 @@ const putObject = async (
   body: Uint8Array | ArrayBuffer,
   options: { expiresAt: number; visibility: ShareVisibility },
 ): Promise<void> => {
+  const ownerSite = ownerSiteOf(ctx.env);
   await bucketOf(ctx.env).put(key, body, {
     httpMetadata: {
       contentType: "text/html; charset=utf-8",
@@ -140,6 +155,7 @@ const putObject = async (
       "expires-at": String(options.expiresAt),
       visibility: options.visibility,
       owner: await canvasOwnerTag(ctx.ownerId),
+      ...(ownerSite ? { "owner-site": ownerSite } : {}),
     },
   });
 };

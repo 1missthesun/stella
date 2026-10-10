@@ -8,6 +8,9 @@ import type {
   EngineAccessResponse,
   EngineAccessResult,
   GatewayConfigSnapshot,
+  ProviderAccessRequest,
+  ProviderAccessResponse,
+  ProviderAccessResult,
   GatewayUsageBatch,
   GatewayUsageBatchResult,
   GatewayUsageEvent,
@@ -134,6 +137,56 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
       console.error(
         JSON.stringify({
           event: "billing_engine_access_failed",
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+      return { ok: false, status: null, code: null, retryable: true };
+    }
+  }
+
+  /**
+   * The owner's saved credential for one account provider (the BYOK lane),
+   * from the providers domain in the owner's object. Refused as
+   * `generation_stale` when the capability predates an owner reset and as
+   * `engine_sign_in_required` when the provider's sign-in ended.
+   */
+  async providerAccess(
+    request: ProviderAccessRequest,
+  ): Promise<BillingControlResult<ProviderAccessResponse>> {
+    if (
+      typeof request?.ownerId !== "string" ||
+      !request.ownerId ||
+      request.ownerId.length > 512 ||
+      typeof request.ownerGeneration !== "string" ||
+      !request.ownerGeneration ||
+      typeof request.provider !== "string" ||
+      !/^[a-z0-9][a-z0-9-]{0,63}$/.test(request.provider)
+    ) {
+      return { ok: false, status: 400, code: "bad_request", retryable: false };
+    }
+    try {
+      const response = (await this.env.OWNER_GATES.getByName(request.ownerId).ownerInternal({
+        name: "providers.access",
+        args: { provider: request.provider },
+        ownerGeneration: request.ownerGeneration,
+      })) as unknown as RpcResponse;
+      if (response.ok) {
+        const access = response.value as ProviderAccessResult;
+        if (access && "needsSignIn" in access) {
+          return { ok: false, status: 403, code: "engine_sign_in_required", retryable: false };
+        }
+        return access
+          ? { ok: true, body: access }
+          : { ok: false, status: 404, code: null, retryable: false };
+      }
+      if (response.error.reason === "owner_generation_stale") {
+        return { ok: false, status: 409, code: "generation_stale", retryable: false };
+      }
+      return { ok: false, status: 503, code: null, retryable: response.error.retryable };
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "billing_provider_access_failed",
           message: error instanceof Error ? error.message : String(error),
         }),
       );

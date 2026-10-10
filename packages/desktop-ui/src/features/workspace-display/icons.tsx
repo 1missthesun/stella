@@ -14,7 +14,7 @@
  */
 
 import type { CSSProperties, ReactNode } from "react";
-import { Globe, Image as ImageGlyph, MessageSquare, Trash2 } from "@/ui/icons";
+import { Folder, Globe, Image as ImageGlyph, MessageSquare, Trash2 } from "@/ui/icons";
 import { CustomHouse } from "@/ui/nav-icons";
 import type { DisplayTabKind } from "./types";
 
@@ -364,6 +364,10 @@ const TrashIcon = ({ size = 18, style }: IconProps) => (
   <Trash2 size={size} strokeWidth={1.5} style={style} />
 );
 
+const FolderIcon = ({ size = 18, style }: IconProps) => (
+  <Folder size={size} strokeWidth={1.5} style={style} />
+);
+
 const UrlIcon = ({ size = 18, style }: IconProps) => (
   <Globe size={size} strokeWidth={1.5} style={style} />
 );
@@ -414,5 +418,7 @@ export const DisplayTabIcon = ({
       return <TextIcon size={size} style={style} />;
     case "trash":
       return <TrashIcon size={size} style={style} />;
+    case "folder":
+      return <FolderIcon size={size} style={style} />;
   }
 };

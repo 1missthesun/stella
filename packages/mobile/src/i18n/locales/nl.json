@@ -1531,7 +1531,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2434,7 +2434,17 @@
     "browser": {
       "connected": "Browser verbonden",
       "connecting": "Wachten op extensie…",
-      "newTab": "Een nieuw tabblad openen"
+      "dismiss": "Sluiten",
+      "emptyBody": "Log hier één keer in op een site en Stella houdt je ingelogd, voor jou en je agents.",
+      "emptyBodyConnected": "Sites openen met de logins van je browser.",
+      "emptyTitle": "Stella-browser",
+      "newTab": "Een nieuw tabblad openen",
+      "openErrorTitle": "Kan de browser niet openen",
+      "pageErrorTitle": "Kan deze pagina niet laden",
+      "reconnectExtension": "Extensie opnieuw verbinden",
+      "serviceMissing": "De browserservice ontbreekt. Installeer Stella opnieuw om deze browser te gebruiken.",
+      "signInHint": "Log hier één keer in op sites. Stella onthoudt het.",
+      "useMyLogins": "Logins van mijn browser gebruiken"
     },
     "capture": {
       "failedDescription": "Er ging iets mis bij het maken van de schermafbeelding. Probeer het opnieuw.",
@@ -2648,6 +2658,14 @@
         "eyebrow": "Live voorbeeld",
         "openInBrowser": "Openen in browser",
         "reload": "Opnieuw laden"
+      },
+      "folder": {
+        "back": "Terug",
+        "onDevice": "Op {device}",
+        "failedTitle": "Kan deze map niet openen",
+        "failedBody": "De inhoud van deze map kan niet worden weergegeven.",
+        "emptyTitle": "Deze map is leeg",
+        "truncated": "Alleen de eerste {count} worden getoond."
       }
     },
     "displayPanel": {

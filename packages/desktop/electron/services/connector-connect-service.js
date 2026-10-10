@@ -176,8 +176,8 @@ export class ConnectorConnectService {
             requestId,
             id: "stella-browser-extension",
             name: "Stella browser extension",
-            description: "Lets Stella work inside your real browser — your logged-in sites, tabs, and pages.",
-            reason: "Stella needs your browser to continue this task, but the extension isn't connected yet.",
+            description: "Brings your logins from your real browser into Stella's browser, so sites open signed in.",
+            reason: "Stella's browser works without it, but this task needs a site you're signed in to.",
             kind: "browser-extension",
             ...(payload.conversationId
                 ? { conversationId: payload.conversationId }

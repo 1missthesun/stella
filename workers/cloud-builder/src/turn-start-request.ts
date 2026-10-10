@@ -5,6 +5,7 @@
  * on trusted headers the Worker stamps after verifying the caller.
  */
 
+import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   orchestratorCliThreadId,
@@ -83,7 +84,8 @@ export const parseCloudExecutionSelection = (
   if (
     pair !== "stella/stella" &&
     pair !== "anthropic/anthropic" &&
-    pair !== "chatgpt/chatgpt"
+    pair !== "chatgpt/chatgpt" &&
+    !(value.engine === "provider" && isAccountProviderId(value.provider))
   ) {
     return null;
   }

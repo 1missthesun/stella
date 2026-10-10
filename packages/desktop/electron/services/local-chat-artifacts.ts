@@ -350,6 +350,7 @@ const artifactKey = (payload: DisplayPayload): string => {
     case "source-diff":
     case "file-artifact":
     case "pdf":
+    case "folder":
       return `${payload.kind}:${payload.filePath}`;
     case "trash":
       return `trash:${payload.createdAt ?? ""}`;

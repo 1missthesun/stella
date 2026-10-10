@@ -64,6 +64,7 @@ export const pickDeviceFileLocation = <T extends DeviceFileCandidate>(
 export type DeviceFileSource =
   | { kind: "local" }
   | { kind: "drive"; deviceName: string }
+  | { kind: "device"; deviceName: string }
   | { kind: "elsewhere"; deviceName: string; oversized: boolean }
   | { kind: "missing" }
   | { kind: "unshared" }
@@ -85,8 +86,8 @@ export const deviceFileElsewhereMessage = (
   const device = friendlyDeviceName(deviceName);
   const noun = options.noun ?? "file";
   return options.oversized
-    ? `This ${noun} is on ${device}. It's over ${COPY_LIMIT_MB} MB, too large to share with your other devices, so open it there.`
-    : `This ${noun} is on ${device}. Open it on that computer.`;
+    ? `This ${noun} is on ${device}, which isn't online. It's over ${COPY_LIMIT_MB} MB, too large for a copy in your Drive, so open Stella on ${device} to see it.`
+    : `This ${noun} is on ${device}, which isn't online. Open Stella on ${device} to see it here.`;
 };
 
 export const deviceFileMissingMessage = (

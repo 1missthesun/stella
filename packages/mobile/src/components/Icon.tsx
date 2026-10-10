@@ -27,6 +27,7 @@ export type IconName =
   | "video"
   | "file"
   | "file-text"
+  | "folder"
   | "git-branch"
   | "box"
   | "panel-top"
@@ -100,6 +101,7 @@ const FEATHER_NAMES: Record<
   video: "video",
   file: "file",
   "file-text": "file-text",
+  folder: "folder",
   "git-branch": "git-branch",
   box: "box",
   "panel-top": "monitor",
@@ -177,6 +179,7 @@ const SYMBOL_NAMES: Record<IconName, SymbolViewProps["name"]> = {
   video: "video",
   file: "doc",
   "file-text": "doc.text",
+  folder: "folder",
   "git-branch": "arrow.triangle.branch",
   box: "cube",
   "panel-top": "rectangle.topthird.inset.filled",

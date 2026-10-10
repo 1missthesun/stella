@@ -572,6 +572,9 @@ export const createStellaHostRunner = (
     sendMessage: orchestratorController.sendMessage,
     sendUserMessage: orchestratorController.sendUserMessage,
     runAutomationTurn: orchestratorController.runAutomationTurn,
+    publishLinkedFiles: (text: string) => {
+      context.linkedFilePublisher.publishText(text);
+    },
     runBlockingLocalAgent: taskOrchestration.runBlockingLocalAgent,
     createBackgroundAgent: taskOrchestration.createBackgroundAgent,
     getActiveAgentCount: () =>

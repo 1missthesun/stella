@@ -86,17 +86,25 @@ const readError = async (
   );
 };
 
+export type DeviceRequestOptions = {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  targetDeviceId?: string;
+};
+
 /**
- * Ask `access.desktopDeviceId` for something. Resolves with the response body
- * and its content type; rejects with a `DeviceRequestError`.
+ * Ask `access.desktopDeviceId`, or `options.targetDeviceId`, for something.
+ * Resolves with the response body and its content type; rejects with a
+ * `DeviceRequestError`.
  */
 export const requestDevice = async (
   access: StoredPhoneAccess,
   method: DeviceRequestMethod,
   params: Record<string, unknown>,
-  options?: { signal?: AbortSignal; timeoutMs?: number },
+  options?: DeviceRequestOptions,
 ): Promise<{ bytes: Uint8Array; contentType: string }> => {
   const requestId = createRequestId();
+  const target = options?.targetDeviceId?.trim() || access.desktopDeviceId;
   // The worker re-serializes `params` with JSON.stringify before checking the
   // proof, so the hash covers exactly that string.
   const paramsJson = JSON.stringify(params);
@@ -104,6 +112,7 @@ export const requestDevice = async (
     requestId,
     method,
     paramsHash: sha256HexUtf8(paramsJson),
+    ...(target !== access.desktopDeviceId ? { targetDeviceId: target } : {}),
   });
   const origin = await resolveExecutionBuilderOrigin();
   const token = await getAuthToken();
@@ -121,7 +130,7 @@ export const requestDevice = async (
   try {
     let response: Awaited<ReturnType<typeof expoFetch>>;
     try {
-      response = await expoFetch(`${origin}${deviceRequestPath(access.desktopDeviceId)}`, {
+      response = await expoFetch(`${origin}${deviceRequestPath(target)}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -177,7 +186,7 @@ export const requestDeviceJson = async <T>(
   access: StoredPhoneAccess,
   method: DeviceRequestMethod,
   params: Record<string, unknown>,
-  options?: { signal?: AbortSignal; timeoutMs?: number },
+  options?: DeviceRequestOptions,
 ): Promise<T> => {
   const { bytes } = await requestDevice(access, method, params, options);
   try {

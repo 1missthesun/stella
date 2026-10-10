@@ -33,7 +33,7 @@
  */
 import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/context";
 import type { Context } from "@earendil-works/chord";
-import type { Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
+import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import {
   AssistantEntry,
@@ -57,6 +57,7 @@ import {
   type OpenStellaHarness,
 } from "@stella/agent/harness";
 import { CHATGPT_PROVIDER_ID, chatGptModel, chatGptProvider } from "@stella/agent/provider/chatgpt";
+import { accountByokProvider, accountProviderModel } from "@stella/agent/provider/account-byok";
 import {
   stellaProvider,
   type StellaGatewayAccess,
@@ -143,7 +144,7 @@ import type {
   SerializedAuthorizedImage,
 } from "@stella/executor-cloud/attached-tool-protocol";
 import { generalAgentWorldGuidance } from "@stella/executor-cloud/general-agent-prompt";
-import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
+import { extractDriveLinkPaths, extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { TURN_BROKER_HEADERS } from "@stella/contracts/turn-credential-broker";
 import { serveTurnDriveRequest } from "./build-session/turn-broker.js";
 import {
@@ -187,8 +188,12 @@ const CLIENT_HISTORY_PAGE = 200;
 /** A client frame of entries stays well under the socket's message limit. */
 const CLIENT_FRAME_BYTES = 512 * 1024;
 
-/** A turn pi runs: on Stella's models, or on the owner's ChatGPT plan through the gateway's native lane. */
-export type PiExecution = Extract<CloudExecutionSelection, { engine: "stella" | "chatgpt" }>;
+/**
+ * A turn pi runs: on Stella's models, on the owner's ChatGPT plan through the
+ * gateway's native lane, or on a provider key saved to the owner's account
+ * through its BYOK lane.
+ */
+export type PiExecution = Extract<CloudExecutionSelection, { engine: "stella" | "chatgpt" | "provider" }>;
 
 /** Whose agents these are, as the latest chat turn admitted them. */
 export type PiAuthority = {
@@ -416,7 +421,7 @@ export const contextFor = (signal?: AbortSignal): Context =>
  * is its provider's (medium); Stella's models think only when asked.
  */
 export const thinkingLevelFor = (effort: AgentModelReasoningEffort, engine: PiExecution["engine"] = "stella"): ModelThinkingLevel =>
-  effort === "none" ? "off" : effort === "default" ? (engine === "chatgpt" ? "medium" : "off") : effort;
+  effort === "none" ? "off" : effort === "default" ? (engine === "stella" ? "off" : "medium") : effort;
 
 const MEMORY_FIELDS: Record<string, keyof Omit<StellaMemory, "enabled">> = {
   "~/.stella/core-memory.md": "core",
@@ -528,6 +533,21 @@ const planModels = (executions: Iterable<PiExecution | undefined>): Model<"opena
     if (plan) plans.set(execution.model, plan);
   }
   return [...plans.values()];
+};
+
+/** Account provider models executions run on, by provider (none for Stella's or a ChatGPT plan). */
+const providerModels = (executions: Iterable<PiExecution | undefined>): Map<string, Model<Api>[]> => {
+  const byProvider = new Map<string, Model<Api>[]>();
+  for (const execution of executions) {
+    if (execution?.engine !== "provider") continue;
+    const models = byProvider.get(execution.provider) ?? [];
+    if (models.some((model) => model.id === execution.model)) continue;
+    const model = accountProviderModel(execution.provider, execution.model);
+    if (!model) continue;
+    models.push(model);
+    byProvider.set(execution.provider, models);
+  }
+  return byProvider;
 };
 
 const brokerFailure = (status: number): Response =>
@@ -678,7 +698,7 @@ export class PiConversationRuntime {
     const capability = await this.#runCapability(active);
     const send = (value: Request) => (active.guard ? active.guard.fetch(value) : gateway.fetch(value));
     // The native lane serves a plan's request as one stream; the managed lane's cancellation is Stella's own.
-    if (active.authority.execution.engine === "chatgpt") return await send(withBearer(request, capability));
+    if (active.authority.execution.engine !== "stella") return await send(withBearer(request, capability));
     return await fetchWithManagedCancellation({
       request: withBearer(request, capability),
       capability,
@@ -722,11 +742,17 @@ export class PiConversationRuntime {
         models.push(model);
       }
     }
-    const plans = planModels([
+    const executions = [
       state?.authority.execution,
       ...[...this.#threadAgents.values()].map((agent) => agent.authority.execution),
+    ];
+    const plans = planModels(executions);
+    const byok = providerModels(executions);
+    const key = JSON.stringify([
+      models,
+      plans.map((plan) => plan.id),
+      [...byok].map(([provider, entries]) => [provider, entries.map((entry) => entry.id)]),
     ]);
-    const key = JSON.stringify([models, plans.map((plan) => plan.id)]);
     if (key === this.#modelKey) return;
     const access = this.#access();
     this.#models.setProvider(stellaProvider({ access, models }));
@@ -738,6 +764,18 @@ export class PiConversationRuntime {
         }),
       );
     }
+    for (const [providerId, entries] of byok) {
+      this.#models.setProvider(
+        accountByokProvider({
+          providerId,
+          models: entries,
+          transport: {
+            gatewayOrigin: this.#options.gatewayOrigin,
+            fetch: (request, route) => access.fetch(request, undefined, route),
+          },
+        }),
+      );
+    }
     this.#modelKey = key;
   }
 
@@ -745,7 +783,9 @@ export class PiConversationRuntime {
   #rootModel(execution: PiExecution) {
     return execution.engine === "chatgpt"
       ? { provider: CHATGPT_PROVIDER_ID, modelId: execution.model }
-      : stellaModelRef("orchestrator", execution.model);
+      : execution.engine === "provider"
+        ? { provider: execution.provider, modelId: execution.model }
+        : stellaModelRef("orchestrator", execution.model);
   }
 
   #sources(): StellaContextSources {
@@ -1594,9 +1634,12 @@ export class PiConversationRuntime {
     if (up) {
       try {
         // The agent's home is the world: a link to `~/drive/...` names the drive copy there.
-        const linked = extractLocalFileLinkPaths(end.answer ?? "").map((linkedPath) =>
-          linkedPath === "~" || linkedPath.startsWith("~/") ? `${WORLD_ROOT}${linkedPath.slice(1)}` : linkedPath,
-        );
+        const linked = [
+          ...extractLocalFileLinkPaths(end.answer ?? "").map((linkedPath) =>
+            linkedPath === "~" || linkedPath.startsWith("~/") ? `${WORLD_ROOT}${linkedPath.slice(1)}` : linkedPath,
+          ),
+          ...extractDriveLinkPaths(end.answer ?? "").map((drivePath) => `${WORLD_ROOT}/drive/${drivePath}`),
+        ];
         const { deliveredFiles } = await lease.quiesce(linked);
         this.#options.log("pi_agent_quiesced", { threadId: held.threadId, delivered: deliveredFiles.length });
       } catch (error) {
@@ -1954,9 +1997,14 @@ export class PiConversationRuntime {
         threadId: attempt.threadId,
         origin: { agentThread: true },
         model: this.#threadModel(attempt.authority.execution, attempt.model),
-        // A ChatGPT plan agent is admitted for its execution's reasoning effort.
-        ...(attempt.authority.execution.engine === "chatgpt"
-          ? { thinkingLevel: thinkingLevelFor(attempt.authority.execution.reasoningEffort, "chatgpt") }
+        // A ChatGPT plan or provider-key agent is admitted for its execution's reasoning effort.
+        ...(attempt.authority.execution.engine !== "stella"
+          ? {
+              thinkingLevel: thinkingLevelFor(
+                attempt.authority.execution.reasoningEffort,
+                attempt.authority.execution.engine,
+              ),
+            }
           : {}),
       },
       context,
@@ -1966,6 +2014,7 @@ export class PiConversationRuntime {
   /** The model an agent thread's agent runs on: its plan's, or the Stella model it was admitted on. */
   #threadModel(execution: PiExecution, model: StellaModelSpec | undefined) {
     if (execution.engine === "chatgpt") return { provider: CHATGPT_PROVIDER_ID, modelId: execution.model };
+    if (execution.engine === "provider") return { provider: execution.provider, modelId: execution.model };
     if (!model) throw new Error("An agent on Stella's models needs its model.");
     return stellaModelRef("general", model.alias);
   }

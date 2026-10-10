@@ -1521,7 +1521,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2423,7 +2423,17 @@
     "browser": {
       "connected": "Browser terhubung",
       "connecting": "Menunggu ekstensi…",
-      "newTab": "Buka tab baru"
+      "dismiss": "Tutup",
+      "emptyBody": "Masuk ke situs di sini sekali dan Stella membuat Anda tetap masuk, untuk Anda dan agen Anda.",
+      "emptyBodyConnected": "Situs terbuka dengan login dari browser Anda.",
+      "emptyTitle": "Browser Stella",
+      "newTab": "Buka tab baru",
+      "openErrorTitle": "Tidak dapat membuka browser",
+      "pageErrorTitle": "Tidak dapat memuat halaman ini",
+      "reconnectExtension": "Hubungkan ulang ekstensi",
+      "serviceMissing": "Layanan browser tidak ada. Instal ulang Stella untuk menggunakan browser ini.",
+      "signInHint": "Masuk ke situs di sini sekali. Stella mengingatnya.",
+      "useMyLogins": "Gunakan login dari browser saya"
     },
     "capture": {
       "failedDescription": "Terjadi masalah saat mengambil tangkapan layar. Coba lagi.",
@@ -2630,6 +2640,14 @@
         "eyebrow": "Pratinjau langsung",
         "openInBrowser": "Buka di browser",
         "reload": "Muat ulang"
+      },
+      "folder": {
+        "back": "Kembali",
+        "onDevice": "Di {device}",
+        "failedTitle": "Folder ini tidak dapat dibuka",
+        "failedBody": "Isi folder ini tidak dapat ditampilkan.",
+        "emptyTitle": "Folder ini kosong",
+        "truncated": "Hanya {count} item pertama yang ditampilkan."
       }
     },
     "displayPanel": {

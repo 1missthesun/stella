@@ -1070,7 +1070,7 @@ describe("importBrowserProfileSnapshot", () => {
     ]);
   });
 
-  it("copies only allowlisted storage once and leaves credentials behind", async () => {
+  it("copies only login storage once and leaves credentials and history behind", async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "stella-profile-copy-"));
     tempRoots.push(root);
     const source = path.join(root, "source");
@@ -1090,7 +1090,10 @@ describe("importBrowserProfileSnapshot", () => {
         sourcePath: source,
       },
     });
-    expect(first.copiedEntries).toEqual(["Local Storage", "History"]);
+    expect(first.copiedEntries).toEqual(["Local Storage"]);
+    await expect(
+      readFile(path.join(destination, "History"), "utf8"),
+    ).rejects.toMatchObject({ code: "ENOENT" });
     await expect(
       readFile(path.join(destination, "Local Storage", "state"), "utf8"),
     ).resolves.toBe("first");

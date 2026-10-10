@@ -1521,7 +1521,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2423,7 +2423,17 @@
     "browser": {
       "connected": "ブラウザに接続済み",
       "connecting": "拡張機能を待機中…",
-      "newTab": "新しいタブを開く"
+      "dismiss": "閉じる",
+      "emptyBody": "ここでサイトに一度サインインすれば、Stella があなたとエージェントのためにサインイン状態を保ちます。",
+      "emptyBodyConnected": "サイトはブラウザのログイン情報で開きます。",
+      "emptyTitle": "Stella ブラウザ",
+      "newTab": "新しいタブを開く",
+      "openErrorTitle": "ブラウザを開けませんでした",
+      "pageErrorTitle": "このページを読み込めませんでした",
+      "reconnectExtension": "拡張機能を再接続",
+      "serviceMissing": "ブラウザサービスが見つかりません。このブラウザを使うには Stella を再インストールしてください。",
+      "signInHint": "ここでサイトに一度サインインすれば、Stella が覚えています。",
+      "useMyLogins": "ブラウザのログイン情報を使う"
     },
     "capture": {
       "failedDescription": "スクリーンショットの取得中に問題が発生しました。もう一度お試しください。",
@@ -2630,6 +2640,14 @@
         "eyebrow": "ライブプレビュー",
         "openInBrowser": "ブラウザで開く",
         "reload": "再読み込み"
+      },
+      "folder": {
+        "back": "戻る",
+        "onDevice": "{device} 上",
+        "failedTitle": "このフォルダを開けませんでした",
+        "failedBody": "このフォルダの内容を表示できませんでした。",
+        "emptyTitle": "このフォルダは空です",
+        "truncated": "最初の {count} 件のみ表示しています。"
       }
     },
     "displayPanel": {

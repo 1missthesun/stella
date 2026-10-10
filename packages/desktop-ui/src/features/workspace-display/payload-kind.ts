@@ -42,6 +42,8 @@ export const displayTabKindForPayload = (
       return "pdf";
     case "trash":
       return "trash";
+    case "folder":
+      return "folder";
     case "media":
       switch (payload.asset.kind) {
         case "image":

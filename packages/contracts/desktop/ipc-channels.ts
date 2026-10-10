@@ -27,9 +27,12 @@ export const IPC_WINDOW_SET_NATIVE_BUTTONS_VISIBLE =
 export const IPC_DISPLAY_UPDATE = "display:update" as const;
 export const IPC_DISPLAY_READ_FILE = "display:readFile" as const;
 export const IPC_DISPLAY_MEDIA_SOURCE = "display:mediaSource" as const;
+export const IPC_DISPLAY_STAT_PATH = "display:statPath" as const;
+export const IPC_DISPLAY_LIST_FOLDER = "display:listFolder" as const;
 export const IPC_DISPLAY_LIST_CANVAS_HTML = "display:listCanvasHtml" as const;
 export const IPC_DISPLAY_OPEN_SHARED_CANVAS =
   "display:openSharedCanvas" as const;
+export const IPC_DISPLAY_OPEN_SHARE_LINK = "display:openShareLink" as const;
 export const IPC_DISPLAY_CANVAS_FILE_URL = "display:canvasFileUrl" as const;
 export const IPC_DISPLAY_CANVAS_HTML_URL = "display:canvasHtmlUrl" as const;
 export const IPC_DISPLAY_TRASH_LIST = "displayTrash:list" as const;
@@ -39,6 +42,7 @@ export const IPC_OFFICE_PREVIEW_LIST = "officePreview:list" as const;
 export const IPC_OFFICE_PREVIEW_START = "officePreview:start" as const;
 export const IPC_OFFICE_PREVIEW_UPDATE = "officePreview:update" as const;
 export const IPC_CHAT_EVIDENCE_CARDS = "chatEvidence:cards" as const;
+export const IPC_CHAT_EVIDENCE_DRIVE_CARDS = "chatEvidence:driveCards" as const;
 
 // ── Remote execution consent ────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@
 // verifier, then polls the conversation's canonical history on the worker
 // until the turn's final assistant message lands.
 //
-//   node .agents/skills/verify-stella/cloud-turn.mjs --prompt "..." [--conversation <id>] [--email <owner>] [--wait 180] [--agent-runtime pi] [--watch-pi] [--locale es] [--attach <drive path>] [--engine chatgpt --model <id> [--effort <level>]] [--wait-report]
+//   node .agents/skills/verify-stella/cloud-turn.mjs --prompt "..." [--conversation <id>] [--email <owner>] [--wait 180] [--agent-runtime pi] [--watch-pi] [--locale es] [--attach <drive path>] [--engine chatgpt|provider [--provider <id>] --model <id> [--effort <level>]] [--wait-report]
 //   (--prompt-file <path> instead of --prompt for prompts too long for one argument)
 //
 // `--agent-runtime pi` creates the conversation on the pi-durable runtime; it
@@ -17,6 +17,9 @@
 // (`--effort`, default `default`), as a client whose cloud engine is ChatGPT
 // does. A test owner has no ChatGPT sign-in, so the gateway refuses the
 // model call after checking it.
+//
+// `--engine provider --provider <id> --model <id>` sends the turn for a model
+// on a provider key saved to the owner's account (`providers.setApiKey`).
 //
 // `--watch-pi` also opens the conversation socket with `pi=1`, prints the pi
 // view's frames as they arrive, and folds them with the clients' reducer
@@ -65,7 +68,7 @@ const isReport = (message) =>
   message?.role === "user" && /\[(Agent completed|Task failed|Task canceled)\]/.test(JSON.stringify(message.content ?? ""));
 const engine = flag("--engine");
 const execution = engine
-  ? { engine, provider: engine, model: flag("--model", ""), reasoningEffort: flag("--effort", "default") }
+  ? { engine, provider: flag("--provider", engine), model: flag("--model", ""), reasoningEffort: flag("--effort", "default") }
   : undefined;
 const devVarsPath = new URL("../../../workers/cloud-builder/.dev.vars", import.meta.url).pathname;
 const devVar = (name) => {

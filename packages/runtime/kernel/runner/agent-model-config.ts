@@ -1,4 +1,5 @@
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
+import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { STELLA_DEFAULT_MODEL } from "@stella/contracts/stella-api";
 import type {
   AgentModelConfigSnapshot,
@@ -152,7 +153,19 @@ export const toCloudExecutionSelection = (
 ): CloudExecutionSelection => {
   const reasoningEffort = snapshot.reasoningEffort ?? "default";
   if (snapshot.engine === "default") {
-    const model = canonicalStellaModelReference(snapshot.routeModel.trim());
+    const route = snapshot.routeModel.trim();
+    const slash = route.indexOf("/");
+    const routeProvider = slash > 0 ? route.slice(0, slash) : "";
+    const routeModelId = slash > 0 ? route.slice(slash + 1).trim() : "";
+    if (isAccountProviderId(routeProvider) && routeModelId) {
+      return {
+        engine: "provider",
+        provider: routeProvider,
+        model: routeModelId,
+        reasoningEffort,
+      };
+    }
+    const model = canonicalStellaModelReference(route);
     const localOnlyManagedPrefix = [
       "stella/local/",
       "stella/ollama/",
@@ -165,7 +178,7 @@ export const toCloudExecutionSelection = (
       localOnlyManagedPrefix
     ) {
       throw new Error(
-        `Cloud agents cannot use the desktop-only model route "${model || "unknown"}". Select a Stella-managed model, Claude, or Codex for this cloud task.`,
+        `Cloud agents cannot use the desktop-only model route "${model || "unknown"}". Select a Stella-managed model, Claude, Codex, or a model on a key saved to your account for this cloud task.`,
       );
     }
     return {

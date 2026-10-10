@@ -207,6 +207,45 @@ export const videoPosterRaster = async (
   return await quickLookRaster(filePath, boxWidth, boxHeight);
 };
 
+/**
+ * A poster frame and duration for a video read straight from an https URL.
+ * ffmpeg seeks with range requests, so a long recording costs a few reads,
+ * not a download.
+ */
+export const remoteVideoPoster = async (
+  url: string,
+  boxWidth: number,
+  boxHeight: number,
+): Promise<{ thumbnail: string; durationMs: number | null } | null> => {
+  const ffmpeg = await resolveFfmpeg();
+  if (!ffmpeg) return null;
+  const dir = await scratchDir();
+  try {
+    const frame = path.join(dir, "poster.png");
+    const result = await run(
+      ffmpeg,
+      ["-y", "-ss", "0.6", "-i", url, "-frames:v", "1", "-f", "image2", frame],
+      PROBE_TIMEOUT_MS,
+    );
+    if (result.code !== 0) return null;
+    const thumbnail = coverCropToDataUrl(
+      nativeImage.createFromPath(frame),
+      boxWidth,
+      boxHeight,
+    );
+    if (!thumbnail) return null;
+    const matched = /Duration:\s*(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(result.stderr);
+    const durationMs = matched
+      ? Math.round(
+          (Number(matched[1]) * 3600 + Number(matched[2]) * 60 + Number(matched[3])) * 1000,
+        )
+      : null;
+    return { thumbnail, durationMs: durationMs && durationMs > 0 ? durationMs : null };
+  } finally {
+    discard(dir);
+  }
+};
+
 export const probeDurationMs = async (filePath: string): Promise<number | null> => {
   const offscreenDuration = await offscreenMediaDurationMs(filePath);
   if (offscreenDuration) return offscreenDuration;

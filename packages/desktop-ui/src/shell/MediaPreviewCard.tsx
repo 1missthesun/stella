@@ -14,8 +14,7 @@ import {
 import { copyImageBlob } from "@/shell/media-clipboard";
 import { displayTabs } from "@/features/workspace-display/tab-store";
 import { AudioPlayer } from "@/shell/AudioPlayer";
-import { localMediaUrl } from "@/shared/hooks/local-media-url";
-import { useLocalMediaFailure } from "@/shared/hooks/use-local-media-failure";
+import { useMediaStream } from "@/shared/hooks/use-media-stream-url";
 import { useT } from "@/shared/i18n";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { ZoomableImage, type SwipeDirection } from "@/shell/ZoomableImage";
@@ -253,8 +252,7 @@ const VideoCard = ({
   inDialog?: boolean;
 }) => {
   const t = useT();
-  const { failure, onError } = useLocalMediaFailure(filePath, "video");
-  const streamUrl = localMediaUrl(filePath);
+  const { url: streamUrl, failure, onError } = useMediaStream(filePath, "video");
   return (
     <div className="display-media display-media--video">
       <PromptHeader prompt={prompt} madeBy={madeBy} />
@@ -266,7 +264,7 @@ const VideoCard = ({
         />
       ) : (
         <video
-          src={streamUrl}
+          src={streamUrl ?? undefined}
           controls
           loop
           playsInline
@@ -307,8 +305,7 @@ const AudioCard = ({
   inDialog?: boolean;
 }) => {
   const t = useT();
-  const { failure, onError } = useLocalMediaFailure(filePath, "audio file");
-  const streamUrl = localMediaUrl(filePath);
+  const { url: streamUrl, failure, onError } = useMediaStream(filePath, "audio file");
   return (
     <div className="display-media display-media--audio">
       <PromptHeader prompt={prompt} madeBy={madeBy} />
@@ -321,7 +318,9 @@ const AudioCard = ({
             body={failure}
           />
         ) : (
-          <AudioPlayer key={streamUrl} src={streamUrl} onError={onError} />
+          streamUrl ? (
+            <AudioPlayer key={streamUrl} src={streamUrl} onError={onError} />
+          ) : null
         )}
         <div className="display-media__audio-name">{filenameOf(filePath)}</div>
       </div>

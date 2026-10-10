@@ -37,6 +37,8 @@ import type {
 import { BROWSER_BRIDGE_MISSING_ERROR } from "../utils/register-stella-native-messaging-host.js";
 import { STELLA_BROWSER_EXTENSION_STORE_URL } from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
 import { CookieMirror } from "./in-app-browser/cookie-mirror.js";
+import { trimInAppBrowserStorage } from "./in-app-browser/storage-hygiene.js";
+import { keepSessionCookies } from "./in-app-browser/session-cookie-keeper.js";
 import {
   DebuggerTargetProxy,
   isRendererUrl,
@@ -166,6 +168,9 @@ const DEFAULT_DEMAND_CONNECTION_TIMEOUT_MS = 30_000;
 const DEMAND_ATTEMPT_WINDOWS_MS = [2_000, 5_000, 10_000] as const;
 // Gap between attempts, so a daemon that is still booting is not hammered.
 const DEMAND_RETRY_BACKOFF_MS = [250, 1_000, 2_000] as const;
+const LOGIN_PROBE_TIMEOUT_MS = 1_500;
+const LOGIN_SEED_WAIT_MS = 15_000;
+const INSTALLED_EXTENSION_WAIT_MS = 5_000;
 const MAX_FAVICON_BYTES = 256 * 1024;
 
 const cloneState = (state: BrowserViewState): BrowserViewState => ({
@@ -176,6 +181,26 @@ const cloneState = (state: BrowserViewState): BrowserViewState => ({
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
+
+const settleWithin = <T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  fallback: T,
+): Promise<T> =>
+  new Promise<T>((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), timeoutMs);
+    timer.unref?.();
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
 
 const normalizeWebUrl = (input: string | undefined) => {
   const raw = input?.trim() || DEFAULT_URL;
@@ -265,6 +290,7 @@ export class InAppBrowserService {
     tabs: [],
   };
   private browserSession: Session | null = null;
+  private releaseSessionCookies: (() => void) | null = null;
   private profileImport: BrowserProfileImportResult | null = null;
   private initializePromise: Promise<void> | null = null;
   private connectPromise: Promise<BrowserViewState> | null = null;
@@ -288,14 +314,7 @@ export class InAppBrowserService {
       exportAllCookies: options.exportAllCookies,
       exportCookiesForUrls: options.exportCookiesForUrls,
       subscribeCookieEvents: options.subscribeCookieEvents,
-      awaitConnection: async () => {
-        if (this.connectPromise) {
-          await this.connectPromise.catch(() => undefined);
-        }
-        if (!this.cookies.hasSeededOnce) {
-          await this.connect().catch(() => undefined);
-        }
-      },
+      awaitConnection: () => this.prepareLogins(),
       getSeedTabContents: () => this.tabs.first()?.view.webContents,
       cookieMirrorIntervalMs: options.cookieMirrorIntervalMs,
       navigationReseedThrottleMs: options.navigationReseedThrottleMs,
@@ -603,10 +622,48 @@ export class InAppBrowserService {
     return this.snapshot();
   }
 
+  private async prepareLogins(): Promise<void> {
+    if (this.disposed) return;
+    if (this.cookies.hasSeededOnce) {
+      if (this.state.connection !== "connected") {
+        void this.ensureConnectionOnDemand().catch(() => undefined);
+      }
+      return;
+    }
+    const extensionConnected = await settleWithin(
+      this.options.getExtensionStatus(),
+      LOGIN_PROBE_TIMEOUT_MS,
+      false,
+    );
+    if (this.disposed) return;
+    if (extensionConnected) {
+      await settleWithin(
+        this.connect().then(() => undefined),
+        LOGIN_SEED_WAIT_MS,
+        undefined,
+      );
+      return;
+    }
+    const stillChecking = this.state.connection === "checking";
+    const attempt = this.connectPromise ?? this.connect();
+    void attempt.catch(() => undefined);
+    if (
+      stillChecking &&
+      this.options.getBrowserSetupStatus?.().extensionInstalled
+    ) {
+      await settleWithin(
+        attempt.then(() => undefined),
+        INSTALLED_EXTENSION_WAIT_MS,
+        undefined,
+      );
+    }
+  }
+
   async createTab(
     options: { url?: string; ownerId?: string; activate?: boolean } = {},
   ): Promise<BrowserViewState> {
     await this.ensureSessionInitialized({});
+    await this.prepareLogins();
     const browserSession = this.browserSession;
     if (!browserSession) throw new Error("Browser session is unavailable.");
     const ownerId = resolveOwnerId(options.ownerId);
@@ -713,32 +770,9 @@ export class InAppBrowserService {
     return tab.id;
   }
 
-  /** Agent web tabs need the extension's cookie mirror; previews do not. */
-  private async requireAgentWebConnection() {
-    if (await this.ensureConnectionOnDemand()) return;
-    // `updateUnavailableConnection` already described the real failure, so
-    // there is no guess left to make here.
-    throw new Error(
-      this.connectionError ??
-        this.describeConnectionFailure(
-          this.connectionUnavailableReason,
-          undefined,
-        ),
-    );
-  }
-
   /**
-   * What is actually wrong, in words the reader can act on.
-   *
-   * The old text was one hard-coded sentence — "Connect the Stella browser
-   * extension before using Stella Browser." — reached whenever the connection
-   * was not green and no error string happened to be set. Most failure reasons
-   * set no error string (`extension_disconnected` and friends pass `error:
-   * undefined`), so that one sentence was the normal output for a daemon that
-   * never started, a bridge the extension cannot reach, an authorization
-   * failure and a genuinely missing extension alike. It named the one cause
-   * that is usually NOT the problem, and the extension was often installed and
-   * enabled the whole time.
+   * Why the login link is down, in words the reader can act on. The browser
+   * itself works regardless; this only explains why pages open signed out.
    */
   private describeConnectionFailure(
     reason: BrowserViewUnavailableReason | undefined,
@@ -760,50 +794,50 @@ export class InAppBrowserService {
         reason === undefined)
     ) {
       return withDetail(
-        "Stella Browser is unavailable because this Stella instance runs an " +
-          "isolated browser bridge, which the browser extension cannot reach " +
-          "(no native-messaging host, private loopback port). This is a Stella " +
-          "instance configuration, not a problem with your extension. Run the " +
-          "installed Stella app, or start this instance with " +
-          "STELLA_BROWSER_BRIDGE=shared to claim the shared bridge.",
+        "Stella Browser works, but without your browser's logins: this Stella " +
+          "instance runs an isolated browser bridge, which the browser " +
+          "extension cannot reach (no native-messaging host, private loopback " +
+          "port). Run the installed Stella app, or start this instance with " +
+          "STELLA_BROWSER_BRIDGE=shared, to use your logins.",
       );
     }
     switch (reason) {
       case "bridge_missing":
         return withDetail(
-          "Stella Browser is unavailable because the stella-browser bridge " +
-            "binary is not installed for this platform, so no bridge daemon " +
-            "can start. Reinstall or rehydrate stella-browser.",
+          "The stella-browser bridge binary is not installed for this " +
+            "platform, so agents cannot drive Stella Browser and your logins " +
+            "cannot be imported. Reinstall or rehydrate stella-browser.",
         );
       case "extension_not_installed":
         return withDetail(
-          "Stella Browser needs the Stella browser extension, which is not " +
-            `installed in any supported browser. Install it from ${STELLA_BROWSER_EXTENSION_STORE_URL}, ` +
-            "then open Browser in Stella's sidebar and press Connect.",
+          "Stella Browser works without the extension, but pages open signed " +
+            "out. To use your browser's logins, install the Stella browser " +
+            `extension from ${STELLA_BROWSER_EXTENSION_STORE_URL}, then press ` +
+            "Connect in Stella's Browser panel.",
         );
       case "extension_disconnected":
         return withDetail(
-          "Stella Browser could not reach the Stella browser extension: the " +
-            "bridge daemon is running but no extension attached within the " +
-            "retry window. The extension is installed, so this is usually its " +
-            "background service worker not waking. Open or focus a tab in the " +
-            "browser where it is installed, or open Browser in Stella's " +
-            "sidebar and press Connect.",
+          "Stella Browser works, but it is not using your browser's logins " +
+            "right now: the Stella browser extension is installed but did not " +
+            "attach to the bridge. Open or focus a tab in the browser where it " +
+            "is installed, then press Connect in Stella's Browser panel.",
         );
       case "authorization_failed":
         return withDetail(
-          "Stella Browser could not authorize against the browser bridge " +
-            "daemon, so its token is stale. Restarting Stella reissues it.",
+          "Stella Browser works, but could not authorize against the browser " +
+            "bridge daemon to import your logins. Restarting Stella reissues " +
+            "its token.",
         );
       case "connection_lost":
         return withDetail(
-          "Stella Browser lost its connection to the browser bridge daemon " +
-            "and could not re-establish it within the retry window.",
+          "Stella Browser works, but lost its link to the browser bridge, so " +
+            "your logins are not being kept in sync. Stella keeps retrying.",
         );
       default:
         return withDetail(
-          "Stella Browser could not connect to the browser bridge. Stella " +
-            "restarted the bridge and retried; it did not come up.",
+          "Stella Browser works, but could not reach the browser bridge to " +
+            "import your logins. Stella restarted the bridge and retried; it " +
+            "did not come up.",
         );
     }
   }
@@ -898,7 +932,6 @@ export class InAppBrowserService {
         resolvedOwnerId,
       );
     } else {
-      await this.requireAgentWebConnection();
       tabId = (await this.createTab({ url, ownerId: resolvedOwnerId }))
         .activeTabId;
     }
@@ -985,6 +1018,8 @@ export class InAppBrowserService {
     this.disposed = true;
     this.visible = false;
     this.cookies.dispose();
+    this.releaseSessionCookies?.();
+    this.releaseSessionCookies = null;
     this.detachAttachedView();
     for (const tab of this.tabs.all()) {
       this.closeTabInternal(tab.id, tab.ownerId);
@@ -1039,6 +1074,8 @@ export class InAppBrowserService {
         shouldAllowAuthDevice(details),
       );
       this.cookies.attachSession(this.browserSession);
+      this.releaseSessionCookies = keepSessionCookies(this.browserSession);
+      void trimInAppBrowserStorage(this.profilePath, this.browserSession);
       this.state.profileName =
         this.profileImport.profileName ??
         this.profileImport.profileId ??
@@ -1317,8 +1354,12 @@ export class InAppBrowserService {
   }
 
   private errorForOwner(ownerId: string) {
+    return this.errorsByOwner.get(ownerId);
+  }
+
+  private currentConnectionError() {
     return this.state.connection === "connected"
-      ? this.errorsByOwner.get(ownerId)
+      ? undefined
       : this.connectionError;
   }
 
@@ -1326,12 +1367,16 @@ export class InAppBrowserService {
     const error = this.errorForOwner(this.tabs.visibleOwnerId);
     if (error) this.state.error = error;
     else delete this.state.error;
+    const connectionError = this.currentConnectionError();
+    if (connectionError) this.state.connectionError = connectionError;
+    else delete this.state.connectionError;
   }
 
   private snapshot(ownerId?: string) {
     if (ownerId === undefined) return cloneState(this.state);
     const activeTabId = this.tabs.activeTabId(ownerId);
     const error = this.errorForOwner(ownerId);
+    const connectionError = this.currentConnectionError();
     return cloneState({
       connection: this.state.connection,
       ...(this.state.profileName
@@ -1342,6 +1387,7 @@ export class InAppBrowserService {
       tabs: this.tabs.ownerTabStates(ownerId),
       ...(activeTabId ? { activeTabId } : {}),
       ...(error ? { error } : {}),
+      ...(connectionError ? { connectionError } : {}),
       ...(this.connectionUnavailableReason
         ? { unavailableReason: this.connectionUnavailableReason }
         : {}),

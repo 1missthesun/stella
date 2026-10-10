@@ -36,6 +36,7 @@ export type BrowserViewState = {
   tabs: BrowserViewTabState[];
   activeTabId?: string;
   error?: string;
+  connectionError?: string;
   unavailableReason?: BrowserViewUnavailableReason;
 };
 

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import type {
   AgentModelReasoningEffort,
-  CloudExecutionSelection,
+  LegacyCloudExecutionSelection,
 } from "@stella/contracts/agent-engine";
 import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
 import { Button } from "@/ui/button";
@@ -38,13 +38,13 @@ export function ProviderAccountsCard() {
   const chatEngine = connections?.execution.engine ?? "stella";
   const refreshing = isAuthenticated && connections === undefined;
 
-  const chooseEngine = async (engine: CloudExecutionSelection["engine"]) => {
+  const chooseEngine = async (engine: LegacyCloudExecutionSelection["engine"]) => {
     if (engine === chatEngine) return;
     setSwitching(true);
     try {
       const reasoningEffort: AgentModelReasoningEffort =
         connections?.execution.reasoningEffort ?? "default";
-      const execution: CloudExecutionSelection =
+      const execution: LegacyCloudExecutionSelection =
         engine === "stella"
           ? {
               engine,

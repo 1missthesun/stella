@@ -513,6 +513,11 @@ export type RunnerPublicApi = {
   runAutomationTurn: (
     payload: RuntimeAutomationTurnRequest,
   ) => Promise<RuntimeAutomationTurnResult>;
+  /**
+   * Share the local files and folders `text` links with the owner's other
+   * devices: an agent report written here, delivered to a chat elsewhere.
+   */
+  publishLinkedFiles: (text: string) => void;
   runBlockingLocalAgent: (
     request: Omit<AgentToolRequest, "storageMode"> & {
       executionId?: string;

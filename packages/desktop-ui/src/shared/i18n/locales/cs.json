@@ -1551,7 +1551,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2456,7 +2456,17 @@
     "browser": {
       "connected": "Prohlížeč připojen",
       "connecting": "Čekání na rozšíření…",
-      "newTab": "Otevřít novou kartu"
+      "dismiss": "Zavřít",
+      "emptyBody": "Přihlaste se zde k webu jednou a Stella vás nechá přihlášené, pro vás i vaše agenty.",
+      "emptyBodyConnected": "Weby se otevírají s přihlášením z vašeho prohlížeče.",
+      "emptyTitle": "Prohlížeč Stella",
+      "newTab": "Otevřít novou kartu",
+      "openErrorTitle": "Prohlížeč se nepodařilo otevřít",
+      "pageErrorTitle": "Tuto stránku se nepodařilo načíst",
+      "reconnectExtension": "Znovu připojit rozšíření",
+      "serviceMissing": "Chybí služba prohlížeče. Pro použití tohoto prohlížeče přeinstalujte Stellu.",
+      "signInHint": "Přihlaste se zde ke stránkám jednou. Stella si to zapamatuje.",
+      "useMyLogins": "Použít přihlášení z mého prohlížeče"
     },
     "capture": {
       "failedDescription": "Při pořizování snímku obrazovky se něco pokazilo. Zkuste to znovu.",
@@ -2680,6 +2690,14 @@
         "eyebrow": "Živý náhled",
         "openInBrowser": "Otevřít v prohlížeči",
         "reload": "Načíst znovu"
+      },
+      "folder": {
+        "back": "Zpět",
+        "onDevice": "Na zařízení {device}",
+        "failedTitle": "Tuto složku nelze otevřít",
+        "failedBody": "Obsah této složky nelze zobrazit.",
+        "emptyTitle": "Tato složka je prázdná",
+        "truncated": "Zobrazuje se jen prvních {count}."
       }
     },
     "displayPanel": {

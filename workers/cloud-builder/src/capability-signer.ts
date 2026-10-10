@@ -145,7 +145,7 @@ export const mintTurnCapability = async (
   }
   if (
     !execution ||
-    execution.engine !== execution.provider ||
+    (execution.engine !== "provider" && execution.engine !== execution.provider) ||
     typeof execution.model !== "string" ||
     execution.model.trim().length === 0 ||
     typeof execution.reasoningEffort !== "string"

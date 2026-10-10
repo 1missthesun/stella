@@ -4,8 +4,8 @@
  *  - macOS only: the Accessibility and Screen Recording permissions Stella
  *    needs to act on the screen. Enabled inline; a screen grant needs a
  *    relaunch, which the card offers rather than nags about.
- *  - The Chrome extension, which lets Stella see and act inside the
- *    user's own browser tabs.
+ *  - The optional Chrome extension, which brings the user's browser logins
+ *    into Stella and lets it act inside their own tabs.
  *  - Signed-in users only: the cloud Memory preference, which the server
  *    requires an explicit acknowledgement for before Stella's first run.
  */
@@ -122,7 +122,7 @@ export function ExtrasCard({
   if (answered !== undefined) {
     const parts: string[] = [];
     if (isMac) parts.push(t("onboarding.chat.extras.settledPermissions"));
-    parts.push(t("onboarding.chat.extras.settledExtension"));
+    if (extensionOpened) parts.push(t("onboarding.chat.extras.settledExtension"));
     if (showMemory) parts.push(t("onboarding.chat.extras.settledMemory"));
     return (
       <div className="obc-card" data-settled>
@@ -135,7 +135,9 @@ export function ExtrasCard({
               ? t("onboarding.chat.extras.settledSkippedTitle")
               : t("onboarding.chat.extras.settledTitle")}
           </span>
-          <span className="obc-card__settled-desc">{parts.join(" · ")}</span>
+          {parts.length > 0 ? (
+            <span className="obc-card__settled-desc">{parts.join(" · ")}</span>
+          ) : null}
         </span>
       </div>
     );

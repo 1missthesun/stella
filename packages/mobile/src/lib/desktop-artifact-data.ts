@@ -1,24 +1,27 @@
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
-import type { DeviceFileLocation } from "@stella/contracts/backend/drive";
-import {
-  deviceFileElsewhereMessage,
-  pickDeviceFileLocation,
-} from "@stella/contracts/device-files";
-import { getBackendClient } from "./backend";
 import {
   decodeUtf8,
   isDeviceNotFoundError,
   requestDevice,
 } from "./device-requests";
+import {
+  isLinkedFileMissingError,
+  linkedSourceIsFolder,
+  readLinkedFileBytes,
+  resolveLinkedFile,
+  type LinkedFileSource,
+} from "./linked-device-files";
 import type { StoredPhoneAccess } from "./phone-access";
-import { EVIDENCE_THUMBNAIL_VARIANT } from "@stella/contracts/chat-evidence-thumbnails";
+
+export { locateDeviceFile } from "./linked-device-files";
 
 /**
- * Files and office previews that live on the paired computer. The phone asks
- * the cloud, the cloud asks the computer over its presence connection, and the
- * bytes stream back through without being stored anywhere. The computer
- * decides what may be read (Stella's own outputs and files from the
- * conversation); see `device-requests.ts` for the offline and refusal errors.
+ * Files and office previews that live on the owner's computers. The phone asks
+ * the cloud, the cloud asks the computer that has the file over its presence
+ * connection, and the bytes stream back through without being stored anywhere.
+ * Each computer decides what may be read (Stella's own outputs and files from
+ * the conversation); see `linked-device-files.ts` for how the computer is
+ * found and `device-requests.ts` for the offline and refusal errors.
  */
 
 export type DesktopFileReadResult =
@@ -30,7 +33,6 @@ export type DesktopFileReadResult =
     }
   | { missing: true; mimeType: string; path: string };
 
-const FILE_READ_TIMEOUT_MS = 120_000;
 const OFFICE_PREVIEW_TIMEOUT_MS = 60_000;
 
 const assertActive = (signal?: AbortSignal): void => {
@@ -48,143 +50,64 @@ const assertActive = (signal?: AbortSignal): void => {
  * machine. Drive files never get here: `stellaFileChatArtifact` routes them to
  * the owner-scoped drive URL first.
  */
-const assertReadableOnPairedComputer = (filePath: string): void => {
+export const assertReadableOnPairedComputer = (filePath: string): void => {
   if (!isCloudWorkspacePath(filePath)) return;
   throw new Error(
     "This file lives in Stella's cloud workspace, not on your computer, so it can't be opened from your phone. Ask Stella to put it in your Drive.",
   );
 };
 
+const MAX_IN_MEMORY_BYTES = 64 * 1024 * 1024;
+
+const missingResult = (filePath: string): DesktopFileReadResult => ({
+  missing: true,
+  mimeType: "application/octet-stream",
+  path: filePath,
+});
+
 // `async` so a refused path rejects rather than throwing synchronously: one
 // caller chains `.then().catch()` straight off this inside an effect, where a
 // synchronous throw would escape the catch and take the screen down.
-export const readDesktopArtifactFile = async (
-  access: StoredPhoneAccess,
-  conversationId: string,
-  filePath: string,
-  signal?: AbortSignal,
-): Promise<DesktopFileReadResult> => {
-  assertReadableOnPairedComputer(filePath);
-  assertActive(signal);
-  try {
-    const { bytes, contentType } = await requestDevice(
-      access,
-      "file.read",
-      { filePath, conversationId },
-      { signal, timeoutMs: FILE_READ_TIMEOUT_MS },
-    );
-    assertActive(signal);
-    return {
-      missing: false,
-      bytes,
-      sizeBytes: bytes.byteLength,
-      mimeType: contentType,
-    };
-  } catch (error) {
-    assertActive(signal);
-    if (isDeviceNotFoundError(error)) {
-      return {
-        missing: true,
-        mimeType: "application/octet-stream",
-        path: filePath,
-      };
-    }
-    throw error;
-  }
-};
-
-export const readDesktopArtifactThumbnail = async (
-  access: StoredPhoneAccess,
-  conversationId: string,
-  filePath: string,
-  signal?: AbortSignal,
-): Promise<{ bytes: Uint8Array; mimeType: string }> => {
-  assertReadableOnPairedComputer(filePath);
-  const { bytes, contentType } = await requestDevice(
-    access,
-    "file.read",
-    { filePath, conversationId, variant: EVIDENCE_THUMBNAIL_VARIANT },
-    { signal, timeoutMs: FILE_READ_TIMEOUT_MS },
-  );
-  return { bytes, mimeType: contentType };
-};
-
-export const locateDeviceFile = async (
-  filePath: string,
-): Promise<DeviceFileLocation | null> => {
-  try {
-    const { files } = await getBackendClient().call("drive.locateDeviceFiles", {
-      paths: [filePath],
-    });
-    return pickDeviceFileLocation(files, filePath);
-  } catch {
-    return null;
-  }
-};
-
-const readDriveCopy = async (
-  drivePath: string,
-  signal?: AbortSignal,
-): Promise<DesktopFileReadResult> => {
-  const file = await getBackendClient().call("drive.fileUrl", {
-    path: drivePath,
-  });
-  const response = await fetch(file.url, { signal });
-  if (!response.ok) {
-    throw new Error("Couldn't load the copy of this file in your Drive.");
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  return {
-    missing: false,
-    bytes,
-    sizeBytes: bytes.byteLength,
-    mimeType: file.contentType || "application/octet-stream",
-  };
-};
-
 export const readLinkedArtifactFile = async (
   access: StoredPhoneAccess | null,
   conversationId: string,
   filePath: string,
   signal?: AbortSignal,
+  options?: { preferDeviceId?: string | null; maxBytes?: number },
 ): Promise<DesktopFileReadResult> => {
   assertReadableOnPairedComputer(filePath);
-  const location = await locateDeviceFile(filePath);
   assertActive(signal);
-  let copyError: unknown = null;
-  if (location?.drivePath) {
-    try {
-      const copy = await readDriveCopy(location.drivePath, signal);
-      assertActive(signal);
-      return copy;
-    } catch (error) {
-      assertActive(signal);
-      copyError = error;
-    }
-  }
-  if (copyError && (!access || location?.deviceId !== access.desktopDeviceId)) {
-    throw copyError;
-  }
-  const elsewhere =
-    location && location.deviceId !== access?.desktopDeviceId
-      ? new Error(deviceFileElsewhereMessage(location.deviceName))
-      : null;
-  if (elsewhere) throw elsewhere;
-  if (!access) {
-    throw new Error("Pair this phone with your desktop again.");
-  }
+  let source: LinkedFileSource;
   try {
-    const result = await readDesktopArtifactFile(
-      access,
-      conversationId,
-      filePath,
-      signal,
-    );
-    if (result.missing && elsewhere) throw elsewhere;
-    return result;
+    source = await resolveLinkedFile(access, conversationId, filePath, {
+      ...(signal ? { signal } : {}),
+      preferDeviceId: options?.preferDeviceId ?? null,
+    });
   } catch (error) {
     assertActive(signal);
-    throw elsewhere ?? error;
+    if (isLinkedFileMissingError(error)) return missingResult(filePath);
+    throw error;
+  }
+  assertActive(signal);
+  if (linkedSourceIsFolder(source)) {
+    throw new Error("This is a folder, not a file.");
+  }
+  try {
+    const { bytes, mimeType } = await readLinkedFileBytes(
+      source,
+      conversationId,
+      filePath,
+      {
+        ...(signal ? { signal } : {}),
+        maxBytes: options?.maxBytes ?? MAX_IN_MEMORY_BYTES,
+      },
+    );
+    assertActive(signal);
+    return { missing: false, bytes, sizeBytes: bytes.byteLength, mimeType };
+  } catch (error) {
+    assertActive(signal);
+    if (isDeviceNotFoundError(error)) return missingResult(filePath);
+    throw error;
   }
 };
 

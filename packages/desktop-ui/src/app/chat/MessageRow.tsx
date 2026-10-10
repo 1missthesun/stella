@@ -54,9 +54,14 @@ import type { ConversationFileEntry } from "@/features/workspace-display/derive-
 import { MessageAttachments } from "@/app/chat/evidence/MessageAttachments";
 import {
   dropAttachmentOnlyLines,
-  extractLocalFileLinkPaths,
+  extractFileLinkTargets,
 } from "@stella/contracts/local-file-links";
-import { cloudWorldDrivePath } from "@stella/contracts/cloud-world-paths";
+import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
+import { evidenceSourceKind } from "@stella/contracts/chat-evidence-naming";
+import {
+  evidenceCardDrivePath,
+  useDriveEvidenceCards,
+} from "@/features/chat/hooks/use-drive-evidence-cards";
 import { AppPreviewCard } from "@/features/cloud/AppPreviewCard";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import { VoiceSessionCard } from "@/app/chat/VoiceSessionCard";
@@ -656,8 +661,30 @@ export const AssistantMessageRow = memo(
       row.agentCompletion && row.agentCompletion.sections.length > 0,
     );
     const linkedFiles = row.linkedFiles ?? [];
-    const evidencePaths = hasText ? extractLocalFileLinkPaths(text) : [];
+    const linkTargets = hasText ? extractFileLinkTargets(text) : [];
+    const evidencePaths = linkTargets.filter((target) => !driveLinkPath(target));
     const evidencePathSet = new Set(evidencePaths);
+    const linkedDrivePaths = [
+      ...new Set(
+        linkTargets.flatMap((target) => {
+          const drivePath = driveLinkPath(target);
+          return drivePath ? [drivePath] : [];
+        }),
+      ),
+    ];
+    const driveCards = useDriveEvidenceCards(
+      linkedDrivePaths.filter((drivePath) => {
+        const kind = evidenceSourceKind(drivePath, false);
+        return kind === "image" || kind === "video";
+      }),
+    );
+    const previewedDrivePaths = new Set(
+      driveCards.flatMap((card) => {
+        const drivePath = evidenceCardDrivePath(card);
+        return drivePath ? [drivePath] : [];
+      }),
+    );
+    const hasMedia = evidencePaths.length > 0 || driveCards.length > 0;
     const unpreviewableFiles = linkedFiles.filter(
       (file) => file.cloudDriveFile || !evidencePathSet.has(file.path),
     );
@@ -683,18 +710,21 @@ export const AssistantMessageRow = memo(
       : [];
     const replyFiles = [...completionFiles, ...attachedFiles].filter(
       (file, index, all) =>
-        (file.cloudDriveFile || !evidencePathSet.has(file.path)) &&
+        (file.cloudDriveFile
+          ? !previewedDrivePaths.has(file.cloudDriveFile.path)
+          : !evidencePathSet.has(file.path)) &&
         all.findIndex((other) => fileKey(other) === fileKey(file)) === index,
     );
     // Links whose files the reply attaches keep their words in a sentence
     // (the Markdown pass unlinks them); a line made only of such links goes.
     const hiddenFileKeys = [...completionFiles, ...linkedFiles]
       .map(fileKey)
-      .concat(evidencePaths.map((filePath) => `local:${filePath}`));
+      .concat(evidencePaths.map((filePath) => `local:${filePath}`))
+      .concat(linkedDrivePaths.map((drivePath) => `cloud:${drivePath}`));
     const hiddenFileKeySet = new Set(hiddenFileKeys);
     const bodyText = hasText
       ? dropAttachmentOnlyLines(text, (filePath) => {
-          const drivePath = cloudWorldDrivePath(filePath);
+          const drivePath = driveLinkPath(filePath);
           return (
             hiddenFileKeySet.has(`local:${filePath}`) ||
             (drivePath !== null && hiddenFileKeySet.has(`cloud:${drivePath}`))
@@ -781,17 +811,25 @@ export const AssistantMessageRow = memo(
               )}
             </div>
           )}
-          {hasBody && (inlineImageStrip || evidencePaths.length > 0) ? (
+          {hasBody && (inlineImageStrip || hasMedia) ? (
             <div className="assistant-media">
               {inlineImageStrip}
-              {evidencePaths.length > 0 ? (
-                <MessageAttachments filePaths={evidencePaths} part="media" />
+              {hasMedia ? (
+                <MessageAttachments
+                  filePaths={evidencePaths}
+                  part="media"
+                  driveCards={driveCards}
+                />
               ) : null}
             </div>
           ) : null}
-          {!hasBody && evidencePaths.length > 0 ? (
+          {!hasBody && hasMedia ? (
             <div className="assistant-media">
-              <MessageAttachments filePaths={evidencePaths} part="media" />
+              <MessageAttachments
+                filePaths={evidencePaths}
+                part="media"
+                driveCards={driveCards}
+              />
               <MessageAttachments filePaths={evidencePaths} part="documents" />
             </div>
           ) : null}

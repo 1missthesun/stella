@@ -12,6 +12,7 @@
  * `ipc-contract.ts`, the method here, and the handler in main through
  * `electron/ipc/typed-ipc.ts`.
  */
+import type { DriveEvidenceSource } from "../chat-evidence.js";
 import type { ChatContext } from "../index.js";
 import type { BrowserFetchInit } from "./ipc-contract.js";
 import type {
@@ -89,6 +90,7 @@ import {
   IPC_CHAT_CONTEXT_SET,
   IPC_CHAT_CONTEXT_UPDATED,
   IPC_CHAT_EVIDENCE_CARDS,
+  IPC_CHAT_EVIDENCE_DRIVE_CARDS,
   IPC_CHAT_OPEN_SIDEBAR,
   IPC_CHATGPT_CANCEL_SIGN_IN,
   IPC_CHATGPT_LIST_MODELS,
@@ -173,9 +175,12 @@ import {
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
+  IPC_DISPLAY_LIST_FOLDER,
   IPC_DISPLAY_MEDIA_SOURCE,
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
+  IPC_DISPLAY_OPEN_SHARE_LINK,
   IPC_DISPLAY_READ_FILE,
+  IPC_DISPLAY_STAT_PATH,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
   IPC_DISPLAY_UPDATE,
@@ -478,6 +483,21 @@ export const createElectronApi = (
        */
       mediaSource: (filePath: string) =>
         ipc.invoke(IPC_DISPLAY_MEDIA_SOURCE, { filePath }),
+      /**
+       * Whether a path is a file or a folder, on this computer or on the
+       * other computer of the user's that has it.
+       */
+      statPath: (filePath: string, options?: { conversationId?: string | null }) =>
+        ipc.invoke(IPC_DISPLAY_STAT_PATH, {
+          filePath,
+          conversationId: options?.conversationId,
+        }),
+      /** A folder's entries, on this computer or on the computer that has it. */
+      listFolder: (filePath: string, options?: { conversationId?: string | null }) =>
+        ipc.invoke(IPC_DISPLAY_LIST_FOLDER, {
+          filePath,
+          conversationId: options?.conversationId,
+        }),
       listCanvasHtml: invoker(IPC_DISPLAY_LIST_CANVAS_HTML),
       /**
        * Fetches a shared canvas (`<CANVAS_SHARE_BASE_URL>/c/<slug>`) in main,
@@ -486,6 +506,12 @@ export const createElectronApi = (
        * a valid share link or the fetch fails.
        */
       openSharedCanvas: invoker(IPC_DISPLAY_OPEN_SHARED_CANVAS),
+      /**
+       * A canvas-share link the main process caught (a new-window or
+       * navigation request). The renderer opens it the way a chat click
+       * does, asking the backend for the owner's grant first.
+       */
+      onOpenShareLink: on(IPC_DISPLAY_OPEN_SHARE_LINK),
       /**
        * The `stella-canvas://` URL a canvas iframe loads a local HTML file
        * from (its own origin and CSP, with the Ask Stella bridge injected).
@@ -514,6 +540,8 @@ export const createElectronApi = (
     chatEvidence: {
       cards: (filePaths: string[]) =>
         ipc.invoke(IPC_CHAT_EVIDENCE_CARDS, { filePaths }),
+      driveCards: (files: DriveEvidenceSource[]) =>
+        ipc.invoke(IPC_CHAT_EVIDENCE_DRIVE_CARDS, { files }),
     },
 
     ui: {

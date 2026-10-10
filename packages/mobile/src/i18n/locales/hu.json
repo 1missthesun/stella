@@ -1531,7 +1531,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2434,7 +2434,17 @@
     "browser": {
       "connected": "Böngésző csatlakoztatva",
       "connecting": "Várakozás a bővítményre…",
-      "newTab": "Új lap megnyitása"
+      "dismiss": "Bezárás",
+      "emptyBody": "Jelentkezz be itt egyszer egy webhelyre, és Stella bejelentkezve tart, neked és az ügynökeidnek.",
+      "emptyBodyConnected": "A webhelyek a böngésződ bejelentkezéseivel nyílnak meg.",
+      "emptyTitle": "Stella böngésző",
+      "newTab": "Új lap megnyitása",
+      "openErrorTitle": "A böngésző nem nyitható meg",
+      "pageErrorTitle": "Az oldal nem tölthető be",
+      "reconnectExtension": "Bővítmény újracsatlakoztatása",
+      "serviceMissing": "Hiányzik a böngészőszolgáltatás. A böngésző használatához telepítsd újra a Stellát.",
+      "signInHint": "Jelentkezz be itt egyszer a webhelyekre. Stella megjegyzi.",
+      "useMyLogins": "A böngészőm bejelentkezéseinek használata"
     },
     "capture": {
       "failedDescription": "Hiba történt a képernyőkép készítésekor. Próbáld újra.",
@@ -2648,6 +2658,14 @@
         "eyebrow": "Élő előnézet",
         "openInBrowser": "Megnyitás böngészőben",
         "reload": "Újratöltés"
+      },
+      "folder": {
+        "back": "Vissza",
+        "onDevice": "Ezen: {device}",
+        "failedTitle": "Ez a mappa nem nyitható meg",
+        "failedBody": "A mappa tartalma nem jeleníthető meg.",
+        "emptyTitle": "Ez a mappa üres",
+        "truncated": "Csak az első {count} látható."
       }
     },
     "displayPanel": {

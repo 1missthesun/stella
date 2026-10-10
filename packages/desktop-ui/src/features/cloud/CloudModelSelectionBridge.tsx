@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
-import { cloudEnginesApi, useCloudEngines } from "./cloud-engines-api";
+import {
+  cloudEnginesApi,
+  useAccountProviders,
+  useCloudEngines,
+} from "./cloud-engines-api";
 import { publishCloudExecutionSelection } from "./cloud-execution-store";
 import {
   cloudExecutionFromLocal,
@@ -27,10 +31,17 @@ export function CloudModelSelectionBridge() {
     window.electronAPI?.system?.setLocalModelPreferences,
   );
   const connections = useCloudEngines(isAuthenticated && hasLocalRuntime);
+  const providers = useAccountProviders(isAuthenticated && hasLocalRuntime);
   const serverRef = useRef<CloudExecutionSelection | null>(null);
+  const accountProvidersRef = useRef<ReadonlySet<string>>(new Set());
+  accountProvidersRef.current = new Set(
+    (providers?.providers ?? [])
+      .filter((provider) => provider.connection?.status === "ok")
+      .map((provider) => provider.id),
+  );
   const queue = useRef<Promise<void>>(Promise.resolve());
 
-  const execution = connections?.execution;
+  const execution = connections?.selection ?? connections?.execution;
   const selectedAt = connections?.selectedAt;
   const loaded = connections !== undefined;
 
@@ -41,7 +52,7 @@ export function CloudModelSelectionBridge() {
   };
 
   const pushLocal = (local: MirroredModelPreferences) => {
-    const derived = cloudExecutionFromLocal(local);
+    const derived = cloudExecutionFromLocal(local, accountProvidersRef.current);
     const server = serverRef.current;
     if (!derived || (server && sameCloudExecution(derived, server))) return;
     serverRef.current = derived;
@@ -60,7 +71,7 @@ export function CloudModelSelectionBridge() {
         return;
       }
       serverRef.current = execution;
-      const current = cloudExecutionFromLocal(local);
+      const current = cloudExecutionFromLocal(local, accountProvidersRef.current);
       if (current && sameCloudExecution(current, execution)) return;
       await window.electronAPI?.system?.setLocalModelPreferences?.(
         localPatchForCloudExecution(local, execution),
@@ -73,6 +84,7 @@ export function CloudModelSelectionBridge() {
     loaded,
     selectedAt,
     execution?.engine,
+    execution?.provider,
     execution?.model,
     execution?.reasoningEffort,
   ]);

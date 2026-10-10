@@ -13,6 +13,7 @@
  *   POST /api/native-oauth/token                 one token exchange
  *   GET  /api/x/connect-url | /api/x/connections, POST /api/x/request
  *   GET  /api/x/oauth_callback                   X's redirect, with the signed state
+ *   GET  /api/providers/oauth/callback           a provider sign-in's redirect: shows the code to paste
  *
  * Bearer JWTs are verified here and owner work runs in the owner's object,
  * as `/api/rpc` does. Errors are `{ error }` with the RPC error's status.
@@ -20,6 +21,7 @@
 
 import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/protocol";
 import { X_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/integrations";
+import { PROVIDER_OAUTH_CALLBACK_PATH } from "@stella/contracts/backend/providers";
 import { verifyOAuthState } from "../oauth-state.js";
 import { RpcError } from "../owner-store/errors.js";
 import { readJsonObject, type BodyResult } from "../http/body.js";
@@ -35,6 +37,43 @@ const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_ADMIN_BODY_BYTES = 8 * 1024 * 1024;
 
 type RouteEnv = Cloudflare.Env;
+
+const escapeHtml = (value: string): string =>
+  value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
+
+/**
+ * Where a provider sign-in (OpenRouter) lands. The code is only useful with
+ * the verifier the owner's object holds, so the page just shows it for the
+ * user to paste back into Stella.
+ */
+const providerCallbackPage = (request: Request): Response => {
+  const code = new URL(request.url).searchParams.get("code")?.trim() ?? "";
+  const valid = /^[A-Za-z0-9._~-]{1,512}$/.test(code);
+  const body = valid
+    ? `<h1>Almost done</h1><p>Copy this code and paste it into Stella.</p>
+<pre id="code">${escapeHtml(code)}</pre>
+<button onclick="navigator.clipboard.writeText(document.getElementById('code').textContent).then(()=>{this.textContent='Copied'})">Copy code</button>`
+    : `<h1>Sign-in didn't finish</h1><p>No code came back. Start signing in again from Stella.</p>`;
+  return new Response(
+    `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Stella sign-in</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #0a0a0a; color: #e5e5e5; }
+  main { text-align: center; padding: 2rem; max-width: 460px; }
+  pre { background: #171717; padding: 1rem; border-radius: 10px; white-space: pre-wrap; word-break: break-all; user-select: all; font-size: 1rem; }
+  button { background: #e5e5e5; color: #0a0a0a; border: 0; border-radius: 999px; padding: .7rem 1.4rem; font-size: 1rem; }
+  p { color: #a3a3a3; line-height: 1.6; }
+</style></head><body><main>${body}</main></body></html>`,
+    {
+      status: valid ? 200 : 400,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+        "referrer-policy": "no-referrer",
+      },
+    },
+  );
+};
 
 const failError = (error: unknown): Response => {
   if (error instanceof RpcError) return failRpcError(error);
@@ -242,6 +281,8 @@ export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): 
       return method === "POST" ? await xRequest(request, env) : methodNotAllowed();
     case X_OAUTH_CALLBACK_PATH:
       return method === "GET" ? await xCallback(request, env) : methodNotAllowed();
+    case PROVIDER_OAUTH_CALLBACK_PATH:
+      return method === "GET" ? providerCallbackPage(request) : methodNotAllowed();
     default:
       return null;
   }

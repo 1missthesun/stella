@@ -266,11 +266,72 @@
 
 .browser-section__page {
   position: relative;
+  display: flex;
   flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   background: var(--background);
+}
+
+.browser-section__login-banner {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 5px 6px 5px 12px;
+  border-bottom: 1px solid var(--border-weak);
+  color: var(--text-weak);
+  background: color-mix(in oklch, var(--background) 96%, var(--foreground));
+}
+
+.browser-section__login-banner > svg {
+  flex: 0 0 auto;
+}
+
+.browser-section__login-banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.browser-section__login-banner-link,
+.browser-section__status-link {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-base);
+  background: none;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, currentColor 35%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.browser-section__login-banner-link:hover:not(:disabled),
+.browser-section__status-link:hover:not(:disabled) {
+  text-decoration-color: currentColor;
+}
+
+.browser-section__login-banner-link:disabled,
+.browser-section__status-link:disabled {
+  color: var(--text-weak);
+  cursor: default;
+}
+
+.browser-section__status-link {
+  margin-top: -2px;
+  color: var(--text-weak);
 }
 
 .browser-section button:focus-visible,

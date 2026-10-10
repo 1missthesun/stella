@@ -192,6 +192,13 @@ export type BillingControlRpc = {
   engineAccess(
     request: EngineAccessRequest,
   ): Promise<BillingControlResult<EngineAccessResponse>>;
+  /**
+   * The owner's saved credential for an account provider, for the BYOK
+   * lane; `engine_sign_in_required` when its sign-in ended, 404 when none.
+   */
+  providerAccess(
+    request: ProviderAccessRequest,
+  ): Promise<BillingControlResult<ProviderAccessResponse>>;
 };
 
 export type { IdentityLevel };
@@ -219,4 +226,39 @@ export type EngineAccessResponse = {
 export type EngineAccessResult =
   | EngineAccessResponse
   | { needsSignIn: true; engineAccountId: string }
+  | null;
+
+/** `BillingControl.providerAccess` request/response for the BYOK lane. */
+export type ProviderAccessRequest = {
+  ownerId: string;
+  ownerGeneration: string;
+  provider: string;
+};
+
+export type ProviderAccessResponse = {
+  /**
+   * Put where the caller put `GATEWAY_BYOK_PLACEHOLDER_KEY`. Without it,
+   * headers carrying the placeholder are dropped and `headers` authorize.
+   */
+  apiKey?: string;
+  /** Set on the upstream request (a sign-in whose token isn't an API key). */
+  headers?: Record<string, string>;
+  /** URL prefixes the provider is served at; an upstream URL must start with one. */
+  baseUrls: string[];
+  /**
+   * A credential bound to its own endpoint (GitHub Copilot's plan): a URL
+   * starting with `from` goes to `to` instead.
+   */
+  rebase?: { from: string; to: string };
+  /** Absolute ms timestamp; the gateway must not cache past this. */
+  expiresAt: number;
+};
+
+/**
+ * The owner object's `providers.access`: the credential, word that its
+ * sign-in ended, or null when the provider isn't connected.
+ */
+export type ProviderAccessResult =
+  | ProviderAccessResponse
+  | { needsSignIn: true }
   | null;

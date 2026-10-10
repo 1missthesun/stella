@@ -22,6 +22,8 @@ import { resolveJwtOwnerScope } from "@stella/runtime/kernel/runner/computer-age
 import { resolveCanonicalConversationFilePaths } from "../services/canonical-conversation-file-paths.js";
 import type { CloudConversationFileGrants } from "../services/cloud-conversation-file-grants.js";
 import { handleIpc } from "./typed-ipc.js";
+import type { PeerDeviceFiles } from "../services/peer-device-files.js";
+import { deviceFileReadRanges } from "@stella/contracts/device-file-reads";
 import {
   resolveDeviceFileSource,
   type DeviceFileSourceDeps,
@@ -42,6 +44,9 @@ type OfficePreviewHandlersOptions = {
   piLinkedFiles?: (conversationId: string) => Promise<readonly string[]>;
   /** Says which device has a file that is not on this computer. */
   deviceFiles?: DeviceFileSourceDeps;
+  /** Reads a document another of the owner's computers has, live. */
+  peerDeviceFiles?: PeerDeviceFiles;
+  getActiveConversationId?: () => string | null;
   assertPrivilegedSender: (
     event: IpcMainEvent | IpcMainInvokeEvent,
     channel: string,
@@ -54,6 +59,7 @@ type MobileOfficePreviewPolicy = {
 };
 
 const PREVIEW_ROOT_DIRNAME = "office-previews";
+const MAX_PEER_OFFICE_BYTES = 64 * 1024 * 1024;
 /** How long a phone's preview request waits for the render to finish. */
 const REMOTE_PREVIEW_TIMEOUT_MS = 40_000;
 const REMOTE_PREVIEW_POLL_MS = 500;
@@ -306,20 +312,48 @@ export const registerOfficePreviewHandlers = (
       );
     }
 
+    // A document on another of the owner's computers is copied from it into
+    // this preview's session and rendered from there.
+    let fetched: Uint8Array | null = null;
     const stats = await fs.stat(sourcePath).catch(async (caught: unknown) => {
       if ((caught as NodeJS.ErrnoException | null)?.code !== "ENOENT")
         throw caught;
+      const holder =
+        !policy && options.peerDeviceFiles
+          ? await options.peerDeviceFiles
+              .findHolder(requestedPath, {
+                conversationId: options.getActiveConversationId?.() ?? null,
+              })
+              .catch(() => null)
+          : null;
+      if (holder?.stat.kind === "file" && holder.stat.sizeBytes <= MAX_PEER_OFFICE_BYTES) {
+        const parts: Uint8Array[] = [];
+        for (const range of deviceFileReadRanges(holder.stat.sizeBytes)) {
+          parts.push(
+            (
+              await options.peerDeviceFiles!.read(
+                holder.computer.deviceId,
+                requestedPath,
+                range,
+                options.getActiveConversationId?.() ?? null,
+              )
+            ).bytes,
+          );
+        }
+        fetched = Buffer.concat(parts);
+        return null;
+      }
       const source = await resolveDeviceFileSource(
         requestedPath,
         options.deviceFiles ?? null,
       );
       throw new Error(
         source.kind === "drive"
-          ? `This file is on ${friendlyDeviceName(source.deviceName)}. Office previews of files from your other devices aren't available yet, so open it there.`
+          ? `This file is on ${friendlyDeviceName(source.deviceName)}, which isn't online. Open Stella there to preview it.`
           : deviceFileUnavailableMessage(source, requestedPath),
       );
     });
-    if (!stats.isFile()) {
+    if (stats && !stats.isFile()) {
       throw new Error(`Office preview target is not a file: ${sourcePath}`);
     }
 
@@ -340,6 +374,10 @@ export const registerOfficePreviewHandlers = (
     );
     const startedAt = Date.now();
     await writeManifest(sessionDir, ref, format, "starting", startedAt);
+    const renderPath = fetched
+      ? path.join(sessionDir, `source${path.extname(sourcePath).toLowerCase()}`)
+      : sourcePath;
+    if (fetched) await fs.writeFile(renderPath, fetched);
 
     const binaryPath = resolveOfficePreviewBinaryPath(
       stellaAppDir,
@@ -347,7 +385,7 @@ export const registerOfficePreviewHandlers = (
     );
     void (async () => {
       try {
-        const html = await renderOfficeHtml(binaryPath, sourcePath);
+        const html = await renderOfficeHtml(binaryPath, renderPath);
         await fs.writeFile(
           path.join(sessionDir, SESSION_HTML_NAME),
           html,

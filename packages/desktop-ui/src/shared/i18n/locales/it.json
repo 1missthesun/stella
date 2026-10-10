@@ -1541,7 +1541,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2445,7 +2445,17 @@
     "browser": {
       "connected": "Browser connesso",
       "connecting": "In attesa dell'estensione…",
-      "newTab": "Apri una nuova scheda"
+      "dismiss": "Chiudi",
+      "emptyBody": "Accedi a un sito qui una volta e Stella ti mantiene connesso, per te e i tuoi agenti.",
+      "emptyBodyConnected": "I siti si aprono con gli accessi del tuo browser.",
+      "emptyTitle": "Browser di Stella",
+      "newTab": "Apri una nuova scheda",
+      "openErrorTitle": "Impossibile aprire il browser",
+      "pageErrorTitle": "Impossibile caricare la pagina",
+      "reconnectExtension": "Ricollega l'estensione",
+      "serviceMissing": "Il servizio del browser non è presente. Reinstalla Stella per usare questo browser.",
+      "signInHint": "Accedi ai siti qui una volta. Stella se lo ricorda.",
+      "useMyLogins": "Usa gli accessi del mio browser"
     },
     "capture": {
       "failedDescription": "Qualcosa è andato storto durante lo screenshot. Riprova.",
@@ -2664,6 +2674,14 @@
         "eyebrow": "Anteprima dal vivo",
         "openInBrowser": "Apri nel browser",
         "reload": "Ricarica"
+      },
+      "folder": {
+        "back": "Indietro",
+        "onDevice": "Su {device}",
+        "failedTitle": "Impossibile aprire questa cartella",
+        "failedBody": "Impossibile mostrare il contenuto di questa cartella.",
+        "emptyTitle": "Questa cartella è vuota",
+        "truncated": "Vengono mostrati solo i primi {count}."
       }
     },
     "displayPanel": {

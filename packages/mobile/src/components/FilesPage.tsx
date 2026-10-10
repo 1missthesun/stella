@@ -17,8 +17,10 @@ import { authClient } from "../lib/auth-client";
 import {
   artifactFileKey,
   artifactFileSource,
+  conversationFilesFromDrive,
   type ConversationFile,
 } from "../lib/conversation-files";
+import { useBackendView } from "../lib/backend";
 import { isGuest } from "../lib/guest-mode";
 import { tapLight } from "../lib/haptics";
 import {
@@ -47,6 +49,8 @@ import { NativeMenu } from "./NativeMenu";
 import type { NativeMenuItem } from "./NativeMenu.types";
 
 const EMPTY_ARTIFACTS: ChatArtifact[] = [];
+/** The owner's newest drive files the page lists beside the conversation's. */
+const DRIVE_VIEW_ARGS = { limit: 200 };
 const EMPTY_PAIRED: StoredPhoneAccess[] = [];
 const SEARCH_HEIGHT = 40;
 const TOP_BAR_CONTROL = 44;
@@ -67,10 +71,12 @@ const fileName = (artifact: ChatArtifact): string => {
 /**
  * The Files page: every file Stella produced or shared in the conversation,
  * wherever it lives (the cloud drive, one of the owner's computers, or an
- * attachment the user sent), newest first. The list is read from the
- * conversation's journal, so it reaches files the chat has long scrolled
- * past; anything the chat holds that the journal has not answered for yet
- * shows too. Each opens in the chat's own viewer.
+ * attachment the user sent), plus everything in the owner's Stella Drive,
+ * newest first. The conversation's files are read from its journal, so they
+ * reach files the chat has long scrolled past; anything the chat holds that
+ * the journal has not answered for yet shows too. Drive files come from the
+ * live drive listing, so uploads and agent outputs from any device show even
+ * when no reply ever linked them. Each opens in the chat's own viewer.
  */
 export function FilesPage() {
   const colors = useColors();
@@ -88,6 +94,17 @@ export function FilesPage() {
     signedIn ? (hub?.conversationId ?? null) : null,
     hub?.revision ?? null,
   );
+  const driveFiles = useBackendView(
+    "drive.files",
+    signedIn ? DRIVE_VIEW_ARGS : "skip",
+  ).value;
+  const driveRows = useMemo(
+    () =>
+      driveFiles
+        ? conversationFilesFromDrive(driveFiles, hub?.conversationId ?? "")
+        : [],
+    [driveFiles, hub?.conversationId],
+  );
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
@@ -100,6 +117,15 @@ export function FilesPage() {
     const byKey = new Map<string, ConversationFile>();
     for (const file of journal.files) byKey.set(file.key, file);
     const merged: ConversationFile[] = [...journal.files];
+    for (const file of driveRows) {
+      const known = byKey.get(file.key);
+      if (known) {
+        byKey.set(file.key, { ...known, folder: file.folder });
+        continue;
+      }
+      byKey.set(file.key, file);
+      merged.push(file);
+    }
     for (const artifact of hubArtifacts) {
       const key = artifactFileKey(artifact);
       const known = byKey.get(key);
@@ -131,7 +157,7 @@ export function FilesPage() {
           : file.source.kind;
       return { ...file, title: fileName(file.artifact), bucket };
     });
-  }, [hubArtifacts, journal.files, preferredAccess?.desktopDeviceId]);
+  }, [driveRows, hubArtifacts, journal.files, preferredAccess?.desktopDeviceId]);
 
   const computerLabel = useCallback(
     (deviceId: string | null) =>
@@ -173,7 +199,8 @@ export function FilesPage() {
     const filtered = rows.filter(
       (row) =>
         (sourceFilter === "all" || row.bucket === sourceFilter) &&
-        (!needle || row.title.toLowerCase().includes(needle)),
+        (!needle ||
+          `${row.title} ${row.folder ?? ""}`.toLowerCase().includes(needle)),
     );
     if (sortOrder === "oldest") {
       return [...filtered].sort((a, b) => a.createdAt - b.createdAt);
@@ -329,9 +356,13 @@ export function FilesPage() {
             numberOfLines={1}
             maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
           >
-            {item.createdAt > 0
-              ? `${bucketLabel(item.bucket)} · ${formatTimestampHeader(item.createdAt)}`
-              : bucketLabel(item.bucket)}
+            {[
+              bucketLabel(item.bucket),
+              item.folder ? item.folder.split("/").pop() : null,
+              item.createdAt > 0 ? formatTimestampHeader(item.createdAt) : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </Text>
         </View>
         <Icon name="chevron-right" size={14} color={colors.textMuted} />

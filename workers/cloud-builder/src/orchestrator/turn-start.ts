@@ -22,7 +22,8 @@ import {
   type OwnerGateAdmissionWithLease,
   type OwnerGateAdmitInput,
   snapshotAllowsCloudSandbox,
-  snapshotAllowsExecutionEngine,
+  executionUnavailableMessage,
+  snapshotAllowsExecution,
 } from "../owner-gate.js";
 import {
   conversationTitleFor,
@@ -431,12 +432,10 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           false,
         );
       }
-      if (!snapshotAllowsExecutionEngine(snapshot, execution.engine)) {
+      if (!snapshotAllowsExecution(snapshot, execution)) {
         return await refuse(
           "execution_unavailable",
-          execution.engine === "anthropic"
-            ? "Connect Claude before using that cloud execution route."
-            : "Connect ChatGPT before using that cloud execution route.",
+          executionUnavailableMessage(execution),
           false,
         );
       }

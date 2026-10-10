@@ -33,6 +33,7 @@ export type DisplayTabKind =
   | "model3d"
   | "download"
   | "text"
+  | "folder"
   | "trash";
 
 /**

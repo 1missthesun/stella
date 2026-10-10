@@ -86,7 +86,7 @@ describe("maybeOfferBrowserExtensionConnect", () => {
     expect(payloadOf(result).note).toMatch(/re-run automatically/);
   });
 
-  it("parks the browser step when the accepted connection still fails", async () => {
+  it("asks for a one-time sign-in when the accepted connection still fails", async () => {
     const retried = execResult(EXTENSION_ERROR);
     const result = await maybeOfferBrowserExtensionConnect({
       result: execResult(EXTENSION_ERROR),
@@ -97,7 +97,9 @@ describe("maybeOfferBrowserExtensionConnect", () => {
 
     expect(payloadOf(result).output).toBe(EXTENSION_ERROR);
     expect(payloadOf(result).note).toMatch(/exact browser error/i);
-    expect(payloadOf(result).note).toMatch(/park the browser-dependent step/i);
+    expect(payloadOf(result).note).toMatch(
+      /sign in once in Stella's Browser panel/i,
+    );
     expect(payloadOf(result).note).not.toMatch(
       /node_repl|visible browser control/i,
     );
@@ -122,7 +124,9 @@ describe("maybeOfferBrowserExtensionConnect", () => {
     expect(offers).toBe(1);
     expect(payloadOf(first).note).toMatch(/declined/);
     expect(payloadOf(first).note).toMatch(/do not re-offer/i);
-    expect(payloadOf(first).note).toMatch(/park the browser-dependent step/i);
+    expect(payloadOf(first).note).toMatch(
+      /sign in once in Stella's Browser panel/i,
+    );
     expect(payloadOf(first).note).not.toMatch(/visible browser control/i);
 
     // Within the cool-down the offer is suppressed entirely.

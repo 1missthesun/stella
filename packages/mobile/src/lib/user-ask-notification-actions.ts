@@ -1,6 +1,5 @@
 import { AppState, Platform } from "react-native";
 import * as Notifications from "expo-notifications";
-import * as TaskManager from "expo-task-manager";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import {
   USER_ASK_ACTION_CATEGORY_PREFIX,
@@ -283,20 +282,6 @@ const responseFromTaskPayload = (payload: unknown): Notifications.NotificationRe
   if (!source || typeof source.actionIdentifier !== "string") return null;
   return source as unknown as Notifications.NotificationResponse;
 };
-
-if (Platform.OS === "android") {
-  TaskManager.defineTask(USER_ASK_NOTIFICATION_TASK, async ({ data }) => {
-    const response = responseFromTaskPayload(data);
-    if (response) {
-      await handleAskReplyResponse(response);
-      return;
-    }
-    const push = actionablePushFromTaskPayload(data);
-    if (!push || !push.alertTitle) return;
-    if (AppState.currentState === "active") return;
-    await presentActionableAsk(push);
-  });
-}
 
 let taskRegistered: Promise<boolean> | null = null;
 

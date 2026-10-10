@@ -2075,6 +2075,8 @@
       "title": "メモリ"
     },
     "modelPicker": {
+      "accountKey": "アカウント",
+      "accountKeyTitle": "Stella アカウントで接続されています。このコンピュータはそのキーを使います。",
       "actions": {
         "addKey": "キーを追加",
         "cancel": "キャンセル",
@@ -2086,7 +2088,9 @@
       "authHint": {
         "apiKey": "API キーはこのデバイスに保存されます。",
         "both": "サインインするか、API キーを貼り付けてください。認証情報はこのデバイスに保存されます。",
-        "oauth": "認証情報はこのデバイスに保存されます。"
+        "oauth": "認証情報はこのデバイスに保存されます。",
+        "apiKeyAccount": "Stella アカウントに保存されるため、スマートフォンやクラウドでも使えます。",
+        "bothAccount": "サインインするか、API キーを貼り付けて Stella アカウントに保存してください。"
       },
       "cancelSignIn": "サインインをキャンセル",
       "closeSearch": "検索を閉じる",
@@ -2096,7 +2100,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth ログインに失敗しました。",
-        "saveApiKey": "API キーを保存できませんでした。"
+        "saveApiKey": "API キーを保存できませんでした。",
+        "accountKeyRejected": "{provider} がこのキーを受け付けませんでした。確認してもう一度お試しください。",
+        "accountSaveFailed": "このコンピュータには保存されましたが、Stella アカウントには保存されませんでした。スマートフォンやクラウドで使うには、もう一度お試しください。"
       },
       "favorite": {
         "add": "お気に入りに追加",

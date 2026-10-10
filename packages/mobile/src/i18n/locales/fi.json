@@ -2084,6 +2084,8 @@
       "title": "Muisti"
     },
     "modelPicker": {
+      "accountKey": "Tili",
+      "accountKeyTitle": "Yhdistetty Stella-tilisi kautta. Tämä tietokone käyttää sitä avainta.",
       "actions": {
         "addKey": "Lisää avain",
         "cancel": "Peruuta",
@@ -2095,7 +2097,9 @@
       "authHint": {
         "apiKey": "API-avaimesi pysyy tällä laitteella.",
         "both": "Kirjaudu sisään tai liitä API-avain. Tunnistetiedot pysyvät tällä laitteella.",
-        "oauth": "Tunnistetiedot pysyvät tällä laitteella."
+        "oauth": "Tunnistetiedot pysyvät tällä laitteella.",
+        "apiKeyAccount": "Tallennetaan Stella-tilillesi, joten se toimii myös puhelimessa ja pilvessä.",
+        "bothAccount": "Kirjaudu sisään tai liitä API-avain tallentaaksesi sen Stella-tilillesi."
       },
       "cancelSignIn": "Peruuta kirjautuminen",
       "closeSearch": "Sulje haku",
@@ -2105,7 +2109,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth-kirjautuminen epäonnistui.",
-        "saveApiKey": "API-avaimen tallennus epäonnistui."
+        "saveApiKey": "API-avaimen tallennus epäonnistui.",
+        "accountKeyRejected": "{provider} ei hyväksynyt avainta. Tarkista se ja yritä uudelleen.",
+        "accountSaveFailed": "Tallennettu tälle tietokoneelle, mutta ei Stella-tilillesi. Yritä uudelleen, jotta voit käyttää sitä puhelimessa ja pilvessä."
       },
       "favorite": {
         "add": "Lisää suosikkeihin",

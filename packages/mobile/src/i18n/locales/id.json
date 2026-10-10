@@ -2075,6 +2075,8 @@
       "title": "Memori"
     },
     "modelPicker": {
+      "accountKey": "Akun",
+      "accountKeyTitle": "Terhubung melalui akun Stella Anda. Komputer ini memakai kunci itu.",
       "actions": {
         "addKey": "Tambah kunci",
         "cancel": "Batal",
@@ -2086,7 +2088,9 @@
       "authHint": {
         "apiKey": "Kunci API Anda tetap di perangkat ini.",
         "both": "Masuk atau tempel kunci API. Kredensial tetap di perangkat ini.",
-        "oauth": "Kredensial tetap di perangkat ini."
+        "oauth": "Kredensial tetap di perangkat ini.",
+        "apiKeyAccount": "Disimpan ke akun Stella Anda, jadi juga berfungsi di ponsel dan di cloud.",
+        "bothAccount": "Masuk, atau tempel kunci API untuk menyimpannya ke akun Stella Anda."
       },
       "cancelSignIn": "Batalkan proses masuk",
       "closeSearch": "Tutup pencarian",
@@ -2096,7 +2100,9 @@
       },
       "errors": {
         "oauthLogin": "Login OAuth gagal.",
-        "saveApiKey": "Gagal menyimpan kunci API."
+        "saveApiKey": "Gagal menyimpan kunci API.",
+        "accountKeyRejected": "{provider} tidak menerima kunci itu. Periksa lalu coba lagi.",
+        "accountSaveFailed": "Tersimpan di komputer ini, tetapi tidak di akun Stella Anda. Coba lagi agar bisa dipakai di ponsel dan di cloud."
       },
       "favorite": {
         "add": "Tambahkan ke favorit",

@@ -2093,6 +2093,8 @@
       "title": "Memorie"
     },
     "modelPicker": {
+      "accountKey": "Cont",
+      "accountKeyTitle": "Conectat prin contul tău Stella. Acest computer folosește acea cheie.",
       "actions": {
         "addKey": "Adaugă cheie",
         "cancel": "Anulează",
@@ -2104,7 +2106,9 @@
       "authHint": {
         "apiKey": "Cheia ta API rămâne pe acest dispozitiv.",
         "both": "Conectează-te sau lipește o cheie API. Datele de autentificare rămân pe acest dispozitiv.",
-        "oauth": "Datele de autentificare rămân pe acest dispozitiv."
+        "oauth": "Datele de autentificare rămân pe acest dispozitiv.",
+        "apiKeyAccount": "Salvată în contul tău Stella, deci funcționează și pe telefon și în cloud.",
+        "bothAccount": "Conectează-te sau lipește o cheie API ca s-o salvezi în contul tău Stella."
       },
       "cancelSignIn": "Anulează conectarea",
       "closeSearch": "Închide căutarea",
@@ -2114,7 +2118,9 @@
       },
       "errors": {
         "oauthLogin": "Conectarea OAuth a eșuat.",
-        "saveApiKey": "Salvarea cheii API a eșuat."
+        "saveApiKey": "Salvarea cheii API a eșuat.",
+        "accountKeyRejected": "{provider} nu a acceptat cheia. Verific-o și încearcă din nou.",
+        "accountSaveFailed": "Salvată pe acest computer, dar nu în contul tău Stella. Încearcă din nou ca s-o folosești pe telefon și în cloud."
       },
       "favorite": {
         "add": "Adaugă la favorite",

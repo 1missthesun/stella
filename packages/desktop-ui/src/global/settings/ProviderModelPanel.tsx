@@ -26,6 +26,7 @@ import {
 import { findApiKey, findOauthCredential, findOauthProvider, useLlmCredentials, } from "@/global/settings/hooks/use-llm-credentials";
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import { useAccountProviders } from "@/features/cloud/cloud-engines-api";
+import { backendClient } from "@/platform/backend/backend-client";
 import { useT } from "@/shared/i18n";
 import "./ProviderModelPicker.css";
 export type ReasoningEffort =
@@ -198,6 +199,12 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
     const accountConnected = useMemo(() => new Set((accountProviders?.providers ?? [])
         .filter((provider) => provider.connection?.status === "ok")
         .map((provider) => provider.id)), [accountProviders]);
+    // Providers the account can hold a key for, and the ones holding one now.
+    const accountCatalog = useMemo(() => new Set((accountProviders?.providers ?? []).map((provider) => provider.id)), [accountProviders]);
+    const accountHolds = useMemo(() => new Set((accountProviders?.providers ?? [])
+        .filter((provider) => provider.connection !== null)
+        .map((provider) => provider.id)), [accountProviders]);
+    const savesToAccount = isAuthenticated && accountCatalog.size > 0;
     const cancelOAuth = credentials.cancelOAuth;
     const tabs = useMemo(() => buildProviderTabs(groups, visibleProviders, hiddenProviders), [groups, hiddenProviders, visibleProviders]);
     const [favorites, setFavorites] = useState<string[]>(() => favoriteScope ? readEngineModelFavorites(favoriteScope) : []);
@@ -393,6 +400,9 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         setSignOutArmed(null);
         setSigningOut(providerKey);
         try {
+            if (accountHolds.has(providerKey)) {
+                await backendClient.call("providers.remove", { provider: providerKey });
+            }
             if (findApiKey(credentials.apiKeys, providerKey)) {
                 await credentials.removeApiKey(providerKey);
             }
@@ -406,7 +416,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         finally {
             setSigningOut(null);
         }
-    }, [credentials.apiKeys, credentials.oauthCredentials, credentials.logoutOAuth, credentials.removeApiKey, signOutArmed]);
+    }, [accountHolds, credentials.apiKeys, credentials.oauthCredentials, credentials.logoutOAuth, credentials.removeApiKey, signOutArmed]);
     const handleSaveKey = useCallback(async (providerKey: string, label: string) => {
         const trimmed = draftKey.trim();
         if (!trimmed)
@@ -414,8 +424,28 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         setSavingProvider(providerKey);
         setAuthError(null);
         try {
+            // The account copy is what the phone and the cloud use, and it is
+            // checked with the provider first, so a refused key is never kept.
+            // This computer keeps its own copy for its local runtime.
+            let accountError: string | null = null;
+            if (savesToAccount && accountCatalog.has(providerKey)) {
+                try {
+                    await backendClient.call("providers.setApiKey", { provider: providerKey, apiKey: trimmed });
+                }
+                catch (caught) {
+                    if ((caught as { reason?: unknown } | null)?.reason === "invalid_api_key") {
+                        setAuthError(t("settings.modelPicker.errors.accountKeyRejected", { provider: label }));
+                        return;
+                    }
+                    accountError = caught instanceof Error ? caught.message : "";
+                }
+            }
             await credentials.saveApiKey(providerKey, label, trimmed);
             setDraftKey("");
+            if (accountError !== null) {
+                setAuthError(t("settings.modelPicker.errors.accountSaveFailed"));
+                return;
+            }
             setExpandedProvider(null);
         }
         catch (caught) {
@@ -426,7 +456,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
         finally {
             setSavingProvider(null);
         }
-    }, [credentials, draftKey, t]);
+    }, [accountCatalog, credentials, draftKey, savesToAccount, t]);
     const handleLoginOAuth = useCallback(async (providerKey: string) => {
         const previousAttempt = oauthAttemptRef.current;
         if (previousAttempt) {
@@ -533,18 +563,19 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             !isApiKeyOnlyPlaceholder(llmEntry?.placeholder ?? "");
         const supportsOAuth = Boolean(oauthEntry);
         const sectionDisabled = disabled || disabledProviderSet.has(tab.key);
-        const removable = Boolean(apiKey) || Boolean(oauthCred);
+        const removable = Boolean(apiKey) || Boolean(oauthCred) || (isAuthenticated && accountHolds.has(tab.key));
         const armed = signOutArmed === tab.key;
         const isSigningOut = signingOut === tab.key;
         const expanded = expandedProvider === tab.key;
         // Local + connected OpenRouter offer a custom-model entry, tucked behind
         // a header toggle so the section doesn't open expanded by default.
         const hasCustomInputs = isLocal || isOpenRouter;
+        const keyToAccount = savesToAccount && accountCatalog.has(tab.key);
         const authDescription = supportsOAuth && supportsApiKey
-            ? t("settings.modelPicker.authHint.both")
+            ? t(keyToAccount ? "settings.modelPicker.authHint.bothAccount" : "settings.modelPicker.authHint.both")
             : supportsOAuth
                 ? t("settings.modelPicker.authHint.oauth")
-                : t("settings.modelPicker.authHint.apiKey");
+                : t(keyToAccount ? "settings.modelPicker.authHint.apiKeyAccount" : "settings.modelPicker.authHint.apiKey");
         return {
             tab,
             isStella,

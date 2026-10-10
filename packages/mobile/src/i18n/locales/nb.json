@@ -2084,6 +2084,8 @@
       "title": "Minne"
     },
     "modelPicker": {
+      "accountKey": "Konto",
+      "accountKeyTitle": "Koblet til via Stella-kontoen din. Denne datamaskinen bruker den nøkkelen.",
       "actions": {
         "addKey": "Legg til nøkkel",
         "cancel": "Avbryt",
@@ -2095,7 +2097,9 @@
       "authHint": {
         "apiKey": "API-nøkkelen din blir værende på denne enheten.",
         "both": "Logg på eller lim inn en API-nøkkel. Legitimasjonen blir værende på denne enheten.",
-        "oauth": "Legitimasjonen blir værende på denne enheten."
+        "oauth": "Legitimasjonen blir værende på denne enheten.",
+        "apiKeyAccount": "Lagres på Stella-kontoen din, så den også virker på telefonen og i skyen.",
+        "bothAccount": "Logg på, eller lim inn en API-nøkkel for å lagre den på Stella-kontoen din."
       },
       "cancelSignIn": "Avbryt pålogging",
       "closeSearch": "Lukk søk",
@@ -2105,7 +2109,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth-pålogging mislyktes.",
-        "saveApiKey": "Kunne ikke lagre API-nøkkelen."
+        "saveApiKey": "Kunne ikke lagre API-nøkkelen.",
+        "accountKeyRejected": "{provider} godtok ikke nøkkelen. Sjekk den og prøv igjen.",
+        "accountSaveFailed": "Lagret på denne datamaskinen, men ikke på Stella-kontoen din. Prøv igjen for å bruke den på telefonen og i skyen."
       },
       "favorite": {
         "add": "Legg til favoritt",

@@ -15,9 +15,18 @@ const WORLD_DRIVE_LINK_RE =
  */
 export const cloudWorldDrivePath = (filePath: string): string | null => {
   const match = WORLD_DRIVE_LINK_RE.exec(filePath.trim());
-  const relative = match?.[1]?.replace(/\/+$/, "");
-  if (!relative) return null;
-  const segments = relative.split("/");
+  return match?.[1] ? safeDriveRelativePath(match[1]) : null;
+};
+
+/**
+ * `relative` as a drive path a client may fetch, or null. Trailing slashes
+ * go; empty, `.` and `..` segments and the tool host's private `.stella`
+ * state directory never resolve.
+ */
+export const safeDriveRelativePath = (relative: string): string | null => {
+  const trimmed = relative.replace(/\/+$/, "");
+  if (!trimmed) return null;
+  const segments = trimmed.split("/");
   if (
     segments.some(
       (segment) => segment === "" || segment === "." || segment === "..",
@@ -26,7 +35,7 @@ export const cloudWorldDrivePath = (filePath: string): string | null => {
   ) {
     return null;
   }
-  return relative;
+  return trimmed;
 };
 
 /**
@@ -50,3 +59,49 @@ export const isCloudWorkspacePath = (filePath: string): boolean => {
 
 export const cloudWorldDriveName = (drivePath: string): string =>
   drivePath.slice(drivePath.lastIndexOf("/") + 1);
+
+/**
+ * The device-neutral link to a file in the owner's Stella Drive:
+ * `stella://drive/<drive-relative path>`, written raw inside angle brackets
+ * (`[clip](<stella://drive/Launch video/clip.mp4>)`) or URL-encoded. Every
+ * client opens it from the drive, whichever device or turn wrote it.
+ */
+export const DRIVE_LINK_SCHEME = "stella://drive/";
+
+const decodeLinkPart = (value: string): string => {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+};
+
+/**
+ * The drive-relative path a link target names: a `stella://drive/...` link,
+ * or a cloud turn's world-absolute `/workspace/world/drive/...` path. Null for
+ * anything else, and for traversal or the private `.stella` directory.
+ */
+export const driveLinkPath = (target: string): string | null => {
+  const trimmed = target.trim();
+  if (!trimmed) return null;
+  if (trimmed.slice(0, DRIVE_LINK_SCHEME.length).toLowerCase() === DRIVE_LINK_SCHEME) {
+    return safeDriveRelativePath(
+      decodeLinkPart(trimmed.slice(DRIVE_LINK_SCHEME.length)).replace(/^\/+/, ""),
+    );
+  }
+  return cloudWorldDrivePath(trimmed) ?? cloudWorldDrivePath(decodeLinkPart(trimmed));
+};
+
+/** One canonical spelling of a drive link, for comparing and keying. */
+export const driveLinkTarget = (drivePath: string): string =>
+  `${DRIVE_LINK_SCHEME}${drivePath}`;
+
+/** The canonical drive link a `stella://drive/...` target names, or null. */
+export const parseDriveLinkTarget = (target: string): string | null => {
+  const trimmed = target.trim();
+  if (trimmed.slice(0, DRIVE_LINK_SCHEME.length).toLowerCase() !== DRIVE_LINK_SCHEME) {
+    return null;
+  }
+  const drivePath = driveLinkPath(trimmed);
+  return drivePath ? driveLinkTarget(drivePath) : null;
+};

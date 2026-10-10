@@ -12,6 +12,7 @@
  * `ipc-contract.ts`, the method here, and the handler in main through
  * `electron/ipc/typed-ipc.ts`.
  */
+import type { DriveEvidenceSource } from "../chat-evidence.js";
 import type { ChatContext } from "../index.js";
 import type { BrowserFetchInit } from "./ipc-contract.js";
 import type {
@@ -89,6 +90,7 @@ import {
   IPC_CHAT_CONTEXT_SET,
   IPC_CHAT_CONTEXT_UPDATED,
   IPC_CHAT_EVIDENCE_CARDS,
+  IPC_CHAT_EVIDENCE_DRIVE_CARDS,
   IPC_CHAT_OPEN_SIDEBAR,
   IPC_CHATGPT_CANCEL_SIGN_IN,
   IPC_CHATGPT_LIST_MODELS,
@@ -514,6 +516,8 @@ export const createElectronApi = (
     chatEvidence: {
       cards: (filePaths: string[]) =>
         ipc.invoke(IPC_CHAT_EVIDENCE_CARDS, { filePaths }),
+      driveCards: (files: DriveEvidenceSource[]) =>
+        ipc.invoke(IPC_CHAT_EVIDENCE_DRIVE_CARDS, { files }),
     },
 
     ui: {

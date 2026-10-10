@@ -27,7 +27,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { Image } from "expo-image";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import { extractPreviewBars } from "@siteed/audio-studio";
-import { cloudWorldDrivePath } from "@stella/contracts/cloud-world-paths";
+import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import { EVIDENCE_PEAK_COUNT } from "@stella/contracts/chat-evidence";
 import {
   EVIDENCE_THUMBNAIL_CONTENT_TYPE,
@@ -131,14 +131,14 @@ const writeManifest = (contentKey: string, preview: EvidencePreview): void => {
 };
 
 /**
- * A chat path that names a drive file: a cloud world link, or the
- * drive-relative form a phone's own upload carries. Anything absolute is a
- * path on the paired computer.
+ * A chat path that names a drive file: a `stella://drive/...` or cloud world
+ * link, or the drive-relative form a phone's own upload carries. Anything
+ * absolute is a path on the paired computer.
  */
 const drivePathFor = (filePath: string): string | null => {
   const trimmed = filePath.trim();
-  const world = cloudWorldDrivePath(trimmed);
-  if (world) return world;
+  const linked = driveLinkPath(trimmed);
+  if (linked) return linked;
   if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed)) return null;
   if (trimmed.startsWith("/") || /^[A-Za-z]:[\\/]/.test(trimmed)) return null;
   return trimmed.replace(/^\.\//, "");

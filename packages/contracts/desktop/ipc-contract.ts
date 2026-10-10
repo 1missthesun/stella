@@ -37,7 +37,11 @@ import type {
 import type { AgentStreamEvent } from "../agent-stream.js";
 import type { AuthSessionSnapshot } from "../auth-session.js";
 import type { StellaBrowserBridgeStatus } from "../browser-bridge-status.js";
-import type { EvidenceCardSet } from "../chat-evidence.js";
+import type {
+  DriveEvidenceSource,
+  EvidenceCard,
+  EvidenceCardSet,
+} from "../chat-evidence.js";
 import type {
   ChatGptProfileSummary,
   ChatGptProfilesState,
@@ -180,6 +184,7 @@ import {
   IPC_CHAT_CONTEXT_SET,
   IPC_CHAT_CONTEXT_UPDATED,
   IPC_CHAT_EVIDENCE_CARDS,
+  IPC_CHAT_EVIDENCE_DRIVE_CARDS,
   IPC_CHAT_OPEN_SIDEBAR,
   IPC_CHATGPT_CANCEL_SIGN_IN,
   IPC_CHATGPT_LIST_MODELS,
@@ -957,6 +962,10 @@ export type IpcInvokeContract = {
   [IPC_CHAT_EVIDENCE_CARDS]: Invoke<
     [payload: { filePaths: string[] }],
     EvidenceCardSet
+  >;
+  [IPC_CHAT_EVIDENCE_DRIVE_CARDS]: Invoke<
+    [payload: { files: DriveEvidenceSource[] }],
+    EvidenceCard[]
   >;
 
   // Remote execution / app source

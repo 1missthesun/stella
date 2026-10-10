@@ -4,7 +4,7 @@ import {
   responseTextForFileLinks,
   type ConversationFileEntry,
 } from "@/features/workspace-display/derive-conversation-files";
-import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
+import { extractFileLinkTargets } from "@stella/contracts/local-file-links";
 
 export function deriveAgentFilesMap(
   activities: ReadonlyArray<EventRecord>,
@@ -74,7 +74,7 @@ const cloudDriveFileCount = (event: EventRecord): number => {
 };
 
 export function eventContributesFiles(event: EventRecord): boolean {
-  if (extractLocalFileLinkPaths(responseTextForFileLinks(event)).length > 0) {
+  if (extractFileLinkTargets(responseTextForFileLinks(event)).length > 0) {
     return true;
   }
   return cloudDriveFileCount(event) > 0;
@@ -90,7 +90,7 @@ export function agentFilesSignature(
     if (typeof agentId !== "string" || agentId.length === 0) continue;
     if (!eventContributesFiles(event)) continue;
     const fileCount =
-      extractLocalFileLinkPaths(responseTextForFileLinks(event)).length +
+      extractFileLinkTargets(responseTextForFileLinks(event)).length +
       cloudDriveFileCount(event);
     signature += `${agentId}\u001f${event._id}\u001f${event.timestamp}\u001f${fileCount}\u001e`;
   }

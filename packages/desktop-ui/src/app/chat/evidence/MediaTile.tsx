@@ -3,6 +3,11 @@ import {
   EVIDENCE_TILE_WIDTH,
   type EvidenceCard,
 } from "@stella/contracts/chat-evidence";
+import {
+  cloudWorldDriveName,
+  driveLinkPath,
+} from "@stella/contracts/cloud-world-paths";
+import { cloudDriveEntry } from "@/features/workspace-display/derive-conversation-files";
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
 import { buildPayloadFromBarePath } from "@/features/chat/lib/derive-turn-resource";
 import { Maximize2 } from "@/ui/icons";
@@ -15,7 +20,21 @@ const VISUAL_KINDS: ReadonlySet<EvidenceCard["kind"]> = new Set([
   "video",
 ]);
 
-const openSource = (filePath: string) => {
+export const openEvidenceSource = (filePath: string) => {
+  const drivePath = driveLinkPath(filePath);
+  if (drivePath) {
+    const entry = cloudDriveEntry(
+      {
+        path: drivePath,
+        name: cloudWorldDriveName(drivePath),
+        sizeBytes: 0,
+        contentType: "application/octet-stream",
+      },
+      Date.now(),
+    );
+    openDisplayPayloadTab({ ...entry.payload, cloudDrivePath: drivePath });
+    return;
+  }
   const payload = buildPayloadFromBarePath(filePath, Date.now());
   if (payload) openDisplayPayloadTab(payload);
 };
@@ -47,8 +66,11 @@ const StackBody = ({ card }: { card: EvidenceCard }) => {
   );
 };
 
+const isDriveCard = (card: EvidenceCard): boolean =>
+  Boolean(card.sourcePaths[0] && driveLinkPath(card.sourcePaths[0]));
+
 const TileBody = ({ card }: { card: EvidenceCard }) => {
-  if (card.kind === "video") {
+  if (card.kind === "video" && !isDriveCard(card)) {
     return (
       <VideoFrame
         poster={card.thumbnail}
@@ -76,7 +98,7 @@ const TileBody = ({ card }: { card: EvidenceCard }) => {
         className="media-tile__raster"
         onClick={() => {
           const target = card.sourcePaths[0];
-          if (target) openSource(target);
+          if (target) openEvidenceSource(target);
         }}
       >
         <img src={card.thumbnail} alt={card.title} draggable={false} />
@@ -107,7 +129,7 @@ export const MediaTile = ({
         onClick={(event) => {
           event.stopPropagation();
           const target = card.sourcePaths[card.sourcePaths.length - 1];
-          if (target) openSource(target);
+          if (target) openEvidenceSource(target);
         }}
       >
         <Maximize2 size={11} />

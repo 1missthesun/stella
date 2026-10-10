@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
 import {
   EVIDENCE_CARD_CAP,
@@ -9,8 +9,11 @@ import {
   EVIDENCE_TILE_WIDTH,
   type EvidenceCard,
   type EvidenceCardKind,
+  type DriveEvidenceSource,
   type EvidenceCardSet,
 } from "@stella/contracts/chat-evidence";
+import os from "node:os";
+import { nativeImage } from "electron";
 import {
   archiveEntryExtensions,
   extractAudioPeaks,
@@ -20,7 +23,9 @@ import {
   probePageCount,
   rasterizeImageFile,
   readTablePreview,
+  remoteVideoPoster,
   videoPosterRaster,
+  coverCropToDataUrl,
 } from "./chat-evidence-media.js";
 import {
   describeComposition,
@@ -33,13 +38,20 @@ import {
   stackTitleFor,
   type EvidenceSourceKind,
 } from "@stella/contracts/chat-evidence-naming";
-import { cloudWorldDrivePath } from "@stella/contracts/cloud-world-paths";
+import {
+  cloudWorldDrivePath,
+  driveLinkPath,
+  driveLinkTarget,
+} from "@stella/contracts/cloud-world-paths";
 
 const CACHE_DIRNAME = "chat-evidence";
 const CACHE_SCHEMA = "v1";
 const FULL_HASH_CAP_BYTES = 48 * 1024 * 1024;
 const SAMPLE_BYTES = 1024 * 1024;
 const STACK_FRAME_CAP = 8;
+const DRIVE_IMAGE_MAX_BYTES = 40 * 1024 * 1024;
+const DRIVE_VIDEO_DOWNLOAD_MAX_BYTES = 64 * 1024 * 1024;
+const DRIVE_FETCH_TIMEOUT_MS = 30_000;
 const GENERATION_CONCURRENCY = 3;
 
 type SourceEntry = {
@@ -356,8 +368,95 @@ const mapWithLimit = async <Input, Output>(
   return results;
 };
 
+const fetchDriveBytes = async (url: string, maxBytes: number): Promise<Buffer | null> => {
+  const response = await fetch(url, { signal: AbortSignal.timeout(DRIVE_FETCH_TIMEOUT_MS) });
+  if (!response.ok) return null;
+  const declared = Number(response.headers.get("content-length") ?? "0");
+  if (declared > maxBytes) {
+    await response.body?.cancel();
+    return null;
+  }
+  const bytes = Buffer.from(await response.arrayBuffer());
+  return bytes.byteLength > maxBytes ? null : bytes;
+};
+
+const driveVideoPoster = async (
+  file: DriveEvidenceSource,
+  box: { width: number; height: number },
+): Promise<{ thumbnail: string; durationMs: number | null } | null> => {
+  const remote = await remoteVideoPoster(file.url, box.width, box.height);
+  if (remote) return remote;
+  if (file.sizeBytes > DRIVE_VIDEO_DOWNLOAD_MAX_BYTES) return null;
+  const bytes = await fetchDriveBytes(file.url, DRIVE_VIDEO_DOWNLOAD_MAX_BYTES);
+  if (!bytes) return null;
+  const dir = path.join(os.tmpdir(), `stella-drive-evidence-${randomUUID()}`);
+  try {
+    await fs.mkdir(dir, { recursive: true });
+    const local = path.join(dir, `source${path.extname(file.drivePath).toLowerCase()}`);
+    await fs.writeFile(local, bytes);
+    const [thumbnail, durationMs] = await Promise.all([
+      videoPosterRaster(local, box.width, box.height),
+      probeDurationMs(local),
+    ]);
+    return thumbnail ? { thumbnail, durationMs } : null;
+  } finally {
+    void fs.rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  }
+};
+
+/**
+ * A preview card for one linked drive file, made from the bytes behind its
+ * signed URL: an image's cover crop, or a video's poster frame. Anything
+ * else, or a file too large to read, has no card and stays a pill.
+ */
+const buildDriveCard = async (
+  id: string,
+  file: DriveEvidenceSource,
+): Promise<EvidenceCard | null> => {
+  const kind = evidenceSourceKind(file.drivePath, false);
+  const base = {
+    id,
+    title: humanTitleFor(file.drivePath, kind),
+    sourcePaths: [driveLinkTarget(file.drivePath)],
+    byteSize: file.sizeBytes,
+  };
+  if (kind === "image") {
+    if (file.sizeBytes > DRIVE_IMAGE_MAX_BYTES) return null;
+    const bytes = await fetchDriveBytes(file.url, DRIVE_IMAGE_MAX_BYTES);
+    if (!bytes) return null;
+    const image = nativeImage.createFromBuffer(bytes);
+    const box = boxFor("image");
+    const thumbnail = coverCropToDataUrl(image, box.width, box.height);
+    if (!thumbnail) return null;
+    const size = image.getSize();
+    return {
+      ...base,
+      kind: "image",
+      thumbnail,
+      subtitle:
+        size.width > 0 && size.height > 0
+          ? `${size.width} × ${size.height}`
+          : formatByteSize(file.sizeBytes),
+    };
+  }
+  if (kind === "video") {
+    const poster = await driveVideoPoster(file, boxFor("video"));
+    if (!poster) return null;
+    return {
+      ...base,
+      kind: "video",
+      thumbnail: poster.thumbnail,
+      ...(poster.durationMs
+        ? { durationMs: poster.durationMs, subtitle: formatDuration(poster.durationMs) }
+        : {}),
+    };
+  }
+  return null;
+};
+
 export type ChatEvidenceService = {
   buildCardSet: (filePaths: string[]) => Promise<EvidenceCardSet>;
+  buildDriveCards: (files: DriveEvidenceSource[]) => Promise<EvidenceCard[]>;
 };
 
 export const createChatEvidenceService = (options: {
@@ -365,6 +464,7 @@ export const createChatEvidenceService = (options: {
 }): ChatEvidenceService => {
   const memory = new Map<string, EvidenceCard>();
   const inFlight = new Map<string, Promise<EvidenceCard>>();
+  const driveInFlight = new Map<string, Promise<EvidenceCard | null>>();
 
   const cachePathFor = (cacheKey: string): string | null => {
     const dataDir = options.getStellaDataDir();
@@ -465,6 +565,35 @@ export const createChatEvidenceService = (options: {
         cardFor(plan),
       );
       return { cards, overflowCount };
+    },
+    buildDriveCards: async (files: DriveEvidenceSource[]): Promise<EvidenceCard[]> => {
+      const unique = files.filter(
+        (file, index) =>
+          driveLinkPath(driveLinkTarget(file.drivePath)) === file.drivePath &&
+          files.findIndex((other) => other.drivePath === file.drivePath) === index,
+      );
+      const cards = await mapWithLimit(
+        unique.slice(0, EVIDENCE_CARD_CAP),
+        GENERATION_CONCURRENCY,
+        async (file): Promise<EvidenceCard | null> => {
+          const cacheKey = `${CACHE_SCHEMA}:drive:${file.drivePath}:${file.sizeBytes}`;
+          const cached = await readCached(cacheKey);
+          if (cached) return cached;
+          const pending = driveInFlight.get(cacheKey);
+          if (pending) return await pending;
+          const id = `drive:${createHash("sha1").update(cacheKey).digest("hex").slice(0, 32)}`;
+          const work = buildDriveCard(id, file)
+            .catch(() => null)
+            .then(async (card) => {
+              if (card) await writeCached(cacheKey, card);
+              return card;
+            })
+            .finally(() => driveInFlight.delete(cacheKey));
+          driveInFlight.set(cacheKey, work);
+          return await work;
+        },
+      );
+      return cards.filter((card): card is EvidenceCard => card !== null);
     },
   };
 };

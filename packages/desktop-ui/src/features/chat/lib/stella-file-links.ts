@@ -1,8 +1,11 @@
-import { cloudWorldDrivePath } from "@stella/contracts/cloud-world-paths";
+import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import type { Plugin } from "unified";
 import type { Image, Link, Parent, Root, RootContent, Text } from "mdast";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
-import { parseLocalFileLinkTarget } from "@stella/contracts/local-file-links";
+import {
+  parseFileLinkTarget,
+  parseLocalFileLinkTarget,
+} from "@stella/contracts/local-file-links";
 import { parseStellaAppUrl } from "@stella/contracts/workspace-apps";
 import {
   basenameOf,
@@ -47,7 +50,7 @@ type StellaFileNode = RootContent & {
 };
 
 const buildStellaFileNode = (path: string, label: string): StellaFileNode => {
-  const displayLabel = label.trim() || basenameOf(path);
+  const displayLabel = label.trim() || fileLabel(path);
   return {
 
     type: "text",
@@ -76,6 +79,16 @@ const textOfChildren = (parent: Parent): string => {
   return out;
 };
 
+const fileIdentity = (path: string): string => {
+  const drivePath = driveLinkPath(path);
+  return drivePath ? `cloud:${drivePath}` : `local:${path}`;
+};
+
+const fileLabel = (path: string): string => {
+  const drivePath = driveLinkPath(path);
+  return drivePath ? basenameOf(drivePath) : basenameOf(path);
+};
+
 const transformChildren = (parent: Parent, hiddenPaths: ReadonlySet<string>): void => {
 
   for (let index = parent.children.length - 1; index >= 0; index -= 1) {
@@ -95,14 +108,14 @@ const transformChildren = (parent: Parent, hiddenPaths: ReadonlySet<string>): vo
         } as unknown as RootContent);
         continue;
       }
-      const path = parseLocalFileLinkTarget((child as Link).url ?? "");
+      const path = parseFileLinkTarget((child as Link).url ?? "");
       if (path) {
-        const identity = cloudWorldDrivePath(path) ? `cloud:${cloudWorldDrivePath(path)}` : `local:${path}`;
+        const identity = fileIdentity(path);
         const label = textOfChildren(child as Parent);
         if (hiddenPaths.has(identity)) {
           parent.children.splice(index, 1, {
             type: "text",
-            value: label.trim() && label.trim() !== path ? label : basenameOf(path),
+            value: label.trim() && label.trim() !== path ? label : fileLabel(path),
           } as Text);
           continue;
         }
@@ -111,10 +124,8 @@ const transformChildren = (parent: Parent, hiddenPaths: ReadonlySet<string>): vo
       }
     }
     if (isImage(child as RootContent)) {
-      const path = parseLocalFileLinkTarget((child as Image).url ?? "");
-      const identity = path
-        ? cloudWorldDrivePath(path) ? `cloud:${cloudWorldDrivePath(path)}` : `local:${path}`
-        : null;
+      const path = parseFileLinkTarget((child as Image).url ?? "");
+      const identity = path ? fileIdentity(path) : null;
       if (identity && hiddenPaths.has(identity)) {
         parent.children.splice(index, 1);
         continue;

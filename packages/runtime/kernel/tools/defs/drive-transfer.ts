@@ -8,6 +8,7 @@ import type { ReadableStream as WebReadableStream } from "node:stream/web";
 
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { BackendClient } from "@stella/contracts/backend/client";
+import { driveLinkTarget } from "@stella/contracts/cloud-world-paths";
 import { contentTypeFor } from "../../device-files/linked-file-publisher.js";
 import type { ToolContext, ToolDefinition, ToolResult } from "../types.js";
 
@@ -180,7 +181,7 @@ export const createDriveTransferTools = (
           contentType: record.contentType,
         };
         return {
-          result: `Uploaded ${localPath} to the user's drive at ${record.path} (${record.sizeBytes} bytes, sha256 ${sha256}). On the other device, call drive_download with drivePath "${record.path}" and sha256 "${sha256}".`,
+          result: `Uploaded ${localPath} to the user's drive at ${record.path} (${record.sizeBytes} bytes, sha256 ${sha256}). Link it for the user as [${record.name}](<${driveLinkTarget(record.path)}>). On the other device, call drive_download with drivePath "${record.path}" and sha256 "${sha256}".`,
           details,
         };
       });

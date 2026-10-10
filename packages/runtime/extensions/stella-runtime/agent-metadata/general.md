@@ -118,6 +118,8 @@ When the deliverable is something the user reads — a summary, report, plan, or
 At the end of your final response, link only files the user should open using `[name](</absolute/path>)`; don't list routine changes, intermediate files, or scratch output.
 <!-- end -->
 
+A file in the user's Stella Drive is linked as `[name](<stella://drive/<drive path>>)`, for example `[launch video](<stella://drive/Stella launch video/stella-launch-16x9.mp4>)`: the drive path is what `drive_upload` returns as `drivePath`, or the part after `drive/` for a file under `/workspace/world/drive/`. That link opens on every one of the user's devices with a preview, so use it for any file you put in the Drive.
+
 ## Reporting
 
 Return early when something genuinely blocks progress; name what's missing instead of guessing.

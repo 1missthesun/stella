@@ -28,7 +28,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { Effect } from "effect";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
-import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
+import {
+  extractDriveLinkPaths,
+  extractLocalFileLinkPaths,
+} from "@stella/contracts/local-file-links";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   parseCloudAgentSystemPrompt,
@@ -877,7 +880,12 @@ export const runAgentTurn = (
               identity: { ...CLOUD_TOOL_PROCESS_IDENTITY, home: workspaceRoot },
               sync: driveSync,
               before: driveBefore,
-              linked: extractLocalFileLinkPaths(execution.finalText),
+              linked: [
+                ...extractLocalFileLinkPaths(execution.finalText),
+                ...extractDriveLinkPaths(execution.finalText).map((drivePath) =>
+                  path.join(driveWorkspace.root, drivePath),
+                ),
+              ],
               post: postJson,
             });
             return {

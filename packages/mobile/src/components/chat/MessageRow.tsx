@@ -24,10 +24,10 @@ import {
 import { Image } from "expo-image";
 import { extractPlainText } from "react-native-nitro-markdown";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
-import { cloudWorldDrivePath } from "@stella/contracts/cloud-world-paths";
+import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import {
-  extractLocalFileLinkPaths,
+  extractFileLinkTargets,
   unlinkLocalFileLinks,
 } from "@stella/contracts/local-file-links";
 import { AssistantBubble, SENT_BUBBLE_POP, useBubblePop } from "../BubblePop";
@@ -716,16 +716,16 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       const filePath = artifactPrimaryFilePath(artifact.payload);
       if (filePath) paths.push(filePath);
     }
-    paths.push(...extractLocalFileLinkPaths(item.text ?? ""));
+    paths.push(...extractFileLinkTargets(item.text ?? ""));
     return paths;
   }, [consolidated.looseFiles, item.role, item.text]);
-  // A cloud turn names one drive file twice: drive-relative as an artifact,
-  // world-absolute as a link. The strip shows each file once, by the
-  // world-absolute path, which is the one that opens from the drive.
+  // A drive file can be named twice: drive-relative as an artifact, and as a
+  // `stella://drive/...` or world-absolute link. The strip shows each file
+  // once, by the link, which is the one that opens from the drive.
   const evidenceStripPaths = useMemo(() => {
     const byKey = new Map<string, string>();
     for (const filePath of evidencePaths) {
-      const drivePath = cloudWorldDrivePath(filePath);
+      const drivePath = driveLinkPath(filePath);
       const key = drivePath ?? filePath;
       if (!byKey.has(key) || drivePath) byKey.set(key, filePath);
     }

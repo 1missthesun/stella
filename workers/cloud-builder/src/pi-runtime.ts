@@ -143,7 +143,7 @@ import type {
   SerializedAuthorizedImage,
 } from "@stella/executor-cloud/attached-tool-protocol";
 import { generalAgentWorldGuidance } from "@stella/executor-cloud/general-agent-prompt";
-import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
+import { extractDriveLinkPaths, extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { TURN_BROKER_HEADERS } from "@stella/contracts/turn-credential-broker";
 import { serveTurnDriveRequest } from "./build-session/turn-broker.js";
 import {
@@ -1594,9 +1594,12 @@ export class PiConversationRuntime {
     if (up) {
       try {
         // The agent's home is the world: a link to `~/drive/...` names the drive copy there.
-        const linked = extractLocalFileLinkPaths(end.answer ?? "").map((linkedPath) =>
-          linkedPath === "~" || linkedPath.startsWith("~/") ? `${WORLD_ROOT}${linkedPath.slice(1)}` : linkedPath,
-        );
+        const linked = [
+          ...extractLocalFileLinkPaths(end.answer ?? "").map((linkedPath) =>
+            linkedPath === "~" || linkedPath.startsWith("~/") ? `${WORLD_ROOT}${linkedPath.slice(1)}` : linkedPath,
+          ),
+          ...extractDriveLinkPaths(end.answer ?? "").map((drivePath) => `${WORLD_ROOT}/drive/${drivePath}`),
+        ];
         const { deliveredFiles } = await lease.quiesce(linked);
         this.#options.log("pi_agent_quiesced", { threadId: held.threadId, delivered: deliveredFiles.length });
       } catch (error) {

@@ -58,6 +58,7 @@ export function TaskReportButton({
   status,
   liveTitle,
   inline = false,
+  journalReport,
   children,
 }: {
   reference: Extract<ReplyRef, { kind: "agent" }>;
@@ -66,6 +67,12 @@ export function TaskReportButton({
   liveTitle?: string;
   /** A quiet text link that flows at the end of the reply's last paragraph. */
   inline?: boolean;
+  /**
+   * The report as the conversation recorded it. Agents a cloud chat runs on
+   * Stella's own models report only into the conversation, so neither the
+   * backend nor this computer has another copy.
+   */
+  journalReport?: string;
   children?: ReactNode;
 }) {
   const t = useT();
@@ -120,14 +127,16 @@ export function TaskReportButton({
   );
   const closeReport = useCallback(() => setReportOpen(false), []);
 
+  const recordedReport =
+    resolvedReport?.result?.trim() || resolvedReport?.error?.trim();
   const reportBody =
-    resolvedReport === undefined
+    recordedReport ||
+    journalReport?.trim() ||
+    (resolvedReport === undefined
       ? null
       : resolvedReport === null
         ? t("app.chat.replyPreview.reportUnavailable")
-        : resolvedReport.result?.trim() ||
-          resolvedReport.error?.trim() ||
-          t("app.chat.replyPreview.reportEmpty");
+        : t("app.chat.replyPreview.reportEmpty"));
 
   const Wrapper = inline ? "span" : "div";
   return (

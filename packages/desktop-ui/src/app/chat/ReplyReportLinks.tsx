@@ -39,7 +39,7 @@ export const ReplyReportLinks = memo(function ReplyReportLinks({
     [primaryLocal?.description, primary?.title],
     primaryLocal?.status,
   );
-  const reports = [
+  const reports: { reference: AgentRef; status: NonNullable<typeof primaryCard.status>; result?: string }[] = [
     ...completions.map((section) => ({
       reference: {
         kind: "agent",
@@ -47,6 +47,7 @@ export const ReplyReportLinks = memo(function ReplyReportLinks({
         title: section.title,
       } as AgentRef,
       status: activity.get(section.agentId)?.status ?? "completed",
+      result: section.result,
     })),
     ...(primary && primaryCard.status && primaryCard.status !== "running"
       ? [{
@@ -62,13 +63,14 @@ export const ReplyReportLinks = memo(function ReplyReportLinks({
   if (reports.length === 0) return null;
   return (
     <span className="reply-report-links">
-      {reports.map(({ reference, status }) => (
+      {reports.map(({ reference, status, result }) => (
         <TaskReportButton
           key={reference.threadId}
           reference={reference}
           conversationId={conversationId}
           status={status}
           liveTitle={activity.get(reference.threadId)?.description ?? reference.title}
+          journalReport={result}
           inline
         />
       ))}

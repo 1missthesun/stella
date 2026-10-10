@@ -56,6 +56,9 @@ export type AgentCompletionSection = {
    *  `Markdown` component: block constructs are stripped and truncation-
    *  dangled inline markers removed (see `toSummaryExcerpt`). */
   summary?: string;
+  /** The agent's full `result` text from that same latest completion: the
+   *  report itself, for clients whose backend keeps no record of the agent. */
+  result?: string;
 };
 
 /** Identity/label metadata for an agent, lifted from its `agent-started`
@@ -272,6 +275,7 @@ export function buildAgentCompletionSections(
   const completionEventIdByAgent = new Map<string, string>();
   const rootRunIdByAgent = new Map<string, string>();
   const summaryByAgent = new Map<string, string>();
+  const resultByAgent = new Map<string, string>();
   for (const event of toolEvents) {
     if (!isAgentCompletedEvent(event)) continue;
     const agentId = asNonEmptyString(event.payload.agentId);
@@ -288,8 +292,13 @@ export function buildAgentCompletionSections(
       // The summary always mirrors the LATEST completion: a re-run that
       // finishes without a result clears the older excerpt rather than
       // leaving stale text attributed to the newer completion.
-      if (result) summaryByAgent.set(agentId, toSummaryExcerpt(result));
-      else summaryByAgent.delete(agentId);
+      if (result) {
+        summaryByAgent.set(agentId, toSummaryExcerpt(result));
+        resultByAgent.set(agentId, result);
+      } else {
+        summaryByAgent.delete(agentId);
+        resultByAgent.delete(agentId);
+      }
     }
   }
 
@@ -301,6 +310,7 @@ export function buildAgentCompletionSections(
       fallbackTaskDescription(agentId);
     const entries = files.get(agentId) ?? [];
     const summary = summaryByAgent.get(agentId);
+    const result = resultByAgent.get(agentId);
     sections.push({
       agentId,
       ...(meta?.agentType ? { agentType: meta.agentType } : {}),
@@ -314,6 +324,7 @@ export function buildAgentCompletionSections(
         : {}),
       files: rankDeliverablesFirst([...entries]),
       ...(summary ? { summary } : {}),
+      ...(result ? { result } : {}),
     });
   }
   return sections;

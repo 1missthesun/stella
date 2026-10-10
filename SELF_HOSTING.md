@@ -94,6 +94,8 @@ you don't use (no website, no mobile app) can be skipped.
 | **Canvas share** (`stellashare.app`) | canvas-share | `routes` in `workers/canvas-share/wrangler.jsonc` | `stellashare.app` | your domain, or delete it and set `"workers_dev": true` |
 | | cloud-builder | `vars.CANVAS_SHARE_BASE_URL` | `https://stellashare.app` | your canvas-share URL |
 | | desktop | `VITE_CANVAS_SHARE_BASE_URL` in `packages/desktop-ui/.env` | `https://stellashare.app` | your canvas-share URL |
+| | mobile | `EXPO_PUBLIC_CANVAS_SHARE_BASE_URL` | `https://stellashare.app` | your canvas-share URL |
+| | canvas-share, cloud-builder | canvas-share `vars.OWNER_SITE_URL`; cloud-builder `vars.CANVAS_OWNER_SITE_URL` (dev points at the dev website) | `https://stella.sh` | your website origin: a private canvas's "private" page sends its owner to `<site>/canvas/open` to sign in |
 | **Releases bucket** (public R2) | launchers | `STELLA_RELEASES_URL` at build (1.8). The launcher also hands it to the app, so native helpers and the Stella browser download from it | `https://pub-a319aaada8144dc9be5a83625033769c.r2.dev` | your releases bucket's public base |
 | | release workflows | repository variable `STELLA_RELEASES_URL` | 〃 | 〃 |
 | | website | `NEXT_PUBLIC_STELLA_RELEASES_URL` | 〃 | 〃 |

@@ -32,6 +32,7 @@ export const IPC_DISPLAY_LIST_FOLDER = "display:listFolder" as const;
 export const IPC_DISPLAY_LIST_CANVAS_HTML = "display:listCanvasHtml" as const;
 export const IPC_DISPLAY_OPEN_SHARED_CANVAS =
   "display:openSharedCanvas" as const;
+export const IPC_DISPLAY_OPEN_SHARE_LINK = "display:openShareLink" as const;
 export const IPC_DISPLAY_CANVAS_FILE_URL = "display:canvasFileUrl" as const;
 export const IPC_DISPLAY_CANVAS_HTML_URL = "display:canvasHtmlUrl" as const;
 export const IPC_DISPLAY_TRASH_LIST = "displayTrash:list" as const;

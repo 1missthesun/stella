@@ -87,3 +87,15 @@ export const isCanvasShareUrl = (
   value: string,
   baseUrl: string | null | undefined,
 ): boolean => parseCanvasShareSlug(value, baseUrl) !== null;
+
+/**
+ * The website page where the owner of a private link signs in and is sent on
+ * to it with a grant, for a browser that holds no view cookie. The share
+ * domain's "private" page links here.
+ */
+export const CANVAS_OWNER_OPEN_PATH = "/canvas/open";
+/** That page's query parameter naming the link's slug. */
+export const CANVAS_OWNER_OPEN_SLUG_PARAM = "c";
+
+export const buildCanvasOwnerOpenUrl = (siteUrl: string, slug: string): string =>
+  `${trimTrailingSlashes(siteUrl)}${CANVAS_OWNER_OPEN_PATH}?${CANVAS_OWNER_OPEN_SLUG_PARAM}=${encodeURIComponent(slug)}`;

@@ -13,8 +13,9 @@
  * backend for the owner's view URL (`shares.viewLink`, which carries a short
  * grant); someone else's link, or a signed-out app, keeps the URL as given.
  * When the canvas can't be rendered here (a private link that isn't ours, the
- * share domain unreachable), the link opens in the system browser instead,
- * so a click is never swallowed.
+ * share domain unreachable, or the web app, which has no native canvas
+ * fetch), that view URL opens in a browser tab instead, so the owner still
+ * gets in and a click is never swallowed.
  */
 import {
   normalizeDisplayPayload,
@@ -51,15 +52,27 @@ const openInSystemBrowser = (url: string): void => {
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
+/**
+ * In a browser the tab has to open inside the click, before the backend
+ * answers, or it is blocked as a popup; it is pointed at the view URL after.
+ */
+const openPendingBrowserTab = (): ((url: string) => void) => {
+  const pending = window.open("about:blank", "_blank");
+  if (!pending) return (url) => openInSystemBrowser(url);
+  pending.opener = null;
+  return (url) => {
+    pending.location.replace(url);
+  };
+};
+
 /** Render natively; the URL that was tried comes back for a browser fallback. */
 const renderShared = async (
   url: string,
 ): Promise<{ handled: boolean; viewUrl: string }> => {
-  const openSharedCanvas = window.electronAPI?.display?.openSharedCanvas;
-  if (!isRendererCanvasShareUrl(url) || typeof openSharedCanvas !== "function") {
-    return { handled: false, viewUrl: url };
-  }
+  if (!isRendererCanvasShareUrl(url)) return { handled: false, viewUrl: url };
   const viewUrl = await ownerViewUrl(url);
+  const openSharedCanvas = window.electronAPI?.display?.openSharedCanvas;
+  if (typeof openSharedCanvas !== "function") return { handled: false, viewUrl };
   let raw: unknown;
   try {
     raw = await openSharedCanvas({ url: viewUrl });
@@ -88,8 +101,11 @@ export const renderSharedCanvasFromUrl = async (
  */
 export const maybeHandleCanvasShareUrl = (url: string): boolean => {
   if (!isRendererCanvasShareUrl(url)) return false;
+  const openFallback = window.electronAPI
+    ? openInSystemBrowser
+    : openPendingBrowserTab();
   void renderShared(url).then(({ handled, viewUrl }) => {
-    if (!handled) openInSystemBrowser(viewUrl);
+    if (!handled) openFallback(viewUrl);
   });
   return true;
 };

@@ -23,6 +23,7 @@ import {
 } from "react-native-nitro-markdown";
 import * as WebBrowser from "expo-web-browser";
 import { parseStellaFileUrl } from "../lib/stella-file-links";
+import { canvasShareOpenUrl } from "../lib/canvas-share-links";
 import { parseStellaAppUrl } from "@stella/contracts/workspace-apps";
 import { requestOpenApp } from "../lib/workspace-app-links";
 import { fadeHex } from "../theme/oklch";
@@ -37,7 +38,7 @@ const BASE_FONT_SIZE = 17;
 async function openLink(url: string): Promise<boolean> {
   try {
     if (/^https?:\/\//i.test(url)) {
-      await WebBrowser.openBrowserAsync(url);
+      await WebBrowser.openBrowserAsync(await canvasShareOpenUrl(url));
     } else {
       await Linking.openURL(url);
     }

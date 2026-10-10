@@ -5,6 +5,7 @@ import {
   normalizeDisplayPayload,
 } from "@stella/contracts/desktop/display-payload";
 import type { RightSidebarHandle } from "@/shell/RightSidebar";
+import { maybeHandleCanvasShareUrl } from "@/features/canvas-share/open-shared-canvas";
 
 type UseDisplayPayloadRoutingOptions = {
   rightSidebarRef: RefObject<RightSidebarHandle | null>;
@@ -54,6 +55,14 @@ export function useDisplayPayloadRouting({
       routeDisplayPayload(payload);
     });
   }, [routeDisplayPayload]);
+
+  // Canvas-share links main caught as a new window or navigation.
+  useEffect(() => {
+    return window.electronAPI?.display.onOpenShareLink?.(({ url }) => {
+      maybeHandleCanvasShareUrl(url);
+    });
+  }, []);
+
 
   // If the previous agent run left files in deferred-delete trash, seed
   // the workspace panel with a stable tab without opening UI. The

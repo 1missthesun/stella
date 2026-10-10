@@ -40,7 +40,7 @@ import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";
 import type { ComposerQuote } from "../../types";
 import { DictationRecordingBar } from "../DictationRecordingBar";
-import { GlassSurface } from "../glass";
+import { GlassSurface, liquidGlassSupported } from "../glass";
 import { Icon } from "../Icon";
 
 // ---------------------------------------------------------------------------
@@ -451,8 +451,11 @@ export const Composer = memo(function Composer({
       : withSpring(1, { damping: 22, stiffness: 220, mass: 0.9 });
   }, [hidden, reveal]);
   const revealStyle = useAnimatedStyle(() => ({
-    opacity: reveal.value,
+    opacity: liquidGlassSupported ? 1 : reveal.value,
     transform: [{ translateY: (1 - reveal.value) * 18 }],
+  }));
+  const contentRevealStyle = useAnimatedStyle(() => ({
+    opacity: liquidGlassSupported ? reveal.value : 1,
   }));
 
   const showAttachmentStrip = (attachments?.length ?? 0) > 0;
@@ -486,6 +489,7 @@ export const Composer = memo(function Composer({
           fallbackColor={colors.surface}
           style={styles.shell}
         >
+          <Reanimated.View style={contentRevealStyle}>
           {showQuoteStrip ? (
             <View style={styles.composerQuoteStrip}>
               {quoteChips.map((quote) => (
@@ -752,6 +756,7 @@ export const Composer = memo(function Composer({
               ) : null}
             </View>
           )}
+          </Reanimated.View>
         </GlassSurface>
       </Pressable>
       </Reanimated.View>

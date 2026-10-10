@@ -11,13 +11,13 @@ import { EngineAccountAccess } from "../services/engine-account-access.js";
 import { MemorySyncService } from "../services/memory-sync/memory-sync-service.js";
 import { ClaudeLocalAccounts } from "../services/claude-local-accounts.js";
 import { ExternalLinkService } from "../services/external-link-service.js";
-import { readConfiguredCanvasShareBaseUrl, resolveSharedCanvasPayload, } from "../services/canvas-share-service.js";
+import { readConfiguredCanvasShareBaseUrl } from "../services/canvas-share-service.js";
 import { isCanvasShareUrl } from "@stella/contracts/canvas-share";
 import {
   IPC_AUTH_SESSION_INVALIDATED,
   IPC_MEMORY_SYNC_STATUS,
   IPC_LOCAL_CHAT_UPDATED,
-  IPC_DISPLAY_UPDATE,
+  IPC_DISPLAY_OPEN_SHARE_LINK,
   IPC_CLAUDE_ACCOUNTS_CHANGED,
 } from "@stella/contracts/desktop/ipc-channels";
 import { LocalChatHistoryService } from "../services/local-chat-history-service.js";
@@ -42,35 +42,23 @@ export const createBootstrapServices = (options) => {
     });
     externalLinkService.setDevBuild(config.isDeveloperInstance);
     externalLinkService.trustRendererOrigin(RENDERER_ORIGIN);
-    // A canvas-share link (`<CANVAS_SHARE_BASE_URL>/c/<slug>`) clicked/opened
-    // inside Stella is fetched + materialized in main and pushed to the Canvas
-    // panel via the existing `display:update` path, instead of bouncing out to
-    // the system browser. Returns true so the external-link funnel skips the
-    // browser open. No-ops when the share domain has not been configured.
-    // A link that can't be rendered here (a private canvas, which opens only
-    // with its owner's grant, or the share domain unreachable) goes to the
-    // system browser after all, so the click is never swallowed.
+    // A canvas-share link (`<CANVAS_SHARE_BASE_URL>/c/<slug>`) that reaches
+    // main as a new-window or navigation request goes to the renderer, which
+    // opens it like a chat click: it asks the backend for the owner's grant
+    // (a private canvas opens only with it), renders the canvas in the Canvas
+    // panel, and opens the browser only when it can't. Returns true so the
+    // external-link funnel skips the browser open. No-ops when the share
+    // domain has not been configured.
     externalLinkService.setCanvasShareHandler((url) => {
         const baseUrl = readConfiguredCanvasShareBaseUrl();
         if (!baseUrl || !isCanvasShareUrl(url, baseUrl))
             return false;
-        void resolveSharedCanvasPayload({
-            url,
-            baseUrl,
-            stellaDataDir: config.stellaDataDirPath,
-        })
-            .then((payload) => {
-            if (!payload) {
-                externalLinkService.openSafeExternalUrl(url);
-                return;
-            }
-            for (const window of options.getAllWindows()) {
-                if (!window.isDestroyed()) {
-                    window.webContents.send(IPC_DISPLAY_UPDATE, payload);
-                }
-            }
-        })
-            .catch(() => { });
+        const windows = options.getAllWindows().filter((window) => !window.isDestroyed());
+        if (windows.length === 0)
+            return false;
+        for (const window of windows) {
+            window.webContents.send(IPC_DISPLAY_OPEN_SHARE_LINK, { url });
+        }
         return true;
     });
     const securityPolicyService = new SecurityPolicyService({

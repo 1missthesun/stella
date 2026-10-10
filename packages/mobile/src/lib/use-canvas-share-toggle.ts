@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import * as Clipboard from "expo-clipboard";
 import {
   SHARE_CANVAS_PATTERN,
@@ -96,5 +96,8 @@ export function useCanvasShareToggle(
       setBusy(false);
     }
   }, [canvas, html, isPublic, link, title]);
-  return canvas ? { isPublic, busy, toggle } : null;
+  return useMemo(
+    () => (canvas ? { isPublic, busy, toggle } : null),
+    [busy, canvas, isPublic, toggle],
+  );
 }

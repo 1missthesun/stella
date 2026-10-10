@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, View, useWindowDimensions } from "react-native";
-import { Group, Host, Popover, RNHostView, Rectangle } from "@expo/ui/swift-ui";
+import { Host, Popover, RNHostView, Rectangle, ZStack } from "@expo/ui/swift-ui";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   frame,
   opacity,
@@ -8,8 +9,11 @@ import {
 } from "@expo/ui/swift-ui/modifiers";
 import { useTheme } from "../theme/theme-context";
 import { recentTouchAnchor, type TouchAnchor } from "../lib/touch-anchor";
+import { TOP_BAR_BAR_HEIGHT } from "./AppBackdrop";
 import {
+  POPOVER_BUTTON_SIZE,
   POPOVER_MAX_WIDTH,
+  POPOVER_ROW_GAP,
   POPOVER_SIDE_MARGIN,
   PopoverActionRow,
   PopoverSurface,
@@ -18,6 +22,9 @@ import {
 
 const ANCHOR_SIZE = 24;
 const DISMISS_MS = 320;
+const ARROW_ROOM = 16;
+const EDGE_GAP = 8;
+const MIN_BUBBLE_HEIGHT = 160;
 
 /**
  * iOS's own popover, pointing at what was tapped. SwiftUI presents it with
@@ -40,6 +47,7 @@ export function FloatingPopover({
 }: FloatingPopoverProps) {
   const { isDark } = useTheme();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const rootRef = useRef<View>(null);
   const [point] = useState<TouchAnchor>(
     () =>
@@ -75,6 +83,17 @@ export function FloatingPopover({
   const width =
     widthProp ??
     Math.min(screenWidth - POPOVER_SIDE_MARGIN * 2, POPOVER_MAX_WIDTH);
+  const topLimit = insets.top + TOP_BAR_BAR_HEIGHT + EDGE_GAP;
+  const bottomLimit = screenHeight - insets.bottom - EDGE_GAP;
+  const above = point.y - ANCHOR_SIZE / 2 - ARROW_ROOM - topLimit;
+  const below = bottomLimit - (point.y + ANCHOR_SIZE / 2) - ARROW_ROOM;
+  const placeBelow = below >= above;
+  const room = Math.max(
+    MIN_BUBBLE_HEIGHT,
+    Math.floor(Math.max(above, below) - POPOVER_ROW_GAP - POPOVER_BUTTON_SIZE),
+  );
+  const bubbleHeight = height === undefined ? undefined : Math.min(height, room);
+  const bubbleMaxHeight = Math.min(maxHeight ?? room, room);
 
   return (
     <View
@@ -98,6 +117,7 @@ export function FloatingPopover({
         >
           <Popover
             isPresented={presented}
+            arrowEdge={placeBelow ? "top" : "bottom"}
             onIsPresentedChange={(next) => {
               if (!next) close();
             }}
@@ -111,30 +131,25 @@ export function FloatingPopover({
               />
             </Popover.Trigger>
             <Popover.Content>
-              <Group modifiers={[presentationBackground(CLEAR)]}>
-              <RNHostView matchContents>
-                <View
-                  style={[
-                    styles.column,
-                    { width, padding: POPOVER_SIDE_MARGIN / 2 },
-                  ]}
-                >
-                  <PopoverSurface
-                    width={width - POPOVER_SIDE_MARGIN}
-                    height={height}
-                    maxHeight={maxHeight}
-                  >
-                    {typeof children === "function" ? children(close) : children}
-                  </PopoverSurface>
-                  <PopoverActionRow
-                    width={width - POPOVER_SIDE_MARGIN}
-                    actions={actions}
-                    closeLabel={closeLabel}
-                    onClose={close}
-                  />
-                </View>
-              </RNHostView>
-              </Group>
+              <ZStack modifiers={[presentationBackground(CLEAR)]}>
+                <RNHostView matchContents>
+                  <View style={[styles.column, { width }]}>
+                    <PopoverSurface
+                      width={width}
+                      height={bubbleHeight}
+                      maxHeight={bubbleMaxHeight}
+                    >
+                      {typeof children === "function" ? children(close) : children}
+                    </PopoverSurface>
+                    <PopoverActionRow
+                      width={width}
+                      actions={actions}
+                      closeLabel={closeLabel}
+                      onClose={close}
+                    />
+                  </View>
+                </RNHostView>
+              </ZStack>
             </Popover.Content>
           </Popover>
         </Host>

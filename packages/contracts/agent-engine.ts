@@ -73,7 +73,28 @@ export type CloudExecutionSelection =
   | (CloudExecutionSelectionBase & {
       engine: "chatgpt";
       provider: "chatgpt";
+    })
+  /**
+   * A model on a provider credential saved to the account
+   * (`@stella/contracts/backend/providers`): `provider` is its pi-ai id
+   * (e.g. "openrouter"), `model` that provider's model id. Runs on the
+   * owner's own key through the model gateway's BYOK lane, never billed to
+   * Stella.
+   */
+  | (CloudExecutionSelectionBase & {
+      engine: "provider";
+      provider: string;
     });
+
+/** The selections every client understood before account provider keys. */
+export type LegacyCloudExecutionSelection = Exclude<
+  CloudExecutionSelection,
+  { engine: "provider" }
+>;
+
+export const isLegacyCloudExecution = (
+  execution: CloudExecutionSelection,
+): execution is LegacyCloudExecutionSelection => execution.engine !== "provider";
 
 export const AGENT_RUNTIME_ENGINES: readonly AgentRuntimeEngine[] = [
   "default",

@@ -13,6 +13,15 @@ import type {
 } from "@/shared/types/electron";
 import { withI18n } from "../../helpers/i18n";
 
+const backendCall = vi.hoisted(() => vi.fn());
+const openDisplayPayloadTab = vi.hoisted(() => vi.fn());
+vi.mock("@/platform/backend/backend-client", () => ({
+  backendClient: { call: backendCall },
+}));
+vi.mock("@/features/workspace-display/open-payload", () => ({
+  openDisplayPayloadTab,
+}));
+
 const tab = (url: string) => ({
   id: "tab-docs",
   ownerId: "owner-current",
@@ -131,6 +140,78 @@ describe("chat markdown web links", () => {
       }),
     );
     expect(browserView.selectTab).not.toHaveBeenCalled();
+  });
+
+  describe("canvas links", () => {
+    const shareUrl = "https://stellashare.app/c/RxHfABskZxC6iqvHwVJfDg";
+    const viewUrl = `${shareUrl}?grant=owner-grant`;
+    const openSharedCanvas = vi.fn();
+
+    beforeEach(() => {
+      vi.stubEnv("VITE_CANVAS_SHARE_BASE_URL", "https://stellashare.app");
+      backendCall.mockReset();
+      openSharedCanvas.mockReset();
+      openDisplayPayloadTab.mockReset();
+      backendCall.mockResolvedValue({ url: viewUrl });
+      Object.defineProperty(window, "electronAPI", {
+        configurable: true,
+        value: {
+          browserView,
+          system: { openExternal },
+          display: { openSharedCanvas },
+        },
+      });
+    });
+
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    it("opens the owner's private canvas with its grant instead of the in-app browser", async () => {
+      openSharedCanvas.mockResolvedValue({
+        kind: "canvas-html",
+        filePath: "/tmp/outputs/html/RxHfABskZxC6iqvHwVJfDg.html",
+        slug: "RxHfABskZxC6iqvHwVJfDg",
+        title: "Report",
+        createdAt: 1,
+      });
+      const anchor = await render(shareUrl);
+
+      expect(await click(anchor)).toBe(false);
+      await vi.waitFor(() =>
+        expect(openSharedCanvas).toHaveBeenCalledWith({ url: viewUrl }),
+      );
+      expect(backendCall).toHaveBeenCalledWith("shares.viewLink", {
+        slug: "RxHfABskZxC6iqvHwVJfDg",
+      });
+      await vi.waitFor(() =>
+        expect(openDisplayPayloadTab).toHaveBeenCalledWith(
+          expect.objectContaining({ kind: "canvas-html", slug: "RxHfABskZxC6iqvHwVJfDg" }),
+          { activate: true },
+        ),
+      );
+      expect(browserView.getState).not.toHaveBeenCalled();
+      expect(browserView.createTab).not.toHaveBeenCalled();
+      expect(openExternal).not.toHaveBeenCalled();
+    });
+
+    it("falls back to the browser with the grant when the canvas can't render here", async () => {
+      openSharedCanvas.mockResolvedValue(null);
+      const anchor = await render(shareUrl);
+
+      expect(await click(anchor)).toBe(false);
+      await vi.waitFor(() => expect(openExternal).toHaveBeenCalledWith(viewUrl));
+      expect(browserView.createTab).not.toHaveBeenCalled();
+    });
+
+    it("keeps the link as given when it isn't the caller's", async () => {
+      backendCall.mockRejectedValue(new Error("Share not found."));
+      openSharedCanvas.mockResolvedValue(null);
+      const anchor = await render(shareUrl);
+
+      expect(await click(anchor)).toBe(false);
+      await vi.waitFor(() => expect(openExternal).toHaveBeenCalledWith(shareUrl));
+    });
   });
 
   it("leaves modifier clicks and non-web protocols to native link handling", async () => {

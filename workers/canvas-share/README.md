@@ -15,7 +15,11 @@ layer.
       and this object's `owner` tag → `302` to the clean `/c/<slug>` with an
       HttpOnly `stella_canvas_view` cookie (24 hours, `Path=/c/`).
     - That cookie for the object's owner → the HTML, `Cache-Control: private, no-store`.
-    - Anything else → `403` "This canvas is private" page.
+    - Anything else → `403` "This canvas is private" page, with a link for the
+      owner to `<site>/canvas/open?c=<slug>` on the website (the object's
+      `owner-site` metadata, else the `OWNER_SITE_URL` var). Signed in there
+      as the owner, the site fetches a grant from `shares.viewLink` and sends
+      the browser back here with it; anyone else is told it isn't theirs.
     - Needs the `CANVAS_SHARE_VIEW_SECRET` secret, the same value cloud-builder
       signs grants with (`workers/shared/canvas-view-grant.ts`). Without it no
       private canvas opens here.

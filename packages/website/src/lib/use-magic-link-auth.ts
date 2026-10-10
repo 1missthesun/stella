@@ -21,7 +21,9 @@ export interface UseMagicLinkAuthResult {
   reset: () => void;
 }
 
-export const useMagicLinkAuth = (): UseMagicLinkAuthResult => {
+export const useMagicLinkAuth = (
+  options: { returnTo?: () => string } = {},
+): UseMagicLinkAuthResult => {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<MagicLinkStatus>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +52,10 @@ export const useMagicLinkAuth = (): UseMagicLinkAuthResult => {
       const token = await getWebsiteChallengeToken();
       const result = await authClient.signIn.magicLink({
         email: trimmed,
-        callbackURL: new URL("/sign-in", window.location.origin).toString(),
+        callbackURL: new URL(
+          options.returnTo?.() ?? "/sign-in",
+          window.location.origin,
+        ).toString(),
         fetchOptions: {
           headers: turnstileHeader(token),
         },

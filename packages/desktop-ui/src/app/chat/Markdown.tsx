@@ -14,6 +14,7 @@ import {
   STELLA_FILE_TAG_ATTRIBUTES,
 } from "@/features/chat/lib/stella-file-links";
 import { openCloudAppPanel } from "@/features/cloud/open-cloud-app-panel";
+import { maybeHandleCanvasShareUrl } from "@/features/canvas-share/open-shared-canvas";
 import {
   isUnmodifiedPrimaryClick,
   normalizedHttpUrl,
@@ -162,9 +163,11 @@ type MarkdownLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 
 /*
  * Unmodified primary clicks on an http(s) link land in the Stella browser
- * rather than the OS one. `node` is Streamdown's mdast payload and must not
- * reach the DOM. If the in-app browser can't take the URL we fall back to
- * the external open so the click is never silently swallowed.
+ * rather than the OS one, except a canvas-share link, which opens as a canvas
+ * with its owner's grant (the in-app browser would show a private canvas's
+ * "private" page). `node` is Streamdown's mdast payload and must not reach
+ * the DOM. If the in-app browser can't take the URL we fall back to the
+ * external open so the click is never silently swallowed.
  */
 const MarkdownLink = ({
   href,
@@ -181,6 +184,10 @@ const MarkdownLink = ({
       if (event.defaultPrevented || !isUnmodifiedPrimaryClick(event)) return;
 
       const url = normalizedHttpUrl(event.currentTarget.href);
+      if (url && maybeHandleCanvasShareUrl(url)) {
+        event.preventDefault();
+        return;
+      }
       const api = window.electronAPI?.browserView;
       if (!url || !api) return;
 

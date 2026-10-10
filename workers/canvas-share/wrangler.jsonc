@@ -23,7 +23,11 @@
   "vars": {
     // Global kill-switch. Set to `1`, `true`, or `yes` to make every share
     // return 503. This is non-secret configuration.
-    "SHARES_DISABLED": ""
+    "SHARES_DISABLED": "",
+    // The website whose `/canvas/open` page signs a private canvas's owner in
+    // and sends them back with a grant. An object's `owner-site` metadata
+    // (written by the cloud-builder that saved it) takes precedence.
+    "OWNER_SITE_URL": "https://stella.sh"
   },
 
   // Public share domain. CANVAS_SHARE_BASE_URL in the backend must match.

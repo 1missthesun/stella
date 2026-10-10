@@ -175,6 +175,7 @@ import {
   IPC_DISPLAY_LIST_CANVAS_HTML,
   IPC_DISPLAY_MEDIA_SOURCE,
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
+  IPC_DISPLAY_OPEN_SHARE_LINK,
   IPC_DISPLAY_READ_FILE,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
@@ -486,6 +487,12 @@ export const createElectronApi = (
        * a valid share link or the fetch fails.
        */
       openSharedCanvas: invoker(IPC_DISPLAY_OPEN_SHARED_CANVAS),
+      /**
+       * A canvas-share link the main process caught (a new-window or
+       * navigation request). The renderer opens it the way a chat click
+       * does, asking the backend for the owner's grant first.
+       */
+      onOpenShareLink: on(IPC_DISPLAY_OPEN_SHARE_LINK),
       /**
        * The `stella-canvas://` URL a canvas iframe loads a local HTML file
        * from (its own origin and CSP, with the Ask Stella bridge injected).

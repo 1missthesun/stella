@@ -107,6 +107,10 @@
     "R2_BACKUP_BUCKET": "stella-v2-app-builds-dev",
     // Public origin of workers/canvas-share; share URLs are `<this>/c/<slug>`.
     "CANVAS_SHARE_BASE_URL": "https://stellashare.app",
+    // The website a private canvas's "private" page sends its owner to, to
+    // sign in and come back with a grant (its `/canvas/open` page). Written
+    // into each canvas object, since every environment shares canvas-share.
+    "CANVAS_OWNER_SITE_URL": "https://stella-website-dev.fromyou.workers.dev",
     // Magic-link sender; its domain is enabled for Email Sending.
     "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
   },
@@ -536,6 +540,7 @@
         "R2_CANVAS_SHARES_BUCKET": "stella-canvas-shares",
         "R2_BACKUP_BUCKET": "stella-v2-app-builds-prod",
         "CANVAS_SHARE_BASE_URL": "https://stellashare.app",
+        "CANVAS_OWNER_SITE_URL": "https://stella.sh",
         "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
       },
       "secrets": {

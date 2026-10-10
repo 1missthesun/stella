@@ -18,7 +18,10 @@
  * owner is traded for an HttpOnly view cookie, and the browser is redirected
  * to the clean link (so the grant never sits where the canvas's scripts could
  * read it). After that the cookie opens the owner's private canvases until it
- * expires. Anyone else gets the "private" page. Without
+ * expires. Anyone else gets the "private" page, which links the owner to the
+ * website's sign-in page for the link (`owner-site` metadata, else
+ * `OWNER_SITE_URL`); signed in there as the owner, the site fetches a grant
+ * and sends the browser back here with it. Without
  * `CANVAS_SHARE_VIEW_SECRET` no private canvas opens here at all. Objects
  * written before visibility existed carry none and stay public.
  */
@@ -30,6 +33,7 @@ import {
   signCanvasViewToken,
   verifyCanvasViewToken,
 } from "../../shared/canvas-view-grant.js";
+import { buildCanvasOwnerOpenUrl } from "../../../packages/contracts/canvas-share.js";
 
 const KEY_PREFIX = "shares";
 /** Slugs are 128-bit base64url tokens (~22 chars); be lenient but strict. */
@@ -67,6 +71,39 @@ const viewSecretOf = (env: Env): string | null => {
   return trimmed || null;
 };
 
+/** An http(s) origin; plain http only for a local site. */
+const siteOrigin = (value: unknown): string | null => {
+  if (typeof value !== "string" || !value.trim()) return null;
+  let url: URL;
+  try {
+    url = new URL(value.trim());
+  } catch {
+    return null;
+  }
+  const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
+  if (url.protocol !== "https:" && !(url.protocol === "http:" && local)) return null;
+  return url.origin;
+};
+
+/** Where this object's owner signs in to open it, if anywhere. */
+const ownerOpenUrlOf = (
+  env: Env,
+  metadata: Record<string, string> | undefined,
+  slug: string,
+): string | null => {
+  const site =
+    siteOrigin(metadata?.["owner-site"]) ??
+    siteOrigin(env.OWNER_SITE_URL);
+  return site ? buildCanvasOwnerOpenUrl(site, slug) : null;
+};
+
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 const readCookie = (request: Request, name: string): string | null => {
   const header = request.headers.get("cookie");
   if (!header) return null;
@@ -78,7 +115,7 @@ const readCookie = (request: Request, name: string): string | null => {
   return null;
 };
 
-const PRIVATE_PAGE = `<!doctype html>
+const privatePageHtml = (ownerOpenUrl: string | null): string => `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -92,22 +129,28 @@ const PRIVATE_PAGE = `<!doctype html>
   main { max-width: 420px; padding: 32px 24px; text-align: center; }
   h1 { font-size: 22px; font-weight: 600; margin: 0 0 8px; }
   p { margin: 0; color: #6b6a66; }
+  a.open { display: inline-block; margin: 24px 0 16px; padding: 10px 18px;
+    border-radius: 999px; background: #1f1f1d; color: #f7f6f3;
+    text-decoration: none; font-weight: 500; }
+  p.note { font-size: 14px; }
   @media (prefers-color-scheme: dark) {
     body { background: #161615; color: #ecebe8; }
     p { color: #a3a29e; }
+    a.open { background: #ecebe8; color: #161615; }
   }
 </style>
 </head>
 <body>
 <main>
   <h1>This canvas is private</h1>
-  <p>Only its owner can open it. If it's yours, open it from Stella. To let others see it, make it public from the canvas's Share menu.</p>
+  <p>Only its owner can open it.</p>
+${ownerOpenUrl ? `  <a class="open" href="${escapeHtml(ownerOpenUrl)}">It's mine, sign in to open it</a>\n` : ""}  <p class="note">To let others see it, its owner can make it public from the canvas's Share menu in Stella.</p>
 </main>
 </body>
 </html>`;
 
-const privatePage = (method: string): Response =>
-  new Response(method === "HEAD" ? null : PRIVATE_PAGE, {
+const privatePage = (method: string, ownerOpenUrl: string | null): Response =>
+  new Response(method === "HEAD" ? null : privatePageHtml(ownerOpenUrl), {
     status: 403,
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -175,8 +218,9 @@ export default {
       const secret = viewSecretOf(env);
       if (!owner || !secret) {
         object.body.cancel().catch(() => {});
-        return privatePage(request.method);
+        return privatePage(request.method, null);
       }
+      const ownerOpenUrl = ownerOpenUrlOf(env, object.customMetadata, slug);
       const now = Date.now();
       const grant = url.searchParams.get(CANVAS_VIEW_GRANT_PARAM);
       if (grant) {
@@ -198,13 +242,13 @@ export default {
             },
           });
         }
-        return privatePage(request.method);
+        return privatePage(request.method, ownerOpenUrl);
       }
       const cookie = readCookie(request, CANVAS_VIEW_COOKIE);
       const claims = cookie ? await verifyCanvasViewToken(secret, cookie, now) : null;
       if (claims?.k !== "view" || claims.o !== owner) {
         object.body.cancel().catch(() => {});
-        return privatePage(request.method);
+        return privatePage(request.method, ownerOpenUrl);
       }
     }
 

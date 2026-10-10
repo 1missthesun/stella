@@ -116,7 +116,7 @@ export default function MainLayout() {
   const router = useRouter();
   const drawerLive = useDrawerLive();
   const drawerSide = useDrawerSide();
-  const { travel } = useDrawerMetrics();
+  const { travel, endTravel } = useDrawerMetrics();
   // The in-progress agents the top-bar indicator was showing when it was
   // pressed. Held rather than re-read so the menu keeps listing what the user
   // tapped on even as work settles underneath it.
@@ -363,7 +363,7 @@ export default function MainLayout() {
           }
           end={{
             enabled: onChatSurface,
-            panel: <ChatSettingsPanel width={travel} />,
+            panel: <ChatSettingsPanel width={endTravel} />,
             chevron: {
               left: width - TOP_BAR_INSET - TOP_BAR_BUTTON,
               top: topBarHeight - TOP_BAR_BUTTON,

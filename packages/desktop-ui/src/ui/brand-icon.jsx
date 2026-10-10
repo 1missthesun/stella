@@ -1,7 +1,7 @@
 import { Box } from "@/ui/icons";
 import { ClaudeLogoIcon } from "@/ui/claude-logo-icon";
 import { StellaLogoIcon } from "@/ui/stella-logo-icon";
-import { BRAND_ICON_COLOR_MARKUP, BRAND_ICON_MARKUP, } from "@/ui/brand-icon-paths";
+import { BRAND_ICON_COLOR_MARKUP, BRAND_ICON_MARKUP, } from "@stella/theme/brand-icons";
 /** Provider key → brand glyph key. Unlisted keys use the key itself. */
 const BRAND_KEY_ALIASES = {
     "chatgpt": "openai",

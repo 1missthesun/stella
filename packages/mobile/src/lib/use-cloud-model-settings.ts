@@ -7,6 +7,10 @@ import {
   type EngineModelOption,
 } from "@stella/contracts/engine-model-catalog";
 import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
+import type {
+  AccountProvider,
+  ProviderModel,
+} from "@stella/contracts/backend/providers";
 import { useT } from "../i18n";
 import { getBackendClient, readBackendView } from "./backend";
 import { authClient } from "./auth-client";
@@ -23,7 +27,7 @@ import {
 import { notifyError } from "./haptics";
 import { userFacingError } from "./user-facing-error";
 
-export type ModelEngine = CloudExecutionSelection["engine"];
+export type ModelEngine = Exclude<CloudExecutionSelection["engine"], "provider">;
 
 export const MODEL_ENGINE_OPTIONS: ReadonlyArray<{ id: ModelEngine; label: string }> = [
   { id: "stella", label: "Stella" },
@@ -43,12 +47,56 @@ export type ModelOption = {
   available: boolean;
 };
 
+/**
+ * What a chat can run on: one of Stella's built-in engines, or a provider
+ * whose key or sign-in is saved to the account. Built-ins are keyed by their
+ * engine; account providers by `provider:<id>`, so the Anthropic API key and
+ * Claude Code never share an id.
+ */
+export type Brain =
+  | {
+      id: ModelEngine;
+      kind: "engine";
+      engine: ModelEngine;
+      label: string;
+      mark: string;
+    }
+  | {
+      id: string;
+      kind: "provider";
+      provider: AccountProvider;
+      label: string;
+      mark: string;
+    };
+
+export const providerBrainId = (provider: string) => `provider:${provider}`;
+
+export const brainIdOf = (execution: CloudExecutionSelection): string =>
+  execution.engine === "provider"
+    ? providerBrainId(execution.provider)
+    : execution.engine;
+
+const ENGINE_MARKS: Record<ModelEngine, string> = {
+  stella: "stella",
+  anthropic: "anthropic",
+  chatgpt: "chatgpt",
+};
+
+/** Ids the engines own; an account provider with one of these is skipped. */
+const ENGINE_OWNED_PROVIDERS = new Set(["stella", "chatgpt"]);
+
+type ProviderModelsState =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "ready"; models: ProviderModel[] };
+
 type LoadedState = {
   scope: string;
   execution: CloudExecutionSelection;
   catalog: StellaCatalog;
   engineModels: EngineModelCatalog;
   connectedProviders: string[];
+  providers: AccountProvider[];
 };
 
 const engineModelList = (
@@ -92,11 +140,17 @@ export function useCloudModelSettings(active: boolean) {
   const [state, setState] = useState<LoadedState | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [providerModels, setProviderModels] = useState<
+    Record<string, ProviderModelsState>
+  >({});
+  const providerModelsRef = useRef(providerModels);
+  providerModelsRef.current = providerModels;
   useLayoutEffect(() => {
     currentScope.current = scope;
     writePending.current = false;
     setSaving(false);
     setLoading(false);
+    setProviderModels({});
     return () => { currentScope.current = null; };
   }, [scope]);
   const loaded = state?.scope === scope ? state : null;
@@ -104,6 +158,7 @@ export function useCloudModelSettings(active: boolean) {
   const catalog = loaded?.catalog ?? EMPTY_CATALOG;
   const engineModels = loaded?.engineModels ?? EMPTY_ENGINE_MODELS;
   const connectedProviders = loaded?.connectedProviders;
+  const providers = loaded?.providers;
 
   const refresh = useCallback(async () => {
     if (!owner || !scope || !active || writePending.current) return;
@@ -114,7 +169,7 @@ export function useCloudModelSettings(active: boolean) {
         getToken: () => getAuthTokenForSubject(owner.expectedSubject),
         isCurrent: () => currentScope.current === scope && readRevision.current === revision,
         request: async (token) => {
-          const [settings, catalog, chatgptModels] = await Promise.all([
+          const [settings, catalog, chatgptModels, providerSettings] = await Promise.all([
             readBackendView("engines.get", {}),
             fetchStellaCatalog({ headers: { Authorization: `Bearer ${token}` } }),
             // The cloud's ChatGPT account's own list; Stella's catalog
@@ -122,9 +177,14 @@ export function useCloudModelSettings(active: boolean) {
             getBackendClient()
               .call("engines.listModels", { provider: "chatgpt" })
               .catch(() => null),
+            // A server without account provider keys lists none.
+            readBackendView("providers.get", {}).catch(() => null),
           ]);
           return {
-            execution: settings.execution,
+            execution: settings.selection ?? settings.execution,
+            providers: (providerSettings?.providers ?? []).filter(
+              (provider) => !ENGINE_OWNED_PROVIDERS.has(provider.id),
+            ),
             connectedProviders: settings.connections
               .filter(isEngineConnectionUsable)
               .map((row) => row.provider),
@@ -177,8 +237,50 @@ export function useCloudModelSettings(active: boolean) {
     }
   }, [active, owner, scope, loaded, t]);
 
-  const engine: ModelEngine = execution?.engine ?? "stella";
+  const brainId = execution ? brainIdOf(execution) : "stella";
+  const engine: CloudExecutionSelection["engine"] = execution?.engine ?? "stella";
   const effort = execution?.reasoningEffort ?? "default";
+
+  const loadProviderModels = useCallback(
+    async (provider: string, force = false): Promise<ProviderModel[] | null> => {
+      const known = providerModelsRef.current[provider];
+      if (!force && known?.status === "ready") return known.models;
+      if (!force && known?.status === "loading") return null;
+      if (!scope) return null;
+      const requestScope = scope;
+      setProviderModels((current) => ({ ...current, [provider]: { status: "loading" } }));
+      try {
+        const result = await getBackendClient().call("providers.listModels", { provider });
+        if (currentScope.current !== requestScope) return null;
+        setProviderModels((current) => ({
+          ...current,
+          [provider]: { status: "ready", models: result.models },
+        }));
+        return result.models;
+      } catch {
+        if (currentScope.current !== requestScope) return null;
+        setProviderModels((current) => ({ ...current, [provider]: { status: "error" } }));
+        return null;
+      }
+    },
+    [scope],
+  );
+
+  useEffect(() => {
+    if (execution?.engine === "provider") void loadProviderModels(execution.provider);
+  }, [execution, loadProviderModels]);
+
+  const selectProviderModel = useCallback(
+    (provider: string, model: string) => {
+      if (!execution) return;
+      const reasoningEffort =
+        execution.engine === "provider" && execution.provider === provider
+          ? execution.reasoningEffort
+          : "default";
+      void apply({ engine: "provider", provider, model, reasoningEffort });
+    },
+    [apply, execution],
+  );
 
   const selectEngineModel = useCallback(
     (targetEngine: ModelEngine, model: string) => {
@@ -222,8 +324,51 @@ export function useCloudModelSettings(active: boolean) {
     [apply, execution],
   );
 
+  const brains = useMemo((): Brain[] => {
+    const builtIn: Brain[] = MODEL_ENGINE_OPTIONS.map((option) => ({
+      id: option.id,
+      kind: "engine",
+      engine: option.id,
+      label: option.label,
+      mark: ENGINE_MARKS[option.id],
+    }));
+    const accounts: Brain[] = (providers ?? []).map((provider) => ({
+      id: providerBrainId(provider.id),
+      kind: "provider",
+      provider,
+      label: provider.label,
+      mark: provider.id,
+    }));
+    return [...builtIn, ...accounts];
+  }, [providers]);
+
+  const providerModelState = useCallback(
+    (provider: string): ProviderModelsState | undefined => providerModels[provider],
+    [providerModels],
+  );
+
   const modelsFor = useCallback(
-    (targetEngine: ModelEngine): ModelOption[] => {
+    (target: string): ModelOption[] => {
+      if (target.startsWith("provider:")) {
+        const provider = target.slice("provider:".length);
+        const state = providerModels[provider];
+        const selectedId =
+          execution?.engine === "provider" && execution.provider === provider
+            ? execution.model
+            : null;
+        const models = state?.status === "ready" ? state.models : [];
+        const options = models.map((model) => ({
+          id: model.id,
+          label: model.name,
+          selected: model.id === selectedId,
+          available: true,
+        }));
+        if (selectedId && !options.some((option) => option.selected)) {
+          options.unshift({ id: selectedId, label: selectedId, selected: true, available: true });
+        }
+        return options;
+      }
+      const targetEngine = target as ModelEngine;
       const selectedId = execution?.engine === targetEngine ? execution.model : null;
       if (targetEngine === "stella") {
         // The opaque default is always selectable, even when the catalog
@@ -249,28 +394,57 @@ export function useCloudModelSettings(active: boolean) {
         available: true,
       }));
     },
-    [catalog.models, engineModels, execution],
+    [catalog.models, engineModels, execution, providerModels],
   );
 
   const label = useMemo(() => {
     if (!execution) return "Stella";
+    if (execution.engine === "provider") {
+      const state = providerModels[execution.provider];
+      const name =
+        (state?.status === "ready"
+          ? state.models.find((model) => model.id === execution.model)?.name
+          : undefined) ?? execution.model;
+      return name;
+    }
     if (execution.engine === "stella") return stellaModelLabel(catalog, execution.model);
     const name =
       engineModelList(engineModels, execution.engine).find((model) => model.id === execution.model)
         ?.name ?? execution.model;
     return execution.engine === "anthropic" ? `Claude Code · ${name}` : name;
-  }, [catalog, engineModels, execution]);
+  }, [catalog, engineModels, execution, providerModels]);
 
   // The compact composer picker only lists models this plan can use.
   const models = useMemo(
-    () => modelsFor(engine).filter((model) => model.available),
-    [engine, modelsFor],
+    () => modelsFor(brainId).filter((model) => model.available),
+    [brainId, modelsFor],
+  );
+
+  const currentProviderModel =
+    execution?.engine === "provider"
+      ? (() => {
+          const state = providerModels[execution.provider];
+          return state?.status === "ready"
+            ? state.models.find((model) => model.id === execution.model)
+            : undefined;
+        })()
+      : undefined;
+  const supportsEffortSelection = Boolean(
+    execution &&
+      execution.engine !== "stella" &&
+      (execution.engine !== "provider" || currentProviderModel?.reasoning !== false),
   );
 
   return useMemo(
     () => ({
       execution,
       engine,
+      brainId,
+      brains,
+      providers,
+      providerModelState,
+      loadProviderModels,
+      selectProviderModel,
       loading,
       saving,
       refresh,
@@ -278,17 +452,27 @@ export function useCloudModelSettings(active: boolean) {
       effort,
       // Stella-managed runs take their effort from the backend config; only
       // the Claude Code / ChatGPT engines expose one.
-      supportsEffortSelection: Boolean(execution && execution.engine !== "stella"),
+      supportsEffortSelection,
       /** Providers connected for cloud runs; undefined until loaded. */
       connectedProviders,
       models,
       modelsFor,
-      selectModel: (model: string) => selectEngineModel(engine, model),
+      selectModel: (model: string) =>
+        execution?.engine === "provider"
+          ? selectProviderModel(execution.provider, model)
+          : selectEngineModel(engine as ModelEngine, model),
       selectEngineModel,
       selectEngine,
       selectEffort,
     }),
     [
+      brainId,
+      brains,
+      providers,
+      providerModelState,
+      loadProviderModels,
+      selectProviderModel,
+      supportsEffortSelection,
       connectedProviders,
       effort,
       engine,

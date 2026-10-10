@@ -1,10 +1,20 @@
-import { useEffect, type ReactNode } from "react";
+import {
+  createContext,
+  forwardRef,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  type ReactNode,
+} from "react";
 import {
   BackHandler,
   Platform,
+  ScrollView,
   StyleSheet,
   View,
   useWindowDimensions,
+  type ScrollViewProps,
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
@@ -16,6 +26,7 @@ import Animated, {
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import {
   closeDrawer,
@@ -26,9 +37,11 @@ import {
   openDrawer,
   useDrawerLive,
   useDrawerMetrics,
+  useDrawerClosePan,
   useDrawerOpen,
-  useDrawerPan,
+  useDrawerOpenPan,
   useDrawerSide,
+  useDrawerTravel,
   type DrawerSide,
 } from "../../lib/drawer";
 import { tapLight } from "../../lib/haptics";
@@ -42,6 +55,7 @@ const AnimatedBlur = Animated.createAnimatedComponent(BlurView);
 const BLUR = Platform.OS === "ios";
 const PAGE_BLUR = 30;
 const PANEL_BLUR = 34;
+const STRIP_VEIL = 0.9;
 
 export const DRAWER_CHEVRON_SIZE = 44;
 
@@ -80,7 +94,7 @@ export function DrawerStage({
   const p = drawerProgress;
   const floor = colors.background;
   const endEnabled = Boolean(end?.enabled);
-  const { travel, scale, radius } = useDrawerMetrics();
+  const { travel, endTravel, scale, radius } = useDrawerMetrics();
   const reduce = useReducedMotion();
 
   const rest = useSharedValue(0);
@@ -110,7 +124,13 @@ export function DrawerStage({
     const v = p.value;
     const s = reduce ? 1 : 1 - (1 - scale) * Math.min(v, 1.2);
     return {
-      transform: [{ translateX: drawerSign.value * v * travel }, { scale: s }],
+      transform: [
+        {
+          translateX:
+            drawerSign.value * v * (drawerSign.value > 0 ? travel : endTravel),
+        },
+        { scale: s },
+      ],
       borderRadius: interpolate(v, [0, 0.12], [0, radius], CLAMP),
     };
   });
@@ -118,25 +138,28 @@ export function DrawerStage({
     borderRadius: interpolate(p.value, [0, 0.12], [0, radius], CLAMP),
   }));
   const fade = useAnimatedStyle(() => ({
-    opacity: drawerVeil(p.value),
+    opacity: drawerVeil(p.value) * STRIP_VEIL,
+  }));
+  const edge = useAnimatedStyle(() => ({
+    borderRadius: interpolate(p.value, [0, 0.12], [0, radius], CLAMP),
+    opacity: interpolate(p.value, [0.3, 0.9], [0, 1], CLAMP),
   }));
   const pageBlur = useAnimatedProps(() => ({
     intensity: reduce ? 0 : drawerBlur(p.value) * PAGE_BLUR,
   }));
 
-  const settled = !live || side === "start";
-  const openStart = useDrawerPan("open", "start", enabled && !open && settled);
-  const openEnd = useDrawerPan(
-    "open",
-    "end",
-    endEnabled && !open && (!live || side === "end"),
+  const openPan = useDrawerOpenPan({ start: enabled, end: endEnabled, open });
+  const closePan = useDrawerClosePan(side);
+  const catcher = useMemo(
+    () =>
+      Gesture.Exclusive(
+        closePan,
+        Gesture.Tap().onEnd(() => {
+          runOnJS(closeDrawer)();
+        }),
+      ),
+    [closePan],
   );
-  const openPan = Gesture.Race(openStart, openEnd);
-  const closePan = useDrawerPan("close", side);
-  const tap = Gesture.Tap().onEnd(() => {
-    runOnJS(closeDrawer)();
-  });
-  const catcher = Gesture.Exclusive(closePan, tap);
 
   return (
     <View style={[styles.root, { backgroundColor: floor }]}>
@@ -178,6 +201,17 @@ export function DrawerStage({
               </>
             ) : null}
           </Animated.View>
+          {live ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                styles.edge,
+                { borderColor: colors.border },
+                edge,
+              ]}
+            />
+          ) : null}
           {open ? (
             <GestureDetector gesture={catcher}>
               <View
@@ -213,7 +247,7 @@ function DrawerPanel({
   children: ReactNode;
 }) {
   const { isDark } = useTheme();
-  const { travel } = useDrawerMetrics();
+  const travel = useDrawerTravel(side);
   const reduce = useReducedMotion();
   const sign = side === "start" ? 1 : -1;
   const p = drawerProgress;
@@ -247,35 +281,58 @@ function DrawerPanel({
   const panelFocusStyle = useAnimatedStyle(() => ({
     opacity: p.value > 0.97 ? 0 : 1,
   }));
-  const panelPan = useDrawerPan("close", side);
+  const scroll = useMemo(() => Gesture.Native(), []);
+  const panelPan = useDrawerClosePan(side, scroll);
 
   return (
-    <GestureDetector gesture={panelPan}>
-      <Animated.View
-        style={[
-          styles.panel,
-          side === "start" ? styles.panelStart : styles.panelEnd,
-          { width: travel },
-          panelStyle,
-        ]}
-        pointerEvents={open ? "auto" : "none"}
-        accessibilityElementsHidden={!open}
-        importantForAccessibility={open ? "auto" : "no-hide-descendants"}
-        onAccessibilityEscape={closeDrawer}
-      >
-        {children}
-        {live && ours && BLUR ? (
-          <AnimatedBlur
-            pointerEvents="none"
-            tint={isDark ? "dark" : "light"}
-            animatedProps={panelFocus}
-            style={[StyleSheet.absoluteFill, panelFocusStyle]}
-          />
-        ) : null}
-      </Animated.View>
-    </GestureDetector>
+    <PanelScroll.Provider value={scroll}>
+      <GestureDetector gesture={panelPan}>
+        <Animated.View
+          style={[
+            styles.panel,
+            side === "start" ? styles.panelStart : styles.panelEnd,
+            { width: travel },
+            panelStyle,
+          ]}
+          pointerEvents={open ? "auto" : "none"}
+          accessibilityElementsHidden={!open}
+          importantForAccessibility={open ? "auto" : "no-hide-descendants"}
+          onAccessibilityEscape={closeDrawer}
+        >
+          {children}
+          {live && ours && BLUR ? (
+            <AnimatedBlur
+              pointerEvents="none"
+              tint={isDark ? "dark" : "light"}
+              animatedProps={panelFocus}
+              style={[StyleSheet.absoluteFill, panelFocusStyle]}
+            />
+          ) : null}
+        </Animated.View>
+      </GestureDetector>
+    </PanelScroll.Provider>
   );
 }
+
+const PanelScroll = createContext<ReturnType<typeof Gesture.Native> | null>(
+  null,
+);
+
+/**
+ * A sidebar's scroll view. It scrolls alongside the sidebar's swipe-to-close
+ * instead of swallowing it, so a sideways swipe anywhere on the panel closes.
+ */
+export const DrawerScrollView = forwardRef<ScrollView, ScrollViewProps>(
+  function DrawerScrollView(props, ref) {
+    const scroll = useContext(PanelScroll);
+    const view = <ScrollView ref={ref} {...props} />;
+    return scroll ? (
+      <GestureDetector gesture={scroll}>{view}</GestureDetector>
+    ) : (
+      view
+    );
+  },
+);
 
 function FloatingChevron({
   left,
@@ -293,7 +350,8 @@ function FloatingChevron({
 }) {
   const colors = useColors();
   const { width, height } = useWindowDimensions();
-  const { travel, scale } = useDrawerMetrics();
+  const { scale } = useDrawerMetrics();
+  const travel = useDrawerTravel(side);
   const reduce = useReducedMotion();
   const sign = side === "start" ? 1 : -1;
   const cx = left + DRAWER_CHEVRON_SIZE / 2;
@@ -334,36 +392,67 @@ function FloatingChevron({
   });
   const press = open ? closeDrawer : () => openDrawer(side);
   const label = open ? closeLabel : openLabel;
+  const pressRef = useRef(press);
+  pressRef.current = press;
+  const pressed = useSharedValue(0);
+  const pressStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: 1 - pressed.value * 0.08 }],
+  }));
+  const tap = useMemo(
+    () =>
+      Gesture.Tap()
+        .runOnJS(true)
+        .maxDistance(32)
+        .hitSlop(8)
+        .onBegin(() => {
+          pressed.value = withTiming(1, { duration: 90 });
+        })
+        .onEnd((_e, success) => {
+          if (success) pressRef.current();
+        })
+        .onFinalize(() => {
+          pressed.value = withTiming(0, { duration: 180 });
+        }),
+    [pressed],
+  );
   return (
-    <Animated.View
-      style={[styles.chevron, { left, top }, follow]}
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onAccessibilityTap={press}
-      accessibilityActions={[{ name: "activate" }]}
-      onAccessibilityAction={press}
-    >
-      <GlassIconButton
-        icon="chevron-right"
-        size={DRAWER_CHEVRON_SIZE}
-        iconSize={20}
-        iconStyle={turn}
+    <GestureDetector gesture={tap}>
+      <Animated.View
+        style={[styles.chevron, { left, top }, follow]}
+        pointerEvents="box-only"
+        accessible
+        accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityHidden
-        onPress={press}
-      />
-      {restIcon ? (
-        <Animated.View pointerEvents="none" style={[styles.restIcon, restTurn]}>
-          <Icon
-            name={restIcon}
-            size={19}
-            color={colors.text}
-            weight="semibold"
+        onAccessibilityTap={press}
+        accessibilityActions={[{ name: "activate" }]}
+        onAccessibilityAction={press}
+      >
+        <Animated.View style={pressStyle}>
+          <GlassIconButton
+            icon="chevron-right"
+            size={DRAWER_CHEVRON_SIZE}
+            iconSize={20}
+            iconStyle={turn}
+            accessibilityLabel={label}
+            accessibilityHidden
+            onPress={press}
           />
+          {restIcon ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.restIcon, restTurn]}
+            >
+              <Icon
+                name={restIcon}
+                size={19}
+                color={colors.text}
+                weight="semibold"
+              />
+            </Animated.View>
+          ) : null}
         </Animated.View>
-      ) : null}
-    </Animated.View>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -379,6 +468,9 @@ const styles = StyleSheet.create({
   stage: { flex: 1 },
   clip: { flex: 1, overflow: "hidden" },
   chevron: { position: "absolute" },
+  edge: {
+    borderWidth: 1,
+  },
   restIcon: {
     alignItems: "center",
     height: DRAWER_CHEVRON_SIZE,

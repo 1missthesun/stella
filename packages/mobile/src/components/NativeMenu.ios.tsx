@@ -28,10 +28,10 @@ export function NativeMenu(props: NativeMenuProps) {
           <RNHostView matchContents>
             <View
               style={{
-                width: props.width - 16,
-                height: props.height - 16,
+                width: props.plain ? props.width : props.width - 16,
+                height: props.plain ? props.height : props.height - 16,
                 justifyContent: "center",
-                alignItems: "center",
+                alignItems: props.plain ? "stretch" : "center",
               }}
             >
               <View pointerEvents="none">{props.label}</View>
@@ -41,8 +41,15 @@ export function NativeMenu(props: NativeMenuProps) {
         modifiers={[
           menuStyle("button"),
           menuIndicator("hidden"),
-          buttonStyle(liquidGlassSupported ? "glass" : "bordered"),
-          buttonBorderShape(props.circular ? "circle" : "roundedRectangle", 14),
+          ...(props.plain
+            ? [buttonStyle("plain")]
+            : [
+                buttonStyle(liquidGlassSupported ? "glass" : "bordered"),
+                buttonBorderShape(
+                  props.circular ? "circle" : "roundedRectangle",
+                  14,
+                ),
+              ]),
           frame({ width: props.width, height: props.height }),
           accessibilityLabel(props.accessibilityLabel),
           disabled(props.disabled ?? false),

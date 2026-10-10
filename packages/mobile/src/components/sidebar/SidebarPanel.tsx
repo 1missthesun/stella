@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -15,6 +15,7 @@ import { fadeHex } from "../../theme/oklch";
 import { useColors } from "../../theme/theme-context";
 import { Icon } from "../Icon";
 import { StellaMarkHero } from "../stella-mark/StellaMarkHero";
+import { DrawerScrollView } from "./DrawerStage";
 import { Rise, SIDEBAR_PLACES, SidebarPlaceRow } from "./SidebarNav";
 
 const AVATAR = 52;
@@ -55,7 +56,7 @@ export function SidebarPanel({
 
   return (
     <View style={[styles.root, { width }]}>
-      <ScrollView
+      <DrawerScrollView
         contentContainerStyle={[
           styles.content,
           {
@@ -150,7 +151,7 @@ export function SidebarPanel({
             </View>
           </Pressable>
         </Rise>
-      </ScrollView>
+      </DrawerScrollView>
       <SidebarTopFade />
     </View>
   );

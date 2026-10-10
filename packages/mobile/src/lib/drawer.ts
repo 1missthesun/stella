@@ -6,7 +6,6 @@ import {
   cancelAnimation,
   makeMutable,
   runOnJS,
-  useSharedValue,
   withSpring,
   type WithSpringConfig,
 } from "react-native-reanimated";
@@ -123,10 +122,37 @@ export function isDrawerOpen(side?: DrawerSide): boolean {
   return state.open && (side === undefined || state.side === side);
 }
 
+const SCALE = 0.9;
+const END_STRIP = 60;
+
+export function drawerTravels(width: number) {
+  const start = Math.round(Math.min(width * 0.75, 320));
+  const end = Math.max(
+    start,
+    Math.round(Math.min(width * (1 + SCALE) * 0.5 - END_STRIP, 400)),
+  );
+  return { start, end };
+}
+
+/**
+ * The sidebars' widths. The left one keeps its 3/4; the right one, with more
+ * to hold, takes all but a strip of the shrunken page wide enough to tap.
+ */
 export function useDrawerMetrics() {
   const { width } = useWindowDimensions();
-  const travel = Math.round(Math.min(width * 0.75, 320));
-  return { width, travel, scale: 0.9, radius: 40 };
+  const travels = drawerTravels(width);
+  return {
+    width,
+    travel: travels.start,
+    endTravel: travels.end,
+    scale: SCALE,
+    radius: 40,
+  };
+}
+
+export function useDrawerTravel(side: DrawerSide) {
+  const { travel, endTravel } = useDrawerMetrics();
+  return side === "start" ? travel : endTravel;
 }
 
 export const DRAWER_VEIL = {
@@ -172,43 +198,107 @@ function rubber(over: number) {
 
 const dismissKeyboard = () => Keyboard.dismiss();
 
-export function useDrawerPan(
-  direction: "open" | "close",
-  side: DrawerSide,
-  enabled = true,
+const dragOwner = makeMutable(0);
+const dragOrigin = makeMutable(0);
+const dragTravel = makeMutable(1);
+
+let nextOwner = 1;
+
+function grab(
+  owner: number,
+  sign: number,
+  translationX: number,
+  travel: number,
 ) {
-  const { travel } = useDrawerMetrics();
-  const origin = useSharedValue(0);
+  "worklet";
+  cancelAnimation(drawerProgress);
+  if (drawerSign.value !== sign) {
+    drawerSign.value = sign;
+    drawerProgress.value = 0;
+  }
+  dragTravel.value = travel;
+  dragOrigin.value = drawerProgress.value - (sign * translationX) / travel;
+  dragOwner.value = owner;
+  runOnJS(begin)(sign === 1 ? "start" : "end");
+}
+
+function track(owner: number, translationX: number) {
+  "worklet";
+  if (dragOwner.value !== owner) return;
+  const raw =
+    dragOrigin.value + (drawerSign.value * translationX) / dragTravel.value;
+  drawerProgress.value = raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
+}
+
+function release(owner: number, velocityX: number) {
+  "worklet";
+  if (dragOwner.value !== owner) return;
+  dragOwner.value = 0;
+  const v = (drawerSign.value * velocityX) / dragTravel.value;
+  const open = drawerProgress.value + v * 0.2 > 0.5;
+  runOnJS(setOpen)(open);
+  settleDrawer(open, v);
+}
+
+/**
+ * The page's drag. At rest the direction picks the sidebar (right for the
+ * start one, left for the end one); a drawer still moving is caught where it
+ * is, whichever way the finger goes. Nothing it reads changes mid-drag, so the
+ * gesture is never rebuilt under a finger. Each drag is owned by the gesture
+ * that grabbed it, and that gesture's finalize always settles it, so no path
+ * leaves the stage part-open.
+ */
+export function useDrawerOpenPan({
+  start,
+  end,
+  open,
+}: {
+  start: boolean;
+  end: boolean;
+  open: boolean;
+}) {
+  const { travel, endTravel } = useDrawerMetrics();
+  return useMemo(() => {
+    const owner = nextOwner++;
+    const offset: number | [number, number] =
+      start && end ? [-12, 12] : start ? 12 : -12;
+    return Gesture.Pan()
+      .enabled((start || end) && !open)
+      .activeOffsetX(offset)
+      .failOffsetY([-14, 14])
+      .onStart((e) => {
+        let sign = drawerSign.value;
+        if (drawerProgress.value <= 0.001) {
+          sign = e.translationX > 0 ? 1 : -1;
+          if (sign === 1 ? !start : !end) return;
+        }
+        grab(owner, sign, e.translationX, sign === 1 ? travel : endTravel);
+        runOnJS(dismissKeyboard)();
+      })
+      .onUpdate((e) => track(owner, e.translationX))
+      .onFinalize((e) => release(owner, e.velocityX));
+  }, [start, end, open, travel, endTravel]);
+}
+
+/**
+ * The open sidebar's drag back toward closed, from its panel or the page.
+ * `scroll` is the panel's own scroll view, which would otherwise claim a
+ * sideways swipe before this sees it.
+ */
+export function useDrawerClosePan(
+  side: DrawerSide,
+  scroll?: ReturnType<typeof Gesture.Native>,
+) {
+  const travel = useDrawerTravel(side);
   const sign = side === "start" ? 1 : -1;
-  const toward = direction === "open" ? sign : -sign;
-  return useMemo(
-    () =>
-      Gesture.Pan()
-        .enabled(enabled)
-        .activeOffsetX(toward > 0 ? 12 : -12)
-        .failOffsetY([-14, 14])
-        .onStart((e) => {
-          cancelAnimation(drawerProgress);
-          if (drawerSign.value !== sign) {
-            drawerSign.value = sign;
-            drawerProgress.value = 0;
-          }
-          origin.value =
-            drawerProgress.value - (sign * e.translationX) / travel;
-          runOnJS(begin)(side);
-          if (direction === "open") runOnJS(dismissKeyboard)();
-        })
-        .onUpdate((e) => {
-          const raw = origin.value + (sign * e.translationX) / travel;
-          drawerProgress.value =
-            raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
-        })
-        .onEnd((e) => {
-          const v = (sign * e.velocityX) / travel;
-          const open = drawerProgress.value + v * 0.2 > 0.5;
-          runOnJS(setOpen)(open);
-          settleDrawer(open, v);
-        }),
-    [direction, side, sign, toward, enabled, travel, origin],
-  );
+  return useMemo(() => {
+    const owner = nextOwner++;
+    const pan = Gesture.Pan()
+      .activeOffsetX(sign > 0 ? -12 : 12)
+      .failOffsetY([-14, 14])
+      .onStart((e) => grab(owner, sign, e.translationX, travel))
+      .onUpdate((e) => track(owner, e.translationX))
+      .onFinalize((e) => release(owner, e.velocityX));
+    return scroll ? pan.simultaneousWithExternalGesture(scroll) : pan;
+  }, [sign, travel, scroll]);
 }

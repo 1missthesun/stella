@@ -72,7 +72,12 @@ export type IconName =
   | "apps"
   | "artifacts"
   | "mail"
-  | "filter";
+  | "filter"
+  | "chevrons-up-down"
+  | "cloud"
+  | "laptop"
+  | "key"
+  | "external-link";
 
 const FEATHER_NAMES: Record<
   IconName,
@@ -148,6 +153,11 @@ const FEATHER_NAMES: Record<
   apps: "grid",
   artifacts: "layers",
   mail: "mail",
+  "chevrons-up-down": "chevron-down",
+  cloud: "cloud",
+  laptop: "monitor",
+  key: "key",
+  "external-link": "external-link",
 };
 
 const SYMBOL_NAMES: Record<IconName, SymbolViewProps["name"]> = {
@@ -215,6 +225,11 @@ const SYMBOL_NAMES: Record<IconName, SymbolViewProps["name"]> = {
   artifacts: "photo.on.rectangle.angled",
   mail: "envelope",
   filter: "line.3.horizontal.decrease",
+  "chevrons-up-down": "chevron.up.chevron.down",
+  cloud: "cloud",
+  laptop: "laptopcomputer",
+  key: "key",
+  "external-link": "arrow.up.right",
 };
 
 type IconProps = {

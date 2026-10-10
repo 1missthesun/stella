@@ -34,8 +34,13 @@ export function parseCloudModelSelection(value: unknown): CloudExecutionSelectio
   const row = value as Record<string, unknown>;
   const model = typeof row.model === "string" ? row.model.trim() : "";
   const efforts: readonly unknown[] = ["default", "none", "minimal", "low", "medium", "high", "xhigh"];
-  if (!model || !efforts.includes(row.reasoningEffort) || row.engine !== row.provider) return undefined;
+  if (!model || !efforts.includes(row.reasoningEffort)) return undefined;
   const reasoningEffort = row.reasoningEffort as CloudExecutionSelection["reasoningEffort"];
+  if (row.engine === "provider") {
+    const provider = typeof row.provider === "string" ? row.provider.trim() : "";
+    return provider ? { engine: "provider", provider, model, reasoningEffort } : undefined;
+  }
+  if (row.engine !== row.provider) return undefined;
   switch (row.engine) {
     case "stella": return { engine: "stella", provider: "stella", model, reasoningEffort };
     case "anthropic": return { engine: "anthropic", provider: "anthropic", model, reasoningEffort };

@@ -1,13 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  type AlertButton,
-} from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, View, type AlertButton } from "react-native";
 import { useIsFocused } from "expo-router";
 import {
   listExecutionDevices,
@@ -23,10 +15,10 @@ import {
 } from "../../lib/phone-access";
 import { userFacingError } from "../../lib/user-facing-error";
 import { useT } from "../../i18n";
-import type { Colors } from "../../theme/colors";
-import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";
-import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { Icon } from "../Icon";
+import { NativeMenu } from "../NativeMenu";
+import type { NativeMenuItem } from "../NativeMenu.types";
 import {
   applyRemoteExecution,
   enableRemoteExecution,
@@ -36,6 +28,7 @@ import {
   type ComputerRow,
   type ComputerRowStatusKind,
 } from "../settings/computer-rows";
+import { ChoiceRow, KIT, SwitcherFace } from "./kit";
 
 /** Live presence goes stale quickly; refresh while the panel is open. */
 const EXECUTION_DEVICE_POLL_MS = 15_000;
@@ -50,31 +43,32 @@ const STATUS_KEYS: Readonly<Record<ComputerRowStatusKind, string>> = {
 };
 
 /**
- * Where the chat's turns run, one row per place: Cloud, then every computer
- * on the account, in the sidebar's large type with its accent dot on the one
- * in use.
+ * Where the chat's turns run, shown as the one place in use, large, with its
+ * state underneath. A tap opens the system menu of every place (Cloud, then
+ * each computer on the account) and picking one switches to it.
  *
  * The list is the account's device list rather than this phone's pairings, so
- * a computer the owner has never paired with this phone still appears. A chip
- * says whether that computer can take work right now; one that can't is not a
- * choice, so tapping it explains why and offers Enable when that would help. Running work on a computer is consent, and only the
- * Enable tap here (or the prompt on that computer's own screen) grants it.
- *
- * There is no pairing step: a computer signed in to the account is listed
- * here, and picking it attaches this phone to it on the spot.
+ * a computer the owner has never paired with this phone still appears. One
+ * that can't take work right now is not a choice: picking it explains why and
+ * offers Enable when that would help. Running work on a computer is consent,
+ * and only the Enable tap here (or the prompt on that computer's own screen)
+ * grants it. There is no pairing step: picking a computer attaches this phone
+ * to it on the spot.
  */
-export function DestinationList({
+export function PlaceSwitcher({
   control,
   signedIn,
   open,
+  width,
 }: {
   control: ComputerControl | null;
   signedIn: boolean;
   open: boolean;
+  width: number;
 }) {
   const colors = useColors();
   const t = useT();
-  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const [expanded, setExpanded] = useState(false);
   const focused = useIsFocused();
   const [destinations, setDestinations] = useState<
     ExecutionDeviceDestination[] | undefined
@@ -254,158 +248,87 @@ export function DestinationList({
   };
 
   const cloudSelected = !selectedRow;
+  const cloudLabel = t("mobile.settings.computer.cloud");
+  const pick = (row: ComputerRow) =>
+    row.available ? selectComputer(row) : explain(row);
+  const working = busy !== null;
+
+  const face = (
+    <SwitcherFace
+      glyph={
+        <Icon
+          name={cloudSelected ? "cloud" : "laptop"}
+          size={24}
+          color={colors.text}
+          weight="semibold"
+        />
+      }
+      title={selectedRow ? labelFor(selectedRow) : cloudLabel}
+      detail={selectedRow ? statusTextFor(selectedRow) : undefined}
+      detailTone={selectedRow ? "ok" : "muted"}
+      busy={working}
+    />
+  );
+
+  const items: NativeMenuItem[] = [
+    {
+      id: "cloud",
+      title: cloudLabel,
+      systemImage: "cloud",
+      selected: cloudSelected,
+      onPress: () => choose({ mode: "cloud" }),
+    },
+    ...rows.map((row, index): NativeMenuItem => ({
+      id: row.deviceId,
+      title: row.available
+        ? labelFor(row)
+        : `${labelFor(row)} · ${statusTextFor(row)}`,
+      systemImage: "laptopcomputer",
+      selected: selectedRow?.deviceId === row.deviceId,
+      separatorBefore: index === 0,
+      onPress: () => pick(row),
+    })),
+  ];
 
   return (
     <View>
-      <Place
-        label={t("mobile.settings.computer.cloud")}
-        selected={cloudSelected}
-        available
-        disabled={!control}
-        onPress={() => choose({ mode: "cloud" })}
-        styles={styles}
-        colors={colors}
+      <NativeMenu
+        plain
+        label={face}
+        accessibilityLabel={`${t("mobile.settings.computer.sectionLabel")}: ${
+          selectedRow ? labelFor(selectedRow) : cloudLabel
+        }`}
+        items={items}
+        width={width}
+        height={KIT.switcherHeight}
+        disabled={!control || working}
+        onFallbackPress={() => setExpanded((value) => !value)}
       />
-
-      {rows.map((row) => {
-        const working = busy?.deviceId === row.deviceId;
-        return (
-          <Place
-            key={row.deviceId}
-            label={labelFor(row)}
-            statusText={statusTextFor(row)}
-            selected={selectedRow?.deviceId === row.deviceId}
-            available={row.available}
-            working={working}
-            disabled={!control || working}
-            onPress={() => (row.available ? selectComputer(row) : explain(row))}
-            onLongPress={() => explain(row)}
-            styles={styles}
-            colors={colors}
+      {expanded ? (
+        <View>
+          <ChoiceRow
+            label={cloudLabel}
+            selected={cloudSelected}
+            onPress={() => {
+              setExpanded(false);
+              choose({ mode: "cloud" });
+            }}
           />
-        );
-      })}
+          {rows.map((row) => (
+            <ChoiceRow
+              key={row.deviceId}
+              label={labelFor(row)}
+              detail={statusTextFor(row)}
+              selected={selectedRow?.deviceId === row.deviceId}
+              disabled={busy?.deviceId === row.deviceId}
+              onPress={() => {
+                setExpanded(false);
+                pick(row);
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
-
-function Place({
-  label,
-  statusText,
-  selected,
-  available,
-  working = false,
-  disabled = false,
-  onPress,
-  onLongPress,
-  styles,
-  colors,
-}: {
-  label: string;
-  statusText?: string;
-  selected: boolean;
-  available: boolean;
-  working?: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-  onLongPress?: () => void;
-  styles: ReturnType<typeof makeStyles>;
-  colors: Colors;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      onLongPress={onLongPress}
-      disabled={disabled}
-      accessibilityRole="button"
-      accessibilityLabel={statusText ? `${label}, ${statusText}` : label}
-      accessibilityState={{ selected, disabled }}
-      style={({ pressed }) => [styles.place, pressed && styles.pressed]}
-    >
-      <View style={styles.labelLine}>
-        <Text
-          style={[styles.label, !available && styles.labelUnavailable]}
-          numberOfLines={1}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        >
-          {label}
-        </Text>
-        {selected ? <View style={styles.current} /> : null}
-        {working ? (
-          <ActivityIndicator size="small" color={colors.textMuted} />
-        ) : null}
-      </View>
-      {statusText !== undefined ? (
-        <View style={styles.statusLine}>
-          <View
-            style={[
-              styles.dot,
-              { backgroundColor: available ? colors.ok : colors.textWeaker },
-            ]}
-          />
-          <Text
-            style={styles.status}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          >
-            {statusText}
-          </Text>
-        </View>
-      ) : null}
-    </Pressable>
-  );
-}
-
-const makeStyles = (colors: Colors) =>
-  StyleSheet.create({
-    place: {
-      justifyContent: "center",
-      minHeight: 50,
-      paddingVertical: 6,
-    },
-    pressed: {
-      opacity: 0.55,
-      transform: [{ scale: 0.98 }],
-    },
-    labelLine: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 10,
-      minWidth: 0,
-    },
-    label: {
-      color: colors.text,
-      flexShrink: 1,
-      fontFamily: fonts.sans.bold,
-      fontSize: 26,
-      letterSpacing: -0.9,
-      lineHeight: 32,
-    },
-    labelUnavailable: {
-      color: colors.textMuted,
-    },
-    current: {
-      backgroundColor: colors.accent,
-      borderRadius: 4,
-      height: 8,
-      marginTop: 3,
-      width: 8,
-    },
-    statusLine: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 7,
-      marginTop: 1,
-    },
-    dot: {
-      borderRadius: 3,
-      height: 6,
-      width: 6,
-    },
-    status: {
-      color: colors.textMuted,
-      flexShrink: 1,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 14,
-    },
-  });

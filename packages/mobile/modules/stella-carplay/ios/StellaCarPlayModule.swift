@@ -87,6 +87,20 @@ public class StellaCarPlayModule: Module {
       }
     }
 
+    Function("setColorScheme") { (scheme: String) in
+      let style: UIUserInterfaceStyle
+      switch scheme {
+      case "light": style = .light
+      case "dark": style = .dark
+      default: style = .unspecified
+      }
+      DispatchQueue.main.async {
+        MainActor.assumeIsolated {
+          StellaWindowAppearance.apply(style)
+        }
+      }
+    }
+
     Function("setBackgroundActivity") { (hold: Bool) in
       DispatchQueue.main.async {
         MainActor.assumeIsolated {

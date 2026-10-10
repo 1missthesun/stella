@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { Appearance, type ColorSchemeName, useColorScheme } from "react-native";
+import { useColorScheme } from "react-native";
+import { setAppColorScheme } from "../carplay/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   defaultTheme,
@@ -227,12 +228,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const forcedMode = resolved.forcedMode;
   useEffect(() => {
     if (!loaded) return;
-    Appearance.setColorScheme(
-      (forcedMode
+    setAppColorScheme(
+      forcedMode
         ? forcedMode
         : preference === "system"
           ? "unspecified"
-          : preference) as ColorSchemeName,
+          : preference,
     );
   }, [loaded, preference, forcedMode]);
 

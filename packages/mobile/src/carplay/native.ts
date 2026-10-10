@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AppState, Platform } from "react-native";
+import { Appearance, AppState, Platform } from "react-native";
 import {
   requireOptionalNativeModule,
   type EventSubscription,
@@ -39,6 +39,7 @@ type StellaCarPlayModule = {
   setHome(sections: CarPlaySection[]): void;
   setVoiceControl(state: "listening" | null): void;
   setBackgroundActivity(hold: boolean): void;
+  setColorScheme(scheme: "light" | "dark" | "unspecified"): void;
   relaxKeychainAccessibility(): Promise<number>;
   addListener<K extends keyof CarPlayEvents>(
     name: K,
@@ -72,6 +73,19 @@ export function isPhoneInForeground(): boolean {
   } catch {
     return true;
   }
+}
+
+/**
+ * React Native's own setColorScheme walks every connected scene as if it were a
+ * window scene and throws on the CarPlay scene; the precompiled React core
+ * ignores source patches, so iOS routes through the CarPlay module instead.
+ */
+export function setAppColorScheme(scheme: "light" | "dark" | "unspecified"): void {
+  if (carPlayNative) {
+    carPlayNative.setColorScheme(scheme);
+    return;
+  }
+  Appearance.setColorScheme(scheme);
 }
 
 export function relaxKeychainAccessibility(): void {

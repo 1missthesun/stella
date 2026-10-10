@@ -19,6 +19,27 @@ final class StellaPhoneSceneState: @unchecked Sendable {
   }
 }
 
+@MainActor
+enum StellaWindowAppearance {
+  static var style: UIUserInterfaceStyle = .unspecified
+
+  static func apply(_ next: UIUserInterfaceStyle) {
+    style = next
+    var windows: [UIWindow] = []
+    for scene in UIApplication.shared.connectedScenes {
+      guard let windowScene = scene as? UIWindowScene else { continue }
+      windows.append(contentsOf: windowScene.windows)
+    }
+    if let appWindow = UIApplication.shared.delegate?.window ?? nil,
+       !windows.contains(where: { $0 === appWindow }) {
+      windows.append(appWindow)
+    }
+    for window in windows {
+      window.overrideUserInterfaceStyle = next
+    }
+  }
+}
+
 @objc(StellaPhoneSceneDelegate)
 public final class StellaPhoneSceneDelegate: UIResponder, UIWindowSceneDelegate {
   public var window: UIWindow?
@@ -32,6 +53,7 @@ public final class StellaPhoneSceneDelegate: UIResponder, UIWindowSceneDelegate 
           let appWindow = UIApplication.shared.delegate?.window ?? nil
     else { return }
     appWindow.windowScene = windowScene
+    appWindow.overrideUserInterfaceStyle = StellaWindowAppearance.style
     window = appWindow
     appWindow.makeKeyAndVisible()
 

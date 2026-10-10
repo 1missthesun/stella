@@ -19,6 +19,10 @@ const READ_ALOUD_KEY = "stella-mobile.read-aloud-enabled";
 // drifted from the server default.)
 // Reload a stalled native player from the same session, never synthesize again.
 const STREAM_START_TIMEOUT_MS = 8000;
+// AVPlayer that opens the playlist before its first segment exists sits silent
+// until the start timeout replaces it, so playback waits for a real segment.
+const PLAYLIST_READY_TIMEOUT_MS = 20_000;
+const PLAYLIST_READY_POLL_MS = 250;
 // Progressive HLS playback is resilient to transient segment/playlist/network
 // failures. Native players (AVPlayer/ExoPlayer) give up on a segment fetch that
 // fails past their small built-in retry budget, stalling mid-message. When that
@@ -362,6 +366,12 @@ async function tryStreamReply(
   // `uri` is a live HLS playlist that grows as Gemini generates, so playback
   // begins on the first segment instead of waiting for the whole clip.
 
+  await waitForPlaylistReady(uri, signal);
+  if (generation !== playbackGeneration || signal.aborted) {
+    cancelStreamSession(ticket);
+    return true;
+  }
+
   if (!(await configurePlaybackAudioSession({ background: options.background }))) {
     if (generation === playbackGeneration) stopReadAloud();
     else cancelStreamSession(ticket);
@@ -373,6 +383,24 @@ async function tryStreamReply(
   }
 
   return await playHlsResilient(uri, id, generation, 0, options.quiet === true);
+}
+
+// The playlist route holds each read until the first segment lands, or answers
+// "still generating". Poll it until it lists a segment, the stream fails for
+// good, or the wait runs out; the native player then opens a playable list.
+async function waitForPlaylistReady(uri: string, signal: AbortSignal) {
+  const deadline = Date.now() + PLAYLIST_READY_TIMEOUT_MS;
+  while (!signal.aborted && Date.now() < deadline) {
+    try {
+      const response = await fetch(uri, { signal, headers: { "cache-control": "no-cache" } });
+      const body = await response.text();
+      if (response.ok) return;
+      if (!/"retryable"\s*:\s*true|retryAfterMs|still being generated/i.test(body)) return;
+    } catch {
+      if (signal.aborted) return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, PLAYLIST_READY_POLL_MS));
+  }
 }
 
 // A player is disposable; the generation session is not. Both startup and

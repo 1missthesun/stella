@@ -205,6 +205,9 @@ beforeEach(() => {
   };
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.endsWith("/index.m3u8")) {
+      return new Response("#EXTM3U\n#EXTINF:2.000,\nseg-0.mp3\n", { status: 200 });
+    }
     fetchCalls.push({
       url,
       aborted: Boolean(init?.signal?.aborted),

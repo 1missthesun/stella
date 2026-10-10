@@ -31,6 +31,7 @@ const localPathFor = (payload: DisplayTabPayload): string | null => {
     case "markdown":
     case "file-artifact":
     case "pdf":
+    case "folder":
       return payload.filePath;
     case "office":
       return payload.previewRef.sourcePath;

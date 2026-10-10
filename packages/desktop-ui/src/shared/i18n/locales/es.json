@@ -2664,6 +2664,14 @@
         "eyebrow": "Vista previa en vivo",
         "openInBrowser": "Abrir en el navegador",
         "reload": "Recargar"
+      },
+      "folder": {
+        "back": "Atrás",
+        "onDevice": "En {device}",
+        "failedTitle": "No se pudo abrir esta carpeta",
+        "failedBody": "No se pudo mostrar el contenido de esta carpeta.",
+        "emptyTitle": "Esta carpeta está vacía",
+        "truncated": "Solo se muestran los primeros {count}."
       }
     },
     "displayPanel": {

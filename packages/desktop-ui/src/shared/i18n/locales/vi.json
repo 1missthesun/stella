@@ -2630,6 +2630,14 @@
         "eyebrow": "Xem trước trực tiếp",
         "openInBrowser": "Mở trong trình duyệt",
         "reload": "Tải lại"
+      },
+      "folder": {
+        "back": "Quay lại",
+        "onDevice": "Trên {device}",
+        "failedTitle": "Không thể mở thư mục này",
+        "failedBody": "Không thể hiển thị nội dung của thư mục này.",
+        "emptyTitle": "Thư mục này trống",
+        "truncated": "Chỉ hiển thị {count} mục đầu tiên."
       }
     },
     "displayPanel": {

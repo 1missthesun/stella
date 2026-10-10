@@ -2664,6 +2664,14 @@
         "eyebrow": "Aperçu en direct",
         "openInBrowser": "Ouvrir dans le navigateur",
         "reload": "Recharger"
+      },
+      "folder": {
+        "back": "Retour",
+        "onDevice": "Sur {device}",
+        "failedTitle": "Impossible d'ouvrir ce dossier",
+        "failedBody": "Impossible d'afficher le contenu de ce dossier.",
+        "emptyTitle": "Ce dossier est vide",
+        "truncated": "Seuls les {count} premiers sont affichés."
       }
     },
     "displayPanel": {

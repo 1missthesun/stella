@@ -1,0 +1,117 @@
+.folder-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 18px 28px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.folder-tab--empty {
+  justify-content: flex-start;
+}
+
+.folder-tab__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.folder-tab__glyph {
+  flex-shrink: 0;
+  color: var(--text-weak);
+}
+
+.folder-tab__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-weak);
+  cursor: pointer;
+}
+
+.folder-tab__back:hover {
+  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+  color: var(--text-strong);
+}
+
+.folder-tab__heading {
+  min-width: 0;
+}
+
+.folder-tab__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-tab__subtitle {
+  margin: 2px 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--text-weak);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-tab__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.folder-tab__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.folder-tab__row:hover {
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+}
+
+.folder-tab__row-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--text-weak);
+}
+
+.folder-tab__row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+.folder-tab__row-meta {
+  flex-shrink: 0;
+  font-size: var(--font-size-xs, var(--font-size-sm));
+  color: var(--text-weak);
+  font-variant-numeric: tabular-nums;
+}

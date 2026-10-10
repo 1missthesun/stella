@@ -8,13 +8,20 @@ import { displayPayloadForStellaFile } from "./stella-file-links";
  * (inline link, attachment pill, overflow menu) should: a type with an
  * in-app viewer opens in the side panel, which explains a file it can't
  * find; anything else (a folder, a `.txt`, an unknown type) goes to the OS,
- * so a folder opens in Finder or the file manager. Resolves to the reason it
- * could not open, or null.
+ * so a folder opens in Finder or the file manager. A folder on another of
+ * the user's computers opens as a listing in the side panel instead. Resolves
+ * to the reason it could not open, or null.
  */
 export const openLocalPath = async (filePath: string): Promise<string | null> => {
   const payload = displayPayloadForStellaFile(filePath, Date.now());
   if (payload) {
     openDisplayPayloadTab(payload);
+    return null;
+  }
+  const statPath = window.electronAPI?.display?.statPath;
+  const stat = statPath ? await statPath(filePath).catch(() => null) : null;
+  if (stat?.kind === "directory" && stat.deviceName) {
+    openDisplayPayloadTab({ kind: "folder", filePath, createdAt: Date.now() });
     return null;
   }
   const api = window.electronAPI?.system;

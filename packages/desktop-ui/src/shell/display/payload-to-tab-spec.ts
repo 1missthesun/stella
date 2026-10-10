@@ -29,6 +29,7 @@ import {
   TrashTabContent,
 } from "./tab-content";
 import { CanvasTabContent } from "./canvas-tab/CanvasTabContent";
+import { FolderTabContent } from "./FolderTabContent";
 import {
   addCanvasHtmlItem,
   canvasDisplayTabId,
@@ -417,6 +418,17 @@ const localPayloadToTabSpec = (
         payload,
         payload.filePath,
       );
+
+    case "folder":
+      return {
+        id: `folder:${payload.filePath}`,
+        kind: "folder",
+        title,
+        tooltip: payload.filePath,
+        metadata: { kind: "folder", filePath: payload.filePath },
+        render: () =>
+          createElement(FolderTabContent, { folderPath: payload.filePath }),
+      };
 
     case "trash":
       // Deferred-delete trash is a shell surface rather than an artifact, so

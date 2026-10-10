@@ -83,6 +83,7 @@ export const DEVICE_FILE_REQUEST_METHODS = [
   "file.read",
   "file.stat",
   "file.list",
+  "officePreview.render",
 ] as const satisfies readonly DeviceRequestMethod[];
 
 export const isDeviceFileRequestMethod = (

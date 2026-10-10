@@ -2664,6 +2664,14 @@
         "eyebrow": "Previzualizare live",
         "openInBrowser": "Deschide în browser",
         "reload": "Reîncarcă"
+      },
+      "folder": {
+        "back": "Înapoi",
+        "onDevice": "Pe {device}",
+        "failedTitle": "Acest dosar nu a putut fi deschis",
+        "failedBody": "Conținutul acestui dosar nu a putut fi afișat.",
+        "emptyTitle": "Acest dosar este gol",
+        "truncated": "Sunt afișate doar primele {count}."
       }
     },
     "displayPanel": {

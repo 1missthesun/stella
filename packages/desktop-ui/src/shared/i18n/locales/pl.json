@@ -2680,6 +2680,14 @@
         "eyebrow": "Podgląd na żywo",
         "openInBrowser": "Otwórz w przeglądarce",
         "reload": "Odśwież"
+      },
+      "folder": {
+        "back": "Wstecz",
+        "onDevice": "Na urządzeniu {device}",
+        "failedTitle": "Nie udało się otworzyć tego folderu",
+        "failedBody": "Nie udało się wyświetlić zawartości tego folderu.",
+        "emptyTitle": "Ten folder jest pusty",
+        "truncated": "Wyświetlono tylko pierwsze {count}."
       }
     },
     "displayPanel": {

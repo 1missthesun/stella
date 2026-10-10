@@ -2630,6 +2630,14 @@
         "eyebrow": "即時預覽",
         "openInBrowser": "在瀏覽器中開啟",
         "reload": "重新載入"
+      },
+      "folder": {
+        "back": "返回",
+        "onDevice": "在 {device} 上",
+        "failedTitle": "無法開啟此資料夾",
+        "failedBody": "無法顯示此資料夾的內容。",
+        "emptyTitle": "此資料夾是空的",
+        "truncated": "僅顯示前 {count} 項。"
       }
     },
     "displayPanel": {

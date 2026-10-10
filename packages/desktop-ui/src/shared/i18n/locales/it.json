@@ -2664,6 +2664,14 @@
         "eyebrow": "Anteprima dal vivo",
         "openInBrowser": "Apri nel browser",
         "reload": "Ricarica"
+      },
+      "folder": {
+        "back": "Indietro",
+        "onDevice": "Su {device}",
+        "failedTitle": "Impossibile aprire questa cartella",
+        "failedBody": "Impossibile mostrare il contenuto di questa cartella.",
+        "emptyTitle": "Questa cartella è vuota",
+        "truncated": "Vengono mostrati solo i primi {count}."
       }
     },
     "displayPanel": {

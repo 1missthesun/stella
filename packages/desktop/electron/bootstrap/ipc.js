@@ -360,6 +360,8 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         cloudFileGrants,
         piLinkedFiles,
         deviceFiles,
+        peerDeviceFiles,
+        getActiveConversationId: () => services.uiStateService.state.conversationId?.trim() || null,
         getAuthToken: () => services.authService.getAuthToken(),
         getStellaAppDir: lifecycle.getStellaAppDir,
         getStellaDataDir: lifecycle.getStellaDataDir,

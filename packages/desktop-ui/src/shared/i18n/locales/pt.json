@@ -2664,6 +2664,14 @@
         "eyebrow": "Prévia ao vivo",
         "openInBrowser": "Abrir no navegador",
         "reload": "Recarregar"
+      },
+      "folder": {
+        "back": "Voltar",
+        "onDevice": "Em {device}",
+        "failedTitle": "Não foi possível abrir esta pasta",
+        "failedBody": "Não foi possível mostrar o conteúdo desta pasta.",
+        "emptyTitle": "Esta pasta está vazia",
+        "truncated": "Apenas os primeiros {count} são mostrados."
       }
     },
     "displayPanel": {

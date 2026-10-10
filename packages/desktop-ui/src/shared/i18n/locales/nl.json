@@ -2648,6 +2648,14 @@
         "eyebrow": "Live voorbeeld",
         "openInBrowser": "Openen in browser",
         "reload": "Opnieuw laden"
+      },
+      "folder": {
+        "back": "Terug",
+        "onDevice": "Op {device}",
+        "failedTitle": "Kan deze map niet openen",
+        "failedBody": "De inhoud van deze map kan niet worden weergegeven.",
+        "emptyTitle": "Deze map is leeg",
+        "truncated": "Alleen de eerste {count} worden getoond."
       }
     },
     "displayPanel": {

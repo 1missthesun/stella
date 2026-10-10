@@ -82,6 +82,16 @@ export type DisplayPayload = {
     }
   | { kind: "pdf"; filePath: string; title?: string }
   | {
+      /**
+       * A folder a reply linked, on this computer or on the other computer
+       * of the user's that has it, listed in the panel.
+       */
+      kind: "folder";
+      filePath: string;
+      title?: string;
+      createdAt?: number;
+    }
+  | {
       kind: "trash";
       title?: string;
       createdAt?: number;
@@ -187,6 +197,12 @@ const displayPayloadSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ kind: z.literal("pdf"), filePath: z.string() }),
   z.object({
+    kind: z.literal("folder"),
+    filePath: z.string(),
+    title: z.string().optional(),
+    createdAt: z.number().optional(),
+  }),
+  z.object({
     kind: z.literal("trash"),
     title: z.string().optional(),
     createdAt: z.number().optional(),
@@ -230,6 +246,9 @@ export const getDisplayPayloadTitle = (payload: DisplayPayload): string => {
   }
   if (payload.kind === "trash") {
     return payload.title ?? "Trash";
+  }
+  if (payload.kind === "folder") {
+    return payload.title ?? payload.filePath.split(/[\\/]/).filter(Boolean).pop() ?? "Folder";
   }
   // payload.kind === "media"
   if (payload.prompt) return payload.prompt;

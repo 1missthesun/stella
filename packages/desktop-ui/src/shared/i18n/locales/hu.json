@@ -2648,6 +2648,14 @@
         "eyebrow": "Élő előnézet",
         "openInBrowser": "Megnyitás böngészőben",
         "reload": "Újratöltés"
+      },
+      "folder": {
+        "back": "Vissza",
+        "onDevice": "Ezen: {device}",
+        "failedTitle": "Ez a mappa nem nyitható meg",
+        "failedBody": "A mappa tartalma nem jeleníthető meg.",
+        "emptyTitle": "Ez a mappa üres",
+        "truncated": "Csak az első {count} látható."
       }
     },
     "displayPanel": {

@@ -90,7 +90,10 @@ const announceChatGptPlanUse = async (t: ReturnType<typeof useT>) => {
     t("mobile.engineAccounts.planWelcomeTitle"),
     t("mobile.engineAccounts.planWelcomeBody"),
     [
-      { text: t("mobile.engineAccounts.manageUsage"), onPress: openChatGptUsage },
+      {
+        text: t("mobile.engineAccounts.manageUsage"),
+        onPress: openChatGptUsage,
+      },
       { text: t("mobile.common.done"), style: "cancel" },
     ],
   );
@@ -197,8 +200,11 @@ export function EngineAccountSection({
   embedded = false,
 }: {
   provider: EngineProvider | "stella";
-  /** Rows only, laid inside a card that already frames and names them. */
-  embedded?: boolean;
+  /**
+   * Rows only: `true` lays them inside a card that already frames and names
+   * them, `"panel"` lays them straight on a sidebar panel with no frame.
+   */
+  embedded?: boolean | "panel";
 }) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -520,9 +526,11 @@ function ProviderSection({
   /**
    * Inside a provider card: the rows sit flush under a hairline instead of
    * in their own rounded group, and the side notes take the card's inset.
+   * `"panel"`: straight on a sidebar panel, no frame and no dividers.
    */
-  embedded?: boolean;
+  embedded?: boolean | "panel";
 }) {
+  const panel = embedded === "panel";
   const t = useT();
   const connect = useEngineConnect(section.provider);
   const {
@@ -665,8 +673,7 @@ function ProviderSection({
           id: "sign-in-cloud",
           title: t("mobile.engineAccounts.signInCloud"),
           systemImage: "icloud",
-          onPress: () =>
-            startConnect(row.email ? { email: row.email } : {}),
+          onPress: () => startConnect(row.email ? { email: row.email } : {}),
         });
       } else {
         actions.push({
@@ -732,9 +739,12 @@ function ProviderSection({
     if (!chatgpt) {
       return [row.plan, placesText(row)].filter(Boolean).join(" · ");
     }
-    if (row.status === "signed_out") return t("mobile.engineAccounts.statusSignedOut");
-    if (row.status === "reauth_required") return t("mobile.engineAccounts.statusReauth");
-    if (row.planUsage === false) return t("mobile.engineAccounts.statusPlanUsageOff");
+    if (row.status === "signed_out")
+      return t("mobile.engineAccounts.statusSignedOut");
+    if (row.status === "reauth_required")
+      return t("mobile.engineAccounts.statusReauth");
+    if (row.planUsage === false)
+      return t("mobile.engineAccounts.statusPlanUsageOff");
     return row.plan;
   };
 
@@ -754,7 +764,11 @@ function ProviderSection({
       {showHeader ? (
         <Text style={settingsStyles.sectionLabel}>{t(section.titleKey)}</Text>
       ) : null}
-      <View style={embedded ? styles.embeddedGroup : settingsStyles.group}>
+      <View
+        style={
+          panel ? null : embedded ? styles.embeddedGroup : settingsStyles.group
+        }
+      >
         {accounts.map((row, index) => {
           const name = row.email ?? row.name ?? row.label;
           const sub = rowSubtitle(row);
@@ -773,15 +787,21 @@ function ProviderSection({
               }
               style={({ pressed }) => [
                 settingsStyles.row,
-                index > 0 && settingsStyles.rowDivider,
-                pressed && !row.active && settingsStyles.rowPressed,
+                panel && styles.panelRow,
+                index > 0 && !panel && settingsStyles.rowDivider,
+                pressed &&
+                  !row.active &&
+                  (panel ? styles.pressed : settingsStyles.rowPressed),
               ]}
             >
-              <View style={styles.avatar}>
+              <View style={[styles.avatar, panel && styles.panelAvatar]}>
                 <Text style={styles.avatarText}>{accountInitials(row)}</Text>
               </View>
               <View style={settingsStyles.rowCopy}>
-                <Text style={settingsStyles.rowLabel} numberOfLines={1}>
+                <Text
+                  style={[settingsStyles.rowLabel, panel && styles.panelLabel]}
+                  numberOfLines={1}
+                >
                   {name}
                 </Text>
                 {sub ? (
@@ -848,12 +868,21 @@ function ProviderSection({
             accessibilityRole="button"
             style={({ pressed }) => [
               settingsStyles.row,
-              (accounts.length > 0 || index > 0) && settingsStyles.rowDivider,
-              pressed && settingsStyles.rowPressed,
+              panel && styles.panelRow,
+              (accounts.length > 0 || index > 0) &&
+                !panel &&
+                settingsStyles.rowDivider,
+              pressed && (panel ? styles.pressed : settingsStyles.rowPressed),
               (busy || connectId !== null) && settingsStyles.rowDisabled,
             ]}
           >
-            <View style={[styles.avatar, styles.addAvatar]}>
+            <View
+              style={[
+                styles.avatar,
+                styles.addAvatar,
+                panel && styles.panelAvatar,
+              ]}
+            >
               {registration.who ? (
                 <Text style={styles.avatarText}>
                   {accountInitials({
@@ -865,7 +894,14 @@ function ProviderSection({
                 <Icon name="message-square" size={16} color={colors.text} />
               )}
             </View>
-            <Text style={[settingsStyles.rowLabel, styles.flexLabel]} numberOfLines={1}>
+            <Text
+              style={[
+                settingsStyles.rowLabel,
+                styles.flexLabel,
+                panel && styles.panelLabel,
+              ]}
+              numberOfLines={1}
+            >
               {registration.who
                 ? t("mobile.engineAccounts.continueAsChatgpt", {
                     name: registration.who,
@@ -880,16 +916,26 @@ function ProviderSection({
           accessibilityRole="button"
           style={({ pressed }) => [
             settingsStyles.row,
+            panel && styles.panelRow,
             accounts.length + registrations.length > 0 &&
+              !panel &&
               settingsStyles.rowDivider,
-            pressed && settingsStyles.rowPressed,
+            pressed && (panel ? styles.pressed : settingsStyles.rowPressed),
             (busy || connectId !== null) && settingsStyles.rowDisabled,
           ]}
         >
-          <View style={[styles.avatar, styles.addAvatar]}>
+          <View
+            style={[
+              styles.avatar,
+              styles.addAvatar,
+              panel && styles.panelAvatar,
+            ]}
+          >
             <Icon name="plus" size={18} color={colors.text} />
           </View>
-          <Text style={settingsStyles.rowLabel}>{t(section.connectKey)}</Text>
+          <Text style={[settingsStyles.rowLabel, panel && styles.panelLabel]}>
+            {t(section.connectKey)}
+          </Text>
         </Pressable>
       </View>
       {!chatgpt && !embedded ? (
@@ -915,6 +961,7 @@ function ProviderSection({
             settingsStyles.groupGap,
             styles.pasteCard,
             embedded && styles.embeddedPasteCard,
+            panel && styles.panelPasteCard,
           ]}
         >
           {/* The provider's own page already said to copy the code, so the
@@ -987,9 +1034,11 @@ function ProviderSection({
       {chatgpt && accounts.length > 0 ? (
         <View
           style={
-            embedded
-              ? styles.embeddedGroup
-              : [settingsStyles.group, settingsStyles.groupGap]
+            panel
+              ? null
+              : embedded
+                ? styles.embeddedGroup
+                : [settingsStyles.group, settingsStyles.groupGap]
           }
         >
           <Pressable
@@ -997,10 +1046,17 @@ function ProviderSection({
             accessibilityRole="link"
             style={({ pressed }) => [
               settingsStyles.row,
-              pressed && settingsStyles.rowPressed,
+              panel && styles.panelRow,
+              pressed && (panel ? styles.pressed : settingsStyles.rowPressed),
             ]}
           >
-            <Text style={[settingsStyles.rowLabel, styles.flexLabel]}>
+            <Text
+              style={[
+                settingsStyles.rowLabel,
+                styles.flexLabel,
+                panel && styles.panelLabel,
+              ]}
+            >
               {t("mobile.engineAccounts.manageUsage")}
             </Text>
             <Icon name="arrow-up-right" size={16} color={colors.textMuted} />
@@ -1085,5 +1141,13 @@ const makeStyles = (colors: Colors) =>
     },
     embeddedPasteCard: { marginBottom: 12, marginHorizontal: 12, marginTop: 0 },
     embeddedNote: { marginBottom: 12, paddingHorizontal: 12 },
+    panelRow: { paddingHorizontal: 0 },
+    panelAvatar: { backgroundColor: colors.surface },
+    panelLabel: {
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 17,
+      letterSpacing: -0.3,
+    },
+    panelPasteCard: { marginHorizontal: 0 },
     flexLabel: { flex: 1 },
   });

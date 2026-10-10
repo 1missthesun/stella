@@ -26,7 +26,7 @@ import { Icon } from "../../src/components/Icon";
 import { GlassIconButton } from "../../src/components/GlassIconButton";
 import { StellaStatusHeader } from "../../src/components/StellaStatusHeader";
 import { StellaActivityMenu } from "../../src/components/StellaActivityMenu";
-import { ChatSettingsSheet } from "../../src/components/ChatSettingsSheet";
+import { ChatSettingsPanel } from "../../src/components/ChatSettingsPanel";
 import {
   AppBackdrop,
   TOP_BAR_BAR_HEIGHT,
@@ -61,6 +61,7 @@ import {
   openDrawer,
   useDrawerLive,
   useDrawerMetrics,
+  useDrawerSide,
 } from "../../src/lib/drawer";
 import { type Colors } from "../../src/theme/colors";
 import { useColors, useTheme } from "../../src/theme/theme-context";
@@ -114,8 +115,8 @@ export default function MainLayout() {
   const pathname = usePathname();
   const router = useRouter();
   const drawerLive = useDrawerLive();
+  const drawerSide = useDrawerSide();
   const { travel } = useDrawerMetrics();
-  const [chatSettingsOpen, setChatSettingsOpen] = useState(false);
   // The in-progress agents the top-bar indicator was showing when it was
   // pressed. Held rather than re-read so the menu keeps listing what the user
   // tapped on even as work settles underneath it.
@@ -198,7 +199,7 @@ export default function MainLayout() {
   const drawerAvailable = onChatSurface || (onTabRoot && !backOverride);
   const backVisible = !drawerAvailable;
 
-  const openSidebar = openDrawer;
+  const openSidebar = () => openDrawer("start");
 
   // Tabs push over the chat rather than replacing it, so the chat keeps its
   // mount (scroll position, draft, journal socket) and coming back is a pop,
@@ -252,8 +253,13 @@ export default function MainLayout() {
   // A route that takes the drawer away (a pushed page, an open app) never
   // inherits it open.
   useEffect(() => {
-    if (!drawerAvailable && isDrawerOpen()) closeDrawer();
+    if (!drawerAvailable && isDrawerOpen("start")) closeDrawer();
   }, [drawerAvailable]);
+
+  // The chat's settings sidebar belongs to the chat alone.
+  useEffect(() => {
+    if (!onChatSurface && isDrawerOpen("end")) closeDrawer();
+  }, [onChatSurface]);
 
   // The chat's running-tasks pill asks for the drawer; the wide layout has
   // the sidebar on screen already, so there is nothing to reveal there.
@@ -266,6 +272,10 @@ export default function MainLayout() {
       }),
     [wide],
   );
+
+  const startHandedOff =
+    drawerAvailable && drawerLive && drawerSide === "start";
+  const endHandedOff = onChatSurface && drawerLive && drawerSide === "end";
 
   const topBarFade = useAnimatedStyle(() => ({
     opacity: interpolate(
@@ -351,6 +361,18 @@ export default function MainLayout() {
               onSelectTab={selectTab}
             />
           }
+          end={{
+            enabled: onChatSurface,
+            panel: <ChatSettingsPanel width={travel} />,
+            chevron: {
+              left: width - TOP_BAR_INSET - TOP_BAR_BUTTON,
+              top: topBarHeight - TOP_BAR_BUTTON,
+              openCenterY: insets.top + SIDEBAR_BRAND_CENTER,
+              openLabel: t("mobile.nav.chatSettingsLabel"),
+              closeLabel: t("mobile.nav.backToChat"),
+              restIcon: "settings",
+            },
+          }}
           chevron={{
             left: TOP_BAR_INSET,
             top: topBarHeight - TOP_BAR_BUTTON,
@@ -431,12 +453,9 @@ export default function MainLayout() {
             ) : null}
             {search.isOpen ? null : (
               <View
-                style={[
-                  styles.topBarSide,
-                  drawerAvailable && drawerLive && styles.handedOff,
-                ]}
-                pointerEvents={drawerAvailable && drawerLive ? "none" : "auto"}
-                accessibilityElementsHidden={drawerAvailable && drawerLive}
+                style={[styles.topBarSide, startHandedOff && styles.handedOff]}
+                pointerEvents={startHandedOff ? "none" : "auto"}
+                accessibilityElementsHidden={startHandedOff}
               >
                 <GlassIconButton
                   icon={drawerAvailable ? "chevron-right" : "chevron-left"}
@@ -457,26 +476,27 @@ export default function MainLayout() {
               </View>
             ) : null}
             {!search.isOpen && onChatSurface ? (
-              <View style={[styles.topBarSide, styles.topBarEnd]}>
+              <View
+                style={[
+                  styles.topBarSide,
+                  styles.topBarEnd,
+                  endHandedOff && styles.handedOff,
+                ]}
+                pointerEvents={endHandedOff ? "none" : "auto"}
+                accessibilityElementsHidden={endHandedOff}
+              >
                 <GlassIconButton
                   icon="settings"
                   size={TOP_BAR_BUTTON}
                   iconSize={19}
                   accessibilityLabel={t("mobile.nav.chatSettingsLabel")}
-                  onPress={() => {
-                    tapLight();
-                    setChatSettingsOpen(true);
-                  }}
+                  onPress={() => openDrawer("end")}
                 />
               </View>
             ) : null}
           </Animated.View>
         </DrawerStage>
       )}
-      <ChatSettingsSheet
-        visible={chatSettingsOpen}
-        onClose={() => setChatSettingsOpen(false)}
-      />
       <StellaActivityMenu
         visible={activityMenuRunning !== null}
         running={activityMenuRunning ?? EMPTY_RUNNING_AGENTS}

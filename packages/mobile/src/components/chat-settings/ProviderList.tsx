@@ -7,8 +7,8 @@ import {
   View,
 } from "react-native";
 import { EngineAccountSection } from "../EngineAccountsSettings";
-import { ProviderGlyph } from "./ProviderGlyph";
 import { tapLight } from "../../lib/haptics";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
 import { REASONING_OPTIONS } from "../../lib/stella-model-catalog";
 import {
   MODEL_ENGINE_OPTIONS,
@@ -20,26 +20,31 @@ import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";
 
 /**
- * The chat's brain as one card per provider: Stella, Claude Code, ChatGPT.
+ * The chat's brain, one large row per provider: Stella, Claude Code, ChatGPT.
  *
- * Picking a card picks the engine, and its ring is the only mark it needs.
- * The chosen card opens to its models, how hard it thinks, and the accounts
- * that pay for it, so an account sits under the provider it belongs to.
- *
- * Every choice in the sheet reads the same way when picked: filled with the
- * accent, its label inverted.
+ * The chosen provider carries the sidebar's accent dot and opens in place to
+ * its models, how hard it thinks, and the accounts that pay for it, so an
+ * account sits under the provider it belongs to.
  *
  * Lists and the saved choice come from the server, so this never waits on a
  * paired computer; the computer mirrors the saved choice for its own turns.
  */
-export function ProviderCards({ settings }: { settings: ModelSettings }) {
+export function ProviderList({
+  settings,
+  active,
+  label,
+}: {
+  settings: ModelSettings;
+  active: boolean;
+  label: string;
+}) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { refresh } = settings;
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    if (active) void refresh();
+  }, [active, refresh]);
 
   const ready = settings.execution !== null;
   const current = settings.engine;
@@ -47,7 +52,7 @@ export function ProviderCards({ settings }: { settings: ModelSettings }) {
   return (
     <View>
       <View style={styles.header}>
-        <Text style={styles.sectionLabel}>Model</Text>
+        <Text style={styles.sectionLabel}>{label}</Text>
         {settings.saving || !ready ? (
           <ActivityIndicator size="small" color={colors.textMuted} />
         ) : null}
@@ -57,10 +62,7 @@ export function ProviderCards({ settings }: { settings: ModelSettings }) {
         const engine = option.id;
         const selected = ready && engine === current;
         return (
-          <View
-            key={engine}
-            style={[styles.card, selected && styles.cardSelected]}
-          >
+          <View key={engine}>
             <Pressable
               onPress={() => {
                 if (selected) return;
@@ -72,18 +74,26 @@ export function ProviderCards({ settings }: { settings: ModelSettings }) {
               accessibilityLabel={option.label}
               accessibilityState={{ checked: selected, disabled: !ready }}
               style={({ pressed }) => [
-                styles.cardHeader,
+                styles.engine,
                 pressed && !selected && styles.pressed,
               ]}
             >
-              <ProviderGlyph engine={engine} />
-              <Text style={styles.title} numberOfLines={1}>
+              <Text
+                style={[styles.engineLabel, !selected && styles.engineIdle]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              >
                 {option.label}
               </Text>
+              {selected ? <View style={styles.current} /> : null}
             </Pressable>
 
             {selected ? (
-              <CardBody engine={engine} settings={settings} styles={styles} />
+              <EngineDetail
+                engine={engine}
+                settings={settings}
+                styles={styles}
+              />
             ) : null}
           </View>
         );
@@ -92,7 +102,7 @@ export function ProviderCards({ settings }: { settings: ModelSettings }) {
   );
 }
 
-function CardBody({
+function EngineDetail({
   engine,
   settings,
   styles,
@@ -105,11 +115,11 @@ function CardBody({
   const effort = settings.effort === "none" ? "default" : settings.effort;
 
   return (
-    <View style={[styles.body, engine === "stella" && styles.bodyEnd]}>
+    <View style={styles.detail}>
       {rows.length === 0 ? (
         <Text style={styles.empty}>No models available.</Text>
       ) : (
-        <View style={styles.models}>
+        <View accessibilityRole="radiogroup">
           {rows.map((model) => (
             <Pressable
               key={model.id}
@@ -130,21 +140,22 @@ function CardBody({
                 disabled: !model.available,
               }}
               style={({ pressed }) => [
-                styles.modelChip,
-                model.selected && styles.chosen,
+                styles.model,
                 !model.available && styles.unavailable,
                 pressed && !model.selected && styles.pressed,
               ]}
             >
               <Text
                 style={[
-                  styles.modelChipLabel,
-                  model.selected && styles.chosenLabel,
+                  styles.modelLabel,
+                  model.selected && styles.modelLabelChosen,
                 ]}
                 numberOfLines={1}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
               >
                 {model.label}
               </Text>
+              {model.selected ? <View style={styles.currentSmall} /> : null}
             </Pressable>
           ))}
         </View>
@@ -164,21 +175,25 @@ function CardBody({
                     tapLight();
                     settings.selectEffort(option.id);
                   }}
+                  hitSlop={{ top: 8, bottom: 8 }}
                   accessibilityRole="radio"
                   accessibilityLabel={`Thinking ${option.label}`}
                   accessibilityState={{ checked: chosen }}
                   style={({ pressed }) => [
                     styles.effort,
-                    chosen && styles.chosen,
                     pressed && !chosen && styles.pressed,
                   ]}
                 >
                   <Text
-                    style={[styles.effortLabel, chosen && styles.chosenLabel]}
+                    style={[styles.effortLabel, chosen && styles.effortChosen]}
                     numberOfLines={1}
+                    maxFontSizeMultiplier={1.3}
                   >
                     {option.label}
                   </Text>
+                  <View
+                    style={[styles.effortMark, chosen && styles.effortMarkOn]}
+                  />
                 </Pressable>
               );
             })}
@@ -188,7 +203,7 @@ function CardBody({
 
       {engine !== "stella" ? (
         <View style={styles.accounts}>
-          <EngineAccountSection provider={engine} embedded />
+          <EngineAccountSection provider={engine} embedded="panel" />
         </View>
       ) : null}
     </View>
@@ -200,118 +215,115 @@ const makeStyles = (colors: Colors) =>
     header: {
       alignItems: "center",
       flexDirection: "row",
-      justifyContent: "space-between",
-      marginBottom: 10,
-      marginTop: 26,
-      minHeight: 18,
+      gap: 10,
+      marginBottom: 2,
+      minHeight: 20,
     },
     sectionLabel: {
       color: colors.textMuted,
-      flex: 1,
-      fontFamily: fonts.sans.medium,
-      fontSize: 13,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 15,
     },
-    card: {
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderRadius: 20,
-      borderWidth: StyleSheet.hairlineWidth,
-      marginBottom: 10,
-      overflow: "hidden",
-    },
-    cardSelected: {
-      borderColor: colors.selectBorder,
-      borderWidth: 1.5,
-    },
-    cardHeader: {
+    engine: {
       alignItems: "center",
       flexDirection: "row",
-      gap: 12,
-      minHeight: 56,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      gap: 10,
+      minHeight: 50,
     },
-    title: {
+    engineLabel: {
       color: colors.text,
-      flex: 1,
-      fontFamily: fonts.sans.medium,
-      fontSize: 16,
-      letterSpacing: -0.2,
+      flexShrink: 1,
+      fontFamily: fonts.sans.bold,
+      fontSize: 26,
+      letterSpacing: -0.9,
+      lineHeight: 32,
+    },
+    engineIdle: {
+      color: colors.textMuted,
+    },
+    current: {
+      backgroundColor: colors.accent,
+      borderRadius: 4,
+      height: 8,
+      marginTop: 3,
+      width: 8,
+    },
+    currentSmall: {
+      backgroundColor: colors.accent,
+      borderRadius: 3,
+      height: 6,
+      marginTop: 2,
+      width: 6,
     },
     pressed: {
-      opacity: 0.6,
+      opacity: 0.55,
+      transform: [{ scale: 0.98 }],
     },
-    body: {
-      paddingTop: 2,
-    },
-    bodyEnd: {
-      paddingBottom: 16,
+    detail: {
+      marginBottom: 10,
     },
     empty: {
       color: colors.textMuted,
       fontFamily: fonts.sans.regular,
-      fontSize: 14,
-      paddingHorizontal: 16,
-    },
-    models: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 8,
-      paddingHorizontal: 16,
-    },
-    modelChip: {
-      backgroundColor: colors.surfaceInset,
-      borderRadius: 999,
-      justifyContent: "center",
-      minHeight: 40,
-      paddingHorizontal: 16,
-    },
-    modelChipLabel: {
-      color: colors.text,
-      fontFamily: fonts.sans.medium,
       fontSize: 15,
-      letterSpacing: -0.2,
+      paddingVertical: 8,
     },
-    chosen: {
-      backgroundColor: colors.accent,
+    model: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      minHeight: 38,
     },
-    chosenLabel: {
-      color: colors.accentForeground,
+    modelLabel: {
+      color: colors.textMuted,
+      flexShrink: 1,
       fontFamily: fonts.sans.semiBold,
+      fontSize: 18,
+      letterSpacing: -0.4,
+    },
+    modelLabelChosen: {
+      color: colors.text,
     },
     unavailable: {
       opacity: 0.4,
     },
     thinking: {
-      gap: 8,
-      marginTop: 18,
-      paddingHorizontal: 16,
+      marginTop: 14,
     },
     thinkingLabel: {
       color: colors.textMuted,
-      fontFamily: fonts.sans.medium,
-      fontSize: 13,
-      marginLeft: 2,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 15,
+      marginBottom: 4,
     },
     efforts: {
       flexDirection: "row",
-      gap: 6,
+      justifyContent: "space-between",
     },
     effort: {
       alignItems: "center",
-      backgroundColor: colors.surfaceInset,
-      borderRadius: 999,
-      flex: 1,
-      height: 40,
+      gap: 4,
+      minHeight: 40,
       justifyContent: "center",
     },
     effortLabel: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 17,
+      letterSpacing: -0.3,
+    },
+    effortChosen: {
       color: colors.text,
-      fontFamily: fonts.sans.medium,
-      fontSize: 14,
-      letterSpacing: -0.2,
+    },
+    effortMark: {
+      borderRadius: 3,
+      height: 6,
+      width: 6,
+    },
+    effortMarkOn: {
+      backgroundColor: colors.accent,
     },
     accounts: {
-      marginTop: 18,
+      marginTop: 14,
     },
   });

@@ -267,7 +267,7 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
   ) {
     return annotate(
       result,
-      "The Stella browser extension is not connected and the user recently declined (or ignored) the connect offer. Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser still works without it (pages open signed out): continue there, and park only steps that need the user's own logins, reporting the exact browser error for those.",
+      "The Stella browser extension is not connected and the user recently declined (or ignored) the connect offer. Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser still works without it (pages open signed out): continue there. For steps that need the user's own login, ask them to sign in once in Stella's Browser panel (Stella keeps that sign-in) instead of parking.",
     );
   }
 
@@ -299,8 +299,8 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
       return annotate(
         result,
         outcome.reason === "declined"
-          ? "A connect card for the Stella browser extension was shown in the chat and the user declined. Acknowledge once at most (it stays available in the Store/settings) and do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there, and park only steps that need the user's own logins."
-          : "A connect card for the Stella browser extension was shown in the chat but the user did not respond in time. Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there, and park only steps that need the user's own logins.",
+          ? "A connect card for the Stella browser extension was shown in the chat and the user declined. Acknowledge once at most (it stays available in the Store/settings) and do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there. For steps that need the user's own login, ask them to sign in once in Stella's Browser panel (Stella keeps that sign-in)."
+          : "A connect card for the Stella browser extension was shown in the chat but the user did not respond in time. Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there. For steps that need the user's own login, ask them to sign in once in Stella's Browser panel (Stella keeps that sign-in).",
       );
     }
     // unsupported / bridge error: stay quiet, just return the raw failure.
@@ -314,7 +314,7 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
     gate.lastRefusedAt = now();
     return annotate(
       retried,
-      "The user accepted the browser-extension connect card, but the browser service still cannot reach the extension (the browser may be closed or the extension disabled). Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there, and park only steps that need the user's own logins, reporting the exact browser error from the retry.",
+      "The user accepted the browser-extension connect card, but the browser service still cannot reach the extension (the browser may be closed or the extension disabled). Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there. For steps that need the user's own login, ask them to sign in once in Stella's Browser panel (Stella keeps that sign-in), and report the exact browser error from the retry.",
     );
   }
   return annotate(

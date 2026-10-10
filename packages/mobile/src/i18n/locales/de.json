@@ -1531,7 +1531,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2434,7 +2434,17 @@
     "browser": {
       "connected": "Browser verbunden",
       "connecting": "Warten auf Erweiterung …",
-      "newTab": "Neuen Tab öffnen"
+      "dismiss": "Schließen",
+      "emptyBody": "Melde dich hier einmal bei einer Website an, und Stella hält dich angemeldet, für dich und deine Agenten.",
+      "emptyBodyConnected": "Websites öffnen mit den Logins deines Browsers.",
+      "emptyTitle": "Stella-Browser",
+      "newTab": "Neuen Tab öffnen",
+      "openErrorTitle": "Der Browser konnte nicht geöffnet werden",
+      "pageErrorTitle": "Diese Seite konnte nicht geladen werden",
+      "reconnectExtension": "Erweiterung neu verbinden",
+      "serviceMissing": "Der Browserdienst fehlt. Installiere Stella neu, um diesen Browser zu nutzen.",
+      "signInHint": "Melde dich hier einmal bei Websites an. Stella merkt es sich.",
+      "useMyLogins": "Logins meines Browsers verwenden"
     },
     "capture": {
       "failedDescription": "Beim Erstellen des Screenshots ist etwas schiefgelaufen. Versuch es erneut.",

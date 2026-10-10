@@ -1521,7 +1521,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2423,7 +2423,17 @@
     "browser": {
       "connected": "Trình duyệt đã kết nối",
       "connecting": "Đang chờ tiện ích…",
-      "newTab": "Mở tab mới"
+      "dismiss": "Đóng",
+      "emptyBody": "Đăng nhập vào một trang tại đây một lần và Stella sẽ giữ bạn đăng nhập, cho bạn và các tác nhân của bạn.",
+      "emptyBodyConnected": "Các trang mở bằng thông tin đăng nhập từ trình duyệt của bạn.",
+      "emptyTitle": "Trình duyệt Stella",
+      "newTab": "Mở tab mới",
+      "openErrorTitle": "Không thể mở trình duyệt",
+      "pageErrorTitle": "Không thể tải trang này",
+      "reconnectExtension": "Kết nối lại tiện ích",
+      "serviceMissing": "Thiếu dịch vụ trình duyệt. Hãy cài đặt lại Stella để dùng trình duyệt này.",
+      "signInHint": "Đăng nhập vào các trang tại đây một lần. Stella sẽ ghi nhớ.",
+      "useMyLogins": "Dùng thông tin đăng nhập từ trình duyệt của tôi"
     },
     "capture": {
       "failedDescription": "Đã xảy ra sự cố khi chụp màn hình. Hãy thử lại.",

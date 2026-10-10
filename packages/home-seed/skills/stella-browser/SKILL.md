@@ -231,9 +231,9 @@ evaluate(pageFunction, arg?), waitFor(options?), allTextContents()
 
 Timeouts are non-negative milliseconds and are capped at 120 seconds unless a smaller `expectNewTab()` limit applies. Locator actions retry transient not-found/not-actionable state for one shared three-second deadline, then add a bounded five-match diagnostic; unknown-outcome transport failures are never replayed. A low-level `browser.chain()` has its own overall `timeout` option capped at 240 seconds. Unknown option keys fail fast. A timeout error states whether its deadline was the caller's override or the runtime default and whether the request had already been dispatched; if dispatch occurred, treat the remote outcome as unknown and inspect state before retrying a mutating action.
 
-## Not Logged In: Try the External Browser
+## Not Logged In: Sign In Once, or Try the External Browser
 
-The default in-app browser has its own session and mirrors the user's signed-in cookies from their real browser, but that copy can be incomplete — sites that keep auth in localStorage/token storage, device-bound sessions, or partitioned cookies may still read as logged out even when the real browser is signed in.
+The default in-app browser has its own persistent session. Anything the user signs in to there stays signed in across restarts, for them and for every agent. When the Stella extension is connected it also mirrors the user's real-browser cookies, but that copy can be incomplete — sites that keep auth in localStorage/token storage, device-bound sessions, or partitioned cookies may still read as logged out even when the real browser is signed in.
 
 When a site loads but appears NOT logged in — redirected to a sign-in page, "session expired", an auth wall, or an action that fails only for lack of auth — attempt the user's real, signed-in browser before concluding the site is inaccessible:
 
@@ -246,7 +246,7 @@ await browser.use("in-app"); // old in-app handles remain bound and safe to reus
 
 Every `Tab` and `Locator` exposes its fixed `.backend`. Switching the default affects newly acquired handles only; an existing handle continues routing to the backend that created it, even after `browser.use()` changes the default. Do not expect an in-app tab to become an external tab.
 
-This is a fallback to try, not a default. Keep using the in-app browser for normal work; reach for `external` only when missing auth actually blocks the task, then switch back with `browser.use("in-app")`. External mode needs the Stella Browser extension installed and connected — if it is unavailable, report that rather than assuming the site is down. This is distinct from a transport/bridge failure (below): use `external` only for a logged-out or auth-failed site on an otherwise-working browser.
+This is a fallback to try, not a default. Keep using the in-app browser for normal work; reach for `external` only when missing auth actually blocks the task, then switch back with `browser.use("in-app")`. External mode needs the Stella Browser extension installed and connected. If it is unavailable, leave the sign-in page open in the in-app tab and ask the user to sign in once in Stella's Browser panel; Stella keeps that sign-in, so it is a one-time step. Never ask for or type their password yourself. Continue once they confirm. This is distinct from a transport/bridge failure (below): use `external` or a user sign-in only for a logged-out or auth-failed site on an otherwise-working browser.
 
 ## Transport Failures
 

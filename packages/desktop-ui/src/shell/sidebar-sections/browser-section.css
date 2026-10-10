@@ -281,10 +281,10 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 6px 8px 6px 12px;
+  padding: 5px 6px 5px 12px;
   border-bottom: 1px solid var(--border-weak);
   color: var(--text-weak);
-  background: color-mix(in oklch, var(--background) 94%, var(--foreground));
+  background: color-mix(in oklch, var(--background) 96%, var(--foreground));
 }
 
 .browser-section__login-banner > svg {
@@ -292,33 +292,46 @@
 }
 
 .browser-section__login-banner-text {
-  display: flex;
   flex: 1 1 auto;
-  flex-direction: column;
-  gap: 1px;
   min-width: 0;
   margin: 0;
+  overflow: hidden;
   font-size: var(--font-size-sm);
   line-height: 1.35;
-}
-
-.browser-section__login-banner-title {
-  overflow: hidden;
-  color: var(--text-base);
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.browser-section__login-banner-detail {
-  display: -webkit-box;
-  overflow: hidden;
-  font-size: var(--font-size-xs);
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+.browser-section__login-banner-link,
+.browser-section__status-link {
+  flex: 0 0 auto;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-base);
+  background: none;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklch, currentColor 35%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
-.browser-section__login-banner-action {
-  flex: 0 0 auto;
+.browser-section__login-banner-link:hover:not(:disabled),
+.browser-section__status-link:hover:not(:disabled) {
+  text-decoration-color: currentColor;
+}
+
+.browser-section__login-banner-link:disabled,
+.browser-section__status-link:disabled {
+  color: var(--text-weak);
+  cursor: default;
+}
+
+.browser-section__status-link {
+  margin-top: -2px;
+  color: var(--text-weak);
 }
 
 .browser-section button:focus-visible,

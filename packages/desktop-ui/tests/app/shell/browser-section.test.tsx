@@ -218,7 +218,7 @@ describe("BrowserSection", () => {
     });
   };
 
-  it("stays usable without the extension and offers it for logins", async () => {
+  it("invites a one-time sign-in and offers the extension for logins", async () => {
     await render();
 
     expect(api.connect).toHaveBeenCalledWith({
@@ -227,7 +227,7 @@ describe("BrowserSection", () => {
     });
     expect(api.setOwnerScope).toHaveBeenCalledWith({});
     expect(container.textContent).toContain(
-      "Connect extension to use your logins",
+      "Sign in to a site here once and Stella keeps you signed in",
     );
     expect(
       Array.from(container.querySelectorAll("button")).some((button) =>
@@ -236,7 +236,7 @@ describe("BrowserSection", () => {
     ).toBe(true);
 
     const connectButton = Array.from(container.querySelectorAll("button")).find(
-      (button) => button.textContent === "Connect",
+      (button) => button.textContent === "Use my browser's logins",
     );
     await act(async () => connectButton?.click());
     expect(api.requestExtensionConnect).toHaveBeenCalledOnce();
@@ -248,7 +248,7 @@ describe("BrowserSection", () => {
     await render();
 
     expect(container.textContent).toContain("Stella Browser");
-    expect(container.textContent).not.toContain("Connect extension");
+    expect(container.textContent).not.toContain("Use my browser's logins");
     const newTab = Array.from(container.querySelectorAll("button")).find(
       (button) => button.textContent?.includes("Open a new tab"),
     );

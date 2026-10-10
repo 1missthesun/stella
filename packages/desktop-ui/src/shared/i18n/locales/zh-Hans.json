@@ -1521,7 +1521,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2423,7 +2423,17 @@
     "browser": {
       "connected": "浏览器已连接",
       "connecting": "正在等待扩展…",
-      "newTab": "打开新标签页"
+      "dismiss": "关闭",
+      "emptyBody": "在这里登录网站一次，Stella 就会为你和你的代理保持登录状态。",
+      "emptyBodyConnected": "网站会使用你浏览器的登录信息打开。",
+      "emptyTitle": "Stella 浏览器",
+      "newTab": "打开新标签页",
+      "openErrorTitle": "无法打开浏览器",
+      "pageErrorTitle": "无法加载此页面",
+      "reconnectExtension": "重新连接扩展程序",
+      "serviceMissing": "缺少浏览器服务。请重新安装 Stella 以使用此浏览器。",
+      "signInHint": "在这里登录网站一次，Stella 会记住。",
+      "useMyLogins": "使用我浏览器的登录信息"
     },
     "capture": {
       "failedDescription": "截图时出了点问题。请重试。",

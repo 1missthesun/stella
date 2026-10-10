@@ -1531,7 +1531,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2434,7 +2434,17 @@
     "browser": {
       "connected": "Selain yhdistetty",
       "connecting": "Odotetaan laajennusta…",
-      "newTab": "Avaa uusi välilehti"
+      "dismiss": "Sulje",
+      "emptyBody": "Kirjaudu sivustolle täällä kerran, niin Stella pitää sinut kirjautuneena, sinulle ja agenteillesi.",
+      "emptyBodyConnected": "Sivustot avautuvat selaimesi kirjautumisilla.",
+      "emptyTitle": "Stella-selain",
+      "newTab": "Avaa uusi välilehti",
+      "openErrorTitle": "Selainta ei voitu avata",
+      "pageErrorTitle": "Sivua ei voitu ladata",
+      "reconnectExtension": "Yhdistä laajennus uudelleen",
+      "serviceMissing": "Selainpalvelu puuttuu. Asenna Stella uudelleen käyttääksesi tätä selainta.",
+      "signInHint": "Kirjaudu sivustoille täällä kerran. Stella muistaa sen.",
+      "useMyLogins": "Käytä selaimeni kirjautumisia"
     },
     "capture": {
       "failedDescription": "Jokin meni pieleen kuvakaappausta otettaessa. Yritä uudelleen.",

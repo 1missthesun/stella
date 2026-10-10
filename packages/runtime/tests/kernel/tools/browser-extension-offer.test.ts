@@ -86,7 +86,7 @@ describe("maybeOfferBrowserExtensionConnect", () => {
     expect(payloadOf(result).note).toMatch(/re-run automatically/);
   });
 
-  it("parks only login-dependent steps when the accepted connection still fails", async () => {
+  it("asks for a one-time sign-in when the accepted connection still fails", async () => {
     const retried = execResult(EXTENSION_ERROR);
     const result = await maybeOfferBrowserExtensionConnect({
       result: execResult(EXTENSION_ERROR),
@@ -98,7 +98,7 @@ describe("maybeOfferBrowserExtensionConnect", () => {
     expect(payloadOf(result).output).toBe(EXTENSION_ERROR);
     expect(payloadOf(result).note).toMatch(/exact browser error/i);
     expect(payloadOf(result).note).toMatch(
-      /park only steps that need the user.s own logins/i,
+      /sign in once in Stella's Browser panel/i,
     );
     expect(payloadOf(result).note).not.toMatch(
       /node_repl|visible browser control/i,
@@ -125,7 +125,7 @@ describe("maybeOfferBrowserExtensionConnect", () => {
     expect(payloadOf(first).note).toMatch(/declined/);
     expect(payloadOf(first).note).toMatch(/do not re-offer/i);
     expect(payloadOf(first).note).toMatch(
-      /park only steps that need the user.s own logins/i,
+      /sign in once in Stella's Browser panel/i,
     );
     expect(payloadOf(first).note).not.toMatch(/visible browser control/i);
 

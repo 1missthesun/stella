@@ -1531,7 +1531,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2434,7 +2434,17 @@
     "browser": {
       "connected": "Το πρόγραμμα περιήγησης συνδέθηκε",
       "connecting": "Αναμονή για την επέκταση…",
-      "newTab": "Άνοιγμα νέας καρτέλας"
+      "dismiss": "Κλείσιμο",
+      "emptyBody": "Συνδεθείτε σε έναν ιστότοπο εδώ μία φορά και η Stella σας κρατά συνδεδεμένους, για εσάς και τους πράκτορές σας.",
+      "emptyBodyConnected": "Οι ιστότοποι ανοίγουν με τις συνδέσεις του προγράμματος περιήγησής σας.",
+      "emptyTitle": "Πρόγραμμα περιήγησης Stella",
+      "newTab": "Άνοιγμα νέας καρτέλας",
+      "openErrorTitle": "Δεν ήταν δυνατό το άνοιγμα του προγράμματος περιήγησης",
+      "pageErrorTitle": "Δεν ήταν δυνατή η φόρτωση της σελίδας",
+      "reconnectExtension": "Επανασύνδεση επέκτασης",
+      "serviceMissing": "Λείπει η υπηρεσία του προγράμματος περιήγησης. Εγκαταστήστε ξανά τη Stella για να το χρησιμοποιήσετε.",
+      "signInHint": "Συνδεθείτε σε ιστότοπους εδώ μία φορά. Η Stella το θυμάται.",
+      "useMyLogins": "Χρήση των συνδέσεων του προγράμματος περιήγησής μου"
     },
     "capture": {
       "failedDescription": "Κάτι πήγε στραβά κατά τη λήψη του στιγμιότυπου. Δοκιμάστε ξανά.",

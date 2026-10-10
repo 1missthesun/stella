@@ -38,6 +38,7 @@ import { BROWSER_BRIDGE_MISSING_ERROR } from "../utils/register-stella-native-me
 import { STELLA_BROWSER_EXTENSION_STORE_URL } from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
 import { CookieMirror } from "./in-app-browser/cookie-mirror.js";
 import { trimInAppBrowserStorage } from "./in-app-browser/storage-hygiene.js";
+import { keepSessionCookies } from "./in-app-browser/session-cookie-keeper.js";
 import {
   DebuggerTargetProxy,
   isRendererUrl,
@@ -289,6 +290,7 @@ export class InAppBrowserService {
     tabs: [],
   };
   private browserSession: Session | null = null;
+  private releaseSessionCookies: (() => void) | null = null;
   private profileImport: BrowserProfileImportResult | null = null;
   private initializePromise: Promise<void> | null = null;
   private connectPromise: Promise<BrowserViewState> | null = null;
@@ -1016,6 +1018,8 @@ export class InAppBrowserService {
     this.disposed = true;
     this.visible = false;
     this.cookies.dispose();
+    this.releaseSessionCookies?.();
+    this.releaseSessionCookies = null;
     this.detachAttachedView();
     for (const tab of this.tabs.all()) {
       this.closeTabInternal(tab.id, tab.ownerId);
@@ -1070,6 +1074,7 @@ export class InAppBrowserService {
         shouldAllowAuthDevice(details),
       );
       this.cookies.attachSession(this.browserSession);
+      this.releaseSessionCookies = keepSessionCookies(this.browserSession);
       void trimInAppBrowserStorage(this.profilePath, this.browserSession);
       this.state.profileName =
         this.profileImport.profileName ??

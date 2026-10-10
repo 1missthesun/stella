@@ -1521,7 +1521,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2423,7 +2423,17 @@
     "browser": {
       "connected": "브라우저 연결됨",
       "connecting": "확장 프로그램 대기 중…",
-      "newTab": "새 탭 열기"
+      "dismiss": "닫기",
+      "emptyBody": "여기서 사이트에 한 번 로그인하면 Stella가 나와 에이전트를 위해 로그인 상태를 유지합니다.",
+      "emptyBodyConnected": "사이트가 브라우저의 로그인 정보로 열립니다.",
+      "emptyTitle": "Stella 브라우저",
+      "newTab": "새 탭 열기",
+      "openErrorTitle": "브라우저를 열 수 없습니다",
+      "pageErrorTitle": "이 페이지를 불러올 수 없습니다",
+      "reconnectExtension": "확장 프로그램 다시 연결",
+      "serviceMissing": "브라우저 서비스가 없습니다. 이 브라우저를 사용하려면 Stella를 다시 설치하세요.",
+      "signInHint": "여기서 사이트에 한 번 로그인하면 Stella가 기억합니다.",
+      "useMyLogins": "내 브라우저의 로그인 사용"
     },
     "capture": {
       "failedDescription": "스크린샷을 찍는 중 문제가 발생했습니다. 다시 시도하세요.",

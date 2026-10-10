@@ -1531,7 +1531,7 @@
         "bodyOne": "Not required, but it makes me a lot more useful.",
         "enable": "Enable",
         "enabled": "Enabled",
-        "extensionDesc": "Lets me see the page you're on and act inside your browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionDesc": "Optional. Brings your browser's logins into Stella and lets me act in your own tabs. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
         "extensionOpened": "Opened",
         "extensionTitle": "Stella for Chrome",
         "getExtension": "Get extension",
@@ -2434,7 +2434,17 @@
     "browser": {
       "connected": "Browser connected",
       "connecting": "Waiting for extension…",
-      "newTab": "Open a new tab"
+      "dismiss": "Dismiss",
+      "emptyBody": "Sign in to a site here once and Stella keeps you signed in, for you and your agents.",
+      "emptyBodyConnected": "Sites open with your browser's logins.",
+      "emptyTitle": "Stella Browser",
+      "newTab": "Open a new tab",
+      "openErrorTitle": "Couldn't open the browser",
+      "pageErrorTitle": "Couldn't load this page",
+      "reconnectExtension": "Reconnect extension",
+      "serviceMissing": "Browser service is missing. Reinstall Stella to use this browser.",
+      "signInHint": "Sign in to sites here once. Stella remembers it.",
+      "useMyLogins": "Use my browser's logins"
     },
     "capture": {
       "failedDescription": "Something went wrong taking the screenshot. Try again.",

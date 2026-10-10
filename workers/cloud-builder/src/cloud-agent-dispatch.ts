@@ -13,7 +13,7 @@ import {
   type CloudAgentTurnStartResponse,
 } from "@stella/contracts/turn-plane/turn-start";
 import type { OwnerGateAdmission } from "./owner-gate.js";
-import { snapshotAllowsExecutionEngine } from "./owner-gate.js";
+import { executionUnavailableMessage, snapshotAllowsExecution } from "./owner-gate.js";
 import { HEADER_GATE_ADMITTED } from "./turn-start-request.js";
 import { parseCloudExecutionSelection } from "./turn-start-request.js";
 import { sha256Hex } from "./hash.js";
@@ -431,13 +431,9 @@ export const dispatchCloudAgentTurn = async (args: {
       ownerId: caller.ownerId,
       turnId: attempt.turnId,
     });
-  if (!snapshotAllowsExecutionEngine(ownerSnapshot, attempt.execution.engine)) {
+  if (!snapshotAllowsExecution(ownerSnapshot, attempt.execution)) {
     await release();
-    throw new CloudAgentDispatchRefused(
-      attempt.execution.engine === "anthropic"
-        ? "Connect Claude before using that cloud execution route."
-        : "Connect ChatGPT before using that cloud execution route.",
-    );
+    throw new CloudAgentDispatchRefused(executionUnavailableMessage(attempt.execution));
   }
   if (runsAsPiAgent(attempt.execution)) {
     // Admitted above only so a refusal (the plan, the owner's limits)
@@ -621,7 +617,7 @@ export type PiAgentExecution = Extract<
 export const runsAsPiAgent = (
   execution: CloudExecutionSelection,
 ): execution is PiAgentExecution =>
-  execution.engine === "stella" || execution.engine === "chatgpt";
+  execution.engine === "stella" || execution.engine === "chatgpt" || execution.engine === "provider";
 
 /**
  * One attempt of an agent thread the owner's agent threads track (a Claude

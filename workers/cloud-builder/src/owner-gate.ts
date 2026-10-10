@@ -216,7 +216,8 @@ export {
 } from "./owner-gate/presence.js";
 export {
   OwnerGateSnapshotError,
-  snapshotAllowsExecutionEngine,
+  executionUnavailableMessage,
+  snapshotAllowsExecution,
   snapshotAllowsCloudSandbox,
   dispatchSummary,
 } from "./owner-gate/support.js";

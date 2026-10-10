@@ -33,6 +33,32 @@ export const GATEWAY_RESOLVE_PATH = "/v1/models/resolve" as const;
 export const GATEWAY_SESSION_CAPABILITY_PATH = "/v1/capabilities/session" as const;
 export const GATEWAY_HEALTH_PATH = "/healthz" as const;
 
+/**
+ * BYOK lane: a model request on a provider credential saved to the owner's
+ * account (`@stella/contracts/backend/providers`), never billed to Stella.
+ *
+ *   POST /v1/byok/<provider>
+ *   x-stella-byok-upstream: <the provider URL the request is for>
+ *   x-stella-byok-header-<name>: <a header carrying GATEWAY_BYOK_PLACEHOLDER_KEY>
+ *
+ * The caller builds the request as its provider SDK would with
+ * `GATEWAY_BYOK_PLACEHOLDER_KEY` as the key, moves every header that carries
+ * the placeholder under `x-stella-byok-header-`, and authorizes with its
+ * capability. The gateway checks the upstream URL against the provider's
+ * endpoints, puts the owner's key where the placeholder was, and pipes the
+ * provider's response back untouched. A turn capability is pinned to the
+ * provider and model its turn was admitted with; a session capability (a
+ * computer with no key of its own) may use any model of the provider.
+ * Only inference endpoints are served.
+ */
+export const GATEWAY_BYOK_RELAY_PREFIX = "/v1/byok" as const;
+export const GATEWAY_BYOK_UPSTREAM_HEADER = "x-stella-byok-upstream" as const;
+export const GATEWAY_BYOK_HEADER_PREFIX = "x-stella-byok-header-" as const;
+export const GATEWAY_BYOK_PLACEHOLDER_KEY = "stella-account-key" as const;
+
+export const gatewayByokRelayPath = (provider: string): string =>
+  `${GATEWAY_BYOK_RELAY_PREFIX}/${encodeURIComponent(provider)}`;
+
 /** Caller-minted idempotency key. Same id + same body => cached result. */
 export const GATEWAY_REQUEST_ID_HEADER = "x-stella-request-id" as const;
 /** Full descriptor digest checked before reservation or provider dispatch. */

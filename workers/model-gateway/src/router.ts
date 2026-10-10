@@ -42,6 +42,7 @@ import {
 import { handleManagedRelay } from "./managed-lane.js";
 import { classifyNetwork } from "../../shared/network-class.js";
 import { handleNativeRelay } from "./native-lane.js";
+import { handleByokRelay, isByokRelayPath } from "./byok-lane.js";
 import {
   ownerEnforcementAdmission,
   type OwnerEnforcementAdmission,
@@ -617,6 +618,11 @@ export const handleRequest = async (
         traceId,
         url.pathname === GATEWAY_PREPARE_PATH ? "await" : "background",
       );
+    }
+    if (!localOwner && isByokRelayPath(url.pathname)) {
+      if (request.method !== "POST")
+        throw new GatewayError(405, "bad_request", "Method not allowed.");
+      return await handleByokRelay({ request, env, deps, traceId });
     }
     if (
       url.pathname === GATEWAY_VALIDATED_RELAY_PREFIX ||

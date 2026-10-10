@@ -2105,6 +2105,8 @@
       "title": "Erinnerung"
     },
     "modelPicker": {
+      "accountKey": "Konto",
+      "accountKeyTitle": "Über dein Stella-Konto verbunden. Dieser Computer nutzt diesen Schlüssel.",
       "actions": {
         "addKey": "Schlüssel hinzufügen",
         "cancel": "Abbrechen",
@@ -2116,7 +2118,9 @@
       "authHint": {
         "apiKey": "Dein API-Schlüssel bleibt auf diesem Gerät.",
         "both": "Melde dich an oder füge einen API-Schlüssel ein. Zugangsdaten bleiben auf diesem Gerät.",
-        "oauth": "Zugangsdaten bleiben auf diesem Gerät."
+        "oauth": "Zugangsdaten bleiben auf diesem Gerät.",
+        "apiKeyAccount": "Wird in deinem Stella-Konto gespeichert und funktioniert so auch auf deinem Handy und in der Cloud.",
+        "bothAccount": "Melde dich an oder füge einen API-Schlüssel ein, um ihn in deinem Stella-Konto zu speichern."
       },
       "cancelSignIn": "Anmeldung abbrechen",
       "closeSearch": "Suche schließen",
@@ -2126,7 +2130,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth-Anmeldung fehlgeschlagen.",
-        "saveApiKey": "API-Schlüssel konnte nicht gespeichert werden."
+        "saveApiKey": "API-Schlüssel konnte nicht gespeichert werden.",
+        "accountKeyRejected": "{provider} hat diesen Schlüssel nicht akzeptiert. Prüfe ihn und versuch es noch einmal.",
+        "accountSaveFailed": "Auf diesem Computer gespeichert, aber nicht in deinem Stella-Konto. Versuch es noch einmal, um ihn auch auf dem Handy und in der Cloud zu nutzen."
       },
       "favorite": {
         "add": "Favorit hinzufügen",

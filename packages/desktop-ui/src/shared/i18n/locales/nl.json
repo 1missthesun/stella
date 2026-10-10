@@ -2105,6 +2105,8 @@
       "title": "Geheugen"
     },
     "modelPicker": {
+      "accountKey": "Account",
+      "accountKeyTitle": "Verbonden via je Stella-account. Deze computer gebruikt die sleutel.",
       "actions": {
         "addKey": "Sleutel toevoegen",
         "cancel": "Annuleren",
@@ -2116,7 +2118,9 @@
       "authHint": {
         "apiKey": "Je API-sleutel blijft op dit apparaat.",
         "both": "Log in of plak een API-sleutel. Inloggegevens blijven op dit apparaat.",
-        "oauth": "Inloggegevens blijven op dit apparaat."
+        "oauth": "Inloggegevens blijven op dit apparaat.",
+        "apiKeyAccount": "Opgeslagen in je Stella-account, zodat hij ook op je telefoon en in de cloud werkt.",
+        "bothAccount": "Log in, of plak een API-sleutel om hem in je Stella-account op te slaan."
       },
       "cancelSignIn": "Inloggen annuleren",
       "closeSearch": "Zoeken sluiten",
@@ -2126,7 +2130,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth-login mislukt.",
-        "saveApiKey": "API-sleutel opslaan mislukt."
+        "saveApiKey": "API-sleutel opslaan mislukt.",
+        "accountKeyRejected": "{provider} accepteerde die sleutel niet. Controleer hem en probeer het opnieuw.",
+        "accountSaveFailed": "Opgeslagen op deze computer, maar niet in je Stella-account. Probeer het opnieuw om hem op je telefoon en in de cloud te gebruiken."
       },
       "favorite": {
         "add": "Favoriet toevoegen",

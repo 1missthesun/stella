@@ -2118,7 +2118,9 @@
       "authHint": {
         "apiKey": "Your API key stays on this device.",
         "both": "Sign in or paste an API key. Credentials stay on this device.",
-        "oauth": "Credentials stay on this device."
+        "oauth": "Credentials stay on this device.",
+        "apiKeyAccount": "Saved to your Stella account, so it also works on your phone and in the cloud.",
+        "bothAccount": "Sign in, or paste an API key to save it to your Stella account."
       },
       "cancelSignIn": "Cancel sign-in",
       "closeSearch": "Close search",
@@ -2128,7 +2130,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth login failed.",
-        "saveApiKey": "Failed to save API key."
+        "saveApiKey": "Failed to save API key.",
+        "accountKeyRejected": "{provider} didn't accept that key. Check it and try again.",
+        "accountSaveFailed": "Saved on this computer, but not to your Stella account. Try again to use it on your phone and in the cloud."
       },
       "favorite": {
         "add": "Add favorite",

@@ -2125,6 +2125,8 @@
       "title": "Paměť"
     },
     "modelPicker": {
+      "accountKey": "Účet",
+      "accountKeyTitle": "Připojeno přes váš účet Stella. Tento počítač používá tento klíč.",
       "actions": {
         "addKey": "Přidat klíč",
         "cancel": "Zrušit",
@@ -2136,7 +2138,9 @@
       "authHint": {
         "apiKey": "Váš klíč API zůstává na tomto zařízení.",
         "both": "Přihlaste se nebo vložte klíč API. Přihlašovací údaje zůstávají na tomto zařízení.",
-        "oauth": "Přihlašovací údaje zůstávají na tomto zařízení."
+        "oauth": "Přihlašovací údaje zůstávají na tomto zařízení.",
+        "apiKeyAccount": "Uloží se do vašeho účtu Stella, takže funguje i v telefonu a v cloudu.",
+        "bothAccount": "Přihlaste se, nebo vložte klíč API a uložte ho do svého účtu Stella."
       },
       "cancelSignIn": "Zrušit přihlášení",
       "closeSearch": "Zavřít hledání",
@@ -2146,7 +2150,9 @@
       },
       "errors": {
         "oauthLogin": "Přihlášení přes OAuth se nezdařilo.",
-        "saveApiKey": "Nepodařilo se uložit klíč API."
+        "saveApiKey": "Nepodařilo se uložit klíč API.",
+        "accountKeyRejected": "{provider} tento klíč nepřijal. Zkontrolujte ho a zkuste to znovu.",
+        "accountSaveFailed": "Uloženo v tomto počítači, ale ne ve vašem účtu Stella. Zkuste to znovu, abyste ho mohli používat v telefonu a v cloudu."
       },
       "favorite": {
         "add": "Přidat do oblíbených",

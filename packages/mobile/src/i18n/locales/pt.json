@@ -2115,6 +2115,8 @@
       "title": "Memória"
     },
     "modelPicker": {
+      "accountKey": "Conta",
+      "accountKeyTitle": "Ligado através da sua conta Stella. Este computador usa essa chave.",
       "actions": {
         "addKey": "Adicionar chave",
         "cancel": "Cancelar",
@@ -2126,7 +2128,9 @@
       "authHint": {
         "apiKey": "Sua chave de API fica neste dispositivo.",
         "both": "Entre ou cole uma chave de API. As credenciais ficam neste dispositivo.",
-        "oauth": "As credenciais ficam neste dispositivo."
+        "oauth": "As credenciais ficam neste dispositivo.",
+        "apiKeyAccount": "Guardada na sua conta Stella, por isso também funciona no telemóvel e na nuvem.",
+        "bothAccount": "Inicie sessão ou cole uma chave de API para a guardar na sua conta Stella."
       },
       "cancelSignIn": "Cancelar entrada",
       "closeSearch": "Fechar busca",
@@ -2136,7 +2140,9 @@
       },
       "errors": {
         "oauthLogin": "Falha no login com OAuth.",
-        "saveApiKey": "Não foi possível salvar a chave de API."
+        "saveApiKey": "Não foi possível salvar a chave de API.",
+        "accountKeyRejected": "{provider} não aceitou essa chave. Verifique-a e tente novamente.",
+        "accountSaveFailed": "Guardada neste computador, mas não na sua conta Stella. Tente novamente para a usar no telemóvel e na nuvem."
       },
       "favorite": {
         "add": "Adicionar aos favoritos",

@@ -2095,6 +2095,8 @@
       "title": "Bộ nhớ"
     },
     "modelPicker": {
+      "accountKey": "Tài khoản",
+      "accountKeyTitle": "Đã kết nối qua tài khoản Stella của bạn. Máy tính này dùng khóa đó.",
       "actions": {
         "addKey": "Thêm khóa",
         "cancel": "Hủy",
@@ -2106,7 +2108,9 @@
       "authHint": {
         "apiKey": "Khóa API của bạn được giữ trên thiết bị này.",
         "both": "Đăng nhập hoặc dán khóa API. Thông tin đăng nhập được giữ trên thiết bị này.",
-        "oauth": "Thông tin đăng nhập được giữ trên thiết bị này."
+        "oauth": "Thông tin đăng nhập được giữ trên thiết bị này.",
+        "apiKeyAccount": "Được lưu vào tài khoản Stella của bạn, nên cũng dùng được trên điện thoại và trên đám mây.",
+        "bothAccount": "Đăng nhập, hoặc dán khóa API để lưu vào tài khoản Stella của bạn."
       },
       "cancelSignIn": "Hủy đăng nhập",
       "closeSearch": "Đóng tìm kiếm",
@@ -2116,7 +2120,9 @@
       },
       "errors": {
         "oauthLogin": "Đăng nhập OAuth thất bại.",
-        "saveApiKey": "Không lưu được khóa API."
+        "saveApiKey": "Không lưu được khóa API.",
+        "accountKeyRejected": "{provider} không chấp nhận khóa đó. Hãy kiểm tra và thử lại.",
+        "accountSaveFailed": "Đã lưu trên máy tính này nhưng chưa lưu vào tài khoản Stella của bạn. Hãy thử lại để dùng trên điện thoại và trên đám mây."
       },
       "favorite": {
         "add": "Thêm yêu thích",

@@ -2095,6 +2095,8 @@
       "title": "记忆"
     },
     "modelPicker": {
+      "accountKey": "账户",
+      "accountKeyTitle": "已通过你的 Stella 账户连接。此电脑使用该密钥。",
       "actions": {
         "addKey": "添加密钥",
         "cancel": "取消",
@@ -2106,7 +2108,9 @@
       "authHint": {
         "apiKey": "你的 API 密钥仅保存在此设备上。",
         "both": "登录或粘贴 API 密钥。凭据仅保存在此设备上。",
-        "oauth": "凭据仅保存在此设备上。"
+        "oauth": "凭据仅保存在此设备上。",
+        "apiKeyAccount": "保存到你的 Stella 账户，因此在手机和云端也能使用。",
+        "bothAccount": "登录，或粘贴 API 密钥以保存到你的 Stella 账户。"
       },
       "cancelSignIn": "取消登录",
       "closeSearch": "关闭搜索",
@@ -2116,7 +2120,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth 登录失败。",
-        "saveApiKey": "保存 API 密钥失败。"
+        "saveApiKey": "保存 API 密钥失败。",
+        "accountKeyRejected": "{provider} 未接受该密钥。请检查后重试。",
+        "accountSaveFailed": "已保存在此电脑上，但未保存到你的 Stella 账户。请重试，以便在手机和云端使用。"
       },
       "favorite": {
         "add": "添加收藏",

@@ -2095,6 +2095,8 @@
       "title": "메모리"
     },
     "modelPicker": {
+      "accountKey": "계정",
+      "accountKeyTitle": "Stella 계정으로 연결되어 있습니다. 이 컴퓨터는 그 키를 사용합니다.",
       "actions": {
         "addKey": "키 추가",
         "cancel": "취소",
@@ -2106,7 +2108,9 @@
       "authHint": {
         "apiKey": "API 키는 이 기기에 유지됩니다.",
         "both": "로그인하거나 API 키를 붙여 넣으세요. 자격 증명은 이 기기에 유지됩니다.",
-        "oauth": "자격 증명은 이 기기에 유지됩니다."
+        "oauth": "자격 증명은 이 기기에 유지됩니다.",
+        "apiKeyAccount": "Stella 계정에 저장되므로 휴대폰과 클라우드에서도 작동합니다.",
+        "bothAccount": "로그인하거나 API 키를 붙여 넣어 Stella 계정에 저장하세요."
       },
       "cancelSignIn": "로그인 취소",
       "closeSearch": "검색 닫기",
@@ -2116,7 +2120,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth 로그인에 실패했습니다.",
-        "saveApiKey": "API 키를 저장하지 못했습니다."
+        "saveApiKey": "API 키를 저장하지 못했습니다.",
+        "accountKeyRejected": "{provider}에서 이 키를 받아들이지 않았습니다. 확인한 후 다시 시도하세요.",
+        "accountSaveFailed": "이 컴퓨터에는 저장되었지만 Stella 계정에는 저장되지 않았습니다. 휴대폰과 클라우드에서 사용하려면 다시 시도하세요."
       },
       "favorite": {
         "add": "즐겨찾기 추가",

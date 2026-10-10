@@ -2105,6 +2105,8 @@
       "title": "Memória"
     },
     "modelPicker": {
+      "accountKey": "Fiók",
+      "accountKeyTitle": "A Stella-fiókodon keresztül csatlakozik. Ez a számítógép azt a kulcsot használja.",
       "actions": {
         "addKey": "Kulcs hozzáadása",
         "cancel": "Mégse",
@@ -2116,7 +2118,9 @@
       "authHint": {
         "apiKey": "Az API-kulcsod ezen az eszközön marad.",
         "both": "Jelentkezz be, vagy illessz be egy API-kulcsot. A hitelesítő adatok ezen az eszközön maradnak.",
-        "oauth": "A hitelesítő adatok ezen az eszközön maradnak."
+        "oauth": "A hitelesítő adatok ezen az eszközön maradnak.",
+        "apiKeyAccount": "A Stella-fiókodba mentjük, így a telefonodon és a felhőben is működik.",
+        "bothAccount": "Jelentkezz be, vagy illessz be egy API-kulcsot, hogy a Stella-fiókodba mentsd."
       },
       "cancelSignIn": "Bejelentkezés megszakítása",
       "closeSearch": "Keresés bezárása",
@@ -2126,7 +2130,9 @@
       },
       "errors": {
         "oauthLogin": "Az OAuth-bejelentkezés sikertelen.",
-        "saveApiKey": "Nem sikerült menteni az API-kulcsot."
+        "saveApiKey": "Nem sikerült menteni az API-kulcsot.",
+        "accountKeyRejected": "A(z) {provider} nem fogadta el ezt a kulcsot. Ellenőrizd, és próbáld újra.",
+        "accountSaveFailed": "Erre a számítógépre mentve, de a Stella-fiókodba nem. Próbáld újra, hogy a telefonodon és a felhőben is használhasd."
       },
       "favorite": {
         "add": "Hozzáadás a kedvencekhez",

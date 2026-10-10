@@ -2105,6 +2105,8 @@
       "title": "Hukommelse"
     },
     "modelPicker": {
+      "accountKey": "Konto",
+      "accountKeyTitle": "Forbundet via din Stella-konto. Denne computer bruger den nøgle.",
       "actions": {
         "addKey": "Tilføj nøgle",
         "cancel": "Annuller",
@@ -2116,7 +2118,9 @@
       "authHint": {
         "apiKey": "Din API-nøgle bliver på denne enhed.",
         "both": "Log ind, eller indsæt en API-nøgle. Loginoplysninger bliver på denne enhed.",
-        "oauth": "Loginoplysninger bliver på denne enhed."
+        "oauth": "Loginoplysninger bliver på denne enhed.",
+        "apiKeyAccount": "Gemmes på din Stella-konto, så den også virker på din telefon og i skyen.",
+        "bothAccount": "Log ind, eller indsæt en API-nøgle for at gemme den på din Stella-konto."
       },
       "cancelSignIn": "Annuller login",
       "closeSearch": "Luk søgning",
@@ -2126,7 +2130,9 @@
       },
       "errors": {
         "oauthLogin": "OAuth-login mislykkedes.",
-        "saveApiKey": "Kunne ikke gemme API-nøglen."
+        "saveApiKey": "Kunne ikke gemme API-nøglen.",
+        "accountKeyRejected": "{provider} accepterede ikke nøglen. Tjek den, og prøv igen.",
+        "accountSaveFailed": "Gemt på denne computer, men ikke på din Stella-konto. Prøv igen for at bruge den på din telefon og i skyen."
       },
       "favorite": {
         "add": "Tilføj favorit",

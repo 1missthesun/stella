@@ -9,35 +9,42 @@ public class StellaCarPlayModule: Module {
     Events("onConnectionChange", "onRowSelect", "onVoiceControlAction")
 
     OnCreate {
-      let controller = StellaCarPlayController.shared
       DispatchQueue.main.async { [weak self] in
-        controller.emit = { name, body in
-          self?.sendEvent(name, body)
+        MainActor.assumeIsolated {
+          StellaCarPlayController.shared.emit = { name, body in
+            self?.sendEvent(name, body)
+          }
         }
       }
     }
 
     OnDestroy {
       DispatchQueue.main.async {
-        StellaCarPlayController.shared.emit = nil
-        StellaCarPlayController.shared.jsObserving = false
+        MainActor.assumeIsolated {
+          StellaCarPlayController.shared.emit = nil
+          StellaCarPlayController.shared.jsObserving = false
+        }
       }
     }
 
     OnStartObserving("onRowSelect") {
       DispatchQueue.main.async {
-        StellaCarPlayController.shared.jsObserving = true
+        MainActor.assumeIsolated {
+          StellaCarPlayController.shared.jsObserving = true
+        }
       }
     }
 
     OnStopObserving("onRowSelect") {
       DispatchQueue.main.async {
-        StellaCarPlayController.shared.jsObserving = false
+        MainActor.assumeIsolated {
+          StellaCarPlayController.shared.jsObserving = false
+        }
       }
     }
 
     Function("isConnected") { () -> Bool in
-      StellaCarPlayController.shared.isConnected
+      StellaCarPlayController.connectedNow
     }
 
     Function("isPhoneForeground") { () -> Bool in
@@ -66,19 +73,25 @@ public class StellaCarPlayModule: Module {
         )
       }
       DispatchQueue.main.async {
-        StellaCarPlayController.shared.setHome(parsed)
+        MainActor.assumeIsolated {
+          StellaCarPlayController.shared.setHome(parsed)
+        }
       }
     }
 
     Function("setVoiceControl") { (state: String?) in
       DispatchQueue.main.async {
-        StellaCarPlayController.shared.setVoiceState(state)
+        MainActor.assumeIsolated {
+          StellaCarPlayController.shared.setVoiceState(state)
+        }
       }
     }
 
     Function("setBackgroundActivity") { (hold: Bool) in
       DispatchQueue.main.async {
-        StellaCarPlayController.shared.holdBackground(hold)
+        MainActor.assumeIsolated {
+          StellaCarPlayController.shared.holdBackground(hold)
+        }
       }
     }
 

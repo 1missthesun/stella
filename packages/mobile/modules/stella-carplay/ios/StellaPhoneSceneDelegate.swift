@@ -1,6 +1,6 @@
 import UIKit
 
-final class StellaPhoneSceneState {
+final class StellaPhoneSceneState: @unchecked Sendable {
   static let shared = StellaPhoneSceneState()
 
   private let lock = NSLock()

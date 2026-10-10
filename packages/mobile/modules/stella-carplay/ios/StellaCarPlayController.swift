@@ -15,12 +15,32 @@ struct CarHomeSection {
   let rows: [CarHomeRow]
 }
 
+final class StellaCarPlayConnectionState: @unchecked Sendable {
+  static let shared = StellaCarPlayConnectionState()
+
+  private let lock = NSLock()
+  private var connected = false
+
+  var isConnected: Bool {
+    lock.lock()
+    defer { lock.unlock() }
+    return connected
+  }
+
+  func set(connected next: Bool) {
+    lock.lock()
+    connected = next
+    lock.unlock()
+  }
+}
+
+@MainActor
 final class StellaCarPlayController: NSObject, CPInterfaceControllerDelegate {
   static let shared = StellaCarPlayController()
 
-  static let listeningState = "listening"
+  nonisolated static let listeningState = "listening"
 
-  static var supportsVoiceControl: Bool {
+  nonisolated static var supportsVoiceControl: Bool {
     let category = Bundle.main.object(forInfoDictionaryKey: "StellaCarPlayCategory") as? String
     if category == "voice" {
       if #available(iOS 26.4, *) { return true }
@@ -33,8 +53,6 @@ final class StellaCarPlayController: NSObject, CPInterfaceControllerDelegate {
   var emit: ((String, [String: Any]) -> Void)?
   var jsObserving = false
 
-  private let lock = NSLock()
-  private var connectedFlag = false
   private var interfaceController: CPInterfaceController?
   private var listTemplate: CPListTemplate?
   private var voiceTemplate: CPVoiceControlTemplate?
@@ -50,16 +68,12 @@ final class StellaCarPlayController: NSObject, CPInterfaceControllerDelegate {
 
   private let accent = UIColor(red: 52 / 255, green: 199 / 255, blue: 89 / 255, alpha: 1)
 
-  var isConnected: Bool {
-    lock.lock()
-    defer { lock.unlock() }
-    return connectedFlag
+  nonisolated static var connectedNow: Bool {
+    StellaCarPlayConnectionState.shared.isConnected
   }
 
   private func setConnected(_ value: Bool) {
-    lock.lock()
-    connectedFlag = value
-    lock.unlock()
+    StellaCarPlayConnectionState.shared.set(connected: value)
   }
 
   func connect(_ controller: CPInterfaceController) {
@@ -102,7 +116,9 @@ final class StellaCarPlayController: NSObject, CPInterfaceControllerDelegate {
     if hold {
       guard backgroundTask == .invalid else { return }
       backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "stella-carplay-voice") { [weak self] in
-        self?.holdBackground(false)
+        MainActor.assumeIsolated {
+          self?.holdBackground(false)
+        }
       }
     } else if backgroundTask != .invalid {
       UIApplication.shared.endBackgroundTask(backgroundTask)

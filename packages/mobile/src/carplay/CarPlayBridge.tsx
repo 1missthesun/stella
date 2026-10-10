@@ -105,6 +105,7 @@ function CarPlayVoiceLoop({
   sendingRef.current = sending;
 
   const [replies] = useState(() => new ReplyQueue());
+  const [live, setLive] = useState(false);
   const baselineRef = useRef(false);
   const currentRef = useRef<string | null>(null);
   const startingRef = useRef(false);
@@ -173,6 +174,7 @@ function CarPlayVoiceLoop({
     if (!baselineRef.current) {
       baselineRef.current = true;
       replies.markAllKnown(messagesRef.current);
+      setLive(true);
       return;
     }
     scan();
@@ -322,7 +324,7 @@ function CarPlayVoiceLoop({
   );
   useCarPlayHome(
     buildHome(
-      ready
+      live
         ? { kind: "ready", phase, hasReply, notice }
         : { kind: "connecting" },
     ),

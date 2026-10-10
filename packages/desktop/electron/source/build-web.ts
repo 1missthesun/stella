@@ -67,6 +67,7 @@ export type WebBuildOptions = {
   cacheDir: string;
   log?: (message: string) => void;
   staticHome?: { firstVisit: Record<"dark" | "light", StaticHomeRoot> };
+  scriptSources?: string[];
 };
 
 export type StaticHomeRoot = { attributes: Record<string, string>; properties: Array<[string, string]> };
@@ -381,11 +382,16 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
         "</head>",
       ].join("\n  "),
     );
-  if (options.staticHome) {
-    const hashes = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
-      (match) => `'sha256-${createHash("sha256").update(match[1]!).digest("base64")}'`,
-    );
-    html = html.replace(/(<meta\s+http-equiv="Content-Security-Policy"\s+content="[^"]*?script-src )/, (match) => `${match}${hashes.join(" ")} `);
+  const scriptSources = [
+    ...(options.staticHome
+      ? [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
+          (match) => `'sha256-${createHash("sha256").update(match[1]!).digest("base64")}'`,
+        )
+      : []),
+    ...(options.scriptSources ?? []),
+  ];
+  if (scriptSources.length > 0) {
+    html = html.replace(/(<meta\s+http-equiv="Content-Security-Policy"\s+content="[^"]*?script-src )/, (match) => `${match}${scriptSources.join(" ")} `);
   }
   fs.writeFileSync(path.join(outDir, "index.html"), html);
 

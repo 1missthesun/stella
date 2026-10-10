@@ -1,13 +1,14 @@
 /**
  * Builds the renderer for the browser (see `electron/source/build-web.ts`).
  *
- *   bun packages/desktop/scripts/build-web-renderer.ts [--out <dir>] [--static-home]
+ *   bun packages/desktop/scripts/build-web-renderer.ts [--out <dir>] [--static-home] [--script-src <origin>]...
  *
  * Runs against the checkout it lives in. The default output is the website's
  * `public/chat-app/`; the desktop passes its own directory when it builds a
  * fork's renderer for upload. `--static-home` puts the static Home
  * (desktop-ui/web-static-home.html) in the page and links the entry's
- * stylesheets from it, for the shared build only.
+ * stylesheets from it, for the shared build only. Each `--script-src` adds an
+ * origin the page's CSP lets scripts load from.
  */
 
 import path from "node:path";
@@ -44,6 +45,9 @@ const { files } = await buildWebRenderer({
   env: webBuildEnv(path.join(repoRoot, "packages", "desktop-ui")),
   cacheDir: path.join(repoRoot, "node_modules", ".cache", "stella-web-build"),
   log: (message) => console.log(message),
+  scriptSources: process.argv.flatMap((arg, index) =>
+    arg === "--script-src" && process.argv[index + 1] ? [process.argv[index + 1]!] : [],
+  ),
   staticHome: process.argv.includes("--static-home")
     ? { firstVisit: { dark: firstVisitRoot(true), light: firstVisitRoot(false) } }
     : undefined,

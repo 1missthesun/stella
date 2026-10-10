@@ -1868,7 +1868,7 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
                 }
                 return error_response(
                     &id,
-                    "Browser extension is not connected. Connect it before importing browser cookies.",
+                    "Browser extension is not connected, so your browser's logins cannot be imported. Stella's in-app browser still works without it.",
                 );
             }
             "cookies_export_for_urls" => {
@@ -1877,13 +1877,13 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
                 }
                 return error_response(
                     &id,
-                    "Browser extension is not connected. Connect it before importing browser cookies.",
+                    "Browser extension is not connected, so your browser's logins cannot be imported. Stella's in-app browser still works without it.",
                 );
             }
             _ => {
                 return error_response(
                     &id,
-                    "In-app browser is not ready. Browser control runs on the Stella in-app browser; the extension transport only seeds credentials. Open the Stella in-app browser and try again.",
+                    "In-app browser is not ready. Browser control runs on the Stella in-app browser, which does not need the extension; the extension only imports logins. Open the Stella in-app browser and try again.",
                 );
             }
         }
@@ -2910,7 +2910,7 @@ async fn forward_targeted_extension_command(cmd: &Value, state: &DaemonState) ->
     let Some(proxy) = state.extension_proxy.clone() else {
         return error_response(
             &id,
-            "Extension not connected. Install or connect the Stella Browser Bridge extension before using the external browser.",
+            "Extension not connected. The external backend drives your real browser and needs the Stella Browser Bridge extension; the in-app browser works without it (browser.use(\"in-app\")).",
         );
     };
     let mut proxied = cmd.clone();

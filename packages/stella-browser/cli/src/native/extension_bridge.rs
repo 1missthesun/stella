@@ -319,7 +319,7 @@ impl ExtensionBridge {
                 if !self.wait_for_connection().await {
                     let guard = self.inner.lock().await;
                     return Err(guard.last_connection_error.clone().unwrap_or_else(||
-                        "Extension not connected. Install the Stella Browser Bridge extension and connect it.".to_string()
+                        "Extension not connected. Install the Stella Browser Bridge extension and connect it to use your real browser or its logins; Stella's in-app browser works without it.".to_string()
                     ));
                 }
             }

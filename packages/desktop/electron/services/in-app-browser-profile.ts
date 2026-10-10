@@ -21,6 +21,7 @@ export const SUPPORTED_IN_APP_BROWSER_TYPES = [
   "arc",
   "opera",
   "vivaldi",
+  "chromium",
 ] as const;
 
 export type InAppBrowserType =
@@ -71,23 +72,53 @@ export const readBrowserHistoryUrls = (
   }
 };
 
-const PROFILE_IMPORT_MARKER = ".stella-browser-profile-import-v1.json";
+export const PROFILE_IMPORT_MARKER = ".stella-browser-profile-import-v1.json";
 
 const PROFILE_STORAGE_ENTRIES = [
   "Local Storage",
   "IndexedDB",
   "Session Storage",
-  "Service Worker",
   "WebStorage",
-  "Storage",
-  "SharedStorage",
   "QuotaManager",
   "QuotaManager-journal",
-  "History",
-  "History-journal",
-  "Favicons",
-  "Favicons-journal",
 ] as const;
+
+const SKIPPED_STORAGE_SEGMENTS = new Set(["CacheStorage", "ScriptCache"]);
+
+const isLoopbackHost = (host: string) =>
+  host === "localhost" ||
+  host.endsWith(".localhost") ||
+  host === "[::1]" ||
+  /^127(?:\.\d{1,3}){3}$/.test(host);
+
+export const indexedDbFolderOrigin = (name: string): string | null => {
+  const match = /^(https?)_(.+)_(\d+)\.indexeddb\.(?:leveldb|blob)$/.exec(name);
+  if (!match) return null;
+  const [, scheme, host, port] = match;
+  const defaultPort = scheme === "https" ? "443" : "80";
+  return `${scheme}://${host}${port === "0" || port === defaultPort ? "" : `:${port}`}`;
+};
+
+export const isLoopbackOrigin = (origin: string) => {
+  try {
+    return isLoopbackHost(new URL(origin).hostname);
+  } catch {
+    return false;
+  }
+};
+
+const shouldCopyStoragePath = (relativePath: string) => {
+  const segments = relativePath.split(path.sep);
+  if (segments.some((segment) => SKIPPED_STORAGE_SEGMENTS.has(segment))) {
+    return false;
+  }
+  if (segments[0] === "IndexedDB" && segments[1]) {
+    if (segments[1].startsWith("chrome-extension_")) return false;
+    const origin = indexedDbFolderOrigin(segments[1]);
+    if (origin && isLoopbackOrigin(origin)) return false;
+  }
+  return true;
+};
 
 const browserRootRelatives: Record<
   InAppBrowserType,
@@ -123,6 +154,11 @@ const browserRootRelatives: Record<
     darwin: "Vivaldi",
     win32: "Vivaldi/User Data",
     linux: ".config/vivaldi",
+  },
+  chromium: {
+    darwin: "Chromium",
+    win32: "Chromium/User Data",
+    linux: ".config/chromium",
   },
 };
 
@@ -316,12 +352,19 @@ export const resolveBrowserProfileSelection = async (options: {
   return selected;
 };
 
-const copyWithoutSymlinks = async (source: string, destination: string) => {
-  await cp(source, destination, {
+const copyStorageEntry = async (
+  sourceRoot: string,
+  entry: string,
+  destinationRoot: string,
+) => {
+  await cp(path.join(sourceRoot, entry), path.join(destinationRoot, entry), {
     recursive: true,
     force: true,
     errorOnExist: false,
     filter: async (candidate) => {
+      if (!shouldCopyStoragePath(path.relative(sourceRoot, candidate))) {
+        return false;
+      }
       try {
         return !(await lstat(candidate)).isSymbolicLink();
       } catch {
@@ -351,12 +394,31 @@ export const importBrowserProfileSnapshot = async (options: {
 
   const copiedEntries: string[] = [];
   const failedEntries: string[] = [];
+  if (!selection.sourcePath) {
+    const ownsStorage = (
+      await Promise.all(
+        PROFILE_STORAGE_ENTRIES.map((entry) =>
+          pathExists(path.join(destinationPath, entry)),
+        ),
+      )
+    ).some(Boolean);
+    if (!ownsStorage) {
+      return {
+        ...selection,
+        destinationPath,
+        copied: false,
+        skipped: true,
+        copiedEntries,
+        failedEntries,
+      };
+    }
+  }
   if (selection.sourcePath) {
     for (const entry of PROFILE_STORAGE_ENTRIES) {
       const source = path.join(selection.sourcePath, entry);
       if (!(await pathExists(source))) continue;
       try {
-        await copyWithoutSymlinks(source, path.join(destinationPath, entry));
+        await copyStorageEntry(selection.sourcePath, entry, destinationPath);
         copiedEntries.push(entry);
       } catch {
         failedEntries.push(entry);

@@ -157,10 +157,9 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             ...(capability.recover ? { recover: true } : {}),
         }, route.cdpUrl);
     };
-    // Agent routing does not wait for the extension: draft previews need none,
-    // and web tabs still require it when they are created (see
-    // InAppBrowserService.createDebuggerTarget). The connect attempt starts
-    // here so cookie seeding overlaps the routing setup.
+    // Agent routing never waits for the extension: tabs work without it, and
+    // the extension only imports logins. The connect attempt starts here so a
+    // cookie seed, when the extension is present, overlaps the routing setup.
     const ensureInAppBrowserReady = async (capability) => {
         if (!isStellaBrowserBridgeBinaryInstalled()) {
             throw new Error(BROWSER_BRIDGE_MISSING_ERROR);

@@ -545,7 +545,11 @@ fn save_screenshot(
         None => {
             let dir = match output_dir {
                 Some(d) => PathBuf::from(d),
-                None => get_screenshot_dir(),
+                None => {
+                    let dir = get_screenshot_dir();
+                    prune_screenshot_dir(&dir);
+                    dir
+                }
             };
             let _ = std::fs::create_dir_all(&dir);
             let timestamp = std::time::SystemTime::now()
@@ -616,6 +620,47 @@ fn write_file_atomic(path: &str, bytes: &[u8]) -> std::io::Result<()> {
 
 fn round(value: f64) -> i64 {
     value.round() as i64
+}
+
+const SCREENSHOT_MAX_AGE: std::time::Duration = std::time::Duration::from_secs(3 * 24 * 60 * 60);
+const SCREENSHOT_MAX_FILES: usize = 300;
+
+fn prune_screenshot_dir(dir: &std::path::Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    let now = std::time::SystemTime::now();
+    let mut kept: Vec<(std::time::SystemTime, PathBuf)> = Vec::new();
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_screenshot = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("screenshot-"));
+        if !is_screenshot {
+            continue;
+        }
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if !metadata.is_file() {
+            continue;
+        }
+        let modified = metadata.modified().unwrap_or(now);
+        let age = now.duration_since(modified).unwrap_or_default();
+        if age > SCREENSHOT_MAX_AGE {
+            let _ = std::fs::remove_file(&path);
+        } else {
+            kept.push((modified, path));
+        }
+    }
+    if kept.len() < SCREENSHOT_MAX_FILES {
+        return;
+    }
+    kept.sort_by(|a, b| b.0.cmp(&a.0));
+    for (_, path) in kept.into_iter().skip(SCREENSHOT_MAX_FILES - 1) {
+        let _ = std::fs::remove_file(path);
+    }
 }
 
 fn get_screenshot_dir() -> PathBuf {

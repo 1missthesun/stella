@@ -20,7 +20,6 @@ import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  CheckCircle2,
   Globe,
   LoaderCircle,
   Plus,
@@ -29,14 +28,6 @@ import {
 } from "@/ui/icons";
 import { useTabStripCloseFreeze } from "@/shared/hooks/use-tab-strip-close-freeze";
 import "./browser-section.css";
-
-type BrowserStatusKind =
-  | "checking"
-  | "setup_required"
-  | Exclude<BrowserViewUnavailableReason, "extension_not_installed">
-  | "connected"
-  | "preparing"
-  | "error";
 
 const MANUAL_OWNER_ID = "stella:manual";
 
@@ -135,139 +126,138 @@ const conversationOwnerId = (conversationId: string | null | undefined) => {
     : MANUAL_OWNER_ID;
 };
 
-function BrowserStatus({
-  kind,
-  profileName,
-  error,
-  connectingExtension,
+function BrowserLoginBanner({
+  connection,
+  reason,
+  detail,
+  busy,
   onConnect,
   onRetry,
-  onCreateTab,
+  onDismiss,
 }: {
-  kind: BrowserStatusKind;
-  profileName?: string;
-  error?: string;
-  connectingExtension: boolean;
+  connection: BrowserViewState["connection"];
+  reason?: BrowserViewUnavailableReason;
+  detail?: string;
+  busy: boolean;
   onConnect: () => void;
   onRetry: () => void;
-  onCreateTab: () => void;
+  onDismiss: () => void;
 }) {
-  const t = useT();
-
-  if (kind === "checking" || kind === "preparing") {
+  if (connection === "connected") return null;
+  if (connection === "checking") {
     return (
-      <div className="browser-section__status" role="status" aria-live="polite">
+      <div className="browser-section__login-banner" role="status">
         <LoaderCircle
           className="stella-loader-circle"
-          size={19}
+          size={13}
           strokeWidth={2}
           aria-hidden="true"
         />
-        <p className="browser-section__status-title">
-          {kind === "checking"
-            ? "Checking browser connection…"
-            : "Preparing your browser…"}
+        <p className="browser-section__login-banner-text">
+          <span className="browser-section__login-banner-title">
+            Checking for your browser logins…
+          </span>
         </p>
       </div>
     );
   }
-
-  if (
-    kind === "extension_disconnected" ||
-    kind === "bridge_missing" ||
-    kind === "authorization_failed" ||
-    kind === "connection_lost" ||
-    kind === "transient_failure" ||
-    kind === "error"
-  ) {
-    const copy = {
-      extension_disconnected: {
-        title: "Extension isn’t connected",
-        body: "Stella found the browser extension, but no extension attached to the bridge. Open or focus a tab in the browser where it is installed, then try again.",
-      },
-      bridge_missing: {
-        title: "Browser service is missing",
-        body: "Reinstall Stella, or run the desktop build, so the browser bridge binary is present.",
-      },
-      authorization_failed: {
-        title: "Browser access is blocked",
-        body: "Stella couldn’t authorize the browser bridge. Check system permissions, then try again.",
-      },
-      connection_lost: {
-        title: "Browser connection lost",
-        body: "The browser bridge stopped responding. Stella is retrying in the background.",
-      },
-      transient_failure: {
-        title: "Couldn’t connect to the browser",
-        body: "The browser bridge didn’t start successfully. Try again in a moment.",
-      },
-      error: {
-        title: "Couldn’t open the browser",
-        body: "Stella couldn’t prepare the in-app browser.",
-      },
-    }[kind];
-    return (
-      <div className="browser-section__status" role="alert">
-        <AlertCircle size={22} strokeWidth={1.75} aria-hidden="true" />
-        <p className="browser-section__status-title">{copy.title}</p>
-        <p className="browser-section__status-body">{error || copy.body}</p>
-        <button
-          type="button"
-          className="pill-btn pill-btn--primary"
-          onClick={onRetry}
-        >
-          Try again
-        </button>
-      </div>
-    );
-  }
-
-  if (kind === "setup_required") {
-    return (
-      <div className="browser-section__status" role="status">
-        <span className="browser-section__status-icon" aria-hidden="true">
-          <Globe size={21} strokeWidth={1.75} />
-        </span>
-        <p className="browser-section__status-title">
-          {t("settings.browserExtension.title")}
-        </p>
-        <p className="browser-section__status-body">
-          {t("settings.browserExtension.description")}
-        </p>
-        <button
-          type="button"
-          className="pill-btn pill-btn--primary"
-          disabled={connectingExtension}
-          onClick={onConnect}
-        >
-          {connectingExtension
-            ? t("shell.browser.connecting")
-            : t("settings.browserExtension.action")}
-        </button>
-      </div>
-    );
-  }
-
+  const bridgeMissing = reason === "bridge_missing";
+  const needsInstall = !reason || reason === "extension_not_installed";
   return (
-    <div className="browser-section__status" role="status">
-      <span
-        className="browser-section__status-icon browser-section__status-icon--connected"
-        aria-hidden="true"
+    <div
+      className="browser-section__login-banner"
+      role="status"
+      data-reason={reason ?? "extension_not_installed"}
+    >
+      <Globe size={13} strokeWidth={1.75} aria-hidden="true" />
+      <p className="browser-section__login-banner-text" title={detail}>
+        <span className="browser-section__login-banner-title">
+          {bridgeMissing
+            ? "Browser service is missing"
+            : "Connect extension to use your logins"}
+        </span>
+        {detail && !needsInstall ? (
+          <span className="browser-section__login-banner-detail">{detail}</span>
+        ) : null}
+      </p>
+      {bridgeMissing ? null : (
+        <button
+          type="button"
+          className="pill-btn browser-section__login-banner-action"
+          disabled={busy}
+          onClick={needsInstall ? onConnect : onRetry}
+        >
+          {busy ? "Connecting…" : needsInstall ? "Connect" : "Try again"}
+        </button>
+      )}
+      <button
+        type="button"
+        className="browser-section__chrome-button"
+        aria-label="Dismiss"
+        title="Dismiss"
+        onClick={onDismiss}
       >
-        <CheckCircle2 size={21} strokeWidth={1.8} />
+        <X size={12} strokeWidth={1.8} />
+      </button>
+    </div>
+  );
+}
+
+function BrowserEmptyState({
+  error,
+  onCreateTab,
+}: {
+  error?: string;
+  onCreateTab: () => void;
+}) {
+  const t = useT();
+  return (
+    <div
+      className="browser-section__status"
+      role={error ? "alert" : "status"}
+    >
+      <span className="browser-section__status-icon" aria-hidden="true">
+        {error ? (
+          <AlertCircle size={21} strokeWidth={1.75} />
+        ) : (
+          <Globe size={21} strokeWidth={1.75} />
+        )}
       </span>
       <p className="browser-section__status-title">
-        {t("shell.browser.connected")}
+        {error ? "Couldn’t open the browser" : "Stella Browser"}
       </p>
-      {profileName ? (
-        <p className="browser-section__status-body">{profileName}</p>
-      ) : null}
+      <p className="browser-section__status-body">
+        {error ?? "Browse here, or ask Stella to work in a tab."}
+      </p>
       <button
         type="button"
         className="pill-btn pill-btn--primary"
         onClick={onCreateTab}
       >
         {t("shell.browser.newTab")}
+      </button>
+    </div>
+  );
+}
+
+function BrowserPageError({
+  error,
+  onRetry,
+}: {
+  error: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="browser-section__status" role="alert">
+      <AlertCircle size={22} strokeWidth={1.75} aria-hidden="true" />
+      <p className="browser-section__status-title">Couldn’t load this page</p>
+      <p className="browser-section__status-body">{error}</p>
+      <button
+        type="button"
+        className="pill-btn pill-btn--primary"
+        onClick={onRetry}
+      >
+        Try again
       </button>
     </div>
   );
@@ -281,6 +271,7 @@ export function BrowserSection() {
   const [state, setState] = useState<BrowserViewState>(EMPTY_STATE);
   const [preparing, setPreparing] = useState(false);
   const [connectingExtension, setConnectingExtension] = useState(false);
+  const [loginBannerDismissed, setLoginBannerDismissed] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [address, setAddress] = useState("");
   const surfaceRef = useRef<HTMLElement | null>(null);
@@ -576,18 +567,21 @@ export function BrowserSection() {
   };
 
   const error = localError ?? state.error;
-  let statusKind: BrowserStatusKind = "connected";
-  if (localError) statusKind = "error";
-  else if (connectingExtension) statusKind = "setup_required";
-  else if (state.connection === "checking") statusKind = "checking";
-  else if (state.connection === "disconnected") {
-    statusKind =
-      !state.unavailableReason ||
-      state.unavailableReason === "extension_not_installed"
-        ? "setup_required"
-        : state.unavailableReason;
-  } else if (error) statusKind = "error";
-  else if (preparing && state.tabs.length === 0) statusKind = "preparing";
+  const retryPage = () => {
+    setLocalError(null);
+    runTabAction((api, tabId, ownerId) => api.reload({ tabId, ownerId }));
+  };
+  const loginBanner = loginBannerDismissed ? null : (
+    <BrowserLoginBanner
+      connection={state.connection}
+      reason={state.unavailableReason}
+      detail={state.connectionError}
+      busy={connectingExtension || preparing}
+      onConnect={() => void requestExtension()}
+      onRetry={() => void connect()}
+      onDismiss={() => setLoginBannerDismissed(true)}
+    />
+  );
 
   return (
     <section
@@ -596,7 +590,7 @@ export function BrowserSection() {
       data-connection={state.connection}
       aria-label="Browser"
     >
-      {activeTab && !error ? (
+      {activeTab ? (
         <>
           <div className="browser-section__chrome">
             <div
@@ -741,22 +735,25 @@ export function BrowserSection() {
               </div>
             ) : null}
           </div>
+          {loginBanner}
           <div
             ref={pageRef}
             className="browser-section__page"
             aria-busy={activeTab.loading || undefined}
-          />
+          >
+            {error ? (
+              <BrowserPageError error={error} onRetry={retryPage} />
+            ) : null}
+          </div>
         </>
       ) : (
-        <BrowserStatus
-          kind={statusKind}
-          profileName={state.profileName}
-          error={error ?? undefined}
-          connectingExtension={connectingExtension}
-          onConnect={() => void requestExtension()}
-          onRetry={() => void connect()}
-          onCreateTab={createConversationTab}
-        />
+        <>
+          {loginBanner}
+          <BrowserEmptyState
+            error={error ?? undefined}
+            onCreateTab={createConversationTab}
+          />
+        </>
       )}
     </section>
   );

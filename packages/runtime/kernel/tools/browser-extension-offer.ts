@@ -3,10 +3,12 @@
  * extension" offer. Production browser actions use the persistent browser API
  * service from `node_repl`.
  *
- * When legacy command output reports that the extension is not connected, the
- * exec tool asks the desktop to render an inline connect card, waits for the
- * user to connect or decline, and retries the intercepted operation once on
- * success.
+ * The extension is optional: Stella's in-app browser works without it, and the
+ * extension only brings the user's real-browser logins in (and backs the
+ * opt-in external backend). When legacy command output reports that the
+ * extension is not connected, the exec tool asks the desktop to render an
+ * inline connect card, waits for the user to connect or decline, and retries
+ * the intercepted operation once on success.
  *
  * The whole path is best-effort and conservative:
  * - only completed (non-running) legacy browser commands are considered;
@@ -256,7 +258,7 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
   if (gate.inFlight) {
     return annotate(
       result,
-      "The Stella browser extension is not connected and a connect card is already open in the chat. Wait for the user's response before retrying the browser operation. If the browser service remains unavailable, report the exact browser error and park the browser-dependent step.",
+      "The Stella browser extension is not connected and a connect card is already open in the chat. The extension only imports the user's logins; Stella's in-app browser works without it. Continue in the in-app browser (pages open signed out), and wait for the user's response only for steps that need a site they are signed in to.",
     );
   }
   if (
@@ -265,7 +267,7 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
   ) {
     return annotate(
       result,
-      "The Stella browser extension is not connected and the user recently declined (or ignored) the connect offer. Do not re-offer or switch to a visible Chrome/Brave browser. Report the exact browser error and park the browser-dependent step; continue only work that does not require browser access.",
+      "The Stella browser extension is not connected and the user recently declined (or ignored) the connect offer. Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser still works without it (pages open signed out): continue there, and park only steps that need the user's own logins, reporting the exact browser error for those.",
     );
   }
 
@@ -297,8 +299,8 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
       return annotate(
         result,
         outcome.reason === "declined"
-          ? "A connect card for the Stella browser extension was shown in the chat and the user declined. Acknowledge once at most (it stays available in the Store/settings), do not re-offer or switch to a visible Chrome/Brave browser, report the exact browser error, and park the browser-dependent step."
-          : "A connect card for the Stella browser extension was shown in the chat but the user did not respond in time. Do not re-offer or switch to a visible Chrome/Brave browser. Report the exact browser error and park the browser-dependent step.",
+          ? "A connect card for the Stella browser extension was shown in the chat and the user declined. Acknowledge once at most (it stays available in the Store/settings) and do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there, and park only steps that need the user's own logins."
+          : "A connect card for the Stella browser extension was shown in the chat but the user did not respond in time. Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there, and park only steps that need the user's own logins.",
       );
     }
     // unsupported / bridge error: stay quiet, just return the raw failure.
@@ -312,7 +314,7 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
     gate.lastRefusedAt = now();
     return annotate(
       retried,
-      "The user accepted the browser-extension connect card, but the browser service still cannot reach the extension (the browser may be closed or the extension disabled). Do not re-offer or switch to a visible Chrome/Brave browser. Report the exact browser error from the retry and park the browser-dependent step.",
+      "The user accepted the browser-extension connect card, but the browser service still cannot reach the extension (the browser may be closed or the extension disabled). Do not re-offer or switch to a visible Chrome/Brave browser. Stella's in-app browser works without the extension (signed out): continue there, and park only steps that need the user's own logins, reporting the exact browser error from the retry.",
     );
   }
   return annotate(

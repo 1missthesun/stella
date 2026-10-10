@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Animated,
   LayoutAnimation,
+  type LayoutChangeEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -23,11 +24,6 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
-import Reanimated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from "react-native-reanimated";
 import { useT } from "../../i18n";
 import { type ComposerAttachment } from "../../lib/chat-attachments";
 import { useChatDraft, type ChatDraftStore } from "../../lib/chat-draft-store";
@@ -40,8 +36,9 @@ import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";
 import type { ComposerQuote } from "../../types";
 import { DictationRecordingBar } from "../DictationRecordingBar";
-import { GlassSurface, liquidGlassSupported } from "../glass";
+import { GlassSurface } from "../glass";
 import { Icon } from "../Icon";
+import { AskSlotContext, type AskSlot } from "./ask-slot";
 
 // ---------------------------------------------------------------------------
 // Constants — mapped from desktop full-shell.composer.css
@@ -70,6 +67,10 @@ const DICTATION_INLINE_MAX_HEIGHT = 168;
  * which has its own cap above it.
  */
 const DICTATION_BELOW_MAX_HEIGHT = 63;
+/** `composerWrap`'s top padding plus its gap between the card and the shell. */
+const ASK_SLOT_CHROME = 20;
+/** A card capped shorter than this still shows a question and its first option. */
+const ASK_MIN_HEIGHT = 160;
 /** LayoutAnimation config matching the same 350ms critically-damped spring. */
 export const LAYOUT_SPRING = {
   duration: 350,
@@ -255,7 +256,10 @@ export const Composer = memo(function Composer({
   enabled,
   placeholder,
   intervention,
-  hidden = false,
+  compact = false,
+  askCollapsed = false,
+  onExpandAsk,
+  interventionRoom,
   bottomPad,
   draftEmpty,
   hasText,
@@ -289,8 +293,19 @@ export const Composer = memo(function Composer({
   placeholder: string;
   /** Owner-approved intervention pinned immediately above the composer. */
   intervention?: ReactNode;
-  /** The intervention takes the composer's place, e.g. a question card. */
-  hidden?: boolean;
+  /**
+   * A question or secure card is open above the composer: the shell holds its
+   * compact pill shape so the card keeps the room.
+   */
+  compact?: boolean;
+  /** The open card is folded to its one-line row. */
+  askCollapsed?: boolean;
+  onExpandAsk?: () => void;
+  /**
+   * Height between the top bar and the composer's lowest edge (above the
+   * keyboard), which a card above the composer must fit inside.
+   */
+  interventionRoom?: number;
   /** Bottom padding that keeps the shell clear of the home indicator. */
   bottomPad: number;
   draftEmpty: boolean;
@@ -365,16 +380,19 @@ export const Composer = memo(function Composer({
     [expanded, draftStore],
   );
 
-  const dictationInline = isListening && !hasText;
-  const dictationBelow = isListening && hasText;
-  const isExpandedComposed = resolveComposerExpanded({
-    expanded,
-    dictationBelow,
-    dictationInline,
-    modelPickerPinned: Boolean(modelPicker?.pinned),
-    hasAttachments: (attachments?.length ?? 0) > 0,
-    hasQuotes: (quotes?.length ?? 0) > 0,
-  });
+  const dictationCompact = compact && isListening;
+  const dictationInline = !compact && isListening && !hasText;
+  const dictationBelow = !compact && isListening && hasText;
+  const isExpandedComposed =
+    !compact &&
+    resolveComposerExpanded({
+      expanded,
+      dictationBelow,
+      dictationInline,
+      modelPickerPinned: Boolean(modelPicker?.pinned),
+      hasAttachments: (attachments?.length ?? 0) > 0,
+      hasQuotes: (quotes?.length ?? 0) > 0,
+    });
 
   // While dictating, the recording bar's leading slot carries cancel instead.
   // Withheld here rather than only in the inline branch so the other dictation
@@ -444,35 +462,44 @@ export const Composer = memo(function Composer({
     </Pressable>
   ) : null;
 
-  const reveal = useSharedValue(hidden ? 0 : 1);
-  useEffect(() => {
-    reveal.value = hidden
-      ? 0
-      : withSpring(1, { damping: 22, stiffness: 220, mass: 0.9 });
-  }, [hidden, reveal]);
-  const revealStyle = useAnimatedStyle(() => ({
-    opacity: liquidGlassSupported ? 1 : reveal.value,
-    transform: [{ translateY: (1 - reveal.value) * 18 }],
-  }));
-  const contentRevealStyle = useAnimatedStyle(() => ({
-    opacity: liquidGlassSupported ? reveal.value : 1,
-  }));
+  const [shellHeight, setShellHeight] = useState(0);
+  const onShellLayout = useCallback((e: LayoutChangeEvent) => {
+    setShellHeight(Math.round(e.nativeEvent.layout.height));
+  }, []);
+  const askMaxHeight =
+    interventionRoom === undefined || shellHeight === 0
+      ? null
+      : Math.max(
+          ASK_MIN_HEIGHT,
+          interventionRoom - shellHeight - bottomPad - ASK_SLOT_CHROME,
+        );
+  const askSlot = useMemo<AskSlot>(
+    () => ({
+      collapsed: askCollapsed,
+      maxHeight: askMaxHeight,
+      expand: onExpandAsk ?? (() => {}),
+    }),
+    [askCollapsed, askMaxHeight, onExpandAsk],
+  );
 
-  const showAttachmentStrip = (attachments?.length ?? 0) > 0;
+  const showAttachmentStrip = !compact && (attachments?.length ?? 0) > 0;
   const quoteChips = quotes ?? [];
-  const showQuoteStrip = quoteChips.length > 0;
+  const showQuoteStrip = !compact && quoteChips.length > 0;
 
   return (
     <View style={[styles.composerWrap, { paddingBottom: bottomPad }]}>
-      {intervention}
-      <Reanimated.View
-        style={[styles.composerReveal, revealStyle, hidden && styles.composerHidden]}
-        pointerEvents={hidden ? "none" : "box-none"}
+      <AskSlotContext.Provider value={askSlot}>
+        {intervention}
+      </AskSlotContext.Provider>
+      <View
+        style={styles.composerShellSlot}
+        pointerEvents="box-none"
+        onLayout={onShellLayout}
       >
       <Pressable
         accessible={false}
         style={styles.composerFocusTarget}
-        disabled={!enabled || dictationInline || dictationBelow}
+        disabled={!enabled || isListening}
         onPress={() => inputRef.current?.focus()}
       >
         <GlassSurface
@@ -489,7 +516,6 @@ export const Composer = memo(function Composer({
           fallbackColor={colors.surface}
           style={styles.shell}
         >
-          <Reanimated.View style={contentRevealStyle}>
           {showQuoteStrip ? (
             <View style={styles.composerQuoteStrip}>
               {quoteChips.map((quote) => (
@@ -603,7 +629,17 @@ export const Composer = memo(function Composer({
               ))}
             </ScrollView>
           ) : null}
-          {dictationInline ? (
+          {dictationCompact ? (
+            <View style={styles.dictationCompact}>
+              <DictationRecordingBar
+                showTranscript={false}
+                transcriptMaxHeight={0}
+                onCancel={onCancelDictation}
+                onConfirm={onConfirmDictation}
+                onSend={onStopAndSendVoice}
+              />
+            </View>
+          ) : dictationInline ? (
             // Dictation into an empty composer keeps the expanded shape:
             // the live transcript takes the text area and the waveform
             // row sits where the toolbar normally is.
@@ -636,7 +672,7 @@ export const Composer = memo(function Composer({
                   ref={inputRef}
                   draftStore={draftStore}
                   multiline
-                  scrollEnabled={isExpandedComposed}
+                  scrollEnabled={isExpandedComposed || compact}
                   onContentSizeChange={handleContentSizeChange}
                   onFocus={onInputFocus}
                   blurOnSubmit={false}
@@ -756,10 +792,9 @@ export const Composer = memo(function Composer({
               ) : null}
             </View>
           )}
-          </Reanimated.View>
         </GlassSurface>
       </Pressable>
-      </Reanimated.View>
+      </View>
     </View>
   );
 });
@@ -884,8 +919,7 @@ const makeComposerStyles = (colors: Colors) =>
       elevation: 8,
     },
     composerFocusTarget: { width: "100%" },
-    composerHidden: { display: "none" },
-    composerReveal: { alignSelf: "stretch" },
+    composerShellSlot: { alignSelf: "stretch" },
     formPill: {
       alignItems: "center",
       flexDirection: "row",
@@ -977,6 +1011,12 @@ const makeComposerStyles = (colors: Colors) =>
       paddingBottom: 8,
     },
     dictationInlineTranscript: { minHeight: 30 },
+    dictationCompact: {
+      justifyContent: "center",
+      minHeight: 56,
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+    },
     addButton: {
       alignItems: "center",
       backgroundColor: fadeHex(colors.text, 0.06),

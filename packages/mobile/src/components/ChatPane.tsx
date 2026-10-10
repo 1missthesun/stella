@@ -189,6 +189,8 @@ const LIST_TOP_GAP = 84;
 /** How far below the top bar the scrolled-under fade reaches. */
 const TOP_TAPER_TAIL = 24;
 const CATCH_UP_PILL_GAP = 10;
+/** Space kept between the top bar and a question card capped to fit. */
+const ASK_TOP_GAP = 12;
 /** LegendList's data-change tail pin, hoisted so it keeps one identity. */
 const LEGEND_TAIL_SCROLL_AT_END = {
   animated: false,
@@ -701,7 +703,8 @@ export function ChatPane({
     () => carryCompletionQuotes(visibleMessages),
     [visibleMessages],
   );
-  const { questions: openQuestionAsks } = useConversationUserAsks(conversationId);
+  const { questions: openQuestionAsks, secureInput: openSecureAsk } =
+    useConversationUserAsks(conversationId);
   const sessionAskRecords = useConversationUserAskRecords(conversationId);
   const listMessages = useMemo(
     () => withInlineAskRecords(visibleMessages, sessionAskRecords),
@@ -724,7 +727,25 @@ export function ChatPane({
     }
     return hidden;
   }, [listMessages, replyContexts]);
-  const questionActive = openQuestionAsks.length > 0;
+  const askActive = openQuestionAsks.length > 0 || openSecureAsk !== null;
+  const [askCollapsed, setAskCollapsed] = useState(false);
+  const askActiveRef = useRef(askActive);
+  askActiveRef.current = askActive;
+  const askCollapsedRef = useRef(askCollapsed);
+  askCollapsedRef.current = askCollapsed;
+  useEffect(() => {
+    if (!askActive) setAskCollapsed(false);
+  }, [askActive]);
+  const expandAsk = useCallback(() => {
+    tapLight();
+    inputRef.current?.blur();
+    LayoutAnimation.configureNext(LAYOUT_SPRING);
+    setAskCollapsed(false);
+  }, []);
+  const [paneHeight, setPaneHeight] = useState(0);
+  const onPaneLayout = useCallback((e: LayoutChangeEvent) => {
+    setPaneHeight(Math.round(e.nativeEvent.layout.height));
+  }, []);
   // A conversation first observed empty mounts its list on the optimistic
   // send. Our post-send owner already places that row; starting Legend's
   // footer-preserving end bootstrap as well would move it a second time.
@@ -1814,7 +1835,15 @@ export function ChatPane({
   // selection. Reads the ref so the memoized composer keeps one handler.
   const onComposerFocus = useCallback(() => {
     if (selectingMessageIdRef.current != null) stopSelectingMessage();
+    if (askActiveRef.current && !askCollapsedRef.current) {
+      LayoutAnimation.configureNext(LAYOUT_SPRING);
+      setAskCollapsed(true);
+    }
   }, [stopSelectingMessage]);
+  const interventionRoom =
+    paneHeight > 0
+      ? paneHeight - topInset - ASK_TOP_GAP - keyboardExtra
+      : undefined;
 
   const listContentContainerStyle = useMemo(
     () => [
@@ -1875,7 +1904,12 @@ export function ChatPane({
     ],
   );
   return (
-    <View ref={rootRef} collapsable={false} style={styles.screen}>
+    <View
+      ref={rootRef}
+      collapsable={false}
+      style={styles.screen}
+      onLayout={onPaneLayout}
+    >
       <View
         style={styles.viewport}
         onTouchStart={handleViewportTouchStart}
@@ -2091,7 +2125,10 @@ export function ChatPane({
           enabled={composerEnabled}
           placeholder={placeholder}
           intervention={composerIntervention}
-          hidden={questionActive}
+          compact={askActive && !askCollapsed}
+          askCollapsed={askActive && askCollapsed}
+          onExpandAsk={expandAsk}
+          interventionRoom={interventionRoom}
           bottomPad={composerBottomPad}
           draftEmpty={draftEmpty}
           hasText={hasText}

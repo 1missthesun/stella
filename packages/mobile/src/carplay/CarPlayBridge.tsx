@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
+import { loadAiConsent } from "../lib/ai-consent";
+import { hasMobileConfig } from "../config/env";
 import {
   useCloudCanonicalChatThread,
   useCloudConversationAuthority,
@@ -34,13 +36,28 @@ import { ReplyQueue } from "./reply-queue";
 const SEND_START_TIMEOUT_MS = 1500;
 const NOTICE_MS = 4000;
 
-export function CarPlayBridge() {
-  if (Platform.OS !== "ios" || !carPlayNative) return null;
+/**
+ * Mounted beside the app root rather than inside Expo Router: the router's
+ * SafeAreaProvider renders nothing until an on-screen window reports insets,
+ * so a launch from the CarPlay screen alone would never reach this bridge.
+ */
+export function CarPlayRootWrapper({ children }: { children?: ReactNode }) {
+  return (
+    <>
+      {children}
+      <CarPlayBridge />
+    </>
+  );
+}
+
+function CarPlayBridge() {
+  if (Platform.OS !== "ios" || !carPlayNative || !hasMobileConfig) return null;
   return <CarPlayBridgeIOS />;
 }
 
 function CarPlayBridgeIOS() {
   useEffect(() => {
+    void loadAiConsent();
     relaxKeychainAccessibility();
     const subscription = AppState.addEventListener("change", (next) => {
       if (next === "active") relaxKeychainAccessibility();

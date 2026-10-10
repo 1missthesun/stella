@@ -60,7 +60,6 @@ import { ThemeProvider } from "../src/theme/theme-context";
 import { ChatSearchProvider } from "../src/lib/chat-search";
 import { I18nProvider, useT } from "../src/i18n";
 import { ShareIntentHandler } from "../src/lib/share-intent-handler";
-import { CarPlayBridge } from "../src/carplay/CarPlayBridge";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -412,7 +411,6 @@ function AuthenticatedLayout() {
   return (
     <>
       <ShareIntentHandler />
-      <CarPlayBridge />
       <RootStack />
     </>
   );

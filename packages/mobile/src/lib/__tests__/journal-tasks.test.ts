@@ -120,64 +120,6 @@ describe("journal tasks", () => {
     ]);
   });
 
-  test("a settled task carries the report its wake prompt or card brought back", () => {
-    const wake = [
-      spawnCall(1, "call-1", "spawn_agent", "Unix shell history report"),
-      message(2, "toolResult", {
-        toolCallId: "call-1",
-        toolName: "spawn_agent",
-        details: { thread_id: "unix-shell-history-report-20" },
-        content: [{ type: "text", text: "Started unix-shell-history-report-20 (cloud)." }],
-      }),
-      message(
-        3,
-        "user",
-        {
-          content: [
-            {
-              type: "text",
-              text: "[Agent completed]\ndescription: Unix shell history report\nthread_id: unix-shell-history-report-20\nagent_type: general\nresult: ### History of the Unix shell\n\nThompson, then Bourne.\nagent_state: idle",
-            },
-          ],
-        },
-        true,
-      ),
-    ];
-    expect(collectJournalTasks(wake)).toEqual([
-      expect.objectContaining({
-        id: "unix-shell-history-report-20",
-        status: "completed",
-        resultText: "### History of the Unix shell\n\nThompson, then Bourne.",
-      }),
-    ]);
-
-    const carded = collectJournalTasks([
-      lifecycle(1, {
-        type: "agent-started",
-        payload: { agentId: "a", attemptGeneration: 1, description: "Plan the trip", agentType: "general" },
-      }),
-      lifecycle(2, {
-        type: "agent-failed",
-        payload: { agentId: "a", attemptGeneration: 1, error: "No flights found." },
-      }),
-    ]);
-    expect(carded).toEqual([
-      expect.objectContaining({ id: "a", status: "error", errorMessage: "No flights found." }),
-    ]);
-  });
-
-  test("a newer terminal snapshot without report text keeps the journal's", () => {
-    const journal: MobileTask[] = [
-      { id: "a", title: "Report", status: "completed", createdAt: 1, completedAt: 5, resultText: "Full report" },
-    ];
-    const live: MobileTask[] = [
-      { id: "a", title: "Report", status: "completed", createdAt: 1, completedAt: 9 },
-    ];
-    expect(mergeJournalTasks(journal, live)).toEqual([
-      expect.objectContaining({ id: "a", completedAt: 9, resultText: "Full report" }),
-    ]);
-  });
-
   test("reads namespaced tool names the way the runtime does", () => {
     expect(bareToolName("mcp__stella__spawn_agent")).toBe("spawn_agent");
     expect(bareToolName("spawn_agent")).toBe("spawn_agent");

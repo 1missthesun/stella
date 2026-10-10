@@ -2648,6 +2648,14 @@
         "eyebrow": "Direkte forhåndsvisning",
         "openInBrowser": "Åbn i browser",
         "reload": "Genindlæs"
+      },
+      "folder": {
+        "back": "Tilbage",
+        "onDevice": "På {device}",
+        "failedTitle": "Kunne ikke åbne denne mappe",
+        "failedBody": "Indholdet af denne mappe kunne ikke vises.",
+        "emptyTitle": "Denne mappe er tom",
+        "truncated": "Kun de første {count} vises."
       }
     },
     "displayPanel": {

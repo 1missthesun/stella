@@ -2630,6 +2630,14 @@
         "eyebrow": "实时预览",
         "openInBrowser": "在浏览器中打开",
         "reload": "重新加载"
+      },
+      "folder": {
+        "back": "返回",
+        "onDevice": "在 {device} 上",
+        "failedTitle": "无法打开此文件夹",
+        "failedBody": "无法显示此文件夹的内容。",
+        "emptyTitle": "此文件夹为空",
+        "truncated": "仅显示前 {count} 项。"
       }
     },
     "displayPanel": {

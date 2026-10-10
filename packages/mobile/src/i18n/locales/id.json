@@ -2630,6 +2630,14 @@
         "eyebrow": "Pratinjau langsung",
         "openInBrowser": "Buka di browser",
         "reload": "Muat ulang"
+      },
+      "folder": {
+        "back": "Kembali",
+        "onDevice": "Di {device}",
+        "failedTitle": "Folder ini tidak dapat dibuka",
+        "failedBody": "Isi folder ini tidak dapat ditampilkan.",
+        "emptyTitle": "Folder ini kosong",
+        "truncated": "Hanya {count} item pertama yang ditampilkan."
       }
     },
     "displayPanel": {

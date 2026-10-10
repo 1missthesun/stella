@@ -2648,6 +2648,14 @@
         "eyebrow": "Live-Vorschau",
         "openInBrowser": "Im Browser öffnen",
         "reload": "Neu laden"
+      },
+      "folder": {
+        "back": "Zurück",
+        "onDevice": "Auf {device}",
+        "failedTitle": "Dieser Ordner konnte nicht geöffnet werden",
+        "failedBody": "Der Inhalt dieses Ordners konnte nicht angezeigt werden.",
+        "emptyTitle": "Dieser Ordner ist leer",
+        "truncated": "Nur die ersten {count} werden angezeigt."
       }
     },
     "displayPanel": {

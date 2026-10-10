@@ -31,17 +31,35 @@ import {
   viewedArtifact,
 } from "../lib/mobile-artifacts";
 import {
+  assertReadableOnPairedComputer,
   bytesToDataUri,
   bytesToText,
   loadExistingOfficePreviewHtml,
-  loadOfficePreviewHtml,
-  locateDeviceFile,
   readLinkedArtifactFile,
 } from "../lib/desktop-artifact-data";
-import { deviceFileElsewhereMessage } from "@stella/contracts/device-files";
+import {
+  downloadLinkedFile,
+  isLinkedFileMissingError,
+  linkedSourceDeviceId,
+  linkedSourceIsFolder,
+  listLinkedFolder,
+  locateDeviceFile,
+  renderLinkedOfficePreview,
+  resolveLinkedFile,
+  subscribeLinkedFileProgress,
+  type LinkedFileSource,
+} from "../lib/linked-device-files";
+import type {
+  DeviceFolderEntry,
+  DeviceFolderListing,
+} from "@stella/contracts/device-file-reads";
+import { DeviceFolderView, formatFileSize } from "./DeviceFolderView";
+import { stellaFileChatArtifact } from "../lib/stella-file-links";
+import { useT } from "../i18n";
 import { embedRelativeHtmlAssets } from "@stella/contracts/html-relative-assets";
 import { sharePdf } from "../lib/chat-pdf";
 import {
+  createArtifactMediaFile,
   writeArtifactMediaFile,
   type ArtifactMediaFile,
 } from "../lib/artifact-media-file";
@@ -128,9 +146,24 @@ type LoadedArtifact =
   | { kind: "pdf"; uri: string }
   /** A `file://` clip played by the native transport in `AudioPlayerView`. */
   | { kind: "audio"; uri: string }
-  | { kind: "video"; uri: string; posterUri: string | null };
+  | { kind: "video"; uri: string; posterUri: string | null }
+  | {
+      kind: "folder";
+      listing: DeviceFolderListing;
+      deviceId: string | null;
+      deviceName: string;
+    };
 
 const CANVAS_ASSET_MAX_BYTES = 16 * 1024 * 1024;
+const VIEWER_MEDIA_MAX_BYTES = 2 * 1024 * 1024 * 1024;
+
+type FolderTrailEntry = { artifact: ChatArtifact; preferDeviceId: string | null };
+
+const isDevicePath = (filePath: string): boolean =>
+  !/^(?:file|https?|data|content):/i.test(filePath.trim());
+
+const folderName = (filePath: string): string =>
+  filePath.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || filePath;
 
 const escapeHtml = (value: string): string =>
   value
@@ -290,19 +323,38 @@ const sharedImageFile = async (uri: string): Promise<string> => {
 export function ArtifactViewerContent({
   artifact: openedArtifact,
   access,
-  onBack,
+  onBack: hostBack,
   onClose,
   siblings: openedSiblings,
   onNavigate,
 }: ArtifactViewerContentProps) {
+  const t = useT();
+  const [trailState, setTrailState] = useState<{
+    root: ChatArtifact | null;
+    entries: FolderTrailEntry[];
+  }>({ root: null, entries: [] });
+  const trail = useMemo(
+    () => (trailState.root === openedArtifact ? trailState.entries : []),
+    [openedArtifact, trailState],
+  );
+  const top = trail[trail.length - 1] ?? null;
+  const preferDeviceId = top?.preferDeviceId ?? null;
+  const shownArtifact = top?.artifact ?? openedArtifact;
   const artifact = useMemo(
-    () => (openedArtifact ? viewedArtifact(openedArtifact) : null),
-    [openedArtifact],
+    () => (shownArtifact ? viewedArtifact(shownArtifact) : null),
+    [shownArtifact],
   );
   const siblings = useMemo(
-    () => openedSiblings?.map(viewedArtifact),
-    [openedSiblings],
+    () => (trail.length > 0 ? undefined : openedSiblings?.map(viewedArtifact)),
+    [openedSiblings, trail.length],
   );
+  const popTrail = useCallback(() => {
+    setTrailState((current) => ({
+      root: openedArtifact,
+      entries: (current.root === openedArtifact ? current.entries : []).slice(0, -1),
+    }));
+  }, [openedArtifact]);
+  const onBack = trail.length > 0 ? popTrail : hostBack;
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const styles = useMemo(
@@ -313,8 +365,46 @@ export function ArtifactViewerContent({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const title = artifact ? artifactTitle(artifact.payload) : "Artifact";
-  const subtitle = artifact ? artifactSubtitle(artifact.payload) : "";
+  const [progress, setProgress] = useState<{
+    received: number;
+    total: number;
+  } | null>(null);
+  useEffect(() => {
+    setProgress(null);
+    const filePath = artifact ? artifactPrimaryFilePath(artifact.payload) : null;
+    if (!filePath) return;
+    return subscribeLinkedFileProgress(filePath, (received, total) =>
+      setProgress({ received, total }),
+    );
+  }, [artifact]);
+
+  const openFolderEntry = useCallback(
+    (entry: DeviceFolderEntry) => {
+      if (!artifact || loaded?.kind !== "folder") return;
+      tapLight();
+      const child = stellaFileChatArtifact(entry.path, artifact.conversationId);
+      setTrailState((current) => ({
+        root: openedArtifact,
+        entries: [
+          ...(current.root === openedArtifact ? current.entries : []),
+          { artifact: child, preferDeviceId: loaded.deviceId },
+        ],
+      }));
+    },
+    [artifact, loaded, openedArtifact],
+  );
+
+  const shownFolder = loaded?.kind === "folder" ? loaded : null;
+  const title = shownFolder
+    ? folderName(shownFolder.listing.path)
+    : artifact
+      ? artifactTitle(artifact.payload)
+      : "Artifact";
+  const subtitle = shownFolder
+    ? t("shell.display.folder.onDevice", { device: shownFolder.deviceName })
+    : artifact
+      ? artifactSubtitle(artifact.payload)
+      : "";
 
   const neighbours = useMemo(
     () => imageNeighbours(artifact, siblings),
@@ -507,43 +597,74 @@ export function ArtifactViewerContent({
           ),
         };
       }
+      const filePath = artifactPrimaryFilePath(payload);
+      if (!filePath) {
+        throw new Error("This artifact does not have a mobile preview yet.");
+      }
+      let source: LinkedFileSource | null = null;
+      if (isDevicePath(filePath)) {
+        assertReadableOnPairedComputer(filePath);
+        source = await resolveLinkedFile(access, artifact.conversationId, filePath, {
+          signal: controller.signal,
+          preferDeviceId,
+        }).catch((caught: unknown) => {
+          throw isLinkedFileMissingError(caught)
+            ? new Error("This file is no longer available.")
+            : caught;
+        });
+        if (linkedSourceIsFolder(source)) {
+          return {
+            kind: "folder" as const,
+            listing: await listLinkedFolder(
+              source,
+              artifact.conversationId,
+              filePath,
+              controller.signal,
+            ),
+            deviceId: linkedSourceDeviceId(source),
+            deviceName:
+              source.kind === "device"
+                ? source.target.deviceName
+                : source.deviceName,
+          };
+        }
+      }
       if (
         payload.kind === "file-artifact" &&
         payload.artifactKind !== "delimited-table"
       ) {
-        const located = await locateDeviceFile(payload.filePath);
-        if (
-          located?.drivePath
-        ) {
+        if (!source) {
+          throw new Error("This artifact does not have a mobile preview yet.");
+        }
+        if (source.kind === "drive") {
+          return {
+            kind: "url" as const,
+            uri: await resolveCloudDriveFileUri(source.drivePath),
+          };
+        }
+        try {
+          return {
+            kind: "html-document" as const,
+            html: prepareDocumentHtml(
+              await renderLinkedOfficePreview(
+                source,
+                artifact.conversationId,
+                filePath,
+                controller.signal,
+              ),
+            ),
+          };
+        } catch (caught) {
+          if (controller.signal.aborted) throw caught;
+          const located = await locateDeviceFile(filePath);
+          if (!located?.drivePath) throw caught;
           return {
             kind: "url" as const,
             uri: await resolveCloudDriveFileUri(located.drivePath),
           };
         }
-        if (!access) {
-          throw new Error(
-            located
-              ? deviceFileElsewhereMessage(located.deviceName)
-              : "Pair this phone with your desktop again.",
-          );
-        }
-        return {
-          kind: "html-document" as const,
-          html: prepareDocumentHtml(
-            await loadOfficePreviewHtml(
-              access,
-              artifact.conversationId,
-              payload.filePath,
-              controller.signal,
-            ),
-          ),
-        };
       }
 
-      const filePath = artifactPrimaryFilePath(payload);
-      if (!filePath) {
-        throw new Error("This artifact does not have a mobile preview yet.");
-      }
       if (payload.kind === "media" && payload.asset.kind === "video") {
         // The chat row's preview already pulled this clip onto the phone and
         // made its poster; play that copy rather than reading it again.
@@ -562,11 +683,44 @@ export function ArtifactViewerContent({
           };
         }
       }
+      const playable =
+        payload.kind === "pdf" ||
+        (payload.kind === "media" &&
+          (payload.asset.kind === "audio" ||
+            payload.asset.kind === "image" ||
+            payload.asset.kind === "video"));
+      if (playable && source) {
+        const media = createArtifactMediaFile(
+          source.kind === "device"
+            ? (source.stat?.mimeType ?? "application/octet-stream")
+            : source.contentType,
+          filePath,
+        );
+        if (cancelled) media.remove();
+        else materialized = media;
+        await downloadLinkedFile(
+          source,
+          artifact.conversationId,
+          filePath,
+          media.file,
+          { signal: controller.signal, maxBytes: VIEWER_MEDIA_MAX_BYTES },
+        );
+        if (payload.kind === "pdf") return { kind: "pdf" as const, uri: media.uri };
+        if (payload.kind === "media" && payload.asset.kind === "audio") {
+          return { kind: "audio" as const, uri: media.uri };
+        }
+        if (payload.kind === "media" && payload.asset.kind === "image") {
+          return { kind: "image" as const, uri: media.uri };
+        }
+        return { kind: "video" as const, uri: media.uri, posterUri: null };
+      }
+      const holderId = source ? linkedSourceDeviceId(source) : null;
       const result = await readLinkedArtifactFile(
         access,
         artifact.conversationId,
         filePath,
         controller.signal,
+        { preferDeviceId },
       );
       if (result.missing) throw new Error("This file is no longer available.");
 
@@ -580,6 +734,7 @@ export function ArtifactViewerContent({
               artifact.conversationId,
               path,
               controller.signal,
+              { preferDeviceId: holderId, maxBytes: CANVAS_ASSET_MAX_BYTES },
             );
             if (asset.missing || asset.sizeBytes > CANVAS_ASSET_MAX_BYTES) {
               return null;
@@ -667,7 +822,7 @@ export function ArtifactViewerContent({
       controller.abort();
       materialized?.remove();
     };
-  }, [access, artifact, colors]);
+  }, [access, artifact, colors, preferDeviceId]);
 
   return (
     <View style={styles.root}>
@@ -721,7 +876,7 @@ export function ArtifactViewerContent({
             )}
           </Pressable>
         ) : null}
-        {onClose && !onBack ? (
+        {onClose && !hostBack ? (
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
@@ -748,10 +903,24 @@ export function ArtifactViewerContent({
               </View>
             </SwipeArea>
           ) : loading && isVideo ? (
-            <PosterCover posterUri={pendingPoster} colors={colors} />
+            <View style={styles.body}>
+              <PosterCover posterUri={pendingPoster} colors={colors} />
+              {progress ? (
+                <View pointerEvents="none" style={styles.progressOverlay}>
+                  <Text style={styles.progressPill}>
+                    {`${formatFileSize(progress.received)} / ${formatFileSize(progress.total)}`}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           ) : loading ? (
             <View style={styles.center}>
               <ActivityIndicator color={colors.textMuted} />
+              {progress ? (
+                <Text style={styles.progress}>
+                  {`${formatFileSize(progress.received)} / ${formatFileSize(progress.total)}`}
+                </Text>
+              ) : null}
             </View>
           ) : error ? (
             <View style={styles.center}>
@@ -781,6 +950,12 @@ export function ArtifactViewerContent({
               // Documents render on their own paper-white surface; never let
               // Android WebView force-darken them into unreadability.
               forceDarkOn={false}
+            />
+          ) : loaded?.kind === "folder" ? (
+            <DeviceFolderView
+              listing={loaded.listing}
+              colors={colors}
+              onOpen={openFolderEntry}
             />
           ) : loaded?.kind === "pdf" ? (
             // Loading the file at the top level (rather than in an iframe)
@@ -930,6 +1105,29 @@ const makeStyles = (colors: ReturnType<typeof useColors>, topInset: number) =>
     },
     scrollContent: {
       padding: 18,
+    },
+    progress: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.regular,
+      fontSize: 12,
+      marginTop: 10,
+    },
+    progressOverlay: {
+      alignItems: "center",
+      bottom: 24,
+      left: 0,
+      position: "absolute",
+      right: 0,
+    },
+    progressPill: {
+      backgroundColor: colors.overlay,
+      borderRadius: 10,
+      color: "#ffffff",
+      fontFamily: fonts.sans.medium,
+      fontSize: 12,
+      overflow: "hidden",
+      paddingHorizontal: 10,
+      paddingVertical: 4,
     },
     monospace: {
       color: colors.text,

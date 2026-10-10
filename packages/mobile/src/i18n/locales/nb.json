@@ -2648,6 +2648,14 @@
         "eyebrow": "Direkte forhåndsvisning",
         "openInBrowser": "Åpne i nettleser",
         "reload": "Last inn på nytt"
+      },
+      "folder": {
+        "back": "Tilbake",
+        "onDevice": "På {device}",
+        "failedTitle": "Kunne ikke åpne denne mappen",
+        "failedBody": "Innholdet i denne mappen kunne ikke vises.",
+        "emptyTitle": "Denne mappen er tom",
+        "truncated": "Bare de første {count} vises."
       }
     },
     "displayPanel": {

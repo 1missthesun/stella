@@ -2664,6 +2664,14 @@
         "eyebrow": "תצוגה מקדימה חיה",
         "openInBrowser": "פתח בדפדפן",
         "reload": "טען מחדש"
+      },
+      "folder": {
+        "back": "חזרה",
+        "onDevice": "ב-{device}",
+        "failedTitle": "לא ניתן לפתוח את התיקייה הזו",
+        "failedBody": "לא ניתן להציג את תוכן התיקייה הזו.",
+        "emptyTitle": "התיקייה הזו ריקה",
+        "truncated": "מוצגים רק {count} הראשונים."
       }
     },
     "displayPanel": {

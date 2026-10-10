@@ -3,6 +3,7 @@ import type {
   EngineProvider,
   EngineSettings,
 } from "@stella/contracts/backend/engines";
+import type { ProviderSettings } from "@stella/contracts/backend/providers";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 
@@ -11,6 +12,12 @@ export type CloudEngineSettings = EngineSettings;
 /** The account's live engine settings; undefined while loading or skipped. */
 export const useCloudEngines = (enabled: boolean): EngineSettings | undefined =>
   useBackendValue("engines.get", enabled ? {} : "skip");
+
+/** Provider keys saved to the account; undefined while loading or skipped. */
+export const useAccountProviders = (
+  enabled: boolean,
+): ProviderSettings | undefined =>
+  useBackendValue("providers.get", enabled ? {} : "skip");
 
 export const cloudEnginesApi = {
   disconnect: (provider: EngineProvider, accountId?: string, options?: { forget?: boolean }) =>

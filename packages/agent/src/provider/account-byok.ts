@@ -127,13 +127,29 @@ export const toByokRelayRequest = async (
   });
 };
 
-/** One account provider's models as a pi-ai provider whose requests go through the BYOK lane. */
+/** The registry id a computer gives an account provider, beside its own key's provider. */
+export const ACCOUNT_REGISTRY_PREFIX = "account-key:";
+
+export const accountRegistryId = (providerId: string): string => `${ACCOUNT_REGISTRY_PREFIX}${providerId}`;
+
+export const accountProviderOfRegistryId = (registryId: string): string | undefined =>
+  registryId.startsWith(ACCOUNT_REGISTRY_PREFIX) ? registryId.slice(ACCOUNT_REGISTRY_PREFIX.length) : undefined;
+
+/**
+ * One account provider's models as a pi-ai provider whose requests go
+ * through the BYOK lane. `registryId` registers it beside a provider of the
+ * same id (a computer's own key); requests still name the real provider.
+ */
 export function accountByokProvider(options: {
   providerId: string;
+  registryId?: string;
   models: readonly Model<Api>[];
   transport: AccountByokTransport;
 }): Provider {
   const { providerId, transport } = options;
+  const registryId = options.registryId ?? providerId;
+  const asProvider = <M extends Model<Api>>(model: M): M =>
+    model.provider === providerId ? model : { ...model, provider: providerId };
   const routed = (sessionId: string | undefined): typeof fetch =>
     (async (input: string | URL | Request, init?: RequestInit) => {
       const request = input instanceof Request ? new Request(input, init) : new Request(String(input), init);
@@ -144,12 +160,12 @@ export function accountByokProvider(options: {
     }) as typeof fetch;
   const withFetch = (streams: ProviderStreams): ProviderStreams => ({
     stream: (model, context, streamOptions) =>
-      streams.stream(model, context, { ...streamOptions, fetch: routed(streamOptions?.sessionId) }),
+      streams.stream(asProvider(model), context, { ...streamOptions, fetch: routed(streamOptions?.sessionId) }),
     streamSimple: (model, context, streamOptions) =>
-      streams.streamSimple(model, context, { ...streamOptions, fetch: routed(streamOptions?.sessionId) }),
+      streams.streamSimple(asProvider(model), context, { ...streamOptions, fetch: routed(streamOptions?.sessionId) }),
   });
   return createProvider({
-    id: providerId,
+    id: registryId,
     name: providerId,
     auth: {
       apiKey: {
@@ -157,7 +173,7 @@ export function accountByokProvider(options: {
         resolve: async () => ({ auth: { apiKey: GATEWAY_BYOK_PLACEHOLDER_KEY }, source: "Stella account" }),
       },
     },
-    models: [...options.models],
+    models: options.models.map((model) => (model.provider === registryId ? model : { ...model, provider: registryId })),
     api: {
       "anthropic-messages": withFetch(anthropicMessagesApi()),
       "openai-completions": withFetch(openAICompletionsApi()),

@@ -186,7 +186,7 @@ function CardBody({
         </View>
       ) : null}
 
-      {engine !== "stella" ? (
+      {engine !== "stella" && engine !== "provider" ? (
         <View style={styles.accounts}>
           <EngineAccountSection provider={engine} embedded />
         </View>

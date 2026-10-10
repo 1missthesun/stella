@@ -323,6 +323,7 @@ export const useConversation = (
   const dispatchByTurnRef = useRef(new Map<string, string>());
   const preparingAttachmentSendRef = useRef(false);
   const cloudEngine = useCloudEngines(isCloudConversationReady);
+  const cloudSelection = cloudEngine?.selection ?? cloudEngine?.execution;
   const localExecution = useSyncExternalStore(
     subscribeCloudExecutionSelection,
     getCloudExecutionSelectionSnapshot,
@@ -338,8 +339,8 @@ export const useConversation = (
       : null;
 
   useEffect(() => {
-    reconcileCloudExecutionSelection(cloudEngine?.execution);
-  }, [cloudEngine?.execution, localExecution]);
+    reconcileCloudExecutionSelection(cloudSelection);
+  }, [cloudSelection, localExecution]);
 
   useEffect(() => {
     if (!authority) return;
@@ -680,7 +681,7 @@ export const useConversation = (
       const clientMsgId = newClientMsgId();
       const attachments = cloudAttachmentsStore.getSnapshot();
       const selectedExecution =
-        getCloudExecutionSelectionSnapshot() ?? cloudEngine?.execution ?? null;
+        getCloudExecutionSelectionSnapshot() ?? cloudSelection ?? null;
       if (!authority) return;
       // Desktop: a send with no conversation open starts one, and the id is
       // ours to pick. Frozen into the submission so every retry addresses
@@ -715,7 +716,7 @@ export const useConversation = (
     },
     [
       authority,
-      cloudEngine?.execution,
+      cloudSelection,
       conversationId,
       decoratePrompt,
       dispatch,

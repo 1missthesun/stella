@@ -78,6 +78,13 @@ import {
   type DirectModelResolver,
   type StellaCredentialAccess,
 } from "../provider/byok.ts";
+import {
+  accountByokProvider,
+  accountProviderModel,
+  accountProviderOfRegistryId,
+  accountRegistryId,
+  isAccountProviderId,
+} from "../provider/account-byok.ts";
 import { openBunSqliteStorage } from "../storage/bun-sqlite.ts";
 import { isDeviceToolName } from "@stella/contracts/turn-plane/device-tools";
 import { deviceRefusal } from "../stella/execution.ts";
@@ -469,13 +476,54 @@ export function desktopChats(options: DesktopChatsOptions) {
     models.setProvider(stellaProvider({ access, models: all.flat() }));
   };
 
-  /** The orchestrator's model for the user's pick: a Stella alias, or a model on the user's own key. */
+  /** Whether this computer holds its own key (or sign-in) for a provider. */
+  const hasOwnKey = async (provider: string, modelId: string): Promise<boolean> => {
+    const stored =
+      (await options.credentials?.apiKey(provider))?.trim() || (await options.credentials?.oauthToken(provider))?.trim();
+    if (stored) return true;
+    const route = options.resolveDirectModel?.(`${provider}/${modelId}`);
+    if (!route || "error" in route) return false;
+    return route.credentialless === true || Boolean((await route.getApiKey())?.trim());
+  };
+
+  /** Models on the account's keys this computer runs, by provider. */
+  const accountModels = new Map<string, NonNullable<ReturnType<typeof accountProviderModel>>[]>();
+  /**
+   * A model on a provider key saved to the account, for a provider this
+   * computer has no key of its own for: its requests go through the model
+   * gateway's BYOK lane on this computer's session, and the key stays on
+   * the server.
+   */
+  const ensureAccountModel = async (provider: string, modelId: string): Promise<ModelRef> => {
+    const { access, gatewayOrigin } = await ensureGateway();
+    const model = accountProviderModel(provider, modelId);
+    if (!model) throw new Error(`${provider}/${modelId} isn't a model Stella can run on your account's key.`);
+    const entries = accountModels.get(provider) ?? [];
+    if (!entries.some((entry) => entry.id === model.id)) {
+      entries.push(model);
+      accountModels.set(provider, entries);
+      models.setProvider(
+        accountByokProvider({
+          providerId: provider,
+          registryId: accountRegistryId(provider),
+          models: entries,
+          transport: { gatewayOrigin, fetch: (request) => access.fetch(request) },
+        }),
+      );
+    }
+    return { provider: accountRegistryId(provider), modelId: model.id };
+  };
+
+  /** The orchestrator's model for the user's pick: a Stella alias, or a model on the user's own key (or the account's). */
   const pickedModel = async (): Promise<ModelRef> => {
     const pick = parseModelPick(options.stellaModel?.());
     if (!pick || pick.kind === "stella") {
       const alias = pick?.alias ?? STELLA_DEFAULT_ALIAS;
       await ensureProvider(alias);
       return stellaModelRef("orchestrator", alias);
+    }
+    if (pick.kind === "direct" && isAccountProviderId(pick.provider) && !(await hasOwnKey(pick.provider, pick.modelId))) {
+      return await ensureAccountModel(pick.provider, pick.modelId);
     }
     const ref = byok.ensure(pick);
     if ("error" in ref) throw new Error(ref.error);
@@ -484,7 +532,9 @@ export function desktopChats(options: DesktopChatsOptions) {
 
   /** A model a conversation or one of its agents is on, ready to run (after a restart too). */
   const ensureModel = async (ref: ModelRef | undefined): Promise<void> => {
-    if (!ref || ref.provider === STELLA_PROVIDER_ID) await ensureProvider(aliasOf(ref));
+    const accountProvider = ref ? accountProviderOfRegistryId(ref.provider) : undefined;
+    if (ref && accountProvider) await ensureAccountModel(accountProvider, ref.modelId);
+    else if (!ref || ref.provider === STELLA_PROVIDER_ID) await ensureProvider(aliasOf(ref));
     else byok.restore(ref);
   };
 
@@ -735,19 +785,27 @@ export function desktopChats(options: DesktopChatsOptions) {
         const rootModel = (await root.agent(context)).model;
         /** The Stella aliases the orchestrator and its unfinished agents run on. */
         const aliases = new Set<string>();
+        /** Models on the account's keys, which need the gateway as Stella's aliases do. */
+        const accountRefs: ModelRef[] = [];
         for (const agent of Object.values((await harness.snapshot(StellaAgentsDoc, root.id, context))?.agents ?? {})) {
           if (agent.remote) continue;
           const model = (await (await harness.conversation(agent.conversationId as ConversationId, context))?.agent(context))?.model;
-          if (model && model.provider !== STELLA_PROVIDER_ID) byok.restore(model);
+          if (model && accountProviderOfRegistryId(model.provider)) accountRefs.push(model);
+          else if (model && model.provider !== STELLA_PROVIDER_ID) byok.restore(model);
           // A finished agent's alias is registered when it is next messaged.
           else if (model && (await harness.snapshot(LiveDoc, agent.conversationId as ConversationId, context))?.run) {
             aliases.add(aliasOf(model));
           }
         }
-        if (rootModel && rootModel.provider !== STELLA_PROVIDER_ID) byok.restore(rootModel);
+        if (rootModel && accountProviderOfRegistryId(rootModel.provider)) accountRefs.push(rootModel);
+        else if (rootModel && rootModel.provider !== STELLA_PROVIDER_ID) byok.restore(rootModel);
         else aliases.add(aliasOf(rootModel));
-        if (aliases.size === 0) void harness.resume();
-        else void Promise.all([...aliases].map((alias) => waitForProvider(alias))).then(() => harness.resume());
+        if (aliases.size === 0 && accountRefs.length === 0) void harness.resume();
+        else
+          void Promise.all([
+            ...[...aliases].map((alias) => waitForProvider(alias)),
+            ...accountRefs.map((ref) => ensureModel(ref).catch((error: unknown) => options.report(error))),
+          ]).then(() => harness.resume());
         const journal = options.journal?.(conversationId);
         const mirror = journal
           ? await journalMirror({

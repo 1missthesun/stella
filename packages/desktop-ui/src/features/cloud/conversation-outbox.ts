@@ -1,4 +1,5 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import type { CloudAttachment } from "./cloud-composer-store";
 import type { DesktopExecutionTarget } from "../execution-placement/execution-target-store";
@@ -114,8 +115,10 @@ const isExecution = (value: unknown): value is CloudExecutionSelection => {
   const candidate = value as Record<string, unknown>;
   return (
     isBoundedString(candidate.engine, 32) &&
-    EXECUTION_ENGINES.has(candidate.engine) &&
-    candidate.provider === candidate.engine &&
+    (EXECUTION_ENGINES.has(candidate.engine)
+      ? candidate.provider === candidate.engine
+      : candidate.engine === "provider" &&
+        isAccountProviderId(candidate.provider)) &&
     isBoundedString(candidate.model, 192) &&
     isBoundedString(candidate.reasoningEffort, 32) &&
     REASONING_EFFORTS.has(candidate.reasoningEffort)

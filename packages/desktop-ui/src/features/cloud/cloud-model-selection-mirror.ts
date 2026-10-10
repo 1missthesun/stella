@@ -34,16 +34,22 @@ export const sameCloudExecution = (
   right: CloudExecutionSelection,
 ): boolean =>
   left.engine === right.engine &&
+  left.provider === right.provider &&
   left.model === right.model &&
-  // Managed Stella routes take their effort from the backend.
-  (left.engine === "stella" || left.reasoningEffort === right.reasoningEffort);
+  // Managed Stella routes take their effort from the backend; a provider
+  // model keeps the effort its picker chose (the desktop has no field for it).
+  (left.engine === "stella" ||
+    left.engine === "provider" ||
+    left.reasoningEffort === right.reasoningEffort);
 
 /**
  * The server selection equivalent to the local preferences, or null when the
- * local choice has no server form (a bring-your-own-key provider model).
+ * local choice has no server form: a model on a provider whose key is only
+ * on this computer (`accountProviders` lists the ones saved to the account).
  */
 export function cloudExecutionFromLocal(
   preferences: MirroredModelPreferences,
+  accountProviders: ReadonlySet<string> = new Set(),
 ): CloudExecutionSelection | null {
   switch (preferences.agentRuntimeEngine) {
     case "claude_code_local":
@@ -73,7 +79,18 @@ export function cloudExecutionFromLocal(
           reasoningEffort: "default",
         };
       }
-      if (!model.startsWith("stella/")) return null;
+      if (!model.startsWith("stella/")) {
+        const slash = model.indexOf("/");
+        const provider = slash > 0 ? model.slice(0, slash) : "";
+        const modelId = slash > 0 ? model.slice(slash + 1).trim() : "";
+        if (!modelId || !accountProviders.has(provider)) return null;
+        return {
+          engine: "provider",
+          provider,
+          model: modelId,
+          reasoningEffort: "default",
+        };
+      }
       return {
         engine: "stella",
         provider: "stella",
@@ -93,6 +110,15 @@ export function localPatchForCloudExecution(
     return buildModelSelectionPatch(
       preferences,
       execution.model === STELLA_DEFAULT_MODEL ? "" : execution.model,
+      { assistant: true, configurableAgentKeys: [] },
+    );
+  }
+  if (execution.engine === "provider") {
+    // The runtime runs it on this computer's own key, or on the account's
+    // through the model gateway when it has none.
+    return buildModelSelectionPatch(
+      preferences,
+      `${execution.provider}/${execution.model}`,
       { assistant: true, configurableAgentKeys: [] },
     );
   }

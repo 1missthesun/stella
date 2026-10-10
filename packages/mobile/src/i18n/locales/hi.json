@@ -975,22 +975,6 @@
       "missingConfigBody": "ऐप शुरू करने से पहले EXPO_PUBLIC_STELLA_BACKEND_URL सेट करें।",
       "missingConfigTitle": "मोबाइल एनवायरनमेंट वेरिएबल जोड़ें"
     },
-    "carPlayDiagnostics": {
-      "clear": "साफ़ करें",
-      "clearLabel": "डायग्नोस्टिक्स साफ़ करें",
-      "clipboardEmpty": "(कोई CarPlay डायग्नोस्टिक्स दर्ज नहीं है)",
-      "copied": "कॉपी हो गया ✓",
-      "copyAll": "सब कॉपी करें",
-      "copyAllLabel": "सारे डायग्नोस्टिक्स कॉपी करें",
-      "empty": "अभी तक कोई CarPlay डायग्नोस्टिक्स दर्ज नहीं हुआ। एक बार CarPlay से कनेक्ट करें, फिर यहाँ वापस आएँ।",
-      "refresh": "रिफ़्रेश",
-      "refreshLabel": "डायग्नोस्टिक्स रिफ़्रेश करें",
-      "subtitle": {
-        "one": "CarPlay कनेक्शन का ब्यौरा ({count} पंक्ति, सबसे नई पहले)। गाड़ी में कुछ गड़बड़ हो तो इसे कॉपी करके भेजें।",
-        "other": "CarPlay कनेक्शन का ब्यौरा ({count} पंक्तियाँ, सबसे नई पहले)। गाड़ी में कुछ गड़बड़ हो तो इसे कॉपी करके भेजें।"
-      },
-      "title": "CarPlay डायग्नोस्टिक्स"
-    },
     "chat": {
       "composerPlaceholder": "Stella को संदेश भेजें",
       "createFailed": "चैट नहीं बनाई जा सकी। कृपया फिर से कोशिश करें।",
@@ -1366,7 +1350,6 @@
         "relative": "सापेक्ष",
         "strong": "गहरा"
       },
-      "carPlayDiagnostics": "CarPlay डायग्नोस्टिक्स",
       "chatStorage": {
         "description": "अपनी चैट सभी डिवाइस पर देखें। बंद करने पर चैट इतिहास सिर्फ़ इसी डिवाइस पर अलग से रहेगा। दोबारा चालू करने पर वे चैट अपलोड नहीं होंगी। AI प्रदाता फिर भी आपके संदेश प्रोसेस करते हैं।"
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "ईमेल छिपाएँ",
       "loadingSession": "सेशन लोड हो रहा है…",
       "notificationsSection": "सूचनाएँ",
-      "openCarPlayDiagnosticsLabel": "CarPlay डायग्नोस्टिक्स खोलें",
       "openPrivacyLabel": "गोपनीयता नीति खोलें",
       "openTermsLabel": "सेवा की शर्तें खोलें",
       "paired": {

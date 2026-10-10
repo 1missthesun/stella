@@ -18,7 +18,11 @@ export const refreshRecordingAudioSession = (
 export const releaseRecordingAudioSession = (lease: RecordingAudioLease) =>
   coordinator.releaseRecording(lease);
 
-export const configurePlaybackAudioSession = () =>
-  coordinator.configurePlayback();
+export const configurePlaybackAudioSession = (options?: { background?: boolean }) =>
+  coordinator.configurePlayback(
+    options?.background
+      ? { shouldPlayInBackground: true, interruptionMode: "duckOthers" }
+      : {},
+  );
 
 export type { RecordingAudioLease } from "./audio-session-coordinator";

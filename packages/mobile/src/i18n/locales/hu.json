@@ -975,22 +975,6 @@
       "missingConfigBody": "Állítsd be az EXPO_PUBLIC_STELLA_BACKEND_URL értékét az alkalmazás indítása előtt.",
       "missingConfigTitle": "Add meg a mobil környezeti változóit"
     },
-    "carPlayDiagnostics": {
-      "clear": "Törlés",
-      "clearLabel": "Diagnosztika törlése",
-      "clipboardEmpty": "(nincs rögzített CarPlay-diagnosztika)",
-      "copied": "Másolva ✓",
-      "copyAll": "Összes másolása",
-      "copyAllLabel": "Összes diagnosztikai adat másolása",
-      "empty": "Még nincs rögzített CarPlay-diagnosztika. Csatlakozz egyszer a CarPlayhez, majd gyere vissza ide.",
-      "refresh": "Frissítés",
-      "refreshLabel": "Diagnosztika frissítése",
-      "subtitle": {
-        "one": "Nyomok a CarPlay-kapcsolatból ({count} sor, a legújabb elöl). Másold ki és küldd el ezeket, ha valami rosszul működik az autóban.",
-        "other": "Nyomok a CarPlay-kapcsolatból ({count} sor, a legújabb elöl). Másold ki és küldd el ezeket, ha valami rosszul működik az autóban."
-      },
-      "title": "CarPlay-diagnosztika"
-    },
     "chat": {
       "composerPlaceholder": "Írj a Stellának",
       "createFailed": "Nem sikerült létrehozni a csevegést. Próbáld újra.",
@@ -1366,7 +1350,6 @@
         "relative": "Relatív",
         "strong": "Erős"
       },
-      "carPlayDiagnostics": "CarPlay-diagnosztika",
       "chatStorage": {
         "description": "Érd el a beszélgetéseidet minden eszközödön. Kikapcsolva külön beszélgetési előzmény marad csak ezen az eszközön. Visszakapcsoláskor ezek a beszélgetések nem töltődnek fel. Az MI-szolgáltatók továbbra is feldolgozzák az üzeneteidet."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "E-mail elrejtése",
       "loadingSession": "Munkamenet betöltése…",
       "notificationsSection": "Értesítések",
-      "openCarPlayDiagnosticsLabel": "CarPlay-diagnosztika megnyitása",
       "openPrivacyLabel": "Adatvédelmi szabályzat megnyitása",
       "openTermsLabel": "Felhasználási feltételek megnyitása",
       "paired": {

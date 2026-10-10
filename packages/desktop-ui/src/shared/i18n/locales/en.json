@@ -975,22 +975,6 @@
       "missingConfigBody": "Set EXPO_PUBLIC_STELLA_BACKEND_URL before starting the app.",
       "missingConfigTitle": "Add mobile environment variables"
     },
-    "carPlayDiagnostics": {
-      "clear": "Clear",
-      "clearLabel": "Clear diagnostics",
-      "clipboardEmpty": "(no CarPlay diagnostics recorded)",
-      "copied": "Copied ✓",
-      "copyAll": "Copy all",
-      "copyAllLabel": "Copy all diagnostics",
-      "empty": "No CarPlay diagnostics recorded yet. Connect to CarPlay once, then come back here.",
-      "refresh": "Refresh",
-      "refreshLabel": "Refresh diagnostics",
-      "subtitle": {
-        "one": "Breadcrumbs from the CarPlay connection ({count} line, newest first). Copy and send these after anything misbehaves in the car.",
-        "other": "Breadcrumbs from the CarPlay connection ({count} lines, newest first). Copy and send these after anything misbehaves in the car."
-      },
-      "title": "CarPlay diagnostics"
-    },
     "chat": {
       "composerPlaceholder": "Message Stella",
       "createFailed": "Could not create a chat. Please try again.",
@@ -1366,7 +1350,6 @@
         "relative": "Relative",
         "strong": "Strong"
       },
-      "carPlayDiagnostics": "CarPlay diagnostics",
       "chatStorage": {
         "description": "Access your chats across devices. Turn off to keep a separate chat history only on this device. Switching back won’t upload those chats. AI providers still process your messages."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "Hide email",
       "loadingSession": "Loading session…",
       "notificationsSection": "Notifications",
-      "openCarPlayDiagnosticsLabel": "Open CarPlay diagnostics",
       "openPrivacyLabel": "Open Privacy Policy",
       "openTermsLabel": "Open Terms of Service",
       "paired": {

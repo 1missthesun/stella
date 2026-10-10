@@ -984,23 +984,6 @@
       "missingConfigBody": "Définissez EXPO_PUBLIC_STELLA_BACKEND_URL avant de lancer l'app.",
       "missingConfigTitle": "Ajoutez les variables d'environnement mobiles"
     },
-    "carPlayDiagnostics": {
-      "clear": "Effacer",
-      "clearLabel": "Effacer les diagnostics",
-      "clipboardEmpty": "(aucun diagnostic CarPlay enregistré)",
-      "copied": "Copié ✓",
-      "copyAll": "Tout copier",
-      "copyAllLabel": "Copier tous les diagnostics",
-      "empty": "Aucun diagnostic CarPlay enregistré. Connectez-vous une fois à CarPlay, puis revenez ici.",
-      "refresh": "Actualiser",
-      "refreshLabel": "Actualiser les diagnostics",
-      "subtitle": {
-        "many": "Traces de la connexion CarPlay ({count} de lignes, les plus récentes en premier). Copiez-les et envoyez-les nous si quelque chose se passe mal en voiture.",
-        "one": "Traces de la connexion CarPlay ({count} ligne, la plus récente en premier). Copiez-les et envoyez-les nous si quelque chose se passe mal en voiture.",
-        "other": "Traces de la connexion CarPlay ({count} lignes, les plus récentes en premier). Copiez-les et envoyez-les nous si quelque chose se passe mal en voiture."
-      },
-      "title": "Diagnostics CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "Écrire à Stella",
       "createFailed": "Impossible de créer un chat. Veuillez réessayer.",
@@ -1376,7 +1359,6 @@
         "relative": "Relative",
         "strong": "Intense"
       },
-      "carPlayDiagnostics": "Diagnostics CarPlay",
       "chatStorage": {
         "description": "Accédez à vos conversations sur tous vos appareils. Désactivez cette option pour conserver un historique distinct uniquement sur cet appareil. En réactivant, ces conversations ne seront pas envoyées. Les fournisseurs d'IA traitent toujours vos messages."
       },
@@ -1406,7 +1388,6 @@
       "hideEmailLabel": "Masquer l'e-mail",
       "loadingSession": "Chargement de la session…",
       "notificationsSection": "Notifications",
-      "openCarPlayDiagnosticsLabel": "Ouvrir les diagnostics CarPlay",
       "openPrivacyLabel": "Ouvrir la Politique de confidentialité",
       "openTermsLabel": "Ouvrir les Conditions d'utilisation",
       "paired": {

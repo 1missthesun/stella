@@ -966,21 +966,6 @@
       "missingConfigBody": "Đặt EXPO_PUBLIC_STELLA_BACKEND_URL trước khi khởi động ứng dụng.",
       "missingConfigTitle": "Thêm biến môi trường cho ứng dụng di động"
     },
-    "carPlayDiagnostics": {
-      "clear": "Xóa",
-      "clearLabel": "Xóa chẩn đoán",
-      "clipboardEmpty": "(chưa ghi được chẩn đoán CarPlay nào)",
-      "copied": "Đã sao chép ✓",
-      "copyAll": "Sao chép tất cả",
-      "copyAllLabel": "Sao chép toàn bộ chẩn đoán",
-      "empty": "Chưa ghi được chẩn đoán CarPlay nào. Hãy kết nối CarPlay một lần rồi quay lại đây.",
-      "refresh": "Làm mới",
-      "refreshLabel": "Làm mới chẩn đoán",
-      "subtitle": {
-        "other": "Nhật ký kết nối CarPlay ({count} dòng, mới nhất trước). Hãy sao chép và gửi cho chúng tôi khi có gì đó trục trặc trên xe."
-      },
-      "title": "Chẩn đoán CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "Nhắn cho Stella",
       "createFailed": "Không thể tạo cuộc trò chuyện. Vui lòng thử lại.",
@@ -1356,7 +1341,6 @@
         "relative": "Tương đối",
         "strong": "Đậm"
       },
-      "carPlayDiagnostics": "Chẩn đoán CarPlay",
       "chatStorage": {
         "description": "Truy cập các cuộc trò chuyện của bạn trên mọi thiết bị. Tắt để giữ lịch sử trò chuyện riêng chỉ trên thiết bị này. Khi bật lại, những cuộc trò chuyện đó sẽ không được tải lên. Các nhà cung cấp AI vẫn xử lý tin nhắn của bạn."
       },
@@ -1386,7 +1370,6 @@
       "hideEmailLabel": "Ẩn email",
       "loadingSession": "Đang tải phiên…",
       "notificationsSection": "Thông báo",
-      "openCarPlayDiagnosticsLabel": "Mở chẩn đoán CarPlay",
       "openPrivacyLabel": "Mở Chính sách quyền riêng tư",
       "openTermsLabel": "Mở Điều khoản dịch vụ",
       "paired": {

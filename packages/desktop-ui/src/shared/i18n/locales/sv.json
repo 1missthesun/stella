@@ -975,22 +975,6 @@
       "missingConfigBody": "Ange EXPO_PUBLIC_STELLA_BACKEND_URL innan du startar appen.",
       "missingConfigTitle": "Lägg till miljövariabler för mobilen"
     },
-    "carPlayDiagnostics": {
-      "clear": "Rensa",
-      "clearLabel": "Rensa diagnostiken",
-      "clipboardEmpty": "(ingen CarPlay-diagnostik registrerad)",
-      "copied": "Kopierat ✓",
-      "copyAll": "Kopiera allt",
-      "copyAllLabel": "Kopiera all diagnostik",
-      "empty": "Ingen CarPlay-diagnostik har registrerats än. Anslut till CarPlay en gång och kom sedan tillbaka hit.",
-      "refresh": "Uppdatera",
-      "refreshLabel": "Uppdatera diagnostiken",
-      "subtitle": {
-        "one": "Spår från CarPlay-anslutningen ({count} rad, nyast först). Kopiera och skicka dem om något krånglar i bilen.",
-        "other": "Spår från CarPlay-anslutningen ({count} rader, nyast först). Kopiera och skicka dem om något krånglar i bilen."
-      },
-      "title": "CarPlay-diagnostik"
-    },
     "chat": {
       "composerPlaceholder": "Skriv till Stella",
       "createFailed": "Det gick inte att skapa en chatt. Försök igen.",
@@ -1366,7 +1350,6 @@
         "relative": "Relativ",
         "strong": "Stark"
       },
-      "carPlayDiagnostics": "CarPlay-diagnostik",
       "chatStorage": {
         "description": "Kom åt dina chattar på alla enheter. Stäng av för att behålla en separat chatthistorik bara på den här enheten. Om du slår på det igen laddas de chattarna inte upp. AI-leverantörer behandlar fortfarande dina meddelanden."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "Dölj e-postadressen",
       "loadingSession": "Läser in sessionen…",
       "notificationsSection": "Aviseringar",
-      "openCarPlayDiagnosticsLabel": "Öppna CarPlay-diagnostiken",
       "openPrivacyLabel": "Öppna Integritetspolicyn",
       "openTermsLabel": "Öppna Användarvillkoren",
       "paired": {

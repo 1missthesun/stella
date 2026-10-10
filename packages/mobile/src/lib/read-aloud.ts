@@ -283,7 +283,18 @@ export function resumeReadAloud() {
   setPlaybackState({ messageId: playbackState.messageId, status: "playing" });
 }
 
-export async function speakReply(text: string, messageId?: string) {
+export type SpeakReplyOptions = {
+  /** Keep playing when the app leaves the foreground, ducking other audio. */
+  background?: boolean;
+  /** Never raise a phone alert; a failed clip just ends. */
+  quiet?: boolean;
+};
+
+export async function speakReply(
+  text: string,
+  messageId?: string,
+  options: SpeakReplyOptions = {},
+) {
   const spoken = stripForSpeech(text);
   if (!spoken) return;
 
@@ -298,10 +309,11 @@ export async function speakReply(text: string, messageId?: string) {
 
   // Generate once. Playback retries reuse the ticket's existing audio.
   try {
-    await tryStreamReply(spoken, id, generation, signal);
+    await tryStreamReply(spoken, id, generation, signal, options);
   } catch (error) {
     if (generation !== playbackGeneration || signal.aborted) return;
     stopReadAloud();
+    if (options.quiet) return;
     console.warn("[read-aloud] could not start speech", error);
     Alert.alert(
       "Couldn’t read aloud",
@@ -316,6 +328,7 @@ async function tryStreamReply(
   id: string | null,
   generation: number,
   signal: AbortSignal,
+  options: SpeakReplyOptions,
 ): Promise<boolean> {
   const { ticket, uri } = await prepareReadAloudStream(text, signal);
   if (generation !== playbackGeneration || signal.aborted) {
@@ -329,7 +342,7 @@ async function tryStreamReply(
   // `uri` is a live HLS playlist that grows as Gemini generates, so playback
   // begins on the first segment instead of waiting for the whole clip.
 
-  if (!(await configurePlaybackAudioSession())) {
+  if (!(await configurePlaybackAudioSession({ background: options.background }))) {
     if (generation === playbackGeneration) stopReadAloud();
     else cancelStreamSession(ticket);
     return true;
@@ -339,7 +352,7 @@ async function tryStreamReply(
     return true;
   }
 
-  return await playHlsResilient(uri, id, generation, 0);
+  return await playHlsResilient(uri, id, generation, 0, options.quiet === true);
 }
 
 // A player is disposable; the generation session is not. Both startup and
@@ -351,6 +364,7 @@ async function playHlsResilient(
   id: string | null,
   generation: number,
   startAt: number,
+  quiet = false,
 ): Promise<boolean> {
   disposeHlsPlayback?.();
   return await new Promise<boolean>((resolve) => {
@@ -408,6 +422,14 @@ async function playHlsResilient(
     const giveUp = () => {
       dispose();
       if (superseded()) return;
+      if (quiet) {
+        hlsResume = null;
+        const ticket = currentStreamTicket;
+        currentStreamTicket = null;
+        if (ticket) cancelStreamSession(ticket);
+        setPlaybackState(null);
+        return;
+      }
       hlsResume = { uri, id, at: lastTime };
       setPlaybackState({ messageId: id, status: "paused" });
       console.warn(

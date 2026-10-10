@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import {
   AUTOMATIC_EXECUTION_TARGET,
   type AutomaticExecutionTarget,

@@ -966,21 +966,6 @@
       "missingConfigBody": "啟動應用程式前，請設定 EXPO_PUBLIC_STELLA_BACKEND_URL。",
       "missingConfigTitle": "新增行動版環境變數"
     },
-    "carPlayDiagnostics": {
-      "clear": "清除",
-      "clearLabel": "清除診斷資訊",
-      "clipboardEmpty": "（未記錄 CarPlay 診斷資訊）",
-      "copied": "已複製 ✓",
-      "copyAll": "全部複製",
-      "copyAllLabel": "複製全部診斷資訊",
-      "empty": "尚未記錄任何 CarPlay 診斷資訊。請先連線 CarPlay 一次，再回到這裡。",
-      "refresh": "重新整理",
-      "refreshLabel": "重新整理診斷資訊",
-      "subtitle": {
-        "other": "CarPlay 連線的紀錄（共 {count} 行，最新在前）。車上出現異常後，請複製並傳送這些內容。"
-      },
-      "title": "CarPlay 診斷"
-    },
     "chat": {
       "composerPlaceholder": "傳訊息給 Stella",
       "createFailed": "無法建立聊天。請重試。",
@@ -1356,7 +1341,6 @@
         "relative": "相對",
         "strong": "濃烈"
       },
-      "carPlayDiagnostics": "CarPlay 診斷",
       "chatStorage": {
         "description": "在所有裝置上存取你的聊天。關閉後，聊天記錄只會單獨保存在這台裝置上。重新開啟時，那些聊天不會上傳。AI 供應商仍會處理你的訊息。"
       },
@@ -1386,7 +1370,6 @@
       "hideEmailLabel": "隱藏電子郵件",
       "loadingSession": "正在載入工作階段…",
       "notificationsSection": "通知",
-      "openCarPlayDiagnosticsLabel": "開啟 CarPlay 診斷",
       "openPrivacyLabel": "開啟隱私權政策",
       "openTermsLabel": "開啟服務條款",
       "paired": {

@@ -69,12 +69,13 @@ export class AudioSessionCoordinator {
     });
   }
 
-  configurePlayback(): Promise<boolean> {
+  configurePlayback(mode: MobileAudioMode = {}): Promise<boolean> {
     if (this.activeRecordingLease !== null) return Promise.resolve(false);
 
     return this.enqueue(async () => {
       if (this.activeRecordingLease !== null) return false;
       await this.applyAudioMode({
+        ...mode,
         allowsRecording: false,
         playsInSilentMode: true,
       });

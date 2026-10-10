@@ -993,24 +993,6 @@
       "missingConfigBody": "Před spuštěním aplikace nastavte EXPO_PUBLIC_STELLA_BACKEND_URL.",
       "missingConfigTitle": "Přidejte proměnné prostředí pro mobil"
     },
-    "carPlayDiagnostics": {
-      "clear": "Vymazat",
-      "clearLabel": "Vymazat diagnostiku",
-      "clipboardEmpty": "(žádná zaznamenaná diagnostika CarPlay)",
-      "copied": "Zkopírováno ✓",
-      "copyAll": "Kopírovat vše",
-      "copyAllLabel": "Kopírovat všechnu diagnostiku",
-      "empty": "Zatím není zaznamenaná žádná diagnostika CarPlay. Připojte se jednou k CarPlay a pak se sem vraťte.",
-      "refresh": "Obnovit",
-      "refreshLabel": "Obnovit diagnostiku",
-      "subtitle": {
-        "few": "Stopy z připojení CarPlay ({count} řádky, nejnovější první). Zkopírujte je a pošlete nám je, když se v autě něco chová divně.",
-        "many": "Stopy z připojení CarPlay ({count} řádku, nejnovější první). Zkopírujte je a pošlete nám je, když se v autě něco chová divně.",
-        "one": "Stopy z připojení CarPlay ({count} řádek, nejnovější první). Zkopírujte je a pošlete nám je, když se v autě něco chová divně.",
-        "other": "Stopy z připojení CarPlay ({count} řádků, nejnovější první). Zkopírujte je a pošlete nám je, když se v autě něco chová divně."
-      },
-      "title": "Diagnostika CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "Napište Stelle",
       "createFailed": "Chat se nepodařilo vytvořit. Zkuste to prosím znovu.",
@@ -1386,7 +1368,6 @@
         "relative": "Relativní",
         "strong": "Výrazné"
       },
-      "carPlayDiagnostics": "Diagnostika CarPlay",
       "chatStorage": {
         "description": "Mějte chaty po ruce na všech zařízeních. Vypnutím zachováte samostatnou historii chatů jen na tomto zařízení. Po opětovném zapnutí se tyto chaty nenahrají. Poskytovatelé AI vaše zprávy nadále zpracovávají."
       },
@@ -1416,7 +1397,6 @@
       "hideEmailLabel": "Skrýt e-mail",
       "loadingSession": "Načítání relace…",
       "notificationsSection": "Oznámení",
-      "openCarPlayDiagnosticsLabel": "Otevřít diagnostiku CarPlay",
       "openPrivacyLabel": "Otevřít Zásady ochrany osobních údajů",
       "openTermsLabel": "Otevřít Podmínky služby",
       "paired": {

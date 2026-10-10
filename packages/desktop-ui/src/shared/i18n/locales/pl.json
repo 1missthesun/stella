@@ -993,24 +993,6 @@
       "missingConfigBody": "Ustaw EXPO_PUBLIC_STELLA_BACKEND_URL przed uruchomieniem aplikacji.",
       "missingConfigTitle": "Dodaj zmienne środowiskowe aplikacji mobilnej"
     },
-    "carPlayDiagnostics": {
-      "clear": "Wyczyść",
-      "clearLabel": "Wyczyść diagnostykę",
-      "clipboardEmpty": "(brak zarejestrowanej diagnostyki CarPlay)",
-      "copied": "Skopiowano ✓",
-      "copyAll": "Kopiuj wszystko",
-      "copyAllLabel": "Kopiuj całą diagnostykę",
-      "empty": "Nie zarejestrowano jeszcze żadnej diagnostyki CarPlay. Połącz się raz z CarPlay, a potem wróć tutaj.",
-      "refresh": "Odśwież",
-      "refreshLabel": "Odśwież diagnostykę",
-      "subtitle": {
-        "few": "Ślady połączenia CarPlay ({count} wiersze, od najnowszego). Skopiuj je i wyślij, gdy coś zacznie się dziwnie zachowywać w samochodzie.",
-        "many": "Ślady połączenia CarPlay ({count} wierszy, od najnowszego). Skopiuj je i wyślij, gdy coś zacznie się dziwnie zachowywać w samochodzie.",
-        "one": "Ślady połączenia CarPlay ({count} wiersz, od najnowszego). Skopiuj je i wyślij, gdy coś zacznie się dziwnie zachowywać w samochodzie.",
-        "other": "Ślady połączenia CarPlay ({count} wiersza, od najnowszego). Skopiuj je i wyślij, gdy coś zacznie się dziwnie zachowywać w samochodzie."
-      },
-      "title": "Diagnostyka CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "Napisz do Stelli",
       "createFailed": "Nie udało się utworzyć czatu. Spróbuj ponownie.",
@@ -1386,7 +1368,6 @@
         "relative": "Względne",
         "strong": "Mocne"
       },
-      "carPlayDiagnostics": "Diagnostyka CarPlay",
       "chatStorage": {
         "description": "Korzystaj ze swoich czatów na wszystkich urządzeniach. Wyłącz, aby zachować osobną historię czatów tylko na tym urządzeniu. Po ponownym włączeniu te czaty nie zostaną przesłane. Dostawcy AI nadal przetwarzają Twoje wiadomości."
       },
@@ -1416,7 +1397,6 @@
       "hideEmailLabel": "Ukryj e-mail",
       "loadingSession": "Wczytywanie sesji…",
       "notificationsSection": "Powiadomienia",
-      "openCarPlayDiagnosticsLabel": "Otwórz diagnostykę CarPlay",
       "openPrivacyLabel": "Otwórz Politykę prywatności",
       "openTermsLabel": "Otwórz Warunki korzystania",
       "paired": {

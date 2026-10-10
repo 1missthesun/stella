@@ -966,21 +966,6 @@
       "missingConfigBody": "アプリを起動する前に EXPO_PUBLIC_STELLA_BACKEND_URL を設定してください。",
       "missingConfigTitle": "モバイルの環境変数を追加してください"
     },
-    "carPlayDiagnostics": {
-      "clear": "クリア",
-      "clearLabel": "診断をクリア",
-      "clipboardEmpty": "（CarPlay の診断は記録されていません）",
-      "copied": "コピーしました ✓",
-      "copyAll": "すべてコピー",
-      "copyAllLabel": "診断をすべてコピー",
-      "empty": "CarPlay の診断はまだ記録されていません。一度 CarPlay に接続してから、ここに戻ってきてください。",
-      "refresh": "更新",
-      "refreshLabel": "診断を更新",
-      "subtitle": {
-        "other": "CarPlay 接続の記録です（{count} 行、新しい順）。車内で不具合があったら、これをコピーして送ってください。"
-      },
-      "title": "CarPlay 診断"
-    },
     "chat": {
       "composerPlaceholder": "Stella にメッセージ",
       "createFailed": "チャットを作成できませんでした。もう一度お試しください。",
@@ -1356,7 +1341,6 @@
         "relative": "相対",
         "strong": "強め"
       },
-      "carPlayDiagnostics": "CarPlay 診断",
       "chatStorage": {
         "description": "すべてのデバイスからチャットを利用できます。オフにすると、このデバイスだけに別のチャット履歴が保存されます。オンに戻しても、その履歴はアップロードされません。AI プロバイダーは引き続きメッセージを処理します。"
       },
@@ -1386,7 +1370,6 @@
       "hideEmailLabel": "メールアドレスを非表示",
       "loadingSession": "セッションを読み込んでいます…",
       "notificationsSection": "通知",
-      "openCarPlayDiagnosticsLabel": "CarPlay 診断を開く",
       "openPrivacyLabel": "プライバシーポリシーを開く",
       "openTermsLabel": "利用規約を開く",
       "paired": {

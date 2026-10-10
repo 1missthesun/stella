@@ -975,22 +975,6 @@
       "missingConfigBody": "Angiv EXPO_PUBLIC_STELLA_BACKEND_URL, før du starter appen.",
       "missingConfigTitle": "Tilføj miljøvariabler til mobilappen"
     },
-    "carPlayDiagnostics": {
-      "clear": "Ryd",
-      "clearLabel": "Ryd diagnostik",
-      "clipboardEmpty": "(ingen CarPlay-diagnostik registreret)",
-      "copied": "Kopieret ✓",
-      "copyAll": "Kopiér alt",
-      "copyAllLabel": "Kopiér al diagnostik",
-      "empty": "Ingen CarPlay-diagnostik registreret endnu. Tilslut til CarPlay én gang, og kom så tilbage hertil.",
-      "refresh": "Opdater",
-      "refreshLabel": "Opdater diagnostik",
-      "subtitle": {
-        "one": "Spor fra CarPlay-forbindelsen ({count} linje, nyeste først). Kopiér og send dem, hvis noget opfører sig mærkeligt i bilen.",
-        "other": "Spor fra CarPlay-forbindelsen ({count} linjer, nyeste først). Kopiér og send dem, hvis noget opfører sig mærkeligt i bilen."
-      },
-      "title": "CarPlay-diagnostik"
-    },
     "chat": {
       "composerPlaceholder": "Skriv til Stella",
       "createFailed": "Kunne ikke oprette en chat. Prøv igen.",
@@ -1366,7 +1350,6 @@
         "relative": "Relativ",
         "strong": "Kraftig"
       },
-      "carPlayDiagnostics": "CarPlay-diagnostik",
       "chatStorage": {
         "description": "Få adgang til dine chats på alle enheder. Slå fra for at beholde en separat chathistorik kun på denne enhed. Når du slår til igen, uploades de chats ikke. AI-udbydere behandler stadig dine beskeder."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "Skjul e-mail",
       "loadingSession": "Indlæser session…",
       "notificationsSection": "Notifikationer",
-      "openCarPlayDiagnosticsLabel": "Åbn CarPlay-diagnostik",
       "openPrivacyLabel": "Åbn Privatlivspolitik",
       "openTermsLabel": "Åbn Servicevilkår",
       "paired": {

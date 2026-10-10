@@ -966,21 +966,6 @@
       "missingConfigBody": "앱을 시작하기 전에 EXPO_PUBLIC_STELLA_BACKEND_URL을 설정하세요.",
       "missingConfigTitle": "모바일 환경 변수를 추가하세요"
     },
-    "carPlayDiagnostics": {
-      "clear": "지우기",
-      "clearLabel": "진단 지우기",
-      "clipboardEmpty": "(기록된 CarPlay 진단 없음)",
-      "copied": "복사됨 ✓",
-      "copyAll": "모두 복사",
-      "copyAllLabel": "진단 모두 복사",
-      "empty": "아직 기록된 CarPlay 진단이 없습니다. CarPlay에 한 번 연결한 뒤 다시 여기로 오세요.",
-      "refresh": "새로고침",
-      "refreshLabel": "진단 새로고침",
-      "subtitle": {
-        "other": "CarPlay 연결 기록입니다({count}줄, 최신 순). 차에서 문제가 생기면 이 내용을 복사해 보내 주세요."
-      },
-      "title": "CarPlay 진단"
-    },
     "chat": {
       "composerPlaceholder": "Stella에게 메시지",
       "createFailed": "채팅을 만들 수 없습니다. 다시 시도해 주세요.",
@@ -1356,7 +1341,6 @@
         "relative": "상대적",
         "strong": "진하게"
       },
-      "carPlayDiagnostics": "CarPlay 진단",
       "chatStorage": {
         "description": "모든 기기에서 대화를 확인하세요. 끄면 이 기기에만 별도의 대화 기록이 저장됩니다. 다시 켜도 그 대화는 업로드되지 않습니다. AI 제공업체는 여전히 메시지를 처리합니다."
       },
@@ -1386,7 +1370,6 @@
       "hideEmailLabel": "이메일 숨기기",
       "loadingSession": "세션 불러오는 중…",
       "notificationsSection": "알림",
-      "openCarPlayDiagnosticsLabel": "CarPlay 진단 열기",
       "openPrivacyLabel": "개인정보 처리방침 열기",
       "openTermsLabel": "서비스 약관 열기",
       "paired": {

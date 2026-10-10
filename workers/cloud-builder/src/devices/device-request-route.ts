@@ -6,17 +6,32 @@
  * The user JWT proves the account; the pairing proof proves this phone was
  * paired with this computer and binds the proof to this exact request. The
  * computer then applies its own file-access policy.
+ *
+ * File reads (`DEVICE_FILE_REQUEST_METHODS`) reach further, because a linked
+ * file lives on whichever of the owner's computers made it: a phone paired
+ * with any of the owner's computers may ask any of them, its proof committing
+ * to the computer asked, and one of the owner's computers may ask another,
+ * signing with its registered device key.
  */
 
 import {
+  DEVICE_REQUEST_DEVICE_HEADERS,
+  DEVICE_REQUEST_DEVICE_PROOF_MAX_SKEW_MS,
   DEVICE_REQUEST_LIMITS,
   buildDeviceRequestChallenge,
+  buildDeviceRequestDeviceProofMessage,
   deviceRequestParamsHash,
+  deviceRequesterLabel,
+  isDeviceFileRequestMethod,
   isDeviceRequestMethod,
   type DeviceRequestBody,
 } from "@stella/contracts/turn-plane/device-requests";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
-import { verifyMobilePairingProof } from "@stella/contracts/turn-plane/pairing-proof";
+import {
+  MOBILE_PAIRING_HEADERS,
+  verifyMobilePairingProof,
+} from "@stella/contracts/turn-plane/pairing-proof";
+import { verifyDevicePresenceProof } from "../owner-gate/presence.js";
 import {
   HEADER_ANONYMOUS,
   HEADER_OWNER,
@@ -80,31 +95,101 @@ export const handleDeviceRequestRoute = async (
   } catch {
     return deviceRequestErrorResponse("failed", "Stella can't check your pairing right now. Try again shortly.");
   }
-  // Only a phone paired with this very computer may ask it for anything.
-  const mobileDeviceId = request.headers.get("x-stella-mobile-device-id")?.trim() ?? "";
-  const pairing = (snapshot.pairedDevices ?? []).find(
-    (candidate) =>
-      candidate.mobileDeviceId === mobileDeviceId &&
-      candidate.desktopDeviceId === deviceId,
-  );
-  const verified = await verifyMobilePairingProof({
-    headers: request.headers,
-    publicKey: pairing?.mobilePublicKey,
-    expectedChallenge: buildDeviceRequestChallenge({
-      requestId,
-      method,
-      paramsHash: await deviceRequestParamsHash(paramsJson),
-    }),
-  });
-  if (!verified.ok || verified.desktopDeviceId !== deviceId) {
-    log("error", "device_request_proof_rejected", {
-      ownerId: caller.ownerId,
-      reason: verified.ok ? "device_mismatch" : verified.reason,
-    });
-    return deviceRequestErrorResponse(
-      "forbidden",
-      "This phone isn't connected to that computer. Connect it again in Settings.",
+  const paramsHash = await deviceRequestParamsHash(paramsJson);
+  const isOwnerComputer = (id: string) =>
+    (snapshot.devices ?? []).some((candidate) => candidate.deviceId === id);
+
+  let asker: string;
+  const requesterDeviceId =
+    request.headers.get(DEVICE_REQUEST_DEVICE_HEADERS.deviceId)?.trim() ?? "";
+  if (requesterDeviceId) {
+    const requester = (snapshot.devices ?? []).find(
+      (candidate) => candidate.deviceId === requesterDeviceId,
     );
+    const signature =
+      request.headers.get(DEVICE_REQUEST_DEVICE_HEADERS.signature)?.trim() ?? "";
+    const issuedAt = Number(
+      request.headers.get(DEVICE_REQUEST_DEVICE_HEADERS.issuedAt)?.trim() ?? "",
+    );
+    const fresh =
+      Number.isFinite(issuedAt) &&
+      issuedAt > 0 &&
+      Math.abs(Date.now() - issuedAt) <= DEVICE_REQUEST_DEVICE_PROOF_MAX_SKEW_MS;
+    const verified =
+      isDeviceFileRequestMethod(method) &&
+      requesterDeviceId !== deviceId &&
+      isOwnerComputer(deviceId) &&
+      Boolean(requester) &&
+      Boolean(signature) &&
+      fresh &&
+      (await verifyDevicePresenceProof({
+        publicKey: requester!.publicKey,
+        message: buildDeviceRequestDeviceProofMessage({
+          requesterDeviceId,
+          targetDeviceId: deviceId,
+          challenge: buildDeviceRequestChallenge({
+            requestId,
+            method,
+            paramsHash,
+            targetDeviceId: deviceId,
+          }),
+          issuedAt,
+        }),
+        signature,
+      }));
+    if (!verified) {
+      log("error", "device_request_proof_rejected", {
+        ownerId: caller.ownerId,
+        reason: "device_proof",
+        registered: Boolean(requester),
+      });
+      return deviceRequestErrorResponse(
+        "forbidden",
+        "That computer can't be reached from this one.",
+      );
+    }
+    asker = deviceRequesterLabel(requesterDeviceId);
+  } else {
+    // A phone asks the computer it was paired with for anything, and any
+    // of the owner's other computers for a file.
+    const mobileDeviceId =
+      request.headers.get(MOBILE_PAIRING_HEADERS.mobileDeviceId)?.trim() ?? "";
+    const pairedDesktopId =
+      request.headers.get(MOBILE_PAIRING_HEADERS.desktopDeviceId)?.trim() || deviceId;
+    const crossDevice = pairedDesktopId !== deviceId;
+    if (crossDevice && (!isDeviceFileRequestMethod(method) || !isOwnerComputer(deviceId))) {
+      return deviceRequestErrorResponse(
+        "forbidden",
+        "This phone isn't connected to that computer. Connect it again in Settings.",
+      );
+    }
+    const pairing = (snapshot.pairedDevices ?? []).find(
+      (candidate) =>
+        candidate.mobileDeviceId === mobileDeviceId &&
+        candidate.desktopDeviceId === pairedDesktopId,
+    );
+    const verified = await verifyMobilePairingProof({
+      headers: request.headers,
+      publicKey: pairing?.mobilePublicKey,
+      expectedChallenge: buildDeviceRequestChallenge({
+        requestId,
+        method,
+        paramsHash,
+        ...(crossDevice ? { targetDeviceId: deviceId } : {}),
+      }),
+    });
+    if (!verified.ok || verified.desktopDeviceId !== pairedDesktopId) {
+      log("error", "device_request_proof_rejected", {
+        ownerId: caller.ownerId,
+        reason: verified.ok ? "device_mismatch" : verified.reason,
+        crossDevice,
+      });
+      return deviceRequestErrorResponse(
+        "forbidden",
+        "This phone isn't connected to that computer. Connect it again in Settings.",
+      );
+    }
+    asker = verified.mobileDeviceId;
   }
 
   const headers = new Headers({ "content-type": "application/json" });
@@ -114,7 +199,7 @@ export const handleDeviceRequestRoute = async (
   headers.set(HEADER_TOKEN_EXP, String(caller.expiresAtMs));
   headers.set(HEADER_ANONYMOUS, "0");
   headers.set(HEADER_PRESENCE_DEVICE_ID, deviceId);
-  headers.set(HEADER_DEVICE_REQUEST_MOBILE_ID, verified.mobileDeviceId);
+  headers.set(HEADER_DEVICE_REQUEST_MOBILE_ID, asker);
   headers.set(HEADER_DEVICE_REQUEST_ID, requestId);
   headers.set(HEADER_DEVICE_REQUEST_METHOD, method);
   return await gate.fetch("https://owner-gate/device-request", {

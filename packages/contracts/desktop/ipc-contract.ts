@@ -264,9 +264,11 @@ import {
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
+  IPC_DISPLAY_LIST_FOLDER,
   IPC_DISPLAY_MEDIA_SOURCE,
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
   IPC_DISPLAY_READ_FILE,
+  IPC_DISPLAY_STAT_PATH,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
   IPC_DISPLAY_UPDATE,
@@ -511,6 +513,29 @@ export type DisplayReadFileResult =
       path: string;
       reason?: DeviceFileMissingReason;
     };
+
+export type DisplayPathStat = {
+  kind: "file" | "directory";
+  sizeBytes: number;
+  mimeType: string;
+  modifiedAt: number;
+  /** Set when the path is on another of the user's computers. */
+  deviceId?: string;
+  deviceName?: string;
+};
+
+export type DisplayFolderListing = {
+  path: string;
+  entries: Array<{
+    name: string;
+    path: string;
+    kind: "file" | "directory";
+    sizeBytes: number;
+    modifiedAt: number;
+  }>;
+  truncated: boolean;
+  deviceName?: string;
+};
 
 export type CanvasHtmlEntry = {
   filePath: string;
@@ -924,6 +949,14 @@ export type IpcInvokeContract = {
   [IPC_DISPLAY_MEDIA_SOURCE]: Invoke<
     [payload: { filePath: string }],
     DeviceFileSource
+  >;
+  [IPC_DISPLAY_STAT_PATH]: Invoke<
+    [payload: { filePath: string; conversationId?: string | null }],
+    DisplayPathStat
+  >;
+  [IPC_DISPLAY_LIST_FOLDER]: Invoke<
+    [payload: { filePath: string; conversationId?: string | null }],
+    DisplayFolderListing
   >;
   [IPC_DISPLAY_LIST_CANVAS_HTML]: Invoke<[], CanvasHtmlEntry[]>;
   [IPC_DISPLAY_OPEN_SHARED_CANVAS]: Invoke<

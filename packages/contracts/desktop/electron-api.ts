@@ -173,9 +173,11 @@ import {
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
+  IPC_DISPLAY_LIST_FOLDER,
   IPC_DISPLAY_MEDIA_SOURCE,
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
   IPC_DISPLAY_READ_FILE,
+  IPC_DISPLAY_STAT_PATH,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
   IPC_DISPLAY_UPDATE,
@@ -478,6 +480,21 @@ export const createElectronApi = (
        */
       mediaSource: (filePath: string) =>
         ipc.invoke(IPC_DISPLAY_MEDIA_SOURCE, { filePath }),
+      /**
+       * Whether a path is a file or a folder, on this computer or on the
+       * other computer of the user's that has it.
+       */
+      statPath: (filePath: string, options?: { conversationId?: string | null }) =>
+        ipc.invoke(IPC_DISPLAY_STAT_PATH, {
+          filePath,
+          conversationId: options?.conversationId,
+        }),
+      /** A folder's entries, on this computer or on the computer that has it. */
+      listFolder: (filePath: string, options?: { conversationId?: string | null }) =>
+        ipc.invoke(IPC_DISPLAY_LIST_FOLDER, {
+          filePath,
+          conversationId: options?.conversationId,
+        }),
       listCanvasHtml: invoker(IPC_DISPLAY_LIST_CANVAS_HTML),
       /**
        * Fetches a shared canvas (`<CANVAS_SHARE_BASE_URL>/c/<slug>`) in main,

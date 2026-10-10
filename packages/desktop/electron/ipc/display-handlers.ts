@@ -7,9 +7,11 @@ import {
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
+  IPC_DISPLAY_LIST_FOLDER,
   IPC_DISPLAY_MEDIA_SOURCE,
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
   IPC_DISPLAY_READ_FILE,
+  IPC_DISPLAY_STAT_PATH,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
 } from "@stella/contracts/desktop/ipc-channels";
@@ -26,7 +28,10 @@ import type { LocalChatHistoryService } from "../services/local-chat-history-ser
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
 import type { LocalChatEventRecord } from "@stella/runtime/kernel/storage/shared";
-import { planDisplayFileRead } from "./display-read-limit.js";
+import {
+  MAX_DISPLAY_FILE_BYTES,
+  planDisplayFileRead,
+} from "./display-read-limit.js";
 import {
   EVIDENCE_THUMBNAIL_CONTENT_TYPE,
   isEvidenceThumbnailSource,
@@ -38,7 +43,21 @@ import {
   registerCanvasHtml,
 } from "../source/canvas-protocol.js";
 import { resolveJwtOwnerScope } from "@stella/runtime/kernel/runner/computer-agent-cloud-records";
-import { resolveCanonicalConversationFilePaths } from "../services/canonical-conversation-file-paths.js";
+import {
+  linkedPathsGrant,
+  localChatLinkedPaths,
+  pathAndAncestors,
+} from "../services/remote-file-grants.js";
+import type { PeerDeviceFiles } from "../services/peer-device-files.js";
+import {
+  DEVICE_FILE_READ_LIMITS,
+  DEVICE_FOLDER_CONTENT_TYPE,
+  deviceFileReadRanges,
+  parseDeviceFolderListing,
+  type DeviceFileStat,
+  type DeviceFolderEntry,
+  type DeviceFolderListing,
+} from "@stella/contracts/device-file-reads";
 import type { CloudConversationFileGrants } from "../services/cloud-conversation-file-grants.js";
 import type { DeviceFileLocator } from "../services/device-file-locator.js";
 import {
@@ -48,8 +67,10 @@ import {
 } from "@stella/contracts/device-files";
 import { describeMediaSource } from "../source/media-protocol.js";
 import {
+  publicDeviceFileSource,
   resolveDeviceFileSource,
   type DeviceFileSourceDeps,
+  type ResolvedDeviceFileSource,
 } from "../services/device-file-source.js";
 import { handleIpc } from "./typed-ipc.js";
 
@@ -64,6 +85,10 @@ type DisplayHandlersOptions = {
   getDeviceId?: () => string | null;
   /** On pi-durable: the local files Stella linked in a conversation's transcript. */
   piLinkedFiles?: (conversationId: string) => Promise<readonly string[]>;
+  /** Reads a file another of the owner's computers has, live. */
+  peerDeviceFiles?: PeerDeviceFiles;
+  /** The conversation this window shows, for reads that don't name one. */
+  getActiveConversationId?: () => string | null;
   assertPrivilegedSender: (
     event: IpcMainEvent | IpcMainInvokeEvent,
     channel: string,
@@ -136,6 +161,43 @@ const MIME_BY_EXTENSION: Record<string, string> = {
 };
 
 const ALLOWED_EXTENSIONS = new Set(Object.keys(MIME_BY_EXTENSION));
+
+/** The most one ranged read returns; a relayed response must stay well under its cap. */
+const MAX_RANGE_READ_BYTES = 2 * DEVICE_FILE_READ_LIMITS.rangeBytes;
+const MAX_FOLDER_MANIFEST_BYTES = 1024 * 1024;
+
+const listLocalFolder = async (
+  folderPath: string,
+): Promise<DeviceFolderListing> => {
+  const dirents = await fs.readdir(folderPath, { withFileTypes: true });
+  const visible = dirents.filter((entry) => !entry.name.startsWith("."));
+  const entries: DeviceFolderEntry[] = [];
+  for (const entry of visible) {
+    if (entries.length >= DEVICE_FILE_READ_LIMITS.folderEntries) break;
+    const entryPath = path.join(folderPath, entry.name);
+    const stats = await fs.stat(entryPath).catch(() => null);
+    if (!stats || (!stats.isFile() && !stats.isDirectory())) continue;
+    entries.push({
+      name: entry.name,
+      path: entryPath,
+      kind: stats.isDirectory() ? "directory" : "file",
+      sizeBytes: stats.isDirectory() ? 0 : stats.size,
+      modifiedAt: stats.mtimeMs,
+    });
+  }
+  entries.sort((a, b) =>
+    a.kind === b.kind
+      ? a.name.localeCompare(b.name, undefined, { numeric: true })
+      : a.kind === "directory"
+        ? -1
+        : 1,
+  );
+  return {
+    path: folderPath,
+    entries,
+    truncated: visible.length > entries.length,
+  };
+};
 
 /** Head of a canvas document; the `<title>` is written near the top of it. */
 const CANVAS_TITLE_SCAN_BYTES = 8192;
@@ -305,8 +367,9 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
 
   /**
    * `display:readFile` for the desktop renderer (`remote: false`) and for a
-   * paired phone's `file.read` relayed through the cloud (`remote: true`),
-   * which is held to Stella's own outputs and the conversation's files.
+   * phone's or another computer's `file.read` relayed through the cloud
+   * (`remote: true`), which is held to Stella's own outputs, the
+   * conversation's linked files and folders, and what this computer shared.
    */
   const deviceFileDeps = (): DeviceFileSourceDeps | null =>
     options.deviceFileLocator
@@ -316,19 +379,144 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         }
       : null;
 
+  const conversationOf = (payload: { conversationId?: unknown } | undefined) =>
+    typeof payload?.conversationId === "string"
+      ? payload.conversationId.trim()
+      : "";
+
+  const rangeOf = (payload: {
+    offset?: unknown;
+    length?: unknown;
+  } | undefined): { offset: number; length: number } | null => {
+    const offset = payload?.offset;
+    const length = payload?.length;
+    if (offset === undefined && length === undefined) return null;
+    if (
+      typeof offset !== "number" ||
+      typeof length !== "number" ||
+      !Number.isSafeInteger(offset) ||
+      !Number.isSafeInteger(length) ||
+      offset < 0 ||
+      length < 1
+    ) {
+      throw new Error("display:readFile offset and length must be whole numbers.");
+    }
+    return { offset, length: Math.min(length, MAX_RANGE_READ_BYTES) };
+  };
+
+  const readPeerBytes = async (
+    deviceId: string,
+    requestedPath: string,
+    from: number,
+    to: number,
+    conversationId: string,
+  ): Promise<{ bytes: Uint8Array; mimeType: string }> => {
+    const peers = options.peerDeviceFiles!;
+    const parts: Uint8Array[] = [];
+    let mimeType = "application/octet-stream";
+    let total = 0;
+    for (const range of deviceFileReadRanges(to - from)) {
+      const part = await peers.read(
+        deviceId,
+        requestedPath,
+        { offset: from + range.offset, length: range.length },
+        conversationId,
+      );
+      mimeType = part.mimeType;
+      parts.push(part.bytes);
+      total += part.bytes.byteLength;
+      if (part.bytes.byteLength < range.length) break;
+    }
+    const bytes = new Uint8Array(total);
+    let cursor = 0;
+    for (const part of parts) {
+      bytes.set(part, cursor);
+      cursor += part.byteLength;
+    }
+    return { bytes, mimeType };
+  };
+
+  /**
+   * The computer that has a file this one does not: the one its device
+   * record names first, then any other online computer of the owner.
+   */
+  const findPeerHolder = async (
+    requestedPath: string,
+    conversationId: string,
+    source: ResolvedDeviceFileSource | null,
+  ) => {
+    if (!options.peerDeviceFiles) return null;
+    const preferred =
+      source && (source.kind === "drive" || source.kind === "elsewhere")
+        ? (source.deviceId ?? null)
+        : null;
+    return await options.peerDeviceFiles
+      .findHolder(requestedPath, { preferred, conversationId })
+      .catch(() => null);
+  };
+
   const readFromOwningDevice = async (
     requestedPath: string,
     resolvedPath: string,
     maxBytes: unknown,
     mimeType: string,
+    range: { offset: number; length: number } | null,
+    conversationId: string,
   ) => {
     const source = await resolveDeviceFileSource(
       requestedPath,
       deviceFileDeps(),
     );
+    if (source.kind === "local") {
+      return null;
+    }
+    const holder = await findPeerHolder(requestedPath, conversationId, source);
+    if (holder) {
+      if (holder.stat.kind !== "file") {
+        throw new Error(`display:readFile target is not a file: ${resolvedPath}`);
+      }
+      const sizeBytes = holder.stat.sizeBytes;
+      let from = 0;
+      let to: number;
+      if (range) {
+        from = Math.min(range.offset, sizeBytes);
+        to = Math.min(sizeBytes, from + range.length);
+      } else {
+        const plan = planDisplayFileRead(sizeBytes, maxBytes);
+        if (!plan.ok) throw new Error(plan.error);
+        to = plan.readBytes;
+      }
+      const read = await readPeerBytes(
+        holder.computer.deviceId,
+        requestedPath,
+        from,
+        to,
+        conversationId,
+      );
+      return {
+        bytes: read.bytes,
+        sizeBytes,
+        mimeType: holder.stat.mimeType || read.mimeType || mimeType,
+        truncated: !range && read.bytes.byteLength < sizeBytes,
+        missing: false as const,
+      };
+    }
     switch (source.kind) {
       case "drive": {
         const locator = options.deviceFileLocator!;
+        if (range) {
+          const copy = await locator.readCopy(
+            source.drivePath,
+            Math.min(source.sizeBytes || MAX_DISPLAY_FILE_BYTES, range.offset + range.length),
+          );
+          return {
+            bytes: copy.bytes.subarray(Math.min(range.offset, copy.bytes.byteLength)),
+            sizeBytes: copy.sizeBytes,
+            mimeType,
+            truncated: false,
+            missing: false as const,
+          };
+        }
         const plan = planDisplayFileRead(source.sizeBytes, maxBytes);
         if (!plan.ok) {
           throw new Error(plan.error);
@@ -342,7 +530,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
           missing: false as const,
         };
       }
-      case "local":
       case "missing":
         return {
           missing: true as const,
@@ -359,8 +546,113 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         };
       case "elsewhere":
       case "unreachable":
-        throw new Error(deviceFileUnavailableMessage(source, requestedPath));
+        throw new Error(
+          deviceFileUnavailableMessage(
+            publicDeviceFileSource(source),
+            requestedPath,
+          ),
+        );
     }
+  };
+
+  const linkSources = (
+    conversationId: string,
+  ): Array<() => Promise<readonly string[]>> => [
+    async () =>
+      options.localChatHistoryService
+        ? localChatLinkedPaths(
+            options.localChatHistoryService.listFiles({
+              conversationId,
+              limit: 500,
+            }).files,
+          )
+        : [],
+    async () =>
+      options.localChatHistoryService
+        ? options.localChatHistoryService.listCanonicalFilePaths(
+            conversationId,
+            resolveJwtOwnerScope(
+              await options.getAuthToken?.().catch(() => null),
+            ),
+          )
+        : [],
+    // Any conversation of this owner, not just the one this window shows:
+    // a file Stella produced or displayed there, per the cloud journal, is
+    // one the user has already been shown.
+    async () =>
+      options.cloudFileGrants
+        ? await options.cloudFileGrants.listPaths(conversationId)
+        : [],
+    async () =>
+      options.piLinkedFiles
+        ? await options.piLinkedFiles(conversationId).catch(() => [])
+        : [],
+  ];
+
+  /** Files and folders this computer itself shared from a reply or report. */
+  const sharedByThisComputer = async (resolved: string): Promise<boolean> => {
+    const deviceId = options.getDeviceId?.() ?? null;
+    if (!deviceId || !options.deviceFileLocator) return false;
+    const recorded = await options.deviceFileLocator
+      .recordedBy(pathAndAncestors(resolved).slice(0, 48), deviceId)
+      .catch(() => new Set<string>());
+    return recorded.size > 0 && (await linkedPathsGrant(resolved, [...recorded]));
+  };
+
+  /**
+   * `granted`: read it here. `elsewhere`: it is not on this computer, so the
+   * computer that has it decides, under its own policy.
+   */
+  const remoteAccess = async (
+    resolved: string,
+    conversationId: string,
+  ): Promise<"granted" | "elsewhere"> => {
+    // Stella's own artifact directories are readable without a
+    // conversation: apps rendered in the phone's mirrored UI (and the
+    // shell's media viewers) read their result files directly, and have
+    // no conversation to attribute the read to.
+    if (await isMobileReadableStellaPath(resolved, options.getStellaDataDir())) {
+      return "granted";
+    }
+    const here = await fs.lstat(resolved).then(
+      () => true,
+      () => false,
+    );
+    if (!here && conversationId) return "elsewhere";
+    if (here && conversationId) {
+      for (const source of linkSources(conversationId)) {
+        if (await linkedPathsGrant(resolved, await source().catch(() => []))) {
+          return "granted";
+        }
+      }
+    }
+    if (here && (await sharedByThisComputer(resolved))) return "granted";
+    if (!conversationId) {
+      throw new Error(
+        `${REMOTE_VIEW_DENIAL_PREFIX}this file is outside Stella's own outputs and media, and no conversation was supplied to check it against.`,
+      );
+    }
+    throw new Error(
+      `${REMOTE_VIEW_DENIAL_PREFIX}Stella didn't share this file in the conversation, so it can only be opened on the computer that has it.`,
+    );
+  };
+
+  const authorizePath = async (
+    payload: { filePath?: unknown; conversationId?: unknown } | undefined,
+    access: { remote: boolean },
+  ) => {
+    const requestedPath =
+      typeof payload?.filePath === "string" ? payload.filePath.trim() : "";
+    if (!requestedPath) {
+      throw new Error("display:readFile requires a filePath.");
+    }
+    assertNotCloudWorkspacePath(requestedPath);
+    const resolved = path.resolve(requestedPath);
+    const conversationId = conversationOf(payload);
+    const elsewhere = access.remote
+      ? (await remoteAccess(resolved, conversationId)) === "elsewhere"
+      : false;
+    return { requestedPath, resolved, conversationId, elsewhere };
   };
 
   const authorizeDisplayRead = async (
@@ -372,93 +664,15 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
       | undefined,
     access: { remote: boolean },
   ) => {
-    const requestedPath =
-      typeof payload?.filePath === "string" ? payload.filePath.trim() : "";
-    if (!requestedPath) {
-      throw new Error("display:readFile requires a filePath.");
-    }
-    assertNotCloudWorkspacePath(requestedPath);
-
-    const resolved = path.resolve(requestedPath);
-    if (access.remote) {
-      // Stella's own artifact directories are readable without a
-      // conversation: apps rendered in the phone's mirrored UI (and the
-      // shell's media viewers) read their result files directly, and have
-      // no conversation to attribute the read to.
-      const isStellaArtifact = await isMobileReadableStellaPath(
-        resolved,
-        options.getStellaDataDir(),
-      );
-      if (!isStellaArtifact) {
-        const conversationId =
-          typeof payload?.conversationId === "string"
-            ? payload.conversationId.trim()
-            : "";
-        if (!conversationId) {
-          throw new Error(
-            `${REMOTE_VIEW_DENIAL_PREFIX}this file is outside Stella's own outputs and media, and no conversation was supplied to check it against.`,
-          );
-        }
-        const allowedByLocalHistory = options.localChatHistoryService
-          ? isDisplayReadPathInLocalChatFiles(
-              options.localChatHistoryService.listFiles({
-                conversationId,
-                limit: 500,
-              }).files,
-              resolved,
-            )
-          : false;
-        const canonicalPaths =
-          allowedByLocalHistory || !options.localChatHistoryService
-            ? new Set<string>()
-            : await resolveCanonicalConversationFilePaths(
-                options.localChatHistoryService.listCanonicalFilePaths(
-                  conversationId,
-                  resolveJwtOwnerScope(
-                    await options.getAuthToken?.().catch(() => null),
-                  ),
-                ),
-              );
-        // Any conversation of this owner, not just the one this window
-        // shows: a file Stella produced or displayed there, per the cloud
-        // journal, is one the user has already been shown.
-        const cloudPaths =
-          allowedByLocalHistory ||
-          canonicalPaths.has(resolved) ||
-          !options.cloudFileGrants
-            ? new Set<string>()
-            : await resolveCanonicalConversationFilePaths(
-                await options.cloudFileGrants.listPaths(conversationId),
-              );
-        const piPaths =
-          allowedByLocalHistory ||
-          canonicalPaths.has(resolved) ||
-          cloudPaths.has(resolved) ||
-          !options.piLinkedFiles
-            ? new Set<string>()
-            : await resolveCanonicalConversationFilePaths(
-                await options.piLinkedFiles(conversationId).catch(() => []),
-              );
-        if (
-          !allowedByLocalHistory &&
-          !canonicalPaths.has(resolved) &&
-          !cloudPaths.has(resolved) &&
-          !piPaths.has(resolved)
-        ) {
-          throw new Error(
-            `${REMOTE_VIEW_DENIAL_PREFIX}reading this file needs your computer. Only Stella's own outputs and files from the current conversation can load here.`,
-          );
-        }
-      }
-    }
-    const extension = path.extname(resolved).toLowerCase();
+    const authorized = await authorizePath(payload, access);
+    const extension = path.extname(authorized.resolved).toLowerCase();
     if (!ALLOWED_EXTENSIONS.has(extension)) {
       throw new Error(
         `display:readFile only supports: ${Array.from(ALLOWED_EXTENSIONS).join(", ")}`,
       );
     }
     const mimeType = MIME_BY_EXTENSION[extension] ?? "application/octet-stream";
-    return { requestedPath, resolved, mimeType };
+    return { ...authorized, mimeType };
   };
 
   const readDisplayFile = async (
@@ -467,14 +681,17 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
           filePath?: unknown;
           conversationId?: unknown;
           maxBytes?: unknown;
+          offset?: unknown;
+          length?: unknown;
         }
       | undefined,
     access: { remote: boolean },
   ) => {
-    const { requestedPath, resolved, mimeType } = await authorizeDisplayRead(
-      payload,
-      access,
-    );
+    const { requestedPath, resolved, mimeType, conversationId, elsewhere } =
+      await authorizeDisplayRead(payload, access);
+    const range = rangeOf(payload);
+    const viewerConversation =
+      conversationId || (access.remote ? "" : (options.getActiveConversationId?.() ?? ""));
 
     // Paths can outlive the file they point at — e.g. an `image_gen` /
     // tool-result registered a path in `generatedMediaItems`, and the
@@ -482,27 +699,56 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     // outside `~/.stella/`). Treat ENOENT as a soft "missing" result so the
     // renderer can render a placeholder instead of surfacing the raw
     // IPC error to the console / UI.
-    let stats: Awaited<ReturnType<typeof fs.stat>>;
-    try {
-      stats = await fs.stat(resolved);
-    } catch (caught) {
-      if (
-        caught &&
-        typeof caught === "object" &&
-        (caught as NodeJS.ErrnoException).code === "ENOENT"
-      ) {
-        return await readFromOwningDevice(
-          requestedPath,
-          resolved,
-          payload?.maxBytes,
-          mimeType,
-        );
+    let stats: Awaited<ReturnType<typeof fs.stat>> | null = null;
+    if (!elsewhere) {
+      try {
+        stats = await fs.stat(resolved);
+      } catch (caught) {
+        if (
+          !caught ||
+          typeof caught !== "object" ||
+          (caught as NodeJS.ErrnoException).code !== "ENOENT"
+        ) {
+          throw caught;
+        }
       }
-      throw caught;
+    }
+    if (!stats) {
+      const remote = await readFromOwningDevice(
+        requestedPath,
+        resolved,
+        payload?.maxBytes,
+        mimeType,
+        range,
+        viewerConversation,
+      );
+      if (remote) return remote;
+      stats = await fs.stat(resolved);
     }
     if (!stats.isFile()) {
       throw new Error(`display:readFile target is not a file: ${resolved}`);
     }
+
+    if (range) {
+      const from = Math.min(range.offset, stats.size);
+      const length = Math.min(range.length, stats.size - from);
+      const handle = await fs.open(resolved, "r");
+      let buffer = Buffer.alloc(length);
+      try {
+        const { bytesRead } = await handle.read(buffer, 0, length, from);
+        if (bytesRead < length) buffer = buffer.subarray(0, bytesRead);
+      } finally {
+        await handle.close();
+      }
+      return {
+        bytes: new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength),
+        sizeBytes: stats.size,
+        mimeType,
+        truncated: false,
+        missing: false as const,
+      };
+    }
+
     const plan = planDisplayFileRead(stats.size, payload?.maxBytes);
     if (!plan.ok) {
       throw new Error(plan.error);
@@ -538,6 +784,111 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
       truncated: buffer.byteLength < stats.size,
       missing: false as const,
     };
+  };
+
+  const mimeTypeOf = (filePath: string) =>
+    MIME_BY_EXTENSION[path.extname(filePath).toLowerCase()] ??
+    "application/octet-stream";
+
+  /** Where a path is and what it is: a file or a folder, here or on another computer. */
+  const statPath = async (
+    payload: { filePath?: unknown; conversationId?: unknown } | undefined,
+    access: { remote: boolean },
+  ): Promise<DeviceFileStat & { deviceName?: string; deviceId?: string }> => {
+    const { requestedPath, resolved, conversationId, elsewhere } =
+      await authorizePath(payload, access);
+    const stats = elsewhere ? null : await fs.stat(resolved).catch(() => null);
+    if (stats) {
+      return {
+        kind: stats.isDirectory() ? "directory" : "file",
+        sizeBytes: stats.isDirectory() ? 0 : stats.size,
+        mimeType: stats.isDirectory() ? "inode/directory" : mimeTypeOf(resolved),
+        modifiedAt: stats.mtimeMs,
+      };
+    }
+    const viewerConversation =
+      conversationId || (access.remote ? "" : (options.getActiveConversationId?.() ?? ""));
+    const source = await resolveDeviceFileSource(requestedPath, deviceFileDeps());
+    const holder = await findPeerHolder(requestedPath, viewerConversation, source);
+    if (holder) {
+      return {
+        ...holder.stat,
+        deviceId: holder.computer.deviceId,
+        deviceName: holder.computer.label,
+      };
+    }
+    if (source.kind === "drive") {
+      if (source.contentType === DEVICE_FOLDER_CONTENT_TYPE) {
+        return {
+          kind: "directory",
+          sizeBytes: 0,
+          mimeType: "inode/directory",
+          modifiedAt: 0,
+          deviceName: source.deviceName,
+        };
+      }
+      return {
+        kind: "file",
+        sizeBytes: source.sizeBytes,
+        mimeType: source.contentType || mimeTypeOf(resolved),
+        modifiedAt: 0,
+        deviceName: source.deviceName,
+      };
+    }
+    throw new Error(
+      deviceFileUnavailableMessage(
+        source.kind === "local" ? { kind: "missing" } : publicDeviceFileSource(source),
+        requestedPath,
+      ),
+    );
+  };
+
+  /** A folder's entries, here or on the computer that has it. */
+  const listFolder = async (
+    payload: { filePath?: unknown; conversationId?: unknown } | undefined,
+    access: { remote: boolean },
+  ): Promise<DeviceFolderListing & { deviceName?: string }> => {
+    const { requestedPath, resolved, conversationId, elsewhere } =
+      await authorizePath(payload, access);
+    const stats = elsewhere ? null : await fs.stat(resolved).catch(() => null);
+    if (stats) {
+      if (!stats.isDirectory()) {
+        throw new Error(`Not a folder: ${resolved}`);
+      }
+      return await listLocalFolder(resolved);
+    }
+    const viewerConversation =
+      conversationId || (access.remote ? "" : (options.getActiveConversationId?.() ?? ""));
+    const source = await resolveDeviceFileSource(requestedPath, deviceFileDeps());
+    const holder = await findPeerHolder(requestedPath, viewerConversation, source);
+    if (holder) {
+      const listing = await options.peerDeviceFiles!.list(
+        holder.computer.deviceId,
+        requestedPath,
+        viewerConversation,
+      );
+      return { ...listing, deviceName: holder.computer.label };
+    }
+    if (
+      source.kind === "drive" &&
+      source.contentType === DEVICE_FOLDER_CONTENT_TYPE &&
+      options.deviceFileLocator
+    ) {
+      const copy = await options.deviceFileLocator.readCopy(
+        source.drivePath,
+        MAX_FOLDER_MANIFEST_BYTES,
+      );
+      const listing = parseDeviceFolderListing(
+        JSON.parse(Buffer.from(copy.bytes).toString("utf8")),
+      );
+      if (listing) return { ...listing, deviceName: source.deviceName };
+    }
+    throw new Error(
+      deviceFileUnavailableMessage(
+        source.kind === "local" ? { kind: "missing" } : publicDeviceFileSource(source),
+        requestedPath,
+      ),
+    );
   };
 
   handleIpc(
@@ -738,18 +1089,46 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     },
   );
 
+  handleIpc(
+    IPC_DISPLAY_STAT_PATH,
+    async (event, payload?: { filePath?: unknown; conversationId?: unknown }) => {
+      if (!options.assertPrivilegedSender(event, IPC_DISPLAY_STAT_PATH)) {
+        throw new Error(`Blocked untrusted ${IPC_DISPLAY_STAT_PATH} request.`);
+      }
+      return await statPath(payload, { remote: false });
+    },
+  );
+
+  handleIpc(
+    IPC_DISPLAY_LIST_FOLDER,
+    async (event, payload?: { filePath?: unknown; conversationId?: unknown }) => {
+      if (!options.assertPrivilegedSender(event, IPC_DISPLAY_LIST_FOLDER)) {
+        throw new Error(`Blocked untrusted ${IPC_DISPLAY_LIST_FOLDER} request.`);
+      }
+      return await listFolder(payload, { remote: false });
+    },
+  );
+
   return {
-    /** A paired phone's `file.read`, under the remote read policy. */
+    /** A phone's or another computer's `file.read`, under the remote read policy. */
     readFileForRequest: (payload: {
       filePath?: unknown;
       conversationId?: unknown;
+      offset?: unknown;
+      length?: unknown;
     }) => readDisplayFile(payload, { remote: true }),
+    statForRequest: (payload: { filePath?: unknown; conversationId?: unknown }) =>
+      statPath(payload, { remote: true }),
+    listForRequest: (payload: { filePath?: unknown; conversationId?: unknown }) =>
+      listFolder(payload, { remote: true }),
     readThumbnailForRequest: async (payload: {
       filePath?: unknown;
       conversationId?: unknown;
     }) => {
-      const { resolved } = await authorizeDisplayRead(payload, { remote: true });
-      const thumbnail = isEvidenceThumbnailSource(resolved)
+      const { resolved, elsewhere } = await authorizeDisplayRead(payload, {
+        remote: true,
+      });
+      const thumbnail = !elsewhere && isEvidenceThumbnailSource(resolved)
         ? await renderDesktopEvidenceThumbnail(resolved)
         : null;
       if (thumbnail) {

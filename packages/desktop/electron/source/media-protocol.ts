@@ -3,6 +3,8 @@ import path from "node:path";
 import { net, session } from "electron";
 import type { DeviceFileSource } from "@stella/contracts/device-files";
 import type { DeviceFileLocator } from "../services/device-file-locator.js";
+import type { PeerDeviceFiles } from "../services/peer-device-files.js";
+import { DEVICE_FILE_READ_LIMITS } from "@stella/contracts/device-file-reads";
 import {
   publicDeviceFileSource,
   resolveDeviceFileSource,
@@ -55,11 +57,120 @@ export const setDeviceMediaSource = (deps: DeviceFileSourceDeps | null) => {
   deviceFiles = deps;
 };
 
+let peerFiles: PeerDeviceFiles | null = null;
+let activeConversation: () => string | null = () => null;
+
+/**
+ * Lets `stella-media:` stream a file another of the user's computers has,
+ * live from that computer while it is online.
+ */
+export const setPeerMediaSource = (
+  peers: PeerDeviceFiles | null,
+  getConversationId: () => string | null,
+) => {
+  peerFiles = peers;
+  activeConversation = getConversationId;
+};
+
+type PeerHolder = NonNullable<Awaited<ReturnType<PeerDeviceFiles["findHolder"]>>>;
+const HOLDER_CACHE_MS = 30_000;
+const holders = new Map<string, { at: number; value: Promise<PeerHolder | null> }>();
+
+const findPeerHolder = async (
+  requested: string,
+  source: Awaited<ReturnType<typeof resolveDeviceFileSource>>,
+): Promise<PeerHolder | null> => {
+  const peers = peerFiles;
+  if (!peers || source.kind === "local") return null;
+  const now = Date.now();
+  for (const [key, entry] of holders) {
+    if (now - entry.at >= HOLDER_CACHE_MS) holders.delete(key);
+  }
+  const cached = holders.get(requested);
+  if (cached) return await cached.value;
+  const preferred =
+    source.kind === "drive" || source.kind === "elsewhere" ? source.deviceId : null;
+  const value = peers
+    .findHolder(requested, { preferred, conversationId: activeConversation() })
+    .then((found) => (found && found.stat.kind === "file" ? found : null))
+    .catch(() => null);
+  holders.set(requested, { at: now, value });
+  const found = await value;
+  if (!found) holders.delete(requested);
+  return found;
+};
+
 /** Where a `stella-media:` stream for this path comes from, without reading it. */
 export const describeMediaSource = async (
   requested: string,
-): Promise<DeviceFileSource> =>
-  publicDeviceFileSource(await resolveDeviceFileSource(requested, deviceFiles));
+): Promise<DeviceFileSource> => {
+  const source = await resolveDeviceFileSource(requested, deviceFiles);
+  const holder = await findPeerHolder(requested, source);
+  if (holder) return { kind: "device", deviceName: holder.computer.label };
+  return publicDeviceFileSource(source);
+};
+
+const parseRange = (
+  header: string | null,
+  sizeBytes: number,
+): { start: number; end: number } | null => {
+  const match = header ? /^bytes=(\d*)-(\d*)$/.exec(header.trim()) : null;
+  if (!match) return null;
+  const [, rawStart, rawEnd] = match;
+  if (!rawStart && !rawEnd) return null;
+  if (!rawStart) {
+    const suffix = Number(rawEnd);
+    return { start: Math.max(0, sizeBytes - suffix), end: sizeBytes - 1 };
+  }
+  const start = Number(rawStart);
+  const end = rawEnd ? Math.min(Number(rawEnd), sizeBytes - 1) : sizeBytes - 1;
+  return start <= end ? { start, end } : null;
+};
+
+/**
+ * Serve a `stella-media:` request from the computer that has the file. A
+ * player asks in byte ranges; each answer is at most one relayed read, so a
+ * long video starts playing without being fetched whole.
+ */
+const streamFromPeer = async (
+  peers: PeerDeviceFiles,
+  holder: PeerHolder,
+  requested: string,
+  request: Request,
+): Promise<Response> => {
+  const sizeBytes = holder.stat.sizeBytes;
+  const headers = new Headers({
+    "access-control-allow-origin": "*",
+    "accept-ranges": "bytes",
+    "content-type": holder.stat.mimeType || "application/octet-stream",
+  });
+  if (request.method === "HEAD") {
+    headers.set("content-length", String(sizeBytes));
+    return new Response(null, { status: 200, headers });
+  }
+  const asked = parseRange(request.headers.get("range"), sizeBytes);
+  if (request.headers.get("range") && !asked) {
+    headers.set("content-range", `bytes */${sizeBytes}`);
+    return new Response(null, { status: 416, headers });
+  }
+  const start = asked?.start ?? 0;
+  const end = Math.min(
+    asked?.end ?? sizeBytes - 1,
+    start + DEVICE_FILE_READ_LIMITS.rangeBytes - 1,
+  );
+  const read = await peers.read(
+    holder.computer.deviceId,
+    requested,
+    { offset: start, length: end - start + 1 },
+    activeConversation(),
+  );
+  headers.set("content-length", String(read.bytes.byteLength));
+  headers.set(
+    "content-range",
+    `bytes ${start}-${start + read.bytes.byteLength - 1}/${sizeBytes}`,
+  );
+  return new Response(read.bytes, { status: 206, headers });
+};
 
 const withMediaHeaders = (upstream: Response, contentType?: string): Response => {
   const responseHeaders = new Headers(upstream.headers);
@@ -122,6 +233,10 @@ export const serveMediaProtocol = (
             bypassCustomProtocolHandlers: true,
           }),
         );
+      }
+      const holder = useDevices ? await findPeerHolder(requested, source) : null;
+      if (holder && peerFiles) {
+        return await streamFromPeer(peerFiles, holder, requested, request);
       }
       if (source.kind === "drive" && devices) {
         return await streamDriveCopy(devices.locator, source.drivePath, request);

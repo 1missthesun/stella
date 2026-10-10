@@ -16,11 +16,21 @@ export type ResolvedDeviceFileSource =
   | {
       kind: "drive";
       drivePath: string;
+      deviceId: string;
       deviceName: string;
       sizeBytes: number;
       contentType: string;
     }
-  | Exclude<DeviceFileSource, { kind: "local" } | { kind: "drive" }>;
+  | {
+      kind: "elsewhere";
+      deviceId: string;
+      deviceName: string;
+      oversized: boolean;
+    }
+  | Exclude<
+      DeviceFileSource,
+      { kind: "local" } | { kind: "drive" } | { kind: "elsewhere" }
+    >;
 
 const localFilePath = async (requested: string): Promise<string | null> => {
   if (!path.isAbsolute(requested)) return null;
@@ -62,6 +72,7 @@ export const resolveDeviceFileSource = async (
     return {
       kind: "drive",
       drivePath: location.drivePath,
+      deviceId: location.deviceId,
       deviceName: location.deviceName,
       sizeBytes: location.sizeBytes,
       contentType: location.contentType,
@@ -70,6 +81,7 @@ export const resolveDeviceFileSource = async (
   if (location.deviceId === ownDeviceId) return { kind: "missing" };
   return {
     kind: "elsewhere",
+    deviceId: location.deviceId,
     deviceName: location.deviceName,
     oversized: location.sizeBytes > DEVICE_FILE_COPY_LIMITS.maxFileBytes,
   };
@@ -80,5 +92,12 @@ export const publicDeviceFileSource = (
 ): DeviceFileSource => {
   if (source.kind === "local") return { kind: "local" };
   if (source.kind === "drive") return { kind: "drive", deviceName: source.deviceName };
+  if (source.kind === "elsewhere") {
+    return {
+      kind: "elsewhere",
+      deviceName: source.deviceName,
+      oversized: source.oversized,
+    };
+  }
   return source;
 };

@@ -1,6 +1,9 @@
 import type { DeviceFileLocation, DriveFileUrl } from "@stella/contracts/backend/drive";
 import { rpcPath, type RpcResponse } from "@stella/contracts/backend/protocol";
-import { pickDeviceFileLocation } from "@stella/contracts/device-files";
+import {
+  DEVICE_FILE_COPY_LIMITS,
+  pickDeviceFileLocation,
+} from "@stella/contracts/device-files";
 import { resolveJwtOwnerScope } from "@stella/runtime/kernel/runner/computer-agent-cloud-records";
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -33,6 +36,8 @@ export type DeviceFileLocator = {
     drivePath: string,
     maxBytes: number,
   ) => Promise<{ bytes: Uint8Array; sizeBytes: number; mimeType: string }>;
+  /** Which of `paths` `deviceId` recorded as files it shared. */
+  recordedBy: (paths: readonly string[], deviceId: string) => Promise<Set<string>>;
 };
 
 type Candidates = { ok: true; files: DeviceFileLocation[] } | { ok: false; message: string };
@@ -175,5 +180,20 @@ export const createDeviceFileLocator = (deps: Deps): DeviceFileLocator => {
     };
   };
 
-  return { locate, lookup, copyUrl, readCopy };
+  const recordedBy = async (paths: readonly string[], deviceId: string) => {
+    const recorded = new Set<string>();
+    const unique = [...new Set(paths.map((entry) => entry.trim()).filter(Boolean))];
+    for (let start = 0; start < unique.length; start += DEVICE_FILE_COPY_LIMITS.maxLocatePaths) {
+      const batch = unique.slice(start, start + DEVICE_FILE_COPY_LIMITS.maxLocatePaths);
+      const result = await call<{ files: DeviceFileLocation[] }>("drive.locateDeviceFiles", {
+        paths: batch,
+      }).catch(() => ({ files: [] as DeviceFileLocation[] }));
+      for (const file of result.files) {
+        if (file.deviceId === deviceId) recorded.add(file.sourcePath);
+      }
+    }
+    return recorded;
+  };
+
+  return { locate, lookup, copyUrl, readCopy, recordedBy };
 };

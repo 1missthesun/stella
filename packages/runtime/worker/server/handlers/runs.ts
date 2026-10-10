@@ -269,6 +269,14 @@ export const runsHandlers: WorkerRpcHandlers = {
             description: payload.description,
             prompt: withAttachedFiles(payload.prompt, attachments),
           });
+          // The report goes back to a chat on another device; the files it
+          // links are here, so this computer shares them.
+          if (result.status === "ok" && result.finalText) {
+            await session.runner
+              .ensureInitialized()
+              .then((runner) => runner.publishLinkedFiles(result.finalText))
+              .catch(() => undefined);
+          }
           return result.status === "ok"
             ? { status: "ok" as const, finalText: result.finalText, threadId: result.threadId }
             : { status: "error" as const, finalText: "" as const, error: result.error, threadId: result.threadId };
@@ -277,13 +285,19 @@ export const runsHandlers: WorkerRpcHandlers = {
       const runner = yield* fromPromise(() =>
         session.runner.ensureInitialized(),
       );
-      return yield* fromPromise(() =>
-        runner.runBlockingLocalAgent({
+      return yield* fromPromise(async () => {
+        const result = await runner.runBlockingLocalAgent({
           ...payload,
           agentType: payload.agentType ?? "general",
           ...(attachments.length > 0 ? { attachments } : {}),
-        }),
-      );
+        });
+        // The report goes back to a chat on another device; the files it
+        // links are here, so this computer shares them.
+        if (result.status === "ok" && result.finalText) {
+          runner.publishLinkedFiles(result.finalText);
+        }
+        return result;
+      });
     }),
 
   [METHOD_NAMES.INTERNAL_WORKER_STEER_BLOCKING_AGENT]: (params) =>

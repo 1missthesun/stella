@@ -9,6 +9,12 @@ import {
   deviceFileCopyDrivePath,
 } from "@stella/contracts/device-files";
 import { relativeHtmlAssetPaths } from "@stella/contracts/html-relative-assets";
+import {
+  DEVICE_FILE_READ_LIMITS,
+  DEVICE_FOLDER_CONTENT_TYPE,
+  type DeviceFolderEntry,
+  type DeviceFolderListing,
+} from "@stella/contracts/device-file-reads";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import {
   EVIDENCE_THUMBNAIL_CONTENT_TYPE,
@@ -134,6 +140,59 @@ const htmlDocumentAssets = async (documentPath: string): Promise<string[]> => {
     }
   }
   return assets;
+};
+
+/** Files of a linked folder copied to Drive, at most. */
+const FOLDER_COPY_FILES = 50;
+
+/**
+ * A linked folder's listing and the files in it worth copying: its own
+ * regular files (not hidden, not reached through a symlink out of it), up
+ * to `FOLDER_COPY_FILES`. Subfolders are listed, not copied.
+ */
+const folderContents = async (
+  folderPath: string,
+): Promise<{ listing: DeviceFolderListing; files: string[] }> => {
+  const root = await fs.realpath(folderPath);
+  const dirents = await fs.readdir(folderPath, { withFileTypes: true });
+  const entries: DeviceFolderEntry[] = [];
+  const files: string[] = [];
+  let truncated = false;
+  for (const dirent of dirents) {
+    if (dirent.name.startsWith(".")) continue;
+    if (entries.length >= DEVICE_FILE_READ_LIMITS.folderEntries) {
+      truncated = true;
+      break;
+    }
+    const entryPath = path.join(folderPath, dirent.name);
+    const real = await fs.realpath(entryPath).catch(() => null);
+    if (!real || !real.startsWith(root + path.sep)) continue;
+    const stat = await fs.stat(real).catch(() => null);
+    if (!stat || (!stat.isFile() && !stat.isDirectory())) continue;
+    entries.push({
+      name: dirent.name,
+      path: entryPath,
+      kind: stat.isDirectory() ? "directory" : "file",
+      sizeBytes: stat.isDirectory() ? 0 : stat.size,
+      modifiedAt: stat.mtimeMs,
+    });
+    if (
+      stat.isFile() &&
+      stat.size > 0 &&
+      stat.size <= DEVICE_FILE_COPY_LIMITS.maxFileBytes &&
+      files.length < FOLDER_COPY_FILES
+    ) {
+      files.push(entryPath);
+    }
+  }
+  entries.sort((a, b) =>
+    a.kind === b.kind
+      ? a.name.localeCompare(b.name, undefined, { numeric: true })
+      : a.kind === "directory"
+        ? -1
+        : 1,
+  );
+  return { listing: { path: folderPath, entries, truncated }, files };
 };
 
 const withHtmlDocumentAssets = async (paths: string[]): Promise<string[]> => {
@@ -292,7 +351,49 @@ export const createLinkedFilePublisher = (deps: {
     try {
       const records: DeviceFileRecordInput[] = [];
       const settled = new Map<string, string>();
-      for (const sourcePath of await withHtmlDocumentAssets(paths)) {
+      const sourcePaths = await withHtmlDocumentAssets(paths);
+      const filePaths = new Set<string>();
+      for (const sourcePath of sourcePaths) {
+        const stat = await fs.stat(sourcePath).catch(() => null);
+        if (!stat?.isDirectory()) {
+          filePaths.add(sourcePath);
+          continue;
+        }
+        const folder = await folderContents(sourcePath).catch(() => null);
+        if (!folder) continue;
+        for (const inner of folder.files) filePaths.add(inner);
+        const manifest = new TextEncoder().encode(JSON.stringify(folder.listing));
+        const key = `${job.ownerScope}\0${sourcePath}`;
+        const signature = `folder:${createHash("sha256").update(manifest).digest("hex")}`;
+        if (published.get(key) === signature) continue;
+        if (!stillSameOwner()) return;
+        const record = await uploadToDrive(
+          client,
+          deviceFileCopyDrivePath({
+            deviceName: deps.deviceName,
+            sourceDigest: createHash("sha256")
+              .update(`${deps.deviceId}\0${sourcePath}`)
+              .digest("hex"),
+            fileName: `${path.basename(sourcePath) || "folder"}.folder.json`,
+          }),
+          manifest,
+          DEVICE_FOLDER_CONTENT_TYPE,
+        ).catch((error: unknown) => {
+          deps.onLog?.("device_folder_manifest_failed", {
+            folder: path.basename(sourcePath),
+            message: error instanceof Error ? error.message : String(error),
+          });
+          return null;
+        });
+        records.push({
+          sourcePath,
+          ...(record ? { drivePath: record.path } : {}),
+          sizeBytes: manifest.byteLength,
+          contentType: DEVICE_FOLDER_CONTENT_TYPE,
+        });
+        if (record) settled.set(key, signature);
+      }
+      for (const sourcePath of filePaths) {
         let stat: Awaited<ReturnType<typeof fs.stat>>;
         try {
           stat = await fs.stat(sourcePath);

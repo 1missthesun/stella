@@ -22,7 +22,8 @@ import { registerOfficePreviewHandlers } from "../ipc/office-preview-handlers.js
 import { registerChatEvidenceHandlers } from "../ipc/chat-evidence-handlers.js";
 import { createCloudConversationFileGrants } from "../services/cloud-conversation-file-grants.js";
 import { createDeviceFileLocator } from "../services/device-file-locator.js";
-import { setDeviceMediaSource } from "../source/media-protocol.js";
+import { createPeerDeviceFiles } from "../services/peer-device-files.js";
+import { setDeviceMediaSource, setPeerMediaSource } from "../source/media-protocol.js";
 import { registerScheduleHandlers } from "../ipc/schedule-handlers.js";
 import { registerThemeHandlers } from "../ipc/theme-handlers.js";
 import { registerWebsiteHandlers } from "../ipc/website-handlers.js";
@@ -345,6 +346,15 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         locator: deviceFileLocator,
         getDeviceId: () => state.deviceId,
     };
+    // A file another of this owner's computers has is read from it live,
+    // signed with this computer's device key; its own policy decides.
+    const peerDeviceFiles = createPeerDeviceFiles({
+        getBackendUrl: () => services.authService.getBackendUrl(),
+        getAuthToken: () => services.authService.getAuthToken(),
+        getDeviceId: () => state.deviceId,
+        sign: async (message) => await (await loadStellaDeviceSigner(context)).sign(message),
+    });
+    setPeerMediaSource(peerDeviceFiles, () => services.uiStateService.state.conversationId?.trim() || null);
     setDeviceMediaSource(deviceFiles);
     const officePreview = registerOfficePreviewHandlers({
         cloudFileGrants,
@@ -364,6 +374,8 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         cloudFileGrants,
         piLinkedFiles,
         deviceFileLocator,
+        peerDeviceFiles,
+        getActiveConversationId: () => services.uiStateService.state.conversationId?.trim() || null,
         getDeviceId: () => state.deviceId,
         getAuthToken: () => services.authService.getAuthToken(),
         getStellaAppDir: lifecycle.getStellaAppDir,
@@ -600,6 +612,8 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     state.deviceRequestHandlers = {
         readFile: display.readFileForRequest,
         readThumbnail: display.readThumbnailForRequest,
+        statPath: display.statForRequest,
+        listFolder: display.listForRequest,
         renderOfficePreview: officePreview.renderForRequest,
         voiceConfig: voice.configForRequest,
         voiceExecuteTool: voice.executeToolForRequest,

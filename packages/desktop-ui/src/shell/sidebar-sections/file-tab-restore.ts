@@ -75,6 +75,7 @@ export const payloadFileUnavailableMessage = async (
     !source ||
     source.kind === "local" ||
     source.kind === "drive" ||
+    source.kind === "device" ||
     source.kind === "unreachable"
   ) {
     return null;

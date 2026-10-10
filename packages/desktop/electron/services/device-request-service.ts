@@ -21,6 +21,8 @@ export type DeviceRequestHandlers = {
   readFile: (payload: {
     filePath?: unknown;
     conversationId?: unknown;
+    offset?: unknown;
+    length?: unknown;
   }) => Promise<
     | {
         missing: true;
@@ -31,6 +33,8 @@ export type DeviceRequestHandlers = {
     | { missing: false; bytes: Uint8Array; mimeType: string }
   >;
   readThumbnail?: DeviceRequestHandlers["readFile"];
+  statPath?: (payload: { filePath?: unknown; conversationId?: unknown }) => Promise<unknown>;
+  listFolder?: (payload: { filePath?: unknown; conversationId?: unknown }) => Promise<unknown>;
   renderOfficePreview: (payload: {
     filePath?: unknown;
     sessionId?: unknown;
@@ -95,6 +99,9 @@ export const serveDeviceRequest = async (
         const result = await read({
           filePath: request.params.filePath,
           conversationId: request.params.conversationId,
+          ...(request.params.offset !== undefined || request.params.length !== undefined
+            ? { offset: request.params.offset, length: request.params.length }
+            : {}),
         });
         if (result.missing) {
           return {
@@ -112,6 +119,20 @@ export const serveDeviceRequest = async (
             result.bytes.byteLength,
           ).toString("base64"),
         };
+      }
+      case "file.stat":
+      case "file.list": {
+        const handler =
+          request.method === "file.stat" ? handlers.statPath : handlers.listFolder;
+        if (!handler) {
+          return { ok: false, code: "failed", message: "This version of Stella can't do that." };
+        }
+        return json(
+          await handler({
+            filePath: request.params.filePath,
+            conversationId: request.params.conversationId,
+          }),
+        );
       }
       case "officePreview.render": {
         const html = await handlers.renderOfficePreview({

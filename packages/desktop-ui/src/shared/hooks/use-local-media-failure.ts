@@ -14,7 +14,10 @@ export const localMediaFailureMessage = (
   filePath: string,
   noun: LocalMediaNoun,
 ): string =>
-  !source || source.kind === "local" || source.kind === "drive"
+  !source ||
+  source.kind === "local" ||
+  source.kind === "drive" ||
+  source.kind === "device"
     ? `Couldn't play ${filenameOf(filePath)}.`
     : deviceFileUnavailableMessage(source, filePath, noun);
 

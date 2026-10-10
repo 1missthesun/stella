@@ -80,12 +80,25 @@ export const log = (
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** True when the snapshot lets a turn pin this execution's engine. */
-export const snapshotAllowsExecutionEngine = (
-  snapshot: Pick<OwnerSnapshot, "connectedEngines">,
-  engine: OwnerSnapshot["execution"]["engine"],
+/** True when the snapshot lets a turn pin this execution. */
+export const snapshotAllowsExecution = (
+  snapshot: Pick<OwnerSnapshot, "connectedEngines" | "connectedProviders">,
+  execution: OwnerSnapshot["execution"],
 ): boolean =>
-  engine === "stella" || (snapshot.connectedEngines ?? []).includes(engine);
+  execution.engine === "stella" ||
+  (execution.engine === "provider"
+    ? (snapshot.connectedProviders ?? []).includes(execution.provider)
+    : (snapshot.connectedEngines ?? []).includes(execution.engine));
+
+/** What the user is told when a turn's execution can't run. */
+export const executionUnavailableMessage = (
+  execution: OwnerSnapshot["execution"],
+): string =>
+  execution.engine === "anthropic"
+    ? "Connect Claude before using that cloud execution route."
+    : execution.engine === "chatgpt"
+      ? "Connect ChatGPT before using that cloud execution route."
+      : `Add a key for ${execution.provider} in Settings before using that cloud model.`;
 
 export const snapshotAllowsCloudSandbox = (
   snapshot: Pick<OwnerSnapshot, "cloudSandbox">,

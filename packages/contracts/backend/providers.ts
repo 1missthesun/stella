@@ -31,6 +31,27 @@
  * minutes may be dropped and reads as `expired` (start it again).
  */
 
+/** Every provider an account can keep a credential for (pi-ai ids), in display order. */
+export const ACCOUNT_PROVIDER_IDS = [
+  "anthropic",
+  "openai",
+  "google",
+  "openrouter",
+  "github-copilot",
+  "xai",
+  "meta",
+  "kimi-coding",
+  "zai",
+  "cerebras",
+  "vercel-ai-gateway",
+  "opencode",
+] as const;
+
+export type AccountProviderId = (typeof ACCOUNT_PROVIDER_IDS)[number];
+
+export const isAccountProviderId = (value: unknown): value is AccountProviderId =>
+  typeof value === "string" && (ACCOUNT_PROVIDER_IDS as readonly string[]).includes(value);
+
 export type ProviderAuthMethod =
   | {
       kind: "api_key";
@@ -167,3 +188,11 @@ export type ProviderCalls = {
 export type ProviderViews = {
   "providers.get": { args: Record<string, never>; result: ProviderSettings };
 };
+
+/**
+ * Where a `redirect_paste` sign-in lands on the backend's origin: a page
+ * that shows the code to paste. A client that opens the sign-in in a
+ * web-auth session can catch this redirect and pass its URL to
+ * `providers.finishOAuth` itself.
+ */
+export const PROVIDER_OAUTH_CALLBACK_PATH = "/api/providers/oauth/callback";

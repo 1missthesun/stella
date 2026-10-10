@@ -37,6 +37,7 @@ import {
   purgeConversationData,
   scheduleConversationPurge,
 } from "../purge.js";
+import { executionUnavailableMessage, snapshotAllowsExecution } from "../../owner-gate/support.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
@@ -149,13 +150,8 @@ const assertExecutionAvailable = async (
 ): Promise<void> => {
   if (execution.engine === "stella") return;
   const snapshot = await ctx.host.snapshot();
-  if (!(snapshot.connectedEngines ?? []).includes(execution.engine)) {
-    throw new RpcError(
-      "CONFLICT",
-      execution.engine === "anthropic"
-        ? "Connect Claude before using that cloud execution route."
-        : "Connect ChatGPT before using that cloud execution route.",
-    );
+  if (!snapshotAllowsExecution(snapshot, execution)) {
+    throw new RpcError("CONFLICT", executionUnavailableMessage(execution));
   }
 };
 

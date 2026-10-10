@@ -92,6 +92,12 @@ export type OwnerSnapshot = {
    * the owner's engines domain, like `execution`.
    */
   connectedEngines?: Array<"anthropic" | "chatgpt">;
+  /**
+   * Account providers (`@stella/contracts/backend/providers`) with a usable
+   * saved credential: an `engine: "provider"` execution needs its provider
+   * here. Absent on snapshots older than provider keys.
+   */
+  connectedProviders?: string[];
   fetchedAt: number;
   ttlMs: number;
 };

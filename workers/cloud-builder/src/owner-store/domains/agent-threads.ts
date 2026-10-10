@@ -57,6 +57,7 @@ import { normalizeDrivePath } from "./drive.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { array, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
+import { executionUnavailableMessage, snapshotAllowsExecution } from "../../owner-gate/support.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import {
   DispatchError,
@@ -1048,13 +1049,8 @@ const assertExecutionAvailable = async (
 ): Promise<void> => {
   if (execution.engine === "stella") return;
   const snapshot = await ctx.host.snapshot();
-  if (!(snapshot.connectedEngines ?? []).includes(execution.engine)) {
-    throw new RpcError(
-      "CONFLICT",
-      execution.engine === "anthropic"
-        ? "Connect Claude before using that cloud execution route."
-        : "Connect ChatGPT before using that cloud execution route.",
-    );
+  if (!snapshotAllowsExecution(snapshot, execution)) {
+    throw new RpcError("CONFLICT", executionUnavailableMessage(execution));
   }
 };
 

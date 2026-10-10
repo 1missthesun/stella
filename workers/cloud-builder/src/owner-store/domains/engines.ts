@@ -24,7 +24,12 @@
 // the owner's hosts so another host can reuse a registration with its own
 // host id.
 
-import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import {
+  isLegacyCloudExecution,
+  type CloudExecutionSelection,
+  type LegacyCloudExecutionSelection,
+} from "@stella/contracts/agent-engine";
+import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import { cloudSandboxAccess } from "./billing.js";
 import {
@@ -237,6 +242,16 @@ export const ENGINE_CLI_LOGINS_MIGRATION = {
   ],
 };
 
+/**
+ * A selection can name a model on an account provider key. Clients older
+ * than provider keys read `execution`; it keeps the last selection they
+ * understand (`legacy_execution`) while the account runs on a provider.
+ */
+export const ENGINE_PROVIDER_SELECTION_MIGRATION = {
+  id: "engines.6-provider-selection",
+  statements: [`ALTER TABLE engine_settings ADD COLUMN legacy_execution TEXT`],
+};
+
 const CONNECT_TTL_MS = 15 * 60_000;
 /** Accounts one provider may hold. */
 const MAX_ACCOUNTS_PER_PROVIDER = 10;
@@ -246,7 +261,7 @@ const PROVIDER_LABELS: Record<EngineProvider, string> = {
   chatgpt: "ChatGPT",
 };
 
-export const DEFAULT_EXECUTION: CloudExecutionSelection = {
+export const DEFAULT_EXECUTION: LegacyCloudExecutionSelection = {
   engine: "stella",
   provider: "stella",
   // Opaque managed default; the cloud-model endpoint resolves it per audience.
@@ -348,6 +363,8 @@ const decryptPayload = async (
 // --- Execution selection ---------------------------------------------------
 
 const EXECUTION_ENGINES = ["stella", "anthropic", "chatgpt"] as const;
+/** A provider's model id: catalog ids include `/`, `:` and `~` (OpenRouter). */
+const PROVIDER_MODEL_ID = /^[A-Za-z0-9~][A-Za-z0-9._:/@~+-]{0,191}$/;
 const REASONING_EFFORTS = ["default", "none", "minimal", "low", "medium", "high", "xhigh"] as const;
 
 const MANAGED_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$/;
@@ -362,8 +379,30 @@ const parseExecutionShape = object({
   reasoningEffort: literal(...REASONING_EFFORTS),
 });
 
+const parseProviderExecutionShape = object({
+  engine: literal("provider"),
+  provider: string({ min: 1, max: 64 }),
+  model: string({ max: 256 }),
+  reasoningEffort: literal(...REASONING_EFFORTS),
+});
+
 /** The shape check plus the relationships a shape can't express. */
 const parseExecution = (value: unknown, path?: string): CloudExecutionSelection => {
+  if (
+    value &&
+    typeof value === "object" &&
+    (value as { engine?: unknown }).engine === "provider"
+  ) {
+    const input = parseProviderExecutionShape(value, path);
+    if (!isAccountProviderId(input.provider)) {
+      throw new RpcError("BAD_REQUEST", "Stella doesn't know that model provider.");
+    }
+    const model = input.model.trim();
+    if (!PROVIDER_MODEL_ID.test(model)) {
+      throw new RpcError("BAD_REQUEST", "Cloud execution model must be a model id of 1–192 safe characters.");
+    }
+    return { ...input, model };
+  }
   const input = parseExecutionShape(value, path);
   if (input.engine !== input.provider) {
     throw new RpcError("BAD_REQUEST", "Cloud execution engine and provider must identify the same route.");
@@ -393,7 +432,7 @@ const parseExecution = (value: unknown, path?: string): CloudExecutionSelection 
   } as CloudExecutionSelection;
 };
 
-type SettingsRow = { execution: string; updated_at: number };
+type SettingsRow = { execution: string; legacy_execution: string | null; updated_at: number };
 type AccountRow = {
   account_id: string;
   provider: string;
@@ -427,14 +466,36 @@ type ConnectRow = {
   expires_at: number;
 };
 
-const readSelection = (db: OwnerDbReader): { execution: CloudExecutionSelection; selectedAt: number | null } => {
-  const row = db.one<SettingsRow>("SELECT execution, updated_at FROM engine_settings WHERE id = 1");
-  if (!row) return { execution: DEFAULT_EXECUTION, selectedAt: null };
+type Selection = {
+  /** The saved selection, a provider model included. */
+  selection: CloudExecutionSelection;
+  /** The last saved selection older clients understand. */
+  execution: LegacyCloudExecutionSelection;
+  selectedAt: number | null;
+};
+
+const parseStored = (raw: string | null): CloudExecutionSelection | null => {
+  if (!raw) return null;
   try {
-    return { execution: parseExecution(JSON.parse(row.execution)), selectedAt: row.updated_at };
+    return parseExecution(JSON.parse(raw));
   } catch {
-    return { execution: DEFAULT_EXECUTION, selectedAt: row.updated_at };
+    return null;
   }
+};
+
+const readSelection = (db: OwnerDbReader): Selection => {
+  const row = db.one<SettingsRow>(
+    "SELECT execution, legacy_execution, updated_at FROM engine_settings WHERE id = 1",
+  );
+  if (!row) return { selection: DEFAULT_EXECUTION, execution: DEFAULT_EXECUTION, selectedAt: null };
+  const selection = parseStored(row.execution) ?? DEFAULT_EXECUTION;
+  const legacy = parseStored(row.legacy_execution);
+  const execution = isLegacyCloudExecution(selection)
+    ? selection
+    : legacy && isLegacyCloudExecution(legacy)
+      ? legacy
+      : DEFAULT_EXECUTION;
+  return { selection, execution, selectedAt: row.updated_at };
 };
 
 const ACCOUNT_COLUMNS =
@@ -526,27 +587,49 @@ const connectedEnginesOf = (db: OwnerDbReader): NonNullable<OwnerSnapshot["conne
   );
 };
 
+/** Account providers with a credential that can serve a turn (`providers.ts`). */
+const connectedProvidersOf = (db: OwnerDbReader): string[] =>
+  db
+    .all<{ provider: string }>("SELECT provider FROM provider_credentials WHERE status = 'ok' ORDER BY provider")
+    .map((row) => row.provider);
+
 export const snapshotEngines = (
   db: OwnerDbReader,
-): Pick<OwnerSnapshot, "execution" | "connectedEngines"> => {
+): Pick<OwnerSnapshot, "execution" | "connectedEngines" | "connectedProviders"> => {
   const connectedEngines = readOrDefault(() => connectedEnginesOf(db), []);
-  const { execution } = readSelection(db);
+  const connectedProviders = readOrDefault(() => connectedProvidersOf(db), [] as string[]);
+  const { selection } = readSelection(db);
+  const runnable =
+    selection.engine === "stella" ||
+    (selection.engine === "provider"
+      ? connectedProviders.includes(selection.provider)
+      : connectedEngines.includes(selection.engine));
   return {
-    execution:
-      execution.engine === "stella" || connectedEngines.includes(execution.engine)
-        ? execution
-        : DEFAULT_EXECUTION,
+    execution: runnable ? selection : DEFAULT_EXECUTION,
     connectedEngines,
+    connectedProviders,
   };
 };
 
 const writeSelection = (ctx: OwnerContext, execution: CloudExecutionSelection): void => {
+  const legacy = isLegacyCloudExecution(execution) ? JSON.stringify(execution) : null;
   ctx.db.run(
-    `INSERT INTO engine_settings (id, execution, updated_at) VALUES (1, ?, ?)
-     ON CONFLICT (id) DO UPDATE SET execution = excluded.execution, updated_at = excluded.updated_at`,
+    `INSERT INTO engine_settings (id, execution, legacy_execution, updated_at) VALUES (1, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET execution = excluded.execution,
+       legacy_execution = COALESCE(excluded.legacy_execution, legacy_execution),
+       updated_at = excluded.updated_at`,
     JSON.stringify(execution),
+    legacy,
     ctx.now,
   );
+};
+
+/** A provider's credential went: a selection on it falls back to Stella's default. */
+export const resetExecutionForProvider = (ctx: OwnerContext, provider: string): void => {
+  const { selection } = readSelection(ctx.db);
+  if (selection.engine === "provider" && selection.provider === provider) {
+    writeSelection(ctx, DEFAULT_EXECUTION);
+  }
 };
 
 const writeActiveAccount = (
@@ -1275,7 +1358,7 @@ const disconnect = async (
     writeActiveAccount(ctx, args.provider, servable[0]?.account_id ?? null);
   }
   // Fall back to the managed engine if the provider's last usable account went.
-  if (servable.length === 0 && readSelection(ctx.db).execution.engine === args.provider) {
+  if (servable.length === 0 && readSelection(ctx.db).selection.engine === args.provider) {
     writeSelection(ctx, DEFAULT_EXECUTION);
   }
   return args.provider === "chatgpt" ? { revoked } : null;
@@ -1453,6 +1536,7 @@ export const enginesDomain = {
     ENGINE_DEVICE_REFRESH_MIGRATION,
     ENGINE_CHATGPT_SIWC_MIGRATION,
     ENGINE_CLI_LOGINS_MIGRATION,
+    ENGINE_PROVIDER_SELECTION_MIGRATION,
   ],
   views: {
     "engines.get": {

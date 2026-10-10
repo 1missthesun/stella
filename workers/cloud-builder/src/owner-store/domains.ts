@@ -21,6 +21,7 @@ import { voiceDomain } from "./domains/voice.js";
 import { abuseDomain } from "./domains/abuse.js";
 import { integrationsDomain } from "./domains/integrations.js";
 import { enginesDomain } from "./domains/engines.js";
+import { providersDomain } from "./domains/providers.js";
 import { projectsDomain } from "./domains/projects.js";
 import { browserDomain } from "./domains/browser.js";
 import { userAsksDomain } from "./domains/user-asks.js";
@@ -58,6 +59,7 @@ export const ownerDomains: OwnerDomain[] = [
   abuseDomain,
   integrationsDomain,
   enginesDomain,
+  providersDomain,
   projectsDomain,
   browserDomain,
   userAsksDomain,

@@ -824,7 +824,7 @@
 }
 
 /* ---- Mobile app downloads ----------------------------------------------- */
-/* Same voice as `.button--download` (Cormorant italic, glow wash, quiet
+/* Same voice as `.button--download` (display type, glow wash, quiet
    border) but shaped like store badges: platform mark + two-line label. */
 .storeLinks {
   display: flex;
@@ -903,10 +903,10 @@
 
 .storeLinkName {
   margin-top: 0.12rem;
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: 1.45rem;
-  font-style: italic;
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.23rem;
+  font-style: normal;
+  font-weight: 600;
   letter-spacing: -0.005em;
 }
 
@@ -1000,10 +1000,10 @@
 
 .qrModal h3 {
   margin: 0.3rem 0 0;
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: clamp(1.8rem, 6vw, 2.25rem);
-  font-style: italic;
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.53rem, 5.1vw, 1.91rem);
+  font-style: normal;
+  font-weight: 600;
   line-height: 1.05;
   letter-spacing: -0.02em;
 }

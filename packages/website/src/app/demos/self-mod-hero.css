@@ -39,18 +39,19 @@
 
 .self-mod-hero__eyebrow {
   color: rgba(18, 18, 15, 0.46);
-  font-family: var(--font-display), serif;
-  font-size: 0.95rem;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.81rem;
+  font-style: normal;
   letter-spacing: -0.03em;
 }
 
 .self-mod-hero__title {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(3.4rem, 12vw, 8.6rem);
-  font-weight: 300;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(2.89rem, 10.2vw, 7.31rem);
+  font-weight: 600;
+  font-style: normal;
   line-height: 0.88;
   letter-spacing: -0.07em;
   color: inherit;
@@ -89,7 +90,7 @@
      in `stella-mock-themes.css` so each transformation reads as a real
      Stella desktop theme. Cozy keeps its own palette via `[data-cozy]`. */
   --font-family-sans: var(--font-sans), system-ui, sans-serif;
-  --font-family-display: var(--font-display), Georgia, serif;
+  --font-family-display: var(--font-display), system-ui, sans-serif;
   --font-family-mono: var(--font-mono), ui-monospace, monospace;
 
   --glass-blur: blur(40px) saturate(180%);
@@ -342,10 +343,10 @@
 }
 
 .smhm-dash__figure {
-  font-family: var(--font-display, Georgia), serif;
-  font-style: italic;
-  font-weight: 400;
-  font-size: 1.7rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 1.44rem;
   letter-spacing: -0.04em;
   line-height: 1;
   color: var(--mini-text-strong);
@@ -439,10 +440,10 @@
 }
 
 .smhm-cozy__brand {
-  font-family: var(--font-display, Georgia), serif;
-  font-style: italic;
-  font-size: 17px;
-  font-weight: 600;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-style: normal;
+  font-size: 14px;
+  font-weight: 700;
   letter-spacing: 0.02em;
   color: #f5f6f9;
 }
@@ -486,20 +487,20 @@
 }
 
 .smhm-cozy__headline {
-  font-family: var(--font-display, Georgia), serif;
-  font-style: italic;
-  font-weight: 300;
-  font-size: 1.4rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 1.19rem;
   line-height: 1;
   letter-spacing: -0.03em;
   color: #f5f6f9;
 }
 
 .smhm-cozy__headline-em {
-  font-family: var(--font-display, Georgia), serif;
-  font-style: italic;
-  font-weight: 300;
-  font-size: 1.4rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 600;
+  font-size: 1.19rem;
   line-height: 1;
   letter-spacing: -0.03em;
   color: rgba(245, 246, 249, 0.62);

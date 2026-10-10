@@ -178,10 +178,10 @@
 .fix-eyebrow {
   margin: 0;
   color: color-mix(in oklch, var(--page-foreground) 64%, transparent);
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: clamp(1.1rem, 1rem + 0.45vw, 1.35rem);
-  font-style: italic;
-  font-weight: 500;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(0.94rem, 0.85rem + 0.38vw, 1.15rem);
+  font-style: normal;
+  font-weight: 600;
   letter-spacing: 0;
   line-height: 1.25;
   text-transform: none;
@@ -190,16 +190,16 @@
 .fix-hero h1 {
   max-width: 50rem;
   margin: 1rem 0 1.3rem;
-  font-family: var(--font-display), serif;
-  font-size: clamp(2.9rem, 7vw, 5.8rem);
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(2.47rem, 5.95vw, 4.93rem);
+  font-weight: 600;
   letter-spacing: -0.055em;
   line-height: 0.92;
 }
 
 .fix-hero h1 span {
   color: #3e6fdc;
-  font-style: italic;
+  font-style: normal;
 }
 
 .fix-lede,
@@ -247,9 +247,9 @@
 .fix-cta h2 {
   max-width: 47rem;
   margin: 0.8rem 0 1rem;
-  font-family: var(--font-display), serif;
-  font-size: clamp(2.1rem, 5vw, 4rem);
-  font-weight: 350;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.79rem, 4.25vw, 3.4rem);
+  font-weight: 600;
   letter-spacing: -0.05em;
   line-height: 0.98;
 }
@@ -281,8 +281,9 @@
   margin-right: 0.7rem;
   color: #3e6fdc;
   content: "\201C";
-  font-family: var(--font-display), serif;
-  font-size: 1.5rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.27rem;
   line-height: 1;
 }
 
@@ -534,9 +535,9 @@ ul.fix-symptoms {
 
 .fix-index-card h2 {
   margin: 0 0 0.1rem;
-  font-family: var(--font-display), serif;
-  font-size: 1.45rem;
-  font-weight: 500;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.23rem;
+  font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1.1;
 }

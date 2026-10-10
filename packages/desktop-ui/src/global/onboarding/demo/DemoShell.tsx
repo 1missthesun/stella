@@ -12,7 +12,7 @@
  *    Settings plus the display-panel toggle on the right;
  *  - no left sidebar — the shell redesign removed it, moving navigation
  *    into the top bar and the right-hand display panel;
- *  - a single centered column holding the Cormorant greeting over a
+ *  - a single centered column holding the display-type greeting over a
  *    centered composer, which on send drops to the bottom and hands the
  *    column to the message stream — the real home-to-chat morph.
  *

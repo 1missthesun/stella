@@ -17,7 +17,7 @@
 .slide-copy { position:absolute; top:10.1%; left:7.3%; right:5%; z-index:5; }
 .slide-copy h1 { margin:0; font-size:calc(121 * var(--u)); font-weight:650; line-height:1.04; letter-spacing:-.067em; }
 .slide-copy h1 span { display:block; }
-.slide-copy h1 .headline-accent { font-family:var(--font-cormorant),serif; font-weight:400; font-size:1.28em; letter-spacing:-.055em; line-height:1.01; }
+.slide-copy h1 .headline-accent { font-family:var(--font-display), system-ui, sans-serif; font-weight:600; font-size:1.09em; letter-spacing:-.055em; line-height:1.01; }
 .slide-copy p { margin:calc(32 * var(--u)) 0 0; font-size:calc(32 * var(--u)); line-height:1.4; letter-spacing:-.025em; opacity:.76; }
 .scene-light { position:absolute; width:135%; height:64%; left:4%; top:35%; border-radius:50%; background:radial-gradient(ellipse,var(--accent),transparent 68%); opacity:.44; filter:blur(calc(38 * var(--u))); z-index:-2; }
 .scene-orbit { position:absolute; width:165%; aspect-ratio:1; border:calc(2 * var(--u)) solid currentColor; border-radius:50%; left:-32%; top:38%; opacity:.13; z-index:-1; box-shadow:0 0 0 calc(55 * var(--u)) #ffffff05,0 0 0 calc(110 * var(--u)) #ffffff04; }
@@ -65,7 +65,7 @@
 @media(max-width:1000px) { .store-gallery { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 @media(max-width:600px) { .store-gallery { grid-template-columns:1fr; } .studio-toolbar { align-items:flex-start; flex-direction:column; } }
 
-.slide-wordmark { font-family:var(--font-cormorant),serif; font-size:calc(84 * var(--u)); font-weight:400; letter-spacing:-.045em; }
+.slide-wordmark { font-family:var(--font-display), system-ui, sans-serif; font-size:calc(71 * var(--u)); font-weight:600; letter-spacing:-.045em; }
 
 .slide-mascot { position:absolute; z-index:6; width:calc(166 * var(--u)); height:calc(166 * var(--u)); top:2.1%; right:5.3%; transform:rotate(9deg); }
 .artifact-cursor { position:absolute; z-index:4; width:calc(100 * var(--u)); height:calc(112 * var(--u)); right:12%; top:35%; filter:drop-shadow(0 calc(5 * var(--u)) calc(6 * var(--u)) #0004); transform:rotate(-12deg); }

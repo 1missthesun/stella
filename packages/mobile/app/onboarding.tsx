@@ -504,8 +504,8 @@ const makeStyles = (colors: Colors) =>
     },
     wordmark: {
       color: colors.text,
-      fontFamily: fonts.display.regular,
-      fontSize: 30,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 26,
       letterSpacing: -0.6,
     },
     assistantRow: {

@@ -4,9 +4,9 @@
 
 .section-kicker--compact h3 {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(1.6rem, 2.8vw, 2.5rem);
-  font-weight: 400;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.36rem, 2.38vw, 2.13rem);
+  font-weight: 600;
   line-height: 0.96;
   letter-spacing: -0.05em;
   /* Reserve ~2 lines so display font swap / wrap doesnâ€™t collapse panel headers */

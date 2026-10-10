@@ -249,8 +249,8 @@ const makeStyles = (colors: Colors) =>
     },
     wordmark: {
       color: colors.text,
-      fontFamily: fonts.display.regular,
-      fontSize: 32,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 27,
       letterSpacing: -0.6,
     },
     topFade: {

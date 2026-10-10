@@ -17,8 +17,8 @@
    * (padding/scroll) — so the surface stays uniform.
    */
   --dialog-title-font: var(--font-family-display);
-  --dialog-title-size: var(--font-size-3xl); /* 24px */
-  --dialog-title-weight: var(--weight-regular);
+  --dialog-title-size: var(--font-size-2xl); /* 20px */
+  --dialog-title-weight: var(--weight-semibold);
   --dialog-title-spacing: -0.03em;
   --dialog-title-line: 1.2;
   --dialog-header-pad: var(--space-5) var(--space-4) var(--space-4)

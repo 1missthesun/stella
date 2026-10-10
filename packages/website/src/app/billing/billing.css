@@ -9,7 +9,7 @@
   --billing-faint: color-mix(in oklch, var(--billing-fg) 8%, transparent);
   --billing-border: color-mix(in oklch, var(--billing-fg) 16%, transparent);
   --billing-border-strong: color-mix(in oklch, var(--billing-fg) 32%, transparent);
-  --billing-serif: var(--font-display, "Cormorant Garamond", Georgia, serif);
+  --billing-serif: var(--font-display, system-ui, sans-serif);
   --billing-mono: var(--font-mono, "IBM Plex Mono", monospace);
 
   min-height: 100vh;
@@ -46,17 +46,17 @@
 }
 
 .billing-title {
-  font-family: var(--billing-serif);
-  font-size: clamp(2.4rem, 4vw, 3.2rem);
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(2.04rem, 3.4vw, 2.72rem);
+  font-weight: 600;
   letter-spacing: -0.04em;
   line-height: 1;
   margin: 0;
 }
 
 .billing-title em {
-  font-weight: 300;
-  font-style: italic;
+  font-weight: 600;
+  font-style: normal;
 }
 
 .billing-lead,
@@ -137,10 +137,10 @@
 }
 
 .billing-status-value {
-  font-family: var(--billing-serif);
-  font-size: 1.6rem;
-  font-weight: 400;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.36rem;
+  font-weight: 600;
+  font-style: normal;
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
@@ -236,10 +236,10 @@
 }
 
 .billing-section-title {
-  font-family: var(--billing-serif);
-  font-size: 1.8rem;
-  font-weight: 400;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.53rem;
+  font-weight: 600;
+  font-style: normal;
   letter-spacing: -0.02em;
   margin: 0;
 }
@@ -312,7 +312,8 @@
   display: flex;
   align-items: baseline;
   gap: 4px;
-  font-family: var(--billing-serif);
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
 }
 
 .billing-plan-price--intro-offer {
@@ -322,9 +323,9 @@
 .billing-plan-price-period.intro {
   text-transform: none;
   letter-spacing: -0.02em;
-  font-family: var(--billing-serif);
-  font-size: 1rem;
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 .billing-plan-price-then {
@@ -470,10 +471,10 @@
 }
 
 .billing-credit-balance-value {
-  font-family: var(--billing-serif);
-  font-size: 1.4rem;
-  font-weight: 400;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 1.19rem;
+  font-weight: 600;
+  font-style: normal;
   letter-spacing: -0.02em;
   line-height: 1;
 }
@@ -533,9 +534,9 @@
 }
 
 .billing-credit-input-prefix {
-  font-family: var(--billing-serif);
-  font-size: 1.1rem;
-  font-weight: 400;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 0.94rem;
+  font-weight: 600;
   color: var(--billing-muted);
 }
 

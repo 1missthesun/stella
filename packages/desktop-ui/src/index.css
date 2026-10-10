@@ -64,7 +64,7 @@
 
 :root {
   /* Font families with metric-adjusted fallbacks. Manrope for UI/body;
-     Cormorant Garamond for display headings and brand voice. */
+     Mona Sans for display headings and brand voice. */
   --font-family-sans: "Manrope", "Manrope Fallback", system-ui, sans-serif;
   --font-family-sans--font-feature-settings: normal;
   --font-family-sans--default-weight: 400;
@@ -72,7 +72,7 @@
   --font-family-sans--emphasis-weight: 600;
   --font-family-mono: "IBM Plex Mono", "IBM Plex Mono Fallback", ui-monospace, monospace;
   --font-family-mono--font-feature-settings: "ss01" 1;
-  --font-family-display: "Cormorant Garamond", Georgia, serif;
+  --font-family-display: "Mona Sans", "Mona Sans Fallback", system-ui, sans-serif;
 
   /* Accent ramp for incidental data viz (Apple system colors). */
   --stella-animation-color-1: #0a84ff;

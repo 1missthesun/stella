@@ -17,11 +17,11 @@
   z-index: 5;
   left: 46px;
   top: 24px;
-  font-family: var(--font-cormorant), serif;
-  font-size: 57px;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 48px;
   line-height: 1;
   letter-spacing: -0.045em;
-  font-weight: 400;
+  font-weight: 600;
 }
 .feature-mascot {
   position: absolute;
@@ -48,10 +48,10 @@
 }
 .feature-copy h1 span {
   display: block;
-  font-family: var(--font-cormorant), serif;
-  font-size: 60px;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 51px;
   line-height: 1.04;
-  font-weight: 400;
+  font-weight: 600;
   color: #252525;
   letter-spacing: -0.055em;
 }

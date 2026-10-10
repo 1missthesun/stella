@@ -23,15 +23,15 @@
 
 .pr-title {
   margin: 0 0 1rem;
-  font-family: var(--font-display), serif;
-  font-size: clamp(2.8rem, 8vw, 5.2rem);
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(2.38rem, 6.8vw, 4.42rem);
+  font-weight: 600;
   line-height: 0.92;
   letter-spacing: -0.06em;
 }
 
 .pr-title span {
-  font-style: italic;
+  font-style: normal;
 }
 
 .pr-subtitle {
@@ -46,9 +46,9 @@
 
 .pr-article h2 {
   margin: 0 0 1rem;
-  font-family: var(--font-display), serif;
-  font-size: clamp(1.6rem, 3vw, 2.4rem);
-  font-weight: 400;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.36rem, 2.55vw, 2.04rem);
+  font-weight: 600;
   line-height: 0.95;
   letter-spacing: -0.05em;
 }
@@ -144,9 +144,9 @@
 .pr-card__period--phrase {
   text-transform: none;
   letter-spacing: -0.02em;
-  font-family: var(--font-display), serif;
-  font-size: 0.95rem;
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 0.81rem;
+  font-weight: 600;
 }
 
 .pr-card__price-then {
@@ -165,9 +165,9 @@
 }
 
 .pr-card__amount {
-  font-family: var(--font-display), serif;
-  font-size: clamp(2rem, 3vw, 2.6rem);
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.7rem, 2.55vw, 2.21rem);
+  font-weight: 600;
   letter-spacing: -0.05em;
   line-height: 1;
 }

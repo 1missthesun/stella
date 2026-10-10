@@ -38,8 +38,8 @@ const makeStyles = (colors: Colors) => StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontFamily: fonts.display.regular,
-    fontSize: 34,
+    fontFamily: fonts.display.semiBold,
+    fontSize: 29,
     letterSpacing: -1.5,
     lineHeight: 38,
   },

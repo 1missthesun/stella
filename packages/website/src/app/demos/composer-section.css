@@ -17,19 +17,19 @@
    the blue codex-frame card, not inside it, so the page background
    (cream/white) shows through. */
 .composer-hero__eyebrow {
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-style: italic;
-  font-size: 18px;
-  font-weight: 450;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-style: normal;
+  font-size: 15px;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .composer-hero__title {
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 600;
   letter-spacing: -0.025em;
-  font-size: clamp(2rem, 4vw, 3rem);
+  font-size: clamp(1.7rem, 3.4vw, 2.55rem);
   margin: 0.4rem 0 0.8rem;
 }
 

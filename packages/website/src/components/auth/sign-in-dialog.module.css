@@ -48,8 +48,9 @@
 }
 
 .brandText {
-  font-family: var(--font-display), serif;
-  font-size: 1.2rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.02rem;
   letter-spacing: -0.02em;
 }
 

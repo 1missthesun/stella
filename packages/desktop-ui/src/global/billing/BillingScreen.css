@@ -112,8 +112,8 @@
 .billing-state strong {
   color: var(--text-strong);
   font-family: var(--font-family-display);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--weight-regular);
+  font-size: var(--font-size-xl);
+  font-weight: var(--weight-semibold);
   letter-spacing: -0.025em;
 }
 
@@ -259,8 +259,8 @@
   margin: 0;
   color: var(--text-strong);
   font-family: var(--font-family-display);
-  font-size: var(--font-size-xl);
-  font-weight: var(--weight-regular);
+  font-size: var(--font-size-lg);
+  font-weight: var(--weight-semibold);
   letter-spacing: -0.025em;
 }
 

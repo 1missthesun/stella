@@ -747,8 +747,8 @@ const makeStyles = (colors: {
     },
     emptyText: {
       color: colors.textMuted,
-      fontFamily: fonts.display.regularItalic,
-      fontSize: 22,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 19,
       letterSpacing: -0.5,
       opacity: 0.45,
       textAlign: "center",

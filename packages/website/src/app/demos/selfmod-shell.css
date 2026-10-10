@@ -4,7 +4,7 @@
  * Mirrors `desktop/src/global/onboarding/panels/StellaAppMock.tsx` so the
  * website "Stella can transform itself" demo reads as the same product
  * users see in onboarding. The shell has a 170px brand-on-right sidebar
- * (Home / Store / Social + account footer), an italic Cormorant home title
+ * (Home / Store / Social + account footer), a display-type home title
  * with category pills, and a pill composer at the bottom.
  *
  * Stages map to the desktop "transformation pills":
@@ -182,10 +182,10 @@
 }
 .selfmod-shell__brand-text {
   color: var(--selfmod-text-weaker);
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: 19px;
-  font-weight: 450;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  font-style: normal;
   letter-spacing: -0.02em;
   line-height: 1;
   text-transform: none;
@@ -403,10 +403,10 @@
 .selfmod-shell__cozy-rail-paw svg { width: 100%; height: 100%; }
 .selfmod-shell__cozy-rail-name {
   color: #8b6240;
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: 17px;
-  font-weight: 600;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  font-style: normal;
   letter-spacing: 0.06em;
   line-height: 1;
 }
@@ -624,10 +624,10 @@
 .selfmod-shell[data-cozy] .selfmod-shell__home { display: none; }
 
 .selfmod-shell__home-title {
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: clamp(1.4rem, 2.6vw, 2rem);
-  font-weight: 450;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.19rem, 2.21vw, 1.7rem);
+  font-weight: 600;
+  font-style: normal;
   letter-spacing: -0.03em;
   line-height: 1.2;
   color: var(--selfmod-foreground);
@@ -769,10 +769,10 @@
   animation: selfmodFadeUp 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .selfmod-shell__home-cozy-title {
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: clamp(1.4rem, 2.6vw, 2rem);
-  font-weight: 450;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.19rem, 2.21vw, 1.7rem);
+  font-weight: 600;
+  font-style: normal;
   letter-spacing: -0.03em;
   line-height: 1.2;
   color: #5c3d2e;
@@ -814,10 +814,10 @@
   padding: 0 24px;
 }
 .selfmod-shell__home-cozy-suggestion {
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: 16px;
-  font-style: italic;
-  font-weight: 500;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
   color: #5c3d2e;
   line-height: 1.4;
   letter-spacing: -0.005em;
@@ -967,9 +967,9 @@
 }
 .selfmod-cozy-zzz {
   position: absolute;
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-style: italic;
-  font-weight: 600;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-style: normal;
+  font-weight: 700;
   color: #b08560;
   pointer-events: none;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
@@ -1024,10 +1024,10 @@
   flex-shrink: 0;
 }
 .selfmod-cozy-line {
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: 17px;
-  font-style: italic;
-  font-weight: 500;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 600;
   color: #5c3d2e;
   white-space: nowrap;
   overflow: hidden;

@@ -9,8 +9,7 @@ import { markdownTextRuns, selectableItalicFonts } from "../lib/selectable-markd
 const italicFontWeights = {
   [fonts.sans.regular]: "400", [fonts.sans.medium]: "500",
   [fonts.sans.semiBold]: "600", [fonts.sans.bold]: "700",
-  [fonts.display.light]: "300", [fonts.display.regular]: "400",
-  [fonts.display.regularItalic]: "400", [fonts.display.semiBold]: "600",
+  [fonts.display.semiBold]: "600",
   [fonts.mono.regular]: "400", [fonts.mono.medium]: "500",
 } as const;
 

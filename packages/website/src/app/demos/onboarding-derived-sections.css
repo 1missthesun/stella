@@ -42,18 +42,19 @@
 
 .ob-section-eyebrow {
   color: rgba(18, 18, 15, 0.46);
-  font-family: var(--font-display), serif;
-  font-size: 0.95rem;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.81rem;
+  font-style: normal;
   letter-spacing: -0.03em;
 }
 
 .ob-section-title {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(2.4rem, 7vw, 5rem);
-  font-weight: 300;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(2.04rem, 5.95vw, 4.25rem);
+  font-weight: 600;
+  font-style: normal;
   line-height: 0.95;
   letter-spacing: -0.06em;
   color: inherit;
@@ -270,9 +271,10 @@
 }
 
 .ob-memory__label {
-  font-family: var(--font-display), serif;
-  font-style: italic;
-  font-size: 1rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 0.85rem;
   color: rgba(15, 23, 40, 0.55);
   letter-spacing: -0.02em;
 }
@@ -377,9 +379,10 @@
 }
 
 .ob-actions__rest-name {
-  font-family: var(--font-display), serif;
-  font-style: italic;
-  font-size: 1.8rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 1.53rem;
   letter-spacing: -0.04em;
   color: rgba(15, 23, 40, 0.95);
 }
@@ -816,9 +819,10 @@
 }
 
 .ob-extension__name {
-  font-family: var(--font-display), serif;
-  font-style: italic;
-  font-size: 1.2rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  font-size: 1.02rem;
   letter-spacing: -0.03em;
   color: rgba(15, 23, 40, 0.92);
 }

@@ -1019,18 +1019,19 @@
 
 .radial-hero__eyebrow {
   color: rgba(18, 18, 15, 0.46);
-  font-family: var(--font-display), serif;
-  font-size: 0.95rem;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.81rem;
+  font-style: normal;
   letter-spacing: -0.03em;
 }
 
 .radial-hero__title {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(3.4rem, 12vw, 8.6rem);
-  font-weight: 300;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(2.89rem, 10.2vw, 7.31rem);
+  font-weight: 600;
+  font-style: normal;
   line-height: 0.88;
   letter-spacing: -0.07em;
   color: inherit;
@@ -1190,19 +1191,20 @@
 .canvas-hero__eyebrow,
 .mobile-hero__eyebrow {
   color: rgba(18, 18, 15, 0.46);
-  font-family: var(--font-display), serif;
-  font-size: 0.95rem;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 0.81rem;
+  font-style: normal;
   letter-spacing: -0.03em;
 }
 
 .canvas-hero__title,
 .mobile-hero__title {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(3.4rem, 12vw, 8.6rem);
-  font-weight: 300;
-  font-style: italic;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(2.89rem, 10.2vw, 7.31rem);
+  font-weight: 600;
+  font-style: normal;
   line-height: 0.88;
   letter-spacing: -0.07em;
   color: inherit;

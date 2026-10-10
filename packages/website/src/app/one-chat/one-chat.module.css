@@ -22,10 +22,10 @@
   max-width: 100%;
   margin: 0;
   color: color-mix(in oklch, var(--ink) 64%, transparent);
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: clamp(1.1rem, 1rem + 0.45vw, 1.35rem);
-  font-style: italic;
-  font-weight: 500;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(0.94rem, 0.85rem + 0.38vw, 1.15rem);
+  font-style: normal;
+  font-weight: 600;
   line-height: 1.25;
   letter-spacing: 0;
 }

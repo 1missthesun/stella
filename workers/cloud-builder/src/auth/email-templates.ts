@@ -21,7 +21,7 @@ export const buildMagicLinkEmail = (
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Manrope:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Mona+Sans:wght@600&family=Manrope:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body style="margin:0;padding:0;background-color:#f2f4f8;font-family:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f8;padding:64px 24px;">
@@ -38,7 +38,7 @@ export const buildMagicLinkEmail = (
           <tr>
             <td style="background-color:rgba(255,255,255,0.92);border:1px solid rgba(22,22,22,0.08);border-radius:10px;padding:40px 36px;">
               <!-- Title -->
-              <h1 style="margin:0 0 6px;font-family:'Cormorant Garamond',Georgia,serif;font-size:28px;font-weight:300;font-style:italic;letter-spacing:-0.02em;line-height:1.1;color:#161616;">
+              <h1 style="margin:0 0 6px;font-family:'Mona Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:24px;font-weight:600;font-style:normal;letter-spacing:-0.02em;line-height:1.1;color:#161616;">
                 ${strings.signInTitle}
               </h1>
               <p style="margin:0 0 32px;font-size:14px;color:rgba(22,22,22,0.52);line-height:1.55;letter-spacing:-0.01em;">

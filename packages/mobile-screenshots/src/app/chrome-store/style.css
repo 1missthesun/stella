@@ -1,11 +1,11 @@
 .cws-gallery { display:flex; flex-direction:column; gap:40px; padding:40px; background:#e9e8e6; }
 .cws { width:1280px; height:800px; position:relative; overflow:hidden; isolation:isolate; background:#faf9f7; color:#252525; font-family:var(--font-manrope),sans-serif; flex:none; }
-.cws-brand { position:absolute; top:40px; left:54px; font-family:var(--font-cormorant),serif; font-size:58px; line-height:1; letter-spacing:-.045em; }
+.cws-brand { position:absolute; top:40px; left:54px; font-family:var(--font-display), system-ui, sans-serif; font-weight:600; font-size:49px; line-height:1; letter-spacing:-.045em; }
 .cws-brand span { font-family:var(--font-manrope),sans-serif; font-size:20px; letter-spacing:-.03em; margin-left:9px; }
 .cws-mascot { position:absolute; width:94px; height:94px; right:47px; top:25px; transform:rotate(8deg); }
 .cws-copy { position:absolute; top:190px; left:54px; z-index:3; }
 .cws-copy h1 { margin:0; font-size:66px; line-height:1.02; font-weight:650; letter-spacing:-.065em; }
-.cws-copy em { font-family:var(--font-cormorant),serif; font-size:88px; font-style:normal; font-weight:400; letter-spacing:-.055em; }
+.cws-copy em { font-family:var(--font-display), system-ui, sans-serif; font-size:75px; font-style:normal; font-weight:600; letter-spacing:-.055em; }
 .cws-copy p { max-width:310px; margin-top:30px; font-size:18px; line-height:1.5; letter-spacing:-.02em; color:#686868; }
 .cws-page { position:absolute; width:850px; left:486px; top:244px; padding:9px; background:white; border-radius:20px; transform:rotate(-4deg); box-shadow:0 22px 42px #24242425,0 1px 3px #24242420; }
 .cws-page>img { display:block; width:100%; border-radius:12px; }
@@ -34,8 +34,8 @@
 .cws-aura { position:absolute; inset:17% 0 0; z-index:-1; }
 .cws-og-aura { position:absolute; inset:-5% -3% -5% 15%; z-index:-1; }
 .cws-og-copy { position:absolute; top:130px; left:100px; z-index:2; }
-.cws-og-copy h1 { font-family:var(--font-cormorant),serif; font-weight:400; font-size:150px; line-height:1; letter-spacing:-.045em; margin:0; }
-.cws-og-copy p { font-family:var(--font-cormorant),serif; font-size:48px; line-height:1.2; letter-spacing:-.025em; margin:30px 0 0; }
+.cws-og-copy h1 { font-family:var(--font-display), system-ui, sans-serif; font-weight:600; font-size:128px; line-height:1; letter-spacing:-.045em; margin:0; }
+.cws-og-copy p { font-family:var(--font-display), system-ui, sans-serif; font-weight:600; font-size:41px; line-height:1.2; letter-spacing:-.025em; margin:30px 0 0; }
 .cws-og { background:#fff; }
 .cws-og-aura { mask-image:linear-gradient(to right,transparent,black 48%); -webkit-mask-image:linear-gradient(to right,transparent,black 48%); }
 

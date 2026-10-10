@@ -31,7 +31,7 @@ export const HTML_TOOL_PARAMETERS: Record<string, unknown> = {
     html: {
       type: "string",
       description:
-        "Complete <!doctype html> document. Load libraries and fonts via <link>, <script src>, or @import from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, cdn.tailwindcss.com, esm.sh or Google Fonts only, with the exact library version in the URL (e.g. chart.js@4.4.1); fetch() reaches only those hosts too. Write the content into the HTML itself so it still reads if a CDN fails to load. Aim for a polished native-feeling canvas: spacious layout, soft borders, rounded cards, subtle shadows, Cormorant Garamond for display type and Manrope for body.",
+        "Complete <!doctype html> document. Load libraries and fonts via <link>, <script src>, or @import from cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, cdn.tailwindcss.com, esm.sh or Google Fonts only, with the exact library version in the URL (e.g. chart.js@4.4.1); fetch() reaches only those hosts too. Write the content into the HTML itself so it still reads if a CDN fails to load. Aim for a polished native-feeling canvas: spacious layout, soft borders, rounded cards, subtle shadows, Mona Sans for display type and Manrope for body.",
     },
   },
   required: ["slug", "title", "html"],

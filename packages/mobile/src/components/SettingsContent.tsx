@@ -698,8 +698,8 @@ const makeStyles = (colors: Colors) =>
     },
     title: {
       color: colors.text,
-      fontFamily: fonts.display.regular,
-      fontSize: 32,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 27,
       letterSpacing: -1.2,
       marginTop: 4,
     },

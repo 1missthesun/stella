@@ -561,9 +561,9 @@
   width: 100%;
   margin: 0 0 32px;
   color: var(--mock-text-strong);
-  font-family: var(--font-display), "Cormorant Garamond", Georgia, serif;
-  font-size: clamp(2rem, 4vw, 42px);
-  font-weight: 300;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.7rem, 3.4vw, 36px);
+  font-weight: 600;
   line-height: 1.2;
   letter-spacing: 0;
   text-align: center;

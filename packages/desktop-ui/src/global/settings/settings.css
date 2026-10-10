@@ -685,8 +685,8 @@
 
 .settings-search-results-empty-title {
   font-family: var(--font-family-display);
-  font-size: 22px;
-  font-weight: var(--weight-regular);
+  font-size: 19px;
+  font-weight: var(--weight-semibold);
   letter-spacing: -0.02em;
   color: var(--text-strong);
 }

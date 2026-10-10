@@ -44,8 +44,8 @@
 
 .error-boundary-content h2 {
   font-family: var(--font-family-display);
-  font-size: var(--font-size-4xl);
-  font-weight: var(--weight-semibold);
+  font-size: 28px;
+  font-weight: var(--weight-bold);
   letter-spacing: -0.03em;
   line-height: var(--lh-tight, 1.2);
   color: var(--text-strong);

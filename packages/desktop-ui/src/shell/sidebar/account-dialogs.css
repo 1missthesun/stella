@@ -48,8 +48,8 @@
 .sidebar-nickname-dialog [data-slot="dialog-title"] {
   color: var(--text-strong);
   font-family: var(--font-family-display);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--weight-semibold);
+  font-size: var(--font-size-xl);
+  font-weight: var(--weight-bold);
   line-height: var(--lh-tight, 1.2);
   letter-spacing: -0.03em;
 }

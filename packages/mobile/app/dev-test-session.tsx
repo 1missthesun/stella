@@ -69,8 +69,8 @@ const makeStyles = (colors: Colors) =>
     },
     title: {
       color: colors.text,
-      fontFamily: fonts.display.regular,
-      fontSize: 28,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 24,
     },
     body: {
       color: colors.textMuted,

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, IBM_Plex_Mono, Manrope } from "next/font/google";
+import { IBM_Plex_Mono, Manrope, Mona_Sans } from "next/font/google";
 import { getSiteUrl } from "@/lib/site-url";
 import { SignInDialogHost } from "@/components/auth/sign-in-dialog-host";
 import { EmbeddedInitScript } from "@/components/embedded/embedded-init-script";
@@ -22,15 +22,14 @@ const sans = Manrope({
   adjustFontFallback: true,
 });
 
-// Cormorant Garamond is a variable font: a single file per style covers the
-// full 300–600 weight range we use, so we rely on the variable axis instead of
-// enumerating discrete weights. This collapses dozens of redundant @font-face
-// rules and lets in-between weights (e.g. 450) interpolate correctly.
-const display = Cormorant_Garamond({
+// Mona Sans is the display face across Stella (the landing hero sets it too).
+// It is a variable font: one file covers every weight and width we use, so we
+// rely on the variable axes instead of enumerating discrete weights.
+const display = Mona_Sans({
   variable: "--font-display",
   subsets: ["latin"],
+  axes: ["wdth"],
   display: "swap",
-  style: ["normal", "italic"],
   // The display face paints the global header wordmark, which is the measured
   // mobile LCP element, as well as the homepage hero. Discover it in the HTML
   // instead of waiting for the route stylesheet to reveal the font URLs.

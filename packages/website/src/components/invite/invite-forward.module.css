@@ -35,9 +35,9 @@
 
 .title {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(2.2rem, 5.5vw, 3.6rem);
-  font-weight: 400;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.87rem, 4.68vw, 3.06rem);
+  font-weight: 600;
   line-height: 0.98;
   letter-spacing: -0.06em;
 }

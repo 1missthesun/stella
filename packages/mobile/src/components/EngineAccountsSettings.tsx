@@ -1022,8 +1022,8 @@ const makeStyles = (colors: Colors) =>
     headerCopy: { flex: 1 },
     title: {
       color: colors.text,
-      fontFamily: fonts.display.regular,
-      fontSize: 26,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 22,
       letterSpacing: -1,
     },
     subtitle: {

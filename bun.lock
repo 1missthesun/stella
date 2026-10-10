@@ -156,9 +156,9 @@
         "@better-auth/expo": "^1.7.7",
         "@better-fetch/fetch": "1.3.2",
         "@config-plugins/react-native-webrtc": "15.0.2",
-        "@expo-google-fonts/cormorant-garamond": "^0.4.1",
         "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
         "@expo-google-fonts/manrope": "^0.4.2",
+        "@expo-google-fonts/mona-sans": "^0.4.1",
         "@expo/app-integrity": "57.0.1",
         "@expo/config-plugins": "57.0.9",
         "@expo/ui": "~57.0.15",
@@ -893,13 +893,13 @@
 
     "@exodus/bytes": ["@exodus/bytes@1.16.0", "", { "peerDependencies": { "@noble/hashes": "^1.8.0 || ^2.0.0" }, "optionalPeers": ["@noble/hashes"] }, "sha512-IcpW84uEn3N7ETtNZMlxKhfl6Pec8rUNGOTBtWbK1FKhJxIFAptZyVrvVRVBimAJxJCgc3PxepxkdWWG4DVzfA=="],
 
-    "@expo-google-fonts/cormorant-garamond": ["@expo-google-fonts/cormorant-garamond@0.4.1", "", {}, "sha512-e8J4Cn13K1txygamg50n3odLUsYP7Ck28XOGobMi7uDsWvFmp/jgK0qcALqJTlmi9NczSWUNdERxcLauHCBa/Q=="],
-
     "@expo-google-fonts/ibm-plex-mono": ["@expo-google-fonts/ibm-plex-mono@0.4.1", "", {}, "sha512-/yYz1mPZq8Nd4tSiH0SBDPEdJUqiOGBwVgSrQvLuw7SPh6C7ezBzmi6eFyHY4QaQwjHDmOLSBKsxzq8ZDFXVAg=="],
 
     "@expo-google-fonts/manrope": ["@expo-google-fonts/manrope@0.4.2", "", {}, "sha512-BZsKe8d9BJrVnIQIZcTS7/Kac0TbXnqs/+8EBSiQxrmK6GoCO6eTkmr50D1weIk/EoF20pTmAkpWICnovATr/g=="],
 
     "@expo-google-fonts/material-symbols": ["@expo-google-fonts/material-symbols@0.4.42", "", {}, "sha512-KZmHZRcthJ3KFZZlpzHjopA9guZgWR9fb3uVZlTR0BNlvG2pw1bnYBCpkze2PB0vRllwGhAM7lWXsfmcWCbXYg=="],
+
+    "@expo-google-fonts/mona-sans": ["@expo-google-fonts/mona-sans@0.4.1", "", {}, "sha512-lwr4o4HWTj9oiBEPotlTX6VarveV9WJAOBPn3k3A98sQaQ3jFGI3Xld8zDp1/ZswAR4cmhxGMJLDqHilh1mojA=="],
 
     "@expo/app-integrity": ["@expo/app-integrity@57.0.1", "", { "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-UkE1HjgXz15CEB3WoFUa3sQOsTP2INcjAgaHv9FVjPa6y/jRQ0Ey4YNLwDM8MsWbHDYLYP2ul3E9oatROznRaQ=="],
 

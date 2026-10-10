@@ -149,7 +149,7 @@
   flex-grow: 0;
 }
 
-/* Home greeting — Cormorant, sitting just above the composer, retired the
+/* Home greeting — display type, sitting just above the composer, retired the
  * moment the first prompt goes out (the real home-overlay fade). */
 .odemo-chat__greeting {
   position: absolute;
@@ -158,8 +158,8 @@
   place-items: end center;
   padding-bottom: 4px;
   font-family: var(--font-family-display);
-  font-size: clamp(18px, 2.1vw, 30px);
-  font-weight: var(--weight-regular, 400);
+  font-size: clamp(15px, 1.8vw, 26px);
+  font-weight: var(--weight-semibold, 600);
   letter-spacing: -0.03em;
   color: var(--text-strong);
   opacity: 0.9;

@@ -1,9 +1,5 @@
 import type { Metadata } from "next";
-import {
-  Cormorant_Garamond,
-  IBM_Plex_Mono,
-  Manrope,
-} from "next/font/google";
+import { IBM_Plex_Mono, Manrope, Mona_Sans } from "next/font/google";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -11,10 +7,9 @@ const manrope = Manrope({
   subsets: ["latin"],
 });
 
-const cormorant = Cormorant_Garamond({
-  variable: "--font-cormorant",
+const display = Mona_Sans({
+  variable: "--font-display",
   subsets: ["latin"],
-  weight: ["300", "400", "600"],
 });
 
 const ibmPlexMono = IBM_Plex_Mono({
@@ -37,7 +32,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${manrope.variable} ${cormorant.variable} ${ibmPlexMono.variable} h-full antialiased`}
+      className={`${manrope.variable} ${display.variable} ${ibmPlexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

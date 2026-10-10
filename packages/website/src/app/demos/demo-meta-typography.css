@@ -1,9 +1,9 @@
 ﻿.radial-demo__preview h3,
 .canvas-showcase__meta h3 {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(1.6rem, 2.5vw, 2.3rem);
-  font-weight: 400;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.36rem, 2.13vw, 1.95rem);
+  font-weight: 600;
   line-height: 0.98;
   letter-spacing: -0.05em;
 }

@@ -35,16 +35,17 @@
 }
 
 .brandText {
-  font-family: var(--font-display), serif;
-  font-size: 1.35rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.15rem;
   letter-spacing: -0.02em;
 }
 
 .title {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: clamp(2rem, 5vw, 3.2rem);
-  font-weight: 400;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.7rem, 4.25vw, 2.72rem);
+  font-weight: 600;
   line-height: 0.98;
   letter-spacing: -0.05em;
 }
@@ -205,8 +206,9 @@
 
 .statusTitle {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: 1.4rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.19rem;
   letter-spacing: -0.03em;
 }
 
@@ -303,8 +305,9 @@
 
 .signedInName {
   margin: 0;
-  font-family: var(--font-display), serif;
-  font-size: 1.5rem;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 600;
+  font-size: 1.27rem;
   letter-spacing: -0.03em;
 }
 

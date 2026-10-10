@@ -1545,9 +1545,9 @@
 }
 
 .mobile-phone-label {
-  font-family: var(--font-display), serif;
-  font-size: clamp(1.2rem, 1.8vw, 1.5rem);
-  font-weight: 400;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-size: clamp(1.02rem, 1.53vw, 1.27rem);
+  font-weight: 600;
   color: var(--page-muted);
   letter-spacing: -0.04em;
   text-align: center;

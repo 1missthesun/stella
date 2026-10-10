@@ -611,8 +611,8 @@ const makeSceneStyles = (colors: Colors) =>
     },
     slideTitle: {
       color: colors.text,
-      fontFamily: fonts.display.regular,
-      fontSize: 11,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 9.5,
       letterSpacing: -0.2,
     },
     slideLine: { borderRadius: 1.5, height: 3 },
@@ -645,8 +645,8 @@ const makeSceneStyles = (colors: Colors) =>
     },
     lockTime: {
       color: colors.text,
-      fontFamily: fonts.display.light,
-      fontSize: 38,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 32,
       letterSpacing: -1,
       lineHeight: 42,
     },

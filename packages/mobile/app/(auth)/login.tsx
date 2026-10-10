@@ -646,9 +646,8 @@ const makeStyles = (colors: Colors) =>
     },
     title: {
       color: colors.text,
-      fontFamily: fonts.display.light,
-      fontStyle: "italic",
-      fontSize: 42,
+      fontFamily: fonts.display.semiBold,
+      fontSize: 36,
       letterSpacing: -2,
       lineHeight: 42,
     },

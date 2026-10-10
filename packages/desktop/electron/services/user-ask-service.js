@@ -405,29 +405,6 @@ export class UserAskService {
             this.cancel({ askId });
         }
     }
-    overrideSensitive(payload) {
-        const askId = typeof payload?.askId === "string" ? payload.askId : "";
-        const fieldId = typeof payload?.fieldId === "string" ? payload.fieldId : "";
-        const record = this.asks.get(askId);
-        if (!record || !userAskAcceptsAnswer(record.ask.state)) {
-            return { ok: false, error: "That ask is no longer open." };
-        }
-        const detail = record.ask.detail;
-        if (detail.kind !== "secure_input") {
-            return { ok: false, error: "That ask has no fields." };
-        }
-        if (!detail.fields.some((field) => field.id === fieldId)) {
-            return { ok: false, error: "That ask has no such field." };
-        }
-        const sensitive = payload?.sensitive === true;
-        this.updateAsk(askId, {
-            detail: {
-                ...detail,
-                fields: detail.fields.map((field) => field.id === fieldId ? { ...field, sensitive } : field),
-            },
-        });
-        return { ok: true };
-    }
     async answer(payload) {
         const askId = typeof payload?.askId === "string" ? payload.askId : "";
         const record = this.asks.get(askId);
@@ -913,6 +890,12 @@ export class UserAskService {
             const body = await response.json().catch(() => null);
             const answer = body?.answer;
             if (!answer || typeof answer !== "object") {
+                if (body?.state === "canceled") {
+                    this.cancel({ askId });
+                }
+                else if (body?.state === "expired") {
+                    this.expire(askId);
+                }
                 return;
             }
             if (answer.answeredOnDeviceId &&

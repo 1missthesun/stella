@@ -11,7 +11,6 @@ import {
 import type {
   UserAsk,
   UserAskAnswerFieldValue,
-  UserAskField,
   UserAskSecureInputDetail,
 } from "@stella/contracts/user-ask";
 import {
@@ -53,7 +52,6 @@ import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";
 import { useColors } from "../theme/theme-context";
-import { GlassToggle } from "./glass";
 import { Icon } from "./Icon";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -502,7 +500,7 @@ function SecureAskSurface({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [busy, setBusy] = useState(false);
   const [issue, setIssue] = useState<string | null>(null);
-  const remaining = useRemaining(ask.deadlineAt);
+  const remaining = useRemaining(ask.blocking ? undefined : ask.deadlineAt);
 
   const submit = useCallback(
     async (run: () => Promise<void>, failureKey: string) => {
@@ -617,20 +615,11 @@ function SecureInputBody({
   onAnswer: (run: () => Promise<void>, failureKey: string) => Promise<void>;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
-  const [sensitiveOverrides, setSensitiveOverrides] = useState<
-    Record<string, boolean>
-  >({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [issue, setIssue] = useState<string | null>(null);
 
   const sealable = canSealUserAskValue(ask.recipientKey);
   const originLabel = useUserAskOriginLabel(ask.originDeviceId);
-
-  const isSensitive = useCallback(
-    (field: UserAskField) =>
-      sealable ? (sensitiveOverrides[field.id] ?? field.sensitive) : field.sensitive,
-    [sealable, sensitiveOverrides],
-  );
 
   const missing = detail.fields.some(
     (field) => !field.optional && !(values[field.id] ?? "").trim(),
@@ -648,13 +637,13 @@ function SecureInputBody({
         setIssue(t("mobile.userAsk.missingFields"));
         return;
       }
-      if (!isSensitive(field)) {
+      if (!ask.recipientKey || !sealable) {
+        if (field.sensitive) {
+          setIssue(t("mobile.userAsk.sensitiveUnavailable"));
+          return;
+        }
         payload.push({ fieldId: field.id, kind: "plain", value: raw });
         continue;
-      }
-      if (!ask.recipientKey || !sealable) {
-        setIssue(t("mobile.userAsk.sensitiveUnavailable"));
-        return;
       }
       try {
         payload.push({
@@ -688,7 +677,6 @@ function SecureInputBody({
     ask.recipientKey,
     ask.revision,
     detail.fields,
-    isSensitive,
     onAnswer,
     sealable,
     t,
@@ -728,7 +716,6 @@ function SecureInputBody({
   return (
     <View style={styles.body}>
       {detail.fields.map((field) => {
-        const sensitive = isSensitive(field);
         const value = values[field.id] ?? "";
         const show = revealed[field.id] === true;
         return (
@@ -834,28 +821,13 @@ function SecureInputBody({
               </View>
             )}
 
-            <View style={styles.sensitiveRow}>
-              <Text style={styles.sensitiveText}>
-                {sensitive
-                  ? t("mobile.userAsk.sensitive")
-                  : t("mobile.userAsk.plain")}
-              </Text>
-              {sealable ? (
-                <GlassToggle
-                  accessibilityLabel={t("mobile.userAsk.sensitiveToggleA11y", {
-                    label: field.label,
-                  })}
-                  onValueChange={(next) => {
-                    tapLight();
-                    setSensitiveOverrides((prev) => ({
-                      ...prev,
-                      [field.id]: next,
-                    }));
-                  }}
-                  value={sensitive}
-                />
-              ) : null}
-            </View>
+            {sealable ? (
+              <View style={styles.sensitiveRow}>
+                <Text style={styles.sensitiveText}>
+                  {t("mobile.userAsk.sensitive")}
+                </Text>
+              </View>
+            ) : null}
           </View>
         );
       })}

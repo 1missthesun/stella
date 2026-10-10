@@ -1482,13 +1482,11 @@
         "titleFrom": "{label} a besoin de vous"
       },
       "optional": "Facultatif",
-      "plain": "Envoyé en clair",
       "revealSecret": "Afficher {label}",
       "sealFailed": "Impossible de chiffrer ça sur cet appareil.",
       "sendSecurely": "Envoyer en sécurité",
       "sending": "Envoi…",
       "sensitive": "Chiffré de bout en bout",
-      "sensitiveToggleA11y": "Chiffrer {label}",
       "sensitiveUnavailable": "Cet appareil ne peut pas encore le chiffrer",
       "unnamedComputer": "Ordinateur · {id}",
       "waitingBadge": "Attend ta réponse"
@@ -2792,8 +2790,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

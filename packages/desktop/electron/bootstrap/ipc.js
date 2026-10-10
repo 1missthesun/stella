@@ -280,7 +280,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         listUserAsks: () => services.userAskService.listOpenAsks(),
         answerUserAsk: (payload) => services.userAskService.answer(payload),
         cancelUserAsk: (payload) => services.userAskService.cancel(payload),
-        overrideUserAskSensitive: (payload) => services.userAskService.overrideSensitive(payload),
         getUserAskPolicy: () => services.userAskService.getPolicy(),
         setUserAskPolicy: (payload) => services.userAskService.setPolicy(payload),
         submitConnectorCredential: (payload) => services.connectorCredentialService.submitCredential(payload),

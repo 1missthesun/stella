@@ -1472,13 +1472,11 @@
         "titleFrom": "Το {label} σε χρειάζεται"
       },
       "optional": "Προαιρετικό",
-      "plain": "Αποστέλλεται ως απλό κείμενο",
       "revealSecret": "Εμφάνιση {label}",
       "sealFailed": "Δεν ήταν δυνατή η κρυπτογράφηση σε αυτή τη συσκευή.",
       "sendSecurely": "Ασφαλής αποστολή",
       "sending": "Αποστολή…",
       "sensitive": "Κρυπτογραφημένο από άκρο σε άκρο",
-      "sensitiveToggleA11y": "Κρυπτογράφηση {label}",
       "sensitiveUnavailable": "Αυτή η συσκευή δεν μπορεί ακόμη να το κρυπτογραφήσει",
       "unnamedComputer": "Υπολογιστής · {id}",
       "waitingBadge": "Περιμένει εσένα"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

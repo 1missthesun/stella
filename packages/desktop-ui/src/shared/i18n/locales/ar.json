@@ -1512,13 +1512,11 @@
         "titleFrom": "{label} يحتاج إليك"
       },
       "optional": "اختياري",
-      "plain": "يُرسل كنص عادي",
       "revealSecret": "إظهار {label}",
       "sealFailed": "تعذّر تشفير ذلك على هذا الجهاز.",
       "sendSecurely": "إرسال بشكل آمن",
       "sending": "جارٍ الإرسال…",
       "sensitive": "مشفّر من الطرف إلى الطرف",
-      "sensitiveToggleA11y": "تشفير {label}",
       "sensitiveUnavailable": "لا يمكن لهذا الجهاز تشفيره بعد",
       "unnamedComputer": "كمبيوتر · {id}",
       "waitingBadge": "في انتظارك"
@@ -2846,8 +2844,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

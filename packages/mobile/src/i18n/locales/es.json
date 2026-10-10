@@ -1482,13 +1482,11 @@
         "titleFrom": "{label} te necesita"
       },
       "optional": "Opcional",
-      "plain": "Se envía como texto normal",
       "revealSecret": "Mostrar {label}",
       "sealFailed": "No se pudo cifrar eso en este dispositivo.",
       "sendSecurely": "Enviar de forma segura",
       "sending": "Enviando…",
       "sensitive": "Cifrado de extremo a extremo",
-      "sensitiveToggleA11y": "Cifrar {label}",
       "sensitiveUnavailable": "Este dispositivo aún no puede cifrarlo",
       "unnamedComputer": "Ordenador · {id}",
       "waitingBadge": "Te está esperando"
@@ -2792,8 +2790,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

@@ -730,13 +730,7 @@ const validateAnswer = (
       throw new RpcError("BAD_REQUEST", "That field was answered twice.");
     }
     seen.add(value.fieldId);
-    if (field.sensitive) {
-      if (value.kind !== "sealed") {
-        throw new RpcError(
-          "BAD_REQUEST",
-          "A sensitive value must be sealed for the asking device.",
-        );
-      }
+    if (value.kind === "sealed") {
       if (!sealedMatchesAsk(value.sealed, ask.recipientKey)) {
         throw new RpcError(
           "BAD_REQUEST",
@@ -745,8 +739,11 @@ const validateAnswer = (
       }
       continue;
     }
-    if (value.kind !== "plain") {
-      throw new RpcError("BAD_REQUEST", "That field does not take a sealed value.");
+    if (field.sensitive) {
+      throw new RpcError(
+        "BAD_REQUEST",
+        "A sensitive value must be sealed for the asking device.",
+      );
     }
     if (field.type === "choice") {
       const choices = field.choices ?? [];
@@ -1195,7 +1192,10 @@ const readAnswerForOriginDevice = (
   }
   const stored = readAnswer(ctx.db, askId);
   if (!stored) {
-    throw new RpcError("NOT_FOUND", "That question has not been answered yet.");
+    if (userAskIsOpen(row.state as UserAskState)) {
+      throw new RpcError("NOT_FOUND", "That question has not been answered yet.");
+    }
+    return { state: row.state as UserAskState };
   }
   return {
     answer: stored.answer,

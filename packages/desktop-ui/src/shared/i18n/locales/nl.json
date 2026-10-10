@@ -1472,13 +1472,11 @@
         "titleFrom": "{label} heeft je nodig"
       },
       "optional": "Optioneel",
-      "plain": "Wordt als gewone tekst verstuurd",
       "revealSecret": "{label} tonen",
       "sealFailed": "Kon dit niet versleutelen op dit apparaat.",
       "sendSecurely": "Veilig versturen",
       "sending": "Versturen…",
       "sensitive": "End-to-end versleuteld",
-      "sensitiveToggleA11y": "{label} versleutelen",
       "sensitiveUnavailable": "Dit apparaat kan dit nog niet versleutelen",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Wacht op je"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

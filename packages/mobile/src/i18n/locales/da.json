@@ -1472,13 +1472,11 @@
         "titleFrom": "{label} har brug for dig"
       },
       "optional": "Valgfri",
-      "plain": "Sendes som almindelig tekst",
       "revealSecret": "Vis {label}",
       "sealFailed": "Det kunne ikke krypteres på denne enhed.",
       "sendSecurely": "Send sikkert",
       "sending": "Sender…",
       "sensitive": "Krypteret hele vejen",
-      "sensitiveToggleA11y": "Krypter {label}",
       "sensitiveUnavailable": "Denne enhed kan ikke kryptere det endnu",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Venter på dig"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

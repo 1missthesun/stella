@@ -1472,13 +1472,11 @@
         "titleFrom": "{label} számít rád"
       },
       "optional": "Nem kötelező",
-      "plain": "Nyílt szövegként megy",
       "revealSecret": "{label} megjelenítése",
       "sealFailed": "Ezen a készüléken nem sikerült titkosítani.",
       "sendSecurely": "Biztonságos küldés",
       "sending": "Küldés…",
       "sensitive": "Végpontok közti titkosítás",
-      "sensitiveToggleA11y": "{label} titkosítása",
       "sensitiveUnavailable": "Ez a készülék még nem tudja titkosítani",
       "unnamedComputer": "Számítógép · {id}",
       "waitingBadge": "Rád vár"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

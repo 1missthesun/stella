@@ -1472,13 +1472,11 @@
         "titleFrom": "{label} tarvitsee sinua"
       },
       "optional": "Valinnainen",
-      "plain": "Lähetetään selkokielisenä",
       "revealSecret": "Näytä {label}",
       "sealFailed": "Sitä ei voitu salata tällä laitteella.",
       "sendSecurely": "Lähetä turvallisesti",
       "sending": "Lähetetään…",
       "sensitive": "Salattu päästä päähän",
-      "sensitiveToggleA11y": "Salaa {label}",
       "sensitiveUnavailable": "Tämä laite ei voi vielä salata sitä",
       "unnamedComputer": "Tietokone · {id}",
       "waitingBadge": "Odottaa sinua"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

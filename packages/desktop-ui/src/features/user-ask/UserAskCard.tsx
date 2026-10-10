@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useState, type FormEvent } from "react";
 import type {
   UserAsk,
   UserAskAnswerFieldValue,
@@ -10,11 +10,7 @@ import { Button } from "@/ui/button";
 import { Select } from "@/ui/select";
 import { TextField } from "@/ui/text-field";
 import { useT } from "@/shared/i18n";
-import {
-  answerUserAsk,
-  setUserAskFieldSensitive,
-  useUserAskRemainingMs,
-} from "./user-ask-store";
+import { answerUserAsk, useUserAskRemainingMs } from "./user-ask-store";
 import { formatRemaining } from "./format-remaining";
 import "./user-ask-card.css";
 
@@ -67,23 +63,18 @@ function UserAskHeader({
 }
 
 function UserAskFieldRow({
-  ask,
   field,
   value,
-  sensitive,
   busy,
   onValueChange,
-  onSensitiveChange,
 }: {
-  ask: UserAsk;
   field: UserAskField;
   value: string;
-  sensitive: boolean;
   busy: boolean;
   onValueChange: (next: string) => void;
-  onSensitiveChange: (next: boolean) => void;
 }) {
   const t = useT();
+  const sensitive = field.sensitive;
   const label = field.optional
     ? `${field.label} · ${t("userAsk.secureInput.optional")}`
     : field.label;
@@ -136,54 +127,26 @@ function UserAskFieldRow({
               : "userAsk.secureInput.sharedBadge",
           )}
         </span>
-        <Button
-          type="button"
-          variant="ghost"
-          className="pill-btn user-ask__badge-toggle"
-          disabled={busy}
-          onClick={() => {
-            onSensitiveChange(!sensitive);
-            void setUserAskFieldSensitive(ask.askId, field.id, !sensitive);
-          }}
-        >
-          {t(
-            sensitive
-              ? "userAsk.secureInput.makeShared"
-              : "userAsk.secureInput.makePrivate",
-          )}
-        </Button>
       </div>
     </div>
   );
 }
 
 function UserAskSecureInputBody({
-  ask,
   detail,
   busy,
   onAnswerFields,
 }: {
-  ask: UserAsk;
   detail: UserAskSecureInputDetail;
   busy: boolean;
   onAnswerFields: (fields: readonly UserAskAnswerFieldValue[]) => void;
 }) {
   const t = useT();
   const [values, setValues] = useState<Record<string, string>>({});
-  const [overrides, setOverrides] = useState<Record<string, boolean>>({});
   const [missing, setMissing] = useState<string | null>(null);
 
-  useEffect(() => {
-    setOverrides({});
-  }, [ask.revision]);
-
-  const sensitiveFor = useCallback(
-    (field: UserAskField) => overrides[field.id] ?? field.sensitive,
-    [overrides],
-  );
-
-  const anySensitive = detail.fields.some(sensitiveFor);
-  const anyShared = detail.fields.some((field) => !sensitiveFor(field));
+  const anySensitive = detail.fields.some((field) => field.sensitive);
+  const anyShared = detail.fields.some((field) => !field.sensitive);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -215,16 +178,11 @@ function UserAskSecureInputBody({
         {detail.fields.map((field) => (
           <UserAskFieldRow
             key={field.id}
-            ask={ask}
             field={field}
             busy={busy}
             value={values[field.id] ?? ""}
-            sensitive={sensitiveFor(field)}
             onValueChange={(next) =>
               setValues((current) => ({ ...current, [field.id]: next }))
-            }
-            onSensitiveChange={(next) =>
-              setOverrides((current) => ({ ...current, [field.id]: next }))
             }
           />
         ))}
@@ -304,7 +262,6 @@ export function UserAskSecureInputCard({
     >
       <UserAskHeader ask={ask} title={detail.purpose} detail={detail.detail} />
       <UserAskSecureInputBody
-        ask={ask}
         detail={detail}
         busy={busy}
         onAnswerFields={(fields) => void send(fields)}

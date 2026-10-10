@@ -76,7 +76,6 @@ import {
   IPC_USER_ASK_ANSWER,
   IPC_USER_ASK_CANCEL,
   IPC_USER_ASK_LIST,
-  IPC_USER_ASK_OVERRIDE_SENSITIVE,
   IPC_USER_ASK_POLICY_GET,
   IPC_USER_ASK_POLICY_SET,
   IPC_DEVICE_GET_ID,
@@ -706,12 +705,6 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted ask cancellation.");
         }
         return options.cancelUserAsk(payload);
-    });
-    handleIpc(IPC_USER_ASK_OVERRIDE_SENSITIVE, (event, payload) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_OVERRIDE_SENSITIVE)) {
-            throw new Error("Blocked untrusted ask sensitivity override.");
-        }
-        return options.overrideUserAskSensitive(payload);
     });
     handleIpc(IPC_USER_ASK_POLICY_GET, async (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_POLICY_GET)) {

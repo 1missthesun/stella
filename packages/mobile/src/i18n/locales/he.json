@@ -1482,13 +1482,11 @@
         "titleFrom": "{label} צריך אותך"
       },
       "optional": "אופציונלי",
-      "plain": "נשלח כטקסט רגיל",
       "revealSecret": "הצגת {label}",
       "sealFailed": "לא הצלחנו להצפין את זה במכשיר הזה.",
       "sendSecurely": "שליחה מאובטחת",
       "sending": "שולח…",
       "sensitive": "מוצפן מקצה לקצה",
-      "sensitiveToggleA11y": "הצפנת {label}",
       "sensitiveUnavailable": "המכשיר הזה עוד לא יכול להצפין את זה",
       "unnamedComputer": "מחשב · {id}",
       "waitingBadge": "ממתינה לך"
@@ -2792,8 +2790,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

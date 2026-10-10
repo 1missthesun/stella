@@ -135,25 +135,6 @@ export const answerUserAsk = async (answer: UserAskAnswer): Promise<boolean> => 
   }
 };
 
-export const setUserAskFieldSensitive = async (
-  askId: string,
-  fieldId: string,
-  sensitive: boolean,
-): Promise<boolean> => {
-  const bridge = userAskBridge();
-  if (!bridge?.overrideSensitive) return false;
-  try {
-    const result = await bridge.overrideSensitive({
-      askId,
-      fieldId,
-      sensitive,
-    });
-    return result?.ok !== false;
-  } catch {
-    return false;
-  }
-};
-
 export const recordUserAskAnswer = (
   conversationId: string,
   record: UserAskRecord,

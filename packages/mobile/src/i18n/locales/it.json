@@ -1482,13 +1482,11 @@
         "titleFrom": "{label} ha bisogno di te"
       },
       "optional": "Opzionale",
-      "plain": "Inviato in chiaro",
       "revealSecret": "Mostra {label}",
       "sealFailed": "Impossibile crittografarlo su questo dispositivo.",
       "sendSecurely": "Invia in sicurezza",
       "sending": "Invio…",
       "sensitive": "Crittografato end-to-end",
-      "sensitiveToggleA11y": "Crittografa {label}",
       "sensitiveUnavailable": "Questo dispositivo non può ancora crittografarlo",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Sta aspettando te"
@@ -2792,8 +2790,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

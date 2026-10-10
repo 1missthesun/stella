@@ -1492,13 +1492,11 @@
         "titleFrom": "{label} tě potřebuje"
       },
       "optional": "Nepovinné",
-      "plain": "Odesláno jako čitelný text",
       "revealSecret": "Zobrazit {label}",
       "sealFailed": "Na tomto zařízení to nejde zašifrovat.",
       "sendSecurely": "Odeslat bezpečně",
       "sending": "Odesílám…",
       "sensitive": "Šifrováno end-to-end",
-      "sensitiveToggleA11y": "Zašifrovat {label}",
       "sensitiveUnavailable": "Tohle zařízení to zatím nedokáže zašifrovat",
       "unnamedComputer": "Počítač · {id}",
       "waitingBadge": "Čeká na tebe"
@@ -2810,8 +2808,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

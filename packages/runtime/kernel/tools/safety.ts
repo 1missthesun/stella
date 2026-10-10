@@ -2,6 +2,8 @@
 // `web` tool's secret refusal and page-text redaction. Path helpers that need
 // node live in `home-path.ts`.
 
+import { isUserAskSecretHandle } from "@stella/contracts/user-ask";
+
 const STRUCTURAL_TAG_RE =
   /<\/?(?:tool_call|function_call|result|response|output|input|system|assistant|user)>/gi;
 const FENCE_OPEN_RE = /^\s*```(?:json|xml|html|markdown)?\s*/gim;
@@ -95,6 +97,7 @@ const INVISIBLE_CHARS = new Set([
 ]);
 
 const maskSecret = (value: string): string => {
+  if (isUserAskSecretHandle(value)) return value;
   if (value.length < 18) return "***";
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 };

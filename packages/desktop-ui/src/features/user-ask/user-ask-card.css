@@ -507,24 +507,6 @@
   color: var(--text-strong);
 }
 
-.user-ask__badge-toggle.pill-btn {
-  padding: 0;
-  height: auto;
-  min-height: 0;
-  border: none;
-  background: none;
-  color: var(--text-weak);
-  font-size: var(--font-size-sm);
-  text-decoration: underline;
-  text-decoration-color: color-mix(in oklch, currentColor 35%, transparent);
-  text-underline-offset: 3px;
-}
-
-.user-ask__badge-toggle.pill-btn:hover:not(:disabled) {
-  background: none;
-  color: var(--text-strong);
-}
-
 .user-ask__notes {
   display: flex;
   flex-direction: column;

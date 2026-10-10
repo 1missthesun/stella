@@ -1462,13 +1462,11 @@
         "titleFrom": "{label} 需要你"
       },
       "optional": "選填",
-      "plain": "將以純文字傳送",
       "revealSecret": "顯示{label}",
       "sealFailed": "無法在此裝置上加密。",
       "sendSecurely": "安全傳送",
       "sending": "傳送中…",
       "sensitive": "端對端加密",
-      "sensitiveToggleA11y": "加密{label}",
       "sensitiveUnavailable": "此裝置暫時無法加密",
       "unnamedComputer": "電腦 · {id}",
       "waitingBadge": "正在等你"
@@ -2754,8 +2752,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

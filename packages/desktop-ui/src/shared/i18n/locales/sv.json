@@ -1472,13 +1472,11 @@
         "titleFrom": "{label} behöver dig"
       },
       "optional": "Valfritt",
-      "plain": "Skickas som vanlig text",
       "revealSecret": "Visa {label}",
       "sealFailed": "Kunde inte kryptera det på den här enheten.",
       "sendSecurely": "Skicka säkert",
       "sending": "Skickar…",
       "sensitive": "Krypterat hela vägen",
-      "sensitiveToggleA11y": "Kryptera {label}",
       "sensitiveUnavailable": "Den här enheten kan inte kryptera det än",
       "unnamedComputer": "Dator · {id}",
       "waitingBadge": "Väntar på dig"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

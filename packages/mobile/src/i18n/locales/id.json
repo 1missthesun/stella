@@ -1462,13 +1462,11 @@
         "titleFrom": "{label} membutuhkan Anda"
       },
       "optional": "Opsional",
-      "plain": "Dikirim sebagai teks biasa",
       "revealSecret": "Tampilkan {label}",
       "sealFailed": "Tidak bisa mengenkripsi itu di perangkat ini.",
       "sendSecurely": "Kirim dengan aman",
       "sending": "Mengirim…",
       "sensitive": "Terenkripsi ujung ke ujung",
-      "sensitiveToggleA11y": "Enkripsi {label}",
       "sensitiveUnavailable": "Perangkat ini belum bisa mengenkripsinya",
       "unnamedComputer": "Komputer · {id}",
       "waitingBadge": "Menunggumu"
@@ -2754,8 +2752,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

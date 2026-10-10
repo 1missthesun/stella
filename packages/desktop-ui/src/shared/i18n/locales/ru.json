@@ -1492,13 +1492,11 @@
         "titleFrom": "{label} нужна ваша помощь"
       },
       "optional": "Необязательно",
-      "plain": "Отправляется открытым текстом",
       "revealSecret": "Показать {label}",
       "sealFailed": "Не удалось зашифровать это на устройстве.",
       "sendSecurely": "Отправить безопасно",
       "sending": "Отправка…",
       "sensitive": "Сквозное шифрование",
-      "sensitiveToggleA11y": "Шифровать {label}",
       "sensitiveUnavailable": "Это устройство пока не может это зашифровать",
       "unnamedComputer": "Компьютер · {id}",
       "waitingBadge": "Ждёт вас"
@@ -2810,8 +2808,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

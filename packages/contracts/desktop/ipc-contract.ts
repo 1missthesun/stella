@@ -425,7 +425,6 @@ import {
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_LIST,
   IPC_USER_ASK_OPENED,
-  IPC_USER_ASK_OVERRIDE_SENSITIVE,
   IPC_USER_ASK_POLICY_GET,
   IPC_USER_ASK_POLICY_SET,
   IPC_USER_ASK_UPDATED,
@@ -1419,10 +1418,6 @@ export type IpcInvokeContract = {
   >;
   [IPC_USER_ASK_CANCEL]: Invoke<
     [payload: { askId: string; revision?: number }],
-    OkErrorResult
-  >;
-  [IPC_USER_ASK_OVERRIDE_SENSITIVE]: Invoke<
-    [payload: { askId: string; fieldId: string; sensitive: boolean }],
     OkErrorResult
   >;
   [IPC_USER_ASK_POLICY_GET]: Invoke<[], UserAskEscalationPolicy>;

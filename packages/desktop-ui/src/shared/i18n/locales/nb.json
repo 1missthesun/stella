@@ -1472,13 +1472,11 @@
         "titleFrom": "{label} trenger deg"
       },
       "optional": "Valgfritt",
-      "plain": "Sendes som vanlig tekst",
       "revealSecret": "Vis {label}",
       "sealFailed": "Kunne ikke kryptere det på denne enheten.",
       "sendSecurely": "Send sikkert",
       "sending": "Sender…",
       "sensitive": "Ende-til-ende-kryptert",
-      "sensitiveToggleA11y": "Krypter {label}",
       "sensitiveUnavailable": "Denne enheten kan ikke kryptere det ennå",
       "unnamedComputer": "Datamaskin · {id}",
       "waitingBadge": "Venter på deg"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

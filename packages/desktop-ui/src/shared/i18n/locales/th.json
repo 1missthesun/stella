@@ -1462,13 +1462,11 @@
         "titleFrom": "{label} ต้องการคุณ"
       },
       "optional": "ไม่บังคับ",
-      "plain": "ส่งเป็นข้อความธรรมดา",
       "revealSecret": "แสดง {label}",
       "sealFailed": "เข้ารหัสบนอุปกรณ์นี้ไม่สำเร็จ",
       "sendSecurely": "ส่งอย่างปลอดภัย",
       "sending": "กำลังส่ง…",
       "sensitive": "เข้ารหัสแบบต้นทางถึงปลายทาง",
-      "sensitiveToggleA11y": "เข้ารหัส {label}",
       "sensitiveUnavailable": "อุปกรณ์นี้ยังเข้ารหัสไม่ได้",
       "unnamedComputer": "คอมพิวเตอร์ · {id}",
       "waitingBadge": "กำลังรอคุณ"
@@ -2754,8 +2752,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

@@ -1482,13 +1482,11 @@
         "titleFrom": "{label} are nevoie de tine"
       },
       "optional": "Opțional",
-      "plain": "Trimis ca text simplu",
       "revealSecret": "Arată {label}",
       "sealFailed": "Nu s-a putut cripta pe acest dispozitiv.",
       "sendSecurely": "Trimite în siguranță",
       "sending": "Se trimite…",
       "sensitive": "Criptat cap-coadă",
-      "sensitiveToggleA11y": "Criptează {label}",
       "sensitiveUnavailable": "Acest dispozitiv nu poate încă să cripteze asta",
       "unnamedComputer": "Calculator · {id}",
       "waitingBadge": "Te așteaptă"
@@ -2792,8 +2790,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

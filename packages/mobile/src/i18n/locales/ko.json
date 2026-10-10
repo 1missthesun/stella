@@ -1462,13 +1462,11 @@
         "titleFrom": "{label}에 답이 필요해요"
       },
       "optional": "선택 사항",
-      "plain": "일반 텍스트로 전송",
       "revealSecret": "{label} 표시",
       "sealFailed": "이 기기에서 암호화할 수 없었어요.",
       "sendSecurely": "안전하게 보내기",
       "sending": "보내는 중…",
       "sensitive": "종단 간 암호화",
-      "sensitiveToggleA11y": "{label} 암호화",
       "sensitiveUnavailable": "이 기기에서는 아직 암호화할 수 없어요",
       "unnamedComputer": "컴퓨터 · {id}",
       "waitingBadge": "기다리고 있어요"
@@ -2754,8 +2752,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

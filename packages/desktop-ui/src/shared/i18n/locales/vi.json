@@ -1462,13 +1462,11 @@
         "titleFrom": "{label} cần bạn"
       },
       "optional": "Không bắt buộc",
-      "plain": "Gửi dưới dạng văn bản thường",
       "revealSecret": "Hiện {label}",
       "sealFailed": "Không mã hóa được trên thiết bị này.",
       "sendSecurely": "Gửi an toàn",
       "sending": "Đang gửi…",
       "sensitive": "Mã hóa đầu cuối",
-      "sensitiveToggleA11y": "Mã hóa {label}",
       "sensitiveUnavailable": "Thiết bị này chưa thể mã hóa nội dung đó",
       "unnamedComputer": "Máy tính · {id}",
       "waitingBadge": "Đang chờ bạn"
@@ -2754,8 +2752,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

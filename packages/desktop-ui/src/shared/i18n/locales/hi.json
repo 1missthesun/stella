@@ -1472,13 +1472,11 @@
         "titleFrom": "{label} को आपकी ज़रूरत है"
       },
       "optional": "वैकल्पिक",
-      "plain": "सादे टेक्स्ट में भेजा जाएगा",
       "revealSecret": "{label} दिखाएं",
       "sealFailed": "इस डिवाइस पर इसे एन्क्रिप्ट नहीं कर सके।",
       "sendSecurely": "सुरक्षित भेजें",
       "sending": "भेज रहे हैं…",
       "sensitive": "एंड-टू-एंड एन्क्रिप्टेड",
-      "sensitiveToggleA11y": "{label} एन्क्रिप्ट करें",
       "sensitiveUnavailable": "यह डिवाइस इसे अभी एन्क्रिप्ट नहीं कर सकता",
       "unnamedComputer": "कंप्यूटर · {id}",
       "waitingBadge": "आपका इंतज़ार है"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

@@ -1492,13 +1492,11 @@
         "titleFrom": "{label} cię potrzebuje"
       },
       "optional": "Opcjonalne",
-      "plain": "Wysyłane jako zwykły tekst",
       "revealSecret": "Pokaż {label}",
       "sealFailed": "Nie udało się tego zaszyfrować na tym urządzeniu.",
       "sendSecurely": "Wyślij bezpiecznie",
       "sending": "Wysyłanie…",
       "sensitive": "Szyfrowane end-to-end",
-      "sensitiveToggleA11y": "Zaszyfruj {label}",
       "sensitiveUnavailable": "To urządzenie nie potrafi tego jeszcze zaszyfrować",
       "unnamedComputer": "Komputer · {id}",
       "waitingBadge": "Czeka na ciebie"
@@ -2810,8 +2808,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

@@ -1462,13 +1462,11 @@
         "titleFrom": "{label} があなたを待っています"
       },
       "optional": "任意",
-      "plain": "平文で送信されます",
       "revealSecret": "{label} を表示",
       "sealFailed": "この端末では暗号化できませんでした。",
       "sendSecurely": "安全に送信",
       "sending": "送信中…",
       "sensitive": "エンドツーエンドで暗号化",
-      "sensitiveToggleA11y": "{label} を暗号化",
       "sensitiveUnavailable": "この端末ではまだ暗号化できません",
       "unnamedComputer": "コンピュータ · {id}",
       "waitingBadge": "あなたを待っています"
@@ -2754,8 +2752,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

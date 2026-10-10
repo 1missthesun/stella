@@ -1472,13 +1472,11 @@
         "titleFrom": "{label} needs you"
       },
       "optional": "Optional",
-      "plain": "Sent as plain text",
       "revealSecret": "Show {label}",
       "sealFailed": "Couldn't encrypt that on this device.",
       "sendSecurely": "Send securely",
       "sending": "Sending…",
       "sensitive": "Encrypted end to end",
-      "sensitiveToggleA11y": "Encrypt {label}",
       "sensitiveUnavailable": "This device can't encrypt it yet",
       "unnamedComputer": "Computer · {id}",
       "waitingBadge": "Waiting on you"
@@ -2774,8 +2772,6 @@
     },
     "secureInput": {
       "choosePlaceholder": "Choose",
-      "makePrivate": "Keep private",
-      "makeShared": "Share with Stella",
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",

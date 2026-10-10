@@ -1,3 +1,5 @@
+import { driveLinkPath, parseDriveLinkTarget } from "./cloud-world-paths";
+
 const isWindowsAbsolutePath = (candidate: string): boolean =>
   /^[A-Za-z]:[\\/]/.test(candidate);
 
@@ -84,7 +86,7 @@ const isAttachmentOnlyLine = (
   const rest = line.replace(
     MARKDOWN_LINK_PARTS_RE,
     (match, _bang: string, _label: string, angled?: string, bare?: string) => {
-      const filePath = parseLocalFileLinkTarget(angled ?? bare ?? "");
+      const filePath = parseFileLinkTarget(angled ?? bare ?? "");
       if (!filePath || !isAttached(filePath)) return match;
       linked = true;
       return "";
@@ -130,7 +132,7 @@ export const unlinkLocalFileLinks = (
       : line.replace(
           MARKDOWN_LINK_PARTS_RE,
           (match, bang: string, label: string, angled?: string, bare?: string) => {
-            const filePath = parseLocalFileLinkTarget(angled ?? bare ?? "");
+            const filePath = parseFileLinkTarget(angled ?? bare ?? "");
             if (!filePath || !attached.has(filePath)) return match;
             if (bang) return "";
             const text = label.trim();
@@ -140,15 +142,48 @@ export const unlinkLocalFileLinks = (
   );
 };
 
-export const extractLocalFileLinkPaths = (markdown: string): string[] => {
-  if (!markdown) return [];
-  const paths: string[] = [];
+/** Every markdown link and image target outside code, in order. */
+export const extractMarkdownLinkTargets = (markdown: string): string[] =>
+  markdown
+    ? Array.from(
+        withoutMarkdownCode(markdown).matchAll(MARKDOWN_LINK_RE),
+        (match) => match[1] ?? match[2] ?? "",
+      )
+    : [];
+
+const uniqueParsed = (
+  markdown: string,
+  parse: (target: string) => string | null,
+): string[] => {
+  const out: string[] = [];
   const seen = new Set<string>();
-  for (const match of withoutMarkdownCode(markdown).matchAll(MARKDOWN_LINK_RE)) {
-    const filePath = parseLocalFileLinkTarget(match[1] ?? match[2] ?? "");
-    if (!filePath || seen.has(filePath)) continue;
-    seen.add(filePath);
-    paths.push(filePath);
+  for (const target of extractMarkdownLinkTargets(markdown)) {
+    const value = parse(target);
+    if (!value || seen.has(value)) continue;
+    seen.add(value);
+    out.push(value);
   }
-  return paths;
+  return out;
 };
+
+/**
+ * Absolute paths a reply links. A `stella://drive/...` link is never one of
+ * them: it names the owner's drive, not a file on any machine.
+ */
+export const extractLocalFileLinkPaths = (markdown: string): string[] =>
+  uniqueParsed(markdown, parseLocalFileLinkTarget);
+
+/**
+ * A link target as a file reference: an absolute local path (a cloud world
+ * path included), or the canonical `stella://drive/<path>` of a drive link.
+ */
+export const parseFileLinkTarget = (url: string): string | null =>
+  parseLocalFileLinkTarget(url) ?? parseDriveLinkTarget(url);
+
+/** Every file a reply links, local or in the drive, as `parseFileLinkTarget` names it. */
+export const extractFileLinkTargets = (markdown: string): string[] =>
+  uniqueParsed(markdown, parseFileLinkTarget);
+
+/** Drive-relative paths of the drive files a reply links, in either link form. */
+export const extractDriveLinkPaths = (markdown: string): string[] =>
+  uniqueParsed(markdown, driveLinkPath);

@@ -1,7 +1,8 @@
 /**
  * Walks an `EventRecord[]` for a conversation and returns the unique files
- * the assistant touched, most-recent first. Local-lane files are derived
- * from `stella://file` links in the response text; cloud-lane files arrive
+ * the assistant touched, most-recent first. Files the response text links
+ * come from its links (local paths, and `stella://drive/...` or cloud world
+ * drive links, which name drive files); cloud-lane files also arrive
  * as `cloudDriveFiles` on the event payload (projected from backend
  * `output_files` events).
  *
@@ -13,10 +14,10 @@
  */
 
 import type { EventRecord } from "@/features/chat/lib/event-transforms";
-import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
+import { extractFileLinkTargets } from "@stella/contracts/local-file-links";
 import {
-  cloudWorldDrivePath,
   cloudWorldDriveName,
+  driveLinkPath,
 } from "@stella/contracts/cloud-world-paths";
 import {
   isDisplayTabPayload,
@@ -90,7 +91,7 @@ export const responseTextForFileLinks = (event: EventRecord): string => {
  * drive URL), so it takes the viewer kind the name implies and falls back
  * to a plain download.
  */
-const cloudDriveEntry = (
+export const cloudDriveEntry = (
   file: CloudDriveConversationFile,
   timestamp: number,
 ): ConversationFileEntry => {
@@ -125,15 +126,15 @@ export function deriveConversationFiles(
       seen.set(`cloud:${file.path}`, cloudDriveEntry(file, event.timestamp));
     }
 
-    for (const filePath of extractLocalFileLinkPaths(
+    for (const filePath of extractFileLinkTargets(
       responseTextForFileLinks(event),
     )) {
-      // A link into the cloud world's drive names a drive file, never a
+      // A drive link names a drive file, never a
       // file on this machine. The journal's files card for the same path
       // (with real size and type) is the richer record: keep it when the
       // link arrives later, and let it replace this entry when it arrives
       // after.
-      const drivePath = cloudWorldDrivePath(filePath);
+      const drivePath = driveLinkPath(filePath);
       if (drivePath) {
         const key = `cloud:${drivePath}`;
         if (!seen.has(key)) {

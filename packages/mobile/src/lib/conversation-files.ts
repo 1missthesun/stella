@@ -1,16 +1,19 @@
 import {
   cloudWorldDriveName,
-  cloudWorldDrivePath,
+  driveLinkPath,
   isCloudWorkspacePath,
 } from "@stella/contracts/cloud-world-paths";
 import {
-  extractLocalFileLinkPaths,
+  extractFileLinkTargets,
   isAbsoluteLocalFilePath,
 } from "@stella/contracts/local-file-links";
-import { cloudFileArtifact } from "./cloud-file-payload";
+import type { DriveFile } from "@stella/contracts/backend/drive";
 import { artifactPrimaryFilePath } from "./mobile-artifacts";
-import { displayPayloadForStellaFile } from "./stella-file-links";
-import type { ChatArtifact, MobileDisplayPayload } from "../types";
+import {
+  displayPayloadForStellaFile,
+  driveFileChatArtifact,
+} from "./stella-file-links";
+import type { ChatArtifact } from "../types";
 
 /**
  * Every file Stella put in front of the user in one conversation, read from
@@ -35,6 +38,8 @@ export type ConversationFile = {
   artifact: ChatArtifact;
   createdAt: number;
   source: ConversationFileSource;
+  /** The drive folder a drive file sits in, when it is not at the root. */
+  folder?: string;
 };
 
 export type JournalEntry = {
@@ -84,7 +89,7 @@ const messageTexts = (payload: Record<string, unknown>): string[] => {
 
 const linksIn = (text: unknown): FoundFile[] =>
   typeof text === "string"
-    ? extractLocalFileLinkPaths(text).map((path) => ({ path }))
+    ? extractFileLinkTargets(text).map((path) => ({ path }))
     : [];
 
 const uploadsIn = (payload: Record<string, unknown>): FoundFile[] => {
@@ -174,60 +179,6 @@ const desktopDeviceOfTurn = (turnId: string): string | null => {
   return match?.[1] ?? null;
 };
 
-const extensionOf = (path: string): string => {
-  const name = path.split(/[?#]/)[0] ?? path;
-  const dot = name.lastIndexOf(".");
-  return dot < 0 ? "" : name.slice(dot + 1).toLowerCase();
-};
-
-const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "heic", "heif", "avif"]);
-const VIDEO_EXTS = new Set(["mp4", "webm", "mov", "m4v"]);
-const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "m4a", "flac", "aac"]);
-
-/** A drive file as the viewer opens it: real media for media, else the files-card shape. */
-const driveArtifact = (
-  drivePath: string,
-  name: string,
-  conversationId: string,
-  createdAt: number,
-): ChatArtifact => {
-  const ext = extensionOf(drivePath);
-  const media: MobileDisplayPayload | null = IMAGE_EXTS.has(ext)
-    ? {
-        kind: "media",
-        asset: { kind: "image", filePaths: [drivePath] },
-        createdAt,
-        driveBacked: true,
-      }
-    : VIDEO_EXTS.has(ext)
-      ? {
-          kind: "media",
-          asset: { kind: "video", filePath: drivePath },
-          createdAt,
-          driveBacked: true,
-        }
-      : AUDIO_EXTS.has(ext)
-        ? {
-            kind: "media",
-            asset: { kind: "audio", filePath: drivePath },
-            createdAt,
-            driveBacked: true,
-          }
-        : null;
-  if (media) {
-    return {
-      id: `${conversationId}:drive:${drivePath}`,
-      conversationId,
-      payload: media,
-    };
-  }
-  return cloudFileArtifact(
-    { path: drivePath, name, sizeBytes: 0, contentType: "application/octet-stream" },
-    conversationId,
-    createdAt,
-  );
-};
-
 const localArtifact = (
   filePath: string,
   conversationId: string,
@@ -249,12 +200,13 @@ const toConversationFile = (
   const raw = found.path.trim();
   if (!raw) return null;
   const absolute = isAbsoluteLocalFilePath(raw);
-  const drivePath = absolute ? cloudWorldDrivePath(raw) : raw.replace(/^\/+/, "");
+  const drivePath =
+    driveLinkPath(raw) ?? (absolute || /^[a-z][a-z0-9+.-]*:/i.test(raw) ? null : raw.replace(/^\/+/, ""));
   if (drivePath) {
     const name = found.name?.trim() || cloudWorldDriveName(drivePath);
     return {
       key: `drive:${drivePath}`,
-      artifact: driveArtifact(drivePath, name, conversationId, entry.createdAt),
+      artifact: driveFileChatArtifact(drivePath, conversationId, entry.createdAt, name),
       createdAt: entry.createdAt,
       source: found.upload ? { kind: "upload" } : { kind: "cloud" },
     };
@@ -296,7 +248,7 @@ export const artifactFileKey = (artifact: ChatArtifact): string => {
   const driveBacked =
     "driveBacked" in artifact.payload && artifact.payload.driveBacked === true;
   if (driveBacked) return `drive:${filePath.replace(/^\/+/, "")}`;
-  const drivePath = cloudWorldDrivePath(filePath);
+  const drivePath = driveLinkPath(filePath);
   return drivePath ? `drive:${drivePath}` : `path:${filePath}`;
 };
 
@@ -337,4 +289,25 @@ export const entryFromRecord = (record: unknown): JournalEntry | null => {
     createdAt: typeof value.createdAtMs === "number" ? value.createdAtMs : 0,
     body: kind === "card" ? asRecord(value.card) : parseJson(value.payload),
   };
+};
+
+/**
+ * The owner's Stella Drive as Files rows: every upload, agent output and
+ * file any device put there, whether or not this conversation ever named it.
+ */
+export const conversationFilesFromDrive = (
+  files: readonly DriveFile[],
+  conversationId: string,
+): ConversationFile[] =>
+  files.map((file) => ({
+    key: `drive:${file.path}`,
+    artifact: driveFileChatArtifact(file.path, conversationId, file.updatedAt, file.name),
+    createdAt: file.updatedAt,
+    source: { kind: "cloud" },
+    folder: driveFolderOf(file.path),
+  }));
+
+const driveFolderOf = (drivePath: string): string => {
+  const slash = drivePath.lastIndexOf("/");
+  return slash > 0 ? drivePath.slice(0, slash) : "";
 };

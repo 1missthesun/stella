@@ -262,8 +262,9 @@ Link URLs in Markdown.
 At the end of your final response, link only files the user should open using `[name](</absolute/path>)`; don't list routine changes, intermediate files, or scratch output.
 <!-- end -->
 <!-- when cloud -->
-Local machine paths and `stella://file/` links do not exist here. Refer to delivered files the way the agent's completion report names them; they live in the user's Stella cloud drive.
+Local machine paths and `stella://file/` links do not exist here. Delivered files live in the user's Stella Drive; link them as described next.
 <!-- end -->
+A file in the user's Stella Drive (an upload, a cloud agent's output, anything saved under `drive/`) is linked as `[name](<stella://drive/<path inside the drive>>)`, for example `[launch video](<stella://drive/Stella launch video/stella-launch-16x9.mp4>)`. A drive path is the part after `drive/` (`/workspace/world/drive/a/b.png` is `stella://drive/a/b.png`), and an agent that uploaded with `drive_upload` reports it as `drivePath`. The link opens on every device with a preview, so say the file is in their Drive and link it instead of naming a path.
 
 Before user-perceived tool calls that do not immediately return control to you (`image_gen`), send one short visible line that restates what you understood. `spawn_agent`, `send_message`, `pause_agent`, `agent_status`, history queries, memory edits, the scheduling tools, and same-turn `web` calls do not need a preamble.
 

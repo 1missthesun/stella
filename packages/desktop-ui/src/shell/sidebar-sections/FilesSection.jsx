@@ -61,6 +61,9 @@ import {
 } from "@/features/workspace-display/tab-store";
 import { notifyMediaGenerationError } from "@/global/billing/paid-media-tier-toast";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
+import { useBackendValue } from "@/platform/backend/use-backend-view";
+import { cloudDriveEntry } from "@/features/workspace-display/derive-conversation-files";
+import { displayTabKindForPayload } from "@/features/workspace-display/payload-kind";
 import {
   loadCanvasHtmlHistory,
   removeCanvasHtmlItem,
@@ -83,6 +86,42 @@ import "./files-section.css";
  */
 export const WORK_PAGE_SIZE = 50;
 export const WORK_PAGE_END_THRESHOLD_PX = 160;
+/** How many of the owner's newest drive files the list shows. */
+const DRIVE_LIST_LIMIT = 200;
+const DRIVE_VIEW_ARGS = { limit: DRIVE_LIST_LIMIT };
+const NO_DRIVE_FILES = [];
+const driveFolderOf = (drivePath) => {
+  const slash = drivePath.lastIndexOf("/");
+  return slash > 0 ? drivePath.slice(0, slash) : "";
+};
+/**
+ * The owner's Stella Drive as list entries: uploads, agent outputs, and files
+ * any device put there, newest first. Each opens through an owner-scoped
+ * drive URL, never as a path on this machine.
+ */
+const driveFileEntries = (files) =>
+  files.map((file) => {
+    const conversationEntry = cloudDriveEntry(
+      {
+        path: file.path,
+        name: file.name,
+        sizeBytes: file.sizeBytes,
+        contentType: file.contentType,
+      },
+      file.updatedAt,
+    );
+    const payload = { ...conversationEntry.payload, cloudDrivePath: file.path };
+    return {
+      source: "drive",
+      id: `drive-file:${file.path}`,
+      kind: displayTabKindForPayload(payload),
+      title: file.name,
+      filePath: file.path,
+      folder: driveFolderOf(file.path),
+      createdAt: file.updatedAt,
+      payload,
+    };
+  });
 const forgetEntry = (entry) => {
   switch (entry.source) {
     case "canvas":
@@ -232,9 +271,27 @@ export function WorkList({ section = "files", idleContent = null }) {
   const showSearch = section === "home";
   const chat = useChatRuntime();
   const activity = chat.conversation.activity;
-  const { accountScope } = useCloudConversationSession();
+  const { accountScope, isCloudConversationReady } =
+    useCloudConversationSession();
   const { state } = useUiState();
-  const entries = useFileEntries();
+  const localEntries = useFileEntries();
+  const driveFiles =
+    useBackendValue(
+      "drive.files",
+      isCloudConversationReady ? DRIVE_VIEW_ARGS : "skip",
+    ) ?? NO_DRIVE_FILES;
+  const entries = useMemo(() => {
+    if (driveFiles.length === 0) return localEntries;
+    const drive = driveFileEntries(driveFiles);
+    const inDrive = new Set(drive.map((entry) => entry.filePath));
+    return [
+      ...localEntries.filter(
+        (entry) =>
+          !(entry.payload?.cloudDrivePath && inDrive.has(entry.payload.cloudDrivePath)),
+      ),
+      ...drive,
+    ];
+  }, [driveFiles, localEntries]);
   const panelOpen = useDisplayPanelOpen();
   const activeSection = useActiveSidebarSection();
   const searchOpen = useDisplaySearchOpen();
@@ -541,17 +598,32 @@ export function WorkList({ section = "files", idleContent = null }) {
                           <span className="files-list__title">
                             {workItemLabel(item)}
                           </span>
-                          <span className="files-list__meta">File</span>
+                          <span
+                            className="files-list__meta"
+                            title={
+                              item.entry.source === "drive"
+                                ? `Stella Drive${item.entry.folder ? ` / ${item.entry.folder}` : ""}`
+                                : undefined
+                            }
+                          >
+                            {item.entry.source === "drive"
+                              ? item.entry.folder
+                                ? `Drive · ${item.entry.folder.split("/").pop()}`
+                                : "Drive"
+                              : "File"}
+                          </span>
                         </button>
-                        <button
-                          type="button"
-                          className="files-list__remove"
-                          onClick={() => forgetEntry(item.entry)}
-                          aria-label={`Remove ${item.entry.title}`}
-                          title={`Remove ${item.entry.title}`}
-                        >
-                          <X size={12} strokeWidth={2.2} aria-hidden="true" />
-                        </button>
+                        {item.entry.source === "drive" ? null : (
+                          <button
+                            type="button"
+                            className="files-list__remove"
+                            onClick={() => forgetEntry(item.entry)}
+                            aria-label={`Remove ${item.entry.title}`}
+                            title={`Remove ${item.entry.title}`}
+                          >
+                            <X size={12} strokeWidth={2.2} aria-hidden="true" />
+                          </button>
+                        )}
                       </li>
                     ),
                   )}

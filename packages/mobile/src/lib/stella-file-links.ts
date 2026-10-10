@@ -1,12 +1,16 @@
-import { parseLocalFileLinkTarget } from "@stella/contracts/local-file-links";
+import { parseFileLinkTarget } from "@stella/contracts/local-file-links";
 import {
   cloudWorldDriveName,
-  cloudWorldDrivePath,
+  driveLinkPath,
 } from "@stella/contracts/cloud-world-paths";
 import { cloudFileArtifact } from "./cloud-file-payload";
 import type { ChatArtifact, MobileDisplayPayload } from "../types";
 
-export const parseStellaFileUrl = parseLocalFileLinkTarget;
+/**
+ * A tapped link as a file reference: an absolute path on a computer, or a
+ * `stella://drive/...` link to the owner's drive.
+ */
+export const parseStellaFileUrl = parseFileLinkTarget;
 
 const basenameOf = (filePath: string) => {
   const cleaned = filePath.trim().split(/[?#]/)[0] ?? filePath.trim();
@@ -110,24 +114,63 @@ export const displayPayloadForStellaFile = (
   return { kind: "markdown", filePath, title, createdAt };
 };
 
+/**
+ * A drive file as the viewer opens it: real media for media, else the
+ * files-card shape. Either way the bytes come from an owner-scoped drive URL.
+ */
+export const driveFileChatArtifact = (
+  drivePath: string,
+  conversationId: string,
+  createdAt: number,
+  name: string = cloudWorldDriveName(drivePath),
+): ChatArtifact => {
+  const ext = extensionOf(drivePath);
+  const media: MobileDisplayPayload | null =
+    ext && IMAGE_EXTS.has(ext)
+      ? {
+          kind: "media",
+          asset: { kind: "image", filePaths: [drivePath] },
+          createdAt,
+          driveBacked: true,
+        }
+      : ext && VIDEO_EXTS.has(ext)
+        ? {
+            kind: "media",
+            asset: { kind: "video", filePath: drivePath },
+            createdAt,
+            driveBacked: true,
+          }
+        : ext && AUDIO_EXTS.has(ext)
+          ? {
+              kind: "media",
+              asset: { kind: "audio", filePath: drivePath },
+              createdAt,
+              driveBacked: true,
+            }
+          : null;
+  if (media) {
+    return {
+      id: `${conversationId}:drive:${drivePath}`,
+      conversationId,
+      payload: media,
+    };
+  }
+  return cloudFileArtifact(
+    { path: drivePath, name, sizeBytes: 0, contentType: "application/octet-stream" },
+    conversationId,
+    createdAt,
+  );
+};
+
 export const stellaFileChatArtifact = (
   filePath: string,
   conversationId: string,
 ): ChatArtifact => {
-  // A link into the cloud world's drive names a drive file, never one on
-  // the paired computer: it opens through a drive URL like a files-card pill.
-  const drivePath = cloudWorldDrivePath(filePath);
+  // A drive link names a drive file, never one on the paired computer: it
+  // opens through a drive URL like a files-card pill.
+  const drivePath = driveLinkPath(filePath);
   if (drivePath) {
-    return cloudFileArtifact(
-      {
-        path: drivePath,
-        name: cloudWorldDriveName(drivePath),
-        sizeBytes: 0,
-        contentType: "application/octet-stream",
-      },
-      conversationId,
-      Date.now(),
-    );
+    return driveFileChatArtifact(drivePath, conversationId, Date.now());
   }
   const payload = displayPayloadForStellaFile(filePath, Date.now());
   return {

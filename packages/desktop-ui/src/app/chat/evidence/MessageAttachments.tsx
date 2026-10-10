@@ -14,7 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/dropdown-menu";
 import { AudioLines, Film, Image as ImageIcon } from "@/ui/icons";
-import { MediaTile } from "./MediaTile";
+import { MediaTile, openEvidenceSource } from "./MediaTile";
+import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import { AttachmentPill } from "./AttachmentPill";
 import "./attachment-strip.css";
 
@@ -139,7 +140,9 @@ const MoreTile = ({ cards }: { cards: readonly EvidenceCard[] }) => (
           key={card.id}
           onSelect={() => {
             const target = card.sourcePaths[0];
-            if (target) openLocalPathOrExplain(target);
+            if (!target) return;
+            if (driveLinkPath(target)) openEvidenceSource(target);
+            else openLocalPathOrExplain(target);
           }}
         >
           <span className="attachment-strip__more-item">
@@ -161,12 +164,17 @@ const MoreTile = ({ cards }: { cards: readonly EvidenceCard[] }) => (
  * previews that sits directly under the bubble, `documents` the pills at the
  * bottom of the bubble.
  */
+const NO_DRIVE_CARDS: readonly EvidenceCard[] = [];
+
 export const MessageAttachments = ({
   filePaths,
   part,
+  driveCards = NO_DRIVE_CARDS,
 }: {
   filePaths: string[];
   part: "media" | "documents";
+  /** Previews of linked drive files, shown in the same media row. */
+  driveCards?: readonly EvidenceCard[];
 }) => {
   const rowRef = useRef<HTMLDivElement | null>(null);
   const { cards, overflowCount } = useEvidenceCards(filePaths);
@@ -179,8 +187,9 @@ export const MessageAttachments = ({
       else if (card.kind === "audio" && card.peaks) media.push(card);
       else documents.push(card);
     }
+    media.push(...driveCards);
     return { media, documents };
-  }, [cards]);
+  }, [cards, driveCards]);
 
   const rowWidth = useRowWidth(rowRef, part === "media" && media.length > 0);
   const shownCount = fittingCount(media, rowWidth);

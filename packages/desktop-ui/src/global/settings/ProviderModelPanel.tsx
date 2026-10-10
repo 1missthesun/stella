@@ -24,6 +24,8 @@ import {
   type LlmProviderEntry,
 } from "@/global/settings/lib/llm-providers";
 import { findApiKey, findOauthCredential, findOauthProvider, useLlmCredentials, } from "@/global/settings/hooks/use-llm-credentials";
+import { useAuthState } from "@/global/auth/BackendAuthProvider";
+import { useAccountProviders } from "@/features/cloud/cloud-engines-api";
 import { useT } from "@/shared/i18n";
 import "./ProviderModelPicker.css";
 export type ReasoningEffort =
@@ -189,6 +191,13 @@ export function buildProviderTabs(groups: readonly ProviderGroup[], visibleProvi
 export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, onSelect, disabled = false, reasoningEffort, onSelectReasoning, restrictStellaPicks = false, restrictedPlanLabel, ariaLabel, hideDefaultRow = false, selectedHeaderKicker, hideSelectedTitle = false, hideSearch = false, hideSelectionCheck = false, disableNonStellaProviders = false, disabledProviderReason, hideProviderLabel = false, visibleProviders, hiddenProviders, favoriteScope, hideGroupHead = false, headerActionsTarget, authOpenRequest = 0, onRequestSearchClose, collapsibleGroups = false, activeSectionKey = null, extraSections = [], sectionOrder = null, onExtraSectionExpanded, onRefresh, refreshing = false, catalogError = null, selectedRowExtra = null, }: ProviderModelPanelProps) {
     const t = useT();
     const credentials = useLlmCredentials();
+    const { isAuthenticated } = useAuthState();
+    const accountProviders = useAccountProviders(isAuthenticated);
+    // Keys saved to the Stella account (from the phone, or the web) run here
+    // too: this computer sends those requests through the account's key.
+    const accountConnected = useMemo(() => new Set((accountProviders?.providers ?? [])
+        .filter((provider) => provider.connection?.status === "ok")
+        .map((provider) => provider.id)), [accountProviders]);
     const cancelOAuth = credentials.cancelOAuth;
     const tabs = useMemo(() => buildProviderTabs(groups, visibleProviders, hiddenProviders), [groups, hiddenProviders, visibleProviders]);
     const [favorites, setFavorites] = useState<string[]>(() => favoriteScope ? readEngineModelFavorites(favoriteScope) : []);
@@ -508,7 +517,9 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                     placeholder: t("settings.modelPicker.apiKeyPlaceholder"),
                 }
                 : undefined);
-        const connected = isStella || Boolean(apiKey) || Boolean(oauthCred);
+        const localCredential = Boolean(apiKey) || Boolean(oauthCred);
+        const onAccount = !isStella && !localCredential && accountConnected.has(tab.key);
+        const connected = isStella || localCredential || onAccount;
         // Providers introduced by models.json/extensions own their auth and may
         // be intentionally credentialless (Ollama, local proxies). Do not block
         // their model rows behind Stella's built-in provider login UI.
@@ -550,6 +561,7 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
             expanded,
             hasCustomInputs,
             authDescription,
+            onAccount,
         };
     };
     const renderGroupActions = ({ tab, requiresAuth, supportsOAuth, sectionDisabled, removable, armed, isSigningOut, expanded, hasCustomInputs, }: ReturnType<typeof getSectionContext>) => requiresAuth ? (<button type="button" className="model-picker-group-connect" data-open={expanded || undefined} onClick={() => toggleExpanded(expanded ? null : tab.key)} disabled={sectionDisabled}>
@@ -675,6 +687,9 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                 <BrandIcon brand={tab.key} size={13}/>
               </span>
               <span className="model-picker-group-label">{tab.label}</span>
+              {section.onAccount ? (<span className="model-picker-group-note" title={t("settings.modelPicker.accountKeyTitle")}>
+                  {t("settings.modelPicker.accountKey")}
+                </span>) : null}
               {!open && sectionHoldsSelection ? (<Check size={12} strokeWidth={2} className="model-picker-group-check" aria-hidden/>) : null}
               <ChevronDown size={13} strokeWidth={1.75} className="model-picker-group-chevron" data-open={open || undefined} aria-hidden/>
             </button>) : hideProviderLabel ? null : (<>
@@ -682,6 +697,9 @@ export function ProviderModelPanel({ value, defaultLabel, currentLabel, groups, 
                 <BrandIcon brand={tab.key} size={13}/>
               </span>
               <span className="model-picker-group-label">{tab.label}</span>
+              {section.onAccount ? (<span className="model-picker-group-note" title={t("settings.modelPicker.accountKeyTitle")}>
+                  {t("settings.modelPicker.accountKey")}
+                </span>) : null}
             </>)}
           {/* Overlay, not a column: the actions are absolutely positioned
               over the row's right end, so the toggle keeps the full width

@@ -1,130 +1,72 @@
-import { useEffect, useMemo } from "react";
-import {
-  BackHandler,
-  Pressable,
-  StyleSheet,
-  View,
-  useWindowDimensions,
-} from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { useTheme } from "../theme/theme-context";
-import {
-  AgentReportContent,
-  REPORT_MAX_HEIGHT_RATIO,
-  REPORT_MAX_WIDTH,
-  REPORT_SIDE_MARGIN,
-  reportRimColors,
-  reportSurfaceFill,
-  type AgentReportPopoverProps,
-} from "./AgentReport";
+import { useMemo } from "react";
+import { useWindowDimensions } from "react-native";
+import * as Clipboard from "expo-clipboard";
+import type { Colors } from "../theme/colors";
+import { notifySuccess } from "../lib/haptics";
+import type { TouchAnchor } from "../lib/touch-anchor";
+import { AgentReportContent, useAgentReport } from "./AgentReport";
+import { FloatingPopover } from "./FloatingPopover";
+import type { PopoverAction } from "./FloatingPopoverParts";
+import type { AgentReplyRef } from "./ReplyFocus";
 
-const PANEL_TOP = 52;
-const RADIUS = 20;
-const RIM = 1;
+const MAX_HEIGHT_RATIO = 0.58;
+const PLACEHOLDERS = new Set([
+  "Loading report…",
+  "Working…",
+  "No report is available yet.",
+  "Couldn’t load the report. Close and reopen it to retry.",
+]);
 
-/**
- * A task's full report in a floating panel, for platforms without iOS's
- * popover. Same surface as iOS: the assistant bubble's fill inside a
- * specular rim, a little narrower than the chat so it reads as nested.
- */
+/** A task's full report, in the floating popover that points at its "Show more". */
 export function AgentReportPopover({
   reference,
   conversationId,
   colors,
   journalReport,
+  anchor,
   onClose,
   topInset = 0,
-}: AgentReportPopoverProps) {
-  const { isDark } = useTheme();
+}: {
+  reference: AgentReplyRef;
+  conversationId: string;
+  colors: Colors;
+  /** The report as the conversation recorded it, when the backend has none. */
+  journalReport?: string;
+  /** Window point of the tap that opened the report. */
+  anchor: TouchAnchor | null;
+  onClose: () => void;
+  /** Room the chrome above takes; a popover without an anchor points below it. */
+  topInset?: number;
+}) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const fill = useMemo(() => reportSurfaceFill(colors), [colors]);
-  const rim = useMemo(() => reportRimColors(isDark), [isDark]);
-  useEffect(() => {
-    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
-      onClose();
-      return true;
-    });
-    return () => handler.remove();
-  }, [onClose]);
-  const width = Math.min(screenWidth - REPORT_SIDE_MARGIN * 2, REPORT_MAX_WIDTH);
-  const maxHeight = Math.round(screenHeight * REPORT_MAX_HEIGHT_RATIO);
+  const report = useAgentReport(conversationId, reference.threadId, journalReport);
+  const ready = !PLACEHOLDERS.has(report);
+  const actions = useMemo<PopoverAction[]>(
+    () => [
+      {
+        key: "copy",
+        icon: "copy",
+        accessibilityLabel: "Copy report",
+        disabled: !ready,
+        confirm: true,
+        onPress: async () => {
+          await Clipboard.setStringAsync(report);
+          notifySuccess();
+        },
+      },
+    ],
+    [ready, report],
+  );
   return (
-    <View style={styles.root} accessibilityViewIsModal>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Close report"
-        onPress={onClose}
-        style={styles.backdrop}
-      />
-      <View
-        style={[
-          styles.panel,
-          {
-            top: topInset + PANEL_TOP,
-            width,
-            left: (screenWidth - width) / 2,
-            backgroundColor: fill.solid,
-          },
-        ]}
-      >
-        <LinearGradient
-          pointerEvents="none"
-          colors={rim as [string, string, ...string[]]}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={styles.inner}>
-          <LinearGradient
-            pointerEvents="none"
-            colors={[fill.top, fill.bottom]}
-            style={StyleSheet.absoluteFill}
-          />
-          <AgentReportContent
-            reference={reference}
-            conversationId={conversationId}
-            colors={colors}
-            journalReport={journalReport}
-            onClose={onClose}
-            width={width - RIM * 2}
-            maxHeight={maxHeight}
-          />
-        </View>
-      </View>
-    </View>
+    <FloatingPopover
+      anchor={anchor}
+      fallbackAnchor={{ x: screenWidth / 2, y: topInset + 52 }}
+      onClose={onClose}
+      closeLabel="Close report"
+      maxHeight={Math.round(screenHeight * MAX_HEIGHT_RATIO)}
+      actions={actions}
+    >
+      <AgentReportContent reference={reference} colors={colors} report={report} />
+    </FloatingPopover>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    zIndex: 40,
-  },
-  backdrop: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    backgroundColor: "rgba(0,0,0,0.2)",
-  },
-  panel: {
-    position: "absolute",
-    borderRadius: RADIUS,
-    borderCurve: "continuous",
-    overflow: "hidden",
-    padding: RIM,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
-  },
-  inner: {
-    borderRadius: RADIUS - RIM,
-    borderCurve: "continuous",
-    overflow: "hidden",
-  },
-});

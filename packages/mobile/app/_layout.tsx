@@ -9,6 +9,7 @@ import {
 } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { recordTouchStart } from "../src/lib/touch-anchor";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { loadAsync, useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
@@ -462,7 +463,10 @@ export default function RootLayout() {
 
   return (
     <ShareIntentProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
+      <GestureHandlerRootView
+        style={{ flex: 1 }}
+        onStartShouldSetResponderCapture={recordTouchStart}
+      >
         <SafeAreaProvider>
           <KeyboardProvider>
             <I18nProvider>

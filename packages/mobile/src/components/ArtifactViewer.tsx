@@ -5,10 +5,13 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { Icon } from "./Icon";
 import { AudioPlayerView } from "./AudioPlayerView";
 import { PosterCover, VideoPlayerView } from "./VideoPlayerView";
@@ -19,9 +22,10 @@ import {
 import * as Sharing from "expo-sharing";
 import { Directory, File, Paths } from "expo-file-system";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AssistantMarkdown } from "./AssistantMarkdown";
-import { TopSheet } from "./TopSheet";
+import { FloatingPopover } from "./FloatingPopover";
+import type { PopoverAction } from "./FloatingPopoverParts";
+import { canvasSlugFor, useCanvasShareToggle } from "../lib/use-canvas-share-toggle";
 import type { ChatArtifact } from "../types";
 import type { StoredPhoneAccess } from "../lib/phone-access";
 import {
@@ -73,7 +77,7 @@ import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { classifyCanvasNavigation } from "../lib/canvas-navigation";
 import { resolveCloudDriveFileUri } from "../lib/use-cloud-drive-file-uri";
-import { tapLight } from "../lib/haptics";
+import { notifyError, notifySuccess, tapLight } from "../lib/haptics";
 import {
   SwipeArea,
   ZoomableImageView,
@@ -106,8 +110,10 @@ type ArtifactViewerContentProps = {
    * dismissing the whole sheet.
    */
   onBack?: () => void;
-  /** Close the sheet hosting the viewer: the header's close button and an image's vertical swipe. */
+  /** Close the popover hosting the viewer: an image's vertical swipe. */
   onClose?: () => void;
+  /** The copy, share and link controls this artifact offers, as they change. */
+  onActionsChange?: (actions: PopoverAction[]) => void;
 } & ArtifactSwipeProps;
 
 const isImageArtifact = (artifact: ChatArtifact): boolean =>
@@ -305,11 +311,6 @@ th { position: sticky; top: 0; background: ${colors.muted}; font-weight: 600; }
 </html>`;
 };
 
-/**
- * The artifact display itself (header + rendered preview), without any sheet
- * chrome. `ArtifactViewer` wraps it in a `TopSheet` for the chat-card path;
- * the activity hub embeds it directly so artifacts open within that sheet.
- */
 const sharedImageFile = async (uri: string): Promise<string> => {
   if (uri.startsWith("file:")) return uri;
   const directory = new Directory(Paths.cache, "artifact-share");
@@ -320,6 +321,17 @@ const sharedImageFile = async (uri: string): Promise<string> => {
   return downloaded.uri;
 };
 
+const imageBase64 = async (uri: string): Promise<string> => {
+  const inline = /^data:[^,]*;base64,(.*)$/s.exec(uri);
+  if (inline?.[1]) return inline[1];
+  return await new File(await sharedImageFile(uri)).base64();
+};
+
+/**
+ * The artifact display itself (header + rendered preview), without the
+ * popover around it. `ArtifactViewer` hosts it in the floating popover, whose
+ * glass row carries the actions this reports through `onActionsChange`.
+ */
 export function ArtifactViewerContent({
   artifact: openedArtifact,
   access,
@@ -327,6 +339,7 @@ export function ArtifactViewerContent({
   onClose,
   siblings: openedSiblings,
   onNavigate,
+  onActionsChange,
 }: ArtifactViewerContentProps) {
   const t = useT();
   const [trailState, setTrailState] = useState<{
@@ -356,11 +369,7 @@ export function ArtifactViewerContent({
   }, [openedArtifact]);
   const onBack = trail.length > 0 ? popTrail : hostBack;
   const colors = useColors();
-  const insets = useSafeAreaInsets();
-  const styles = useMemo(
-    () => makeStyles(colors, insets.top),
-    [colors, insets.top],
-  );
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const [loaded, setLoaded] = useState<LoadedArtifact | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -460,29 +469,204 @@ export function ArtifactViewerContent({
       ? artifact.payload
       : null;
   const [sharing, setSharing] = useState(false);
-  const shareableImageUri =
-    loaded?.kind === "image" && /^(?:file|https?):/i.test(loaded.uri)
-      ? loaded.uri
-      : null;
-  const onShare = useCallback(async () => {
-    if ((!localPdf && !shareableImageUri) || sharing) return;
-    setSharing(true);
-    try {
-      if (localPdf) {
-        const result = await sharePdf(localPdf);
-        if (!result.ok) Alert.alert("Couldn't share the PDF", result.error);
-      } else if (shareableImageUri) {
-        await Sharing.shareAsync(await sharedImageFile(shareableImageUri), {
-          mimeType: "image/*",
-          dialogTitle: "Share image",
-        });
+  const shareFile = useCallback(
+    async (run: () => Promise<unknown>, failure: string) => {
+      if (sharing) return;
+      setSharing(true);
+      try {
+        await run();
+      } catch {
+        notifyError();
+        Alert.alert(failure);
+      } finally {
+        setSharing(false);
       }
-    } catch {
-      Alert.alert("Couldn't share the image");
-    } finally {
-      setSharing(false);
+    },
+    [sharing],
+  );
+  const copy = useCallback(
+    async (run: () => Promise<unknown>, failure: string) => {
+      try {
+        await run();
+        notifySuccess();
+        return true;
+      } catch {
+        notifyError();
+        Alert.alert(failure);
+        return false;
+      }
+    },
+    [],
+  );
+  const canvas =
+    artifact?.payload.kind === "canvas-html" ? artifact.payload : null;
+  const canvasShare = useCanvasShareToggle(
+    canvas ? canvasSlugFor(canvas.slug, canvas.filePath) : null,
+    loaded?.kind === "canvas-html" ? loaded.html : null,
+    canvas?.title,
+  );
+  const actions = useMemo<PopoverAction[]>(() => {
+    if (!loaded) return [];
+    if (canvas && canvasShare) {
+      return [
+        {
+          key: "canvas-link",
+          icon: "globe",
+          accessibilityLabel: canvasShare.isPublic
+            ? "Make canvas private"
+            : "Make canvas public and copy its link",
+          active: canvasShare.isPublic,
+          loading: canvasShare.busy,
+          confirm: true,
+          onPress: async () => {
+            try {
+              const isPublic = await canvasShare.toggle();
+              if (isPublic) notifySuccess();
+              else tapLight();
+              return isPublic;
+            } catch {
+              notifyError();
+              Alert.alert("Couldn't change the canvas link");
+              return false;
+            }
+          },
+        },
+      ];
     }
-  }, [localPdf, shareableImageUri, sharing]);
+    switch (loaded.kind) {
+      case "image": {
+        const uri = loaded.uri;
+        const shareable = /^(?:file|https?):/i.test(uri);
+        return [
+          {
+            key: "copy",
+            icon: "copy",
+            accessibilityLabel: "Copy image",
+            confirm: true,
+            onPress: () =>
+              copy(
+                async () => Clipboard.setImageAsync(await imageBase64(uri)),
+                "Couldn't copy the image",
+              ),
+          },
+          ...(shareable
+            ? [
+                {
+                  key: "share",
+                  icon: "share" as const,
+                  accessibilityLabel: "Share image",
+                  loading: sharing,
+                  onPress: () =>
+                    shareFile(
+                      async () =>
+                        Sharing.shareAsync(await sharedImageFile(uri), {
+                          mimeType: "image/*",
+                          dialogTitle: "Share image",
+                        }),
+                      "Couldn't share the image",
+                    ),
+                },
+              ]
+            : []),
+        ];
+      }
+      case "markdown":
+      case "text": {
+        const text = loaded.text;
+        return [
+          {
+            key: "copy",
+            icon: "copy",
+            accessibilityLabel: "Copy text",
+            confirm: true,
+            onPress: () =>
+              copy(() => Clipboard.setStringAsync(text), "Couldn't copy the text"),
+          },
+          {
+            key: "share",
+            icon: "share",
+            accessibilityLabel: "Share text",
+            onPress: () =>
+              shareFile(
+                () => Share.share({ message: text }),
+                "Couldn't share the text",
+              ),
+          },
+        ];
+      }
+      case "url": {
+        const url = loaded.uri;
+        return [
+          {
+            key: "copy",
+            icon: "copy",
+            accessibilityLabel: "Copy link",
+            confirm: true,
+            onPress: () =>
+              copy(() => Clipboard.setStringAsync(url), "Couldn't copy the link"),
+          },
+          {
+            key: "share",
+            icon: "share",
+            accessibilityLabel: "Share link",
+            onPress: () =>
+              shareFile(() => Share.share({ url }), "Couldn't share the link"),
+          },
+        ];
+      }
+      case "pdf": {
+        const uri = loaded.uri;
+        return [
+          {
+            key: "share",
+            icon: "share",
+            accessibilityLabel: "Save or share PDF",
+            loading: sharing,
+            onPress: () =>
+              shareFile(async () => {
+                if (localPdf) {
+                  const result = await sharePdf(localPdf);
+                  if (!result.ok) throw new Error(result.error);
+                  return;
+                }
+                await Sharing.shareAsync(uri, {
+                  mimeType: "application/pdf",
+                  UTI: "com.adobe.pdf",
+                  dialogTitle: "Share PDF",
+                });
+              }, "Couldn't share the PDF"),
+          },
+        ];
+      }
+      case "audio":
+      case "video": {
+        const uri = loaded.uri;
+        const kind = loaded.kind;
+        return /^file:/i.test(uri)
+          ? [
+              {
+                key: "share",
+                icon: "share",
+                accessibilityLabel: kind === "video" ? "Share video" : "Share audio",
+                loading: sharing,
+                onPress: () =>
+                  shareFile(
+                    () => Sharing.shareAsync(uri, { dialogTitle: "Share" }),
+                    kind === "video"
+                      ? "Couldn't share the video"
+                      : "Couldn't share the audio",
+                  ),
+              },
+            ]
+          : [];
+      }
+      default:
+        return [];
+    }
+  }, [canvas, canvasShare, copy, loaded, localPdf, shareFile, sharing]);
+  useEffect(() => {
+    onActionsChange?.(actions);
+  }, [actions, onActionsChange]);
 
   useEffect(() => {
     if (!artifact) return;
@@ -857,39 +1041,6 @@ export function ArtifactViewerContent({
             {subtitle}
           </Text>
         </View>
-        {localPdf || shareableImageUri ? (
-          <Pressable
-            onPress={onShare}
-            disabled={sharing}
-            accessibilityRole="button"
-            accessibilityLabel={localPdf ? "Save or share PDF" : "Share image"}
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.shareButton,
-              pressed && styles.backButtonPressed,
-            ]}
-          >
-            {sharing ? (
-              <ActivityIndicator color={colors.text} />
-            ) : (
-              <Icon name="share" size={20} color={colors.text} />
-            )}
-          </Pressable>
-        ) : null}
-        {onClose && !hostBack ? (
-          <Pressable
-            onPress={onClose}
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.shareButton,
-              pressed && styles.backButtonPressed,
-            ]}
-          >
-            <Icon name="x" size={20} color={colors.text} />
-          </Pressable>
-        ) : null}
       </View>
         <View style={styles.body}>
           {(loading || error) && swipeable ? (
@@ -1008,7 +1159,12 @@ export function ArtifactViewerContent({
   );
 }
 
-/** Standalone top-sheet artifact viewer, opened from agent cards in chat. */
+const VIEWER_HEIGHT_RATIO = 0.6;
+
+/**
+ * The artifact viewer opened from chat cards, links and Files: a floating
+ * popover pointing at what was tapped, its controls in a glass row beneath.
+ */
 export function ArtifactViewer({
   artifact,
   access,
@@ -1017,35 +1173,44 @@ export function ArtifactViewer({
   siblings,
   onNavigate,
 }: ArtifactViewerProps) {
+  const { height: screenHeight } = useWindowDimensions();
+  const [actions, setActions] = useState<PopoverAction[]>([]);
+  if (!visible || !artifact) return null;
   return (
-    <TopSheet visible={visible} onClose={onClose}>
-      <ArtifactViewerContent
-        artifact={artifact}
-        access={access}
-        onClose={onClose}
-        {...(siblings ? { siblings } : {})}
-        {...(onNavigate ? { onNavigate } : {})}
-      />
-    </TopSheet>
+    <FloatingPopover
+      onClose={onClose}
+      closeLabel="Close"
+      height={Math.round(screenHeight * VIEWER_HEIGHT_RATIO)}
+      actions={actions}
+    >
+      {(close) => (
+        <ArtifactViewerContent
+          artifact={artifact}
+          access={access}
+          onClose={close}
+          onActionsChange={setActions}
+          {...(siblings ? { siblings } : {})}
+          {...(onNavigate ? { onNavigate } : {})}
+        />
+      )}
+    </FloatingPopover>
   );
 }
 
-const makeStyles = (colors: ReturnType<typeof useColors>, topInset: number) =>
+const makeStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     root: {
-      backgroundColor: colors.background,
       flex: 1,
     },
     header: {
       alignItems: "center",
-      backgroundColor: colors.background,
       borderBottomColor: colors.border,
       borderBottomWidth: StyleSheet.hairlineWidth,
       flexDirection: "row",
       gap: 8,
-      paddingBottom: 12,
-      paddingHorizontal: 18,
-      paddingTop: topInset + 12,
+      paddingBottom: 10,
+      paddingHorizontal: 16,
+      paddingTop: 12,
     },
     headerText: {
       flex: 1,
@@ -1059,13 +1224,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>, topInset: number) =>
     },
     backButtonPressed: {
       opacity: 0.6,
-    },
-    shareButton: {
-      alignItems: "center",
-      height: 32,
-      justifyContent: "center",
-      marginLeft: 8,
-      width: 32,
     },
     title: {
       color: colors.text,
@@ -1083,7 +1241,7 @@ const makeStyles = (colors: ReturnType<typeof useColors>, topInset: number) =>
       flex: 1,
     },
     webview: {
-      backgroundColor: colors.background,
+      backgroundColor: "transparent",
       flex: 1,
     },
     documentWebview: {

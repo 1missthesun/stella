@@ -21,6 +21,7 @@ import type { MediaCalls, MediaViews } from "./media.js";
 import type { VoiceCalls } from "./voice.js";
 import type { IntegrationCalls, IntegrationViews } from "./integrations.js";
 import type { EngineCalls, EngineViews } from "./engines.js";
+import type { ProviderCalls, ProviderViews } from "./providers.js";
 import type { ProjectCalls, ProjectViews } from "./projects.js";
 import type { BrowserCalls, BrowserViews } from "./browser.js";
 import type { UserAskCalls, UserAskViews } from "./user-asks.js";
@@ -47,6 +48,7 @@ export type BackendCalls = SystemCalls &
   VoiceCalls &
   IntegrationCalls &
   EngineCalls &
+  ProviderCalls &
   ProjectCalls &
   BrowserCalls &
   UserAskCalls;
@@ -62,6 +64,7 @@ export type BackendViews = ConversationViews &
   MediaViews &
   IntegrationViews &
   EngineViews &
+  ProviderViews &
   ProjectViews &
   BrowserViews &
   UserAskViews;

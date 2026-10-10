@@ -5,7 +5,9 @@ import {
   projectAgentLabels,
   type AgentLabelRow,
 } from "@stella/contracts/agent-labels";
-import { AgentReportSheet, ReplyFocus, type AgentReplyRef } from "./ReplyFocus";
+import { ReplyFocus, type AgentReplyRef } from "./ReplyFocus";
+import { AgentReportPopover } from "./AgentReportPopover";
+import type { ReportAnchor } from "./AgentReport";
 import { type ReplyAgentStatus } from "./ReplyPreview";
 import {
   mobileReplyContexts,
@@ -732,12 +734,20 @@ export function ChatPane({
     initialScrollAtEndRef.current = visibleMessages.length > 0;
   }
   const [replyFocus, setReplyFocus] = useState<ReplyRef | null>(null);
-  const [reportRef, setReportRef] = useState<AgentReplyRef | null>(null);
+  const [openReport, setOpenReport] = useState<{
+    ref: AgentReplyRef;
+    anchor: ReportAnchor | null;
+  } | null>(null);
+  const showReport = useCallback(
+    (ref: AgentReplyRef, anchor?: ReportAnchor) =>
+      setOpenReport({ ref, anchor: anchor ?? null }),
+    [],
+  );
   const closeReplyFocus = useCallback(() => setReplyFocus(null), []);
-  const closeReport = useCallback(() => setReportRef(null), []);
+  const closeReport = useCallback(() => setOpenReport(null), []);
   useEffect(() => {
     setReplyFocus(null);
-    setReportRef(null);
+    setOpenReport(null);
   }, [conversationId]);
   const contextStatusFor = useCallback(
     (
@@ -1605,7 +1615,7 @@ export function ChatPane({
       onAskStella: quoteMessage,
       onOpenAgentActivity: onOpenActivity,
       onOpenReply: setReplyFocus,
-      onOpenReport: setReportRef,
+      onOpenReport: showReport,
     }),
     [
       onOpenArtifact,
@@ -1613,6 +1623,7 @@ export function ChatPane({
       stopSelectingMessage,
       quoteMessage,
       onOpenActivity,
+      showReport,
     ],
   );
   // The long-press menu's lifted copy is inert: no file, reply or report taps.
@@ -1987,10 +1998,11 @@ export function ChatPane({
             )}
           />
         )}
-        {reportRef && conversationId ? (
-          <AgentReportSheet
-            key={reportRef.threadId}
-            reference={reportRef}
+        {openReport && conversationId ? (
+          <AgentReportPopover
+            key={openReport.ref.threadId}
+            reference={openReport.ref}
+            anchor={openReport.anchor}
             conversationId={conversationId}
             colors={colors}
             onClose={closeReport}

@@ -32,6 +32,7 @@ import {
 } from "@stella/contracts/local-file-links";
 import { AssistantBubble, SENT_BUBBLE_POP, useBubblePop } from "../BubblePop";
 import { type AgentReplyRef } from "../ReplyFocus";
+import type { ReportAnchor } from "../AgentReport";
 import {
   ReplyPreview,
   replyTitle,
@@ -98,7 +99,7 @@ export type MessageRowActions = {
   /** Opens the activity hub — the tap-through target for agent rows. */
   onOpenAgentActivity?: () => void;
   onOpenReply?: (ref: ReplyRef) => void;
-  onOpenReport?: (ref: AgentReplyRef) => void;
+  onOpenReport?: (ref: AgentReplyRef, anchor?: ReportAnchor) => void;
 };
 
 /**
@@ -1090,7 +1091,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       ? reportRefs.map((ref) => ({
           key: ref.threadId,
           label: `Full report: ${replyTitle(ref)}`,
-          onPress: () => onOpenReport(ref),
+          onPress: (anchor?: ReportAnchor) => onOpenReport(ref, anchor),
         }))
       : undefined;
   const fillAssistantBubble = boundedAssistantBubble;

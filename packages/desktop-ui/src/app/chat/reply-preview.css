@@ -182,6 +182,12 @@
   max-width: none;
   padding: 0;
   overflow: hidden;
+  border-radius: var(--radius-3xl);
+  background-color: var(--background);
+  background-image: var(--chat-assistant-bubble-fill);
+  color: var(--chat-assistant-bubble-text);
+  --chat-text-color: var(--chat-assistant-bubble-text);
+  --markdown-table-controls-bg: var(--chat-assistant-bubble-fill);
 }
 
 .reply-preview-report {
@@ -203,7 +209,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--foreground);
+  color: var(--chat-assistant-bubble-text);
   font-size: var(--font-size-sm, 12.5px);
   font-weight: 600;
 }
@@ -235,14 +241,24 @@
 .reply-preview-report__body {
   max-height: min(60vh, 32rem);
   overflow: auto;
-  padding: 10px 14px 12px;
-  color: var(--foreground);
-  font-size: var(--font-size-sm, 12.5px);
+  padding: 2px 14px 12px;
   user-select: text;
 }
 
-.reply-preview-report__body .markdown :is(p, li) {
-  font-size: inherit;
+.reply-preview-report__body .markdown {
+  color: var(--chat-text-color);
+  font-size: var(--chat-text-size, var(--font-size-lg));
+  font-weight: var(--chat-text-weight, var(--weight-regular));
+  letter-spacing: var(--chat-text-tracking, 0);
+  line-height: var(--chat-text-line-height, 1.5);
+}
+
+.reply-preview-report__body .markdown :is(p, li, blockquote, td, th) {
+  font-weight: inherit;
+}
+
+.reply-preview-report__body .markdown :is(strong, b, th) {
+  font-weight: var(--chat-text-strong-weight, var(--weight-medium));
 }
 
 .reply-preview__report-loading {
@@ -310,6 +326,7 @@
   background: transparent;
   color: var(--text-weak);
   font: inherit;
+  font-size: 0.88em;
   font-weight: var(--weight-medium);
   cursor: pointer;
   transition: color 120ms ease;

@@ -34,6 +34,7 @@ import { AssistantMarkdownTable } from "./AssistantMarkdownTable";
 import { useT } from "../i18n";
 
 const BASE_FONT_SIZE = 17;
+const MORE_LINK_FONT_SIZE = 15;
 
 async function openLink(url: string): Promise<boolean> {
   try {
@@ -219,7 +220,11 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
    * Quiet "more" links appended after the last paragraph, one per task whose
    * full report this reply offers. Each opens that report.
    */
-  moreLinks?: readonly { key: string; label: string; onPress: () => void }[];
+  moreLinks?: readonly {
+    key: string;
+    label: string;
+    onPress: (anchor?: { x: number; y: number }) => void;
+  }[];
 }) {
   const theme = useMemo(() => buildTheme(colors), [colors]);
   // Callers rebuild the link list every render; only its labels shape the
@@ -320,8 +325,13 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
           <Text
             accessibilityRole="link"
             accessibilityLabel={label}
-            onPress={() => moreLinksRef.current?.[index]?.onPress()}
-            style={{ color: colors.textMuted, fontFamily: fonts.sans.medium, fontSize: BASE_FONT_SIZE }}
+            onPress={(event) =>
+              moreLinksRef.current?.[index]?.onPress({
+                x: event.nativeEvent.pageX,
+                y: event.nativeEvent.pageY,
+              })
+            }
+            style={{ color: colors.textMuted, fontFamily: fonts.sans.medium, fontSize: MORE_LINK_FONT_SIZE }}
           >
             {showMoreLabel}
           </Text>

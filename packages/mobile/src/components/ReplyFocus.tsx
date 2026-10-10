@@ -5,7 +5,7 @@
  * The selected chain sits above the dimmed, blurred timeline in the same
  * chat column; the composer stays available below it. Three ways out: the
  * close button, a tap on the backdrop outside the chain, or the hardware
- * back gesture. Task descriptions open their full report in a separate sheet.
+ * back gesture. Task descriptions open their full report in a separate popover.
  */
 import { LegendList } from "@legendapp/list/react-native";
 import {
@@ -17,7 +17,6 @@ import {
 import {
   BackHandler,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -26,144 +25,18 @@ import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ChatMessage } from "../types";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
-import { getBackendClient } from "../lib/backend";
 import {
   mobileReplyContexts,
   mobileReplyLineage,
   type MobileReplyContexts,
 } from "../lib/mobile-reply-context";
-import { AssistantMarkdown } from "./AssistantMarkdown";
 import { GlassSurface } from "./glass";
 import { fadeHex } from "../theme/oklch";
 import { Icon } from "./Icon";
-import { replyTitle } from "./ReplyPreview";
-
-const REPORT_PANEL_TOP = 52;
 
 export { replyTitle } from "./ReplyPreview";
 
 export type AgentReplyRef = Extract<ReplyRef, { kind: "agent" }>;
-
-type ReportThread = {
-  resultJson?: string;
-  errorMessage?: string;
-  status: string;
-} | null;
-
-/** Live text of a task's report, or a placeholder while it loads or runs. */
-function useAgentReport(
-  conversationId: string,
-  threadId: string,
-): string | null {
-  const [report, setReport] = useState<string | null>(null);
-  useEffect(() => {
-    setReport(null);
-    const render = (thread: ReportThread) => {
-      try {
-        let text = thread?.errorMessage || "";
-        if (thread?.resultJson) {
-          try {
-            const parsed: unknown = JSON.parse(thread.resultJson);
-            if (
-              parsed &&
-              typeof parsed === "object" &&
-              "finalText" in parsed &&
-              typeof parsed.finalText === "string"
-            ) {
-              text = parsed.finalText;
-            }
-          } catch {
-            text = thread.resultJson;
-          }
-        }
-        setReport(
-          text ||
-            (thread?.status === "running"
-              ? "Working…"
-              : "No report is available yet."),
-        );
-      } catch {
-        setReport("Couldn’t load the report. Close and reopen it to retry.");
-      }
-    };
-    try {
-      return getBackendClient().watch(
-        "agentThreads.get",
-        { conversationId, threadId },
-        render,
-        () =>
-          setReport("Couldn’t load the report. Close and reopen it to retry."),
-      );
-    } catch {
-      setReport("Couldn’t load the report. Close and reopen it to retry.");
-      return undefined;
-    }
-  }, [conversationId, threadId]);
-  return report;
-}
-
-/** A task's full report in a floating panel; desktop's report popover. */
-export function AgentReportSheet({
-  reference,
-  conversationId,
-  colors,
-  onClose,
-  topInset = 0,
-}: {
-  reference: AgentReplyRef;
-  conversationId: string;
-  colors: Colors;
-  onClose: () => void;
-  /** Room the chrome above takes; the panel opens below it. */
-  topInset?: number;
-}) {
-  const styles = useMemo(() => makeStyles(colors), [colors]);
-  const report = useAgentReport(conversationId, reference.threadId);
-  useEffect(() => {
-    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
-      onClose();
-      return true;
-    });
-    return () => handler.remove();
-  }, [onClose]);
-  return (
-    <View style={styles.reportRoot} accessibilityViewIsModal>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Close report"
-        onPress={onClose}
-        style={styles.reportBackdrop}
-      />
-      <View style={[styles.reportPanel, { top: topInset + REPORT_PANEL_TOP }]}>
-        <View style={styles.reportHead}>
-          <Text numberOfLines={1} style={styles.reportTitle}>
-            {replyTitle(reference)}
-          </Text>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close report"
-            onPress={onClose}
-            hitSlop={6}
-            style={styles.iconButton}
-          >
-            <Icon name="x" size={16} color={colors.textMuted} />
-          </Pressable>
-        </View>
-        <ScrollView
-          style={styles.reportBody}
-          contentContainerStyle={styles.reportBodyContent}
-        >
-          <AssistantMarkdown
-            text={report ?? "Loading report…"}
-            colors={colors}
-            selectable
-            fill={false}
-          />
-        </ScrollView>
-      </View>
-    </View>
-  );
-}
 
 export function ReplyFocus({
   root,
@@ -310,13 +183,6 @@ const makeStyles = (colors: Colors) =>
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: colors.border,
     },
-    iconButton: {
-      width: 30,
-      height: 30,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: 999,
-    },
     panel: { flex: 1 },
     list: { flex: 1 },
     listContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12 },
@@ -326,52 +192,5 @@ const makeStyles = (colors: Colors) =>
       color: colors.textMuted,
       fontFamily: fonts.sans.regular,
       fontSize: 12.5,
-    },
-    reportRoot: {
-      position: "absolute",
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-      zIndex: 40,
-    },
-    reportBackdrop: {
-      position: "absolute",
-      top: 0,
-      right: 0,
-      bottom: 0,
-      left: 0,
-      backgroundColor: "rgba(0,0,0,0.2)",
-    },
-    reportPanel: {
-      position: "absolute",
-      left: 12,
-      right: 12,
-      maxHeight: "65%",
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderRadius: 16,
-      overflow: "hidden",
-    },
-    reportHead: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingLeft: 14,
-      paddingRight: 8,
-      paddingVertical: 8,
-    },
-    reportTitle: {
-      flex: 1,
-      color: colors.text,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 12.5,
-    },
-    reportBody: { flexShrink: 1 },
-    reportBodyContent: {
-      paddingHorizontal: 14,
-      paddingBottom: 12,
-      paddingTop: 2,
     },
   });

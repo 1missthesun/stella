@@ -1451,10 +1451,15 @@
       "hideSecret": "Ẩn {label}",
       "missingFields": "Hãy điền mọi trường bắt buộc.",
       "notification": {
+        "alreadyAnsweredBody": "Câu hỏi đã được trả lời hoặc đóng trước khi câu trả lời của bạn đến.",
+        "alreadyAnsweredTitle": "Đã được trả lời",
         "answer": "Trả lời",
         "body": "Chạm để trả lời.",
         "dismiss": "Bỏ qua",
-        "title": "Stella đang cần bạn"
+        "sendFailedBody": "Mở Stella để trả lời tại đó.",
+        "sendFailedTitle": "Không gửi được câu trả lời của bạn",
+        "title": "Stella đang cần bạn",
+        "titleFrom": "{label} cần bạn"
       },
       "optional": "Không bắt buộc",
       "plain": "Gửi dưới dạng văn bản thường",

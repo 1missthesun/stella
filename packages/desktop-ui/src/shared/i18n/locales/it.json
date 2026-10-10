@@ -1471,10 +1471,15 @@
       "hideSecret": "Nascondi {label}",
       "missingFields": "Compila tutti i campi obbligatori.",
       "notification": {
+        "alreadyAnsweredBody": "La domanda ha avuto risposta o è stata chiusa prima che arrivasse la tua.",
+        "alreadyAnsweredTitle": "Già risposta",
         "answer": "Rispondi",
         "body": "Tocca per rispondere.",
         "dismiss": "Ignora",
-        "title": "Stella ha bisogno di te"
+        "sendFailedBody": "Apri Stella per rispondere lì.",
+        "sendFailedTitle": "Impossibile inviare la tua risposta",
+        "title": "Stella ha bisogno di te",
+        "titleFrom": "{label} ha bisogno di te"
       },
       "optional": "Opzionale",
       "plain": "Inviato in chiaro",

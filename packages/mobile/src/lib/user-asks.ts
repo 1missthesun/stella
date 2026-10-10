@@ -383,6 +383,17 @@ export const useOpenUserAsks = (): readonly UserAsk[] => useUserAskState().asks;
 
 export const getOpenUserAsks = (): readonly UserAsk[] => state.asks;
 
+export const subscribeOpenUserAsks = (
+  listener: (asks: readonly UserAsk[], loaded: boolean) => void,
+): (() => void) => {
+  let last: readonly UserAsk[] | null = null;
+  return subscribe(() => {
+    if (state.asks === last) return;
+    last = state.asks;
+    listener(state.asks, state.loaded);
+  });
+};
+
 const useConnectedAccountAccess = (): boolean => {
   const session = authClient.useSession();
   return Boolean(session.data) && session.data?.user?.isAnonymous !== true;

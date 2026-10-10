@@ -9,6 +9,12 @@ const MOUNT_GRACE_MS = 2_000;
 
 export type ActivityNotificationKind = "started" | "completed" | "failed";
 
+export type ActivityNotification = {
+  kind: ActivityNotificationKind;
+  taskId: string;
+  title: string;
+};
+
 export type TaskNotificationRecord = {
   attemptGeneration?: number;
   observedRunning: boolean;
@@ -54,12 +60,12 @@ export function selectActivityNotificationTasks(
   });
 }
 
-export function collectActivityNotificationKinds(
+export function collectActivityNotifications(
   tasks: readonly TaskItem[],
   records: Map<string, TaskNotificationRecord>,
   mountedAtMs: number,
-): ActivityNotificationKind[] {
-  const kinds: ActivityNotificationKind[] = [];
+): ActivityNotification[] {
+  const kinds: ActivityNotification[] = [];
   const seenTaskIds = new Set<string>();
 
   for (const task of tasks) {
@@ -118,7 +124,7 @@ export function collectActivityNotificationKinds(
       record.observedRunning = true;
       if (record.eligibleForStartedNotification && !record.startedNotified) {
         record.startedNotified = true;
-        kinds.push("started");
+        kinds.push({ kind: "started", taskId: task.id, title: task.description.trim() });
       }
       continue;
     }
@@ -134,7 +140,11 @@ export function collectActivityNotificationKinds(
       task.status !== "canceled"
     ) {
       record.terminalNotified = true;
-      kinds.push(task.status === "completed" ? "completed" : "failed");
+      kinds.push({
+        kind: task.status === "completed" ? "completed" : "failed",
+        taskId: task.id,
+        title: task.description.trim(),
+      });
     }
   }
 
@@ -158,10 +168,17 @@ export function MobileActivityNotificationsBridge() {
   );
 
   useEffect(() => {
-    const send = (kind: ActivityNotificationKind) => {
-      void backendClient.call("phone.notifyActivity", { kind }).catch((error) => {
-        console.warn("[mobile-activity] Failed to send notification:", error);
-      });
+    const send = (notification: ActivityNotification) => {
+      const { kind, taskId, title } = notification;
+      void backendClient
+        .call("phone.notifyActivity", { kind, taskId, ...(title ? { title } : {}) })
+        .catch((error: unknown) => {
+          if ((error as { code?: unknown } | null)?.code !== "BAD_REQUEST") throw error;
+          return backendClient.call("phone.notifyActivity", { kind });
+        })
+        .catch((error) => {
+          console.warn("[mobile-activity] Failed to send notification:", error);
+        });
     };
 
     if (!hasConnectedAccount) {
@@ -169,13 +186,13 @@ export function MobileActivityNotificationsBridge() {
       return;
     }
 
-    const kinds = collectActivityNotificationKinds(
+    const notifications = collectActivityNotifications(
       allTasks,
       recordsRef.current,
       mountedAtMsRef.current,
     );
-    for (const kind of kinds) {
-      send(kind);
+    for (const notification of notifications) {
+      send(notification);
     }
   }, [allTasks, hasConnectedAccount]);
 

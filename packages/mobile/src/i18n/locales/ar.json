@@ -1501,10 +1501,15 @@
       "hideSecret": "إخفاء {label}",
       "missingFields": "أكمل كل الحقول المطلوبة.",
       "notification": {
+        "alreadyAnsweredBody": "تمت الإجابة على هذا السؤال أو إغلاقه قبل وصول ردك.",
+        "alreadyAnsweredTitle": "تمت الإجابة بالفعل",
         "answer": "إجابة",
         "body": "اضغط للإجابة.",
         "dismiss": "تجاهل",
-        "title": "ستella بحاجة إليك"
+        "sendFailedBody": "افتح Stella للإجابة من هناك.",
+        "sendFailedTitle": "تعذّر إرسال إجابتك",
+        "title": "ستella بحاجة إليك",
+        "titleFrom": "{label} يحتاج إليك"
       },
       "optional": "اختياري",
       "plain": "يُرسل كنص عادي",

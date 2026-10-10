@@ -1,10 +1,43 @@
+import { parseUserAskReplyToken } from "@stella/contracts/user-ask-notification";
 import { readJsonObject } from "../http/body.js";
 import { requireCaller } from "../http/caller.js";
 import { fail, failRpcError } from "../http/response.js";
+import { verifyUserAskReplyRoute } from "./reply-route-signature.js";
 
 const PREFIX = "/api/user-asks";
 const MAX_BODY_BYTES = 192 * 1024;
+const MAX_REPLY_BODY_BYTES = 8 * 1024;
 const MAX_ASK_ID = 128;
+
+const replyRoute = async (
+  request: Request,
+  env: Cloudflare.Env,
+  askId: string,
+): Promise<Response> => {
+  const body = await readJsonObject(request, MAX_REPLY_BODY_BYTES);
+  if (!body.ok) return fail(body.status, body.error);
+  const token =
+    typeof body.value.token === "string"
+      ? parseUserAskReplyToken(body.value.token)
+      : null;
+  if (
+    !token ||
+    !(await verifyUserAskReplyRoute(env, token.ownerId, token.routeSignature))
+  ) {
+    return fail(403, "That reply is not valid for this question.");
+  }
+  const result = await env.OWNER_GATES.getByName(token.ownerId).userAskReply({
+    askId,
+    body: body.value,
+  });
+  return new Response(result.json, {
+    status: result.status,
+    headers: {
+      "content-type": "application/json",
+      "cache-control": "no-store",
+    },
+  });
+};
 
 type Resolved = { route: string; askId: string };
 
@@ -32,7 +65,12 @@ const resolve = (method: string, path: string): Resolved | null => {
     return action === "answer" ? { route: "GET answer", askId } : null;
   }
   if (method !== "POST") return null;
-  if (action !== "answer" && action !== "cancel" && action !== "escalate") {
+  if (
+    action !== "answer" &&
+    action !== "cancel" &&
+    action !== "escalate" &&
+    action !== "reply"
+  ) {
     return null;
   }
   return { route: `POST ${action}`, askId };
@@ -45,6 +83,9 @@ const userAskRoute = async (
 ): Promise<Response> => {
   const resolved = resolve(request.method, url.pathname);
   if (!resolved) return fail(404, "Not found");
+  if (resolved.route === "POST reply") {
+    return await replyRoute(request, env, resolved.askId);
+  }
   const verified = await requireCaller(request, env, { allowAnonymous: false });
   if (!verified.ok) {
     return failRpcError(verified.error, { code: verified.error.code });

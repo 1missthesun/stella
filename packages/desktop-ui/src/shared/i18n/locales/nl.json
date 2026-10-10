@@ -1461,10 +1461,15 @@
       "hideSecret": "{label} verbergen",
       "missingFields": "Vul alle verplichte velden in.",
       "notification": {
+        "alreadyAnsweredBody": "Die vraag was al beantwoord of gesloten voordat je antwoord aankwam.",
+        "alreadyAnsweredTitle": "Al beantwoord",
         "answer": "Antwoorden",
         "body": "Tik om te antwoorden.",
         "dismiss": "Sluiten",
-        "title": "Stella heeft je nodig"
+        "sendFailedBody": "Open Stella om daar te antwoorden.",
+        "sendFailedTitle": "Je antwoord kon niet worden verstuurd",
+        "title": "Stella heeft je nodig",
+        "titleFrom": "{label} heeft je nodig"
       },
       "optional": "Optioneel",
       "plain": "Wordt als gewone tekst verstuurd",

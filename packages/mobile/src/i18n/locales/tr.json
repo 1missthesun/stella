@@ -1461,10 +1461,15 @@
       "hideSecret": "{label} alanını gizle",
       "missingFields": "Zorunlu alanların tümünü doldur.",
       "notification": {
+        "alreadyAnsweredBody": "Yanıtın ulaşmadan önce bu soru yanıtlandı veya kapatıldı.",
+        "alreadyAnsweredTitle": "Zaten yanıtlandı",
         "answer": "Yanıtla",
         "body": "Yanıtlamak için dokun.",
         "dismiss": "Kapat",
-        "title": "Stella seni bekliyor"
+        "sendFailedBody": "Yanıtlamak için Stella'yı aç.",
+        "sendFailedTitle": "Yanıtın gönderilemedi",
+        "title": "Stella seni bekliyor",
+        "titleFrom": "{label} sana ihtiyaç duyuyor"
       },
       "optional": "İsteğe bağlı",
       "plain": "Düz metin olarak gönderilir",

@@ -1461,10 +1461,15 @@
       "hideSecret": "Dölj {label}",
       "missingFields": "Fyll i alla obligatoriska fält.",
       "notification": {
+        "alreadyAnsweredBody": "Frågan besvarades eller stängdes innan ditt svar kom fram.",
+        "alreadyAnsweredTitle": "Redan besvarad",
         "answer": "Svara",
         "body": "Tryck för att svara.",
         "dismiss": "Avvisa",
-        "title": "Stella behöver dig"
+        "sendFailedBody": "Öppna Stella för att svara där.",
+        "sendFailedTitle": "Ditt svar kunde inte skickas",
+        "title": "Stella behöver dig",
+        "titleFrom": "{label} behöver dig"
       },
       "optional": "Valfritt",
       "plain": "Skickas som vanlig text",

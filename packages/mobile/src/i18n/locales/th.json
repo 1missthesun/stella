@@ -1451,10 +1451,15 @@
       "hideSecret": "ซ่อน {label}",
       "missingFields": "กรอกข้อมูลที่จำเป็นให้ครบ",
       "notification": {
+        "alreadyAnsweredBody": "คำถามนั้นได้รับคำตอบหรือถูกปิดไปก่อนที่คำตอบของคุณจะมาถึง",
+        "alreadyAnsweredTitle": "ตอบแล้ว",
         "answer": "ตอบ",
         "body": "แตะเพื่อตอบ",
         "dismiss": "ปิด",
-        "title": "Stella กำลังรอคุณ"
+        "sendFailedBody": "เปิด Stella เพื่อตอบที่นั่น",
+        "sendFailedTitle": "ส่งคำตอบของคุณไม่ได้",
+        "title": "Stella กำลังรอคุณ",
+        "titleFrom": "{label} ต้องการคุณ"
       },
       "optional": "ไม่บังคับ",
       "plain": "ส่งเป็นข้อความธรรมดา",

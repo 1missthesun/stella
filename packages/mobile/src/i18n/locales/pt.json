@@ -1471,10 +1471,15 @@
       "hideSecret": "Ocultar {label}",
       "missingFields": "Preenche todos os campos obrigatórios.",
       "notification": {
+        "alreadyAnsweredBody": "Essa pergunta foi respondida ou encerrada antes de sua resposta chegar.",
+        "alreadyAnsweredTitle": "Já respondida",
         "answer": "Responder",
         "body": "Toca para responder.",
         "dismiss": "Dispensar",
-        "title": "A Stella precisa de ti"
+        "sendFailedBody": "Abra a Stella para responder lá.",
+        "sendFailedTitle": "Não foi possível enviar sua resposta",
+        "title": "A Stella precisa de ti",
+        "titleFrom": "{label} precisa de você"
       },
       "optional": "Opcional",
       "plain": "Enviado como texto simples",

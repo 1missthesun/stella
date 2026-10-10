@@ -1461,10 +1461,15 @@
       "hideSecret": "{label} छिपाएं",
       "missingFields": "सभी आवश्यक फ़ील्ड भरें।",
       "notification": {
+        "alreadyAnsweredBody": "आपका जवाब पहुँचने से पहले ही उस सवाल का जवाब दे दिया गया या वह बंद हो गया।",
+        "alreadyAnsweredTitle": "पहले ही जवाब दिया जा चुका है",
         "answer": "जवाब दें",
         "body": "जवाब देने के लिए टैप करें।",
         "dismiss": "खारिज करें",
-        "title": "Stella को आपकी ज़रूरत है"
+        "sendFailedBody": "वहीं जवाब देने के लिए Stella खोलें।",
+        "sendFailedTitle": "आपका जवाब नहीं भेजा जा सका",
+        "title": "Stella को आपकी ज़रूरत है",
+        "titleFrom": "{label} को आपकी ज़रूरत है"
       },
       "optional": "वैकल्पिक",
       "plain": "सादे टेक्स्ट में भेजा जाएगा",

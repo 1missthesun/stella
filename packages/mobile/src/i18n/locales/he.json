@@ -1471,10 +1471,15 @@
       "hideSecret": "הסתרת {label}",
       "missingFields": "מלא את כל השדות הנדרשים.",
       "notification": {
+        "alreadyAnsweredBody": "השאלה נענתה או נסגרה לפני שהתשובה שלך הגיעה.",
+        "alreadyAnsweredTitle": "כבר נענתה",
         "answer": "תשובה",
         "body": "הקש כדי לענות.",
         "dismiss": "התעלם",
-        "title": "סטלה צריכה אותך"
+        "sendFailedBody": "פתח את Stella כדי לענות שם.",
+        "sendFailedTitle": "לא ניתן היה לשלוח את התשובה שלך",
+        "title": "סטלה צריכה אותך",
+        "titleFrom": "{label} צריך אותך"
       },
       "optional": "אופציונלי",
       "plain": "נשלח כטקסט רגיל",

@@ -1461,10 +1461,15 @@
       "hideSecret": "Απόκρυψη {label}",
       "missingFields": "Συμπλήρωσε όλα τα υποχρεωτικά πεδία.",
       "notification": {
+        "alreadyAnsweredBody": "Η ερώτηση απαντήθηκε ή έκλεισε πριν φτάσει η απάντησή σου.",
+        "alreadyAnsweredTitle": "Έχει ήδη απαντηθεί",
         "answer": "Απάντηση",
         "body": "Πάτα για απάντηση.",
         "dismiss": "Απόρριψη",
-        "title": "Η Stella σε χρειάζεται"
+        "sendFailedBody": "Άνοιξε τη Stella για να απαντήσεις εκεί.",
+        "sendFailedTitle": "Η απάντησή σου δεν στάλθηκε",
+        "title": "Η Stella σε χρειάζεται",
+        "titleFrom": "Το {label} σε χρειάζεται"
       },
       "optional": "Προαιρετικό",
       "plain": "Αποστέλλεται ως απλό κείμενο",

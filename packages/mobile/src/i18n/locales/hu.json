@@ -1461,10 +1461,15 @@
       "hideSecret": "{label} elrejtése",
       "missingFields": "Töltsd ki az összes kötelező mezőt.",
       "notification": {
+        "alreadyAnsweredBody": "A kérdést megválaszolták vagy lezárták, mielőtt a válaszod megérkezett.",
+        "alreadyAnsweredTitle": "Már megválaszolva",
         "answer": "Válasz",
         "body": "Koppints a válaszhoz.",
         "dismiss": "Elvetés",
-        "title": "Stellának szüksége van rád"
+        "sendFailedBody": "Nyisd meg a Stellát, és válaszolj ott.",
+        "sendFailedTitle": "Nem sikerült elküldeni a válaszodat",
+        "title": "Stellának szüksége van rád",
+        "titleFrom": "{label} számít rád"
       },
       "optional": "Nem kötelező",
       "plain": "Nyílt szövegként megy",

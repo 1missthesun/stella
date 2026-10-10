@@ -1471,10 +1471,15 @@
       "hideSecret": "Ascunde {label}",
       "missingFields": "Completează toate câmpurile obligatorii.",
       "notification": {
+        "alreadyAnsweredBody": "Întrebarea a primit răspuns sau a fost închisă înainte să ajungă răspunsul tău.",
+        "alreadyAnsweredTitle": "Deja răspuns",
         "answer": "Răspunde",
         "body": "Atinge pentru a răspunde.",
         "dismiss": "Respinge",
-        "title": "Stella are nevoie de tine"
+        "sendFailedBody": "Deschide Stella ca să răspunzi acolo.",
+        "sendFailedTitle": "Răspunsul tău nu a putut fi trimis",
+        "title": "Stella are nevoie de tine",
+        "titleFrom": "{label} are nevoie de tine"
       },
       "optional": "Opțional",
       "plain": "Trimis ca text simplu",

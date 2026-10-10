@@ -707,7 +707,8 @@ export class UserAskService {
     }
     async applyEscalationLevel(ask, level, { policy, quietHours, nextEscalationAt }) {
         const detail = ask.detail;
-        const title = detail.kind === "question" ? "Stella needs an answer" : "Stella needs a value";
+        const who = typeof ask.agentLabel === "string" && ask.agentLabel.trim() ? ask.agentLabel.trim() : "Stella";
+        const title = detail.kind === "question" ? `${who} needs an answer` : `${who} needs a value`;
         const body = userAskTitleOf(detail);
         if (level >= 2) {
             const withSound = level >= 3 && policy.soundEnabled && !quietHours;

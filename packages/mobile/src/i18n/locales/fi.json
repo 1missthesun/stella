@@ -1461,10 +1461,15 @@
       "hideSecret": "Piilota {label}",
       "missingFields": "Täytä kaikki pakolliset kentät.",
       "notification": {
+        "alreadyAnsweredBody": "Kysymykseen vastattiin tai se suljettiin ennen kuin vastauksesi ehti perille.",
+        "alreadyAnsweredTitle": "Jo vastattu",
         "answer": "Vastaa",
         "body": "Napauta vastataksesi.",
         "dismiss": "Ohita",
-        "title": "Stella tarvitsee sinua"
+        "sendFailedBody": "Avaa Stella ja vastaa siellä.",
+        "sendFailedTitle": "Vastaustasi ei voitu lähettää",
+        "title": "Stella tarvitsee sinua",
+        "titleFrom": "{label} tarvitsee sinua"
       },
       "optional": "Valinnainen",
       "plain": "Lähetetään selkokielisenä",

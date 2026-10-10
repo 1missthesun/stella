@@ -1,7 +1,7 @@
 {
   "name": "stella-mobile",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "index.ts",
   "scripts": {
     "i18n:sync": "node scripts/sync-i18n-catalogs.mjs",
     "start": "bun run i18n:sync && expo start",
@@ -66,6 +66,7 @@
     "expo-sqlite": "~57.0.2",
     "expo-status-bar": "~57.0.1",
     "expo-symbols": "~57.0.2",
+    "expo-task-manager": "~57.0.21",
     "expo-updates": "~57.0.20",
     "expo-video-thumbnails": "~57.0.2",
     "expo-web-browser": "~57.0.2",

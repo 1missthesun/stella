@@ -1461,10 +1461,15 @@
       "hideSecret": "Hide {label}",
       "missingFields": "Fill in every required field.",
       "notification": {
+        "alreadyAnsweredBody": "That question was answered or closed before your reply arrived.",
+        "alreadyAnsweredTitle": "Already answered",
         "answer": "Answer",
         "body": "Tap to answer.",
         "dismiss": "Dismiss",
-        "title": "Stella needs you"
+        "sendFailedBody": "Open Stella to answer there.",
+        "sendFailedTitle": "Couldn't send your answer",
+        "title": "Stella needs you",
+        "titleFrom": "{label} needs you"
       },
       "optional": "Optional",
       "plain": "Sent as plain text",

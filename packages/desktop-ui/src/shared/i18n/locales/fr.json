@@ -1471,10 +1471,15 @@
       "hideSecret": "Masquer {label}",
       "missingFields": "Remplis tous les champs obligatoires.",
       "notification": {
+        "alreadyAnsweredBody": "Cette question a été répondue ou fermée avant l'arrivée de votre réponse.",
+        "alreadyAnsweredTitle": "Déjà répondu",
         "answer": "Répondre",
         "body": "Touche pour répondre.",
         "dismiss": "Ignorer",
-        "title": "Stella a besoin de toi"
+        "sendFailedBody": "Ouvrez Stella pour répondre.",
+        "sendFailedTitle": "Impossible d'envoyer votre réponse",
+        "title": "Stella a besoin de toi",
+        "titleFrom": "{label} a besoin de vous"
       },
       "optional": "Facultatif",
       "plain": "Envoyé en clair",

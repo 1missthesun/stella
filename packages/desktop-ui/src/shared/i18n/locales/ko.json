@@ -1451,10 +1451,15 @@
       "hideSecret": "{label} 숨기기",
       "missingFields": "필수 항목을 모두 채워 주세요.",
       "notification": {
+        "alreadyAnsweredBody": "답장이 도착하기 전에 질문에 답변되었거나 닫혔어요.",
+        "alreadyAnsweredTitle": "이미 답변됨",
         "answer": "답변",
         "body": "탭하여 답변하세요.",
         "dismiss": "닫기",
-        "title": "Stella가 기다려요"
+        "sendFailedBody": "Stella를 열어 답해 주세요.",
+        "sendFailedTitle": "답변을 보내지 못했어요",
+        "title": "Stella가 기다려요",
+        "titleFrom": "{label}에 답이 필요해요"
       },
       "optional": "선택 사항",
       "plain": "일반 텍스트로 전송",

@@ -1451,10 +1451,15 @@
       "hideSecret": "Sembunyikan {label}",
       "missingFields": "Isi semua kolom yang wajib.",
       "notification": {
+        "alreadyAnsweredBody": "Pertanyaan itu sudah dijawab atau ditutup sebelum balasan Anda tiba.",
+        "alreadyAnsweredTitle": "Sudah dijawab",
         "answer": "Jawab",
         "body": "Ketuk untuk menjawab.",
         "dismiss": "Tutup",
-        "title": "Stella membutuhkanmu"
+        "sendFailedBody": "Buka Stella untuk menjawab di sana.",
+        "sendFailedTitle": "Jawaban Anda tidak dapat dikirim",
+        "title": "Stella membutuhkanmu",
+        "titleFrom": "{label} membutuhkan Anda"
       },
       "optional": "Opsional",
       "plain": "Dikirim sebagai teks biasa",

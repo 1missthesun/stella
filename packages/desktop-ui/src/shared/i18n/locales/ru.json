@@ -1481,10 +1481,15 @@
       "hideSecret": "Скрыть {label}",
       "missingFields": "Заполните все обязательные поля.",
       "notification": {
+        "alreadyAnsweredBody": "На вопрос ответили или его закрыли до того, как пришёл ваш ответ.",
+        "alreadyAnsweredTitle": "Уже отвечено",
         "answer": "Ответить",
         "body": "Нажмите, чтобы ответить.",
         "dismiss": "Закрыть",
-        "title": "Stella ждёт вас"
+        "sendFailedBody": "Откройте Stella, чтобы ответить там.",
+        "sendFailedTitle": "Не удалось отправить ответ",
+        "title": "Stella ждёт вас",
+        "titleFrom": "{label} нужна ваша помощь"
       },
       "optional": "Необязательно",
       "plain": "Отправляется открытым текстом",

@@ -1451,10 +1451,15 @@
       "hideSecret": "隐藏{label}",
       "missingFields": "请填写所有必填项。",
       "notification": {
+        "alreadyAnsweredBody": "你的回复到达前，这个问题已被回答或关闭。",
+        "alreadyAnsweredTitle": "已回答",
         "answer": "回答",
         "body": "轻点以回答。",
         "dismiss": "忽略",
-        "title": "Stella 在等你"
+        "sendFailedBody": "打开 Stella 在那里回答。",
+        "sendFailedTitle": "无法发送你的回答",
+        "title": "Stella 在等你",
+        "titleFrom": "{label} 需要你"
       },
       "optional": "可选",
       "plain": "将以明文发送",

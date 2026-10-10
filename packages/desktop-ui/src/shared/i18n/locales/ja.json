@@ -1451,10 +1451,15 @@
       "hideSecret": "{label} を隠す",
       "missingFields": "必須項目をすべて入力してください。",
       "notification": {
+        "alreadyAnsweredBody": "返信が届く前に、その質問は回答済みか終了していました。",
+        "alreadyAnsweredTitle": "回答済みです",
         "answer": "回答",
         "body": "タップして回答します。",
         "dismiss": "閉じる",
-        "title": "Stella が待っています"
+        "sendFailedBody": "Stella を開いて回答してください。",
+        "sendFailedTitle": "回答を送信できませんでした",
+        "title": "Stella が待っています",
+        "titleFrom": "{label} があなたを待っています"
       },
       "optional": "任意",
       "plain": "平文で送信されます",

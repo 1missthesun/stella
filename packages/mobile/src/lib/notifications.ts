@@ -12,9 +12,29 @@ import {
 import { backendOrigin, postJson } from "./http";
 import { getOrCreateMobileDeviceId } from "./phone-access";
 import { getNotificationsMuted } from "./notifications-prefs";
-import { focusUserAsk, getOpenUserAsks, refreshUserAsks } from "./user-asks";
+import {
+  focusUserAsk,
+  getOpenUserAsks,
+  refreshUserAsks,
+  subscribeOpenUserAsks,
+} from "./user-asks";
 import { i18nFallback } from "../i18n";
 import { requestMainChat } from "./main-chat-request";
+import { userAskTitleOf } from "@stella/contracts/user-ask";
+import {
+  askPushCapabilities,
+  dismissResolvedAskNotifications,
+  handleAskReplyResponse,
+  isAskReplyResponse,
+  privateAskChannel,
+  setAskReplyDeviceIdReader,
+  shareDeviceIdWithNativeReplies,
+} from "./user-ask-notification-actions";
+
+setAskReplyDeviceIdReader(() => getOrCreateMobileDeviceId());
+void getOrCreateMobileDeviceId()
+  .then(shareDeviceIdWithNativeReplies)
+  .catch(() => undefined);
 
 const COMPUTER_REPLY_CATEGORY = "computer_reply";
 const AGENT_ACTIVITY_CATEGORY = "agent_activity";
@@ -93,18 +113,23 @@ const scheduleUserAskRepeats = (askId: string) => {
             return;
           }
           await refreshUserAsks().catch(() => undefined);
-          const stillOpen = getOpenUserAsks().some(
-            (ask) => ask.askId === askId,
-          );
-          if (!stillOpen) {
+          const open = getOpenUserAsks().find((ask) => ask.askId === askId);
+          if (!open) {
             stopUserAskRepeats(askId);
             return;
           }
+          if (AppState.currentState === "active") return;
           try {
             await Notifications.scheduleNotificationAsync({
               content: {
-                title: i18nFallback.t("mobile.userAsk.notification.title"),
-                body: i18nFallback.t("mobile.userAsk.notification.body"),
+                title: open.agentLabel
+                  ? i18nFallback.t("mobile.userAsk.notification.titleFrom", {
+                      label: open.agentLabel,
+                    })
+                  : i18nFallback.t("mobile.userAsk.notification.title"),
+                body:
+                  userAskTitleOf(open.detail) ||
+                  i18nFallback.t("mobile.userAsk.notification.body"),
                 categoryIdentifier: USER_ASK_PUSH_CATEGORY,
                 data: { kind: USER_ASK_PUSH_KIND, askId },
                 interruptionLevel: "timeSensitive",
@@ -132,6 +157,7 @@ Notifications.setNotificationHandler({
     );
     if (ask) {
       void refreshUserAsks();
+      if (AppState.currentState === "active") return { ...SILENT };
       if (ask.level >= USER_ASK_MAX_URGENCY) {
         scheduleUserAskRepeats(ask.askId);
         return {
@@ -172,6 +198,23 @@ async function ensureAndroidChannels(): Promise<void> {
       name: "Stella needs you urgently",
       importance: Notifications.AndroidImportance.MAX,
       bypassDnd: true,
+    },
+  );
+  await Notifications.setNotificationChannelAsync(
+    privateAskChannel(USER_ASK_ANDROID_CHANNEL),
+    {
+      name: "Questions from Stella",
+      importance: Notifications.AndroidImportance.HIGH,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+    },
+  );
+  await Notifications.setNotificationChannelAsync(
+    privateAskChannel(USER_ASK_ANDROID_BREAKTHROUGH_CHANNEL),
+    {
+      name: "Urgent questions from Stella",
+      importance: Notifications.AndroidImportance.MAX,
+      bypassDnd: true,
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
     },
   );
 }
@@ -241,10 +284,12 @@ async function registerOnce(subject: string): Promise<void> {
     if (!token) return;
 
     const mobileDeviceId = await getOrCreateMobileDeviceId();
+    const capabilities = await askPushCapabilities().catch(() => []);
     await postJson("/api/mobile/push-token", {
       token,
       platform: Platform.OS,
       mobileDeviceId,
+      capabilities,
     }, { origin: backendOrigin() });
     registeredSubject = subject;
   } catch {
@@ -305,6 +350,11 @@ const handleNotificationResponse = (
     | null
     | undefined;
   const ask = readUserAskPush(data);
+  if (isAskReplyResponse(response)) {
+    if (ask) stopUserAskRepeats(ask.askId);
+    void handleAskReplyResponse(response).then(() => refreshUserAsks());
+    return;
+  }
   if (response.actionIdentifier === "dismiss") {
     if (ask) stopUserAskRepeats(ask.askId);
     return;
@@ -322,6 +372,10 @@ export async function installNotificationCategoriesAndListeners(): Promise<() =>
   );
   const launchResponse = readLaunchResponse();
   if (launchResponse) handleNotificationResponse(launchResponse);
+  const stopWatchingAsks = subscribeOpenUserAsks((asks, loaded) => {
+    if (!loaded) return;
+    void dismissResolvedAskNotifications(new Set(asks.map((ask) => ask.askId)));
+  });
 
   try {
     await Promise.all([
@@ -342,5 +396,8 @@ export async function installNotificationCategoriesAndListeners(): Promise<() =>
     // Best-effort; some platforms (Expo Go) just don't support categories.
   }
 
-  return () => subscription.remove();
+  return () => {
+    subscription.remove();
+    stopWatchingAsks();
+  };
 }

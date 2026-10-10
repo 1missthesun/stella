@@ -1481,10 +1481,15 @@
       "hideSecret": "Skrýt {label}",
       "missingFields": "Vyplň všechna povinná pole.",
       "notification": {
+        "alreadyAnsweredBody": "Otázka byla zodpovězena nebo uzavřena dřív, než dorazila tvoje odpověď.",
+        "alreadyAnsweredTitle": "Už zodpovězeno",
         "answer": "Odpovědět",
         "body": "Klepnutím odpovíš.",
         "dismiss": "Zavřít",
-        "title": "Stella tě potřebuje"
+        "sendFailedBody": "Otevři Stellu a odpověz tam.",
+        "sendFailedTitle": "Odpověď se nepodařilo odeslat",
+        "title": "Stella tě potřebuje",
+        "titleFrom": "{label} tě potřebuje"
       },
       "optional": "Nepovinné",
       "plain": "Odesláno jako čitelný text",

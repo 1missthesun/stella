@@ -1461,10 +1461,15 @@
       "hideSecret": "Skjul {label}",
       "missingFields": "Udfyld alle påkrævede felter.",
       "notification": {
+        "alreadyAnsweredBody": "Spørgsmålet blev besvaret eller lukket, før dit svar nåede frem.",
+        "alreadyAnsweredTitle": "Allerede besvaret",
         "answer": "Svar",
         "body": "Tryk for at svare.",
         "dismiss": "Afvis",
-        "title": "Stella har brug for dig"
+        "sendFailedBody": "Åbn Stella for at svare der.",
+        "sendFailedTitle": "Dit svar kunne ikke sendes",
+        "title": "Stella har brug for dig",
+        "titleFrom": "{label} har brug for dig"
       },
       "optional": "Valgfri",
       "plain": "Sendes som almindelig tekst",

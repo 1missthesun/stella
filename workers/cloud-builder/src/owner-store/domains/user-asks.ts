@@ -44,6 +44,17 @@ import {
   type UserAskSummary,
   type UserAskUrgencyLevel,
 } from "@stella/contracts/user-ask";
+import {
+  USER_ASK_NOTIFICATION_THREAD,
+  USER_ASK_PUSH_CAPABILITY,
+  formatUserAskReplyToken,
+  parseUserAskReplyToken,
+  userAskAnswerFromNotificationReply,
+  userAskNotificationPlan,
+  userAskReplyLabel,
+  type UserAskActionablePushData,
+  type UserAskNotificationPlatform,
+} from "@stella/contracts/user-ask-notification";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { PI_LATE_ANSWER_PREFIX } from "@stella/contracts/pi-chat";
 import {
@@ -66,7 +77,8 @@ import type {
   OwnerDbReader,
   OwnerDomain,
 } from "../registry.js";
-import { livePushTokens } from "./devices.js";
+import { livePushTokens, type LivePushToken } from "./devices.js";
+import { signUserAskReplyRoute } from "../../user-asks/reply-route-signature.js";
 
 const EXPO_PUSH_ENDPOINT = "https://exp.host/--/api/v2/push/send";
 const MAX_OPEN_ASKS = 32;
@@ -84,6 +96,9 @@ const BREAKTHROUGH_LEVEL = 4;
 const SOUND_LEVEL = 3;
 const ANDROID_CHANNEL = "user-ask";
 const ANDROID_BREAKTHROUGH_CHANNEL = "user-ask-breakthrough";
+const ANNOUNCE_MAX_LEVEL = 3;
+const COALESCE_WINDOW_MS = 60_000;
+const REPLY_SECRET_BYTES = 32;
 
 export const USER_ASK_CLOUD_ORIGIN_DEVICE_ID = "stella-cloud";
 
@@ -96,11 +111,15 @@ export const USER_ASKS_REPEAT_JOB = "userAsks.repeat";
 export const USER_ASKS_SWEEP_JOB = "userAsks.sweep";
 export const USER_ASKS_CLOUD_ESCALATE_JOB = "userAsks.cloudEscalate";
 export const USER_ASKS_DELIVER_LATE_JOB = "userAsks.deliverLate";
+export const USER_ASKS_ANNOUNCE_JOB = "userAsks.announce";
 
 const CLOUD_ORCHESTRATOR_ASK_THREAD_ID = AGENT_IDS.ORCHESTRATOR;
 
 const deliverLateJobId = (askId: string): string =>
   `${USER_ASKS_DELIVER_LATE_JOB}:${askId}`;
+
+const announceJobId = (askId: string): string =>
+  `${USER_ASKS_ANNOUNCE_JOB}:${askId}`;
 
 export const USER_ASKS_MIGRATION = {
   id: "userAsks.1-init",
@@ -169,6 +188,11 @@ export const USER_ASKS_QUESTION_RESPONSES_MIGRATION = {
   statements: [`ALTER TABLE user_ask_answers ADD COLUMN responses TEXT`],
 };
 
+export const USER_ASKS_REPLY_TOKEN_MIGRATION = {
+  id: "userAsks.5-reply-token",
+  statements: [`ALTER TABLE user_asks ADD COLUMN reply_secret TEXT`],
+};
+
 type AskRow = {
   ask_id: string;
   kind: string;
@@ -188,6 +212,7 @@ type AskRow = {
   local_offset_minutes: number | null;
   detail: string;
   recipient_key: string | null;
+  reply_secret: string | null;
   created_at: number;
   updated_at: number;
 };
@@ -749,6 +774,47 @@ const pushCopy = (row: AskRow): { title: string; body: string } => {
   return { title: who, body: text.slice(0, 240) };
 };
 
+const newReplySecret = (): string => {
+  const bytes = crypto.getRandomValues(new Uint8Array(REPLY_SECRET_BYTES));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+
+const replyAccess = async (
+  ctx: OwnerContext,
+  row: AskRow,
+): Promise<{ replyUrl: string; replyToken: string } | null> => {
+  const origin = (ctx.env?.CLOUD_BUILDER_PUBLIC_URL ?? "").trim().replace(/\/+$/, "");
+  if (!row.reply_secret || !origin.startsWith("https://")) return null;
+  const routeSignature = await signUserAskReplyRoute(ctx.env, ctx.ownerId).catch(() => null);
+  if (!routeSignature) return null;
+  return {
+    replyUrl: `${origin}/api/user-asks/${encodeURIComponent(row.ask_id)}/reply`,
+    replyToken: formatUserAskReplyToken({
+      ownerId: ctx.ownerId,
+      routeSignature,
+      secret: row.reply_secret,
+    }),
+  };
+};
+
+const notificationPlatform = (token: LivePushToken): UserAskNotificationPlatform =>
+  token.platform === "android" ? "android" : "ios";
+
+const maxPushedLevel = (db: OwnerDbReader, askId: string): number =>
+  db.one<{ level: number | null }>(
+    "SELECT MAX(level) AS level FROM user_ask_pushes WHERE ask_id = ?",
+    askId,
+  )?.level ?? 0;
+
+const otherAskPushedRecently = (ctx: OwnerContext, askId: string): boolean =>
+  (ctx.db.one<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM user_ask_pushes WHERE ask_id != ? AND sent_at >= ?",
+    askId,
+    ctx.now - COALESCE_WINDOW_MS,
+  )?.n ?? 0) > 0;
+
 const pushesInWindow = (ctx: OwnerContext): number =>
   ctx.db.one<{ n: number }>(
     "SELECT COUNT(*) AS n FROM user_ask_pushes WHERE sent_at >= ?",
@@ -767,6 +833,95 @@ const recordPush = (ctx: OwnerContext, row: AskRow, level: number): void => {
 
 type PushOutcome = "sent" | "no_push_target" | "send_failed";
 
+export const userAskPushMessages = (args: {
+  row: AskRow;
+  level: UserAskUrgencyLevel;
+  policy: UserAskEscalationPolicy;
+  tokens: readonly LivePushToken[];
+  reply: { replyUrl: string; replyToken: string } | null;
+  coalesce: boolean;
+}): Record<string, unknown>[] => {
+  const { row, level, policy, tokens, reply } = args;
+  const detail = parseDetail(row);
+  const copy = pushCopy(row);
+  const base: UserAskPushPayload = {
+    kind: USER_ASK_PUSH_KIND,
+    askId: row.ask_id,
+    conversationId: row.conversation_id,
+    level,
+  };
+  const breakthrough = level >= BREAKTHROUGH_LEVEL;
+  const quiet = args.coalesce && !breakthrough;
+  const sound = policy.soundEnabled && level >= SOUND_LEVEL && !quiet;
+  const collapse = `${USER_ASK_PUSH_CATEGORY}:${row.ask_id}`;
+  const channelId = breakthrough ? ANDROID_BREAKTHROUGH_CHANNEL : ANDROID_CHANNEL;
+  const interruptionLevel = breakthrough
+    ? "critical"
+    : quiet
+      ? "passive"
+      : level >= SOUND_LEVEL
+        ? "time-sensitive"
+        : "active";
+  const common = {
+    priority: "high",
+    ttl: breakthrough ? 0 : 60 * 60,
+  };
+  return tokens.map((token) => {
+    const platform = notificationPlatform(token);
+    const plan = userAskNotificationPlan(detail, platform);
+    const actionable =
+      reply !== null || plan.actions.every((action) => action.foreground === true);
+    const body = plan.bodySuffix
+      ? `${copy.body}\n${plan.bodySuffix}`.slice(0, 600)
+      : copy.body;
+    const rich: UserAskActionablePushData = {
+      ...base,
+      ...(actionable ? { actions: plan.actions } : {}),
+      ...(actionable && reply ? reply : {}),
+      ...(quiet ? { quiet: true } : {}),
+    };
+    if (
+      platform === "android" &&
+      token.capabilities.includes(USER_ASK_PUSH_CAPABILITY)
+    ) {
+      return {
+        to: token.token,
+        ...common,
+        data: { ...rich, alertTitle: copy.title, alertBody: body, channelId },
+        tag: collapse,
+      };
+    }
+    if (platform === "android") {
+      return {
+        to: token.token,
+        ...common,
+        title: copy.title,
+        body: copy.body,
+        data: base,
+        categoryId: USER_ASK_PUSH_CATEGORY,
+        channelId,
+        tag: collapse,
+        collapseId: collapse,
+        ...(sound ? { sound: "default" } : {}),
+      };
+    }
+    return {
+      to: token.token,
+      ...common,
+      title: copy.title,
+      body,
+      data: rich,
+      categoryId: USER_ASK_PUSH_CATEGORY,
+      mutableContent: true,
+      threadId: USER_ASK_NOTIFICATION_THREAD,
+      collapseId: collapse,
+      interruptionLevel,
+      ...(sound ? { sound: "default" } : {}),
+      ...(breakthrough ? { badge: 1 } : {}),
+    };
+  });
+};
+
 const sendAskPush = async (
   ctx: OwnerContext,
   row: AskRow,
@@ -775,40 +930,18 @@ const sendAskPush = async (
 ): Promise<PushOutcome> => {
   const tokens = livePushTokens(ctx);
   if (tokens.length === 0) return "no_push_target";
-  const copy = pushCopy(row);
-  const payload: UserAskPushPayload = {
-    kind: USER_ASK_PUSH_KIND,
-    askId: row.ask_id,
-    conversationId: row.conversation_id,
+  const messages = userAskPushMessages({
+    row,
     level,
-  };
-  const breakthrough = level >= BREAKTHROUGH_LEVEL;
-  const sound = policy.soundEnabled && level >= SOUND_LEVEL;
-  const thread = `${USER_ASK_PUSH_CATEGORY}:${row.ask_id}`;
+    policy,
+    tokens,
+    reply: await replyAccess(ctx, row),
+    coalesce: otherAskPushedRecently(ctx, row.ask_id),
+  });
   const response = await fetch(EXPO_PUSH_ENDPOINT, {
     method: "POST",
     headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify(
-      tokens.map(({ token }) => ({
-        to: token,
-        title: copy.title,
-        body: copy.body,
-        data: payload,
-        categoryId: USER_ASK_PUSH_CATEGORY,
-        threadId: thread,
-        collapseId: thread,
-        priority: "high",
-        ttl: breakthrough ? 0 : 60 * 60,
-        channelId: breakthrough ? ANDROID_BREAKTHROUGH_CHANNEL : ANDROID_CHANNEL,
-        interruptionLevel: breakthrough
-          ? "critical"
-          : level >= SOUND_LEVEL
-            ? "timeSensitive"
-            : "active",
-        ...(sound ? { sound: "default" } : {}),
-        ...(breakthrough ? { badge: 1 } : {}),
-      })),
-    ),
+    body: JSON.stringify(messages),
     signal: AbortSignal.timeout(15_000),
   }).catch(() => null);
   if (!response?.ok) {
@@ -847,6 +980,7 @@ const closeAsk = (
   ctx.jobs.cancel(expireJobId(row.ask_id));
   ctx.jobs.cancel(repeatJobId(row.ask_id));
   ctx.jobs.cancel(cloudEscalateJobId(row.ask_id));
+  ctx.jobs.cancel(announceJobId(row.ask_id));
   return readRow(ctx.db, row.ask_id)!;
 };
 
@@ -919,8 +1053,9 @@ const registerAsk = (ctx: OwnerContext, args: RegisterArgs) => {
     `INSERT INTO user_asks
        (ask_id, kind, conversation_id, thread_id, tool_call_id, agent_label, origin_device_id,
         state, urgency, escalation_level, blocking, deadline_at, expires_at, revision,
-        next_escalation_at, local_offset_minutes, detail, recipient_key, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1, ?, ?, ?, 1, NULL, ?, ?, ?, ?, ?)`,
+        next_escalation_at, local_offset_minutes, detail, recipient_key, reply_secret,
+        created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, 1, ?, ?, ?, 1, NULL, ?, ?, ?, ?, ?, ?)`,
     args.askId,
     args.kind,
     args.conversationId,
@@ -935,9 +1070,13 @@ const registerAsk = (ctx: OwnerContext, args: RegisterArgs) => {
     offsetFromLocalMinute(ctx.now, args.localMinuteOfDay),
     JSON.stringify(detail),
     args.recipientKey ? JSON.stringify(args.recipientKey) : null,
+    newReplySecret(),
     ctx.now,
     ctx.now,
   );
+  ctx.jobs.schedule(USER_ASKS_ANNOUNCE_JOB, ctx.now, { askId: args.askId }, {
+    id: announceJobId(args.askId),
+  });
   if (hasDefault) {
     ctx.jobs.schedule(USER_ASKS_DEFAULT_JOB, deadlineAt, { askId: args.askId }, {
       id: defaultJobId(args.askId),
@@ -1149,7 +1288,13 @@ type EscalateResult = {
   level: UserAskUrgencyLevel;
   requested: UserAskUrgencyLevel;
   pushed: boolean;
-  reason?: "closed" | "ceiling" | "max_per_hour" | "no_push_target" | "send_failed";
+  reason?:
+    | "closed"
+    | "ceiling"
+    | "max_per_hour"
+    | "no_push_target"
+    | "send_failed"
+    | "already_notified";
 };
 
 const escalateAsk = async (
@@ -1213,6 +1358,16 @@ const escalateAsk = async (
   if (allowed < PUSH_LEVEL_FLOOR) {
     ctx.jobs.cancel(repeatJobId(askId));
     return { ask: summaryOf(updated), level, requested, pushed: false };
+  }
+  if (allowed < BREAKTHROUGH_LEVEL && maxPushedLevel(ctx.db, askId) >= allowed) {
+    ctx.jobs.cancel(repeatJobId(askId));
+    return {
+      ask: summaryOf(updated),
+      level,
+      requested,
+      pushed: false,
+      reason: "already_notified",
+    };
   }
   if (pushesInWindow(ctx) >= policy.maxPerHour) {
     ctx.jobs.cancel(repeatJobId(askId));
@@ -1335,6 +1490,18 @@ const escalateCloudAsk = async (
     rearm();
     return;
   }
+  if (!repeatOnly && level < BREAKTHROUGH_LEVEL && maxPushedLevel(ctx.db, askId) >= level) {
+    ctx.db.run(
+      `UPDATE user_asks SET escalation_level = ?, revision = revision + 1,
+         next_escalation_at = ?, updated_at = ? WHERE ask_id = ?`,
+      level,
+      ctx.now + USER_ASK_ESCALATION_STEP_MS,
+      ctx.now,
+      askId,
+    );
+    rearm();
+    return;
+  }
   if (pushesInWindow(ctx) >= policy.maxPerHour) {
     rearm();
     return;
@@ -1367,6 +1534,118 @@ const escalateCloudAsk = async (
     );
   }
   rearm();
+};
+
+const announceAsk = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
+  const askId = (payload as { askId?: unknown } | null)?.askId;
+  if (typeof askId !== "string") return;
+  const row = readRow(ctx.db, askId);
+  if (!row || row.state !== "pending") return;
+  if (maxPushedLevel(ctx.db, askId) > 0) return;
+  const policy = readPolicy(ctx.db);
+  const wanted = Math.min(
+    ANNOUNCE_MAX_LEVEL,
+    Math.max(PUSH_LEVEL_FLOOR, clampUrgency(row.urgency)),
+  ) as UserAskUrgencyLevel;
+  const allowed = effectiveEscalationCeiling(
+    policy,
+    wanted,
+    quietHoursMinute(ctx, row.local_offset_minutes),
+  );
+  if (allowed < PUSH_LEVEL_FLOOR) {
+    log("user_ask_announce_held", { askId, reason: "ceiling" });
+    return;
+  }
+  if (pushesInWindow(ctx) >= policy.maxPerHour) {
+    log("user_ask_announce_held", { askId, reason: "max_per_hour" });
+    return;
+  }
+  const outcome = await sendAskPush(ctx, row, allowed, policy);
+  if (outcome !== "sent") log("user_ask_announce_failed", { askId, outcome });
+};
+
+type ReplyResult = {
+  accepted: boolean;
+  state: UserAskState;
+  label?: string;
+};
+
+const replyBodyParser = object({
+  token: string({ min: 1, max: 1024 }),
+  action: string({ min: 1, max: 64 }),
+  text: optional(string({ max: USER_ASK_MAX_RESPONSE_TEXT })),
+  deviceId: optional(string({ max: 256 })),
+});
+
+const secretsMatch = (expected: string, given: string): boolean => {
+  if (expected.length !== given.length) return false;
+  let difference = 0;
+  for (let index = 0; index < expected.length; index += 1) {
+    difference |= expected.charCodeAt(index) ^ given.charCodeAt(index);
+  }
+  return difference === 0;
+};
+
+const replyFromNotification = (
+  ctx: OwnerContext,
+  askId: string,
+  raw: unknown,
+): ReplyResult => {
+  const body = replyBodyParser(raw, "body");
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "userAsks.reply",
+    { count: 60, windowMs: 60_000 },
+    "Too many answers at once. Please wait a moment.",
+  );
+  const token = parseUserAskReplyToken(body.token);
+  const row = readRow(ctx.db, askId);
+  if (
+    !token ||
+    token.ownerId !== ctx.ownerId ||
+    !row ||
+    !row.reply_secret ||
+    !secretsMatch(row.reply_secret, token.secret)
+  ) {
+    throw new RpcError("FORBIDDEN", "That reply is not valid for this question.");
+  }
+  const detail = parseDetail(row);
+  const mapped = userAskAnswerFromNotificationReply(detail, {
+    action: body.action,
+    ...(body.text === undefined ? {} : { text: body.text }),
+  });
+  if (!mapped) {
+    throw new RpcError("BAD_REQUEST", "That reply does not fit this question.");
+  }
+  const deviceId = body.deviceId ? { answeredOnDeviceId: body.deviceId } : {};
+  const answer: UserAskAnswer =
+    mapped.kind === "questions"
+      ? { askId, revision: row.revision, kind: "questions", responses: mapped.responses, ...deviceId }
+      : { askId, revision: row.revision, kind: "fields", fields: mapped.fields, ...deviceId };
+  const result = answerAsk(ctx, askId, answer);
+  return {
+    accepted: result.accepted,
+    state: result.ask.state,
+    ...(result.accepted ? { label: userAskReplyLabel(detail, mapped) } : {}),
+  };
+};
+
+export const handleUserAskReply = async (
+  ctx: OwnerContext,
+  input: { askId: string; body: Record<string, unknown> },
+): Promise<UserAskRouteResult> => {
+  try {
+    return { status: 200, body: replyFromNotification(ctx, input.askId, input.body) };
+  } catch (caught) {
+    if (caught instanceof RpcError) {
+      return {
+        status: STATUS_BY_CODE[caught.code] ?? 500,
+        body: { error: caught.message, code: caught.code },
+      };
+    }
+    throw caught;
+  }
 };
 
 const deliverLateAnswer = async (
@@ -1596,6 +1875,7 @@ export const userAsksDomain = {
     USER_ASKS_POLICY_TIME_ZONE_MIGRATION,
     USER_ASKS_ANSWER_REVISION_MIGRATION,
     USER_ASKS_QUESTION_RESPONSES_MIGRATION,
+    USER_ASKS_REPLY_TOKEN_MIGRATION,
   ],
   calls: {
     "userAsks.policy": {
@@ -1623,6 +1903,7 @@ export const userAsksDomain = {
     [USER_ASKS_REPEAT_JOB]: { run: repeatBreakthrough, maxAttempts: 3 },
     [USER_ASKS_CLOUD_ESCALATE_JOB]: { run: escalateCloudAsk, maxAttempts: 3 },
     [USER_ASKS_DELIVER_LATE_JOB]: { run: deliverLateAnswer, maxAttempts: 5 },
+    [USER_ASKS_ANNOUNCE_JOB]: { run: announceAsk, maxAttempts: 2 },
     [USER_ASKS_SWEEP_JOB]: { run: (ctx) => sweep(ctx), maxAttempts: 10 },
   },
   purge: (ctx: OwnerContext) => {
@@ -1634,6 +1915,7 @@ export const userAsksDomain = {
       ctx.jobs.cancel(repeatJobId(ask_id));
       ctx.jobs.cancel(cloudEscalateJobId(ask_id));
       ctx.jobs.cancel(deliverLateJobId(ask_id));
+      ctx.jobs.cancel(announceJobId(ask_id));
     }
     ctx.jobs.cancel(USER_ASKS_SWEEP_JOB);
     ctx.db.run("DELETE FROM user_ask_answers");

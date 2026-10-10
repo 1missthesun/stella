@@ -76,6 +76,7 @@ import {
   snapshotDevices,
 } from "./owner-store/domains/devices.js";
 import {
+  handleUserAskReply,
   handleUserAskRoute,
   type UserAskRouteInput,
 } from "./owner-store/domains/user-asks.js";
@@ -562,6 +563,17 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   ): Promise<{ status: number; json: string }> {
     const result = await this.billingWrite((ctx) =>
       handleUserAskRoute(ctx, input),
+    );
+    return { status: result.status, json: JSON.stringify(result.body) };
+  }
+
+  /** `/api/user-asks/<id>/reply` from a phone notification, verified by its reply token. */
+  async userAskReply(input: {
+    askId: string;
+    body: Record<string, unknown>;
+  }): Promise<{ status: number; json: string }> {
+    const result = await this.billingWrite((ctx) =>
+      handleUserAskReply(ctx, input),
     );
     return { status: result.status, json: JSON.stringify(result.body) };
   }

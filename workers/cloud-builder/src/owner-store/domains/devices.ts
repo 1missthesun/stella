@@ -181,6 +181,14 @@ export const DEVICES_DROP_PAIRING_CODES_MIGRATION = {
   ],
 };
 
+export const DEVICES_PUSH_CAPABILITIES_MIGRATION = {
+  id: "devices.7-push-capabilities",
+  statements: [
+    `ALTER TABLE push_tokens ADD COLUMN capabilities TEXT`,
+    `ALTER TABLE push_digest ADD COLUMN titles TEXT`,
+  ],
+};
+
 type DeviceRow = {
   device_id: string;
   public_key: string | null;
@@ -620,19 +628,65 @@ const ACTIVITY_COPY: Record<ActivityNotificationKind, { title: string; body: str
   failed: { title: "Stella needs attention", body: "Stella could not finish on your desktop." },
 };
 
+const MAX_ACTIVITY_TITLE = 120;
+const MAX_DIGEST_TITLES = 12;
+
+type ActivityTitle = { kind: "completed" | "failed"; title: string };
+
+const cleanActivityTitle = (value: string | undefined): string => {
+  const trimmed = (value ?? "").trim().replace(/\s+/g, " ");
+  return trimmed.length <= MAX_ACTIVITY_TITLE
+    ? trimmed
+    : `${trimmed.slice(0, MAX_ACTIVITY_TITLE - 1).trimEnd()}…`;
+};
+
+const activityCopy = (
+  kind: ActivityNotificationKind,
+  title: string,
+): { title: string; body: string } => {
+  if (!title) return ACTIVITY_COPY[kind];
+  if (kind === "started") {
+    return { title: `Started: ${title}`, body: "Stella is working on this on your computer." };
+  }
+  if (kind === "completed") {
+    return { title: `Done: ${title}`, body: "Open Stella to see the result." };
+  }
+  return { title: `Couldn't finish: ${title}`, body: "Open Stella to see what happened." };
+};
+
+const listTitles = (titles: readonly string[]): string => {
+  if (titles.length <= 1) return titles[0] ?? "";
+  if (titles.length === 2) return `${titles[0]} and ${titles[1]}`;
+  if (titles.length === 3) return `${titles[0]}, ${titles[1]} and ${titles[2]}`;
+  return `${titles[0]}, ${titles[1]} and ${titles.length - 2} more`;
+};
+
+export const PUSH_TOKEN_CAPABILITY_LIMIT = 16;
+
 const registerPushToken = (
   ctx: OwnerContext,
-  input: { token: string; mobileDeviceId: string; sessionId: string; platform?: string },
+  input: {
+    token: string;
+    mobileDeviceId: string;
+    sessionId: string;
+    platform?: string;
+    capabilities?: readonly string[];
+  },
 ) => {
   ctx.db.run(
-    `INSERT INTO push_tokens (token, mobile_device_id, session_id, platform, updated_at) VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO push_tokens (token, mobile_device_id, session_id, platform, capabilities, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT (token) DO UPDATE SET mobile_device_id = excluded.mobile_device_id,
        session_id = excluded.session_id,
-       platform = COALESCE(excluded.platform, push_tokens.platform), updated_at = excluded.updated_at`,
+       platform = COALESCE(excluded.platform, push_tokens.platform),
+       capabilities = excluded.capabilities, updated_at = excluded.updated_at`,
     input.token,
     input.mobileDeviceId,
     input.sessionId,
     input.platform ?? null,
+    input.capabilities && input.capabilities.length > 0
+      ? JSON.stringify(input.capabilities)
+      : null,
     ctx.now,
   );
   ctx.db.run(
@@ -655,61 +709,137 @@ const forgetAllPushTokens = (ctx: OwnerContext): void => {
   ctx.db.run("DELETE FROM push_tokens");
 };
 
-export const livePushTokens = (ctx: OwnerContext): { token: string }[] =>
-  ctx.db.all<{ token: string }>(
-    "SELECT token FROM push_tokens WHERE session_id IS NOT NULL ORDER BY updated_at DESC LIMIT ?",
-    MAX_TOKENS,
+export type LivePushToken = {
+  token: string;
+  platform: string | null;
+  capabilities: readonly string[];
+};
+
+const parseCapabilities = (raw: string | null): readonly string[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((entry): entry is string => typeof entry === "string")
+      : [];
+  } catch {
+    return [];
+  }
+};
+
+export const livePushTokens = (ctx: OwnerContext): LivePushToken[] =>
+  ctx.db
+    .all<{ token: string; platform: string | null; capabilities: string | null }>(
+      "SELECT token, platform, capabilities FROM push_tokens WHERE session_id IS NOT NULL ORDER BY updated_at DESC LIMIT ?",
+      MAX_TOKENS,
+    )
+    .map((row) => ({
+      token: row.token,
+      platform: row.platform,
+      capabilities: parseCapabilities(row.capabilities),
+    }));
+
+type PushDigest = {
+  last_sent_at: number;
+  last_finish_at: number;
+  completed: number;
+  failed: number;
+  titles: readonly ActivityTitle[];
+};
+
+const parseDigestTitles = (raw: string | null | undefined): ActivityTitle[] => {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is ActivityTitle =>
+        !!entry &&
+        typeof entry === "object" &&
+        ((entry as ActivityTitle).kind === "completed" || (entry as ActivityTitle).kind === "failed") &&
+        typeof (entry as ActivityTitle).title === "string",
+    );
+  } catch {
+    return [];
+  }
+};
+
+const readDigest = (ctx: OwnerContext): PushDigest => {
+  const row = ctx.db.one<Omit<PushDigest, "titles"> & { titles: string | null }>(
+    "SELECT last_sent_at, last_finish_at, completed, failed, titles FROM push_digest WHERE id = 1",
   );
-
-type PushDigest = { last_sent_at: number; last_finish_at: number; completed: number; failed: number };
-
-const readDigest = (ctx: OwnerContext): PushDigest =>
-  ctx.db.one<PushDigest>("SELECT last_sent_at, last_finish_at, completed, failed FROM push_digest WHERE id = 1") ??
-  { last_sent_at: 0, last_finish_at: 0, completed: 0, failed: 0 };
+  if (!row) return { last_sent_at: 0, last_finish_at: 0, completed: 0, failed: 0, titles: [] };
+  return { ...row, titles: parseDigestTitles(row.titles) };
+};
 
 const writeDigest = (ctx: OwnerContext, digest: PushDigest): void => {
   ctx.db.run(
-    `INSERT INTO push_digest (id, last_sent_at, last_finish_at, completed, failed) VALUES (1, ?, ?, ?, ?)
+    `INSERT INTO push_digest (id, last_sent_at, last_finish_at, completed, failed, titles) VALUES (1, ?, ?, ?, ?, ?)
      ON CONFLICT (id) DO UPDATE SET last_sent_at = excluded.last_sent_at, last_finish_at = excluded.last_finish_at,
-       completed = excluded.completed, failed = excluded.failed`,
+       completed = excluded.completed, failed = excluded.failed, titles = excluded.titles`,
     digest.last_sent_at,
     digest.last_finish_at,
     digest.completed,
     digest.failed,
+    digest.titles.length > 0 ? JSON.stringify(digest.titles.slice(-MAX_DIGEST_TITLES)) : null,
   );
 };
 
 const taskCount = (count: number): string => `${count} ${count === 1 ? "task" : "tasks"}`;
 
-const digestCopy = ({ completed, failed }: PushDigest): { title: string; body: string } => {
-  if (completed + failed === 1) return ACTIVITY_COPY[failed ? "failed" : "completed"];
+export const digestCopy = ({ completed, failed, titles }: Pick<PushDigest, "completed" | "failed" | "titles">): { title: string; body: string } => {
+  const done = titles.filter((entry) => entry.kind === "completed").map((entry) => entry.title);
+  const stuck = titles.filter((entry) => entry.kind === "failed").map((entry) => entry.title);
+  if (completed + failed === 1) {
+    const kind = failed ? "failed" : "completed";
+    return activityCopy(kind, (kind === "failed" ? stuck : done)[0] ?? "");
+  }
+  const named = [
+    done.length === completed && done.length > 0 ? `Done: ${listTitles(done)}.` : "",
+    stuck.length === failed && stuck.length > 0 ? `Couldn't finish: ${listTitles(stuck)}.` : "",
+  ].filter(Boolean);
   if (failed === 0) {
-    return { title: `Stella finished ${taskCount(completed)}`, body: `${taskCount(completed)} finished. Open Stella to see the results.` };
+    return {
+      title: `Stella finished ${taskCount(completed)}`,
+      body: named.length > 0 ? named.join(" ") : `${taskCount(completed)} finished. Open Stella to see the results.`,
+    };
   }
   return {
     title: "Stella needs attention",
-    body: completed === 0
-      ? `${taskCount(failed)} could not finish.`
-      : `${taskCount(completed)} finished, ${failed} could not finish.`,
+    body: named.length === (completed > 0 ? 2 : 1)
+      ? named.join(" ")
+      : completed === 0
+        ? `${taskCount(failed)} could not finish.`
+        : `${taskCount(completed)} finished, ${failed} could not finish.`,
   };
 };
 
-const notifyActivity = async (ctx: OwnerContext, kind: ActivityNotificationKind): Promise<null> => {
+const activityCollapseId = (taskId: string | undefined): string =>
+  taskId ? `agent_activity:${taskId}`.slice(0, 64) : "agent_activity";
+
+const notifyActivity = async (
+  ctx: OwnerContext,
+  args: DeviceCalls["phone.notifyActivity"]["args"],
+): Promise<null> => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "phone.notifyActivity", { count: 30, windowMs: 60_000 }, "Slow down a moment and try again.");
+  const { kind } = args;
+  const title = cleanActivityTitle(args.title);
+  const collapseId = activityCollapseId(args.taskId);
   const digest = readDigest(ctx);
   if (kind === "started") {
     if (ctx.now - digest.last_sent_at < PUSH_QUIET_MS) return null;
     writeDigest(ctx, { ...digest, last_sent_at: ctx.now });
-    return sendPush(ctx, ACTIVITY_COPY.started);
+    return sendPush(ctx, activityCopy("started", title), collapseId);
   }
   if (digest.completed + digest.failed === 0 && ctx.now - digest.last_finish_at >= PUSH_QUIET_MS) {
-    writeDigest(ctx, { ...digest, last_sent_at: ctx.now, last_finish_at: ctx.now });
-    return sendPush(ctx, ACTIVITY_COPY[kind]);
+    writeDigest(ctx, { ...digest, last_sent_at: ctx.now, last_finish_at: ctx.now, titles: [] });
+    return sendPush(ctx, activityCopy(kind, title), collapseId);
   }
   writeDigest(ctx, {
     ...digest,
     completed: digest.completed + (kind === "completed" ? 1 : 0),
     failed: digest.failed + (kind === "failed" ? 1 : 0),
+    titles: title ? [...digest.titles, { kind, title }] : digest.titles,
   });
   ctx.jobs.schedule(DEVICES_PUSH_DIGEST_JOB, digest.last_finish_at + PUSH_QUIET_MS, null, { id: DEVICES_PUSH_DIGEST_JOB });
   return null;
@@ -718,11 +848,15 @@ const notifyActivity = async (ctx: OwnerContext, kind: ActivityNotificationKind)
 const flushDigest = async (ctx: OwnerContext): Promise<void> => {
   const digest = readDigest(ctx);
   if (digest.completed + digest.failed === 0) return;
-  writeDigest(ctx, { last_sent_at: ctx.now, last_finish_at: ctx.now, completed: 0, failed: 0 });
-  await sendPush(ctx, digestCopy(digest));
+  writeDigest(ctx, { last_sent_at: ctx.now, last_finish_at: ctx.now, completed: 0, failed: 0, titles: [] });
+  await sendPush(ctx, digestCopy(digest), "agent_activity:digest");
 };
 
-const sendPush = async (ctx: OwnerContext, copy: { title: string; body: string }): Promise<null> => {
+const sendPush = async (
+  ctx: OwnerContext,
+  copy: { title: string; body: string },
+  collapseId: string,
+): Promise<null> => {
   const tokens = livePushTokens(ctx);
   if (tokens.length === 0) return null;
   const response = await fetch(EXPO_PUSH_ENDPOINT, {
@@ -737,7 +871,8 @@ const sendPush = async (ctx: OwnerContext, copy: { title: string; body: string }
         data: { kind: "agent_activity" },
         categoryId: "agent_activity",
         threadId: "agent_activity",
-        collapseId: "agent_activity",
+        collapseId,
+        tag: collapseId,
       })),
     ),
     signal: AbortSignal.timeout(15_000),
@@ -783,11 +918,18 @@ export const handleMobileRoute = async (ctx: OwnerContext, input: MobileRouteInp
       if (!caller.sessionId) return error(403, "Sign in again to receive notifications.");
       enforceOwnerRateLimit(ctx.db, ctx.now, "push.register", { count: 60, windowMs: 60_000 }, "Too many requests.");
       const platform = optionalText(body.platform, 64);
+      const capabilities = Array.isArray(body.capabilities)
+        ? body.capabilities
+            .map((entry) => text(entry, 64))
+            .filter(Boolean)
+            .slice(0, PUSH_TOKEN_CAPABILITY_LIMIT)
+        : [];
       registerPushToken(ctx, {
         token,
         mobileDeviceId,
         sessionId: caller.sessionId,
         ...(platform ? { platform } : {}),
+        capabilities,
       });
       return { status: 200, body: { ok: true } };
     }
@@ -839,6 +981,7 @@ export const devicesDomain = {
     DEVICES_PUSH_DIGEST_MIGRATION,
     DEVICES_PUSH_TOKEN_SESSION_MIGRATION,
     DEVICES_DROP_PAIRING_CODES_MIGRATION,
+    DEVICES_PUSH_CAPABILITIES_MIGRATION,
   ],
   calls: {
     "devices.identity": {
@@ -880,8 +1023,12 @@ export const devicesDomain = {
     "phone.notifyActivity": {
       scope: "owner",
       requireAccount: true,
-      parse: object({ kind: literal("started", "completed", "failed") }),
-      handler: (ctx: OwnerContext, args: DeviceCalls["phone.notifyActivity"]["args"]) => notifyActivity(ctx, args.kind),
+      parse: object({
+        kind: literal("started", "completed", "failed"),
+        title: optional(string({ max: 400 })),
+        taskId: optional(string({ max: 256 })),
+      }),
+      handler: (ctx: OwnerContext, args: DeviceCalls["phone.notifyActivity"]["args"]) => notifyActivity(ctx, args),
     },
   },
   /**

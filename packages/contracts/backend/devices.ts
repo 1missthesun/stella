@@ -95,7 +95,10 @@ export type DeviceCalls = {
     };
   };
   /** Tell the owner's phones about desktop activity. */
-  "phone.notifyActivity": { args: { kind: ActivityNotificationKind }; result: null };
+  "phone.notifyActivity": {
+    args: { kind: ActivityNotificationKind; title?: string; taskId?: string };
+    result: null;
+  };
 };
 
 export type DeviceViews = Record<never, never>;

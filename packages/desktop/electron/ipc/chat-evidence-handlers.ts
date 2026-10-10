@@ -11,6 +11,7 @@ import type {
 import { driveLinkPath, driveLinkTarget } from "@stella/contracts/cloud-world-paths";
 import { createChatEvidenceService } from "../services/chat-evidence-service.js";
 import { handleIpc } from "./typed-ipc.js";
+import type { PeerDeviceFiles } from "../services/peer-device-files.js";
 
 const REQUEST_PATH_CAP = 40;
 
@@ -45,6 +46,8 @@ const driveSourcesFrom = (value: unknown): DriveEvidenceSource[] => {
 
 export const registerChatEvidenceHandlers = (options: {
   getStellaDataDir: () => string | null;
+  peerDeviceFiles?: PeerDeviceFiles;
+  getActiveConversationId?: () => string | null;
   assertPrivilegedSender: (
     event: IpcMainEvent | IpcMainInvokeEvent,
     channel: string,
@@ -52,6 +55,10 @@ export const registerChatEvidenceHandlers = (options: {
 }) => {
   const service = createChatEvidenceService({
     getStellaDataDir: options.getStellaDataDir,
+    ...(options.peerDeviceFiles ? { peerDeviceFiles: options.peerDeviceFiles } : {}),
+    ...(options.getActiveConversationId
+      ? { getActiveConversationId: options.getActiveConversationId }
+      : {}),
   });
 
   handleIpc(

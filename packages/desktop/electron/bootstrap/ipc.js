@@ -370,6 +370,8 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     });
     registerChatEvidenceHandlers({
         getStellaDataDir: lifecycle.getStellaDataDir,
+        peerDeviceFiles,
+        getActiveConversationId: () => services.uiStateService.state.conversationId?.trim() || null,
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     const display = registerDisplayHandlers({

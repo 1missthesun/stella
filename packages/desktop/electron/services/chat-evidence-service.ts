@@ -13,6 +13,8 @@ import {
   type EvidenceCardSet,
 } from "@stella/contracts/chat-evidence";
 import os from "node:os";
+import type { PeerDeviceFiles } from "./peer-device-files.js";
+import { deviceFileReadRanges } from "@stella/contracts/device-file-reads";
 import { nativeImage } from "electron";
 import {
   archiveEntryExtensions,
@@ -61,7 +63,13 @@ type SourceEntry = {
   isDirectory: boolean;
   order: number;
   elsewhere?: boolean;
+  /** The other computer of the owner's that has an `elsewhere` entry. */
+  holder?: { deviceId: string; modifiedAt: number };
 };
+
+/** How much of a file on another computer is fetched to draw its card. */
+const PEER_IMAGE_MAX_BYTES = 16 * 1024 * 1024;
+const PEER_VIDEO_HEAD_BYTES = 8 * 1024 * 1024;
 
 type CardPlan =
   | { kind: "single"; entry: SourceEntry }
@@ -461,6 +469,8 @@ export type ChatEvidenceService = {
 
 export const createChatEvidenceService = (options: {
   getStellaDataDir: () => string | null;
+  peerDeviceFiles?: PeerDeviceFiles;
+  getActiveConversationId?: () => string | null;
 }): ChatEvidenceService => {
   const memory = new Map<string, EvidenceCard>();
   const inFlight = new Map<string, Promise<EvidenceCard>>();
@@ -501,9 +511,64 @@ export const createChatEvidenceService = (options: {
     }
   };
 
+  /**
+   * The card for an image or video another of the owner's computers has:
+   * the image, or the head of the video, is fetched from it into the cache
+   * and drawn the way a local one is.
+   */
+  const peerCard = async (entry: SourceEntry): Promise<EvidenceCard | null> => {
+    const peers = options.peerDeviceFiles;
+    const holder = entry.holder;
+    const dataDir = options.getStellaDataDir();
+    if (!peers || !holder || !dataDir?.trim()) return null;
+    if (entry.kind !== "image" && entry.kind !== "video") return null;
+    if (entry.kind === "image" && entry.byteSize > PEER_IMAGE_MAX_BYTES) return null;
+    const cacheKey = `${CACHE_SCHEMA}:peer:${holder.deviceId}:${entry.filePath}:${entry.byteSize}:${holder.modifiedAt}`;
+    const cached = await readCached(cacheKey);
+    if (cached) return cached;
+    const length =
+      entry.kind === "image"
+        ? entry.byteSize
+        : Math.min(entry.byteSize, PEER_VIDEO_HEAD_BYTES);
+    const conversationId = options.getActiveConversationId?.() ?? null;
+    const parts: Uint8Array[] = [];
+    for (const range of deviceFileReadRanges(length)) {
+      parts.push(
+        (await peers.read(holder.deviceId, entry.filePath, range, conversationId)).bytes,
+      );
+    }
+    const digest = createHash("sha1").update(cacheKey).digest("hex");
+    const copyPath = path.join(
+      dataDir,
+      CACHE_DIRNAME,
+      "peer",
+      `${digest}${path.extname(entry.filePath).toLowerCase()}`,
+    );
+    await fs.mkdir(path.dirname(copyPath), { recursive: true });
+    await fs.writeFile(copyPath, Buffer.concat(parts));
+    try {
+      const card = await buildSingleCard(`peer:${digest.slice(0, 32)}`, {
+        ...entry,
+        filePath: copyPath,
+        elsewhere: false,
+      });
+      if (card.kind === "plain") return null;
+      const placed: EvidenceCard = {
+        ...card,
+        title: humanTitleFor(entry.filePath, entry.kind),
+        sourcePaths: [entry.filePath],
+        byteSize: entry.byteSize,
+      };
+      await writeCached(cacheKey, placed);
+      return placed;
+    } finally {
+      await fs.rm(copyPath, { force: true }).catch(() => undefined);
+    }
+  };
+
   const cardFor = async (plan: CardPlan): Promise<EvidenceCard> => {
     if (plan.kind === "single" && plan.entry.elsewhere) {
-      return elsewhereCard(plan.entry);
+      return (await peerCard(plan.entry).catch(() => null)) ?? elsewhereCard(plan.entry);
     }
     const cacheKey = await planCacheKey(plan);
     const cached = await readCached(cacheKey);
@@ -536,18 +601,41 @@ export const createChatEvidenceService = (options: {
       const described = await Promise.all(
         unique.map((filePath, index) => describeSource(filePath, index)),
       );
+      const holders = await Promise.all(
+        described.map(async (entry, index) => {
+          const filePath = unique[index] as string;
+          if (entry || cloudWorldDrivePath(filePath) !== null || !options.peerDeviceFiles) {
+            return null;
+          }
+          return await options.peerDeviceFiles
+            .findHolder(filePath, {
+              conversationId: options.getActiveConversationId?.() ?? null,
+            })
+            .catch(() => null);
+        }),
+      );
       const entries = described.flatMap((entry, index): SourceEntry[] => {
         if (entry) return [entry];
         const filePath = unique[index] as string;
         if (cloudWorldDrivePath(filePath) !== null) return [];
+        const holder = holders[index];
+        const isDirectory = holder?.stat.kind === "directory";
         return [
           {
             filePath,
-            kind: evidenceSourceKind(filePath, false),
-            byteSize: 0,
-            isDirectory: false,
+            kind: evidenceSourceKind(filePath, isDirectory),
+            byteSize: holder && !isDirectory ? holder.stat.sizeBytes : 0,
+            isDirectory,
             order: index,
             elsewhere: true,
+            ...(holder
+              ? {
+                  holder: {
+                    deviceId: holder.computer.deviceId,
+                    modifiedAt: holder.stat.modifiedAt,
+                  },
+                }
+              : {}),
           },
         ];
       });

@@ -57,6 +57,7 @@ let fetchImpl: (
 };
 
 mock.module("expo-audio", () => ({
+  setIsAudioActiveAsync: async () => {},
   createAudioPlayer: (source: unknown) => {
     playerSources.push(source);
     const listeners = new Set<(status: Record<string, unknown>) => void>();

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createAudioPlayer, type AudioPlayer } from "expo-audio";
+import { createAudioPlayer, setIsAudioActiveAsync, type AudioPlayer } from "expo-audio";
 import { Alert } from "react-native";
 import { VOICE_TTS_STREAM_CANCEL_PATH } from "@stella/contracts/backend/voice";
 import { getAuthToken } from "./auth-token";
@@ -79,16 +79,23 @@ export type ReadAloudState = {
 
 let playbackState: ReadAloudState | null = null;
 
-// expo-audio deactivates the shared session shortly after a player is torn
-// down. Starting the microphone inside that window reads a 0 Hz input format
-// and the recorder aborts the app, so dictation waits this long after speech.
+// Starting the microphone while a just-stopped speech clip still holds the
+// playback session makes the recorder read a 0 Hz input format or time out,
+// and it aborts the app. Dictation that follows speech this closely first
+// deactivates the session and lets it settle, matching a start from idle.
+const RECENT_SPEECH_MS = 2000;
 const SESSION_RELEASE_MS = 400;
 let lastPlayerReleasedAt = 0;
 
 /** Resolves once a just-stopped clip has released the audio session. */
 export async function waitForReadAloudRelease() {
-  const remaining = lastPlayerReleasedAt + SESSION_RELEASE_MS - Date.now();
-  if (remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+  if (Date.now() - lastPlayerReleasedAt > RECENT_SPEECH_MS) return;
+  try {
+    await setIsAudioActiveAsync(false);
+  } catch {
+    /* the session may already be inactive */
+  }
+  await new Promise((resolve) => setTimeout(resolve, SESSION_RELEASE_MS));
 }
 let playbackAbort: AbortController | null = null;
 

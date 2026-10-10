@@ -74,6 +74,10 @@ final class StellaCarPlayController: NSObject, CPInterfaceControllerDelegate {
 
   private func setConnected(_ value: Bool) {
     StellaCarPlayConnectionState.shared.set(connected: value)
+    StellaTimerKeeper.shared.update(
+      carPlayConnected: value,
+      phoneForeground: StellaPhoneSceneState.shared.isForeground
+    )
   }
 
   func connect(_ controller: CPInterfaceController) {

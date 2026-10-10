@@ -9,6 +9,7 @@ public class StellaCarPlayModule: Module {
     Events("onConnectionChange", "onRowSelect", "onVoiceControlAction")
 
     OnCreate {
+      StellaTimerKeeper.shared.install()
       DispatchQueue.main.async { [weak self] in
         MainActor.assumeIsolated {
           StellaCarPlayController.shared.emit = { name, body in

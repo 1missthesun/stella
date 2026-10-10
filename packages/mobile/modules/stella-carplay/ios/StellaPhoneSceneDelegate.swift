@@ -16,6 +16,10 @@ final class StellaPhoneSceneState: @unchecked Sendable {
     lock.lock()
     foreground = next
     lock.unlock()
+    StellaTimerKeeper.shared.update(
+      carPlayConnected: StellaCarPlayConnectionState.shared.isConnected,
+      phoneForeground: next
+    )
   }
 }
 

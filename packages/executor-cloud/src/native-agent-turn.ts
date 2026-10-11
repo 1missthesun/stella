@@ -873,10 +873,11 @@ export const runCloudClaude = async (options: {
     }
     const limit = error ? claudeCodeSubscriptionLimitOf(error) : null;
     if (limit) {
-      // Say so, with the reset when the CLI gave one. Nothing switches.
+      // Say so, with the exact reset instant when the CLI gave one, so the
+      // cloud can hold the work until then. Nothing switches.
       error =
         limit.resetsAt !== undefined
-          ? `Claude usage limit reached for ${options.claudeAccount.email}. It resets at ${new Date(limit.resetsAt).toUTCString()}.`
+          ? `Claude usage limit reached for ${options.claudeAccount.email}. It resets at ${new Date(limit.resetsAt).toISOString()}.`
           : `Claude usage limit reached for ${options.claudeAccount.email}.`;
     }
     return {

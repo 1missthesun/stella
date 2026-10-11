@@ -13,6 +13,14 @@ import type { Context } from "@earendil-works/chord";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { AssistantEntry, LiveDoc, type Conversation, type Harness } from "@earendil-works/pi-durable";
 
+export async function afterStop(harness: Harness, root: Conversation, context: Context): Promise<void> {
+  for (;;) {
+    const taskId = (await harness.snapshot(LiveDoc, root.id, context))?.run?.taskId;
+    if (taskId === undefined || (await harness.getTask(taskId, context))?.abortRequested !== true) return;
+    await harness.waitForTask(taskId, context);
+  }
+}
+
 export async function stopStella(harness: Harness, root: Conversation, context: Context): Promise<void> {
   const { model } = await root.agent(context);
   await harness.commit(async (tx) => {

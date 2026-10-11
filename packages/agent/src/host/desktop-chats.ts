@@ -117,7 +117,7 @@ import { journalMirror, type DesktopJournal, type JournalMirror } from "./deskto
 import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror } from "./desktop-local-log.ts";
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
 import { desktopContextSources } from "./desktop-sources.ts";
-import { stopStella } from "../stella/stop.ts";
+import { afterStop, stopStella } from "../stella/stop.ts";
 import type { ClaudeCodeEngine, ClaudeCodeStatus } from "../engine/claude-code.ts";
 import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
 
@@ -1419,6 +1419,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     await markActive(conversationId, true);
     await caughtUp(chat);
+    await afterStop(chat.harness, chat.root, context);
     const input = await withReminders(conversationId, chat, content, sent);
     const submission = await chat.root.submit(
       // A message sent while Stella works joins the run at its next step.

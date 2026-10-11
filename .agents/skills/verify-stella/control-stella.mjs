@@ -1155,7 +1155,7 @@ const cmdFill = async (options) => {
 
 const KEY_CODES = {
   Escape: { key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
-  Enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 },
+  Enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" },
   Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
   Backspace: { key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 },
   Delete: { key: "Delete", code: "Delete", windowsVirtualKeyCode: 46 },

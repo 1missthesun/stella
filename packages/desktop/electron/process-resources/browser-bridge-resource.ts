@@ -20,6 +20,7 @@ export type StellaBrowserBridgeResource = {
   stop: () => Promise<void>;
   getStatus: () => StellaBrowserBridgeStatus;
   getExtensionStatus: () => Promise<boolean>;
+  reconnectExtension: () => Promise<boolean>;
   exportAllCookies: () => Promise<StellaBrowserExportedCookie[]>;
   exportCookiesForUrls: (
     urls: string[],
@@ -79,6 +80,7 @@ export const createStellaBrowserBridgeResource = (options: {
       StellaBrowserBridgeResource,
       | "getStatus"
       | "getExtensionStatus"
+      | "reconnectExtension"
       | "exportAllCookies"
       | "exportCookiesForUrls"
       | "connectCdp"
@@ -143,6 +145,7 @@ export const createStellaBrowserBridgeResource = (options: {
         getStatus: () => currentStatus,
         getExtensionStatus: async () =>
           getService()?.getExtensionStatus() ?? false,
+        reconnectExtension: async () => requireService().reconnectExtension(),
         exportAllCookies: async () => requireService().exportAllCookies(),
         exportCookiesForUrls: async (urls: string[]) =>
           requireService().exportCookiesForUrls(urls),

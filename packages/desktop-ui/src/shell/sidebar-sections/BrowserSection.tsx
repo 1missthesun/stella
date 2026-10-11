@@ -128,9 +128,7 @@ const conversationOwnerId = (conversationId: string | null | undefined) => {
 
 type LoginAction = "install" | "reconnect" | null;
 
-const loginActionFor = (
-  state: BrowserViewState,
-): LoginAction => {
+const loginActionFor = (state: BrowserViewState): LoginAction => {
   if (state.connection !== "disconnected") return null;
   const reason = state.unavailableReason;
   if (reason === "bridge_missing") return null;
@@ -222,10 +220,7 @@ function BrowserEmptyState({
       ? t("shell.browser.emptyBodyConnected")
       : t("shell.browser.emptyBody");
   return (
-    <div
-      className="browser-section__status"
-      role={error ? "alert" : "status"}
-    >
+    <div className="browser-section__status" role={error ? "alert" : "status"}>
       <span className="browser-section__status-icon" aria-hidden="true">
         {error ? (
           <AlertCircle size={21} strokeWidth={1.75} />
@@ -387,7 +382,7 @@ export function BrowserSection() {
       });
   }, []);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (reconnect = false) => {
     const api = browserViewApi();
     if (!api) return;
     setLocalError(null);
@@ -395,6 +390,7 @@ export function BrowserSection() {
       const next = await api.connect({
         browserType: uiState.getItem(BROWSER_SELECTION_KEY) ?? undefined,
         profileId: uiState.getItem(BROWSER_PROFILE_KEY) ?? undefined,
+        ...(reconnect ? { reconnect: true } : {}),
       });
       if (mountedRef.current && isBrowserViewState(next)) setState(next);
     } catch (error) {
@@ -601,7 +597,7 @@ export function BrowserSection() {
   const loginBusy = connectingExtension || reconnectingLogins;
   const reconnectLogins = () => {
     setReconnectingLogins(true);
-    void connect().finally(() => {
+    void connect(true).finally(() => {
       if (mountedRef.current) setReconnectingLogins(false);
     });
   };

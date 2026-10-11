@@ -245,6 +245,11 @@
       "chain": false,
       "params": ["name"]
     },
+    "extension_reconnect": {
+      "chain": false,
+      "params": [],
+      "note": "Top-level only. Retires the live extension connection so the extension reconnects with a fresh hello."
+    },
     "extension_status": {
       "chain": false,
       "params": []

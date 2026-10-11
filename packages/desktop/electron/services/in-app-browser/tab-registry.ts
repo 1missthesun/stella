@@ -202,6 +202,7 @@ export class BrowserTabRegistry {
 
   private shouldActivateOwner(ownerId: string, requested?: boolean) {
     if (requested) return true;
+    if (this.scopedOwnerId === null) return true;
     if (typeof this.scopedOwnerId === "string") {
       return this.scopedOwnerId === ownerId;
     }

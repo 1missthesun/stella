@@ -3,6 +3,7 @@ import path from "node:path";
 import {
   BrowserWindow,
   session,
+  View,
   WebContentsView,
   type Rectangle,
   type Session,
@@ -102,6 +103,11 @@ type InAppBrowserServiceOptions = {
     | { mode: "shared" | "isolated"; ownsExtensionChannel: boolean }
     | undefined;
   getExtensionStatus: () => Promise<boolean>;
+  /**
+   * Make the extension drop its link to the bridge and reconnect with a
+   * fresh handshake, so a link the daemon retired comes back.
+   */
+  reconnectExtension?: () => Promise<void>;
   exportAllCookies: () => Promise<StellaBrowserExportedCookie[]>;
   exportCookiesForUrls?: (
     urls: string[],
@@ -298,6 +304,7 @@ export class InAppBrowserService {
   private layout: BrowserViewLayout | null = null;
   private attachedView: WebContentsView | null = null;
   private attachedWindow: BrowserWindow | null = null;
+  private visibilityNudge: View | null = null;
   private disposed = false;
   private connectionError: string | undefined;
   private connectionUnavailableReason: BrowserViewUnavailableReason | undefined;
@@ -425,6 +432,29 @@ export class InAppBrowserService {
         this.readConnectionFailure("transient_failure", errorMessage(error)),
       );
     }
+    return this.snapshot();
+  }
+
+  /**
+   * The panel's Reconnect: a real reconnect, not a status re-probe. The
+   * extension's current link is retired so it handshakes again, then the
+   * bridge is brought back up with the same recovery the agents use.
+   */
+  async reconnectExtension(): Promise<BrowserViewState> {
+    if (this.disposed) throw new Error("The in-app browser has been closed.");
+    const setupRequirement = this.readSetupRequirement();
+    if (setupRequirement) {
+      this.updateUnavailableConnection(setupRequirement);
+      return this.snapshot();
+    }
+    this.updateConnection("checking");
+    await this.connectPromise?.catch(() => undefined);
+    try {
+      await this.options.reconnectExtension?.();
+    } catch {
+      // The attempts below report whatever state the bridge is left in.
+    }
+    await this.ensureConnectionOnDemand();
     return this.snapshot();
   }
 
@@ -962,6 +992,9 @@ export class InAppBrowserService {
     ownerId?: string,
     debuggerSessionId?: string,
   ): Promise<unknown> {
+    if (method === "Page.navigate" && !debuggerSessionId) {
+      this.revealAgentNavigation(tabId, resolveOwnerId(ownerId));
+    }
     return this.debuggerProxy.sendCommand(
       tabId,
       method,
@@ -969,6 +1002,19 @@ export class InAppBrowserService {
       ownerId,
       debuggerSessionId,
     );
+  }
+
+  private revealAgentNavigation(tabId: string, ownerId: string) {
+    if (!this.tabs.isOwnedBy(tabId, ownerId)) return;
+    if (
+      this.tabs.visibleOwnerId === ownerId &&
+      this.tabs.activeTabId(ownerId) === tabId
+    ) {
+      return;
+    }
+    this.tabs.select(tabId, ownerId);
+    this.syncState();
+    this.attachActiveView();
   }
 
   recoverDebuggerTarget(
@@ -1429,20 +1475,38 @@ export class InAppBrowserService {
       return;
     }
     if (this.debuggerProxy.isMountedInHiddenHost(tab.id)) {
-      // The view remains drawable without stealing the visible surface. The
-      // final lease release restores it if it is still the visible active tab.
-      if (this.attachedView && this.attachedView !== tab.view) {
-        this.detachAttachedView();
-      }
-      return;
+      // The panel is showing this tab, so it comes back now rather than when
+      // an agent's lease ends. A lease that never ended used to leave the tab
+      // blank in the panel for good.
+      this.debuggerProxy.takeBackForPanel(tab);
     }
+    let attached = false;
     if (this.attachedView !== tab.view || this.attachedWindow !== window) {
       this.detachAttachedView();
       window.contentView.addChildView(tab.view);
       this.attachedView = tab.view;
       this.attachedWindow = window;
+      attached = true;
     }
     tab.view.setBounds(clampBoundsToWindow(this.layout.pageBounds, window));
+    if (attached) this.refreshAttachedVisibility(window);
+  }
+
+  /**
+   * Chromium keeps a view that went hidden (inside the unmapped agent host, or
+   * detached while covered) marked hidden after it is re-added to the window,
+   * so the page paints nothing until the window's focus changes. Adding and
+   * removing any child view makes it recompute which views are visible.
+   */
+  private refreshAttachedVisibility(window: BrowserWindow) {
+    this.visibilityNudge ??= new View();
+    try {
+      window.contentView.addChildView(this.visibilityNudge);
+      this.visibilityNudge.setBounds({ x: 0, y: 0, width: 1, height: 1 });
+      window.contentView.removeChildView(this.visibilityNudge);
+    } catch {
+      // A window torn down mid-attach has nothing to recompute.
+    }
   }
 
   private detachAttachedView() {

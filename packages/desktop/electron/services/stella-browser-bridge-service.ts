@@ -296,6 +296,23 @@ export class StellaBrowserBridgeService {
     );
   }
 
+  /**
+   * Retire the daemon's extension connection so the extension reconnects
+   * with a fresh hello. Rejects on a daemon that predates the command.
+   */
+  async reconnectExtension(): Promise<boolean> {
+    const response = await this.sendCommand({
+      id: randomUUID(),
+      action: "extension_reconnect",
+    });
+    return (
+      typeof response.data === "object" &&
+      response.data !== null &&
+      "retired" in response.data &&
+      response.data.retired === true
+    );
+  }
+
   async exportAllCookies(): Promise<StellaBrowserExportedCookie[]> {
     const response = await this.sendCommand({
       id: randomUUID(),

@@ -67,6 +67,7 @@ const connectPayloadSchema = z
   .object({
     browserType: optionalStringField,
     profileId: optionalStringField,
+    reconnect: z.boolean().optional().catch(undefined),
   })
   .catch({});
 
@@ -136,14 +137,16 @@ export const registerInAppBrowserHandlers = (
   register(IPC_BROWSER_VIEW_GET_STATE, () => options.service.getState());
   register(IPC_BROWSER_VIEW_CONNECT, async (payload) => {
     const record = connectPayloadSchema.parse(payload);
-    const state = await options.service.connect({
-      ...(record.browserType !== undefined
-        ? { browserType: record.browserType }
-        : {}),
-      ...(record.profileId !== undefined
-        ? { profileId: record.profileId }
-        : {}),
-    });
+    const state = record.reconnect
+      ? await options.service.reconnectExtension()
+      : await options.service.connect({
+          ...(record.browserType !== undefined
+            ? { browserType: record.browserType }
+            : {}),
+          ...(record.profileId !== undefined
+            ? { profileId: record.profileId }
+            : {}),
+        });
     if (state.connection === "connected") {
       await options.ensureAgentRouting?.();
       return await options.service.getState();

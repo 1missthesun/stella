@@ -91,6 +91,7 @@ fn is_known_action(action: &str) -> bool {
             | "cookies_set"
             | "cookies_clear"
             | "extension_status"
+            | "extension_reconnect"
             | "storage_get"
             | "storage_set"
             | "storage_clear"
@@ -331,6 +332,7 @@ fn validate_chain_actions(cmd: &Value) -> Result<Vec<&str>, String> {
             || action == "cookies_export_all"
             || action == "cookies_export_for_urls"
             || action == "extension_status"
+            || action == "extension_reconnect"
         {
             return Err(format!(
                 "Chain step {} cannot contain top-level-only action {}",
@@ -1760,6 +1762,7 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
             | "cookies_export_all"
             | "cookies_export_for_urls"
             | "extension_status"
+            | "extension_reconnect"
     );
     if !skip_launch && !matches!(state.backend_type, BackendType::Extension) {
         // Check if existing connection is stale and needs re-launch
@@ -1861,7 +1864,7 @@ pub async fn execute_command(cmd: &Value, state: &mut DaemonState) -> Value {
     // browser-control actions into the user's real Chrome/Brave profile.
     if matches!(state.backend_type, BackendType::Extension) {
         match action {
-            "healthcheck" | "launch" | "close" | "extension_status" => {}
+            "healthcheck" | "launch" | "close" | "extension_status" | "extension_reconnect" => {}
             "cookies_export_all" => {
                 if let Some(ref bridge) = state.extension_bridge {
                     return forward_extension_command(cmd, bridge).await;
@@ -1944,6 +1947,7 @@ async fn dispatch_action(
     match action {
         "healthcheck" => Ok(json!({ "status": "ok" })),
         "extension_status" => Ok(handle_extension_status(state).await),
+        "extension_reconnect" => Ok(handle_extension_reconnect(state).await),
         "launch" => handle_launch(cmd, state).await,
         "navigate" => handle_navigate(cmd, state).await,
         "url" => handle_url(state).await,
@@ -2753,6 +2757,17 @@ async fn handle_extension_status(state: &DaemonState) -> Value {
         "connected": connection_generation.is_some(),
         "authorized": connection_generation.is_some(),
         "connectionGeneration": connection_generation,
+        "daemonGeneration": std::process::id(),
+    })
+}
+
+async fn handle_extension_reconnect(state: &DaemonState) -> Value {
+    let retired = match state.extension_bridge.as_ref() {
+        Some(bridge) => bridge.force_reconnect().await,
+        None => false,
+    };
+    json!({
+        "retired": retired,
         "daemonGeneration": std::process::id(),
     })
 }

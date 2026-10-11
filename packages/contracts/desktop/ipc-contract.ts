@@ -1389,7 +1389,13 @@ export type IpcInvokeContract = {
   [IPC_BROWSER_FETCH_TEXT]: Invoke<[payload: BrowserFetchRequest], string>;
   [IPC_BROWSER_VIEW_GET_STATE]: Invoke<[], BrowserViewState>;
   [IPC_BROWSER_VIEW_CONNECT]: Invoke<
-    [payload?: { browserType?: string; profileId?: string }],
+    [
+      payload?: {
+        browserType?: string;
+        profileId?: string;
+        reconnect?: boolean;
+      },
+    ],
     BrowserViewState
   >;
   [IPC_BROWSER_VIEW_SHOW]: Invoke<

@@ -2732,6 +2732,20 @@
       "title": "छवि पूर्वावलोकन"
     }
   },
+  "reminders": {
+    "title": "रिमाइंडर",
+    "done": "हो गया",
+    "doneState": "पूरा हुआ",
+    "snooze": "स्नूज़ करें",
+    "snoozeFor": "10 मिनट के लिए स्नूज़ करें",
+    "snooze10": "10 मिनट",
+    "snooze60": "1 घंटा",
+    "snoozeTomorrow": "कल सुबह",
+    "snoozedUntil": "{time} तक स्नूज़ किया गया",
+    "snoozed": "स्नूज़ किया गया",
+    "due": "नियत: {time}",
+    "failed": "रिमाइंडर अपडेट नहीं हो सका। फिर से कोशिश करें।"
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2767,6 +2781,67 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "आने वाले",
+    "pausedHeading": "रुके हुए",
+    "kind": {
+      "reminder": "रिमाइंडर",
+      "task": "कार्य",
+      "watch": "निगरानी"
+    },
+    "next": "अगला: {when}",
+    "paused": "रुका हुआ",
+    "runsInCloud": "क्लाउड में चलता है",
+    "runsOnComputer": "इस कंप्यूटर पर चलता है",
+    "toAgent": "एक एजेंट को जाता है",
+    "toStella": "Stella को जाता है",
+    "once": "मिलते ही रुक जाता है",
+    "lastFailed": "पिछला रन विफल रहा: {error}",
+    "pause": "रोकें",
+    "resume": "फिर शुरू करें",
+    "delete": "हटाएं",
+    "deleteConfirm": "हटाएं?",
+    "emptyTitle": "कुछ भी शेड्यूल नहीं है",
+    "emptyBody": "Stella से कहें कि वह आपको याद दिलाए, किसी चीज़ पर नज़र रखे या नियमित रूप से कुछ करे।",
+    "signedOutTitle": "अपना शेड्यूल देखने के लिए साइन इन करें",
+    "signedOutBody": "आपके रिमाइंडर, निगरानियां और कार्य आपके Stella खाते में रहते हैं।",
+    "edit": {
+      "title": "संपादित करें",
+      "name": "नाम",
+      "message": "संदेश",
+      "onFound": "जब कुछ मिले",
+      "task": "क्या करना है",
+      "when": "कब",
+      "every": "हर",
+      "unit": "इकाई",
+      "minutes": "मिनट",
+      "hours": "घंटे",
+      "days": "दिन",
+      "time": "समय",
+      "zone": "{zone} समय",
+      "cron": "Cron एक्सप्रेशन",
+      "cancel": "रद्द करें",
+      "save": "सहेजें",
+      "errors": {
+        "pickWhen": "तारीख और समय चुनें।",
+        "pickFuture": "भविष्य का समय चुनें।",
+        "pickEvery": "कितनी बार, यह दर्ज करें।",
+        "pickTime": "समय चुनें।",
+        "pickDays": "कम से कम एक दिन चुनें।",
+        "pickCron": "Cron एक्सप्रेशन दर्ज करें।"
+      }
+    },
+    "zone": {
+      "title": "अब आप {place} में हैं",
+      "body": {
+        "one": "{count} शेड्यूल अब भी {place} के समय पर चलता है।",
+        "other": "{count} शेड्यूल अब भी {place} के समय पर चलते हैं।"
+      },
+      "move": "मेरे शेड्यूल ले जाएं",
+      "keep": "समय वही रखें",
+      "failed": "यह नहीं हो पाया। फिर से कोशिश करें।"
     }
   }
 }

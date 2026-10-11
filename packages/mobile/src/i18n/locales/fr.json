@@ -2748,6 +2748,20 @@
       "title": "Aperçu de l’image"
     }
   },
+  "reminders": {
+    "title": "Rappel",
+    "done": "Terminé",
+    "doneState": "Terminé",
+    "snooze": "Reporter",
+    "snoozeFor": "Reporter de 10 minutes",
+    "snooze10": "10 minutes",
+    "snooze60": "1 heure",
+    "snoozeTomorrow": "Demain matin",
+    "snoozedUntil": "Reporté jusqu'à {time}",
+    "snoozed": "Reporté",
+    "due": "Échéance : {time}",
+    "failed": "Impossible de mettre à jour le rappel. Réessayez."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2783,6 +2797,68 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "À venir",
+    "pausedHeading": "En pause",
+    "kind": {
+      "reminder": "Rappel",
+      "task": "Tâche",
+      "watch": "Veille"
+    },
+    "next": "Prochaine : {when}",
+    "paused": "En pause",
+    "runsInCloud": "S'exécute dans le cloud",
+    "runsOnComputer": "S'exécute sur cet ordinateur",
+    "toAgent": "Envoyé à un agent",
+    "toStella": "Envoyé à Stella",
+    "once": "S'arrête dès que trouvé",
+    "lastFailed": "Échec de la dernière exécution : {error}",
+    "pause": "Mettre en pause",
+    "resume": "Reprendre",
+    "delete": "Supprimer",
+    "deleteConfirm": "Supprimer ?",
+    "emptyTitle": "Rien de planifié",
+    "emptyBody": "Demandez à Stella de vous rappeler quelque chose, de surveiller quelque chose ou de faire quelque chose régulièrement.",
+    "signedOutTitle": "Connectez-vous pour voir votre planning",
+    "signedOutBody": "Vos rappels, veilles et tâches sont enregistrés dans votre compte Stella.",
+    "edit": {
+      "title": "Modifier",
+      "name": "Nom",
+      "message": "Message",
+      "onFound": "Quand quelque chose est trouvé",
+      "task": "Que faire",
+      "when": "Quand",
+      "every": "Tous les",
+      "unit": "Unité",
+      "minutes": "minutes",
+      "hours": "heures",
+      "days": "jours",
+      "time": "Heure",
+      "zone": "Heure de {zone}",
+      "cron": "Expression cron",
+      "cancel": "Annuler",
+      "save": "Enregistrer",
+      "errors": {
+        "pickWhen": "Choisissez une date et une heure.",
+        "pickFuture": "Choisissez une heure dans le futur.",
+        "pickEvery": "Indiquez la fréquence.",
+        "pickTime": "Choisissez une heure.",
+        "pickDays": "Choisissez au moins un jour.",
+        "pickCron": "Saisissez une expression cron."
+      }
+    },
+    "zone": {
+      "title": "Vous êtes maintenant à {place}",
+      "body": {
+        "many": "{count} planifications suivent encore l'heure de {place}.",
+        "one": "{count} planification suit encore l'heure de {place}.",
+        "other": "{count} planifications suivent encore l'heure de {place}."
+      },
+      "move": "Déplacer mes planifications",
+      "keep": "Garder les horaires",
+      "failed": "Cela n'a pas fonctionné. Réessayez."
     }
   }
 }

@@ -2732,6 +2732,20 @@
       "title": "Bildförhandsvisning"
     }
   },
+  "reminders": {
+    "title": "Påminnelse",
+    "done": "Klar",
+    "doneState": "Klar",
+    "snooze": "Snooza",
+    "snoozeFor": "Snooza 10 minuter",
+    "snooze10": "10 minuter",
+    "snooze60": "1 timme",
+    "snoozeTomorrow": "I morgon bitti",
+    "snoozedUntil": "Snoozad till {time}",
+    "snoozed": "Snoozad",
+    "due": "Förfaller: {time}",
+    "failed": "Det gick inte att uppdatera påminnelsen. Försök igen."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2767,6 +2781,67 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Kommande",
+    "pausedHeading": "Pausade",
+    "kind": {
+      "reminder": "Påminnelse",
+      "task": "Uppgift",
+      "watch": "Bevakning"
+    },
+    "next": "Nästa: {when}",
+    "paused": "Pausad",
+    "runsInCloud": "Körs i molnet",
+    "runsOnComputer": "Körs på den här datorn",
+    "toAgent": "Går till en agent",
+    "toStella": "Går till Stella",
+    "once": "Slutar när det hittas",
+    "lastFailed": "Senaste körningen misslyckades: {error}",
+    "pause": "Pausa",
+    "resume": "Återuppta",
+    "delete": "Ta bort",
+    "deleteConfirm": "Ta bort?",
+    "emptyTitle": "Inget schemalagt",
+    "emptyBody": "Be Stella att påminna dig, hålla koll på något eller göra något regelbundet.",
+    "signedOutTitle": "Logga in för att se ditt schema",
+    "signedOutBody": "Dina påminnelser, bevakningar och uppgifter finns i ditt Stella-konto.",
+    "edit": {
+      "title": "Redigera",
+      "name": "Namn",
+      "message": "Meddelande",
+      "onFound": "När den hittar något",
+      "task": "Vad som ska göras",
+      "when": "När",
+      "every": "Var",
+      "unit": "Enhet",
+      "minutes": "minuter",
+      "hours": "timmar",
+      "days": "dagar",
+      "time": "Tid",
+      "zone": "Tid i {zone}",
+      "cron": "Cron-uttryck",
+      "cancel": "Avbryt",
+      "save": "Spara",
+      "errors": {
+        "pickWhen": "Välj datum och tid.",
+        "pickFuture": "Välj en tid i framtiden.",
+        "pickEvery": "Ange hur ofta.",
+        "pickTime": "Välj en tid.",
+        "pickDays": "Välj minst en dag.",
+        "pickCron": "Ange ett cron-uttryck."
+      }
+    },
+    "zone": {
+      "title": "Du är nu i {place}",
+      "body": {
+        "one": "{count} schema körs fortfarande efter tiden i {place}.",
+        "other": "{count} scheman körs fortfarande efter tiden i {place}."
+      },
+      "move": "Flytta mina scheman",
+      "keep": "Behåll tiderna",
+      "failed": "Det gick inte. Försök igen."
     }
   }
 }

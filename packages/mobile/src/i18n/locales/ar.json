@@ -2796,6 +2796,20 @@
       "title": "معاينة الصورة"
     }
   },
+  "reminders": {
+    "title": "تذكير",
+    "done": "تم",
+    "doneState": "تم",
+    "snooze": "غفوة",
+    "snoozeFor": "غفوة 10 دقائق",
+    "snooze10": "10 دقائق",
+    "snooze60": "ساعة واحدة",
+    "snoozeTomorrow": "صباح الغد",
+    "snoozedUntil": "مؤجل حتى {time}",
+    "snoozed": "مؤجل",
+    "due": "الموعد: {time}",
+    "failed": "تعذر تحديث التذكير. حاول مرة أخرى."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2831,6 +2845,71 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "القادمة",
+    "pausedHeading": "متوقفة مؤقتًا",
+    "kind": {
+      "reminder": "تذكير",
+      "task": "مهمة",
+      "watch": "مراقبة"
+    },
+    "next": "التالي: {when}",
+    "paused": "متوقف مؤقتًا",
+    "runsInCloud": "يعمل في السحابة",
+    "runsOnComputer": "يعمل على هذا الكمبيوتر",
+    "toAgent": "يذهب إلى وكيل",
+    "toStella": "يذهب إلى Stella",
+    "once": "يتوقف عند العثور عليه",
+    "lastFailed": "فشل آخر تشغيل: {error}",
+    "pause": "إيقاف مؤقت",
+    "resume": "استئناف",
+    "delete": "حذف",
+    "deleteConfirm": "حذف؟",
+    "emptyTitle": "لا شيء مجدول",
+    "emptyBody": "اطلب من Stella أن تذكّرك أو تراقب شيئًا أو تنفّذ شيئًا بانتظام.",
+    "signedOutTitle": "سجّل الدخول لرؤية جدولك",
+    "signedOutBody": "تذكيراتك ومراقباتك ومهامك محفوظة في حساب Stella الخاص بك.",
+    "edit": {
+      "title": "تعديل",
+      "name": "الاسم",
+      "message": "الرسالة",
+      "onFound": "عندما يجد شيئًا",
+      "task": "ما يجب فعله",
+      "when": "متى",
+      "every": "كل",
+      "unit": "الوحدة",
+      "minutes": "دقائق",
+      "hours": "ساعات",
+      "days": "أيام",
+      "time": "الوقت",
+      "zone": "توقيت {zone}",
+      "cron": "تعبير cron",
+      "cancel": "إلغاء",
+      "save": "حفظ",
+      "errors": {
+        "pickWhen": "اختر تاريخًا ووقتًا.",
+        "pickFuture": "اختر وقتًا في المستقبل.",
+        "pickEvery": "أدخل عدد المرات.",
+        "pickTime": "اختر وقتًا.",
+        "pickDays": "اختر يومًا واحدًا على الأقل.",
+        "pickCron": "أدخل تعبير cron."
+      }
+    },
+    "zone": {
+      "title": "أنت الآن في {place}",
+      "body": {
+        "few": "لا تزال {count} جدولات تعمل بتوقيت {place}.",
+        "many": "لا تزال {count} جدولة تعمل بتوقيت {place}.",
+        "one": "لا تزال {count} جدولة تعمل بتوقيت {place}.",
+        "other": "لا تزال {count} جدولة تعمل بتوقيت {place}.",
+        "two": "لا تزال {count} جدولتان تعملان بتوقيت {place}.",
+        "zero": "{count} جدولة تعمل بتوقيت {place}."
+      },
+      "move": "نقل جدولاتي",
+      "keep": "الإبقاء على الأوقات",
+      "failed": "لم تنجح العملية. حاول مرة أخرى."
     }
   }
 }

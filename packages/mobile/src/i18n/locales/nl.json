@@ -2732,6 +2732,20 @@
       "title": "Afbeeldingsvoorbeeld"
     }
   },
+  "reminders": {
+    "title": "Herinnering",
+    "done": "Klaar",
+    "doneState": "Klaar",
+    "snooze": "Snoozen",
+    "snoozeFor": "10 minuten snoozen",
+    "snooze10": "10 minuten",
+    "snooze60": "1 uur",
+    "snoozeTomorrow": "Morgenochtend",
+    "snoozedUntil": "Gesnoozed tot {time}",
+    "snoozed": "Gesnoozed",
+    "due": "Gepland: {time}",
+    "failed": "Kan de herinnering niet bijwerken. Probeer het opnieuw."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2767,6 +2781,67 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Binnenkort",
+    "pausedHeading": "Gepauzeerd",
+    "kind": {
+      "reminder": "Herinnering",
+      "task": "Taak",
+      "watch": "Bewaking"
+    },
+    "next": "Volgende: {when}",
+    "paused": "Gepauzeerd",
+    "runsInCloud": "Draait in de cloud",
+    "runsOnComputer": "Draait op deze computer",
+    "toAgent": "Gaat naar een agent",
+    "toStella": "Gaat naar Stella",
+    "once": "Stopt zodra gevonden",
+    "lastFailed": "Laatste uitvoering mislukt: {error}",
+    "pause": "Pauzeren",
+    "resume": "Hervatten",
+    "delete": "Verwijderen",
+    "deleteConfirm": "Verwijderen?",
+    "emptyTitle": "Niets gepland",
+    "emptyBody": "Vraag Stella om je te herinneren, iets in de gaten te houden of regelmatig iets te doen.",
+    "signedOutTitle": "Log in om je planning te zien",
+    "signedOutBody": "Je herinneringen, bewakingen en taken staan in je Stella-account.",
+    "edit": {
+      "title": "Bewerken",
+      "name": "Naam",
+      "message": "Bericht",
+      "onFound": "Als er iets gevonden wordt",
+      "task": "Wat te doen",
+      "when": "Wanneer",
+      "every": "Elke",
+      "unit": "Eenheid",
+      "minutes": "minuten",
+      "hours": "uur",
+      "days": "dagen",
+      "time": "Tijd",
+      "zone": "Tijd in {zone}",
+      "cron": "Cron-expressie",
+      "cancel": "Annuleren",
+      "save": "Opslaan",
+      "errors": {
+        "pickWhen": "Kies een datum en tijd.",
+        "pickFuture": "Kies een tijd in de toekomst.",
+        "pickEvery": "Geef aan hoe vaak.",
+        "pickTime": "Kies een tijd.",
+        "pickDays": "Kies minstens één dag.",
+        "pickCron": "Voer een cron-expressie in."
+      }
+    },
+    "zone": {
+      "title": "Je bent nu in {place}",
+      "body": {
+        "one": "{count} planning loopt nog op de tijd van {place}.",
+        "other": "{count} planningen lopen nog op de tijd van {place}."
+      },
+      "move": "Mijn planningen verplaatsen",
+      "keep": "Tijden behouden",
+      "failed": "Dat is niet gelukt. Probeer het opnieuw."
     }
   }
 }

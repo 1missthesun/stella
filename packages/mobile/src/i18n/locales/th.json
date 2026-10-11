@@ -2714,6 +2714,20 @@
       "title": "ตัวอย่างรูปภาพ"
     }
   },
+  "reminders": {
+    "title": "การเตือน",
+    "done": "เสร็จแล้ว",
+    "doneState": "เสร็จแล้ว",
+    "snooze": "เลื่อนเตือน",
+    "snoozeFor": "เลื่อน 10 นาที",
+    "snooze10": "10 นาที",
+    "snooze60": "1 ชั่วโมง",
+    "snoozeTomorrow": "พรุ่งนี้เช้า",
+    "snoozedUntil": "เลื่อนถึง {time}",
+    "snoozed": "เลื่อนแล้ว",
+    "due": "ครบกำหนด: {time}",
+    "failed": "อัปเดตการเตือนไม่ได้ ลองอีกครั้ง"
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2749,6 +2763,66 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "ที่จะมาถึง",
+    "pausedHeading": "หยุดชั่วคราว",
+    "kind": {
+      "reminder": "การเตือน",
+      "task": "งาน",
+      "watch": "การติดตาม"
+    },
+    "next": "ครั้งถัดไป: {when}",
+    "paused": "หยุดชั่วคราว",
+    "runsInCloud": "ทำงานบนคลาวด์",
+    "runsOnComputer": "ทำงานบนคอมพิวเตอร์นี้",
+    "toAgent": "ส่งไปยังเอเจนต์",
+    "toStella": "ส่งไปยัง Stella",
+    "once": "หยุดเมื่อพบ",
+    "lastFailed": "การทำงานครั้งล่าสุดล้มเหลว: {error}",
+    "pause": "หยุดชั่วคราว",
+    "resume": "ทำต่อ",
+    "delete": "ลบ",
+    "deleteConfirm": "ลบไหม",
+    "emptyTitle": "ไม่มีกำหนดการ",
+    "emptyBody": "ขอให้ Stella เตือนคุณ คอยติดตามบางอย่าง หรือทำบางอย่างเป็นประจำ",
+    "signedOutTitle": "ลงชื่อเข้าใช้เพื่อดูกำหนดการของคุณ",
+    "signedOutBody": "การเตือน การติดตาม และงานของคุณอยู่ในบัญชี Stella ของคุณ",
+    "edit": {
+      "title": "แก้ไข",
+      "name": "ชื่อ",
+      "message": "ข้อความ",
+      "onFound": "เมื่อพบบางอย่าง",
+      "task": "สิ่งที่ต้องทำ",
+      "when": "เมื่อไร",
+      "every": "ทุก",
+      "unit": "หน่วย",
+      "minutes": "นาที",
+      "hours": "ชั่วโมง",
+      "days": "วัน",
+      "time": "เวลา",
+      "zone": "เวลา{zone}",
+      "cron": "นิพจน์ cron",
+      "cancel": "ยกเลิก",
+      "save": "บันทึก",
+      "errors": {
+        "pickWhen": "เลือกวันที่และเวลา",
+        "pickFuture": "เลือกเวลาในอนาคต",
+        "pickEvery": "ระบุความถี่",
+        "pickTime": "เลือกเวลา",
+        "pickDays": "เลือกอย่างน้อยหนึ่งวัน",
+        "pickCron": "ป้อนนิพจน์ cron"
+      }
+    },
+    "zone": {
+      "title": "ตอนนี้คุณอยู่ที่ {place}",
+      "body": {
+        "other": "{count} กำหนดการยังทำงานตามเวลา{place}"
+      },
+      "move": "ย้ายกำหนดการของฉัน",
+      "keep": "คงเวลาเดิม",
+      "failed": "ไม่สำเร็จ ลองอีกครั้ง"
     }
   }
 }

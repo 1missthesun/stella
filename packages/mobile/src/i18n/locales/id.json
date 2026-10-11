@@ -2714,6 +2714,20 @@
       "title": "Pratinjau gambar"
     }
   },
+  "reminders": {
+    "title": "Pengingat",
+    "done": "Selesai",
+    "doneState": "Selesai",
+    "snooze": "Tunda",
+    "snoozeFor": "Tunda 10 menit",
+    "snooze10": "10 menit",
+    "snooze60": "1 jam",
+    "snoozeTomorrow": "Besok pagi",
+    "snoozedUntil": "Ditunda hingga {time}",
+    "snoozed": "Ditunda",
+    "due": "Jatuh tempo: {time}",
+    "failed": "Tidak dapat memperbarui pengingat. Coba lagi."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2749,6 +2763,66 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Mendatang",
+    "pausedHeading": "Dijeda",
+    "kind": {
+      "reminder": "Pengingat",
+      "task": "Tugas",
+      "watch": "Pantauan"
+    },
+    "next": "Berikutnya: {when}",
+    "paused": "Dijeda",
+    "runsInCloud": "Berjalan di cloud",
+    "runsOnComputer": "Berjalan di komputer ini",
+    "toAgent": "Dikirim ke agen",
+    "toStella": "Dikirim ke Stella",
+    "once": "Berhenti setelah ditemukan",
+    "lastFailed": "Proses terakhir gagal: {error}",
+    "pause": "Jeda",
+    "resume": "Lanjutkan",
+    "delete": "Hapus",
+    "deleteConfirm": "Hapus?",
+    "emptyTitle": "Tidak ada jadwal",
+    "emptyBody": "Minta Stella untuk mengingatkan Anda, memantau sesuatu, atau melakukan sesuatu secara rutin.",
+    "signedOutTitle": "Masuk untuk melihat jadwal Anda",
+    "signedOutBody": "Pengingat, pantauan, dan tugas Anda tersimpan di akun Stella Anda.",
+    "edit": {
+      "title": "Edit",
+      "name": "Nama",
+      "message": "Pesan",
+      "onFound": "Saat menemukan sesuatu",
+      "task": "Yang harus dilakukan",
+      "when": "Kapan",
+      "every": "Setiap",
+      "unit": "Satuan",
+      "minutes": "menit",
+      "hours": "jam",
+      "days": "hari",
+      "time": "Waktu",
+      "zone": "Waktu {zone}",
+      "cron": "Ekspresi cron",
+      "cancel": "Batal",
+      "save": "Simpan",
+      "errors": {
+        "pickWhen": "Pilih tanggal dan waktu.",
+        "pickFuture": "Pilih waktu di masa depan.",
+        "pickEvery": "Masukkan seberapa sering.",
+        "pickTime": "Pilih waktu.",
+        "pickDays": "Pilih setidaknya satu hari.",
+        "pickCron": "Masukkan ekspresi cron."
+      }
+    },
+    "zone": {
+      "title": "Anda sekarang di {place}",
+      "body": {
+        "other": "{count} jadwal masih berjalan dengan waktu {place}."
+      },
+      "move": "Pindahkan jadwal saya",
+      "keep": "Pertahankan waktu",
+      "failed": "Gagal. Coba lagi."
     }
   }
 }

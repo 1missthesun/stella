@@ -2732,6 +2732,20 @@
       "title": "Görsel önizlemesi"
     }
   },
+  "reminders": {
+    "title": "Hatırlatıcı",
+    "done": "Tamam",
+    "doneState": "Tamamlandı",
+    "snooze": "Ertele",
+    "snoozeFor": "10 dakika ertele",
+    "snooze10": "10 dakika",
+    "snooze60": "1 saat",
+    "snoozeTomorrow": "Yarın sabah",
+    "snoozedUntil": "{time} saatine ertelendi",
+    "snoozed": "Ertelendi",
+    "due": "Bitiş: {time}",
+    "failed": "Hatırlatıcı güncellenemedi. Tekrar deneyin."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2767,6 +2781,67 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Yaklaşan",
+    "pausedHeading": "Duraklatılanlar",
+    "kind": {
+      "reminder": "Hatırlatıcı",
+      "task": "Görev",
+      "watch": "Takip"
+    },
+    "next": "Sonraki: {when}",
+    "paused": "Duraklatıldı",
+    "runsInCloud": "Bulutta çalışır",
+    "runsOnComputer": "Bu bilgisayarda çalışır",
+    "toAgent": "Bir ajana gider",
+    "toStella": "Stella'ya gider",
+    "once": "Bulunca durur",
+    "lastFailed": "Son çalıştırma başarısız: {error}",
+    "pause": "Duraklat",
+    "resume": "Devam et",
+    "delete": "Sil",
+    "deleteConfirm": "Silinsin mi?",
+    "emptyTitle": "Planlanmış bir şey yok",
+    "emptyBody": "Stella'dan size bir şey hatırlatmasını, bir şeyi takip etmesini ya da düzenli olarak bir şey yapmasını isteyin.",
+    "signedOutTitle": "Zamanlamalarınızı görmek için giriş yapın",
+    "signedOutBody": "Hatırlatıcılarınız, takipleriniz ve görevleriniz Stella hesabınızda durur.",
+    "edit": {
+      "title": "Düzenle",
+      "name": "Ad",
+      "message": "Mesaj",
+      "onFound": "Bir şey bulduğunda",
+      "task": "Ne yapılacak",
+      "when": "Ne zaman",
+      "every": "Her",
+      "unit": "Birim",
+      "minutes": "dakika",
+      "hours": "saat",
+      "days": "gün",
+      "time": "Saat",
+      "zone": "{zone} saati",
+      "cron": "Cron ifadesi",
+      "cancel": "İptal",
+      "save": "Kaydet",
+      "errors": {
+        "pickWhen": "Bir tarih ve saat seçin.",
+        "pickFuture": "Gelecekte bir saat seçin.",
+        "pickEvery": "Ne sıklıkla olacağını girin.",
+        "pickTime": "Bir saat seçin.",
+        "pickDays": "En az bir gün seçin.",
+        "pickCron": "Bir cron ifadesi girin."
+      }
+    },
+    "zone": {
+      "title": "Artık {place} konumundasınız",
+      "body": {
+        "one": "{count} zamanlama hâlâ {place} saatine göre çalışıyor.",
+        "other": "{count} zamanlama hâlâ {place} saatine göre çalışıyor."
+      },
+      "move": "Zamanlamalarımı taşı",
+      "keep": "Saatleri koru",
+      "failed": "Bu işlem olmadı. Tekrar deneyin."
     }
   }
 }

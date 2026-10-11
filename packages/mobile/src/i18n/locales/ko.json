@@ -2714,6 +2714,20 @@
       "title": "이미지 미리보기"
     }
   },
+  "reminders": {
+    "title": "리마인더",
+    "done": "완료",
+    "doneState": "완료됨",
+    "snooze": "다시 알림",
+    "snoozeFor": "10분 후 다시 알림",
+    "snooze10": "10분",
+    "snooze60": "1시간",
+    "snoozeTomorrow": "내일 아침",
+    "snoozedUntil": "{time}까지 다시 알림",
+    "snoozed": "다시 알림 설정됨",
+    "due": "기한: {time}",
+    "failed": "리마인더를 업데이트하지 못했습니다. 다시 시도하세요."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2749,6 +2763,66 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "예정",
+    "pausedHeading": "일시 중지됨",
+    "kind": {
+      "reminder": "리마인더",
+      "task": "작업",
+      "watch": "감시"
+    },
+    "next": "다음: {when}",
+    "paused": "일시 중지됨",
+    "runsInCloud": "클라우드에서 실행",
+    "runsOnComputer": "이 컴퓨터에서 실행",
+    "toAgent": "에이전트에게 전달",
+    "toStella": "Stella에게 전달",
+    "once": "찾으면 중지",
+    "lastFailed": "마지막 실행 실패: {error}",
+    "pause": "일시 중지",
+    "resume": "재개",
+    "delete": "삭제",
+    "deleteConfirm": "삭제할까요?",
+    "emptyTitle": "예약된 항목 없음",
+    "emptyBody": "Stella에게 알림, 무언가 지켜보기, 정기적인 작업을 요청해 보세요.",
+    "signedOutTitle": "로그인하여 일정 보기",
+    "signedOutBody": "리마인더, 감시, 작업은 Stella 계정에 저장됩니다.",
+    "edit": {
+      "title": "편집",
+      "name": "이름",
+      "message": "메시지",
+      "onFound": "무언가를 찾으면",
+      "task": "할 일",
+      "when": "언제",
+      "every": "간격",
+      "unit": "단위",
+      "minutes": "분",
+      "hours": "시간",
+      "days": "일",
+      "time": "시간",
+      "zone": "{zone} 시간",
+      "cron": "cron 표현식",
+      "cancel": "취소",
+      "save": "저장",
+      "errors": {
+        "pickWhen": "날짜와 시간을 선택하세요.",
+        "pickFuture": "미래의 시간을 선택하세요.",
+        "pickEvery": "반복 주기를 입력하세요.",
+        "pickTime": "시간을 선택하세요.",
+        "pickDays": "하루 이상 선택하세요.",
+        "pickCron": "cron 표현식을 입력하세요."
+      }
+    },
+    "zone": {
+      "title": "현재 {place}에 있습니다",
+      "body": {
+        "other": "일정 {count}개가 아직 {place} 시간 기준으로 실행됩니다."
+      },
+      "move": "일정 옮기기",
+      "keep": "시간 유지",
+      "failed": "처리되지 않았습니다. 다시 시도하세요."
     }
   }
 }

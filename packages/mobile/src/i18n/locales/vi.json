@@ -2714,6 +2714,20 @@
       "title": "Xem trước hình ảnh"
     }
   },
+  "reminders": {
+    "title": "Lời nhắc",
+    "done": "Xong",
+    "doneState": "Đã xong",
+    "snooze": "Báo lại",
+    "snoozeFor": "Báo lại sau 10 phút",
+    "snooze10": "10 phút",
+    "snooze60": "1 giờ",
+    "snoozeTomorrow": "Sáng mai",
+    "snoozedUntil": "Đã hoãn đến {time}",
+    "snoozed": "Đã hoãn",
+    "due": "Đến hạn: {time}",
+    "failed": "Không thể cập nhật lời nhắc. Hãy thử lại."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2749,6 +2763,66 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Sắp tới",
+    "pausedHeading": "Đã tạm dừng",
+    "kind": {
+      "reminder": "Lời nhắc",
+      "task": "Tác vụ",
+      "watch": "Theo dõi"
+    },
+    "next": "Tiếp theo: {when}",
+    "paused": "Đã tạm dừng",
+    "runsInCloud": "Chạy trên đám mây",
+    "runsOnComputer": "Chạy trên máy tính này",
+    "toAgent": "Gửi đến một tác nhân",
+    "toStella": "Gửi đến Stella",
+    "once": "Dừng khi tìm thấy",
+    "lastFailed": "Lần chạy gần nhất thất bại: {error}",
+    "pause": "Tạm dừng",
+    "resume": "Tiếp tục",
+    "delete": "Xóa",
+    "deleteConfirm": "Xóa?",
+    "emptyTitle": "Chưa có lịch nào",
+    "emptyBody": "Hãy nhờ Stella nhắc bạn, theo dõi điều gì đó hoặc làm việc gì đó định kỳ.",
+    "signedOutTitle": "Đăng nhập để xem lịch của bạn",
+    "signedOutBody": "Lời nhắc, theo dõi và tác vụ của bạn được lưu trong tài khoản Stella.",
+    "edit": {
+      "title": "Chỉnh sửa",
+      "name": "Tên",
+      "message": "Tin nhắn",
+      "onFound": "Khi tìm thấy điều gì đó",
+      "task": "Việc cần làm",
+      "when": "Khi nào",
+      "every": "Mỗi",
+      "unit": "Đơn vị",
+      "minutes": "phút",
+      "hours": "giờ",
+      "days": "ngày",
+      "time": "Thời gian",
+      "zone": "Giờ {zone}",
+      "cron": "Biểu thức cron",
+      "cancel": "Hủy",
+      "save": "Lưu",
+      "errors": {
+        "pickWhen": "Chọn ngày và giờ.",
+        "pickFuture": "Chọn một thời điểm trong tương lai.",
+        "pickEvery": "Nhập tần suất.",
+        "pickTime": "Chọn giờ.",
+        "pickDays": "Chọn ít nhất một ngày.",
+        "pickCron": "Nhập biểu thức cron."
+      }
+    },
+    "zone": {
+      "title": "Bạn đang ở {place}",
+      "body": {
+        "other": "{count} lịch vẫn chạy theo giờ {place}."
+      },
+      "move": "Chuyển lịch của tôi",
+      "keep": "Giữ nguyên giờ",
+      "failed": "Không thực hiện được. Hãy thử lại."
     }
   }
 }

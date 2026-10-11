@@ -47,7 +47,15 @@ export function ScheduleRow({
       <View style={styles.scheduleRow}>
         <View style={styles.scheduleGlyph}>
           <Icon
-            name={schedule.kind === "heartbeat" ? "waveform" : "clock"}
+            name={
+              schedule.kind === "heartbeat"
+                ? "waveform"
+                : schedule.scheduleKind === "watch"
+                  ? "eye"
+                  : schedule.scheduleKind === "task"
+                    ? "sparkles"
+                    : "clock"
+            }
             size={14}
             color={paused ? colors.textMuted : colors.accent}
           />
@@ -69,6 +77,9 @@ export function ScheduleRow({
             maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
           >
             {[
+              schedule.scheduleKind
+                ? t(`schedule.kind.${schedule.scheduleKind}`)
+                : null,
               cadence,
               badge.kind === "paused"
                 ? t("mobile.activityHub.schedule.paused")

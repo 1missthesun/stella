@@ -3,7 +3,7 @@ import {
   type LegendListRenderItemProps,
 } from "@legendapp/list/react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Alert, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useT } from "../i18n";
 import {
@@ -19,6 +19,14 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useColors } from "../theme/theme-context";
 import { EmptyState } from "./EmptyState";
 import { ScheduleRow, makeScheduleRowStyles } from "./schedule-rows";
+import {
+  answerScheduleZone,
+  useScheduleZoneCopy,
+  useScheduleZoneNotice,
+} from "../lib/schedule-zone";
+import type { Colors } from "../theme/colors";
+import { fonts } from "../theme/fonts";
+import { tapLight } from "../lib/haptics";
 
 /**
  * The Schedule tab: every schedule the owner has, whichever computer or the
@@ -28,7 +36,7 @@ import { ScheduleRow, makeScheduleRowStyles } from "./schedule-rows";
 export function SchedulePage() {
   const colors = useColors();
   const t = useT();
-  const styles = useMemo(() => makeStyles(), []);
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const rowStyles = useMemo(() => makeScheduleRowStyles(colors), [colors]);
   const bottomInset = useSafeAreaInsets().bottom;
@@ -39,6 +47,27 @@ export function SchedulePage() {
   const schedules = loaded ?? EMPTY;
   const loading = signedIn && loaded === undefined;
   const runAction = useScheduleAction();
+  const zoneNotice = useScheduleZoneNotice(signedIn);
+  const zoneCopy = useScheduleZoneCopy();
+  const [zoneBusy, setZoneBusy] = useState(false);
+  const answerZone = useCallback(
+    async (move: boolean) => {
+      if (!zoneNotice) return;
+      tapLight();
+      setZoneBusy(true);
+      try {
+        await answerScheduleZone(zoneNotice.to, move);
+      } catch {
+        Alert.alert(
+          t("mobile.activityHub.schedule.alertTitle"),
+          t("schedule.zone.failed"),
+        );
+      } finally {
+        setZoneBusy(false);
+      }
+    },
+    [zoneNotice, t],
+  );
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const applyAction = useCallback(
@@ -124,8 +153,40 @@ export function SchedulePage() {
         />
       );
     }
+    const zoneText = zoneNotice ? zoneCopy(zoneNotice) : null;
+    const zoneBanner = zoneText ? (
+      <View style={styles.zone} accessibilityRole="summary">
+        <Text style={styles.zoneTitle}>{zoneText.title}</Text>
+        <Text style={styles.zoneBody}>{zoneText.body}</Text>
+        <View style={styles.zoneActions}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={zoneBusy}
+            onPress={() => void answerZone(false)}
+            style={({ pressed }) => [styles.zoneButton, pressed && styles.zoneButtonPressed]}
+          >
+            <Text style={styles.zoneButtonText}>{zoneText.keep}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            disabled={zoneBusy}
+            onPress={() => void answerZone(true)}
+            style={({ pressed }) => [
+              styles.zoneButton,
+              styles.zoneButtonPrimary,
+              pressed && styles.zoneButtonPressed,
+            ]}
+          >
+            <Text style={[styles.zoneButtonText, styles.zoneButtonTextPrimary]}>
+              {zoneText.move}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    ) : null;
     return (
       <LegendList<MobileSchedule>
+        ListHeaderComponent={zoneBanner}
         style={styles.list}
         contentContainerStyle={{ paddingBottom: bottomInset + 24 }}
         data={schedules}
@@ -153,8 +214,54 @@ export function SchedulePage() {
 
 const EMPTY: MobileSchedule[] = [];
 
-const makeStyles = () =>
+const makeStyles = (colors: Colors) =>
   StyleSheet.create({
+    zone: {
+      borderColor: colors.border,
+      borderRadius: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      gap: 4,
+      marginBottom: 8,
+      padding: 12,
+    },
+    zoneTitle: {
+      color: colors.text,
+      fontFamily: fonts.sans.medium,
+      fontSize: 14.5,
+    },
+    zoneBody: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.regular,
+      fontSize: 13,
+    },
+    zoneActions: {
+      flexDirection: "row",
+      gap: 8,
+      justifyContent: "flex-end",
+      marginTop: 8,
+    },
+    zoneButton: {
+      borderColor: colors.border,
+      borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+    },
+    zoneButtonPrimary: {
+      backgroundColor: colors.text,
+      borderColor: colors.text,
+    },
+    zoneButtonPressed: {
+      opacity: 0.7,
+    },
+    zoneButtonText: {
+      color: colors.text,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13,
+    },
+    zoneButtonTextPrimary: {
+      color: colors.background,
+    },
     root: {
       flex: 1,
       minHeight: 0,

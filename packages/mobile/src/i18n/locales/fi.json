@@ -2732,6 +2732,20 @@
       "title": "Kuvan esikatselu"
     }
   },
+  "reminders": {
+    "title": "Muistutus",
+    "done": "Valmis",
+    "doneState": "Valmis",
+    "snooze": "Torkuta",
+    "snoozeFor": "Torkuta 10 minuuttia",
+    "snooze10": "10 minuuttia",
+    "snooze60": "1 tunti",
+    "snoozeTomorrow": "Huomenna aamulla",
+    "snoozedUntil": "Torkutettu klo {time} asti",
+    "snoozed": "Torkutettu",
+    "due": "Erääntyy: {time}",
+    "failed": "Muistutuksen päivitys epäonnistui. Yritä uudelleen."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2767,6 +2781,67 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Tulossa",
+    "pausedHeading": "Keskeytetyt",
+    "kind": {
+      "reminder": "Muistutus",
+      "task": "Tehtävä",
+      "watch": "Seuranta"
+    },
+    "next": "Seuraava: {when}",
+    "paused": "Keskeytetty",
+    "runsInCloud": "Toimii pilvessä",
+    "runsOnComputer": "Toimii tällä tietokoneella",
+    "toAgent": "Menee agentille",
+    "toStella": "Menee Stellalle",
+    "once": "Pysähtyy, kun löytyy",
+    "lastFailed": "Viimeisin suoritus epäonnistui: {error}",
+    "pause": "Keskeytä",
+    "resume": "Jatka",
+    "delete": "Poista",
+    "deleteConfirm": "Poistetaanko?",
+    "emptyTitle": "Ei ajastuksia",
+    "emptyBody": "Pyydä Stellaa muistuttamaan, seuraamaan jotain tai tekemään jotain säännöllisesti.",
+    "signedOutTitle": "Kirjaudu sisään nähdäksesi ajastuksesi",
+    "signedOutBody": "Muistutuksesi, seurantasi ja tehtäväsi ovat Stella-tililläsi.",
+    "edit": {
+      "title": "Muokkaa",
+      "name": "Nimi",
+      "message": "Viesti",
+      "onFound": "Kun jotain löytyy",
+      "task": "Mitä tehdään",
+      "when": "Milloin",
+      "every": "Joka",
+      "unit": "Yksikkö",
+      "minutes": "minuuttia",
+      "hours": "tuntia",
+      "days": "päivää",
+      "time": "Aika",
+      "zone": "Aikavyöhyke: {zone}",
+      "cron": "Cron-lauseke",
+      "cancel": "Peruuta",
+      "save": "Tallenna",
+      "errors": {
+        "pickWhen": "Valitse päivä ja aika.",
+        "pickFuture": "Valitse aika tulevaisuudesta.",
+        "pickEvery": "Anna toistoväli.",
+        "pickTime": "Valitse aika.",
+        "pickDays": "Valitse vähintään yksi päivä.",
+        "pickCron": "Anna cron-lauseke."
+      }
+    },
+    "zone": {
+      "title": "Olet nyt kohteessa {place}",
+      "body": {
+        "one": "{count} ajastus käyttää yhä kohteen {place} aikaa.",
+        "other": "{count} ajastusta käyttää yhä kohteen {place} aikaa."
+      },
+      "move": "Siirrä ajastukseni",
+      "keep": "Pidä ajat",
+      "failed": "Se ei onnistunut. Yritä uudelleen."
     }
   }
 }

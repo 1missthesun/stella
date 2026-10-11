@@ -2748,6 +2748,20 @@
       "title": "תצוגה מקדימה של תמונה"
     }
   },
+  "reminders": {
+    "title": "תזכורת",
+    "done": "סיום",
+    "doneState": "בוצע",
+    "snooze": "נודניק",
+    "snoozeFor": "נודניק ל-10 דקות",
+    "snooze10": "10 דקות",
+    "snooze60": "שעה",
+    "snoozeTomorrow": "מחר בבוקר",
+    "snoozedUntil": "נדחה עד {time}",
+    "snoozed": "נדחה",
+    "due": "מועד: {time}",
+    "failed": "לא ניתן לעדכן את התזכורת. נסו שוב."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2783,6 +2797,68 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "בקרוב",
+    "pausedHeading": "מושהים",
+    "kind": {
+      "reminder": "תזכורת",
+      "task": "משימה",
+      "watch": "מעקב"
+    },
+    "next": "הבא: {when}",
+    "paused": "מושהה",
+    "runsInCloud": "פועל בענן",
+    "runsOnComputer": "פועל במחשב הזה",
+    "toAgent": "עובר לסוכן",
+    "toStella": "עובר ל-Stella",
+    "once": "נעצר כשנמצא",
+    "lastFailed": "ההרצה האחרונה נכשלה: {error}",
+    "pause": "השהיה",
+    "resume": "המשך",
+    "delete": "מחיקה",
+    "deleteConfirm": "למחוק?",
+    "emptyTitle": "אין שום דבר מתוזמן",
+    "emptyBody": "בקשו מ-Stella להזכיר לכם, לעקוב אחרי משהו או לעשות משהו באופן קבוע.",
+    "signedOutTitle": "התחברו כדי לראות את התזמונים שלכם",
+    "signedOutBody": "התזכורות, המעקבים והמשימות שלכם נשמרים בחשבון Stella שלכם.",
+    "edit": {
+      "title": "עריכה",
+      "name": "שם",
+      "message": "הודעה",
+      "onFound": "כשנמצא משהו",
+      "task": "מה לעשות",
+      "when": "מתי",
+      "every": "כל",
+      "unit": "יחידה",
+      "minutes": "דקות",
+      "hours": "שעות",
+      "days": "ימים",
+      "time": "שעה",
+      "zone": "שעון {zone}",
+      "cron": "ביטוי cron",
+      "cancel": "ביטול",
+      "save": "שמירה",
+      "errors": {
+        "pickWhen": "בחרו תאריך ושעה.",
+        "pickFuture": "בחרו שעה בעתיד.",
+        "pickEvery": "הזינו תדירות.",
+        "pickTime": "בחרו שעה.",
+        "pickDays": "בחרו לפחות יום אחד.",
+        "pickCron": "הזינו ביטוי cron."
+      }
+    },
+    "zone": {
+      "title": "אתם עכשיו ב{place}",
+      "body": {
+        "one": "תזמון {count} עדיין פועל לפי שעון {place}.",
+        "other": "{count} תזמונים עדיין פועלים לפי שעון {place}.",
+        "two": "{count} תזמונים עדיין פועלים לפי שעון {place}."
+      },
+      "move": "העברת התזמונים שלי",
+      "keep": "שמירת השעות",
+      "failed": "זה לא הצליח. נסו שוב."
     }
   }
 }

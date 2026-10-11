@@ -2782,5 +2782,66 @@
       "submit": "Send securely",
       "submitting": "Sending…"
     }
+  },
+  "schedule": {
+    "upcoming": "Upcoming",
+    "pausedHeading": "Paused",
+    "kind": {
+      "reminder": "Reminder",
+      "task": "Task",
+      "watch": "Watch"
+    },
+    "next": "Next {when}",
+    "paused": "Paused",
+    "runsInCloud": "Runs in the cloud",
+    "runsOnComputer": "Runs on this computer",
+    "toAgent": "Goes to an agent",
+    "toStella": "Goes to Stella",
+    "once": "Stops once found",
+    "lastFailed": "Last run failed: {error}",
+    "pause": "Pause",
+    "resume": "Resume",
+    "delete": "Delete",
+    "deleteConfirm": "Delete?",
+    "emptyTitle": "Nothing scheduled",
+    "emptyBody": "Ask Stella to remind you, check on something, or do something regularly.",
+    "signedOutTitle": "Sign in to see your schedule",
+    "signedOutBody": "Your reminders, watches and tasks live in your Stella account.",
+    "edit": {
+      "title": "Edit",
+      "name": "Name",
+      "message": "Message",
+      "onFound": "When it finds something",
+      "task": "What to do",
+      "when": "When",
+      "every": "Every",
+      "unit": "Unit",
+      "minutes": "minutes",
+      "hours": "hours",
+      "days": "days",
+      "time": "Time",
+      "zone": "{zone} time",
+      "cron": "Cron expression",
+      "cancel": "Cancel",
+      "save": "Save",
+      "errors": {
+        "pickWhen": "Pick a date and time.",
+        "pickFuture": "Pick a time in the future.",
+        "pickEvery": "Enter how often.",
+        "pickTime": "Pick a time.",
+        "pickDays": "Pick at least one day.",
+        "pickCron": "Enter a cron expression."
+      }
+    },
+    "zone": {
+      "title": "You're in {place} now",
+      "body": {
+        "one": "{count} schedule still runs on {place} time.",
+        "other": "{count} schedules still run on {place} time."
+      },
+      "move": "Move my schedules",
+      "keep": "Keep times",
+      "failed": "That didn't go through. Try again."
+    }
   }
 }

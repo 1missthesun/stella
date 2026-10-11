@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useMemo } from "react";
-import type { ScheduleRow } from "@stella/contracts/backend/schedules";
+import type { ScheduleKind, ScheduleRow } from "@stella/contracts/backend/schedules";
 import { getBackendClient, useBackendView } from "./backend";
 import {
   formatNextRun,
@@ -16,6 +16,8 @@ import {
 
 export type MobileSchedule = {
   kind: "cron" | "heartbeat";
+  /** What a cloud schedule does when it fires; absent for heartbeats. */
+  scheduleKind?: ScheduleKind;
   id: string;
   title: string;
   conversationId: string;
@@ -43,12 +45,14 @@ export type CloudScheduleRow = Pick<
   | "status"
   | "description"
   | "lastError"
->;
+> &
+  Partial<Pick<ScheduleRow, "kind">>;
 
 export type MobileScheduleAction = "pause" | "resume" | "remove";
 
 export const toMobileSchedule = (row: CloudScheduleRow): MobileSchedule => ({
   kind: "cron",
+  ...(row.kind ? { scheduleKind: row.kind } : {}),
   id: row.scheduleId,
   title: row.description || row.prompt,
   conversationId: row.conversationId ?? "",

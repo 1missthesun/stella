@@ -2714,6 +2714,20 @@
       "title": "圖片預覽"
     }
   },
+  "reminders": {
+    "title": "提醒",
+    "done": "完成",
+    "doneState": "已完成",
+    "snooze": "稍後提醒",
+    "snoozeFor": "10 分鐘後提醒",
+    "snooze10": "10 分鐘",
+    "snooze60": "1 小時",
+    "snoozeTomorrow": "明天早上",
+    "snoozedUntil": "已延後至 {time}",
+    "snoozed": "已延後",
+    "due": "到期：{time}",
+    "failed": "無法更新提醒。請再試一次。"
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2749,6 +2763,66 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "即將到來",
+    "pausedHeading": "已暫停",
+    "kind": {
+      "reminder": "提醒",
+      "task": "任務",
+      "watch": "監看"
+    },
+    "next": "下次：{when}",
+    "paused": "已暫停",
+    "runsInCloud": "在雲端執行",
+    "runsOnComputer": "在這台電腦上執行",
+    "toAgent": "交給代理程式",
+    "toStella": "交給 Stella",
+    "once": "找到後停止",
+    "lastFailed": "上次執行失敗：{error}",
+    "pause": "暫停",
+    "resume": "繼續",
+    "delete": "刪除",
+    "deleteConfirm": "刪除？",
+    "emptyTitle": "沒有排程",
+    "emptyBody": "請 Stella 提醒你、幫你留意某件事，或定期做某件事。",
+    "signedOutTitle": "登入以查看你的排程",
+    "signedOutBody": "你的提醒、監看和任務都儲存在你的 Stella 帳戶中。",
+    "edit": {
+      "title": "編輯",
+      "name": "名稱",
+      "message": "訊息",
+      "onFound": "找到內容時",
+      "task": "要做什麼",
+      "when": "時間",
+      "every": "每",
+      "unit": "單位",
+      "minutes": "分鐘",
+      "hours": "小時",
+      "days": "天",
+      "time": "時間",
+      "zone": "{zone} 時間",
+      "cron": "Cron 運算式",
+      "cancel": "取消",
+      "save": "儲存",
+      "errors": {
+        "pickWhen": "請選擇日期和時間。",
+        "pickFuture": "請選擇未來的時間。",
+        "pickEvery": "請輸入頻率。",
+        "pickTime": "請選擇時間。",
+        "pickDays": "請至少選擇一天。",
+        "pickCron": "請輸入 Cron 運算式。"
+      }
+    },
+    "zone": {
+      "title": "你現在在{place}",
+      "body": {
+        "other": "{count} 個排程仍依{place}時間執行。"
+      },
+      "move": "移動我的排程",
+      "keep": "保留時間",
+      "failed": "操作未成功。請再試一次。"
     }
   }
 }

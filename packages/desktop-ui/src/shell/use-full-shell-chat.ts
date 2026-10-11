@@ -26,7 +26,6 @@ import { useChatScrollManagement } from "./use-chat-scroll-management";
 import { useChatHomeSurface } from "./use-chat-home-surface";
 import { useConversationUserAsks } from "@/features/user-ask/user-ask-store";
 import { useAgentInputRouting } from "./use-agent-input-routing";
-import { useConversationModelSelection } from "./use-conversation-model-selection";
 import { useStellaSendMessageBridge } from "./use-stella-send-message-bridge";
 import { useChatStore } from "@/context/chat-store-context";
 import { useCloudChatBridge } from "@/features/cloud/use-cloud-chat-bridge";
@@ -849,14 +848,6 @@ export function useFullShellChat({
     isStreaming,
     latestMessageRef,
   ]);
-  // Per-conversation model selection: mirror the global model preferences
-  // to whichever conversation is active so each tab remembers its own
-  // engine/model/reasoning pick. Cloud and local conversations both retain
-  // their own selection while sharing the same global picker surface.
-  useConversationModelSelection({
-    activeConversationId,
-    enabled: true,
-  });
   const chatColumnConversation = useMemo(
     () => ({
       conversationId: activeConversationId,

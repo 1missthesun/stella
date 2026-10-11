@@ -73,8 +73,8 @@ export function cloudExecutionFromLocal(
       };
     default: {
       const model =
-        preferences.modelOverrides.general ??
         preferences.modelOverrides.orchestrator ??
+        preferences.modelOverrides.general ??
         "";
       if (!model) {
         return {

@@ -335,6 +335,14 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               event.turnId,
             ),
           agentsChanged: () => this.refreshAgentsSoon(),
+          agentLedger: (event) => {
+            void this.recordPiAgentRun(event).catch((error: unknown) => {
+              log("error", "pi_agent_record_failed", {
+                threadId: event.threadId,
+                message: errorMessage(error),
+              });
+            });
+          },
           agentTools: (authority, browser) =>
             this.createPiAgentTools(authority, browser),
           browserHandoff: (handoff, signal) =>
@@ -489,6 +497,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             targetDeviceId: args.deviceId,
             description: args.description,
             prompt: args.prompt,
+            ...(args.model ? { model: args.model } : {}),
           },
         );
         await this.ctx.storage.put(receiptKey(started.threadId), started);
@@ -629,6 +638,71 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       piReportOutcome(report.text),
       wakeTurnId,
     );
+  }
+
+  /**
+   * One run of a pi agent here, in the owner's agent threads: its row, under
+   * the agent that started it, and how the run ended. The row is marked as
+   * the harness's, which keeps its attempts and reports. An end carries its
+   * start again, so a row whose start was lost still gets made first.
+   */
+  protected async recordPiAgentRun(
+    event: import("../pi-runtime.js").PiAgentLedgerEvent,
+  ): Promise<void> {
+    const { authority } = event;
+    const now = Date.now();
+    const base = (key: string) => ({
+      v: OWNER_EVENT_VERSION,
+      key,
+      ownerId: authority.ownerId,
+      ownerGeneration: authority.ownerGeneration,
+      emittedAt: now,
+    });
+    const events: OwnerEvent[] = [
+      {
+        ...base(`pi:${event.threadId}:${event.attempt}`),
+        kind: "thread.spawned",
+        threadId: event.threadId,
+        conversationId: authority.conversationId,
+        parentTurnId: event.turnId,
+        ...(event.parentThreadId ? { parentThreadId: event.parentThreadId } : {}),
+        agentDepth: event.parentThreadId ? 2 : 1,
+        attemptGeneration: event.attempt,
+        description: event.description,
+        prompt: "",
+        execution: authority.execution,
+        placement: "cloud",
+        harness: "pi",
+        createdAt: now,
+      },
+    ];
+    if (event.ended) {
+      const { outcome, text } = event.ended;
+      events.push({
+        ...base(`pi:${event.threadId}:${event.attempt}:ended`),
+        kind: "thread.completed",
+        threadId: event.threadId,
+        conversationId: authority.conversationId,
+        turnId: event.turnId,
+        attemptGeneration: event.attempt,
+        status:
+          outcome === "completed"
+            ? "completed"
+            : outcome === "failed"
+              ? "failed"
+              : "canceled",
+        ...(outcome === "completed" && text
+          ? { resultJson: JSON.stringify({ finalText: text.slice(0, 30_000) }) }
+          : {}),
+        ...(outcome === "failed"
+          ? { errorMessage: (text || "The agent failed.").slice(0, 2_000) }
+          : outcome === "paused"
+            ? { errorMessage: AGENT_PAUSED_REASON }
+            : {}),
+        completedAt: now,
+      });
+    }
+    await this.deferOwnerEvents(events);
   }
 
   /** The card that ends one of pi's agents' attempts, under `turnId` (its own, by default). */

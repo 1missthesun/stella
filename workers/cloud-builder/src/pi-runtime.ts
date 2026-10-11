@@ -74,6 +74,7 @@ import {
   type DeviceToolResult,
 } from "@stella/contracts/turn-plane/device-tools";
 import {
+  agentRunOutcome,
   StellaAgentsDoc,
   type AgentNote,
   type AgentOrigin,
@@ -220,13 +221,32 @@ type PiAgentState = {
 
 export type PiDeviceAgents = {
   start(
-    args: { key: string; deviceId: string; description: string; prompt: string },
+    args: { key: string; deviceId: string; description: string; prompt: string; model?: string },
     authority: PiAuthority,
     parentTurnId: string,
   ): Promise<{ threadId: string }>;
   message(args: { key: string; threadId: string; message: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
   status(threadId: string, authority: PiAuthority, parentTurnId: string): Promise<string>;
   pause(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
+};
+
+/**
+ * One run of an agent pi runs here, at any depth, for the owner's agent
+ * threads: every agent gets one row, under the agent that started it. An
+ * agent thread's own agent is left out; its thread records its attempts.
+ */
+export type PiAgentLedgerEvent = {
+  threadId: string;
+  /** The message of its starter's this run answers, from 1. */
+  attempt: number;
+  description: string;
+  /** The agent that started it; absent for Stella's own. */
+  parentThreadId?: string;
+  /** The turn it started during or just after. */
+  turnId: string;
+  authority: PiAuthority;
+  /** How the run ended; absent when it started. */
+  ended?: { outcome: "completed" | "failed" | "paused"; text?: string };
 };
 
 /** One of the orchestrator's agents, as its lifecycle cards name it. */
@@ -348,6 +368,8 @@ export type PiRuntimeOptions = {
   agentPaused?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
   /** One of Stella's own agents started or stopped running: `runningAgents` changed. */
   agentsChanged?(): void;
+  /** A run of an agent here started or ended (`PiAgentLedgerEvent`). */
+  agentLedger?(event: PiAgentLedgerEvent): void;
   /**
    * Agents on the owner's devices, run there as a whole through the owner's
    * agent threads as the loop's are; their reports come back as wake turns.
@@ -1024,6 +1046,7 @@ export class PiConversationRuntime {
             this.#options.report(error),
           );
         }
+        await this.#recordAgentRun(run, authority, turnId, context).catch((error: unknown) => this.#options.report(error));
         // Stella's own agents, not their subagents: those report to the agent
         // that started them, so nothing in this conversation would end their cards.
         if (run.parentConversationId !== root.id) return;
@@ -1037,7 +1060,7 @@ export class PiConversationRuntime {
         const turnId = this.#cardTurnId(threadId, info);
         if (turnId) this.#options.agentPaused?.({ threadId, turnId, ...info });
       },
-      endAgentRun: async (run, _context, end) => {
+      endAgentRun: async (run, context, end) => {
         let ended: ActiveRun | undefined;
         for (const [sessionId, runs] of this.#runs) {
           const index = runs.findIndex((active) => active.run.runId === run.runId);
@@ -1064,6 +1087,12 @@ export class PiConversationRuntime {
         await ended?.guard?.release().catch((error: unknown) => this.#options.report(error));
         const authority = ended?.authority ?? this.#state?.authority;
         if (!authority) return;
+        const outcome = agentRunOutcome(end);
+        if (outcome) {
+          await this.#recordAgentRun(run, authority, ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}`, context, outcome).catch(
+            (error: unknown) => this.#options.report(error),
+          );
+        }
         await this.#gate(authority)
           .release({ turnId: ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}` })
           .catch((error: unknown) => this.#options.report(error));
@@ -1171,6 +1200,30 @@ export class PiConversationRuntime {
         await devices.pause({ key: `pause:${threadId}:${Date.now()}`, threadId }, authority, parentTurnId);
       },
     };
+  }
+
+  /** A run's start or end, for the owner's agent threads (`PiAgentLedgerEvent`). */
+  async #recordAgentRun(
+    run: AgentRun,
+    authority: PiAuthority,
+    turnId: string,
+    context: Context,
+    ended?: PiAgentLedgerEvent["ended"],
+  ): Promise<void> {
+    if (!this.#options.agentLedger) return;
+    if (run.parentConversationId === (await this.open()).root.id) {
+      const { origin } = await this.#agentInfo(run.threadId, context);
+      if (origin && "agentThread" in origin) return;
+    }
+    this.#options.agentLedger({
+      threadId: run.threadId,
+      attempt: run.attempt,
+      description: run.description,
+      ...(run.parentThreadId ? { parentThreadId: run.parentThreadId } : {}),
+      turnId,
+      authority,
+      ...(ended ? { ended } : {}),
+    });
   }
 
   /** What an agent's lifecycle cards say about it. */

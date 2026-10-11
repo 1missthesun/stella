@@ -543,7 +543,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         return { threadId: started.threadId };
       },
       message: async (args, authority, parentTurnId) => {
-        const next = await continueDeviceAgent(
+        const { receipt: next, delivery } = await continueDeviceAgent(
           caller(authority, parentTurnId),
           await receipt(args.threadId),
           {
@@ -552,6 +552,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           },
         );
         await this.ctx.storage.put(receiptKey(args.threadId), next);
+        return delivery;
       },
       status: async (threadId, authority, parentTurnId) => {
         const current = await readDeviceAgent(

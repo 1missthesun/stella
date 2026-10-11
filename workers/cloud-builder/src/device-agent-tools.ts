@@ -10,6 +10,7 @@
  */
 
 import type {
+  AgentMessageDelivery,
   AgentThreadControl,
   AgentThreadSummary,
 } from "@stella/contracts/backend/agent-threads";
@@ -100,7 +101,7 @@ export const continueDeviceAgent = async (
   caller: DeviceAgentCaller,
   prior: CloudAgentControlReceipt,
   input: { controlRequestId: string; message: string },
-): Promise<CloudAgentControlReceipt> => {
+): Promise<{ receipt: CloudAgentControlReceipt; delivery?: AgentMessageDelivery }> => {
   const control = (await caller.ownerInternal("agentThreads.continueOnDevice", {
     ownerGeneration: caller.ownerGeneration,
     conversationId: caller.conversationId,
@@ -109,10 +110,13 @@ export const continueDeviceAgent = async (
     description: prior.description ?? "Continued task",
     prompt: input.message,
   })) as AgentThreadControl;
-  return receiptOf(control, {
-    ...(prior.description ? { description: prior.description } : {}),
-    executorDeviceId: prior.executorDeviceId!,
-  });
+  return {
+    receipt: receiptOf(control, {
+      ...(prior.description ? { description: prior.description } : {}),
+      executorDeviceId: prior.executorDeviceId!,
+    }),
+    ...(control.delivery ? { delivery: control.delivery } : {}),
+  };
 };
 
 export const cancelDeviceAgent = async (

@@ -75,7 +75,7 @@ import {
   type StellaRequestRoute,
 } from "@stella/agent/provider/stella";
 import { StellaAgentDoc } from "@stella/agent/stella/agent-doc";
-import { deviceRefusal, type StellaExecutionHost } from "@stella/agent/stella/execution";
+import { deviceRefusal, deviceStanding, type StellaExecutionHost } from "@stella/agent/stella/execution";
 import { findDeviceDestination } from "@stella/contracts/turn-plane/placement";
 import { placementOf, StellaPlacementDoc, type StellaPlacement } from "@stella/agent/stella/placement";
 import type { PiBrainHost } from "@stella/contracts/turn-plane/pi-brain";
@@ -247,7 +247,11 @@ export type PiDeviceAgents = {
     authority: PiAuthority,
     parentTurnId: string,
   ): Promise<{ threadId: string }>;
-  message(args: { key: string; threadId: string; message: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
+  message(
+    args: { key: string; threadId: string; message: string },
+    authority: PiAuthority,
+    parentTurnId: string,
+  ): Promise<AgentMessageDelivery | undefined>;
   status(threadId: string, authority: PiAuthority, parentTurnId: string): Promise<string>;
   pause(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
 };
@@ -1375,7 +1379,7 @@ export class PiConversationRuntime {
       },
       message: async (args) => {
         const { authority, parentTurnId } = await scope();
-        await devices.message(args, authority, parentTurnId);
+        return await devices.message(args, authority, parentTurnId);
       },
       status: async (threadId) => {
         const { authority, parentTurnId } = await scope();
@@ -1597,6 +1601,14 @@ export class PiConversationRuntime {
    */
   #execution(): StellaExecutionHost {
     return {
+      standing: async (deviceId) => {
+        const { authority } = await this.#agentState();
+        const listed = await this.#gate(authority)
+          .devices()
+          .catch(() => undefined);
+        const device = listed?.devices.find((entry) => entry.deviceId === deviceId);
+        return device ? deviceStanding(device) : undefined;
+      },
       prepare: async (target) => {
         if (target.kind !== "device") return { placement: { kind: "cloud" } };
         const { authority } = await this.#agentState();

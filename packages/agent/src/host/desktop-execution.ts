@@ -230,6 +230,7 @@ export function desktopExecution(options: {
   const host: StellaExecutionHost = {
     localOnly: options.localOnly,
     prepare: async (target) => await environment.prepare(target),
+    standing: async (deviceId) => await environment.standing(deviceId),
     // Leaving the cloud saves the container's work into the world, then lets it go.
     moved: async (piConversationId, from) => await environment.moved(String(piConversationId), from),
     ...(options.brain && !options.localOnly

@@ -57,7 +57,18 @@ export type StellaExecutionHost = {
    * Answers where it went, named for her; absent, her brain stays on this host.
    */
   moveBrain?(target: StellaPlacement, brief: string, context: Context): Promise<{ moved: StellaPlacement } | { error: string }>;
+  /** One of the owner's computers as the device list has it now; undefined when the list can't be read. */
+  standing?(deviceId: string, context: Context): Promise<DeviceStanding | undefined>;
 };
+
+/** A computer's name, whether it is online, and when it was last seen. */
+export type DeviceStanding = { name: string; online: boolean; lastSeenAt?: number };
+
+export const deviceStanding = (device: DeviceDestination): DeviceStanding => ({
+  name: device.label?.trim() || device.deviceId,
+  online: device.online,
+  ...(device.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {}),
+});
 
 /**
  * Why a listed device cannot run tools now, in the old `switch_destination`

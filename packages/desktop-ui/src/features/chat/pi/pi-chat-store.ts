@@ -180,7 +180,7 @@ export const piChatAgents = async (conversationId: string): Promise<DesktopThrea
       conversationId,
       agentType: "general",
       description: agent.description,
-      status: agent.status,
+      status: agent.agentStatus === "paused" || agent.agentStatus === "canceled" ? "canceled" : agent.status,
       startedAt: agent.startedAt,
       updatedAt: agent.updatedAt,
       ...(agent.status === "running" ? {} : { completedAt: agent.updatedAt }),

@@ -1,3 +1,4 @@
+import type { AgentStatus } from "./agent-status.js";
 /**
  * Stella's chat on pi-durable, as its clients see it.
  *
@@ -267,6 +268,8 @@ export type PiChatAgent = {
   /** Its latest prose, oldest first. */
   assistantMessages: string[];
   error?: string;
+  /** Its status in the shared vocabulary; absent from builds before it. */
+  agentStatus?: AgentStatus;
 };
 
 export type PiChatAgentsResult = { agents: PiChatAgent[] };

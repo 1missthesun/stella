@@ -102,12 +102,19 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
     // host's signal follows the context only while the call is in flight.
     const controller = new AbortController();
     const parent = context.abortSignal;
-    const forward = () => controller.abort(parent?.reason);
+    let stop: ((reason: unknown) => void) | undefined;
+    const stopped = new Promise<never>((_, reject) => {
+      stop = reject;
+    });
+    const forward = () => {
+      controller.abort(parent?.reason);
+      stop?.(parent?.reason ?? new Error(`Tool ${spec.name} was aborted`));
+    };
     if (parent?.aborted) forward();
     else parent?.addEventListener("abort", forward, { once: true });
     let outcome: StellaToolOutcome;
     try {
-      outcome = await host.run(
+      const running = host.run(
         {
           role,
           name: spec.name,
@@ -117,6 +124,9 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
         },
         withAbortSignal(controller.signal, withoutAbortSignal(context)),
       );
+      running.catch(() => undefined);
+      stopped.catch(() => undefined);
+      outcome = await Promise.race([running, stopped]);
     } finally {
       parent?.removeEventListener("abort", forward);
     }

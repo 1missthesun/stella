@@ -203,6 +203,7 @@ export const localWebFetch = async (args: {
   url: string;
   prompt?: string;
   format?: WebFetchFormat;
+  signal?: AbortSignal;
 }): Promise<string> => {
   if (!args.url) return "Error: URL is required.";
   if (containsSecretLikeToken(args.url)) {
@@ -211,6 +212,9 @@ export const localWebFetch = async (args: {
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const stop = () => controller.abort();
+  if (args.signal?.aborted) stop();
+  else args.signal?.addEventListener("abort", stop, { once: true });
 
   try {
     let targetUrl = await normalizeSafeExternalUrl(args.url);
@@ -288,12 +292,14 @@ export const localWebFetch = async (args: {
     return sanitizeToolVisibleText(text);
   } catch (error) {
     const msg = (error as Error).message ?? "Unknown error";
+    if (args.signal?.aborted) return "Error: Stopped before the page loaded.";
     if (msg.includes("abort")) {
       return `Error: Request timed out after ${FETCH_TIMEOUT_MS / 1000}s`;
     }
     return `Error fetching URL: ${sanitizeToolVisibleText(msg)}`;
   } finally {
     clearTimeout(timeout);
+    args.signal?.removeEventListener("abort", stop);
   }
 };
 

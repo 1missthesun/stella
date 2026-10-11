@@ -37,7 +37,7 @@ export const createWebTool = (options: WebToolOptions = {}): ToolDefinition => (
   description: WEB_TOOL_DESCRIPTION,
   promptSnippet: WEB_TOOL_PROMPT_SNIPPET,
   parameters: WEB_TOOL_PARAMETERS,
-  execute: async (args) => {
+  execute: async (args, _context, extras) => {
     const query = typeof args.query === "string" ? args.query.trim() : "";
     const url = typeof args.url === "string" ? args.url.trim() : "";
     const prompt =
@@ -97,6 +97,7 @@ export const createWebTool = (options: WebToolOptions = {}): ToolDefinition => (
       url,
       format,
       ...(prompt ? { prompt } : {}),
+      ...(extras?.signal ? { signal: extras.signal } : {}),
     });
     return {
       result: text,

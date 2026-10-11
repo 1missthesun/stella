@@ -42,7 +42,6 @@ import {
 } from "@/features/chat/lib/reply-file-events";
 import { getDeviceIdOrNull } from "@/platform/electron/device";
 import { cloudAttachmentsStore } from "@/features/cloud/cloud-composer-store";
-import { useOwnDeviceRemoteCancel } from "@/features/cloud/use-own-device-remote-cancel";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-message-ids";
 import type { LegendListRef } from "@legendapp/list/react";
@@ -145,7 +144,7 @@ export function useFullShellChat({
   isOnChatRoute: boolean;
   traceEnabled: boolean;
 }) {
-  const { cloudFeaturesEnabled, isLocalStorage, storageMode } = useChatStore();
+  const { cloudFeaturesEnabled, storageMode } = useChatStore();
   const { accountScope } = useCloudConversationSession();
   // Message state + always-current mirror ref, synced at WRITE time. The
   // dictate-and-submit commit is rAF-deferred and can fire before React
@@ -312,12 +311,6 @@ export function useFullShellChat({
     localActivities,
     localFiles: localPersistedFiles,
     localTasks,
-  });
-  useOwnDeviceRemoteCancel({
-    conversationId: cloudChat.conversation.state.conversationId,
-    records: cloudChat.records,
-    enabled: cloudFeaturesEnabled && isLocalStorage && !cloudChat.isWebShell,
-    onCancel: piChat.cancelCurrentStream,
   });
   const isPrivateChat = storageMode === "local";
   const journalState = cloudChat.conversation.state;

@@ -188,6 +188,7 @@ export async function journalMirror(args: {
   let remoteSeen = "[]";
   /** Turns whose lease this process holds (or re-adopted after a restart). */
   const held = new Set<string>();
+  const ending = new Set<string>();
   let running = false;
   let again = false;
   let stopped = false;
@@ -255,7 +256,9 @@ export async function journalMirror(args: {
             await recordMessageId(harness, root.id, record.clientMsgId, record.seq, context);
           }
           // Stopped from another device (the phone's Stop) while it runs here.
-          const open = [...held].some((localTurnId) => record.turnId.endsWith(`:${localTurnId}`));
+          const open = [...held].some(
+            (localTurnId) => !ending.has(localTurnId) && record.turnId.endsWith(`:${localTurnId}`),
+          );
           if (open && record.kind === "turn" && record.phase === "canceled") stoppedElsewhere = true;
           continue;
         }
@@ -293,6 +296,7 @@ export async function journalMirror(args: {
   const finishTurn = (open: Readonly<JournalOpenTurn>) =>
     finishWith(open).catch((error: unknown) => {
       held.delete(open.localTurnId);
+      ending.delete(open.localTurnId);
       report(error);
     });
 
@@ -304,6 +308,7 @@ export async function journalMirror(args: {
     }
     const messages = entries.map((entry) => entry.model![0]!);
     const last = [...messages].reverse().find((message) => message.role === "assistant");
+    ending.add(open.localTurnId);
     await journal.finish({
       localTurnId: open.localTurnId,
       leaseToken: open.leaseToken,
@@ -316,6 +321,7 @@ export async function journalMirror(args: {
       ...((last?.role === "assistant" ? piTerminalNotice(last) : undefined) ?? { phase: "completed" as const }),
     });
     held.delete(open.localTurnId);
+    ending.delete(open.localTurnId);
   };
 
   const mirror = async () => {

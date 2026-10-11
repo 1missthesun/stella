@@ -21,6 +21,6 @@ export const createAskUserTool = (options: AskUserOptions): ToolDefinition => ({
   description: ASK_USER_TOOL_DESCRIPTION,
   promptSnippet: ASK_USER_TOOL_PROMPT_SNIPPET,
   parameters: ASK_USER_TOOL_PARAMETERS,
-  execute: (args, context) =>
-    handleAskUser({ askUser: options.askUser }, args, context),
+  execute: (args, context, extras) =>
+    handleAskUser({ askUser: options.askUser }, args, context, extras?.signal),
 });

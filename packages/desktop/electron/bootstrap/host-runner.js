@@ -206,6 +206,7 @@ export const createHostRunnerHandlers = (context, options) => ({
     askUser: (payload) => context.services.userAskService.askUser(payload),
     requestSecureInput: (payload) => context.services.userAskService.requestSecureInput(payload),
     useSecureValue: (payload) => context.services.userAskService.useSecureValue(payload),
+    cancelUserAsk: (payload) => context.services.userAskService.withdraw(payload),
     requestLlmCredentials: async (request) => {
         const stellaDataDir = context.state.stellaDataDirPath;
         if (!stellaDataDir) {

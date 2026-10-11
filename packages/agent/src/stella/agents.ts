@@ -390,6 +390,18 @@ const slug = (text: string): string =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 40) || "agent";
 
+const AGENT_ID_TAIL_LENGTH = 6;
+
+const agentIdTail = (): string =>
+  Array.from(crypto.getRandomValues(new Uint8Array(AGENT_ID_TAIL_LENGTH)), (byte) => (byte % 36).toString(36)).join("");
+
+const mintAgentId = (description: string, taken: Readonly<Record<string, unknown>>): string => {
+  for (;;) {
+    const candidate = `${slug(description)}-${agentIdTail()}`;
+    if (!(candidate in taken)) return candidate;
+  }
+};
+
 const textOf = (message: AssistantMessage | undefined): string =>
   (message?.content ?? []).map((part) => (part.type === "text" ? part.text : "")).join("").trim();
 
@@ -743,7 +755,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       conversationId: parentConversationId,
     });
     const child = await tx.createConversation({ ownership: { kind: "task", taskId: anchor } });
-    const threadId = args.threadId && !state.agents[args.threadId] ? args.threadId : `${slug(description)}-${child.id}`;
+    const threadId = args.threadId && !state.agents[args.threadId] ? args.threadId : mintAgentId(description, state.agents);
     // It starts there, not confined there: its tools still take any path.
     const cwd = args.cwd ?? (placement.kind === "local" ? host.agentDirectory?.(threadId) : undefined);
     await configure(tx, child.id, {

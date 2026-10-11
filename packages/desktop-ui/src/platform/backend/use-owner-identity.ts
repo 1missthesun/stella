@@ -1,29 +1,49 @@
 import { useEffect, useState } from "react";
-import type { OwnerIdentity } from "@stella/contracts/backend/conversations";
+import type { ConversationCalls } from "@stella/contracts/backend/conversations";
 import type { BackendRequestError } from "@stella/contracts/backend/client";
 import { backendClient } from "./backend-client";
 
 const RETRY_DELAYS_MS = [500, 1_000, 2_000, 5_000, 10_000];
 
-const inflight = new Map<string, Promise<OwnerIdentity>>();
+export type OwnerBootstrap =
+  ConversationCalls["conversations.bootstrap"]["result"];
+
+const inflight = new Map<string, Promise<OwnerBootstrap>>();
+const refreshListeners = new Set<(accountKey: string) => void>();
 
 /**
  * The backend's answer to "who am I": the owner id it verified from the
- * current token and the owner generation that fences stale work. Asked once
+ * current token, the owner generation that fences stale work, and the
+ * account's main conversation (the one chat every client opens). Asked once
  * per `accountKey` (change the key when the account or session changes).
  * The answer is also the identity proof: a result whose `ownerId` is not the
  * expected one means the token still belongs to another account.
+ * `preferConversationId` is only a hint for the server's first pin.
  */
-export function useOwnerIdentity(accountKey: string | null): {
-  identity: OwnerIdentity | undefined;
+export function useOwnerIdentity(
+  accountKey: string | null,
+  preferConversationId: string | null,
+): {
+  identity: OwnerBootstrap | undefined;
   error: BackendRequestError | undefined;
 } {
   const [state, setState] = useState<{
     key: string | null;
-    identity?: OwnerIdentity;
+    identity?: OwnerBootstrap;
     error?: BackendRequestError;
   }>({ key: null });
   const [attempt, setAttempt] = useState(0);
+
+  useEffect(() => {
+    if (!accountKey) return;
+    const listener = (key: string) => {
+      if (key === accountKey) setAttempt((value) => value + 1);
+    };
+    refreshListeners.add(listener);
+    return () => {
+      refreshListeners.delete(listener);
+    };
+  }, [accountKey]);
 
   useEffect(() => {
     if (!accountKey) return;
@@ -31,7 +51,10 @@ export function useOwnerIdentity(accountKey: string | null): {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
     let request = inflight.get(accountKey);
     if (!request) {
-      request = backendClient.call("owner.identity", {});
+      request = backendClient.call(
+        "conversations.bootstrap",
+        preferConversationId ? { preferConversationId } : {},
+      );
       inflight.set(accountKey, request);
     }
     request
@@ -41,7 +64,11 @@ export function useOwnerIdentity(accountKey: string | null): {
       .catch((error: BackendRequestError) => {
         inflight.delete(accountKey);
         if (canceled) return;
-        setState({ key: accountKey, error });
+        setState((current) =>
+          current.key === accountKey && current.identity
+            ? current
+            : { key: accountKey, error },
+        );
         if (error.retryable !== false) {
           const delay = RETRY_DELAYS_MS[Math.min(attempt, RETRY_DELAYS_MS.length - 1)]!;
           retryTimer = setTimeout(() => setAttempt((value) => value + 1), delay);
@@ -51,13 +78,19 @@ export function useOwnerIdentity(accountKey: string | null): {
       canceled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
+    // The hint only matters to the first request for a key.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accountKey, attempt]);
 
   const current = state.key === accountKey ? state : { key: accountKey };
   return { identity: current.identity, error: current.error };
 }
 
-/** Forget a cached identity, e.g. after the owner reset their data. */
-export const forgetOwnerIdentity = (accountKey: string): void => {
+/**
+ * Ask again, e.g. when the main conversation was deleted: the server re-pins
+ * a live one. Every mounted reader for the key picks up the new answer.
+ */
+export const refreshOwnerIdentity = (accountKey: string): void => {
   inflight.delete(accountKey);
+  for (const listener of refreshListeners) listener(accountKey);
 };

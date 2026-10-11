@@ -78,7 +78,6 @@ mock.module("../../config/env", () => ({
 
 const {
   cancelAutomaticExecution,
-  ensureAutomaticExecutionConversation,
   getAutomaticExecutionStatus,
   listExecutionDevices,
   submitAutomaticExecution,
@@ -398,26 +397,6 @@ describe("mobile execution placement client", () => {
       }),
     ).rejects.toThrow("No computer with what this needs is online.");
   });
-
-  test("fences conversation creation on the conversation identity, not device placement", async () => {
-    // Hosted chat is open to the anonymous owner; the execution-placement
-    // identity query refuses anonymous callers because it registers desktops
-    // for remote execution. Admitting a chat conversation through it made
-    // account-free mobile chat fail on its first turn.
-    const conversationId = await ensureAutomaticExecutionConversation({
-      threadId: "cloud",
-      title: "Chat",
-    });
-    expect(conversationId).toBe("conv:mobile-placement:cloud");
-    expect(backendCalls).toEqual([
-      { kind: "call", name: "owner.identity" },
-      { kind: "call", name: "conversations.create" },
-    ]);
-    expect(backendCalls.map((call) => call.name)).not.toContain(
-      "execution_placement:getMyExecutionPlacementIdentity",
-    );
-  });
-
   test("maps anonymous and suspended placement refusals to client copy", async () => {
     for (const [code, message] of [
       ["sign_in_required", "Sign in to Stella to use cloud agents."],

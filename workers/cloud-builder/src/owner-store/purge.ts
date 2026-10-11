@@ -126,7 +126,8 @@ export const conversationPurgeJob: JobDef = {
 
 /**
  * Reset and account deletion: purge every conversation's orchestrator, then
- * delete the conversation index, the agent threads and the edit receipts.
+ * delete the conversation index, the main-conversation pin, the agent
+ * threads and the edit receipts.
  * The owner is fenced with no turns running while this runs.
  */
 export const purgeConversationData: PurgeDef = async (ctx) => {
@@ -177,6 +178,7 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
     "agent_commands",
     "agent_report_outbox",
     "agent_events",
+    "conversation_main",
   ]) {
     ctx.db.run(`DELETE FROM ${table}`);
   }

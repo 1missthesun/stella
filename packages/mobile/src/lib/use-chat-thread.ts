@@ -47,7 +47,7 @@ import {
   automaticExecutionResultText,
   bindAutomaticExecutionAdmission,
   cancelAutomaticExecution,
-  ensureAutomaticExecutionConversation,
+  readMainConversationId,
   isAutomaticExecutionPairCredentialRejection,
   requestAutomaticExecutionCancellation,
   submitAutomaticExecution,
@@ -768,11 +768,7 @@ export function useChatThread(opts: {
           assertAuthorityLease();
           try {
             if (!placementConversationId) {
-              placementConversationId =
-                await ensureAutomaticExecutionConversation({
-                  threadId,
-                  title: "Chat",
-                });
+              placementConversationId = await readMainConversationId();
               assertAuthorityLease();
             }
             const target = item.executionTarget ?? AUTOMATIC_EXECUTION_TARGET;
@@ -951,7 +947,6 @@ export function useChatThread(opts: {
       canonicalConversationId,
       finishDispatch,
       patchActivity,
-      threadId,
       transport,
       updateMessages,
     ],

@@ -1,7 +1,6 @@
 import { useMemo } from "react";
 import type { ConversationSummary } from "@stella/contracts/backend/conversations";
 import { useBackendView } from "@/platform/backend/use-backend-view";
-import { readActiveCloudConversationIdCache } from "@/features/cloud/cloud-conversation-cache";
 import {
   cloudConversationsForOwnerSubject,
   isOwnedCloudConversation,
@@ -13,8 +12,9 @@ type CloudConversationSession = ReturnType<typeof useCloudConversationSession>;
 /**
  * Every backend read the root shell makes to select a conversation: the
  * owner's recent conversations as a live view, plus exact lookups for the
- * routed and last-open conversation when they aren't in that list. The
- * owner generation comes from the session's verified identity.
+ * routed and the main conversation when they aren't in that list. The owner
+ * generation and the main conversation come from the session's verified
+ * identity.
  */
 export function useShellConversationSource({
   session,
@@ -40,8 +40,8 @@ export function useShellConversationSource({
       cloudConversationsForOwnerSubject(cloudConversations ?? [], ownerSubject),
     [cloudConversations, ownerSubject],
   );
-  const cachedCloudConversationId = isCloudConversationReady
-    ? readActiveCloudConversationIdCache(accountScope)
+  const mainCloudConversationId = isCloudConversationReady
+    ? session.mainConversationId
     : null;
   const routeIsListedOrPendingCloudConversation = isOwnedCloudConversation(
     scopedCloudConversations,
@@ -66,29 +66,29 @@ export function useShellConversationSource({
       : (routeLookup.value ?? null)
     : undefined;
 
-  const cachedConversationIsListed = Boolean(
-    cachedCloudConversationId &&
+  const mainConversationIsListed = Boolean(
+    mainCloudConversationId &&
       scopedCloudConversations.some(
         (conversation) =>
-          conversation.conversationId === cachedCloudConversationId,
+          conversation.conversationId === mainCloudConversationId,
       ),
   );
-  const cachedLookupId =
+  const mainLookupId =
     isCloudConversationReady &&
     cloudConversations !== undefined &&
-    cachedCloudConversationId &&
-    cachedCloudConversationId !== routeConversationId &&
-    !cachedConversationIsListed
-      ? cachedCloudConversationId
+    mainCloudConversationId &&
+    mainCloudConversationId !== routeConversationId &&
+    !mainConversationIsListed
+      ? mainCloudConversationId
       : null;
-  const cachedLookup = useBackendView(
+  const mainLookup = useBackendView(
     "conversations.get",
-    cachedLookupId ? { conversationId: cachedLookupId } : "skip",
+    mainLookupId ? { conversationId: mainLookupId } : "skip",
   );
-  const exactCachedCloudConversation = cachedLookupId
-    ? cachedLookup.status === "loading"
+  const exactMainCloudConversation = mainLookupId
+    ? mainLookup.status === "loading"
       ? undefined
-      : (cachedLookup.value ?? null)
+      : (mainLookup.value ?? null)
     : undefined;
 
   return {
@@ -97,10 +97,10 @@ export function useShellConversationSource({
     cloudConversations,
     scopedCloudConversations,
     ownerGeneration,
-    cachedCloudConversationId,
+    mainCloudConversationId,
     routeIsListedOrPendingCloudConversation,
     exactCloudConversation,
-    cachedConversationIsListed,
-    exactCachedCloudConversation,
+    mainConversationIsListed,
+    exactMainCloudConversation,
   };
 }

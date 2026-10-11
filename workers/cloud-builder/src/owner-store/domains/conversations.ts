@@ -91,6 +91,22 @@ export const CONVERSATIONS_DROP_EDITS_MIGRATION = {
   statements: [`DROP TABLE IF EXISTS conversation_edits`],
 };
 
+/**
+ * The account's main conversation: the one chat every client opens. One row,
+ * pinned by `conversations.bootstrap` and re-pinned there when its
+ * conversation is gone.
+ */
+export const CONVERSATIONS_MAIN_MIGRATION = {
+  id: "conversations.3-main-conversation",
+  statements: [
+    `CREATE TABLE conversation_main (
+       id INTEGER PRIMARY KEY CHECK (id = 1),
+       conversation_id TEXT NOT NULL,
+       pinned_at INTEGER NOT NULL
+     )`,
+  ],
+};
+
 export const CONVERSATION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const CLIENT_CREATE_ID_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
@@ -212,6 +228,69 @@ const createConversation = async (
     args.execution ? JSON.stringify(args.execution) : null,
   );
   return summary(readConversation(ctx.db, conversationId)!, ctx.ownerId);
+};
+
+const isLiveConversation = (db: OwnerDbReader, conversationId: string): boolean => {
+  const row = readConversation(db, conversationId);
+  return row !== null && row.deleted_at === null;
+};
+
+const pinnedMainConversationId = (db: OwnerDbReader): string | null => {
+  const pinned = db.one<{ conversation_id: string }>(
+    "SELECT conversation_id FROM conversation_main WHERE id = 1",
+  );
+  return pinned && isLiveConversation(db, pinned.conversation_id)
+    ? pinned.conversation_id
+    : null;
+};
+
+const newestConversationId = (db: OwnerDbReader): string | null =>
+  db.one<{ conversation_id: string }>(
+    `SELECT conversation_id FROM conversations WHERE deleted_at IS NULL
+      ORDER BY updated_at DESC, conversation_id DESC LIMIT 1`,
+  )?.conversation_id ?? null;
+
+/**
+ * The main conversation without pinning one: the pin while it is live, else
+ * the conversation bootstrap would pin first (the most recently used).
+ */
+export const readMainConversationId = (db: OwnerDbReader): string | null =>
+  pinnedMainConversationId(db) ?? newestConversationId(db);
+
+/**
+ * The pinned main conversation, pinning one when none is live: the client's
+ * hint, else the most recently used conversation, else a new empty one. No
+ * await between the read and the pin, so concurrent callers agree.
+ */
+const resolveMainConversation = (
+  ctx: OwnerContext,
+  preferConversationId: string | undefined,
+): string => {
+  const pinned = pinnedMainConversationId(ctx.db);
+  if (pinned) return pinned;
+  let conversationId =
+    preferConversationId && isLiveConversation(ctx.db, preferConversationId)
+      ? preferConversationId
+      : newestConversationId(ctx.db);
+  if (!conversationId) {
+    conversationId = crypto.randomUUID();
+    ctx.db.run(
+      `INSERT INTO conversations
+         (conversation_id, title, created_at, updated_at, allow_empty)
+       VALUES (?, '', ?, ?, 1)`,
+      conversationId,
+      ctx.now,
+      ctx.now,
+    );
+  }
+  ctx.db.run(
+    `INSERT INTO conversation_main (id, conversation_id, pinned_at) VALUES (1, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET
+       conversation_id = excluded.conversation_id, pinned_at = excluded.pinned_at`,
+    conversationId,
+    ctx.now,
+  );
+  return conversationId;
 };
 
 const page = (
@@ -361,7 +440,11 @@ const conversationIdArg = string({ pattern: CONVERSATION_ID_PATTERN, max: 64 });
 
 export const conversationsDomain = {
   name: "conversations",
-  migrations: [CONVERSATIONS_MIGRATION, CONVERSATIONS_DROP_EDITS_MIGRATION],
+  migrations: [
+    CONVERSATIONS_MIGRATION,
+    CONVERSATIONS_DROP_EDITS_MIGRATION,
+    CONVERSATIONS_MAIN_MIGRATION,
+  ],
   purge: purgeConversationData,
   jobs: { [CONVERSATION_PURGE_JOB]: conversationPurgeJob },
   calls: {
@@ -382,18 +465,19 @@ export const conversationsDomain = {
   },
   "conversations.bootstrap": {
     scope: "owner",
-    parse: object({ clientCreateId: string({ max: 128 }) }),
-    handler: async (ctx: OwnerContext, args: { clientCreateId: string }) => {
-      if (!CLIENT_CREATE_ID_PATTERN.test(args.clientCreateId)) {
-        throw new RpcError("BAD_REQUEST", "That conversation could not be created. Try again.");
-      }
+    parse: object({
+      clientCreateId: optional(string({ max: 128 })),
+      preferConversationId: optional(string({ max: 64 })),
+    }),
+    handler: async (
+      ctx: OwnerContext,
+      args: ConversationCalls["conversations.bootstrap"]["args"],
+    ) => {
       const identity = await ownerIdentity(ctx);
-      const existing = ctx.db.one<ConversationRow>(
-        "SELECT * FROM conversations WHERE client_create_id = ?",
-        args.clientCreateId,
-      );
-      if (existing?.deleted_at != null) throw new RpcError("NOT_FOUND", "Conversation not found.");
-      return { ...identity, conversationId: existing?.conversation_id ?? null };
+      return {
+        ...identity,
+        conversationId: resolveMainConversation(ctx, args.preferConversationId),
+      };
     },
   },
   "conversations.page": {

@@ -14,7 +14,6 @@ import { getBackendClient } from "./backend";
 import {
   AUTOMATIC_EXECUTION_TARGET,
   buildAutomaticExecutionAdmission,
-  automaticExecutionConversationClientCreateId,
   readAutomaticExecutionDispatch,
   waitForAutomaticExecutionStatus,
   type AutomaticExecutionAdmissionInput,
@@ -26,7 +25,6 @@ export {
   AutomaticExecutionWaitAbortedError,
   automaticExecutionCancellationCommand,
   automaticExecutionResultText,
-  automaticExecutionConversationClientCreateId,
   bindAutomaticExecutionAdmission,
   buildAutomaticExecutionAdmission,
   isAutomaticExecutionTerminal,
@@ -143,52 +141,13 @@ const readDispatchEnvelope = (
   ) as AutomaticExecutionDispatch;
 };
 
-/**
- * Creates (or replays) the owner's conversation used by a mobile surface, for
- * connected and anonymous owners alike. A client key, rather than a cached
- * server UUID, makes a lost mutation response and an app restart safe without
- * ever creating two cloud conversation identities for one surface.
- */
-export const ensureAutomaticExecutionConversation = async (args: {
-  threadId: string;
-  title: string;
-}): Promise<string> => {
-  // `owner.identity` is open to anonymous owners: hosted chat needs no account.
-  const identity = await getBackendClient().call("owner.identity", {});
-  const expectedOwnerGeneration = identity.ownerGeneration.trim();
-  if (!expectedOwnerGeneration) {
-    throw new Error(
-      "Conversation admission could not establish owner authority.",
-    );
-  }
-  return await createAutomaticExecutionConversation({
-    ...args,
-    expectedOwnerGeneration,
-  });
-};
-
-/**
- * `ensureAutomaticExecutionConversation` for a caller that already holds the
- * owner generation (the chat bootstrap read), saving its identity round trip.
- */
-export const createAutomaticExecutionConversation = async (args: {
-  threadId: string;
-  title: string;
-  expectedOwnerGeneration: string;
-}): Promise<string> => {
-  const conversation = await getBackendClient().call("conversations.create", {
-    clientCreateId: automaticExecutionConversationClientCreateId(args.threadId),
-    title: args.title.trim().slice(0, 80),
-  });
-  if (
-    !conversation ||
-    typeof conversation.conversationId !== "string" ||
-    !conversation.conversationId.trim() ||
-    conversation.conversationId.length > 256
-  ) {
-    throw new Error("Conversation admission returned malformed data.");
-  }
-  return conversation.conversationId.trim();
+/** The account's main conversation, the one chat every client opens. */
+export const readMainConversationId = async (): Promise<string> => {
+  const { conversationId } = await getBackendClient().call(
+    "conversations.bootstrap",
+    {},
+  );
+  return conversationId;
 };
 
 export type ExecutionDeviceDestination = DeviceDestination;

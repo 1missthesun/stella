@@ -36,23 +36,21 @@ export type CloudChatBootstrap =
       status: "ready";
       ownerId: string;
       ownerGeneration: string;
-      /** Null until the one chat is first created. */
-      conversationId: string | null;
+      /** The account's main conversation, the same one every client opens. */
+      conversationId: string;
       realtime: CloudRealtimeConfig;
     };
 
 export type CloudAuthorityPorts = {
   getBootstrap: () => Promise<CloudChatBootstrap>;
-  /** Idempotent: always resolves the same chat for this account. */
-  createConversation: (expectedOwnerGeneration: string) => Promise<string>;
 };
 
 /**
  * Framework-free authority handshake used by the hook and focused tests.
  *
- * One read normally resolves everything; the chat is created (deterministic
- * and idempotent) only the first time an account opens it, so a clean install
- * discovers the existing chat instead of creating a new one.
+ * One read resolves everything. The server pins the account's main
+ * conversation (creating it for a new account), so a clean install and every
+ * other client open the same chat.
  */
 export const loadCloudConversationAuthority = async (
   identity: CloudConversationIdentity,
@@ -93,10 +91,7 @@ export const loadCloudConversationAuthority = async (
       false,
     );
   }
-  const conversationId = (
-    bootstrap.conversationId ??
-    (await ports.createConversation(ownerGeneration))
-  ).trim();
+  const conversationId = bootstrap.conversationId.trim();
   if (!conversationId) {
     throw new CloudAuthorityError(
       "Stella could not identify this cloud conversation.",

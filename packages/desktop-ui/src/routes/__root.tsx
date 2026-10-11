@@ -16,6 +16,7 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -32,8 +33,6 @@ import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import {
   acknowledgeCloudConversation,
   cloudConversationBelongsToOwnerSubject,
-  markCloudConversationCreated,
-  createCloudConversationDraft,
   resolveCloudConversationForShell,
   resolveCloudConversationRoute,
 } from "@/features/cloud/cloud-conversation-selection";
@@ -114,20 +113,6 @@ import { platformCapabilities } from "@/platform/capabilities";
 import { dismissLaunchSplash } from "@/shell/launch-splash";
 import { usePendingDiscoveryWelcome } from "@/global/onboarding/chat/pending-handoff";
 
-const CLOUD_CONVERSATION_CREATE_MAX_ATTEMPTS = 4;
-const CLOUD_CONVERSATION_CREATE_RETRY_BASE_MS = 1_000;
-
-export const getCloudConversationCreateRetryDelayMs = (attempt: number) =>
-  Math.min(
-    10_000,
-    CLOUD_CONVERSATION_CREATE_RETRY_BASE_MS * 2 ** Math.max(0, attempt - 1),
-  );
-
-const toCloudConversationCreateError = (error: unknown) =>
-  error instanceof Error && error.message.trim()
-    ? error.message
-    : "Stella couldn't create your cloud conversation.";
-
 function CloudStartupFailure({
   message,
   onRetry,
@@ -180,6 +165,7 @@ function RootLayout() {
     accountScope,
     ownerSubject,
     retryAuthBootstrap,
+    refreshMainConversation,
   } = cloudSession;
   const matchRoute = useMatchRoute();
   const isOnChatRoute = Boolean(matchRoute({ to: "/chat" }));
@@ -229,8 +215,6 @@ function RootLayout() {
     router,
     privateSelectionAttempt,
   ]);
-  const activeRouteIntentRef = useRef(routeIntent);
-  activeRouteIntentRef.current = routeIntent;
   // Conversation selection reads the owner's recent conversations as a live
   // backend view, with exact lookups for the routed and last-open ids.
   const {
@@ -238,35 +222,20 @@ function RootLayout() {
     isLoading: isAuthLoading,
     cloudConversations,
     scopedCloudConversations,
-    ownerGeneration,
-    cachedCloudConversationId,
+    mainCloudConversationId,
     routeIsListedOrPendingCloudConversation,
     exactCloudConversation,
-    cachedConversationIsListed,
-    exactCachedCloudConversation,
+    mainConversationIsListed,
+    exactMainCloudConversation,
   } = useShellConversationSource({
     session: cloudSession,
     isPrivate,
     routeConversationId: routerConversationId,
   });
-  const cloudCreateRequestRef = useRef<{
+  const refreshedMainConversationRef = useRef<string | null>(null);
+  const [mainConversationFailure, setMainConversationFailure] = useState<{
     accountScope: string;
-    routeIntent: string;
-    ownerGeneration: string;
-    clientCreateId: string;
-    attempt: number;
-    inFlight: boolean;
-  } | null>(null);
-  const activeAccountScopeRef = useRef(accountScope);
-  activeAccountScopeRef.current = accountScope;
-  const activeOwnerGenerationRef = useRef(ownerGeneration);
-  activeOwnerGenerationRef.current = ownerGeneration;
-  const cloudCreateRetryTimerRef = useRef<number | null>(null);
-  const [cloudCreateRetrySignal, setCloudCreateRetrySignal] = useState(0);
-  const [cloudCreateFailure, setCloudCreateFailure] = useState<{
-    accountScope: string;
-    routeIntent: string;
-    message: string;
+    conversationId: string;
   } | null>(null);
 
   const routeOwnershipIsLoading = Boolean(
@@ -275,12 +244,12 @@ function RootLayout() {
       !routeIsListedOrPendingCloudConversation &&
       exactCloudConversation === undefined,
   );
-  const cachedOwnershipIsLoading = Boolean(
+  const mainOwnershipIsLoading = Boolean(
     isCloudConversationReady &&
-      cachedCloudConversationId &&
-      cachedCloudConversationId !== routerConversationId &&
-      !cachedConversationIsListed &&
-      exactCachedCloudConversation === undefined,
+      mainCloudConversationId &&
+      mainCloudConversationId !== routerConversationId &&
+      !mainConversationIsListed &&
+      exactMainCloudConversation === undefined,
   );
   const routeIsOwnedCloudConversation =
     routeIsListedOrPendingCloudConversation ||
@@ -294,24 +263,31 @@ function RootLayout() {
     cloudConversationBelongsToOwnerSubject(exactCloudConversation, ownerSubject)
       ? exactCloudConversation
       : null;
-  const scopedExactCachedCloudConversation =
-    exactCachedCloudConversation &&
+  const scopedExactMainCloudConversation =
+    exactMainCloudConversation &&
     cloudConversationBelongsToOwnerSubject(
-      exactCachedCloudConversation,
+      exactMainCloudConversation,
       ownerSubject,
     )
-      ? exactCachedCloudConversation
+      ? exactMainCloudConversation
       : null;
-  const ownedCloudConversationCandidates = [
-    ...(scopedExactCloudConversation ? [scopedExactCloudConversation] : []),
-    ...(scopedExactCachedCloudConversation
-      ? [scopedExactCachedCloudConversation]
-      : []),
-    ...scopedCloudConversations,
-  ];
+  const ownedCloudConversationCandidates = useMemo(
+    () => [
+      ...(scopedExactCloudConversation ? [scopedExactCloudConversation] : []),
+      ...(scopedExactMainCloudConversation
+        ? [scopedExactMainCloudConversation]
+        : []),
+      ...scopedCloudConversations,
+    ],
+    [
+      scopedCloudConversations,
+      scopedExactCloudConversation,
+      scopedExactMainCloudConversation,
+    ],
+  );
   const shellConversationSelectionIsLoading =
     cloudConversations === undefined ||
-    (isOnChatRoute ? routeOwnershipIsLoading : cachedOwnershipIsLoading);
+    (isOnChatRoute ? routeOwnershipIsLoading : mainOwnershipIsLoading);
   const conversationId = isPrivate
     ? privateSelection?.intent === routeIntent
       ? privateSelection.id
@@ -323,7 +299,7 @@ function RootLayout() {
           isOnChatRoute,
           conversations: ownedCloudConversationCandidates,
           routeConversationId: routerConversationId,
-          cachedConversationId: cachedCloudConversationId,
+          mainConversationId: mainCloudConversationId,
           accountScope,
           ownerSubject,
         })
@@ -332,19 +308,6 @@ function RootLayout() {
   // selected conversation, then lands as Stella's opening message.
   usePendingDiscoveryWelcome(conversationId);
 
-  const clearCloudCreateRetryTimer = useCallback(() => {
-    if (cloudCreateRetryTimerRef.current === null) return;
-    window.clearTimeout(cloudCreateRetryTimerRef.current);
-    cloudCreateRetryTimerRef.current = null;
-  }, []);
-
-  useEffect(
-    () => () => {
-      clearCloudCreateRetryTimer();
-    },
-    [clearCloudCreateRetryTimer],
-  );
-
   const settledAccountScope = cloudSession.sessionGate.sessionIsLoading
     ? null
     : accountScope;
@@ -352,9 +315,8 @@ function RootLayout() {
   // Electron UiState hydration can reintroduce an unvalidated UUID. Tabs are
   // loaded from the same immutable account scope as one atomic snapshot.
   useLayoutEffect(() => {
-    clearCloudCreateRetryTimer();
-    cloudCreateRequestRef.current = null;
-    setCloudCreateFailure(null);
+    refreshedMainConversationRef.current = null;
+    setMainConversationFailure(null);
     if (settledAccountScope !== null) {
       retireCloudConversationClientAuthority(settledAccountScope);
       retireCloudExecutionClientAuthority(settledAccountScope);
@@ -368,7 +330,6 @@ function RootLayout() {
     accountScope,
     settledAccountScope,
     isPrivate,
-    clearCloudCreateRetryTimer,
     isCloudConversationReady,
     setConversationId,
   ]);
@@ -382,55 +343,33 @@ function RootLayout() {
     }
   }, [conversationId, setConversationId, state.conversationId]);
 
-  const retryCloudConversationCreate = useCallback(() => {
-    clearCloudCreateRetryTimer();
-    const current = cloudCreateRequestRef.current;
-    if (
-      current?.accountScope === accountScope &&
-      current.routeIntent === routeIntent
-    ) {
-      current.attempt = 0;
-      current.inFlight = false;
-    }
-    setCloudCreateFailure(null);
-    setCloudCreateRetrySignal((signal) => signal + 1);
-  }, [accountScope, clearCloudCreateRetryTimer, routeIntent]);
+  const retryMainConversation = useCallback(() => {
+    refreshedMainConversationRef.current = null;
+    setMainConversationFailure(null);
+    refreshMainConversation();
+  }, [refreshMainConversation]);
 
+  // Without a routed conversation the owner has, the chat route opens the
+  // account's main conversation. A main that is gone (deleted elsewhere) is
+  // asked for once more; the backend re-pins a live one.
   useEffect(() => {
-    const priorRequest = cloudCreateRequestRef.current;
-    if (priorRequest && priorRequest.routeIntent !== routeIntent) {
-      clearCloudCreateRetryTimer();
-      priorRequest.inFlight = false;
-      cloudCreateRequestRef.current = null;
-      setCloudCreateFailure(null);
-    }
     if (isAuthLoading || !isOnChatRoute || !isCloudConversationReady) return;
     if (cloudConversations === undefined || routeOwnershipIsLoading) return;
     for (const item of scopedCloudConversations) {
-      acknowledgeCloudConversation(item.conversationId, accountScope);
+      acknowledgeCloudConversation(item.conversationId);
     }
-
-    if (routeIsOwnedCloudConversation && routerConversationId) {
-      clearCloudCreateRetryTimer();
-      cloudCreateRequestRef.current = null;
-      setCloudCreateFailure(null);
-      return;
-    }
-
-    if (cachedOwnershipIsLoading) return;
+    if (routeIsOwnedCloudConversation && routerConversationId) return;
+    if (mainOwnershipIsLoading || !mainCloudConversationId) return;
     const fallbackConversationId = resolveCloudConversationRoute({
-      conversations: scopedExactCachedCloudConversation
-        ? [scopedExactCachedCloudConversation, ...scopedCloudConversations]
-        : scopedCloudConversations,
+      conversations: ownedCloudConversationCandidates,
       routeConversationId: routerConversationId,
-      cachedConversationId: cachedCloudConversationId,
+      mainConversationId: mainCloudConversationId,
       accountScope,
       ownerSubject,
     });
     if (fallbackConversationId) {
-      clearCloudCreateRetryTimer();
-      cloudCreateRequestRef.current = null;
-      setCloudCreateFailure(null);
+      refreshedMainConversationRef.current = null;
+      setMainConversationFailure(null);
       void router.navigate({
         to: "/chat",
         search: { c: fallbackConversationId },
@@ -438,111 +377,31 @@ function RootLayout() {
       });
       return;
     }
-    if (!ownerGeneration) return;
-
-    let request = cloudCreateRequestRef.current;
-    if (
-      request?.accountScope !== accountScope ||
-      request.routeIntent !== routeIntent ||
-      request.ownerGeneration !== ownerGeneration
-    ) {
-      request = {
+    if (refreshedMainConversationRef.current === mainCloudConversationId) {
+      setMainConversationFailure({
         accountScope,
-        routeIntent,
-        ownerGeneration,
-        clientCreateId: crypto.randomUUID(),
-        attempt: 0,
-        inFlight: false,
-      };
-      cloudCreateRequestRef.current = request;
-    }
-    if (
-      request.inFlight ||
-      request.attempt >= CLOUD_CONVERSATION_CREATE_MAX_ATTEMPTS
-    ) {
+        conversationId: mainCloudConversationId,
+      });
       return;
     }
-    request.inFlight = true;
-    request.attempt += 1;
-    const { attempt, clientCreateId } = request;
-    // Conversation ids are minted on the client; the create id doubles as
-    // the conversation id so the route, the socket and the first turn all
-    // agree before the backend has projected the row.
-    void Promise.resolve({
-      conversationId: createCloudConversationDraft(
-        accountScope,
-        clientCreateId,
-      ),
-    })
-      .then((created) => {
-        const current = cloudCreateRequestRef.current;
-        if (
-          activeAccountScopeRef.current !== accountScope ||
-          activeOwnerGenerationRef.current !== request.ownerGeneration ||
-          activeRouteIntentRef.current !== routeIntent ||
-          current?.accountScope !== accountScope ||
-          current.routeIntent !== routeIntent ||
-          current.clientCreateId !== clientCreateId
-        ) {
-          return;
-        }
-        clearCloudCreateRetryTimer();
-        current.inFlight = false;
-        cloudCreateRequestRef.current = null;
-        setCloudCreateFailure(null);
-        markCloudConversationCreated(created.conversationId, accountScope);
-        return router.navigate({
-          to: "/chat",
-          search: { c: created.conversationId },
-          replace: true,
-        });
-      })
-      .catch((error: unknown) => {
-        const current = cloudCreateRequestRef.current;
-        if (
-          activeAccountScopeRef.current !== accountScope ||
-          activeOwnerGenerationRef.current !== request.ownerGeneration ||
-          activeRouteIntentRef.current !== routeIntent ||
-          current?.accountScope !== accountScope ||
-          current.routeIntent !== routeIntent ||
-          current.clientCreateId !== clientCreateId
-        ) {
-          return;
-        }
-        current.inFlight = false;
-        if (attempt >= CLOUD_CONVERSATION_CREATE_MAX_ATTEMPTS) {
-          setCloudCreateFailure({
-            accountScope,
-            routeIntent,
-            message: toCloudConversationCreateError(error),
-          });
-          return;
-        }
-        clearCloudCreateRetryTimer();
-        cloudCreateRetryTimerRef.current = window.setTimeout(() => {
-          cloudCreateRetryTimerRef.current = null;
-          setCloudCreateRetrySignal((signal) => signal + 1);
-        }, getCloudConversationCreateRetryDelayMs(attempt));
-      });
+    refreshedMainConversationRef.current = mainCloudConversationId;
+    refreshMainConversation();
   }, [
     accountScope,
-    cachedCloudConversationId,
-    cachedOwnershipIsLoading,
-    clearCloudCreateRetryTimer,
     cloudConversations,
-    cloudCreateRetrySignal,
-    ownerGeneration,
-    ownerSubject,
-    isCloudConversationReady,
-    routeIntent,
-    scopedCloudConversations,
-    scopedExactCachedCloudConversation,
     isAuthLoading,
+    isCloudConversationReady,
     isOnChatRoute,
+    mainCloudConversationId,
+    mainOwnershipIsLoading,
+    ownedCloudConversationCandidates,
+    ownerSubject,
+    refreshMainConversation,
     routeIsOwnedCloudConversation,
     routeOwnershipIsLoading,
     router,
     routerConversationId,
+    scopedCloudConversations,
   ]);
 
   useEffect(() => {
@@ -553,11 +412,11 @@ function RootLayout() {
   useLastLocationRestore(router);
   usePersistLastLocation(router);
 
-  const showsCloudCreateFailure = Boolean(
+  const showsMainConversationFailure = Boolean(
     isOnChatRoute &&
       !conversationId &&
-      cloudCreateFailure?.accountScope === accountScope &&
-      cloudCreateFailure.routeIntent === routeIntent,
+      mainConversationFailure?.accountScope === accountScope &&
+      mainConversationFailure.conversationId === mainCloudConversationId,
   );
   // The shell is "live" once the user can act on it: a selected conversation
   // on the chat route, or cloud readiness anywhere else. The launch splash is
@@ -569,7 +428,7 @@ function RootLayout() {
   const shouldDismissLaunchSplash =
     shellIsLive ||
     Boolean(authBootstrapError) ||
-    showsCloudCreateFailure ||
+    showsMainConversationFailure ||
     authBootstrapStatus === "reauth_required";
   useEffect(() => {
     if (shouldDismissLaunchSplash) dismissLaunchSplash();
@@ -593,11 +452,11 @@ function RootLayout() {
     );
   }
 
-  if (showsCloudCreateFailure && cloudCreateFailure) {
+  if (showsMainConversationFailure) {
     return (
       <CloudStartupFailure
-        message={cloudCreateFailure.message}
-        onRetry={retryCloudConversationCreate}
+        message="Stella couldn't open your conversation."
+        onRetry={retryMainConversation}
       />
     );
   }

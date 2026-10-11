@@ -41,12 +41,16 @@ export type ConversationCalls = {
     result: ConversationSummary;
   };
   /**
-   * The conversation already created under `clientCreateId`, if any, plus the
-   * owner identity: everything a client needs before showing its chat.
+   * The account's main conversation plus the owner identity: everything a
+   * client needs before showing its chat. Every client opens the same main
+   * conversation. The server pins it the first time any client asks: the
+   * `preferConversationId` hint when it is a live conversation, else the most
+   * recently used one, else a new empty one. Deleting it re-pins on the next
+   * call. Older phone builds still send `clientCreateId`; it is ignored.
    */
   "conversations.bootstrap": {
-    args: { clientCreateId: string };
-    result: OwnerIdentity & { conversationId: string | null };
+    args: { clientCreateId?: string; preferConversationId?: string };
+    result: OwnerIdentity & { conversationId: string };
   };
   /** Sidebar history, newest first; pass the last row back as the cursor. */
   "conversations.page": {

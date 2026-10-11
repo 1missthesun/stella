@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import {
   automaticExecutionResultText,
   automaticExecutionCancellationCommand,
-  automaticExecutionConversationClientCreateId,
   bindAutomaticExecutionAdmission,
   buildAutomaticExecutionAdmission,
   isAutomaticExecutionPairCredentialRejection,
@@ -354,15 +353,5 @@ describe("automatic mobile execution admission", () => {
         subject: "computer",
       }).body.subject,
     ).toBe("computer");
-  });
-
-  test("reuses one canonical conversation bootstrap identity across restarts", () => {
-    const first = automaticExecutionConversationClientCreateId("cloud");
-    const restarted = automaticExecutionConversationClientCreateId("cloud");
-    expect(first).toBe("mobile-placement:cloud");
-    expect(restarted).toBe(first);
-    expect(
-      automaticExecutionConversationClientCreateId("carplay computer"),
-    ).toBe("mobile-placement:carplay-computer");
   });
 });

@@ -215,13 +215,6 @@ export const isAutomaticExecutionPairCredentialRejection = (error: unknown) => {
   );
 };
 
-export const automaticExecutionConversationClientCreateId = (
-  threadId: string,
-): string => {
-  const normalized = threadId.trim().replace(/[^A-Za-z0-9._:-]/g, "-");
-  return `mobile-placement:${normalized}`.slice(0, 128);
-};
-
 const TERMINAL_EXECUTION_STATES = new Set([
   "completed",
   "failed",

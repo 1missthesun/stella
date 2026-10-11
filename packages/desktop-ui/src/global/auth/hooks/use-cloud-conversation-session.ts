@@ -1,6 +1,10 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { setBackendAccount } from "@/platform/backend/backend-client";
-import { useOwnerIdentity } from "@/platform/backend/use-owner-identity";
+import {
+  refreshOwnerIdentity,
+  useOwnerIdentity,
+} from "@/platform/backend/use-owner-identity";
+import { readActiveCloudConversationIdCache } from "@/features/cloud/cloud-conversation-cache";
 import { useAuthBootstrapState, useAuthState } from "../BackendAuthProvider";
 import {
   resolveCloudConversationSession,
@@ -17,9 +21,10 @@ import { reportCloudReadiness } from "@/features/cloud/cloud-readiness-timing";
  * anonymous auth or token exchange is incomplete, conversation selection
  * remains in a loading state.
  *
- * The identity proof is the backend's own answer: `owner.identity` returns
- * the owner it verified from the current token, and selection waits until
- * that is the account the renderer expects.
+ * The identity proof is the backend's own answer: `conversations.bootstrap`
+ * returns the owner it verified from the current token, and selection waits
+ * until that is the account the renderer expects. The same answer names the
+ * account's main conversation, the chat every client opens.
  */
 export function useCloudConversationSession() {
   const auth = useAuthState();
@@ -42,7 +47,13 @@ export function useCloudConversationSession() {
   useEffect(() => {
     if (!session.isLoading) setBackendAccount(accountKey);
   }, [accountKey, session.isLoading]);
-  const { identity } = useOwnerIdentity(accountKey);
+  const { identity } = useOwnerIdentity(
+    accountKey,
+    accountKey ? readActiveCloudConversationIdCache(session.cacheScope) : null,
+  );
+  const refreshMainConversation = useCallback(() => {
+    if (accountKey) refreshOwnerIdentity(accountKey);
+  }, [accountKey]);
   const identityConfirmed = Boolean(
     identity && ownerSubject && identity.ownerId === ownerSubject,
   );
@@ -95,6 +106,10 @@ export function useCloudConversationSession() {
     ownerSubject,
     /** The verified owner's generation, once the identity is confirmed. */
     ownerGeneration: identityConfirmed ? (identity?.ownerGeneration ?? null) : null,
+    /** The account's main conversation, once the identity is confirmed. */
+    mainConversationId: identityConfirmed ? (identity?.conversationId ?? null) : null,
+    /** Re-resolve the main conversation, e.g. after it was deleted. */
+    refreshMainConversation,
     identityRevision: session.identityRevision,
     error: authBootstrap.error,
     authBootstrapStatus: authBootstrap.status,

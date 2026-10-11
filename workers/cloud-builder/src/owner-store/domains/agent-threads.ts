@@ -57,6 +57,7 @@ import {
   CONVERSATION_AGENT_THREADS_MAX,
 } from "@stella/contracts/backend/agent-threads";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
+import { readMainConversationId } from "./conversations.js";
 import { agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
@@ -1306,15 +1307,13 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
   const destination = targetDeviceId
     ? await assertDeviceDestination(ctx, targetDeviceId, args.originDeviceId)
     : { waiting: false };
-  const conversation = args.conversationId
+  const lookupConversationId = args.conversationId ?? readMainConversationId(ctx.db);
+  const conversation = lookupConversationId
     ? ctx.db.one<{ conversation_id: string; execution_json: string | null }>(
         "SELECT conversation_id, execution_json FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
-        args.conversationId,
+        lookupConversationId,
       )
-    : ctx.db.one<{ conversation_id: string; execution_json: string | null }>(
-        `SELECT conversation_id, execution_json FROM conversations WHERE deleted_at IS NULL
-          ORDER BY updated_at DESC, conversation_id DESC LIMIT 1`,
-      );
+    : null;
   if (args.conversationId && !conversation) {
     throw new RpcError("NOT_FOUND", "Conversation not found.", { reason: "conversation_not_found" });
   }

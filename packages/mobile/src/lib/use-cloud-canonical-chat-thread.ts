@@ -59,9 +59,7 @@ import { getBackendClient } from "./backend";
 import { env } from "../config/env";
 import {
   AUTOMATIC_EXECUTION_TARGET,
-  automaticExecutionConversationClientCreateId,
   cancelAutomaticExecution,
-  createAutomaticExecutionConversation,
   getAutomaticExecutionStatus,
   type AutomaticExecutionTarget,
 } from "./execution-placement";
@@ -135,18 +133,13 @@ export type CloudAuthorityHookState =
       retry: () => void;
     };
 
-const CHAT_THREAD_ID = "cloud";
-const CHAT_TITLE = "Chat";
-
 /**
  * The backend verifies the token and answers for the owner it belongs to;
  * the authority check compares that owner with the one this session expects.
  * The conversation socket lives on the same backend origin.
  */
 const readChatBootstrap = async (): Promise<CloudChatBootstrap> => {
-  const bootstrap = await getBackendClient().call("conversations.bootstrap", {
-    clientCreateId: automaticExecutionConversationClientCreateId(CHAT_THREAD_ID),
-  });
+  const bootstrap = await getBackendClient().call("conversations.bootstrap", {});
   return {
     status: "ready",
     ownerId: bootstrap.ownerId,
@@ -169,12 +162,6 @@ const resolveMobileCloudConversationAuthority = async (
   const ownerSubject = tokenOwner.subject;
   return loadCloudConversationAuthority(identity, ownerSubject, {
     getBootstrap: () => readChatBootstrap(),
-    createConversation: (expectedOwnerGeneration) =>
-      createAutomaticExecutionConversation({
-        threadId: CHAT_THREAD_ID,
-        title: CHAT_TITLE,
-        expectedOwnerGeneration,
-      }),
   });
 };
 

@@ -1,10 +1,5 @@
 import { describe, expect, test } from "bun:test";
 import {
-  CloudAuthorityError,
-  loadCloudConversationAuthority,
-  type CloudChatBootstrap,
-} from "../cloud-conversation-authority";
-import {
   encodeCloudConversationCacheMetadata,
   readCloudConversationCache,
   rebuildCloudConversationCache,
@@ -18,23 +13,6 @@ const identity = {
   identityKey: "account:user-1:session:session-1",
   revision: 4,
 };
-
-const OWNER_ID = "https://issuer|user-1";
-
-const readyBootstrap = (
-  overrides: Partial<Extract<CloudChatBootstrap, { status: "ready" }>> = {},
-): CloudChatBootstrap => ({
-  status: "ready",
-  ownerId: OWNER_ID,
-  ownerGeneration: "owner-generation-1",
-  conversationId: "conversation-stable",
-  realtime: {
-    httpOrigin: "https://builder.example",
-    socketOrigin: "wss://builder.example/",
-    protocol: 1,
-  },
-  ...overrides,
-});
 
 const metadata: CloudConversationCacheMetadata = {
   version: 1,
@@ -64,126 +42,6 @@ const remoteMessages: ChatMessage[] = [
 ];
 
 describe("mobile cloud canonical hydration", () => {
-  test("a clean client creates the one chat once, from the bootstrap generation", async () => {
-    const calls: string[] = [];
-    const authority = await loadCloudConversationAuthority(
-      identity,
-      OWNER_ID,
-      {
-        getBootstrap: async () => {
-          calls.push("bootstrap");
-          return readyBootstrap({ conversationId: null });
-        },
-        createConversation: async (generation) => {
-          calls.push(`create:${generation}`);
-          return "conversation-stable";
-        },
-      },
-    );
-
-    expect(authority).toEqual({
-      identityKey: identity.identityKey,
-      accountScope: identity.accountScope,
-      ownerGeneration: "owner-generation-1",
-      conversationId: "conversation-stable",
-      socketOrigin: "wss://builder.example",
-    });
-    expect(calls).toEqual(["bootstrap", "create:owner-generation-1"]);
-  });
-
-  // Ratchet: the handshake holds the native splash, so every serial round
-  // trip is launch latency. It was four (confirm → ensure → config →
-  // generation, with ensure itself a read plus a write); an account whose
-  // chat exists now pays one read, and only its first launch adds the create.
-  test("the handshake costs one round trip once the chat exists", async () => {
-    let creates = 0;
-    const authority = await loadCloudConversationAuthority(
-      identity,
-      OWNER_ID,
-      {
-        getBootstrap: async () => readyBootstrap(),
-        createConversation: async () => {
-          creates += 1;
-          return "never";
-        },
-      },
-    );
-    expect(authority.conversationId).toBe("conversation-stable");
-    expect(creates).toBe(0);
-  });
-
-  test("an unconfirmed or different owner never creates a chat", async () => {
-    for (const bootstrap of [
-      { status: "identity_pending" } as const,
-      readyBootstrap({ ownerId: "https://issuer|someone-else", conversationId: null }),
-    ]) {
-      let creates = 0;
-      await expect(
-        loadCloudConversationAuthority(identity, OWNER_ID, {
-          getBootstrap: async () => bootstrap,
-          createConversation: async () => {
-            creates += 1;
-            return "conversation-stable";
-          },
-        }),
-      ).rejects.toThrow(
-        "Stella is still securing this account. Try again in a moment.",
-      );
-      expect(creates).toBe(0);
-    }
-  });
-
-  test("cache deletion rebuilds the same projection without a new identity", async () => {
-    let localMessages: ChatMessage[] = [];
-    let localMetadata: CloudConversationCacheMetadata | null = null;
-    let serverConversationId: string | null = null;
-    let createCalls = 0;
-    const load = () =>
-      loadCloudConversationAuthority(identity, OWNER_ID, {
-        getBootstrap: async () =>
-          readyBootstrap({ conversationId: serverConversationId }),
-        createConversation: async () => {
-          createCalls += 1;
-          // conversations.create is idempotent on mobile-placement:cloud.
-          serverConversationId = "conversation-stable";
-          return serverConversationId;
-        },
-      });
-    const rebuild = async () =>
-      rebuildCloudConversationCache({
-        metadata,
-        messages: remoteMessages,
-        port: {
-          clearMetadata: async () => {
-            localMetadata = null;
-          },
-          synchronizeMessages: async (messages) => {
-            localMessages = messages.map((message) => ({ ...message }));
-          },
-          saveMetadata: async (next) => {
-            localMetadata = { ...next };
-          },
-        },
-      });
-
-    expect((await load()).conversationId).toBe("conversation-stable");
-    await rebuild();
-    expect(localMessages).toEqual(remoteMessages);
-    expect(localMetadata).toEqual(metadata);
-
-    // Simulate an uninstall/cache loss while server conversation identity
-    // survives, then cold-hydrate and rebuild from the DO again.
-    localMessages = [];
-    localMetadata = null;
-    expect((await load()).conversationId).toBe("conversation-stable");
-    await rebuild();
-
-    // The reinstall discovers the surviving chat instead of creating it.
-    expect(createCalls).toBe(1);
-    expect(localMessages).toEqual(remoteMessages);
-    expect(localMetadata).toEqual(metadata);
-  });
-
   test("metadata commits last and stale rebuilds cannot publish authority", async () => {
     const calls: string[] = [];
     let current = true;
@@ -249,44 +107,6 @@ describe("mobile cloud canonical hydration", () => {
       localMessages.some((message) => message.id === "local-optimistic"),
     ).toBe(false);
     expect(localMetadata).toEqual(metadata);
-  });
-
-  test("identity and deployment failures are explicit", async () => {
-    let unconfirmed: unknown = null;
-    try {
-      await loadCloudConversationAuthority(identity, OWNER_ID, {
-        getBootstrap: async () => ({ status: "identity_pending" }),
-        createConversation: async () => "never",
-      });
-    } catch (error) {
-      unconfirmed = error;
-    }
-    expect(unconfirmed).toBeInstanceOf(CloudAuthorityError);
-    expect(unconfirmed).toMatchObject({ retryable: true });
-
-    let missingConfig: unknown = null;
-    let creates = 0;
-    try {
-      await loadCloudConversationAuthority(identity, OWNER_ID, {
-        getBootstrap: async () =>
-          readyBootstrap({
-            conversationId: null,
-            realtime: { httpOrigin: null, socketOrigin: null, protocol: 1 },
-          }),
-        createConversation: async () => {
-          creates += 1;
-          return "conversation-stable";
-        },
-      });
-    } catch (error) {
-      missingConfig = error;
-    }
-    expect(missingConfig).toMatchObject({
-      retryable: false,
-      message:
-        "Cloud conversation history is not available on this deployment.",
-    });
-    expect(creates).toBe(0);
   });
 });
 

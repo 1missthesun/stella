@@ -1,4 +1,8 @@
 /**
+ * Which cloud conversation the shell shows. The account's main conversation
+ * comes from the backend (`conversations.bootstrap`), so every client opens
+ * the same chat; a routed conversation the owner has stays open.
+ *
  * Conversations created by this renderer may be routed to before the live
  * `conversations.recent` view has delivered its next value. Keep that
  * short handoff explicit so route validation cannot mistake a just-created
@@ -6,36 +10,6 @@
  */
 
 import type { CloudConversation } from "./cloud-api";
-import { uiState } from "@/platform/ui-state";
-
-const draftKey = (scope: string) => `stella:cloud-chat-drafts:${scope}`;
-const readDrafts = (scope: string): string[] => {
-  try {
-    const value: unknown = JSON.parse(uiState.getItem(draftKey(scope)) ?? "[]");
-    return Array.isArray(value)
-      ? value.filter((id): id is string => typeof id === "string")
-      : [];
-  } catch {
-    return [];
-  }
-};
-
-/** Reserve a route locally; the first accepted turn creates the cloud row. */
-export const createCloudConversationDraft = (
-  accountScope: string,
-  conversationId: string = crypto.randomUUID(),
-): string => {
-  uiState.setItem(
-    draftKey(accountScope),
-    JSON.stringify(
-      [
-        ...readDrafts(accountScope).filter((id) => id !== conversationId),
-        conversationId,
-      ].slice(-100),
-    ),
-  );
-  return conversationId;
-};
 
 const PENDING_CREATE_TTL_MS = 30_000;
 type PendingCreatedConversation = {
@@ -84,18 +58,7 @@ export const markCloudConversationCreated = (
   });
 };
 
-export const acknowledgeCloudConversation = (
-  conversationId: string,
-  accountScope?: string,
-): void => {
-  if (accountScope) {
-    const drafts = readDrafts(accountScope);
-    if (drafts.includes(conversationId))
-      uiState.setItem(
-        draftKey(accountScope),
-        JSON.stringify(drafts.filter((id) => id !== conversationId)),
-      );
-  }
+export const acknowledgeCloudConversation = (conversationId: string): void => {
   pendingCreatedConversations.delete(conversationId);
 };
 
@@ -111,9 +74,8 @@ export const isPendingCloudConversation = (
 ): boolean => {
   prune();
   return (
-    readDrafts(accountScope).includes(conversationId) ||
     pendingCreatedConversations.get(conversationId)?.accountScope ===
-      accountScope
+    accountScope
   );
 };
 
@@ -134,65 +96,48 @@ export const isOwnedCloudConversation = (
   );
 
 /**
- * Route selection is deterministic and never follows list reordering while
- * the current route still belongs to the owner.
+ * Route selection is deterministic and never follows list reordering: the
+ * routed conversation while the owner has it, else the main conversation.
  */
 export const resolveCloudConversationRoute = (args: {
   conversations: readonly CloudConversation[];
   routeConversationId: string | null;
-  cachedConversationId: string | null;
+  mainConversationId: string | null;
   accountScope: string;
   ownerSubject: string | null;
 }): string | null => {
-  if (
-    isOwnedCloudConversation(
-      args.conversations,
-      args.routeConversationId,
-      args.accountScope,
-      args.ownerSubject,
-    )
-  ) {
-    return args.routeConversationId;
+  for (const candidate of [args.routeConversationId, args.mainConversationId]) {
+    if (
+      isOwnedCloudConversation(
+        args.conversations,
+        candidate,
+        args.accountScope,
+        args.ownerSubject,
+      )
+    ) {
+      return candidate;
+    }
   }
-  const cached = isOwnedCloudConversation(
-    args.conversations,
-    args.cachedConversationId,
-    args.accountScope,
-    args.ownerSubject,
-  )
-    ? args.cachedConversationId
-    : null;
-  return cached ?? args.conversations[0]?.conversationId ?? null;
+  return null;
 };
 
 /**
- * The URL owns selection while the chat route is visible. Elsewhere the
- * account-scoped cache (or newest owned conversation) keeps the persistent
- * workspace Chat panel attached without manufacturing a chat-route redirect.
+ * The URL owns selection while the chat route is visible. Elsewhere the main
+ * conversation keeps the persistent workspace Chat panel attached without
+ * manufacturing a chat-route redirect.
  */
 export const resolveCloudConversationForShell = (args: {
   isOnChatRoute: boolean;
   conversations: readonly CloudConversation[];
   routeConversationId: string | null;
-  cachedConversationId: string | null;
+  mainConversationId: string | null;
   accountScope: string;
   ownerSubject: string | null;
-}): string | null => {
-  if (args.isOnChatRoute) {
-    return isOwnedCloudConversation(
-      args.conversations,
-      args.routeConversationId,
-      args.accountScope,
-      args.ownerSubject,
-    )
-      ? args.routeConversationId
-      : null;
-  }
-  return resolveCloudConversationRoute({
+}): string | null =>
+  resolveCloudConversationRoute({
     conversations: args.conversations,
-    routeConversationId: null,
-    cachedConversationId: args.cachedConversationId,
+    routeConversationId: args.isOnChatRoute ? args.routeConversationId : null,
+    mainConversationId: args.isOnChatRoute ? null : args.mainConversationId,
     accountScope: args.accountScope,
     ownerSubject: args.ownerSubject,
   });
-};

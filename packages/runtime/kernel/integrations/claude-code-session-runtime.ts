@@ -1,4 +1,9 @@
 import { spawn } from "child_process";
+import {
+  claudeUsageLimitOf,
+  formatClaudeUsageLimitReset,
+  type ClaudeUsageLimit,
+} from "./claude-code-usage-limit.js";
 import type { ChildProcess, ChildProcessByStdio } from "child_process";
 import type { Readable, Writable } from "stream";
 import { StringDecoder } from "node:string_decoder";
@@ -57,10 +62,12 @@ type ClaudeToolUseTruncation = {
   category?: string;
   explanation?: string;
 };
-type ClaudeCodeStatusChange = {
-  state: "running" | "compacting" | "model-fallback";
-  text: string;
-};
+type ClaudeCodeStatusChange =
+  | { state: "running" | "compacting" | "model-fallback"; text: string }
+  /** The turn is held until the Claude usage limit resets (`until`, when the CLI named it). */
+  | { state: "usage-limit"; text: string; until?: number }
+  /** The hold ended: the turn resumed, or it was stopped while held. */
+  | { state: "usage-limit-end"; text: string; resumed: boolean };
 type ClaudeCodeImage = { mimeType: string; data: string };
 type ClaudeCodeUsage = {
   inputTokens: number | undefined;
@@ -111,6 +118,11 @@ export type ClaudeCodeTurnRequest = {
   autoCompactWindowTokens?: number;
   autoCompactTriggerPct?: number;
   abortSignal?: AbortSignal;
+  /**
+   * On a Claude usage limit, hold the turn until the limit resets and then
+   * carry on, rather than failing it. Off, the limit fails the turn at once.
+   */
+  holdOnUsageLimit?: boolean;
   executeTool(
     toolCallId: string,
     toolName: string,
@@ -453,22 +465,11 @@ export const checkClaudeCodeAuth = async () => {
 
 /**
  * A subscription limit (5-hour or weekly window) in a CLI result, with the
- * reset time when the CLI printed one (`...limit reached|<epoch seconds>`).
+ * reset time when the CLI printed one.
  */
 export const claudeCodeSubscriptionLimitOf = (
   error: unknown,
-): { resetsAt?: number } | null => {
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  if (
-    !/usage limit|limit reached|hit your (?:usage )?limit|out of (?:extra )?usage/i.test(
-      message,
-    )
-  ) {
-    return null;
-  }
-  const epoch = /\|(\d{10})\b/.exec(message)?.[1];
-  return epoch ? { resetsAt: Number(epoch) * 1000 } : {};
-};
+): ClaudeUsageLimit | null => claudeUsageLimitOf(error);
 /**
  * Anthropic rejected the credential the CLI was given. Distinct from a
  * subscription limit (a 429, checked first by the caller) and from CLI
@@ -565,29 +566,52 @@ const withClaudeLoginRejected = (error: unknown, email: string | undefined) => {
 };
 /**
  * The shared recovery budget ran out. Auth rejections and usage limits never
- * reach here (they are reported at once), so the CLI is the suspect.
+ * reach here (they are reported or held at once), so the CLI is the suspect.
  */
 const withStepRecoveryExhausted = (error: unknown) =>
   new Error(
-    `${normalizeErrorMessage(error)} Stella retried ${MAX_STEP_RECOVERIES_PER_TURN} time(s) but Claude Code kept ending the step without a usable result. Check the \`claude\` CLI health (\`claude --version\`, login status), then retry the request.`,
+    `${normalizeErrorMessage(error)} Stella retried ${MAX_STEP_RECOVERIES_PER_TURN} time(s) but Claude Code kept ending the step without a usable result. Try the request again; if it keeps failing, check that \`claude --version\` runs on this computer.`,
   );
+const describeClaudeUsageLimit = (limit: ClaudeUsageLimit) =>
+  typeof limit.resetsAt === "number" && Number.isFinite(limit.resetsAt)
+    ? `Claude usage limit reached. It resets at ${formatClaudeUsageLimitReset(limit.resetsAt)}.`
+    : "Claude usage limit reached for this account.";
 /**
  * A Claude subscription usage limit, named as such. Inform only: Stella never
  * switches accounts.
  */
-const withClaudeSubscriptionLimitReported = (limit: { resetsAt?: number }) => {
-  const resetsAt =
-    typeof limit.resetsAt === "number" && Number.isFinite(limit.resetsAt)
-      ? new Date(limit.resetsAt)
-      : null;
-  const failure: ClaudeCodeError = new Error(
-    resetsAt
-      ? `Claude usage limit reached. It resets at ${resetsAt.toLocaleString()}.`
-      : "Claude usage limit reached for this account.",
-  );
+const withClaudeSubscriptionLimitReported = (limit: ClaudeUsageLimit) => {
+  const failure: ClaudeCodeError = new Error(describeClaudeUsageLimit(limit));
   failure.code = "CLAUDE_CODE_USAGE_LIMIT";
   return failure;
 };
+/** How long a hold lasts when the CLI named no reset time: then it asks again. */
+const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60 * 1000;
+/** Margin past the named reset, so the first step after it is not refused again. */
+const USAGE_LIMIT_RESET_MARGIN_MS = 30 * 1000;
+const waitUntil = (until: number, signal: AbortSignal | undefined) =>
+  new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason ?? new Error("Stopped."));
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onAbort = () => {
+      if (timer) clearTimeout(timer);
+      reject(signal?.reason ?? new Error("Stopped."));
+    };
+    const tick = () => {
+      const remaining = until - Date.now();
+      if (remaining <= 0) {
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+        return;
+      }
+      timer = setTimeout(tick, Math.min(remaining, 60_000));
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+    tick();
+  });
 const buildClaudeCodeHookSettings = () => {
   const command = `"${process.execPath}" -e ""`;
   return JSON.stringify({
@@ -2053,11 +2077,23 @@ class ClaudeCodeSessionRuntime {
         const hasPossibleSideEffects = Boolean(
           recoverable && recoverable.mcpCalls.length > 0,
         );
-        // A usage limit or a rejected login: report it, never switch
-        // accounts or retry. Detection is the CLI's own wording.
+        // A usage limit or a rejected login: never switch accounts or retry
+        // into it. A limit holds the turn until it resets when the caller
+        // asked for that, and fails it otherwise. Detection is the CLI's
+        // own wording.
         const limit = claudeCodeSubscriptionLimitOf(error);
         if (limit) {
-          throw withClaudeSubscriptionLimitReported(limit);
+          if (!request.holdOnUsageLimit) {
+            throw withClaudeSubscriptionLimitReported(limit);
+          }
+          this.resetStreamingProcess(request.sessionKey, session);
+          await this.holdForUsageLimit(request, limit);
+          if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
+          if (failedAttemptMcpCalls.length > 0) {
+            currentPrompt = buildSideEffectReconciliationPrompt(failedAttemptMcpCalls);
+            currentPromptImages = [];
+          }
+          continue;
         }
         if (claudeCodeAuthFailureOf(error)) {
           throw withClaudeLoginRejected(error, session.claudeLoginEmail);
@@ -2096,6 +2132,43 @@ class ClaudeCodeSessionRuntime {
           : buildResultRetryPrompt();
         currentPromptImages = [];
       }
+    }
+  }
+  /**
+   * Hold a turn the Claude usage limit stopped until the limit resets: the
+   * host shows it as waiting, not failed, and the caller then resends the
+   * step. A stop while held ends the turn as stopped.
+   */
+  async holdForUsageLimit(
+    request: ClaudeCodeTurnRequest,
+    limit: ClaudeUsageLimit,
+  ) {
+    const named =
+      typeof limit.resetsAt === "number" && Number.isFinite(limit.resetsAt)
+        ? limit.resetsAt
+        : undefined;
+    const until =
+      named !== undefined
+        ? Math.max(Date.now(), named) + USAGE_LIMIT_RESET_MARGIN_MS
+        : Date.now() + USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS;
+    request.onStatusChange?.({
+      state: "usage-limit",
+      text:
+        named !== undefined
+          ? `${describeClaudeUsageLimit(limit)} Waiting until then to continue.`
+          : `${describeClaudeUsageLimit(limit)} Waiting for it to reset to continue.`,
+      ...(named !== undefined ? { until: named } : {}),
+    });
+    let resumed = false;
+    try {
+      await waitUntil(until, request.abortSignal);
+      resumed = true;
+    } finally {
+      request.onStatusChange?.({
+        state: "usage-limit-end",
+        text: resumed ? "Claude usage limit reset. Continuing." : "",
+        resumed,
+      });
     }
   }
   /**

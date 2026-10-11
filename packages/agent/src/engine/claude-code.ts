@@ -81,7 +81,10 @@ export type ClaudeCodeSessionRef = {
 
 export type ClaudeCodeToolSpec = { name: string; description: string; parameters: Record<string, unknown> };
 export type ClaudeCodeToolOutcome = { content: (TextContent | ImageContent)[]; isError?: boolean };
-export type ClaudeCodeStatus = { state: "running" | "compacting" | "model-fallback"; text: string };
+export type ClaudeCodeStatus =
+  | { state: "running" | "compacting" | "model-fallback"; text: string }
+  | { state: "usage-limit"; text: string; until?: number }
+  | { state: "usage-limit-end"; text: string; resumed: boolean };
 
 export type ClaudeCodeTurnSpec = {
   session: ClaudeCodeSessionRef;

@@ -11,6 +11,10 @@ import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activit
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
 import { showToast } from "@/ui/toast";
 import {
+  dismissComposerNotice,
+  presentComposerNotice,
+} from "@/features/chat/composer-notice-store";
+import {
   emptyPiChat,
   reducePiChat,
   type PiChatAgentsResult,
@@ -74,8 +78,46 @@ const attach = (conversationId: string, entry: Watched) => {
   );
 };
 
+const usageLimitNoticeId = (conversationId: string) => `claude-usage-limit:${conversationId}`;
+
+/** "11:30 PM" today, or "Sun 11:30 PM" on another day. */
+const resetTime = (until: number) => {
+  const at = new Date(until);
+  const time = at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  if (at.toDateString() === new Date().toDateString()) return time;
+  const far = until - Date.now() > 6 * 24 * 60 * 60 * 1000;
+  return `${at.toLocaleDateString(undefined, { weekday: "short", ...(far ? { month: "short", day: "numeric" } : {}) })} ${time}`;
+};
+
+/**
+ * Claude Code work here is held until the Claude usage limit resets: a card
+ * in the sign-in card's style with the reset time, which goes away with one
+ * line when the held work resumes.
+ */
+const presentUsageLimit = (conversationId: string, event: PiChatEvent & { type: "engine_status" }) => {
+  const id = usageLimitNoticeId(conversationId);
+  if (event.state === "usage-limit") {
+    const description =
+      event.until !== undefined
+        ? `It resets at ${resetTime(event.until)}. Stella is holding the work that hit it and continues it automatically then.`
+        : "Stella is holding the work that hit it and continues it automatically once the limit resets.";
+    presentComposerNotice(
+      { id, conversationId, kind: "limit", title: "Claude usage limit reached", description },
+      { title: "Claude usage limit reached", description, variant: "default", duration: 10000 },
+    );
+    return;
+  }
+  if (event.state !== "usage-limit-end") return;
+  dismissComposerNotice(id);
+  if (event.resumed) showToast({ title: "Claude usage limit reset. Stella is continuing the held work." });
+};
+
 const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) => {
   for (const event of events) {
+    if (event.type === "engine_status" && (event.state === "usage-limit" || event.state === "usage-limit-end")) {
+      presentUsageLimit(conversationId, event);
+      continue;
+    }
     if (event.type === "engine_status" && event.state === "model-fallback") {
       showToast({
         title: "Switched to a fallback model",

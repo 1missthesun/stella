@@ -166,6 +166,13 @@ export type PiChatEvent =
   | { type: "compaction_start"; reason: string; blocking: boolean }
   | { type: "compaction_end"; reason: string }
   | { type: "engine_status"; state: "running" | "compacting" | "model-fallback"; text: string }
+  /**
+   * Claude Code work in this conversation (Stella's turn or an agent's) is
+   * held until the Claude usage limit resets at `until`, when the CLI named it.
+   */
+  | { type: "engine_status"; state: "usage-limit"; text: string; until?: number }
+  /** Every held turn here ended its hold: resumed, or stopped while held. */
+  | { type: "engine_status"; state: "usage-limit-end"; text: string; resumed: boolean }
   /** Stella's turns another writer is running (the cloud, another computer), from the journal. */
   | { type: "remote_turns"; turns: PiRemoteTurn[] };
 

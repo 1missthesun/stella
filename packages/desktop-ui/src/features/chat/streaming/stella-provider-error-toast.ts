@@ -36,6 +36,15 @@ export type StellaProviderErrorToastOptions = {
   t?: Translate
 }
 
+const stripClaudeCodeMark = (message: string) =>
+  message.replace(/^\s*\[claude-code\/[a-z-]+\]\s*/i, '').trim()
+
+/** The Claude account a login failure names (`... signed in to a@b.c ...`). */
+const claudeLoginEmailOf = (message: string): string | undefined =>
+  /(?:login for|signed in to|Sign in to)\s+([^\s@]+@[^\s@]+?)(?=[.,;)]?(?:\s|$))/i.exec(
+    message,
+  )?.[1]
+
 const openBilling = () => {
   void import('@/router').then(({ router }) => {
     void router.navigate({ to: '/billing' })
@@ -153,11 +162,23 @@ export const resolveStellaProviderErrorToast = (
   }
 
   switch (classification.kind) {
-    case 'claude-code-login':
+    case 'claude-code-login': {
+      const email = claudeLoginEmailOf(message)
       return {
         title: 'Claude Code needs login',
+        description: email
+          ? `Claude Code needs to sign in to ${email} on this computer before Stella can use it.`
+          : 'Claude Code needs to sign in on this computer before Stella can use it.',
+        variant: 'error',
+        duration: 10000,
+      }
+    }
+    case 'claude-code-usage-limit':
+      return {
+        title: 'Claude usage limit reached',
         description:
-          'Open Terminal, run claude, then use /login. Retry in Stella after Claude Code confirms you are signed in.',
+          stripClaudeCodeMark(message) ||
+          'Your Claude plan reached its usage limit. Try again after it resets.',
         variant: 'error',
         duration: 10000,
       }
@@ -338,6 +359,7 @@ const COMPOSER_NOTICE_KIND_BY_ERROR: Partial<
   'sign-in-required': 'sign-in',
   'account-auth': 'sign-in',
   'claude-code-login': 'sign-in',
+  'claude-code-usage-limit': 'limit',
   billing: 'upgrade',
   'free-allowance-exhausted': 'upgrade',
   'capability-required': 'upgrade',
@@ -376,6 +398,7 @@ export const presentStellaProviderError = (
 ): void => {
   const toast = resolveStellaProviderErrorToast(reason, options)
   const kind = resolveStellaProviderErrorNoticeKind(reason)
+  const classification = classifyStellaProviderError(reason)
   if (!kind) {
     showToast(toast)
     return
@@ -388,6 +411,9 @@ export const presentStellaProviderError = (
       description: toast.description,
       action: toast.action,
       secondaryAction: toast.secondaryAction,
+      ...(classification.kind === 'claude-code-login'
+        ? { claudeSignIn: { email: claudeLoginEmailOf(classification.message) } }
+        : {}),
     },
     toast,
   )

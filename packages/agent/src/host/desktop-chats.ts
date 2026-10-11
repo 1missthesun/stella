@@ -115,7 +115,7 @@ import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
 import { desktopContextSources } from "./desktop-sources.ts";
 import { stopStella } from "../stella/stop.ts";
-import type { ClaudeCodeEngine } from "../engine/claude-code.ts";
+import type { ClaudeCodeEngine, ClaudeCodeStatus } from "../engine/claude-code.ts";
 import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
 
 /** The newest entries a client gets when it attaches, and per older page. */
@@ -502,11 +502,54 @@ export function desktopChats(options: DesktopChatsOptions) {
       : {},
   );
   const byok = byokModels(models, options.resolveDirectModel);
+  /**
+   * Claude Code turns held until the Claude usage limit resets, by
+   * conversation and session (Stella's turn or one of its agents): the chat
+   * shows one waiting card while any is held, and one line when the last
+   * resumes. A restart drops this; the held turns re-run, meet the limit
+   * again and hold again, so it fills back up.
+   */
+  const usageLimitHolds = new Map<string, Map<string, number | undefined>>();
+  const usageLimitEvent = (conversationId: string): PiChatEvent | undefined => {
+    const holds = usageLimitHolds.get(conversationId);
+    if (!holds || holds.size === 0) return undefined;
+    const known = [...holds.values()].filter((until): until is number => until !== undefined);
+    const until = known.length > 0 ? Math.max(...known) : undefined;
+    return {
+      type: "engine_status",
+      state: "usage-limit",
+      text: "Claude usage limit reached. Held work continues when it resets.",
+      ...(until !== undefined ? { until } : {}),
+    };
+  };
+  const noteUsageLimit = (
+    conversationId: string,
+    sessionKey: string,
+    status: Extract<ClaudeCodeStatus, { state: "usage-limit" | "usage-limit-end" }>,
+  ) => {
+    const holds = usageLimitHolds.get(conversationId) ?? new Map<string, number | undefined>();
+    let event: PiChatEvent | undefined;
+    if (status.state === "usage-limit") {
+      holds.set(sessionKey, status.until);
+      usageLimitHolds.set(conversationId, holds);
+      event = usageLimitEvent(conversationId);
+    } else {
+      if (!holds.delete(sessionKey)) return;
+      if (holds.size > 0) return;
+      usageLimitHolds.delete(conversationId);
+      event = { type: "engine_status", state: "usage-limit-end", text: status.text, resumed: status.resumed };
+    }
+    if (event) options.emit({ conversationId, events: [event] });
+  };
   const claudeCodeEngine = options.claudeCodeEngine;
   if (claudeCodeEngine) {
     models.setProvider(claudeCodeEngine.provider());
     claudeCodeEngine.onProviderChange((provider) => models.setProvider(provider));
     claudeCodeEngine.onStatus((session, status) => {
+      if (status.state === "usage-limit" || status.state === "usage-limit-end") {
+        noteUsageLimit(session.conversationId, session.sessionKey, status);
+        return;
+      }
       if (session.threadId) return;
       void chats
         .get(session.conversationId)
@@ -1209,6 +1252,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     const stream = await attach(conversationId, chat);
     const { entries, hasOlder } = await history(chat);
     const [snapshot] = eventsForClients([stream.snapshot as unknown as PiChatEvent]) as [PiChatWatchResult["snapshot"]];
+    const held = usageLimitEvent(conversationId);
+    if (held) options.emit({ conversationId, events: [held] });
     return {
       snapshot: { ...snapshot, entries: mergePiEntries(entries, snapshot.entries) },
       hasOlder,

@@ -39,7 +39,7 @@ export const SPAWN_AGENT_TOOL_DESCRIPTOR = {
       destination: {
         type: "string",
         description:
-          'Where the agent runs: "cloud", or a device_id from the connected devices list. Omit to run it where you are.',
+          'Where the agent runs: "cloud", or a device_id from the connected devices list. Omit to run it where your tools run. From Stella, it runs there as a whole; from an agent, the new agent stays with you and only its tools (shell and files) run there.',
       },
       directory: {
         type: "string",

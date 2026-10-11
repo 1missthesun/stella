@@ -295,6 +295,8 @@ export type RunnerState = {
   sendRuntimeMessage?: (input: RuntimeSendMessageInput) => Promise<void>;
   piReportDelivery?: PiReportDelivery;
   piAgentEngine?: PiAgentEngine;
+  /** Places what Stella reads hidden at the host holding a conversation's brain lease. */
+  brainNote?: BrainNote;
   /**
    * The thread each cloud conversation's last turn here ran, hidden prompt
    * rows included, keyed by `conversationId`. The next cloud turn extends it
@@ -478,6 +480,8 @@ export type PiAgentEngine = {
     prompt: string;
     /** The pick it runs on (`stella/...`, `<provider>/<model>[:effort]`); absent, Stella's default. */
     model?: string;
+    /** Where its file and shell tools start, when not on this computer. */
+    placement?: import("@stella/agent/stella/placement").StellaPlacement;
     signal: AbortSignal;
   }) => Promise<
     | { status: "ok"; finalText: string }
@@ -514,12 +518,25 @@ export type PiCloudAgentThreads = {
   }) => Promise<void>;
 };
 
+/**
+ * What Stella reads hidden (an agent's report) for a conversation whose
+ * brain lease another host holds, placed there once per `id`. False when
+ * that host can't take it now, for this computer to take instead.
+ */
+export type BrainNote = (note: {
+  conversationId: string;
+  host: import("@stella/contracts/turn-plane/pi-brain").PiBrainHost;
+  id: string;
+  text: string;
+}) => Promise<boolean>;
+
 export type RunnerPublicApi = {
   deviceId: string;
   hookEmitter: HookEmitter;
   piCloudAgentThreads: PiCloudAgentThreads;
   setPiReportDelivery: (delivery: PiReportDelivery | null) => void;
   setPiAgentEngine: (engine: PiAgentEngine | null) => void;
+  setBrainNote: (note: BrainNote | null) => void;
   deliverOrchestratorNote: PiReportDelivery;
   setBackendUrl: (value: string | null) => void;
   setAuthToken: (value: string | null) => void;

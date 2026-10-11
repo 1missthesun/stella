@@ -11,6 +11,7 @@ import type { AgentSteering } from "../agent-runtime/agent-steering.js";
 import type { SubagentRunResult } from "../agent-runtime/types.js";
 import type { RuntimeStore } from "../storage/runtime-store.js";
 import type { PiAgentEngine } from "./types.js";
+import { claudeCodeToolEnvironments } from "../integrations/claude-code-tool-environment.js";
 
 const PI_EFFORTS = new Set(["minimal", "low", "medium", "high", "xhigh"]);
 
@@ -65,6 +66,11 @@ export const runSubagentOnPi = async (
   }
   const agentKey = `kernel:${args.agentId}`;
   const model = piModelPick(args.agentContext);
+  // Tools its spawn placed elsewhere start there, in pi's own environment.
+  const placement = claudeCodeToolEnvironments()?.placement({
+    conversationId: args.conversationId,
+    agentId: args.agentId,
+  });
   let running = true;
   const detach = args.steering?.attach(
     {
@@ -100,6 +106,7 @@ export const runSubagentOnPi = async (
       description: args.description,
       prompt: withAttachedFiles(args.prompt, args.attachments),
       ...(model ? { model } : {}),
+      ...(placement && placement.kind !== "local" ? { placement } : {}),
       signal: args.abortSignal,
     });
     if (result.status === "ok") return { runId: args.runId, result: result.finalText };

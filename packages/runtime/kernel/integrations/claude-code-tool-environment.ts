@@ -73,6 +73,13 @@ export type ClaudeCodeToolEnvironments = {
   /** Whether a Claude Code session ever ran for this owner in this process. */
   attached(owner: ClaudeCodeToolOwner): boolean;
   /**
+   * Whether `target` can take a conversation's tools now, and what an agent
+   * is told about it; else why not, in words an agent can act on.
+   */
+  prepare(conversationId: string, target: StellaPlacement): Promise<{ placement: StellaPlacement } | { error: string }>;
+  /** Where a new agent's tools start, as `prepare` answered it. */
+  place(owner: ClaudeCodeToolOwner, placement: StellaPlacement): void;
+  /**
    * Move an owner's tools to `target` once it can take them: the place they
    * left and the one they run on now (what an agent is told of it), or why
    * not, in words an agent can act on.
@@ -153,27 +160,32 @@ export const createClaudeCodeToolEnvironments = (options: {
     return environment;
   };
   const placement = (owner: ClaudeCodeToolOwner) => placements.get(ownerKey(owner)) ?? LOCAL;
+  const record = (owner: ClaudeCodeToolOwner, to: StellaPlacement) => {
+    const key = ownerKey(owner);
+    if (to.kind === "local") placements.delete(key);
+    else placements.set(key, to);
+    save();
+  };
+  const prepare = async (conversationId: string, target: StellaPlacement) =>
+    conversationId.startsWith("local_") && target.kind !== "local"
+      ? { error: "This chat is stored only on this computer, so its tools can only run here." }
+      : await environmentFor(conversationId).prepare(target);
   return {
     placement,
+    prepare,
+    place: record,
     attach: (owner) => {
       attached.add(ownerKey(owner));
     },
     attached: (owner) => attached.has(ownerKey(owner)),
     move: async (owner, target) => {
-      if (owner.conversationId.startsWith("local_")) {
-        return { error: "This chat is stored only on this computer, so its tools can only run here." };
-      }
-      const environment = environmentFor(owner.conversationId);
-      const prepared = await environment.prepare(target);
+      const prepared = await prepare(owner.conversationId, target);
       if ("error" in prepared) return prepared;
       const from = placement(owner);
       const to = prepared.placement;
       if (samePlacement(from, to)) return { from, to };
-      const key = ownerKey(owner);
-      if (to.kind === "local") placements.delete(key);
-      else placements.set(key, to);
-      save();
-      await environment.moved(scopeKey(owner), from);
+      record(owner, to);
+      await environmentFor(owner.conversationId).moved(scopeKey(owner), from);
       return { from, to };
     },
     route: (executor, owner) => async (toolName, args, context, signal, onUpdate) => {

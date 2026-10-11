@@ -11,6 +11,8 @@ import type {
 import { AGENT_PAUSE_CANCEL_REASON } from "../agents/local-agent-manager.js";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { parseSpawnDestination } from "./defs/agent-orchestration-def.js";
+import type { StellaPlacement } from "@stella/agent/stella/placement";
+import { claudeCodeToolEnvironments } from "../integrations/claude-code-tool-environment.js";
 import { STELLA_DEFAULT_MODEL } from "@stella/contracts/stella-api";
 import {
   AGENT_MESSAGE_MAX_CHARS,
@@ -793,11 +795,39 @@ export const handleSpawnAgent = async (
       error: `directory must be an absolute path; got "${workingDirectory}".`,
     };
   }
+  // An agent's agent stays with it, here, and only its tools go where it
+  // asked (pi's rule); Stella's goes there whole. Without a destination,
+  // the new agent's tools start where its caller's run.
+  const toolEnvironments = claudeCodeToolEnvironments();
+  const callerTools = toolEnvironments?.placement({
+    conversationId: context.conversationId,
+    ...(context.agentId ? { agentId: context.agentId } : {}),
+  });
+  const away =
+    destination.kind === "cloud" ||
+    (destination.kind === "device" && destination.deviceId !== context.deviceId);
+  const toolsTarget: StellaPlacement | undefined =
+    toolEnvironments && away && context.agentType !== AGENT_IDS.ORCHESTRATOR
+      ? destination.kind === "device"
+        ? { kind: "device", deviceId: destination.deviceId }
+        : { kind: "cloud" }
+      : destination.kind === "here" && callerTools?.kind !== "local"
+        ? callerTools
+        : undefined;
+  const toolsOnly = toolsTarget !== undefined && away;
   const targetDeviceId =
-    destination.kind === "device" && destination.deviceId !== context.deviceId
+    !toolsOnly &&
+    destination.kind === "device" &&
+    destination.deviceId !== context.deviceId
       ? destination.deviceId
       : undefined;
-  const cloudPlacement = destination.kind === "cloud" || targetDeviceId !== undefined;
+  const cloudPlacement =
+    !toolsOnly && (destination.kind === "cloud" || targetDeviceId !== undefined);
+  if (toolsOnly && workingDirectory) {
+    return {
+      error: "directory works only for an agent whose tools run on this computer. Leave it out, and name the directory in the prompt instead.",
+    };
+  }
   if (cloudPlacement && workingDirectory) {
     // The cloud's and another computer's tools start in their own home.
     return {
@@ -980,6 +1010,18 @@ export const handleSpawnAgent = async (
         return { error: (error as Error).message };
       }
     }
+    // Where its tools run must take them now, before it starts.
+    let toolPlacement: StellaPlacement | undefined;
+    if (toolsTarget && toolEnvironments) {
+      const prepared = await toolEnvironments.prepare(
+        context.conversationId,
+        toolsTarget,
+      );
+      if ("error" in prepared) return { error: prepared.error };
+      if (prepared.placement.kind !== "local") {
+        toolPlacement = prepared.placement;
+      }
+    }
     let created: Awaited<ReturnType<AgentToolApi["createAgent"]>>;
     try {
       created = await ctx.agentApi.createAgent({
@@ -1019,10 +1061,24 @@ export const handleSpawnAgent = async (
       // errors the model can act on, not as runner-level crashes.
       return { error: (error as Error).message };
     }
+    if (toolPlacement) {
+      toolEnvironments?.place(
+        { conversationId: context.conversationId, agentId: created.threadId },
+        toolPlacement,
+      );
+    }
     return {
       result: {
         status: "spawned_running_in_background",
         thread_id: created.threadId,
+        ...(toolPlacement
+          ? {
+              tools_run_on:
+                toolPlacement.kind === "device"
+                  ? toolPlacement.label || toolPlacement.deviceId
+                  : "cloud",
+            }
+          : {}),
         note: "The agent is now working in the background and has NOT finished. Do not describe the task as if it never started, and do not call send_message to check on it — wait for the [Agent completed] event. In this turn, reply to the user with at most one short line, or say nothing.",
         // Back-compat booleans (kept after status/note so they can't read as "done").
         created: true,

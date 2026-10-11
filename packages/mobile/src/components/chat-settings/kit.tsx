@@ -306,7 +306,7 @@ export const LineField = forwardRef<
         style={[styles.fieldInput, style]}
         {...props}
       />
-      {trailing}
+      {trailing ? <View style={styles.fieldTrailing}>{trailing}</View> : null}
     </View>
   );
 });
@@ -458,6 +458,10 @@ const makeStyles = (colors: Colors) =>
       flexDirection: "row",
       gap: 10,
       minHeight: 50,
+    },
+    fieldTrailing: {
+      alignItems: "center",
+      justifyContent: "center",
     },
     fieldInput: {
       color: colors.text,

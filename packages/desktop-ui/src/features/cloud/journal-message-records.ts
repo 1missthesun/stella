@@ -17,9 +17,8 @@ import {
 import {
   journalMessageTimestamp,
   journalTerminalNotice,
+  journalMirroredWake,
   journalUserReactions,
-  lifecycleWakeOutcome,
-  lifecycleWakeTask,
   resolveJournalReplyRefs,
 } from "@stella/contracts/conversation-journal-projection";
 import { splitReplyRefs, type ReplyRef } from "@stella/contracts/reply-refs";
@@ -91,36 +90,38 @@ const mirroredLifecycleEvents = (
     }
   }
   const spawns = new Map<number, EventRecord>();
+  const mirroredWake = journalMirroredWake(turnRecords);
   let wake: EventRecord | null = null;
+  if (mirroredWake) {
+    const { record, outcome } = mirroredWake;
+    const timestamp = journalMessageTimestamp(record);
+    const base = {
+      agentId: mirroredWake.threadId,
+      ...(mirroredWake.description ? { description: mirroredWake.description } : {}),
+    };
+    wake =
+      outcome.kind === "completed"
+        ? {
+            _id: `cloud:${turnId}:wake:${record.seq}:agent-completed`,
+            timestamp,
+            type: "agent-completed",
+            payload: { ...base, result: outcome.body },
+          }
+        : {
+            _id: `cloud:${turnId}:wake:${record.seq}:agent-${outcome.kind}`,
+            timestamp,
+            type: outcome.kind === "failed" ? "agent-failed" : "agent-canceled",
+            payload: {
+              ...base,
+              ...(outcome.body ? { error: outcome.body } : {}),
+              ...(outcome.kind === "paused" ? { status: "paused" } : {}),
+            },
+          };
+  }
   for (const record of turnRecords) {
     if (record.kind !== "message") continue;
     const timestamp = journalMessageTimestamp(record);
-    if (record.role === "user" && record.hidden) {
-      const text = messageText(record.payload);
-      const task = lifecycleWakeTask(text);
-      const outcome = lifecycleWakeOutcome(text);
-      if (!task || !outcome || carded.has(task.threadId)) continue;
-      const base = { agentId: task.threadId, ...(task.description ? { description: task.description } : {}) };
-      wake =
-        outcome.kind === "completed"
-          ? {
-              _id: `cloud:${turnId}:wake:${record.seq}:agent-completed`,
-              timestamp,
-              type: "agent-completed",
-              payload: { ...base, result: outcome.body },
-            }
-          : {
-              _id: `cloud:${turnId}:wake:${record.seq}:agent-${outcome.kind}`,
-              timestamp,
-              type: outcome.kind === "failed" ? "agent-failed" : "agent-canceled",
-              payload: {
-                ...base,
-                ...(outcome.body ? { error: outcome.body } : {}),
-                ...(outcome.kind === "paused" ? { status: "paused" } : {}),
-              },
-            };
-      continue;
-    }
+    if (record.role === "user" && record.hidden) continue;
     const threadId = spawnResultThreadId(record);
     if (!threadId || carded.has(threadId)) continue;
     const callId =

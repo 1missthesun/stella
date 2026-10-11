@@ -122,6 +122,36 @@ export const lifecycleWakeOutcome = (
   return { kind: WAKE_OUTCOMES[kind] ?? "failed", body };
 };
 
+export type JournalMirroredWake = {
+  record: JournalMessageRecord;
+  threadId: string;
+  description?: string;
+  outcome: { kind: AgentAttemptOutcome; body: string };
+};
+
+export const journalMirroredWake = (
+  turnRecords: readonly JournalRecord[],
+): JournalMirroredWake | null => {
+  const carded = new Set<string>();
+  for (const record of turnRecords) {
+    if (record.kind === "card" && record.card.type === "agent-lifecycle") {
+      carded.add(record.card.event.payload.agentId);
+    }
+  }
+  let wake: JournalMirroredWake | null = null;
+  for (const record of turnRecords) {
+    if (record.kind !== "message" || record.role !== "user" || !record.hidden) {
+      continue;
+    }
+    const text = messageText(record.payload);
+    const task = lifecycleWakeTask(text);
+    const outcome = task ? lifecycleWakeOutcome(text) : null;
+    if (!task || !outcome || carded.has(task.threadId)) continue;
+    wake = { record, ...task, outcome };
+  }
+  return wake;
+};
+
 /**
  * Raw socket windows are record-count bounded and can therefore begin in the
  * middle of a turn. A leading turn whose prompt is still below the window has

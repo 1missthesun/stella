@@ -128,7 +128,13 @@ export const renderCloudDestination = (orchestrator: boolean): string =>
 /** How an agent names where its tools started: "local" on a computer, "cloud" in the cloud. */
 const homeName = (rootPlacement: StellaPlacement): string => (rootPlacement.kind === "local" ? "local" : "cloud");
 
-const switchedText = (from: StellaPlacement, to: StellaPlacement, orchestrator: boolean, rootPlacement: StellaPlacement): string => {
+/**
+ * What an agent reads when its tools move from `from` to `to`, whichever
+ * engine runs it: pi's `switch_destination` answers with it, and Claude
+ * Code's agents read it as the switch's answer and again as they carry on
+ * once their tool set changed.
+ */
+export const toolsMovedNotice = (from: StellaPlacement, to: StellaPlacement, orchestrator: boolean, rootPlacement: StellaPlacement): string => {
   const left = describePlacement(from);
   const back = `switch_destination with "${homeName(rootPlacement)}" moves your tools back.`;
   if (to.kind === "device") {
@@ -260,7 +266,7 @@ export const switchDestinationTool = (
       await host.moved?.(api.conversationId, current, to, context);
       const brief = args.prompt?.trim();
       return {
-        content: [{ type: "text", text: switchedText(current, to, orchestrator, rootPlacement) }],
+        content: [{ type: "text", text: toolsMovedNotice(current, to, orchestrator, rootPlacement) }],
         details: {
           destination: to.kind === "device" ? to.deviceId : to.kind,
           ...(brief ? { brief } : {}),

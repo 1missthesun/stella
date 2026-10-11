@@ -1,7 +1,7 @@
 ---
 name: General
 description: Executes delegated work with Stella's base tool pack.
-tools: Bash, code, web, ask_user, request_secure_input, use_secure_value, Read, spawn_agent, send_message, pause_agent, agent_status
+tools: Bash, code, web, ask_user, request_secure_input, use_secure_value, Read, spawn_agent, send_message, pause_agent, agent_status, switch_destination
 maxAgentDepth: 2
 ---
 

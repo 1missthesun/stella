@@ -3,7 +3,12 @@ import {
   DEVICES_PATH,
   type DeviceDestination,
 } from "@stella/contracts/turn-plane/placement";
-import type { ToolDefinition } from "../types.js";
+import { samePlacement, type StellaPlacement } from "@stella/agent/stella/placement";
+import type { ToolContext, ToolDefinition, ToolResult } from "../types.js";
+import {
+  claudeCodeToolEnvironments,
+  claudeCodeToolsMovedAnswer,
+} from "../../integrations/claude-code-tool-environment.js";
 import { parseSpawnDestination } from "./agent-orchestration-def.js";
 
 export const SWITCH_DESTINATION_TOOL_NAME = "switch_destination";
@@ -27,19 +32,25 @@ export type ExecutionDestinationSwitcher = (
 export const SWITCH_DESTINATION_TOOL_DESCRIPTOR = {
   name: SWITCH_DESTINATION_TOOL_NAME,
   description:
-    "Move yourself to another execution destination: the same switch the user flips in the app, so the chat's destination picker changes too. Your own tools (code, Read, and the rest) then run there. Use it when the user wants you, not a background agent, working on another computer or in the cloud. The move takes effect when this turn ends: you continue there with `prompt` as your brief, so end this turn right after calling it.",
+    'Move where you or your tools run. For Stella, by default this moves yourself to another execution destination: the same switch the user flips in the app, so the chat\'s destination picker changes too, and your own tools (code, Read, and the rest) then run there. Use it when the user wants you, not a background agent, working on another computer or in the cloud. That move takes effect when this turn ends: you continue there with `prompt` as your brief, so end this turn right after calling it. With move: "tools" (always, for an agent) only your file and shell tools move: "cloud", a device_id, or "local" for this computer. You stay here with your conversation and carry on in this same turn; the new place is a fresh environment, and files and shells from where you were do not come along. Use it when the work needs that computer\'s files, programs or hardware, or to bring your tools back.',
   parameters: {
     type: "object",
     properties: {
       destination: {
         type: "string",
         description:
-          'Where to move: "cloud", or a device_id from the connected devices list. This device\'s own id switches the chat back to running here.',
+          'Where to move: "cloud", or a device_id from the connected devices list. This device\'s own id (or "local", for your tools) means this computer.',
       },
       prompt: {
         type: "string",
         description:
-          "Your brief to yourself for the turn that continues at the destination: what the user asked and what to do there. Self-contained; it is the first thing you read after the move. Required unless the destination is where you already are.",
+          'Your brief to yourself for the turn that continues at the destination: what the user asked and what to do there. Self-contained; it is the first thing you read after the move. Required for Stella\'s own move unless the destination is where you already are; optional with move: "tools".',
+      },
+      move: {
+        type: "string",
+        enum: ["tools", "brain"],
+        description:
+          'Stella only: "brain" (the default for Stella) moves the whole chat as described; "tools" moves only your tools. An agent always moves only its tools.',
       },
     },
     required: ["destination"],
@@ -89,6 +100,50 @@ const deviceRefusal = (device: DeviceDestination, name: string): string | null =
   return null;
 };
 
+/**
+ * Only the calling session's file and shell tools move: Claude Code's
+ * sessions turn their built-ins off while their tools run elsewhere
+ * (`integrations/claude-code-tool-environment`). pi's agents and Stella have
+ * their own `switch_destination` in their harness.
+ */
+const moveTools = async (
+  destination: ReturnType<typeof parseSpawnDestination> | { kind: "local" },
+  context: ToolContext,
+): Promise<ToolResult> => {
+  if (destination.kind === "here") {
+    return { error: 'destination is required: "cloud", a device_id, or "local".' };
+  }
+  if (context.conversationId.startsWith("local_") || context.storageMode === "local") {
+    return { error: "This chat is stored only on this computer, so your tools can only run here." };
+  }
+  const environments = claudeCodeToolEnvironments();
+  const owner = {
+    conversationId: context.conversationId,
+    ...(context.agentId ? { agentId: context.agentId } : {}),
+  };
+  if (!environments?.attached(owner)) {
+    return { error: "Your tools can't move from this runtime. Use spawn_agent with a destination instead." };
+  }
+  const target: StellaPlacement =
+    destination.kind === "local" || (destination.kind === "device" && destination.deviceId === context.deviceId)
+      ? { kind: "local" }
+      : destination.kind === "cloud"
+        ? { kind: "cloud" }
+        : { kind: "device", deviceId: destination.deviceId };
+  const moved = await environments.move(owner, target);
+  if ("error" in moved) return { error: moved.error };
+  if (samePlacement(moved.from, moved.to)) {
+    return { result: "Your tools already run there. Carry on." };
+  }
+  return {
+    result: claudeCodeToolsMovedAnswer(moved.from, moved.to, context.agentType === AGENT_IDS.ORCHESTRATOR),
+    details: {
+      move: "tools",
+      destination: moved.to.kind === "device" ? moved.to.deviceId : moved.to.kind,
+    },
+  };
+};
+
 export const createSwitchDestinationTool = (options: {
   getCloudBackendAuth?: () => { baseUrl: string; authToken: string } | null;
   switchExecutionDestination?: ExecutionDestinationSwitcher;
@@ -97,9 +152,18 @@ export const createSwitchDestinationTool = (options: {
   label: "Switch destination",
   workingText: "Switching destination",
   replay: "unsafe",
-  agentTypes: [AGENT_IDS.ORCHESTRATOR],
+  agentTypes: [AGENT_IDS.ORCHESTRATOR, AGENT_IDS.GENERAL],
   execute: async (args, context) => {
     const destination = parseSpawnDestination(args.destination);
+    if (context.agentType !== AGENT_IDS.ORCHESTRATOR || args.move === "tools") {
+      const local =
+        typeof args.destination === "string" &&
+        /^(local|here|this computer)$/iu.test(args.destination.trim());
+      return await moveTools(local ? { kind: "local" } : destination, context);
+    }
+    if (args.move !== undefined && args.move !== "brain") {
+      return { error: 'move is "tools" or "brain".' };
+    }
     if (destination.kind === "here") {
       return { error: 'destination is required: "cloud" or a device_id.' };
     }

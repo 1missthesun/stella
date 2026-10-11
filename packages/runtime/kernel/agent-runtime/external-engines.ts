@@ -35,10 +35,14 @@ import {
   getClaudeCodeRuntimeEffortLevel,
   shouldUseClaudeCodeAgentRuntime,
 } from "../integrations/claude-code-agent-runtime.js";
+import { resolveClaudeCodeToolSet } from "../integrations/claude-code-native-tools.js";
 import {
-  resolveClaudeCodeNativeTools,
-  withoutToolsReplacedByNative,
-} from "../integrations/claude-code-native-tools.js";
+  claudeCodeToolDestinationPrompt,
+  claudeCodeToolEnvironments,
+  claudeCodeToolsMovedContinuation,
+  type ClaudeCodeToolOwner,
+} from "../integrations/claude-code-tool-environment.js";
+import { samePlacement } from "@stella/agent/stella/placement";
 import {
   buildRuntimeSystemPrompt,
   buildSubagentSystemPrompt,
@@ -2288,28 +2292,52 @@ const runClaudeHostedTurn = async (
     args.opts.agentType === AGENT_IDS.ORCHESTRATOR
       ? "orchestrator"
       : "worker";
+  // Where this session's file and shell tools run. Where the CLI runs they
+  // are its built-ins; anywhere else the built-ins are off and Stella's own
+  // run there, routed call by call.
+  const toolEnvironments = vanilla ? null : claudeCodeToolEnvironments();
+  const toolOwner: ClaudeCodeToolOwner = {
+    conversationId: args.opts.conversationId,
+    ...(args.opts.agentId ? { agentId: args.opts.agentId } : {}),
+  };
+  toolEnvironments?.attach(toolOwner);
+  let toolPlacement = toolEnvironments?.placement(toolOwner) ?? {
+    kind: "local" as const,
+  };
   // An agent allowlist bounds the built-ins too: they run with permissions
   // skipped, so a read-only worker must not get a native writer or shell.
-  const nativeTools = vanilla
-    ? []
-    : resolveClaudeCodeNativeTools(
-        nativeToolRole,
-        args.opts.agentContext.toolsAllowlist,
-      );
   // node_repl carries the bounded deferred catalog; profiles without it get
   // the safe direct-schema fallback instead. Stella
   // tools a built-in supersedes are left out so the model sees one spelling.
-  const toolMetadata = vanilla
-    ? []
-    : withoutToolsReplacedByNative(
-        getProviderToolMetadata({
+  const toolSetAt = (placement: typeof toolPlacement) => {
+    if (vanilla) {
+      return {
+        nativeTools: [] as readonly string[],
+        tools: [] as ReturnType<typeof getProviderToolMetadata>,
+        systemPrompt: args.systemPrompt,
+      };
+    }
+    const destination = claudeCodeToolDestinationPrompt(
+      placement,
+      nativeToolRole === "orchestrator",
+    );
+    return {
+      ...resolveClaudeCodeToolSet({
+        role: nativeToolRole,
+        toolsAllowlist: args.opts.agentContext.toolsAllowlist,
+        catalog: getProviderToolMetadata({
           toolsAllowlist: args.opts.agentContext.toolsAllowlist,
           toolCatalog: args.opts.toolCatalog,
           connectorProvider: args.opts.connectorDeliveryTarget?.provider,
         }),
-        nativeTools,
-        nativeToolRole,
-      );
+        toolsAway: placement.kind !== "local",
+      }),
+      systemPrompt: destination
+        ? [args.systemPrompt, destination].filter(Boolean).join("\n\n")
+        : args.systemPrompt,
+    };
+  };
+  const initialToolSet = toolSetAt(toolPlacement);
   const claudeCodeModelId = getClaudeCodeAgentModelId(
     args.opts.stellaAppDir,
     args.opts.agentContext.model,
@@ -2343,7 +2371,15 @@ const runClaudeHostedTurn = async (
     runEvents.noteAssistantTextChunk(chunk);
   };
   const toolRelay = createClaudeToolRelay({
-    opts: args.opts,
+    opts: toolEnvironments
+      ? {
+          ...args.opts,
+          toolExecutor: toolEnvironments.route(
+            args.opts.toolExecutor,
+            toolOwner,
+          ),
+        }
+      : args.opts,
     session: args.session,
     callbacks: args.callbacks,
     assistantUpdateBuffer,
@@ -2494,10 +2530,28 @@ const runClaudeHostedTurn = async (
         : {}),
       ...(vanilla ? { vanilla } : {}),
       ...(claudeCodeEffortLevel ? { effortLevel: claudeCodeEffortLevel } : {}),
-      systemPrompt: args.systemPrompt,
+      systemPrompt: initialToolSet.systemPrompt,
       cwd: localCliCwd,
-      tools: toolMetadata,
-      nativeTools,
+      tools: initialToolSet.tools,
+      nativeTools: initialToolSet.nativeTools,
+      ...(toolEnvironments
+        ? {
+            toolSetAfterStep: () => {
+              const now = toolEnvironments.placement(toolOwner);
+              if (samePlacement(now, toolPlacement)) return undefined;
+              toolPlacement = now;
+              const next = toolSetAt(now);
+              return {
+                tools: next.tools,
+                nativeTools: next.nativeTools,
+                ...(next.systemPrompt !== undefined
+                  ? { systemPrompt: next.systemPrompt }
+                  : {}),
+                prompt: claudeCodeToolsMovedContinuation(now),
+              };
+            },
+          }
+        : {}),
       onNativeToolStart: toolRelay.recordNativeToolStart,
       onNativeToolEnd: toolRelay.recordNativeToolEnd,
       ...(syncsSession
@@ -2549,10 +2603,26 @@ const runClaudeHostedTurn = async (
     // The CLI's native Bash replaces Stella's shell tool, so it needs the
     // same environment that tool gives its commands (CLI shims on PATH,
     // entrypoint variables, media / X auth, checkout, drafts, agent id).
-    perTurnRequest: () =>
-      args.opts.executionHost !== "sandbox"
-        ? { shellEnv: nativeShellEnv() }
-        : {},
+    perTurnRequest: () => {
+      // Every turn runs with the tool set for where its tools run now, which
+      // a step of an earlier turn may have changed.
+      if (toolEnvironments) toolPlacement = toolEnvironments.placement(toolOwner);
+      const toolSet = toolEnvironments ? toolSetAt(toolPlacement) : undefined;
+      return {
+        ...(args.opts.executionHost !== "sandbox"
+          ? { shellEnv: nativeShellEnv() }
+          : {}),
+        ...(toolSet
+          ? {
+              tools: toolSet.tools,
+              nativeTools: toolSet.nativeTools,
+              ...(toolSet.systemPrompt !== undefined
+                ? { systemPrompt: toolSet.systemPrompt }
+                : {}),
+            }
+          : {}),
+      };
+    },
     persistedSessionId: persistedSessionId ?? restoredSessionId,
     firstPrompt,
     buildQueuedPrompt: ({

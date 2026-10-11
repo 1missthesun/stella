@@ -139,6 +139,14 @@ export type ClaudeCodeTurnRequest = {
     inject: (input: ClaudeCodeInjectInput) => boolean;
   }): (() => void) | undefined;
   onIntermediateResult?(result: ClaudeCodeStepResult): void;
+  /**
+   * Asked as each step ends: the tool set the session runs with now, when it
+   * changed while the step ran (its file and shell tools moved to another
+   * computer or back), with what the agent reads as it carries on. The CLI
+   * restarts on the new set with --resume and the same turn goes on; the
+   * step's own answer reaches the host as an intermediate reply.
+   */
+  toolSetAfterStep?(): ClaudeCodeToolSetChange | undefined;
   onSessionId?(sessionId: string): void;
   onSessionCheckpoint?(checkpoint: {
     sessionId: string;
@@ -154,6 +162,14 @@ export type ClaudeCodeTurnRequest = {
     mcpServers: { name?: string; status?: string }[];
   }): void;
 };
+export type ClaudeCodeToolSetChange = {
+  tools: readonly ToolMetadata[];
+  nativeTools: readonly string[];
+  systemPrompt?: string;
+  prompt: string;
+};
+/** Tool-set changes one turn takes before it stops asking. */
+const MAX_TOOL_SET_CHANGES_PER_TURN = 4;
 type ClaudeCodeInjection = {
   consumed: boolean;
   answered?: boolean;
@@ -1005,7 +1021,7 @@ const isSessionAlreadyInUseError = (message: string) =>
   /Session ID .* is already in use\./i.test(message);
 const isMissingResumeSessionError = (message: string) =>
   /No conversation found with session ID:/i.test(message);
-const isRejectedThinkingSignatureError = (message: string) =>
+export const isRejectedThinkingSignatureError = (message: string) =>
   /\bsignature\b[^\n]{0,80}\bthinking\b|\bthinking\b[^\n]{0,80}\bsignature\b/i.test(
     message,
   );
@@ -1928,7 +1944,7 @@ class ClaudeCodeSessionRuntime {
       };
     }
     try {
-      const response = await this.executeStepWithRecovery(
+      let response = await this.executeStepWithRecovery(
         session,
         request,
         effectiveSystemPrompt,
@@ -1936,6 +1952,39 @@ class ClaudeCodeSessionRuntime {
         [],
         { remaining: MAX_STEP_RECOVERIES_PER_TURN },
       );
+      let current = request;
+      for (let changes = 0; !request.vanilla && changes < MAX_TOOL_SET_CHANGES_PER_TURN; changes += 1) {
+        const change = current.toolSetAfterStep?.();
+        if (!change) break;
+        if (!response.delivered && response.message.trim()) {
+          try {
+            current.onIntermediateResult?.(response);
+          } catch {
+            // A host-side observer must not break the engine turn.
+          }
+        }
+        current = {
+          ...current,
+          tools: change.tools,
+          nativeTools: change.nativeTools,
+          ...(change.systemPrompt !== undefined
+            ? { systemPrompt: change.systemPrompt }
+            : {}),
+        };
+        // The launch config changes with the tool set, so the next step
+        // restarts the CLI on it and resumes the same conversation.
+        response = await this.executeStepWithRecovery(
+          session,
+          current,
+          buildClaudeCodeNativeToolRuntimePrompt(
+            current.systemPrompt,
+            current.nativeTools,
+          ),
+          change.prompt,
+          [],
+          { remaining: MAX_STEP_RECOVERIES_PER_TURN },
+        );
+      }
       return {
         text: response.message,
         sessionId: response.sessionId,

@@ -18,54 +18,28 @@
  * records the new host (`@stella/contracts/turn-plane/pi-brain`), and once
  * her turn here ends her brief continues there as a placed chat.
  */
-import { createHash } from "node:crypto";
 import type { Context, JsonValue } from "@earendil-works/chord";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { defineExtension, type Extension, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-durable/tools";
-import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import type { PiBrainHost, PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
-import type {
-  DeviceToolCall,
-  DeviceToolName,
-  DeviceToolOutcome,
-  DeviceToolResult,
-} from "@stella/contracts/turn-plane/device-tools";
+import type { DeviceToolName, DeviceToolResult } from "@stella/contracts/turn-plane/device-tools";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import { STELLA_CODING_EXTENSION } from "../stella/coding.ts";
-import { deviceRefusal, type StellaExecutionHost } from "../stella/execution.ts";
+import type { StellaExecutionHost } from "../stella/execution.ts";
 import { placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella/placement.ts";
+import { remoteToolEnvironment, type DesktopExecutionRemote, type RemoteToolCall as EnvironmentToolCall } from "./remote-tools.ts";
 
-/** How long a cloud container is kept for a conversation that stopped calling it. */
-const CLOUD_IDLE_MS = 10 * 60_000;
-/** The longest a shell command waits for its end on the other side before handing back a session. */
-const SHELL_WAIT_MS = 600_000;
+export type { DesktopExecutionRemote } from "./remote-tools.ts";
 
-/** One file or shell call for a conversation's tools elsewhere. */
-export type RemoteToolCall = {
+/** One file or shell call for a pi conversation's tools elsewhere. */
+export type RemoteToolCall = Omit<EnvironmentToolCall, "owner"> & {
   /** The pi conversation whose tools these are, in this computer's harness. */
   piConversationId: number;
-  /** The agent's thread; absent for Stella herself. */
-  threadId?: string;
-  callId: string;
-  toolName: DeviceToolName;
-  params: Record<string, unknown>;
 };
 
-/** How this computer reaches the owner's other computers and the cloud, for one conversation stored in the cloud. */
-export type DesktopExecutionRemote = {
-  /** The owner's computers, as the owner gate lists them. */
-  devices(): Promise<DeviceDestination[]>;
-  /** One call on a computer, relayed by the owner gate; `signal` withdraws it there too. */
-  deviceTool(deviceId: string, requestId: string, call: DeviceToolCall, signal?: AbortSignal): Promise<DeviceToolOutcome>;
-  /** One call in the conversation's cloud container for `scope`, which comes up on the first. */
-  cloudTool(
-    call: { scope: string; threadId: string; callId: string; toolName: DeviceToolName; params: Record<string, unknown> },
-    signal?: AbortSignal,
-  ): Promise<DeviceToolResult>;
-  /** Save the container's work into the world and let it go. */
-  releaseCloud(scope: string): Promise<void>;
-};
+/** The longest a shell command waits for its end on the other side before handing back a session. */
+const SHELL_WAIT_MS = 600_000;
 
 /** Where a conversation stored in the cloud has its brain, as its object records it. */
 export type DesktopBrain = {
@@ -90,8 +64,6 @@ const result = (outcome: DeviceToolResult): { content: ToolResultContent; isErro
   ],
   ...(outcome.isError ? { isError: true as const } : {}),
 });
-
-const failure = (message: string) => ({ content: [{ type: "text" as const, text: message }], isError: true as const });
 
 /**
  * pi's file and shell tools, as the other side's tools take them: the
@@ -190,28 +162,12 @@ export function desktopExecution(options: {
   brainMoved?(record: PiBrainRecord): void;
   report(error: unknown): void;
 }) {
-  const { conversationId, remote } = options;
-  /** Containers this conversation holds, by scope, each let go when it sits idle. */
-  const idle = new Map<string, ReturnType<typeof setTimeout>>();
-  const scopeOf = (piConversationId: number) => `${options.deviceId ?? "desktop"}:${piConversationId}`;
-
-  const release = async (scope: string) => {
-    const timer = idle.get(scope);
-    if (timer) clearTimeout(timer);
-    idle.delete(scope);
-    await remote?.releaseCloud(scope);
-  };
-
-  const touch = (scope: string) => {
-    const previous = idle.get(scope);
-    if (previous) clearTimeout(previous);
-    const timer = setTimeout(() => {
-      if (idle.get(scope) !== timer) return;
-      void release(scope).catch((error: unknown) => options.report(error));
-    }, CLOUD_IDLE_MS);
-    timer.unref?.();
-    idle.set(scope, timer);
-  };
+  const environment = remoteToolEnvironment({
+    conversationId: options.conversationId,
+    ...(options.deviceId ? { deviceId: options.deviceId } : {}),
+    ...(options.remote ? { remote: options.remote } : {}),
+    report: options.report,
+  });
 
   /** One call where the conversation's tools run now. */
   const run = async (
@@ -219,109 +175,15 @@ export function desktopExecution(options: {
     call: RemoteToolCall,
     context: Context,
   ): Promise<{ content: ToolResultContent; isError?: true }> => {
-    if (!remote) return failure("Sign in to Stella to run tools away from this computer.");
-    const signal = context.abortSignal;
-    if (placement.kind === "cloud") {
-      const scope = scopeOf(call.piConversationId);
-      touch(scope);
-      try {
-        return result(
-          await remote.cloudTool(
-            {
-              scope,
-              threadId: call.threadId ?? "stella",
-              callId: call.callId,
-              toolName: call.toolName,
-              params: call.params,
-            },
-            signal,
-          ),
-        );
-      } catch (error) {
-        if (signal?.aborted) throw error;
-        return failure(
-          `The cloud workspace did not run it: ${error instanceof Error ? error.message : String(error)} Try again, or switch_destination back to this computer.`,
-        );
-      } finally {
-        touch(scope);
-      }
-    }
-    const name = placement.label || placement.deviceId;
-    // The same call is the same request on every attempt, so a rerun joins it there.
-    const requestId = `pt:${createHash("sha256").update(`${conversationId}:${call.piConversationId}:${call.callId}`).digest("hex")}`;
-    let outcome: DeviceToolOutcome;
-    try {
-      outcome = await remote.deviceTool(
-        placement.deviceId,
-        requestId,
-        {
-          kind: "tool",
-          toolName: call.toolName,
-          params: call.params,
-          callId: call.callId,
-          conversationId,
-          ...(call.threadId ? { threadId: call.threadId } : {}),
-        },
-        signal,
-      );
-    } catch (error) {
-      if (signal?.aborted) throw error;
-      outcome = { ok: false, code: "failed", message: error instanceof Error ? error.message : String(error) };
-    }
-    if (!outcome.ok) {
-      const unreachable = outcome.code === "device_offline" || outcome.code === "not_ready" || outcome.code === "not_enabled";
-      return failure(
-        `${outcome.message.replace(/^That computer/u, name)}${
-          unreachable
-            ? ` Your tools are set to run on ${name}. Tell the user, wait for it, or switch_destination back to this computer and carry on here.`
-            : ""
-        }`,
-      );
-    }
-    if (!("result" in outcome)) return failure(`${name} sent no result.`);
-    return result(outcome.result);
+    const { piConversationId, ...rest } = call;
+    return result(await environment.run(placement, { ...rest, owner: String(piConversationId) }, context.abortSignal));
   };
 
   const host: StellaExecutionHost = {
     localOnly: options.localOnly,
-    prepare: async (target) => {
-      if (target.kind === "local" || (target.kind === "device" && target.deviceId === options.deviceId)) {
-        return { placement: { kind: "local" } };
-      }
-      if (!remote) return { error: "Sign in to Stella to run tools away from this computer." };
-      if (target.kind === "cloud") return { placement: { kind: "cloud" } };
-      const listed = await remote.devices().catch(() => undefined);
-      if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
-      const device = listed.find((entry) => entry.deviceId === target.deviceId);
-      if (!device) {
-        return {
-          error: `No connected device has device_id ${target.deviceId}. Use a device_id from the connected devices list, "cloud", or "local" for this computer.`,
-        };
-      }
-      const name = device.label?.trim() || target.deviceId;
-      const refusal = deviceRefusal(device, name);
-      if (refusal) return { error: refusal };
-      const described = await remote
-        .deviceTool(target.deviceId, `describe:${crypto.randomUUID()}`, { kind: "describe" })
-        .catch((error: unknown) => ({ ok: false as const, code: "failed" as const, message: error instanceof Error ? error.message : String(error) }));
-      if (!described.ok) return { error: `${name} could not take tool calls: ${described.message.replace(/^That computer/u, "it")}` };
-      if (!("description" in described)) return { error: `${name} did not describe itself.` };
-      const { home, hostname, platform } = described.description;
-      return {
-        placement: {
-          kind: "device",
-          deviceId: target.deviceId,
-          label: name,
-          home,
-          ...(hostname ? { hostname } : {}),
-          ...(platform ? { platform } : {}),
-        },
-      };
-    },
+    prepare: async (target) => await environment.prepare(target),
     // Leaving the cloud saves the container's work into the world, then lets it go.
-    moved: async (piConversationId, from) => {
-      if (from.kind === "cloud") await release(scopeOf(piConversationId)).catch((error: unknown) => options.report(error));
-    },
+    moved: async (piConversationId, from) => await environment.moved(String(piConversationId), from),
     ...(options.brain && !options.localOnly
       ? {
           moveBrain: async (target, brief, context) => {
@@ -353,9 +215,7 @@ export function desktopExecution(options: {
     host,
     run,
     /** Let every container this conversation holds go. */
-    async close(): Promise<void> {
-      await Promise.all([...idle.keys()].map((scope) => release(scope).catch(() => undefined)));
-    },
+    close: environment.close,
   };
 }
 

@@ -11,7 +11,15 @@
  * The orchestrator coordinates rather than works: it may look (Read, Grep,
  * Glob) but never gets a native shell or file writer. Workers get the full
  * file and shell set.
+ *
+ * Built-ins run where the CLI runs. While a session's file and shell tools
+ * are set to run elsewhere (another of the owner's computers, or a cloud
+ * container), every built-in is off and Stella's own Read/Write/Edit/Bash/
+ * Grep come back over MCP, where the host routes them there
+ * (`@stella/agent/host/remote-tools`). Back where the CLI runs, the
+ * built-ins return: the fast path whenever tools are local.
  */
+import { isDeviceToolName } from "@stella/contracts/turn-plane/device-tools";
 import type { ToolMetadata } from "../tools/types.js";
 
 export type ClaudeCodeNativeToolRole = "orchestrator" | "worker";
@@ -128,3 +136,27 @@ export const withoutToolsReplacedByNative = <
 /** MCP tools are `mcp__<server>__<name>`; everything else is a CLI built-in. */
 export const isClaudeCodeNativeToolName = (toolName: string): boolean =>
   !toolName.startsWith("mcp__");
+
+/**
+ * A session's built-ins and Stella MCP tools for where its file and shell
+ * tools run: native where the CLI runs, Stella's routed ones (`toolsAway`)
+ * anywhere else.
+ */
+export const resolveClaudeCodeToolSet = <T extends Pick<ToolMetadata, "name">>(args: {
+  role: ClaudeCodeNativeToolRole;
+  toolsAllowlist?: readonly string[];
+  catalog: readonly T[];
+  toolsAway: boolean;
+}): { nativeTools: readonly string[]; tools: T[] } => {
+  const nativeTools = args.toolsAway
+    ? []
+    : resolveClaudeCodeNativeTools(args.role, args.toolsAllowlist);
+  return {
+    nativeTools,
+    tools: withoutToolsReplacedByNative(args.catalog, nativeTools, args.role),
+  };
+};
+
+/** Stella tools that run where a session's file and shell tools run, wherever that is. */
+export const isClaudeCodeEnvironmentToolName = (toolName: string): boolean =>
+  isDeviceToolName(toolName);

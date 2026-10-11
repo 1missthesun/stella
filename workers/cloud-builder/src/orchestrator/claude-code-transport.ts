@@ -15,6 +15,7 @@
  *   claude --MCP--> executor --> BuildSession --tool--> here --> pi's tool task
  *   claude --stream-json--> executor --> BuildSession --events--> here --> pi
  */
+import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
 import type {
   ClaudeCodeSessionRef,
   ClaudeCodeToolOutcome,
@@ -387,7 +388,9 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
       } else {
         const reason = terminal.error?.trim() || "Claude Code could not finish this turn.";
         failures.set(attempt.turn.turnId, reason);
-        settle(attempt, { ok: false, error: new Error(reason) });
+        const error: Error & { code?: string } = new Error(reason);
+        if (claudeUsageLimitOf(reason)) error.code = "CLAUDE_CODE_USAGE_LIMIT";
+        settle(attempt, { ok: false, error });
       }
       return { status: 200, body: { ok: true } };
     },

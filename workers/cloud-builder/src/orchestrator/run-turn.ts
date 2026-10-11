@@ -1,4 +1,5 @@
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
+import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
 import { attachedFilesText } from "../prompt-context.js";
 import { formatMessageRefTag } from "@stella/contracts/reply-refs";
 import { buildCloudSkillsBlock } from "../cloud-skills.js";
@@ -1160,6 +1161,11 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           args.execution.engine === "anthropic"
             ? this.claudeCodeTransport().takeFailure(turn.turnId)
             : undefined;
+        // A usage limit holds the work until it resets instead of failing it.
+        const usageLimit = claudeCodeFailure ? claudeUsageLimitOf(claudeCodeFailure) : null;
+        if (usageLimit && (await this.holdForClaudeUsageLimit(turn, usageLimit))) {
+          return await this.completeChatTurn(turn, "", args.started);
+        }
         throw claudeCodeFailure
           ? new CliTurnFailedError(
               `Claude Code turn failed: ${claudeCodeFailure}`,

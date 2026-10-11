@@ -41,14 +41,14 @@ export const applyOwnerEventsToStore = (
         break;
       case "turn.started":
         applyConversationEvent(ctx, event);
-        applyAgentThreadEvent(db, event, effects);
+        applyAgentThreadEvent(db, event, effects, ctx.jobs);
         break;
       case "turn.event":
-        applyAgentThreadEvent(db, event, effects);
+        applyAgentThreadEvent(db, event, effects, ctx.jobs);
         break;
       case "thread.spawned":
       case "thread.completed":
-        applyAgentThreadEvent(db, event, effects);
+        applyAgentThreadEvent(db, event, effects, ctx.jobs);
         break;
     }
   }

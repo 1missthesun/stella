@@ -13,6 +13,7 @@
  *    it), then deletes the rows outright.
  */
 
+import { USAGE_LIMIT_AGENT_JOB, USAGE_LIMIT_CONVERSATION_JOB } from "./domains/agent-threads.js";
 import { deleteConversationAgentEvents } from "./domains/agent-events.js";
 import { AGENT_REPORT_JOB, deleteConversationAgentReports } from "./domains/agent-reports.js";
 import type { JobDef, OwnerContext, OwnerDb, OwnerJobs, PurgeDef } from "./registry.js";
@@ -151,7 +152,14 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
     return { pending: true };
   }
   // Every conversation is gone; what is left has no conversation to name.
-  for (const kind of ["agentThreads.dispatch", "agentThreads.deviceMessage", AGENT_REPORT_JOB, CONVERSATION_PURGE_JOB]) {
+  for (const kind of [
+    "agentThreads.dispatch",
+    "agentThreads.deviceMessage",
+    USAGE_LIMIT_AGENT_JOB,
+    USAGE_LIMIT_CONVERSATION_JOB,
+    AGENT_REPORT_JOB,
+    CONVERSATION_PURGE_JOB,
+  ]) {
     for (const { id } of ctx.db.all<{ id: string }>(
       "SELECT id FROM owner_jobs WHERE kind = ?",
       kind,

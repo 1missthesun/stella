@@ -42,6 +42,7 @@ export type OwnerDbReader = {
 export type OwnerDb = OwnerDbReader & {
   /** A write. Marks the owner's views for a recompute. */
   run(query: string, ...params: SqlValue[]): void;
+  transaction?<T>(fn: () => T): T;
 };
 
 export type OwnerJobs = {

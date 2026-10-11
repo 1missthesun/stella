@@ -13,6 +13,7 @@
  *    it), then deletes the rows outright.
  */
 
+import { deleteConversationAgentEvents } from "./domains/agent-events.js";
 import type { JobDef, OwnerContext, OwnerDb, OwnerJobs, PurgeDef } from "./registry.js";
 
 /** Orchestrator purges per hook call; the caller calls again while pending. */
@@ -87,6 +88,7 @@ const deleteThreadRows = (db: OwnerDb, jobs: OwnerJobs, conversationId: string):
     jobs.cancel(`devmsg:${message_id}`);
     db.run("DELETE FROM agent_device_messages WHERE message_id = ?", message_id);
   }
+  deleteConversationAgentEvents(db, conversationId);
   db.run("DELETE FROM agent_threads WHERE conversation_id = ?", conversationId);
 };
 
@@ -154,6 +156,7 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
     "agent_cancel_receipts",
     "agent_message_receipts",
     "agent_device_messages",
+    "agent_events",
   ]) {
     ctx.db.run(`DELETE FROM ${table}`);
   }

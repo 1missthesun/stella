@@ -59,6 +59,7 @@ import type {
 import { TURN_ATTACHMENTS_MAX } from "@stella/contracts/turn-plane/turn-start";
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
+import { endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { array, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -427,18 +428,24 @@ type DispatchJob = {
 };
 
 const failAttempt = (db: OwnerDb, job: DispatchJob, message: string, now: number): void => {
-  db.run(
-    "UPDATE agent_turns SET status = 'failed', updated_at = ? WHERE turn_id = ? AND status IN ('running', 'resuming')",
-    now,
-    job.turnId,
-  );
-  db.run(
-    `UPDATE agent_threads SET status = 'failed', error_message = ?, updated_at = ?
-      WHERE thread_id = ? AND attempt_generation = ? AND status = 'running'`,
-    clip(message, 2_000),
-    now,
-    job.threadId,
-    job.attemptGeneration,
+  recordAgentChange(
+    db,
+    { threadId: job.threadId, turnId: job.turnId, kind: endedKind, source: "owner:dispatch", now },
+    () => {
+      db.run(
+        "UPDATE agent_turns SET status = 'failed', updated_at = ? WHERE turn_id = ? AND status IN ('running', 'resuming')",
+        now,
+        job.turnId,
+      );
+      db.run(
+        `UPDATE agent_threads SET status = 'failed', error_message = ?, updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ? AND status = 'running'`,
+        clip(message, 2_000),
+        now,
+        job.threadId,
+        job.attemptGeneration,
+      );
+    },
   );
 };
 
@@ -493,6 +500,20 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
         : {}),
     });
     ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
+    recordAgentChange(
+      ctx.db,
+      {
+        threadId: thread.thread_id,
+        turnId: turn.turn_id,
+        kind: "attempt_dispatched",
+        key: `attempt_dispatched:${turn.turn_id}`,
+        source: "owner:dispatch",
+        detail: { executor: "cloud" },
+        always: true,
+        now: ctx.now,
+      },
+      () => undefined,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const retryable = !(error instanceof DispatchError) || error.retryable;
@@ -512,6 +533,30 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
 
 // ── Device threads ────────────────────────────────────────────────────────
 
+const recordSteered = (
+  ctx: OwnerContext,
+  threadId: string,
+  turnId: string | null,
+  messageId: string,
+  source: string,
+  detail: Record<string, unknown>,
+): void => {
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId,
+      turnId,
+      kind: "steered",
+      key: `steered:${threadId}:${messageId}`,
+      source,
+      detail: { messageId, ...detail },
+      always: true,
+      now: ctx.now,
+    },
+    () => undefined,
+  );
+};
+
 /**
  * Hand new input to the device attempt a thread is running, as a cloud
  * agent is steered: the running agent takes it before its next model call.
@@ -521,6 +566,7 @@ const steerDeviceThread = async (
   thread: ThreadRow,
   messageId: string,
   text: string,
+  source: string,
 ): Promise<AgentThreadControl> => {
   const turn = ctx.db.one<TurnRow>(
     `SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?
@@ -531,7 +577,10 @@ const steerDeviceThread = async (
   const steered = turn?.dispatch_id
     ? await ctx.host.steerDeviceAgentTurn({ dispatchId: turn.dispatch_id, messageId, text })
     : { delivered: false as const, reason: "not_running" as const };
-  if (steered.delivered) return control(thread);
+  if (steered.delivered) {
+    recordSteered(ctx, thread.thread_id, turn?.turn_id ?? null, messageId, source, { executor: "dispatch" });
+    return control(thread);
+  }
   if (steered.reason === "unreachable") {
     throw new RpcError(
       "UNAVAILABLE",
@@ -656,7 +705,24 @@ const runDeviceDispatch = async (
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(job.availabilityRetries ? { requeue: job.availabilityRetries } : {}),
     });
-    ctx.db.run("UPDATE agent_turns SET dispatch_id = ? WHERE turn_id = ?", dispatchId, turn.turn_id);
+    recordAgentChange(
+      ctx.db,
+      {
+        threadId: thread.thread_id,
+        turnId: turn.turn_id,
+        kind: "attempt_dispatched",
+        key: `attempt_dispatched:${turn.turn_id}:${dispatchId}`,
+        source: "owner:dispatch",
+        detail: {
+          executor: "device",
+          executorDeviceId: thread.executor_device_id,
+          dispatchId,
+          ...(job.availabilityRetries ? { requeue: job.availabilityRetries } : {}),
+        },
+        now: ctx.now,
+      },
+      () => ctx.db.run("UPDATE agent_turns SET dispatch_id = ? WHERE turn_id = ?", dispatchId, turn.turn_id),
+    );
   } catch (error) {
     let message = error instanceof Error ? error.message : String(error);
     if (error instanceof DispatchError && DEVICE_AVAILABILITY_CODES.has(error.code ?? "")) {
@@ -674,7 +740,7 @@ const runDeviceDispatch = async (
       return;
     }
     ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
-    await settleDeviceAttempt(ctx, turn.turn_id, "failed", { errorMessage: message });
+    await settleDeviceAttempt(ctx, turn.turn_id, "failed", { errorMessage: message }, "owner:dispatch");
   }
 };
 
@@ -688,34 +754,43 @@ const settleDeviceAttempt = async (
   turnId: string,
   status: TerminalStatus,
   outcome: { resultJson?: string; errorMessage?: string },
+  source: string,
 ): Promise<void> => {
   const turn = readTurn(ctx.db, turnId);
   if (!turn?.thread_id || TERMINAL_STATUSES.has(turn.status)) return;
-  ctx.db.run("UPDATE agent_turns SET status = ?, updated_at = ? WHERE turn_id = ?", status, ctx.now, turnId);
-  ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turnId);
-  const thread = readThread(ctx.db, turn.thread_id);
-  if (
-    !thread ||
-    !thread.executor_device_id ||
-    thread.attempt_generation !== turn.attempt_generation ||
-    !ACTIVE_STATUSES.has(thread.status)
-  ) {
-    return;
-  }
   const errorMessage =
     status === "completed" || status === "paused"
       ? null
       : clip(outcome.errorMessage?.trim() || `The agent ${status === "canceled" ? "was stopped" : "failed"}.`, 2_000);
-  ctx.db.run(
-    `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?,
-       origin_delivery_ack_at = NULL, updated_at = ?
-     WHERE thread_id = ?`,
-    status,
-    outcome.resultJson ?? null,
-    errorMessage,
-    ctx.now,
-    thread.thread_id,
+  const thread = recordAgentChange(
+    ctx.db,
+    { threadId: turn.thread_id, turnId, kind: endedKind, outcome: status, source, now: ctx.now },
+    () => {
+      ctx.db.run("UPDATE agent_turns SET status = ?, updated_at = ? WHERE turn_id = ?", status, ctx.now, turnId);
+      ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turnId);
+      const current = readThread(ctx.db, turn.thread_id!);
+      if (
+        !current ||
+        !current.executor_device_id ||
+        current.attempt_generation !== turn.attempt_generation ||
+        !ACTIVE_STATUSES.has(current.status)
+      ) {
+        return null;
+      }
+      ctx.db.run(
+        `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?,
+           origin_delivery_ack_at = NULL, updated_at = ?
+         WHERE thread_id = ?`,
+        status,
+        outcome.resultJson ?? null,
+        errorMessage,
+        ctx.now,
+        current.thread_id,
+      );
+      return current;
+    },
   );
+  if (!thread) return;
   // A pause reports to no one: whoever asked for it already knows.
   if (thread.origin_device_id || status === "paused") return;
   try {
@@ -761,14 +836,20 @@ const deviceSettled = async (ctx: OwnerContext, raw: unknown): Promise<{ settled
     args.state === "blocked"
       ? "failed"
       : agentAttemptOutcomeOf({ status: args.state, reason: args.errorMessage, errorCode: args.errorCode });
-  await settleDeviceAttempt(ctx, args.turnId, status, {
-    ...(args.resultJson ? { resultJson: args.resultJson } : {}),
-    ...(args.errorMessage
-      ? { errorMessage: unavailable ? deviceWaitExpiredMessage(args.errorMessage) : args.errorMessage }
-      : args.state === "blocked"
-        ? { errorMessage: "The selected computer did not accept the request." }
-        : {}),
-  });
+  await settleDeviceAttempt(
+    ctx,
+    args.turnId,
+    status,
+    {
+      ...(args.resultJson ? { resultJson: args.resultJson } : {}),
+      ...(args.errorMessage
+        ? { errorMessage: unavailable ? deviceWaitExpiredMessage(args.errorMessage) : args.errorMessage }
+        : args.state === "blocked"
+          ? { errorMessage: "The selected computer did not accept the request." }
+          : {}),
+    },
+    "gate",
+  );
   return { settled: true };
 };
 
@@ -845,32 +926,48 @@ const spawnOnDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<A
   const raced = replayAttempt(ctx.db, args.clientMsgId, fingerprint, args.ownerGeneration);
   if (raced) return raced;
   const threadId = newAgentThreadId();
-  ctx.db.run(
-    `INSERT INTO agent_threads
-       (thread_id, conversation_id, owner_generation, parent_turn_id, parent_thread_id,
-        executor_device_id, requested_model, description, placement, agent_type,
-        attempt_generation, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'computer', 'general', 1, 'running', ?, ?)`,
-    threadId,
-    args.conversationId,
-    args.ownerGeneration,
-    args.parentTurnId,
-    args.parentThreadId ?? null,
-    args.targetDeviceId,
-    args.model?.trim() || null,
-    clip(args.description.trim(), 1_000),
-    ctx.now,
-    ctx.now,
+  const turnId = crypto.randomUUID();
+  const thread = recordAgentChange(
+    ctx.db,
+    {
+      threadId,
+      turnId,
+      kind: "spawned",
+      key: `spawned:${threadId}`,
+      source: `cloud:${args.conversationId}`,
+      detail: { executor: "device", ...(destination.waiting ? { waitingForDevice: true } : {}) },
+      now: ctx.now,
+    },
+    () => {
+      ctx.db.run(
+        `INSERT INTO agent_threads
+           (thread_id, conversation_id, owner_generation, parent_turn_id, parent_thread_id,
+            executor_device_id, requested_model, description, placement, agent_type,
+            attempt_generation, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'computer', 'general', 1, 'running', ?, ?)`,
+        threadId,
+        args.conversationId,
+        args.ownerGeneration,
+        args.parentTurnId,
+        args.parentThreadId ?? null,
+        args.targetDeviceId,
+        args.model?.trim() || null,
+        clip(args.description.trim(), 1_000),
+        ctx.now,
+        ctx.now,
+      );
+      const inserted = readThread(ctx.db, threadId)!;
+      startAttempt(ctx, {
+        thread: inserted,
+        turnId,
+        clientMsgId: args.clientMsgId,
+        fingerprint,
+        prompt: args.prompt,
+        ...(attachments.length > 0 ? { attachments } : {}),
+      });
+      return inserted;
+    },
   );
-  const thread = readThread(ctx.db, threadId)!;
-  startAttempt(ctx, {
-    thread,
-    turnId: crypto.randomUUID(),
-    clientMsgId: args.clientMsgId,
-    fingerprint,
-    prompt: args.prompt,
-    ...(attachments.length > 0 ? { attachments } : {}),
-  });
   return { ...control(thread), ...(destination.waiting ? { waitingForDevice: true } : {}) };
 };
 
@@ -948,26 +1045,21 @@ const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<
   if (replay) return replay;
   await assertGeneration(ctx, args.ownerGeneration);
   const thread = readCloudDeviceThread(ctx, args);
+  const source = `cloud:${args.conversationId}`;
   if (ACTIVE_STATUSES.has(thread.status)) {
-    return await steerDeviceThread(ctx, thread, args.controlRequestId, args.prompt);
+    return await steerDeviceThread(ctx, thread, args.controlRequestId, args.prompt, source);
   }
   const destination = await assertDeviceDestination(ctx, thread.executor_device_id!);
-  ctx.db.run(
-    `UPDATE agent_threads SET
-       status = 'running', attempt_generation = ?,
-       result_json = NULL, error_message = NULL, updated_at = ?
-     WHERE thread_id = ?`,
-    thread.attempt_generation + 1,
-    ctx.now,
-    thread.thread_id,
-  );
-  const continued = readThread(ctx.db, thread.thread_id)!;
-  startAttempt(ctx, {
-    thread: continued,
-    turnId: crypto.randomUUID(),
+  const continued = beginNextAttempt(ctx, thread, {
     clientMsgId: args.controlRequestId,
     fingerprint,
     prompt: args.prompt,
+    source,
+    detail: { controlRequestId: args.controlRequestId },
+    sql: `UPDATE agent_threads SET
+       status = 'running', attempt_generation = ?,
+       result_json = NULL, error_message = NULL, updated_at = ?
+     WHERE thread_id = ?`,
   });
   return { ...control(continued), ...(destination.waiting ? { waitingForDevice: true } : {}) };
 };
@@ -985,7 +1077,12 @@ const cancelDeviceForCloud = async (
   })(raw);
   await assertGeneration(ctx, args.ownerGeneration);
   const thread = readCloudDeviceThread(ctx, args);
-  await stopDeviceAttempt(ctx, thread, args.controlRequestId);
+  const source = `cloud:${args.conversationId}`;
+  recordPauseRequested(ctx, thread, `pause_requested:${args.controlRequestId}`, source, {
+    controlRequestId: args.controlRequestId,
+    via: "agentThreads.cancelOnDevice",
+  });
+  await stopDeviceAttempt(ctx, thread, args.controlRequestId, source);
   return { canceled: true, control: control(readThread(ctx.db, thread.thread_id)!) };
 };
 
@@ -998,6 +1095,7 @@ const stopDeviceAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
   cancelRequestId: string,
+  source: string,
 ): Promise<void> => {
   if (!ACTIVE_STATUSES.has(thread.status)) return;
   const turn = runningTurn(ctx.db, thread);
@@ -1007,17 +1105,31 @@ const stopDeviceAttempt = async (
   // anything for a pause the requester asked for.
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
   ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
-  ctx.db.run(
-    "UPDATE agent_turns SET status = 'paused', updated_at = ? WHERE turn_id = ?",
-    ctx.now,
-    turn.turn_id,
-  );
-  ctx.db.run(
-    `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
-      WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
-    ctx.now,
-    thread.thread_id,
-    thread.attempt_generation,
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      turnId: turn.turn_id,
+      kind: endedKind,
+      outcome: "paused",
+      source,
+      detail: { cancelRequestId },
+      now: ctx.now,
+    },
+    () => {
+      ctx.db.run(
+        "UPDATE agent_turns SET status = 'paused', updated_at = ? WHERE turn_id = ?",
+        ctx.now,
+        turn.turn_id,
+      );
+      ctx.db.run(
+        `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+        ctx.now,
+        thread.thread_id,
+        thread.attempt_generation,
+      );
+    },
   );
   if (turn.dispatch_id) {
     await ctx.host.cancelDeviceAgentTurn({
@@ -1026,6 +1138,58 @@ const stopDeviceAttempt = async (
       reason: AGENT_PAUSED_REASON,
     });
   }
+};
+
+const recordPauseRequested = (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  key: string,
+  source: string,
+  detail: Record<string, unknown>,
+): void => {
+  recordAgentChange(
+    ctx.db,
+    { threadId: thread.thread_id, kind: "pause_requested", key, source, detail, always: true, now: ctx.now },
+    () => undefined,
+  );
+};
+
+const beginNextAttempt = (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  input: {
+    clientMsgId: string;
+    fingerprint: string;
+    prompt: string;
+    source: string;
+    detail?: Record<string, unknown>;
+    sql: string;
+  },
+): ThreadRow => {
+  const turnId = crypto.randomUUID();
+  return recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      turnId,
+      kind: startedKind,
+      source: input.source,
+      ...(input.detail ? { detail: input.detail } : {}),
+      now: ctx.now,
+    },
+    () => {
+      ctx.db.run(input.sql, thread.attempt_generation + 1, ctx.now, thread.thread_id);
+      const continued = readThread(ctx.db, thread.thread_id)!;
+      startAttempt(ctx, {
+        thread: continued,
+        turnId,
+        clientMsgId: input.clientMsgId,
+        fingerprint: input.fingerprint,
+        prompt: input.prompt,
+      });
+      return continued;
+    },
+  );
 };
 
 /** Record one attempt and queue its dispatch. */
@@ -1211,34 +1375,54 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
     );
   }
   const threadId = newAgentThreadId();
-  ctx.db.run(
-    `INSERT INTO agent_threads
-       (thread_id, conversation_id, owner_generation, parent_thread_id, origin_device_id, origin_conversation_id,
-        executor_device_id, requested_model, description, placement, agent_type, execution_json,
-        attempt_generation, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'general', ?, 1, 'running', ?, ?)`,
-    threadId,
-    conversationId,
-    args.ownerGeneration,
-    args.parentThreadId ?? null,
-    args.originDeviceId,
-    args.originConversationId,
-    targetDeviceId,
-    targetDeviceId ? (args.model?.trim() || null) : null,
-    clip(args.description.trim(), 1_000),
-    targetDeviceId ? "computer" : "cloud",
-    JSON.stringify(execution),
-    ctx.now,
-    ctx.now,
+  const turnId = crypto.randomUUID();
+  const createdConversationId = conversationId;
+  const thread = recordAgentChange(
+    ctx.db,
+    {
+      threadId,
+      turnId,
+      kind: "spawned",
+      key: `spawned:${threadId}`,
+      source: `device:${args.originDeviceId}`,
+      detail: {
+        executor: targetDeviceId ? "device" : "cloud",
+        ...(destination.waiting ? { waitingForDevice: true } : {}),
+      },
+      now: ctx.now,
+    },
+    () => {
+      ctx.db.run(
+        `INSERT INTO agent_threads
+           (thread_id, conversation_id, owner_generation, parent_thread_id, origin_device_id, origin_conversation_id,
+            executor_device_id, requested_model, description, placement, agent_type, execution_json,
+            attempt_generation, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'general', ?, 1, 'running', ?, ?)`,
+        threadId,
+        createdConversationId,
+        args.ownerGeneration,
+        args.parentThreadId ?? null,
+        args.originDeviceId,
+        args.originConversationId,
+        targetDeviceId,
+        targetDeviceId ? (args.model?.trim() || null) : null,
+        clip(args.description.trim(), 1_000),
+        targetDeviceId ? "computer" : "cloud",
+        JSON.stringify(execution),
+        ctx.now,
+        ctx.now,
+      );
+      const inserted = readThread(ctx.db, threadId)!;
+      startAttempt(ctx, {
+        thread: inserted,
+        turnId,
+        clientMsgId: args.clientMsgId,
+        fingerprint,
+        prompt: args.prompt,
+      });
+      return inserted;
+    },
   );
-  const thread = readThread(ctx.db, threadId)!;
-  startAttempt(ctx, {
-    thread,
-    turnId: crypto.randomUUID(),
-    clientMsgId: args.clientMsgId,
-    fingerprint,
-    prompt: args.prompt,
-  });
   return { ...control(thread), ...(destination.waiting ? { waitingForDevice: true } : {}) };
 };
 
@@ -1276,6 +1460,7 @@ const continueFromDesktop = async (
   ) {
     throw new RpcError("NOT_FOUND", "That cloud thread no longer exists.");
   }
+  const source = `device:${args.originDeviceId}`;
   // A running thread is steered: the attempt that is running takes the
   // message before its next model call, wherever it runs.
   if (ACTIVE_STATUSES.has(thread.status)) {
@@ -1283,7 +1468,7 @@ const continueFromDesktop = async (
       throw threadChanged(thread.thread_id);
     }
     if (thread.executor_device_id) {
-      return await steerDeviceThread(ctx, thread, args.controlRequestId, args.prompt);
+      return await steerDeviceThread(ctx, thread, args.controlRequestId, args.prompt, source);
     }
     const steered = await ctx.host.steerAgentTurn({
       threadId: thread.thread_id,
@@ -1293,6 +1478,9 @@ const continueFromDesktop = async (
       text: args.prompt,
     });
     if (!steered) throw threadChanged(thread.thread_id);
+    recordSteered(ctx, thread.thread_id, runningTurn(ctx.db, thread)?.turn_id ?? null, args.controlRequestId, source, {
+      executor: "cloud",
+    });
     return control(thread);
   }
   if (
@@ -1301,23 +1489,16 @@ const continueFromDesktop = async (
   ) {
     throw threadChanged(thread.thread_id);
   }
-  const attemptGeneration = thread.attempt_generation + 1;
-  ctx.db.run(
-    `UPDATE agent_threads SET
-       status = 'running', attempt_generation = ?,
-       origin_delivery_ack_at = NULL, result_json = NULL, error_message = NULL, updated_at = ?
-     WHERE thread_id = ?`,
-    attemptGeneration,
-    ctx.now,
-    thread.thread_id,
-  );
-  const continued = readThread(ctx.db, thread.thread_id)!;
-  startAttempt(ctx, {
-    thread: continued,
-    turnId: crypto.randomUUID(),
+  const continued = beginNextAttempt(ctx, thread, {
     clientMsgId: args.controlRequestId,
     fingerprint,
     prompt: args.prompt,
+    source,
+    detail: { controlRequestId: args.controlRequestId },
+    sql: `UPDATE agent_threads SET
+       status = 'running', attempt_generation = ?,
+       origin_delivery_ack_at = NULL, result_json = NULL, error_message = NULL, updated_at = ?
+     WHERE thread_id = ?`,
   });
   return control(continued);
 };
@@ -1488,6 +1669,7 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
     to,
     text,
     from: args.from,
+    source: `${ctx.caller ? "client" : "cloud"}:${args.from.threadId}`,
   });
   ctx.db.run(
     "DELETE FROM agent_message_receipts WHERE created_at < ?",
@@ -1516,7 +1698,14 @@ const sentByStarter = (thread: ThreadRow, from: MessageArgs["from"]): boolean =>
 
 const deliverAgentMessage = async (
   ctx: OwnerContext,
-  args: { ownerGeneration: string; messageId: string; to: string; text: string; from: MessageArgs["from"] },
+  args: {
+    ownerGeneration: string;
+    messageId: string;
+    to: string;
+    text: string;
+    from: MessageArgs["from"];
+    source: string;
+  },
 ): Promise<MessageDelivery> => {
   const to = isPlacementThreadId(args.to) ? (placementAliasThreadId(ctx.db, args.to) ?? args.to) : args.to;
   const conversation = ctx.db.one<{ conversation_id: string }>(
@@ -1551,7 +1740,7 @@ const deliverAgentMessage = async (
   }
   if (ACTIVE_STATUSES.has(thread.status)) {
     if (executor.kind === "dispatch") {
-      await steerDeviceThread(ctx, thread, args.messageId, message);
+      await steerDeviceThread(ctx, thread, args.messageId, message, args.source);
       return { delivered: "steered", threadId: to };
     }
     const steered = await ctx.host.steerAgentTurn({
@@ -1561,7 +1750,13 @@ const deliverAgentMessage = async (
       messageId: args.messageId,
       text: message,
     });
-    if (steered) return { delivered: "steered", threadId: to };
+    if (steered) {
+      recordSteered(ctx, to, runningTurn(ctx.db, thread)?.turn_id ?? null, args.messageId, args.source, {
+        executor: "cloud",
+        from: args.from.threadId,
+      });
+      return { delivered: "steered", threadId: to };
+    }
     // Not running yet is not finished: superseding a queued first attempt
     // would drop its prompt.
     const queued = ctx.db.one<{ turn_id: string }>(
@@ -1583,21 +1778,16 @@ const deliverAgentMessage = async (
   if (!current || current.attempt_generation !== thread.attempt_generation) {
     throw threadChanged(to);
   }
-  ctx.db.run(
-    `UPDATE agent_threads SET
-       status = 'running', attempt_generation = ?, origin_delivery_ack_at = NULL,
-       result_json = NULL, error_message = NULL, updated_at = ?
-     WHERE thread_id = ?`,
-    current.attempt_generation + 1,
-    ctx.now,
-    to,
-  );
-  startAttempt(ctx, {
-    thread: readThread(ctx.db, to)!,
-    turnId: crypto.randomUUID(),
+  beginNextAttempt(ctx, current, {
     clientMsgId: args.messageId,
     fingerprint: "agent-message",
     prompt: message,
+    source: args.source,
+    detail: { messageId: args.messageId, from: args.from.threadId },
+    sql: `UPDATE agent_threads SET
+       status = 'running', attempt_generation = ?, origin_delivery_ack_at = NULL,
+       result_json = NULL, error_message = NULL, updated_at = ?
+     WHERE thread_id = ?`,
   });
   return { delivered: "resumed", threadId: to };
 };
@@ -1681,7 +1871,7 @@ const messageLocalThread = async (
   ctx: OwnerContext,
   thread: ThreadRow,
   homeDeviceId: string | null,
-  args: { ownerGeneration: string; messageId: string; framed: string },
+  args: { ownerGeneration: string; messageId: string; framed: string; source: string },
 ): Promise<MessageDelivery> => {
   const threadId = thread.thread_id;
   if (!homeDeviceId) {
@@ -1698,6 +1888,9 @@ const messageLocalThread = async (
     messageId: args.messageId,
     text: args.framed,
   });
+  if (sent.outcome === "steered" || sent.outcome === "resumed" || sent.outcome === "queued") {
+    recordLocalMessage(ctx, threadId, args.messageId, sent.outcome, args.source, deviceId);
+  }
   switch (sent.outcome) {
     case "steered":
     case "resumed":
@@ -1729,6 +1922,7 @@ const messageLocalThread = async (
     kind: "message",
     text: args.framed,
   });
+  recordLocalMessage(ctx, threadId, args.messageId, "held", args.source, deviceId);
   const name = await deviceName(ctx, deviceId);
   return {
     delivered: "queued",
@@ -1738,6 +1932,35 @@ const messageLocalThread = async (
         ? `${name} is offline. The message waits and is delivered to ${threadId} when ${name} reconnects, if that is within an hour.`
         : `${name} did not answer in time. The message is offered to ${threadId} again until ${name} answers, for up to an hour.`,
   };
+};
+
+const recordLocalMessage = (
+  ctx: OwnerContext,
+  threadId: string,
+  messageId: string,
+  delivered: "steered" | "resumed" | "queued" | "held",
+  source: string,
+  deviceId: string,
+): void => {
+  const kind = delivered === "steered" ? "steered" : delivered === "resumed" ? "resume_requested" : "input_queued";
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId,
+      kind,
+      key: `${kind}:${threadId}:${messageId}${kind === "input_queued" ? `:${delivered}` : ""}`,
+      source,
+      detail: {
+        messageId,
+        executor: "local",
+        deviceId,
+        ...(kind === "input_queued" ? { heldBy: delivered === "held" ? "owner" : "device" } : {}),
+      },
+      always: true,
+      now: ctx.now,
+    },
+    () => undefined,
+  );
 };
 
 const settleDeviceMessage = (ctx: OwnerContext, row: DeviceMessageRow, outcome: string): void => {
@@ -1783,13 +2006,17 @@ const runDeviceMessage = async (ctx: OwnerContext, payload: { messageId?: unknow
     await runDevicePause(ctx, row, thread);
     return;
   }
+  const deviceId = resolveCurrentDeviceId(ctx.db, row.device_id);
   const sent = await ctx.host.messageLocalAgent({
-    deviceId: resolveCurrentDeviceId(ctx.db, row.device_id),
+    deviceId,
     threadId: row.thread_id,
     ownerGeneration: row.owner_generation,
     messageId: row.message_id,
     text: row.text,
   });
+  if (sent.outcome === "steered" || sent.outcome === "resumed" || sent.outcome === "queued") {
+    recordLocalMessage(ctx, row.thread_id, row.message_id, sent.outcome, "owner:device-outbox", deviceId);
+  }
   ctx.db.run(
     "UPDATE agent_device_messages SET attempts = attempts + 1 WHERE message_id = ?",
     row.message_id,
@@ -1839,7 +2066,7 @@ const runDevicePause = async (ctx: OwnerContext, row: DeviceMessageRow, thread: 
     dropDeviceMessage(ctx, { ...row, attempts: row.attempts + 1 }, sent.outcome);
     return;
   }
-  if (sent.outcome === "paused") await markLocalThreadPaused(ctx, thread);
+  if (sent.outcome === "paused") await markLocalThreadPaused(ctx, thread, "owner:device-outbox", row.message_id);
   settleDeviceMessage(ctx, row, sent.outcome);
 };
 
@@ -1885,6 +2112,7 @@ const pauseCloudAttempt = async (
   thread: ThreadRow,
   ownerGeneration: string,
   cancelRequestId: string,
+  source: string,
 ): Promise<void> => {
   const turn = runningTurn(ctx.db, thread);
   if (!turn) throw threadChanged(thread.thread_id);
@@ -1898,29 +2126,60 @@ const pauseCloudAttempt = async (
   });
   if (outcome === "changed") throw threadChanged(thread.thread_id);
   const now = Date.now();
-  ctx.db.run(
-    "UPDATE agent_turns SET status = 'paused', updated_at = ? WHERE turn_id = ?",
-    now,
-    turn.turn_id,
-  );
-  ctx.db.run(
-    `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
-      WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
-    now,
-    thread.thread_id,
-    thread.attempt_generation,
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      turnId: turn.turn_id,
+      kind: endedKind,
+      outcome: "paused",
+      source,
+      detail: { cancelRequestId },
+      now,
+    },
+    () => {
+      ctx.db.run(
+        "UPDATE agent_turns SET status = 'paused', updated_at = ? WHERE turn_id = ?",
+        now,
+        turn.turn_id,
+      );
+      ctx.db.run(
+        `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+        now,
+        thread.thread_id,
+        thread.attempt_generation,
+      );
+    },
   );
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
 };
 
 /** A local thread its computer stopped for a pause: recorded, with its journal card. */
-const markLocalThreadPaused = async (ctx: OwnerContext, thread: ThreadRow): Promise<void> => {
-  ctx.db.run(
-    `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
-      WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
-    ctx.now,
-    thread.thread_id,
-    thread.attempt_generation,
+const markLocalThreadPaused = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  source: string,
+  commandId: string,
+): Promise<void> => {
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      kind: endedKind,
+      outcome: "paused",
+      source,
+      detail: { commandId, executor: "local" },
+      now: ctx.now,
+    },
+    () =>
+      ctx.db.run(
+        `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+        ctx.now,
+        thread.thread_id,
+        thread.attempt_generation,
+      ),
   );
   const paused = readThread(ctx.db, thread.thread_id);
   if (paused?.status === "paused" && paused.attempt_generation === thread.attempt_generation) {
@@ -1976,6 +2235,12 @@ const pauseAgent = async (ctx: OwnerContext, args: PauseArgs): Promise<PauseResu
   }
   const executor = threadExecutor(thread);
   if (executor.kind === "harness") throw harnessControlRefused(thread.thread_id, "pause_target_not_found");
+  const source = `${ctx.caller ? "client" : "cloud"}:${args.conversationId}`;
+  recordPauseRequested(ctx, thread, `pause_requested:${receiptId}`, source, {
+    controlRequestId: args.controlRequestId,
+    executor: executor.kind,
+    ...(executor.kind === "dispatch" || executor.kind === "local" ? { deviceId: executor.deviceId } : {}),
+  });
   const device =
     executor.kind === "cloud" || !executor.deviceId
       ? null
@@ -1987,9 +2252,9 @@ const pauseAgent = async (ctx: OwnerContext, args: PauseArgs): Promise<PauseResu
     outcome = "not_running";
     note = thread.status === "paused" ? "It was already paused." : `It had already ${thread.status === "canceled" ? "stopped" : thread.status}; nothing was running.`;
   } else if (executor.kind === "cloud") {
-    await pauseCloudAttempt(ctx, thread, args.ownerGeneration, args.controlRequestId);
+    await pauseCloudAttempt(ctx, thread, args.ownerGeneration, args.controlRequestId, source);
   } else if (executor.kind === "dispatch") {
-    await stopDeviceAttempt(ctx, thread, args.controlRequestId);
+    await stopDeviceAttempt(ctx, thread, args.controlRequestId, source);
     if (device && !device.online) {
       note = `${device.name} is offline right now. The agent is recorded as paused, and it stops there the moment ${device.name} reconnects.`;
     }
@@ -2009,7 +2274,7 @@ const pauseAgent = async (ctx: OwnerContext, args: PauseArgs): Promise<PauseResu
     });
     switch (sent.outcome) {
       case "paused":
-        await markLocalThreadPaused(ctx, thread);
+        await markLocalThreadPaused(ctx, thread, source, commandId);
         break;
       case "not_running":
       case "not_found":
@@ -2030,6 +2295,19 @@ const pauseAgent = async (ctx: OwnerContext, args: PauseArgs): Promise<PauseResu
           kind: "pause",
           text: "",
         });
+        recordAgentChange(
+          ctx.db,
+          {
+            threadId: thread.thread_id,
+            kind: "pause_held",
+            key: `pause_held:${commandId}`,
+            source,
+            detail: { commandId, deviceId, reason: sent.outcome },
+            always: true,
+            now: ctx.now,
+          },
+          () => undefined,
+        );
         outcome = "held";
         note =
           sent.outcome === "unreachable"
@@ -2102,8 +2380,13 @@ const cancelThread = async (ctx: OwnerContext, args: CancelArgs): Promise<Cancel
     throw threadChanged(thread.thread_id);
   }
   if (!runningTurn(ctx.db, thread)) throw threadChanged(thread.thread_id);
+  const source = `device:${args.originDeviceId}`;
+  recordPauseRequested(ctx, thread, `pause_requested:cancel:${args.controlRequestId}`, source, {
+    controlRequestId: args.controlRequestId,
+    via: "agentThreads.cancel",
+  });
   if (thread.executor_device_id) {
-    await stopDeviceAttempt(ctx, thread, args.controlRequestId);
+    await stopDeviceAttempt(ctx, thread, args.controlRequestId, source);
     const stopped: CancelResult = { canceled: true, control: control(readThread(ctx.db, thread.thread_id)!) };
     ctx.db.run(
       "INSERT INTO agent_cancel_receipts (cancel_request_id, thread_id, result_json, created_at) VALUES (?, ?, ?, ?)",
@@ -2114,7 +2397,7 @@ const cancelThread = async (ctx: OwnerContext, args: CancelArgs): Promise<Cancel
     );
     return stopped;
   }
-  await pauseCloudAttempt(ctx, thread, args.ownerGeneration, args.controlRequestId);
+  await pauseCloudAttempt(ctx, thread, args.ownerGeneration, args.controlRequestId, source);
   const result: CancelResult = { canceled: true, control: control(readThread(ctx.db, thread.thread_id)!) };
   ctx.db.run(
     "INSERT INTO agent_cancel_receipts (cancel_request_id, thread_id, result_json, created_at) VALUES (?, ?, ?, ?)",
@@ -2148,10 +2431,20 @@ const acknowledgeDelivery = (
     throw new RpcError("CONFLICT", "That thread is still running.");
   }
   if (thread.origin_delivery_ack_at !== null) return { acknowledged: false, superseded: false };
-  ctx.db.run(
-    "UPDATE agent_threads SET origin_delivery_ack_at = ? WHERE thread_id = ?",
-    ctx.now,
-    thread.thread_id,
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      kind: "delivery_acknowledged",
+      source: `device:${args.originDeviceId}`,
+      now: ctx.now,
+    },
+    () =>
+      ctx.db.run(
+        "UPDATE agent_threads SET origin_delivery_ack_at = ? WHERE thread_id = ?",
+        ctx.now,
+        thread.thread_id,
+      ),
   );
   return { acknowledged: true, superseded: false };
 };
@@ -2194,15 +2487,26 @@ const startComputerThread = async (
     if (args.attemptGeneration < existing.attempt_generation) {
       throw rejectStart("attempt_stale", "A newer attempt of this agent already started.");
     }
-    ctx.db.run(
-      `UPDATE agent_threads SET status = 'running', attempt_generation = ?, description = ?, agent_type = ?,
-         origin_delivery_ack_at = NULL, result_json = NULL, error_message = NULL, updated_at = ?
-       WHERE thread_id = ?`,
-      args.attemptGeneration,
-      args.description,
-      args.agentType,
-      ctx.now,
-      existing.thread_id,
+    recordAgentChange(
+      ctx.db,
+      {
+        threadId: existing.thread_id,
+        kind: startedKind,
+        source: `device:${args.originDeviceId}`,
+        detail: { executor: "local" },
+        now: ctx.now,
+      },
+      () =>
+        ctx.db.run(
+          `UPDATE agent_threads SET status = 'running', attempt_generation = ?, description = ?, agent_type = ?,
+             origin_delivery_ack_at = NULL, result_json = NULL, error_message = NULL, updated_at = ?
+           WHERE thread_id = ?`,
+          args.attemptGeneration,
+          args.description,
+          args.agentType,
+          ctx.now,
+          existing.thread_id,
+        ),
     );
     await postAgentLifecycleCard(ctx, readThread(ctx.db, existing.thread_id)!, { kind: "started" });
     return { threadId: existing.thread_id };
@@ -2210,21 +2514,33 @@ const startComputerThread = async (
   if (args.attemptGeneration !== 1) {
     throw rejectStart("initial_attempt_invalid", "A new agent starts at attempt 1.");
   }
-  ctx.db.run(
-    `INSERT INTO agent_threads
-       (thread_id, conversation_id, owner_generation, parent_thread_id, origin_device_id, origin_conversation_id,
-        description, placement, agent_type, attempt_generation, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'computer', ?, 1, 'running', ?, ?)`,
-    args.threadId,
-    args.conversationId,
-    args.ownerGeneration,
-    args.parentThreadId ?? null,
-    args.originDeviceId,
-    args.conversationId,
-    args.description,
-    args.agentType,
-    ctx.now,
-    ctx.now,
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: args.threadId,
+      kind: "spawned",
+      key: `spawned:${args.threadId}`,
+      source: `device:${args.originDeviceId}`,
+      detail: { executor: "local" },
+      now: ctx.now,
+    },
+    () =>
+      ctx.db.run(
+        `INSERT INTO agent_threads
+           (thread_id, conversation_id, owner_generation, parent_thread_id, origin_device_id, origin_conversation_id,
+            description, placement, agent_type, attempt_generation, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'computer', ?, 1, 'running', ?, ?)`,
+        args.threadId,
+        args.conversationId,
+        args.ownerGeneration,
+        args.parentThreadId ?? null,
+        args.originDeviceId,
+        args.conversationId,
+        args.description,
+        args.agentType,
+        ctx.now,
+        ctx.now,
+      ),
   );
   await postAgentLifecycleCard(ctx, readThread(ctx.db, args.threadId)!, { kind: "started" });
   return { threadId: args.threadId };
@@ -2255,14 +2571,19 @@ const completeComputerThread = async (
     return { updated: false, status: row.status };
   }
   const status = agentThreadTerminalStatus(args.status, args.error);
-  ctx.db.run(
-    `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?, updated_at = ?
-      WHERE thread_id = ?`,
-    status,
-    args.result !== undefined ? JSON.stringify({ finalText: args.result }) : null,
-    status === "paused" ? null : (args.error ?? null),
-    ctx.now,
-    row.thread_id,
+  recordAgentChange(
+    ctx.db,
+    { threadId: row.thread_id, kind: endedKind, outcome: status, source: `device:${args.originDeviceId}`, now: ctx.now },
+    () =>
+      ctx.db.run(
+        `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?, updated_at = ?
+          WHERE thread_id = ?`,
+        status,
+        args.result !== undefined ? JSON.stringify({ finalText: args.result }) : null,
+        status === "paused" ? null : (args.error ?? null),
+        ctx.now,
+        row.thread_id,
+      ),
   );
   await postAgentLifecycleCard(ctx, row, {
     kind: status,
@@ -2282,12 +2603,17 @@ const cancelComputerThread = async (
   if (row.status !== "running") return { canceled: true, status: row.status };
   const reason = args.reason?.trim() || "Canceled on this computer.";
   const status = agentThreadTerminalStatus("canceled", reason);
-  ctx.db.run(
-    "UPDATE agent_threads SET status = ?, error_message = ?, updated_at = ? WHERE thread_id = ?",
-    status,
-    status === "paused" ? null : reason,
-    ctx.now,
-    row.thread_id,
+  recordAgentChange(
+    ctx.db,
+    { threadId: row.thread_id, kind: endedKind, outcome: status, source: `device:${args.originDeviceId}`, now: ctx.now },
+    () =>
+      ctx.db.run(
+        "UPDATE agent_threads SET status = ?, error_message = ?, updated_at = ? WHERE thread_id = ?",
+        status,
+        status === "paused" ? null : reason,
+        ctx.now,
+        row.thread_id,
+      ),
   );
   await postAgentLifecycleCard(ctx, row, { kind: status, text: reason });
   return { canceled: true, status };
@@ -2354,6 +2680,8 @@ const threadOutputFiles = (db: OwnerDbReader, threadId: string): unknown[] => {
   return [...byPath.values()].slice(0, OUTPUT_FILE_CARD_MAX);
 };
 
+const ownerEventKey = (event: AgentThreadEvent): string => `owner-event:${event.kind}:${event.key}`;
+
 /** Apply one event. Safe to replay; late events from older attempts are dropped. */
 export const applyAgentThreadEvent = (
   db: OwnerDb,
@@ -2363,20 +2691,37 @@ export const applyAgentThreadEvent = (
   switch (event.kind) {
     case "turn.started": {
       if (event.turnKind !== "agent" || readTurn(db, event.turnId)) return;
-      db.run(
-        `INSERT INTO agent_turns
-           (turn_id, thread_id, conversation_id, owner_generation, attempt_generation,
-            status, client_msg_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?)
-         ON CONFLICT DO NOTHING`,
-        event.turnId,
-        event.threadId ?? null,
-        event.conversationId,
-        event.ownerGeneration,
-        event.attemptGeneration ?? null,
-        event.clientMsgId ?? null,
-        event.createdAt,
-        event.createdAt,
+      const insert = () =>
+        db.run(
+          `INSERT INTO agent_turns
+             (turn_id, thread_id, conversation_id, owner_generation, attempt_generation,
+              status, client_msg_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, 'running', ?, ?, ?)
+           ON CONFLICT DO NOTHING`,
+          event.turnId,
+          event.threadId ?? null,
+          event.conversationId,
+          event.ownerGeneration,
+          event.attemptGeneration ?? null,
+          event.clientMsgId ?? null,
+          event.createdAt,
+          event.createdAt,
+        );
+      if (!event.threadId) {
+        insert();
+        return;
+      }
+      recordAgentChange(
+        db,
+        {
+          threadId: event.threadId,
+          turnId: event.turnId,
+          kind: "turn_recorded",
+          key: ownerEventKey(event),
+          source: `cloud:${event.conversationId}`,
+          now: event.createdAt,
+        },
+        insert,
       );
       return;
     }
@@ -2408,42 +2753,62 @@ export const applyAgentThreadEvent = (
         return;
       }
       if (event.terminal) {
-        db.run(
-          "UPDATE agent_turns SET status = ?, updated_at = ? WHERE turn_id = ? AND status IN ('running', 'resuming', 'waiting_for_user')",
-          event.terminalStatus ?? "failed",
-          event.createdAt,
-          turn.turn_id,
+        recordAgentChange(
+          db,
+          {
+            threadId: turn.thread_id,
+            turnId: turn.turn_id,
+            kind: "attempt_ended",
+            key: ownerEventKey(event),
+            source: `cloud:${turn.conversation_id ?? ""}`,
+            now: event.createdAt,
+          },
+          () =>
+            db.run(
+              "UPDATE agent_turns SET status = ?, updated_at = ? WHERE turn_id = ? AND status IN ('running', 'resuming', 'waiting_for_user')",
+              event.terminalStatus ?? "failed",
+              event.createdAt,
+              turn.turn_id,
+            ),
         );
       }
       return;
     }
     case "thread.spawned": {
       const thread = readThread(db, event.threadId);
+      const change = {
+        threadId: event.threadId,
+        key: ownerEventKey(event),
+        source: `${event.harness ?? "cloud"}:${event.conversationId}`,
+        now: event.createdAt,
+      };
       if (!thread) {
-        db.run(
-          `INSERT INTO agent_threads
-             (thread_id, conversation_id, owner_generation, parent_turn_id, parent_thread_id,
-              origin_device_id, origin_conversation_id, description, placement,
-              agent_type, execution_json, harness, attempt_generation, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'cloud', 'general', ?, ?, ?, 'running', ?, ?)`,
-          event.threadId,
-          event.conversationId,
-          event.ownerGeneration,
-          event.parentTurnId,
-          event.parentThreadId ?? null,
-          event.originDeviceId ?? null,
-          event.originConversationId ?? null,
-          clip(event.description, 1_000),
-          JSON.stringify(event.execution),
-          event.harness ?? null,
-          event.attemptGeneration,
-          event.createdAt,
-          event.createdAt,
+        recordAgentChange(db, { ...change, kind: "spawned" }, () =>
+          db.run(
+            `INSERT INTO agent_threads
+               (thread_id, conversation_id, owner_generation, parent_turn_id, parent_thread_id,
+                origin_device_id, origin_conversation_id, description, placement,
+                agent_type, execution_json, harness, attempt_generation, status, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'cloud', 'general', ?, ?, ?, 'running', ?, ?)`,
+            event.threadId,
+            event.conversationId,
+            event.ownerGeneration,
+            event.parentTurnId,
+            event.parentThreadId ?? null,
+            event.originDeviceId ?? null,
+            event.originConversationId ?? null,
+            clip(event.description, 1_000),
+            JSON.stringify(event.execution),
+            event.harness ?? null,
+            event.attemptGeneration,
+            event.createdAt,
+            event.createdAt,
+          ),
         );
         return;
       }
-      // A pi harness names its agents uniquely only within its conversation:
-      // another agent's row with the same id is not this one.
+      // A pi harness's older agent ids are unique only within its
+      // conversation: another agent's row with the same id is not this one.
       if (
         event.harness !== undefined &&
         (thread.harness !== event.harness || thread.conversation_id !== event.conversationId)
@@ -2454,24 +2819,28 @@ export const applyAgentThreadEvent = (
       // older one arriving late.
       if (event.attemptGeneration <= thread.attempt_generation) {
         if (event.attemptGeneration === thread.attempt_generation && thread.parent_turn_id === null) {
-          db.run(
-            "UPDATE agent_threads SET parent_turn_id = ? WHERE thread_id = ?",
-            event.parentTurnId,
-            thread.thread_id,
+          recordAgentChange(db, { ...change, kind: "parent_linked" }, () =>
+            db.run(
+              "UPDATE agent_threads SET parent_turn_id = ? WHERE thread_id = ?",
+              event.parentTurnId,
+              thread.thread_id,
+            ),
           );
         }
         return;
       }
-      db.run(
-        `UPDATE agent_threads SET
-           status = 'running', attempt_generation = ?, execution_json = ?,
-           origin_delivery_ack_at = NULL, result_json = NULL, error_message = NULL,
-           updated_at = MAX(updated_at, ?)
-         WHERE thread_id = ?`,
-        event.attemptGeneration,
-        JSON.stringify(event.execution),
-        event.createdAt,
-        thread.thread_id,
+      recordAgentChange(db, { ...change, kind: startedKind }, () =>
+        db.run(
+          `UPDATE agent_threads SET
+             status = 'running', attempt_generation = ?, execution_json = ?,
+             origin_delivery_ack_at = NULL, result_json = NULL, error_message = NULL,
+             updated_at = MAX(updated_at, ?)
+           WHERE thread_id = ?`,
+          event.attemptGeneration,
+          JSON.stringify(event.execution),
+          event.createdAt,
+          thread.thread_id,
+        ),
       );
       return;
     }
@@ -2492,16 +2861,29 @@ export const applyAgentThreadEvent = (
         event.status === "waiting_for_user"
           ? event.status
           : agentThreadTerminalStatus(event.status, event.errorMessage);
-      db.run(
-        `UPDATE agent_threads SET status = ?, attempt_generation = ?, result_json = ?, error_message = ?,
-           updated_at = MAX(updated_at + 1, ?)
-         WHERE thread_id = ?`,
-        status,
-        event.attemptGeneration,
-        event.resultJson ?? null,
-        status === "paused" ? null : (event.errorMessage ?? null),
-        event.completedAt,
-        thread.thread_id,
+      recordAgentChange(
+        db,
+        {
+          threadId: thread.thread_id,
+          kind: status === "waiting_for_user" ? "waiting_for_user" : endedKind,
+          key: ownerEventKey(event),
+          source: `${thread.harness ?? "cloud"}:${thread.conversation_id}`,
+          ...(status !== "waiting_for_user" ? { outcome: status } : {}),
+          detail: { turnId: event.turnId },
+          now: event.completedAt,
+        },
+        () =>
+          db.run(
+            `UPDATE agent_threads SET status = ?, attempt_generation = ?, result_json = ?, error_message = ?,
+               updated_at = MAX(updated_at + 1, ?)
+             WHERE thread_id = ?`,
+            status,
+            event.attemptGeneration,
+            event.resultJson ?? null,
+            status === "paused" ? null : (event.errorMessage ?? null),
+            event.completedAt,
+            thread.thread_id,
+          ),
       );
       // A desktop-dispatched thread reports through that desktop, which may
       // be asleep: its conversation's journal still learns it ended.

@@ -201,6 +201,7 @@ export class OwnerStore {
         sql.exec(query, ...params);
         this.dirty = true;
       },
+      transaction: <T>(fn: () => T): T => this.transaction(fn),
     };
   }
 

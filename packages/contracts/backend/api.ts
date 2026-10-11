@@ -5,6 +5,7 @@
  * changed argument fails to compile on both sides.
  */
 
+import type { AgentEventViews } from "./agent-events.js";
 import type { AgentThreadCalls, AgentThreadViews } from "./agent-threads.js";
 import type { AppSourceCalls } from "./app-source.js";
 import type { BillingCalls, BillingViews } from "./billing.js";
@@ -54,6 +55,7 @@ export type BackendCalls = SystemCalls &
   ClaudeSessionCalls;
 export type BackendViews = ConversationViews &
   AgentThreadViews &
+  AgentEventViews &
   BillingViews &
   DeviceViews &
   HomeViews &

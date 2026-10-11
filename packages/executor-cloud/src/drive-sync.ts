@@ -117,6 +117,7 @@ export type DriveSyncResult = {
    * other has never seen.
    */
   conflicts: Array<{ path: string; driveMoved: boolean }>;
+  untracked: string[];
   /** The ledger once hydration finished: what this disk holds of the drive. */
   ledger: DriveLedgerSnapshot;
 };
@@ -129,6 +130,7 @@ export const emptyDriveSync = (): DriveSyncResult => ({
   deleted: [],
   stale: [],
   conflicts: [],
+  untracked: [],
   ledger: { files: new Map(), syncedAt: 0, checkedThrough: "" },
 });
 
@@ -178,6 +180,9 @@ const TOMBSTONE_MAX = 500;
  * or two late — never a file removed on a guess.
  */
 const PRESENCE_MAX = 500;
+const RESYNC_MAX_FILES = 20_000;
+const RESYNC_MAX_ENTRIES = 100_000;
+const RESYNC_CLOCK_MARGIN_MS = 5 * 60_000;
 
 /** What this workspace last hydrated for a drive path. */
 export type DriveLedgerEntry = {
@@ -815,18 +820,64 @@ type Hydration =
   | { kind: "conflict"; path: string; driveMoved: true }
   | { kind: "skipped"; path: string; reason: string };
 
-/**
- * Whether the drive tree holds anything besides its hydration state: the
- * disk itself, not the agent-writable ledger, is what can prove that a
- * restored tree has no copy to go stale.
- */
-const driveTreeHoldsFiles = async (
+const listDriveTree = async (
   workspaceRoot: string,
   stateRelative: string,
-): Promise<boolean> => {
+): Promise<{ paths: string[]; complete: boolean }> => {
   const stateEntry = stateRelative.split(path.sep)[0];
-  const entries = await readdir(workspaceRoot);
-  return entries.some((entry) => entry !== stateEntry);
+  const paths: string[] = [];
+  const pending: string[] = [""];
+  let visited = 0;
+  while (pending.length > 0) {
+    const relative = pending.pop()!;
+    const entries = await readdir(path.join(workspaceRoot, relative), {
+      withFileTypes: true,
+    }).catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT" || error.code === "ENOTDIR") return [];
+      throw error;
+    });
+    for (const entry of entries) {
+      if (!relative && entry.name === stateEntry) continue;
+      visited += 1;
+      if (visited > RESYNC_MAX_ENTRIES || paths.length >= RESYNC_MAX_FILES) {
+        return { paths: paths.sort(), complete: false };
+      }
+      const child = relative ? `${relative}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) pending.push(child);
+      else if (entry.isFile()) paths.push(child);
+    }
+  }
+  return { paths: paths.sort(), complete: true };
+};
+
+const askDrivePresence = async (
+  post: (route: string, body: unknown) => Promise<Response>,
+  turnId: string,
+  paths: readonly string[],
+): Promise<Set<string>> => {
+  const absent = new Set<string>();
+  for (let index = 0; index < paths.length; index += PRESENCE_MAX) {
+    const have = paths.slice(index, index + PRESENCE_MAX);
+    const response = await post("/api/cloud/drive/sync", {
+      turnId,
+      include: [],
+      have,
+    }).catch(() => null);
+    if (!response?.ok) {
+      throw new Error(
+        `Drive resync failed (${response ? response.status : "no response"}).`,
+      );
+    }
+    const answer = (await response.json()) as { absent?: unknown };
+    if (!Array.isArray(answer.absent)) {
+      throw new Error("Drive resync returned an invalid manifest.");
+    }
+    const asked = new Set(have);
+    for (const value of answer.absent) {
+      if (typeof value === "string" && asked.has(value)) absent.add(value);
+    }
+  }
+  return absent;
 };
 
 export const materializeDriveFiles = async (options: {
@@ -879,6 +930,7 @@ export const materializeDriveFiles = async (options: {
   // the server can answer which of them it no longer has instead of the
   // workspace guessing from what the (capped) file list happens to name.
   const asked = presenceWindow(ledger);
+  const syncStartedAt = Date.now();
   const response = await options
     .post("/api/cloud/drive/sync", {
       turnId: options.turnId,
@@ -926,25 +978,28 @@ export const materializeDriveFiles = async (options: {
   ) {
     throw new Error("Drive sync returned an invalid manifest.");
   }
-  if (
-    manifest.deletedComplete === false &&
-    options.workspaceRestored !== false &&
-    // A restored tree with nothing in it but hydration state holds no copy
-    // that could be stale, so this full sync is already the complete
-    // authoritative resync. That is the workspace an owner has when the
-    // builder restored a world no agent ever hydrated a drive into.
-    (await driveTreeHoldsFiles(workspaceRoot, stateRelative))
-  ) {
-    // The restored checkpoint may contain a file deleted before the server's
-    // retained tombstone window. Running an agent now would present that stale
-    // copy as current drive truth, and prefix-sweeping is unsafe because this
-    // same tree also contains undelivered agent work. The builder's restore
-    // descriptor is the authority here: the agent-writable ledger cannot
-    // prove that a sandbox is fresh. Fail before touching the workspace or
-    // advancing its ledger.
-    throw new Error(
-      "Drive sync refused an incomplete deletion history; a complete authoritative resync is required before this workspace can run.",
-    );
+  let resyncAbsent: Set<string> | null = null;
+  let resyncComplete = false;
+  if (manifest.deletedComplete === false) {
+    if (options.workspaceRestored === false) {
+      resyncComplete = true;
+    } else {
+      const tree = await listDriveTree(workspaceRoot, stateRelative);
+      if (tree.paths.length > 0) {
+        options.onProgress?.(
+          `Checking ${tree.paths.length} drive ${tree.paths.length === 1 ? "file" : "files"} in this workspace against the drive.`,
+        );
+      }
+      const prefixed = tree.paths.map(
+        (relative) => `${manifest.prefix}${relative}`,
+      );
+      resyncAbsent = await askDrivePresence(
+        options.post,
+        options.turnId,
+        prefixed,
+      );
+      resyncComplete = tree.complete;
+    }
   }
   const visible = (entry: { path?: unknown } | null | undefined) =>
     !(entry && typeof entry.path === "string" && isEvidenceThumbnailDrivePath(entry.path));
@@ -962,6 +1017,7 @@ export const materializeDriveFiles = async (options: {
     deleted: [],
     stale: [],
     conflicts: [],
+    untracked: [],
     ledger: emptyDriveSync().ledger,
   };
 
@@ -995,12 +1051,25 @@ export const materializeDriveFiles = async (options: {
         .filter((value): value is string => typeof value === "string")
     : [];
   const named = new Set(tombstones.map((entry) => entry.path));
-  for (const drivePath of absent) {
-    if (named.has(drivePath) || !ledger.files.has(drivePath)) continue;
+  const listedLive = new Set(
+    [...entries, ...manifest.skipped].flatMap((entry) =>
+      entry && typeof entry.path === "string" ? [entry.path] : [],
+    ),
+  );
+  const untracked = new Set<string>();
+  for (const drivePath of [...absent, ...(resyncAbsent ?? [])]) {
     if (prefix && !drivePath.startsWith(prefix)) continue;
+    if (!ledger.files.has(drivePath)) {
+      if (resyncAbsent?.has(drivePath) && !listedLive.has(drivePath)) {
+        untracked.add(drivePath);
+      }
+      continue;
+    }
+    if (named.has(drivePath)) continue;
     named.add(drivePath);
     tombstones.push({ path: drivePath, relativePath: "", deletedAt: 0 });
   }
+  result.untracked = [...untracked];
   let ledgerDropped = 0;
   if (tombstones.length > 0) {
     const applied = await applyTombstones(
@@ -1362,8 +1431,11 @@ export const materializeDriveFiles = async (options: {
     manifest.syncedAt > 0
       ? Math.floor(manifest.syncedAt)
       : ledger.syncedAt;
-  const moved = answered !== ledger.syncedAt;
-  ledger.syncedAt = answered;
+  const resolved = resyncComplete
+    ? Math.max(answered, syncStartedAt - RESYNC_CLOCK_MARGIN_MS)
+    : answered;
+  const moved = resolved !== ledger.syncedAt;
+  ledger.syncedAt = resolved;
   // Same rule for the presence window: it advances only once its answer has
   // been applied, so a turn that threw asks about the same slice again.
   const walked = asked.at(-1) ?? ledger.checkedThrough;
@@ -1396,6 +1468,12 @@ export const materializeDriveFiles = async (options: {
     const kept = result.stale.length;
     notes.push(
       `Kept ${kept} changed ${kept === 1 ? "copy" : "copies"} of ${kept === 1 ? "a file" : "files"} deleted from the drive.`,
+    );
+  }
+  if (result.untracked.length > 0) {
+    const kept = result.untracked.length;
+    notes.push(
+      `Kept ${kept} workspace ${kept === 1 ? "file" : "files"} the drive does not have.`,
     );
   }
   if (result.conflicts.length > 0) {

@@ -21,7 +21,7 @@ import {
   releaseRecordingAudioSession,
   type RecordingAudioLease,
 } from "./mobile-audio-session";
-import { stopReadAloudForDictation, waitForReadAloudRelease } from "./read-aloud";
+import { stopReadAloudForDictation } from "./read-aloud";
 import {
   DICTATION_MAX_PCM_BYTES,
   DICTATION_SAMPLE_RATE,
@@ -275,11 +275,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         return false;
       }
 
-      await waitForReadAloudRelease();
-      if (!mountedRef.current) {
-        operationInFlightRef.current = false;
-        return false;
-      }
       phase = "audio-session";
       const lease = await acquireRecordingAudioSession();
       if (lease === null) {
@@ -523,6 +518,11 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
   useEffect(() => {
     mountedRef.current = true;
     return () => {
+      const ownsRecorder =
+        statusRef.current !== "idle" ||
+        operationInFlightRef.current ||
+        captureRef.current !== null ||
+        recordingLeaseRef.current !== null;
       mountedRef.current = false;
       statusRef.current = "idle";
       discardCapture(captureRef.current);
@@ -530,7 +530,9 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       audioSubscriptionRef.current = null;
       stopDictationMeter();
       resetDictationTranscriptPreview();
-      void AudioStudioModule.stopRecording().catch(() => undefined);
+      if (ownsRecorder) {
+        void AudioStudioModule.stopRecording().catch(() => undefined);
+      }
       void releaseAudioMode();
     };
   }, [discardCapture, releaseAudioMode]);

@@ -100,8 +100,8 @@ import { sanitizeSensitiveData } from "@stella/contracts/sensitive-data";
 import { stellaAgentShellEnvironment } from "../tools/stella-agent-env.js";
 import { markImageOperationDelivered } from "../tools/image-operation-store.js";
 import {
+  claudeCliCanResume,
   claudeCliVersion,
-  compareClaudeCliVersions,
   hashClaudeReplyText,
 } from "../integrations/claude-code-session-files.js";
 import {
@@ -835,12 +835,7 @@ const adoptRestoredClaudeSession = async (args: {
   if (!sameWorkingFolder(restored.cwd, args.cwd)) {
     return reject("working_folder_changed");
   }
-  const localCli = await claudeCliVersion();
-  if (
-    restored.cliVersion !== "unknown" &&
-    localCli !== "unknown" &&
-    compareClaudeCliVersions(localCli, restored.cliVersion) < 0
-  ) {
+  if (!claudeCliCanResume(await claudeCliVersion(), restored.cliVersion)) {
     return reject("cli_older_than_origin");
   }
   const history = buildHistorySource(args.opts.agentContext);

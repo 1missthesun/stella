@@ -20,11 +20,11 @@ import {
 } from "@stella/contracts/backend/claude-sessions";
 import { createRuntimeLogger } from "../debug.js";
 import {
+  claudeCliCanResume,
   claudeCliVersion,
   claudeSessionFileAbsolutePath,
   claudeSessionProjectDir,
   claudeSessionReplyHashes,
-  compareClaudeCliVersions,
   listClaudeSessionFiles,
   resolveClaudeWorkingFolder,
   writeFileAtomically,
@@ -885,10 +885,7 @@ export const createClaudeSessionSync = (options: {
       originCwd: manifest.originCwd,
       cliVersion: manifest.cliVersion,
       localCliVersion,
-      cliCompatible:
-        manifest.cliVersion === "unknown" ||
-        localCliVersion === "unknown" ||
-        compareClaudeCliVersions(localCliVersion, manifest.cliVersion) >= 0,
+      cliCompatible: claudeCliCanResume(localCliVersion, manifest.cliVersion),
       ...(manifest.journalCursor ? { journalCursor: manifest.journalCursor } : {}),
       ...(manifest.journalSeq !== undefined ? { journalSeq: manifest.journalSeq } : {}),
       syncedAt: manifest.updatedAt,

@@ -115,6 +115,13 @@ export const compareClaudeCliVersions = (left: string, right: string): number =>
   return 0;
 };
 
+export const claudeCliCanResume = (local: string, origin: string): boolean => {
+  if (local === "unknown" || origin === "unknown") return true;
+  if (compareClaudeCliVersions(local, origin) >= 0) return true;
+  const minor = (value: string) => /^(\d+)\.(\d+)\./.exec(value)?.slice(1, 3).join(".");
+  return minor(local) !== undefined && minor(local) === minor(origin);
+};
+
 export const hashClaudeReplyText = (text: string): string =>
   crypto.createHash("sha256").update(text.trim()).digest("hex");
 

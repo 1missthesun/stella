@@ -9,6 +9,7 @@
 import {
   samePiBrainHost,
   type PiBrainClaim,
+  type PiBrainHost,
   type PiBrainRecord,
 } from "@stella/contracts/turn-plane/pi-brain";
 
@@ -19,6 +20,8 @@ export type BrainLeaseView = {
   claim(conversationId: string): PiBrainClaim;
   /** Whether this computer holds the conversation's lease, as last seen; undefined when unknown. */
   holds(conversationId: string): boolean | undefined;
+  /** The host holding the conversation's lease, as last seen; undefined when unknown or none. */
+  holder(conversationId: string): PiBrainHost | undefined;
   /** Whether work done under `epoch` belongs to a lease the conversation has since moved past. */
   superseded(conversationId: string, epoch: number): boolean;
   /**
@@ -59,6 +62,13 @@ export const createBrainLeaseView = (deviceId: string): BrainLeaseView => {
       if (!records.has(conversationId)) return undefined;
       const record = records.get(conversationId);
       return record ? samePiBrainHost(record, { host: "device", deviceId }) : false;
+    },
+    holder(conversationId) {
+      const record = records.get(conversationId);
+      if (!record) return undefined;
+      return record.host === "cloud"
+        ? { host: "cloud" }
+        : { host: "device", deviceId: record.deviceId, ...(record.label ? { label: record.label } : {}) };
     },
     superseded(conversationId, epoch) {
       const record = records.get(conversationId);

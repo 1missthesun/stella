@@ -590,27 +590,72 @@ export const createAgentOrchestration = (
           ...(deliveryEventId ? { eventId: deliveryEventId } : {}),
         });
       } else {
-        await deps.sendMessage({
-          conversationId: event.conversationId,
-          text: orchestratorPrompt,
-          uiVisibility: "hidden",
-          agentType: AGENT_IDS.ORCHESTRATOR,
-          deliverAs: "steer",
-          callbackRunId: event.rootRunId,
-          customType: "runtime.task_lifecycle",
-          ...(event.ownerGeneration
-            ? { ownerGeneration: event.ownerGeneration }
-            : {}),
-          ...(deliveryEventId ? { eventId: deliveryEventId } : {}),
-          display: false,
-          responseTarget: createAgentLifecycleResponseTarget({
-            agentId: event.agentId,
-            eventType: event.type,
-            ...(event.type === "agent-completed" && event.eventId
-              ? { completionEventId: event.eventId }
+        // Another host holds this conversation's brain lease: the report
+        // wakes Stella there, never a second Claude Code brain here. Only a
+        // holder that can't take it now leaves it to this computer, whose
+        // turn then claims the lease (a takeover, or refused while it lives).
+        const holder =
+          context.brainLeases.holds(event.conversationId) === false
+            ? context.brainLeases.holder(event.conversationId)
+            : undefined;
+        const noted =
+          holder && context.state.brainNote
+            ? await context.state
+                .brainNote({
+                  conversationId: event.conversationId,
+                  host: holder,
+                  id: `cc-report:${crypto
+                    .createHash("sha256")
+                    .update(
+                      `${context.deviceId}\0${event.conversationId}\0${
+                        deliveryEventId ??
+                        `${event.agentId}:${event.attemptGeneration ?? 0}:${event.type}`
+                      }`,
+                    )
+                    .digest("hex")
+                    .slice(0, 48)}`,
+                  text: orchestratorPrompt,
+                })
+                .catch((error: unknown) => {
+                  console.warn(
+                    "[agent-report] the brain lease holder did not take the report",
+                    error instanceof Error ? error.message : error,
+                  );
+                  return false;
+                })
+            : false;
+        if (noted) {
+          persistThreadCustomMessage(context.runtimeStore, {
+            threadKey: orchestratorThreadKey,
+            customType: TASK_LIFECYCLE_CUSTOM_TYPE,
+            content: [{ type: "text", text: orchestratorPrompt }],
+            display: false,
+            timestamp: Date.now(),
+            ...(deliveryEventId ? { eventId: deliveryEventId } : {}),
+          });
+        } else {
+          await deps.sendMessage({
+            conversationId: event.conversationId,
+            text: orchestratorPrompt,
+            uiVisibility: "hidden",
+            agentType: AGENT_IDS.ORCHESTRATOR,
+            deliverAs: "steer",
+            callbackRunId: event.rootRunId,
+            customType: "runtime.task_lifecycle",
+            ...(event.ownerGeneration
+              ? { ownerGeneration: event.ownerGeneration }
               : {}),
-          }),
-        });
+            ...(deliveryEventId ? { eventId: deliveryEventId } : {}),
+            display: false,
+            responseTarget: createAgentLifecycleResponseTarget({
+              agentId: event.agentId,
+              eventType: event.type,
+              ...(event.type === "agent-completed" && event.eventId
+                ? { completionEventId: event.eventId }
+                : {}),
+            }),
+          });
+        }
       }
     } finally {
       if (deliveryEventId) inFlightLifecycleEventIds.delete(deliveryEventId);
@@ -815,7 +860,9 @@ export const createAgentOrchestration = (
             settled: resource.settled,
           }),
         ...(toolWorkspaceRoot ? { toolWorkspaceRoot } : {}),
-        ...(workingDirectory ? { agentWorkingDirectory: workingDirectory } : {}),
+        ...(workingDirectory
+          ? { agentWorkingDirectory: workingDirectory }
+          : {}),
         ...(steering ? { steering } : {}),
         compactionScheduler: context.state.compactionScheduler,
         onProgress,

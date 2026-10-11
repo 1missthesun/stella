@@ -577,6 +577,10 @@ export const createStellaHostRunner = (
       if (engine) context.state.piAgentEngine = engine;
       else delete context.state.piAgentEngine;
     },
+    setBrainNote: (note) => {
+      if (note) context.state.brainNote = note;
+      else delete context.state.brainNote;
+    },
     deliverOrchestratorNote: async (note) => {
       if (desktopPiChatEnabled(getAgentRuntimeEngine(context.stellaDataDir))) {
         const deliver = context.state.piReportDelivery;

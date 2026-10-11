@@ -33,6 +33,7 @@ import {
   reconcileComputerAgents,
   resumePiChats,
 } from "./pi-chats.js";
+import { brainFor } from "./pi-brain.js";
 import * as SessionConfig from "./session/config.js";
 import * as SessionStorage from "./session/storage.js";
 import * as RunEventBus from "./session/run-events.js";
@@ -564,6 +565,13 @@ export const layer = Layer.effect(
                     );
                     builtRunner?.setPiAgentEngine(
                       piAgentEngineFor(session, hostBus),
+                    );
+                    builtRunner?.setBrainNote(
+                      async ({ conversationId, host, id, text }) =>
+                        (await brainFor(session, hostBus, conversationId)?.note(
+                          host,
+                          { id, text },
+                        )) ?? false,
                     );
                     // The initialize-time warm below no-ops while the runner
                     // is still building; warm once it exists, as before.

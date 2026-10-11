@@ -274,10 +274,7 @@ export const piChatsFor = (
       // The models the picker lists: models.json and extension providers, builtin overrides.
       resolveDirectModel: (reference) =>
         resolveDirectLlmRoute({ stellaAppDir: session.config.get().stellaDataDirPath, modelName: reference }),
-      thinkingLevel: () => {
-        const effort = getReasoningEffort(session.config.get().stellaDataDirPath, "orchestrator");
-        return effort === "default" ? "off" : effort;
-      },
+      thinkingLevel: () => getReasoningEffort(session.config.get().stellaDataDirPath, "orchestrator"),
       refreshAuthToken: async () => {
         const result = (await hostBus.request(
           METHOD_NAMES.HOST_RUNTIME_AUTH_REFRESH,

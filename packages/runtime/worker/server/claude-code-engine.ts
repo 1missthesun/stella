@@ -39,12 +39,12 @@ const IMAGE_TYPES = new Set<AuthorizedToolImage["mimeType"]>(["image/png", "imag
 
 const EFFORT_BY_THINKING: Record<ModelThinkingLevel, AgentModelReasoningEffort | undefined> = {
   off: undefined,
-  minimal: "minimal",
+  minimal: "low",
   low: "low",
   medium: "medium",
   high: "high",
   xhigh: "xhigh",
-  max: "xhigh",
+  max: "max",
 };
 
 const sameFolder = (left: string, right: string | undefined): boolean => {

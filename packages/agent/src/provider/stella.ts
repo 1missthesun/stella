@@ -27,6 +27,7 @@ import {
   GATEWAY_REQUEST_ID_HEADER,
   type GatewayProtocol,
 } from "@stella/contracts/gateway/api";
+import { REASONING_EFFORT_PASSTHROUGH } from "@stella/contracts/reasoning-effort";
 import { anthropicMessageToSse, chatCompletionToSse, responseToSse } from "./relay-sse.ts";
 
 export const STELLA_PROVIDER_ID = "stella";
@@ -98,6 +99,8 @@ export function stellaModel(spec: StellaModelSpec, relayBaseUrl: string): Model<
     provider: STELLA_PROVIDER_ID,
     baseUrl: relayBaseUrl,
     reasoning: spec.reasoning ?? true,
+    thinkingLevelMap: { ...REASONING_EFFORT_PASSTHROUGH },
+    ...(api === "anthropic-messages" ? { compat: { forceAdaptiveThinking: true } } : {}),
     input: spec.supportsImages === false ? ["text"] : ["text", "image"],
     // Stella bills through the gateway ledger; pi.usage keeps tokens only.
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },

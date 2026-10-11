@@ -98,18 +98,18 @@ export const getClaudeCodeAgentModelId = (
 
 /**
  * Map the stored reasoning effort to a Claude Code `CLAUDE_CODE_EFFORT_LEVEL`
- * value. Returns undefined for "default" so the CLI keeps its model default.
- * Claude Code has no "minimal" tier, so it folds into "low".
+ * value. Claude Code takes every level natively and itself falls back to the
+ * nearest level a model supports.
  */
 const CLAUDE_CODE_EFFORT_BY_REASONING: Record<
-  Exclude<AgentModelReasoningEffort, "default" | "none">,
+  Exclude<AgentModelReasoningEffort, "none">,
   string
 > = {
-  minimal: "low",
   low: "low",
   medium: "medium",
   high: "high",
   xhigh: "xhigh",
+  max: "max",
 };
 
 export const getClaudeCodeRuntimeEffortLevel = (
@@ -118,15 +118,13 @@ export const getClaudeCodeRuntimeEffortLevel = (
 ): string | undefined => {
   // A spawn suffix is authoritative for this run only and never writes the
   // engine-wide preference or environment configuration.
-  if (spawnOverride === "default") return undefined;
   if (spawnOverride === "none") return undefined;
   if (spawnOverride) return CLAUDE_CODE_EFFORT_BY_REASONING[spawnOverride];
   const envOverride = process.env.CLAUDE_CODE_EFFORT_LEVEL?.trim();
   if (envOverride) return envOverride;
   const prefs = stellaAppDir ? loadLocalPreferences(stellaAppDir) : null;
   const effort = prefs?.claudeCodeReasoningEffort;
-  if (!effort || effort === "default") return undefined;
-  return CLAUDE_CODE_EFFORT_BY_REASONING[effort];
+  return effort ? CLAUDE_CODE_EFFORT_BY_REASONING[effort] : undefined;
 };
 
 type PromptContentPart =

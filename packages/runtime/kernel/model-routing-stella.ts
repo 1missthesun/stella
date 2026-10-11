@@ -5,6 +5,7 @@ import {
 import { Buffer } from "node:buffer";
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { StellaGatewayAccess } from "@stella/agent/provider/stella";
+import { REASONING_EFFORT_PASSTHROUGH } from "@stella/contracts/reasoning-effort";
 import {
   findRegistryModel,
   findRegistryModelsById,
@@ -301,6 +302,7 @@ const createRelayModel = (args: {
       lookup.candidates,
     );
 
+  const api = args.api ?? apiForRelay(args.provider, registryModel);
   const model = {
     ...(registryModel ?? {
       id: nativeId,
@@ -315,8 +317,20 @@ const createRelayModel = (args: {
     }),
     id: args.requestedModelId,
     name: modelName(args.requestedModelId),
+    thinkingLevelMap: {
+      ...(registryModel?.thinkingLevelMap ?? {}),
+      ...REASONING_EFFORT_PASSTHROUGH,
+    },
+    ...(api === "anthropic-messages"
+      ? {
+          compat: {
+            ...((registryModel?.compat as Record<string, unknown>) ?? {}),
+            forceAdaptiveThinking: true,
+          },
+        }
+      : {}),
     provider: registryModel?.provider ?? args.provider,
-    api: args.api ?? apiForRelay(args.provider, registryModel),
+    api,
     baseUrl: relayBaseUrlFor(args.siteBaseUrl, args.gatewayOrigin),
     headers: {
       ...(registryModel?.headers ?? {}),

@@ -714,7 +714,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       return { engine: CLOUD_THREAD_ENGINE };
     }
     if (placement) return { there: true };
-    const effort = /^(.+):(minimal|low|medium|high|xhigh)$/.exec(requested.trim());
+    const effort = /^(.+):(low|medium|high|xhigh|max)$/.exec(requested.trim());
     const reference = (effort?.[1] ?? requested).trim();
     const stellaDefault = reference.toLowerCase() === "stella";
     const pick = stellaDefault ? undefined : parseModelPick(reference);
@@ -724,7 +724,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       );
     }
     const model = await modelOfPick(pick, "general");
-    return { runsOn: { model, ...(effort ? { thinkingLevel: effort[2] as ModelThinkingLevel } : {}) } };
+    const thinkingLevel = (effort?.[2] as ModelThinkingLevel | undefined) ?? options.thinkingLevel?.();
+    return { runsOn: { model, ...(thinkingLevel ? { thinkingLevel } : {}) } };
   };
 
   /**

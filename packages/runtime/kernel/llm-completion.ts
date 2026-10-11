@@ -105,13 +105,11 @@ export async function completeOnRoute(
   const { apiKey: givenKey, ...request } = options;
   const models = createModels();
   if (route.stella) {
-    // The gateway decides how a Stella model reasons, so a request carries
-    // no reasoning controls at all (not even an explicit "none").
-    const { reasoning: _reasoning, ...managed } = request;
-    const { access } = route.stella;
-    const spec = { ...route.stella.spec, reasoning: false };
+    // A pinned level reaches the gateway, which maps it to the upstream
+    // model; without one the gateway uses the route's own default.
+    const { access, spec } = route.stella;
     models.setProvider(stellaProvider({ access, models: [spec] }));
-    return await models.completeSimple(stellaModel(spec, access.relayBaseUrl), context, managed);
+    return await models.completeSimple(stellaModel(spec, access.relayBaseUrl), context, request);
   }
   // Reading the key applies the route's configured models.json headers.
   const apiKey = givenKey ?? (await route.getApiKey())?.trim();

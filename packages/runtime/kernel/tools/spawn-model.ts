@@ -7,6 +7,7 @@ import type {
   SpawnEngineSelection,
   SpawnReasoningEffort,
 } from "@stella/contracts/agent-engine";
+import { REASONING_EFFORT_LEVELS } from "@stella/contracts/reasoning-effort";
 import { STELLA_DEFAULT_MODEL } from "@stella/contracts/stella-api";
 import { isRegisteredModelReference } from "../model-catalog.js";
 import {
@@ -38,12 +39,9 @@ export type SpawnModelSelection =
       reasoningEffort?: SpawnReasoningEffort;
     };
 
-const SPAWN_REASONING_EFFORTS = new Set<SpawnReasoningEffort>([
-  "low",
-  "medium",
-  "high",
-  "xhigh",
-]);
+const SPAWN_REASONING_EFFORTS = new Set<SpawnReasoningEffort>(
+  REASONING_EFFORT_LEVELS,
+);
 
 const splitSpawnReasoningSuffix = (
   raw: string,
@@ -60,7 +58,7 @@ const splitSpawnReasoningSuffix = (
 
 const invalidSpawnReasoningSuffix = (suffix: string): Error =>
   new Error(
-    `Invalid spawn_agent model reasoning suffix ":${suffix}". Expected one of :low, :medium, :high, or :xhigh; open-ended gateway references keep colons verbatim.`,
+    `Invalid spawn_agent model reasoning suffix ":${suffix}". Expected one of :low, :medium, :high, :xhigh, or :max; open-ended gateway references keep colons verbatim.`,
   );
 
 /**
@@ -73,7 +71,7 @@ const invalidSpawnReasoningSuffix = (suffix: string): Error =>
  *   - anything else                  → plain model reference, resolved through
  *                                      the normal model-routing path
  *
- * Closed known forms may end in `:low`, `:medium`, `:high`, or `:xhigh`.
+ * Closed known forms may end in `:low`, `:medium`, `:high`, `:xhigh`, or `:max`.
  * Open-ended provider model identifiers preserve colons verbatim.
  */
 export const parseSpawnAgentModel = (

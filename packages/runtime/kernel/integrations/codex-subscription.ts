@@ -3,33 +3,20 @@ import {
   DEFAULT_CODEX_SERVICE_TIER,
   type CodexServiceTier,
 } from "@stella/contracts/agent-engine";
+import {
+  parseReasoningEffortLevel,
+  type ReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
 import { loadLocalPreferences } from "../preferences/local-preferences.js";
 
-type CodexReasoningEffort =
-  | "none"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+type CodexReasoningEffort = "none" | ReasoningEffortLevel;
 
 export const CODEX_LIGHT_MODEL = "gpt-5.4-mini";
 
 const normalizeCodexReasoningEffort = (
   value: unknown,
-): CodexReasoningEffort | undefined => {
-  if (
-    value === "none" ||
-    value === "minimal" ||
-    value === "low" ||
-    value === "medium" ||
-    value === "high" ||
-    value === "xhigh"
-  ) {
-    return value;
-  }
-  return undefined;
-};
+): CodexReasoningEffort | undefined =>
+  value === "none" ? "none" : parseReasoningEffortLevel(value);
 
 /**
  * Resolve the ChatGPT subscription model settings a Codex selection captures
@@ -63,10 +50,7 @@ export const getCodexSubscriptionPreferences = (
   const envReasoning = normalizeCodexReasoningEffort(
     process.env.STELLA_CODEX_REASONING_EFFORT?.trim(),
   );
-  const prefReasoning = prefs?.codexReasoningEffort;
-  const reasoningEffort =
-    envReasoning ??
-    (prefReasoning && prefReasoning !== "default" ? prefReasoning : undefined);
+  const reasoningEffort = envReasoning ?? prefs?.codexReasoningEffort;
   return {
     model,
     ...(reasoningEffort ? { reasoningEffort } : {}),

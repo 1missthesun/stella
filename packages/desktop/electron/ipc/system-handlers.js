@@ -9,6 +9,7 @@ import { exportDesktopDebugLogs, getDesktopDebugPaths } from "../observability/d
 import { resolveLogPaths } from "@stella/runtime/observability/log-paths";
 import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, saveLocalPreferences, setOnboardingCompleted, updateLocalModelPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { coerceAgentRuntimeEngine } from "@stella/contracts/agent-engine";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
 import { hasRealtimeVoiceSessionRouteChanged, } from "@stella/contracts/local-preferences";
 import { resetStellaCustomizations } from "@stella/runtime/kernel/home/reset-customizations";
@@ -374,26 +375,11 @@ const sanitizeReasoningEfforts = (value) => {
         const trimmedKey = asTrimmedString(key);
         if (!trimmedKey)
             continue;
-        if (entryValue === "minimal" ||
-            entryValue === "low" ||
-            entryValue === "medium" ||
-            entryValue === "high" ||
-            entryValue === "xhigh") {
-            nextRecord[trimmedKey] = entryValue;
-        }
+        nextRecord[trimmedKey] = normalizeReasoningEffortLevel(entryValue);
     }
     return nextRecord;
 };
-const sanitizeReasoningEffort = (value) => {
-    if (value === "minimal" ||
-        value === "low" ||
-        value === "medium" ||
-        value === "high" ||
-        value === "xhigh") {
-        return value;
-    }
-    return "default";
-};
+const sanitizeReasoningEffort = (value) => normalizeReasoningEffortLevel(value);
 let preventSleepBlockerId = null;
 export const setPreventComputerSleep = (enabled) => {
     if (enabled) {

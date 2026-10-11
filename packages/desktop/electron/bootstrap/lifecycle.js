@@ -148,6 +148,7 @@ export const registerBootstrapLifecycle = (context) => {
         }
         event.preventDefault();
         context.state.isQuitting = true;
+        context.services.globalInputHook.dispose();
         void (async () => {
             const startedAt = Date.now();
             await runQuitPhase(context, "before-quit");

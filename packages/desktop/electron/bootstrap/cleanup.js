@@ -124,7 +124,7 @@ export const registerBootstrapProcessCleanups = (context) => {
         stopNativeHelperDaemons();
     });
     processRuntime.registerCleanup("before-quit", "global-input-hooks", () => {
-        context.services.globalInputHook.stop();
+        context.services.globalInputHook.dispose();
         context.state.globalInputHooksStarted = false;
         context.state.globalInputHooksStartScheduled = false;
     });

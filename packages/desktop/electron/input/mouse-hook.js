@@ -27,6 +27,7 @@ const ALT_TAP_MAX_MS = 400;
  */
 export class MouseHookManager {
     started = false;
+    disposed = false;
     uiohookListenersAttached = false;
     uiohookStarted = false;
     pressedKeycodes = new Set();
@@ -37,7 +38,7 @@ export class MouseHookManager {
         this.handlers = handlers;
     }
     start() {
-        if (this.started)
+        if (this.started || this.disposed)
             return;
         this.started = true;
         try {
@@ -52,11 +53,12 @@ export class MouseHookManager {
         }
     }
     stop() {
-        if (!this.started)
+        if (!this.started && !this.uiohookStarted && !this.uiohookListenersAttached)
             return;
         this.started = false;
         this.altDownAt = null;
         this.pressedKeycodes.clear();
+        this.detachUiohookListeners();
         if (this.uiohookStarted) {
             try {
                 getUiohook().stop();
@@ -66,7 +68,10 @@ export class MouseHookManager {
             }
             this.uiohookStarted = false;
         }
-        this.detachUiohookListeners();
+    }
+    dispose() {
+        this.disposed = true;
+        this.stop();
     }
     isHookRunning() {
         return this.uiohookStarted;

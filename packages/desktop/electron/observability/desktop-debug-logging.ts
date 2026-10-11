@@ -20,6 +20,7 @@ const EXPORT_WINDOW_MS = 24 * 60 * 60 * 1_000;
 const MAX_EXPORT_FILE_BYTES = 50 * 1024 * 1024;
 const MAX_EXPORT_TOTAL_BYTES = 200 * 1024 * 1024;
 const NET_LOG_MAX_BYTES = 20 * 1024 * 1024;
+const NET_LOG_SIZE_CHECK_MS = 30_000;
 
 type DebugPaths = {
   root: string;
@@ -37,6 +38,8 @@ export type DebugExportEntry = {
 
 let debugPaths: DebugPaths | null = null;
 let initialized = false;
+let netLogSizeTimer: ReturnType<typeof setInterval> | null = null;
+let netLogRotating = false;
 
 const stamp = (): string =>
   new Date()
@@ -159,19 +162,53 @@ export const initDesktopDebugLogging = (stellaAppDir: string): void => {
 
 export const getDesktopDebugPaths = (): DebugPaths | null => debugPaths;
 
+const previousNetworkLogPath = (networkLog: string): string =>
+  path.join(path.dirname(networkLog), "network.previous.netlog");
+
+const retireCurrentNetworkLog = async (networkLog: string): Promise<void> => {
+  const size = await stat(networkLog)
+    .then((info) => info.size)
+    .catch(() => 0);
+  if (size === 0) return;
+  await rename(networkLog, previousNetworkLogPath(networkLog));
+};
+
+const rotateNetworkLogIfFull = async (): Promise<void> => {
+  const paths = debugPaths;
+  if (!paths || netLogRotating || !netLog.currentlyLogging) return;
+  const size = await stat(paths.networkLog)
+    .then((info) => info.size)
+    .catch(() => 0);
+  if (size <= NET_LOG_MAX_BYTES) return;
+  netLogRotating = true;
+  try {
+    await netLog.stopLogging();
+    await startDesktopNetworkLogging();
+  } catch (error) {
+    log.scope("network").warn("failed to rotate network log", { error });
+  } finally {
+    netLogRotating = false;
+  }
+};
+
 export const startDesktopNetworkLogging = async (): Promise<void> => {
   const paths = debugPaths;
   if (!paths || netLog.currentlyLogging) return;
   try {
-    await netLog.startLogging(paths.networkLog, {
-      captureMode: "default",
-      maxFileSize: NET_LOG_MAX_BYTES,
-    });
+    await retireCurrentNetworkLog(paths.networkLog);
+    await netLog.startLogging(paths.networkLog, { captureMode: "default" });
     log.scope("network").info("network log started", {
       path: paths.networkLog,
     });
   } catch (error) {
     log.scope("network").warn("failed to start network log", { error });
+    return;
+  }
+  if (!netLogSizeTimer) {
+    netLogSizeTimer = setInterval(() => {
+      void rotateNetworkLogIfFull();
+    }, NET_LOG_SIZE_CHECK_MS);
+    netLogSizeTimer.unref?.();
   }
 };
 

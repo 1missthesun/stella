@@ -12,7 +12,10 @@
  * - The owner id is `sub`, the Better Auth user id.
  *
  * An unknown `kid` refetches the keys at most once per JWKS_MIN_REFETCH_MS,
- * single-flighted, so a key rotation does not lock out every signed-in user.
+ * so a key rotation does not lock out every signed-in user. Each request loads
+ * the keys itself under a deadline: a load promise shared across requests is
+ * bound to the request that started it, and never settles for the others once
+ * that request is cancelled.
  */
 
 import type { IdentityLevel } from "@stella/contracts/gateway/api";
@@ -126,8 +129,9 @@ const fail = (reason: string, retryable = false): VerifyResult => ({
 
 type UserKeys = { keys: Map<string, CryptoKey>; fetchedAtMs: number };
 
+const USER_KEYS_LOAD_TIMEOUT_MS = 5_000;
+
 let userKeys: UserKeys | null = null;
-let userKeysInflight: Promise<UserKeys> | null = null;
 
 const importUserKeys = async (jwks: unknown): Promise<UserKeys> => {
   const keys = new Map<string, CryptoKey>();
@@ -145,13 +149,26 @@ export const setUserJwksForTests = async (jwks: unknown | null): Promise<void> =
   userKeys = jwks === null ? null : await importUserKeys(jwks);
 };
 
-const loadUserKeys = (env: Cloudflare.Env): Promise<UserKeys> =>
-  (userKeysInflight ??= (async () => {
+const loadUserKeys = async (env: Cloudflare.Env): Promise<UserKeys> => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_resolve, reject) => {
+    timer = setTimeout(
+      () => reject(new Error("jwks_load_timeout")),
+      USER_KEYS_LOAD_TIMEOUT_MS,
+    );
+  });
+  const load = (async () => {
     const { createAuth } = await import("./auth/auth.js");
-    return (userKeys = await importUserKeys(await createAuth(env).api.getJwks()));
-  })().finally(() => {
-    userKeysInflight = null;
-  }));
+    return importUserKeys(await createAuth(env).api.getJwks());
+  })();
+  try {
+    const loaded = await Promise.race([load, deadline]);
+    userKeys = loaded;
+    return loaded;
+  } finally {
+    clearTimeout(timer);
+  }
+};
 
 /** The key for `kid`, refetching once per JWKS_MIN_REFETCH_MS when it is unknown (a rotation). */
 const userKey = async (env: Cloudflare.Env, kid: string): Promise<CryptoKey | null> => {

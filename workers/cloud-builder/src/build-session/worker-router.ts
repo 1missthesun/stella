@@ -143,6 +143,8 @@ import type { ConversationCaller, DispatchCaller } from "./shared/types.js";
  * responses — so refusals there complete the handshake and close with a real
  * code instead.
  */
+const SOCKET_HANDOFF_TIMEOUT_MS = 15_000;
+
 const authenticateConversationCaller = async (
   request: Request,
   env: Env,
@@ -201,6 +203,7 @@ const authenticateConversationCaller = async (
     );
   }
 
+  const authStartedAt = Date.now();
   const verified = await verifyUserToken(token, env);
   if (!verified.ok) {
     // The reason is a log-only discriminator; the caller is told one thing.
@@ -223,6 +226,11 @@ const authenticateConversationCaller = async (
         );
   }
   await noteOwnerIdentity(env, verified.token);
+  log("info", "conversation_caller_authenticated", {
+    requestId,
+    socket: wantsSocket,
+    ms: Date.now() - authStartedAt,
+  });
   return { ok: true, caller: { ...verified.token, issuer } };
 };
 
@@ -1104,9 +1112,39 @@ app.post(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}/cancel`, (c) =>
 app.all(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}`, methodNotAllowed());
 app.all(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}/cancel`, methodNotAllowed());
 
-app.all("/conversations/:id/socket", socketOnly, userAuth({ socket: true }), (c) =>
-  forwardToConversation(c.req.raw, c.env, c.req.param("id"), "/socket", c.var.caller),
-);
+app.all("/conversations/:id/socket", socketOnly, userAuth({ socket: true }), async (c) => {
+  const conversationId = c.req.param("id");
+  const requestId = c.var.requestId;
+  const startedAt = Date.now();
+  log("info", "conversation_socket_forwarding", { requestId, conversationId });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      forwardToConversation(c.req.raw, c.env, conversationId, "/socket", c.var.caller),
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("conversation socket hand-off timed out")),
+          SOCKET_HANDOFF_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } catch (error) {
+    log("error", "conversation_socket_forward_failed", {
+      requestId,
+      conversationId,
+      ms: Date.now() - startedAt,
+      message: error instanceof Error ? error.message : String(error),
+    });
+    return refuseUpgrade(
+      c.req.raw,
+      CLOSE_INTERNAL,
+      "Stella couldn't open this conversation. Try again.",
+      { retryable: true, ref: requestId },
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+});
 app.post("/conversations/:id/turns", (c) =>
   handleTurnStartRoute(c.req.raw, c.env, c.req.param("id"), c.var.requestId),
 );

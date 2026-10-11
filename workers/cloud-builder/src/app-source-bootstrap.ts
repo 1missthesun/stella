@@ -21,7 +21,6 @@ const CACHE_NAME = "stella-app-source-bootstrap-v1";
 const cacheKey = (host: string) => `https://app-source-bootstrap.internal/${host}/upstream`;
 
 let memo: AppSourceRemote | null = null;
-let minting: Promise<AppSourceRemote> | null = null;
 
 const fresh = (value: AppSourceRemote | null, now = Date.now()) =>
   value !== null && value.expiresAt - MIN_REMAINING_MS > now;
@@ -65,29 +64,27 @@ const mint = async (artifacts: Artifacts): Promise<AppSourceRemote> => {
 
 const upstreamAccess = async (artifacts: Artifacts, host: string): Promise<AppSourceRemote> => {
   if (fresh(memo)) return memo!;
-  minting ??= (async () => {
-    const cache = await edgeCache();
-    const cached = await readEdge(cache, cacheKey(host));
-    if (fresh(cached)) return cached!;
-    const minted = await mint(artifacts);
-    const maxAge = Math.max(
-      0,
-      Math.floor(Math.min(CACHE_TTL_MS, minted.expiresAt - MIN_REMAINING_MS - Date.now()) / 1000),
-    );
-    await cache
-      ?.put(
-        cacheKey(host),
-        new Response(JSON.stringify(minted), {
-          headers: { "content-type": "application/json", "cache-control": `max-age=${maxAge}` },
-        }),
-      )
-      .catch(() => {});
-    return minted;
-  })().finally(() => {
-    minting = null;
-  });
-  memo = await minting;
-  return memo;
+  const cache = await edgeCache();
+  const cached = await readEdge(cache, cacheKey(host));
+  if (fresh(cached)) {
+    memo = cached;
+    return cached!;
+  }
+  const minted = await mint(artifacts);
+  const maxAge = Math.max(
+    0,
+    Math.floor(Math.min(CACHE_TTL_MS, minted.expiresAt - MIN_REMAINING_MS - Date.now()) / 1000),
+  );
+  await cache
+    ?.put(
+      cacheKey(host),
+      new Response(JSON.stringify(minted), {
+        headers: { "content-type": "application/json", "cache-control": `max-age=${maxAge}` },
+      }),
+    )
+    .catch(() => {});
+  memo = minted;
+  return minted;
 };
 
 /** `POST /api/app-source/bootstrap` → `{ upstream: AppSourceRemote }`; null for other paths. */

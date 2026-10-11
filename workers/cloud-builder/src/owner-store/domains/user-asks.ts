@@ -400,7 +400,7 @@ const readAnswer = (db: OwnerDbReader, askId: string): StoredAnswer | null => {
 export const listOpenUserAsks = (db: OwnerDbReader): UserAsk[] =>
   db
     .all<AskRow>(
-      `SELECT * FROM user_asks WHERE state IN ('pending', 'defaulted')
+      `SELECT * FROM user_asks WHERE state = 'pending'
        ORDER BY urgency DESC, created_at ASC LIMIT ?`,
       MAX_OPEN_ASKS,
     )
@@ -408,7 +408,7 @@ export const listOpenUserAsks = (db: OwnerDbReader): UserAsk[] =>
 
 const openAsks = (db: OwnerDbReader): AskRow[] =>
   db.all<AskRow>(
-    `SELECT * FROM user_asks WHERE state IN ('pending', 'defaulted')
+    `SELECT * FROM user_asks WHERE state = 'pending'
      ORDER BY urgency DESC, created_at ASC LIMIT ?`,
     MAX_OPEN_ASKS,
   );
@@ -1031,7 +1031,7 @@ const registerAsk = (ctx: OwnerContext, args: RegisterArgs) => {
     throw new RpcError("CONFLICT", "That tool call already registered an ask.");
   }
   const open = ctx.db.one<{ n: number }>(
-    "SELECT COUNT(*) AS n FROM user_asks WHERE state IN ('pending', 'defaulted')",
+    "SELECT COUNT(*) AS n FROM user_asks WHERE state = 'pending'",
   )?.n ?? 0;
   if (open >= MAX_OPEN_ASKS) {
     throw new RpcError(

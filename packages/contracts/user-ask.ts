@@ -252,6 +252,9 @@ export const userAskDefaultedNote = (choiceLabels: readonly string[]): string =>
 export const userAskIsOpen = (state: UserAskState): boolean =>
   (USER_ASK_OPEN_STATES as readonly UserAskState[]).includes(state);
 
+export const userAskAwaitsAnswer = (state: UserAskState): boolean =>
+  state === "pending";
+
 export const userAskAcceptsAnswer = (state: UserAskState): boolean =>
   state === "pending" || state === "defaulted";
 
@@ -519,9 +522,7 @@ export const userAskTitleOf = (detail: UserAskDetail): string =>
     : detail.purpose;
 
 export const userAskHasDefaults = (detail: UserAskDetail): boolean =>
-  detail.kind === "question" &&
-  detail.questions.length > 0 &&
-  detail.questions.every((question) => question.defaultChoiceId !== undefined);
+  detail.kind === "question" && detail.questions.length > 0;
 
 export const userAskDefaultResponses = (
   detail: UserAskDetail,

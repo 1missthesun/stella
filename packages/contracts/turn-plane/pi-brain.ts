@@ -13,14 +13,18 @@
  * - No record: Stella follows the sender. Each sender's host answers its
  *   own messages (a computer its user's, the object the phone's).
  * - A record: its holder takes the conversation's turns. A host that would
- *   have answered a message while the holder is unavailable (a computer
- *   offline or not ready) or its lease expired takes the lease over under the
- *   next epoch and answers it; the brain stays there until it moves again.
- *   Two hosts never answer side by side.
+ *   have answered a message while the holder is gone (a computer offline or
+ *   no longer the owner's) or its lease expired takes the lease over under
+ *   the next epoch and answers it; the brain stays there until it moves
+ *   again. Two hosts never answer side by side. A holder that is up keeps
+ *   the brain even when it takes no work from other devices (their messages
+ *   are answered once without the lease where they were sent, and its
+ *   agents' reports reach it all the same): only a move, Stella's or the
+ *   user's, takes the brain from it.
  *
- * A computer's lease is renewed while it is up: by its presence heartbeat to
- * the owner gate, which the object reads whenever it weighs the lease, and by
- * the turns it journals. The cloud's never lapses. A computer claims the
+ * A computer's lease is renewed while it is up and ready: by its presence
+ * heartbeat to the owner gate, which the object reads whenever it weighs the
+ * lease, and by the turns it journals. One that stays not ready lets it lapse. The cloud's never lapses. A computer claims the
  * lease with the epoch it last read (`PiBrainClaim`, on `local-turns/begin`):
  * the object refuses a turn claimed under an older epoch than the record's
  * while another host holds it, so a holder that comes back after a
@@ -165,14 +169,15 @@ export type PiBrainClaimDecision =
 /**
  * Whether a host may answer a turn of the conversation, the one rule every
  * host's turn passes (the object's own and a computer's begin alike).
- * `holderRefusal` says why the holding computer can't take work now
- * (offline, not ready), undefined when it can; the cloud is always up.
+ * `holderGone` says the holding computer is offline or no longer the
+ * owner's; one that is up but takes no work from other devices still holds
+ * it. The cloud is always up.
  */
 export const decidePiBrainClaim = (args: {
   record: PiBrainRecord | null | undefined;
   claimant: PiBrainHost;
   claimEpoch: number | null;
-  holderRefusal?: string;
+  holderGone?: boolean;
   now: number;
 }): PiBrainClaimDecision => {
   const { record, claimant, claimEpoch } = args;
@@ -184,7 +189,7 @@ export const decidePiBrainClaim = (args: {
   // a takeover).
   if (claimEpoch !== null && claimEpoch !== record.epoch) return { kind: "elsewhere", reason: "stale_epoch" };
   if (record.host === "cloud") return { kind: "elsewhere", reason: "holder_live" };
-  if (args.holderRefusal !== undefined) return { kind: "takeover", reason: "unavailable" };
+  if (args.holderGone) return { kind: "takeover", reason: "unavailable" };
   if (record.leaseExpiresAt !== undefined && record.leaseExpiresAt <= args.now) {
     return { kind: "takeover", reason: "expired" };
   }

@@ -179,9 +179,12 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       }
       // Stella runs on one of the owner's computers: a message the user
       // sent from elsewhere is placed there, and this object answers none.
-      // While that computer can't take it (offline, not ready, gone) or its
+      // While that computer is gone (offline, no longer the owner's) or its
       // lease lapsed, this object takes the brain over under the next epoch
-      // and answers it; the computer, once back, finds the lease moved.
+      // and answers it; the computer, once back, finds the lease moved. One
+      // that is up but takes no work from other devices keeps the brain:
+      // this object answers the message once without the lease, as the
+      // owner gate answers work aimed at a computer that has not said yes.
       const placedHere = authKind === "service" && start.source === "placement";
       const brain =
         (authKind === "user" || placedHere) && lane === "chat" && !start.piAgent
@@ -192,14 +195,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         const claim = await this.claimPiBrain({
           claimant: { host: "cloud" },
           claimEpoch: null,
-          holder: {
-            forEpoch: brain.epoch,
-            ...(holder.gone
-              ? holder
-              : holder.seenAt !== undefined
-                ? { seenAt: holder.seenAt }
-                : {}),
-          },
+          holder: { forEpoch: brain.epoch, ...holder },
         });
         if (claim.record?.host === "device") {
           log("info", "pi_brain_turn_unleased", {
@@ -215,7 +211,9 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           holder: { forEpoch: brain.epoch, ...holder },
         });
         const placeOn =
-          claim.decision.kind === "elsewhere" && claim.record?.host === "device"
+          claim.decision.kind === "elsewhere" &&
+          claim.record?.host === "device" &&
+          !(claim.record.epoch === brain.epoch && holder.refusal)
             ? claim.record
             : undefined;
         if (placeOn) {
@@ -247,7 +245,8 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               202,
             );
           } catch (error) {
-            // It went away meanwhile: this object takes the brain over.
+            // Gone meanwhile, this object takes the brain over; still up,
+            // it keeps the brain.
             log("info", "pi_brain_turn_unplaced", {
               deviceId: placeOn.deviceId,
               message: errorMessage(error),
@@ -257,15 +256,14 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               claimEpoch: placeOn.epoch,
               holder: {
                 forEpoch: placeOn.epoch,
-                refusal: "the placement failed",
+                ...(await this.piBrainHolderState(ownerId, placeOn.deviceId)),
               },
             });
           }
         }
         if (claim.record?.host === "device") {
-          // The computer took it back meanwhile and the placement failed:
-          // this object answers once without the lease, as a computer
-          // from before the lease would.
+          // The computer is up but could not take it: this object answers
+          // once without the lease, as a computer from before the lease would.
           log("info", "pi_brain_turn_unleased", {
             deviceId: claim.record.deviceId,
             epoch: claim.record.epoch,

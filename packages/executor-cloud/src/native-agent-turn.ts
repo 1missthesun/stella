@@ -621,6 +621,27 @@ const transcript = (args: {
 export type ClaudeStreamJsonEvent = Record<string, unknown>;
 
 /**
+ * Why a turn must not go on, from the CLI's init event: Stella's MCP server
+ * did not connect. The CLI gives a server about 30 seconds and then runs
+ * without it, and a model without Stella's tools writes its tool calls out
+ * as text and makes up their results.
+ */
+const stellaToolsUnavailable = (
+  event: ClaudeStreamJsonEvent,
+): string | undefined => {
+  const servers = Array.isArray(event.mcp_servers) ? event.mcp_servers : [];
+  const stella = servers.find(
+    (server): server is { name: string; status?: unknown } =>
+      Boolean(server) &&
+      typeof server === "object" &&
+      (server as { name?: unknown }).name === CLOUD_CLAUDE_MCP_SERVER_NAME,
+  );
+  if (stella?.status === "connected") return undefined;
+  const status = typeof stella?.status === "string" ? stella.status : "missing";
+  return `Claude Code could not load Stella's tools (their server was ${status}), so it stopped before answering. Try again.`;
+};
+
+/**
  * Runs one `claude -p` turn for either role and returns its outcome. Callers
  * observe the raw stream through `onStreamEvent`; this owns the session
  * marker, final text, usage, the compaction-loop breaker, and cancellation.
@@ -785,6 +806,11 @@ export const runCloudClaude = async (options: {
         if (type === "system" && event.subtype === "init") {
           initialized = true;
           void writeFile(markerPath, `${sessionId}\n`, { mode: 0o600 });
+          const unavailable = stellaToolsUnavailable(event);
+          if (unavailable && !cancellation.aborted) {
+            error = unavailable;
+            cancellation.abort(new Error(unavailable));
+          }
           return;
         }
         if (type === "user") {

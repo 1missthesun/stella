@@ -310,6 +310,8 @@ export type MessageMetadata = {
    * of the message text.
    */
   voiceSession?: VoiceSessionSummaryMetadata;
+  /** A reminder Stella delivered (`reminders.ts`): its row carries Done and Snooze. */
+  reminder?: { fireId: string; scheduleId: string };
 };
 
 export type VoiceSessionSummaryMetadata = {

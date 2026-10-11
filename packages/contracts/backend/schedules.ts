@@ -4,11 +4,19 @@
  */
 
 import type { LocalCronSchedule } from "../scheduling.js";
+import type { ReminderFire } from "../reminders.js";
 
 export type ScheduleStatus = "active" | "paused" | "done";
 
+/**
+ * `reminder`: the prompt is the text itself, delivered with no model.
+ * `task`: the prompt starts a run at fire time.
+ */
+export type ScheduleKind = "reminder" | "task";
+
 export type ScheduleRow = {
   scheduleId: string;
+  kind: ScheduleKind;
   /** Absent until the first fire picks the conversation it reports into. */
   conversationId?: string;
   /** The desktop a fire is offered to first; absent runs in the cloud. */
@@ -33,6 +41,7 @@ export type ScheduleToolRequest =
   | {
       action: "create";
       requestId: string;
+      kind?: ScheduleKind;
       prompt: string;
       schedule: LocalCronSchedule;
       description?: string;
@@ -63,6 +72,8 @@ export type ScheduleCalls = {
   "schedules.create": {
     args: {
       requestId: string;
+      /** Defaults to `task`. */
+      kind?: ScheduleKind;
       prompt: string;
       schedule: LocalCronSchedule;
       description?: string;
@@ -88,9 +99,18 @@ export type ScheduleCalls = {
   };
   /** Fire an active schedule now. */
   "schedules.runNow": { args: { scheduleId: string }; result: null };
+  /** The reminder was seen to: it stops asking for attention everywhere. */
+  "schedules.reminderDone": { args: { fireId: string }; result: ReminderFire };
+  /** Bring the reminder back in `minutes`, as a fresh delivery. */
+  "schedules.reminderSnooze": {
+    args: { fireId: string; minutes: number };
+    result: ReminderFire;
+  };
 };
 
 export type ScheduleViews = {
   /** Live schedules: active ones soonest first, then paused ones. */
   "schedules.list": { args: Record<string, never>; result: ScheduleRow[] };
+  /** Reminder deliveries of the last few days, newest first. */
+  "schedules.reminders": { args: Record<string, never>; result: ReminderFire[] };
 };

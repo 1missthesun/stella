@@ -7,6 +7,11 @@ import {
   type ClaudeUsageLimitCard,
 } from "./claude-usage-limit.js";
 import {
+  parseReminderCard,
+  REMINDER_CARD_TYPE,
+  type ReminderCard,
+} from "./reminders.js";
+import {
   parseAgentActivityEntry,
   type AgentActivityEntry,
 } from "./conversation-agent-activity.js";
@@ -137,7 +142,8 @@ export type JournalCard =
       result?: Record<string, unknown> | null;
     }
   | { type: "files"; files: JournalFile[] }
-  | ClaudeUsageLimitCard;
+  | ClaudeUsageLimitCard
+  | ReminderCard;
 
 type JournalRecordBase = {
   seq: number;
@@ -399,6 +405,7 @@ const decodeCard = (value: unknown): JournalCard | null => {
   if (!raw || !type) return null;
   if (type === "agent-lifecycle") return parseCloudAgentLifecycleCard(raw);
   if (type === "usage-limit") return parseClaudeUsageLimitCard(raw);
+  if (type === REMINDER_CARD_TYPE) return parseReminderCard(raw);
   if (type === "build") {
     const buildId = str(raw.buildId);
     if (!buildId) return null;

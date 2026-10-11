@@ -8,7 +8,9 @@
  *  - task     — the prompt, run at fire time
  *  - reminder — the message itself, delivered with no model: a push to the
  *               phone and Stella's line in the conversation
- *  - watch    — a device sensor script; not runnable in the cloud
+ *  - watch    — a check script run with no model at each fire; its prompt
+ *               is what to do with a finding. A watch on a computer
+ *               (`runsOn: "computer"`) is set up from that computer.
  */
 
 import type { TSchema } from "@sinclair/typebox";
@@ -21,6 +23,7 @@ import {
   SCHEDULE_UPDATE_TOOL_DESCRIPTOR,
   type ScheduleToolDescriptor,
 } from "@stella/runtime/kernel/tools/defs/schedule-manage-def.js";
+import { WATCH_MIN_INTERVAL_MS } from "@stella/contracts/backend/schedules";
 import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
 import { sha256Hex } from "./hash.js";
 import { RpcError } from "./owner-store/errors.js";
@@ -40,6 +43,10 @@ export const CLOUD_SCHEDULE_MIN_EVERY_MS = 15 * 60_000;
 type ScheduleRow = {
   scheduleId: string;
   kind?: string;
+  route?: string;
+  once?: boolean;
+  lastFinding?: string;
+  lastCheckAt?: number;
   conversationId?: string;
   prompt: string;
   schedule: string;
@@ -87,10 +94,20 @@ const describeSchedule = (schedule: Record<string, unknown>): string => {
 /** The device `summarizeJob` shape so lists read the same on both hosts. */
 const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
   const message = row.kind === "reminder" ? row.prompt : null;
+  const watch = row.kind === "watch";
   return {
     jobId: row.scheduleId,
     name: row.description || (message ?? row.prompt).slice(0, 60),
-    triggerKind: message !== null ? "reminder" : "task",
+    triggerKind: message !== null ? "reminder" : watch ? "watch" : "task",
+    ...(watch
+      ? {
+          runsOn: "cloud",
+          deliverTo: row.route === "agent" ? "agent" : "orchestrator",
+          ...(row.once ? { once: true } : {}),
+          ...(row.lastFinding ? { lastFinding: row.lastFinding } : {}),
+          ...(iso(row.lastCheckAt) ? { lastCheckAt: iso(row.lastCheckAt) } : {}),
+        }
+      : {}),
     schedule: parseStoredSchedule(row.schedule),
     enabled: row.status === "active",
     ...(row.conversationId ? { conversationId: row.conversationId } : {}),
@@ -107,7 +124,9 @@ const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
  * will on the backend, plus the cloud interval floor so the model hears
  * about it before the request leaves.
  */
-const scheduleFromArgs = (value: unknown): Record<string, unknown> => {
+const scheduleFromArgs = (value: unknown, triggerKind = "task"): Record<string, unknown> => {
+  const watch = triggerKind === "watch";
+  const floor = watch ? WATCH_MIN_INTERVAL_MS : CLOUD_SCHEDULE_MIN_EVERY_MS;
   if (!isRecord(value)) throw new Error("schedule must be an object.");
   const kind = asTrimmedString(value.kind);
   if (kind === "at") {
@@ -123,9 +142,9 @@ const scheduleFromArgs = (value: unknown): Record<string, unknown> => {
     if (!Number.isFinite(everyMs) || everyMs <= 0) {
       throw new Error("schedule.kind='every' requires everyMs (> 0).");
     }
-    if (everyMs < CLOUD_SCHEDULE_MIN_EVERY_MS) {
+    if (everyMs < floor) {
       throw new Error(
-        `schedule.everyMs must be at least ${CLOUD_SCHEDULE_MIN_EVERY_MS} (${CLOUD_SCHEDULE_MIN_EVERY_MS / 60_000} minutes); cloud schedules cannot run more often than that.`,
+        `schedule.everyMs must be at least ${floor} (${floor / 60_000} minutes); ${watch ? "watches" : "cloud schedules"} cannot run more often than that.`,
       );
     }
     const anchorMs = Number(value.anchorMs);
@@ -159,6 +178,15 @@ const failure = (message: string): AgentToolResult<unknown> => ({
   details: null,
   isError: true,
 });
+
+/** A watch's first check, which ran before it was saved. */
+const firstCheckNote = (payload: Record<string, unknown>): string => {
+  const check = isRecord(payload.check) ? payload.check : null;
+  if (!check || check.ok !== true) return "";
+  return typeof check.found === "string" && check.found
+    ? ` Its first check already finds: ${check.found} (not handed over; tell the user if it matters now).`
+    : " Its first check ran clean and found nothing yet.";
+};
 
 const rowsOf = (payload: Record<string, unknown>): ScheduleRow[] =>
   (Array.isArray(payload.schedules) ? payload.schedules : []).filter(
@@ -229,6 +257,7 @@ export const createCloudScheduleTools = (
         const name = asTrimmedString(args.name);
         const kind = asTrimmedString(args.kind);
         let prompt: string;
+        let watch: Record<string, unknown> = {};
         if (kind === "reminder") {
           prompt = asTrimmedString(args.message);
           if (!prompt) throw new Error('kind="reminder" requires message.');
@@ -236,13 +265,30 @@ export const createCloudScheduleTools = (
           prompt = asTrimmedString(args.prompt);
           if (!prompt) throw new Error('kind="task" requires prompt.');
         } else if (kind === "watch") {
-          throw new Error(
-            'kind="watch" runs a sensor script on the user\'s computer and is only available from the desktop app. In the cloud, schedule a "task" whose prompt tells you what to check and how to report a change.',
-          );
+          if (args.runsOn === "computer" || asTrimmedString(args.scriptPath)) {
+            throw new Error(
+              'A watch that needs a computer is set up from Stella on that computer. Here, give it a cloud script (runsOn "cloud").',
+            );
+          }
+          const script = typeof args.script === "string" ? args.script.trim() : "";
+          if (!script) {
+            throw new Error(
+              'kind="watch" requires script: an ES module whose default export checks and returns { found, state }.',
+            );
+          }
+          prompt = asTrimmedString(args.prompt) || "Tell the user what it found.";
+          if (args.deliverTo === "agent" && !asTrimmedString(args.prompt)) {
+            throw new Error('deliverTo="agent" needs prompt: the action the user approved.');
+          }
+          watch = {
+            script,
+            ...(args.deliverTo === "agent" ? { route: "agent" } : {}),
+            ...(args.once === true ? { once: true } : {}),
+          };
         } else {
           throw new Error('kind must be "reminder", "task", or "watch".');
         }
-        const schedule = scheduleFromArgs(args.schedule);
+        const schedule = scheduleFromArgs(args.schedule, kind);
         const description = asTrimmedString(args.description) || name;
         const payload = await post(
           "create",
@@ -253,6 +299,7 @@ export const createCloudScheduleTools = (
             conversationId:
               asTrimmedString(args.conversationId) || context.conversationId,
             schedule,
+            ...watch,
           },
           toolCallId,
           signal,
@@ -268,7 +315,7 @@ export const createCloudScheduleTools = (
             ? (receiptRow as unknown as ScheduleRow)
             : undefined);
         return result(
-          `Added ${kind} "${name}" (${jobId}), ${describeSchedule(schedule)}; next fire ${iso(record?.nextRunAt) ?? "pending"}.`,
+          `Added ${kind} "${name}" (${jobId}), ${describeSchedule(schedule)}; next fire ${iso(record?.nextRunAt) ?? "pending"}.${firstCheckNote(payload)}`,
           {
             action: "added",
             jobId,
@@ -304,12 +351,18 @@ export const createCloudScheduleTools = (
         }
         if (asTrimmedString(args.scriptPath)) {
           throw new Error(
-            "scriptPath only applies to watch entries, which run on the desktop app.",
+            "scriptPath only applies to watches on a computer, which are edited from that computer.",
           );
         }
         const message = asTrimmedString(args.message);
         const prompt = asTrimmedString(args.prompt);
         const nextPrompt = message || prompt || undefined;
+        const script = typeof args.script === "string" ? args.script.trim() : "";
+        const watch = {
+          ...(script ? { script } : {}),
+          ...(args.deliverTo === "agent" || args.deliverTo === "orchestrator" ? { route: args.deliverTo } : {}),
+          ...(typeof args.once === "boolean" ? { once: args.once } : {}),
+        };
         const description =
           asTrimmedString(args.description) || asTrimmedString(args.name);
         const status =
@@ -320,9 +373,9 @@ export const createCloudScheduleTools = (
             : undefined;
         const schedule =
           args.schedule === undefined ? undefined : scheduleFromArgs(args.schedule);
-        if (!nextPrompt && !description && !status && !schedule) {
+        if (!nextPrompt && !description && !status && !schedule && Object.keys(watch).length === 0) {
           throw new Error(
-            "Pass at least one field to change: name, schedule, message/prompt, description, or enabled.",
+            "Pass at least one field to change: name, schedule, message/prompt, script, deliverTo, once, description, or enabled.",
           );
         }
         const payload = await post(
@@ -333,6 +386,7 @@ export const createCloudScheduleTools = (
             ...(description ? { description } : {}),
             ...(status ? { status } : {}),
             ...(schedule ? { schedule } : {}),
+            ...watch,
           },
           toolCallId,
           signal,
@@ -342,7 +396,7 @@ export const createCloudScheduleTools = (
           return failure(`No schedule entry found with jobId ${jobId}.`);
         }
         return result(
-          `Updated "${record.description || jobId}" (${jobId}); next fire ${iso(record.nextRunAt) ?? "pending"}.`,
+          `Updated "${record.description || jobId}" (${jobId}); next fire ${iso(record.nextRunAt) ?? "pending"}.${firstCheckNote(payload)}`,
           { action: "updated", jobId, ...summarizeRow(record) },
         );
       } catch (error) {

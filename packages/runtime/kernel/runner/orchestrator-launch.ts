@@ -715,6 +715,7 @@ export const launchPreparedOrchestratorRun = (args: {
     }
     let leaseToken: string | null = null;
     let cloudJournalSeq: number | undefined;
+    let cloudContextEndSeq: number | undefined;
     let ephemeralCaptureStarted = false;
     let seededCloudThread: CloudThread = [];
     let deferredTerminal: DeferredTerminalCallback | null = null;
@@ -803,6 +804,10 @@ export const launchPreparedOrchestratorRun = (args: {
         const begin = await beginCloudTurn();
         leaseToken = begin.leaseToken;
         seedCloudHistory(begin);
+        cloudContextEndSeq = begin.contextEndSeq;
+        if (userMessageHidden && begin.promptSeq !== undefined) {
+          cloudJournalSeq = begin.promptSeq;
+        }
         if (!userMessageHidden) {
           const promptSeq = await context.cloudTranscript.promptSeq(
             prepared.conversationId,
@@ -836,6 +841,15 @@ export const launchPreparedOrchestratorRun = (args: {
         storageMode: prepared.storageMode,
         ownerGeneration: cloudOwnerGeneration ?? prepared.ownerGeneration,
         ...(cloudJournalSeq !== undefined ? { cloudJournalSeq } : {}),
+        ...(cloudContextEndSeq !== undefined && cloudContextEndSeq >= 0
+          ? {
+              resolveClaudeResumeJournalSeq: () =>
+                context.cloudTranscript.priorTurnPromptSeq(
+                  prepared.conversationId,
+                  cloudContextEndSeq!,
+                ),
+            }
+          : {}),
         userMessageId: args.userMessageId,
         agentType: prepared.agentType,
         userPrompt: prepared.userPrompt,

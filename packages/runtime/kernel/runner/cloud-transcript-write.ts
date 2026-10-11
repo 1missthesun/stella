@@ -196,6 +196,10 @@ export type CloudTranscriptWriter = {
     conversationId: string,
     ack: CloudTranscriptBeginAck,
   ) => Promise<number | undefined>;
+  priorTurnPromptSeq: (
+    conversationId: string,
+    throughSeq: number,
+  ) => Promise<number | undefined>;
   /**
    * Commits the terminal payload to SQLite before resolving. Delivery is
    * retried in the background, including after worker restart.
@@ -526,6 +530,41 @@ export const createCloudTranscriptWriter = (
       contextEndSeq: body.contextEndSeq,
       ...(checkpoint ? { checkpoint } : {}),
     };
+  };
+
+  const readPriorTurnPromptSeq = async (
+    conversationId: string,
+    throughSeq: number,
+  ): Promise<number | undefined> => {
+    const token = options.getAuthToken();
+    const baseUrl = token ? await options.getBaseUrl() : null;
+    if (!token || !baseUrl || stopped) return undefined;
+    const response = await doFetch(
+      `${baseUrl.replace(
+        /\/+$/,
+        "",
+      )}/conversations/${encodeURIComponent(conversationId)}/history/query`,
+      {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          op: "sql",
+          query:
+            "SELECT MIN(seq) AS seq FROM journal WHERE kind = 'message' AND role = 'user' AND turn_id = (SELECT turn_id FROM journal WHERE kind = 'message' AND role = 'user' AND seq <= ? ORDER BY seq DESC LIMIT 1)",
+          params: [throughSeq],
+        }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      },
+    );
+    if (!response.ok) return undefined;
+    const rows = (await response.json().catch(() => null)) as unknown;
+    const seq = Array.isArray(rows)
+      ? (rows[0] as { seq?: unknown } | undefined)?.seq
+      : undefined;
+    return typeof seq === "number" && Number.isInteger(seq) ? seq : undefined;
   };
 
   const readPromptSeq = async (
@@ -1392,6 +1431,8 @@ export const createCloudTranscriptWriter = (
     refreshHistory,
     promptSeq: (conversationId, ack) =>
       readPromptSeq(conversationId, ack).catch(() => undefined),
+    priorTurnPromptSeq: (conversationId, throughSeq) =>
+      readPriorTurnPromptSeq(conversationId, throughSeq).catch(() => undefined),
     begin: (request) => {
       if (stopped) {
         return Promise.reject(new Error("Cloud transcript writer is stopped."));

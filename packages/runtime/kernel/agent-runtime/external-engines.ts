@@ -108,6 +108,7 @@ import {
   claudeSessionSyncSink,
   type RestoredClaudeSession,
 } from "../integrations/claude-code-session-sync-sink.js";
+import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
 
 /**
  * External engines run node_repl through the same host dispatcher, so the
@@ -806,6 +807,47 @@ const sameWorkingFolder = (left: string, right: string | undefined): boolean => 
     }
   };
   return resolve(left) === resolve(right);
+};
+
+const prepareClaudeSessionResume = async (args: {
+  opts: BaseRunOptions;
+  threadKey: string;
+  engine: "claude_code_local" | "claude_code_local_vanilla";
+  cwd: string | undefined;
+  orchestrator: boolean;
+}): Promise<void> => {
+  const sink = claudeSessionSyncSink();
+  if (!sink || !args.cwd) return;
+  const pending = sink.takeRestored({
+    threadId: args.threadKey,
+    engine: args.engine,
+  });
+  if (pending) return;
+  const configDir = (await getClaudeCodeConfig()).configDir ?? null;
+  if (!args.orchestrator) {
+    await sink.prepareLocalResume({
+      threadId: args.threadKey,
+      engine: args.engine,
+      configDir,
+      cwd: args.cwd,
+    });
+    return;
+  }
+  const atJournalSeq = await args.opts
+    .resolveClaudeResumeJournalSeq?.()
+    .catch(() => undefined);
+  if (atJournalSeq === undefined) return;
+  const decision = await sink.restoreForResume({
+    threadId: args.threadKey,
+    configDir,
+    cwd: args.cwd,
+    atJournalSeq,
+  });
+  historyDeliveryLogger.info("claude-session-restore.resume", {
+    threadKey: args.threadKey,
+    atJournalSeq,
+    decision,
+  });
 };
 
 const adoptRestoredClaudeSession = async (args: {
@@ -2302,6 +2344,15 @@ const runClaudeHostedTurn = async (
     ? claudeCodeResumableSessionId(sessionKey, localCliCwd)
     : undefined;
   const syncsSession = syncsClaudeSession(args.opts);
+  if (syncsSession && !persistedSessionId && !inProcessSessionId) {
+    await prepareClaudeSessionResume({
+      opts: args.opts,
+      threadKey,
+      engine: sessionEngine,
+      cwd: localCliCwd,
+      orchestrator: deliversHistoryIncrementally,
+    });
+  }
   const adoptedRestore =
     syncsSession && !persistedSessionId && !inProcessSessionId
       ? await adoptRestoredClaudeSession({

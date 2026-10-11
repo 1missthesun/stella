@@ -29,6 +29,18 @@ export type ClaudeSessionSyncSink = {
     engine: ClaudeSessionEngine;
   }): RestoredClaudeSession | null;
   consumeRestored(args: { threadId: string; sessionId: string }): void;
+  restoreForResume(args: {
+    threadId: string;
+    configDir: string | null;
+    cwd: string;
+    atJournalSeq: number;
+  }): Promise<"native" | "rebuild" | "none">;
+  prepareLocalResume(args: {
+    threadId: string;
+    engine: ClaudeSessionEngine;
+    configDir: string | null;
+    cwd: string;
+  }): Promise<boolean>;
 };
 
 let activeSink: ClaudeSessionSyncSink | null = null;

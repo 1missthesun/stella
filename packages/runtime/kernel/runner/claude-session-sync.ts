@@ -46,6 +46,7 @@ const BASE_RETRY_MS = 1_000;
 const MAX_RETRY_MS = 5 * 60_000;
 const MAX_ATTEMPTS_BEFORE_PARK = 40;
 const REPLACE_MODE_MAX_BYTES = 32 * 1024 * 1024;
+const RESUME_RESTORE_TIMEOUT_MS = 20_000;
 
 export type ClaudeSessionSyncBackend = {
   append(args: ClaudeSessionAppendArgs): Promise<ClaudeSessionFileHead>;
@@ -410,6 +411,44 @@ class ClaudeSessionSyncRepo {
       record = { replyHashes: [], cliVersion: "unknown" };
     }
     return { sessionId: row.sessionId, cwd: row.cwd, ...record };
+  }
+
+  latestLocal(
+    threadId: string,
+    engine: ClaudeSessionEngine,
+  ): { sessionId: string; configDir: string | null; cwd: string } | null {
+    const row = this.db
+      .prepare(
+        `SELECT session_id AS sessionId, config_dir AS configDir, cwd
+           FROM claude_session_sync_sessions
+          WHERE thread_id = ? AND engine = ? AND state <> 'diverged'
+          ORDER BY updated_at DESC
+          LIMIT 1`,
+      )
+      .get(threadId, engine) as
+      | { sessionId: string; configDir: string | null; cwd: string }
+      | undefined;
+    return row ?? null;
+  }
+
+  localJournalSeq(threadId: string, sessionId: string): number | null {
+    const row = this.db
+      .prepare(
+        `SELECT journal_seq AS journalSeq FROM claude_session_sync_sessions
+          WHERE thread_id = ? AND session_id = ?`,
+      )
+      .get(threadId, sessionId) as { journalSeq: number | null } | undefined;
+    return row?.journalSeq ?? null;
+  }
+
+  markLocalResume(threadId: string, sessionId: string, record: RestoreRecord): void {
+    this.db
+      .prepare(
+        `UPDATE claude_session_sync_sessions
+            SET resume_pending = 1, reply_hashes_json = ?, updated_at = ?
+          WHERE thread_id = ? AND session_id = ?`,
+      )
+      .run(JSON.stringify(record), Date.now(), threadId, sessionId);
   }
 
   consumeRestored(threadId: string, sessionId: string): void {
@@ -808,9 +847,19 @@ export const createClaudeSessionSync = (options: {
     const workingFolder = await resolveClaudeWorkingFolder(args.cwd);
     const projectDir = claudeSessionProjectDir(args.configDir, workingFolder);
     const localCliVersion = await claudeCliVersion();
+    const mainFile = files.find((file) => file.path === mainPath)!;
+    const localSeq = repo.localJournalSeq(manifest.threadId, manifest.sessionId);
+    const coveredSeq =
+      localSeq !== null &&
+      (await localCoversCloud(
+        claudeSessionFileAbsolutePath(projectDir, mainPath),
+        mainFile,
+      ))
+        ? Math.max(localSeq, manifest.journalSeq ?? localSeq)
+        : manifest.journalSeq;
     const behindReason: ClaudeSessionRestoreResult["reason"] =
       args.atJournalSeq !== undefined &&
-      (manifest.journalSeq === undefined || manifest.journalSeq < args.atJournalSeq)
+      (coveredSeq === undefined || coveredSeq < args.atJournalSeq)
         ? "sync_behind_log"
         : !claudeCliCanResume(localCliVersion, manifest.cliVersion)
           ? "cli_older_than_origin"
@@ -828,7 +877,7 @@ export const createClaudeSessionSync = (options: {
       localCliVersion,
       cliCompatible: claudeCliCanResume(localCliVersion, manifest.cliVersion),
       ...(manifest.journalCursor ? { journalCursor: manifest.journalCursor } : {}),
-      ...(manifest.journalSeq !== undefined ? { journalSeq: manifest.journalSeq } : {}),
+      ...(coveredSeq !== undefined ? { journalSeq: coveredSeq } : {}),
       ...(args.atJournalSeq !== undefined ? { requestedJournalSeq: args.atJournalSeq } : {}),
       syncedAt: manifest.updatedAt,
     };
@@ -837,7 +886,7 @@ export const createClaudeSessionSync = (options: {
       logger.warn("claude-session-sync.restore-rebuild", {
         threadId: manifest.threadId,
         reason: behindReason,
-        journalSeq: manifest.journalSeq ?? null,
+        journalSeq: coveredSeq ?? null,
         requestedJournalSeq: args.atJournalSeq ?? null,
       });
       return {
@@ -944,6 +993,52 @@ export const createClaudeSessionSync = (options: {
     return restored;
   };
 
+  const restoreForResume: ClaudeSessionSyncSink["restoreForResume"] = async (
+    args,
+  ) => {
+    try {
+      const result = await raceWithTimeoutError(
+        restore(args),
+        RESUME_RESTORE_TIMEOUT_MS,
+        () => new Error("Restoring the synced Claude Code session timed out."),
+      );
+      return result ? result.decision : "none";
+    } catch (error) {
+      logger.warn("claude-session-sync.resume-restore-failed", {
+        threadId: args.threadId,
+        error: errorMessage(error),
+      });
+      return "none";
+    }
+  };
+
+  const prepareLocalResume: ClaudeSessionSyncSink["prepareLocalResume"] = async (
+    args,
+  ) => {
+    try {
+      const local = repo.latestLocal(args.threadId, args.engine);
+      if (!local || (local.configDir ?? null) !== (args.configDir ?? null)) {
+        return false;
+      }
+      const workingFolder = await resolveClaudeWorkingFolder(args.cwd);
+      if (local.cwd !== workingFolder) return false;
+      const transcript = await fs.readFile(
+        claudeSessionFileAbsolutePath(
+          claudeSessionProjectDir(local.configDir, workingFolder),
+          `${local.sessionId}.jsonl`,
+        ),
+        "utf8",
+      );
+      repo.markLocalResume(args.threadId, local.sessionId, {
+        replyHashes: claudeSessionReplyHashes(transcript),
+        cliVersion: await claudeCliVersion(),
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const pendingCount = (): number => {
     try {
       return repo.countPending();
@@ -967,6 +1062,8 @@ export const createClaudeSessionSync = (options: {
   return {
     noteCheckpoint,
     takeRestored,
+    restoreForResume,
+    prepareLocalResume,
     consumeRestored: ({ threadId, sessionId }) => {
       try {
         repo.consumeRestored(threadId, sessionId);

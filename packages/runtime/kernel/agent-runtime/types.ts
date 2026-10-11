@@ -210,6 +210,7 @@ export type BaseRunOptions = {
   /** Exact owner-data epoch captured at root turn admission. */
   ownerGeneration?: string;
   cloudJournalSeq?: number;
+  resolveClaudeResumeJournalSeq?: () => Promise<number | undefined>;
   userMessageId: string;
   uiVisibility?: "visible" | "hidden";
   agentType: string;

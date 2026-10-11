@@ -31,6 +31,7 @@ import {
 import type { AgentToolResult } from "../agent-core/types.js";
 import { buildDemotedCodeSuffix } from "../tools/code-catalog.js";
 import { CODE_TOOL_NAME, toolRequiresExplicitApproval } from "../tools/code-tool.js";
+import { CODE_TOOL_ORCHESTRATOR_DESCRIPTION } from "../tools/defs/code-def.js";
 import type { ToolMetadata } from "../tools/types.js";
 import { resolveAgent, resolveAgentModelRoute } from "./context.js";
 import type { RunnerContext } from "./types.js";
@@ -141,7 +142,7 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
       name: tool.name,
       description:
         tool.name === CODE_TOOL_NAME
-          ? `${tool.description}${buildDemotedCodeSuffix(codeReachableDemoted(offered))}`
+          ? `${agentType === "orchestrator" ? CODE_TOOL_ORCHESTRATOR_DESCRIPTION : tool.description}${buildDemotedCodeSuffix(codeReachableDemoted(offered))}`
           : tool.description,
       parameters: tool.parameters,
       ...(tool.replay ? { replay: tool.replay } : {}),

@@ -17,6 +17,15 @@ export const CODE_TOOL_DESCRIPTION =
   "Run JavaScript with top-level await in Stella's persistent code runtime; bindings persist within one generation (use var for reusable names). Globals: codeRuntime, sky, browser, connect, history, and tools; the stella-computer and stella-browser skills document sky and browser, and codeRuntime.help() lists its helpers. End with an expression to return its value, or call codeRuntime.write(...); console.log is not an output channel. A long cell yields a cell_id: call code again with it to read new output or terminate it. tools exposes allowed Stella tools: tools.$list() for exact names (bracket notation for non-identifier names, such as tools[\"mcp.server/tool\"](...)), tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete schema. Use Promise.all for independent calls. Nested calls keep permissions, cancellation, and file tracking; tools requiring explicit approval must be called directly. " +
   CODE_TOOL_HISTORY_SENTENCE;
 
+/**
+ * The orchestrator's `code`: the same runtime without `sky` and `browser`
+ * (computer use and browser control belong to agents), with its file access
+ * stated plainly.
+ */
+export const CODE_TOOL_ORCHESTRATOR_DESCRIPTION =
+  "Run JavaScript with top-level await in Stella's persistent code runtime on the computer you run on; use var for bindings you reuse. Globals: codeRuntime, connect, history, memory (when on), and tools. node:fs reads, writes and edits files there (absolute paths); codeRuntime.emitImage(path) shows you an image. No process spawning. End with an expression to return it; console.log is not output. A long cell yields a cell_id to call code with again. tools.$list(), tools.$search({ query }) and tools.$describe(name) find tools; call them as tools.<name>(args) (bracket notation for other names). " +
+  CODE_TOOL_HISTORY_SENTENCE;
+
 export const CODE_TOOL_PROMPT_SNIPPET =
   "Run persistent JavaScript, orchestrate allowed Stella tools, and control apps through the sky/browser/connect globals";
 

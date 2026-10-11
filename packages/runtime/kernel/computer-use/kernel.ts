@@ -83,6 +83,7 @@ import {
 } from "../tools/code-tool.js";
 import type { ReplConnectClient } from "../connectors/connect-service.js";
 import { resolveToolFallbackCwd } from "../tools/cwd.js";
+import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 
 // Browser protocol waits can deliberately run for ten minutes. Keep the
 // enclosing REPL cell alive slightly longer so a requested wait is not killed
@@ -781,6 +782,7 @@ class NodeReplKernel {
   private readonly describeTool?: NodeReplKernelManagerOptions["describeTool"];
   private readonly queryHistory?: NodeReplKernelManagerOptions["queryHistory"];
   private readonly memory?: NodeReplMemoryHost;
+  private readonly deviceControl: boolean;
   private readonly connectClient?: ReplConnectClient;
   private readonly onTerminated: (kernel: NodeReplKernel) => void;
   private tail: Promise<void> = Promise.resolve();
@@ -823,6 +825,8 @@ class NodeReplKernel {
       queryHistory?: NodeReplKernelManagerOptions["queryHistory"];
       /** Present only when this kernel's context may use `memory`. */
       memory?: NodeReplMemoryHost;
+      /** Whether this kernel's context gets `sky` and `browser`; the orchestrator's never does. */
+      deviceControl: boolean;
       connectClient?: ReplConnectClient;
       /** The context's validated tool account; the REPL child runs as it. */
       processIdentity?: ToolProcessIdentity;
@@ -844,6 +848,7 @@ class NodeReplKernel {
     this.describeTool = options.describeTool;
     this.queryHistory = options.queryHistory;
     this.memory = options.memory;
+    this.deviceControl = options.deviceControl;
     this.connectClient = options.connectClient;
     this.browserSessionId = options.browserSessionId;
     const getSignal = () => this.active?.controller.signal;
@@ -882,6 +887,7 @@ class NodeReplKernel {
       maxToolDrainWaitMs: options.toolDrainTimeoutMs,
       toolNames: options.toolNames,
       memory: options.memory !== undefined,
+      deviceControl: options.deviceControl,
     };
     this.worker = createNodeReplTransport(
       createNodeReplWorkerSource(),
@@ -1028,7 +1034,7 @@ class NodeReplKernel {
     if (BLOCKED_NODE_MODULE_RE.test(code)) {
       return Promise.reject(
         new Error(
-          "Direct process spawning is blocked in code; use sky for computer use or Bash for explicit shell work.",
+          "Direct process spawning is blocked in code; use Bash for explicit shell work.",
         ),
       );
     }
@@ -1260,6 +1266,7 @@ class NodeReplKernel {
   ) {
     const active = this.active;
     if (
+      !this.deviceControl ||
       !active ||
       message.evaluationId !== active.id ||
       !SKY_METHODS.has(message.method) ||
@@ -1435,6 +1442,7 @@ class NodeReplKernel {
   ) {
     const active = this.active;
     if (
+      !this.deviceControl ||
       !active ||
       message.evaluationId !== active.id ||
       !BROWSER_METHODS.has(message.method) ||
@@ -2703,6 +2711,7 @@ export class NodeReplKernelRegistry {
         ...(this.options.memory?.available(context)
           ? { memory: this.options.memory }
           : {}),
+        deviceControl: context.agentType !== AGENT_IDS.ORCHESTRATOR,
         connectClient: this.options.connectClient,
         toolNames: replToolNamesForContext(context),
         browserSessionId,

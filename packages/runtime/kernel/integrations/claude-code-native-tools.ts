@@ -8,9 +8,9 @@
  * inside the CLI; the Stella tools they supersede are dropped from the MCP
  * catalog so the model never sees two spellings of the same operation.
  *
- * The orchestrator coordinates rather than works: it may look (Read, Grep,
- * Glob) but never gets a native shell or file writer. Workers get the full
- * file and shell set.
+ * The orchestrator coordinates rather than works: it keeps Read and never
+ * gets a native shell, file writer or search (its `code` covers the rest).
+ * Workers get the full file and shell set.
  *
  * Built-ins run where the CLI runs. While a session's file and shell tools
  * are set to run elsewhere (another of the owner's computers, or a cloud
@@ -26,8 +26,6 @@ export type ClaudeCodeNativeToolRole = "orchestrator" | "worker";
 
 export const CLAUDE_CODE_ORCHESTRATOR_NATIVE_TOOLS: readonly string[] = [
   "Read",
-  "Grep",
-  "Glob",
 ];
 
 export const CLAUDE_CODE_WORKER_NATIVE_TOOLS: readonly string[] = [
@@ -55,10 +53,11 @@ const STELLA_TOOLS_REPLACED_BY_NATIVE: Readonly<
 };
 
 /**
- * The orchestrator never writes files, natively or over MCP: its memory
- * goes through the `memory` client inside `code`, and every other change is
- * delegated to an agent. Withheld even when an agent definition lists them,
- * so a prompt override cannot hand them back.
+ * Never the orchestrator's, natively or over MCP (served Grep and Glob
+ * included): no shell, no file writer, no search tools. Its small file work
+ * goes through `code`; anything bigger is delegated to an agent. Withheld
+ * even when an agent definition lists them, so a prompt override cannot hand
+ * them back.
  */
 export const CLAUDE_CODE_ORCHESTRATOR_WITHHELD_TOOLS: readonly string[] = [
   "Write",
@@ -67,6 +66,8 @@ export const CLAUDE_CODE_ORCHESTRATOR_WITHHELD_TOOLS: readonly string[] = [
   "Bash",
   "exec_command",
   "write_stdin",
+  "Grep",
+  "Glob",
 ];
 
 /**

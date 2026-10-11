@@ -111,6 +111,8 @@ export type NodeReplWorkerData = {
   toolNames: string[];
   /** Whether this REPL gets the `memory` global (the orchestrator's only). */
   memory: boolean;
+  /** Whether this REPL gets the `sky` and `browser` globals (agents only, not the orchestrator). */
+  deviceControl: boolean;
 };
 
 export type ParentToNodeReplWorkerMessage =

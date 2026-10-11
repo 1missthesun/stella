@@ -827,12 +827,16 @@ const nodeReplWorkerMain = async (
     const entries = {
       bindings:
         "Bindings persist within one kernel generation. Use var for names you may redeclare. let and const cannot be redeclared in a later cell.",
-      images:
-        "Browser screenshots attach automatically and return a receipt. Call codeRuntime.emitImage(path, { mimeType, detail }) only for an absolute local path or file:// URL you created yourself; emitAudio(path, { mimeType }) records typed audio output.",
+      images: workerData.deviceControl
+        ? "Browser screenshots attach automatically and return a receipt. Call codeRuntime.emitImage(path, { mimeType, detail }) only for an absolute local path or file:// URL you created yourself; emitAudio(path, { mimeType }) records typed audio output."
+        : "Call codeRuntime.emitImage(path, { mimeType, detail }) with an absolute local path or file:// URL to see an image; emitAudio(path, { mimeType }) records typed audio output.",
       reset:
         "codeRuntime.reset() ends the current generation after this cell and discards all bindings. codeRuntime.status() reports the current generation.",
       tools:
-        "Use tools.$list() for exact callable names and access expressions, including bracket notation for names that are not valid JavaScript identifiers. Use await tools.$search({ query }) for scoped discovery. Browser and computer APIs are documented by their installed skills.",
+        "Use tools.$list() for exact callable names and access expressions, including bracket notation for names that are not valid JavaScript identifiers. Use await tools.$search({ query }) for scoped discovery." +
+        (workerData.deviceControl
+          ? " Browser and computer APIs are documented by their installed skills."
+          : ""),
     } as const;
     if (topic === undefined) {
       return "codeRuntime help topics: bindings, images, reset, tools";
@@ -926,18 +930,22 @@ const nodeReplWorkerMain = async (
       writable: false,
       configurable: false,
     },
-    sky: {
-      value: sky,
-      enumerable: true,
-      writable: false,
-      configurable: false,
-    },
-    browser: {
-      value: browser,
-      enumerable: true,
-      writable: false,
-      configurable: false,
-    },
+    ...(workerData.deviceControl
+      ? {
+          sky: {
+            value: sky,
+            enumerable: true,
+            writable: false,
+            configurable: false,
+          },
+          browser: {
+            value: browser,
+            enumerable: true,
+            writable: false,
+            configurable: false,
+          },
+        }
+      : {}),
     connect: {
       value: connect,
       enumerable: true,

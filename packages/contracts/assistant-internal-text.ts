@@ -1,4 +1,4 @@
-import { PI_REPORT_RE } from "@stella/contracts/pi-chat";
+import { PI_REPORT_RE } from "./pi-chat.js";
 
 const FENCE_RE = /^\s{0,3}(```|~~~)/;
 const HARNESS_BLOCK_RE = /<harness>\s*([\s\S]*?)\s*<\/harness>/g;
@@ -68,11 +68,11 @@ const presentReportEcho = (text: string): string => {
 };
 
 /**
- * Stella's reply as the phone shows it. A reply sometimes repeats what the
+ * Stella's reply as the desktop and the phone show it. A reply sometimes repeats what the
  * runtime told the model rather than the user: a tool's `<harness>`
  * diagnostics, or the header of an agent's report. Diagnostics outside code
- * show as their text, the way the desktop's markdown sanitizer drops the
- * unknown tag, and an echoed report keeps its outcome, task and message but
+ * show as their text, as a markdown sanitizer that drops the
+ * unknown tag would, and an echoed report keeps its outcome, task and message but
  * not its internal thread and agent fields.
  */
 export const presentAssistantText = (text: string): string => {

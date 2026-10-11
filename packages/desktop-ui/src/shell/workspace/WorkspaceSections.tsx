@@ -26,7 +26,7 @@ import {
   useConversationSchedules,
   type ScheduleEntry,
 } from "@/global/schedule/use-conversation-schedules";
-import { formatNextRun } from "@/global/schedule/format-schedule";
+import { formatNextRun } from "@stella/contracts/schedule-format";
 import { matchesQuery } from "@/features/workspace-display/display-search-store";
 import {
   sectionCollapseStore,

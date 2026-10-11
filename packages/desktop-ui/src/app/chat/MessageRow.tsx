@@ -57,6 +57,7 @@ import {
 } from "@stella/contracts/local-file-links";
 import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
 import { replyAttachmentPlacement } from "@stella/contracts/reply-attachments";
+import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import {
   evidenceCardDrivePath,
   useDriveEvidenceCards,
@@ -740,7 +741,7 @@ export const AssistantMessageRow = memo(
       .concat(linkedDrivePaths.map((drivePath) => `cloud:${drivePath}`));
     const hiddenFileKeySet = new Set(hiddenFileKeys);
     const bodyText = hasText
-      ? dropAttachmentOnlyLines(text, (filePath) => {
+      ? dropAttachmentOnlyLines(presentAssistantText(text), (filePath) => {
           const drivePath = driveLinkPath(filePath);
           return (
             hiddenFileKeySet.has(`local:${filePath}`) ||

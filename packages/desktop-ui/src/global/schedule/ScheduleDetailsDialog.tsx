@@ -27,7 +27,10 @@ import type {
   LocalHeartbeatConfigRecord,
   ScheduleToolAffectedRef,
 } from "@stella/contracts/scheduling";
-import { formatNextRun, summarizeSchedule } from "./format-schedule";
+import {
+  formatNextRun,
+  summarizeSchedule,
+} from "@stella/contracts/schedule-format";
 import { useT, useTPlural } from "@/shared/i18n";
 import "./schedule-details-dialog.css";
 
@@ -58,7 +61,11 @@ const cronToRow = (record: LocalCronJobRecord, t: Translate): DialogRow => ({
   name: record.name?.trim() || t("global.schedule.untitledTask"),
   enabled: record.enabled,
   nextRunAtMs: record.nextRunAtMs,
-  recurrence: summarizeSchedule(record.schedule),
+  recurrence: summarizeSchedule(
+    record.schedule,
+    undefined,
+    record.nextRunAtMs,
+  ),
   conversationId: record.conversationId,
 });
 

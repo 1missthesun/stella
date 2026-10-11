@@ -45,8 +45,29 @@ const formatClock12 = (h: number, m: number): string => {
   return `${displayHour}:${String(m).padStart(2, "0")} ${period}`;
 };
 
+let deviceHourCycle: () => "h12" | "h23" | null = () => null;
+
+/**
+ * Where the device's own 12/24-hour choice comes from, for a platform whose
+ * `Intl` reports only its locale's default (Hermes on iOS ignores the
+ * 24-Hour Time switch). Answer null to fall back to `Intl`.
+ */
+export const setDeviceHourCycle = (read: () => "h12" | "h23" | null): void => {
+  deviceHourCycle = read;
+};
+
+const chosenHourCycle = (): "h12" | "h23" | null => {
+  try {
+    return deviceHourCycle();
+  } catch {
+    return null;
+  }
+};
+
 /** Whether this device shows times on a 12-hour clock, from its own setting. */
 const uses12HourClock = (): boolean => {
+  const chosen = chosenHourCycle();
+  if (chosen) return chosen === "h12";
   try {
     const options = new Intl.DateTimeFormat(undefined, {
       hour: "numeric",

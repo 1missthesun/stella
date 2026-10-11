@@ -1,7 +1,16 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   Keyboard,
+  type LayoutChangeEvent,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -53,6 +62,7 @@ import { fonts } from "../theme/fonts";
 import { fadeHex } from "../theme/oklch";
 import { useColors } from "../theme/theme-context";
 import { Icon } from "./Icon";
+import { useAskSlot } from "./chat/ask-slot";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
 
@@ -179,6 +189,92 @@ function DeckTiming({
   );
 }
 
+function AskCardFrame({
+  summary,
+  progress,
+  leading,
+  body,
+  footer,
+  colors,
+  styles,
+}: {
+  summary: string;
+  progress?: string;
+  leading?: ReactNode;
+  body: ReactNode;
+  footer: ReactNode;
+  colors: Colors;
+  styles: AskStyles;
+}) {
+  const { collapsed, maxHeight, expand } = useAskSlot();
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const overflowing = contentHeight > viewportHeight + 1;
+  const onViewportLayout = useCallback((e: LayoutChangeEvent) => {
+    setViewportHeight(Math.round(e.nativeEvent.layout.height));
+  }, []);
+  const onContentSizeChange = useCallback((_: number, height: number) => {
+    setContentHeight(Math.round(height));
+  }, []);
+  return (
+    <>
+      {collapsed ? (
+        <Reanimated.View entering={FadeIn.duration(160)}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: false }}
+            accessibilityLabel={summary}
+            onPress={expand}
+            style={({ pressed }) => [
+              styles.collapsedRow,
+              pressed && styles.pressed,
+            ]}
+          >
+            {leading}
+            <Text numberOfLines={1} style={styles.collapsedText}>
+              {summary}
+            </Text>
+            {progress ? (
+              <Text numberOfLines={1} style={styles.collapsedMeta}>
+                {progress}
+              </Text>
+            ) : null}
+            <View style={styles.collapsedChevron}>
+              <Icon color={colors.textMuted} name="chevron-down" size={15} />
+            </View>
+          </Pressable>
+        </Reanimated.View>
+      ) : null}
+      <View
+        accessibilityRole="summary"
+        style={[
+          styles.card,
+          maxHeight !== null && { maxHeight },
+          collapsed && styles.cardCollapsed,
+        ]}
+      >
+        <ScrollView
+          alwaysBounceVertical={false}
+          contentContainerStyle={styles.cardScrollContent}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={onContentSizeChange}
+          onLayout={onViewportLayout}
+          scrollEnabled={overflowing}
+          showsVerticalScrollIndicator={overflowing}
+          style={styles.cardScroll}
+        >
+          {body}
+        </ScrollView>
+        <View
+          style={[styles.cardFooter, overflowing && styles.cardFooterDivided]}
+        >
+          {footer}
+        </View>
+      </View>
+    </>
+  );
+}
+
 function QuestionDeck({
   asks,
   focusedAskId,
@@ -269,12 +365,8 @@ function QuestionDeck({
   const typed = draft.text.trim().length > 0;
   const textChosen = !draft.choiceId && !draft.skipped && typed;
 
-  return (
-    <Reanimated.View
-      layout={LinearTransition.springify().damping(22).stiffness(200)}
-      style={styles.card}
-      accessibilityRole="summary"
-    >
+  const body = (
+    <>
       <Reanimated.View
         key={userAskDeckKey(ask.askId, question.id)}
         entering={FadeIn.duration(180)}
@@ -391,100 +483,117 @@ function QuestionDeck({
       </Reanimated.View>
 
       {issue ? <Text style={styles.issue}>{issue}</Text> : null}
+    </>
+  );
 
-      <View style={styles.footer}>
-        <View style={styles.footerStart}>
-          <DeckTiming ask={ask} colors={colors} styles={styles} t={t} />
+  const footer = (
+    <View style={styles.footer}>
+      <View style={styles.footerStart}>
+        <DeckTiming ask={ask} colors={colors} styles={styles} t={t} />
+      </View>
+      {total > 1 ? (
+        <View style={styles.pager}>
+          <Pressable
+            accessibilityLabel={t("userAsk.question.previous")}
+            accessibilityRole="button"
+            disabled={index === 0}
+            hitSlop={6}
+            onPress={() => {
+              tapLight();
+              goTo(index - 1);
+            }}
+            style={({ pressed }) => [styles.nav, pressed && styles.pressed]}
+          >
+            <Icon
+              color={index === 0 ? colors.textWeaker : colors.text}
+              name="chevron-left"
+              size={20}
+            />
+          </Pressable>
+          <Text style={styles.progress}>
+            {t("userAsk.question.progress", { current: index + 1, total })}
+          </Text>
+          <Pressable
+            accessibilityLabel={t("userAsk.question.next")}
+            accessibilityRole="button"
+            disabled={index === total - 1}
+            hitSlop={6}
+            onPress={() => {
+              tapLight();
+              goTo(index + 1);
+            }}
+            style={({ pressed }) => [styles.nav, pressed && styles.pressed]}
+          >
+            <Icon
+              color={index === total - 1 ? colors.textWeaker : colors.text}
+              name="chevron-right"
+              size={20}
+            />
+          </Pressable>
         </View>
-        {total > 1 ? (
-          <View style={styles.pager}>
-            <Pressable
-              accessibilityLabel={t("userAsk.question.previous")}
-              accessibilityRole="button"
-              disabled={index === 0}
-              hitSlop={6}
-              onPress={() => {
-                tapLight();
-                goTo(index - 1);
-              }}
-              style={({ pressed }) => [styles.nav, pressed && styles.pressed]}
-            >
-              <Icon
-                color={index === 0 ? colors.textWeaker : colors.text}
-                name="chevron-left"
-                size={20}
-              />
-            </Pressable>
-            <Text style={styles.progress}>
-              {t("userAsk.question.progress", { current: index + 1, total })}
-            </Text>
-            <Pressable
-              accessibilityLabel={t("userAsk.question.next")}
-              accessibilityRole="button"
-              disabled={index === total - 1}
-              hitSlop={6}
-              onPress={() => {
-                tapLight();
-                goTo(index + 1);
-              }}
-              style={({ pressed }) => [styles.nav, pressed && styles.pressed]}
-            >
-              <Icon
-                color={index === total - 1 ? colors.textWeaker : colors.text}
-                name="chevron-right"
-                size={20}
-              />
-            </Pressable>
-          </View>
-        ) : null}
-        <View style={styles.footerActions}>
+      ) : null}
+      <View style={styles.footerActions}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityState={{ selected: draft.skipped === true, disabled: busy }}
+          disabled={busy}
+          onPress={() => commit(skipUserAskQuestion(draft))}
+          style={({ pressed }) => [
+            styles.skip,
+            draft.skipped && styles.skipSelected,
+            pressed && styles.pressed,
+            busy && styles.disabled,
+          ]}
+        >
+          {draft.skipped ? (
+            <Icon color={colors.text} name="check" size={15} />
+          ) : null}
+          <Text
+            style={[styles.skipText, draft.skipped && styles.skipTextSelected]}
+          >
+            {draft.skipped
+              ? t("userAsk.question.skipped")
+              : t("userAsk.question.skip")}
+          </Text>
+        </Pressable>
+        {total > 1 && complete ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ selected: draft.skipped === true, disabled: busy }}
             disabled={busy}
-            onPress={() => commit(skipUserAskQuestion(draft))}
+            onPress={() => {
+              tapLight();
+              void submit(drafts);
+            }}
             style={({ pressed }) => [
-              styles.skip,
-              draft.skipped && styles.skipSelected,
+              styles.primaryAction,
               pressed && styles.pressed,
               busy && styles.disabled,
             ]}
           >
-            {draft.skipped ? (
-              <Icon color={colors.text} name="check" size={15} />
-            ) : null}
-            <Text
-              style={[styles.skipText, draft.skipped && styles.skipTextSelected]}
-            >
-              {draft.skipped
-                ? t("userAsk.question.skipped")
-                : t("userAsk.question.skip")}
+            <Text style={styles.primaryActionText}>
+              {busy
+                ? t("userAsk.question.sending")
+                : t("userAsk.question.submit")}
             </Text>
           </Pressable>
-          {total > 1 && complete ? (
-            <Pressable
-              accessibilityRole="button"
-              disabled={busy}
-              onPress={() => {
-                tapLight();
-                void submit(drafts);
-              }}
-              style={({ pressed }) => [
-                styles.primaryAction,
-                pressed && styles.pressed,
-                busy && styles.disabled,
-              ]}
-            >
-              <Text style={styles.primaryActionText}>
-                {busy
-                  ? t("userAsk.question.sending")
-                  : t("userAsk.question.submit")}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
+        ) : null}
       </View>
-    </Reanimated.View>
+    </View>
+  );
+
+  return (
+    <AskCardFrame
+      body={body}
+      colors={colors}
+      footer={footer}
+      progress={
+        total > 1
+          ? t("userAsk.question.progress", { current: index + 1, total })
+          : undefined
+      }
+      styles={styles}
+      summary={question.question}
+    />
   );
 }
 
@@ -526,8 +635,8 @@ function SecureAskSurface({
     );
   }, [ask.askId, submit]);
 
-  return (
-    <View style={styles.card} accessibilityRole="summary">
+  const body = (
+    <>
       <View style={styles.header}>
         <View style={[styles.icon, ask.blocking && styles.iconBlocking]}>
           <Icon
@@ -578,22 +687,39 @@ function SecureAskSurface({
       />
 
       {issue ? <Text style={styles.issue}>{issue}</Text> : null}
+    </>
+  );
 
-      <Pressable
-        accessibilityRole="button"
-        disabled={busy}
-        onPress={decline}
-        style={({ pressed }) => [
-          styles.declineRow,
-          pressed && styles.pressed,
-          busy && styles.disabled,
-        ]}
-      >
-        <Text style={styles.declineText}>
-          {t("mobile.userAsk.cantRightNow")}
-        </Text>
-      </Pressable>
-    </View>
+  return (
+    <AskCardFrame
+      body={body}
+      colors={colors}
+      footer={
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy}
+          onPress={decline}
+          style={({ pressed }) => [
+            styles.declineRow,
+            pressed && styles.pressed,
+            busy && styles.disabled,
+          ]}
+        >
+          <Text style={styles.declineText}>
+            {t("mobile.userAsk.cantRightNow")}
+          </Text>
+        </Pressable>
+      }
+      leading={
+        <Icon
+          color={ask.blocking ? colors.accent : colors.textMuted}
+          name="eye-off"
+          size={15}
+        />
+      }
+      styles={styles}
+      summary={detail.purpose}
+    />
   );
 }
 
@@ -926,10 +1052,59 @@ const makeStyles = (colors: Colors) =>
       borderColor: colors.border,
       borderRadius: 20,
       borderWidth: StyleSheet.hairlineWidth,
-      gap: 14,
+      overflow: "hidden",
+    },
+    cardCollapsed: {
+      display: "none",
+    },
+    cardFooter: {
       paddingBottom: 12,
       paddingHorizontal: 16,
+      paddingTop: 14,
+    },
+    cardFooterDivided: {
+      borderTopColor: colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      paddingTop: 10,
+    },
+    cardScroll: {
+      flexGrow: 0,
+      flexShrink: 1,
+    },
+    cardScrollContent: {
+      gap: 14,
+      paddingHorizontal: 16,
       paddingTop: 16,
+    },
+    collapsedChevron: {
+      transform: [{ rotate: "180deg" }],
+    },
+    collapsedMeta: {
+      color: colors.textMuted,
+      flexShrink: 0,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13,
+      fontVariant: ["tabular-nums"],
+    },
+    collapsedRow: {
+      alignItems: "center",
+      alignSelf: "stretch",
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 20,
+      borderWidth: StyleSheet.hairlineWidth,
+      flexDirection: "row",
+      gap: 10,
+      minHeight: 48,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+    },
+    collapsedText: {
+      color: colors.text,
+      flex: 1,
+      fontFamily: fonts.sans.medium,
+      fontSize: 15,
+      letterSpacing: -0.2,
     },
     choice: {
       borderColor: colors.border,

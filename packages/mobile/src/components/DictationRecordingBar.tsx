@@ -56,6 +56,8 @@ type Props = {
   onConfirm: () => void;
   /** When provided, stop dictation and auto-send once the transcript lands. */
   onSend?: () => void;
+  /** False keeps only the control row, for the composer's compact pill. */
+  showTranscript?: boolean;
 
   /** Muted hint shown in the transcript area until the first words arrive. */
   placeholder?: string;
@@ -73,6 +75,7 @@ export const DictationRecordingBar = memo(function DictationRecordingBar({
   onCancel,
   onConfirm,
   onSend,
+  showTranscript = true,
   placeholder,
   transcriptStyle,
   transcriptMaxHeight,
@@ -83,14 +86,16 @@ export const DictationRecordingBar = memo(function DictationRecordingBar({
 
   return (
     <View style={styles.recordingBar}>
-      <LiveTranscript
-        color={fadeHex(colors.text, 0.66)}
-        placeholder={placeholder}
-        placeholderColor={fadeHex(colors.textMuted, 0.35)}
-        reduceMotion={reduceMotion}
-        style={transcriptStyle}
-        maxHeight={transcriptMaxHeight}
-      />
+      {showTranscript ? (
+        <LiveTranscript
+          color={fadeHex(colors.text, 0.66)}
+          placeholder={placeholder}
+          placeholderColor={fadeHex(colors.textMuted, 0.35)}
+          reduceMotion={reduceMotion}
+          style={transcriptStyle}
+          maxHeight={transcriptMaxHeight}
+        />
+      ) : null}
       <View style={styles.recordingRow}>
         {/* Cancel takes the slot the composer's + occupies at rest, so the
             leading control is one place with one meaning: add something when

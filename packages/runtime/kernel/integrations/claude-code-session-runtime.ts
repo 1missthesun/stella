@@ -354,6 +354,13 @@ const DEFAULT_STEP_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 // executeToolWithInactivityBound; this only backstops native tools and
 // leaked tracking.)
 const DEFAULT_STEP_TOOL_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
+/**
+ * How long a new CLI may take to list Stella's MCP catalog. The CLI itself
+ * gives a server about 30 seconds to connect, retrying meanwhile, and then
+ * runs without it; waiting past that would only wait on a CLI that dropped
+ * Stella's tools.
+ */
+const DEFAULT_TOOL_CATALOG_TIMEOUT_MS = 40 * 1000;
 const CLAUDE_CODE_COMPACTING_TEXT = "Compacting context";
 const CLAUDE_CODE_RUNNING_TEXT = "Working";
 /**
@@ -2943,9 +2950,61 @@ class ClaudeCodeSessionRuntime {
     // Claude accepts stdin before it has discovered the private MCP catalog.
     // Do not let the first tool-bearing prompt race that discovery.
     if (mcpHost && request.tools.length > 0) {
-      await mcpHost.waitForClientReady(request.abortSignal);
+      await this.waitForToolCatalog(session, processState, mcpHost, request);
     }
     return processState;
+  }
+  /**
+   * Wait until the new CLI has listed Stella's MCP catalog. A CLI that exits
+   * first fails the step with its own reason (a missing session to resume, a
+   * rejected login), which the step's recovery reads; one that never lists
+   * it is stopped and fails the step as ended, so recovery starts a new one.
+   */
+  async waitForToolCatalog(
+    session: ClaudeCodeSession,
+    processState: ClaudeCodeProcessState,
+    mcpHost: ClaudeCodeToolMcpHost,
+    request: ClaudeCodeTurnRequest,
+  ) {
+    const child = processState.child;
+    const exited = new AbortController();
+    const onExit = () => {
+      if (exited.signal.aborted) return;
+      exited.abort(
+        new ClaudeCodeProcessEndedError(
+          processState.stderrText.trim() ||
+            `Claude Code exited with code ${child.exitCode ?? "unknown"} before it loaded Stella's tools.`,
+          child.exitCode,
+        ),
+      );
+    };
+    child.once("close", onExit);
+    child.once("error", onExit);
+    if (processState.closed || processIsDead(child)) onExit();
+    const timeoutMs = configuredTimeoutMs(
+      "STELLA_CLAUDE_CODE_TOOL_CATALOG_TIMEOUT_MS",
+      DEFAULT_TOOL_CATALOG_TIMEOUT_MS,
+    );
+    try {
+      await mcpHost.waitForClientReady(
+        request.abortSignal
+          ? AbortSignal.any([request.abortSignal, exited.signal])
+          : exited.signal,
+        timeoutMs,
+      );
+    } catch (error) {
+      if (request.abortSignal?.aborted) throw error;
+      if (exited.signal.aborted) throw exited.signal.reason;
+      if (session.process === processState) {
+        this.resetStreamingProcess(request.sessionKey, session);
+      }
+      throw new ClaudeCodeProcessEndedError(
+        `Claude Code did not load Stella's tools within ${Math.round(timeoutMs / 1000)}s.`,
+      );
+    } finally {
+      child.off("close", onExit);
+      child.off("error", onExit);
+    }
   }
   async sendStreamingPrompt(
     session: ClaudeCodeSession,

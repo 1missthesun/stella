@@ -41,6 +41,7 @@ export const SANDBOX_CODE_PACKAGES = Object.freeze([
   "runtime",
   "executor-cloud",
   "model-catalog",
+  "agent",
 ]);
 
 /** Where the Worker's static assets live and where the bundle sits in them. */

@@ -56,7 +56,11 @@ import {
   extractFileLinkTargets,
 } from "@stella/contracts/local-file-links";
 import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
-import { evidenceSourceKind } from "@stella/contracts/chat-evidence-naming";
+import {
+  placeReplyAttachments,
+  replyAttachmentPlacement,
+  replyAttachmentTarget,
+} from "@stella/contracts/reply-attachments";
 import {
   evidenceCardDrivePath,
   useDriveEvidenceCards,
@@ -679,7 +683,22 @@ export const AssistantMessageRow = memo(
     );
     const linkedFiles = row.linkedFiles ?? [];
     const linkTargets = hasText ? extractFileLinkTargets(text) : [];
-    const evidencePaths = linkTargets.filter((target) => !driveLinkPath(target));
+    const fileTarget = (file: ConversationFileEntry) =>
+      file.cloudDriveFile
+        ? replyAttachmentTarget(file.cloudDriveFile.path, { driveRelative: true })
+        : file.path;
+    const completionFiles = conversationId
+      ? row.agentCompletion?.sections.flatMap((section) => section.files) ?? []
+      : [];
+    const attachmentTargets = [
+      ...new Set([
+        ...linkTargets,
+        ...placeReplyAttachments(completionFiles, fileTarget).media.map(fileTarget),
+      ]),
+    ];
+    const evidencePaths = attachmentTargets.filter(
+      (target) => !driveLinkPath(target),
+    );
     const evidencePathSet = new Set(evidencePaths);
     const linkedDrivePaths = [
       ...new Set(
@@ -689,12 +708,16 @@ export const AssistantMessageRow = memo(
         }),
       ),
     ];
-    const driveCards = useDriveEvidenceCards(
-      linkedDrivePaths.filter((drivePath) => {
-        const kind = evidenceSourceKind(drivePath, false);
-        return kind === "image" || kind === "video";
-      }),
-    );
+    const driveCards = useDriveEvidenceCards([
+      ...new Set(
+        attachmentTargets.flatMap((target) => {
+          const drivePath = driveLinkPath(target);
+          return drivePath && replyAttachmentPlacement(target) === "media"
+            ? [drivePath]
+            : [];
+        }),
+      ),
+    ]);
     const previewedDrivePaths = new Set(
       driveCards.flatMap((card) => {
         const drivePath = evidenceCardDrivePath(card);
@@ -722,9 +745,6 @@ export const AssistantMessageRow = memo(
       : unpreviewableFiles;
     const fileKey = (file: ConversationFileEntry) =>
       file.cloudDriveFile ? `cloud:${file.cloudDriveFile.path}` : `local:${file.path}`;
-    const completionFiles = conversationId
-      ? row.agentCompletion?.sections.flatMap((section) => section.files) ?? []
-      : [];
     const replyFiles = [...completionFiles, ...attachedFiles].filter(
       (file, index, all) =>
         (file.cloudDriveFile

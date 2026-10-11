@@ -622,6 +622,15 @@ export const createStellaHostRunner = (
       if (delivery) context.state.piReportDelivery = delivery;
       else delete context.state.piReportDelivery;
     },
+    setBackgroundExitTarget: (target) => {
+      if (target) context.state.backgroundExitTarget = target;
+      else delete context.state.backgroundExitTarget;
+    },
+    backgroundExits: {
+      arm: (args) => context.state.backgroundExitWake?.arm(args) ?? [],
+      disarm: (owner) => context.state.backgroundExitWake?.disarm(owner),
+      runningSessions: (owner) => context.toolHost.listRunningShellSessionsOwnedBy(owner),
+    },
     piCloudAgentThreads: context.piCloudAgentThreads,
     setPiAgentEngine: (engine) => {
       if (engine) context.state.piAgentEngine = engine;

@@ -284,6 +284,8 @@ export type RunnerState = {
    * (it needs both the tool host and the agent manager).
    */
   backgroundExitWake: BackgroundExitWake | null;
+  /** Who a background exit wakes, and how it stands (`setBackgroundExitTarget`). */
+  backgroundExitTarget?: BackgroundExitTarget;
   activeOrchestratorRunId: string | null;
   activeOrchestratorConversationId: string | null;
   activeOrchestratorUiVisibility: "visible" | "hidden";
@@ -459,6 +461,21 @@ export type RunnerContext = {
   };
 };
 
+/**
+ * The agents a background command's exit wakes: how one stands, and the
+ * wake itself. False from `deliver` keeps the exit batch for a retry.
+ */
+export type BackgroundExitTarget = {
+  status: (agentId: string, conversationId: string) => Promise<string>;
+  deliver: (wake: {
+    conversationId: string;
+    agentId: string;
+    eventId: string;
+    isCurrent: () => boolean;
+    text: string;
+  }) => Promise<boolean>;
+};
+
 export type PiReportDelivery = (report: {
   conversationId: string;
   requestId: string;
@@ -535,6 +552,21 @@ export type RunnerPublicApi = {
   hookEmitter: HookEmitter;
   piCloudAgentThreads: PiCloudAgentThreads;
   setPiReportDelivery: (delivery: PiReportDelivery | null) => void;
+  setBackgroundExitTarget: (target: BackgroundExitTarget | null) => void;
+  /**
+   * The exit wakes of shells a finished run left running: `arm` watches the
+   * sessions it names for the agent, `disarm` drops them when it runs again.
+   */
+  backgroundExits: {
+    arm: (args: {
+      conversationId: string;
+      agentId: string;
+      runningSessionIds: string[];
+      interrupted?: boolean;
+    }) => string[];
+    disarm: (owner: { conversationId: string; agentId: string }) => void;
+    runningSessions: (owner: { conversationId: string; agentId: string }) => string[];
+  };
   setPiAgentEngine: (engine: PiAgentEngine | null) => void;
   setBrainNote: (note: BrainNote | null) => void;
   deliverOrchestratorNote: PiReportDelivery;

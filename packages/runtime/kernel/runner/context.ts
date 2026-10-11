@@ -1217,54 +1217,21 @@ export const createRunnerContext = ({
   context.state.backgroundExitWake = createBackgroundExitWake({
     watchShellExit: toolHost.watchShellExit,
     readShellExitSnapshot: toolHost.readShellExitSnapshot,
-    getThreadStatus: async (agentId: string, conversationId: string) => {
-      const snapshot = await context.state.localAgentManager?.getAgent(agentId);
-      // The wake registry is owner-scoped even though LocalAgentManager's
-      // historical lookup key is only the globally-minted thread id. Fail
-      // closed if an explicit/reused id resolves in another conversation.
-      if (!snapshot || snapshot.conversationId !== conversationId) {
-        return "canceled";
-      }
-      return snapshot.status;
-    },
+    getThreadStatus: async (agentId: string, conversationId: string) =>
+      (await context.state.backgroundExitTarget?.status(agentId, conversationId)) ??
+      "canceled",
     writeExitLog: async (sessionId: string, contents: string) =>
       await writeBackgroundExitLog(stellaDataDir, sessionId, contents),
-    deliver: async ({
-      conversationId,
-      agentId,
-      eventId,
-      isCurrent,
-      text,
-    }: Record<string, any>) => {
-      const manager = context.state.localAgentManager;
-      if (!manager) return false;
-      const snapshot = await manager.getAgent(agentId);
-      if (!snapshot || snapshot.conversationId !== conversationId) {
-        return false;
-      }
-      // getAgent may cross storage I/O. A new run/cancel/runner teardown can
-      // disarm this batch while that await is pending; close that window before
-      // the synchronous manager enqueue/resume boundary performs any effect.
-      if (typeof isCurrent === "function" && !isCurrent()) {
-        return false;
-      }
-      // Same door as `send_message`: rehydrates an evicted or finished thread
-      // with its own history instead of starting a stranger.
-      const result = await manager.sendAgentMessage(
-        agentId,
-        text,
-        "orchestrator",
-        {
-          deliveryKind: "external-input",
-          deliveryEventId: eventId,
-        },
-      );
-      if (result.delivered) {
+    deliver: async (args) => {
+      const target = context.state.backgroundExitTarget;
+      if (!target || !args.isCurrent()) return false;
+      const delivered = await target.deliver(args);
+      if (delivered) {
         console.info(
-          `[background-wake] resumed thread ${agentId} (conversation ${conversationId}) on background command exit`,
+          `[background-wake] woke ${args.agentId} (conversation ${args.conversationId}) on background command exit`,
         );
       }
-      return result.delivered;
+      return delivered;
     },
   });
 

@@ -18,6 +18,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -528,15 +529,6 @@ const withInlineAskRecords = (
   return out;
 };
 
-const nextFrames = (count: number): Promise<void> =>
-  new Promise((resolve) => {
-    const step = (left: number) => {
-      if (left <= 0) resolve();
-      else requestAnimationFrame(() => step(left - 1));
-    };
-    step(count);
-  });
-
 export function ChatPane({
   messages: projectedMessages,
   streaming,
@@ -807,33 +799,6 @@ export function ChatPane({
     topInset,
   );
 
-  const [landingSpacerPx, setLandingSpacerPx] = useState(0);
-  const { beginReplyLanding, glideToEndForReply, endReplyLanding } = scroll;
-  useEffect(
-    () =>
-      replyHandoffController.attachRoom({
-        make: async (heightPx) => {
-          beginReplyLanding();
-          setLandingSpacerPx(heightPx);
-          await nextFrames(2);
-          await glideToEndForReply();
-        },
-        revealed: () =>
-          setLandingSpacerPx((px) => px + WORKING_INDICATOR_SLOT_HEIGHT),
-        settle: () => {
-          requestAnimationFrame(() => {
-            setLandingSpacerPx(0);
-            endReplyLanding();
-          });
-        },
-      }),
-    [
-      beginReplyLanding,
-      endReplyLanding,
-      glideToEndForReply,
-      replyHandoffController,
-    ],
-  );
   const [unread, setUnread] = useState(false);
   const prevLenRef = useRef(0);
   const sawTurnRef = useRef(false);
@@ -1628,6 +1593,29 @@ export function ChatPane({
     streaming && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const latestUserMessageId =
     lastMessage?.role === "user" ? lastMessage.id : null;
+  const emptyReplyIdsRef = useRef(new Set<string>());
+  const placedReplyIdRef = useRef<string | null>(null);
+  const lastReplyHasText =
+    lastMessage?.role === "assistant" && lastMessage.text.trim().length > 0;
+  const landingReplyId =
+    lastMessage && lastReplyHasText && emptyReplyIdsRef.current.has(lastMessage.id)
+      ? lastMessage.id
+      : null;
+  const placingReplyId = landingReplyId ?? placedReplyIdRef.current;
+  const {
+    getShouldPlaceLatestTurn: shouldPlaceLatestTurn,
+    nudgeAfterSend: placeLatestTurnFor,
+  } = scroll;
+  useLayoutEffect(() => {
+    if (!lastMessage || lastMessage.role !== "assistant") return;
+    if (!lastReplyHasText) {
+      emptyReplyIdsRef.current.add(lastMessage.id);
+      return;
+    }
+    if (!emptyReplyIdsRef.current.delete(lastMessage.id)) return;
+    placedReplyIdRef.current = lastMessage.id;
+    if (shouldPlaceLatestTurn()) placeLatestTurnFor(lastMessage.id);
+  }, [lastMessage, lastReplyHasText, shouldPlaceLatestTurn, placeLatestTurnFor]);
   useEffect(() => {
     if (!activeAssistantId) {
       scroll.clearActiveAssistantLayout();
@@ -1719,7 +1707,8 @@ export function ChatPane({
         );
       }
       const isActiveAssistant = item.id === activeAssistantId;
-      const isLatestUser = item.id === latestUserMessageId;
+      const isLatestUser =
+        item.id === latestUserMessageId || item.id === placingReplyId;
       const animate = shouldAnimateMessageEntry(
         seenMessageIdsRef.current,
         item.id,
@@ -1729,7 +1718,7 @@ export function ChatPane({
           key={item.id}
           animate={animate && item.role !== "assistant"}
           onLayout={
-            isActiveAssistant
+            isActiveAssistant && item.id !== placingReplyId
               ? onActiveAssistantLayout
               : isLatestUser
                 ? (event) => onLatestUserLayout(item.id, event)
@@ -1785,6 +1774,7 @@ export function ChatPane({
       onLatestUserLayout,
       onActiveAssistantLayout,
       activeAssistantId,
+      placingReplyId,
       activeMenuMessageId,
       selectingMessageId,
       desktopAccess,
@@ -1822,10 +1812,9 @@ export function ChatPane({
           toolName={workingIndicator?.toolName}
           toolCallId={workingIndicator?.toolCallId}
         />
-        {landingSpacerPx > 0 ? <View style={{ height: landingSpacerPx }} /> : null}
       </View>
     ),
-    [streaming, workingIndicator, styles.chatTail, landingSpacerPx],
+    [streaming, workingIndicator, styles.chatTail],
   );
 
   // Search shows a separate results menu that overlays the chat (the chat

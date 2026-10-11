@@ -81,9 +81,6 @@ const POST_SEND_REANCHOR_WINDOW_MS = 1500;
 // near the bottom.
 // ---------------------------------------------------------------------------
 
-const LANDING_GLIDE_TIMEOUT_MS = 700;
-const LANDING_SETTLE_MS = 250;
-
 export function useChatScroll(
   listTrailingSlackPx: number,
   trailingMessageId: string | null,
@@ -437,8 +434,6 @@ export function useChatScroll(
     followRafRef.current = requestAnimationFrame(stepFollow);
   }, [commitOffset, updateAwayFromBottom]);
 
-  const followSuspendedUntilMsRef = useRef(0);
-
   const setFollowTarget = useCallback(
     (target: number, gentle = false) => {
       if (!followArmedRef.current) return;
@@ -447,8 +442,6 @@ export function useChatScroll(
       const contentHeight = contentHeightRef.current;
       const maxOffset = Math.max(0, contentHeight - layoutHeight);
       const clamped = Math.max(0, Math.min(maxOffset, target));
-
-      if (Date.now() < followSuspendedUntilMsRef.current) return;
 
       // Seed the spring's current offset from the real position when starting
       // cold, so the first frame integrates from where the list actually sits.
@@ -478,26 +471,6 @@ export function useChatScroll(
     },
     [stepFollow],
   );
-
-  const beginReplyLanding = useCallback(() => {
-    stopFollowLoop();
-    followSuspendedUntilMsRef.current = Number.POSITIVE_INFINITY;
-  }, [stopFollowLoop]);
-
-  const glideToEndForReply = useCallback(async (): Promise<void> => {
-    if (!followArmedRef.current) return;
-    const scrolled = listRef.current?.scrollToEnd({ animated: true });
-    await Promise.race([
-      scrolled ?? Promise.resolve(),
-      new Promise<void>((resolve) =>
-        setTimeout(resolve, LANDING_GLIDE_TIMEOUT_MS),
-      ),
-    ]);
-  }, []);
-
-  const endReplyLanding = useCallback(() => {
-    followSuspendedUntilMsRef.current = Date.now() + LANDING_SETTLE_MS;
-  }, []);
 
   const followActiveAssistantRow = useCallback(() => {
     const assistantHeight = activeAssistantHeightRef.current;
@@ -711,9 +684,6 @@ export function useChatScroll(
     getShouldPlaceLatestTurn,
     releaseFollow,
     nudgeAfterSend,
-    beginReplyLanding,
-    glideToEndForReply,
-    endReplyLanding,
     awayFromBottom,
     isFollowingLatest,
   };

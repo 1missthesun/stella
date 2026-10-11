@@ -38,6 +38,7 @@ import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/con
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { splitReplyRefs } from "@stella/contracts/reply-refs";
 import {
+  isPiAgentInput,
   isPiAgentText,
   mergePiEntries,
   piEntriesForClients,
@@ -182,6 +183,13 @@ export type DesktopChatsOptions = {
    */
   claudeCode?(conversationId: string): DesktopEngineAgents | undefined;
   claudeCodeEngine?: ClaudeCodeEngine;
+  userReminders?(input: {
+    conversationId: string;
+    text: string;
+    sentAt: number;
+    previousUserAt?: number;
+    timezone?: string;
+  }): Promise<string[]>;
   /**
    * For a conversation stored in the cloud: cloud agents started with a
    * model, run as the owner's agent threads on that model (a Stella model,
@@ -1295,7 +1303,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     conversationId: string,
     requestId: string,
     content: UserInput,
-    sent: { locale?: string; followSender?: boolean } = {},
+    sent: { locale?: string; followSender?: boolean; timezone?: string } = {},
   ) => {
     // Stella answers where her brain is; the app places a send there instead,
     // and sends it here when that host could not take it.
@@ -1316,12 +1324,57 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     await markActive(conversationId, true);
     await caughtUp(chat);
+    const input = await withReminders(conversationId, chat, content, sent);
     const submission = await chat.root.submit(
       // A message sent while Stella works joins the run at its next step.
-      { type: "input", content, requestId, whenBusy: "steer" },
+      { type: "input", content: input, requestId, whenBusy: "steer" },
       context,
     );
     return { submissionId: submission.id };
+  };
+
+  const withReminders = async (
+    conversationId: string,
+    chat: Chat,
+    content: UserInput,
+    sent: { timezone?: string } = {},
+  ): Promise<UserInput> => {
+    if (!options.userReminders) return content;
+    const text = typeof content === "string" ? content : piUserView({ role: "user", content, timestamp: 0 } as PiUserMessage).text;
+    if (!text.trim()) return content;
+    const view = await chat.root.context(context);
+    let previousUserAt: number | undefined;
+    const shown = new Set<string>();
+    for (const message of view.messages) {
+      if (message.role !== "user") continue;
+      const user = message as unknown as PiUserMessage;
+      if (typeof user.content !== "string") {
+        for (const part of user.content) if (part.type === "text" && part.stella?.hidden) shown.add(part.text);
+      }
+      if (piUserView(user).text.trim() && !isPiAgentInput(user)) previousUserAt = user.timestamp;
+    }
+    const reminders = (
+      await options
+        .userReminders({
+          conversationId,
+          text,
+          sentAt: Date.now(),
+          ...(previousUserAt !== undefined ? { previousUserAt } : {}),
+          ...(sent.timezone ? { timezone: sent.timezone } : {}),
+        })
+        .catch((error: unknown) => {
+          options.report(error);
+          return [];
+        })
+    ).filter((reminder) => !shown.has(reminder));
+    if (reminders.length === 0) return content;
+    const parts = typeof content === "string" ? [{ type: "text" as const, text: content }] : [...content];
+    const hidden = reminders.map((reminder): TextContent & { stella: { hidden: true } } => ({
+      type: "text",
+      text: reminder,
+      stella: { hidden: true },
+    }));
+    return [...parts, ...hidden];
   };
 
   const followPickedModel = async (chat: Chat): Promise<void> => {
@@ -1396,7 +1449,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       const observer = observe ? await watchEvents(chat.harness, chat.root.id, context) : undefined;
       observer?.start(async (events) => observe?.(events as unknown as PiChatEvent[]));
       try {
-        return await automationTurn(chat, turn);
+        return await automationTurn(conversationId, chat, turn);
       } finally {
         await observer?.stop().catch(() => undefined);
       }
@@ -1406,6 +1459,7 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
 
   const automationTurn = async (
+    conversationId: string,
     chat: Chat,
     turn: {
       requestId: string;
@@ -1421,14 +1475,15 @@ export function desktopChats(options: DesktopChatsOptions) {
     const placement = turn.placementRunId ? placements.get(turn.placementRunId) : undefined;
     if (placement?.canceled) return { status: "error", finalText: "", error: "Canceled." };
     let submission;
+    const content: UserInput =
+      turn.content ??
+      (turn.visible ? turn.prompt : [{ type: "text", text: turn.prompt, stella: { hidden: true } } as TextContent]);
     try {
       submission = await chat.root.submit(
         {
           type: "input",
           // A prompt the user did not write is read by the model, not shown.
-          content:
-            turn.content ??
-            (turn.visible ? turn.prompt : [{ type: "text", text: turn.prompt, stella: { hidden: true } } as TextContent]),
+          content: turn.visible ? await withReminders(conversationId, chat, content) : content,
           requestId: turn.requestId,
           whenBusy: turn.rejectIfBusy ? "reject" : "followUp",
         },

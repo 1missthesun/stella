@@ -37,6 +37,7 @@ import { brainFor } from "./pi-brain.js";
 import { executionRemoteFor } from "./pi-execution.js";
 import { cloudJournalFor } from "./pi-journal.js";
 import { claudeCodeEngineFor } from "./claude-code-engine.js";
+import { piUserReminders } from "./pi-reminders.js";
 import { piModelUsage } from "./pi-usage.js";
 import {
   createRemoteDeviceSigner,
@@ -349,6 +350,13 @@ export const piChatsFor = (
           : getModelOverride(dataDir, "orchestrator");
       },
       claudeCodeEngine,
+      userReminders: ({ text, sentAt, previousUserAt, timezone }) =>
+        piUserReminders(session.config.get().stellaDataDirPath, {
+          text,
+          sentAt,
+          ...(previousUserAt !== undefined ? { previousUserAt } : {}),
+          ...(timezone ? { timezone } : {}),
+        }),
       credentials: {
         apiKey: (provider) => getAccessibleLocalLlmApiKey(session.config.get().stellaDataDirPath, provider),
         oauthToken: (provider) => getAccessibleLocalLlmOAuthApiKey(session.config.get().stellaDataDirPath, provider),
@@ -747,6 +755,7 @@ export const piChatRequest = async (
   }
   return await chats.submit(request.conversationId, request.requestId, content, {
     ...(payload.locale ? { locale: payload.locale } : {}),
+    ...(payload.timezone ? { timezone: payload.timezone } : {}),
     ...(request.send.followSender ? { followSender: true } : {}),
   });
 };

@@ -28,6 +28,7 @@ import type { ProjectCalls, ProjectViews } from "./projects.js";
 import type { BrowserCalls, BrowserViews } from "./browser.js";
 import type { UserAskCalls, UserAskViews } from "./user-asks.js";
 import type { ClaudeSessionCalls } from "./claude-sessions.js";
+import type { EmailDigestCalls, EmailDigestViews } from "./email-digest.js";
 
 type SystemCalls = {
   /** Round trip through the caller's owner object. */
@@ -56,7 +57,8 @@ export type BackendCalls = SystemCalls &
   ProjectCalls &
   BrowserCalls &
   UserAskCalls &
-  ClaudeSessionCalls;
+  ClaudeSessionCalls &
+  EmailDigestCalls;
 export type BackendViews = ConversationViews &
   AgentThreadViews &
   AgentEventViews &
@@ -74,7 +76,8 @@ export type BackendViews = ConversationViews &
   ProviderViews &
   ProjectViews &
   BrowserViews &
-  UserAskViews;
+  UserAskViews &
+  EmailDigestViews;
 
 export type CallName = keyof BackendCalls & string;
 export type ViewName = keyof BackendViews & string;

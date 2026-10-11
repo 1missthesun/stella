@@ -77,7 +77,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
   label: "Add schedule",
   workingText: "Adding schedule",
   description:
-    "Create a scheduled trigger. 'reminder' delivers message as written, with no AI: a phone push, an in-app notice on the desktop, and your line in the chat with Done and Snooze. 'task' fires prompt as a turn to you. 'watch' runs an AI-free check script on its schedule, in the cloud by default (script, checked once before it is saved) or on this computer when it needs something local (runsOn 'computer' with a ScriptDraft scriptPath); only a finding or a failure wakes AI, going to you or, with deliverTo 'agent', straight to an agent for an action the user already approved.",
+    "Create a scheduled trigger. 'reminder' delivers message as written, with no AI: a phone push, an in-app notice on the desktop, and your line in the chat with Done and Snooze. 'task' is work that needs AI each time: at fire time an agent runs prompt and its result comes back to you like any finished job (deliverTo 'orchestrator' wakes you instead, for tasks that need your judgment then). 'watch' runs an AI-free check script on its schedule, in the cloud by default (script, checked once before it is saved) or on this computer when it needs something local (runsOn 'computer' with a ScriptDraft scriptPath); only a finding or a failure wakes AI, going to you or, with deliverTo 'agent', straight to an agent for an action the user already approved.",
   parameters: {
     type: "object",
     properties: {
@@ -99,7 +99,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       prompt: {
         type: "string",
         description:
-          "kind='task': the stored intent delivered at fire time. kind='watch': what to do with a finding, as the user put it (tell them, ask them, or act; with deliverTo 'agent', the approved action itself). Make it self-contained.",
+          "kind='task': the work, as the brief an agent gets at fire time (or you, with deliverTo 'orchestrator'). kind='watch': what to do with a finding, as the user put it (tell them, ask them, or act; with deliverTo 'agent', the approved action itself). Make it self-contained.",
       },
       script: {
         type: "string",
@@ -121,7 +121,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
         type: "string",
         enum: ["orchestrator", "agent"],
         description:
-          "kind='watch': who handles a finding. 'orchestrator' (default) wakes you to tell, ask or act as prompt says; 'agent' starts an agent on prompt right away, for an action the user already approved (\"book it when it opens\").",
+          "kind='task': 'agent' (default) runs it as an agent; 'orchestrator' only when it needs your judgment at fire time. kind='watch': who handles a finding; 'orchestrator' (default) wakes you to tell, ask or act as prompt says, 'agent' starts an agent on prompt right away, for an action the user already approved (\"book it when it opens\").",
       },
       once: {
         type: "boolean",
@@ -189,7 +189,7 @@ export const SCHEDULE_UPDATE_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       deliverTo: {
         type: "string",
         enum: ["orchestrator", "agent"],
-        description: "Watch entries: who handles a finding.",
+        description: "Task entries: who runs it at fire time. Watch entries: who handles a finding.",
       },
       once: {
         type: "boolean",

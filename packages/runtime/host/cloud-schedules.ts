@@ -57,7 +57,9 @@ const watchFields = (payload: LocalCronJobCreateInput["payload"]) =>
         ...(payload.route ? { route: payload.route } : {}),
         ...(payload.once !== undefined ? { once: payload.once } : {}),
       }
-    : {};
+    : payload.kind === "task" && payload.route
+      ? { route: payload.route }
+      : {};
 
 const payloadOf = (row: ScheduleRow): LocalCronJobRecord["payload"] => {
   if (row.kind === "reminder") return { kind: "notify", text: row.prompt };
@@ -69,7 +71,7 @@ const payloadOf = (row: ScheduleRow): LocalCronJobRecord["payload"] => {
       ...(row.once ? { once: true } : {}),
     };
   }
-  return { kind: "task", prompt: row.prompt };
+  return { kind: "task", prompt: row.prompt, route: row.route };
 };
 
 const toCronJob = (row: ScheduleRow): LocalCronJobRecord => {

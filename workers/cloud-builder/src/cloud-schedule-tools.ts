@@ -99,6 +99,7 @@ const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
     jobId: row.scheduleId,
     name: row.description || (message ?? row.prompt).slice(0, 60),
     triggerKind: message !== null ? "reminder" : watch ? "watch" : "task",
+    ...(row.kind === "task" ? { deliverTo: row.route === "agent" ? "agent" : "orchestrator" } : {}),
     ...(watch
       ? {
           runsOn: "cloud",
@@ -264,6 +265,7 @@ export const createCloudScheduleTools = (
         } else if (kind === "task") {
           prompt = asTrimmedString(args.prompt);
           if (!prompt) throw new Error('kind="task" requires prompt.');
+          watch = { route: args.deliverTo === "orchestrator" ? "orchestrator" : "agent" };
         } else if (kind === "watch") {
           if (args.runsOn === "computer" || asTrimmedString(args.scriptPath)) {
             throw new Error(

@@ -150,6 +150,7 @@ const summarizeJob = (record: LocalCronJobRecord): Record<string, unknown> => ({
   ...(record.payload.kind === "task" || record.payload.kind === "agent"
     ? { prompt: record.payload.prompt }
     : {}),
+  ...(record.payload.kind === "task" ? { deliverTo: record.payload.route ?? "orchestrator" } : {}),
   ...(record.payload.kind === "script" ? { scriptPath: record.payload.scriptPath } : {}),
   ...(record.payload.kind === "watch"
     ? {
@@ -187,7 +188,7 @@ const buildPayloadForAdd = (
     if (!prompt) {
       throw new Error('kind="task" requires prompt.');
     }
-    return { kind: "task", prompt };
+    return { kind: "task", prompt, route: args.deliverTo === "orchestrator" ? "orchestrator" : "agent" };
   }
   if (kind === "watch") {
     const instructions = asTrimmedString(args.prompt);
@@ -248,7 +249,8 @@ const buildPayloadPatch = (
       ...(once !== undefined ? { once } : {}),
     };
   }
-  if (!message && !prompt && !scriptPath) return null;
+  const deliverTo = args.deliverTo === "agent" || args.deliverTo === "orchestrator" ? args.deliverTo : undefined;
+  if (!message && !prompt && !scriptPath && !(current.kind === "task" && deliverTo)) return null;
 
   if (message) {
     if (current.kind !== "notify") {
@@ -258,8 +260,10 @@ const buildPayloadPatch = (
     }
     return { kind: "notify", text: message };
   }
+  if (current.kind === "task" && (prompt || deliverTo)) {
+    return { ...current, ...(prompt ? { prompt } : {}), ...(deliverTo ? { route: deliverTo } : {}) };
+  }
   if (prompt) {
-    if (current.kind === "task") return { kind: "task", prompt };
     if (current.kind === "agent") return { ...current, prompt };
     throw new Error(
       `prompt only applies to task entries (this entry is ${getCronTriggerKind(current)}).`,

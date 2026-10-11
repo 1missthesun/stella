@@ -52,6 +52,8 @@ export type LocalCronPayload =
   | {
       kind: 'task'
       prompt: string
+      /** Who runs it at fire time: an agent (default for new tasks) or the orchestrator. */
+      route?: 'orchestrator' | 'agent'
     }
   | {
       kind: 'watch'

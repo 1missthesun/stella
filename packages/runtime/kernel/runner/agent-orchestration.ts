@@ -43,6 +43,7 @@ import type { ThreadActivityRecord } from "@stella/contracts/local-chat";
 import { createRunnerSiteConfig } from "./model-selection.js";
 import { RUNTIME_PRIVATE_TASK_LIFECYCLE_CUSTOM_TYPE } from "../storage/shared.js";
 import type { ComputerAgentCloudRecords } from "./computer-agent-cloud-records.js";
+import { createPlacedHelperMirror } from "./placed-agent-helpers.js";
 import {
   getPlacementCancellation,
   isPlacementLocalAgentId,
@@ -423,6 +424,9 @@ export const createAgentOrchestration = (
   },
 ) => {
   const inFlightLifecycleEventIds = new Set<string>();
+  const mirrorPlacedHelper = deps.cloudAgentRecords
+    ? createPlacedHelperMirror(context, deps.cloudAgentRecords)
+    : undefined;
   const handleAgentLifecycleEvent = async (event: AgentLifecycleEvent) => {
     const installedManager = context.state.localAgentManager;
     const destination = resolveLifecycleReportDestination(context, event);
@@ -656,6 +660,7 @@ export const createAgentOrchestration = (
     },
     onAgentEvent: (event: AgentLifecycleEvent) => {
       reconcileBackgroundExitWake(context, event);
+      mirrorPlacedHelper?.(event);
       const delivery = handleAgentLifecycleEvent(event);
       if (
         event.type === "agent-completed" ||

@@ -393,10 +393,13 @@ export const createStellaHostRunner = (
       Boolean(context.backend.client()),
     hasDurableLifecycleEvent:
       taskOrchestration.hasDurableExternalLifecycleEvent,
-    reportsLocally: (row) =>
-      row.placement === "computer" &&
-      row.executorDeviceId === null &&
-      !context.runtimeStore.getAgentRecord?.(row.threadId),
+    // A local-storage agent's row only mirrors it (a placed agent's helper):
+    // its report goes to its parent here, never through this monitor.
+    reportsLocally: (row) => {
+      if (row.placement !== "computer" || row.executorDeviceId !== null) return false;
+      const record = context.runtimeStore.getAgentRecord?.(row.threadId);
+      return !record || record.storageMode === "local";
+    },
     onLifecycleEvent: (event) => {
       const spawned =
         event.agentId && event.ownerGeneration

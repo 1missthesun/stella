@@ -75,6 +75,7 @@ export type GateHostDependencies = {
   messageLocalAgent: OwnerHost["messageLocalAgent"];
   /** The gate's pause of an agent a device runs locally. */
   pauseLocalAgent: OwnerHost["pauseLocalAgent"];
+  askDeviceConsent: OwnerHost["askDeviceConsent"];
   /** The gate's own dispatch cancellation. */
   cancelDispatch: (input: OwnerGateCancelInput) => Promise<OwnerGateStatusResult>;
   /** The gate's devices, with live presence. */
@@ -169,6 +170,8 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
   messageLocalAgent: (input) => deps.messageLocalAgent(input),
 
   pauseLocalAgent: (input) => deps.pauseLocalAgent(input),
+
+  askDeviceConsent: (input) => deps.askDeviceConsent(input),
 
   async steerAgentTurn(input) {
     const steered = await steerCloudAgent({

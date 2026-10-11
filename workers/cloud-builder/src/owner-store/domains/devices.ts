@@ -377,16 +377,7 @@ const requireDevice = (ctx: OwnerContext, deviceId: string): DeviceRow => {
   return row;
 };
 
-/**
- * Enable or disable a device's willingness to run dispatched work.
- *
- * Authorized by the account, which is the whole point of the enable control:
- * the owner should not have to walk to the other machine. Cross-account reach
- * is impossible here for a structural reason rather than a check — the row
- * lives in the caller's own owner object, so there is no device of anyone
- * else's to name.
- */
-const setRemoteExecution = (
+const answerRemoteExecution = (
   ctx: OwnerContext,
   args: DeviceCalls["devices.setRemoteExecution"]["args"],
 ): DeviceCalls["devices.setRemoteExecution"]["result"] => {
@@ -399,6 +390,28 @@ const setRemoteExecution = (
   }
   writeRemoteExecution(ctx, row.device_id, after, null);
   return { deviceId: row.device_id, remoteExecution: after, changed: true };
+};
+
+/**
+ * Enable or disable a device from the account, on any of the owner's
+ * clients. Turning remote work off takes effect at once. Turning it on is
+ * only asked for: that computer raises the question on its own screen (now,
+ * or as soon as it next connects), and only its own answer enables it.
+ */
+const setRemoteExecution = (
+  ctx: OwnerContext,
+  args: DeviceCalls["devices.setRemoteExecution"]["args"],
+): DeviceCalls["devices.setRemoteExecution"]["result"] => {
+  if (!args.enabled) return answerRemoteExecution(ctx, args);
+  enforceOwnerRateLimit(ctx.db, ctx.now, "devices.setRemoteExecution", { count: 60, windowMs: 60_000 }, "Too many device permission changes. Please wait a minute and try again.");
+  const row = requireDevice(ctx, args.deviceId);
+  const before = remoteExecutionOf(row);
+  if (before === "enabled") {
+    return { deviceId: row.device_id, remoteExecution: before, changed: false };
+  }
+  writeRemoteExecution(ctx, row.device_id, "asking", ctx.now);
+  ctx.host.askDeviceConsent({ deviceId: row.device_id, requestedAt: ctx.now });
+  return { deviceId: row.device_id, remoteExecution: "asking", changed: before !== "asking" };
 };
 
 /**
@@ -1040,7 +1053,7 @@ export const devicesDomain = {
    */
   internal: {
     "devices.setRemoteExecution": (ctx: OwnerContext, raw: unknown) =>
-      setRemoteExecution(
+      answerRemoteExecution(
         ctx,
         object({ deviceId: deviceIdArg, enabled: boolean() })(raw),
       ),

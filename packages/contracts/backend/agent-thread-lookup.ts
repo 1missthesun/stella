@@ -19,12 +19,6 @@ export const agentThreadLookupLocation = (thread: AgentThreadLookup): string =>
       ? `locally on ${deviceName(thread.originDeviceLabel, thread.originDeviceId)}`
       : "in Stella's cloud";
 
-/**
- * Whether a control sent from here reaches the thread. Control goes through
- * the owner's agent threads, which route it to wherever the thread runs, so
- * the device that started it never decides this; only a computer agent with
- * no computer on record is out of reach.
- */
 export const agentThreadLookupControllable = (thread: AgentThreadLookup): boolean =>
   thread.placement !== "computer" || Boolean(thread.executorDeviceId || thread.originDeviceId);
 

@@ -392,8 +392,6 @@ export const handleSendMessage = async (
     }
   }
 
-  // A receipt this computer keeps for a cloud thread it started only makes
-  // its follow-up exact; without one, the owner's agent threads take it.
   if (isOrchestrator && api.cloudContinue) {
     const continued = await api.cloudContinue({
       threadId,

@@ -332,11 +332,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         ...(signal ? { signal } : {}),
       });
 
-    /**
-     * A control this conversation applied to its own cloud agent itself (its
-     * exact-replay path), in that agent's event log like every routed one.
-     * Best effort: the control already happened.
-     */
     const logOwnControl = async (
       control: CloudAgentControlReceipt,
       command: "message" | "pause",

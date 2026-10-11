@@ -1024,7 +1024,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!known) return await messageOther(api, threadId, args.message, conversation, context);
       const remote = known?.remote ? remoteHostOf(known) : undefined;
       if (known?.remote) {
-        // No way from this host to where it runs: the owner's agent threads route it there.
         if (!remote) return await messageThroughLedger(api, threadId, args.message, conversation, context);
         await remote.message({ key: `message:${api.taskId}`, threadId, message: args.message }, context);
         await expectRemoteReport(api, api.conversationId, String(api.taskId), threadId, context);
@@ -1282,11 +1281,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     throw new Error(`No agent or Stella session has thread_id ${threadId}. agent_status without a thread_id lists who you can reach.`);
   };
 
-  /**
-   * `send_message` the owner's agent threads carry: they authorize it by
-   * owner, never by the host that started the agent, and route it to
-   * wherever the agent runs now. Once per call.
-   */
   const messageThroughLedger = async (
     api: ToolExecutionApi,
     threadId: string,

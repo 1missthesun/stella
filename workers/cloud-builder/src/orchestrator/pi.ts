@@ -1235,11 +1235,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return "paused";
   }
 
-  /**
-   * A message or a pause the owner's agent threads route to an agent this
-   * conversation's pi harness runs (its row's `harness`), whichever host
-   * sent it. A conversation pi never ran here holds no such agent.
-   */
   async controlPiHarnessAgent(
     input: PiHarnessAgentControl,
   ): Promise<PiHarnessAgentControlResult> {

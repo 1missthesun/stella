@@ -2161,13 +2161,6 @@ export class PiConversationRuntime {
     await Promise.race([paused, waitFor(ORIGIN_PAUSE_HOLD_MS)]);
   }
 
-  /**
-   * A control the owner's agent threads routed to one of this harness's
-   * agents, at any depth: a message it reads as its starter's (already
-   * framed as a note when someone else sent it), or a pause. Once per
-   * `commandId`. `not_found` unless this harness holds the agent for this
-   * owner and generation.
-   */
   async controlHarnessAgent(
     input: {
       ownerId: string;

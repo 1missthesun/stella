@@ -84,10 +84,6 @@ export const sessionStatus = async (
   };
 };
 
-/**
- * `send_message` to an agent or a session, through the owner's one control
- * path: the ledger records it and routes it to wherever the target runs.
- */
 export const sendAgentMessage = async (
   caller: AgentMessagingCaller,
   input: {
@@ -95,7 +91,6 @@ export const sendAgentMessage = async (
     to: string;
     text: string;
     from: AgentMessageSender;
-    /** The sender's conversation. */
     conversationId: string;
   },
 ): Promise<AgentMessageDelivery> => {
@@ -135,7 +130,6 @@ export const pauseAgentThread = async (
   };
 };
 
-/** One control for any of the owner's agents (`agentThreads.control`). */
 export const controlAgentThread = async (
   caller: AgentMessagingCaller,
   input: {

@@ -106,11 +106,6 @@ export type OwnerHost = {
   pauseLocalAgent(input: LocalAgentPause): Promise<{
     outcome: import("@stella/contracts/turn-plane/placement").AgentPauseDeviceOutcome | "unreachable" | "timeout";
   }>;
-  /**
-   * A message or a pause for an agent a cloud conversation's pi harness runs,
-   * through that conversation's object. `not_found` when its harness does
-   * not hold that agent (or not for this owner and generation).
-   */
   controlHarnessAgent(input: HarnessAgentControl): Promise<{
     outcome: "steered" | "resumed" | "paused" | "not_running" | "not_found";
   }>;
@@ -184,10 +179,8 @@ export type HarnessAgentControl = {
   conversationId: string;
   ownerGeneration: string;
   threadId: string;
-  /** Stable across redeliveries; the harness takes each once. */
   commandId: string;
   kind: "message" | "pause";
-  /** The message as the agent reads it: its starter's words, or a framed note. */
   text?: string;
 };
 

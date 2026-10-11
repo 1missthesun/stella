@@ -59,31 +59,13 @@ export const agentPauseText = (result: AgentPauseResult): string => {
     .join(" ");
 };
 
-/** What one control asks of an agent, through the owner's agent threads. */
 export type AgentControlCommand =
   | { kind: "message"; text: string; from: AgentMessageSender }
   | { kind: "resume"; text?: string; from: AgentMessageSender }
   | { kind: "pause" };
 
-/**
- * Where an agent's attempts run, which is where its controls go: its own
- * runtime in the cloud, its conversation's Stella in the cloud (`harness`),
- * a device a dispatch offered it to, or the computer whose Stella runs it.
- */
 export type AgentControlExecutor = "cloud" | "harness" | "dispatch" | "local";
 
-/**
- * How a control landed:
- * - `steered`: a running agent reads it before its next step.
- * - `resumed`: an idle agent started its next attempt with it.
- * - `queued`: its executor holds it for the agent's next step, or a Stella
- *   session reads it as its next turn.
- * - `held`: its computer is offline or slow to answer; the owner keeps it
- *   and delivers it when that computer reconnects.
- * - `paused`: it stopped, or stops the moment its computer reconnects.
- * - `not_running`: a pause found nothing running.
- * - `running`: a resume found it already running.
- */
 export type AgentControlOutcome =
   | "steered"
   | "resumed"
@@ -97,11 +79,9 @@ export type AgentControlResult = {
   threadId: string;
   command: AgentControlCommand["kind"];
   outcome: AgentControlOutcome;
-  /** The agent's status after the control; absent for a Stella session. */
   status?: string;
   attemptGeneration?: number;
   executor?: AgentControlExecutor;
-  /** Where it runs: "in Stella's cloud", "on omarchy". */
   where?: string;
   note?: string;
 };
@@ -238,19 +218,9 @@ export type AgentThreadCalls = {
     };
     result: AgentPauseResult;
   };
-  /**
-   * One control for any of the owner's agents, from any of the owner's
-   * hosts: authorized by the owner, never by the device that started the
-   * agent, recorded in the agent's event log, and routed to wherever the
-   * agent runs now. A command for a computer that is offline waits in the
-   * owner's command outbox and is delivered when it reconnects. `message`
-   * also reaches a Stella session by its conversation id. Idempotent per
-   * `commandId`.
-   */
   "agentThreads.control": {
     args: {
       ownerGeneration: string;
-      /** The requester's conversation. */
       conversationId: string;
       threadId: string;
       commandId: string;

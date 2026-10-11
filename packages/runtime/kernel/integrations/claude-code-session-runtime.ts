@@ -152,6 +152,14 @@ export type ClaudeCodeTurnRequest = {
   }): void;
   onTurnControl?(control: {
     inject: (input: ClaudeCodeInjectInput) => boolean;
+    /**
+     * End the step where it stands, at a tool boundary, without its answer:
+     * the CLI is stopped and the turn goes on as `toolSetAfterStep` says,
+     * on a CLI resuming the same session. False when the step can't end
+     * that way (it already ended, was stopped, or the turn took its last
+     * tool-set change).
+     */
+    endStep: () => boolean;
   }): (() => void) | undefined;
   onIntermediateResult?(result: ClaudeCodeStepResult): void;
   /**
@@ -254,6 +262,8 @@ type ClaudeCodeSession = {
   allowEmptyNativeFinal?: boolean;
   /** Set to [] at every turn start, before any step can consume steering. */
   consumedSteeringTexts?: string[];
+  /** Tool-set changes the running turn took (`MAX_TOOL_SET_CHANGES_PER_TURN`). */
+  toolSetChanges?: number;
   modelFallbackNotified?: boolean;
   claudeLoginEmail?: string;
   thinkingStripped?: boolean;
@@ -776,6 +786,7 @@ type ObservedToolUse = {
   toolName: string;
   toolArgs: ClaudeToolArgs;
 };
+const callsThroughMcp = (toolName: string) => toolName.startsWith("mcp__");
 export const createClaudeNativeToolUseCorrelator = () => {
   const queued = new Map<string, string[]>();
   const waiters = new Map<string, ((id: string) => void)[]>();
@@ -849,7 +860,8 @@ export const createClaudeNativeToolUseCorrelator = () => {
   };
 
   const observe = (args: ObservedToolUse) => {
-    if (observedIds.has(args.toolCallId)) return;
+    if (!callsThroughMcp(args.toolName) || observedIds.has(args.toolCallId))
+      return;
     observedIds.add(args.toolCallId);
     const key = claudeToolKey(args.toolName, args.toolArgs);
     const waiter = waiters.get(key)?.shift();
@@ -876,7 +888,11 @@ export const createClaudeNativeToolUseCorrelator = () => {
       const truncated = getClaudeCodeTruncatedToolUseFromStreamEvent(event);
       for (const raw of content) {
         const block = asObject(raw);
-        if (block?.type !== "tool_use" || typeof block.name !== "string") {
+        if (
+          block?.type !== "tool_use" ||
+          typeof block.name !== "string" ||
+          !callsThroughMcp(block.name)
+        ) {
           continue;
         }
         const key = claudeToolKey(block.name, asObject(block.input) ?? {});
@@ -940,7 +956,8 @@ export const createClaudeNativeToolUseCorrelator = () => {
         if (
           block?.type === "tool_use" &&
           typeof block.id === "string" &&
-          typeof block.name === "string"
+          typeof block.name === "string" &&
+          callsThroughMcp(block.name)
         ) {
           streamingBlocks.set(index, {
             toolCallId: block.id,
@@ -1894,6 +1911,7 @@ class ClaudeCodeSessionRuntime {
     session.fableSafetyFailures = 0;
     session.allowEmptyNativeFinal = false;
     session.consumedSteeringTexts = [];
+    session.toolSetChanges = 0;
     // The compaction loop breaker counts per Stella turn.
     if (session.process) {
       session.process.compacting = false;
@@ -1983,13 +2001,13 @@ class ClaudeCodeSessionRuntime {
         { remaining: MAX_STEP_RECOVERIES_PER_TURN },
       );
       let current = request;
-      for (
-        let changes = 0;
-        !request.vanilla && changes < MAX_TOOL_SET_CHANGES_PER_TURN;
-        changes += 1
+      while (
+        !request.vanilla &&
+        (session.toolSetChanges ?? 0) < MAX_TOOL_SET_CHANGES_PER_TURN
       ) {
         const change = current.toolSetAfterStep?.();
         if (!change) break;
+        session.toolSetChanges = (session.toolSetChanges ?? 0) + 1;
         if (!response.delivered && response.message.trim()) {
           try {
             current.onIntermediateResult?.(response);
@@ -3044,6 +3062,7 @@ class ClaudeCodeSessionRuntime {
           pending.detachTurnControl = request.onTurnControl({
             inject: (input) =>
               this.injectIntoPendingTurn(session, processState, pending, input),
+            endStep: () => this.endPendingStep(session, processState, pending),
           });
         } catch {
           // A host-side steering observer must not break the engine turn.
@@ -3109,6 +3128,44 @@ class ClaudeCodeSessionRuntime {
       )}\n`,
       () => {},
     );
+    return true;
+  }
+  /**
+   * End a step at a tool boundary instead of with its answer: the CLI is
+   * stopped before it reads the results it waits on, and the step resolves
+   * with no answer of its own, so the turn goes on with the step
+   * `toolSetAfterStep` names. Its file and shell tools moved, and the CLI
+   * must not take one more call with the built-ins it started with.
+   */
+  endPendingStep(
+    session: ClaudeCodeSession,
+    processState: ClaudeCodeProcessState,
+    pending: PendingStep,
+  ) {
+    const index = processState.pending.indexOf(pending);
+    if (
+      index < 0 ||
+      processState.closed ||
+      pending.request.vanilla ||
+      pending.request.abortSignal?.aborted ||
+      (session.toolSetChanges ?? 0) >= MAX_TOOL_SET_CHANGES_PER_TURN
+    ) {
+      return false;
+    }
+    processState.pending.splice(index, 1);
+    this.detachAbortListener(pending);
+    processState.closed = true;
+    if (session.process === processState) {
+      this.resetStreamingProcess(pending.request.sessionKey, session);
+    } else {
+      killProcess(processState.child);
+    }
+    pending.resolve({
+      message: "",
+      sessionId: session.sessionId,
+      usage: undefined,
+      delivered: true,
+    });
     return true;
   }
   noteInjectionConsumed(

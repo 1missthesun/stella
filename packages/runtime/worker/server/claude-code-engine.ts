@@ -243,8 +243,8 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         onStreamEvent: (event) => spec.onEvent(event),
         onStatusChange: (status) => spec.onStatus(status),
         onSessionId: (sessionId) => spec.onSessionId(sessionId),
-        onTurnControl: ({ inject }) => {
-          spec.control((input) => inject({ text: input.text, images: input.images }));
+        onTurnControl: ({ inject, endStep }) => {
+          spec.control({ inject: (input) => inject({ text: input.text, images: input.images }), endStep });
           return undefined;
         },
         toolSetAfterStep: () => spec.toolSetAfterStep(),

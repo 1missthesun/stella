@@ -24,6 +24,7 @@ import { enginesDomain } from "./domains/engines.js";
 import { projectsDomain } from "./domains/projects.js";
 import { browserDomain } from "./domains/browser.js";
 import { userAsksDomain } from "./domains/user-asks.js";
+import { claudeSessionsDomain } from "./domains/claude-sessions.js";
 import { RATE_LIMIT_MIGRATION } from "./rate-limit.js";
 import { createOwnerRegistry, type OwnerDomain } from "./registry.js";
 
@@ -61,6 +62,7 @@ export const ownerDomains: OwnerDomain[] = [
   projectsDomain,
   browserDomain,
   userAsksDomain,
+  claudeSessionsDomain,
 ];
 
 export const ownerRegistry = createOwnerRegistry(ownerDomains);

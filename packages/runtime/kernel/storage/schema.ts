@@ -27,7 +27,7 @@ import {
   legacyTablesPresent,
 } from "./legacy-import.js";
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 const FTS_TOKENIZER = "'porter unicode61 remove_diacritics 2'";
 
@@ -507,6 +507,49 @@ const applyCloudColumnBackfills = (db: SqliteDatabase): void => {
   addColumn("computer_agent_cloud_thread_owners", "owner_generation TEXT");
 };
 
+export const CLAUDE_SESSION_SYNC_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS claude_session_sync_sessions (
+  thread_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  conversation_id TEXT NOT NULL,
+  engine TEXT NOT NULL,
+  config_dir TEXT,
+  cwd TEXT NOT NULL,
+  owner_scope TEXT NOT NULL,
+  journal_cursor TEXT,
+  journal_seq INTEGER,
+  lease_epoch INTEGER,
+  state TEXT NOT NULL DEFAULT 'active',
+  dirty INTEGER NOT NULL DEFAULT 1,
+  tag_dirty INTEGER NOT NULL DEFAULT 1,
+  resume_pending INTEGER NOT NULL DEFAULT 0,
+  reply_hashes_json TEXT,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at INTEGER NOT NULL,
+  last_error TEXT,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (thread_id, session_id)
+);
+CREATE INDEX IF NOT EXISTS idx_claude_session_sync_sessions_drain
+  ON claude_session_sync_sessions(owner_scope, dirty, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_claude_session_sync_sessions_resume
+  ON claude_session_sync_sessions(thread_id, resume_pending, updated_at);
+
+CREATE TABLE IF NOT EXISTS claude_session_sync_files (
+  thread_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  generation INTEGER NOT NULL,
+  acked_length INTEGER NOT NULL,
+  acked_chain TEXT NOT NULL,
+  content_sha256 TEXT,
+  pending_end INTEGER,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (thread_id, session_id, path)
+);
+`;
+
 export const FTS_SCHEMA_SQL = `
 CREATE VIRTUAL TABLE IF NOT EXISTS entry_fts USING fts5(
   search_text,
@@ -714,6 +757,12 @@ const MIGRATIONS: Migration[] = [
           db.exec(statement);
         } catch {}
       }
+    },
+  },
+  {
+    version: 8,
+    apply: (db) => {
+      db.exec(CLAUDE_SESSION_SYNC_SCHEMA_SQL);
     },
   },
 ];

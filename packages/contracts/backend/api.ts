@@ -24,6 +24,7 @@ import type { EngineCalls, EngineViews } from "./engines.js";
 import type { ProjectCalls, ProjectViews } from "./projects.js";
 import type { BrowserCalls, BrowserViews } from "./browser.js";
 import type { UserAskCalls, UserAskViews } from "./user-asks.js";
+import type { ClaudeSessionCalls } from "./claude-sessions.js";
 
 type SystemCalls = {
   /** Round trip through the caller's owner object. */
@@ -49,7 +50,8 @@ export type BackendCalls = SystemCalls &
   EngineCalls &
   ProjectCalls &
   BrowserCalls &
-  UserAskCalls;
+  UserAskCalls &
+  ClaudeSessionCalls;
 export type BackendViews = ConversationViews &
   AgentThreadViews &
   BillingViews &

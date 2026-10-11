@@ -16,6 +16,13 @@ import { createRuntimeInitialization } from "./runner/runtime-initialization.js"
 import { createAgentOrchestration } from "./runner/agent-orchestration.js";
 import { createCloudAgentLifecycleMonitor } from "./runner/cloud-agent-lifecycle.js";
 import { createComputerAgentCloudRecords } from "./runner/computer-agent-cloud-records.js";
+import { createClaudeSessionSync } from "./runner/claude-session-sync.js";
+import {
+  claudeSessionSyncSink,
+  setClaudeSessionSyncSink,
+} from "./integrations/claude-code-session-sync-sink.js";
+import { getClaudeCodeConfig } from "./storage/local-llm-credential-access.js";
+import { resolveAgentWorkingDirectory } from "./agent-runtime/shared.js";
 import { parseCanonicalCloudHistory } from "./runner/orchestrator-launch.js";
 import {
   buildRuntimeSystemPrompt,
@@ -180,6 +187,7 @@ export const createStellaHostRunner = (
   context.toolHost.setToolCallHooks(context.hookEmitter);
   let restartCloudAgentLifecycle = () => {};
   let resumeComputerAgentCloudRecords = () => {};
+  let resumeClaudeSessionSync = () => {};
   const setAuthToken = (value: string | null) => {
     if (process.env.STELLA_LLM_PROXY_TOKEN) return;
     const prev = context.state.authToken?.trim() || null;
@@ -190,6 +198,7 @@ export const createStellaHostRunner = (
     if (next) {
       restartCloudAgentLifecycle();
       resumeComputerAgentCloudRecords();
+      resumeClaudeSessionSync();
       context.cloudTranscript.resume();
     }
   };
@@ -256,6 +265,25 @@ export const createStellaHostRunner = (
     },
   });
   resumeComputerAgentCloudRecords = computerAgentCloudRecords.resume;
+  const claudeSessionSync = createClaudeSessionSync({
+    deviceId: context.deviceId,
+    db: context.runtimeStore.db,
+    getAuthToken: () => context.state.authToken?.trim() || null,
+    getBackend: () => {
+      const client = context.backend.client();
+      if (!client) return null;
+      return {
+        append: async (args) => await client.call("claudeSessions.append", args),
+        tag: async (args) => await client.call("claudeSessions.tag", args),
+        latest: async (args) => await client.call("claudeSessions.latest", args),
+        readChunk: async (args) =>
+          await client.call("claudeSessions.readChunk", args),
+      };
+    },
+  });
+  setClaudeSessionSyncSink(claudeSessionSync);
+  resumeClaudeSessionSync = claudeSessionSync.resume;
+  claudeSessionSync.resume();
   const buildAgentContextWithResolvedRoute = async (
     args:
       | Parameters<typeof buildAgentContext>[1]
@@ -487,6 +515,10 @@ export const createStellaHostRunner = (
       // client that runtime teardown has already disposed. The next worker
       // resumes those durable rows before constructing its agent manager.
       computerAgentCloudRecords.stop();
+      claudeSessionSync.stop();
+      if (claudeSessionSyncSink() === claudeSessionSync) {
+        setClaudeSessionSyncSink(null);
+      }
       await taskOrchestration.shutdown();
     },
   });
@@ -499,6 +531,7 @@ export const createStellaHostRunner = (
       scheduleRemotePromptRevalidation();
       queueMicrotask(() => cloudAgentLifecycle.start());
       computerAgentCloudRecords.resume();
+      claudeSessionSync.resume();
     },
     setAuthToken,
     setHasConnectedAccount,
@@ -587,6 +620,25 @@ export const createStellaHostRunner = (
     publishLinkedFiles: (text: string) => {
       context.linkedFilePublisher.publishText(text);
     },
+    restoreClaudeCodeSession: async ({ threadId, cwd }) => {
+      const claudeConfig = await getClaudeCodeConfig();
+      const workingFolder =
+        cwd?.trim() ||
+        context.runtimeStore.getAgentRecord(threadId)?.workingDirectory ||
+        resolveAgentWorkingDirectory({
+          agentType: AGENT_IDS.ORCHESTRATOR,
+          stellaAppDir: context.stellaAppDir,
+        });
+      if (!workingFolder) {
+        throw new Error("No working folder to restore the session into.");
+      }
+      return await claudeSessionSync.restore({
+        threadId,
+        configDir: claudeConfig.configDir ?? null,
+        cwd: workingFolder,
+      });
+    },
+    flushClaudeSessionSync: (timeoutMs) => claudeSessionSync.flush(timeoutMs),
     runBlockingLocalAgent: taskOrchestration.runBlockingLocalAgent,
     createBackgroundAgent: taskOrchestration.createBackgroundAgent,
     getActiveAgentCount: () =>

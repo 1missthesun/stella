@@ -27,6 +27,11 @@ import {
   type ClaudeCodeToolMcpHost,
 } from "./claude-code-tool-mcp-host.js";
 import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
+import {
+  claudeSessionProjectDir,
+  resolveClaudeWorkingFolder,
+  stripClaudeThinkingFromSessionFile,
+} from "./claude-code-session-files.js";
 import type {
   ToolMetadata,
   ToolResult,
@@ -135,6 +140,12 @@ export type ClaudeCodeTurnRequest = {
   }): (() => void) | undefined;
   onIntermediateResult?(result: ClaudeCodeStepResult): void;
   onSessionId?(sessionId: string): void;
+  onSessionCheckpoint?(checkpoint: {
+    sessionId: string;
+    configDir: string | null;
+    cwd: string;
+    final: boolean;
+  }): void;
   onStatusChange?(status: ClaudeCodeStatusChange): void;
   onStream?(chunk: string): void;
   onModelRound?(round: { messageId?: string; toolCallCount: number }): void;
@@ -213,6 +224,7 @@ type ClaudeCodeSession = {
   consumedSteeringTexts?: string[];
   modelFallbackNotified?: boolean;
   claudeLoginEmail?: string;
+  thinkingStripped?: boolean;
 };
 type ClaudeCodeError = Error & { code?: string; status?: number };
 const CLAUDE_CODE_MODEL_PREFIX = "claude-code/";
@@ -993,6 +1005,10 @@ const isSessionAlreadyInUseError = (message: string) =>
   /Session ID .* is already in use\./i.test(message);
 const isMissingResumeSessionError = (message: string) =>
   /No conversation found with session ID:/i.test(message);
+const isRejectedThinkingSignatureError = (message: string) =>
+  /\bsignature\b[^\n]{0,80}\bthinking\b|\bthinking\b[^\n]{0,80}\bsignature\b/i.test(
+    message,
+  );
 const configuredTimeoutMs = (envName: string, fallbackMs: number) => {
   const raw = process.env[envName]?.trim();
   if (!raw) return fallbackMs;
@@ -2147,6 +2163,36 @@ class ClaudeCodeSessionRuntime {
           observedMcpCalls,
         );
       }
+      if (
+        useResume &&
+        !session.thinkingStripped &&
+        isRejectedThinkingSignatureError(message)
+      ) {
+        session.thinkingStripped = true;
+        this.resetStreamingProcess(request.sessionKey, session);
+        const claudeConfig = await getClaudeCodeConfig();
+        const removed = await stripClaudeThinkingFromSessionFile(
+          path.join(
+            claudeSessionProjectDir(
+              claudeConfig.configDir ?? null,
+              await resolveClaudeWorkingFolder(request.cwd ?? process.cwd()),
+            ),
+            `${session.sessionId}.jsonl`,
+          ),
+        );
+        if (removed > 0) {
+          return await this.executeStepWithMode(
+            session,
+            request,
+            effectiveSystemPrompt,
+            prompt,
+            true,
+            allowCompactionLoopRestart,
+            promptImages,
+            observedMcpCalls,
+          );
+        }
+      }
       if (useResume && isMissingResumeSessionError(message)) {
         this.resetStreamingProcess(request.sessionKey, session);
         session.sessionId = crypto.randomUUID();
@@ -2476,6 +2522,21 @@ class ClaudeCodeSessionRuntime {
         if (parsedLine.type === "user" && parsedLine.isReplay === true) {
           this.noteInjectionConsumed(session, processState, parsedLine.uuid);
           continue;
+        }
+        if (
+          parsedLine.type === "assistant" ||
+          parsedLine.type === "user" ||
+          parsedLine.type === "result"
+        ) {
+          const checkpointRequest = processState.pending[0]?.request ?? request;
+          try {
+            checkpointRequest.onSessionCheckpoint?.({
+              sessionId: session.sessionId,
+              configDir: processState.claudeConfigDir,
+              cwd: checkpointRequest.cwd ?? process.cwd(),
+              final: parsedLine.type === "result",
+            });
+          } catch {}
         }
         // The init event names the model the CLI actually resolved the
         // requested alias to (e.g. default -> claude-opus-4-8[1m]).

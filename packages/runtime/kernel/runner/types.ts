@@ -518,6 +518,13 @@ export type RunnerPublicApi = {
    * devices: an agent report written here, delivered to a chat elsewhere.
    */
   publishLinkedFiles: (text: string) => void;
+  restoreClaudeCodeSession: (args: {
+    threadId: string;
+    cwd?: string;
+  }) => Promise<
+    import("./claude-session-sync.js").ClaudeSessionRestoreResult | null
+  >;
+  flushClaudeSessionSync: (timeoutMs?: number) => Promise<boolean>;
   runBlockingLocalAgent: (
     request: Omit<AgentToolRequest, "storageMode"> & {
       executionId?: string;

@@ -209,6 +209,7 @@ export type BaseRunOptions = {
   storageMode?: "cloud" | "local";
   /** Exact owner-data epoch captured at root turn admission. */
   ownerGeneration?: string;
+  cloudJournalSeq?: number;
   userMessageId: string;
   uiVisibility?: "visible" | "hidden";
   agentType: string;

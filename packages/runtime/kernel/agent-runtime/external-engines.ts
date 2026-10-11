@@ -1,5 +1,11 @@
 import crypto from "crypto";
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 import type {
   AssistantMessage,
@@ -93,6 +99,15 @@ import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { sanitizeSensitiveData } from "@stella/contracts/sensitive-data";
 import { stellaAgentShellEnvironment } from "../tools/stella-agent-env.js";
 import { markImageOperationDelivered } from "../tools/image-operation-store.js";
+import {
+  claudeCliVersion,
+  compareClaudeCliVersions,
+  hashClaudeReplyText,
+} from "../integrations/claude-code-session-files.js";
+import {
+  claudeSessionSyncSink,
+  type RestoredClaudeSession,
+} from "../integrations/claude-code-session-sync-sink.js";
 
 /**
  * External engines run node_repl through the same host dispatcher, so the
@@ -756,6 +771,115 @@ const recordClaudeHistoryDelivery = (args: {
     staleAfterCompaction: args.staleAfterCompaction,
     ...(updatesSince !== undefined ? { updatesSince } : {}),
   });
+};
+
+const replyTextOf = (content: AgentMessage["content"]): string =>
+  typeof content === "string"
+    ? content
+    : content
+        .map((block) => (block.type === "text" ? block.text : ""))
+        .filter((text) => text.trim().length > 0)
+        .join("\n\n");
+
+const claudeSessionJournalCursor = (opts: BaseRunOptions): string => {
+  const history = buildHistorySource(opts.agentContext);
+  const last = history[history.length - 1];
+  if (!last) return "v1:empty";
+  return `v1:${crypto
+    .createHash("sha256")
+    .update(JSON.stringify({ role: last.role, text: contentToText(last.content) }))
+    .digest("hex")}`;
+};
+
+const syncsClaudeSession = (opts: BaseRunOptions): boolean =>
+  opts.executionHost === "device" &&
+  opts.storageMode !== "local" &&
+  !opts.conversationId.startsWith("local_");
+
+const sameWorkingFolder = (left: string, right: string | undefined): boolean => {
+  if (!right) return false;
+  const resolve = (value: string) => {
+    try {
+      return realpathSync(value);
+    } catch {
+      return path.resolve(value);
+    }
+  };
+  return resolve(left) === resolve(right);
+};
+
+const adoptRestoredClaudeSession = async (args: {
+  opts: BaseRunOptions;
+  threadKey: string;
+  engine: "claude_code_local" | "claude_code_local_vanilla";
+  cwd: string | undefined;
+}): Promise<{
+  restored: RestoredClaudeSession;
+  deliveredHashes: string[] | null;
+} | null> => {
+  const sink = claudeSessionSyncSink();
+  const restored = sink?.takeRestored({
+    threadId: args.threadKey,
+    engine: args.engine,
+  });
+  if (!sink || !restored) return null;
+  const reject = (reason: string) => {
+    historyDeliveryLogger.warn("claude-session-restore.rebuild", {
+      threadKey: args.threadKey,
+      sessionId: restored.sessionId,
+      reason,
+    });
+    sink.consumeRestored({ threadId: args.threadKey, sessionId: restored.sessionId });
+    return null;
+  };
+  if (!sameWorkingFolder(restored.cwd, args.cwd)) {
+    return reject("working_folder_changed");
+  }
+  const localCli = await claudeCliVersion();
+  if (
+    restored.cliVersion !== "unknown" &&
+    localCli !== "unknown" &&
+    compareClaudeCliVersions(localCli, restored.cliVersion) < 0
+  ) {
+    return reject("cli_older_than_origin");
+  }
+  const history = buildHistorySource(args.opts.agentContext);
+  let lastReplyIndex = -1;
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const message = history[index]!;
+    if (message.role === "assistant" && replyTextOf(message.content).trim()) {
+      lastReplyIndex = index;
+      break;
+    }
+  }
+  if (lastReplyIndex >= 0) {
+    const content = history[lastReplyIndex]!.content;
+    const candidates =
+      typeof content === "string"
+        ? [content]
+        : [
+            replyTextOf(content),
+            content
+              .map((block) => (block.type === "text" ? block.text : ""))
+              .join(""),
+          ];
+    if (
+      !candidates.some((text) =>
+        restored.replyHashes.has(hashClaudeReplyText(text)),
+      )
+    ) {
+      return reject("sync_behind_log");
+    }
+  }
+  return {
+    restored,
+    deliveredHashes:
+      lastReplyIndex >= 0
+        ? toStellaHistoryEntries(history.slice(0, lastReplyIndex + 1)).flatMap(
+            (entry) => entry.hashes,
+          )
+        : null,
+  };
 };
 
 /**
@@ -2179,12 +2303,35 @@ const runClaudeHostedTurn = async (
   });
 
   const deliversHistoryIncrementally = args.session.kind === "orchestrator";
+  const inProcessSessionId = deliversHistoryIncrementally
+    ? claudeCodeResumableSessionId(sessionKey, localCliCwd)
+    : undefined;
+  const syncsSession = syncsClaudeSession(args.opts);
+  const adoptedRestore =
+    syncsSession && !persistedSessionId && !inProcessSessionId
+      ? await adoptRestoredClaudeSession({
+          opts: args.opts,
+          threadKey,
+          engine: sessionEngine,
+          cwd: localCliCwd,
+        })
+      : null;
+  const restoredSessionId = adoptedRestore?.restored.sessionId;
+  if (adoptedRestore && deliversHistoryIncrementally) {
+    recordClaudeHistoryDelivery({
+      stellaDataDir: args.opts.stellaDataDir,
+      sessionKey,
+      sessionId: adoptedRestore.restored.sessionId,
+      entryHashes: adoptedRestore.deliveredHashes ?? [],
+      staleAfterCompaction: false,
+    });
+  }
   const resumableSessionId =
-    persistedSessionId ??
-    (deliversHistoryIncrementally
-      ? claudeCodeResumableSessionId(sessionKey, localCliCwd)
-      : undefined);
+    persistedSessionId ?? inProcessSessionId ?? restoredSessionId;
   const resumesExistingSession = Boolean(resumableSessionId);
+  const journalCursor = syncsSession
+    ? claudeSessionJournalCursor(args.opts)
+    : undefined;
   const initialDeliveredEntryId = getExternalDeliveredEntryId({
     store: args.opts.store,
     threadKey,
@@ -2270,6 +2417,29 @@ const runClaudeHostedTurn = async (
       nativeTools,
       onNativeToolStart: toolRelay.recordNativeToolStart,
       onNativeToolEnd: toolRelay.recordNativeToolEnd,
+      ...(syncsSession
+        ? {
+            onSessionCheckpoint: (checkpoint: {
+              sessionId: string;
+              configDir: string | null;
+              cwd: string;
+              final: boolean;
+            }) =>
+              claudeSessionSyncSink()?.noteCheckpoint({
+                threadId: threadKey,
+                conversationId: args.opts.conversationId,
+                sessionId: checkpoint.sessionId,
+                engine: sessionEngine,
+                configDir: checkpoint.configDir,
+                cwd: checkpoint.cwd,
+                final: checkpoint.final,
+                ...(journalCursor ? { journalCursor } : {}),
+                ...(typeof args.opts.cloudJournalSeq === "number"
+                  ? { journalSeq: args.opts.cloudJournalSeq }
+                  : {}),
+              }),
+          }
+        : {}),
       abortSignal: args.opts.abortSignal,
       onStream: acceptClaudeStreamChunk,
       onToolUpdate: ({ update }: { update: ToolResult }) =>
@@ -2297,7 +2467,7 @@ const runClaudeHostedTurn = async (
       args.opts.executionHost !== "sandbox"
         ? { shellEnv: nativeShellEnv() }
         : {},
-    persistedSessionId,
+    persistedSessionId: persistedSessionId ?? restoredSessionId,
     firstPrompt,
     buildQueuedPrompt: ({
       promptMessages,
@@ -2335,6 +2505,12 @@ const runClaudeHostedTurn = async (
   });
 
   const { finalResult, latestAttempt } = drained;
+  if (adoptedRestore) {
+    claudeSessionSyncSink()?.consumeRestored({
+      threadId: threadKey,
+      sessionId: adoptedRestore.restored.sessionId,
+    });
+  }
   if (!finalResult) {
     throw new Error("Claude Code completed without a final result.");
   }

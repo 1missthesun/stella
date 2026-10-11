@@ -714,6 +714,7 @@ export const launchPreparedOrchestratorRun = (args: {
       );
     }
     let leaseToken: string | null = null;
+    let cloudJournalSeq: number | undefined;
     let ephemeralCaptureStarted = false;
     let seededCloudThread: CloudThread = [];
     let deferredTerminal: DeferredTerminalCallback | null = null;
@@ -808,6 +809,7 @@ export const launchPreparedOrchestratorRun = (args: {
             begin,
           );
           if (promptSeq !== undefined) {
+            cloudJournalSeq = promptSeq;
             Object.assign(prepared, withCloudPromptRefTag(prepared, promptSeq));
           }
         }
@@ -833,6 +835,7 @@ export const launchPreparedOrchestratorRun = (args: {
         conversationId: prepared.conversationId,
         storageMode: prepared.storageMode,
         ownerGeneration: cloudOwnerGeneration ?? prepared.ownerGeneration,
+        ...(cloudJournalSeq !== undefined ? { cloudJournalSeq } : {}),
         userMessageId: args.userMessageId,
         agentType: prepared.agentType,
         userPrompt: prepared.userPrompt,

@@ -81,7 +81,6 @@ export function BrainSection({
   const loadingModels =
     current?.kind === "provider" &&
     settings.providerModelState(current.provider.id)?.status === "loading";
-  const effort = settings.effort === "none" ? "default" : settings.effort;
   const moreLabel =
     models.length > SHORT_LIST
       ? `All ${models.length} models`
@@ -196,46 +195,55 @@ export function BrainSection({
           />
         ) : null}
       </View>
+    </View>
+  );
+}
 
-      {settings.supportsEffortSelection ? (
-        <View style={styles.thinking}>
-          <SectionLabel>Thinking</SectionLabel>
-          <View style={styles.efforts} accessibilityRole="radiogroup">
-            {REASONING_OPTIONS.map((option) => {
-              const picked = option.id === effort;
-              return (
-                <Pressable
-                  key={option.id}
-                  onPress={() => {
-                    if (picked) return;
-                    tapLight();
-                    settings.selectEffort(option.id);
-                  }}
-                  hitSlop={{ top: 8, bottom: 8 }}
-                  accessibilityRole="radio"
-                  accessibilityLabel={`Thinking ${option.label}`}
-                  accessibilityState={{ checked: picked }}
-                  style={({ pressed }) => [
-                    styles.effort,
-                    pressed && !picked && styles.pressed,
-                  ]}
-                >
-                  <Text
-                    style={[styles.effortLabel, picked && styles.effortPicked]}
-                    numberOfLines={1}
-                    maxFontSizeMultiplier={1.3}
-                  >
-                    {option.label}
-                  </Text>
-                  <View style={styles.effortMark}>
-                    {picked ? <Dot size={6} /> : null}
-                  </View>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      ) : null}
+/**
+ * How hard the chosen model thinks. The sidebar keeps it at its foot, so it
+ * stays put however long the model list above it is.
+ */
+export function ThinkingRow({ settings }: { settings: ModelSettings }) {
+  const colors = useColors();
+  const styles = makeStyles(colors);
+  const effort = settings.effort === "none" ? "default" : settings.effort;
+  return (
+    <View>
+      <SectionLabel>Thinking</SectionLabel>
+      <View style={styles.efforts} accessibilityRole="radiogroup">
+        {REASONING_OPTIONS.map((option) => {
+          const picked = option.id === effort;
+          return (
+            <Pressable
+              key={option.id}
+              onPress={() => {
+                if (picked) return;
+                tapLight();
+                settings.selectEffort(option.id);
+              }}
+              hitSlop={{ top: 8, bottom: 8 }}
+              accessibilityRole="radio"
+              accessibilityLabel={`Thinking ${option.label}`}
+              accessibilityState={{ checked: picked }}
+              style={({ pressed }) => [
+                styles.effort,
+                pressed && !picked && styles.pressed,
+              ]}
+            >
+              <Text
+                style={[styles.effortLabel, picked && styles.effortPicked]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={1.3}
+              >
+                {option.label}
+              </Text>
+              <View style={styles.effortMark}>
+                {picked ? <Dot size={6} /> : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -253,9 +261,6 @@ const makeStyles = (colors: Colors) =>
     accounts: {
       marginBottom: 4,
       marginLeft: 42,
-    },
-    thinking: {
-      marginTop: 18,
     },
     efforts: {
       flexDirection: "row",

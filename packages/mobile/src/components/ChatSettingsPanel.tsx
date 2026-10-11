@@ -6,9 +6,8 @@ import Animated, {
   FadeOut,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GlassToggle } from "./glass";
 import { Icon } from "./Icon";
-import { BrainSection } from "./chat-settings/BrainSection";
+import { BrainSection, ThinkingRow } from "./chat-settings/BrainSection";
 import { Hairline, KIT, SectionLabel } from "./chat-settings/kit";
 import { PlaceSwitcher } from "./chat-settings/PlaceSwitcher";
 import { ProviderMark } from "./chat-settings/ProviderMark";
@@ -129,24 +128,13 @@ export function ChatSettingsPanel({ width }: { width: number }) {
               />
             </Rise>
 
-            <Rise i={i++} animated from="end">
-              <Hairline space={18} />
-              <View style={styles.toggleRow}>
-                <Text
-                  style={styles.toggleLabel}
-                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                >
-                  Show in composer
-                </Text>
-                <GlassToggle
-                  value={computer?.composerModelPinned ?? false}
-                  onValueChange={(value) =>
-                    computer?.onComposerModelPinnedChange(value)
-                  }
-                  accessibilityLabel="Show model picker in composer"
-                />
-              </View>
-            </Rise>
+            <View style={styles.spacer} />
+
+            {settings.supportsEffortSelection ? (
+              <Rise i={i++} animated from="end">
+                <ThinkingRow settings={settings} />
+              </Rise>
+            ) : null}
           </>
         ) : null}
       </>
@@ -285,6 +273,10 @@ const makeStyles = (colors: Colors) =>
       minHeight: "100%",
       paddingHorizontal: KIT.gutter,
     },
+    spacer: {
+      flex: 1,
+      minHeight: 24,
+    },
     firstSection: {
       height: 24,
     },
@@ -329,19 +321,6 @@ const makeStyles = (colors: Colors) =>
       fontSize: 30,
       letterSpacing: -1,
       lineHeight: 38,
-    },
-    toggleRow: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 12,
-      minHeight: 50,
-    },
-    toggleLabel: {
-      color: colors.text,
-      flex: 1,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 18,
-      letterSpacing: -0.4,
     },
     pressed: {
       opacity: 0.55,

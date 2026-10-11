@@ -8,6 +8,7 @@ import {
   isAbsoluteLocalFilePath,
 } from "@stella/contracts/local-file-links";
 import type { DriveFile } from "@stella/contracts/backend/drive";
+import { generatedImageFileName } from "@stella/contracts/generated-image-name";
 import { artifactPrimaryFilePath } from "./mobile-artifacts";
 import {
   displayPayloadForStellaFile,
@@ -38,6 +39,8 @@ export type ConversationFile = {
   artifact: ChatArtifact;
   createdAt: number;
   source: ConversationFileSource;
+  /** The name the file goes by, when it is not its path's last segment. */
+  name?: string;
   /** The drive folder a drive file sits in, when it is not at the root. */
   folder?: string;
 };
@@ -128,10 +131,13 @@ const entryFiles = (entry: JournalEntry): FoundFile[] => {
         body.source === "agent-thread" ? messageTexts(body).flatMap(linksIn) : [];
       return [...reports, ...uploadsIn(body)];
     }
+    const toolName =
+      typeof body.toolName === "string"
+        ? (body.toolName.split("__").at(-1) ?? body.toolName)
+        : "";
     if (
       role === "toolResult" &&
-      typeof body.toolName === "string" &&
-      DISPLAY_TOOLS.has(body.toolName) &&
+      DISPLAY_TOOLS.has(toolName) &&
       body.isError !== true
     ) {
       const details = asRecord(body.details);
@@ -139,12 +145,23 @@ const entryFiles = (entry: JournalEntry): FoundFile[] => {
       if (typeof details?.filePath === "string") {
         found.push({ path: details.filePath });
       }
-      if (Array.isArray(details?.drivePaths)) {
-        for (const drivePath of details.drivePaths) {
-          if (typeof drivePath === "string" && drivePath.trim()) {
-            found.push({ path: drivePath });
-          }
-        }
+      if (toolName === "image_gen") {
+        const drivePaths = pathList(details?.drivePaths);
+        const paths =
+          drivePaths.length > 0 ? drivePaths : pathList(details?.filePaths);
+        const prompt =
+          typeof details?.prompt === "string" ? details.prompt : undefined;
+        paths.forEach((path, index) =>
+          found.push({
+            path,
+            name: generatedImageFileName({
+              prompt,
+              index,
+              count: paths.length,
+              extension: extensionOfPath(path),
+            }),
+          }),
+        );
       }
       return found;
     }
@@ -173,6 +190,17 @@ const entryFiles = (entry: JournalEntry): FoundFile[] => {
   }
   return [];
 };
+
+const pathList = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter(
+        (entry): entry is string =>
+          typeof entry === "string" && entry.trim().length > 0,
+      )
+    : [];
+
+const extensionOfPath = (path: string): string =>
+  /\.([A-Za-z0-9]{1,8})$/.exec(path)?.[1] ?? "png";
 
 const desktopDeviceOfTurn = (turnId: string): string | null => {
   const match = /^desktop:([^:]+):/.exec(turnId);
@@ -209,13 +237,16 @@ const toConversationFile = (
       artifact: driveFileChatArtifact(drivePath, conversationId, entry.createdAt, name),
       createdAt: entry.createdAt,
       source: found.upload ? { kind: "upload" } : { kind: "cloud" },
+      name,
     };
   }
   if (!absolute) return null;
+  const name = found.name?.trim();
   return {
     key: `path:${raw}`,
     artifact: localArtifact(raw, conversationId, entry.createdAt),
     createdAt: entry.createdAt,
+    ...(name ? { name } : {}),
     source: isCloudWorkspacePath(raw)
       ? { kind: "cloud" }
       : { kind: "computer", deviceId: desktopDeviceOfTurn(entry.turnId) },
@@ -304,6 +335,7 @@ export const conversationFilesFromDrive = (
     artifact: driveFileChatArtifact(file.path, conversationId, file.updatedAt, file.name),
     createdAt: file.updatedAt,
     source: { kind: "cloud" },
+    name: file.name,
     folder: driveFolderOf(file.path),
   }));
 

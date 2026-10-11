@@ -129,8 +129,10 @@ const stringList = (value: unknown): string[] =>
 /**
  * One inline image card per `image_gen` call the orchestrator made in this
  * assistant row — the cloud twin of the desktop bridge's tool-start /
- * tool-end artifacts. A call without a result yet renders as generating;
- * a settled call carries the drive paths the cloud tool saved the image to.
+ * tool-end artifacts. A call without a result yet renders as generating.
+ * A settled cloud call carries the drive paths it saved the image to; a call
+ * Stella ran on a computer carries that computer's file paths, which load
+ * through the computer like any other file it made.
  */
 const generatedImageArtifacts = (args: {
   record: JournalMessageRecord;
@@ -144,14 +146,17 @@ const generatedImageArtifacts = (args: {
 }): ChatArtifact[] => {
   const artifacts: ChatArtifact[] = [];
   for (const call of toolCalls(args.record)) {
-    if (call.name !== "image_gen") continue;
+    if (call.name.split("__").at(-1) !== "image_gen") continue;
     const result = args.toolResults.get(call.id);
-    const details = asRecord(result?.payload.details);
+    const details =
+      asRecord(result?.payload.details) ?? asRecord(result?.payload.result);
     const drivePaths = stringList(details?.drivePaths);
+    const filePaths =
+      drivePaths.length > 0 ? drivePaths : stringList(details?.filePaths);
     const status = typeof details?.status === "string" ? details.status : "";
     const generationState: "running" | "completed" | "failed" | "canceled" =
       result
-        ? !result.error && drivePaths.length > 0
+        ? !result.error && filePaths.length > 0
           ? "completed"
           : status === "canceled"
             ? "canceled"
@@ -172,7 +177,7 @@ const generatedImageArtifacts = (args: {
       conversationId: args.conversationId,
       payload: {
         kind: "media",
-        asset: { kind: "image", filePaths: drivePaths },
+        asset: { kind: "image", filePaths },
         createdAt: args.createdAt,
         presentation: "inline-image",
         toolCallId: call.id,

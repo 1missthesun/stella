@@ -18,6 +18,7 @@ import type { TSchema } from "@sinclair/typebox";
 import { sleepWithAbort } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import type { AgentTool } from "@stella/runtime/kernel/agent-core/types.js";
 import type { MediaGenerateAccepted, MediaJob } from "@stella/contracts/backend/media";
+import { generatedImageFileName } from "@stella/contracts/generated-image-name";
 import { stellaImageRequest } from "@stella/contracts/media-models";
 import { readBoundedResponseBytes } from "./bounded-body.js";
 import { sha256Hex } from "./hash.js";
@@ -516,6 +517,7 @@ export const createCloudImageGenTool = (
                   context,
                   fetchImpl,
                   jobId,
+                  prompt,
                   toolCallId,
                   images,
                   signal,
@@ -594,6 +596,7 @@ const saveImagesToDrive = async (args: {
   context: CloudImageGenToolContext;
   fetchImpl: typeof fetch;
   jobId: string;
+  prompt: string;
   toolCallId: string;
   images: RemoteImage[];
   signal?: AbortSignal;
@@ -625,7 +628,12 @@ const saveImagesToDrive = async (args: {
     const path = drivePathFor(args.jobId, index, mimeType, args.now);
     files.push({
       path,
-      name: path.slice(path.lastIndexOf("/") + 1),
+      name: generatedImageFileName({
+        prompt: args.prompt,
+        index,
+        count: args.images.length,
+        extension: extensionForMime(mimeType),
+      }),
       sizeBytes: bytes.byteLength,
       contentType: mimeType,
       contentBase64: encodeBase64(bytes),

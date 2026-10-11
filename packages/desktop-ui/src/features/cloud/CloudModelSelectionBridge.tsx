@@ -24,6 +24,13 @@ const readLocal = async (): Promise<MirroredModelPreferences | null> =>
  * server selection, which phone and web pickers write. A server change is
  * applied locally; a local pick is saved to the server. Before the account has
  * ever saved one, the desktop's current choice seeds it.
+ *
+ * Only a real local change is saved: the bridge remembers the local selection
+ * it last reconciled (`reconciledRef`, read back after every apply and set on
+ * every save) and saves only when the local preferences have moved away from
+ * it. Applying a server selection never saves, so a server that stores a
+ * selection differently from how this computer stores it (an older server
+ * keeping "default" effort, say) can never start a save loop.
  */
 export function CloudModelSelectionBridge() {
   const { isAuthenticated } = useAuthState();
@@ -32,7 +39,7 @@ export function CloudModelSelectionBridge() {
   );
   const connections = useCloudEngines(isAuthenticated && hasLocalRuntime);
   const providers = useAccountProviders(isAuthenticated && hasLocalRuntime);
-  const serverRef = useRef<CloudExecutionSelection | null>(null);
+  const reconciledRef = useRef<CloudExecutionSelection | null>(null);
   const accountProvidersRef = useRef<ReadonlySet<string>>(new Set());
   accountProvidersRef.current = new Set(
     (providers?.providers ?? [])
@@ -51,13 +58,17 @@ export function CloudModelSelectionBridge() {
     queue.current = queue.current.then(step).catch(() => undefined);
   };
 
-  const pushLocal = (local: MirroredModelPreferences) => {
-    const derived = cloudExecutionFromLocal(local, accountProvidersRef.current);
-    const server = serverRef.current;
-    if (!derived || (server && sameCloudExecution(derived, server))) return;
-    serverRef.current = derived;
+  const derive = (local: MirroredModelPreferences) =>
+    cloudExecutionFromLocal(local, accountProvidersRef.current);
+
+  const pushLocal = async (local: MirroredModelPreferences) => {
+    const derived = derive(local);
+    if (!derived) return;
+    const reconciled = reconciledRef.current;
+    if (reconciled && sameCloudExecution(derived, reconciled)) return;
+    reconciledRef.current = derived;
     publishCloudExecutionSelection(derived);
-    return cloudEnginesApi.setExecution(derived);
+    await cloudEnginesApi.setExecution(derived);
   };
 
   useEffect(() => {
@@ -70,12 +81,16 @@ export function CloudModelSelectionBridge() {
         await pushLocal(local);
         return;
       }
-      serverRef.current = execution;
-      const current = cloudExecutionFromLocal(local, accountProvidersRef.current);
-      if (current && sameCloudExecution(current, execution)) return;
-      await window.electronAPI?.system?.setLocalModelPreferences?.(
-        localPatchForCloudExecution(local, execution),
-      );
+      const current = derive(local);
+      const patch = localPatchForCloudExecution(local, execution);
+      const target = derive({ ...local, ...patch });
+      if (current && target && sameCloudExecution(current, target)) {
+        reconciledRef.current = current;
+        return;
+      }
+      await window.electronAPI?.system?.setLocalModelPreferences?.(patch);
+      const applied = await readLocal();
+      reconciledRef.current = (applied && derive(applied)) ?? target;
       window.dispatchEvent(new CustomEvent(LOCAL_PREFERENCES_CHANGED_EVENT));
     });
     // The selection's identity is the trigger; helpers read refs.

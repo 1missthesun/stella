@@ -115,6 +115,13 @@ export const turnEventSeqKey = (turnId: string): string =>
  * so the event is the first turn's job whichever contact came first.
  */
 export const CONVERSATION_PROJECTED_KEY = "conversationProjected";
+/**
+ * The execution this conversation's latest chat turn was admitted with. A
+ * wake (an agent's report or message) carries none of its own and goes on
+ * on this one, so a conversation running on Claude Code answers its agents
+ * on Claude Code too.
+ */
+export const CONVERSATION_EXECUTION_KEY = "conversationExecution";
 /** Owner event batches the owner has not confirmed yet; the alarm retries them. */
 export const OWNER_EVENT_BATCH_PREFIX = "ownerEventBatch:";
 export const OWNER_EVENT_DEBT_RETRY_MS = 30_000;

@@ -44,6 +44,7 @@ import {
   resolveClaudeCodeToolSet,
   type ClaudeCodeServedSearchToolName,
 } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
+import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import { describePlacement, placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella/placement.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
@@ -77,6 +78,7 @@ const UPDATE_MAX_MESSAGE_CHARS = 12_000;
 const SUPERSEDED_SETTLE_MS = 10_000;
 
 export type ClaudeCodeRole = "orchestrator" | "worker";
+export type { ClaudeCodeCompaction };
 
 export type ClaudeCodeSessionRef = {
   conversationId: string;
@@ -116,6 +118,8 @@ export type ClaudeCodeTurnSpec = {
   onNativeToolEnd(end: { toolUseId: string; result: string; isError: boolean }): void;
   onStatus(status: ClaudeCodeStatus): void;
   onSessionId(sessionId: string): void;
+  /** The CLI compacted its session (`createClaudeCodeCompactionDetector`). */
+  onCompaction(compaction: ClaudeCodeCompaction): void;
   control(turn: {
     /** Steer the running CLI; `onConsumed` once it took the input in, `onDropped` if the step ended before it did. */
     inject(input: { text: string; images: ImageContent[]; onConsumed?: () => void; onDropped?: () => void }): boolean;
@@ -438,6 +442,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const nativeWaiters = new Map<string, Set<(result: NativeResult) => void>>();
   const statusListeners = new Set<(session: ClaudeCodeSessionRef, status: ClaudeCodeStatus) => void>();
   const wakeListeners = new Set<(session: ClaudeCodeSessionRef, wake: { key: string; text: string }) => void>();
+  const compactionListeners = new Set<(session: ClaudeCodeSessionRef, compaction: ClaudeCodeCompaction) => void>();
   const modelIds = new Set<string>(CLAUDE_CODE_MODEL_ALIASES);
   let providerListener: ((provider: Provider) => void) | undefined;
 
@@ -726,6 +731,15 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           for (const listener of statusListeners) {
             try {
               listener(binding.session, status);
+            } catch (error) {
+              report(error);
+            }
+          }
+        },
+        onCompaction: (compaction) => {
+          for (const listener of compactionListeners) {
+            try {
+              listener(session.binding.session, compaction);
             } catch (error) {
               report(error);
             }
@@ -1333,6 +1347,15 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     onBackgroundWake(listener: (session: ClaudeCodeSessionRef, wake: { key: string; text: string }) => void): () => void {
       wakeListeners.add(listener);
       return () => wakeListeners.delete(listener);
+    },
+    /**
+     * A session's CLI compacted its context: the summary stands in for
+     * everything it had before, and the host records it as the
+     * conversation's compaction (`recordEngineCompaction`).
+     */
+    onCompaction(listener: (session: ClaudeCodeSessionRef, compaction: ClaudeCodeCompaction) => void): () => void {
+      compactionListeners.add(listener);
+      return () => compactionListeners.delete(listener);
     },
     onStatus(listener: (session: ClaudeCodeSessionRef, status: ClaudeCodeStatus) => void): () => void {
       statusListeners.add(listener);

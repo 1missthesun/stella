@@ -408,7 +408,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       // Rollover, at the one boundary this route can offer. `afterTerminal` used
       // to be its only trigger, so a conversation written only through here —
       // every desktop-mirrored conversation, once that trigger is wired — never
-      // evaluated HOT_MAX_ROWS at all and grew with its lifetime writes. The
+      // evaluated its resident set at all and grew with its lifetime writes. The
       // running-turn re-check is not redundant with the one above: the appends
       // between them yield, and rollover mid-turn is forbidden.
       if (!(await this.turnRunning())) {

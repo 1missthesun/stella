@@ -67,6 +67,7 @@ import {
   STELLA_DEFAULT_ALIAS,
   stellaModelRef,
 } from "../harness.ts";
+import { recordEngineCompaction } from "../stella/journal-sync.ts";
 import {
   agentRunOutcome,
   noteRemoteReport,
@@ -634,6 +635,21 @@ export function desktopChats(options: DesktopChatsOptions) {
           });
         })
         .catch(() => undefined);
+    });
+    // Claude Code compacts its own context; pi never does for it. Stella's
+    // summary is the conversation's compaction, which the journal sync then
+    // publishes as its checkpoint for every other host.
+    claudeCodeEngine.onCompaction((session, compaction) => {
+      if (session.threadId) return;
+      void (async () => {
+        const chat = await ready(session.conversationId);
+        await recordEngineCompaction(
+          chat.harness,
+          chat.root,
+          { id: compaction.id, summary: compaction.summary, engine: "claude-code" },
+          context,
+        );
+      })().catch((error: unknown) => options.report(error));
     });
     // An agent's Claude Code CLI took up a background command that finished:
     // the agent is woken for it, as for one of Stella's own shells, unless

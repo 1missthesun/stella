@@ -15,10 +15,11 @@
  *    bump happen third in one transaction. A crash anywhere leaves rows
  *    resident and a segment marked 'uploading'; the next cut re-uploads that
  *    range first. The worst outcome is a duplicate object, never a lost row.
- *  - A cut lands only below the most recent turn's context start, at the end
- *    of a terminal turn, immediately before a plain user message. That is what
- *    keeps R2 off the agent loop's path entirely: a normal turn never reads a
- *    segment.
+ *  - A cut lands only at or below the conversation's compaction checkpoint
+ *    and below the most recent turn's context start, at the end of a terminal
+ *    turn, immediately before a plain user message. That is what keeps R2 off
+ *    the agent loop's path entirely: a new transcript starts from the
+ *    checkpoint and a normal turn never reads a segment.
  */
 
 import {
@@ -28,11 +29,11 @@ import {
   DB_PRESSURE_AGGRESSIVE_ROWS,
   DB_PRESSURE_EMERGENCY_BYTES,
   DB_PRESSURE_EMERGENCY_ROWS,
+  CUT_SCAN_MAX_ROWS,
   HOT_MAX_BYTES,
-  HOT_MAX_ROWS,
-  HOT_TARGET_BYTES,
-  HOT_TARGET_ROWS,
   MAX_SEGMENTS_PER_READ,
+  RESIDENT_CONTEXT_TOKENS,
+  RESIDENT_ROLLOVER_TOKENS,
   utf8Length,
   type ConversationLogger,
   type JournalRange,
@@ -52,6 +53,14 @@ import type {
  */
 const SEGMENT_MAX_ROWS = 1_000;
 const SEGMENT_MAX_BYTES = 8 * 1024 * 1024;
+/**
+ * Segments one rollover pass may write. A new checkpoint can leave a whole
+ * context window to archive at once; this drains it in a few passes without
+ * holding one turn boundary for long.
+ */
+const SEGMENTS_PER_PASS = 4;
+/** Turn ends below the ceiling a cut tries before giving up for this pass. */
+const CUT_BOUNDARY_CANDIDATES = 64;
 const ARCHIVE_READ_ROWS = 500;
 const PURGE_BATCH = 200;
 /**
@@ -128,6 +137,11 @@ export class ConversationArchive {
     private readonly bucket: R2Bucket | undefined,
     private readonly journal: Journal,
     private readonly log: ConversationLogger,
+    /**
+     * Where the conversation's latest compaction checkpoint covers through,
+     * this epoch; undefined before any host compacted.
+     */
+    private readonly checkpointSeq: () => Promise<number | undefined>,
   ) {}
 
   get available(): boolean {
@@ -256,38 +270,28 @@ export class ConversationArchive {
       // that lands mid-pass must not get a fresh object written behind it. The
       // pass already in flight is covered by `quiesce()`, not by this.
       if (this.sealed || this.journal.isDeleted()) return;
-      const hot = this.journal.hotStats();
-      const dbBytes = this.journal.databaseSize();
-      let targetRows = HOT_TARGET_ROWS;
-      let targetBytes = HOT_TARGET_BYTES;
-      let tier = "normal";
-      if (dbBytes > DB_PRESSURE_EMERGENCY_BYTES) {
-        targetRows = DB_PRESSURE_EMERGENCY_ROWS;
-        targetBytes = 0;
-        tier = "emergency";
-      } else if (dbBytes > DB_PRESSURE_AGGRESSIVE_BYTES) {
-        targetRows = DB_PRESSURE_AGGRESSIVE_ROWS;
-        targetBytes = 0;
-        tier = "aggressive";
-      } else if (hot.rows <= HOT_MAX_ROWS && hot.bytes <= HOT_MAX_BYTES) {
-        return;
+      const checkpoint = await this.checkpointSeq();
+      if (this.sealed || this.journal.isDeleted()) return;
+      const plan = this.residencyCeiling(checkpoint);
+      if (!plan) return;
+      for (let pass = 0; pass < SEGMENTS_PER_PASS; pass += 1) {
+        const cutSeq = this.resolveCut(plan.ceiling);
+        if (cutSeq === null) {
+          if (pass === 0) {
+            this.log("info", "rollover_no_boundary", {
+              ceiling: plan.ceiling,
+              reason: plan.reason,
+              hotRows: plan.hot.rows,
+              hotBytes: plan.hot.bytes,
+              hotTokens: plan.hot.tokens,
+            });
+          }
+          return;
+        }
+        const committed = await this.cut(cutSeq, now);
+        if (!committed || this.sealed || this.journal.isDeleted()) return;
+        if (committed >= cutSeq) return;
       }
-      if (tier !== "normal") {
-        this.log("error", "conversation_storage_pressure", {
-          tier,
-          databaseBytes: dbBytes,
-          hotRows: hot.rows,
-        });
-      }
-      const cutSeq = this.resolveCut(targetRows, targetBytes);
-      if (cutSeq === null) {
-        this.log("info", "rollover_no_boundary", {
-          hotRows: hot.rows,
-          hotBytes: hot.bytes,
-        });
-        return;
-      }
-      await this.cut(cutSeq, now);
     } catch (error) {
       this.log("error", "conversation_rollover_failed", {
         message: error instanceof Error ? error.message : String(error),
@@ -296,45 +300,111 @@ export class ConversationArchive {
   }
 
   /**
+   * The highest seq this pass may archive through, and why; null when
+   * nothing should move.
+   *
+   *  - storage pressure: the database is too big, and the resident set is cut
+   *    to a few hundred rows whatever that costs, checkpoint included;
+   *  - checkpoint: everything older than the latest compaction checkpoint,
+   *    which is where every new transcript starts;
+   *  - window: no checkpoint yet, and the resident model context passed
+   *    RESIDENT_ROLLOVER_TOKENS; the newest RESIDENT_CONTEXT_TOKENS stay;
+   *  - backstop: the resident bytes passed HOT_MAX_BYTES; rows older than
+   *    the newest RESIDENT_CONTEXT_TOKENS go even past a stale checkpoint.
+   */
+  private residencyCeiling(checkpoint: number | undefined): {
+    ceiling: number;
+    reason: string;
+    hot: { rows: number; bytes: number; tokens: number };
+  } | null {
+    const hot = this.journal.hotStats();
+    const dbBytes = this.journal.databaseSize();
+    if (dbBytes > DB_PRESSURE_AGGRESSIVE_BYTES) {
+      const tier =
+        dbBytes > DB_PRESSURE_EMERGENCY_BYTES ? "emergency" : "aggressive";
+      this.log("error", "conversation_storage_pressure", {
+        tier,
+        databaseBytes: dbBytes,
+        hotRows: hot.rows,
+        checkpoint: checkpoint ?? null,
+      });
+      const desired = this.journal.desiredCutSeq(
+        tier === "emergency"
+          ? DB_PRESSURE_EMERGENCY_ROWS
+          : DB_PRESSURE_AGGRESSIVE_ROWS,
+        0,
+      );
+      return desired === null ? null : { ceiling: desired, reason: tier, hot };
+    }
+    const floor = this.journal.meta().hot_min_seq;
+    const overBytes = hot.bytes > HOT_MAX_BYTES;
+    let ceiling: number | null = null;
+    let reason = "checkpoint";
+    if (checkpoint !== undefined && checkpoint >= floor) ceiling = checkpoint;
+    if (overBytes || (checkpoint === undefined && hot.tokens > RESIDENT_ROLLOVER_TOKENS)) {
+      const windowCut = this.journal.seqBeforeContextTokens(
+        RESIDENT_CONTEXT_TOKENS,
+        CUT_SCAN_MAX_ROWS,
+      );
+      if (windowCut !== null && (ceiling === null || windowCut > ceiling)) {
+        ceiling = windowCut;
+        reason = overBytes ? "backstop" : "window";
+        if (checkpoint !== undefined && windowCut > checkpoint) {
+          this.log("error", "rollover_past_checkpoint", {
+            checkpoint,
+            ceiling: windowCut,
+            hotBytes: hot.bytes,
+            hotTokens: hot.tokens,
+          });
+        }
+      }
+    }
+    if (ceiling === null || ceiling < floor) return null;
+    return { ceiling, reason, hot };
+  }
+
+  /**
    * The three conditions, all required:
-   *  1. strictly below the most recent turn's context start — this is what
-   *     makes R2 non-load-bearing for a normal turn;
+   *  1. at or below `ceiling` (the checkpoint, the context window, or the
+   *     pressure target) and strictly below the most recent turn's context
+   *     start, which is what makes R2 non-load-bearing for a normal turn;
    *  2. the last row of a turn that reached a terminal state;
    *  3. followed immediately by a plain user message, so the resident window
    *     can never open on an orphaned tool result.
    */
-  private resolveCut(targetRows: number, targetBytes: number): number | null {
-    const desired = this.journal.desiredCutSeq(targetRows, targetBytes);
-    if (desired === null) return null;
+  private resolveCut(desired: number): number | null {
     const latest = this.journal.latestTerminalTurn();
     const ceiling =
       latest?.ctx_start_seq != null
         ? Math.min(desired, latest.ctx_start_seq - 1)
         : desired;
-    if (ceiling < 0) return null;
-    const candidates = this.journal.terminalTurnBoundaries(500);
-    let best: number | null = null;
-    for (const candidate of candidates) {
-      if (candidate.last_seq > ceiling) break;
-      if (!this.journal.isCutBoundary(candidate.last_seq)) continue;
-      best = candidate.last_seq;
+    const floor = this.journal.meta().hot_min_seq;
+    if (ceiling < floor) return null;
+    for (const candidate of this.journal.terminalTurnBoundariesAtOrBelow(
+      ceiling,
+      CUT_BOUNDARY_CANDIDATES,
+    )) {
+      if (candidate.last_seq < floor) return null;
+      if (this.journal.isCutBoundary(candidate.last_seq)) {
+        return candidate.last_seq;
+      }
     }
-    return best;
+    return null;
   }
 
-  private async cut(cutSeq: number, now: number): Promise<void> {
+  private async cut(cutSeq: number, now: number): Promise<number | null> {
     const meta = this.journal.meta();
     const prefix = await this.prefix();
-    if (!this.bucket || !prefix) return;
-    if (this.sealed || this.journal.isDeleted()) return;
+    if (!this.bucket || !prefix) return null;
+    if (this.sealed || this.journal.isDeleted()) return null;
     const firstSeq = meta.hot_min_seq;
-    if (cutSeq < firstSeq) return;
+    if (cutSeq < firstSeq) return null;
     const rows = this.journal.rowsForArchive(
       firstSeq,
       cutSeq,
       SEGMENT_MAX_ROWS,
     );
-    if (rows.length === 0) return;
+    if (rows.length === 0) return null;
     let bytes = 0;
     let lastSeq = rows[0]!.seq;
     let count = 0;
@@ -350,7 +420,14 @@ export class ConversationArchive {
     while (lastSeq > firstSeq && !this.journal.isCutBoundary(lastSeq)) {
       lastSeq -= 1;
     }
-    if (lastSeq < firstSeq || !this.journal.isCutBoundary(lastSeq)) return;
+    if (lastSeq < firstSeq || !this.journal.isCutBoundary(lastSeq)) return null;
+    count = 0;
+    bytes = 0;
+    for (const row of rows) {
+      if (row.seq > lastSeq) break;
+      count += 1;
+      bytes += row.bytes;
+    }
     const key = `${prefix}/seg/${pad(firstSeq)}-${pad(lastSeq)}.jsonl.gz`;
     const header: SegmentHeader = {
       v: 1,
@@ -383,6 +460,7 @@ export class ConversationArchive {
       rows: count,
       bytes,
     });
+    return lastSeq;
   }
 
   /** Re-runs phase 2 for a range whose previous cut crashed mid-upload. */

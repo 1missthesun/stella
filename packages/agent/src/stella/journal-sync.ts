@@ -197,6 +197,50 @@ export async function checkpointToPublish(
   return firstKept ? { markerId: found.markerId, summary: found.summary, firstKept } : undefined;
 }
 
+/**
+ * An engine that keeps its own context (Claude Code) compacted it: record
+ * that as this transcript's compaction, so its summary opens the context
+ * from the newest prompt on, as a compaction of pi's own would, and
+ * `checkpointToPublish` publishes it as the conversation's checkpoint. The
+ * newest prompt is the earliest entry the engine can still have taken in
+ * after compacting, so the context kept from it is never short of what the
+ * summary leaves out. Admitted as a write: placed at once when idle, else at
+ * the run's next boundary. Returns whether it was submitted.
+ */
+export async function recordEngineCompaction(
+  harness: Harness,
+  root: Conversation,
+  compaction: { id: string; summary: string; engine: string },
+  context: Context,
+): Promise<boolean> {
+  const head = await harness.commit(async (tx) => {
+    let cursor: Cursor | undefined;
+    do {
+      const page = await tx.scanEntries({ conversationId: root.id, order: "descending" }, ALIGN_SCAN_PAGE, cursor);
+      for (const entry of page.items) {
+        if (entry.kind === ENTRY_KIND.user) return entry.id;
+      }
+      cursor = page.next;
+    } while (cursor !== undefined);
+    return undefined;
+  }, context);
+  if (head === undefined) return false;
+  await root.submit(
+    {
+      type: "write",
+      requestId: `engine-compaction:${compaction.id}`,
+      entry: {
+        kind: CompactionEntry.kind,
+        head,
+        model: [{ role: "user", content: compaction.summary, timestamp: Date.now() }],
+        data: { reason: "threshold", engine: compaction.engine },
+      },
+    },
+    context,
+  );
+  return true;
+}
+
 /** The compaction `checkpointToPublish` returned is in the journal now. */
 export async function noteCheckpointPublished(
   harness: Harness,

@@ -117,6 +117,7 @@ import {
   journalImportAfter,
   JournalSyncDoc,
   noteCheckpointPublished,
+  recordEngineCompaction,
   type JournalMessage,
   type JournalStart,
 } from "@stella/agent/stella/journal-sync";
@@ -714,6 +715,22 @@ export class PiConversationRuntime {
       engine.onStatus((session, status) =>
         options.log("claude_code_status", { role: session.role, state: status.state }),
       );
+      // Claude Code compacts its own context; pi never does for it. Its
+      // summary is the root's compaction, which the turn then publishes as
+      // the conversation's checkpoint.
+      engine.onCompaction((session, compaction) => {
+        if (session.role !== "orchestrator" || session.threadId) return;
+        void (async () => {
+          const { harness, root } = await this.open();
+          const recorded = await recordEngineCompaction(
+            harness,
+            root,
+            { id: compaction.id, summary: compaction.summary, engine: "claude-code" },
+            contextFor(),
+          );
+          options.log("claude_code_compaction_recorded", { recorded, summaryChars: compaction.summary.length });
+        })().catch((error: unknown) => options.report(error));
+      });
       this.#claudeCode = engine;
     }
   }

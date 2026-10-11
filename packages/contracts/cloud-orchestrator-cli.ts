@@ -308,6 +308,8 @@ export type CloudOrchestratorEvent =
   | { type: "text_delta"; text: string }
   /** The CLI's own status changes, e.g. while it compacts its session. */
   | { type: "status"; state: "running" | "compacting"; text: string }
+  /** The CLI compacted its session; `summary` now stands in for everything before. */
+  | { type: "compaction"; id: string; summary: string }
   /**
    * Journal this message. A batch carrying a message with `toolCall` blocks
    * is acknowledged before the executor forwards any of those calls.

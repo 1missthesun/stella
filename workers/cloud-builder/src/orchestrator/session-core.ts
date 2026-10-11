@@ -37,6 +37,7 @@ import {
   AGENT_RUNTIME_KEY,
   AGENTS_VIEW_KEY,
   LOCAL_TURN_LEASE_KEY,
+  JOURNAL_CHECKPOINT_KEY,
 } from "./constants.js";
 import { listedAgents, errorMessage, log } from "./support.js";
 import type { OrchestratorOwner } from "./owner.js";
@@ -185,6 +186,16 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
       env.CONVERSATION_ARCHIVE,
       this.journal,
       log,
+      async () => {
+        const stored = await ctx.storage.get<{ throughSeq?: unknown; epoch?: unknown }>(
+          JOURNAL_CHECKPOINT_KEY,
+        );
+        return stored &&
+          stored.epoch === this.journal.meta().epoch &&
+          typeof stored.throughSeq === "number"
+          ? stored.throughSeq
+          : undefined;
+      },
     );
     this.index = new ConversationIndex(
       this.journal,

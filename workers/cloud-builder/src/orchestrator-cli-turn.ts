@@ -125,6 +125,14 @@ const parseCliEvent = (value: unknown): CloudOrchestratorEvent | null => {
         typeof value.text === "string"
         ? { type: "status", state: value.state, text: value.text }
         : null;
+    case "compaction":
+      return typeof value.id === "string" &&
+        value.id.length > 0 &&
+        value.id.length <= 200 &&
+        typeof value.summary === "string" &&
+        value.summary.length > 0
+        ? { type: "compaction", id: value.id, summary: value.summary }
+        : null;
     case "assistant_message":
       return isCliAssistantMessage(value.message)
         ? { type: "assistant_message", message: value.message }

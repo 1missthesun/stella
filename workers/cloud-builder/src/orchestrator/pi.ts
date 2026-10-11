@@ -1383,9 +1383,9 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
 
   /**
    * The latest checkpoint of this journal epoch, if a host published one.
-   * One whose messages after it already rolled out of the hot journal is
-   * stale (no host compacted for that long), and a new transcript starts
-   * from the journal's window instead.
+   * Rollover keeps every message after it resident; only storage pressure or
+   * the byte backstop archives past it, and then it is stale and a new
+   * transcript starts from the journal's window instead.
    */
   protected async journalCheckpoint(): Promise<JournalCheckpoint | undefined> {
     const stored = await this.ctx.storage.get<

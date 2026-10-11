@@ -24,6 +24,7 @@ import {
   claudeCliVersion,
   hashClaudeReplyText,
 } from "../../kernel/integrations/claude-code-session-files.js";
+import { createClaudeCodeCompactionDetector } from "../../kernel/integrations/claude-code-compaction.js";
 import { claudeSessionSyncSink } from "../../kernel/integrations/claude-code-session-sync-sink.js";
 import { getClaudeCodeConfig } from "../../kernel/storage/local-llm-credential-access.js";
 import { stellaAgentShellEnvironment } from "../../kernel/tools/stella-agent-env.js";
@@ -219,6 +220,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
       const effort = EFFORT_BY_THINKING[spec.thinkingLevel];
       const effortLevel = getClaudeCodeRuntimeEffortLevel(dataDir(), effort);
       const cliBridgeSocketPath = runner()?.piTools.cliBridgeSocketPath;
+      const compaction = createClaudeCodeCompactionDetector();
       const result = await runClaudeCodeTurn({
         sessionKey: ref.sessionKey,
         ...(spec.resumeSessionId ? { persistedSessionId: spec.resumeSessionId } : {}),
@@ -244,7 +246,11 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         executeTool: async (toolCallId, toolName, toolArgs, signal) =>
           toToolResult(await spec.executeTool(toolCallId, toolName, toolArgs, signal)),
         onNativeToolEnd: ({ toolCallId, result, isError }) => spec.onNativeToolEnd({ toolUseId: toolCallId, result, isError }),
-        onStreamEvent: (event) => spec.onEvent(event),
+        onStreamEvent: (event) => {
+          const compacted = compaction(event as Record<string, unknown>);
+          if (compacted) spec.onCompaction(compacted);
+          spec.onEvent(event);
+        },
         onStatusChange: (status) => spec.onStatus(status),
         onSessionId: (sessionId) => spec.onSessionId(sessionId),
         onTurnControl: ({ inject, endStep }) => {

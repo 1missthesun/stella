@@ -34,6 +34,7 @@ import {
   getClaudeCodeStatusChangeFromStreamEvent,
 } from "@stella/runtime/kernel/integrations/claude-code-session-runtime.js";
 import { createClaudeCodeToolMcpHost } from "@stella/runtime/kernel/integrations/claude-code-tool-mcp-host.js";
+import { createClaudeCodeCompactionDetector } from "@stella/runtime/kernel/integrations/claude-code-compaction.js";
 import {
   TOOL_RESULT_AUTHORIZED_IMAGES,
   type AuthorizedToolImage,
@@ -320,7 +321,13 @@ export class CliAssistantAssembler {
     private readonly fallbackModel: string,
   ) {}
 
+  readonly #compaction = createClaudeCodeCompactionDetector();
+
   observe(event: ClaudeStreamJsonEvent): void {
+    const compaction = this.#compaction(event as Record<string, unknown>);
+    if (compaction) {
+      this.emit({ type: "compaction", id: compaction.id, summary: compaction.summary });
+    }
     const status = getClaudeCodeStatusChangeFromStreamEvent(event);
     if (status) {
       this.emit({

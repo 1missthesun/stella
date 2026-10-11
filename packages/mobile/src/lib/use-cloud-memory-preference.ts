@@ -93,6 +93,7 @@ export const useCloudMemoryPreference = (
   const desiredValueRef = useRef<boolean | null>(null);
   const writeInFlightRef = useRef(false);
   const mountedRef = useRef(true);
+  const reconnectedForRef = useRef<string | null>(null);
   const runWriteRef = useRef<
     | ((
         attempt: MobileCloudMemoryPreferenceWriteAttempt,
@@ -319,7 +320,15 @@ export const useCloudMemoryPreference = (
       return;
     }
     if (live.value === undefined) return;
-    if (belongsToAnotherOwner(live.value, identity.expectedSubject)) return;
+    if (belongsToAnotherOwner(live.value, identity.expectedSubject)) {
+      // The live channel still speaks for the previous account. Ask it to
+      // reconnect as this one; its next head settles here.
+      if (reconnectedForRef.current !== identity.expectedSubject) {
+        reconnectedForRef.current = identity.expectedSubject;
+        reconnectBackend();
+      }
+      return;
+    }
     let preference: MobileCloudMemoryPreference;
     try {
       preference = decodeMobileCloudMemoryPreferenceForSubject(
@@ -330,7 +339,9 @@ export const useCloudMemoryPreference = (
       liveRef.current = null;
       if (writeInFlightRef.current) return;
       retryPlanRef.current = { kind: "load" };
-      setState(failedMobileCloudMemoryPreference(preferenceRef.current, "load"));
+      setState(
+        failedMobileCloudMemoryPreference(preferenceRef.current, "load"),
+      );
       return;
     }
     liveRef.current = preference;

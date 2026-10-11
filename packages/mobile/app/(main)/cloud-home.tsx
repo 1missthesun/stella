@@ -17,7 +17,6 @@ export default function CloudHomeScreen() {
       <CloudHomeSettings
         key={identity?.identityKey ?? "signed-out"}
         identity={identity}
-        onBack={() => router.back()}
         onSignIn={() => router.replace("/login")}
       />
     </MainDetailSurface>

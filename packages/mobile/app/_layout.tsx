@@ -15,6 +15,7 @@ import { loadAsync, useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { authClient } from "../src/lib/auth-client";
+import { reconnectBackend } from "../src/lib/backend";
 import { hasMobileConfig } from "../src/config/env";
 import {
   installNotificationCategoriesAndListeners,
@@ -173,8 +174,30 @@ function RootStack() {
   );
 }
 
+/**
+ * The backend's live channel authenticates once, when it connects. When the
+ * signed-in account changes (sign-in, sign-out, a switch, a guest upgrading)
+ * it reconnects with the new account's token, so live views stop serving the
+ * previous account's values.
+ */
+function useBackendFollowsAccount(
+  session: ReturnType<typeof authClient.useSession>,
+) {
+  const account = session.data
+    ? `${session.data.user?.id ?? ""}\u0000${session.data.session?.id ?? ""}`
+    : null;
+  const previous = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (session.isPending) return;
+    const before = previous.current;
+    previous.current = account;
+    if (before !== undefined && before !== account) reconnectBackend();
+  }, [account, session.isPending]);
+}
+
 function AuthenticatedLayout() {
   const session = authClient.useSession();
+  useBackendFollowsAccount(session);
   const router = useRouter();
   const pathname = usePathname();
   const mainChatRequested = useMainChatRequested();

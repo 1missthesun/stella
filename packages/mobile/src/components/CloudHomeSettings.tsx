@@ -8,7 +8,6 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Icon } from "./Icon";
 import { GlassToggle } from "./glass";
 import { PrimaryButton } from "./PrimaryButton";
 import type { CloudConversationIdentity } from "../lib/cloud-conversation-auth";
@@ -20,13 +19,15 @@ import { useT } from "../i18n";
 
 type CloudHomeSettingsProps = {
   identity: CloudConversationIdentity | null;
-  onBack: () => void;
   onSignIn: () => void;
 };
 
+/**
+ * Cloud Home's own page. The app shell draws the back arrow for every pushed
+ * page, so this draws only the title.
+ */
 export function CloudHomeSettings({
   identity,
-  onBack,
   onSignIn,
 }: CloudHomeSettingsProps) {
   const colors = useColors();
@@ -37,14 +38,6 @@ export function CloudHomeSettings({
 
   const header = (
     <View style={styles.header}>
-      <Pressable
-        onPress={onBack}
-        hitSlop={10}
-        accessibilityLabel={t("mobile.cloudHome.backToSettingsLabel")}
-        style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-      >
-        <Icon name="chevron-left" size={22} color={colors.text} />
-      </Pressable>
       <View style={styles.headerCopy}>
         <Text style={styles.title} numberOfLines={1}>
           {t("mobile.cloudHome.title")}
@@ -147,13 +140,6 @@ const makeStyles = (colors: Colors) =>
       flexDirection: "row",
       gap: 8,
       marginBottom: 20,
-    },
-    backButton: {
-      alignItems: "center",
-      height: 40,
-      justifyContent: "center",
-      marginLeft: -8,
-      width: 40,
     },
     headerCopy: { flex: 1 },
     title: {

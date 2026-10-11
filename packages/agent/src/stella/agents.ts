@@ -948,6 +948,14 @@ export function stellaAgents(host: StellaAgentsHost) {
       const engine = choice && "engine" in choice ? choice.engine : undefined;
       const engineHost = engine ? host.engine?.(engine) : undefined;
       if (engine && !engineHost) throw new Error(`"${requested}" runs on ${engine}, which this host cannot start agents on.`);
+      if (engineHost && placement.kind === "device") {
+        const omitModel = named && named !== "default" && host.defaultAgentModel?.(callerAgent) === undefined;
+        throw new Error(
+          `An agent on "${requested}" runs as a whole where that engine runs, so its tools can't run on ${describePlacement(placement)}. ${
+            omitModel ? "Leave out model to start an agent whose tools run there, or pass" : "Pass"
+          } whole_agent to run the agent on that computer's own Stella.`,
+        );
+      }
       const remote = engineHost ?? placedRemote;
       if (remote) {
         // Its report comes back to the orchestrator only.

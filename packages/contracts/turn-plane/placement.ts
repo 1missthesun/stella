@@ -101,6 +101,52 @@ export type DeviceDestination = {
   lastSeenAt?: number;
 };
 
+type ResolvableDevice = Pick<
+  DeviceDestination,
+  "deviceId" | "label" | "online" | "remoteExecutionEnabled" | "lastSeenAt"
+>;
+
+const deviceName = (device: Pick<DeviceDestination, "label">): string =>
+  device.label?.trim().toLowerCase() ?? "";
+
+const liveFirst = (a: ResolvableDevice, b: ResolvableDevice): number =>
+  Number(b.online) - Number(a.online) ||
+  Number(b.remoteExecutionEnabled) - Number(a.remoteExecutionEnabled) ||
+  (b.lastSeenAt ?? 0) - (a.lastSeenAt ?? 0);
+
+export const findDeviceDestination = <T extends ResolvableDevice>(
+  devices: readonly T[],
+  requested: string,
+): T | undefined => {
+  const wanted = requested.trim();
+  if (!wanted) return undefined;
+  const exact = devices.find((device) => device.deviceId === wanted);
+  if (exact) return exact;
+  const name = wanted.toLowerCase();
+  return devices
+    .filter((device) => deviceName(device) === name)
+    .sort(liveFirst)[0];
+};
+
+export const currentDeviceDestinations = <T extends ResolvableDevice>(
+  devices: readonly T[],
+): T[] => {
+  const kept = new Map<string, T>();
+  const result: T[] = [];
+  for (const device of [...devices].sort(liveFirst)) {
+    const name = deviceName(device);
+    if (!name) {
+      result.push(device);
+      continue;
+    }
+    const prior = kept.get(name);
+    if (prior && !(prior.online && device.online)) continue;
+    if (!prior) kept.set(name, device);
+    result.push(device);
+  }
+  return devices.filter((device) => result.includes(device));
+};
+
 export type DevicesResponse = {
   protocol: typeof PLACEMENT_PROTOCOL;
   devices: DeviceDestination[];

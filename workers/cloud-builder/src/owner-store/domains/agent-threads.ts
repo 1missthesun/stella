@@ -49,7 +49,7 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import { SELECTED_DEVICE_NEEDS_CONSENT } from "@stella/contracts/turn-plane/placement";
+import { findDeviceDestination, SELECTED_DEVICE_NEEDS_CONSENT } from "@stella/contracts/turn-plane/placement";
 import {
   AGENT_PROMPT_MAX_CHARS,
   AGENT_THREAD_PAGE_MAX,
@@ -617,22 +617,20 @@ const assertDeviceDestination = async (
   ctx: OwnerContext,
   targetDeviceId: string,
   requestingDeviceId?: string,
-): Promise<{ waiting: boolean }> => {
-  if (requestingDeviceId && targetDeviceId === requestingDeviceId) {
+): Promise<{ deviceId: string; waiting: boolean }> => {
+  const device = findDeviceDestination(await ctx.host.deviceDestinations(), targetDeviceId);
+  if (!device) {
+    throw new RpcError(
+      "NOT_FOUND",
+      `No connected device has the id or name ${targetDeviceId}. Use "cloud" or a device_id from the connected devices list.`,
+      { reason: "device_not_found" },
+    );
+  }
+  if (requestingDeviceId && device.deviceId === requestingDeviceId) {
     throw new RpcError(
       "BAD_REQUEST",
       "That is the device this agent is already running on. Leave destination empty to run the work here.",
       { reason: "device_is_requester" },
-    );
-  }
-  const device = (await ctx.host.deviceDestinations()).find(
-    (candidate) => candidate.deviceId === targetDeviceId,
-  );
-  if (!device) {
-    throw new RpcError(
-      "NOT_FOUND",
-      `No connected device has the id ${targetDeviceId}. Use "cloud" or a device_id from the connected devices list.`,
-      { reason: "device_not_found" },
     );
   }
   const name = device.label || device.deviceId;
@@ -646,6 +644,7 @@ const assertDeviceDestination = async (
     });
   }
   return {
+    deviceId: device.deviceId,
     waiting:
       !device.remoteExecutionEnabled ||
       !device.online ||
@@ -931,7 +930,7 @@ const spawnOnDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<A
         args.ownerGeneration,
         args.parentTurnId,
         args.parentThreadId ?? null,
-        args.targetDeviceId,
+        destination.deviceId,
         args.model?.trim() || null,
         clip(args.description.trim(), 1_000),
         ctx.now,
@@ -1303,10 +1302,10 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
     { count: 30, windowMs: 10 * 60_000 },
     "Too many cloud agents started at once. Wait a moment and try again.",
   );
-  const targetDeviceId = args.targetDeviceId?.trim() || null;
-  const destination = targetDeviceId
-    ? await assertDeviceDestination(ctx, targetDeviceId, args.originDeviceId)
-    : { waiting: false };
+  const destination = args.targetDeviceId?.trim()
+    ? await assertDeviceDestination(ctx, args.targetDeviceId.trim(), args.originDeviceId)
+    : null;
+  const targetDeviceId = destination?.deviceId ?? null;
   const lookupConversationId = args.conversationId ?? readMainConversationId(ctx.db);
   const conversation = lookupConversationId
     ? ctx.db.one<{ conversation_id: string; execution_json: string | null }>(
@@ -1361,7 +1360,7 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
       source: `device:${args.originDeviceId}`,
       detail: {
         executor: targetDeviceId ? "device" : "cloud",
-        ...(destination.waiting ? { waitingForDevice: true } : {}),
+        ...(destination?.waiting ? { waitingForDevice: true } : {}),
       },
       now: ctx.now,
     },
@@ -1397,7 +1396,7 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
       return inserted;
     },
   );
-  return { ...control(thread), ...(destination.waiting ? { waitingForDevice: true } : {}) };
+  return { ...control(thread), ...(destination?.waiting ? { waitingForDevice: true } : {}) };
 };
 
 type ContinueArgs = AgentThreadCalls["agentThreads.continueFromDesktop"]["args"];

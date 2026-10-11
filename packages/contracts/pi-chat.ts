@@ -512,7 +512,7 @@ const LEADING_SYSTEM_REMINDER_RE = /^<system-reminder>[\s\S]*?<\/system-reminder
  * A note an agent sent with `send_message`, as `formatAgentMessage`
  * (`agent-directory`) frames it: the whole text, not a message that quotes one.
  */
-const AGENT_NOTE_RE = /^<agent-message from="[^"\n]*" thread_id="[^"\n]*">\n[\s\S]*\n<\/agent-message>$/;
+const AGENT_NOTE_RE = /^<agent-message from="[^"\n]*" thread_id="[^"\n]*"(?: relation="[^"\n]*")?>\n[\s\S]*\n<\/agent-message>$/;
 
 /** Text from Stella's agents, not the user: an agent's report, or a note an agent sent. */
 export const PI_LATE_ANSWER_PREFIX = "[Late answer]";

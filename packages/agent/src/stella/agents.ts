@@ -812,6 +812,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       origin?: AgentOrigin;
       /** The absolute directory its caller asked it to start in. */
       cwd?: string;
+      /** The agent or Stella that started it. */
+      startedBy?: AgentMessageSender;
     },
   ): Promise<{ threadId: string; existing: boolean }> => {
     const { parentConversationId, depth, description, runsOn, placement } = args;
@@ -843,6 +845,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     role.description = description;
     role.threadId = threadId;
     role.parentConversationId = parentConversationId;
+    if (args.startedBy) role.startedBy = { threadId: args.startedBy.threadId, label: args.startedBy.label };
     Object.assign(await tx.doc(StellaPlacementDoc, child.id), placementRecord(placement));
     state.agents[threadId] = {
       conversationId: child.id,
@@ -1002,6 +1005,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         if ("error" in prepared) throw new Error(prepared.error);
         placement = prepared.placement;
       }
+      const startedBy = senderOf(
+        caller,
+        (await host.directory?.conversationId(context).catch(() => undefined)) ?? STELLA_MESSAGE_TARGET,
+      );
       const { threadId, existing } = await api.commit(
         (tx) =>
           createAgent(tx, {
@@ -1013,6 +1020,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             runsOn,
             placement,
             ...(directory ? { cwd: directory } : {}),
+            startedBy,
           }),
         context,
       );
@@ -1089,7 +1097,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const sendMessage = defineTool({
     name: "send_message",
     description:
-      'Message an agent or Stella session by thread_id, including while it is busy; it reads the message before its next step. To an agent you started, the message is an instruction: steer it, correct it, or resume it on the same thread after it finished or was paused. To anyone else (Stella, the agent that started you, teammates, other sessions) it arrives as a note from you, which they weigh against their own work and can answer with send_message. "stella" reaches the Stella you work for. A successful result means the message was delivered, not that any work finished; completion still arrives in [Agent completed]. agent_status without a thread_id lists who you can reach.',
+      'Message an agent or Stella session by thread_id, including while it is busy; it reads the message before its next step. To an agent you started, the message is an instruction: steer it, correct it, or resume it on the same thread after it finished or was paused. To anyone else (Stella, the agent that started you, teammates, other sessions) it arrives as a note from you, which they weigh against their own work and can answer with send_message. Every message reaches them as from you, with your thread_id, so they can answer. "stella" reaches the Stella you work for. A successful result means the message was delivered, not that any work finished; completion still arrives in [Agent completed]. agent_status without a thread_id lists who you can reach.',
     parameters: Type.Object({
       thread_id: Type.String({ description: 'Who to message: a thread_id from agent_status, or "stella".' }),
       message: Type.String({ description: "The message. To your own agent, send only what is new or changed." }),
@@ -1104,9 +1112,14 @@ export function stellaAgents(host: StellaAgentsHost) {
       const known = (await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.agents[threadId];
       if (!known) return await messageOther(api, threadId, args.message, conversation, context);
       const remote = known?.remote ? remoteHostOf(known) : undefined;
+      const framed = formatAgentMessage(
+        senderOf(await roleOf(api, api.conversationId, context), conversation ?? STELLA_MESSAGE_TARGET),
+        args.message,
+        { starter: true },
+      );
       if (known?.remote) {
         if (!remote) return await messageThroughLedger(api, threadId, args.message, conversation, context);
-        await remote.message({ key: `message:${api.taskId}`, threadId, message: args.message }, context);
+        await remote.message({ key: `message:${api.taskId}`, threadId, message: framed }, context);
         await expectRemoteReport(api, api.conversationId, String(api.taskId), threadId, context);
         return { content: [{ type: "text", text: `Delivered to ${threadId}.` }] };
       }
@@ -1117,7 +1130,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (!agent) throw new Error(`No agent ${threadId} here. agent_status lists the ones you started.`);
         const reporter = await tx.createTask(
           Reporter,
-          { threadId, conversationId: agent.conversationId, message: args.message },
+          { threadId, conversationId: agent.conversationId, message: framed },
           { ownership: { kind: "conversation" }, background: true },
         );
         state.calls[String(api.taskId)] = { threadId, reporter };

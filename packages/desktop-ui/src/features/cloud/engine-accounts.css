@@ -97,6 +97,10 @@
   background: var(--success);
 }
 
+.engine-account-place[data-in-use] {
+  color: var(--text-strong);
+}
+
 .engine-account-add {
   display: flex;
   align-items: center;

@@ -1948,6 +1948,7 @@
       "pastePlaceholderUrl": "วางที่อยู่ที่นี่",
       "placeCloud": "คลาวด์",
       "placeComputer": "คอมพิวเตอร์เครื่องนี้",
+      "placeInUse": "{place}: กำลังใช้งาน",
       "placeOtherComputer": "คอมพิวเตอร์เครื่องอื่น",
       "placeSignedIn": "{place}: ลงชื่อเข้าใช้แล้ว",
       "placeSignedOut": "{place}: ยังไม่ได้ลงชื่อเข้าใช้",
@@ -1975,7 +1976,8 @@
       "statusPlanUsageOff": "ยังไม่ได้เปิดใช้แพ็กเกจ ChatGPT",
       "statusReauth": "ลงชื่อเข้าใช้อีกครั้งเพื่อใช้งานต่อ",
       "statusSignedOut": "ออกจากระบบแล้ว",
-      "useAccount": "ใช้บัญชีนี้"
+      "useAccount": "ใช้บัญชีนี้",
+      "useInCloud": "ใช้ในคลาวด์"
     },
     "engineModels": {
       "ariaLabel": "โมเดล {engine}",

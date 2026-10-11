@@ -1957,6 +1957,7 @@
       "pastePlaceholderUrl": "Liitä osoite tähän",
       "placeCloud": "Pilvi",
       "placeComputer": "Tämä tietokone",
+      "placeInUse": "{place}: käytössä",
       "placeOtherComputer": "Toinen tietokone",
       "placeSignedIn": "{place}: kirjautunut",
       "placeSignedOut": "{place}: ei kirjautunut",
@@ -1984,7 +1985,8 @@
       "statusPlanUsageOff": "ChatGPT-tilauksen käyttöä ei ole otettu käyttöön",
       "statusReauth": "Kirjaudu uudelleen, jotta voit jatkaa käyttöä",
       "statusSignedOut": "Kirjauduttu ulos",
-      "useAccount": "Käytä tätä tiliä"
+      "useAccount": "Käytä tätä tiliä",
+      "useInCloud": "Käytä pilvessä"
     },
     "engineModels": {
       "ariaLabel": "Mallit: {engine}",

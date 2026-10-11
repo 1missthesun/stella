@@ -1957,6 +1957,7 @@
       "pastePlaceholderUrl": "Επικολλήστε τη διεύθυνση εδώ",
       "placeCloud": "Cloud",
       "placeComputer": "Αυτός ο υπολογιστής",
+      "placeInUse": "{place}: σε χρήση",
       "placeOtherComputer": "Άλλος υπολογιστής",
       "placeSignedIn": "{place}: συνδεδεμένο",
       "placeSignedOut": "{place}: μη συνδεδεμένο",
@@ -1984,7 +1985,8 @@
       "statusPlanUsageOff": "Η χρήση του προγράμματος ChatGPT δεν είναι ενεργή",
       "statusReauth": "Συνδεθείτε ξανά για να συνεχίσετε να τον χρησιμοποιείτε",
       "statusSignedOut": "Αποσυνδέθηκε",
-      "useAccount": "Χρήση αυτού του λογαριασμού"
+      "useAccount": "Χρήση αυτού του λογαριασμού",
+      "useInCloud": "Χρήση στο cloud"
     },
     "engineModels": {
       "ariaLabel": "Μοντέλα {engine}",

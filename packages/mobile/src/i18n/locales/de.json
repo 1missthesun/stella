@@ -1957,6 +1957,7 @@
       "pastePlaceholderUrl": "Adresse hier einfügen",
       "placeCloud": "Cloud",
       "placeComputer": "Dieser Computer",
+      "placeInUse": "{place}: in Verwendung",
       "placeOtherComputer": "Anderer Computer",
       "placeSignedIn": "{place}: angemeldet",
       "placeSignedOut": "{place}: nicht angemeldet",
@@ -1984,7 +1985,8 @@
       "statusPlanUsageOff": "Nutzung des ChatGPT-Abos ist nicht aktiviert",
       "statusReauth": "Melde dich erneut an, um es weiter zu verwenden",
       "statusSignedOut": "Abgemeldet",
-      "useAccount": "Dieses Konto verwenden"
+      "useAccount": "Dieses Konto verwenden",
+      "useInCloud": "In der Cloud verwenden"
     },
     "engineModels": {
       "ariaLabel": "{engine}-Modelle",

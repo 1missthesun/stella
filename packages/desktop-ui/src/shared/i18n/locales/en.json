@@ -1957,6 +1957,7 @@
       "pastePlaceholderUrl": "Paste the address here",
       "placeCloud": "Cloud",
       "placeComputer": "This computer",
+      "placeInUse": "{place}: in use",
       "placeOtherComputer": "Another computer",
       "placeSignedIn": "{place}: signed in",
       "placeSignedOut": "{place}: not signed in",
@@ -1984,7 +1985,8 @@
       "statusPlanUsageOff": "ChatGPT plan use isn't enabled",
       "statusReauth": "Sign in again to keep using it",
       "statusSignedOut": "Signed out",
-      "useAccount": "Use this account"
+      "useAccount": "Use this account",
+      "useInCloud": "Use in the cloud"
     },
     "engineModels": {
       "ariaLabel": "{engine} models",

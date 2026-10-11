@@ -1966,6 +1966,7 @@
       "pastePlaceholderUrl": "Collez l'adresse ici",
       "placeCloud": "Cloud",
       "placeComputer": "Cet ordinateur",
+      "placeInUse": "{place} : utilisé",
       "placeOtherComputer": "Autre ordinateur",
       "placeSignedIn": "{place} : connecté",
       "placeSignedOut": "{place} : non connecté",
@@ -1993,7 +1994,8 @@
       "statusPlanUsageOff": "L'utilisation du forfait ChatGPT n'est pas activée",
       "statusReauth": "Reconnectez-vous pour continuer à l'utiliser",
       "statusSignedOut": "Déconnecté",
-      "useAccount": "Utiliser ce compte"
+      "useAccount": "Utiliser ce compte",
+      "useInCloud": "Utiliser dans le cloud"
     },
     "engineModels": {
       "ariaLabel": "Modèles {engine}",

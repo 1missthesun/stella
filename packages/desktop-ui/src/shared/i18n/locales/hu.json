@@ -1957,6 +1957,7 @@
       "pastePlaceholderUrl": "Illeszd be ide a címet",
       "placeCloud": "Felhő",
       "placeComputer": "Ez a számítógép",
+      "placeInUse": "{place}: használatban",
       "placeOtherComputer": "Másik számítógép",
       "placeSignedIn": "{place}: bejelentkezve",
       "placeSignedOut": "{place}: nincs bejelentkezve",
@@ -1984,7 +1985,8 @@
       "statusPlanUsageOff": "A ChatGPT-előfizetés használata nincs engedélyezve",
       "statusReauth": "Jelentkezz be újra a további használathoz",
       "statusSignedOut": "Kijelentkezve",
-      "useAccount": "Ennek a fióknak a használata"
+      "useAccount": "Ennek a fióknak a használata",
+      "useInCloud": "Használat a felhőben"
     },
     "engineModels": {
       "ariaLabel": "{engine} modellek",

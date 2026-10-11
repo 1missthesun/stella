@@ -1948,6 +1948,7 @@
       "pastePlaceholderUrl": "Tempel alamat di sini",
       "placeCloud": "Cloud",
       "placeComputer": "Komputer ini",
+      "placeInUse": "{place}: sedang dipakai",
       "placeOtherComputer": "Komputer lain",
       "placeSignedIn": "{place}: sudah masuk",
       "placeSignedOut": "{place}: belum masuk",
@@ -1975,7 +1976,8 @@
       "statusPlanUsageOff": "Penggunaan paket ChatGPT belum diaktifkan",
       "statusReauth": "Masuk lagi untuk terus menggunakannya",
       "statusSignedOut": "Sudah keluar",
-      "useAccount": "Gunakan akun ini"
+      "useAccount": "Gunakan akun ini",
+      "useInCloud": "Gunakan di cloud"
     },
     "engineModels": {
       "ariaLabel": "Model {engine}",

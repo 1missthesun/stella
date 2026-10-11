@@ -1432,7 +1432,7 @@ export const runAgentAttempt = async (
     // Only Claude turns run here (agents on Stella's models or a ChatGPT
     // plan run on pi in their conversation), and a Claude turn holds no
     // model capability: its Claude Code CLI runs on the login the owner's
-    // container holds for the active account, and talks to Anthropic itself.
+    // container uses, and talks to Anthropic itself.
     if (!turn.execution) throw new AgentTurnAuthorityLostError();
     const orchestrator = turn.agentRole === "orchestrator";
     const admitted = turn.execution;
@@ -1849,7 +1849,7 @@ export const runAgentAttempt = async (
 
 /**
  * Which of the owner's container Claude Code logins a Claude turn runs on:
- * the active account's, when the cloud holds one. Only a directory key and
+ * the account the cloud uses, among the logins it holds. Only a directory key and
  * the email go into the turn input; the credential stays where the CLI
  * wrote it.
  */

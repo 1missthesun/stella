@@ -1975,6 +1975,7 @@
       "pastePlaceholderUrl": "Вставьте адрес сюда",
       "placeCloud": "Облако",
       "placeComputer": "Этот компьютер",
+      "placeInUse": "{place}: используется",
       "placeOtherComputer": "Другой компьютер",
       "placeSignedIn": "{place}: вход выполнен",
       "placeSignedOut": "{place}: вход не выполнен",
@@ -2002,7 +2003,8 @@
       "statusPlanUsageOff": "Использование плана ChatGPT не включено",
       "statusReauth": "Войдите снова, чтобы продолжить использование",
       "statusSignedOut": "Выполнен выход",
-      "useAccount": "Использовать этот аккаунт"
+      "useAccount": "Использовать этот аккаунт",
+      "useInCloud": "Использовать в облаке"
     },
     "engineModels": {
       "ariaLabel": "Модели {engine}",

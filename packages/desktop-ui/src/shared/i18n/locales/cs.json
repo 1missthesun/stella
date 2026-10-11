@@ -1975,6 +1975,7 @@
       "pastePlaceholderUrl": "Sem vložte adresu",
       "placeCloud": "Cloud",
       "placeComputer": "Tento počítač",
+      "placeInUse": "{place}: používá se",
       "placeOtherComputer": "Jiný počítač",
       "placeSignedIn": "{place}: přihlášeno",
       "placeSignedOut": "{place}: nepřihlášeno",
@@ -2002,7 +2003,8 @@
       "statusPlanUsageOff": "Používání tarifu ChatGPT není povolené",
       "statusReauth": "Pokud ho chcete dál používat, přihlaste se znovu",
       "statusSignedOut": "Odhlášeno",
-      "useAccount": "Použít tento účet"
+      "useAccount": "Použít tento účet",
+      "useInCloud": "Používat v cloudu"
     },
     "engineModels": {
       "ariaLabel": "Modely {engine}",

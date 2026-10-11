@@ -21,7 +21,12 @@ import "./engine-accounts.css";
 export type EngineAccountMenuItem = { key: string; label: string; onSelect: () => void };
 
 /** Where an account is signed in: this computer, the cloud, another computer. */
-export type EngineAccountPlace = { key: string; label: string; signedIn: boolean };
+export type EngineAccountPlace = {
+  key: string;
+  label: string;
+  signedIn: boolean;
+  inUse?: boolean;
+};
 
 const K = "settings.engineAccounts";
 
@@ -42,21 +47,28 @@ export function EngineAccountPlaces({ places }: { places: EngineAccountPlace[] }
   if (places.length === 0) return null;
   return (
     <div className="engine-account-places">
-      {places.map((place) => (
-        <span
-          key={place.key}
-          className="engine-account-place"
-          data-signed-in={place.signedIn || undefined}
-          aria-label={t(place.signedIn ? `${K}.placeSignedIn` : `${K}.placeSignedOut`, {
-            place: place.label,
-          })}
-          title={t(place.signedIn ? `${K}.placeSignedIn` : `${K}.placeSignedOut`, {
-            place: place.label,
-          })}
-        >
-          {place.label}
-        </span>
-      ))}
+      {places.map((place) => {
+        const label = t(
+          place.inUse
+            ? `${K}.placeInUse`
+            : place.signedIn
+              ? `${K}.placeSignedIn`
+              : `${K}.placeSignedOut`,
+          { place: place.label },
+        );
+        return (
+          <span
+            key={place.key}
+            className="engine-account-place"
+            data-signed-in={place.signedIn || undefined}
+            data-in-use={place.inUse || undefined}
+            aria-label={label}
+            title={label}
+          >
+            {place.label}
+          </span>
+        );
+      })}
     </div>
   );
 }

@@ -15,7 +15,7 @@ import type {
   ClaudeLocalConfig,
   ClaudeLocalLoginStart,
 } from "@stella/contracts/claude-local-accounts";
-import type { ClaudeLocalLogin } from "@stella/contracts/backend/engines";
+import type { ClaudeLocalLogin, EngineConnection } from "@stella/contracts/backend/engines";
 import {
   buildExternalCliChildEnv,
   resolveExternalCliPath,
@@ -32,8 +32,10 @@ import type { EngineAccountAccess } from "./engine-account-access.js";
  * The CLI keys its stored credentials by config dir (on macOS, one keychain
  * item per dir), so the configs never share a login.
  *
- * Local Claude turns run on the config signed in to the owner's active
- * Claude account (`engines.get`); nothing switches accounts on its own.
+ * Local Claude turns run on the login this computer uses: the account the
+ * owner chose for this computer (`engines.get`, `places[].active`) while a
+ * config here is signed in to it, else Claude Code's default login, else
+ * the first signed-in config. Another computer's logins never change it.
  * This computer reports which identities it holds (`engines.reportClaudeLogins`)
  * so every client can show where each account is signed in.
  */
@@ -132,6 +134,7 @@ export class ClaudeLocalAccounts {
   private reportAgain = false;
   private lastSent: { key: string; at: number } | null = null;
   private lastFailed: { key: string; at: number } | null = null;
+  private deviceId: string | null = null;
   private readonly unsubscribe: () => void;
 
   constructor(private readonly options: ClaudeLocalAccountsOptions) {
@@ -139,6 +142,7 @@ export class ClaudeLocalAccounts {
       this.broadcastIfChanged();
       void this.reportIfChanged();
     });
+    void this.loadDeviceId().then(() => this.broadcastIfChanged());
   }
 
   private get accountsDir(): string {
@@ -173,8 +177,6 @@ export class ClaudeLocalAccounts {
   }
 
   state(): ClaudeLocalAccountsState {
-    const active = this.options.engineAccounts.activeClaudeAccount();
-    const activeEmail = text(active?.email);
     return {
       cliInstalled: this.cliInstalled,
       configs: (this.configs ?? []).map(({ configId, isDefault, loggedIn, email, plan }) => ({
@@ -185,7 +187,6 @@ export class ClaudeLocalAccounts {
         ...(plan ? { plan } : {}),
       })),
       activeConfigId: this.activeConfig()?.configId ?? null,
-      ...(activeEmail ? { activeEmail } : {}),
     };
   }
 
@@ -480,9 +481,16 @@ export class ClaudeLocalAccounts {
       .sort((a, b) => a.createdAt - b.createdAt);
   }
 
+  private async loadDeviceId(): Promise<string | null> {
+    const deviceId = await this.options.loadDeviceId().catch(() => null);
+    if (deviceId) this.deviceId = deviceId;
+    return this.deviceId;
+  }
+
   private refresh(): Promise<void> {
     if (this.refreshing) return this.refreshing;
     const run = (async () => {
+      if (!this.deviceId) await this.loadDeviceId();
       const executable = this.resolveCli();
       if (!executable) {
         this.configs = [];
@@ -505,40 +513,47 @@ export class ClaudeLocalAccounts {
     return run;
   }
 
-  /**
-   * The owner's active Claude account's config: the one signed in to its
-   * email (case-insensitive), else null. With no active account (or signed
-   * out of Stella): the default config when it is signed in, else the first
-   * signed-in config.
-   */
-  private activeConfig(): ConfigStatus | null {
-    const configs = this.configs ?? [];
-    const active = this.options.engineAccounts.activeClaudeAccount();
-    if (active) {
-      const wanted = lower(active.email);
-      if (!wanted) return null;
-      return configs.find((config) => config.loggedIn && lower(config.email) === wanted) ?? null;
-    }
+  private chosenAccount(): EngineConnection | null {
+    const deviceId = this.deviceId;
+    if (!deviceId) return null;
     return (
-      configs.find((config) => config.isDefault && config.loggedIn) ??
-      configs.find((config) => config.loggedIn) ??
+      this.options.engineAccounts
+        .settings()
+        ?.connections.find(
+          (connection) =>
+            connection.provider === "anthropic" &&
+            (connection.places ?? []).some(
+              (place) =>
+                place.kind === "device" &&
+                place.deviceId === deviceId &&
+                (place.active ?? connection.active),
+            ),
+        ) ?? null
+    );
+  }
+
+  private activeConfig(): ConfigStatus | null {
+    const signedIn = (this.configs ?? []).filter((config) => config.loggedIn);
+    const wanted = lower(this.chosenAccount()?.email);
+    return (
+      (wanted ? signedIn.find((config) => lower(config.email) === wanted) : undefined) ??
+      signedIn.find((config) => config.isDefault) ??
+      signedIn[0] ??
       null
     );
   }
 
   private resolveForTurn(): ClaudeCodeConfigForTurn {
-    const email = text(this.options.engineAccounts.activeClaudeAccount()?.email);
     const configs = this.configs ?? [];
     // Not installed, or no login could be read: let the CLI speak for itself.
     if (!this.cliInstalled || !configs.some((config) => config.known)) {
-      return { configDir: null, ...(email ? { email } : {}), signedIn: true };
+      return { configDir: null, signedIn: true };
     }
     const config = this.activeConfig();
-    if (!config) return { configDir: null, ...(email ? { email } : {}), signedIn: false };
-    const configEmail = email ?? config.email;
+    if (!config) return { configDir: null, signedIn: false };
     return {
       configDir: config.dir,
-      ...(configEmail ? { email: configEmail } : {}),
+      ...(config.email ? { email: config.email } : {}),
       signedIn: true,
     };
   }
@@ -648,22 +663,32 @@ export class ClaudeLocalAccounts {
     for (const config of this.configs) {
       const email = lower(config.email);
       if (!config.loggedIn || !email || logins.has(email)) continue;
-      logins.set(email, { email: config.email!, ...(config.plan ? { plan: config.plan } : {}) });
+      logins.set(email, {
+        email: config.email!,
+        ...(config.plan ? { plan: config.plan } : {}),
+        ...(config.isDefault ? { isDefault: true } : {}),
+      });
     }
     const list = [...logins.values()].sort((a, b) => a.email.localeCompare(b.email));
-    const deviceId = await this.options.loadDeviceId();
+    const deviceId = await this.loadDeviceId();
     if (!deviceId) return;
+    const perPlace = settings.connections.some((connection) =>
+      (connection.places ?? []).some((place) => place.active !== undefined),
+    );
+    const loginKey = (email: string, isDefault: boolean | undefined) =>
+      perPlace && isDefault ? `${email}\u0000default` : email;
     const recorded = new Set(
       settings.connections.flatMap((connection) => {
         const email = connection.provider === "anthropic" ? lower(connection.email) : undefined;
         if (!email) return [];
-        const here = (connection.places ?? []).some(
+        const here = (connection.places ?? []).find(
           (place) => place.kind === "device" && place.deviceId === deviceId,
         );
-        return here ? [email] : [];
+        return here?.kind === "device" ? [loginKey(email, here.isDefault)] : [];
       }),
     );
-    if (recorded.size === logins.size && [...logins.keys()].every((email) => recorded.has(email))) {
+    const reported = [...logins].map(([email, login]) => loginKey(email, login.isDefault));
+    if (recorded.size === reported.length && reported.every((key) => recorded.has(key))) {
       return;
     }
     const key = JSON.stringify(list);

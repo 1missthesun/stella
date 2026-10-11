@@ -1948,6 +1948,7 @@
       "pastePlaceholderUrl": "ここにアドレスを貼り付け",
       "placeCloud": "クラウド",
       "placeComputer": "このコンピュータ",
+      "placeInUse": "{place}：使用中",
       "placeOtherComputer": "別のコンピュータ",
       "placeSignedIn": "{place}：サインイン済み",
       "placeSignedOut": "{place}：未サインイン",
@@ -1975,7 +1976,8 @@
       "statusPlanUsageOff": "ChatGPT のプランの使用が有効になっていません",
       "statusReauth": "引き続き使うにはもう一度サインインしてください",
       "statusSignedOut": "サインアウト済み",
-      "useAccount": "このアカウントを使う"
+      "useAccount": "このアカウントを使う",
+      "useInCloud": "クラウドで使う"
     },
     "engineModels": {
       "ariaLabel": "{engine} のモデル",

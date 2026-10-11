@@ -1975,6 +1975,7 @@
       "pastePlaceholderUrl": "Wklej tutaj adres",
       "placeCloud": "Chmura",
       "placeComputer": "Ten komputer",
+      "placeInUse": "{place}: w użyciu",
       "placeOtherComputer": "Inny komputer",
       "placeSignedIn": "{place}: zalogowano",
       "placeSignedOut": "{place}: nie zalogowano",
@@ -2002,7 +2003,8 @@
       "statusPlanUsageOff": "Korzystanie z planu ChatGPT nie jest włączone",
       "statusReauth": "Zaloguj się ponownie, aby dalej z niego korzystać",
       "statusSignedOut": "Wylogowano",
-      "useAccount": "Użyj tego konta"
+      "useAccount": "Użyj tego konta",
+      "useInCloud": "Używaj w chmurze"
     },
     "engineModels": {
       "ariaLabel": "Modele {engine}",

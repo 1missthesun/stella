@@ -1957,6 +1957,7 @@
       "pastePlaceholderUrl": "Adresi buraya yapıştır",
       "placeCloud": "Bulut",
       "placeComputer": "Bu bilgisayar",
+      "placeInUse": "{place}: kullanılıyor",
       "placeOtherComputer": "Başka bir bilgisayar",
       "placeSignedIn": "{place}: oturum açık",
       "placeSignedOut": "{place}: oturum açık değil",
@@ -1984,7 +1985,8 @@
       "statusPlanUsageOff": "ChatGPT planı kullanımı etkin değil",
       "statusReauth": "Kullanmaya devam etmek için yeniden oturum aç",
       "statusSignedOut": "Oturum kapatıldı",
-      "useAccount": "Bu hesabı kullan"
+      "useAccount": "Bu hesabı kullan",
+      "useInCloud": "Bulutta kullan"
     },
     "engineModels": {
       "ariaLabel": "{engine} modelleri",

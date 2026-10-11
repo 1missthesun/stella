@@ -124,6 +124,16 @@ import {
   ORCHESTRATOR_INTERNAL_ORIGIN,
 } from "./shared/keys.js";
 import type { ConversationCaller, DispatchCaller } from "./shared/types.js";
+import {
+  SOCKET_TICKET_PATH,
+  type SocketTicketPurpose,
+} from "@stella/contracts/socket-ticket";
+import {
+  isSocketTicketPurpose,
+  isSocketTicketResource,
+  issueSocketTicket,
+  verifySocketTicket,
+} from "../socket-ticket.js";
 
 // ---------------------------------------------------------------------------
 // The user-authenticated conversation surfaces
@@ -136,6 +146,8 @@ import type { ConversationCaller, DispatchCaller } from "./shared/types.js";
 // and never touches the agent's thread.
 // ---------------------------------------------------------------------------
 
+const SOCKET_HANDOFF_TIMEOUT_MS = 15_000;
+
 /**
  * Verify the caller. `wantsSocket` decides only how a refusal is shaped: a
  * WebSocket client that gets an HTTP 4xx before the 101 sees close code 1006
@@ -143,13 +155,12 @@ import type { ConversationCaller, DispatchCaller } from "./shared/types.js";
  * responses — so refusals there complete the handshake and close with a real
  * code instead.
  */
-const SOCKET_HANDOFF_TIMEOUT_MS = 15_000;
-
 const authenticateConversationCaller = async (
   request: Request,
   env: Env,
   wantsSocket: boolean,
   requestId: string,
+  socketScope?: { purpose: SocketTicketPurpose; resource: string },
 ): Promise<
   { ok: true; caller: ConversationCaller } | { ok: false; response: Response }
 > => {
@@ -182,8 +193,9 @@ const authenticateConversationCaller = async (
   }
 
   let token = "";
+  let ticket = "";
   if (wantsSocket) {
-    // The JWT rides in Sec-WebSocket-Protocol, never the query string:
+    // The credential rides in Sec-WebSocket-Protocol, never the query string:
     // browsers and React Native cannot set WebSocket request headers, and a
     // URL is the one part of a request that gets logged everywhere.
     const offer = tokenFromSubprotocol(request);
@@ -191,10 +203,11 @@ const authenticateConversationCaller = async (
       return deny(CLOSE_BAD_REQUEST, 400, "Unsupported client.", false);
     }
     token = offer.token;
+    ticket = offer.ticket;
   } else {
     token = bearerCredential(request.headers.get("authorization")) ?? "";
   }
-  if (!token) {
+  if (!token && !ticket) {
     return deny(
       CLOSE_UNAUTHENTICATED,
       401,
@@ -204,6 +217,37 @@ const authenticateConversationCaller = async (
   }
 
   const authStartedAt = Date.now();
+  if (ticket) {
+    const ticketCaller = socketScope
+      ? await verifySocketTicket({
+          secret: env.BUILDER_SERVICE_SECRET,
+          ticket,
+          purpose: socketScope.purpose,
+          resource: socketScope.resource,
+          now: Date.now(),
+        }).catch(() => null)
+      : null;
+    if (!ticketCaller) {
+      log("error", "conversation_auth_rejected", {
+        requestId,
+        reason: "bad_socket_ticket",
+      });
+      return deny(
+        CLOSE_UNAUTHENTICATED,
+        401,
+        "Your sign-in expired. Sign in again to continue.",
+        false,
+      );
+    }
+    await noteOwnerIdentity(env, ticketCaller);
+    log("info", "conversation_caller_authenticated", {
+      requestId,
+      socket: wantsSocket,
+      credential: "ticket",
+      ms: Date.now() - authStartedAt,
+    });
+    return { ok: true, caller: { ...ticketCaller, issuer } };
+  }
   const verified = await verifyUserToken(token, env);
   if (!verified.ok) {
     // The reason is a log-only discriminator; the caller is told one thing.
@@ -229,6 +273,7 @@ const authenticateConversationCaller = async (
   log("info", "conversation_caller_authenticated", {
     requestId,
     socket: wantsSocket,
+    credential: wantsSocket ? "legacy_token" : "bearer",
     ms: Date.now() - authStartedAt,
   });
   return { ok: true, caller: { ...verified.token, issuer } };
@@ -847,14 +892,19 @@ const mount = (handle: SubRouter): MiddlewareHandler<RouterEnv> =>
  * `c.var.caller`. `socket` shapes refusals for a WebSocket client.
  */
 const userAuth = (
-  { socket }: { socket: boolean } = { socket: false },
+  { socket }: { socket?: "conversation" | "presence" } = {},
 ): MiddlewareHandler<RouterEnv> =>
   async (c, next) => {
     const auth = await authenticateConversationCaller(
       c.req.raw,
       c.env,
-      socket,
+      socket !== undefined,
       c.var.requestId,
+      socket === "conversation"
+        ? { purpose: "conversation", resource: c.req.param("id") ?? "" }
+        : socket === "presence"
+          ? { purpose: "presence", resource: c.req.param("deviceId") ?? "" }
+          : undefined,
     );
     if (!auth.ok) return auth.response;
     c.set("caller", auth.caller);
@@ -1031,6 +1081,7 @@ app.all("/dictation/socket", socketOnly, async (c) => {
     c.env,
     true,
     c.var.requestId,
+    { purpose: "dictation", resource: "" },
   );
   if (!auth.ok) return auth.response;
   return await handleMuseTranscribeSocket({
@@ -1048,7 +1099,7 @@ app.all("/dictation/socket", socketOnly, async (c) => {
 app.all(
   "/owners/me/devices/:deviceId{[A-Za-z0-9._~-]{1,256}}/presence",
   socketOnly,
-  userAuth({ socket: true }),
+  userAuth({ socket: "presence" }),
   (c) =>
     forwardToDevicePresence(c.req.raw, c.env, c.req.param("deviceId"), c.var.caller),
 );
@@ -1112,7 +1163,35 @@ app.post(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}/cancel`, (c) =>
 app.all(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}`, methodNotAllowed());
 app.all(`${DISPATCH_SUBMIT_PATH}/:dispatchId{${DISPATCH_ID}}/cancel`, methodNotAllowed());
 
-app.all("/conversations/:id/socket", socketOnly, userAuth({ socket: true }), async (c) => {
+app.post(SOCKET_TICKET_PATH, userAuth(), jsonBody(1024), async (c) => {
+  const body = (await c.req.raw.json().catch(() => null)) as {
+    purpose?: unknown;
+    resource?: unknown;
+  } | null;
+  const purpose = body?.purpose;
+  const resource = body?.resource ?? "";
+  if (
+    !isSocketTicketPurpose(purpose) ||
+    !isSocketTicketResource(resource) ||
+    ((purpose === "conversation" || purpose === "presence") && !resource) ||
+    ((purpose === "live" || purpose === "dictation") && resource)
+  ) {
+    return json({ error: "Invalid socket ticket request." }, 400);
+  }
+  const issued = await issueSocketTicket({
+    secret: c.env.BUILDER_SERVICE_SECRET,
+    token: c.var.caller,
+    purpose,
+    resource,
+    now: Date.now(),
+  });
+  return new Response(JSON.stringify(issued), {
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+  });
+});
+app.all(SOCKET_TICKET_PATH, methodNotAllowed());
+
+app.all("/conversations/:id/socket", socketOnly, userAuth({ socket: "conversation" }), async (c) => {
   const conversationId = c.req.param("id");
   const requestId = c.var.requestId;
   const startedAt = Date.now();

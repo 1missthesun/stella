@@ -10,6 +10,8 @@
  * `OwnerGate`).
  */
 
+import { SOCKET_TICKET_SUBPROTOCOL_PREFIX } from "@stella/contracts/socket-ticket";
+import { verifySocketTicket } from "../socket-ticket.js";
 import {
   LIVE_CLOSE,
   LIVE_PATH,
@@ -37,7 +39,10 @@ import type { OwnerRegistry } from "./registry.js";
 
 const MAX_RPC_BODY_BYTES = 1024 * 1024;
 
-type RouteEnv = Pick<Cloudflare.Env, "OWNER_GATES" | "CLOUD_BUILDER_PUBLIC_URL">;
+type RouteEnv = Pick<
+  Cloudflare.Env,
+  "OWNER_GATES" | "CLOUD_BUILDER_PUBLIC_URL" | "BUILDER_SERVICE_SECRET"
+>;
 
 const rpcJson = (body: RpcResponse): Response =>
   Response.json(body, {
@@ -105,17 +110,42 @@ export const handleRpc = async (
   }
 };
 
-const liveOffer = (request: Request): { offered: boolean; token: string } => {
+const liveOffer = (
+  request: Request,
+): { offered: boolean; token: string; ticket: string } => {
   let offered = false;
   let token = "";
+  let ticket = "";
   for (const part of (request.headers.get("sec-websocket-protocol") ?? "").split(",")) {
     const value = part.trim();
     if (value === LIVE_SUBPROTOCOL) offered = true;
-    else if (value.startsWith(LIVE_TOKEN_SUBPROTOCOL_PREFIX)) {
+    else if (value.startsWith(SOCKET_TICKET_SUBPROTOCOL_PREFIX)) {
+      ticket = value.slice(SOCKET_TICKET_SUBPROTOCOL_PREFIX.length);
+    } else if (value.startsWith(LIVE_TOKEN_SUBPROTOCOL_PREFIX)) {
       token = value.slice(LIVE_TOKEN_SUBPROTOCOL_PREFIX.length);
     }
   }
-  return { offered, token };
+  return { offered, token, ticket };
+};
+
+const verifyLiveCaller = async (
+  env: RouteEnv,
+  offer: { token: string; ticket: string },
+): ReturnType<typeof verifyCaller> => {
+  if (!offer.ticket) return await verifyCaller(env, offer.token);
+  const caller = await verifySocketTicket({
+    secret: env.BUILDER_SERVICE_SECRET,
+    ticket: offer.ticket,
+    purpose: "live",
+    resource: "",
+    now: Date.now(),
+  }).catch(() => null);
+  return caller
+    ? { ok: true, caller }
+    : {
+        ok: false,
+        error: new RpcError("UNAUTHENTICATED", "Your sign-in expired. Sign in again to continue."),
+      };
 };
 
 /**
@@ -145,7 +175,7 @@ export const handleLive = async (request: Request, env: RouteEnv): Promise<Respo
   }
   const offer = liveOffer(request);
   if (!offer.offered) return refuseLive(false, LIVE_CLOSE.protocol, "unsupported_client");
-  const verified = await verifyCaller(env, offer.token);
+  const verified = await verifyLiveCaller(env, offer);
   if (!verified.ok) {
     return refuseLive(
       true,

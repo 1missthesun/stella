@@ -1,4 +1,5 @@
 import { getAuthToken } from "./auth-token";
+import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
 import { getBackendClient } from "./backend";
 
 // The relay accepts at most one second of 16 kHz mono signed PCM per frame.
@@ -112,11 +113,15 @@ export class DictationStream {
     const url = new URL("/dictation/socket", relayOrigin);
     if (url.protocol === "https:") url.protocol = "wss:";
     else if (url.protocol === "http:") url.protocol = "ws:";
+    if (!token) throw new Error("Sign in to Stella to use dictation.");
+    const credential = await socketCredentialProtocol({
+      socketUrl: url.toString(),
+      token,
+      purpose: "dictation",
+    });
+    if (this.cancelled) throw new Error("Dictation cancelled.");
     await new Promise<void>((resolve, reject) => {
-      const socket = new WebSocket(url.toString(), [
-        "stella.v1",
-        `stella.token.${token}`,
-      ]);
+      const socket = new WebSocket(url.toString(), ["stella.v1", credential]);
       this.socket = socket;
       const failOpening = (error: Error) => {
         clearTimeout(timer);

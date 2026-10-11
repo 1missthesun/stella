@@ -1,4 +1,5 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import type { VerifiedToken } from "../../auth-jwt.js";
 import type { CloudOrchestratorCliTurnSpec } from "@stella/contracts/cloud-orchestrator-cli";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import type {
@@ -286,6 +287,8 @@ export type ConversationCaller = {
   expiresAtMs: number;
   issuer: string;
   isAnonymous: boolean;
+  identityLevel: VerifiedToken["identityLevel"];
+  issuedAtMs: number;
 };
 
 /**

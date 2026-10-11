@@ -32,6 +32,10 @@
  */
 
 import {
+  LEGACY_SOCKET_TOKEN_SUBPROTOCOL_PREFIX,
+  SOCKET_TICKET_SUBPROTOCOL_PREFIX,
+} from "@stella/contracts/socket-ticket";
+import {
   AUTH_GRACE_MS,
   BACKFILL_BATCH_BYTES,
   BACKFILL_BATCH_RECORDS,
@@ -219,7 +223,7 @@ export {
 } from "./conversation-types.js";
 
 export const SUBPROTOCOL = "stella.v1";
-export const SUBPROTOCOL_TOKEN_PREFIX = "stella.token.";
+export const SUBPROTOCOL_TOKEN_PREFIX = LEGACY_SOCKET_TOKEN_SUBPROTOCOL_PREFIX;
 
 /** Remove every client-supplied `x-stella-*` header before forwarding. */
 export const stripStellaHeaders = (headers: Headers): void => {
@@ -300,21 +304,28 @@ export const refuseUpgrade = (
 export const isWebSocketUpgrade = (request: Request): boolean =>
   (request.headers.get("upgrade") ?? "").toLowerCase() === "websocket";
 
-/** Pull the JWT out of `Sec-WebSocket-Protocol`. Never out of the query string. */
+/**
+ * Pull the socket credential out of `Sec-WebSocket-Protocol`, never out of the
+ * query string: a short-lived `stella.ticket.` from current clients, or the
+ * raw JWT older clients still send.
+ */
 export const tokenFromSubprotocol = (
   request: Request,
-): { token: string; offered: boolean } => {
+): { token: string; ticket: string; offered: boolean } => {
   const raw = request.headers.get("sec-websocket-protocol") ?? "";
   let token = "";
+  let ticket = "";
   let offered = false;
   for (const part of raw.split(",")) {
     const value = part.trim();
     if (value === SUBPROTOCOL) offered = true;
-    else if (value.startsWith(SUBPROTOCOL_TOKEN_PREFIX)) {
+    else if (value.startsWith(SOCKET_TICKET_SUBPROTOCOL_PREFIX)) {
+      ticket = value.slice(SOCKET_TICKET_SUBPROTOCOL_PREFIX.length);
+    } else if (value.startsWith(SUBPROTOCOL_TOKEN_PREFIX)) {
       token = value.slice(SUBPROTOCOL_TOKEN_PREFIX.length);
     }
   }
-  return { token, offered };
+  return { token, ticket, offered };
 };
 
 // ---------------------------------------------------------------------------

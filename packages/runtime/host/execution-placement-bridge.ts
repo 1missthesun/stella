@@ -2,6 +2,7 @@ import {
   AGENT_PAUSED_ERROR_CODE,
   AGENT_PAUSED_REASON,
 } from "@stella/contracts/backend/agent-threads";
+import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
 import { createHash } from "node:crypto";
 import type { BackendClient } from "@stella/contracts/backend/client";
 import {
@@ -388,6 +389,7 @@ export class ExecutionPlacementBridge {
   readonly client: ExecutionPlacementClient;
   private readonly inbox: ExecutionPlacementInbox;
   private readonly fetchImpl: typeof fetch;
+  private openingSocket = false;
   private readonly leases: ExecutionPlacementLeases;
   private ownerId: string | null = null;
   private ownerGeneration: string | null = null;
@@ -754,7 +756,8 @@ export class ExecutionPlacementBridge {
       !this.started ||
       !this.sessionReady ||
       !this.builderOrigin ||
-      this.socket
+      this.socket ||
+      this.openingSocket
     ) {
       return;
     }
@@ -764,9 +767,44 @@ export class ExecutionPlacementBridge {
       return;
     }
     const session = this.requireSession();
+    const deviceId = this.options.deviceIdentity.deviceId;
     const url = `${socketOriginOf(this.builderOrigin)}${devicePresencePath(
-      this.options.deviceIdentity.deviceId,
+      deviceId,
     )}`;
+    this.openingSocket = true;
+    void socketCredentialProtocol({
+      socketUrl: url,
+      token,
+      purpose: "presence",
+      resource: deviceId,
+      fetchImpl: (input, init) => this.fetchImpl(input, init),
+    }).then(
+      (credential) => {
+        this.openingSocket = false;
+        if (
+          this.stopped ||
+          !this.started ||
+          !this.sessionReady ||
+          this.socket
+        ) {
+          return;
+        }
+        this.attachSocket(url, token, credential, session.presenceSessionId);
+      },
+      (error: unknown) => {
+        this.openingSocket = false;
+        this.log("warn", "The device presence socket ticket failed.", error);
+        this.scheduleReconnect();
+      },
+    );
+  }
+
+  private attachSocket(
+    url: string,
+    token: string,
+    credential: string,
+    presenceSessionId: string,
+  ) {
     const create =
       this.options.createSocket ??
       ((target: string, protocols: string[]) =>
@@ -776,10 +814,7 @@ export class ExecutionPlacementBridge {
         ) as unknown as ExecutionPlacementSocket);
     let socket: ExecutionPlacementSocket;
     try {
-      socket = create(url, [
-        DEVICE_PRESENCE_SUBPROTOCOL,
-        `stella.token.${token}`,
-      ]);
+      socket = create(url, [DEVICE_PRESENCE_SUBPROTOCOL, credential]);
     } catch (error) {
       this.log("warn", "The device presence socket could not open.", error);
       this.scheduleReconnect();
@@ -826,7 +861,7 @@ export class ExecutionPlacementBridge {
           socket.close(4000, "bad_frame");
           return;
         }
-        void this.proveConnection(socket, session.presenceSessionId, {
+        void this.proveConnection(socket, presenceSessionId, {
           connectionId,
           nonce,
         }).catch((error) => {

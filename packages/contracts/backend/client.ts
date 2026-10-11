@@ -9,6 +9,7 @@
  * happens in place when the server asks for one.
  */
 
+import { socketCredentialProtocol } from "../socket-ticket.js";
 import type {
   CallArgs,
   CallName,
@@ -21,7 +22,6 @@ import {
   LIVE_CLOSE,
   LIVE_PATH,
   LIVE_SUBPROTOCOL,
-  LIVE_TOKEN_SUBPROTOCOL_PREFIX,
   rpcPath,
   SOCKET_KEEPALIVE_PING,
   type BackendError,
@@ -320,9 +320,12 @@ export class BackendClient {
     this.forceTokenOnConnect = false;
     void this.getToken(force ? { force: true } : undefined)
       .then((token) => {
-        this.connecting = false;
-        if (this.disposed || this.subscriptions.size === 0) return;
+        if (this.disposed || this.subscriptions.size === 0) {
+          this.connecting = false;
+          return;
+        }
         if (!token) {
+          this.connecting = false;
           this.failAll({
             code: "UNAUTHENTICATED",
             message: "Sign in to load this.",
@@ -330,7 +333,16 @@ export class BackendClient {
           });
           return;
         }
-        this.openSocket(token);
+        return socketCredentialProtocol({
+          socketUrl: this.liveSocketUrl(),
+          token,
+          purpose: "live",
+          fetchImpl: this.fetchImpl,
+        }).then((credential) => {
+          this.connecting = false;
+          if (this.disposed || this.subscriptions.size === 0) return;
+          this.openSocket(token, credential);
+        });
       })
       .catch(() => {
         this.connecting = false;
@@ -338,15 +350,16 @@ export class BackendClient {
       });
   }
 
-  private openSocket(token: string): void {
-    const url = `${this.baseUrl.replace(/^http/, "ws")}${LIVE_PATH}`;
+  private liveSocketUrl(): string {
+    return `${this.baseUrl.replace(/^http/, "ws")}${LIVE_PATH}`;
+  }
+
+  private openSocket(token: string, credential: string): void {
+    const url = this.liveSocketUrl();
     this.socketTokenExpiryMs = backendTokenExpiryMs(token);
     let socket: SocketLike;
     try {
-      socket = new this.SocketImpl!(url, [
-        LIVE_SUBPROTOCOL,
-        `${LIVE_TOKEN_SUBPROTOCOL_PREFIX}${token}`,
-      ]);
+      socket = new this.SocketImpl!(url, [LIVE_SUBPROTOCOL, credential]);
     } catch {
       this.scheduleReconnect();
       return;

@@ -11,9 +11,11 @@
  *   POST /api/rpc/<name>   body `{ args }` → `RpcResponse`
  *   GET  /owners/me/live   WebSocket, subprotocol `LIVE_SUBPROTOCOL`
  *
- * Both authenticate with the user's JWT: `Authorization: Bearer` for calls,
- * and the `stella.token.<jwt>` subprotocol offer for the socket (browsers and
- * React Native cannot set WebSocket headers, and URLs get logged).
+ * Calls authenticate with `Authorization: Bearer <jwt>`. The socket offers a
+ * short-lived `stella.ticket.<ticket>` minted from that JWT (see
+ * `../socket-ticket.ts`): browsers and React Native cannot set WebSocket
+ * headers, URLs get logged, and the edge logs Sec-WebSocket-Protocol verbatim.
+ * `stella.token.<jwt>` is still accepted from clients that predate tickets.
  */
 
 export const RPC_PATH_PREFIX = "/api/rpc/";

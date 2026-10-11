@@ -1,4 +1,5 @@
 import { getAuthToken } from "@/global/auth/services/auth-token";
+import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
 import { backendClient } from "@/platform/backend/backend-client";
 
@@ -71,12 +72,14 @@ const connectRelay = async (): Promise<WebSocket> => {
   url.searchParams.set("start", "deferred");
   if (url.protocol === "https:") url.protocol = "wss:";
   else if (url.protocol === "http:") url.protocol = "ws:";
+  const credential = await socketCredentialProtocol({
+    socketUrl: url.toString(),
+    token,
+    purpose: "dictation",
+  });
 
   return await new Promise<WebSocket>((resolve, reject) => {
-    const socket = new WebSocket(url.toString(), [
-      "stella.v1",
-      `stella.token.${token}`,
-    ]);
+    const socket = new WebSocket(url.toString(), ["stella.v1", credential]);
     socket.binaryType = "arraybuffer";
     const timer = setTimeout(() => {
       socket.close();

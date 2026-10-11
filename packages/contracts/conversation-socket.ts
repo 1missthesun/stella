@@ -19,6 +19,7 @@
  *    heartbeat, no acks, no send verb.
  */
 
+import { socketCredentialProtocol } from "./socket-ticket.js";
 import {
   BACKFILL_BATCH_RECORDS,
   CLOSE_BAD_REQUEST,
@@ -535,8 +536,6 @@ export class ConversationSocket {
       this.scheduleReconnect("Waiting for your session…");
       return;
     }
-    this.options.onReadiness?.("socket-token", tokenStartedAt);
-
     const socketBaseUrl =
       this.options.socketBaseUrl?.() || this.options.baseUrl;
     const url = new URL(
@@ -555,12 +554,28 @@ export class ConversationSocket {
     if (this.lastSeq >= 0) url.searchParams.set("since", String(this.lastSeq));
     if (this.epoch !== null) url.searchParams.set("epoch", String(this.epoch));
 
+    let credential: string;
+    try {
+      credential = await socketCredentialProtocol({
+        socketUrl: url.toString(),
+        token,
+        purpose: "conversation",
+        resource: this.options.conversationId,
+      });
+    } catch {
+      this.connecting = false;
+      if (!this.stopped) this.scheduleReconnect();
+      return;
+    }
+    if (this.stopped) {
+      this.connecting = false;
+      return;
+    }
+    this.options.onReadiness?.("socket-token", tokenStartedAt);
+
     let socket: WebSocket;
     try {
-      socket = new WebSocket(url.toString(), [
-        "stella.v1",
-        `stella.token.${token}`,
-      ]);
+      socket = new WebSocket(url.toString(), ["stella.v1", credential]);
     } catch {
       this.connecting = false;
       this.scheduleReconnect();

@@ -1,24 +1,18 @@
 /** Stella's managed model catalog, fetched over HTTP from the backend. */
+import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { backendOrigin, getJson } from "./http";
 
-export type ReasoningEffort =
-  | "default"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+export type ReasoningEffort = ReasoningEffortLevel;
 
 export const REASONING_OPTIONS: ReadonlyArray<{
   id: ReasoningEffort;
   label: string;
 }> = [
-  { id: "default", label: "Auto" },
-  { id: "minimal", label: "Min" },
   { id: "low", label: "Low" },
   { id: "medium", label: "Med" },
   { id: "high", label: "High" },
-  { id: "xhigh", label: "Max" },
+  { id: "xhigh", label: "XHigh" },
+  { id: "max", label: "Max" },
 ];
 
 export type StellaCatalogModel = {

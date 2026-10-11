@@ -2122,13 +2122,12 @@
         "modelIdAriaLabel": "id model OpenRouter"
       },
       "reasoning": {
-        "default": "Otomatis",
         "high": "Tinggi",
         "label": "Upaya penalaran",
         "low": "Rendah",
+        "max": "Maks",
         "medium": "Sedang",
-        "minimal": "Minimal",
-        "xhigh": "Maks"
+        "xhigh": "Ekstra"
       },
       "refresh": "Segarkan katalog model",
       "restrictedPlan": "Tidak tersedia pada paket {plan}",
@@ -2228,8 +2227,8 @@
     "reasoningEffort": {
       "high": "Tinggi",
       "low": "Rendah",
+      "max": "Maks",
       "medium": "Sedang",
-      "minimal": "Minimal",
       "xhigh": "Ekstra"
     },
     "resetCustomizations": {

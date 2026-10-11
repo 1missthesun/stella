@@ -7,6 +7,7 @@ import {
   type EngineModelOption,
 } from "@stella/contracts/engine-model-catalog";
 import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import type {
   AccountProvider,
   ProviderModel,
@@ -250,7 +251,7 @@ export function useCloudModelSettings(active: boolean) {
 
   const brainId = execution ? brainIdOf(execution) : "stella";
   const engine: CloudExecutionSelection["engine"] = execution?.engine ?? "stella";
-  const effort = execution?.reasoningEffort ?? "default";
+  const effort = normalizeReasoningEffortLevel(execution?.reasoningEffort);
 
   const loadProviderModels = useCallback(
     async (provider: string, force = false): Promise<ProviderModel[] | null> => {
@@ -287,10 +288,10 @@ export function useCloudModelSettings(active: boolean) {
       const reasoningEffort =
         execution.engine === "provider" && execution.provider === provider
           ? execution.reasoningEffort
-          : "default";
+          : effort;
       void apply({ engine: "provider", provider, model, reasoningEffort });
     },
-    [apply, execution],
+    [apply, effort, execution],
   );
 
   const selectEngineModel = useCallback(
@@ -301,21 +302,21 @@ export function useCloudModelSettings(active: boolean) {
           model === STELLA_DEFAULT_MODEL ||
           catalog.models.some((entry) => entry.id === model && entry.allowedForAudience);
         if (!allowed) return;
-        void apply({ engine: "stella", provider: "stella", model, reasoningEffort: "default" });
+        void apply({ engine: "stella", provider: "stella", model, reasoningEffort: effort });
         return;
       }
       if (!engineModelList(engineModels, targetEngine).some((entry) => entry.id === model)) {
         return;
       }
-      // Keep the engine's effort when staying on it; a new engine starts on Auto.
-      const reasoningEffort = execution.engine === targetEngine ? execution.reasoningEffort : "default";
+      // The chosen effort carries over to the new engine, which maps it to its own levels.
+      const reasoningEffort = effort;
       void apply(
         targetEngine === "anthropic"
           ? { engine: "anthropic", provider: "anthropic", model, reasoningEffort }
           : { engine: "chatgpt", provider: "chatgpt", model, reasoningEffort },
       );
     },
-    [apply, catalog.models, engineModels, execution],
+    [apply, catalog.models, effort, engineModels, execution],
   );
 
   const selectEngine = useCallback(
@@ -328,9 +329,7 @@ export function useCloudModelSettings(active: boolean) {
 
   const selectEffort = useCallback(
     (next: CloudExecutionSelection["reasoningEffort"]) => {
-      if (execution && execution.engine !== "stella") {
-        void apply({ ...execution, reasoningEffort: next });
-      }
+      if (execution) void apply({ ...execution, reasoningEffort: next });
     },
     [apply, execution],
   );
@@ -442,7 +441,6 @@ export function useCloudModelSettings(active: boolean) {
       : undefined;
   const supportsEffortSelection = Boolean(
     execution &&
-      execution.engine !== "stella" &&
       (execution.engine !== "provider" || currentProviderModel?.reasoning !== false),
   );
 
@@ -460,8 +458,8 @@ export function useCloudModelSettings(active: boolean) {
       refresh,
       label,
       effort,
-      // Stella-managed runs take their effort from the backend config; only
-      // the Claude Code / ChatGPT engines expose one.
+      // Every engine takes the user's effort; only a provider model that
+      // cannot reason hides it.
       supportsEffortSelection,
       /** Providers connected for cloud runs; undefined until loaded. */
       connectedProviders,

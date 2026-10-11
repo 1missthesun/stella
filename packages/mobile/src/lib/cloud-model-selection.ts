@@ -1,4 +1,8 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import {
+  REASONING_EFFORT_LEVELS,
+  normalizeReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
 import type { AutomaticExecutionTarget } from "./execution-placement-core";
 
 export const usesCloudModelSettings = (
@@ -33,9 +37,10 @@ export function parseCloudModelSelection(value: unknown): CloudExecutionSelectio
   if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
   const row = value as Record<string, unknown>;
   const model = typeof row.model === "string" ? row.model.trim() : "";
-  const efforts: readonly unknown[] = ["default", "none", "minimal", "low", "medium", "high", "xhigh"];
+  const efforts: readonly unknown[] = ["none", ...REASONING_EFFORT_LEVELS, "default", "minimal"];
   if (!model || !efforts.includes(row.reasoningEffort)) return undefined;
-  const reasoningEffort = row.reasoningEffort as CloudExecutionSelection["reasoningEffort"];
+  const reasoningEffort: CloudExecutionSelection["reasoningEffort"] =
+    row.reasoningEffort === "none" ? "none" : normalizeReasoningEffortLevel(row.reasoningEffort);
   if (row.engine === "provider") {
     const provider = typeof row.provider === "string" ? row.provider.trim() : "";
     return provider ? { engine: "provider", provider, model, reasoningEffort } : undefined;

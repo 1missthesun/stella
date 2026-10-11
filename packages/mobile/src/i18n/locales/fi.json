@@ -2131,13 +2131,12 @@
         "modelIdAriaLabel": "OpenRouter-mallin tunnus"
       },
       "reasoning": {
-        "default": "Automaattinen",
         "high": "Korkea",
         "label": "Päättelyn taso",
         "low": "Matala",
+        "max": "Maksimi",
         "medium": "Keskitaso",
-        "minimal": "Minimaalinen",
-        "xhigh": "Maksimi"
+        "xhigh": "Erittäin korkea"
       },
       "refresh": "Päivitä malliluettelo",
       "restrictedPlan": "Ei saatavilla tilauksessa {plan}",
@@ -2237,8 +2236,8 @@
     "reasoningEffort": {
       "high": "Korkea",
       "low": "Matala",
+      "max": "Maksimi",
       "medium": "Keskitaso",
-      "minimal": "Minimaalinen",
       "xhigh": "Erittäin korkea"
     },
     "resetCustomizations": {

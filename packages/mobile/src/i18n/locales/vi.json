@@ -2122,13 +2122,12 @@
         "modelIdAriaLabel": "id mô hình OpenRouter"
       },
       "reasoning": {
-        "default": "Tự động",
         "high": "Cao",
         "label": "Mức độ suy luận",
         "low": "Thấp",
+        "max": "Tối đa",
         "medium": "Trung bình",
-        "minimal": "Tối thiểu",
-        "xhigh": "Tối đa"
+        "xhigh": "Rất cao"
       },
       "refresh": "Làm mới danh mục mô hình",
       "restrictedPlan": "Không có trên gói {plan}",
@@ -2228,8 +2227,8 @@
     "reasoningEffort": {
       "high": "Cao",
       "low": "Thấp",
+      "max": "Tối đa",
       "medium": "Trung bình",
-      "minimal": "Tối thiểu",
       "xhigh": "Rất cao"
     },
     "resetCustomizations": {

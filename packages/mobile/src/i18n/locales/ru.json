@@ -2149,13 +2149,12 @@
         "modelIdAriaLabel": "id модели OpenRouter"
       },
       "reasoning": {
-        "default": "Авто",
         "high": "Высокая",
         "label": "Глубина рассуждений",
         "low": "Низкая",
+        "max": "Максимум",
         "medium": "Средняя",
-        "minimal": "Минимальная",
-        "xhigh": "Максимум"
+        "xhigh": "Экстра"
       },
       "refresh": "Обновить каталог моделей",
       "restrictedPlan": "Недоступно на тарифе {plan}",
@@ -2255,8 +2254,8 @@
     "reasoningEffort": {
       "high": "Высокая",
       "low": "Низкая",
+      "max": "Максимум",
       "medium": "Средняя",
-      "minimal": "Минимальная",
       "xhigh": "Экстра"
     },
     "resetCustomizations": {

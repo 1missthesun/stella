@@ -2149,13 +2149,12 @@
         "modelIdAriaLabel": "id modelu OpenRouter"
       },
       "reasoning": {
-        "default": "Auto",
         "high": "Vysoká",
         "label": "Míra uvažování",
         "low": "Nízká",
+        "max": "Maximální",
         "medium": "Střední",
-        "minimal": "Minimální",
-        "xhigh": "Maximální"
+        "xhigh": "Extra"
       },
       "refresh": "Obnovit katalog modelů",
       "restrictedPlan": "Není dostupné v plánu {plan}",
@@ -2255,8 +2254,8 @@
     "reasoningEffort": {
       "high": "Vysoká",
       "low": "Nízká",
+      "max": "Maximální",
       "medium": "Střední",
-      "minimal": "Minimální",
       "xhigh": "Extra"
     },
     "resetCustomizations": {

@@ -2149,13 +2149,12 @@
         "modelIdAriaLabel": "id modelu OpenRouter"
       },
       "reasoning": {
-        "default": "Auto",
         "high": "Wysoki",
         "label": "Poziom rozumowania",
         "low": "Niski",
+        "max": "Maks.",
         "medium": "Średni",
-        "minimal": "Minimalny",
-        "xhigh": "Maks."
+        "xhigh": "Ekstra"
       },
       "refresh": "Odśwież katalog modeli",
       "restrictedPlan": "Niedostępne w planie {plan}",
@@ -2255,8 +2254,8 @@
     "reasoningEffort": {
       "high": "Wysoki",
       "low": "Niski",
+      "max": "Maks.",
       "medium": "Średni",
-      "minimal": "Minimalny",
       "xhigh": "Ekstra"
     },
     "resetCustomizations": {

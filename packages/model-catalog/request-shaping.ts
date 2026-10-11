@@ -10,6 +10,12 @@ import {
   type ManagedProtocol,
 } from "./managed-gateway";
 import { STELLA_DEEPSEEK_V4_FLASH_UPSTREAM_MODEL } from "@stella/contracts/stella-api";
+import {
+  REASONING_EFFORT_LEVELS,
+  nearestReasoningEffortLevel,
+  parseReasoningEffortLevel,
+  type ReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
 import { downgradeUnsupportedRequestImages } from "./request-estimate";
 import {
   isInternalRelayRequestHeader,
@@ -416,13 +422,130 @@ export const stripManagedReasoningControls = (
   ]);
 };
 
+const recordAt = (
+  value: unknown,
+  key: string,
+): Record<string, unknown> | undefined => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+  const nested = (value as Record<string, unknown>)[key];
+  return nested && typeof nested === "object" && !Array.isArray(nested)
+    ? (nested as Record<string, unknown>)
+    : undefined;
+};
+
+/**
+ * The level the client asked for, read from whichever wire shape it used:
+ * Responses / OpenRouter `reasoning.effort`, Chat Completions
+ * `reasoning_effort`, Anthropic `output_config.effort`, or Google
+ * `thinkingConfig.thinkingLevel`.
+ */
+export const requestedReasoningEffort = (
+  body: Record<string, unknown>,
+): ReasoningEffortLevel | undefined => {
+  const generationConfig =
+    recordAt(body, "generationConfig") ?? recordAt(body, "generation_config");
+  const thinkingConfig =
+    recordAt(generationConfig, "thinkingConfig") ??
+    recordAt(generationConfig, "thinking_config");
+  const candidates: unknown[] = [
+    recordAt(body, "reasoning")?.effort,
+    body.reasoning_effort,
+    recordAt(body, "output_config")?.effort,
+    thinkingConfig?.thinkingLevel ?? thinkingConfig?.thinking_level,
+  ];
+  for (const candidate of candidates) {
+    const level = parseReasoningEffortLevel(candidate);
+    if (level) return level;
+  }
+  return undefined;
+};
+
+const ANTHROPIC_ADAPTIVE_THINKING =
+  /(opus|sonnet)-4[.-][6-9]|(opus|sonnet|haiku|fable)-[5-9]/u;
+const ANTHROPIC_XHIGH_EFFORT = /opus-4[.-][7-9]|(opus|sonnet|fable)-[5-9]/u;
+
+/**
+ * The effort levels a managed upstream takes natively, or undefined when the
+ * gateway leaves that upstream's reasoning untouched. OpenRouter accepts the
+ * whole ladder and maps it to each model's own levels itself.
+ */
+export const managedReasoningLevels = (
+  provider: ManagedGatewayProvider,
+  model: string,
+): readonly ReasoningEffortLevel[] | undefined => {
+  switch (provider) {
+    case "openrouter":
+      return REASONING_EFFORT_LEVELS;
+    case "openai":
+      return ["low", "medium", "high", "xhigh"];
+    case "deepseek":
+      return ["low", "high", "max"];
+    case "xai":
+      return ["low", "high"];
+    case "fireworks":
+    case "meta":
+      return ["low", "medium", "high"];
+    case "anthropic":
+      if (!ANTHROPIC_ADAPTIVE_THINKING.test(model)) return undefined;
+      return ANTHROPIC_XHIGH_EFFORT.test(model)
+        ? REASONING_EFFORT_LEVELS
+        : ["low", "medium", "high", "max"];
+    case "google":
+      if (!/gemini-3/u.test(model)) return undefined;
+      return /gemini-3-pro/u.test(model)
+        ? ["low", "high"]
+        : ["low", "medium", "high"];
+  }
+};
+
+/** The level sent upstream: the nearest one the provider takes. */
+export const managedProviderReasoningEffort = (
+  provider: ManagedGatewayProvider,
+  model: string,
+  level: ReasoningEffortLevel,
+): ReasoningEffortLevel | undefined => {
+  const supported = managedReasoningLevels(provider, model);
+  return supported ? nearestReasoningEffortLevel(level, supported) : undefined;
+};
+
 const applyManagedReasoningEffort = (
   body: Record<string, unknown>,
   provider: ManagedGatewayProvider,
-  effort: string | undefined,
+  model: string,
+  catalogEffort: string | undefined,
 ): void => {
+  const requested =
+    requestedReasoningEffort(body) ?? parseReasoningEffortLevel(catalogEffort);
   stripManagedReasoningControls(body);
-  if (!effort || provider === "anthropic" || provider === "google") return;
+  if (!requested) return;
+  if (provider === "deepseek") {
+    body.reasoning_effort = requested;
+    body.reasoning = { effort: requested };
+    return;
+  }
+  const effort = managedProviderReasoningEffort(provider, model, requested);
+  if (!effort) return;
+  if (provider === "anthropic") {
+    body.thinking = { type: "adaptive" };
+    body.output_config = { ...(recordAt(body, "output_config") ?? {}), effort };
+    if (body.temperature !== undefined && body.temperature !== 1) {
+      delete body.temperature;
+    }
+    return;
+  }
+  if (provider === "google") {
+    const generationConfig = recordAt(body, "generationConfig") ?? {};
+    body.generationConfig = {
+      ...generationConfig,
+      thinkingConfig: {
+        ...(recordAt(generationConfig, "thinkingConfig") ?? {}),
+        thinkingLevel: effort,
+      },
+    };
+    return;
+  }
   body.reasoning_effort = effort;
   body.reasoning = { effort };
 };
@@ -448,27 +571,15 @@ export const DEEPSEEK_IGNORED_PARAMS = [
 
 /**
  * DeepSeek V4 Flash's native effort ladder is `low | high | max`, so Stella's
- * wider set has to be clamped. The gateway applies this to the catalog-owned
- * effort after removing every client-supplied reasoning control.
+ * wider set is mapped to the nearest of those (medium to high, xhigh to max).
  */
 export const deepSeekReasoningEffort = (raw: unknown): string | undefined => {
   const value = typeof raw === "string" ? raw.trim().toLowerCase() : "";
-  switch (value) {
-    case "none":
-    case "off":
-      return "none";
-    case "minimal":
-    case "low":
-      return "low";
-    case "medium":
-      return "high";
-    case "high":
-    case "xhigh":
-    case "max":
-      return "max";
-    default:
-      return undefined;
-  }
+  if (value === "none" || value === "off") return "none";
+  const level = parseReasoningEffortLevel(value);
+  return level
+    ? nearestReasoningEffortLevel(level, ["low", "high", "max"])
+    : undefined;
 };
 
 export const normalizeDeepSeekBody = (
@@ -589,6 +700,7 @@ export const bodyForUpstream = (
   applyManagedReasoningEffort(
     body,
     provider,
+    authorized.resolvedModel,
     authorized.managedReasoningEffort,
   );
   if (isResponsesRequest(provider, request)) {

@@ -102,7 +102,6 @@ import {
 } from "../provider/account-byok.ts";
 import { openBunSqliteStorage } from "../storage/bun-sqlite.ts";
 import { isDeviceToolName } from "@stella/contracts/turn-plane/device-tools";
-import { deviceRefusal } from "../stella/execution.ts";
 import { placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella/placement.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
 import {
@@ -441,10 +440,12 @@ export function desktopChats(options: DesktopChatsOptions) {
     record && !(record.host === "device" && record.deviceId === options.deviceId) ? record : null;
   /**
    * The host this computer's turns for the conversation go to: the one its
-   * record names, while that host can take them. With no record, or one
-   * naming a host that can't now (a computer offline or not ready, the cloud
-   * out of reach), null: the sender's host answers, as with no record, and
-   * the record stays for once that host is back.
+   * record names, while that host is up. With no record, or one naming a
+   * host that is gone (a computer offline or no longer the owner's, the
+   * cloud out of reach), null: the sender's host answers, as with no record,
+   * and takes the lease over from a gone computer. A computer that is up
+   * holds it even when it takes no work from other devices: what is placed
+   * there is answered as the owner gate falls back, and Stella stays.
    */
   const brainHost = async (conversationId: string): Promise<PiBrainRecord | null> => {
     const known = brains.get(conversationId);
@@ -461,10 +462,10 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     let host = otherHost(record);
     if (host?.host === "device") {
-      const { deviceId, label } = host;
+      const { deviceId } = host;
       const listed = await options.execution?.(conversationId)?.devices().catch(() => undefined);
       const device = listed?.find((entry) => entry.deviceId === deviceId);
-      if (!device || deviceRefusal(device, label ?? deviceId)) host = null;
+      if (!device?.online) host = null;
     }
     brains.set(conversationId, { record, host, at: Date.now() });
     return host;
@@ -479,18 +480,30 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
   /**
    * What Stella reads hidden and the user did not write (an agent's report
-   * or note) for a conversation whose brain runs elsewhere: placed there as
-   * this computer's sends are, once per `requestId`. False when she runs
-   * here, or where she runs can't take it now, for the conversation here to take.
+   * or note) for a conversation whose brain runs elsewhere, once per
+   * `requestId`: to the cloud placed as this computer's sends are, to
+   * another computer through the owner's agent ledger, which hands it to
+   * whichever host holds Stella when it arrives, whether or not that one
+   * takes work from other devices. False when she runs here, or where she
+   * runs can't take it now, for the conversation here to take.
    */
-  const noteOnBrain = async (conversationId: string, requestId: string, text: string): Promise<boolean> => {
+  const noteOnBrain = async (
+    conversationId: string,
+    requestId: string,
+    text: string,
+    fromThreadId: string = conversationId,
+  ): Promise<boolean> => {
     const host = await brainHost(conversationId);
     if (!host) return false;
-    const brain = options.brain?.(conversationId);
-    if (!brain) return false;
     // Another computer's harness counts its own request ids.
     const id = createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${requestId}`).digest("hex").slice(0, 48);
-    if (!(await brain.note(host, { id: `pi-note:${id}`, text }))) return false;
+    if (host.host === "device" && options.agentThreads) {
+      await options.agentThreads.note({ noteId: `note:${id}`, conversationId, fromThreadId, text });
+    } else {
+      const brain = options.brain?.(conversationId);
+      if (!brain) return false;
+      if (!(await brain.note(host, { id: `pi-note:${id}`, text }))) return false;
+    }
     // Her answer comes back through the journal.
     const chat = await chats.get(conversationId)?.catch(() => undefined);
     if (chat) chat.followUntil = Date.now() + FOLLOW_WINDOW_MS;
@@ -1093,7 +1106,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 reportsFromLedger: () => !conversationId.startsWith("local_"),
                 deliverReport: async (report, context) => {
                   if (report.settled || report.ledger) return;
-                  if (await noteOnBrain(conversationId, report.requestId, report.text)) return;
+                  if (await noteOnBrain(conversationId, report.requestId, report.text, report.threadId)) return;
                   // The harness is open by then: reports run once it resumes.
                   const root = await harness.conversation(report.rootConversationId, context);
                   await root?.submit(

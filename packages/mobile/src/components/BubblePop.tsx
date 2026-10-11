@@ -17,10 +17,22 @@ import { useReducedMotion } from "react-native-reanimated";
 import { useColors } from "../theme/theme-context";
 import { useReplyHandoffController } from "./reply-handoff";
 
-type Pop = { side: "left" | "right"; rise: number; scale: number };
+type Pop = {
+  side: "left" | "right";
+  rise: number;
+  scale: number;
+  fadeFrom?: number;
+  beforePaint?: boolean;
+};
 
 export const SENT_BUBBLE_POP: Pop = { side: "right", rise: 14, scale: 0.84 };
-const ARRIVING_BUBBLE_POP: Pop = { side: "left", rise: 14, scale: 0.84 };
+const ARRIVING_BUBBLE_POP: Pop = {
+  side: "left",
+  rise: 14,
+  scale: 0.84,
+  fadeFrom: 0.35,
+  beforePaint: true,
+};
 
 /**
  * iMessage-style entry shared by the sent bubble and the arriving reply: the
@@ -35,9 +47,11 @@ export function useBubblePop(animate: boolean, pop: Pop) {
   const reducedMotion = useReducedMotion();
   const play = useRef(animate).current && !reducedMotion;
   const progress = useRef(new Animated.Value(play ? 0 : 1)).current;
-  const opacity = useRef(new Animated.Value(play ? 0 : 1)).current;
+  const opacity = useRef(new Animated.Value(play ? (pop.fadeFrom ?? 0) : 1))
+    .current;
+  const useStartEffect = pop.beforePaint ? useLayoutEffect : useEffect;
 
-  useEffect(() => {
+  useStartEffect(() => {
     if (!play) {
       progress.setValue(1);
       opacity.setValue(1);

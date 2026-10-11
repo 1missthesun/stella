@@ -529,6 +529,8 @@ const withInlineAskRecords = (
   return out;
 };
 
+const REPLY_PLACEMENT_PIN_SUPPRESS_MS = 1500;
+
 export function ChatPane({
   messages: projectedMessages,
   streaming,
@@ -875,10 +877,54 @@ export function ChatPane({
     }
   }, [sendPinSuppressForId, streaming, lastMessage?.id]);
 
+  const [replyPinSuppressForId, setReplyPinSuppressForId] = useState<
+    string | null
+  >(null);
+  const emptyReplyIdsRef = useRef(new Set<string>());
+  const placedReplyIdRef = useRef<string | null>(null);
+  const lastReplyHasText =
+    lastMessage?.role === "assistant" && lastMessage.text.trim().length > 0;
+  const landingReplyId =
+    lastMessage && lastReplyHasText && emptyReplyIdsRef.current.has(lastMessage.id)
+      ? lastMessage.id
+      : null;
+  const placingReplyId = landingReplyId ?? placedReplyIdRef.current;
+  const {
+    getShouldPlaceLatestTurn: shouldPlaceLatestTurn,
+    nudgeAfterSend: placeLatestTurnFor,
+  } = scroll;
+  useLayoutEffect(() => {
+    if (!lastMessage || lastMessage.role !== "assistant") return;
+    if (!lastReplyHasText) {
+      emptyReplyIdsRef.current.add(lastMessage.id);
+      return;
+    }
+    if (!emptyReplyIdsRef.current.delete(lastMessage.id)) return;
+    placedReplyIdRef.current = lastMessage.id;
+    if (!shouldPlaceLatestTurn()) return;
+    placeLatestTurnFor(lastMessage.id);
+    setReplyPinSuppressForId(lastMessage.id);
+  }, [lastMessage, lastReplyHasText, shouldPlaceLatestTurn, placeLatestTurnFor]);
+  useEffect(() => {
+    if (!replyPinSuppressForId) return;
+    if (lastMessage?.id !== replyPinSuppressForId) {
+      setReplyPinSuppressForId(null);
+      return;
+    }
+    const timer = setTimeout(
+      () => setReplyPinSuppressForId(null),
+      REPLY_PLACEMENT_PIN_SUPPRESS_MS,
+    );
+    return () => clearTimeout(timer);
+  }, [replyPinSuppressForId, lastMessage?.id]);
+
   const dataChangeScrollOwner = resolveChatDataChangeScrollOwner({
     isFollowingLatest: scroll.isFollowingLatest,
     isStreaming: streaming,
-    postSendPlacementPending: sendPinSuppressForId !== null,
+    postSendPlacementPending:
+      sendPinSuppressForId !== null ||
+      replyPinSuppressForId !== null ||
+      landingReplyId !== null,
   });
   const scrollOwnerRef = useRef(dataChangeScrollOwner);
   scrollOwnerRef.current = dataChangeScrollOwner;
@@ -1593,29 +1639,6 @@ export function ChatPane({
     streaming && lastMessage?.role === "assistant" ? lastMessage.id : null;
   const latestUserMessageId =
     lastMessage?.role === "user" ? lastMessage.id : null;
-  const emptyReplyIdsRef = useRef(new Set<string>());
-  const placedReplyIdRef = useRef<string | null>(null);
-  const lastReplyHasText =
-    lastMessage?.role === "assistant" && lastMessage.text.trim().length > 0;
-  const landingReplyId =
-    lastMessage && lastReplyHasText && emptyReplyIdsRef.current.has(lastMessage.id)
-      ? lastMessage.id
-      : null;
-  const placingReplyId = landingReplyId ?? placedReplyIdRef.current;
-  const {
-    getShouldPlaceLatestTurn: shouldPlaceLatestTurn,
-    nudgeAfterSend: placeLatestTurnFor,
-  } = scroll;
-  useLayoutEffect(() => {
-    if (!lastMessage || lastMessage.role !== "assistant") return;
-    if (!lastReplyHasText) {
-      emptyReplyIdsRef.current.add(lastMessage.id);
-      return;
-    }
-    if (!emptyReplyIdsRef.current.delete(lastMessage.id)) return;
-    placedReplyIdRef.current = lastMessage.id;
-    if (shouldPlaceLatestTurn()) placeLatestTurnFor(lastMessage.id);
-  }, [lastMessage, lastReplyHasText, shouldPlaceLatestTurn, placeLatestTurnFor]);
   useEffect(() => {
     if (!activeAssistantId) {
       scroll.clearActiveAssistantLayout();

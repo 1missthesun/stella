@@ -115,8 +115,12 @@ export type ClaudeCodeTurnRequest = {
   nativeToolCallIds?: boolean;
   boundToolInactivity?: boolean;
   allowEmptyFinal?: boolean;
+  /**
+   * Context capacity the CLI compacts against (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`).
+   * The CLI clamps it to the model's own window, so a smaller model keeps
+   * its default. Unset leaves the CLI's default.
+   */
   autoCompactWindowTokens?: number;
-  autoCompactTriggerPct?: number;
   abortSignal?: AbortSignal;
   /**
    * On a Claude usage limit, hold the turn until the limit resets and then
@@ -214,6 +218,12 @@ export type ClaudeCodeToolSetChange = {
 };
 /** Tool-set changes one turn takes before it stops asking. */
 const MAX_TOOL_SET_CHANGES_PER_TURN = 4;
+
+/**
+ * Agents (not the orchestrator) on a model whose window is larger compact
+ * against 400k tokens; the CLI keeps the smaller window of the two.
+ */
+export const CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW = 400_000;
 type ClaudeCodeInjection = {
   consumed: boolean;
   answered?: boolean;
@@ -2571,7 +2581,6 @@ class ClaudeCodeSessionRuntime {
       normalizeNativeTools(request.nativeTools),
       effectiveSystemPrompt.trim(),
       request.autoCompactWindowTokens ?? null,
-      request.autoCompactTriggerPct ?? null,
       request.cliBridgeSocketPath ?? "",
     ]);
   }
@@ -2696,20 +2705,14 @@ class ClaudeCodeSessionRuntime {
       childEnv.CLAUDE_CODE_EFFORT_LEVEL = effortLevel;
     }
     session.claudeLoginEmail = claudeConfig.email;
+    delete childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
+    delete childEnv.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE;
     if (
       Number.isFinite(request.autoCompactWindowTokens) &&
       (request.autoCompactWindowTokens ?? 0) > 0
     ) {
       childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(
         Math.floor(request.autoCompactWindowTokens!),
-      );
-    }
-    if (
-      Number.isFinite(request.autoCompactTriggerPct) &&
-      (request.autoCompactTriggerPct ?? 0) > 0
-    ) {
-      childEnv.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE = String(
-        Math.min(100, Math.max(1, Math.floor(request.autoCompactTriggerPct!))),
       );
     }
     const child = spawn(

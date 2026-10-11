@@ -1,6 +1,7 @@
 import type { GatewayModelResolution } from "@stella/contracts/gateway/api";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import { resolveManagedGatewayProvider } from "./managed-gateway";
+import { MANAGED_MODEL_CONTEXT_WINDOWS } from "./model";
 import {
   managedModelSupportsImageInput,
   resolveRequestedStellaModel,
@@ -42,14 +43,18 @@ export const managedModelDescriptor = (
   > & {
     config: { maxOutputTokens?: number };
   },
-): GatewayModelResolution => ({
-  requestedModel: route.requestedModel,
-  resolvedModel: route.resolvedModel,
-  provider: route.provider,
-  protocol: route.protocol,
-  reasoning: true,
-  supportsImages: managedModelSupportsImageInput(route.resolvedModel),
-  ...(route.config.maxOutputTokens !== undefined
-    ? { maxOutputTokens: route.config.maxOutputTokens }
-    : {}),
-});
+): GatewayModelResolution => {
+  const contextWindow = MANAGED_MODEL_CONTEXT_WINDOWS[route.resolvedModel];
+  return {
+    requestedModel: route.requestedModel,
+    resolvedModel: route.resolvedModel,
+    provider: route.provider,
+    protocol: route.protocol,
+    reasoning: true,
+    supportsImages: managedModelSupportsImageInput(route.resolvedModel),
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
+    ...(route.config.maxOutputTokens !== undefined
+      ? { maxOutputTokens: route.config.maxOutputTokens }
+      : {}),
+  };
+};

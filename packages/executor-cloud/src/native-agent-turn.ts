@@ -38,6 +38,7 @@ import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-isolation.js";
 import type { ToolProcessIdentity } from "@stella/runtime/kernel/tools/types.js";
 import {
+  CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
   ClaudeCodeCompactionLoopError,
   claudeCodeSubscriptionLimitOf,
   getClaudeCodeStatusChangeFromStreamEvent,
@@ -395,6 +396,8 @@ export type CloudClaudeRoleProfile = {
   includePartialMessages: boolean;
   /** Hard and idle MCP tool-call bound; unset keeps the CLI defaults. */
   mcpToolTimeoutMs?: number;
+  /** `CLAUDE_CODE_AUTO_COMPACT_WINDOW`; unset keeps the CLI default. */
+  autoCompactWindowTokens?: number;
 };
 
 /**
@@ -440,6 +443,7 @@ export const cloudClaudeRoleProfile = (args: {
         agentType: "general",
         cwd: WORLD_ROOT,
         includePartialMessages: false,
+        autoCompactWindowTokens: CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
       };
 
 /**
@@ -478,6 +482,7 @@ export const buildClaudeChildEnv = (options: {
   accountDirectory: string;
   reasoningEffort: AgentModelReasoningEffort;
   mcpToolTimeoutMs?: number;
+  autoCompactWindowTokens?: number;
 }): NodeJS.ProcessEnv => {
   const childEnv: NodeJS.ProcessEnv = {
     ...options.initialEnv,
@@ -516,6 +521,13 @@ export const buildClaudeChildEnv = (options: {
     childEnv.MCP_TOOL_TIMEOUT = String(options.mcpToolTimeoutMs);
     childEnv.CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT = String(
       options.mcpToolTimeoutMs,
+    );
+  }
+  delete childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
+  delete childEnv.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE;
+  if (options.autoCompactWindowTokens !== undefined) {
+    childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW = String(
+      options.autoCompactWindowTokens,
     );
   }
   return childEnv;
@@ -782,6 +794,9 @@ export const runCloudClaude = async (options: {
       reasoningEffort: options.execution.reasoningEffort,
       ...(profile.mcpToolTimeoutMs !== undefined
         ? { mcpToolTimeoutMs: profile.mcpToolTimeoutMs }
+        : {}),
+      ...(profile.autoCompactWindowTokens !== undefined
+        ? { autoCompactWindowTokens: profile.autoCompactWindowTokens }
         : {}),
     });
     const result = await runJsonLines({

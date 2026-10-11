@@ -186,8 +186,10 @@ export const MANAGED_MODEL_API_OVERRIDES: Readonly<
   [GPT_6_LUNA_MODEL]: "openai-completions",
 };
 
+export const GEMINI_3_1_FLASH_LITE_MODEL = "google/gemini-3.1-flash-lite";
+
 const GEMINI_3_1_FLASH_LITE_IMAGE_DESCRIPTION_CONFIG: ModelConfig = {
-  model: "google/gemini-3.1-flash-lite",
+  model: GEMINI_3_1_FLASH_LITE_MODEL,
   managedGatewayProvider: "google",
   maxOutputTokens: 4096,
   providerOptions: gatewayOptions("google"),
@@ -206,6 +208,19 @@ const GEMINI_3_7_FLASH_OFFLINE_RESPONDER_CONFIG: ModelConfig = {
       reasoningEffort: "low",
     },
   },
+};
+
+/**
+ * Input context window of each managed upstream, as its route serves it.
+ * DeepSeek is pinned to OpenRouter's inference-net endpoint, which serves
+ * 1,040,000 of the model's 1,048,576. Verified 2026-10-11 against OpenAI,
+ * Google and OpenRouter.
+ */
+export const MANAGED_MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
+  [GPT_6_LUNA_MODEL]: 1_050_000,
+  [DEEPSEEK_V4_1_FLASH_MODEL]: 1_040_000,
+  [GEMINI_3_7_FLASH_OFFLINE_RESPONDER_MODEL]: 1_048_576,
+  [GEMINI_3_1_FLASH_LITE_MODEL]: 1_048_576,
 };
 
 const INTERNAL_MODEL_CONFIGS = {

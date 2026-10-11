@@ -17,6 +17,7 @@ import {
   checkClaudeCodeAuth,
   claudeCodeResumableSessionId,
   closeClaudeCodeSessionWhenIdle,
+  CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
   runClaudeCodeTurn,
 } from "../../kernel/integrations/claude-code-session-runtime.js";
 import {
@@ -241,6 +242,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         nativeToolCallIds: true,
         boundToolInactivity: false,
         allowEmptyFinal: true,
+        ...(ref.role === "worker" ? { autoCompactWindowTokens: CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW } : {}),
         abortSignal: spec.signal,
         holdOnUsageLimit: true,
         executeTool: async (toolCallId, toolName, toolArgs, signal) =>

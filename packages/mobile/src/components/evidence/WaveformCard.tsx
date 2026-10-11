@@ -9,7 +9,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { Icon } from "../Icon";
-import { configurePlaybackAudioSession } from "../../lib/mobile-audio-session";
+import { createPlaybackSessionHold } from "../../lib/mobile-audio-session";
 import { evidenceAudioFileUri } from "../../lib/chat-evidence-previews";
 import type { StoredPhoneAccess } from "../../lib/phone-access";
 import type { Colors } from "../../theme/colors";
@@ -77,6 +77,8 @@ export function WaveformCard({
   const trackWidth = BAR_COUNT * BAR_WIDTH + (BAR_COUNT - 1) * BAR_GAP;
   const progress = useSharedValue(0);
   const playerRef = useRef<AudioPlayer | null>(null);
+  const session = useMemo(() => createPlaybackSessionHold(), []);
+  const mountedRef = useRef(true);
   const subscriptionRef = useRef<{ remove: () => void } | null>(null);
   const [playing, setPlaying] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -87,6 +89,7 @@ export function WaveformCard({
         "playbackStatusUpdate",
         (status) => {
           if (!status.didJustFinish) return;
+          session.release();
           cancelAnimation(progress);
           progress.value = 0;
           setPlaying(false);
@@ -95,11 +98,13 @@ export function WaveformCard({
       );
       subscriptionRef.current = subscription;
     },
-    [progress],
+    [progress, session],
   );
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
       cancelAnimation(progress);
       subscriptionRef.current?.remove();
       subscriptionRef.current = null;
@@ -113,14 +118,15 @@ export function WaveformCard({
           // Already torn down by the module's own cleanup.
         }
       }
-    },
-    [progress],
-  );
+      session.release();
+    };
+  }, [progress, session]);
 
   const toggle = useCallback(() => {
     const existing = playerRef.current;
     if (existing && existing.playing) {
       existing.pause();
+      session.release();
       cancelAnimation(progress);
       setPlaying(false);
       return;
@@ -129,9 +135,14 @@ export function WaveformCard({
       const from =
         existing.duration > 0 ? existing.currentTime / existing.duration : 0;
       const remaining = Math.max(120, durationMs * (1 - from));
-      void configurePlaybackAudioSession()
-        .then(() => {
-          if (!playerRef.current) return;
+      void session
+        .acquire()
+        .then((ready) => {
+          if (!ready) return;
+          if (!playerRef.current) {
+            session.release();
+            return;
+          }
           if (from >= 0.999) {
             void playerRef.current.seekTo(0);
             progress.value = 0;
@@ -154,8 +165,15 @@ export function WaveformCard({
       access,
     })
       .then(async (uri) => {
-        if (!(await configurePlaybackAudioSession())) return;
-        const player = createAudioPlayer({ uri });
+        if (!mountedRef.current || !(await session.acquire())) return;
+        if (!mountedRef.current) {
+          session.release();
+          return;
+        }
+        const player = createAudioPlayer(
+          { uri },
+          { keepAudioSessionActive: true },
+        );
         playerRef.current = player;
         attachCompletion(player);
         player.play();
@@ -175,6 +193,7 @@ export function WaveformCard({
     durationMs,
     filePath,
     progress,
+    session,
   ]);
 
   const cursorStyle = useAnimatedStyle(() => ({

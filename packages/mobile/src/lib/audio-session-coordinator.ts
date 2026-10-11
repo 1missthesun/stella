@@ -6,6 +6,8 @@ export type MobileAudioMode = {
 
 export type RecordingAudioLease = number;
 
+export type PlaybackHolder = symbol;
+
 type ApplyAudioMode = (mode: MobileAudioMode) => Promise<void>;
 type DeactivateAudioSession = () => Promise<void>;
 
@@ -17,6 +19,7 @@ type DeactivateAudioSession = () => Promise<void>;
  */
 export class AudioSessionCoordinator {
   private activeRecordingLease: RecordingAudioLease | null = null;
+  private readonly playbackHolders = new Set<PlaybackHolder>();
   private nextLease = 0;
   private operations: Promise<void> = Promise.resolve();
 
@@ -90,13 +93,54 @@ export class AudioSessionCoordinator {
     });
   }
 
-  releasePlayback(): Promise<void> {
-    if (this.activeRecordingLease !== null) return Promise.resolve();
+  holdPlayback(holder: PlaybackHolder): boolean {
+    if (this.activeRecordingLease !== null) return false;
+    this.playbackHolders.add(holder);
+    return true;
+  }
+
+  acquirePlayback(
+    holder: PlaybackHolder,
+    mode: MobileAudioMode = {},
+  ): Promise<boolean> {
+    if (!this.holdPlayback(holder)) return Promise.resolve(false);
 
     return this.enqueue(async () => {
-      if (this.activeRecordingLease !== null) return;
+      if (!this.playbackHolders.has(holder)) return false;
+      if (this.activeRecordingLease !== null) {
+        this.playbackHolders.delete(holder);
+        return false;
+      }
+      try {
+        await this.applyAudioMode({
+          ...mode,
+          allowsRecording: false,
+          playsInSilentMode: true,
+        });
+      } catch (error) {
+        this.playbackHolders.delete(holder);
+        throw error;
+      }
+      if (this.activeRecordingLease !== null) {
+        this.playbackHolders.delete(holder);
+        return false;
+      }
+      return this.playbackHolders.has(holder);
+    });
+  }
+
+  releasePlayback(holder: PlaybackHolder): Promise<void> {
+    if (!this.playbackHolders.delete(holder)) return Promise.resolve();
+    if (!this.canDeactivate()) return Promise.resolve();
+
+    return this.enqueue(async () => {
+      if (!this.canDeactivate()) return;
       await this.deactivateAudioSession();
     });
+  }
+
+  private canDeactivate() {
+    return this.playbackHolders.size === 0 && this.activeRecordingLease === null;
   }
 
   private enqueue<T>(operation: () => Promise<T>): Promise<T> {

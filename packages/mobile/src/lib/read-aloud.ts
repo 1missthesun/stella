@@ -6,10 +6,7 @@ import { VOICE_TTS_STREAM_CANCEL_PATH } from "@stella/contracts/backend/voice";
 import { getAuthToken } from "./auth-token";
 import { getBackendClient } from "./backend";
 import { backendOrigin } from "./http";
-import {
-  configurePlaybackAudioSession,
-  releasePlaybackAudioSession,
-} from "./mobile-audio-session";
+import { createPlaybackSessionHold } from "./mobile-audio-session";
 
 const READ_ALOUD_KEY = "stella-mobile.read-aloud-enabled";
 // The mobile player streams a live HLS playlist so audio starts while Gemini
@@ -86,13 +83,7 @@ export type ReadAloudState = {
 
 let playbackState: ReadAloudState | null = null;
 
-let playbackSessionHeld = false;
-
-const releasePlaybackSession = () => {
-  if (!playbackSessionHeld) return;
-  playbackSessionHeld = false;
-  void releasePlaybackAudioSession().catch(() => undefined);
-};
+const playbackSession = createPlaybackSessionHold();
 let playbackAbort: AbortController | null = null;
 
 const abortPlaybackWork = () => {
@@ -248,7 +239,7 @@ export function stopReadAloud() {
       /* already released */
     }
   }
-  releasePlaybackSession();
+  playbackSession.release();
 }
 
 /** Terminal stop used when dictation begins. Never a pause; nothing resumes. */
@@ -272,7 +263,7 @@ export function pauseReadAloud() {
   } catch {
     /* ignore */
   }
-  releasePlaybackSession();
+  playbackSession.release();
   setPlaybackState({ messageId: playbackState.messageId, status: "paused" });
 }
 
@@ -291,8 +282,7 @@ export function resumeReadAloud() {
     void playHlsResilient(resume.uri, id, generation, resume.at);
     return;
   }
-  if (!currentPlayer) return;
-  playbackSessionHeld = true;
+  if (!currentPlayer || !playbackSession.hold()) return;
   try {
     currentPlayer.play();
   } catch {
@@ -405,7 +395,7 @@ async function tryStreamReply(
 
   const [, sessionReady] = await Promise.all([
     waitForPlaylistReady(uri, signal),
-    configurePlaybackAudioSession({ background: options.background }),
+    playbackSession.acquire({ background: options.background }),
   ]);
   if (generation !== playbackGeneration || signal.aborted) {
     cancelStreamSession(ticket);
@@ -504,7 +494,7 @@ async function playHlsResilient(
       dropPlayer();
       if (disposeHlsPlayback === dispose) {
         disposeHlsPlayback = null;
-        releasePlaybackSession();
+        playbackSession.release();
       }
       resolve(true);
     };
@@ -574,7 +564,7 @@ async function playHlsResilient(
       // Also covers native failures that never emit a playback error event.
       startTimer = setTimeout(retry, STREAM_START_TIMEOUT_MS);
       try {
-        playbackSessionHeld = true;
+        playbackSession.hold();
         const p = createAudioPlayer(
           { uri },
           { preferredForwardBufferDuration: 1, keepAudioSessionActive: true },

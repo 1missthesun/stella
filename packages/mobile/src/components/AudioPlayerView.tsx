@@ -13,7 +13,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Icon } from "./Icon";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
-import { configurePlaybackAudioSession } from "../lib/mobile-audio-session";
+import {
+  configurePlaybackAudioSession,
+  createPlaybackSessionHold,
+} from "../lib/mobile-audio-session";
 
 type AudioPlayerViewProps = {
   /** `file://` URI of the decoded clip — see `writeArtifactMediaFile`. */
@@ -51,8 +54,18 @@ export function AudioPlayerView({ uri }: AudioPlayerViewProps) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   // 200ms keeps the scrubber moving smoothly without churning the tree; the
   // expo-audio default (500ms) reads as a stuttering progress bar.
-  const player = useAudioPlayer({ uri }, { updateInterval: 200 });
+  const player = useAudioPlayer(
+    { uri },
+    { updateInterval: 200, keepAudioSessionActive: true },
+  );
   const status = useAudioPlayerStatus(player);
+  const session = useMemo(() => createPlaybackSessionHold(), []);
+
+  useEffect(() => () => session.release(), [session]);
+
+  useEffect(() => {
+    if (status.didJustFinish) session.release();
+  }, [session, status.didJustFinish]);
 
   // Playback should be audible with the ringer switch flipped, the same way
   // read-aloud configures the session.
@@ -126,6 +139,7 @@ export function AudioPlayerView({ uri }: AudioPlayerViewProps) {
     if (status.playing) {
       playRequestRef.current += 1;
       player.pause();
+      session.release();
       return;
     }
     // Replaying a finished clip needs an explicit rewind; `play()` alone
@@ -134,13 +148,11 @@ export function AudioPlayerView({ uri }: AudioPlayerViewProps) {
       seekTo(0);
     }
     const request = ++playRequestRef.current;
-    if (
-      (await configurePlaybackAudioSession()) &&
-      request === playRequestRef.current
-    ) {
+    const ready = await session.acquire();
+    if (ready && request === playRequestRef.current) {
       player.play();
     }
-  }, [duration, player, seekTo, status.currentTime, status.playing]);
+  }, [duration, player, seekTo, session, status.currentTime, status.playing]);
 
   const skip = useCallback(
     (delta: number) => seekTo((scrubTime ?? status.currentTime) + delta),

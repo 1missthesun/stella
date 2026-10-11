@@ -8,11 +8,37 @@ import {
 } from "@stella/contracts/reply-context";
 import { journalAgents } from "@stella/contracts/agent-titles";
 import type { ChatMessage, ChatArtifact } from "../types";
-import type { JournalFile, JournalRecord } from "@stella/contracts/conversation-protocol";
+import {
+  messageText,
+  type JournalFile,
+  type JournalMessageRecord,
+  type JournalRecord,
+} from "@stella/contracts/conversation-protocol";
+import { bareToolName } from "@stella/contracts/conversation-agent-activity";
 import { cloudFileArtifact } from "./cloud-file-payload";
 import { journalMirroredWake } from "@stella/contracts/conversation-journal-projection";
 
 const SUMMARY_MAX_CHARS = 160;
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+/** The thread a `spawn_agent` result started; a computer's turn mirrors only the tool's JSON text. */
+const spawnResultThreadId = (record: JournalMessageRecord): string | null => {
+  const toolName = record.payload.toolName;
+  if (record.role !== "toolResult" || record.payload.isError === true) return null;
+  if (typeof toolName !== "string" || bareToolName(toolName) !== "spawn_agent") return null;
+  const details = asRecord(record.payload.details);
+  if (typeof details?.thread_id === "string" && details.thread_id) return details.thread_id;
+  try {
+    const threadId = asRecord(JSON.parse(messageText(record.payload)))?.thread_id;
+    return typeof threadId === "string" && threadId ? threadId : null;
+  } catch {
+    return null;
+  }
+};
 
 /**
  * Compact one-line excerpt of a task's result for a fileless completion
@@ -125,6 +151,34 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     if (turn) turn.push(record);
     else turns.set(record.turnId, [record]);
   }
+  // A turn a computer ran is mirrored without lifecycle cards: its spawns are
+  // `spawn_agent` results and its outcomes the hidden report the agent sent.
+  // Give each such spawn the card a cloud turn would have carried, settled
+  // by what the journal last said about the task (desktop parity).
+  const carded = new Set<string>();
+  for (const record of records) {
+    if (record.kind === "card" && record.card.type === "agent-lifecycle") carded.add(record.card.event.payload.agentId);
+  }
+  for (const [turnId, turnRecords] of turns) {
+    for (const record of turnRecords) {
+      if (record.kind !== "message") continue;
+      const id = spawnResultThreadId(record);
+      if (!id || carded.has(id)) continue;
+      carded.add(id);
+      const message = anchorBefore(turnId, record.seq);
+      if (!message) continue;
+      const status = journal.get(id)?.status;
+      const details = asRecord(record.payload.details);
+      const title = titles.get(id) || (typeof details?.description === "string" ? details.description : "") || id;
+      attach(message, [{ id: `cloud:${turnId}:spawn:${record.seq}`, conversationId, payload: {
+        kind: "agent-work", agentIds: [id], total: 1, title, subtitle: "", createdAt: record.createdAtMs,
+        ...(status === undefined || status === "running"
+          ? { state: "running", completed: 0 }
+          : { state: "done", completed: status === "completed" ? 1 : 0, ...(status === "completed" ? {} : { failed: true }) }),
+      } }]);
+    }
+  }
+
   const wakeTitles = new Map<string, string>();
   for (const [turnId, turnRecords] of turns) {
     const wake = journalMirroredWake(turnRecords);

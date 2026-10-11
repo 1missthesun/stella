@@ -2685,14 +2685,20 @@
       "connect": "连接 Gmail",
       "connecting": "正在等待 Google…",
       "connectError": "Gmail 未能连接，请重试。",
-      "unavailable": "登录 Stella 以连接 Gmail。",
       "checkNow": "立即查看",
       "checking": "正在查看收件箱…",
       "checked": "{when}已查看",
       "firstDigest": "你的第一份摘要即将送达",
       "nothingNew": "没有新内容",
       "error": "无法查看收件箱，Stella 稍后会再试。",
-      "justNow": "刚刚"
+      "justNow": "刚刚",
+      "loadErrorTitle": "无法加载摘要",
+      "loadErrorBody": "Stella 暂时无法连接服务器。请检查网络后重试。",
+      "retry": "重试",
+      "nothingNewSince": "自 {time} 以来没有新内容",
+      "minutesAgo": "{count} 分钟前",
+      "hoursAgo": "{count} 小时前",
+      "daysAgo": "{count} 天前"
     }
   },
   "sidebar": {

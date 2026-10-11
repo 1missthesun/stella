@@ -2767,14 +2767,20 @@
       "connect": "ربط Gmail",
       "connecting": "بانتظار Google…",
       "connectError": "لم يتم ربط Gmail. حاول مرة أخرى.",
-      "unavailable": "سجّل الدخول إلى Stella لربط Gmail.",
       "checkNow": "افحص الآن",
       "checking": "جارٍ فحص بريدك…",
       "checked": "تم الفحص {when}",
       "firstDigest": "ملخصك الأول في الطريق",
       "nothingNew": "لا جديد",
       "error": "تعذّر فحص بريدك. ستحاول Stella مرة أخرى قريبًا.",
-      "justNow": "الآن"
+      "justNow": "الآن",
+      "loadErrorTitle": "تعذّر تحميل ملخصك",
+      "loadErrorBody": "لا تستطيع Stella الوصول إلى خوادمها الآن. تحقّق من اتصالك وحاول مرة أخرى.",
+      "retry": "حاول مرة أخرى",
+      "nothingNewSince": "لا جديد منذ {time}",
+      "minutesAgo": "قبل {count} د",
+      "hoursAgo": "قبل {count} س",
+      "daysAgo": "قبل {count} ي"
     }
   },
   "sidebar": {

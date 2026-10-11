@@ -2703,14 +2703,20 @@
       "connect": "Gmail'i bağla",
       "connecting": "Google bekleniyor…",
       "connectError": "Gmail bağlanamadı. Tekrar deneyin.",
-      "unavailable": "Gmail'i bağlamak için Stella'ya giriş yapın.",
       "checkNow": "Şimdi kontrol et",
       "checking": "Gelen kutusu kontrol ediliyor…",
       "checked": "{when} kontrol edildi",
       "firstDigest": "İlk özetiniz yolda",
       "nothingNew": "Yeni bir şey yok",
       "error": "Gelen kutusu kontrol edilemedi. Stella yakında tekrar deneyecek.",
-      "justNow": "Az önce"
+      "justNow": "Az önce",
+      "loadErrorTitle": "Özet yüklenemedi",
+      "loadErrorBody": "Stella şu anda sunucularına ulaşamıyor. Bağlantınızı kontrol edip tekrar deneyin.",
+      "retry": "Tekrar dene",
+      "nothingNewSince": "{time} itibarıyla yeni bir şey yok",
+      "minutesAgo": "{count} dk önce",
+      "hoursAgo": "{count} sa önce",
+      "daysAgo": "{count} g önce"
     }
   },
   "sidebar": {

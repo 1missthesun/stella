@@ -2703,14 +2703,20 @@
       "connect": "Connect Gmail",
       "connecting": "Waiting for Google…",
       "connectError": "Gmail didn't connect. Try again.",
-      "unavailable": "Sign in to Stella to connect Gmail.",
       "checkNow": "Check now",
       "checking": "Checking your inbox…",
       "checked": "Checked {when}",
       "firstDigest": "Your first digest is on its way",
       "nothingNew": "Nothing new",
       "error": "Couldn't check your inbox. Stella will try again soon.",
-      "justNow": "Just now"
+      "justNow": "Just now",
+      "loadErrorTitle": "Couldn't load your digest",
+      "loadErrorBody": "Stella can't reach its servers right now. Check your connection and try again.",
+      "retry": "Try again",
+      "nothingNewSince": "Nothing new since {time}",
+      "minutesAgo": "{count} min ago",
+      "hoursAgo": "{count} hr ago",
+      "daysAgo": "{count} d ago"
     }
   },
   "sidebar": {

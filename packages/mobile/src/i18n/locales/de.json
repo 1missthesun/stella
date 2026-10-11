@@ -2703,14 +2703,20 @@
       "connect": "Gmail verbinden",
       "connecting": "Warte auf Google…",
       "connectError": "Gmail wurde nicht verbunden. Versuch es noch einmal.",
-      "unavailable": "Melde dich bei Stella an, um Gmail zu verbinden.",
       "checkNow": "Jetzt prüfen",
       "checking": "Posteingang wird geprüft…",
       "checked": "Geprüft {when}",
       "firstDigest": "Deine erste Übersicht ist unterwegs",
       "nothingNew": "Nichts Neues",
       "error": "Posteingang konnte nicht geprüft werden. Stella versucht es bald erneut.",
-      "justNow": "Gerade eben"
+      "justNow": "Gerade eben",
+      "loadErrorTitle": "Übersicht konnte nicht geladen werden",
+      "loadErrorBody": "Stella erreicht ihre Server gerade nicht. Prüf deine Verbindung und versuch es noch einmal.",
+      "retry": "Erneut versuchen",
+      "nothingNewSince": "Nichts Neues seit {time}",
+      "minutesAgo": "vor {count} Min.",
+      "hoursAgo": "vor {count} Std.",
+      "daysAgo": "vor {count} T."
     }
   },
   "sidebar": {

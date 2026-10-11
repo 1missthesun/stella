@@ -2719,14 +2719,20 @@
       "connect": "Conectar Gmail",
       "connecting": "Aguardando o Google…",
       "connectError": "O Gmail não conectou. Tente novamente.",
-      "unavailable": "Entre na Stella para conectar o Gmail.",
       "checkNow": "Verificar agora",
       "checking": "Verificando sua caixa…",
       "checked": "Verificado {when}",
       "firstDigest": "Seu primeiro resumo está a caminho",
       "nothingNew": "Nada novo",
       "error": "Não foi possível verificar sua caixa. A Stella tentará de novo em breve.",
-      "justNow": "Agora mesmo"
+      "justNow": "Agora mesmo",
+      "loadErrorTitle": "Não foi possível carregar seu resumo",
+      "loadErrorBody": "A Stella não consegue acessar os servidores agora. Verifique sua conexão e tente novamente.",
+      "retry": "Tentar novamente",
+      "nothingNewSince": "Nada novo desde {time}",
+      "minutesAgo": "há {count} min",
+      "hoursAgo": "há {count} h",
+      "daysAgo": "há {count} d"
     }
   },
   "sidebar": {

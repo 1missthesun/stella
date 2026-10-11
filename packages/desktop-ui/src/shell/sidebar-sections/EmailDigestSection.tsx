@@ -9,7 +9,7 @@ import {
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { useLocale, useT } from "@/shared/i18n";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
-import { Check, LoaderCircle, Mail } from "@/ui/icons";
+import { Check, LoaderCircle, Mail, RefreshCw } from "@/ui/icons";
 import "./email-digest-section.css";
 
 const GMAIL_ID = "gmail";
@@ -18,6 +18,15 @@ type Connection = "checking" | "connected" | "disconnected" | "unavailable";
 
 const threadUrl = (threadId: string) =>
   `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(threadId)}`;
+
+const clockTime = (locale: string, at: number, now: number) =>
+  new Intl.DateTimeFormat(locale, {
+    ...(new Date(at).toDateString() === new Date(now).toDateString()
+      ? {}
+      : { weekday: "short" }),
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(at);
 
 const connectGmail = async (): Promise<boolean> => {
   const api = window.electronAPI?.nativeIntegrations;
@@ -133,19 +142,31 @@ export function EmailDigestSection({ active }: { active: boolean }) {
     return <div className="email-digest" aria-busy="true" />;
   }
 
-  if (connection === "disconnected" || connection === "unavailable") {
+  if (connection === "unavailable" && !value) {
+    return (
+      <EmptyState
+        motif="mail"
+        title={t("shell.emailDigest.loadErrorTitle")}
+        body={t("shell.emailDigest.loadErrorBody")}
+        action={{
+          label: t("shell.emailDigest.retry"),
+          icon: RefreshCw,
+          onClick: () => {
+            setConnection("checking");
+            void refresh();
+          },
+        }}
+      />
+    );
+  }
+
+  if (connection === "disconnected") {
     return (
       <EmptyState
         motif="mail"
         title={t("shell.emailDigest.connectTitle")}
         body={t("shell.emailDigest.connectBody")}
-        detail={
-          connectFailed
-            ? t("shell.emailDigest.connectError")
-            : connection === "unavailable"
-              ? t("shell.emailDigest.unavailable")
-              : undefined
-        }
+        detail={connectFailed ? t("shell.emailDigest.connectError") : undefined}
         action={{
           label: connecting
             ? t("shell.emailDigest.connecting")
@@ -202,7 +223,11 @@ export function EmailDigestSection({ active }: { active: boolean }) {
       {quiet ? (
         <div className="email-digest__quiet" data-testid="email-digest-quiet">
           <Check size={14} strokeWidth={2} aria-hidden="true" />
-          {t("shell.emailDigest.nothingNew")}
+          {latestDigestAt > 0
+            ? t("shell.emailDigest.nothingNewSince", {
+                time: clockTime(locale, latestDigestAt, now),
+              })
+            : t("shell.emailDigest.nothingNew")}
         </div>
       ) : null}
       {status?.lastOutcome === "error" && status.lastError && !running ? (

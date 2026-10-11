@@ -2703,14 +2703,20 @@
       "connect": "Gmail koppelen",
       "connecting": "Wachten op Google…",
       "connectError": "Gmail is niet gekoppeld. Probeer het opnieuw.",
-      "unavailable": "Log in bij Stella om Gmail te koppelen.",
       "checkNow": "Nu controleren",
       "checking": "Inbox controleren…",
       "checked": "Gecontroleerd {when}",
       "firstDigest": "Je eerste overzicht komt eraan",
       "nothingNew": "Niets nieuws",
       "error": "Kon je inbox niet controleren. Stella probeert het snel opnieuw.",
-      "justNow": "Zojuist"
+      "justNow": "Zojuist",
+      "loadErrorTitle": "Kon je overzicht niet laden",
+      "loadErrorBody": "Stella kan haar servers nu niet bereiken. Controleer je verbinding en probeer het opnieuw.",
+      "retry": "Opnieuw proberen",
+      "nothingNewSince": "Niets nieuws sinds {time}",
+      "minutesAgo": "{count} min geleden",
+      "hoursAgo": "{count} u geleden",
+      "daysAgo": "{count} d geleden"
     }
   },
   "sidebar": {

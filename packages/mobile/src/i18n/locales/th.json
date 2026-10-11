@@ -2685,14 +2685,20 @@
       "connect": "เชื่อมต่อ Gmail",
       "connecting": "กำลังรอ Google…",
       "connectError": "เชื่อมต่อ Gmail ไม่สำเร็จ ลองอีกครั้ง",
-      "unavailable": "ลงชื่อเข้าใช้ Stella เพื่อเชื่อมต่อ Gmail",
       "checkNow": "ตรวจตอนนี้",
       "checking": "กำลังตรวจกล่องจดหมาย…",
       "checked": "ตรวจแล้ว {when}",
       "firstDigest": "สรุปฉบับแรกของคุณกำลังมา",
       "nothingNew": "ไม่มีอะไรใหม่",
       "error": "ตรวจกล่องจดหมายไม่ได้ Stella จะลองใหม่เร็ว ๆ นี้",
-      "justNow": "เมื่อสักครู่"
+      "justNow": "เมื่อสักครู่",
+      "loadErrorTitle": "โหลดสรุปไม่ได้",
+      "loadErrorBody": "Stella ติดต่อเซิร์ฟเวอร์ไม่ได้ในขณะนี้ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
+      "retry": "ลองอีกครั้ง",
+      "nothingNewSince": "ไม่มีอะไรใหม่ตั้งแต่ {time}",
+      "minutesAgo": "{count} นาทีที่แล้ว",
+      "hoursAgo": "{count} ชม. ที่แล้ว",
+      "daysAgo": "{count} วันที่แล้ว"
     }
   },
   "sidebar": {

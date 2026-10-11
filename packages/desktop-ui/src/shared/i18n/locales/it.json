@@ -2719,14 +2719,20 @@
       "connect": "Collega Gmail",
       "connecting": "In attesa di Google…",
       "connectError": "Gmail non si è collegato. Riprova.",
-      "unavailable": "Accedi a Stella per collegare Gmail.",
       "checkNow": "Controlla ora",
       "checking": "Controllo della posta…",
       "checked": "Controllato {when}",
       "firstDigest": "Il tuo primo riepilogo è in arrivo",
       "nothingNew": "Niente di nuovo",
       "error": "Impossibile controllare la posta. Stella riproverà a breve.",
-      "justNow": "Proprio ora"
+      "justNow": "Proprio ora",
+      "loadErrorTitle": "Impossibile caricare il riepilogo",
+      "loadErrorBody": "Stella non riesce a raggiungere i suoi server. Controlla la connessione e riprova.",
+      "retry": "Riprova",
+      "nothingNewSince": "Niente di nuovo dalle {time}",
+      "minutesAgo": "{count} min fa",
+      "hoursAgo": "{count} h fa",
+      "daysAgo": "{count} g fa"
     }
   },
   "sidebar": {

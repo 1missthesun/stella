@@ -2703,14 +2703,20 @@
       "connect": "Forbind Gmail",
       "connecting": "Venter på Google…",
       "connectError": "Gmail blev ikke forbundet. Prøv igen.",
-      "unavailable": "Log ind på Stella for at forbinde Gmail.",
       "checkNow": "Tjek nu",
       "checking": "Tjekker din indbakke…",
       "checked": "Tjekket {when}",
       "firstDigest": "Dit første overblik er på vej",
       "nothingNew": "Intet nyt",
       "error": "Kunne ikke tjekke din indbakke. Stella prøver igen snart.",
-      "justNow": "Lige nu"
+      "justNow": "Lige nu",
+      "loadErrorTitle": "Kunne ikke hente dit overblik",
+      "loadErrorBody": "Stella kan ikke nå sine servere lige nu. Tjek din forbindelse, og prøv igen.",
+      "retry": "Prøv igen",
+      "nothingNewSince": "Intet nyt siden {time}",
+      "minutesAgo": "for {count} min. siden",
+      "hoursAgo": "for {count} t. siden",
+      "daysAgo": "for {count} d. siden"
     }
   },
   "sidebar": {

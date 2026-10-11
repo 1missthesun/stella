@@ -2685,14 +2685,20 @@
       "connect": "Hubungkan Gmail",
       "connecting": "Menunggu Google…",
       "connectError": "Gmail tidak terhubung. Coba lagi.",
-      "unavailable": "Masuk ke Stella untuk menghubungkan Gmail.",
       "checkNow": "Periksa sekarang",
       "checking": "Memeriksa kotak masuk…",
       "checked": "Diperiksa {when}",
       "firstDigest": "Ringkasan pertama Anda sedang disiapkan",
       "nothingNew": "Tidak ada yang baru",
       "error": "Tidak dapat memeriksa kotak masuk. Stella akan mencoba lagi segera.",
-      "justNow": "Baru saja"
+      "justNow": "Baru saja",
+      "loadErrorTitle": "Tidak dapat memuat ringkasan",
+      "loadErrorBody": "Stella tidak dapat menjangkau servernya saat ini. Periksa koneksi Anda lalu coba lagi.",
+      "retry": "Coba lagi",
+      "nothingNewSince": "Tidak ada yang baru sejak {time}",
+      "minutesAgo": "{count} mnt lalu",
+      "hoursAgo": "{count} jam lalu",
+      "daysAgo": "{count} hr lalu"
     }
   },
   "sidebar": {

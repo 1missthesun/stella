@@ -2735,14 +2735,20 @@
       "connect": "Propojit Gmail",
       "connecting": "Čekání na Google…",
       "connectError": "Gmail se nepropojil. Zkuste to znovu.",
-      "unavailable": "Pro propojení Gmailu se přihlaste do Stelly.",
       "checkNow": "Zkontrolovat",
       "checking": "Kontroluji schránku…",
       "checked": "Zkontrolováno {when}",
       "firstDigest": "Váš první přehled je na cestě",
       "nothingNew": "Nic nového",
       "error": "Schránku se nepodařilo zkontrolovat. Stella to brzy zkusí znovu.",
-      "justNow": "Právě teď"
+      "justNow": "Právě teď",
+      "loadErrorTitle": "Přehled se nepodařilo načíst",
+      "loadErrorBody": "Stella se teď nemůže spojit se svými servery. Zkontrolujte připojení a zkuste to znovu.",
+      "retry": "Zkusit znovu",
+      "nothingNewSince": "Nic nového od {time}",
+      "minutesAgo": "před {count} min",
+      "hoursAgo": "před {count} h",
+      "daysAgo": "před {count} d"
     }
   },
   "sidebar": {

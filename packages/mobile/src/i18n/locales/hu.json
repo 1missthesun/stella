@@ -2703,14 +2703,20 @@
       "connect": "Gmail csatlakoztatása",
       "connecting": "Várakozás a Google-ra…",
       "connectError": "A Gmail nem csatlakozott. Próbáld újra.",
-      "unavailable": "Jelentkezz be a Stellába a Gmail csatlakoztatásához.",
       "checkNow": "Ellenőrzés most",
       "checking": "Beérkezett levelek ellenőrzése…",
       "checked": "Ellenőrizve {when}",
       "firstDigest": "Az első összefoglalód úton van",
       "nothingNew": "Nincs újdonság",
       "error": "Nem sikerült ellenőrizni a leveleidet. A Stella hamarosan újra próbálja.",
-      "justNow": "Épp most"
+      "justNow": "Épp most",
+      "loadErrorTitle": "Nem sikerült betölteni az összefoglalót",
+      "loadErrorBody": "A Stella most nem éri el a szervereit. Ellenőrizd a kapcsolatot, és próbáld újra.",
+      "retry": "Újra",
+      "nothingNewSince": "Nincs újdonság {time} óta",
+      "minutesAgo": "{count} perce",
+      "hoursAgo": "{count} órája",
+      "daysAgo": "{count} napja"
     }
   },
   "sidebar": {

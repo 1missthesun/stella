@@ -1,3 +1,4 @@
+import { SOCKET_TICKET_PATH } from "@stella/contracts/socket-ticket";
 // Keep these aligned with the browser origins Better Auth trusts (src/auth).
 const BROWSER_ORIGINS = new Set([
   "https://stella.sh",
@@ -19,6 +20,7 @@ const isBrowserRoute = (path: string): boolean =>
   ) ||
   /^\/owners\/me\/(devices|dispatches|apps)(\/|$)/u.test(path) ||
   path.startsWith("/cloud-home/") ||
+  path === SOCKET_TICKET_PATH ||
   path.startsWith("/api/rpc/") ||
   path.startsWith("/api/media/v1/") ||
   path.startsWith("/api/voice/") ||
@@ -47,6 +49,7 @@ export async function withBrowserCors(
   const path = new URL(request.url).pathname;
   const appRoute =
     /^\/owners\/me\/apps(\/|$)/.test(path) ||
+    path === SOCKET_TICKET_PATH ||
     path.startsWith("/api/rpc/") ||
     path.startsWith("/api/media/v1/") ||
     path.startsWith("/api/voice/") ||

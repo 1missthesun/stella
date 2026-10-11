@@ -23,16 +23,6 @@ export type SocketTicketResponse = {
   expiresAtMs: number;
 };
 
-export class SocketTicketError extends Error {
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = "SocketTicketError";
-    this.status = status;
-  }
-}
-
 const httpOriginOf = (socketUrl: string): string => {
   const url = new URL(socketUrl);
   if (url.protocol === "ws:") url.protocol = "http:";
@@ -56,13 +46,12 @@ export const socketCredentialProtocol = async (args: {
     purpose: args.purpose,
     ...(args.resource ? { resource: args.resource } : {}),
   };
+  const legacy = `${LEGACY_SOCKET_TOKEN_SUBPROTOCOL_PREFIX}${args.token}`;
   const controller = new AbortController();
   const timer = setTimeout(
     () => controller.abort(),
     SOCKET_TICKET_REQUEST_TIMEOUT_MS,
   );
-  let value: Partial<SocketTicketResponse> | null;
-  let status: number;
   try {
     const response = await fetchImpl(
       `${httpOriginOf(args.socketUrl)}${SOCKET_TICKET_PATH}`,
@@ -76,24 +65,16 @@ export const socketCredentialProtocol = async (args: {
         signal: controller.signal,
       },
     );
-    status = response.status;
-    if (status === 401 || status === 404 || status === 405) {
-      return `${LEGACY_SOCKET_TOKEN_SUBPROTOCOL_PREFIX}${args.token}`;
-    }
-    if (!response.ok) {
-      throw new SocketTicketError(
-        status,
-        `Socket ticket request failed (${status}).`,
-      );
-    }
-    value = (await response.json().catch(() => null)) as
+    if (!response.ok) return legacy;
+    const value = (await response.json().catch(() => null)) as
       | Partial<SocketTicketResponse>
       | null;
+    return isTicket(value?.ticket)
+      ? `${SOCKET_TICKET_SUBPROTOCOL_PREFIX}${value.ticket}`
+      : legacy;
+  } catch {
+    return legacy;
   } finally {
     clearTimeout(timer);
   }
-  if (!isTicket(value?.ticket)) {
-    throw new SocketTicketError(status, "Socket ticket was malformed.");
-  }
-  return `${SOCKET_TICKET_SUBPROTOCOL_PREFIX}${value.ticket}`;
 };

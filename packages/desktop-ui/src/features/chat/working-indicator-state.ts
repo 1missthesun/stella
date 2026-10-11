@@ -4,6 +4,8 @@ import { computeStatus, normalizeDisplayStatusText } from "./status-utils";
 
 export const INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS = 2000;
 
+export const INLINE_WORKING_INDICATOR_SHOW_DELAY_MS = 300;
+
 /**
  * Duration of the indicator's handoff exit. Replies are published
  * immediately; the arriving row plays its own entry animation.

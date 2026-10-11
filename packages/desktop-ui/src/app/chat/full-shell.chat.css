@@ -194,6 +194,39 @@
   will-change: opacity, transform;
 }
 
+.event-row--assistant[data-reply-morph] .event-item.assistant {
+  animation: none;
+}
+
+.event-row--assistant[data-reply-morph="hold"] .event-item.assistant {
+  opacity: 0;
+}
+
+.assistant-message-text--morphing {
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.reply-morph-layer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint style;
+}
+
+.reply-morph-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  margin: 0;
+  background: transparent;
+  animation: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .event-row--assistant--just-arrived .event-item.assistant {
     animation: none;

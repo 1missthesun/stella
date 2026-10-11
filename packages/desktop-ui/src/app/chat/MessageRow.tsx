@@ -70,6 +70,7 @@ import { AgentUpdateCard } from "@/features/app-source/AppSourceCards";
 import { sanitizeAttachmentImageUrl } from "@/shared/lib/url-safety";
 import { UserMessageBody } from "@/app/chat/UserMessageBody";
 import { MessageActions } from "@/app/chat/MessageActions";
+import { useReplyMorphArrival } from "@/app/chat/reply-morph";
 import { useMessageReply } from "@/app/chat/message-reply-context";
 import { truncateChipLabel } from "@/features/chat/composer-context";
 import { primaryCopyAttachment } from "@/app/chat/message-copy-attachment";
@@ -646,6 +647,8 @@ export const AssistantMessageRow = memo(
     conversationId,
   }: AssistantRowProps) {
     const reply = useMessageReply();
+    const rowRef = useRef<HTMLDivElement>(null);
+    useReplyMorphArrival(rowRef, Boolean(row.justArrived), !row.isIntraTurn);
     const text = row.text;
     const hasText = text.trim().length > 0;
     const hasWebSearchResults = (row.webSearchResults?.length ?? 0) > 0;
@@ -784,6 +787,7 @@ export const AssistantMessageRow = memo(
 
     return (
       <div
+        ref={rowRef}
         className={`event-row event-row--assistant${row.justArrived ? " event-row--assistant--just-arrived" : ""}`}
         data-chat-row-id={row.id}
         data-scroll-follow-key={row.id}

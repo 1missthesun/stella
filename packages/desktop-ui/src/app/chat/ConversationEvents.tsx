@@ -134,8 +134,11 @@ function useAssistantArrivalIds(
 ): Set<string> {
   const seededConversationRef = useRef<string | null | undefined>(undefined);
   const tailAssistantId = useMemo(() => {
-    const last = rows[rows.length - 1];
-    return last && last.kind === "assistant" ? last.id : null;
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      if (row?.kind === "assistant") return row.id;
+    }
+    return null;
   }, [rows]);
 
   if (seededConversationRef.current !== conversationId) {

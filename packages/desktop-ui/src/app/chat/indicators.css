@@ -117,10 +117,8 @@
 /* Apply the entrance only for a real idle -> visible transition. Keeping it
  * off the base class prevents a canceled exit from replaying the entrance
  * when `--leaving` is removed. */
-/* The delay lets an outgoing indicator finish clearing its row before the
- * next one starts growing into it, so back-to-back turns don't overlap. */
 .inline-working-indicator--entering {
-  animation: inline-indicator-in 320ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  animation: inline-indicator-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .chat-viewport-region--sidebar .inline-working-indicator,

@@ -12,12 +12,14 @@
  *    the whole of it.
  *  - Long-running agent task presence lives in the composer's task chip; this
  *    inline indicator only follows the orchestrator's thinking/tool lifecycle.
- *  - There are three ways out, and which one runs is the caller's call:
- *    the ordinary grow-out after the `MIN_VISIBLE_MS` floor; an immediate
- *    exit (`exitImmediately`) when the run went terminal without answering,
- *    e.g. a cancel; and the handoff exit (`handoff`) when the run's final
- *    message landed, which keeps the row's height while it clears so the
- *    reply drops into the line the indicator was holding.
+ *  - It appears only after `SHOW_DELAY_MS` of continuous work, so a reply
+ *    that lands sooner never shows it.
+ *  - Inside a chat timeline the reply-morph controller decides how it leaves:
+ *    when a reply arrives with the deactivation the indicator's bubble grows
+ *    into the reply bubble (see `reply-morph.ts`) and the slot is vacated at
+ *    once; otherwise it plays the short grow-out. Outside a timeline it
+ *    falls back to the ordinary grow-out after the `MIN_VISIBLE_MS` floor, an
+ *    immediate exit (`exitImmediately`), or the handoff clear (`handoff`).
  *  - The parent mounts the indicator unconditionally and toggles `active` so
  *    React doesn't rip the node out before the exit animation runs. If
  *    `active` flips back true mid-exit, the exit is canceled and live updates
@@ -27,14 +29,17 @@
  *    idle chat carries no ghost gutter.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { notifyChatContentGrowth } from "@/shell/chat-scroll-follow";
 import {
   getInlineWorkingIndicatorExitDelayMs,
   INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS,
+  INLINE_WORKING_INDICATOR_SHOW_DELAY_MS,
   type InlineWorkingIndicatorMountProps,
   type InlineWorkingIndicatorProps,
 } from "@/features/chat/working-indicator-state";
 import { WorkingIndicator } from "./WorkingIndicator";
+import { useReplyMorphController } from "./reply-morph";
 import "./indicators.css";
 
 export type {
@@ -50,6 +55,7 @@ export type {
 export const EXIT_ANIMATION_MS = 240;
 export const ENTER_ANIMATION_MS = 320;
 const MIN_VISIBLE_MS = INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS;
+const SHOW_DELAY_MS = INLINE_WORKING_INDICATOR_SHOW_DELAY_MS;
 
 function newReasoningSeed(): string {
   return `${Date.now()}-${Math.random()}`;
@@ -90,12 +96,49 @@ export function InlineWorkingIndicator({
 
   // Stay mounted until the exit animation finishes. If `active` flips back
   // to true mid-animation, cancel the exit and resume live updates.
-  const [renderShell, setRenderShell] = useState(active);
-  const [entering, setEntering] = useState(active);
+  const [renderShell, setRenderShell] = useState(false);
+  const [entering, setEntering] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const exitTimerRef = useRef<number | null>(null);
-  const activatedAtRef = useRef<number | null>(active ? Date.now() : null);
-  const wasActiveRef = useRef(active);
+  const showTimerRef = useRef<number | null>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const leavingRef = useRef(false);
+  leavingRef.current = leaving;
+  const morphController = useReplyMorphController();
+
+  useEffect(() => {
+    if (!morphController) return;
+    return morphController.attachIndicator({
+      pill: () =>
+        leavingRef.current
+          ? null
+          : (rootRef.current?.querySelector<HTMLElement>(
+              ".inline-working-indicator__indicator",
+            ) ?? null),
+      vacate: () => {
+        if (exitTimerRef.current !== null) {
+          window.clearTimeout(exitTimerRef.current);
+          exitTimerRef.current = null;
+        }
+        flushSync(() => {
+          setRenderShell(false);
+          setLeaving(false);
+          setEntering(false);
+        });
+      },
+      exit: () => {
+        if (exitTimerRef.current !== null) return;
+        setLeaving(true);
+        exitTimerRef.current = window.setTimeout(() => {
+          exitTimerRef.current = null;
+          setRenderShell(false);
+          setLeaving(false);
+        }, EXIT_ANIMATION_MS);
+      },
+    });
+  }, [morphController]);
+  const activatedAtRef = useRef<number | null>(null);
+  const wasActiveRef = useRef(false);
   const showingThinking = active && !runningTool;
   const wasShowingThinkingRef = useRef(showingThinking);
   // Seeds the reasoning label ("Thinking" / "Mulling it over" / …). It rerolls
@@ -128,26 +171,40 @@ export function InlineWorkingIndicator({
         exitTimerRef.current = null;
       }
     };
+    const clearShowTimer = () => {
+      if (showTimerRef.current !== null) {
+        window.clearTimeout(showTimerRef.current);
+        showTimerRef.current = null;
+      }
+    };
 
     if (active) {
       clearTimer();
-      if (!renderShell) setEntering(true);
-      const isReactivation = !wasActiveRef.current;
-      if (isReactivation) {
+      morphController?.indicatorReactivated();
+      if (!wasActiveRef.current) {
         activatedAtRef.current = Date.now();
       }
       wasActiveRef.current = true;
       setLeaving(false);
-      setRenderShell(true);
+      if (renderShell || showTimerRef.current !== null) return;
+      showTimerRef.current = window.setTimeout(() => {
+        showTimerRef.current = null;
+        setEntering(true);
+        setRenderShell(true);
+      }, SHOW_DELAY_MS);
       return;
     }
 
+    clearShowTimer();
     wasActiveRef.current = false;
     setEntering(false);
     if (!renderShell) return;
-    // The reply lands in this same commit, so clear the indicator before the
-    // browser paints: the reply takes its line, the way iMessage swaps the
-    // typing bubble for the message.
+    if (morphController) {
+      if (!leavingRef.current) {
+        morphController.indicatorDeactivated(Boolean(handoff));
+      }
+      return;
+    }
     if (handoff) {
       clearTimer();
       setRenderShell(false);
@@ -163,16 +220,13 @@ export function InlineWorkingIndicator({
         setLeaving(false);
       }, EXIT_ANIMATION_MS);
     };
-    // A terminal run may not leave a stale row behind, so it skips the
-    // minimum-visible hold.
-    const remainingMs =
-      exitImmediately || handoff
-        ? 0
-        : getInlineWorkingIndicatorExitDelayMs({
-            activatedAtMs: activatedAtRef.current ?? Date.now(),
-            nowMs: Date.now(),
-            minVisibleMs: MIN_VISIBLE_MS,
-          });
+    const remainingMs = exitImmediately
+      ? 0
+      : getInlineWorkingIndicatorExitDelayMs({
+          activatedAtMs: activatedAtRef.current ?? Date.now(),
+          nowMs: Date.now(),
+          minVisibleMs: MIN_VISIBLE_MS,
+        });
     if (remainingMs > 0) {
       exitTimerRef.current = window.setTimeout(startExit, remainingMs);
     } else {
@@ -182,7 +236,17 @@ export function InlineWorkingIndicator({
     return () => {
       clearTimer();
     };
-  }, [active, renderShell, exitImmediately, handoff]);
+  }, [active, renderShell, exitImmediately, handoff, morphController]);
+
+  useEffect(
+    () => () => {
+      if (showTimerRef.current !== null)
+        window.clearTimeout(showTimerRef.current);
+      if (exitTimerRef.current !== null)
+        window.clearTimeout(exitTimerRef.current);
+    },
+    [],
+  );
 
   // The wrapper itself is always rendered with a fixed height once the
   // indicator has appeared — `renderShell` only gates the inner content,
@@ -204,6 +268,7 @@ export function InlineWorkingIndicator({
 
   return (
     <div
+      ref={rootRef}
       className={`inline-working-indicator${entering ? " inline-working-indicator--entering" : ""}${leaving ? " inline-working-indicator--leaving" : ""}${leaving && handoff ? " inline-working-indicator--handoff" : ""}${showInner ? "" : " inline-working-indicator--vacated"}`}
       aria-live="polite"
     >

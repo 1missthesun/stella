@@ -1,5 +1,12 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import {
+  Animated,
+  Easing,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutChangeEvent,
+} from "react-native";
 import { ShimmerText } from "./ShimmerText";
 import { StellaMarkIndicator } from "./stella-mark/StellaMarkIndicator";
 import { computeWorkingIndicatorStatus } from "./working-indicator-status";
@@ -9,13 +16,18 @@ import {
   type WorkingIndicatorCharacterState,
 } from "./working-indicator-character";
 import { useMinimumVisibleValue } from "../lib/use-minimum-visible-value";
+import {
+  useReplyMorphController,
+  type ReplyMorphSnapshot,
+} from "./reply-morph";
 import { type Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 
 const ENTER_DURATION_MS = 320;
-const ENTER_DELAY_MS = 200;
+const ENTER_DELAY_MS = 300;
 const EXIT_HOLD_MS = 300;
+const EXIT_HANDOFF_GRACE_MS = 100;
 const EXIT_ANIMATION_MS = 480;
 /** The assistant's message has already landed above the indicator, so the
  *  bubble has to be gone almost at once: a lingering indicator under a finished
@@ -261,6 +273,46 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const shellProgress = useRef(new Animated.Value(0)).current;
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bubbleSizeRef = useRef<{ width: number; height: number } | null>(null);
+  const exitingRef = useRef(false);
+  const renderShellRef = useRef(renderShell);
+  renderShellRef.current = renderShell;
+  const snapshotRef = useRef<Omit<ReplyMorphSnapshot, "width" | "height">>({
+    characterState,
+    label: displayStatus,
+  });
+  snapshotRef.current = { characterState, label: displayStatus };
+  const morphController = useReplyMorphController();
+
+  useEffect(() => {
+    if (!morphController) return;
+    return morphController.attachIndicator({
+      snapshot: () => {
+        const size = bubbleSizeRef.current;
+        if (!renderShellRef.current || exitingRef.current || !size) return null;
+        return { ...size, ...snapshotRef.current };
+      },
+      vacate: () => {
+        if (holdTimerRef.current !== null) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        if (leaveTimerRef.current !== null) {
+          clearTimeout(leaveTimerRef.current);
+          leaveTimerRef.current = null;
+        }
+        exitingRef.current = false;
+        shellProgress.stopAnimation();
+        shellProgress.setValue(0);
+        setRenderShell(false);
+      },
+    });
+  }, [morphController, shellProgress]);
+
+  const onBubbleLayout = (event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    bubbleSizeRef.current = { width, height };
+  };
 
   useEffect(() => {
     const clearTimers = () => {
@@ -276,6 +328,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
 
     if (active) {
       clearTimers();
+      exitingRef.current = false;
       if (!renderShell) {
         // A short run or cancellation clears this timer without showing dots.
         holdTimerRef.current = setTimeout(() => {
@@ -302,6 +355,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     const exitMs = exitImmediately ? EXIT_HANDOFF_MS : EXIT_ANIMATION_MS;
     const startExit = () => {
       holdTimerRef.current = null;
+      exitingRef.current = true;
       Animated.timing(shellProgress, {
         toValue: 0,
         duration: exitMs,
@@ -310,18 +364,15 @@ export const WorkingIndicator = memo(function WorkingIndicator({
       }).start();
       leaveTimerRef.current = setTimeout(() => {
         leaveTimerRef.current = null;
+        exitingRef.current = false;
         setRenderShell(false);
       }, exitMs);
     };
 
-    // Skip the hold when the answer has landed so the indicator doesn't trail
-    // the delivered reply; otherwise hold briefly so a fast turn still flashes
-    // the indicator.
-    if (exitImmediately) {
-      startExit();
-    } else {
-      holdTimerRef.current = setTimeout(startExit, EXIT_HOLD_MS);
-    }
+    holdTimerRef.current = setTimeout(
+      startExit,
+      exitImmediately ? EXIT_HANDOFF_GRACE_MS : EXIT_HOLD_MS,
+    );
 
     return clearTimers;
   }, [active, exitImmediately, renderShell, shellProgress]);
@@ -331,7 +382,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     [shellProgress],
   );
 
-  const showShell = renderShell && (active || !exitImmediately);
+  const showShell = renderShell;
 
   return (
     <View
@@ -340,7 +391,10 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     >
       {showShell ? (
         <Animated.View style={[styles.row, shellStyle]} collapsable={false}>
-          <View style={[styles.bubble, !hasLabel && styles.bubbleDots]}>
+          <View
+            style={[styles.bubble, !hasLabel && styles.bubbleDots]}
+            onLayout={onBubbleLayout}
+          >
             <View style={styles.markBox}>
               {
                 // Kept active for as long as the shell is mounted: dropping it
@@ -368,6 +422,37 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     </View>
   );
 });
+
+export function WorkingIndicatorGhost({
+  snapshot,
+}: {
+  snapshot: ReplyMorphSnapshot;
+}) {
+  const colors = useColors();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const hasLabel = snapshot.label.length > 0;
+  return (
+    <View
+      style={[styles.ghost, !hasLabel && styles.bubbleDots]}
+      pointerEvents="none"
+    >
+      <View style={styles.markBox}>
+        <StellaMarkIndicator
+          active
+          settled
+          size={INDICATOR_VIEWPORT_SIZE}
+          state={snapshot.characterState}
+          faceColor={colors.card}
+        />
+      </View>
+      {hasLabel ? (
+        <Text style={styles.statusText} numberOfLines={1}>
+          {snapshot.label}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
@@ -412,6 +497,16 @@ const makeStyles = (colors: Colors) =>
     },
     bubbleDots: {
       paddingHorizontal: 8,
+    },
+    ghost: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      left: 0,
+      paddingHorizontal: 13,
+      paddingVertical: BUBBLE_PAD_VERTICAL,
+      position: "absolute",
+      top: 0,
     },
     markBox: {
       alignItems: "center",

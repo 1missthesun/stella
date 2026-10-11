@@ -132,6 +132,7 @@ import {
   WORKING_INDICATOR_SLOT_HEIGHT,
 } from "./WorkingIndicator";
 import type { WorkingIndicatorState } from "./working-indicator-state";
+import { createReplyMorphController, ReplyMorphContext } from "./reply-morph";
 import { useDictation } from "../lib/dictation";
 import { canSubmitFinalizedDictation } from "../lib/dictation-send";
 import { hasAiConsent, requestAiConsent } from "../lib/ai-consent";
@@ -643,6 +644,7 @@ export function ChatPane({
   // clipped by it. The composer's keyboard lift is a transform, so this
   // measured height stays constant across keyboard show/hide.
   const [footerHeight, setFooterHeight] = useState(0);
+  const [replyMorphController] = useState(createReplyMorphController);
   // The list runs under the composer, so its reserved inset is exactly the
   // overlay; the chat tail supplies the gap between the last row and it.
   const listBottomInsetPx = footerHeight;
@@ -1909,117 +1911,288 @@ export function ChatPane({
     ],
   );
   return (
-    <View
-      ref={rootRef}
-      collapsable={false}
-      style={styles.screen}
-      onLayout={onPaneLayout}
-    >
+    <ReplyMorphContext.Provider value={replyMorphController}>
       <View
-        style={styles.viewport}
-        onTouchStart={handleViewportTouchStart}
-        onTouchEnd={handleViewportTouchEnd}
+        ref={rootRef}
+        collapsable={false}
+        style={styles.screen}
+        onLayout={onPaneLayout}
       >
-        {historyLoading ? (
-          // Hold a stable blank surface while history hydrates so the empty
-          // state never flashes during a tab transition.
-          <View style={emptyStateStyle} />
-        ) : empty ? (
-          <Pressable style={emptyStateStyle} onPress={() => Keyboard.dismiss()}>
-            {emptyContent}
-          </Pressable>
-        ) : (
-          <>
-            <Reanimated.View style={[styles.messageList, listKeyboardStyle]}>
-              <LegendList<ChatMessage>
-                ref={scroll.listRef}
-                pointerEvents={replyFocus ? "none" : "auto"}
-                accessibilityElementsHidden={Boolean(replyFocus)}
-                importantForAccessibility={
-                  replyFocus ? "no-hide-descendants" : "auto"
-                }
-                style={styles.messageList}
-                contentContainerStyle={listContentContainerStyle}
-                data={listMessages}
-                extraData={listExtraData}
-                // Short transcript rows measure roughly 44–70 pt. Reserve
-                // enough containers for those runs; measured heights still
-                // determine layout for longer replies and artifacts.
-                estimatedItemSize={64}
-                renderItem={renderItem}
-                keyExtractor={keyExtractor}
-                getItemType={getItemType}
-                ItemSeparatorComponent={renderSeparator}
-                ListFooterComponent={listFooter}
-                onScroll={handleListScroll}
-                onScrollBeginDrag={handleListScrollBeginDrag}
-                onScrollEndDrag={handleListScrollEndDrag}
-                onMomentumScrollBegin={handleListMomentumScrollBegin}
-                onMomentumScrollEnd={handleListMomentumScrollEnd}
-                onContentSizeChange={handleListContentSizeChange}
-                scrollEventThrottle={16}
-                showsVerticalScrollIndicator={false}
-                keyboardDismissMode="on-drag"
-                fadingEdgeLength={EDGE_FADE}
-                // Open at the latest message every time the tab mounts, instead
-                // of landing at the top of history. Short conversations that
-                // don't fill the viewport read top-down (no `alignItemsAtEnd`)
-                // so the first message sits at the top rather than the bottom.
-                initialScrollAtEnd={initialScrollAtEndRef.current === true}
-                // Keep the visible message anchored when the data array changes
-                // (e.g. messages syncing in from the desktop) so the list never
-                // snaps back to the top.
-                maintainVisibleContentPosition={maintainVisibleContentPosition}
-                // Pin to the tail only when new/synced messages arrive while the
-                // user is already near the bottom. Scoped to data changes so it
-                // doesn't fight the custom streaming-follow target updates,
-                // which own item-layout/size growth.
-                //
-                // While streaming, every token mutates the data array, so a
-                // dataChange-pinned tail would fire `scrollToEnd` on each token —
-                // overriding the custom "freeze once the message reaches the top"
-                // target and snapping the user back down whenever they try to
-                // scroll up. The custom follow loop already keeps the tail in view
-                // during streaming, so disable the built-in pin for that window.
-                // Position ownership is exclusive: history anchoring wins while
-                // follow is released, the custom loop owns streams/post-send
-                // placement, and this pin owns only ordinary live-tail appends.
-                maintainScrollAtEnd={
-                  dataChangeScrollOwner === "legend-tail"
-                    ? LEGEND_TAIL_SCROLL_AT_END
-                    : false
-                }
+        <View
+          style={styles.viewport}
+          onTouchStart={handleViewportTouchStart}
+          onTouchEnd={handleViewportTouchEnd}
+        >
+          {historyLoading ? (
+            // Hold a stable blank surface while history hydrates so the empty
+            // state never flashes during a tab transition.
+            <View style={emptyStateStyle} />
+          ) : empty ? (
+            <Pressable style={emptyStateStyle} onPress={() => Keyboard.dismiss()}>
+              {emptyContent}
+            </Pressable>
+          ) : (
+            <>
+              <Reanimated.View style={[styles.messageList, listKeyboardStyle]}>
+                <LegendList<ChatMessage>
+                  ref={scroll.listRef}
+                  pointerEvents={replyFocus ? "none" : "auto"}
+                  accessibilityElementsHidden={Boolean(replyFocus)}
+                  importantForAccessibility={
+                    replyFocus ? "no-hide-descendants" : "auto"
+                  }
+                  style={styles.messageList}
+                  contentContainerStyle={listContentContainerStyle}
+                  data={listMessages}
+                  extraData={listExtraData}
+                  // Short transcript rows measure roughly 44–70 pt. Reserve
+                  // enough containers for those runs; measured heights still
+                  // determine layout for longer replies and artifacts.
+                  estimatedItemSize={64}
+                  renderItem={renderItem}
+                  keyExtractor={keyExtractor}
+                  getItemType={getItemType}
+                  ItemSeparatorComponent={renderSeparator}
+                  ListFooterComponent={listFooter}
+                  onScroll={handleListScroll}
+                  onScrollBeginDrag={handleListScrollBeginDrag}
+                  onScrollEndDrag={handleListScrollEndDrag}
+                  onMomentumScrollBegin={handleListMomentumScrollBegin}
+                  onMomentumScrollEnd={handleListMomentumScrollEnd}
+                  onContentSizeChange={handleListContentSizeChange}
+                  scrollEventThrottle={16}
+                  showsVerticalScrollIndicator={false}
+                  keyboardDismissMode="on-drag"
+                  fadingEdgeLength={EDGE_FADE}
+                  // Open at the latest message every time the tab mounts, instead
+                  // of landing at the top of history. Short conversations that
+                  // don't fill the viewport read top-down (no `alignItemsAtEnd`)
+                  // so the first message sits at the top rather than the bottom.
+                  initialScrollAtEnd={initialScrollAtEndRef.current === true}
+                  // Keep the visible message anchored when the data array changes
+                  // (e.g. messages syncing in from the desktop) so the list never
+                  // snaps back to the top.
+                  maintainVisibleContentPosition={maintainVisibleContentPosition}
+                  // Pin to the tail only when new/synced messages arrive while the
+                  // user is already near the bottom. Scoped to data changes so it
+                  // doesn't fight the custom streaming-follow target updates,
+                  // which own item-layout/size growth.
+                  //
+                  // While streaming, every token mutates the data array, so a
+                  // dataChange-pinned tail would fire `scrollToEnd` on each token —
+                  // overriding the custom "freeze once the message reaches the top"
+                  // target and snapping the user back down whenever they try to
+                  // scroll up. The custom follow loop already keeps the tail in view
+                  // during streaming, so disable the built-in pin for that window.
+                  // Position ownership is exclusive: history anchoring wins while
+                  // follow is released, the custom loop owns streams/post-send
+                  // placement, and this pin owns only ordinary live-tail appends.
+                  maintainScrollAtEnd={
+                    dataChangeScrollOwner === "legend-tail"
+                      ? LEGEND_TAIL_SCROLL_AT_END
+                      : false
+                  }
+                />
+              </Reanimated.View>
+              {/* Top taper — fades the list into the surface at the top edge so
+                  messages scrolling under the top bar dissolve instead of
+                  hard-cutting. Cross-platform (RN `fadingEdgeLength` is
+                  Android-only). Paints the *actual* app backdrop (aligned to the
+                  screen via the top-bar offset) and masks it to a vertical fade,
+                  so it matches the soft gradient seamlessly instead of stamping a
+                  flat `colors.background` band over it. */}
+              {/* Android's native MaskedView does not implement pointerEvents.
+                  Keep touch exclusion on a real RN View around the whole mask,
+                  including its screen-height backdrop child. */}
+              {topTaper}
+            </>
+          )}
+          {replyFocus && (
+            <ReplyFocus
+              key={`${conversationId}:${replyFocus.kind === "agent" ? replyFocus.threadId : replyFocus.id}`}
+              topInset={topInset}
+              bottomInset={footerHeight + keyboardExtra}
+              root={replyFocus}
+              messages={visibleMessages}
+              colors={colors}
+              onClose={closeReplyFocus}
+              hasOlder={hasOlderHistory}
+              onLoadOlder={onLoadOlderHistory}
+              // Inside focus the chain is already open, so rows carry no reply
+              // count; a quote still appears for a link to *other* work.
+              renderMessage={(item, contexts) => (
+                <ChatMessageRow
+                  item={item}
+                  conversationId={conversationId ?? ""}
+                  animate={false}
+                  styles={rowStyles}
+                  colors={colors}
+                  menuActive={false}
+                  isSelecting={false}
+                  anySelecting={false}
+                  actions={rowActions}
+                  carriedQuotes={quoteCarry.carried.get(item.id)}
+                  quotesForwarded={quoteCarry.forwarded.has(item.id)}
+                  contextRef={contexts.contexts.get(item.id)}
+                  contextStatus={contextStatusFor(
+                    contexts,
+                    contexts.contexts.get(item.id),
+                  )}
+                  desktopAccess={desktopAccess}
+                />
+              )}
+            />
+          )}
+          {openReport && conversationId ? (
+            <AgentReportPopover
+              key={openReport.ref.threadId}
+              reference={openReport.ref}
+              anchor={openReport.anchor}
+              conversationId={conversationId}
+              journalReport={openReportTask?.resultText ?? openReportTask?.errorMessage}
+              colors={colors}
+              onClose={closeReport}
+              topInset={topInset}
+            />
+          ) : null}
+          {/* Floating glass controls (scroll-to-bottom FAB + computer-options
+              button) sit in a pass-through absolute overlay. This MUST be a plain
+              View, not a GlassGroup/GlassContainer: the native glass container is
+              a raw view that ignores `pointerEvents`, so a full-screen one swallows
+              every touch over the chat (no scroll/tap) and, as a screen-spanning
+              glass layer beneath the in-tree menu popovers, triggers Apple's
+              glass-on-glass suppression that renders those menus clear. A plain
+              `box-none` View passes touches through to the list and lets each
+              button — and the popovers — keep their own Liquid Glass. While a
+              focused chain is open they hide: its glass backdrop would sit over
+              them and, being glass over glass, render them clear. */}
+          <View
+            pointerEvents={replyFocus ? "none" : "box-none"}
+            style={[
+              StyleSheet.absoluteFill,
+              replyFocus ? styles.hiddenWhileFocused : null,
+            ]}
+          >
+            {!searchOpen ? (
+              <CatchUpPill
+                visible={catchUpVisible}
+                top={topInset + CATCH_UP_PILL_GAP}
+                colors={colors}
               />
-            </Reanimated.View>
-            {/* Top taper — fades the list into the surface at the top edge so
-                messages scrolling under the top bar dissolve instead of
-                hard-cutting. Cross-platform (RN `fadingEdgeLength` is
-                Android-only). Paints the *actual* app backdrop (aligned to the
-                screen via the top-bar offset) and masks it to a vertical fade,
-                so it matches the soft gradient seamlessly instead of stamping a
-                flat `colors.background` band over it. */}
-            {/* Android's native MaskedView does not implement pointerEvents.
-                Keep touch exclusion on a real RN View around the whole mask,
-                including its screen-height backdrop child. */}
-            {topTaper}
-          </>
-        )}
-        {replyFocus && (
-          <ReplyFocus
-            key={`${conversationId}:${replyFocus.kind === "agent" ? replyFocus.threadId : replyFocus.id}`}
-            topInset={topInset}
-            bottomInset={footerHeight + keyboardExtra}
-            root={replyFocus}
-            messages={visibleMessages}
+            ) : null}
+            {!historyLoading && !empty ? (
+              <Reanimated.View
+                pointerEvents="box-none"
+                style={[StyleSheet.absoluteFill, listKeyboardStyle]}
+              >
+                <ScrollToBottomFab
+                  visible={scroll.awayFromBottom}
+                  hasUnread={unread}
+                  onPress={scroll.scrollToBottom}
+                  colors={colors}
+                  bottomOffset={footerHeight + FLOATING_CONTROL_LIFT - 24}
+                />
+              </Reanimated.View>
+            ) : null}
+          </View>
+          {searchOpen && searchActive ? (
+            <ChatSearchResults
+              results={searchResults}
+              query={searchQuery}
+              topInset={topInset}
+              colors={colors}
+              onSelect={jumpToMessage}
+            />
+          ) : null}
+        </View>
+
+        <Reanimated.View
+          style={[
+            styles.footerOverlay,
+            composerKeyboardStyle,
+            searchOpen && styles.hiddenFooter,
+          ]}
+          onLayout={onFooterLayout}
+          pointerEvents={searchOpen ? "none" : "box-none"}
+        >
+          {offline ? (
+            <View style={styles.offlineNotice} pointerEvents="none">
+              <Icon name="wifi-off" size={13} color={colors.textMuted} />
+              <Text
+                style={styles.offlineNoticeText}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              >
+                You're offline
+              </Text>
+            </View>
+          ) : null}
+          <Composer
             colors={colors}
-            onClose={closeReplyFocus}
-            hasOlder={hasOlderHistory}
-            onLoadOlder={onLoadOlderHistory}
-            // Inside focus the chain is already open, so rows carry no reply
-            // count; a quote still appears for a link to *other* work.
-            renderMessage={(item, contexts) => (
+            inputRef={inputRef}
+            draftStore={draftStore}
+            enabled={composerEnabled}
+            placeholder={placeholder}
+            intervention={composerIntervention}
+            compact={askActive && !askCollapsed}
+            askCollapsed={askActive && askCollapsed}
+            onExpandAsk={expandAsk}
+            interventionRoom={interventionRoom}
+            bottomPad={composerBottomPad}
+            draftEmpty={draftEmpty}
+            hasText={hasText}
+            canSubmit={canSubmit}
+            streaming={streaming}
+            onSubmit={submit}
+            onStop={onStop}
+            onInputFocus={onComposerFocus}
+            onPressPlus={onPressPlus}
+            dictationStatus={dictationStatus}
+            onToggleVoice={toggleVoice}
+            onCancelDictation={cancelDictationInput}
+            onConfirmDictation={confirmDictationInput}
+            onStopAndSendVoice={stopAndSendVoice}
+            showRealtimeVoice={showRealtimeVoice}
+            onOpenRealtimeVoice={openRealtimeVoice}
+            modelPicker={composerModelPicker}
+            modelPickerAnchorRef={modelPickerAnchorRef}
+            onPressModelPicker={onPressModelPicker}
+            quotes={quotes}
+            onRemoveQuote={onRemoveQuote}
+            attachments={attachments}
+            onRemoveAttachment={onRemoveAttachment}
+            onRetryAttachment={onRetryAttachment}
+          />
+        </Reanimated.View>
+        <AddContextSheet
+          visible={addSheetOpen}
+          onClose={() => setAddSheetOpen(false)}
+          onDismissed={onAddSheetDismissed}
+          onCamera={
+            enableAttachments
+              ? () => chooseFromAddSheet(() => void takePhoto())
+              : undefined
+          }
+          onPhotos={
+            enableAttachments
+              ? () => chooseFromAddSheet(() => void pickImage())
+              : undefined
+          }
+          onFiles={
+            enableAttachments
+              ? () => chooseFromAddSheet(() => void pickDocument())
+              : undefined
+          }
+          readAloud={readAloud.enabled}
+          onReadAloudChange={(next) => void readAloud.setEnabled(next)}
+        />
+        {messageMenu && messageMenuActions.length > 0 ? (
+          <MessageContextMenu
+            key={messageMenu.message.id}
+            rect={messageMenu.anchor}
+            side={messageMenu.message.role === "user" ? "right" : "left"}
+            bubble={
               <ChatMessageRow
-                item={item}
+                item={messageMenu.message}
                 conversationId={conversationId ?? ""}
                 animate={false}
                 styles={rowStyles}
@@ -2027,208 +2200,39 @@ export function ChatPane({
                 menuActive={false}
                 isSelecting={false}
                 anySelecting={false}
-                actions={rowActions}
-                carriedQuotes={quoteCarry.carried.get(item.id)}
-                quotesForwarded={quoteCarry.forwarded.has(item.id)}
-                contextRef={contexts.contexts.get(item.id)}
-                contextStatus={contextStatusFor(
-                  contexts,
-                  contexts.contexts.get(item.id),
-                )}
-                desktopAccess={desktopAccess}
+                actions={menuCloneRowActions}
+                menuClone
               />
-            )}
-          />
-        )}
-        {openReport && conversationId ? (
-          <AgentReportPopover
-            key={openReport.ref.threadId}
-            reference={openReport.ref}
-            anchor={openReport.anchor}
-            conversationId={conversationId}
-            journalReport={openReportTask?.resultText ?? openReportTask?.errorMessage}
+            }
+            actions={messageMenuActions}
             colors={colors}
-            onClose={closeReport}
-            topInset={topInset}
+            onDismiss={dismissMessageMenu}
           />
         ) : null}
-        {/* Floating glass controls (scroll-to-bottom FAB + computer-options
-            button) sit in a pass-through absolute overlay. This MUST be a plain
-            View, not a GlassGroup/GlassContainer: the native glass container is
-            a raw view that ignores `pointerEvents`, so a full-screen one swallows
-            every touch over the chat (no scroll/tap) and, as a screen-spanning
-            glass layer beneath the in-tree menu popovers, triggers Apple's
-            glass-on-glass suppression that renders those menus clear. A plain
-            `box-none` View passes touches through to the list and lets each
-            button — and the popovers — keep their own Liquid Glass. While a
-            focused chain is open they hide: its glass backdrop would sit over
-            them and, being glass over glass, render them clear. */}
-        <View
-          pointerEvents={replyFocus ? "none" : "box-none"}
-          style={[
-            StyleSheet.absoluteFill,
-            replyFocus ? styles.hiddenWhileFocused : null,
-          ]}
-        >
-          {!searchOpen ? (
-            <CatchUpPill
-              visible={catchUpVisible}
-              top={topInset + CATCH_UP_PILL_GAP}
-              colors={colors}
-            />
-          ) : null}
-          {!historyLoading && !empty ? (
-            <Reanimated.View
-              pointerEvents="box-none"
-              style={[StyleSheet.absoluteFill, listKeyboardStyle]}
-            >
-              <ScrollToBottomFab
-                visible={scroll.awayFromBottom}
-                hasUnread={unread}
-                onPress={scroll.scrollToBottom}
-                colors={colors}
-                bottomOffset={footerHeight + FLOATING_CONTROL_LIFT - 24}
-              />
-            </Reanimated.View>
-          ) : null}
-        </View>
-        {searchOpen && searchActive ? (
-          <ChatSearchResults
-            results={searchResults}
-            query={searchQuery}
-            topInset={topInset}
-            colors={colors}
-            onSelect={jumpToMessage}
-          />
-        ) : null}
+        <PlusMenuPopover
+          visible={Boolean(modelPickerAnchor) && modelPickerOptions.length > 0}
+          anchor={modelPickerAnchor}
+          options={modelPickerOptions}
+          onDismiss={dismissModelPicker}
+          colors={colors}
+          containerRef={rootRef}
+          minWidth={320}
+          wrapLabels
+        />
+        <RealtimeVoiceOverlay
+          visible={realtimeVoiceOpen}
+          conversationId={realtimeVoiceConversationId}
+          execution={realtimeVoiceExecution}
+          desktopAccess={realtimeVoiceDesktopAccess}
+          signInRequired={realtimeVoiceSignInRequired}
+          messages={messages}
+          tasks={activityTasks ?? []}
+          chatBusy={streaming}
+          onPerformAction={performRealtimeVoiceAction}
+          onClose={() => setRealtimeVoiceOpen(false)}
+        />
       </View>
-
-      <Reanimated.View
-        style={[
-          styles.footerOverlay,
-          composerKeyboardStyle,
-          searchOpen && styles.hiddenFooter,
-        ]}
-        onLayout={onFooterLayout}
-        pointerEvents={searchOpen ? "none" : "box-none"}
-      >
-        {offline ? (
-          <View style={styles.offlineNotice} pointerEvents="none">
-            <Icon name="wifi-off" size={13} color={colors.textMuted} />
-            <Text
-              style={styles.offlineNoticeText}
-              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-            >
-              You're offline
-            </Text>
-          </View>
-        ) : null}
-        <Composer
-          colors={colors}
-          inputRef={inputRef}
-          draftStore={draftStore}
-          enabled={composerEnabled}
-          placeholder={placeholder}
-          intervention={composerIntervention}
-          compact={askActive && !askCollapsed}
-          askCollapsed={askActive && askCollapsed}
-          onExpandAsk={expandAsk}
-          interventionRoom={interventionRoom}
-          bottomPad={composerBottomPad}
-          draftEmpty={draftEmpty}
-          hasText={hasText}
-          canSubmit={canSubmit}
-          streaming={streaming}
-          onSubmit={submit}
-          onStop={onStop}
-          onInputFocus={onComposerFocus}
-          onPressPlus={onPressPlus}
-          dictationStatus={dictationStatus}
-          onToggleVoice={toggleVoice}
-          onCancelDictation={cancelDictationInput}
-          onConfirmDictation={confirmDictationInput}
-          onStopAndSendVoice={stopAndSendVoice}
-          showRealtimeVoice={showRealtimeVoice}
-          onOpenRealtimeVoice={openRealtimeVoice}
-          modelPicker={composerModelPicker}
-          modelPickerAnchorRef={modelPickerAnchorRef}
-          onPressModelPicker={onPressModelPicker}
-          quotes={quotes}
-          onRemoveQuote={onRemoveQuote}
-          attachments={attachments}
-          onRemoveAttachment={onRemoveAttachment}
-          onRetryAttachment={onRetryAttachment}
-        />
-      </Reanimated.View>
-      <AddContextSheet
-        visible={addSheetOpen}
-        onClose={() => setAddSheetOpen(false)}
-        onDismissed={onAddSheetDismissed}
-        onCamera={
-          enableAttachments
-            ? () => chooseFromAddSheet(() => void takePhoto())
-            : undefined
-        }
-        onPhotos={
-          enableAttachments
-            ? () => chooseFromAddSheet(() => void pickImage())
-            : undefined
-        }
-        onFiles={
-          enableAttachments
-            ? () => chooseFromAddSheet(() => void pickDocument())
-            : undefined
-        }
-        readAloud={readAloud.enabled}
-        onReadAloudChange={(next) => void readAloud.setEnabled(next)}
-      />
-      {messageMenu && messageMenuActions.length > 0 ? (
-        <MessageContextMenu
-          key={messageMenu.message.id}
-          rect={messageMenu.anchor}
-          side={messageMenu.message.role === "user" ? "right" : "left"}
-          bubble={
-            <ChatMessageRow
-              item={messageMenu.message}
-              conversationId={conversationId ?? ""}
-              animate={false}
-              styles={rowStyles}
-              colors={colors}
-              menuActive={false}
-              isSelecting={false}
-              anySelecting={false}
-              actions={menuCloneRowActions}
-              menuClone
-            />
-          }
-          actions={messageMenuActions}
-          colors={colors}
-          onDismiss={dismissMessageMenu}
-        />
-      ) : null}
-      <PlusMenuPopover
-        visible={Boolean(modelPickerAnchor) && modelPickerOptions.length > 0}
-        anchor={modelPickerAnchor}
-        options={modelPickerOptions}
-        onDismiss={dismissModelPicker}
-        colors={colors}
-        containerRef={rootRef}
-        minWidth={320}
-        wrapLabels
-      />
-      <RealtimeVoiceOverlay
-        visible={realtimeVoiceOpen}
-        conversationId={realtimeVoiceConversationId}
-        execution={realtimeVoiceExecution}
-        desktopAccess={realtimeVoiceDesktopAccess}
-        signInRequired={realtimeVoiceSignInRequired}
-        messages={messages}
-        tasks={activityTasks ?? []}
-        chatBusy={streaming}
-        onPerformAction={performRealtimeVoiceAction}
-        onClose={() => setRealtimeVoiceOpen(false)}
-      />
-    </View>
+    </ReplyMorphContext.Provider>
   );
 }
 

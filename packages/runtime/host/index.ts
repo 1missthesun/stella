@@ -66,6 +66,7 @@ import {
   MAX_DEVICE_SIGNING_INPUT_LENGTH,
 } from "./device-signing-method.js";
 import { isDelegatedDeviceSigningInput } from "@stella/contracts/gateway/dpop";
+import { piBrainHandoffPrompt } from "@stella/contracts/turn-plane/pi-brain";
 import type { BrowserType } from "@stella/contracts";
 import type { DiscoveryKnowledgeSeedPayload } from "@stella/contracts/discovery";
 import type {
@@ -1073,6 +1074,7 @@ export class StellaRuntimeHost {
             // visible or no other client can ever render the message.
             userAuthoredPrompt: userAuthored,
             ...(scheduled ? { scheduled: true } : {}),
+            ...(handoff ? { handoff: true } : {}),
             // A desktop/voice turn may be in flight when the phone
             // sends. The runtime queues this exact accepted execution;
             // background agents must not make the computer offline.
@@ -1657,7 +1659,10 @@ export class StellaRuntimeHost {
     const handoffId = crypto.randomUUID();
     const placedPayload: PlacedChatPayload = {
       conversationId,
-      userPrompt: `[You moved this chat here from ${hostname().trim() || "another computer"} with switch_destination. This is your brief, not a new message from the user.]\n\n${prompt}`,
+      userPrompt: piBrainHandoffPrompt(
+        hostname().trim() || "another computer",
+        prompt,
+      ),
       requestId: `handoff:${handoffId}`,
       userMessageEventId: `handoff-${handoffId}`,
       storageMode: "cloud",

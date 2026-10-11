@@ -65,6 +65,7 @@ export const runsHandlers: WorkerRpcHandlers = {
         userMessageEventId?: string;
         userAuthoredPrompt?: boolean;
         scheduled?: boolean;
+        handoff?: boolean;
         attachments?: RuntimeAttachmentRef[];
       };
       // The host's own turns (schedule fires, watch escalations, heartbeats)
@@ -80,6 +81,7 @@ export const runsHandlers: WorkerRpcHandlers = {
             ...(automation.userMessageEventId ? { userMessageEventId: automation.userMessageEventId } : {}),
             ...(automation.attachments?.length ? { attachments: automation.attachments } : {}),
             ...(automation.scheduled ? { scheduled: true } : {}),
+            ...(automation.handoff ? { handoff: true } : {}),
           }),
         );
       }

@@ -97,7 +97,7 @@ const INVISIBLE_CHARS = new Set([
 ]);
 
 const maskSecret = (value: string): string => {
-  if (isUserAskSecretHandle(value)) return value;
+  if (isUserAskSecretHandle(value as unknown)) return value;
   if (value.length < 18) return "***";
   return `${value.slice(0, 6)}...${value.slice(-4)}`;
 };

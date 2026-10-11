@@ -50,6 +50,11 @@ export const usePiChat = (conversationId: string | null) => {
     const last = running[running.length - 1];
     return last ? { callId: last[0], name: last[1].name } : null;
   }, [state.tools]);
+  const latestCompletedTool = useMemo(() => {
+    const done = Object.entries(state.tools).filter(([, tool]) => tool.status === "done");
+    const last = done[done.length - 1];
+    return last ? { toolCallId: last[0], toolName: last[1].name } : null;
+  }, [state.tools]);
 
   const lastEntry = state.entries[state.entries.length - 1];
   const lastMessage = lastEntry?.model?.[0];
@@ -73,11 +78,12 @@ export const usePiChat = (conversationId: string | null) => {
     runtimeStatusText: state.retry
       ? `Retrying: ${state.retry.error}`
       : state.compacting
-        ? "Compacting the conversation…"
-        : null,
+        ? (state.engineStatus ?? "Compacting the conversation…")
+        : (state.engineStatus ?? null),
     isCompacting: state.compacting,
     activeToolCallId: runningTool?.callId ?? null,
     activeToolName: runningTool?.name ?? null,
+    latestCompletedTool,
     hasToolActivity: Object.keys(state.tools).length > 0,
     isToolActive: runningTool !== null,
     answerLanded,

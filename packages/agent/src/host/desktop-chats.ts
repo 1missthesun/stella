@@ -505,6 +505,19 @@ export function desktopChats(options: DesktopChatsOptions) {
   if (claudeCodeEngine) {
     models.setProvider(claudeCodeEngine.provider());
     claudeCodeEngine.onProviderChange((provider) => models.setProvider(provider));
+    claudeCodeEngine.onStatus((session, status) => {
+      if (session.threadId) return;
+      void chats
+        .get(session.conversationId)
+        ?.then((chat) => {
+          if (chat.watchers === 0) return;
+          options.emit({
+            conversationId: session.conversationId,
+            events: [{ type: "engine_status", state: status.state, text: status.text }],
+          });
+        })
+        .catch(() => undefined);
+    });
   }
   let gateway: Promise<{ access: StellaGatewayAccess; gatewayOrigin: string }> | undefined;
   /** Each Stella model alias in use, resolved for the orchestrator and agents. */

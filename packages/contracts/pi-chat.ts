@@ -165,6 +165,7 @@ export type PiChatEvent =
   | { type: "task_failed"; taskId: number; kind: string; message: string }
   | { type: "compaction_start"; reason: string; blocking: boolean }
   | { type: "compaction_end"; reason: string }
+  | { type: "engine_status"; state: "running" | "compacting" | "model-fallback"; text: string }
   /** Stella's turns another writer is running (the cloud, another computer), from the journal. */
   | { type: "remote_turns"; turns: PiRemoteTurn[] };
 
@@ -295,6 +296,7 @@ export type PiChatState = {
   /** The last task failure of the current run. */
   failure?: string;
   compacting: boolean;
+  engineStatus?: string;
   /** Turns running elsewhere (`remote_turns`). */
   remote: PiRemoteTurn[];
 };
@@ -379,7 +381,7 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
         entries: mergePiEntries(state.entries, event.entries),
         running: !idle,
         ...(idle && event.inbox.length === 0 ? { queued: [] } : {}),
-        ...(idle ? { compacting: false } : {}),
+        ...(idle ? { compacting: false, engineStatus: undefined } : {}),
         ...(event.generation?.message ? { streaming: event.generation.message } : { streaming: undefined }),
         ...(event.generation?.retry ? { retry: event.generation.retry } : { retry: undefined }),
         tools,
@@ -388,7 +390,7 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
     case "run_start":
       return { ...state, running: true, failure: undefined, tools: {} };
     case "run_end":
-      return { ...state, running: false, streaming: undefined, retry: undefined, compacting: false };
+      return { ...state, running: false, streaming: undefined, retry: undefined, compacting: false, engineStatus: undefined };
     case "message_start":
       return event.message.role === "assistant" ? { ...state, streaming: event.message } : state;
     case "message_update": {
@@ -448,6 +450,12 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
       return event.blocking ? { ...state, compacting: true } : state;
     case "compaction_end":
       return { ...state, compacting: false };
+    case "engine_status":
+      if (event.state === "compacting") return { ...state, compacting: true, engineStatus: event.text };
+      if (event.state === "running") {
+        return { ...state, compacting: false, engineStatus: event.text === ENGINE_WORKING_TEXT ? undefined : event.text };
+      }
+      return state;
     default:
       return state;
   }
@@ -478,10 +486,16 @@ export const piTerminalNotice = (message: {
   errorMessage?: string;
 }): { phase: "failed" | "canceled"; notice: string } | undefined =>
   message.stopReason === "error"
-    ? { phase: "failed", notice: `Stella couldn't answer: ${message.errorMessage?.trim() || "the model request failed."}` }
+    ? {
+        phase: "failed",
+        notice: `Stella couldn't answer: ${message.errorMessage?.replace(ENGINE_ERROR_MARK, "").trim() || "the model request failed."}`,
+      }
     : message.stopReason === "aborted"
       ? { phase: "canceled", notice: "Stopped." }
       : undefined;
+
+const ENGINE_ERROR_MARK = /^\s*\[[a-z-]+\/[a-z-]+\]\s*/;
+const ENGINE_WORKING_TEXT = "Working";
 
 /** An agent's report, which arrives as user input the user never wrote. */
 export const PI_REPORT_RE = /^\[(Agent completed|Task failed|Task canceled|Subagent paused)\]/;

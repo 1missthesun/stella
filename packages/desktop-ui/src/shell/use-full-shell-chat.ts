@@ -526,8 +526,11 @@ export function useFullShellChat({
         ? null
         : cloudChat.activeToolName
       : localActiveToolName;
-  const latestCompletedTool =
-    useCloudRun || piChat.enabled ? null : localLatestCompletedTool;
+  const latestCompletedTool = piChat.enabled
+    ? piChat.latestCompletedTool
+    : useCloudRun
+      ? null
+      : localLatestCompletedTool;
   const hasToolActivity = piChat.enabled
     ? piChat.hasToolActivity
     : useCloudRun

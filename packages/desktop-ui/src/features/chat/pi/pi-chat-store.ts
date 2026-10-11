@@ -9,6 +9,8 @@
  */
 import type { LocalChatAgentReport } from "@stella/contracts/local-chat";
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
+import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
+import { showToast } from "@/ui/toast";
 import {
   emptyPiChat,
   reducePiChat,
@@ -80,6 +82,26 @@ const attach = (conversationId: string, entry: Watched) => {
   );
 };
 
+const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) => {
+  for (const event of events) {
+    if (event.type === "engine_status" && event.state === "model-fallback") {
+      showToast({
+        title: "Switched to a fallback model",
+        description:
+          event.text || "The configured model was unavailable, so this session switched to a fallback model.",
+        variant: "error",
+        duration: 10000,
+      });
+      continue;
+    }
+    if (event.type !== "message_end" || event.entry.kind !== "pi.assistant") continue;
+    const message = event.entry.model?.[0];
+    if (message?.role === "assistant" && message.stopReason === "error") {
+      presentStellaProviderError(message.errorMessage ?? null, { conversationId });
+    }
+  }
+};
+
 let runtimeReady = true;
 
 const listen = () => {
@@ -87,6 +109,7 @@ const listen = () => {
   unsubscribeEvents = api()?.onEvents(({ conversationId, events }) => {
     const entry = watched.get(conversationId);
     if (!entry || entry.watchers === 0) return;
+    presentEvents(conversationId, events);
     if (entry.held) {
       entry.held.push(events);
       return;

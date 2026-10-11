@@ -66,7 +66,16 @@ const CLOSE: WithSpringConfig = {
 
 let openedAt = 0;
 
+export function diag(...parts: unknown[]) {
+  console.log("[drawer-diag]", Date.now() % 100000, ...parts);
+}
+
+export function drawerDiagState() {
+  return state;
+}
+
 function setOpen(open: boolean) {
+  diag("setOpen", open, "progress", drawerProgress.value);
   if (open && !state.open) openedAt = Date.now();
   setState({ open, live: open || state.live });
 }
@@ -101,6 +110,7 @@ function settleDrawer(open: boolean, velocity = 0) {
     open ? 1 : 0,
     { ...(open ? OPEN : CLOSE), velocity },
     (done) => {
+      runOnJS(diag)("spring-end", open, "done", done, "progress", drawerProgress.value);
       if (done && !open) runOnJS(rested)();
     },
   );
@@ -219,6 +229,7 @@ function grab(
   dragTravel.value = travel;
   dragOrigin.value = drawerProgress.value - (sign * translationX) / travel;
   dragOwner.value = owner;
+  runOnJS(diag)("grab", owner, sign, drawerProgress.value);
   runOnJS(begin)(sign === 1 ? "start" : "end");
 }
 
@@ -236,6 +247,7 @@ function release(owner: number, velocityX: number) {
   dragOwner.value = 0;
   const v = (drawerSign.value * velocityX) / dragTravel.value;
   const open = drawerProgress.value + v * 0.2 > 0.5;
+  runOnJS(diag)("release", owner, "progress", drawerProgress.value, "v", v, "open", open);
   runOnJS(setOpen)(open);
   settleDrawer(open, v);
 }

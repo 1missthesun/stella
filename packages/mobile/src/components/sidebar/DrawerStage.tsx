@@ -24,6 +24,9 @@ import Animated, {
   useAnimatedProps,
   useAnimatedReaction,
   useAnimatedStyle,
+  useAnimatedRef,
+  measure,
+  runOnUI,
   useReducedMotion,
   useSharedValue,
   withTiming,
@@ -34,6 +37,8 @@ import {
   drawerProgress,
   drawerSign,
   drawerVeil,
+  diag,
+  drawerDiagState,
   openDrawer,
   useDrawerLive,
   useDrawerMetrics,
@@ -111,6 +116,36 @@ export function DrawerStage({
     },
   );
 
+  const stageRef = useAnimatedRef<Animated.View>();
+  useEffect(() => {
+    if (!live) return;
+    const timer = setInterval(() => {
+      const st = drawerDiagState();
+      runOnUI(() => {
+        "worklet";
+        const m = measure(stageRef);
+        runOnJS(diag)(
+          "tick",
+          "progress",
+          drawerProgress.value,
+          "sign",
+          drawerSign.value,
+          "stageX",
+          m ? Math.round(m.pageX) : null,
+          "expectX",
+          Math.round(drawerSign.value * drawerProgress.value * (drawerSign.value > 0 ? travel : endTravel) + (m ? (m.width * (1 - (1 - (1 - scale) * Math.min(drawerProgress.value, 1.2)))) / 2 : 0)),
+          "open",
+          st.open,
+          "live",
+          st.live,
+          "side",
+          st.side,
+        );
+      })();
+    }, 250);
+    return () => clearInterval(timer);
+  }, [live, travel, endTravel, scale, stageRef]);
+
   useEffect(() => {
     if (!open) return;
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -174,6 +209,7 @@ export function DrawerStage({
 
       <GestureDetector gesture={openPan}>
         <Animated.View
+          ref={stageRef}
           style={[styles.stage, { backgroundColor: floor }, stage]}
           accessibilityElementsHidden={open}
           importantForAccessibility={open ? "no-hide-descendants" : "auto"}

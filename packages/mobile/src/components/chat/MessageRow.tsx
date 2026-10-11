@@ -47,7 +47,7 @@ import { AppPreviewCard } from "../AppPreviewCard";
 import { MapRouteCard } from "../MapRouteCard";
 import type { AnchorRect } from "./PlusMenu";
 import { assistantBubbleNeedsBoundedWidth } from "../../lib/assistant-bubble-layout";
-import { presentAssistantText } from "../../lib/assistant-internal-text";
+import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import { artifactAttachmentTarget } from "../../lib/mobile-artifacts";
 import {
   resolveCloudDriveFileUri,

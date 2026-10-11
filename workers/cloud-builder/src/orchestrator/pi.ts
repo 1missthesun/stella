@@ -1462,11 +1462,13 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   }
 
   /**
-   * Whether the computer holding this conversation's brain can take a turn
-   * now, as pi's `switch_destination` would refuse a move there (`refusal`
-   * undefined when it can), when the owner gate last heard its presence
-   * heartbeat, which renews its lease, and whether it is gone: offline, or
-   * not among the owner's computers at all.
+   * The computer holding this conversation's brain as the owner gate sees
+   * it: whether it takes work from other devices now, as pi's
+   * `switch_destination` would refuse a move there (`refusal` undefined when
+   * it does), when its presence heartbeat was last heard while it was ready,
+   * which renews its lease, and whether it is gone: offline, or not among
+   * the owner's computers at all. Only a gone holder loses the brain to a
+   * takeover; one that is up and takes no work from elsewhere keeps it.
    */
   protected async piBrainHolderState(
     ownerId: string,
@@ -1481,14 +1483,18 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     const { deviceRefusal } = await import("@stella/agent/stella/execution");
     const refusal = deviceRefusal(device, device.label?.trim() || deviceId);
     if (!device.online) return { refusal: refusal ?? "offline", gone: true };
+    const ready = !device.availability || device.availability.ready === true;
     const seenAt = Math.max(device.lastSeenAt ?? 0, Date.now());
-    return refusal ? { refusal, seenAt } : { seenAt };
+    return {
+      ...(refusal ? { refusal } : {}),
+      ...(ready ? { seenAt } : {}),
+    };
   }
 
   /**
    * A host's claim on this conversation's brain for a turn it would answer:
    * the record's holder renews its lease, a host that finds the holder
-   * unavailable or lapsed takes the lease over under the next epoch, and
+   * gone or lapsed takes the lease over under the next epoch, and
    * any other claim is refused (`decidePiBrainClaim`). `holder` is the
    * holding computer's state, read before this so no request interleaves
    * between the record read and its write; a record that moved meanwhile
@@ -1517,7 +1523,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ? args.holder
         : undefined;
     let record = stored;
-    if (record && holder?.seenAt !== undefined && !holder.refusal) {
+    if (record && holder?.seenAt !== undefined) {
       const renewed = renewPiBrainLease(record, holder.seenAt);
       if (renewed) {
         record = renewed;
@@ -1528,9 +1534,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       record,
       claimant: args.claimant,
       claimEpoch: args.claimEpoch,
-      ...(holder?.refusal !== undefined
-        ? { holderRefusal: holder.refusal }
-        : {}),
+      ...(holder?.gone ? { holderGone: true } : {}),
       now,
     });
     if (decision.kind === "holder" && record) {
@@ -1550,9 +1554,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ...(holder?.refusal ? { holderRefusal: holder.refusal } : {}),
         ...(args.turnId ? { turnId: args.turnId } : {}),
       });
-      if (decision.reason === "expired" || holder?.gone) {
-        await this.settleTakenOverTurn(prior);
-      }
+      await this.settleTakenOverTurn(prior);
       return { decision, record, takenOver: true };
     }
     // The object's own claim on a live holder is routine: it places there.

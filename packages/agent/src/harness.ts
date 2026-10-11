@@ -105,7 +105,14 @@ export type OpenStellaHarness = {
     threadId: string,
     context: Context,
   ): Promise<
-    | { status: StellaAgentRecord["status"]; paused?: true; agentStatus: StellaAgentRecord["agentStatus"]; attempt: number }
+    | {
+        status: StellaAgentRecord["status"];
+        paused?: true;
+        /** Paused by its starter: reports from the agents it started wait for it. */
+        holdsReports?: true;
+        agentStatus: StellaAgentRecord["agentStatus"];
+        attempt: number;
+      }
     | undefined
   >;
   /** The orchestrator's agents, as the app lists them. */

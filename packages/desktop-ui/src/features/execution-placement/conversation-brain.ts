@@ -4,8 +4,13 @@ import type {
   PiChatMoveTarget,
 } from "@stella/contracts/pi-chat";
 
-/** Others move Stella too (her own switch, another device): read again now and then. */
-const REFRESH_MS = 30_000;
+/**
+ * Others move Stella too (her own switch, another device, the cloud taking
+ * her over from a computer that went away). The host says when what it reads
+ * changes (a `brain` event); this reads again now and then for a move no turn
+ * here has shown yet.
+ */
+const REFRESH_MS = 15_000;
 
 const api = () =>
   typeof window === "undefined" ? undefined : window.electronAPI?.piChat;
@@ -42,12 +47,22 @@ export function useConversationBrain(conversationId: string | null) {
         void read().catch(() => undefined);
       }
     };
-    refresh();
+    void read().catch(() => undefined);
     const timer = window.setInterval(refresh, REFRESH_MS);
     window.addEventListener("focus", refresh);
+    const unsubscribe = api()?.onEvents(
+      ({ conversationId: changed, events }) => {
+        if (changed !== conversationId) return;
+        for (const event of events) {
+          if (event.type === "brain")
+            setState({ conversationId, brain: event.brain });
+        }
+      },
+    );
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("focus", refresh);
+      unsubscribe?.();
     };
   }, [conversationId, read]);
 

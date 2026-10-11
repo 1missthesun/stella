@@ -174,7 +174,9 @@ export type PiChatEvent =
   /** Every held turn here ended its hold: resumed, or stopped while held. */
   | { type: "engine_status"; state: "usage-limit-end"; text: string; resumed: boolean }
   /** Stella's turns another writer is running (the cloud, another computer), from the journal. */
-  | { type: "remote_turns"; turns: PiRemoteTurn[] };
+  | { type: "remote_turns"; turns: PiRemoteTurn[] }
+  /** Where the conversation's Stella runs changed, as the host now reads it (`op: "brain"`). */
+  | { type: "brain"; brain: PiChatBrainResult };
 
 /** A turn of the conversation running elsewhere, which the journal shows as started. */
 export type PiRemoteTurn = {

@@ -6,6 +6,7 @@ import { backendClient } from "@/platform/backend/backend-client";
 type RealtimeConfig = { relayOrigin: string; modelId: string };
 type DictationTranscriptFrame = {
   type?: unknown;
+  sessionId?: unknown;
   transcript?: unknown;
   text?: unknown;
   final?: unknown;
@@ -165,6 +166,7 @@ export class DictationStream {
   private finishReject: ((reason: Error) => void) | null = null;
   private cancelled = false;
   private failed = false;
+  private openSettle: ((error: Error | null) => void) | null = null;
 
   constructor(
     private readonly onPartial?: (text: string) => void,
@@ -178,6 +180,11 @@ export class DictationStream {
     this.onFailure?.(error);
   }
 
+  /**
+   * Resolves once the provider acknowledged its session, which is when its
+   * real-time clock starts; audio captured before then is the caller's to
+   * hold and pace.
+   */
   async open(): Promise<void> {
     const socket = await (takeWarmSocket() ?? connectRelay());
     if (this.cancelled) {
@@ -185,11 +192,28 @@ export class DictationStream {
       throw new Error("Dictation cancelled.");
     }
     this.socket = socket;
+    const acknowledged = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.openSettle?.(new Error("Dictation took too long to connect."));
+        socket.close();
+      }, OPEN_TIMEOUT_MS);
+      this.openSettle = (error) => {
+        clearTimeout(timer);
+        this.openSettle = null;
+        if (error) reject(error);
+        else resolve();
+      };
+    });
     socket.onerror = null;
     socket.onmessage = (event) => this.handleMessage(event.data);
     socket.onclose = (event) => {
       this.socket = null;
-      if (this.finishReject && this.streamError) {
+      if (this.openSettle) {
+        this.openSettle(
+          this.streamError ??
+            new Error(event.reason || "Could not connect to dictation."),
+        );
+      } else if (this.finishReject && this.streamError) {
         this.finishReject(this.streamError);
       } else if (
         this.finishResolve &&
@@ -210,11 +234,12 @@ export class DictationStream {
     };
     // The relay reserves the session and opens the provider only now.
     socket.send(JSON.stringify({ type: "start" }));
+    await acknowledged;
   }
 
-  send(pcm: Int16Array): void {
-    if (this.socket?.readyState !== WebSocket.OPEN || pcm.length === 0) return;
-    this.socket.send(exactBuffer(pcm));
+  send(pcm: Int16Array | ArrayBuffer): void {
+    if (this.socket?.readyState !== WebSocket.OPEN || pcm.byteLength === 0) return;
+    this.socket.send(pcm instanceof ArrayBuffer ? pcm : exactBuffer(pcm));
   }
 
   async replay(chunks: readonly Int16Array[]): Promise<void> {
@@ -263,6 +288,7 @@ export class DictationStream {
 
   cancel(): void {
     this.cancelled = true;
+    this.openSettle?.(new Error("Dictation cancelled."));
     this.clearFinishHandlers();
     this.socket?.close(1000, "Cancelled");
     this.socket = null;
@@ -276,13 +302,22 @@ export class DictationStream {
     } catch {
       return;
     }
+    if (
+      frame.type === undefined &&
+      typeof frame.sessionId === "string" &&
+      frame.sessionId.trim()
+    ) {
+      this.openSettle?.(null);
+      return;
+    }
     if (frame.type === "error") {
       this.streamError = new Error(
         typeof frame.message === "string"
           ? frame.message
           : "Dictation failed.",
       );
-      if (this.finishReject) this.finishReject(this.streamError);
+      if (this.openSettle) this.openSettle(this.streamError);
+      else if (this.finishReject) this.finishReject(this.streamError);
       else this.fail(this.streamError);
       this.clearFinishHandlers();
       return;

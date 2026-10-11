@@ -49,7 +49,6 @@ import {
 const MIN_RECORDING_MS = 300;
 /** Under this the route answers an empty transcript anyway. */
 const MIN_PCM_BYTES = DICTATION_SAMPLE_RATE / 5;
-const PRE_ROLL_MAX_BYTES = 4 * DICTATION_SAMPLE_RATE * 2;
 
 export type DictationStatus = "idle" | "recording" | "transcribing";
 
@@ -75,60 +74,44 @@ export type UseDictationResult = {
   toggle: () => Promise<void>;
 };
 
-/** One recording's captured PCM, in native delivery order. */
+/**
+ * One recording's captured PCM, in native delivery order. Capture starts
+ * before the transport is chosen; until then (and for the batch route) the
+ * audio stays in `chunks`, and the live route takes all of it.
+ */
 type DictationCapture = {
   chunks: ArrayBuffer[];
   bytes: number;
   /** Set once the 15-minute ceiling is reached; capture stops there. */
   full: boolean;
   live: DictationLive | null;
+  /** Settles once the transport is chosen and `live` is set if streaming. */
+  routed: Promise<void>;
+  pressedAt: number;
+  firstAudioAt: number;
 };
 
 type DictationLive = {
   stream: DictationStream;
   /** Settles when the provider acknowledged the handshake (or failed). */
   opened: Promise<void>;
-  /** Set once connected; owns real-time accounting from then on. */
-  pacer: DictationIngressPacer | null;
-  preRoll: ArrayBuffer[];
-  preRollBytes: number;
+  /** Holds audio losslessly until the handshake, then paces it out. */
+  pacer: DictationIngressPacer;
 };
 
 const discardLive = (live: DictationLive | null): void => {
   if (!live) return;
-  live.pacer?.stop();
-  live.pacer = null;
-  live.preRoll = [];
-  live.preRollBytes = 0;
+  live.pacer.stop();
   live.stream.cancel();
 };
 
-const forwardLive = (live: DictationLive | null, bytes: ArrayBuffer): void => {
-  if (!live) return;
-  if (live.pacer) {
-    live.pacer.send(bytes);
-    return;
-  }
-  live.preRoll.push(bytes);
-  live.preRollBytes += bytes.byteLength;
-  while (
-    live.preRollBytes > PRE_ROLL_MAX_BYTES &&
-    live.preRoll.length > 1
-  ) {
-    live.preRollBytes -= live.preRoll.shift()!.byteLength;
-  }
-};
-
 const finishLive = async (live: DictationLive): Promise<string> => {
+  live.pacer.stopPadding();
   await live.opened;
   const stream = live.stream;
   stream.throwIfFailed();
-  if (!live.pacer) {
-    const buffered = concatPcm(live.preRoll, live.preRollBytes);
-    live.preRoll = [];
-    live.preRollBytes = 0;
-    if (buffered.byteLength > 0) stream.send(buffered);
-  }
+  await live.pacer.flushed();
+  stream.throwIfFailed();
   return await stream.finish();
 };
 
@@ -188,20 +171,12 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     const live: DictationLive = {
       stream,
       opened: Promise.resolve(),
-      pacer: null,
-      preRoll: [],
-      preRollBytes: 0,
+      pacer: new DictationIngressPacer(stream),
     };
     live.opened = stream.open().then(
       () => {
+        live.pacer.start();
         if (captureRef.current?.live !== live) return;
-        const pacer = new DictationIngressPacer(stream);
-        live.pacer = pacer;
-        const buffered = concatPcm(live.preRoll, live.preRollBytes);
-        live.preRoll = [];
-        live.preRollBytes = 0;
-        if (buffered.byteLength > 0) pacer.send(buffered);
-        pacer.start();
         if (stream.isComplete && isCurrent()) {
           void stopRecordingRef.current?.();
         }
@@ -217,6 +192,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     if (statusRef.current !== "idle" || operationInFlightRef.current) {
       return false;
     }
+    const pressedAt = Date.now();
     // Terminal TTS stop before any permission/consent work so a late chunk
     // cannot restart playback after the user has already asked to speak.
     stopReadAloudForDictation();
@@ -231,9 +207,39 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     }
     let phase: "permission" | "audio-session" | "relay" | "recorder" =
       "permission";
-    let capture: DictationCapture | null = null;
+    // The user starts talking on the press, so nothing on the network may
+    // stand between the press and the recorder. The transport is chosen (and
+    // the relay connected) alongside the recorder's start; whatever is
+    // captured first waits in `chunks` and goes out in order.
+    resetDictationTranscriptPreview();
+    const current: DictationCapture = {
+      chunks: [],
+      bytes: 0,
+      full: false,
+      live: null,
+      routed: Promise.resolve(),
+      pressedAt,
+      firstAudioAt: 0,
+    };
+    let capture: DictationCapture | null = current;
+    captureRef.current = current;
+    const permission = AudioModule.requestRecordingPermissionsAsync();
+    current.routed = Promise.all([
+      options.anonymous
+        ? Promise.resolve(false)
+        : loadDictationStreamingAvailable().catch(() => false),
+      permission.then(
+        (result) => result.granted,
+        () => false,
+      ),
+    ]).then(([streaming, granted]) => {
+      if (!streaming || !granted || captureRef.current !== current) return;
+      const live = openLive();
+      current.live = live;
+      for (const chunk of current.chunks.splice(0)) live.pacer.send(chunk);
+    });
     try {
-      const perm = await AudioModule.requestRecordingPermissionsAsync();
+      const perm = await permission;
       if (!perm.granted) {
         // If the user previously denied the system prompt, iOS will not
         // show it again — the only way back is the system Settings app.
@@ -259,10 +265,12 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
                 },
               ],
         );
+        discardCapture(current);
         operationInFlightRef.current = false;
         return false;
       }
       if (!mountedRef.current) {
+        discardCapture(current);
         operationInFlightRef.current = false;
         return false;
       }
@@ -270,35 +278,19 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       phase = "audio-session";
       const lease = await acquireRecordingAudioSession();
       if (lease === null) {
+        discardCapture(current);
         operationInFlightRef.current = false;
         return false;
       }
       recordingLeaseRef.current = lease;
       if (!mountedRef.current) {
-        await releaseAudioMode();
-        operationInFlightRef.current = false;
-        return false;
-      }
-
-      const streaming = options.anonymous
-        ? false
-        : await loadDictationStreamingAvailable().catch(() => false);
-      if (!mountedRef.current) {
+        discardCapture(current);
         await releaseAudioMode();
         operationInFlightRef.current = false;
         return false;
       }
 
       phase = "recorder";
-      resetDictationTranscriptPreview();
-      const current: DictationCapture = {
-        chunks: [],
-        bytes: 0,
-        full: false,
-        live: streaming ? openLive() : null,
-      };
-      capture = current;
-      captureRef.current = current;
       const sliceLevels = createLevelSlicer();
       const emitter = new LegacyEventEmitter(AudioStudioModule);
       audioSubscriptionRef.current = emitter.addListener<{
@@ -311,11 +303,19 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         if (!audio) return;
         const bytes = audioEventToPcm16(audio);
         if (bytes.byteLength === 0) return;
+        if (current.firstAudioAt === 0) {
+          current.firstAudioAt = Date.now();
+          if (__DEV__) {
+            console.info(
+              `[dictation] first audio ${current.firstAudioAt - current.pressedAt}ms after press`,
+            );
+          }
+        }
         pushDictationLevels(sliceLevels(bytes));
         if (current.full) return;
         if (current.live) {
           current.bytes += bytes.byteLength;
-          forwardLive(current.live, bytes);
+          current.live.pacer.send(bytes);
         } else {
           current.chunks.push(bytes);
           current.bytes += bytes.byteLength;
@@ -349,10 +349,10 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       cancelledRef.current = false;
       startedAtRef.current = Date.now();
       startDictationMeter(startedAtRef.current);
-      // The mic is live — speak now. This is the cue that matters: the user
-      // has to know the recorder is listening before they start talking, and
-      // it fires here rather than on the button press so it never promises a
-      // recording that consent or a denied mic then refuses.
+      // The recorder is running. Speech from the press onward is already
+      // captured, so this confirms the recording rather than asking the user
+      // to wait for it; it fires here rather than on the press so it never
+      // promises a recording that consent or a denied mic then refuses.
       tapMedium();
       safeSetStatus("recording");
       operationInFlightRef.current = false;
@@ -409,11 +409,12 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       audioSubscriptionRef.current?.remove();
       audioSubscriptionRef.current = null;
       const capture = captureRef.current;
-      captureRef.current = null;
       stopDictationMeter();
       resetDictationTranscriptPreview();
+      await capture?.routed;
+      if (captureRef.current === capture) captureRef.current = null;
       const live = capture?.live ?? null;
-      live?.pacer?.stop();
+      live?.pacer.stopPadding();
       // The recorder is configured without file output, but delete anything it
       // produced anyway: the audio we send is the PCM we captured.
       if (uri) {
@@ -539,17 +540,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     toggle,
   };
 }
-
-const concatPcm = (chunks: ArrayBuffer[], totalBytes: number): ArrayBuffer => {
-  if (chunks.length === 1) return chunks[0]!;
-  const out = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(new Uint8Array(chunk), offset);
-    offset += chunk.byteLength;
-  }
-  return out.buffer;
-};
 
 const audioEventToPcm16 = (
   data: string | Float32Array | Int16Array | number[],

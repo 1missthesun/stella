@@ -23,6 +23,7 @@ import {
   ensureDictationSuperFastWarm,
   DictationSession,
   isDictationSuperFastEnabled,
+  warmDictationMicrophone,
   type DictationSessionState,
 } from "@/features/dictation/services/dictation-session";
 import {
@@ -141,6 +142,8 @@ export const useDictation = ({
   const onCommitRef = useRef(onCommit);
   const commitOnShortcutStopRef = useRef(commitOnShortcutStop);
   const stateRef = useRef<DictationSessionState>("idle");
+  const disabledRef = useRef(disabled);
+  disabledRef.current = disabled;
   /**
    * When true, the next time we land on idle (whether after a successful
    * transcription or a no-audio short-circuit), we should fire `onCommit`.
@@ -452,8 +455,14 @@ export const useDictation = ({
 
   // Stable so the memoized mic button skips re-rendering on every keystroke.
   const prewarm = useCallback(() => {
-    if (cachedDictationRoute() === "streaming") prewarmDictationSocket();
+    const route = cachedDictationRoute();
+    if (route === "streaming") prewarmDictationSocket();
     else prewarmDictation();
+    // Opening the microphone takes up to two seconds on macOS. Open it while
+    // the pointer is on its way to the button so the press loses nothing.
+    if (!disabledRef.current && route !== null && route !== "needs-key") {
+      warmDictationMicrophone();
+    }
   }, []);
 
   return {

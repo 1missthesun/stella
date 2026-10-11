@@ -1,3 +1,4 @@
+import { DictationIngressQueue } from "@stella/contracts/dictation-ingress";
 import { uiState } from "@/platform/ui-state";
 import {
   acquireSharedMicrophone,
@@ -11,13 +12,10 @@ import { PcmRecording } from "./pcm-recording";
 type WorkletFrame = { pcm: Int16Array; rms: number };
 
 const TARGET_SAMPLE_RATE = 16_000;
-/** Audio held while the relay connects. Meta closes a session with more than
- *  five seconds queued ahead of real time, so a flush must stay well under
- *  that; a connect slower than this is failing anyway. */
-const STREAM_PRE_ROLL_MAX_SAMPLES = 4 * TARGET_SAMPLE_RATE;
 const PCM_WORKLET_NAME = "stella-dictation-pcm-capture";
 const PCM_WORKLET_FILE = "dictation-pcm-worklet.js";
 const DICTATION_SUPER_FAST_KEY = "stella-dictation-super-fast";
+const DICTATION_MIC_OPENED_KEY = "stella-dictation-mic-opened";
 /** Hard cap on a single dictation recording before we auto-stop and
  * transcribe. Stella keeps the existing 15-minute product limit. */
 const MAX_DICTATION_DURATION_MS = 15 * 60 * 1000;
@@ -31,7 +29,10 @@ const LEVEL_EMIT_INTERVAL_MS = 80;
  *  this constant maps that range onto a perceptually pleasing 0–1 scale
  *  for the waveform without immediately clipping at the top. */
 const LEVEL_GAIN = 6;
-const SUPER_FAST_PRE_ROLL_MS = 450;
+/** Audio kept from just before the press, covering the click's own latency. */
+const PRE_ROLL_MS = 300;
+/** A warm-up from hovering the mic ends this long after the last intent. */
+const INTENT_WARM_MS = 10_000;
 
 export const resolveDictationPcmWorkletUrl = (rendererHref: string): string =>
   new URL(PCM_WORKLET_FILE, rendererHref).href;
@@ -60,6 +61,16 @@ export function setDictationSuperFastPreference(enabled: boolean): void {
   uiState.setItem(DICTATION_SUPER_FAST_KEY, enabled ? "true" : "false");
 }
 
+/**
+ * The microphone and its 16 kHz PCM pipeline, shared by every recording.
+ *
+ * Opening a microphone and an AudioContext on macOS takes from a few hundred
+ * milliseconds to almost two seconds, and nothing said in that time can be
+ * recovered. So the pipeline opens ahead of a likely press (hovering or
+ * focusing the mic, or always with Super Fast), keeps only the last
+ * `PRE_ROLL_MS` while nobody is recording, and a press takes it over with no
+ * device open at all. A press with nothing warm opens it on the spot.
+ */
 class DictationWarmCapture {
   private micLease: SharedMicrophoneLease | null = null;
   private audioContext: AudioContext | null = null;
@@ -68,6 +79,9 @@ class DictationWarmCapture {
   private chunks: Int16Array[] = [];
   private totalSamples = 0;
   private startPromise: Promise<void> | null = null;
+  private listener: ((frame: WorkletFrame) => void) | null = null;
+  private pinned = false;
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   async start(): Promise<void> {
     if (this.startPromise) return this.startPromise;
@@ -77,32 +91,107 @@ class DictationWarmCapture {
     return this.startPromise;
   }
 
-  async stop(): Promise<void> {
-    this.tearDownAudioPipeline();
-    if (this.audioContext) {
-      await this.audioContext.close().catch(() => undefined);
-      this.audioContext = null;
+  /** Super Fast: stay open until turned off. */
+  async pin(enabled: boolean): Promise<void> {
+    this.pinned = enabled;
+    if (enabled) {
+      this.clearIdle();
+      await this.start();
+    } else {
+      await this.stop();
     }
-    this.micLease?.release();
+  }
+
+  /**
+   * A press is likely: open now and close again if none comes. Only once
+   * dictation has opened the microphone before, so hovering never raises the
+   * system permission prompt.
+   */
+  warmForIntent(): void {
+    if (this.listener) return;
+    if (uiState.getItem(DICTATION_MIC_OPENED_KEY) !== "true") return;
+    this.scheduleIdleStop(INTENT_WARM_MS);
+    void this.start().catch(() => undefined);
+  }
+
+  /**
+   * Hand the pipeline to a recording, opening it if nothing is warm: resolves
+   * with the pre-roll, and every later frame goes to `listener` until
+   * `detach`. The listener is registered first, so a warm-up timing out
+   * meanwhile cannot close the microphone under the press.
+   */
+  async attach(listener: (frame: WorkletFrame) => void): Promise<Int16Array[]> {
+    this.clearIdle();
+    this.listener = listener;
+    const preRoll = this.chunks;
+    this.chunks = [];
+    this.totalSamples = 0;
+    try {
+      await this.start();
+    } catch (error) {
+      this.detach(listener);
+      throw error;
+    }
+    return preRoll;
+  }
+
+  detach(listener: (frame: WorkletFrame) => void): void {
+    if (this.listener !== listener) return;
+    this.listener = null;
+    void this.stop();
+  }
+
+  /** Close the microphone unless a recording or Super Fast still needs it. */
+  async stop(): Promise<void> {
+    this.clearIdle();
+    const starting = this.startPromise;
+    if (starting) await starting.catch(() => undefined);
+    if (this.listener || this.pinned || this.startPromise) return;
+    this.tearDownAudioPipeline();
+    const ctx = this.audioContext;
+    const lease = this.micLease;
+    this.audioContext = null;
     this.micLease = null;
     this.chunks = [];
     this.totalSamples = 0;
+    lease?.release();
+    await ctx?.close().catch(() => undefined);
   }
 
-  snapshot(): Int16Array[] {
-    return this.chunks.map((chunk) => chunk.slice());
+  private scheduleIdleStop(ms: number): void {
+    this.clearIdle();
+    if (this.pinned) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = null;
+      void this.stop();
+    }, ms);
+  }
+
+  private clearIdle(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = null;
   }
 
   private async startInner(): Promise<void> {
     if (this.audioContext && this.micLease) return;
-    this.micLease = await acquireSharedMicrophone();
+    // The context and its worklet come up while the device opens.
     const ctx = new AudioContext();
-    this.audioContext = ctx;
-    await ctx.audioWorklet.addModule(
+    const moduleReady = ctx.audioWorklet.addModule(
       resolveDictationPcmWorkletUrl(window.location.href),
     );
+    let lease: SharedMicrophoneLease;
+    try {
+      [lease] = await Promise.all([acquireSharedMicrophone(), moduleReady]);
+    } catch (error) {
+      void moduleReady.catch(() => undefined);
+      await ctx.close().catch(() => undefined);
+      throw error;
+    }
+    this.micLease = lease;
+    this.audioContext = ctx;
+    uiState.setItem(DICTATION_MIC_OPENED_KEY, "true");
 
-    const source = ctx.createMediaStreamSource(this.micLease.stream);
+    const source = ctx.createMediaStreamSource(lease.stream);
     this.sourceNode = source;
     const worklet = new AudioWorkletNode(ctx, PCM_WORKLET_NAME, {
       numberOfInputs: 1,
@@ -112,8 +201,10 @@ class DictationWarmCapture {
       channelInterpretation: "speakers",
     });
     worklet.port.onmessage = (event: MessageEvent<WorkletFrame>) => {
-      const pcm = event.data?.pcm;
-      if (pcm?.length) this.append(pcm);
+      const frame = event.data;
+      if (!frame?.pcm?.length) return;
+      if (this.listener) this.listener(frame);
+      else this.append(frame.pcm);
     };
     this.workletNode = worklet;
     source.connect(worklet);
@@ -122,9 +213,7 @@ class DictationWarmCapture {
   private append(chunk: Int16Array): void {
     this.chunks.push(chunk);
     this.totalSamples += chunk.length;
-    const maxSamples = Math.round(
-      (SUPER_FAST_PRE_ROLL_MS / 1000) * TARGET_SAMPLE_RATE,
-    );
+    const maxSamples = Math.round((PRE_ROLL_MS / 1000) * TARGET_SAMPLE_RATE);
     while (this.totalSamples > maxSamples && this.chunks.length > 0) {
       const first = this.chunks[0]!;
       if (this.totalSamples - first.length >= maxSamples) {
@@ -141,13 +230,23 @@ class DictationWarmCapture {
 
   private tearDownAudioPipeline(): void {
     if (this.workletNode) {
-      this.workletNode.port.onmessage = null;
-      this.workletNode.port.close();
-      this.workletNode.disconnect();
+      try {
+        this.workletNode.port.onmessage = null;
+        this.workletNode.port.close();
+        this.workletNode.disconnect();
+      } catch {
+        // The node may already be gone with its context.
+      }
       this.workletNode = null;
     }
-    this.sourceNode?.disconnect();
-    this.sourceNode = null;
+    if (this.sourceNode) {
+      try {
+        this.sourceNode.disconnect();
+      } catch {
+        // Already disconnected.
+      }
+      this.sourceNode = null;
+    }
   }
 }
 
@@ -158,11 +257,7 @@ export async function setDictationSuperFastModeEnabled(
 ): Promise<void> {
   setDictationSuperFastPreference(enabled);
   await setSharedMicrophoneKeepWarm(enabled);
-  if (enabled) {
-    await warmCapture.start();
-  } else {
-    await warmCapture.stop();
-  }
+  await warmCapture.pin(enabled);
 }
 
 export async function ensureDictationSuperFastWarm(): Promise<void> {
@@ -170,24 +265,25 @@ export async function ensureDictationSuperFastWarm(): Promise<void> {
   await setDictationSuperFastModeEnabled(true);
 }
 
+/** The user is about to press the mic (hover or focus): open it now. */
+export function warmDictationMicrophone(): void {
+  warmCapture.warmForIntent();
+}
+
 export class DictationSession {
   private state: DictationSessionState = "idle";
-  private micLease: SharedMicrophoneLease | null = null;
-  private audioContext: AudioContext | null = null;
-  private sourceNode: MediaStreamAudioSourceNode | null = null;
-  private workletNode: AudioWorkletNode | null = null;
+  private attached: ((frame: WorkletFrame) => void) | null = null;
   private callbacks: DictationCallbacks = {};
   private recording = new PcmRecording();
   private transcription: AbortController | null = null;
   private streaming = false;
   private streamedSamples = 0;
   private stream: DictationStream | null = null;
-  /** Settles once the relay connection has opened or failed. */
+  /** Settles once the provider acknowledged its session or the relay failed. */
   private streamOpened: Promise<void> = Promise.resolve();
-  private streamReady = false;
   private streamFailure: Error | null = null;
-  private pending: Int16Array[] = [];
-  private pendingSamples = 0;
+  /** Everything captured, held from the press and paced out once connected. */
+  private ingress: DictationIngressQueue | null = null;
   private durationLimitTimer: ReturnType<typeof setTimeout> | null = null;
   private cancelled = false;
   /** Peak RMS seen since the last `onLevel` emit, reset every tick. */
@@ -209,13 +305,12 @@ export class DictationSession {
     this.recording = new PcmRecording();
     this.resetStream();
     if (this.streaming) this.openStream();
-    if (isDictationSuperFastEnabled()) {
-      for (const chunk of warmCapture.snapshot()) this.capture(chunk);
-    }
 
-    let lease: SharedMicrophoneLease;
+    const listener = (frame: WorkletFrame) => this.onFrame(frame);
+    this.attached = listener;
+    let preRoll: Int16Array[];
     try {
-      lease = await acquireSharedMicrophone();
+      preRoll = await warmCapture.attach(listener);
     } catch (err) {
       if (this.cancelled) {
         await this.cleanup();
@@ -227,15 +322,14 @@ export class DictationSession {
       await this.cleanup();
       throw err;
     }
-    this.micLease = lease;
 
     try {
-      if (!this.cancelled) await this.setupAudioPipeline(lease.stream);
       if (this.cancelled) {
         await this.cleanup();
         this.setState("idle");
         return;
       }
+      for (const chunk of preRoll) this.capture(chunk);
       // The relay may already have refused while the mic was starting.
       if (this.streamFailure) throw this.streamFailure;
       this.durationLimitTimer = setTimeout(() => {
@@ -261,13 +355,7 @@ export class DictationSession {
       this.durationLimitTimer = null;
     }
     this.stopLevelEmitter();
-    this.tearDownAudioPipeline();
-    this.micLease?.release();
-    this.micLease = null;
-    if (this.audioContext) {
-      await this.audioContext.close().catch(() => undefined);
-      this.audioContext = null;
-    }
+    this.releaseCapture();
 
     const recording = this.recording;
     this.recording = new PcmRecording();
@@ -316,45 +404,34 @@ export class DictationSession {
       this.callbacks = {};
       return;
     }
+    if (this.state === "idle") {
+      this.releaseCapture();
+      return;
+    }
     await this.stop();
   }
 
-  private async setupAudioPipeline(stream: MediaStream): Promise<void> {
-    const ctx = new AudioContext();
-    this.audioContext = ctx;
-    await ctx.audioWorklet.addModule(
-      resolveDictationPcmWorkletUrl(window.location.href),
-    );
-    const source = ctx.createMediaStreamSource(stream);
-    this.sourceNode = source;
-    const worklet = new AudioWorkletNode(ctx, PCM_WORKLET_NAME, {
-      numberOfInputs: 1,
-      numberOfOutputs: 0,
-      channelCount: 1,
-      channelCountMode: "explicit",
-      channelInterpretation: "speakers",
-    });
-    worklet.port.onmessage = (event: MessageEvent<WorkletFrame>) => {
-      const frame = event.data;
-      if (!frame?.pcm?.length) return;
-      if (frame.rms > this.peakSinceLastEmit) this.peakSinceLastEmit = frame.rms;
-      this.capture(frame.pcm);
-      if (this.recording.full && this.state === "listening") {
-        console.warn("[dictation] hit max recording length, auto-stopping");
-        void this.stop();
-      }
-    };
-    this.workletNode = worklet;
-    source.connect(worklet);
+  private onFrame(frame: WorkletFrame): void {
+    if (frame.rms > this.peakSinceLastEmit) this.peakSinceLastEmit = frame.rms;
+    this.capture(frame.pcm);
+    if (this.recording.full && this.state === "listening") {
+      console.warn("[dictation] hit max recording length, auto-stopping");
+      void this.stop();
+    }
+  }
+
+  private releaseCapture(): void {
+    if (!this.attached) return;
+    warmCapture.detach(this.attached);
+    this.attached = null;
   }
 
   private resetStream(): void {
+    this.ingress?.close();
+    this.ingress = null;
     this.stream = null;
     this.streamOpened = Promise.resolve();
-    this.streamReady = false;
     this.streamFailure = null;
-    this.pending = [];
-    this.pendingSamples = 0;
     this.streamedSamples = 0;
   }
 
@@ -372,13 +449,12 @@ export class DictationSession {
       },
     );
     this.stream = stream;
+    const ingress = new DictationIngressQueue((bytes) => stream.send(bytes));
+    this.ingress = ingress;
     this.streamOpened = stream.open().then(
       () => {
         if (this.stream !== stream || this.streamFailure) return;
-        for (const chunk of this.pending) stream.send(chunk);
-        this.pending = [];
-        this.pendingSamples = 0;
-        this.streamReady = true;
+        ingress.start();
       },
       (error: unknown) => {
         if (this.stream !== stream) return;
@@ -406,22 +482,7 @@ export class DictationSession {
       return;
     }
     this.streamedSamples += pcm.length;
-    if (this.streamReady) {
-      this.stream?.send(pcm);
-      return;
-    }
-    this.bufferWhileConnecting(pcm);
-  }
-
-  private bufferWhileConnecting(pcm: Int16Array): void {
-    this.pending.push(pcm);
-    this.pendingSamples += pcm.length;
-    while (
-      this.pendingSamples > STREAM_PRE_ROLL_MAX_SAMPLES &&
-      this.pending.length > 1
-    ) {
-      this.pendingSamples -= this.pending.shift()!.length;
-    }
+    this.ingress?.push(pcm);
   }
 
   private async finishStream(): Promise<string> {
@@ -432,43 +493,18 @@ export class DictationSession {
       await this.streamOpened;
       if (this.streamFailure) throw this.streamFailure;
       if (!stream) throw new Error("Dictation stream is unavailable.");
+      await this.ingress?.flushed();
+      if (this.streamFailure) throw this.streamFailure;
       return await stream.finish();
     } finally {
       if (this.stream === stream) this.resetStream();
     }
   }
 
-  private tearDownAudioPipeline(): void {
-    if (this.workletNode) {
-      try {
-        this.workletNode.port.onmessage = null;
-        this.workletNode.port.close();
-        this.workletNode.disconnect();
-      } catch {
-        // The node may already be gone with its context.
-      }
-      this.workletNode = null;
-    }
-    if (this.sourceNode) {
-      try {
-        this.sourceNode.disconnect();
-      } catch {
-        // Already disconnected.
-      }
-      this.sourceNode = null;
-    }
-  }
-
   private async cleanup(): Promise<void> {
     this.stream?.cancel();
     this.resetStream();
-    this.tearDownAudioPipeline();
-    if (this.audioContext) {
-      await this.audioContext.close().catch(() => undefined);
-      this.audioContext = null;
-    }
-    this.micLease?.release();
-    this.micLease = null;
+    this.releaseCapture();
     if (this.durationLimitTimer) {
       clearTimeout(this.durationLimitTimer);
       this.durationLimitTimer = null;

@@ -1,27 +1,33 @@
 /**
- * Keeps dictation audio ingress at real time.
+ * Keeps dictation audio ingress at real time, without losing any of it.
+ *
+ * The microphone starts on the press, before the relay and Meta's realtime
+ * ASR are connected. Everything captured meanwhile waits in a lossless
+ * `DictationIngressQueue` and is released in order once the provider
+ * acknowledges its handshake, never far enough ahead of its clock to trip
+ * its backlog limit.
  *
  * Meta's realtime ASR runs a wall clock from the handshake and closes the
  * session (code 1008, "ingress audio slower than real-time") once the audio it
- * has received falls a cumulative ten seconds behind that clock. It also
- * closes when more than five seconds of audio is queued ahead of real time.
- * The phone only ever hands us what the microphone captured, so any gap in
- * capture (audio-session interruption, route change, a brief suspension, a
- * slow recorder start) becomes permanent lateness that eventually ends the
- * session mid-sentence.
+ * has received falls a cumulative ten seconds behind that clock. The phone
+ * only ever hands us what the microphone captured, so any gap in capture
+ * (audio-session interruption, route change, a brief suspension) becomes
+ * permanent lateness that eventually ends the session mid-sentence.
  *
  * The pacer accounts for the audio it forwards and, from a timer, fills any
  * lateness beyond a small tolerance with silence. Silence is only sent when
- * the timer fires on schedule: a late timer means the JS thread was blocked,
- * and the recorder's queued buffers are about to catch the stream up on their
- * own. Padding on top of those would push the session past the backlog limit
- * instead.
+ * the timer fires on schedule and nothing captured is still waiting: a late
+ * timer means the JS thread was blocked, and the recorder's queued buffers are
+ * about to catch the stream up on their own. Padding on top of those would
+ * push the session past the backlog limit instead.
  */
 
+import {
+  DICTATION_PCM_BYTES_PER_MS,
+  DictationIngressQueue,
+} from "@stella/contracts/dictation-ingress";
 import type { DictationStream } from "./dictation-stream";
 
-/** 16 kHz mono signed 16-bit PCM. */
-const PCM_BYTES_PER_MS = 32;
 const TICK_MS = 250;
 /** A tick this late means the JS thread stalled; queued audio will follow. */
 const STALLED_TICK_MS = 200;
@@ -33,42 +39,73 @@ const PAD_KEEP_MS = 250;
 const MAX_PAD_MS = 1_000;
 
 export class DictationIngressPacer {
-  private sentMs = 0;
+  private readonly queue: DictationIngressQueue;
   private timer: ReturnType<typeof setInterval> | null = null;
   private expectedTickAt = 0;
+  private startedAt = 0;
+  private stopped = false;
 
   constructor(
-    private readonly stream: Pick<DictationStream, "send">,
-    /** When the provider's clock started: the handshake acknowledgment. */
-    private readonly startedAt: number = Date.now(),
-  ) {}
-
-  /** Forward captured audio and account for its duration. */
-  send(bytes: ArrayBuffer): void {
-    this.stream.send(bytes);
-    this.sentMs += bytes.byteLength / PCM_BYTES_PER_MS;
+    stream: Pick<DictationStream, "send">,
+    private readonly now: () => number = Date.now,
+  ) {
+    this.queue = new DictationIngressQueue((bytes) => stream.send(bytes), now);
   }
 
-  start(): void {
-    if (this.timer !== null) return;
-    this.expectedTickAt = Date.now() + TICK_MS;
+  /** Audio captured but not yet released to the relay. */
+  get queuedMs(): number {
+    return this.queue.queuedMs;
+  }
+
+  /** Audio released to the relay so far. */
+  get sentMs(): number {
+    return this.queue.sentMs;
+  }
+
+  /** Forward captured audio; before `start` it is held, never dropped. */
+  send(bytes: ArrayBuffer): void {
+    this.queue.push(bytes);
+  }
+
+  /** The provider acknowledged its handshake: its clock starts now. */
+  start(startedAt: number = this.now()): void {
+    if (this.stopped || this.timer !== null) return;
+    this.startedAt = startedAt;
+    this.queue.start(startedAt);
+    this.expectedTickAt = this.now() + TICK_MS;
     this.timer = setInterval(this.tick, TICK_MS);
   }
 
-  stop(): void {
+  /** Recording ended: no more silence, but captured audio keeps flowing. */
+  stopPadding(): void {
     if (this.timer !== null) clearInterval(this.timer);
     this.timer = null;
   }
 
+  /** Resolves once every captured byte has been released to the relay. */
+  flushed(): Promise<void> {
+    return this.queue.flushed();
+  }
+
+  /** Abandon the session: stop the timer and forget queued audio. */
+  stop(): void {
+    this.stopped = true;
+    this.stopPadding();
+    this.queue.close();
+  }
+
   private readonly tick = (): void => {
-    const now = Date.now();
+    const now = this.now();
     const lateness = now - this.expectedTickAt;
     this.expectedTickAt = now + TICK_MS;
     if (lateness > STALLED_TICK_MS) return;
-    const deficitMs = now - this.startedAt - this.sentMs;
+    this.queue.drain();
+    if (this.queue.queuedMs > 0) return;
+    const deficitMs = now - this.startedAt - this.queue.sentMs;
     if (deficitMs < PAD_AFTER_MS) return;
     const padMs = Math.min(MAX_PAD_MS, deficitMs - PAD_KEEP_MS);
-    const silence = new ArrayBuffer(Math.floor(padMs) * PCM_BYTES_PER_MS);
-    this.send(silence);
+    this.queue.push(
+      new ArrayBuffer(Math.floor(padMs) * DICTATION_PCM_BYTES_PER_MS),
+    );
   };
 }

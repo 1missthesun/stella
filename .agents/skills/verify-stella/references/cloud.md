@@ -41,6 +41,12 @@ teardown) is faster to drive headless:
   sandbox and background-agent behavior on dev. `wrangler tail` does not
   attach to Previews; read the Preview's logs in the dashboard
   (Observability, persisted at full sampling).
+- Call an owner RPC or read a live view as a test account without printing
+  tokens: `node .agents/skills/verify-stella/scripts/backend-call.mjs call
+  <name> '<argsJson>'`, `... view <name>`, or `... history <conversationId>`.
+  It targets `STELLA_BACKEND_URL` and acts as `STELLA_VERIFY_ACCOUNT_EMAIL`,
+  else the current desktop run's account, so it can seed or read back what
+  the desktop under test shows (schedules, reminders, conversations).
 - A worker-only `bun run deploy:dev` takes about two minutes; one that
   rebuilds the image takes six. Never deploy while a cloud thread is
   `running`: the deploy replaces the isolate running it and the turn is

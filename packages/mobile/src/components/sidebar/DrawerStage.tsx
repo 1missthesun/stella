@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, type ReactNode } from "react";
 import {
   BackHandler,
   Platform,
@@ -26,8 +26,9 @@ import {
   openDrawer,
   useDrawerLive,
   useDrawerMetrics,
+  useDrawerClosePan,
   useDrawerOpen,
-  useDrawerPan,
+  useDrawerOpenPan,
   useDrawerSide,
   type DrawerSide,
 } from "../../lib/drawer";
@@ -42,6 +43,7 @@ const AnimatedBlur = Animated.createAnimatedComponent(BlurView);
 const BLUR = Platform.OS === "ios";
 const PAGE_BLUR = 30;
 const PANEL_BLUR = 34;
+const STRIP_VEIL = 0.9;
 
 export const DRAWER_CHEVRON_SIZE = 44;
 
@@ -118,25 +120,28 @@ export function DrawerStage({
     borderRadius: interpolate(p.value, [0, 0.12], [0, radius], CLAMP),
   }));
   const fade = useAnimatedStyle(() => ({
-    opacity: drawerVeil(p.value),
+    opacity: drawerVeil(p.value) * STRIP_VEIL,
+  }));
+  const edge = useAnimatedStyle(() => ({
+    borderRadius: interpolate(p.value, [0, 0.12], [0, radius], CLAMP),
+    opacity: interpolate(p.value, [0.3, 0.9], [0, 1], CLAMP),
   }));
   const pageBlur = useAnimatedProps(() => ({
     intensity: reduce ? 0 : drawerBlur(p.value) * PAGE_BLUR,
   }));
 
-  const settled = !live || side === "start";
-  const openStart = useDrawerPan("open", "start", enabled && !open && settled);
-  const openEnd = useDrawerPan(
-    "open",
-    "end",
-    endEnabled && !open && (!live || side === "end"),
+  const openPan = useDrawerOpenPan({ start: enabled, end: endEnabled, open });
+  const closePan = useDrawerClosePan(side);
+  const catcher = useMemo(
+    () =>
+      Gesture.Exclusive(
+        closePan,
+        Gesture.Tap().onEnd(() => {
+          runOnJS(closeDrawer)();
+        }),
+      ),
+    [closePan],
   );
-  const openPan = Gesture.Race(openStart, openEnd);
-  const closePan = useDrawerPan("close", side);
-  const tap = Gesture.Tap().onEnd(() => {
-    runOnJS(closeDrawer)();
-  });
-  const catcher = Gesture.Exclusive(closePan, tap);
 
   return (
     <View style={[styles.root, { backgroundColor: floor }]}>
@@ -178,6 +183,17 @@ export function DrawerStage({
               </>
             ) : null}
           </Animated.View>
+          {live ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                styles.edge,
+                { borderColor: colors.border },
+                edge,
+              ]}
+            />
+          ) : null}
           {open ? (
             <GestureDetector gesture={catcher}>
               <View
@@ -247,7 +263,7 @@ function DrawerPanel({
   const panelFocusStyle = useAnimatedStyle(() => ({
     opacity: p.value > 0.97 ? 0 : 1,
   }));
-  const panelPan = useDrawerPan("close", side);
+  const panelPan = useDrawerClosePan(side);
 
   return (
     <GestureDetector gesture={panelPan}>
@@ -334,36 +350,55 @@ function FloatingChevron({
   });
   const press = open ? closeDrawer : () => openDrawer(side);
   const label = open ? closeLabel : openLabel;
+  const pressRef = useRef(press);
+  pressRef.current = press;
+  const tap = useMemo(
+    () =>
+      Gesture.Tap()
+        .runOnJS(true)
+        .maxDistance(32)
+        .hitSlop(8)
+        .onEnd((_e, success) => {
+          if (success) pressRef.current();
+        }),
+    [],
+  );
   return (
-    <Animated.View
-      style={[styles.chevron, { left, top }, follow]}
-      accessible
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      onAccessibilityTap={press}
-      accessibilityActions={[{ name: "activate" }]}
-      onAccessibilityAction={press}
-    >
-      <GlassIconButton
-        icon="chevron-right"
-        size={DRAWER_CHEVRON_SIZE}
-        iconSize={20}
-        iconStyle={turn}
+    <GestureDetector gesture={tap}>
+      <Animated.View
+        style={[styles.chevron, { left, top }, follow]}
+        pointerEvents="box-only"
+        accessible
+        accessibilityRole="button"
         accessibilityLabel={label}
-        accessibilityHidden
-        onPress={press}
-      />
-      {restIcon ? (
-        <Animated.View pointerEvents="none" style={[styles.restIcon, restTurn]}>
-          <Icon
-            name={restIcon}
-            size={19}
-            color={colors.text}
-            weight="semibold"
-          />
-        </Animated.View>
-      ) : null}
-    </Animated.View>
+        onAccessibilityTap={press}
+        accessibilityActions={[{ name: "activate" }]}
+        onAccessibilityAction={press}
+      >
+        <GlassIconButton
+          icon="chevron-right"
+          size={DRAWER_CHEVRON_SIZE}
+          iconSize={20}
+          iconStyle={turn}
+          accessibilityLabel={label}
+          accessibilityHidden
+          onPress={press}
+        />
+        {restIcon ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.restIcon, restTurn]}
+          >
+            <Icon
+              name={restIcon}
+              size={19}
+              color={colors.text}
+              weight="semibold"
+            />
+          </Animated.View>
+        ) : null}
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
@@ -379,6 +414,9 @@ const styles = StyleSheet.create({
   stage: { flex: 1 },
   clip: { flex: 1, overflow: "hidden" },
   chevron: { position: "absolute" },
+  edge: {
+    borderWidth: 1,
+  },
   restIcon: {
     alignItems: "center",
     height: DRAWER_CHEVRON_SIZE,

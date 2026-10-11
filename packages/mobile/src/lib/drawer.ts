@@ -6,7 +6,6 @@ import {
   cancelAnimation,
   makeMutable,
   runOnJS,
-  useSharedValue,
   withSpring,
   type WithSpringConfig,
 } from "react-native-reanimated";
@@ -172,43 +171,87 @@ function rubber(over: number) {
 
 const dismissKeyboard = () => Keyboard.dismiss();
 
-export function useDrawerPan(
-  direction: "open" | "close",
-  side: DrawerSide,
-  enabled = true,
-) {
+const dragging = makeMutable(0);
+const dragOrigin = makeMutable(0);
+
+function grab(sign: number, translationX: number, travel: number) {
+  "worklet";
+  cancelAnimation(drawerProgress);
+  if (drawerSign.value !== sign) {
+    drawerSign.value = sign;
+    drawerProgress.value = 0;
+  }
+  dragOrigin.value = drawerProgress.value - (sign * translationX) / travel;
+  dragging.value = 1;
+  runOnJS(begin)(sign === 1 ? "start" : "end");
+}
+
+function track(translationX: number, travel: number) {
+  "worklet";
+  if (dragging.value !== 1) return;
+  const raw = dragOrigin.value + (drawerSign.value * translationX) / travel;
+  drawerProgress.value = raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
+}
+
+function release(velocityX: number, travel: number) {
+  "worklet";
+  if (dragging.value !== 1) return;
+  dragging.value = 0;
+  const v = (drawerSign.value * velocityX) / travel;
+  const open = drawerProgress.value + v * 0.2 > 0.5;
+  runOnJS(setOpen)(open);
+  settleDrawer(open, v);
+}
+
+/**
+ * The page's drag. At rest the direction picks the sidebar (right for the
+ * start one, left for the end one); a drawer still moving is caught where it
+ * is, whichever way the finger goes. Nothing it reads changes mid-drag, so the
+ * gesture is never rebuilt under a finger, and every drag ends in a settle.
+ */
+export function useDrawerOpenPan({
+  start,
+  end,
+  open,
+}: {
+  start: boolean;
+  end: boolean;
+  open: boolean;
+}) {
   const { travel } = useDrawerMetrics();
-  const origin = useSharedValue(0);
+  return useMemo(() => {
+    const offset: number | [number, number] =
+      start && end ? [-12, 12] : start ? 12 : -12;
+    return Gesture.Pan()
+      .enabled((start || end) && !open)
+      .activeOffsetX(offset)
+      .failOffsetY([-14, 14])
+      .onStart((e) => {
+        let sign = drawerSign.value;
+        if (drawerProgress.value <= 0.001) {
+          sign = e.translationX > 0 ? 1 : -1;
+          if (sign === 1 ? !start : !end) return;
+        }
+        grab(sign, e.translationX, travel);
+        runOnJS(dismissKeyboard)();
+      })
+      .onUpdate((e) => track(e.translationX, travel))
+      .onFinalize((e) => release(e.velocityX, travel));
+  }, [start, end, open, travel]);
+}
+
+/** The open sidebar's drag back toward closed, from its panel or the page. */
+export function useDrawerClosePan(side: DrawerSide) {
+  const { travel } = useDrawerMetrics();
   const sign = side === "start" ? 1 : -1;
-  const toward = direction === "open" ? sign : -sign;
   return useMemo(
     () =>
       Gesture.Pan()
-        .enabled(enabled)
-        .activeOffsetX(toward > 0 ? 12 : -12)
+        .activeOffsetX(sign > 0 ? -12 : 12)
         .failOffsetY([-14, 14])
-        .onStart((e) => {
-          cancelAnimation(drawerProgress);
-          if (drawerSign.value !== sign) {
-            drawerSign.value = sign;
-            drawerProgress.value = 0;
-          }
-          origin.value =
-            drawerProgress.value - (sign * e.translationX) / travel;
-          runOnJS(begin)(side);
-          if (direction === "open") runOnJS(dismissKeyboard)();
-        })
-        .onUpdate((e) => {
-          const raw = origin.value + (sign * e.translationX) / travel;
-          drawerProgress.value =
-            raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
-        })
-        .onEnd((e) => {
-          const v = (sign * e.velocityX) / travel;
-          const open = drawerProgress.value + v * 0.2 > 0.5;
-          runOnJS(setOpen)(open);
-          settleDrawer(open, v);
-        }),
-    [direction, side, sign, toward, enabled, travel, origin],
+        .onStart((e) => grab(sign, e.translationX, travel))
+        .onUpdate((e) => track(e.translationX, travel))
+        .onFinalize((e) => release(e.velocityX, travel)),
+    [sign, travel],
   );
 }

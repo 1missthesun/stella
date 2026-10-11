@@ -146,7 +146,8 @@ const reusableChatGptRegistrations = (
   return result;
 };
 
-export function EngineAccountsSettings({ onBack }: { onBack: () => void }) {
+/** The accounts page. The app shell draws its back arrow; this draws the title. */
+export function EngineAccountsSettings() {
   const colors = useColors();
   const t = useT();
   const insets = useSafeAreaInsets();
@@ -162,17 +163,6 @@ export function EngineAccountsSettings({ onBack }: { onBack: () => void }) {
       keyboardShouldPersistTaps="handled"
     >
       <View style={styles.header}>
-        <Pressable
-          onPress={onBack}
-          hitSlop={10}
-          accessibilityLabel={t("mobile.engineAccounts.backLabel")}
-          style={({ pressed }) => [
-            styles.backButton,
-            pressed && styles.pressed,
-          ]}
-        >
-          <Icon name="chevron-left" size={22} color={colors.text} />
-        </Pressable>
         <View style={styles.headerCopy}>
           <Text style={styles.title} numberOfLines={1}>
             {t("mobile.engineAccounts.title")}
@@ -1095,13 +1085,6 @@ const makeStyles = (colors: Colors) =>
       flexDirection: "row",
       gap: 8,
       marginBottom: 4,
-    },
-    backButton: {
-      alignItems: "center",
-      height: 40,
-      justifyContent: "center",
-      marginLeft: -8,
-      width: 40,
     },
     pressed: { opacity: 0.55 },
     headerCopy: { flex: 1 },

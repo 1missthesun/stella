@@ -81,12 +81,7 @@ export function ProvidersPage({
       brain.kind === "provider" ? brain.provider.id : brain.engine,
     ),
   );
-  const ready = brains.filter((brain) =>
-    brain.kind === "provider"
-      ? brainReady(brain)
-      : brain.engine === "stella" ||
-        settings.connectedProviders?.includes(brain.engine),
-  );
+  const ready = brains.filter((brain) => brainReady(brain, settings));
   const more = brains.filter((brain) => !ready.includes(brain));
 
   const row = (brain: Brain) => {

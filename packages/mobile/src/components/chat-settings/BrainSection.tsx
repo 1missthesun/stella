@@ -28,9 +28,20 @@ import {
 /** Models shown under the switcher before "All models" takes over. */
 const SHORT_LIST = 5;
 
-/** A brain the menu can switch to without setting anything up first. */
-export const brainReady = (brain: Brain) =>
-  brain.kind === "engine" || brain.provider.connection?.status === "ok";
+/**
+ * Whether a brain can run now without setting anything up: Stella always;
+ * Claude Code and ChatGPT once an account is signed in for the cloud; an
+ * account provider once its key or sign-in works. The one in use counts too,
+ * so it is never missing from the menu that shows it checked. The Model menu
+ * and the Providers page both sort by this.
+ */
+export const brainReady = (brain: Brain, settings: ModelSettings) => {
+  if (brain.id === settings.brainId) return true;
+  if (brain.kind === "provider")
+    return brain.provider.connection?.status === "ok";
+  if (brain.engine === "stella") return true;
+  return settings.connectedProviders?.includes(brain.engine) ?? false;
+};
 
 /**
  * Which brain runs the chat, shown as the one in use with its models under
@@ -95,7 +106,9 @@ export function BrainSection({
     });
   };
 
-  const readyBrains = settings.brains.filter(brainReady);
+  const readyBrains = settings.brains.filter((brain) =>
+    brainReady(brain, settings),
+  );
   const items: NativeMenuItem[] = [
     ...readyBrains.map((brain): NativeMenuItem => ({
       id: brain.id,
@@ -238,6 +251,7 @@ const makeStyles = (colors: Colors) =>
     efforts: {
       flexDirection: "row",
       justifyContent: "space-between",
+      paddingRight: 6,
     },
     effort: {
       alignItems: "center",

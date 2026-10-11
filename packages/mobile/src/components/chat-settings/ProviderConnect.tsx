@@ -162,24 +162,12 @@ function ApiKeyForm({
         }
       />
       {error ? <Note tone="danger">{error}</Note> : null}
-      <View style={styles.actions}>
-        {secondary ? (
-          <TextAction
-            label={saving ? "Checking…" : "Save key"}
-            disabled={!key.trim() || saving}
-            onPress={() => void save()}
-          />
-        ) : (
-          <View style={styles.grow}>
-            <PrimaryButton
-              label="Save key"
-              busy={saving}
-              disabled={!key.trim()}
-              onPress={() => void save()}
-            />
-          </View>
-        )}
-      </View>
+      <PrimaryButton
+        label="Save key"
+        busy={saving}
+        disabled={!key.trim()}
+        onPress={() => void save()}
+      />
       {method.keyUrl ? (
         <TextAction
           label="Get a key"
@@ -436,12 +424,6 @@ const makeStyles = (colors: Colors) =>
     },
     block: {
       gap: 14,
-    },
-    actions: {
-      flexDirection: "row",
-    },
-    grow: {
-      flex: 1,
     },
     row: {
       flexDirection: "row",

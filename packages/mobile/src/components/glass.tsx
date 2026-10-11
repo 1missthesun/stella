@@ -260,6 +260,10 @@ export function GlassToggle({
         fallbackColor={offTrack}
         style={StyleSheet.absoluteFill}
       >
+        <View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFill, { backgroundColor: offTrack }]}
+        />
         <Animated.View
           pointerEvents="none"
           style={[

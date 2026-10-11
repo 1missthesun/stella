@@ -8,10 +8,11 @@ import { agentAttemptOutcomeOf, type AgentAttemptOutcome, type AgentStatus } fro
 
 /**
  * How a `send_message` landed: `steered` into a running agent, `resumed` an
- * idle one as its next attempt, or `queued` as a Stella session's next turn.
+ * idle one as its next attempt, `queued` as a Stella session's next turn, or
+ * `held` for an agent whose computer is offline until it reconnects.
  */
 export type AgentMessageDelivery = {
-  delivered: "steered" | "resumed" | "queued";
+  delivered: "steered" | "resumed" | "queued" | "held";
   threadId: string;
   /** Why the message waits, when it was queued for a computer that is offline. */
   note?: string;
@@ -85,6 +86,17 @@ export type AgentControlResult = {
   where?: string;
   note?: string;
 };
+
+export const agentMessageDelivery = (result: AgentControlResult): AgentMessageDelivery => ({
+  delivered:
+    result.outcome === "resumed" || result.outcome === "held"
+      ? result.outcome
+      : result.outcome === "queued" && result.executor === undefined
+        ? "queued"
+        : "steered",
+  threadId: result.threadId,
+  ...(result.note ? { note: result.note } : {}),
+});
 
 /**
  * Agent threads: every background agent the owner has, cloud or desktop,

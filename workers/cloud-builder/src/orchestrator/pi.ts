@@ -1,9 +1,11 @@
 import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import {
   agentAttemptOutcomeOf,
+  isLiveAgentStatus,
   reportStatusOf,
   type AgentAttemptOutcome,
 } from "@stella/contracts/agent-status";
+import { normalizeAgentDirectoryStatus } from "@stella/contracts/agent-directory";
 import type {
   AdmittedCloudChat,
   CloudChatPreparation,
@@ -557,7 +559,23 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           await receipt(threadId),
         );
         await this.ctx.storage.put(receiptKey(threadId), current);
-        return `${current.status} on device ${current.executorDeviceId ?? "?"}`;
+        const deviceId = current.executorDeviceId;
+        const device = deviceId
+          ? (
+              await this.ownerGate(authority.ownerId)
+                .devices()
+                .catch(() => undefined)
+            )?.devices.find((entry) => entry.deviceId === deviceId)
+          : undefined;
+        const name = device?.label?.trim() || deviceId || "its computer";
+        const status = normalizeAgentDirectoryStatus(current.status);
+        const offline =
+          device && !device.online && isLiveAgentStatus(status)
+            ? `, but ${name} is offline${
+                device.lastSeenAt ? ` (last seen ${new Date(device.lastSeenAt).toISOString()})` : ""
+              }, so this may be out of date; it reports when ${name} reconnects`
+            : "";
+        return `${status} on ${name}${offline}`;
       },
       pause: async (args, authority, parentTurnId) => {
         const next = await cancelDeviceAgent(

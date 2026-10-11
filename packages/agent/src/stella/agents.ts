@@ -39,6 +39,7 @@ import {
 } from "@earendil-works/pi-durable";
 import {
   AGENT_MESSAGE_MAX_CHARS,
+  agentDirectoryEntry,
   buildAgentDirectoryResult,
   formatAgentMessage,
   STELLA_MESSAGE_TARGET,
@@ -572,10 +573,23 @@ const deliveredResult = (delivery: { threadId: string; delivered?: AgentMessageD
             ? "It was idle, so your message started its next run; its report goes to whoever started it."
             : delivery.delivered === "queued"
               ? "That Stella reads it as its next turn."
-              : "It reads your message before its next step; its report goes to whoever started it."
+              : delivery.delivered === "held"
+                ? "Its computer is offline, so the message is held and reaches it once that computer reconnects; its report goes to whoever started it."
+                : "It reads your message before its next step; its report goes to whoever started it."
       }${delivery.note ? ` ${delivery.note}` : ""}`,
     },
   ],
+});
+
+const statusResult = (view: Record<string, unknown>) => ({
+  content: [{ type: "text" as const, text: JSON.stringify(view, null, 2) }],
+});
+
+const controlNote = (starter: boolean) => ({
+  send_message: starter
+    ? "reaches it as an instruction from you, since you started it: it steers it while it runs, or resumes it once it stopped. Its report comes back to you."
+    : "reaches it as a note from you, which it weighs against its own work; its report still goes to whoever started it.",
+  pause_agent: "pauses it wherever it runs; a message later resumes it.",
 });
 
 export function stellaAgents(host: StellaAgentsHost) {
@@ -1195,34 +1209,34 @@ export function stellaAgents(host: StellaAgentsHost) {
     return host.remote?.(placement.kind === "device" ? { ...placement, whole: true } : placement);
   };
 
-  const status = async (api: ToolExecutionApi, threadId: string, agent: AgentRecord, context: Context, detailed: boolean) => {
+  const agentDetails = async (
+    api: ToolExecutionApi,
+    threadId: string,
+    agent: AgentRecord,
+    context: Context,
+  ): Promise<Record<string, unknown>> => {
     if (agent.remote) {
-      const where = describePlacement(placementOf(agent.placement) ?? host.rootPlacement);
       const there = await remoteHostOf(agent)
         ?.status?.(threadId, context)
         .catch(() => undefined);
-      return `- ${threadId}: ${agent.description} [${where}] ${there ?? "runs there; its report arrives in [Agent completed]"}`;
+      return there ? { status_there: there } : {};
     }
     const conversationId = agent.conversationId as ConversationId;
     const live = await api.snapshot(LiveDoc, conversationId, context);
-    const lines = [
-      `- ${threadId}: ${agent.description} [${describePlacement(placementOf(agent.placement) ?? host.rootPlacement)}] ${live?.run !== undefined ? "running" : "idle"}`,
-    ];
-    if (detailed) {
-      const running = live?.tools?.filter((tool) => tool.status === "running").map((tool) => tool.name) ?? [];
-      if (running.length) lines.push(`  running tools: ${running.join(", ")}`);
-      const recent = await api.commit(
-        async (tx) => (await tx.scanEntries({ conversationId, order: "descending" }, 20)).items,
-        context,
-      );
-      const lastAnswer = recent.find((entry) => entry.kind === "pi.assistant");
-      const message = lastAnswer?.model?.[0] as AssistantMessage | undefined;
-      const text = textOf(message);
-      if (text) lines.push(`  latest message: ${text.slice(0, 2_000)}`);
-      const call = message?.content.find((part) => part.type === "toolCall");
-      if (call && call.type === "toolCall") lines.push(`  latest tool call: ${call.name}`);
-    }
-    return lines.join("\n");
+    const running = live?.tools?.filter((tool) => tool.status === "running").map((tool) => tool.name) ?? [];
+    const recent = await api.commit(
+      async (tx) => (await tx.scanEntries({ conversationId, order: "descending" }, 20)).items,
+      context,
+    );
+    const message = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
+    const text = textOf(message);
+    const call = message?.content.find((part) => part.type === "toolCall");
+    return {
+      ...(running.length ? { running_tools: running } : {}),
+      ...(text ? { latest_message: text.slice(0, 2_000) } : {}),
+      ...(call && call.type === "toolCall" ? { latest_tool_call: call.name } : {}),
+      ...(agent.held?.length ? { held_messages: agent.held.length } : {}),
+    };
   };
 
   /**
@@ -1298,10 +1312,10 @@ export function stellaAgents(host: StellaAgentsHost) {
       status:
         live?.run !== undefined
           ? "running"
-          : latest?.stopReason === "error"
-            ? "failed"
-            : latest?.stopReason === "aborted"
-              ? "paused"
+          : stoppedShort(recent)
+            ? "paused"
+            : latest?.stopReason === "error"
+              ? "failed"
               : "completed",
       updatedAt: at ?? latest?.timestamp ?? Date.now(),
     };
@@ -1408,7 +1422,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const agentStatus = defineTool({
     name: "agent_status",
     description:
-      "Without thread_id: list who you can reach — subagents you started, your teammates (Stella and the other agents in this conversation), other Stella sessions on this computer, and the user's cloud sessions — with each one's thread_id, what it is working on, where it runs, and its status. With thread_id: that agent's status, latest message and tool call. Read-only: it never interrupts or messages anyone.",
+      "Without thread_id: list who you can reach — subagents you started, your teammates (Stella and the other agents in this conversation), other Stella sessions on this computer, and the user's cloud sessions — with each one's thread_id, what it is working on, where it runs, and its status. With thread_id: that agent's status and where it runs, whether send_message and pause_agent reach it from here (controllable_here) and how a message lands, and its latest message and tool call. Read-only: it never interrupts or messages anyone.",
     parameters: Type.Object({
       thread_id: Type.Optional(Type.String({ description: "The agent to inspect. Omit it to list everyone you can reach." })),
     }),
@@ -1416,56 +1430,69 @@ export function stellaAgents(host: StellaAgentsHost) {
     execute: async (args, api, context) => {
       const threadId = args.thread_id?.trim();
       if (!threadId) return await directoryStatus(api, context);
-      const own = (await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.agents[threadId];
-      if (own) return { content: [{ type: "text", text: await status(api, threadId, own, context, true) }] };
-      const { root } = await chainOf(api, context);
+      const { self, root } = await chainOf(api, context);
       const conversation = await host.directory?.conversationId(context).catch(() => undefined);
+      const conversationId = conversation ?? STELLA_MESSAGE_TARGET;
       if (root !== undefined && (threadId.toLowerCase() === STELLA_MESSAGE_TARGET || threadId === conversation)) {
         const running = (await api.snapshot(LiveDoc, root, context))?.run !== undefined;
-        return {
-          content: [
-            {
-              type: "text",
-              text: `${conversation ?? STELLA_MESSAGE_TARGET} is Stella for this conversation, ${running ? "running" : "idle"}. send_message with "${STELLA_MESSAGE_TARGET}" reaches it.`,
-            },
-          ],
-        };
+        return statusResult({
+          thread_id: conversationId,
+          role: "Stella for this conversation",
+          status: running ? "running" : "idle",
+          controllable_here: true,
+          send_message: `reaches it as a note from you, with "${STELLA_MESSAGE_TARGET}" or this thread_id; it reads it as its next turn.`,
+        });
       }
-      const found = root === undefined ? undefined : (await agentTree(api, root, context)).find((agent) => agent.threadId === threadId);
+      const ownState = await api.snapshot(StellaAgentsDoc, api.conversationId, context);
+      const tree = root === undefined ? [] : await agentTree(api, root, context);
+      const own = ownState?.agents[threadId];
+      const found: TreeAgent | undefined =
+        tree.find((agent) => agent.threadId === threadId) ??
+        (own
+          ? {
+              threadId,
+              record: own,
+              parentConversationId: api.conversationId,
+              ...(self.threadId ? { parentThreadId: self.threadId } : {}),
+              given: Object.values(ownState?.calls ?? {}).filter((call) => call.threadId === threadId).length,
+              reports: true,
+            }
+          : undefined);
       if (found) {
-        const text = await status(api, threadId, found.record, context, true);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `${text}\n  started by: ${found.parentThreadId ?? "Stella"}; send_message reaches it as a note from you.`,
-            },
-          ],
-        };
+        const starter = found.parentConversationId === api.conversationId;
+        const row = await directoryRow(api, found, conversationId, context);
+        const reachable = !found.record.remote || remoteHostOf(found.record) !== undefined || host.directory !== undefined;
+        return statusResult({
+          ...agentDirectoryEntry(row),
+          ...(row.parentThreadId ? {} : { started_by: "Stella" }),
+          controllable_here: reachable,
+          ...(reachable ? controlNote(starter) : {}),
+          ...(await agentDetails(api, threadId, found.record, context)),
+        });
       }
       const elsewhere = await host.directory?.list(context).catch(() => undefined);
       const session = elsewhere?.sessions.find((row) => row.conversationId === threadId);
       if (session) {
-        const title = session.title.trim() || "Untitled chat";
-        return {
-          content: [
-            {
-              type: "text",
-              text: `Thread ${threadId} is another Stella session ("${title}"), ${session.active ? "running" : "idle"} in ${session.where}, last active ${new Date(session.updatedAt).toISOString()}. send_message queues a note as its next turn.`,
-            },
-          ],
-        };
+        return statusResult({
+          thread_id: threadId,
+          role: "another Stella session",
+          title: session.title.trim() || "Untitled chat",
+          status: session.active ? "running" : "idle",
+          where: session.where,
+          last_active: new Date(session.updatedAt).toISOString(),
+          controllable_here: true,
+          send_message: "queues a note from you as its next turn.",
+        });
       }
       const agent = elsewhere?.agents.find((row) => row.threadId === threadId);
       if (agent) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `- ${threadId}: ${agent.description} [${agent.where}] ${agent.status}, last active ${new Date(agent.updatedAt).toISOString()}. send_message reaches it as a note from you.`,
-            },
-          ],
-        };
+        const starter = self.threadId ? agent.parentThreadId === self.threadId : !agent.parentThreadId;
+        return statusResult({
+          ...agentDirectoryEntry(agent),
+          ...(agent.parentThreadId ? {} : { started_by: "Stella" }),
+          controllable_here: true,
+          ...controlNote(starter),
+        });
       }
       throw new Error(`Thread not found: ${threadId}. agent_status without a thread_id lists who you can reach.`);
     },

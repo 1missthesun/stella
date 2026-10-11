@@ -22,6 +22,7 @@ import {
 } from "@stella/contracts/conversation-protocol";
 import type { LiveTurn } from "./cloud-conversation-store";
 import { withAttachmentPreamble } from "./chat-attachments";
+import type { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -595,6 +596,7 @@ export const mergeCanonicalCloudMessages = (args: {
   local: readonly ChatMessage[];
   dispatchBindings: ReadonlyMap<string, string | null>;
   acknowledgedDispatchIds: ReadonlySet<string>;
+  sentAnchors?: SentMessageAnchors;
 }): ChatMessage[] => {
   const canonicalIds = new Set(args.canonical.map((message) => message.id));
   const canonicalAssistantOwners = new Set(
@@ -646,26 +648,62 @@ export const mergeCanonicalCloudMessages = (args: {
   // Failed admissions have no journal row. Appending them after the entire
   // journal makes an old offline notice follow every later successful reply.
   // Merge by time while preserving the journal's authoritative relative order.
-  const timestamp = (message: ChatMessage) => message.createdAt ?? Infinity;
-  const pending = [...optimistic].sort((a, b) => timestamp(a) - timestamp(b));
+  const anchors = args.sentAnchors;
+  for (const message of optimistic) {
+    if (message.role === "user") anchors?.note(message.id, message.createdAt);
+  }
+  const anchorOf = (message: ChatMessage) =>
+    message.role === "user" ? anchors?.anchorOf(message.id) : undefined;
+  const timestamp = (message: ChatMessage) =>
+    anchorOf(message) ?? message.createdAt ?? Infinity;
+  const anchoredIds = new Set(
+    canonical.flatMap((message) =>
+      anchorOf(message) === undefined ? [] : [message.id],
+    ),
+  );
+  const fixed = anchoredIds.size
+    ? canonical.filter((message) => !anchoredIds.has(message.id))
+    : canonical;
+  const pending = [
+    ...optimistic,
+    ...canonical.filter((message) => anchoredIds.has(message.id)),
+  ].sort((a, b) => timestamp(a) - timestamp(b));
+  const upcoming = new Set([...canonicalIds, ...pending.map((message) => message.id)]);
   const merged: ChatMessage[] = [];
-  const seenCanonical = new Set<string>();
+  const placed = new Set<string>();
+  const waiting = new Map<string, ChatMessage[]>();
+  const place = (message: ChatMessage) => {
+    const owner = message.requestId;
+    if (owner && upcoming.has(owner) && !placed.has(owner)) {
+      const queue = waiting.get(owner);
+      if (queue) queue.push(message);
+      else waiting.set(owner, [message]);
+      return;
+    }
+    merged.push(message);
+    placed.add(message.id);
+    const followers = waiting.get(message.id);
+    if (!followers) return;
+    waiting.delete(message.id);
+    for (const follower of followers) place(follower);
+  };
   let index = 0;
-  for (const message of canonical) {
+  for (const message of fixed) {
     while (index < pending.length) {
       const next = pending[index]!;
       if (timestamp(next) > timestamp(message)) break;
-      // A phone clock can precede the server clock. Never put an optimistic
-      // assistant segment above the canonical user message it answers.
-      if (next.requestId && canonicalIds.has(next.requestId) &&
-          !seenCanonical.has(next.requestId)) break;
-      merged.push(next);
+      place(next);
       index += 1;
     }
-    merged.push(message);
-    seenCanonical.add(message.id);
+    place(message);
   }
-  merged.push(...pending.slice(index));
+  for (const message of pending.slice(index)) place(message);
+  for (const followers of waiting.values()) {
+    for (const follower of followers) {
+      merged.push(follower);
+      placed.add(follower.id);
+    }
+  }
   return merged;
 };
 

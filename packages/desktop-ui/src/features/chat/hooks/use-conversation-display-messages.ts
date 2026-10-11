@@ -42,6 +42,7 @@ import {
   type LifecycleRoutingState,
 } from "@/features/chat/lib/route-lifecycle-events";
 import type { MessageRecord } from "@stella/contracts/local-chat";
+import { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
 
 const SCHEDULED_EVENTS_OVERLAY_MAX = 200;
 
@@ -503,10 +504,17 @@ export const useConversationDisplayMessages = ({
    * a reload starts empty and falls back to canonical persisted timestamps.
    */
   const frozenSlotSortTsRef = useRef<Map<string, number>>(new Map());
+  const sentAnchorsRef = useRef(new SentMessageAnchors());
   const frozenConversationIdRef = useRef<string | null>(conversationId);
   if (frozenConversationIdRef.current !== conversationId) {
     frozenConversationIdRef.current = conversationId;
     frozenSlotSortTsRef.current = new Map();
+    sentAnchorsRef.current = new SentMessageAnchors();
+  }
+  for (const event of optimisticEvents) {
+    if (event.type === "user_message") {
+      sentAnchorsRef.current.note(event._id, event.timestamp);
+    }
   }
   for (const slot of streamingAssistants) {
     const slotKey = `${slot.userMessageId}:${slot.indexInTurn}`;
@@ -538,12 +546,22 @@ export const useConversationDisplayMessages = ({
     return map;
   }, [persistedAssistantSlots, streamingAssistants]);
 
+  const sentAnchors = sentAnchorsRef.current;
+  const sentAnchorCount = sentAnchors.size;
   const getSortTimestamp = useMemo<SortTimestampResolver | undefined>(() => {
-    if (sortTimestampByMessageId.size === 0) return undefined;
+    if (sortTimestampByMessageId.size === 0 && sentAnchorCount === 0) {
+      return undefined;
+    }
     return (message) =>
+      (message.type === "user_message"
+        ? sentAnchors.anchorOf(
+            message._id,
+            message.payload?.originUserMessageId,
+          )
+        : undefined) ??
       sortTimestampByMessageId.get(message._id) ??
       getMessageChronologicalTimestamp(message);
-  }, [sortTimestampByMessageId]);
+  }, [sentAnchorCount, sentAnchors, sortTimestampByMessageId]);
 
   const overlayMessages = useMemo(() => {
     const overlayEvents: EventRecord[] = [];

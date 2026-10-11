@@ -80,6 +80,7 @@ import { useChatAttachmentPreviews } from "./use-chat-attachment-previews";
 import { reuseEqualChatMessages } from "./structural-sharing";
 import { TrailingTask } from "./trailing-task";
 import type { ChatMessage } from "../types";
+import { SentMessageAnchors } from "@stella/contracts/sent-message-anchors";
 import type { ChatThreadId } from "./offline-chat-storage";
 import type { StoredPhoneAccess } from "./phone-access";
 import {
@@ -677,6 +678,14 @@ export const useCloudCanonicalChatThread = (
     () => rebindCanonicalCloudMessages(displayedProjection, dispatchBindings),
     [dispatchBindings, displayedProjection],
   );
+  const sentAnchorsRef = useRef<{
+    store: ConversationStore;
+    anchors: SentMessageAnchors;
+  }>({ store, anchors: new SentMessageAnchors() });
+  if (sentAnchorsRef.current.store !== store) {
+    sentAnchorsRef.current = { store, anchors: new SentMessageAnchors() };
+  }
+  const sentAnchors = sentAnchorsRef.current.anchors;
   const mergedMessages = useMemo(
     () =>
       mergeCanonicalCloudMessages({
@@ -684,8 +693,15 @@ export const useCloudCanonicalChatThread = (
         local: local.messages,
         dispatchBindings,
         acknowledgedDispatchIds,
+        sentAnchors,
       }),
-    [acknowledgedDispatchIds, canonical, dispatchBindings, local.messages],
+    [
+      acknowledgedDispatchIds,
+      canonical,
+      dispatchBindings,
+      local.messages,
+      sentAnchors,
+    ],
   );
   const messages = useStableChatMessages(
     useChatAttachmentPreviews(mergedMessages, JSON.stringify(cacheAuthority)),

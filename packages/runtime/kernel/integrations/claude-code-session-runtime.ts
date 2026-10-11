@@ -3,7 +3,7 @@ import {
   claudeUsageLimitOf,
   formatClaudeUsageLimitReset,
   type ClaudeUsageLimit,
-} from "./claude-code-usage-limit.js";
+} from "@stella/contracts/claude-usage-limit";
 import type { ChildProcess, ChildProcessByStdio } from "child_process";
 import type { Readable, Writable } from "stream";
 import { StringDecoder } from "node:string_decoder";

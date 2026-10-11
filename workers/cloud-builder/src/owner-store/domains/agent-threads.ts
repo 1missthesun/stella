@@ -18,6 +18,12 @@
  * `forDevice` delivery; a cloud requester is woken (see `settleDeviceAttempt`).
  */
 
+import {
+  CLAUDE_USAGE_LIMIT_RESUME_PROMPT,
+  claudeUsageLimitOf,
+  type ClaudeUsageLimit,
+  type ClaudeUsageLimitCard,
+} from "@stella/contracts/claude-usage-limit";
 import { agentAttemptOutcomeOf, agentStatusOf } from "@stella/contracts/agent-status";
 import {
   AGENT_PAUSED_REASON,
@@ -78,6 +84,7 @@ import {
   type OwnerDb,
   type OwnerDbReader,
   type OwnerDomain,
+  type OwnerJobs,
 } from "../registry.js";
 
 type ThreadRow = {
@@ -2896,6 +2903,153 @@ export type AgentThreadEvent =
   | ThreadSpawnedEvent
   | ThreadCompletedEvent;
 
+// ── Claude usage limit holds ──────────────────────────────────────────────
+
+export const USAGE_LIMIT_AGENT_JOB = "agentThreads.usageLimitResume";
+export const USAGE_LIMIT_CONVERSATION_JOB = "agentThreads.usageLimitResumeConversation";
+/** How long a hold lasts when the CLI named no reset time: then the work tries again. */
+const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60_000;
+/** Margin past the named reset, so the resumed work is not refused again. */
+const USAGE_LIMIT_RESET_MARGIN_MS = 30_000;
+const USAGE_LIMIT_HOLD_PREFIX = "Waiting for the Claude usage limit to reset";
+
+const usageLimitResumeAt = (limit: ClaudeUsageLimit, now: number): number =>
+  limit.resetsAt !== undefined
+    ? Math.max(now, limit.resetsAt) + USAGE_LIMIT_RESET_MARGIN_MS
+    : now + USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS;
+
+const usageLimitHoldMessage = (limit: ClaudeUsageLimit): string =>
+  limit.resetsAt !== undefined
+    ? `${USAGE_LIMIT_HOLD_PREFIX} at ${new Date(limit.resetsAt).toISOString()}; it continues automatically then.`
+    : `${USAGE_LIMIT_HOLD_PREFIX}; it continues automatically once it does.`;
+
+/**
+ * A cloud agent's attempt ended on the Claude usage limit: the thread waits
+ * (not failed, so no failure is reported) and an owner job, the durable
+ * timer, resumes it once the limit resets. Its conversation shows the hold.
+ */
+const holdAgentForUsageLimit = (
+  db: OwnerDb,
+  jobs: OwnerJobs,
+  effects: AgentThreadEffects,
+  thread: ThreadRow,
+  limit: ClaudeUsageLimit,
+  now: number,
+): void => {
+  jobs.schedule(
+    USAGE_LIMIT_AGENT_JOB,
+    usageLimitResumeAt(limit, now),
+    { threadId: thread.thread_id, attemptGeneration: thread.attempt_generation },
+    { id: `usage-limit:agent:${thread.thread_id}` },
+  );
+  const conversationId = thread.parent_thread_id === null ? journalConversationOf(db, thread) : null;
+  if (!conversationId || !thread.owner_generation) return;
+  effects.cards.push({
+    conversationId,
+    ownerGeneration: thread.owner_generation,
+    sourceTurnId: `usage-limit:${thread.thread_id}:${thread.attempt_generation}`,
+    card: {
+      type: "usage-limit",
+      state: "held",
+      threadId: thread.thread_id,
+      ...(limit.resetsAt !== undefined ? { until: limit.resetsAt } : {}),
+    } satisfies ClaudeUsageLimitCard,
+  });
+};
+
+const postUsageLimitResumed = async (
+  ctx: OwnerContext,
+  args: { conversationId: string; ownerGeneration: string; key: string; threadId?: string },
+): Promise<void> => {
+  await ctx.host.postConversationCard({
+    conversationId: args.conversationId,
+    ownerGeneration: args.ownerGeneration,
+    sourceTurnId: `usage-limit-resumed:${args.key}`,
+    card: {
+      type: "usage-limit",
+      state: "resumed",
+      ...(args.threadId ? { threadId: args.threadId } : {}),
+    } satisfies ClaudeUsageLimitCard,
+  });
+};
+
+/** The limit reset: the held agent's next attempt continues its work. */
+const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
+  const payload = raw as { threadId?: unknown; attemptGeneration?: unknown } | null;
+  if (typeof payload?.threadId !== "string" || typeof payload.attemptGeneration !== "number") return;
+  const thread = readThread(ctx.db, payload.threadId);
+  if (
+    !thread ||
+    thread.status !== "waiting_for_user" ||
+    thread.attempt_generation !== payload.attemptGeneration ||
+    !thread.error_message?.startsWith(USAGE_LIMIT_HOLD_PREFIX) ||
+    !thread.owner_generation
+  ) {
+    return;
+  }
+  const commandId = `ulr-${(await sha256Hex(`${thread.thread_id}:${thread.attempt_generation}`)).slice(0, 40)}`;
+  await controlAgent(ctx, {
+    commandId,
+    kind: "resume",
+    thread,
+    ownerGeneration: thread.owner_generation,
+    text: CLAUDE_USAGE_LIMIT_RESUME_PROMPT,
+    source: "owner:usage-limit",
+    detail: { reason: "claude_usage_limit_reset" },
+    next: { clientMsgId: commandId, fingerprint: "usage-limit-resume" },
+  });
+  const conversationId = thread.parent_thread_id === null ? journalConversationOf(ctx.db, thread) : null;
+  if (conversationId) {
+    await postUsageLimitResumed(ctx, {
+      conversationId,
+      ownerGeneration: thread.owner_generation,
+      key: `${thread.thread_id}:${thread.attempt_generation}`,
+      threadId: thread.thread_id,
+    });
+  }
+};
+
+/**
+ * Stella's own Claude Code turn in a cloud conversation ended on the Claude
+ * usage limit: hold it with an owner job, the durable timer, that starts its
+ * continuation once the limit resets. One hold per conversation; a later one
+ * replaces it.
+ */
+const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resumeAt: number } => {
+  const args = object({ conversationId: string(), ownerGeneration: string(), resetsAt: optional(number()) })(raw);
+  const resumeAt = usageLimitResumeAt(args.resetsAt !== undefined ? { resetsAt: args.resetsAt } : {}, ctx.now);
+  ctx.jobs.schedule(
+    USAGE_LIMIT_CONVERSATION_JOB,
+    resumeAt,
+    { conversationId: args.conversationId, ownerGeneration: args.ownerGeneration, resumeAt },
+    { id: `usage-limit:conversation:${args.conversationId}` },
+  );
+  return { resumeAt };
+};
+
+/** The limit reset: Stella's held turn continues as a wake turn. */
+const resumeConversationAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Promise<void> => {
+  const payload = raw as { conversationId?: unknown; ownerGeneration?: unknown; resumeAt?: unknown } | null;
+  if (typeof payload?.conversationId !== "string" || typeof payload.ownerGeneration !== "string") return;
+  const exists = ctx.db.one<{ conversation_id: string }>(
+    "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
+    payload.conversationId,
+  );
+  if (!exists) return;
+  const key = `${typeof payload.resumeAt === "number" ? payload.resumeAt : ctx.now}`;
+  await ctx.host.startAgentMessageTurn({
+    ownerGeneration: payload.ownerGeneration,
+    conversationId: payload.conversationId,
+    clientMsgId: `ulr-${key}`,
+    prompt: CLAUDE_USAGE_LIMIT_RESUME_PROMPT,
+  });
+  await postUsageLimitResumed(ctx, {
+    conversationId: payload.conversationId,
+    ownerGeneration: payload.ownerGeneration,
+    key,
+  });
+};
+
 export type AgentThreadEffects = {
   /** Cards to post once the events are applied. */
   cards: Array<{ conversationId: string; ownerGeneration: string; sourceTurnId: string; card: unknown }>;
@@ -2926,6 +3080,7 @@ export const applyAgentThreadEvent = (
   db: OwnerDb,
   event: AgentThreadEvent,
   effects: AgentThreadEffects,
+  jobs?: OwnerJobs,
 ): void => {
   switch (event.kind) {
     case "turn.started": {
@@ -3096,10 +3251,19 @@ export const applyAgentThreadEvent = (
       ) {
         return;
       }
-      const status =
+      const ended =
         event.status === "waiting_for_user"
           ? event.status
           : agentThreadTerminalStatus(event.status, event.errorMessage);
+      const limit =
+        ended === "failed" && jobs && threadExecutor(thread).kind === "cloud"
+          ? claudeUsageLimitOf(event.errorMessage ?? "")
+          : null;
+      const status = limit ? "waiting_for_user" : ended;
+      const errorMessage = limit ? usageLimitHoldMessage(limit) : event.errorMessage;
+      if (limit && jobs) {
+        holdAgentForUsageLimit(db, jobs, effects, { ...thread, attempt_generation: event.attemptGeneration }, limit, event.completedAt);
+      }
       recordAgentChange(
         db,
         {
@@ -3108,7 +3272,7 @@ export const applyAgentThreadEvent = (
           key: ownerEventKey(event),
           source: `${thread.harness ?? "cloud"}:${thread.conversation_id}`,
           ...(status !== "waiting_for_user" ? { outcome: status } : {}),
-          detail: { turnId: event.turnId },
+          detail: { turnId: event.turnId, ...(limit ? { claudeUsageLimit: limit.resetsAt ?? null } : {}) },
           now: event.completedAt,
         },
         () =>
@@ -3119,7 +3283,7 @@ export const applyAgentThreadEvent = (
             status,
             event.attemptGeneration,
             event.resultJson ?? null,
-            status === "paused" ? null : (event.errorMessage ?? null),
+            status === "paused" ? null : (errorMessage ?? null),
             event.completedAt,
             thread.thread_id,
           ),
@@ -3136,7 +3300,7 @@ export const applyAgentThreadEvent = (
           ownerGeneration: thread.owner_generation,
           ...agentLifecycleCard(
             { ...thread, attempt_generation: event.attemptGeneration },
-            { kind: status, text: status === "completed" ? null : event.errorMessage },
+            { kind: status, text: status === "completed" ? null : errorMessage },
           ),
         });
       }
@@ -3553,6 +3717,7 @@ export const agentThreadsDomain = {
     },
   },
   internal: {
+    "agentThreads.holdForUsageLimit": holdConversationForUsageLimit,
     "agentThreads.spawnOnDevice": spawnOnDeviceForCloud,
     "agentThreads.deviceThread": deviceThreadForCloud,
     "agentThreads.conversationThread": conversationThreadForCloud,
@@ -3628,6 +3793,14 @@ export const agentThreadsDomain = {
     [COMMAND_JOB]: {
       maxAttempts: 3,
       run: async (ctx, payload) => await runCommand(ctx, payload as { messageId?: unknown }),
+    },
+    [USAGE_LIMIT_AGENT_JOB]: {
+      maxAttempts: 10,
+      run: async (ctx, payload) => await resumeAgentAfterUsageLimit(ctx, payload),
+    },
+    [USAGE_LIMIT_CONVERSATION_JOB]: {
+      maxAttempts: 10,
+      run: async (ctx, payload) => await resumeConversationAfterUsageLimit(ctx, payload),
     },
   },
 } satisfies OwnerDomain;

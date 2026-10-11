@@ -5,6 +5,8 @@
  * (`Claude AI usage limit reached|1760000000`) and a wall-clock reset with
  * its time zone (`You've hit your session limit · resets 11:30pm
  * (America/Phoenix)`, `... · resets Oct 14, 9am (America/Phoenix)`).
+ * Stella's own wording carries an exact instant (`It resets at
+ * 2026-10-12T06:30:00.000Z.`), which is how the cloud reports it onward.
  */
 export type ClaudeUsageLimit = { resetsAt?: number };
 
@@ -106,6 +108,8 @@ export const claudeUsageLimitOf = (error: unknown, now = Date.now()): ClaudeUsag
   if (!LIMIT_PATTERN.test(message)) return null;
   const epoch = /\|(\d{10})\b/.exec(message)?.[1];
   if (epoch) return { resetsAt: Number(epoch) * 1000 };
+  const instant = /\bresets? at (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z)/i.exec(message)?.[1];
+  if (instant && Number.isFinite(Date.parse(instant))) return { resetsAt: Date.parse(instant) };
   const resetsAt = wallClockReset(message, now);
   return resetsAt !== undefined && Number.isFinite(resetsAt) ? { resetsAt } : {};
 };
@@ -122,3 +126,35 @@ export const formatClaudeUsageLimitReset = (resetsAt: number, now = Date.now()) 
   });
   return `${day} ${time}`;
 };
+
+/**
+ * Claude Code work in a cloud conversation is held until the Claude usage
+ * limit resets (`held`, with `until` when it was named), or the hold ended
+ * and the work continues (`resumed`). `threadId` names a held agent; absent,
+ * it is Stella's own turn. Clients show the waiting card and the one line.
+ */
+export type ClaudeUsageLimitCard = {
+  type: "usage-limit";
+  state: "held" | "resumed";
+  until?: number;
+  threadId?: string;
+};
+
+export const parseClaudeUsageLimitCard = (value: unknown): ClaudeUsageLimitCard | null => {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  if (raw.type !== "usage-limit" || (raw.state !== "held" && raw.state !== "resumed")) return null;
+  return {
+    type: "usage-limit",
+    state: raw.state,
+    ...(typeof raw.until === "number" && Number.isFinite(raw.until) ? { until: raw.until } : {}),
+    ...(typeof raw.threadId === "string" && raw.threadId ? { threadId: raw.threadId } : {}),
+  };
+};
+
+/** The one line clients show when held work continues. */
+export const CLAUDE_USAGE_LIMIT_RESUMED_TEXT = "Claude usage limit reset. Stella is continuing the held work.";
+
+/** What a held turn or agent is told when it continues. */
+export const CLAUDE_USAGE_LIMIT_RESUME_PROMPT =
+  "The Claude usage limit has reset. Continue the work it interrupted, picking up where you left off.";

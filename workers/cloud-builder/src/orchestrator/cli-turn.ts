@@ -1,4 +1,5 @@
 import type { ExecutionContextSnapshot } from "@stella/contracts/execution-context";
+import type { ClaudeUsageLimit, ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import type { ClaudeSessionManifest } from "@stella/contracts/backend/claude-sessions";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
@@ -260,6 +261,57 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
         : { isError: isError === true }),
     });
     this.slack().tool(turn.turnId, call.toolCallId, call.name, phase, isError);
+  }
+
+  /**
+   * Stella's Claude Code turn met the Claude usage limit: hold it rather than
+   * fail it. The conversation shows the hold (a `usage-limit` card) and the
+   * owner object keeps the durable timer that starts its continuation once
+   * the limit resets. False when the hold could not be recorded, so the
+   * caller reports the limit as the turn's failure instead.
+   */
+  protected async holdForClaudeUsageLimit(
+    turn: ChatTurnRequest,
+    limit: ClaudeUsageLimit,
+  ): Promise<boolean> {
+    try {
+      const response = (await this.env.OWNER_GATES.getByName(turn.ownerId).ownerInternal({
+        name: "agentThreads.holdForUsageLimit",
+        args: {
+          conversationId: turn.conversationId,
+          ownerGeneration: turn.ownerGeneration,
+          ...(limit.resetsAt !== undefined ? { resetsAt: limit.resetsAt } : {}),
+        },
+        ownerGeneration: turn.ownerGeneration,
+      })) as RpcResponse;
+      if (!response.ok) throw new Error(response.error.message);
+    } catch (error) {
+      log("error", "claude_usage_limit_hold_failed", {
+        turnId: turn.turnId,
+        conversationId: turn.conversationId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return false;
+    }
+    const card: ClaudeUsageLimitCard = {
+      type: "usage-limit",
+      state: "held",
+      ...(limit.resetsAt !== undefined ? { until: limit.resetsAt } : {}),
+    };
+    const appended = this.journal.appendCard({
+      turnId: turn.turnId,
+      card,
+      writer: "orchestrator",
+      writerKey: `turn:${turn.turnId}:usage-limit`,
+    });
+    this.journal.setTurnSpan(turn.turnId, appended.seq);
+    if (appended.inserted) this.publish(appended.record);
+    log("info", "claude_usage_limit_held", {
+      turnId: turn.turnId,
+      conversationId: turn.conversationId,
+      resetsAt: limit.resetsAt ?? null,
+    });
+    return true;
   }
 
   /** `CLOUD_CLI_TURN_DO_PATHS.tool`: a CLI tool call, answered by pi's tool task. */

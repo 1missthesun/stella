@@ -3,6 +3,10 @@ import {
   type CloudAgentLifecycleCard,
 } from "./cloud-agent-lifecycle.js";
 import {
+  parseClaudeUsageLimitCard,
+  type ClaudeUsageLimitCard,
+} from "./claude-usage-limit.js";
+import {
   parseAgentActivityEntry,
   type AgentActivityEntry,
 } from "./conversation-agent-activity.js";
@@ -132,7 +136,8 @@ export type JournalCard =
       args?: Record<string, unknown>;
       result?: Record<string, unknown> | null;
     }
-  | { type: "files"; files: JournalFile[] };
+  | { type: "files"; files: JournalFile[] }
+  | ClaudeUsageLimitCard;
 
 type JournalRecordBase = {
   seq: number;
@@ -393,6 +398,7 @@ const decodeCard = (value: unknown): JournalCard | null => {
   const type = str(raw?.type);
   if (!raw || !type) return null;
   if (type === "agent-lifecycle") return parseCloudAgentLifecycleCard(raw);
+  if (type === "usage-limit") return parseClaudeUsageLimitCard(raw);
   if (type === "build") {
     const buildId = str(raw.buildId);
     if (!buildId) return null;

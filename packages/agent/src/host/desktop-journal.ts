@@ -12,6 +12,7 @@
  * answers, and while the conversation is open, so its orchestrator and its
  * timeline have the whole conversation.
  */
+import { parseClaudeUsageLimitCard, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import { randomUUID } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
 import type { Message } from "@earendil-works/pi-ai";
@@ -166,6 +167,8 @@ export async function journalMirror(args: {
   report: (error: unknown) => void;
   /** The turns running elsewhere changed (`remoteTurns`). */
   onRemoteTurns?: (turns: PiRemoteTurn[]) => void;
+  /** The cloud held Claude Code work here until the usage limit resets, or resumed it. */
+  onUsageLimit?: (card: ClaudeUsageLimitCard, createdAtMs: number) => void;
   context: Context;
 }): Promise<JournalMirror> {
   const { harness, root, journal, report, context } = args;
@@ -210,6 +213,11 @@ export async function journalMirror(args: {
         const report = reportFor(record, journal.deviceId);
         if (report) {
           messages.push(report);
+          continue;
+        }
+        const usageLimit = record.kind === "card" ? parseClaudeUsageLimitCard(record.card) : null;
+        if (usageLimit) {
+          args.onUsageLimit?.(usageLimit, record.createdAtMs ?? Date.now());
           continue;
         }
         if (journal.ownTurn(record.turnId)) {

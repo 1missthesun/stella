@@ -402,7 +402,6 @@ export const createStellaHostRunner = (
       const claudeConfig = await getClaudeCodeConfig();
       const workingFolder =
         cwd?.trim() ||
-        context.runtimeStore.getAgentRecord(threadId)?.workingDirectory ||
         resolveAgentWorkingDirectory({
           agentType: AGENT_IDS.ORCHESTRATOR,
           stellaAppDir: context.stellaAppDir,

@@ -9,8 +9,6 @@
 
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
 import {
-  toReplyPreview,
-  type RawReplyRef,
   type ReplyCounts,
   type ReplyRef,
 } from "@stella/contracts/reply-refs";
@@ -368,9 +366,6 @@ export class ChatLog {
            WHERE candidate.status = 'active'
              AND candidate.kind = 'chat'
              AND NOT EXISTS (
-               SELECT 1 FROM agent WHERE agent.conversation_id = candidate.id
-             )
-             AND NOT EXISTS (
                SELECT 1 FROM entry
                WHERE entry.conversation_id = candidate.id
                  AND entry.visible = 1
@@ -553,31 +548,7 @@ export class ChatLog {
     conversationId = requireConversationId(conversationId);
     const exists = this.conversationExists(conversationId);
     if (!exists) return false;
-    const runningAgent = this.cached
-      .prepare(
-        `SELECT 1 FROM agent
-         WHERE conversation_id = ? AND status = 'running' LIMIT 1`,
-      )
-      .get(conversationId);
-    if (runningAgent) {
-      throw new Error("A conversation with running tasks cannot be deleted.");
-    }
     this.tx.immediate(() => {
-      this.cached
-        .prepare(
-          `DELETE FROM blob WHERE id IN (
-             SELECT blob_id FROM thread_entry
-             JOIN thread ON thread.id = thread_entry.thread_id
-             WHERE thread.conversation_id = ? AND blob_id IS NOT NULL
-           )`,
-        )
-        .run(conversationId);
-      this.cached
-        .prepare("DELETE FROM agent WHERE conversation_id = ?")
-        .run(conversationId);
-      this.cached
-        .prepare("DELETE FROM thread WHERE conversation_id = ?")
-        .run(conversationId);
       this.cached
         .prepare("DELETE FROM settings WHERE key = ? AND value = ?")
         .run(DEFAULT_CONVERSATION_SETTING_KEY, conversationId);
@@ -1400,80 +1371,6 @@ export class ChatLog {
     }
   }
 
-  /**
-   * Validate the citations a reply carried against this conversation.
-   * Unknown sequence numbers and unknown thread ids drop silently; the
-   * message right above the reply is dropped too (a chip pointing at the
-   * adjacent bubble is noise). When nothing survives and the turn was an
-   * agent lifecycle turn, the agent itself is the reference.
-   */
-  resolveReplyRefs(
-    conversationId: string,
-    raw: readonly RawReplyRef[],
-    options: { excludeMessageId?: string; fallbackAgentId?: string } = {},
-  ): ReplyRef[] {
-    conversationId = requireConversationId(conversationId);
-    const resolved: ReplyRef[] = [];
-    const seen = new Set<string>();
-    const push = (ref: ReplyRef) => {
-      const key =
-        ref.kind === "message" ? `m:${ref.sequence}` : `a:${ref.threadId}`;
-      if (seen.has(key)) return;
-      seen.add(key);
-      resolved.push(ref);
-    };
-    const resolveAgent = (threadId: string): ReplyRef | null => {
-      const row = this.cached
-        .prepare(
-          `SELECT description FROM agent
-           WHERE thread_id = ? AND conversation_id = ? LIMIT 1`,
-        )
-        .get(threadId, conversationId) as
-        | { description?: string | null }
-        | undefined;
-      if (!row) return null;
-      return {
-        kind: "agent",
-        threadId,
-        title: asTrimmedString(row.description) || threadId,
-      };
-    };
-    for (const ref of raw) {
-      if (ref.kind === "agent") {
-        const agent = resolveAgent(ref.threadId.trim());
-        if (agent) push(agent);
-        continue;
-      }
-      const row = this.cached
-        .prepare(
-          `SELECT id, type, payload AS payloadJson FROM entry
-           WHERE conversation_id = ? AND seq = ?
-             AND type IN (${placeholders(CHAT_MESSAGE_TYPES)})
-             AND visible = 1
-           LIMIT 1`,
-        )
-        .get(conversationId, ref.sequence, ...CHAT_MESSAGE_TYPES) as
-        | { id: string; type: string; payloadJson: string | null }
-        | undefined;
-      if (!row) continue;
-      if (options.excludeMessageId && row.id === options.excludeMessageId) {
-        continue;
-      }
-      const payload = parseJsonRecord(row.payloadJson) ?? undefined;
-      push({
-        kind: "message",
-        sequence: ref.sequence,
-        id: row.id,
-        role: row.type === "user_message" ? "user" : "assistant",
-        preview: toReplyPreview(eventTextFromPayload(payload)),
-      });
-    }
-    if (resolved.length === 0 && options.fallbackAgentId) {
-      const agent = resolveAgent(options.fallbackAgentId.trim());
-      if (agent) push(agent);
-    }
-    return resolved;
-  }
 
   /** Reply counts for every cited message and agent in a conversation. */
   listReplyCounts(conversationId: string): ReplyCounts {

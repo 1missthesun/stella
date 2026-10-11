@@ -567,15 +567,6 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
             }).files,
           )
         : [],
-    async () =>
-      options.localChatHistoryService
-        ? options.localChatHistoryService.listCanonicalFilePaths(
-            conversationId,
-            resolveJwtOwnerScope(
-              await options.getAuthToken?.().catch(() => null),
-            ),
-          )
-        : [],
     // Any conversation of this owner, not just the one this window shows:
     // a file Stella produced or displayed there, per the cloud journal, is
     // one the user has already been shown.

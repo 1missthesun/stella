@@ -199,7 +199,6 @@ import {
   IPC_LLM_CREDENTIALS_VALIDATE_OAUTH,
   IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID,
   IPC_LOCAL_CHAT_DELETE_CONVERSATION,
-  IPC_LOCAL_CHAT_GET_AGENT_REPORT,
   IPC_LOCAL_CHAT_GET_OR_CREATE_ID,
   IPC_LOCAL_CHAT_LIST_ACTIVITY,
   IPC_LOCAL_CHAT_LIST_CONVERSATIONS,
@@ -212,10 +211,8 @@ import {
   IPC_LOCAL_CHAT_LIST_MESSAGES_BEFORE,
   IPC_LOCAL_CHAT_LIST_MODEL_USAGE,
   IPC_LOCAL_CHAT_LIST_REPLY_COUNTS,
-  IPC_LOCAL_CHAT_LIST_THREAD_ACTIVITY,
   IPC_LOCAL_CHAT_PERSIST_WELCOME,
   IPC_LOCAL_CHAT_SET_ACTIVE_ID,
-  IPC_LOCAL_CHAT_THREAD_ACTIVITY_UPDATED,
   IPC_LOCAL_CHAT_UPDATED,
   IPC_MEDIA_COPY_ATTACHMENT,
   IPC_MEDIA_COPY_IMAGE,
@@ -1106,19 +1103,12 @@ export const createElectronApi = (
       listMessagesAfter: invoker(IPC_LOCAL_CHAT_LIST_MESSAGES_AFTER),
       listMessageToolEvents: invoker(IPC_LOCAL_CHAT_LIST_MESSAGE_TOOL_EVENTS),
       listActivity: invoker(IPC_LOCAL_CHAT_LIST_ACTIVITY),
-      /**
-       * Authoritative Activity read: one row per background-agent thread,
-       * paired with `onThreadActivityUpdated` for refetch-on-write.
-       */
-      listThreadActivity: invoker(IPC_LOCAL_CHAT_LIST_THREAD_ACTIVITY),
       listLineageMessages: invoker(IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES),
       listReplyCounts: invoker(IPC_LOCAL_CHAT_LIST_REPLY_COUNTS),
-      getAgentReport: invoker(IPC_LOCAL_CHAT_GET_AGENT_REPORT),
       listModelUsage: invoker(IPC_LOCAL_CHAT_LIST_MODEL_USAGE),
       listFiles: invoker(IPC_LOCAL_CHAT_LIST_FILES),
       persistDiscoveryWelcome: invoker(IPC_LOCAL_CHAT_PERSIST_WELCOME),
       onUpdated: on(IPC_LOCAL_CHAT_UPDATED),
-      onThreadActivityUpdated: on(IPC_LOCAL_CHAT_THREAD_ACTIVITY_UPDATED),
     },
 
     nativeIntegrations: {

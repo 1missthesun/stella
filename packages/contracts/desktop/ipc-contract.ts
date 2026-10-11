@@ -72,14 +72,11 @@ import type {
   ConversationSummaryCursor,
   ConversationSummaryPage,
   EventRecord,
-  LocalChatAgentReport,
   LocalChatLineageWindow,
   LocalChatMessageWindow,
   LocalChatToolEventPage,
   LocalChatUpdatedPayload,
   LocalModelUsagePage,
-  ThreadActivityRecord,
-  ThreadActivityUpdatedPayload,
 } from "../local-chat.js";
 import type { RealtimeVoicePreferences } from "../local-preferences.js";
 import type { RuntimeModelCatalogSnapshot } from "../model-catalog.js";
@@ -292,7 +289,6 @@ import {
   IPC_LLM_CREDENTIALS_VALIDATE_OAUTH,
   IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID,
   IPC_LOCAL_CHAT_DELETE_CONVERSATION,
-  IPC_LOCAL_CHAT_GET_AGENT_REPORT,
   IPC_LOCAL_CHAT_GET_EVENT_COUNT,
   IPC_LOCAL_CHAT_GET_OR_CREATE_ID,
   IPC_LOCAL_CHAT_LIST_ACTIVITY,
@@ -306,10 +302,8 @@ import {
   IPC_LOCAL_CHAT_LIST_MESSAGES_BEFORE,
   IPC_LOCAL_CHAT_LIST_MODEL_USAGE,
   IPC_LOCAL_CHAT_LIST_REPLY_COUNTS,
-  IPC_LOCAL_CHAT_LIST_THREAD_ACTIVITY,
   IPC_LOCAL_CHAT_PERSIST_WELCOME,
   IPC_LOCAL_CHAT_SET_ACTIVE_ID,
-  IPC_LOCAL_CHAT_THREAD_ACTIVITY_UPDATED,
   IPC_LOCAL_CHAT_UPDATED,
   IPC_MEDIA_COPY_ATTACHMENT,
   IPC_MEDIA_COPY_IMAGE,
@@ -1599,10 +1593,6 @@ export type IpcInvokeContract = {
     ],
     { activities: EventRecord[] }
   >;
-  [IPC_LOCAL_CHAT_LIST_THREAD_ACTIVITY]: Invoke<
-    [payload: { conversationId: string }],
-    ThreadActivityRecord[]
-  >;
   [IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES]: Invoke<
     [
       payload: {
@@ -1617,10 +1607,6 @@ export type IpcInvokeContract = {
   [IPC_LOCAL_CHAT_LIST_REPLY_COUNTS]: Invoke<
     [payload: { conversationId: string }],
     ReplyCounts
-  >;
-  [IPC_LOCAL_CHAT_GET_AGENT_REPORT]: Invoke<
-    [payload: { threadId: string }],
-    LocalChatAgentReport | null
   >;
   [IPC_LOCAL_CHAT_LIST_MODEL_USAGE]: Invoke<
     [
@@ -1803,7 +1789,6 @@ export type IpcEventContract = {
   [IPC_BROWSER_VIEW_STATE]: BrowserViewState;
   [IPC_SCHEDULE_UPDATED]: void;
   [IPC_LOCAL_CHAT_UPDATED]: LocalChatUpdatedPayload | null;
-  [IPC_LOCAL_CHAT_THREAD_ACTIVITY_UPDATED]: ThreadActivityUpdatedPayload;
 };
 
 export type IpcInvokeChannel = keyof IpcInvokeContract;

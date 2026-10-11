@@ -16,8 +16,6 @@ export const shutdownBootstrapRuntime = async (context, options = {}) => {
     const { lifecycle, state } = context;
     state.localChatUpdateUnsubscribe?.();
     state.localChatUpdateUnsubscribe = null;
-    state.threadActivityUpdateUnsubscribe?.();
-    state.threadActivityUpdateUnsubscribe = null;
     state.scheduleUpdateUnsubscribe?.();
     state.scheduleUpdateUnsubscribe = null;
     if (state.stellaHostRunner) {

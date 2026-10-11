@@ -138,12 +138,9 @@ export function UsagePanel() {
       timeout = window.setTimeout(refresh, 2000);
     };
     const removeChat = window.electronAPI?.localChat?.onUpdated?.(queueRefresh);
-    const removeThreads =
-      window.electronAPI?.localChat?.onThreadActivityUpdated?.(queueRefresh);
     return () => {
       window.clearTimeout(timeout);
       removeChat?.();
-      removeThreads?.();
     };
   }, []);
 

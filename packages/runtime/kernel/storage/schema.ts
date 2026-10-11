@@ -14,20 +14,13 @@
  *    an entry belongs to, written at insert time.
  *  - `entry.visible` is computed once at write time by the single policy
  *    function in TypeScript (`chat-event-visibility` contract).
- *  - `entry.search_text` / `thread.search_text` are writer-populated columns
- *    that the external-content FTS indexes mirror via trivial triggers.
- *  - `thread_context` materializes the latest compaction checkpoint so
- *    context assembly never reconstructs overlays from the log.
+ *  - `entry.search_text` is a writer-populated column that the
+ *    external-content FTS index mirrors via trivial triggers.
  */
 
 import type { SqliteDatabase } from "./shared.js";
-import {
-  dropRetiredFeatureTables,
-  importLegacyDatabase,
-  legacyTablesPresent,
-} from "./legacy-import.js";
 
-export const SCHEMA_VERSION = 9;
+export const SCHEMA_VERSION = 10;
 
 const FTS_TOKENIZER = "'porter unicode61 remove_diacritics 2'";
 
@@ -86,127 +79,6 @@ CREATE INDEX IF NOT EXISTS idx_entry_conv_turn_seq
 CREATE INDEX IF NOT EXISTS idx_entry_created ON entry(created_at);
 CREATE INDEX IF NOT EXISTS idx_entry_run
   ON entry(run_id) WHERE run_id IS NOT NULL;
-
-CREATE TABLE IF NOT EXISTS thread (
-  id TEXT PRIMARY KEY,
-  conversation_id TEXT NOT NULL,
-  agent_type TEXT NOT NULL,
-  name TEXT NOT NULL,
-  status TEXT NOT NULL,
-  summary TEXT,
-  external_session_id TEXT,
-  external_delivered_entry_id TEXT,
-  group_key TEXT,
-  group_label TEXT,
-  session_id TEXT,
-  session_created_at INTEGER,
-  cwd TEXT NOT NULL DEFAULT '',
-  parent_session TEXT,
-  next_seq INTEGER NOT NULL DEFAULT 1,
-  search_text TEXT,
-  created_at INTEGER NOT NULL,
-  last_used_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_thread_conv_status
-  ON thread(conversation_id, status, last_used_at);
-CREATE INDEX IF NOT EXISTS idx_thread_last_used ON thread(last_used_at);
-
-CREATE TABLE IF NOT EXISTS blob (
-  id INTEGER PRIMARY KEY,
-  byte_length INTEGER NOT NULL,
-  content TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS thread_entry (
-  thread_id TEXT NOT NULL REFERENCES thread(id) ON DELETE CASCADE,
-  seq INTEGER NOT NULL,
-  id TEXT NOT NULL,
-  type TEXT NOT NULL,
-  role TEXT,
-  custom_type TEXT,
-  payload TEXT,
-  blob_id INTEGER,
-  est_tokens INTEGER NOT NULL DEFAULT 0,
-  image_count INTEGER NOT NULL DEFAULT 0,
-  image_bytes INTEGER NOT NULL DEFAULT 0,
-  timestamp_iso TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  PRIMARY KEY (thread_id, seq)
-);
-CREATE UNIQUE INDEX IF NOT EXISTS idx_thread_entry_id ON thread_entry(id);
-CREATE INDEX IF NOT EXISTS idx_thread_entry_assistant_created
-  ON thread_entry(created_at) WHERE role = 'assistant' AND type = 'message';
-CREATE INDEX IF NOT EXISTS idx_thread_entry_thread_role
-  ON thread_entry(thread_id, role, seq);
-CREATE INDEX IF NOT EXISTS idx_thread_entry_thread_custom
-  ON thread_entry(thread_id, custom_type, seq) WHERE custom_type IS NOT NULL;
-
-CREATE TABLE IF NOT EXISTS thread_context (
-  thread_id TEXT PRIMARY KEY REFERENCES thread(id) ON DELETE CASCADE,
-  compaction_entry_id TEXT NOT NULL,
-  covered_from_seq INTEGER NOT NULL,
-  covered_through_seq INTEGER NOT NULL,
-  summary TEXT NOT NULL,
-  details TEXT,
-  tokens_before INTEGER NOT NULL DEFAULT 0,
-  timestamp_iso TEXT NOT NULL,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS agent (
-  thread_id TEXT PRIMARY KEY,
-  conversation_id TEXT NOT NULL,
-  storage_mode TEXT NOT NULL DEFAULT 'local',
-  owner_generation TEXT,
-  agent_type TEXT NOT NULL,
-  description TEXT NOT NULL,
-  prompt TEXT,
-  prompt_created_at INTEGER,
-  agent_depth INTEGER NOT NULL,
-  max_agent_depth INTEGER,
-  parent_agent_id TEXT,
-  model_config_json TEXT,
-  tool_workspace_root TEXT,
-  working_directory TEXT,
-  status TEXT NOT NULL,
-  started_at INTEGER NOT NULL,
-  completed_at INTEGER,
-  result TEXT,
-  error TEXT,
-  updated_at INTEGER NOT NULL,
-  root_run_id TEXT,
-  attempt_generation INTEGER NOT NULL DEFAULT 0,
-  cloud_terminal_receipt_generation INTEGER,
-  terminal_lifecycle_receipt_generation INTEGER,
-  descendant_boundary_state_json TEXT,
-  record_revision INTEGER NOT NULL DEFAULT 0,
-  remote_thread_id TEXT
-);
-CREATE INDEX IF NOT EXISTS idx_agent_conversation_updated
-  ON agent(conversation_id, updated_at, thread_id);
-CREATE INDEX IF NOT EXISTS idx_agent_active_updated
-  ON agent(conversation_id, updated_at DESC, thread_id)
-  WHERE status IN ('pending', 'running');
-CREATE INDEX IF NOT EXISTS idx_agent_terminal_updated
-  ON agent(conversation_id, updated_at DESC, thread_id)
-  WHERE status NOT IN ('pending', 'running');
-CREATE INDEX IF NOT EXISTS idx_agent_status ON agent(status, updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_agent_updated ON agent(updated_at);
-
-CREATE TABLE IF NOT EXISTS durable_thread_summaries (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
-  source_key TEXT NOT NULL,
-  thread_id TEXT NOT NULL,
-  run_id TEXT NOT NULL,
-  agent_type TEXT NOT NULL,
-  content TEXT NOT NULL,
-  conversation_id TEXT,
-  source_updated_at INTEGER NOT NULL,
-  UNIQUE (source_key)
-);
-CREATE INDEX IF NOT EXISTS idx_durable_thread_summaries_updated
-  ON durable_thread_summaries(source_updated_at);
 `;
 
 /**
@@ -226,80 +98,6 @@ CREATE TABLE IF NOT EXISTS entry_ref (
 );
 CREATE INDEX IF NOT EXISTS idx_entry_ref_target
   ON entry_ref(conversation_id, target_kind, target_key, entry_seq);
-`;
-
-/**
- * Run admission: one row per user send the worker admitted, keyed by the
- * client's stable request identity (`userMessageEventId`, else the
- * caller's `requestId`). `startChat` claims the key before it touches the
- * transcript or the runner, so a retried send (host reconnect, worker
- * restart, mobile resend) returns the original run instead of starting a
- * second one. `status` follows the send: `queued` (admitted, not yet placed
- * on a run), `placed` (a run owns it; `run_id` set), then `done` or
- * `unanswered` once that run ends. Small and bounded: idle maintenance
- * deletes rows older than 30 days (`run-admission.ts`). Never in `entry`.
- */
-export const RUN_ADMISSION_SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS run_admission (
-  conversation_id TEXT NOT NULL,
-  request_id TEXT NOT NULL,
-  run_id TEXT,
-  status TEXT NOT NULL CHECK (
-    status IN ('queued', 'placed', 'done', 'unanswered')
-  ),
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  PRIMARY KEY (conversation_id, request_id)
-);
-CREATE INDEX IF NOT EXISTS idx_run_admission_run
-  ON run_admission(conversation_id, run_id) WHERE run_id IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_run_admission_created
-  ON run_admission(created_at);
-`;
-
-/**
- * Durable runs (`run-task.ts`, schema v5). The agent loop of older builds
- * kept one `run_task` row per orchestrator chat run or local agent run and
- * one `tool_intent` row per tool call, to resume a run after its worker died.
- * Nothing writes them now; a boot settles what an older build left running,
- * and idle maintenance deletes terminal rows after 7 days. Never in `entry`.
- */
-export const RUN_TASK_SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS run_task (
-  run_id TEXT PRIMARY KEY,
-  conversation_id TEXT NOT NULL,
-  thread_key TEXT NOT NULL,
-  agent_type TEXT NOT NULL,
-  owner_run_id TEXT,
-  background INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL CHECK (
-    status IN ('running', 'done', 'failed', 'canceled', 'interrupted')
-  ),
-  abort_requested INTEGER NOT NULL DEFAULT 0,
-  resume_count INTEGER NOT NULL DEFAULT 0,
-  checkpoint_json TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_run_task_status
-  ON run_task(status, updated_at);
-CREATE INDEX IF NOT EXISTS idx_run_task_thread
-  ON run_task(thread_key, updated_at);
-CREATE TABLE IF NOT EXISTS tool_intent (
-  run_id TEXT NOT NULL,
-  tool_call_id TEXT NOT NULL,
-  tool_name TEXT NOT NULL,
-  args_json TEXT,
-  replay TEXT NOT NULL CHECK (replay IN ('safe', 'keyed', 'unsafe')),
-  status TEXT NOT NULL CHECK (status IN ('running', 'done', 'interrupted')),
-  result_json TEXT,
-  attempts INTEGER NOT NULL DEFAULT 1,
-  started_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  PRIMARY KEY (run_id, tool_call_id)
-);
-CREATE INDEX IF NOT EXISTS idx_tool_intent_updated
-  ON tool_intent(updated_at);
 `;
 
 /**
@@ -325,24 +123,10 @@ CREATE INDEX IF NOT EXISTS idx_entry_search_conv_created
 `;
 
 /**
- * Dev-only (local/cloud hybrid) operational tables. These are durable
- * delivery/receipt ledgers for the cloud lane and realtime voice — they are
- * not chat history and are never imported/rebuilt by the legacy importer
- * (existing rows carry over as-is; a legacy `legacy_chat_cloud_import` table
- * is rebuilt FK-free before the legacy `session` table is dropped).
+ * Operational tables: durable delivery and receipt ledgers for the cloud
+ * lane. They are not chat history.
  */
 export const CLOUD_SCHEMA_SQL = `
-CREATE TABLE IF NOT EXISTS legacy_chat_cloud_import (
-  local_conversation_id TEXT PRIMARY KEY,
-  cloud_conversation_id TEXT,
-  owner_generation TEXT,
-  next_turn_index INTEGER NOT NULL DEFAULT 0,
-  status TEXT NOT NULL DEFAULT 'pending',
-  detail TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS cloud_transcript_outbox (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL CHECK (kind IN ('begin', 'finish')),
@@ -429,58 +213,6 @@ CREATE TABLE IF NOT EXISTS cloud_journal_admission_receipts (
 );
 CREATE INDEX IF NOT EXISTS idx_cloud_journal_admission_receipts_created
   ON cloud_journal_admission_receipts(created_at, id);
-
-CREATE TABLE IF NOT EXISTS cloud_agent_thread_controls (
-  thread_id TEXT NOT NULL,
-  owner_generation TEXT NOT NULL,
-  cloud_conversation_id TEXT NOT NULL,
-  origin_conversation_id TEXT NOT NULL,
-  attempt_generation INTEGER NOT NULL,
-  thread_updated_at INTEGER NOT NULL,
-  status TEXT NOT NULL CHECK (
-    status IN ('running', 'completed', 'failed', 'canceled', 'paused')
-  ),
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  description TEXT,
-  PRIMARY KEY (thread_id, owner_generation)
-);
-CREATE INDEX IF NOT EXISTS idx_cloud_agent_thread_controls_origin
-  ON cloud_agent_thread_controls(owner_generation, origin_conversation_id, updated_at);
-
-CREATE TABLE IF NOT EXISTS cloud_agent_tool_operations (
-  operation_id TEXT PRIMARY KEY,
-  kind TEXT NOT NULL CHECK (kind IN ('spawn', 'continue', 'cancel')),
-  fingerprint TEXT NOT NULL,
-  owner_generation TEXT NOT NULL,
-  request_json TEXT NOT NULL,
-  result_json TEXT,
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_cloud_agent_tool_operations_updated
-  ON cloud_agent_tool_operations(updated_at, operation_id);
-
-CREATE TABLE IF NOT EXISTS voice_transcript_inbox (
-  sequence INTEGER PRIMARY KEY AUTOINCREMENT,
-  event_id TEXT NOT NULL UNIQUE,
-  payload_json TEXT NOT NULL,
-  created_at INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS voice_tool_call_receipts (
-  conversation_id TEXT NOT NULL,
-  call_id TEXT NOT NULL,
-  request_fingerprint TEXT NOT NULL,
-  operation_id TEXT NOT NULL,
-  started_at INTEGER NOT NULL,
-  completion_json TEXT,
-  completed_at INTEGER,
-  updated_at INTEGER NOT NULL,
-  PRIMARY KEY (conversation_id, call_id)
-);
-CREATE INDEX IF NOT EXISTS idx_voice_tool_call_receipts_completed
-  ON voice_tool_call_receipts(completed_at, updated_at);
 `;
 
 /**
@@ -496,7 +228,6 @@ const applyCloudColumnBackfills = (db: SqliteDatabase): void => {
       /* column already exists */
     }
   };
-  addColumn("legacy_chat_cloud_import", "owner_generation TEXT");
   addColumn("cloud_transcript_outbox", "owner_generation TEXT");
   addColumn("cloud_transcript_outbox", "recovery_json TEXT");
   addColumn("cloud_transcript_outbox", "last_error TEXT");
@@ -577,81 +308,31 @@ BEGIN
   SELECT NEW.rowid, NEW.search_text WHERE NEW.search_text IS NOT NULL;
 END;
 
-CREATE VIRTUAL TABLE IF NOT EXISTS thread_fts USING fts5(
-  search_text,
-  content='thread',
-  content_rowid='rowid',
-  tokenize = ${FTS_TOKENIZER}
-);
-CREATE TRIGGER IF NOT EXISTS trg_thread_fts_insert
-AFTER INSERT ON thread WHEN NEW.search_text IS NOT NULL
-BEGIN
-  INSERT INTO thread_fts(rowid, search_text) VALUES (NEW.rowid, NEW.search_text);
-END;
-CREATE TRIGGER IF NOT EXISTS trg_thread_fts_delete
-AFTER DELETE ON thread WHEN OLD.search_text IS NOT NULL
-BEGIN
-  INSERT INTO thread_fts(thread_fts, rowid, search_text)
-  VALUES ('delete', OLD.rowid, OLD.search_text);
-END;
-CREATE TRIGGER IF NOT EXISTS trg_thread_fts_update
-AFTER UPDATE OF search_text ON thread
-BEGIN
-  INSERT INTO thread_fts(thread_fts, rowid, search_text)
-  SELECT 'delete', OLD.rowid, OLD.search_text WHERE OLD.search_text IS NOT NULL;
-  INSERT INTO thread_fts(rowid, search_text)
-  SELECT NEW.rowid, NEW.search_text WHERE NEW.search_text IS NOT NULL;
-END;
 `;
 
 /**
- * Durable thread summaries are indexed with the same FTS5 shape as
- * the cloud transcript index (`workers/cloud-builder/src/transcript-search.ts`):
- * a bm25-ranked MATCH over an external-content table, so the summary rows stay
- * the single copy of the text. Mirror triggers keep the index in step with the
- * upsert in `kernel/memory/thread-summary-store.ts`.
+ * The agent loops' tables, which nothing reads or writes any more: their
+ * threads, agents, runs, summaries and receipts.
  */
-export const THREAD_SUMMARY_FTS_TABLE = "durable_thread_summaries_fts";
-
-export const THREAD_SUMMARY_FTS_SCHEMA_SQL = `
-CREATE VIRTUAL TABLE IF NOT EXISTS durable_thread_summaries_fts USING fts5(
-  "content",
-  thread_id,
-  run_id,
-  agent_type,
-  content='durable_thread_summaries',
-  content_rowid='id',
-  tokenize = ${FTS_TOKENIZER}
-);
-CREATE TRIGGER IF NOT EXISTS trg_durable_thread_summaries_fts_insert
-AFTER INSERT ON durable_thread_summaries
-BEGIN
-  INSERT INTO durable_thread_summaries_fts(
-    rowid, "content", thread_id, run_id, agent_type
-  )
-  VALUES (NEW.id, NEW.content, NEW.thread_id, NEW.run_id, NEW.agent_type);
-END;
-CREATE TRIGGER IF NOT EXISTS trg_durable_thread_summaries_fts_delete
-AFTER DELETE ON durable_thread_summaries
-BEGIN
-  INSERT INTO durable_thread_summaries_fts(
-    durable_thread_summaries_fts, rowid, "content", thread_id, run_id, agent_type
-  )
-  VALUES ('delete', OLD.id, OLD.content, OLD.thread_id, OLD.run_id, OLD.agent_type);
-END;
-CREATE TRIGGER IF NOT EXISTS trg_durable_thread_summaries_fts_update
-AFTER UPDATE OF content, thread_id, run_id, agent_type
-ON durable_thread_summaries
-BEGIN
-  INSERT INTO durable_thread_summaries_fts(
-    durable_thread_summaries_fts, rowid, "content", thread_id, run_id, agent_type
-  )
-  VALUES ('delete', OLD.id, OLD.content, OLD.thread_id, OLD.run_id, OLD.agent_type);
-  INSERT INTO durable_thread_summaries_fts(
-    rowid, "content", thread_id, run_id, agent_type
-  )
-  VALUES (NEW.id, NEW.content, NEW.thread_id, NEW.run_id, NEW.agent_type);
-END;
+const DROP_AGENT_LOOP_SEARCH_INDEXES = [
+  "DROP TABLE IF EXISTS thread_fts;",
+  "DROP TABLE IF EXISTS durable_thread_summaries_fts;",
+];
+const DROP_AGENT_LOOP_TABLES_SQL = `
+DROP TABLE IF EXISTS thread_context;
+DROP TABLE IF EXISTS thread_entry;
+DROP TABLE IF EXISTS thread;
+DROP TABLE IF EXISTS blob;
+DROP TABLE IF EXISTS agent;
+DROP TABLE IF EXISTS durable_thread_summaries;
+DROP TABLE IF EXISTS run_admission;
+DROP TABLE IF EXISTS run_task;
+DROP TABLE IF EXISTS tool_intent;
+DROP TABLE IF EXISTS cloud_agent_thread_controls;
+DROP TABLE IF EXISTS cloud_agent_tool_operations;
+DROP TABLE IF EXISTS voice_tool_call_receipts;
+DROP TABLE IF EXISTS voice_transcript_inbox;
+DROP TABLE IF EXISTS legacy_chat_cloud_import;
 `;
 
 const readUserVersion = (db: SqliteDatabase): number => {
@@ -684,10 +365,6 @@ const MIGRATIONS: Migration[] = [
       } catch {
         /* searches degrade; everything else keeps working */
       }
-      dropRetiredFeatureTables(db);
-      if (legacyTablesPresent(db)) {
-        importLegacyDatabase(db);
-      }
       if (ftsReady) {
         db.prepare(
           `INSERT INTO meta (key, value, updated_at) VALUES (?, '1', ?)
@@ -703,132 +380,34 @@ const MIGRATIONS: Migration[] = [
     },
   },
   {
-    version: 3,
-    apply: (db) => {
-      // Same tolerance as migration 1: a SQLite build without FTS5 keeps the
-      // summaries table without its index.
-      try {
-        db.exec(THREAD_SUMMARY_FTS_SCHEMA_SQL);
-        // Backfill: the triggers only see writes made after this point.
-        db.exec(
-          "INSERT INTO durable_thread_summaries_fts(durable_thread_summaries_fts) VALUES ('rebuild');",
-        );
-      } catch {
-        /* summaries keep working without the index */
-      }
-    },
-  },
-  {
-    version: 4,
-    apply: (db) => {
-      // New, empty table + its own indexes only: constant time at open even
-      // on a multi-GiB file (no scan of `entry`).
-      db.exec(RUN_ADMISSION_SCHEMA_SQL);
-    },
-  },
-  {
-    version: 5,
-    apply: (db) => {
-      // Two new, empty tables + their own indexes (CREATE ... IF NOT EXISTS
-      // only): constant time at open on any file size.
-      db.exec(RUN_TASK_SCHEMA_SQL);
-    },
-  },
-  {
-    version: 6,
-    apply: (db) => {
-      // Where each agent starts. A file created at migration 1 by this build
-      // already has the column; adding a nullable column is constant time.
-      try {
-        db.exec("ALTER TABLE agent ADD COLUMN working_directory TEXT;");
-      } catch {
-        /* column already exists */
-      }
-    },
-  },
-  {
-    version: 7,
-    apply: (db) => {
-      for (const statement of [
-        "ALTER TABLE agent ADD COLUMN remote_thread_id TEXT;",
-        "ALTER TABLE cloud_agent_thread_controls ADD COLUMN description TEXT;",
-      ]) {
-        try {
-          db.exec(statement);
-        } catch {}
-      }
-    },
-  },
-  {
     version: 8,
     apply: (db) => {
       db.exec(CLAUDE_SESSION_SYNC_SCHEMA_SQL);
     },
   },
   {
-    version: 9,
+    version: 10,
     apply: (db) => {
-      allowPausedCloudAgentControls(db);
+      // A SQLite build without FTS5 cannot drop an FTS5 table; it never
+      // made one either.
+      for (const statement of DROP_AGENT_LOOP_SEARCH_INDEXES) {
+        try {
+          db.exec(statement);
+        } catch {
+          /* no FTS5 here */
+        }
+      }
+      db.exec(DROP_AGENT_LOOP_TABLES_SQL);
     },
   },
 ];
 
 /**
- * A control receipt records a paused cloud agent as `paused`. Tables made
- * before that refuse the status in their CHECK, which SQLite cannot alter,
- * so the table is rebuilt with its rows. A table that already allows it is
- * left alone, so the rebuild runs at most once whatever version it lands in.
- */
-const allowPausedCloudAgentControls = (db: SqliteDatabase): void => {
-  const table = db
-    .prepare(
-      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'cloud_agent_thread_controls'",
-    )
-    .get() as { sql?: string } | undefined;
-  if (!table?.sql || table.sql.includes("'paused'")) return;
-  db.exec(`
-ALTER TABLE cloud_agent_thread_controls RENAME TO cloud_agent_thread_controls_before_paused;
-DROP INDEX IF EXISTS idx_cloud_agent_thread_controls_origin;
-CREATE TABLE cloud_agent_thread_controls (
-  thread_id TEXT NOT NULL,
-  owner_generation TEXT NOT NULL,
-  cloud_conversation_id TEXT NOT NULL,
-  origin_conversation_id TEXT NOT NULL,
-  attempt_generation INTEGER NOT NULL,
-  thread_updated_at INTEGER NOT NULL,
-  status TEXT NOT NULL CHECK (
-    status IN ('running', 'completed', 'failed', 'canceled', 'paused')
-  ),
-  created_at INTEGER NOT NULL,
-  updated_at INTEGER NOT NULL,
-  description TEXT,
-  PRIMARY KEY (thread_id, owner_generation)
-);
-INSERT INTO cloud_agent_thread_controls (
-  thread_id, owner_generation, cloud_conversation_id, origin_conversation_id,
-  attempt_generation, thread_updated_at, status, created_at, updated_at, description
-)
-SELECT
-  thread_id, owner_generation, cloud_conversation_id, origin_conversation_id,
-  attempt_generation, thread_updated_at, status, created_at, updated_at, description
-FROM cloud_agent_thread_controls_before_paused;
-DROP TABLE cloud_agent_thread_controls_before_paused;
-CREATE INDEX IF NOT EXISTS idx_cloud_agent_thread_controls_origin
-  ON cloud_agent_thread_controls(owner_generation, origin_conversation_id, updated_at);
-`);
-};
-
-/**
  * Every external-content FTS5 index the schema owns. Their rows are keyed by
  * the content table's rowid, so anything that can renumber rowids (VACUUM on
- * `entry`/`thread`, which have no INTEGER PRIMARY KEY) must rebuild all of
- * them. `kernel/storage/maintenance.ts` relies on this list being complete.
+ * `entry`, which has no INTEGER PRIMARY KEY) must rebuild all of them. `kernel/storage/maintenance.ts` relies on this list being complete.
  */
-export const EXTERNAL_CONTENT_FTS_TABLES = [
-  "entry_fts",
-  "thread_fts",
-  THREAD_SUMMARY_FTS_TABLE,
-] as const;
+export const EXTERNAL_CONTENT_FTS_TABLES = ["entry_fts"] as const;
 
 /** `INSERT INTO <fts>(<fts>) VALUES ('rebuild')` for one index. */
 export const rebuildFtsIndexSql = (table: string): string =>

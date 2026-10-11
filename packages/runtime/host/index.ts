@@ -2788,12 +2788,6 @@ export class StellaRuntimeHost {
       },
     );
     peer.registerNotificationHandler(
-      NOTIFICATION_NAMES.THREAD_ACTIVITY_UPDATED,
-      (params) => {
-        this.events.emit("thread-activity-updated", params);
-      },
-    );
-    peer.registerNotificationHandler(
       NOTIFICATION_NAMES.PI_CHAT_EVENTS,
       (params) => {
         this.events.emit("pi-chat-events", params);

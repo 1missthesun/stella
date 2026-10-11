@@ -7,7 +7,6 @@ import { createBootstrapServices } from "./bootstrap-services.js";
 import { registerBootstrapProcessCleanups } from "./cleanup.js";
 import {
   IPC_LOCAL_CHAT_UPDATED,
-  IPC_LOCAL_CHAT_THREAD_ACTIVITY_UPDATED,
   IPC_SCHEDULE_UPDATED,
   IPC_BROWSER_BRIDGE_STATUS,
 } from "@stella/contracts/desktop/ipc-channels";
@@ -31,9 +30,6 @@ export const broadcastToWindows = (context, channel, payload) => {
 export const broadcastLocalChatUpdated = (context, payload) => {
     broadcastToWindows(context, IPC_LOCAL_CHAT_UPDATED, payload ?? null);
 };
-export const broadcastThreadActivityUpdated = (context, payload) => {
-    broadcastToWindows(context, IPC_LOCAL_CHAT_THREAD_ACTIVITY_UPDATED, payload);
-};
 export const broadcastScheduleUpdated = (context) => {
     broadcastToWindows(context, IPC_SCHEDULE_UPDATED);
 };
@@ -53,7 +49,6 @@ export const createBootstrapContext = (config) => {
         deviceSignerPromise: null,
         isQuitting: false,
         localChatUpdateUnsubscribe: null,
-        threadActivityUpdateUnsubscribe: null,
         piChatEventsUnsubscribe: null,
         overlayController: null,
         companionController: null,

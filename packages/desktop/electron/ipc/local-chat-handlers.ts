@@ -15,7 +15,6 @@ import {
   IPC_CLOUD_CONVERSATION_CACHE_REPLACE,
   IPC_CLOUD_CONVERSATION_CACHE_RETAIN_ACCOUNT,
   IPC_LOCAL_CHAT_DELETE_CONVERSATION,
-  IPC_LOCAL_CHAT_GET_AGENT_REPORT,
   IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES,
   IPC_LOCAL_CHAT_LIST_REPLY_COUNTS,
   IPC_LOCAL_CHAT_LIST_CONVERSATIONS,
@@ -29,7 +28,6 @@ import {
   IPC_LOCAL_CHAT_LIST_MESSAGES,
   IPC_LOCAL_CHAT_LIST_MESSAGES_BEFORE,
   IPC_LOCAL_CHAT_LIST_ACTIVITY,
-  IPC_LOCAL_CHAT_LIST_THREAD_ACTIVITY,
   IPC_LOCAL_CHAT_LIST_FILES,
   IPC_LOCAL_CHAT_GET_EVENT_COUNT,
   IPC_LOCAL_CHAT_PERSIST_WELCOME,
@@ -367,25 +365,6 @@ export const registerLocalChatHandlers = (
   );
 
   handleIpc(
-    IPC_LOCAL_CHAT_LIST_THREAD_ACTIVITY,
-    async (
-      event,
-      payload: {
-        conversationId?: string;
-      },
-    ) =>
-      await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_LIST_THREAD_ACTIVITY,
-        (client) =>
-          client.listThreadActivity({
-            conversationId: payload?.conversationId ?? "",
-          }),
-      ),
-  );
-
-  handleIpc(
     IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES,
     async (
       event,
@@ -434,18 +413,6 @@ export const registerLocalChatHandlers = (
   );
 
   handleIpc(
-    IPC_LOCAL_CHAT_GET_AGENT_REPORT,
-    async (event, payload: { threadId?: string }) =>
-      await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_GET_AGENT_REPORT,
-        (client) =>
-          client.getAgentReport({ threadId: payload?.threadId ?? "" }),
-      ),
-  );
-
-  handleIpc(
     IPC_LOCAL_CHAT_LIST_MODEL_USAGE,
     async (
       event,
@@ -461,7 +428,7 @@ export const registerLocalChatHandlers = (
         options,
         event,
         IPC_LOCAL_CHAT_LIST_MODEL_USAGE,
-        async (client) => {
+        async () => {
           const args = {
             fromMs: payload?.fromMs,
             toMs: payload?.toMs,
@@ -469,24 +436,12 @@ export const registerLocalChatHandlers = (
             threadId: payload?.threadId,
             limit: payload?.limit,
           };
-          const local = client.listModelUsage(args);
-          // pi's conversations keep their own calls; Claude Code's and the
-          // older agent loops' history stays listed beside them.
           const runner = options.getStellaHostRunner?.();
-          if (!runner) return local;
-          const pi = (await runner.piChat({
+          if (!runner) return { records: [], truncated: false };
+          return (await runner.piChat({
             op: "usage",
             ...args,
           })) as LocalModelUsagePage;
-          const limit = args.limit ?? 10_000;
-          const records = [...local.records, ...pi.records].sort(
-            (a, b) => b.timestamp - a.timestamp,
-          );
-          return {
-            records: records.slice(0, limit),
-            truncated:
-              local.truncated || pi.truncated || records.length > limit,
-          };
         },
       ),
   );

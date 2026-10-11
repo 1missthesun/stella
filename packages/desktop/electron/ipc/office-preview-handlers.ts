@@ -249,17 +249,6 @@ export const registerOfficePreviewHandlers = (
           )
         : [],
     );
-    if (history) {
-      for (const filePath of await resolveCanonicalConversationFilePaths(
-        history.listCanonicalFilePaths(
-          conversationId,
-          resolveJwtOwnerScope(
-            await options.getAuthToken?.().catch(() => null),
-          ),
-        ),
-      ))
-        artifactPaths.add(filePath);
-    }
     // The conversation's cloud journal is the source of truth for what Stella
     // produced or displayed there, whichever conversation this window shows.
     if (options.cloudFileGrants) {

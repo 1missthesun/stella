@@ -7,22 +7,6 @@
  */
 import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
 
-export const MAX_ACTIVE_RUNTIME_THREADS = 16;
-
-/**
- * Cap on active member threads per group so one fan-out can't grow the
- * injected context block without bound. The 9th spawn into a group is
- * rejected with an instructive error (continue a member with
- * `send_message` instead).
- */
-export const MAX_GROUP_MEMBER_THREADS = 8;
-
-/**
- * Group keys are minted as `grp-<slug>` so the orchestrator (and the
- * pause routing) can tell a group id from a thread id at a glance.
- */
-export const THREAD_GROUP_KEY_PREFIX = "grp-";
-
 export type RuntimeThreadRecord = {
   conversationId: string;
   threadId: string;
@@ -62,30 +46,3 @@ export const deriveRuntimeThreadLiveState = (
   record: Pick<RuntimeThreadRecord, "agentStatus">,
 ): RuntimeThreadLiveState =>
   record.agentStatus === "running" ? "active" : "paused";
-
-/**
- * Compact, machine-legible status token for a single thread. Primary token
- * is always active/paused; a paused thread whose last run errored keeps that
- * detail (still resumable, but worth flagging) so the orchestrator isn't
- * flying blind on failures.
- */
-export const formatRuntimeThreadStatusLabel = (
-  record: Pick<RuntimeThreadRecord, "agentStatus">,
-): string => {
-  if (deriveRuntimeThreadLiveState(record) === "active") return "active";
-  return record.agentStatus === "error"
-    ? "paused (last run errored)"
-    : "paused";
-};
-
-export const normalizeRuntimeThreadId = (value: string): string | undefined => {
-  // Preserve case: conversation ids are case-sensitive and orchestrator thread
-  // keys are derived directly from them.
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
-};
-
-export const estimateRuntimeTokens = (value: string): number => {
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? Math.max(1, Math.ceil(trimmed.length / 4)) : 0;
-};

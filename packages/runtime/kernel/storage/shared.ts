@@ -19,12 +19,6 @@ import type { MapRouteArtifact } from "@stella/contracts/map-artifact";
 export type StoredImageContent = ImageContent & { sourcePath?: string };
 
 export const ORCHESTRATOR_ROSTER_CUSTOM_TYPE = "runtime.orchestrator_reminder";
-/** A `send_message` note another agent left for a conversation's Stella. */
-export const AGENT_MESSAGE_CUSTOM_TYPE = "runtime.agent_message";
-/** Structured descendant lifecycle rows used only by exact-thread UI.
- * They are never part of model history or the conversation-wide event table. */
-export const RUNTIME_PRIVATE_TASK_LIFECYCLE_CUSTOM_TYPE =
-  "runtime.task_lifecycle_private";
 
 export type LocalChatEventRecord = {
   _id: string;
@@ -36,10 +30,6 @@ export type LocalChatEventRecord = {
   targetDeviceId?: string;
   payload?: Record<string, unknown>;
   channelEnvelope?: Record<string, unknown>;
-};
-
-export type LocalChatRecentActivityRecord = LocalChatEventRecord & {
-  conversationId: string;
 };
 
 /**
@@ -106,10 +96,6 @@ export type LocalChatFilesWindow = {
   files: LocalChatEventRecord[];
 };
 
-/** `(timestamp, id)` cursor used to page chat messages. `null` means
- *  "no cursor" (start at the beginning of the conversation). */
-export type TimelineCursor = { timestamp: number; id: string } | null;
-
 export type LocalChatAppendEventArgs = {
   conversationId: string;
   type: string;
@@ -120,14 +106,6 @@ export type LocalChatAppendEventArgs = {
   channelEnvelope?: unknown;
   timestamp?: number;
   eventId?: string;
-};
-
-export type LocalChatSyncMessage = {
-  localMessageId: string;
-  role: "user" | "assistant";
-  text: string;
-  timestamp: number;
-  deviceId?: string;
 };
 
 /**
@@ -155,71 +133,11 @@ export type PersistedRuntimeThreadPayload =
       details?: PersistedToolResultDetails;
     });
 
-export const RUNTIME_THREAD_SESSION_VERSION = 3;
-
-export type RuntimeThreadSessionHeader = {
-  type: "session";
-  version: typeof RUNTIME_THREAD_SESSION_VERSION;
-  id: string;
-  timestamp: string;
-  cwd: string;
-  parentSession?: string;
-};
-
 export type RuntimeThreadSessionEntryBase = {
   type: string;
   id: string;
   parentId: string | null;
   timestamp: string;
-};
-
-export type RuntimeThreadMessageEntry = RuntimeThreadSessionEntryBase & {
-  type: "message";
-  message: PersistedRuntimeThreadPayload;
-};
-
-export type RuntimeThreadThinkingLevelChangeEntry =
-  RuntimeThreadSessionEntryBase & {
-    type: "thinking_level_change";
-    thinkingLevel: string;
-  };
-
-export type RuntimeThreadModelChangeEntry = RuntimeThreadSessionEntryBase & {
-  type: "model_change";
-  provider: string;
-  modelId: string;
-};
-
-export type RuntimeThreadCompactionEntry = RuntimeThreadSessionEntryBase & {
-  type: "compaction";
-  summary: string;
-  fromEntryId?: string;
-  toEntryId?: string;
-  firstKeptEntryId?: string;
-  tokensBefore: number;
-  summaryValidation?: {
-    version: 1;
-    /** Exact folded middle-span estimate passed to validateThreadSummary. */
-    middleTokens: number;
-    /** Exact prior checkpoint input, or null when no prior checkpoint existed. */
-    previousSummary: string | null;
-  };
-  details?: unknown;
-  fromHook?: boolean;
-};
-
-export type RuntimeThreadBranchSummaryEntry = RuntimeThreadSessionEntryBase & {
-  type: "branch_summary";
-  fromId: string;
-  summary: string;
-  details?: unknown;
-  fromHook?: boolean;
-};
-
-export type RuntimeThreadCustomEntry = RuntimeThreadSessionEntryBase & {
-  type: "custom";
-  customType: string;
-  data?: unknown;
 };
 
 export type RuntimeThreadCustomMessageEntry = RuntimeThreadSessionEntryBase & {
@@ -240,97 +158,6 @@ export type RuntimeThreadCustomMessageEntry = RuntimeThreadSessionEntryBase & {
       | "agent-canceled";
     payload: Record<string, unknown>;
   };
-};
-
-export type RuntimeThreadLifecycleEntry = RuntimeThreadSessionEntryBase & {
-  type: "lifecycle_event";
-  event: LocalChatEventRecord;
-};
-
-/**
- * Compare-and-swap mutations applied in the same SQLite transaction as a
- * compaction overlay. They are intentionally storage-level so the resident
- * memory module can plan a complete cache-epoch transition without making
- * SessionStore depend on memory policy.
- */
-export type RuntimeThreadCustomMessageMutation =
-  | {
-      action: "replace";
-      entryId: string;
-      expectedCustomType: string;
-      expectedContent: RuntimeThreadCustomMessageEntry["content"];
-      content: RuntimeThreadCustomMessageEntry["content"];
-    }
-  | {
-      action: "remove";
-      entryId: string;
-      expectedCustomType: string;
-      expectedContent: RuntimeThreadCustomMessageEntry["content"];
-    };
-
-export type RuntimeThreadLabelEntry = RuntimeThreadSessionEntryBase & {
-  type: "label";
-  targetId: string;
-  label?: string;
-};
-
-export type RuntimeThreadSessionInfoEntry = RuntimeThreadSessionEntryBase & {
-  type: "session_info";
-  name?: string;
-};
-
-export type RuntimeThreadSessionEntry =
-  | RuntimeThreadMessageEntry
-  | RuntimeThreadThinkingLevelChangeEntry
-  | RuntimeThreadModelChangeEntry
-  | RuntimeThreadCompactionEntry
-  | RuntimeThreadBranchSummaryEntry
-  | RuntimeThreadCustomEntry
-  | RuntimeThreadCustomMessageEntry
-  | RuntimeThreadLifecycleEntry
-  | RuntimeThreadLabelEntry
-  | RuntimeThreadSessionInfoEntry;
-
-export type RuntimeThreadSessionFileEntry =
-  | RuntimeThreadSessionHeader
-  | RuntimeThreadSessionEntry;
-
-export type RuntimeThreadMessage = {
-  timestamp: number;
-  threadKey: string;
-  role: "user" | "assistant" | "toolResult" | "runtimeInternal";
-  content: string;
-  toolCallId?: string;
-  payload?: PersistedRuntimeThreadPayload;
-  customMessage?: Pick<
-    RuntimeThreadCustomMessageEntry,
-    "customType" | "content" | "display" | "eventId" | "lifecycleEvent"
-  >;
-};
-
-export type RuntimeRunEvent = {
-  timestamp: number;
-  runId: string;
-  conversationId: string;
-  agentType: string;
-  seq?: number;
-  type:
-    | "run_start"
-    | "stream"
-    | "tool_start"
-    | "tool_end"
-    | "error"
-    | "interrupted"
-    | "run_end";
-  chunk?: string;
-  toolCallId?: string;
-  toolName?: string;
-  resultPreview?: string;
-  /** Optional for compatibility with historical run-event rows. */
-  isError?: boolean;
-  error?: string;
-  fatal?: boolean;
-  finalText?: string;
 };
 
 export type SqliteStatement = {
@@ -406,17 +233,6 @@ export const cachedStatements = (db: SqliteDatabase): CachedStatements => {
   return cache;
 };
 
-export type LocalChatEventRow = {
-  _id: string;
-  timestamp: number;
-  type: string;
-  deviceId: string | null;
-  requestId: string | null;
-  targetDeviceId: string | null;
-  payloadJson: string | null;
-  channelEnvelopeJson: string | null;
-};
-
 const ULID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
 export const MAX_EVENTS_PER_CONVERSATION = 2000;
@@ -444,9 +260,6 @@ export const asObject = (value: unknown): Record<string, unknown> | null => {
   return value as Record<string, unknown>;
 };
 
-export const fileSafeId = (value: string): string =>
-  value.replace(/[^a-zA-Z0-9._-]/g, "_");
-
 const encodeBase32 = (value: number, length: number): string => {
   let remaining = Math.floor(value);
   let output = "";
@@ -465,16 +278,6 @@ export const generateLocalId = (): string => {
     randomPart += ULID_ALPHABET[bytes[index]! % ULID_ALPHABET.length];
   }
   return `${time}${randomPart}`;
-};
-
-export const toJsonString = (value: unknown): string | null => {
-  const record = asObject(value);
-  if (!record) return null;
-  try {
-    return JSON.stringify(record);
-  } catch {
-    return null;
-  }
 };
 
 export const toJsonValueString = (value: unknown): string | null => {

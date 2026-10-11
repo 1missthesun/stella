@@ -6,10 +6,6 @@ import { getDesktopDatabasePath } from "../../../kernel/storage/database-init.js
 import { DatabaseMaintenance } from "../../../kernel/storage/maintenance.js";
 import { ChatStore } from "../../../kernel/storage/chat-store.js";
 import { RuntimeStore } from "../../../kernel/storage/runtime-store.js";
-import {
-  RunEventLog,
-  openRunEventDatabase,
-} from "../../../kernel/storage/run-event-log.js";
 import { projectLocalChatUpdateEvent } from "../../../kernel/storage/session-store.js";
 import type {
   LocalChatEventRecord,
@@ -26,15 +22,13 @@ import * as SessionConfig from "./config.js";
  * The session's SQLite database and every store carved out of it, as one
  * scoped resource. This layer sits at the bottom of the session chain so its
  * `db.close()` finalizer runs LAST on teardown: nothing may touch the db
- * after it, and the runner's finalizer (which drains compaction writes) and
- * the RunEventBus finalizer (`runEventLog.stop()`) are guaranteed to have
- * completed first by finalizer ordering — the old stopWorkerServices order.
+ * after it, and the runner's finalizer is guaranteed to have completed first
+ * by finalizer ordering.
  */
 export interface Interface {
   readonly db: SqliteDatabase;
   readonly chatStore: ChatStore;
   readonly runtimeStore: RuntimeStore;
-  readonly runEventLog: RunEventLog;
   /**
    * Idle-time checkpoint / ANALYZE / one-time VACUUM of `stella.sqlite`.
    * Started by WorkerSessions once the session is published (it needs the
@@ -65,8 +59,8 @@ export const layer = Layer.effect(
   Effect.gen(function* () {
     const hostBus = yield* HostBus.Service;
     const config = yield* SessionConfig.Service;
-    // Boot timing: open vs. pragmas/migration, then the store and the
-    // run-event database (reported on the worker.ready.timing event).
+    // Boot timing: open vs. pragmas/migration, then the store (reported on
+    // the worker.ready.timing event).
     const db = createDesktopDatabase(config.get().stellaDataDirPath, {
       onTiming: (timing) => {
         recordBootStep("dbOpen", timing.openMs);
@@ -77,23 +71,9 @@ export const layer = Layer.effect(
       },
     });
     const storesStartedAt = performance.now();
-    const chatStore = new ChatStore(db, {
-      onThreadActivityUpdate: (payload) => {
-        hostBus.notify(NOTIFICATION_NAMES.THREAD_ACTIVITY_UPDATED, payload);
-      },
-      onThreadAssistantUpdate: (payload) => {
-        hostBus.notify(NOTIFICATION_NAMES.THREAD_ACTIVITY_UPDATED, payload);
-      },
-      onThreadTranscriptUpdate: (payload) => {
-        hostBus.notify(NOTIFICATION_NAMES.THREAD_ACTIVITY_UPDATED, payload);
-      },
-    });
+    const chatStore = new ChatStore(db);
     const runtimeStore = chatStore as RuntimeStore;
-    const runEventDbStartedAt = performance.now();
-    recordBootStep("chatStore", runEventDbStartedAt - storesStartedAt);
-    const runEventDb = openRunEventDatabase(config.get().stellaDataDirPath);
-    const runEventLog = new RunEventLog(runEventDb);
-    recordBootStep("runEventDbOpen", performance.now() - runEventDbStartedAt);
+    recordBootStep("chatStore", performance.now() - storesStartedAt);
     const maintenance = new DatabaseMaintenance({
       db,
       databasePath: getDesktopDatabasePath(config.get().stellaDataDirPath),
@@ -103,7 +83,6 @@ export const layer = Layer.effect(
       Effect.sync(() => {
         // Cancel ticks + PRAGMA optimize on the still-open connection.
         maintenance.stop();
-        runEventDb.close();
         db.close();
       }),
     );
@@ -135,7 +114,6 @@ export const layer = Layer.effect(
       db,
       chatStore,
       runtimeStore,
-      runEventLog,
       maintenance,
       notifyLocalChatUpdated,
       appendChatEventAndNotify,

@@ -250,7 +250,6 @@ export const NOTIFICATION_NAMES = {
   RUN_EVENT: "run.event",
   VOICE_AGENT_EVENT: "voice.agentEvent",
   LOCAL_CHAT_UPDATED: "localChat.updated",
-  THREAD_ACTIVITY_UPDATED: "localChat.threadActivityUpdated",
   /** A watched pi-durable conversation's events (`PiChatEventsPayload`). */
   PI_CHAT_EVENTS: "piChat.events",
   THREAD_TRANSCRIPT_UPDATED: "localChat.threadTranscriptUpdated",

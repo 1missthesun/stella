@@ -1,14 +1,10 @@
 /**
- * Renderer-side client for the authoritative thread-activity IPC
- * (`localChat:listThreadActivity`). Stella-managed rows come from
- * `runtime_agents`; Claude-native rows are passive observations projected by
- * the external-engine session. Both use the same refresh stream, while only
- * Stella rows carry lifecycle authority.
+ * A conversation's agents as the app lists them, read from its pi harness.
  *
- * One bounded hydration read builds a thread-id index. Durable keyed pushes
- * patch that index and wake only listeners for the changed thread. Aggregate
- * subscribers (Activity surfaces) receive a rebuilt list only when one is
- * actually mounted; chat cards never subscribe to or scan that list.
+ * One bounded hydration read builds a thread-id index. Each pi commit in the
+ * conversation re-reads it and wakes only listeners for the changed thread.
+ * Aggregate subscribers (Activity surfaces) receive a rebuilt list only when
+ * one is actually mounted; chat cards never subscribe to or scan that list.
  */
 import type {
   DesktopThreadActivityRecord as ThreadActivityRecord,
@@ -20,10 +16,6 @@ import {
   piChatAgents,
   piChatAvailable,
 } from "@/features/chat/pi/pi-chat-store";
-
-// Absent outside Electron (plain-browser `bun run dev`): degrade to an
-// empty, update-free list instead of erroring.
-const getLocalChatApi = () => window.electronAPI?.localChat ?? null;
 
 const EMPTY_RECORDS: ThreadActivityRecord[] = [];
 
@@ -38,40 +30,20 @@ const PI_AGENT_POLL_MS = 2_000;
 /** Conversations whose last read had a pi agent running. */
 const piAgentsRunning = new Set<string>();
 
-const listLocalThreadActivity = async (
-  conversationId: string,
-): Promise<ThreadActivityRecord[]> => {
-  const api = getLocalChatApi();
-  if (!api?.listThreadActivity) return EMPTY_RECORDS;
-  return (await api.listThreadActivity({
-    conversationId,
-  })) as ThreadActivityRecord[];
-};
-
-/**
- * A conversation's agents, whatever engine runs it now: the agent loops'
- * rows and the agents pi ran in it (listed from its harness), pi's winning
- * over an older row with the same thread id.
- */
+/** A conversation's agents, as its harness lists them. */
 export const listThreadActivity = async (
   conversationId: string,
 ): Promise<ThreadActivityRecord[]> => {
-  if (!piChatAvailable()) return await listLocalThreadActivity(conversationId);
-  const [local, pi] = await Promise.all([
-    listLocalThreadActivity(conversationId),
-    piChatAgents(conversationId).catch(() => [] as ThreadActivityRecord[]),
-  ]);
-  if (pi.some((record) => record.status === "running")) {
+  if (!piChatAvailable()) return EMPTY_RECORDS;
+  const records = await piChatAgents(conversationId).catch(
+    () => [] as ThreadActivityRecord[],
+  );
+  if (records.some((record) => record.status === "running")) {
     piAgentsRunning.add(conversationId);
   } else {
     piAgentsRunning.delete(conversationId);
   }
-  if (pi.length === 0) return local;
-  const piThreadIds = new Set(pi.map((record) => record.threadId));
-  return [
-    ...local.filter((record) => !piThreadIds.has(record.threadId)),
-    ...pi,
-  ].sort(
+  return records.sort(
     (a, b) => a.startedAt - b.startedAt || a.threadId.localeCompare(b.threadId),
   );
 };
@@ -79,12 +51,10 @@ export const listThreadActivity = async (
 const subscribeToThreadActivityUpdates = (
   listener: (payload: ThreadActivityUpdatedPayload) => void,
 ): (() => void) => {
-  const local =
-    getLocalChatApi()?.onThreadActivityUpdated?.(listener) ?? (() => {});
-  if (!piChatAvailable()) return local;
+  if (!piChatAvailable()) return () => {};
   // pi agents push no rows: a commit in the conversation (a spawn, a
   // report, a message) is the cue to re-read them.
-  const pi = onPiChatEvents(({ conversationId, events }) => {
+  return onPiChatEvents(({ conversationId, events }) => {
     if (
       events.some(
         (event) =>
@@ -96,10 +66,6 @@ const subscribeToThreadActivityUpdates = (
       listener({ conversationId });
     }
   });
-  return () => {
-    local();
-    pi();
-  };
 };
 
 export type ThreadActivitySnapshot = {

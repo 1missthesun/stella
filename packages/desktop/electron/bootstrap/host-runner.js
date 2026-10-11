@@ -8,7 +8,7 @@ import { getSoundNotificationsEnabled } from "@stella/runtime/kernel/preferences
 import { deleteConnectorAccessTokens, loadConnectorTokenPayload, saveConnectorTokenPayload, } from "@stella/runtime/kernel/connectors/oauth";
 import { ensureStellaDataDirSeeded } from "@stella/runtime/kernel/home/stella-home";
 import { createStellaHostRunner, } from "../stella-host-runner.js";
-import { broadcastLocalChatUpdated, broadcastThreadActivityUpdated, broadcastScheduleUpdated, broadcastToWindows, } from "./context.js";
+import { broadcastLocalChatUpdated, broadcastScheduleUpdated, broadcastToWindows, } from "./context.js";
 import { startOfficePreviewBridge } from "./office-preview-bridge.js";
 import { showStellaNotification } from "../services/notification-service.js";
 import { serveDeviceRequest } from "../services/device-request-service.js";
@@ -315,8 +315,6 @@ const clearHostRunnerSubscriptions = (context) => {
     const { state } = context;
     state.localChatUpdateUnsubscribe?.();
     state.localChatUpdateUnsubscribe = null;
-    state.threadActivityUpdateUnsubscribe?.();
-    state.threadActivityUpdateUnsubscribe = null;
     state.piChatEventsUnsubscribe?.();
     state.piChatEventsUnsubscribe = null;
     state.scheduleUpdateUnsubscribe?.();
@@ -333,9 +331,6 @@ const connectHostRunner = async (context) => {
     runner.setAuthToken(await services.authService.getAuthToken());
     state.localChatUpdateUnsubscribe = runner.onLocalChatUpdated((payload) => {
         broadcastLocalChatUpdated(context, payload);
-    });
-    state.threadActivityUpdateUnsubscribe = runner.onThreadActivityUpdated((payload) => {
-        broadcastThreadActivityUpdated(context, payload);
     });
     state.scheduleUpdateUnsubscribe = runner.onScheduleUpdated(() => {
         broadcastScheduleUpdated(context);

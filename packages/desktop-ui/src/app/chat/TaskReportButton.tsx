@@ -24,20 +24,10 @@ const fetchAgentReport = (
 ): Promise<LocalChatAgentReport | null> => {
   const cached = reportCache.get(threadId);
   if (cached) return cached;
-  const api =
-    typeof window === "undefined" ? undefined : window.electronAPI?.localChat;
-  // Pi's agents hold their own reports; the agent loops' are on this
-  // computer. Whichever engine runs the chat now, an agent's report is where
-  // its engine kept it.
-  const local = () =>
-    api?.getAgentReport
-      ? api.getAgentReport({ threadId }).catch(() => null)
-      : Promise.resolve(null);
+  // An agent's report is in the conversation's harness.
   const request = piChatAvailable()
-    ? piAgentReport(conversationId, threadId)
-        .catch(() => null)
-        .then((report) => report ?? local())
-    : local();
+    ? piAgentReport(conversationId, threadId).catch(() => null)
+    : Promise.resolve(null);
   reportCache.set(threadId, request);
   // A running task's report changes; only a settled one is worth keeping.
   void request.then((report) => {

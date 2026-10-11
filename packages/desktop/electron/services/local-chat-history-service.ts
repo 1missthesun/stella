@@ -40,7 +40,6 @@ import {
   type LocalChatSyncMessageWithArtifacts,
 } from "./local-chat-artifacts.js";
 import { CloudConversationCacheClient } from "./cloud-conversation-cache-client.js";
-import { listCanonicalConversationFilePaths } from "./canonical-conversation-file-paths.js";
 
 type LocalChatHistoryServiceOptions = {
   stellaAppDir: string;
@@ -103,22 +102,6 @@ export class LocalChatHistoryService {
     return this.cloudConversationCacheStore;
   }
 
-  private getAssistantMessagesByAgent(
-    conversationId: string,
-  ): Map<string, string[]> {
-    type ActivityWithAssistantMessages = {
-      threadId: string;
-      assistantMessages?: string[];
-    };
-    const records = this.getStore().listThreadActivity(
-      conversationId,
-    ) as ActivityWithAssistantMessages[];
-    return new Map(
-      records
-        .filter((record) => record.assistantMessages?.length)
-        .map((record) => [record.threadId, record.assistantMessages!]),
-    );
-  }
 
   async close(): Promise<void> {
     const db = this.db;
@@ -176,15 +159,6 @@ export class LocalChatHistoryService {
     ) as LocalChatEventRecord[];
   }
 
-  listModelUsage(args: {
-    fromMs?: number;
-    toMs?: number;
-    conversationId?: string;
-    threadId?: string;
-    limit?: number;
-  }): LocalModelUsagePage {
-    return this.getStore().listModelUsage(args) as LocalModelUsagePage;
-  }
 
   listMessages(args: {
     conversationId: string;
@@ -264,13 +238,6 @@ export class LocalChatHistoryService {
     }) as LocalChatActivityWindow;
   }
 
-  listThreadActivity(args: {
-    conversationId: string;
-  }): ThreadActivityRecord[] {
-    return this.getStore().listThreadActivity(
-      args.conversationId,
-    ) as unknown as ThreadActivityRecord[];
-  }
 
   /**
    * Focus (lineage) page for one message or agent thread. Reads the
@@ -300,39 +267,7 @@ export class LocalChatHistoryService {
     return this.getStore().chat.listReplyCounts(args.conversationId);
   }
 
-  /** The untruncated report an agent returned (the activity list ships a
-   *  bounded excerpt; this is the on-demand full read behind the reply
-   *  preview's expand affordance). */
-  getAgentReport(args: { threadId: string }): LocalChatAgentReport | null {
-    const record = this.getStore().getAgentRecord(args.threadId);
-    if (!record) return null;
-    return {
-      threadId: record.threadId,
-      description: record.description,
-      agentType: record.agentType,
-      status: record.status,
-      ...(typeof record.result === "string" && record.result.trim()
-        ? { result: record.result }
-        : {}),
-      ...(typeof record.error === "string" && record.error.trim()
-        ? { error: record.error }
-        : {}),
-      startedAt: record.startedAt,
-      ...(typeof record.completedAt === "number"
-        ? { completedAt: record.completedAt }
-        : {}),
-    };
-  }
 
-  listCanonicalFilePaths(
-    conversationId: string,
-    ownerScope: string | null,
-  ): string[] {
-    this.getStore(); // Respect reset/closed lifecycle before accessing SQLite.
-    return this.db
-      ? listCanonicalConversationFilePaths(this.db, conversationId, ownerScope)
-      : [];
-  }
 
   listFiles(args: {
     conversationId: string;
@@ -427,7 +362,7 @@ export class LocalChatHistoryService {
       {
         includeDeveloperArtifacts: args.includeDeveloperArtifacts === true,
       },
-      this.getAssistantMessagesByAgent(args.conversationId),
+      undefined,
       messages,
     );
   }

@@ -700,20 +700,13 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         conversationId: authority.conversationId,
         turnId: event.turnId,
         attemptGeneration: event.attempt,
-        status:
-          outcome === "completed"
-            ? "completed"
-            : outcome === "failed"
-              ? "failed"
-              : "canceled",
+        status: outcome,
         ...(outcome === "completed" && text
           ? { resultJson: JSON.stringify({ finalText: text.slice(0, 30_000) }) }
           : {}),
         ...(outcome === "failed"
           ? { errorMessage: (text || "The agent failed.").slice(0, 2_000) }
-          : outcome === "paused"
-            ? { errorMessage: AGENT_PAUSED_REASON }
-            : {}),
+          : {}),
         completedAt: now,
       });
     }

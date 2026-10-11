@@ -103,7 +103,10 @@ export type OpenStellaHarness = {
   agentStanding(
     threadId: string,
     context: Context,
-  ): Promise<{ status: StellaAgentRecord["status"]; paused?: true; attempt: number } | undefined>;
+  ): Promise<
+    | { status: StellaAgentRecord["status"]; paused?: true; agentStatus: StellaAgentRecord["agentStatus"]; attempt: number }
+    | undefined
+  >;
   /** The orchestrator's agents, as the app lists them. */
   agentRecords(context: Context): Promise<StellaAgentRecord[]>;
   /** A message from the user to one of the orchestrator's agents, or one of theirs. */

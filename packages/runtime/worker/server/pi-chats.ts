@@ -13,7 +13,6 @@ import {
   type RuntimeChatPayload,
 } from "@stella/contracts/protocol";
 import { appendMessageRefTag } from "@stella/contracts/reply-refs";
-import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
 import {
   getAgentRuntimeEngine,
@@ -359,7 +358,7 @@ export const piChatsFor = (
               ? { status: "completed" as const, ...(agent.text ? { result: agent.text.slice(0, 30_000) } : {}) }
               : agent.outcome === "failed"
                 ? { status: "error" as const, error: (agent.text || "The agent failed.").slice(0, 10_000) }
-                : { status: "canceled" as const, error: AGENT_PAUSED_REASON }),
+                : { status: "paused" as const }),
           });
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },

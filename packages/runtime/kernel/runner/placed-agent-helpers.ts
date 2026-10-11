@@ -86,7 +86,13 @@ export const createPlacedHelperMirror = (
         attemptGeneration,
         ownerGeneration: await context.cloudOwnerGeneration(),
         status:
-          event.type === "agent-completed" ? "completed" : event.type === "agent-failed" ? "error" : "canceled",
+          event.type === "agent-completed"
+            ? "completed"
+            : event.type === "agent-failed"
+              ? "error"
+              : event.status === "paused"
+                ? "paused"
+                : "canceled",
         ...(typeof event.result === "string" && event.result ? { result: event.result.slice(0, 30_000) } : {}),
         ...(typeof event.error === "string" && event.error ? { error: event.error.slice(0, 10_000) } : {}),
       }),

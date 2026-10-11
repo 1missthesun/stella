@@ -395,6 +395,8 @@ export type RunnerContext = {
   ) => Promise<import("@stella/contracts/agent-directory").AgentDirectoryAgentRow[]>;
   /** Desktop's writer into a cloud conversation's DO-resident transcript. */
   cloudTranscript: import("./cloud-transcript-write.js").CloudTranscriptWriter;
+  /** This computer's view of each cloud conversation's brain lease. */
+  brainLeases: import("./brain-lease.js").BrainLeaseView;
   /** The signed-in owner's current data epoch, which cloud writes are fenced by. */
   cloudOwnerGeneration: () => Promise<string>;
   linkedFilePublisher: import("../device-files/linked-file-publisher.js").LinkedFilePublisher;
@@ -614,6 +616,8 @@ export type RunnerPublicApi = {
     timezone?: string;
   }) => void;
   appendCloudJournal: import("./cloud-transcript-write.js").CloudTranscriptWriter["append"];
+  /** This computer's view of each cloud conversation's brain lease, which reads of the record feed. */
+  brainLeases: Pick<import("./brain-lease.js").BrainLeaseView, "note" | "holds">;
   /**
    * A cloud-stored conversation's journal for a transcript this computer
    * mirrors into it (pi-durable): the local-turn begin and finish, the

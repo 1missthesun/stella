@@ -1,5 +1,10 @@
 import {
+  parsePiBrainClaim,
   parsePiBrainHost,
+  PI_BRAIN_ELSEWHERE_CODE,
+  piBrainHostName,
+  samePiBrainHost,
+  type PiBrainClaimAck,
   type PiBrainRecord,
   type PiBrainResponse,
 } from "@stella/contracts/turn-plane/pi-brain";
@@ -212,6 +217,13 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       expectedOwnerGeneration,
     );
     if (owner instanceof Response) return owner;
+    if (deviceId) {
+      // Only the brain's holder compacts the conversation for every host.
+      const brain = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
+      if (brain && !samePiBrainHost(brain, { host: "device", deviceId })) {
+        return this.piBrainElsewhereResponse(brain);
+      }
+    }
     const throughSeq = await this.storeJournalCheckpoint(
       body.summary,
       firstKept,
@@ -279,6 +291,18 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     if (!host) return json({ error: "Name the cloud or a device." }, 400);
     const record = await this.setPiBrain(host);
     return json({ record } satisfies PiBrainResponse);
+  }
+
+  /** A computer's turn or write refused because another host holds the brain. */
+  protected piBrainElsewhereResponse(record: PiBrainRecord): Response {
+    return json(
+      {
+        code: PI_BRAIN_ELSEWHERE_CODE,
+        message: `Stella for this chat runs ${record.host === "cloud" ? "in the cloud" : `on ${piBrainHostName(record)}`} now.`,
+        record,
+      },
+      409,
+    );
   }
 
   protected async handleHistoryQuery(request: Request): Promise<Response> {
@@ -571,6 +595,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         409,
       );
     }
+    await this.renewPiBrainHolder(deviceId);
     return json({
       turnId,
       leaseToken: renewed.leaseToken,
@@ -600,6 +625,8 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       renewOnly?: boolean;
       /** The prompt is a lifecycle wake the clients never show. */
       hidden?: boolean;
+      /** The computer's claim on the brain lease (`PiBrainClaim`); absent from a computer from before the lease. */
+      brain?: unknown;
     };
     try {
       body = (await request.json()) as typeof body;
@@ -844,12 +871,21 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         ) {
           throw new OwnerPurgeFenceError();
         }
+        await this.renewPiBrainHolder(deviceId);
+        const brain =
+          body.brain !== undefined
+            ? ((await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ??
+              null)
+            : undefined;
         return json({
           turnId,
           leaseToken: renewed.leaseToken,
           expiresAt: renewed.expiresAt,
           replayed: true,
           ...context,
+          ...(brain !== undefined
+            ? { brain: { record: brain } satisfies PiBrainClaimAck }
+            : {}),
         });
       } catch (error) {
         if (error instanceof OwnerPurgeFenceError) {
@@ -885,6 +921,39 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         413,
       );
     }
+
+    // A computer from before the lease journals as it always did; one that
+    // claims it answers only as the brain's holder, or by taking it over
+    // from a holder that can't answer.
+    const brainClaim = parsePiBrainClaim(body.brain);
+    let brainAck: PiBrainClaimAck | undefined;
+    if (brainClaim) {
+      const current = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
+      const holder =
+        current?.host === "device" && current.deviceId !== deviceId
+          ? {
+              forEpoch: current.epoch,
+              ...(await this.piBrainHolderState(
+                caller.ownerId,
+                current.deviceId,
+              )),
+            }
+          : undefined;
+      const claim = await this.claimPiBrain({
+        claimant: { host: "device", deviceId },
+        claimEpoch: brainClaim.epoch,
+        ...(holder ? { holder } : {}),
+        turnId,
+      });
+      if (claim.decision.kind === "elsewhere" && claim.record) {
+        return this.piBrainElsewhereResponse(claim.record);
+      }
+      brainAck = {
+        record: claim.record,
+        ...(claim.takenOver ? { takenOver: true as const } : {}),
+      };
+    }
+    markTiming("brainClaimMs");
 
     const lease: LocalTurnLease = {
       ownerId: caller.ownerId,
@@ -1088,6 +1157,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         expiresAt: lease.expiresAt,
         replayed: false,
         ...context,
+        ...(brainAck ? { brain: brainAck } : {}),
       });
     } catch (error) {
       if (error instanceof OwnerPurgeFenceError) {

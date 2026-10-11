@@ -82,6 +82,8 @@ export type ClaudeSessionRestoreResult = {
 
 export type ClaudeSessionSync = ClaudeSessionSyncSink & {
   resume(): void;
+  /** Weigh what is pending again now, as a lease that moved may have made some of it stale. */
+  wake(): void;
   stop(): void;
   pending(): number;
   flush(timeoutMs?: number): Promise<boolean>;
@@ -262,6 +264,25 @@ class ClaudeSessionSyncRepo {
         row.threadId,
         row.sessionId,
       );
+  }
+
+  /**
+   * The conversation's brain lease moved past the epoch this session ran
+   * under: what it has not uploaded is a stale holder's and stays here. A
+   * later step under a newer lease marks it dirty again.
+   */
+  markLeaseLost(row: SessionRow, error: string, now: number): void {
+    this.db
+      .prepare(
+        `UPDATE claude_session_sync_sessions
+            SET dirty = CASE WHEN dirty = ? THEN 0 ELSE dirty END,
+                tag_dirty = CASE WHEN tag_dirty = ? THEN 0 ELSE tag_dirty END,
+                attempts = 0,
+                last_error = ?,
+                updated_at = ?
+          WHERE thread_id = ? AND session_id = ?`,
+      )
+      .run(row.dirty, row.tagDirty, error.slice(0, 2_000), now, row.threadId, row.sessionId);
   }
 
   markDiverged(row: SessionRow, error: string, now: number): void {
@@ -473,8 +494,11 @@ const errorMessage = (error: unknown): string =>
 const isDivergence = (error: unknown): boolean =>
   error instanceof ClaudeSessionDivergedError ||
   (error instanceof BackendRequestError &&
-    (error.reason === CLAUDE_SESSION_CONFLICT_REASON ||
-      error.reason === CLAUDE_SESSION_STALE_LEASE_REASON));
+    error.reason === CLAUDE_SESSION_CONFLICT_REASON);
+
+const isStaleLease = (error: unknown): boolean =>
+  error instanceof BackendRequestError &&
+  error.reason === CLAUDE_SESSION_STALE_LEASE_REASON;
 
 const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
   raceWithTimeoutError(
@@ -515,6 +539,8 @@ export const createClaudeSessionSync = (options: {
   db: SqliteDatabase;
   getAuthToken: () => string | null;
   getBackend: () => ClaudeSessionSyncBackend | null;
+  /** Whether the conversation's brain lease moved past `epoch` (`BrainLeaseView.superseded`). */
+  leaseSuperseded?: (conversationId: string, epoch: number) => boolean;
 }): ClaudeSessionSync => {
   const logger = createRuntimeLogger("claude-session-sync");
   const repo = new ClaudeSessionSyncRepo(options.db);
@@ -704,6 +730,21 @@ export const createClaudeSessionSync = (options: {
         scheduleDrain(Math.min(...rows.map((candidate) => candidate.nextAttemptAt)) - now);
         return;
       }
+      // A holder that lost the lease stops uploading by its epoch, before
+      // the cloud would refuse it for a newer holder's.
+      if (
+        row.leaseEpoch !== null &&
+        options.leaseSuperseded?.(row.conversationId, row.leaseEpoch) === true
+      ) {
+        repo.markLeaseLost(row, "The brain lease moved to a newer epoch.", Date.now());
+        logger.warn("claude-session-sync.lease-lost", {
+          threadId: row.threadId,
+          sessionId: row.sessionId,
+          leaseEpoch: row.leaseEpoch,
+          by: "epoch",
+        });
+        continue;
+      }
       try {
         await syncSession(row, backend);
         if (stopped) return;
@@ -711,6 +752,16 @@ export const createClaudeSessionSync = (options: {
       } catch (error) {
         if (stopped) return;
         const message = errorMessage(error);
+        if (isStaleLease(error)) {
+          repo.markLeaseLost(row, message, Date.now());
+          logger.warn("claude-session-sync.lease-lost", {
+            threadId: row.threadId,
+            sessionId: row.sessionId,
+            leaseEpoch: row.leaseEpoch,
+            by: "cloud",
+          });
+          continue;
+        }
         if (isDivergence(error)) {
           repo.markDiverged(row, message, Date.now());
           logger.warn("claude-session-sync.diverged", {
@@ -1081,6 +1132,7 @@ export const createClaudeSessionSync = (options: {
       }
       scheduleDrain(0);
     },
+    wake: () => scheduleDrain(0),
     stop: () => {
       stopped = true;
       cancelScheduled?.();

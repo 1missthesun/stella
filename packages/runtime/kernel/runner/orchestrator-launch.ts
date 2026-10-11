@@ -716,6 +716,8 @@ export const launchPreparedOrchestratorRun = (args: {
     let leaseToken: string | null = null;
     let cloudJournalSeq: number | undefined;
     let cloudContextEndSeq: number | undefined;
+    let brainLeaseEpoch: number | undefined;
+    let brainLeaseMoved = false;
     let ephemeralCaptureStarted = false;
     let seededCloudThread: CloudThread = [];
     let deferredTerminal: DeferredTerminalCallback | null = null;
@@ -751,6 +753,9 @@ export const launchPreparedOrchestratorRun = (args: {
             clientMsgId: args.userMessageId,
             userMessageJson: JSON.stringify(userMessage),
             ...(userMessageHidden ? { hidden: true } : {}),
+            // A wake of this computer's own agents runs here as it always
+            // has; what the user sends answers only under the brain lease.
+            claimBrain: !userMessageHidden,
             onLeaseLost: (reason) => {
               prepared.abortController.abort(
                 `Cloud conversation lease ended (${reason}).`,
@@ -805,6 +810,23 @@ export const launchPreparedOrchestratorRun = (args: {
         leaseToken = begin.leaseToken;
         seedCloudHistory(begin);
         cloudContextEndSeq = begin.contextEndSeq;
+        if (begin.brain) {
+          const epoch = begin.brain.record?.epoch ?? null;
+          if (epoch !== null) brainLeaseEpoch = epoch;
+          brainLeaseMoved =
+            context.brainLeases.beganUnder(prepared.conversationId, epoch) ||
+            begin.brain.takenOver === true;
+          if (begin.brain.takenOver) {
+            logger.info("brain-lease.taken-over", {
+              conversationId: prepared.conversationId,
+              epoch,
+              from:
+                begin.brain.record?.previous?.host === "device"
+                  ? begin.brain.record.previous.deviceId
+                  : begin.brain.record?.previous?.host,
+            });
+          }
+        }
         if (userMessageHidden && begin.promptSeq !== undefined) {
           cloudJournalSeq = begin.promptSeq;
         }
@@ -841,6 +863,8 @@ export const launchPreparedOrchestratorRun = (args: {
         storageMode: prepared.storageMode,
         ownerGeneration: cloudOwnerGeneration ?? prepared.ownerGeneration,
         ...(cloudJournalSeq !== undefined ? { cloudJournalSeq } : {}),
+        ...(brainLeaseEpoch !== undefined ? { brainLeaseEpoch } : {}),
+        ...(brainLeaseMoved ? { brainLeaseMoved } : {}),
         ...(cloudContextEndSeq !== undefined && cloudContextEndSeq >= 0
           ? {
               resolveClaudeResumeJournalSeq: () =>

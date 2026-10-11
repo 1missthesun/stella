@@ -20,6 +20,7 @@ import { piJournalUserMessage, piTerminalNotice, type PiRemoteTurn, type PiUserM
 import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
 import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
 import { isAgentAttemptOutcome } from "@stella/contracts/agent-status";
+import { PI_BRAIN_ELSEWHERE_CODE } from "@stella/contracts/turn-plane/pi-brain";
 import {
   checkpointToPublish,
   importJournal,
@@ -338,7 +339,9 @@ export async function journalMirror(args: {
             const journaled = piJournalUserMessage(message as PiUserMessage);
             const localTurnId = `pi:${syncId}:${entry.id}`;
             // The writer retries what can succeed; a refusal is final, and the
-            // turn stays on this computer only.
+            // turn stays on this computer only. Refused because another host
+            // holds the brain, this computer's Stella stops: it does not answer
+            // beside the holder, and what it holds is now only a cache.
             const ack = await journal
               .begin({
                 localTurnId,
@@ -350,8 +353,11 @@ export async function journalMirror(args: {
                 userMessageJson: JSON.stringify(journaled.message),
                 hidden: journaled.hidden,
               })
-              .catch((error: unknown) => {
+              .catch(async (error: unknown) => {
                 report(error);
+                if ((error as { code?: unknown } | null)?.code === PI_BRAIN_ELSEWHERE_CODE) {
+                  await stopStella(harness, root, context).catch(report);
+                }
                 return undefined;
               });
             if (ack) held.add(localTurnId);

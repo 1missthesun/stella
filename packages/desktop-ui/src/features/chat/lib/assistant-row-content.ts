@@ -43,8 +43,7 @@ export const assistantRowHasOwnContent = (
   (row.askRecords?.length ?? 0) > 0 ||
   (row.sourceDiffPayloads?.length ?? 0) > 0 ||
   Boolean(row.customSlot) ||
-  Boolean(row.voiceSession) ||
-  (row.agentCompletion?.sections.some((section) => section.files.length > 0) ?? false);
+  Boolean(row.voiceSession);
 /**
  * Whether a timeline row produces a rendered box at all. User rows always
  * render; assistant rows render when they have visible content. A reply

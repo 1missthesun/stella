@@ -215,6 +215,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         nativeTools: spec.nativeTools,
         nativeToolCallIds: true,
         boundToolInactivity: false,
+        allowEmptyFinal: true,
         abortSignal: spec.signal,
         executeTool: async (toolCallId, toolName, toolArgs, signal) =>
           toToolResult(await spec.executeTool(toolCallId, toolName, toolArgs, signal)),

@@ -107,6 +107,7 @@ export type ClaudeCodeTurnRequest = {
   nativeTools?: readonly string[];
   nativeToolCallIds?: boolean;
   boundToolInactivity?: boolean;
+  allowEmptyFinal?: boolean;
   autoCompactWindowTokens?: number;
   autoCompactTriggerPct?: number;
   abortSignal?: AbortSignal;
@@ -2754,7 +2755,8 @@ class ClaudeCodeSessionRuntime {
               parsedLine,
               processState.stderrText,
               Boolean(
-                !completed.request.vanilla && session.allowEmptyNativeFinal,
+                completed.request.allowEmptyFinal ||
+                  (!completed.request.vanilla && session.allowEmptyNativeFinal),
               ),
             );
             completed.resolve(stepResult);

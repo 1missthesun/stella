@@ -144,6 +144,7 @@ type Turn = {
   wake?: () => void;
   callIds: Set<string>;
   prompted?: Message[];
+  unsent: Message[];
   waiting: Map<string, (outcome: ClaudeCodeToolOutcome) => void>;
   early: Map<string, ClaudeCodeToolOutcome>;
   inject?: (input: { text: string; images: ImageContent[] }) => boolean;
@@ -151,9 +152,20 @@ type Turn = {
   nextToolSet?: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
 };
 
+type TurnRequest = {
+  model: Model<Api>;
+  messages: Message[];
+  systemPrompt: string;
+  tools: ClaudeCodeToolSpec[];
+  nativeTools: readonly string[];
+  thinkingLevel: ModelThinkingLevel;
+  prompt?: { text: string; images: ImageContent[] };
+};
+
 type Session = {
   piSessionId: string;
   binding: Binding;
+  request?: TurnRequest;
   record?: ClaudeCodeSessionRecord;
   turn?: Turn;
   cliSessionId?: string;
@@ -413,7 +425,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
 
   const startTurn = async (
     session: Session,
-    request: { model: Model<Api>; messages: Message[]; systemPrompt: string; tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[]; thinkingLevel: ModelThinkingLevel },
+    request: TurnRequest,
   ): Promise<Turn> => {
     const binding = session.binding;
     await options.transport.preflight?.(binding.session);
@@ -457,7 +469,12 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       }
     }
     const rebuild = rebuildPrompt(conversation);
-    const prompt = resumeSessionId && seenAt >= 0 ? deltaPrompt(conversation.slice(seenAt + 1)) : rebuild;
+    const prompt =
+      request.prompt && resumeSessionId
+        ? request.prompt
+        : resumeSessionId && seenAt >= 0
+          ? deltaPrompt(conversation.slice(seenAt + 1))
+          : rebuild;
     const abort = new AbortController();
     const turn: Turn = {
       id: crypto.randomUUID(),
@@ -467,6 +484,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       queue: [],
       callIds: new Set(),
       prompted: conversation,
+      unsent: [],
       waiting: new Map(),
       early: new Map(),
       toolSet: { tools: request.tools, nativeTools: request.nativeTools },
@@ -560,11 +578,12 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   };
 
   const consumeRound = async (
-    turn: Turn,
+    first: Turn,
     out: AssistantMessageEventStream,
     modelInfo: Model<Api>,
     signal: AbortSignal | undefined,
   ): Promise<void> => {
+    let turn = first;
     const output: AssistantMessage = {
       role: "assistant",
       content: [],
@@ -644,6 +663,17 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             if (signal?.aborted || turn.abort.signal.aborted) fail("aborted", "Stopped.");
             else fail("error", markedError(outcome?.error));
             return;
+          }
+          const request = turn.session.request;
+          if (turn.unsent.length > 0 && request) {
+            const steer = userPrompt(turn.unsent);
+            try {
+              turn = await startTurn(turn.session, { ...request, prompt: steer });
+            } catch (error) {
+              fail("error", markedError(error));
+              return;
+            }
+            continue;
           }
           if (!output.content.some((part) => part.type === "text" && part.text.trim()) && outcome.text.trim()) {
             output.content.push({ type: "text", text: outcome.text });
@@ -801,17 +831,25 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       if (!ours || (turn.done && turn.queue.length === 0)) {
         abortTurn(turn, "Superseded.");
         turn = undefined;
-      } else if (!turn.done) {
+      } else {
         const { users } = trailingUsers(tail);
         const fresh = users.filter((message) => {
           const key = messageKey(message);
           return key !== undefined && !session.record?.seen.includes(key);
         });
-        {
-          if (fresh.length > 0) {
-            const prompt = userPrompt(fresh);
-            if (prompt.text && turn.inject?.({ text: prompt.text, images: prompt.images })) noteSeen(session, fresh);
+        const held = new Set(turn.unsent.map(messageKey));
+        const waiting = [...turn.unsent, ...fresh.filter((message) => !held.has(messageKey(message)))];
+        if (waiting.length > 0) {
+          const prompt = userPrompt(waiting);
+          if (!turn.done && prompt.text && turn.inject?.({ text: prompt.text, images: prompt.images })) {
+            noteSeen(session, waiting);
+            turn.unsent = [];
+          } else {
+            turn.unsent = waiting;
           }
+        }
+        noteSeen(session, results);
+        if (!turn.done) {
           for (const message of results) {
             if (message.role !== "toolResult") continue;
             const record = calls.get(message.toolCallId);
@@ -829,23 +867,24 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               turn.early.set(message.toolCallId, outcome);
             }
           }
-          noteSeen(session, results);
           const before = JSON.stringify(turn.toolSet.nativeTools) + JSON.stringify(turn.toolSet.tools.map((tool) => tool.name));
           const after = JSON.stringify(toolSet.nativeTools) + JSON.stringify(toolSet.tools.map((tool) => tool.name));
           if (before !== after) turn.nextToolSet = toolSet;
         }
       }
     }
+    const request: TurnRequest = {
+      model: modelInfo,
+      messages,
+      systemPrompt,
+      tools: toolSet.tools,
+      nativeTools: toolSet.nativeTools,
+      thinkingLevel: thinkingLevelOf(streamOptions),
+    };
+    session.request = request;
     if (!turn) {
       try {
-        turn = await startTurn(session, {
-          model: modelInfo,
-          messages,
-          systemPrompt,
-          tools: toolSet.tools,
-          nativeTools: toolSet.nativeTools,
-          thinkingLevel: thinkingLevelOf(streamOptions),
-        });
+        turn = await startTurn(session, request);
       } catch (error) {
         fail(markedError(error));
         return;

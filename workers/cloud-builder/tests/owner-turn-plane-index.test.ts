@@ -261,7 +261,7 @@ describe("desktop-dispatched cloud agents", () => {
       controlRequestId: "cancel-request-1",
     };
     const result = await h.call("agentThreads.cancel", args);
-    expect(result).toMatchObject({ canceled: true, control: { status: "canceled", attemptGeneration: 1 } });
+    expect(result).toMatchObject({ canceled: true, control: { status: "paused", attemptGeneration: 1 } });
     expect(h.host.canceled).toEqual([
       expect.objectContaining({ threadId: control.threadId, attemptGeneration: 1, cancelRequestId: "cancel-request-1" }),
     ]);

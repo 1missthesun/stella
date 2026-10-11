@@ -443,7 +443,7 @@ describe("subagent shell recovery scope", () => {
       ),
     ).toEqual({ canceled: true });
     expect(await running).toEqual({
-      status: "error",
+      status: "canceled",
       finalText: "",
       error: "Canceled by placement",
       threadId: "placement-agent:exact-running",

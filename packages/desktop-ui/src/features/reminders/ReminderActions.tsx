@@ -34,6 +34,9 @@ export const ReminderActions = memo(function ReminderActions({ mark }: { mark: R
   const [failed, setFailed] = useState(false);
   const fire = fires?.get(mark.fireId);
   if (!fire) return null;
+  const due = mark.dueAt ? (
+    <span className="reminder-actions__due">{t("reminders.due", { time: formatTime(mark.dueAt) })}</span>
+  ) : null;
 
   const run = (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -46,6 +49,7 @@ export const ReminderActions = memo(function ReminderActions({ mark }: { mark: R
   if (fire.state === "done") {
     return (
       <div className="reminder-actions reminder-actions--settled" data-reminder-state="done">
+        {due}
         <Check size={14} strokeWidth={2} />
         <span>{t("reminders.doneState")}</span>
       </div>
@@ -55,6 +59,7 @@ export const ReminderActions = memo(function ReminderActions({ mark }: { mark: R
     const until = fire.snoozedUntil;
     return (
       <div className="reminder-actions reminder-actions--settled" data-reminder-state="snoozed">
+        {due}
         <Clock size={14} strokeWidth={1.75} />
         <span>
           {until && until > Date.now()
@@ -66,6 +71,7 @@ export const ReminderActions = memo(function ReminderActions({ mark }: { mark: R
   }
   return (
     <div className="reminder-actions" data-reminder-state="open">
+      {due}
       <button
         type="button"
         className="reminder-actions__button reminder-actions__button--primary"

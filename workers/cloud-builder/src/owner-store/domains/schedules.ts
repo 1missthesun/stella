@@ -38,6 +38,7 @@ import {
 } from "@stella/contracts/backend/schedules";
 import {
   REMINDER_CARD_TYPE,
+  REMINDER_LATE_MS,
   REMINDER_MAX_SNOOZE_MINUTES,
   REMINDER_PUSH_CATEGORY,
   REMINDER_PUSH_KIND,
@@ -155,6 +156,12 @@ export const SCHEDULES_WATCHES_MIGRATION = {
     `ALTER TABLE schedules ADD COLUMN last_finding TEXT`,
     `ALTER TABLE schedules ADD COLUMN failing_since INTEGER`,
   ],
+};
+
+/** When a late delivery was due, so it can say so. */
+export const SCHEDULES_DUE_MIGRATION = {
+  id: "schedules.4-due",
+  statements: [`ALTER TABLE reminder_fires ADD COLUMN due_at INTEGER`],
 };
 
 type Row = {
@@ -763,6 +770,7 @@ type FireRow = {
   state: string;
   snoozed_until: number | null;
   pushed_at: number | null;
+  due_at: number | null;
   updated_at: number;
 };
 
@@ -775,6 +783,7 @@ const toReminderFire = (row: FireRow): ReminderFire => ({
   ...(row.conversation_id ? { conversationId: row.conversation_id } : {}),
   text: row.text,
   firedAt: row.fired_at,
+  ...(row.due_at !== null ? { dueAt: row.due_at } : {}),
   state: toFireState(row.state),
   ...(row.snoozed_until !== null ? { snoozedUntil: row.snoozed_until } : {}),
   updatedAt: row.updated_at,
@@ -796,17 +805,20 @@ const listFires = (db: OwnerDbReader, now: number): ReminderFire[] =>
 /** The delivery's row, once per fire id: a retried fire finds the first one. */
 const recordFire = (
   ctx: OwnerContext,
-  fire: { fireId: string; scheduleId: string; conversationId: string | null; text: string },
+  fire: { fireId: string; scheduleId: string; conversationId: string | null; text: string; dueAt?: number },
 ): FireRow => {
+  // Late past a point, it says when it was due; it is still delivered just once.
+  const dueAt = fire.dueAt !== undefined && ctx.now - fire.dueAt > REMINDER_LATE_MS ? fire.dueAt : null;
   ctx.db.run(
     `INSERT OR IGNORE INTO reminder_fires
-       (fire_id, schedule_id, conversation_id, text, fired_at, state, updated_at)
-     VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+       (fire_id, schedule_id, conversation_id, text, fired_at, due_at, state, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'open', ?)`,
     fire.fireId,
     fire.scheduleId,
     fire.conversationId,
     fire.text,
     ctx.now,
+    dueAt,
     ctx.now,
   );
   ctx.db.run(
@@ -864,6 +876,7 @@ const deliverReminder = async (ctx: OwnerContext, ownerGeneration: string, fire:
       fireId: fire.fire_id,
       scheduleId: fire.schedule_id,
       text: fire.text,
+      ...(fire.due_at !== null ? { dueAt: fire.due_at } : {}),
     };
     const posted = await ctx.host.postConversationCard({
       conversationId,
@@ -1047,6 +1060,7 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
       scheduleId,
       conversationId: row.conversation_id,
       text: row.prompt,
+      dueAt: row.next_run_at,
     });
     const delivered = await deliverReminder(ctx, snapshot.ownerGeneration, delivery);
     finishFire(
@@ -1063,11 +1077,17 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   }
   if (!retrying && !spendRun(ctx, scheduleId, fireId, oneShot)) return;
   const started = await startRun(ctx, row, fireId, snapshot.ownerGeneration, {
-    prompt: row.prompt,
+    prompt: `${row.prompt}${retrying ? "" : lateNote(row.next_run_at, ctx.now)}`,
     ...(toRoute(row.route) === "agent" ? { agent: { description: row.description } } : {}),
   });
   finishFire(ctx, scheduleId, fireId, started.ok ? {} : { ...started.outcome, oneShot });
 };
+
+/** A run that starts well after it was due says so: it runs once, not once per missed slot. */
+const lateNote = (dueAt: number, now: number): string =>
+  now - dueAt > REMINDER_LATE_MS
+    ? `\n\n(This was due at ${new Date(dueAt).toISOString()} and runs now instead, once, in place of any runs it missed.)`
+    : "";
 
 /**
  * One of the owner's daily scheduled runs, for a fire about to wake AI.
@@ -1317,7 +1337,7 @@ const removeArgs = object({
 
 export const schedulesDomain = {
   name: "schedules",
-  migrations: [SCHEDULES_MIGRATION, SCHEDULES_KINDS_MIGRATION, SCHEDULES_WATCHES_MIGRATION],
+  migrations: [SCHEDULES_MIGRATION, SCHEDULES_KINDS_MIGRATION, SCHEDULES_WATCHES_MIGRATION, SCHEDULES_DUE_MIGRATION],
   views: {
     "schedules.list": {
       parse: empty(),

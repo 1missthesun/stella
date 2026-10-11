@@ -51,3 +51,9 @@
   color: var(--text-weak);
   font-size: var(--font-size-small, 12px);
 }
+
+.reminder-actions__due {
+  color: var(--text-weak);
+  font-size: var(--font-size-small, 12px);
+  margin-right: 4px;
+}

@@ -16,15 +16,19 @@ export const REMINDER_ACTION_SNOOZE = "reminder.snooze";
 export const REMINDER_DEFAULT_SNOOZE_MINUTES = 10;
 export const REMINDER_MAX_SNOOZE_MINUTES = 7 * 24 * 60;
 export const REMINDER_TEXT_MAX_CHARS = 4_000;
+/** A delivery this much later than it was due says when it was due. */
+export const REMINDER_LATE_MS = 10 * 60_000;
 
 export type ReminderCard = {
   type: typeof REMINDER_CARD_TYPE;
   fireId: string;
   scheduleId: string;
   text: string;
+  /** Set when it went out late (the cloud or the account was away): when it was due. */
+  dueAt?: number;
 };
 
-export type ReminderMark = { fireId: string; scheduleId: string };
+export type ReminderMark = { fireId: string; scheduleId: string; dueAt?: number };
 
 export type ReminderFireState = "open" | "done" | "snoozed";
 
@@ -35,6 +39,8 @@ export type ReminderFire = {
   conversationId?: string;
   text: string;
   firedAt: number;
+  /** Set when it went out late: when it was due. */
+  dueAt?: number;
   state: ReminderFireState;
   /** Set while snoozed: when it comes back. */
   snoozedUntil?: number;
@@ -59,7 +65,8 @@ export const parseReminderCard = (value: unknown): ReminderCard | null => {
   const scheduleId = nonEmpty(raw.scheduleId);
   const text = nonEmpty(raw.text);
   if (!fireId || !scheduleId || !text) return null;
-  return { type: REMINDER_CARD_TYPE, fireId, scheduleId, text };
+  const dueAt = typeof raw.dueAt === "number" && Number.isFinite(raw.dueAt) ? raw.dueAt : undefined;
+  return { type: REMINDER_CARD_TYPE, fireId, scheduleId, text, ...(dueAt !== undefined ? { dueAt } : {}) };
 };
 
 export const parseReminderMark = (value: unknown): ReminderMark | null => {
@@ -67,8 +74,16 @@ export const parseReminderMark = (value: unknown): ReminderMark | null => {
   const raw = value as Record<string, unknown>;
   const fireId = nonEmpty(raw.fireId);
   const scheduleId = nonEmpty(raw.scheduleId);
-  return fireId && scheduleId ? { fireId, scheduleId } : null;
+  const dueAt = typeof raw.dueAt === "number" && Number.isFinite(raw.dueAt) ? raw.dueAt : undefined;
+  return fireId && scheduleId ? { fireId, scheduleId, ...(dueAt !== undefined ? { dueAt } : {}) } : null;
 };
+
+/** The mark a reminder card gives its line. */
+export const reminderMarkOf = (card: ReminderCard): ReminderMark => ({
+  fireId: card.fireId,
+  scheduleId: card.scheduleId,
+  ...(card.dueAt !== undefined ? { dueAt: card.dueAt } : {}),
+});
 
 /**
  * The reminder as a line Stella said: what a host's transcript imports, so
@@ -91,7 +106,7 @@ export const reminderAssistantMessage = (card: ReminderCard, createdAtMs: number
   },
   stopReason: "stop" as const,
   timestamp: createdAtMs,
-  reminder: { fireId: card.fireId, scheduleId: card.scheduleId } satisfies ReminderMark,
+  reminder: reminderMarkOf(card),
 });
 
 export const parseReminderPushData = (value: unknown): ReminderPushData | null => {

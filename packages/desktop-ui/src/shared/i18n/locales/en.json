@@ -2743,6 +2743,7 @@
     "snoozeTomorrow": "Tomorrow morning",
     "snoozedUntil": "Snoozed until {time}",
     "snoozed": "Snoozed",
+    "due": "Due {time}",
     "failed": "Couldn't update the reminder. Try again."
   },
   "userAsk": {

@@ -1,3 +1,4 @@
+import { reminderMarkOf } from "@stella/contracts/reminders";
 import { parseAskUserToolResult, type UserAskRecord } from "@stella/contracts/user-ask-deck";
 import { projectMobileLifecycle } from "./mobile-reply-context";
 import { cloudFileArtifact } from "./cloud-file-payload";
@@ -320,7 +321,7 @@ export const projectCloudConversationMessages = (args: {
         createdAt: reminderRecord.createdAtMs,
         canonicalCreatedAt: reminderRecord.createdAtMs,
         sequence: reminderRecord.seq,
-        reminder: { fireId: card.fireId, scheduleId: card.scheduleId },
+        reminder: reminderMarkOf(card),
       });
       continue;
     }

@@ -35,6 +35,11 @@ export const ReminderActions = memo(function ReminderActions({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const fire = fires?.get(mark.fireId);
   if (!fire) return null;
+  const due = mark.dueAt ? (
+    <Text style={styles.settled} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+      {t("reminders.due", { time: formatTime(mark.dueAt) })}
+    </Text>
+  ) : null;
 
   const run = (action: () => Promise<unknown>) => {
     tapMedium();
@@ -70,33 +75,39 @@ export const ReminderActions = memo(function ReminderActions({
           ? t("reminders.snoozedUntil", { time: formatTime(fire.snoozedUntil) })
           : t("reminders.snoozed");
     return (
-      <Text style={styles.settled} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-        {label}
-      </Text>
+      <View>
+        {due}
+        <Text style={styles.settled} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+          {label}
+        </Text>
+      </View>
     );
   }
   return (
-    <View style={styles.row}>
-      <Pressable
-        accessibilityRole="button"
-        disabled={busy}
-        onPress={() => run(() => markReminderDone(fire.fireId))}
-        style={({ pressed }) => [styles.button, styles.primary, (pressed || busy) && styles.dimmed]}
-      >
-        <Text style={[styles.label, styles.primaryLabel]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {t("reminders.done")}
-        </Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        disabled={busy}
-        onPress={chooseSnooze}
-        style={({ pressed }) => [styles.button, (pressed || busy) && styles.dimmed]}
-      >
-        <Text style={styles.label} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {t("reminders.snooze")}
-        </Text>
-      </Pressable>
+    <View>
+      {due}
+      <View style={styles.row}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy}
+          onPress={() => run(() => markReminderDone(fire.fireId))}
+          style={({ pressed }) => [styles.button, styles.primary, (pressed || busy) && styles.dimmed]}
+        >
+          <Text style={[styles.label, styles.primaryLabel]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+            {t("reminders.done")}
+          </Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy}
+          onPress={chooseSnooze}
+          style={({ pressed }) => [styles.button, (pressed || busy) && styles.dimmed]}
+        >
+          <Text style={styles.label} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+            {t("reminders.snooze")}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 });

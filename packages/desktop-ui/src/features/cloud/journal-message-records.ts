@@ -5,7 +5,7 @@ import type {
   MessageRecord,
 } from "@stella/contracts/local-chat";
 import { isPiAgentText } from "@stella/contracts/pi-chat";
-import { parseReminderCard } from "@stella/contracts/reminders";
+import { parseReminderCard, reminderMarkOf } from "@stella/contracts/reminders";
 import { journalAgentTitles } from "@stella/contracts/agent-titles";
 import { groupEventsIntoMessages } from "@/features/chat/lib/group-events-into-messages";
 import { withAttachmentPreamble } from "./cloud-composer-store";
@@ -433,7 +433,7 @@ export const journalRecordsToMessageRecords = (
           type: "assistant_message",
           payload: {
             text: reminder.text,
-            metadata: { reminder: { fireId: reminder.fireId, scheduleId: reminder.scheduleId } },
+            metadata: { reminder: reminderMarkOf(reminder) },
           },
         });
         continue;

@@ -547,7 +547,6 @@ function ChatSurface(props: {
     // A turn is only sendable once every attachment has a drive path. Until
     // then the chip is still uploading or has failed, and sending would drop it.
     attachmentsSettled(thread.attachments) &&
-    !(cloudModelsActive && cloudModelSettings.saving) &&
     !offline &&
     thread.storageLoaded &&
     thread.authorityReady !== false;
@@ -598,7 +597,6 @@ function ChatSurface(props: {
       pinned: composerModelPinned,
       label: cloudModelSettings.label,
       loading: cloudModelSettings.loading && !cloudModelSettings.execution,
-      saving: cloudModelSettings.saving,
       effortLabel:
         cloudModelSettings.effort === "default"
           ? t("settings.agentModelPicker.default")

@@ -136,10 +136,11 @@ export function useCloudModelSettings(active: boolean) {
   const scope = owner ? `${owner.identityKey}:${owner.identityRevision}` : null;
   const currentScope = useRef<string | null>(scope);
   const writePending = useRef(false);
+  /** The newest pick still to be saved; picks made mid-save collapse into it. */
+  const desired = useRef<CloudExecutionSelection | null>(null);
   const readRevision = useRef(0);
   const [state, setState] = useState<LoadedState | null>(null);
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [providerModels, setProviderModels] = useState<
     Record<string, ProviderModelsState>
   >({});
@@ -148,7 +149,7 @@ export function useCloudModelSettings(active: boolean) {
   useLayoutEffect(() => {
     currentScope.current = scope;
     writePending.current = false;
-    setSaving(false);
+    desired.current = null;
     setLoading(false);
     setProviderModels({});
     return () => { currentScope.current = null; };
@@ -206,35 +207,45 @@ export function useCloudModelSettings(active: boolean) {
   }, [owner, scope, active, t]);
   useEffect(() => { void refresh(); }, [refresh]);
 
-  const apply = useCallback(async (next: CloudExecutionSelection) => {
-    if (!active || !owner || !scope || !loaded || writePending.current) return;
-    writePending.current = true;
+  /**
+   * A pick shows at once and is saved behind it. Picks made while a save is
+   * in flight are not dropped: the newest one is saved next. A failed save
+   * puts back the last selection the server accepted and says so.
+   */
+  const apply = useCallback((next: CloudExecutionSelection) => {
+    if (!active || !owner || !scope || !loaded) return;
     ++readRevision.current;
     setLoading(false);
-    setSaving(true);
-    // Show the pick immediately; a failed save restores the previous one.
-    const previous = loaded;
-    setState({ ...loaded, execution: next });
-    try {
-      await runOwnerBoundModelRequest({
-        getToken: () => getAuthTokenForSubject(owner.expectedSubject),
-        isCurrent: () => currentScope.current === scope,
-        request: async () => {
-          await getBackendClient().call("engines.setExecution", { execution: next });
-        },
-      });
-    } catch (error) {
-      if (currentScope.current === scope) {
-        setState(previous);
-        notifyError();
-        Alert.alert(t("app.chat.miniModelPicker.updateFailedTitle"), userFacingError(error));
+    setState((current) => (current?.scope === scope ? { ...current, execution: next } : current));
+    desired.current = next;
+    if (writePending.current) return;
+    writePending.current = true;
+    let saved = loaded.execution;
+    void (async () => {
+      try {
+        while (desired.current && currentScope.current === scope) {
+          const target = desired.current;
+          desired.current = null;
+          await runOwnerBoundModelRequest({
+            getToken: () => getAuthTokenForSubject(owner.expectedSubject),
+            isCurrent: () => currentScope.current === scope,
+            request: async () => {
+              await getBackendClient().call("engines.setExecution", { execution: target });
+            },
+          });
+          saved = target;
+        }
+      } catch (error) {
+        if (currentScope.current === scope) {
+          desired.current = null;
+          setState((current) => (current?.scope === scope ? { ...current, execution: saved } : current));
+          notifyError();
+          Alert.alert(t("app.chat.miniModelPicker.updateFailedTitle"), userFacingError(error));
+        }
+      } finally {
+        if (currentScope.current === scope) writePending.current = false;
       }
-    } finally {
-      if (currentScope.current === scope) {
-        writePending.current = false;
-        setSaving(false);
-      }
-    }
+    })();
   }, [active, owner, scope, loaded, t]);
 
   const brainId = execution ? brainIdOf(execution) : "stella";
@@ -446,7 +457,6 @@ export function useCloudModelSettings(active: boolean) {
       loadProviderModels,
       selectProviderModel,
       loading,
-      saving,
       refresh,
       label,
       effort,
@@ -482,7 +492,6 @@ export function useCloudModelSettings(active: boolean) {
       models,
       modelsFor,
       refresh,
-      saving,
       selectEffort,
       selectEngine,
       selectEngineModel,

@@ -96,7 +96,6 @@ export type ComposerModelPickerConfig = {
   pinned: boolean;
   label: string;
   loading?: boolean;
-  saving?: boolean;
   effortLabel: string;
   effortOptions: readonly {
     id: string;

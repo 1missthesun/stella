@@ -127,7 +127,7 @@ export function BrainSection({
     <View>
       <SectionLabel
         trailing={
-          settings.saving || !ready ? (
+          !ready ? (
             <ActivityIndicator size="small" color={colors.textMuted} />
           ) : null
         }

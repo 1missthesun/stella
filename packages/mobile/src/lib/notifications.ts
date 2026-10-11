@@ -10,6 +10,13 @@ import {
   clampUrgency,
   type UserAskUrgencyLevel,
 } from "@stella/contracts/user-ask";
+import {
+  REMINDER_ACTION_DONE,
+  REMINDER_ACTION_SNOOZE,
+  REMINDER_PUSH_CATEGORY,
+  parseReminderPushData,
+} from "@stella/contracts/reminders";
+import { markReminderDone, snoozeReminder } from "./reminders";
 import { backendOrigin, postJson } from "./http";
 import { getOrCreateMobileDeviceId } from "./phone-access";
 import { getNotificationsMuted } from "./notifications-prefs";
@@ -72,6 +79,19 @@ const USER_ASK_ACTIONS = [
     identifier: "dismiss",
     buttonTitle: i18nFallback.t("mobile.userAsk.notification.dismiss"),
     options: { opensAppToForeground: false, isDestructive: false },
+  },
+];
+
+const REMINDER_ACTIONS = [
+  {
+    identifier: REMINDER_ACTION_DONE,
+    buttonTitle: "Done",
+    options: { opensAppToForeground: false },
+  },
+  {
+    identifier: REMINDER_ACTION_SNOOZE,
+    buttonTitle: "Snooze 10 min",
+    options: { opensAppToForeground: false },
   },
 ];
 
@@ -153,6 +173,16 @@ Notifications.setNotificationHandler({
     if (!pushDeliveryEnabled()) return { ...SILENT };
     // User-side mute wins over everything — drop the notification entirely.
     if (getNotificationsMuted()) return { ...SILENT };
+    // A reminder is due now: it shows even over the app.
+    if (parseReminderPushData(notification.request.content.data)) {
+      return {
+        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      };
+    }
     const ask = readUserAskPush(
       notification.request.content.data as UserAskPushData | null | undefined,
     );
@@ -346,6 +376,19 @@ const handleNotificationResponse = (
   handledResponses.add(key);
   clearLaunchResponse();
   if (!pushDeliveryEnabled()) return;
+  const reminder = parseReminderPushData(response.notification.request.content.data);
+  if (reminder) {
+    if (response.actionIdentifier === REMINDER_ACTION_DONE) {
+      void markReminderDone(reminder.fireId).catch(() => undefined);
+      return;
+    }
+    if (response.actionIdentifier === REMINDER_ACTION_SNOOZE) {
+      void snoozeReminder(reminder.fireId).catch(() => undefined);
+      return;
+    }
+    requestMainChat();
+    return;
+  }
   const data = response.notification.request.content.data as
     | UserAskPushData
     | null
@@ -391,6 +434,10 @@ export async function installNotificationCategoriesAndListeners(): Promise<() =>
       Notifications.setNotificationCategoryAsync(
         USER_ASK_PUSH_CATEGORY,
         USER_ASK_ACTIONS,
+      ),
+      Notifications.setNotificationCategoryAsync(
+        REMINDER_PUSH_CATEGORY,
+        REMINDER_ACTIONS,
       ),
     ]);
   } catch {

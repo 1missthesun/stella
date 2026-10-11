@@ -306,6 +306,24 @@ export const projectCloudConversationMessages = (args: {
 
   const messages: ChatMessage[] = [];
   for (const [turnId, turn] of byTurn) {
+    // A reminder Stella delivered: her line, on its own, with Done and Snooze.
+    const reminderRecord = turn.find(
+      (record): record is Extract<JournalRecord, { kind: "card" }> =>
+        record.kind === "card" && record.card.type === "reminder",
+    );
+    if (reminderRecord && reminderRecord.card.type === "reminder") {
+      const card = reminderRecord.card;
+      messages.push({
+        id: `cloud:${turnId}:reminder:${reminderRecord.seq}`,
+        role: "assistant",
+        text: card.text,
+        createdAt: reminderRecord.createdAtMs,
+        canonicalCreatedAt: reminderRecord.createdAtMs,
+        sequence: reminderRecord.seq,
+        reminder: { fireId: card.fireId, scheduleId: card.scheduleId },
+      });
+      continue;
+    }
     let userMessageId = `cloud:${turnId}:user`;
     let turnUserRecord: JournalMessageRecord | undefined;
     let terminal: Extract<JournalRecord, { kind: "turn" }> | undefined;

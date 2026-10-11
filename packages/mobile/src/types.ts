@@ -242,6 +242,8 @@ export type ComposerQuote = {
 export type ChatMessage = {
   /** Compact records of answered `ask_user` questions on this row. */
   askRecords?: readonly UserAskRecord[];
+  /** A reminder Stella delivered: the row carries Done and Snooze. */
+  reminder?: { fireId: string; scheduleId: string };
   /** Durable reply relationships; UI hides adjacent context. */
   replyRefs?: ReplyRef[];
   reaction?: string;

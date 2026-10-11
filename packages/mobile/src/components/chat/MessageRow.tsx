@@ -74,6 +74,7 @@ import { fadeHex } from "../../theme/oklch";
 import { fonts } from "../../theme/fonts";
 import type { ChatArtifact, ChatMessage } from "../../types";
 import { UserAskRecordView } from "../UserAskCard";
+import { ReminderActions } from "./ReminderActions";
 
 export type MessageRowStyles = ReturnType<typeof makeMessageRowStyles>;
 
@@ -1146,6 +1147,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
           </Animated.View>
         </View>
       ) : null}
+      {item.reminder ? <ReminderActions mark={item.reminder} colors={colors} /> : null}
       {hasText && (showGeneratedImages || showEvidence) ? (
         <View>
           {showGeneratedImages ? (

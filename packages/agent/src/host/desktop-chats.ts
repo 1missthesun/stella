@@ -646,7 +646,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         await recordEngineCompaction(
           chat.harness,
           chat.root,
-          { id: compaction.id, summary: compaction.summary, engine: "claude-code" },
+          { ...compaction, engine: "claude-code" },
           context,
         );
       })().catch((error: unknown) => options.report(error));

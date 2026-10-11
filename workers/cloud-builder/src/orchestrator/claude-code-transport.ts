@@ -361,7 +361,11 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
           attempt.spec.onStatus({ state: event.state, text: event.text });
         } else if (event.type === "compaction") {
           host.log("claude_code_compaction", { turnId: attempt.turn.turnId, summaryChars: event.summary.length });
-          attempt.spec.onCompaction({ id: event.id, summary: event.summary });
+          attempt.spec.onCompaction({
+            id: event.id,
+            summary: event.summary,
+            ...(event.preservedMessages !== undefined ? { preservedMessages: event.preservedMessages } : {}),
+          });
         }
       }
       return { status: 200, body: { ok: true } };

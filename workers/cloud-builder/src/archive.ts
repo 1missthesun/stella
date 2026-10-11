@@ -275,7 +275,7 @@ export class ConversationArchive {
       const plan = this.residencyCeiling(checkpoint);
       if (!plan) return;
       for (let pass = 0; pass < SEGMENTS_PER_PASS; pass += 1) {
-        const cutSeq = this.resolveCut(plan.ceiling);
+        const cutSeq = this.resolveCut(plan.ceiling, plan.reason !== "checkpoint");
         if (cutSeq === null) {
           if (pass === 0) {
             this.log("info", "rollover_no_boundary", {
@@ -366,14 +366,17 @@ export class ConversationArchive {
   /**
    * The three conditions, all required:
    *  1. at or below `ceiling` (the checkpoint, the context window, or the
-   *     pressure target) and strictly below the most recent turn's context
-   *     start, which is what makes R2 non-load-bearing for a normal turn;
+   *     pressure target); below anything but the checkpoint, also strictly
+   *     below the most recent turn's context start, which is what makes R2
+   *     non-load-bearing for a normal turn. A checkpoint needs no such
+   *     guard: its summary stands in for every row it covers, and a turn's
+   *     window over the journal only ever reads resident rows;
    *  2. the last row of a turn that reached a terminal state;
    *  3. followed immediately by a plain user message, so the resident window
    *     can never open on an orphaned tool result.
    */
-  private resolveCut(desired: number): number | null {
-    const latest = this.journal.latestTerminalTurn();
+  private resolveCut(desired: number, belowContext: boolean): number | null {
+    const latest = belowContext ? this.journal.latestTerminalTurn() : null;
     const ceiling =
       latest?.ctx_start_seq != null
         ? Math.min(desired, latest.ctx_start_seq - 1)

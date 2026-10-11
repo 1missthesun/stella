@@ -199,25 +199,33 @@ export async function checkpointToPublish(
 
 /**
  * An engine that keeps its own context (Claude Code) compacted it: record
- * that as this transcript's compaction, so its summary opens the context
- * from the newest prompt on, as a compaction of pi's own would, and
- * `checkpointToPublish` publishes it as the conversation's checkpoint. The
- * newest prompt is the earliest entry the engine can still have taken in
- * after compacting, so the context kept from it is never short of what the
- * summary leaves out. Admitted as a write: placed at once when idle, else at
- * the run's next boundary. Returns whether it was submitted.
+ * that as this transcript's compaction, so its summary opens the context, as
+ * a compaction of pi's own would, and `checkpointToPublish` publishes it as
+ * the conversation's checkpoint. The context it keeps opens on the prompt
+ * before the last `preservedMessages` messages the engine kept word for word
+ * (the newest prompt when it kept none), so nothing the summary leaves out
+ * is dropped; counting an entry per engine message errs toward keeping more.
+ * Admitted as a write: placed at once when idle, else at the run's next
+ * boundary. Returns whether it was submitted.
  */
 export async function recordEngineCompaction(
   harness: Harness,
   root: Conversation,
-  compaction: { id: string; summary: string; engine: string },
+  compaction: { id: string; summary: string; engine: string; preservedMessages?: number },
   context: Context,
 ): Promise<boolean> {
+  const messageKinds = new Set<string>(Object.values(ENTRY_KIND));
   const head = await harness.commit(async (tx) => {
+    let skip = compaction.preservedMessages ?? 0;
     let cursor: Cursor | undefined;
     do {
       const page = await tx.scanEntries({ conversationId: root.id, order: "descending" }, ALIGN_SCAN_PAGE, cursor);
       for (const entry of page.items) {
+        if (!messageKinds.has(entry.kind)) continue;
+        if (skip > 0) {
+          skip -= 1;
+          continue;
+        }
         if (entry.kind === ENTRY_KIND.user) return entry.id;
       }
       cursor = page.next;

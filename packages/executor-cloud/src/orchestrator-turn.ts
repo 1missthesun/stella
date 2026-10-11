@@ -326,7 +326,14 @@ export class CliAssistantAssembler {
   observe(event: ClaudeStreamJsonEvent): void {
     const compaction = this.#compaction(event as Record<string, unknown>);
     if (compaction) {
-      this.emit({ type: "compaction", id: compaction.id, summary: compaction.summary });
+      this.emit({
+        type: "compaction",
+        id: compaction.id,
+        summary: compaction.summary,
+        ...(compaction.preservedMessages !== undefined
+          ? { preservedMessages: compaction.preservedMessages }
+          : {}),
+      });
     }
     const status = getClaudeCodeStatusChangeFromStreamEvent(event);
     if (status) {

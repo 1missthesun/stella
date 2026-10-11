@@ -725,7 +725,7 @@ export class PiConversationRuntime {
           const recorded = await recordEngineCompaction(
             harness,
             root,
-            { id: compaction.id, summary: compaction.summary, engine: "claude-code" },
+            { ...compaction, engine: "claude-code" },
             contextFor(),
           );
           options.log("claude_code_compaction_recorded", { recorded, summaryChars: compaction.summary.length });

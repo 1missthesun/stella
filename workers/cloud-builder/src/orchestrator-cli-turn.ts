@@ -131,7 +131,14 @@ const parseCliEvent = (value: unknown): CloudOrchestratorEvent | null => {
         value.id.length <= 200 &&
         typeof value.summary === "string" &&
         value.summary.length > 0
-        ? { type: "compaction", id: value.id, summary: value.summary }
+        ? {
+            type: "compaction",
+            id: value.id,
+            summary: value.summary,
+            ...(nonNegativeInteger(value.preservedMessages)
+              ? { preservedMessages: value.preservedMessages }
+              : {}),
+          }
         : null;
     case "assistant_message":
       return isCliAssistantMessage(value.message)

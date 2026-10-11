@@ -12,6 +12,11 @@ export type ClaudeCodeCompaction = {
   summary: string;
   trigger?: string;
   preTokens?: number;
+  /**
+   * Messages the CLI kept word for word after the summary
+   * (`compact_metadata.preserved_messages`): the summary does not cover them.
+   */
+  preservedMessages?: number;
 };
 
 /** Keeps a summary within the journal checkpoint's 256 KB, however it encodes. */
@@ -45,13 +50,15 @@ export const claudeCodeSummaryText = (text: string): string => {
 
 /** Watches one CLI's stream lines and returns each compaction once its summary arrives. */
 export const createClaudeCodeCompactionDetector = () => {
-  let boundary: { id: string; trigger?: string; preTokens?: number } | undefined;
+  let boundary: Omit<ClaudeCodeCompaction, "summary"> | undefined;
   const seen = new Set<string>();
   return (event: Record<string, unknown>): ClaudeCodeCompaction | undefined => {
     if (event.type === "system" && event.subtype === "compact_boundary") {
       const id = typeof event.uuid === "string" && event.uuid ? event.uuid : `compact:${Date.now()}`;
       const metadata = asRecord(event.compact_metadata);
+      const preserved = asRecord(metadata?.preserved_messages)?.uuids;
       boundary = {
+        ...(Array.isArray(preserved) && preserved.length > 0 ? { preservedMessages: preserved.length } : {}),
         id,
         ...(typeof metadata?.trigger === "string" ? { trigger: metadata.trigger } : {}),
         ...(typeof metadata?.pre_tokens === "number" ? { preTokens: metadata.pre_tokens } : {}),

@@ -168,7 +168,11 @@ export function ClaudeAccountsSection({
 
   return (
     <>
-      <EngineAccountHeader title={t(`${K}.claudeTitle`)} control={addControl} />
+      <EngineAccountHeader
+        title={t(`${K}.claudeTitle`)}
+        description={t(`${K}.claudeSyncNote`)}
+        control={addControl}
+      />
       {accounts.map((account) => {
         const config = localFor(account.email);
         const places = account.places ?? [];

@@ -1035,6 +1035,7 @@
       "chatgptSection": "ChatGPT",
       "claudeNote": "여기서 계정을 추가하면 Stella의 클라우드가 Anthropic의 자체 페이지에서 Claude Code에 로그인합니다. 각 컴퓨터는 자체 Claude Code 로그인을 사용합니다.",
       "claudeSection": "Claude",
+      "claudeSyncNote": "도구 출력을 포함한 전체 Claude Code 세션이 Stella의 클라우드에 동기화됩니다.",
       "connectChatgpt": "ChatGPT 계정 연결",
       "connectClaude": "Claude 계정 추가",
       "connecting": "연결 중…",
@@ -1948,6 +1949,7 @@
         "whereCloud": "클라우드의 Claude Code에 로그인하는 중입니다.",
         "whereComputer": "이 컴퓨터의 Claude Code에 로그인하는 중입니다."
       },
+      "claudeSyncNote": "도구 출력을 포함한 전체 Claude Code 세션이 Stella의 클라우드에 동기화됩니다.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "여기서 Claude를 사용하려면 이 컴퓨터에 Claude Code를 설치하세요.",
       "connecting": "연결 중…",

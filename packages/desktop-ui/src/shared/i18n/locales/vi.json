@@ -1035,6 +1035,7 @@
       "chatgptSection": "ChatGPT",
       "claudeNote": "Thêm tài khoản ở đây sẽ đăng nhập đám mây của Stella vào Claude Code trên chính trang của Anthropic. Mỗi máy tính dùng đăng nhập Claude Code riêng.",
       "claudeSection": "Claude",
+      "claudeSyncNote": "Toàn bộ phiên Claude Code, kể cả đầu ra của công cụ, được đồng bộ lên đám mây của Stella.",
       "connectChatgpt": "Kết nối tài khoản ChatGPT",
       "connectClaude": "Thêm tài khoản Claude",
       "connecting": "Đang kết nối…",
@@ -1948,6 +1949,7 @@
         "whereCloud": "Đang đăng nhập Claude Code trên đám mây của bạn.",
         "whereComputer": "Đang đăng nhập Claude Code trên máy tính này."
       },
+      "claudeSyncNote": "Toàn bộ phiên Claude Code, kể cả đầu ra của công cụ, được đồng bộ lên đám mây của Stella.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Cài Claude Code trên máy tính này để dùng Claude tại đây.",
       "connecting": "Đang kết nối…",

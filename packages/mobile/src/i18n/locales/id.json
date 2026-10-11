@@ -1035,6 +1035,7 @@
       "chatgptSection": "ChatGPT",
       "claudeNote": "Menambahkan akun di sini membuat cloud Stella masuk ke Claude Code di halaman Anthropic sendiri. Setiap komputer menggunakan login Claude Code-nya sendiri.",
       "claudeSection": "Claude",
+      "claudeSyncNote": "Sesi Claude Code lengkap, termasuk output alat, disinkronkan ke cloud Stella.",
       "connectChatgpt": "Hubungkan akun ChatGPT",
       "connectClaude": "Tambahkan akun Claude",
       "connecting": "Menghubungkan…",
@@ -1948,6 +1949,7 @@
         "whereCloud": "Masuk ke Claude Code di cloud Anda.",
         "whereComputer": "Masuk ke Claude Code di komputer ini."
       },
+      "claudeSyncNote": "Sesi Claude Code lengkap, termasuk output alat, disinkronkan ke cloud Stella.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Instal Claude Code di komputer ini untuk menggunakan Claude di sini.",
       "connecting": "Menghubungkan…",

@@ -1035,6 +1035,7 @@
       "chatgptSection": "ChatGPT",
       "claudeNote": "在此添加账号会让 Stella 的云端在 Anthropic 自己的页面上登录 Claude Code。每台电脑使用各自的 Claude Code 登录。",
       "claudeSection": "Claude",
+      "claudeSyncNote": "完整的 Claude Code 会话（包括工具输出）会同步到 Stella 的云端。",
       "connectChatgpt": "连接 ChatGPT 账号",
       "connectClaude": "添加 Claude 账号",
       "connecting": "正在连接…",
@@ -1948,6 +1949,7 @@
         "whereCloud": "正在你的云端登录 Claude Code。",
         "whereComputer": "正在这台电脑上登录 Claude Code。"
       },
+      "claudeSyncNote": "完整的 Claude Code 会话（包括工具输出）会同步到 Stella 的云端。",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "在这台电脑上安装 Claude Code，即可在此使用 Claude。",
       "connecting": "正在连接…",

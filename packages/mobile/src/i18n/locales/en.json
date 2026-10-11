@@ -1045,6 +1045,7 @@
       "chatgptSection": "ChatGPT",
       "claudeNote": "Adding an account here signs Stella's cloud in to Claude Code on Anthropic's own page. Each computer uses its own Claude Code sign-in.",
       "claudeSection": "Claude",
+      "claudeSyncNote": "Full Claude Code sessions, including tool outputs, sync to Stella's cloud.",
       "connectChatgpt": "Connect ChatGPT account",
       "connectClaude": "Add Claude account",
       "connecting": "Connecting…",
@@ -1958,6 +1959,7 @@
         "whereCloud": "Signing in to Claude Code in your cloud.",
         "whereComputer": "Signing in to Claude Code on this computer."
       },
+      "claudeSyncNote": "Full Claude Code sessions, including tool outputs, sync to Stella's cloud.",
       "claudeTitle": "Claude",
       "cliMissing": "Install Claude Code on this computer to use Claude here.",
       "connecting": "Connecting…",

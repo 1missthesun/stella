@@ -1065,6 +1065,7 @@
       "chatgptSection": "ChatGPT",
       "claudeNote": "Dodanie konta tutaj loguje chmurę Stelli do Claude Code na stronie samego Anthropic. Każdy komputer używa własnego logowania do Claude Code.",
       "claudeSection": "Claude",
+      "claudeSyncNote": "Pełne sesje Claude Code, łącznie z wynikami narzędzi, są synchronizowane z chmurą Stelli.",
       "connectChatgpt": "Połącz konto ChatGPT",
       "connectClaude": "Dodaj konto Claude",
       "connecting": "Łączenie…",
@@ -1978,6 +1979,7 @@
         "whereCloud": "Logowanie do Claude Code w Twojej chmurze.",
         "whereComputer": "Logowanie do Claude Code na tym komputerze."
       },
+      "claudeSyncNote": "Pełne sesje Claude Code, łącznie z wynikami narzędzi, są synchronizowane z chmurą Stelli.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Zainstaluj Claude Code na tym komputerze, aby używać tu Claude.",
       "connecting": "Łączenie…",

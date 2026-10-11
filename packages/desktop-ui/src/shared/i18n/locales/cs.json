@@ -1065,6 +1065,7 @@
       "chatgptSection": "ChatGPT",
       "claudeNote": "Přidáním účtu zde se cloud Stelly přihlásí do Claude Code na vlastní stránce Anthropic. Každý počítač používá své vlastní přihlášení do Claude Code.",
       "claudeSection": "Claude",
+      "claudeSyncNote": "Celé relace Claude Code, včetně výstupů nástrojů, se synchronizují do cloudu Stelly.",
       "connectChatgpt": "Připojit účet ChatGPT",
       "connectClaude": "Přidat účet Claude",
       "connecting": "Připojování…",
@@ -1978,6 +1979,7 @@
         "whereCloud": "Přihlašování ke Claude Code ve vašem cloudu.",
         "whereComputer": "Přihlašování ke Claude Code na tomto počítači."
       },
+      "claudeSyncNote": "Celé relace Claude Code, včetně výstupů nástrojů, se synchronizují do cloudu Stelly.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Nainstalujte Claude Code do tohoto počítače, abyste tu mohli používat Claude.",
       "connecting": "Připojování…",

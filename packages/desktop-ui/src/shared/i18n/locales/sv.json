@@ -1045,6 +1045,7 @@
       "chatgptSection": "ChatGPT",
       "claudeNote": "När du lägger till ett konto här loggar Stellas moln in i Claude Code på Anthropics egen sida. Varje dator använder sin egen Claude Code-inloggning.",
       "claudeSection": "Claude",
+      "claudeSyncNote": "Hela Claude Code-sessioner, inklusive verktygsutdata, synkroniseras till Stellas moln.",
       "connectChatgpt": "Anslut ChatGPT-konto",
       "connectClaude": "Lägg till Claude-konto",
       "connecting": "Ansluter…",
@@ -1958,6 +1959,7 @@
         "whereCloud": "Loggar in på Claude Code i ditt moln.",
         "whereComputer": "Loggar in på Claude Code på den här datorn."
       },
+      "claudeSyncNote": "Hela Claude Code-sessioner, inklusive verktygsutdata, synkroniseras till Stellas moln.",
       "claudeTitle": "Claude (Pro/Max)",
       "cliMissing": "Installera Claude Code på den här datorn för att använda Claude här.",
       "connecting": "Ansluter…",

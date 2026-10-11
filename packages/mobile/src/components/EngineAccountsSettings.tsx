@@ -897,6 +897,16 @@ function ProviderSection({
           {t("mobile.engineAccounts.claudeNote")}
         </Text>
       ) : null}
+      {!chatgpt ? (
+        <Text
+          style={[
+            settingsStyles.rowSub,
+            embedded ? styles.embeddedNote : styles.sectionNote,
+          ]}
+        >
+          {t("mobile.engineAccounts.claudeSyncNote")}
+        </Text>
+      ) : null}
 
       {connectId ? (
         <View
@@ -1074,5 +1084,6 @@ const makeStyles = (colors: Colors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
     },
     embeddedPasteCard: { marginBottom: 12, marginHorizontal: 12, marginTop: 0 },
+    embeddedNote: { marginBottom: 12, paddingHorizontal: 12 },
     flexLabel: { flex: 1 },
   });

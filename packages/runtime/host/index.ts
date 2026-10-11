@@ -1048,6 +1048,24 @@ export class StellaRuntimeHost {
         const handoff = payload.handoff === true;
         // A schedule's prompt is runtime input, not a message the user typed.
         const scheduled = dispatch.ingress === "schedule";
+        const scheduledAgent =
+          scheduled &&
+          payload.scheduledAgent &&
+          typeof payload.scheduledAgent === "object" &&
+          typeof (payload.scheduledAgent as { description?: unknown }).description === "string"
+            ? (payload.scheduledAgent as { description: string })
+            : null;
+        if (scheduledAgent) {
+          // Straight to an agent of this conversation's orchestrator: no
+          // orchestrator turn now; its report wakes the orchestrator later.
+          await this.createBackgroundAgent({
+            conversationId: dispatch.conversationId,
+            threadId: dispatch.dispatchId,
+            description: scheduledAgent.description.trim() || prompt.slice(0, 160),
+            prompt,
+          });
+          return { status: "ok", finalText: "" };
+        }
         const userAuthored = !handoff && !scheduled;
         // A placed chat's conversation is stored in the cloud: its journal
         // is its one record, which the turn below writes. A copy in this
@@ -2255,6 +2273,13 @@ export class StellaRuntimeHost {
                 recordActivity: true,
               },
             ),
+          startAgent: async ({ conversationId, key, description, prompt }) =>
+            await this.createBackgroundAgent({
+              conversationId,
+              threadId: key,
+              description,
+              prompt,
+            }),
         }),
       },
       // Pop a native banner whenever a scheduled fire delivers a message.

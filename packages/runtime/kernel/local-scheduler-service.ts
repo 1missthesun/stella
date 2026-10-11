@@ -134,7 +134,7 @@ const cloneCronJob = (job: LocalCronJobRecord): LocalCronJobRecord => ({
 /** Script file backing a payload, if any (`watch` sensors and legacy `script` jobs). */
 const payloadScriptPath = (payload: LocalCronPayload): string | null =>
   payload.kind === 'script' || payload.kind === 'watch'
-    ? payload.scriptPath
+    ? (payload.scriptPath ?? null)
     : null
 
 const cloneHeartbeat = (
@@ -265,7 +265,14 @@ const assertValidPayload = (
   }
   if (kind === 'watch') {
     const scriptPath = assertValidScriptPath(record.scriptPath, scriptsDir)
-    return { kind: 'watch', scriptPath }
+    const instructions = asTrimmedString(record.instructions)
+    return {
+      kind: 'watch',
+      scriptPath,
+      ...(instructions ? { instructions } : {}),
+      ...(record.route === 'agent' ? { route: 'agent' as const } : {}),
+      ...(record.once === true ? { once: true } : {}),
+    }
   }
   if (kind === 'script') {
     const scriptPath = assertValidScriptPath(record.scriptPath, scriptsDir)
@@ -337,12 +344,29 @@ const buildTaskFirePrompt = (name: string, intent: string) =>
 Stored intent:
 ${intent}`
 
-const buildWatchChangePrompt = (name: string, details: string) =>
+const buildWatchChangePrompt = (
+  name: string,
+  details: string,
+  instructions: string | undefined,
+  once: boolean,
+) =>
   `Watch "${name}" detected a change. Raw change details from its check script:
 
 ${details}
 
-Tell the user what changed, and act on it only if the watch clearly implies an action. Your final reply is delivered as an assistant message and a native notification — keep it concise and user-facing.`
+${instructions ? `When it was set up, the user asked: ${instructions}\n${once ? 'It has done its job and stops checking now.' : 'It keeps checking on its schedule.'}\nHandle the finding as they asked: tell them, ask them, or act.` : 'Tell the user what changed, and act on it only if the watch clearly implies an action.'} Your final reply is delivered as an assistant message and a native notification — keep it concise and user-facing.`
+
+const buildWatchAgentPrompt = (
+  name: string,
+  details: string,
+  instructions: string,
+) =>
+  `${instructions}
+
+A watch ("${name}") just found what the user was waiting for:
+${details}
+
+The user approved this when they set the watch up, so go ahead now, then report what you did.`
 
 const buildWatchFailurePrompt = (
   name: string,
@@ -1595,7 +1619,18 @@ export class LocalSchedulerService {
     startedAt: number,
   ): Promise<'done' | 'busy'> {
     if (active.payload.kind !== 'watch') return 'done'
-    const scriptPath = active.payload.scriptPath
+    const watch = active.payload
+    const scriptPath = watch.scriptPath
+    if (!scriptPath) {
+      active.runningAtMs = undefined
+      active.enabled = false
+      active.lastStatus = 'error'
+      active.lastError = 'A watch on this computer needs its check script.'
+      active.updatedAt = Date.now()
+      this.persistState()
+      this.emitChange()
+      return 'done'
+    }
 
     let escalation = active.pendingEscalation
       ? { ...active.pendingEscalation }
@@ -1653,14 +1688,45 @@ export class LocalSchedulerService {
       }
     }
 
-    const turnResult = await runner.runAutomationTurn({
-      conversationId: active.conversationId,
-      userPrompt:
-        escalation.reason === 'change'
-          ? buildWatchChangePrompt(active.name, escalation.summary)
-          : buildWatchFailurePrompt(active.name, scriptPath, escalation.summary),
-      agentType: 'orchestrator',
-    })
+    // An approved action goes straight to an agent; anything else, and a
+    // failing sensor, to the orchestrator.
+    const toAgent =
+      escalation.reason === 'change' &&
+      watch.route === 'agent' &&
+      Boolean(watch.instructions) &&
+      Boolean(runner.startAgent)
+    const turnResult: Awaited<ReturnType<typeof runner.runAutomationTurn>> =
+      toAgent
+        ? await runner.startAgent!({
+            conversationId: active.conversationId,
+            key: `watch-${active.id}-${escalation.atMs}`,
+            description: active.name,
+            prompt: buildWatchAgentPrompt(
+              active.name,
+              escalation.summary,
+              watch.instructions!,
+            ),
+          }).then(
+            () => ({ status: 'ok' as const, finalText: '' }),
+            (error: unknown) => ({
+              status: 'error' as const,
+              finalText: '' as const,
+              error: error instanceof Error ? error.message : String(error),
+            }),
+          )
+        : await runner.runAutomationTurn({
+            conversationId: active.conversationId,
+            userPrompt:
+              escalation.reason === 'change'
+                ? buildWatchChangePrompt(
+                    active.name,
+                    escalation.summary,
+                    watch.instructions,
+                    watch.once === true,
+                  )
+                : buildWatchFailurePrompt(active.name, scriptPath, escalation.summary),
+            agentType: 'orchestrator',
+          })
 
     if (turnResult.status === 'busy') {
       active.pendingEscalation = escalation
@@ -1717,6 +1783,11 @@ export class LocalSchedulerService {
     }
 
     this.advanceCronAfterRun(active, finishedAt, false)
+    // A one-off watch has answered its question once its finding is handed over.
+    if (escalation.reason === 'change' && watch.once === true) {
+      active.enabled = false
+      active.lastStatus = 'done'
+    }
     this.persistState()
     this.emitChange()
     return 'done'

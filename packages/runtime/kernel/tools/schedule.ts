@@ -150,8 +150,16 @@ const summarizeJob = (record: LocalCronJobRecord): Record<string, unknown> => ({
   ...(record.payload.kind === "task" || record.payload.kind === "agent"
     ? { prompt: record.payload.prompt }
     : {}),
-  ...(record.payload.kind === "watch" || record.payload.kind === "script"
-    ? { scriptPath: record.payload.scriptPath }
+  ...(record.payload.kind === "script" ? { scriptPath: record.payload.scriptPath } : {}),
+  ...(record.payload.kind === "watch"
+    ? {
+        runsOn: record.payload.scriptPath ? "computer" : "cloud",
+        ...(record.payload.scriptPath ? { scriptPath: record.payload.scriptPath } : {}),
+        ...(record.payload.instructions ? { prompt: record.payload.instructions } : {}),
+        deliverTo: record.payload.route ?? "orchestrator",
+        ...(record.payload.once ? { once: true } : {}),
+        ...(record.lastOutputPreview ? { lastFinding: record.lastOutputPreview } : {}),
+      }
     : {}),
   ...(record.lastStatus ? { lastStatus: record.lastStatus } : {}),
   ...(record.lastError ? { lastError: record.lastError } : {}),
@@ -182,13 +190,31 @@ const buildPayloadForAdd = (
     return { kind: "task", prompt };
   }
   if (kind === "watch") {
-    const scriptPath = asTrimmedString(args.scriptPath);
-    if (!scriptPath) {
+    const instructions = asTrimmedString(args.prompt);
+    const watchOptions = {
+      ...(instructions ? { instructions } : {}),
+      ...(args.deliverTo === "agent" ? { route: "agent" as const } : {}),
+      ...(args.once === true ? { once: true } : {}),
+    };
+    if (args.deliverTo === "agent" && !instructions) {
+      throw new Error('deliverTo="agent" needs prompt: the action the user approved.');
+    }
+    if (args.runsOn === "computer") {
+      const scriptPath = asTrimmedString(args.scriptPath);
+      if (!scriptPath) {
+        throw new Error(
+          'A watch on this computer requires scriptPath (author + dry-run the check script with ScriptDraft first).',
+        );
+      }
+      return { kind: "watch", scriptPath, ...watchOptions };
+    }
+    const script = typeof args.script === "string" ? args.script.trim() : "";
+    if (!script) {
       throw new Error(
-        'kind="watch" requires scriptPath (author + dry-run the check script with ScriptDraft first).',
+        'A cloud watch requires script (an ES module whose default export checks and returns { found, state }). Use runsOn "computer" with a ScriptDraft scriptPath only when the check needs this machine.',
       );
     }
-    return { kind: "watch", scriptPath };
+    return { kind: "watch", script, ...watchOptions };
   }
   throw new Error('kind must be "reminder", "task", or "watch".');
 };
@@ -206,6 +232,22 @@ const buildPayloadPatch = (
   const message = asTrimmedString(args.message);
   const prompt = asTrimmedString(args.prompt);
   const scriptPath = asTrimmedString(args.scriptPath);
+  const script = typeof args.script === "string" ? args.script.trim() : "";
+  if (current.kind === "watch") {
+    const deliverTo = args.deliverTo === "agent" || args.deliverTo === "orchestrator" ? args.deliverTo : undefined;
+    const once = typeof args.once === "boolean" ? args.once : undefined;
+    if (!prompt && !scriptPath && !script && deliverTo === undefined && once === undefined) return null;
+    if (scriptPath && !current.scriptPath) throw new Error("This watch runs in the cloud: replace its script, not a scriptPath.");
+    if (script && current.scriptPath) throw new Error("This watch runs on this computer: replace its scriptPath, not a script.");
+    return {
+      ...current,
+      ...(scriptPath ? { scriptPath } : {}),
+      ...(script ? { script } : {}),
+      ...(prompt ? { instructions: prompt } : {}),
+      ...(deliverTo ? { route: deliverTo } : {}),
+      ...(once !== undefined ? { once } : {}),
+    };
+  }
   if (!message && !prompt && !scriptPath) return null;
 
   if (message) {
@@ -223,7 +265,6 @@ const buildPayloadPatch = (
       `prompt only applies to task entries (this entry is ${getCronTriggerKind(current)}).`,
     );
   }
-  if (current.kind === "watch") return { kind: "watch", scriptPath };
   if (current.kind === "script") return { kind: "script", scriptPath };
   throw new Error(
     `scriptPath only applies to watch entries (this entry is ${getCronTriggerKind(current)}).`,
@@ -251,9 +292,17 @@ export const handleScheduleAdd = async (
       : {}),
   });
   return {
-    result: `Added ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.`,
+    result: `Added ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${watchCheckNote(record)}`,
     details: cronDetails("added", record),
   };
+};
+
+/** A cloud watch's first check, which ran before it was saved. */
+const watchCheckNote = (record: LocalCronJobRecord): string => {
+  if (record.payload.kind !== "watch" || record.payload.scriptPath) return "";
+  return record.lastOutputPreview
+    ? ` Its first check already finds: ${record.lastOutputPreview} (not handed over; tell the user if it matters now).`
+    : " Its first check ran clean and found nothing yet.";
 };
 
 export const handleScheduleList = async (
@@ -356,7 +405,7 @@ export const handleScheduleUpdate = async (
     return { error: `No schedule entry found with jobId ${jobId}.` };
   }
   return {
-    result: `Updated ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.`,
+    result: `Updated ${getCronTriggerKind(record.payload)} "${record.name}" (${record.id}), ${describeSchedule(record.schedule)}; next fire ${new Date(record.nextRunAtMs).toISOString()}.${payloadPatch?.kind === "watch" && payloadPatch.script ? watchCheckNote(record) : ""}`,
     details: cronDetails("updated", record),
   };
 };

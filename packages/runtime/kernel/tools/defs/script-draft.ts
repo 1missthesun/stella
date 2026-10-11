@@ -87,7 +87,7 @@ export const createScriptDraftTool = (
     ],
   },
   description:
-    "Author a watch check script: writes Bun/TypeScript to the schedule-scripts directory and immediately dry-runs it, returning the assigned scriptPath plus exitCode, stdout, and stderr. Watch contract at fire time: empty stdout + exit 0 = no change (silent); non-empty stdout = detected change details; non-zero exit = sensor failure. Keep the script deterministic (fetch + extract + diff against `<scriptPath>.state.json`), store the new baseline in the sidecar, and iterate here until the dry-run is clean — then register the sensor with `schedule_add({ kind: 'watch', scriptPath })`.",
+    "Author a watch check script: writes Bun/TypeScript to the schedule-scripts directory and immediately dry-runs it, returning the assigned scriptPath plus exitCode, stdout, and stderr. Watch contract at fire time: empty stdout + exit 0 = no change (silent); non-empty stdout = detected change details; non-zero exit = sensor failure. Keep the script deterministic (fetch + extract + diff against `<scriptPath>.state.json`), store the new baseline in the sidecar, and iterate here until the dry-run is clean — then register it with `schedule_add({ kind: 'watch', runsOn: 'computer', scriptPath })`. Use this only for a watch that needs this computer; a cloud watch takes `script` directly.",
   parameters: {
     type: "object",
     properties: {

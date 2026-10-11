@@ -77,7 +77,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
   label: "Add schedule",
   workingText: "Adding schedule",
   description:
-    "Create a scheduled trigger. 'reminder' delivers message as written, with no AI: a phone push, an in-app notice on the desktop, and your line in the chat with Done and Snooze; 'task' fires prompt as a turn to you; 'watch' runs a check script verified with ScriptDraft each cycle and escalates a change or failure to you as a turn.",
+    "Create a scheduled trigger. 'reminder' delivers message as written, with no AI: a phone push, an in-app notice on the desktop, and your line in the chat with Done and Snooze. 'task' fires prompt as a turn to you. 'watch' runs an AI-free check script on its schedule, in the cloud by default (script, checked once before it is saved) or on this computer when it needs something local (runsOn 'computer' with a ScriptDraft scriptPath); only a finding or a failure wakes AI, going to you or, with deliverTo 'agent', straight to an agent for an action the user already approved.",
   parameters: {
     type: "object",
     properties: {
@@ -99,12 +99,34 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       prompt: {
         type: "string",
         description:
-          "kind='task': the stored intent delivered to the assistant at fire time. Make it self-contained.",
+          "kind='task': the stored intent delivered at fire time. kind='watch': what to do with a finding, as the user put it (tell them, ask them, or act; with deliverTo 'agent', the approved action itself). Make it self-contained.",
+      },
+      script: {
+        type: "string",
+        description:
+          "kind='watch' in the cloud: an ES module, `export default async function check({ state }) { ... return { found, state } }`. It may fetch; `state` is what it returned last time (null at first). Return a non-empty `found` describing what it found only when there is something to act on; throw when the check itself fails. No AI, no secrets, no local files.",
       },
       scriptPath: {
         type: "string",
         description:
-          "kind='watch': absolute path of the verified check script (from ScriptDraft). Empty stdout = no change (silent); non-empty stdout = change details; non-zero exit = sensor failure.",
+          "kind='watch' with runsOn 'computer': absolute path of the check script verified with ScriptDraft. Empty stdout = nothing found (silent); non-empty stdout = what it found; non-zero exit = sensor failure.",
+      },
+      runsOn: {
+        type: "string",
+        enum: ["cloud", "computer"],
+        description:
+          "kind='watch': where it runs, one place only. 'cloud' (default) works with the computer off; use 'computer' only when the check needs this machine (a site signed in here, local files) or the cloud is off.",
+      },
+      deliverTo: {
+        type: "string",
+        enum: ["orchestrator", "agent"],
+        description:
+          "kind='watch': who handles a finding. 'orchestrator' (default) wakes you to tell, ask or act as prompt says; 'agent' starts an agent on prompt right away, for an action the user already approved (\"book it when it opens\").",
+      },
+      once: {
+        type: "boolean",
+        description:
+          "kind='watch': stop after the first finding is handed over (a one-off question). Leave false to keep watching.",
       },
       description: {
         type: "string",
@@ -152,12 +174,26 @@ export const SCHEDULE_UPDATE_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       },
       prompt: {
         type: "string",
-        description: "Task entries: replacement intent prompt.",
+        description: "Task entries: replacement intent prompt. Watch entries: replacement instructions for a finding.",
+      },
+      script: {
+        type: "string",
+        description:
+          "Cloud watch entries: replacement check script (same contract as schedule_add), checked once before it is saved.",
       },
       scriptPath: {
         type: "string",
         description:
-          "Watch entries: replacement verified check script path (from ScriptDraft).",
+          "Computer watch entries: replacement verified check script path (from ScriptDraft).",
+      },
+      deliverTo: {
+        type: "string",
+        enum: ["orchestrator", "agent"],
+        description: "Watch entries: who handles a finding.",
+      },
+      once: {
+        type: "boolean",
+        description: "Watch entries: stop after the first finding is handed over.",
       },
       description: { type: "string" },
       enabled: {

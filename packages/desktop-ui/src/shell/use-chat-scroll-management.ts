@@ -1305,6 +1305,20 @@ export function useChatScrollManagement({
         scheduleFollowIdleContentGrowth();
       });
 
+      let lastViewportHeight = node.clientHeight;
+      const viewportResizeObserver = new ResizeObserver(() => {
+        if (!attached) return;
+        const height = attached.clientHeight;
+        const shrunkBy = lastViewportHeight - height;
+        lastViewportHeight = height;
+        if (shrunkBy <= 0) return;
+        const maxScroll = Math.max(0, attached.scrollHeight - height);
+        const gapBeforeShrink = maxScroll - attached.scrollTop - shrunkBy;
+        if (gapBeforeShrink > 2) return;
+        attached.scrollTop = maxScroll;
+      });
+      viewportResizeObserver.observe(node);
+
       // NOTE: We intentionally do NOT re-pin scrollTop on container *width*
       // changes (the display/sidebar panel sliding open/closed over 460ms).
       // Earlier versions re-ran `scrollToEnd`, or wrote `scrollTop` directly,
@@ -1323,6 +1337,7 @@ export function useChatScrollManagement({
       cleanup = () => {
         if (!attached) return;
         unsubscribeGrowth();
+        viewportResizeObserver.disconnect();
         if (idleGrowthRaf) {
           cancelAnimationFrame(idleGrowthRaf);
           idleGrowthRaf = 0;

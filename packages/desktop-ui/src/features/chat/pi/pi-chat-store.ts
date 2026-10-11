@@ -145,6 +145,9 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
   }
 };
 
+/** A reply shows once it is whole, so its streamed text changes nothing on screen. */
+const changesWhatShows = (event: PiChatEvent) => event.type !== "message_update";
+
 let runtimeReady = true;
 
 const listen = () => {
@@ -158,7 +161,7 @@ const listen = () => {
       return;
     }
     entry.state = reducePiChat(entry.state, events);
-    publish(entry);
+    if (events.some(changesWhatShows)) publish(entry);
   });
   // A restarted runtime has no streams: watch again once it is back.
   window.electronAPI?.agent?.onAvailability?.((snapshot) => {

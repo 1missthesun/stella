@@ -20,10 +20,6 @@ import type { EventRecord, MessageRecord } from "@stella/contracts/local-chat";
 import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activity-types";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import { journalRecordsToMessageRecords } from "@/features/cloud/journal-message-records";
-import {
-  streamingAssistantOverlayId,
-  type StreamingAssistantOverlay,
-} from "@/features/chat/streaming/streaming-types";
 
 type Turn = {
   userMessageId?: string;
@@ -262,25 +258,6 @@ export const piPendingRows = (args: {
     );
   }
   return messages.length === 0 && journalUserIds.size === 0 ? NO_PENDING_ROWS : { messages, journalUserIds };
-};
-
-/** The assistant message being generated, as the timeline's streaming overlay. */
-export const piStreamingOverlay = (
-  state: Pick<PiChatState, "streaming">,
-  turn: Turn,
-): StreamingAssistantOverlay[] => {
-  const text = piMessageText(state.streaming);
-  if (!state.streaming || !text.trim() || !turn.userMessageId || turn.hidden) return [];
-  return [
-    {
-      _id: streamingAssistantOverlayId(turn.userMessageId, turn.assistantMessages),
-      userMessageId: turn.userMessageId,
-      indexInTurn: turn.assistantMessages,
-      text,
-      timestamp: state.streaming.timestamp,
-      runId: "pi",
-    },
-  ];
 };
 
 /**

@@ -46,6 +46,7 @@ import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conve
 import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-message-ids";
 import type { LegendListRef } from "@legendapp/list/react";
 import type { EventRecord } from "@stella/contracts/local-chat";
+import type { StreamingAssistantOverlay } from "@/features/chat/streaming/streaming-types";
 import type { ChatContext } from "@/shared/types/electron";
 
 type TabComposerMemory = {
@@ -65,6 +66,7 @@ const OPEN_BOTTOM_SETTLE_MS = 600;
 const OPEN_BOTTOM_STABLE_FRAMES = 3;
 const NO_NEWER_CLOUD_MESSAGES = () => false;
 const EMPTY_EVENTS: EventRecord[] = [];
+const NO_STREAMING_ASSISTANTS: StreamingAssistantOverlay[] = [];
 const NO_JOURNALED_TURNS: ReturnType<typeof journaledPiTurns> = new Map();
 const NO_PI_PENDING_ROWS: ReturnType<typeof piPendingRows> = {
   messages: [],
@@ -291,6 +293,7 @@ export function useFullShellChat({
     queuedUserMessages: localQueuedUserMessages,
     removeQueuedUserMessage: localRemoveQueuedUserMessage,
     sendMessage: localSendMessage,
+    pendingUserMessageId: localPendingUserMessageId,
   } = useStreamingChat({
     conversationId: activeConversationId,
     persistedMessages: localPersistedMessages,
@@ -376,23 +379,6 @@ export function useFullShellChat({
         : cloudChat.persistedMessages,
     [cloudChat.persistedMessages, piPending.messages],
   );
-  const recordUserId = useCallback(
-    (userMessageId: string) =>
-      piPending.journalUserIds.get(userMessageId) ?? userMessageId,
-    [piPending.journalUserIds],
-  );
-  const piStreamingAssistants = useMemo(
-    () =>
-      piPending.journalUserIds.size === 0
-        ? piChat.streamingAssistants
-        : piChat.streamingAssistants.map((overlay) => {
-            const userMessageId = recordUserId(overlay.userMessageId);
-            return userMessageId === overlay.userMessageId
-              ? overlay
-              : { ...overlay, userMessageId };
-          }),
-    [recordUserId, piChat.streamingAssistants, piPending.journalUserIds],
-  );
   // Cloud placement can acknowledge IPC before its journal reaches this
   // window. Keep pending sends working until canonical history takes over,
   // and retire their overlays even when no SQLite write occurs on this device.
@@ -437,9 +423,6 @@ export function useFullShellChat({
   const optimisticEvents = cloudChat.isWebShell
     ? cloudChat.optimisticEvents
     : localOptimisticEvents;
-  // The web shell has no in-memory overlay: a cloud reply becomes visible when
-  // its journal row commits, not before.
-  const streamingAssistants = piStreamingAssistants;
   const runtimeStatusText = piChat.runtimeStatusText;
   const isCompacting = piChat.isCompacting;
   const activeToolCallId = piChat.activeToolCallId;
@@ -450,8 +433,11 @@ export function useFullShellChat({
   const isStreaming = piChat.isStreaming || awaitingMessageAdmission;
   // The committed reply hands off before the terminal turn frame arrives.
   const answerLanded = !awaitingMessageAdmission && piChat.answerLanded;
-  const pendingUserMessageId =
-    piChat.pendingUserMessageId && recordUserId(piChat.pendingUserMessageId);
+  // The sent bubble pops in on the frame it first paints, so its id comes from
+  // the send itself, not from pi starting the turn a few frames later.
+  const pendingUserMessageId = cloudChat.isWebShell
+    ? cloudChat.pendingUserMessageId
+    : localPendingUserMessageId;
   const queuedUserMessages = cloudChat.isWebShell
     ? []
     : localQueuedUserMessages;
@@ -515,7 +501,7 @@ export function useFullShellChat({
     conversationId: activeConversationId,
     persistedMessages,
     optimisticEvents,
-    streamingAssistants,
+    streamingAssistants: NO_STREAMING_ASSISTANTS,
   });
   // Opt-in event trace consumes the union of activity + message + the
   // per-turn tool events. The hook's internal `seenIds` set keeps it

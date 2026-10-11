@@ -2864,18 +2864,6 @@
         "pickDays": "Wybierz co najmniej jeden dzień.",
         "pickCron": "Wpisz wyrażenie cron."
       }
-    },
-    "zone": {
-      "title": "Jesteś teraz w: {place}",
-      "body": {
-        "few": "{count} harmonogramy nadal działają według czasu: {place}.",
-        "many": "{count} harmonogramów nadal działa według czasu: {place}.",
-        "one": "{count} harmonogram nadal działa według czasu: {place}.",
-        "other": "{count} harmonogramu nadal działa według czasu: {place}."
-      },
-      "move": "Przenieś moje harmonogramy",
-      "keep": "Zachowaj godziny",
-      "failed": "Nie udało się. Spróbuj ponownie."
     }
   }
 }

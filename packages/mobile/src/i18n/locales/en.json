@@ -2832,16 +2832,6 @@
         "pickDays": "Pick at least one day.",
         "pickCron": "Enter a cron expression."
       }
-    },
-    "zone": {
-      "title": "You're in {place} now",
-      "body": {
-        "one": "{count} schedule still runs on {place} time.",
-        "other": "{count} schedules still run on {place} time."
-      },
-      "move": "Move my schedules",
-      "keep": "Keep times",
-      "failed": "That didn't go through. Try again."
     }
   }
 }

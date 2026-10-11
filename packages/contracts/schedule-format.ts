@@ -279,13 +279,15 @@ const summarizeCron = (
 
 /**
  * Natural-language one-liner for a stored schedule shape (or a heartbeat
- * interval), in the phone's time zone. Falls back to the raw cron expression
+ * interval), in the reader's time zone. `zone` is where a cron with none of
+ * its own runs: the user's zone, which it follows. Falls back to the raw cron expression
  * when the pattern is too custom to summarize cheaply.
  */
 export const summarizeSchedule = (
   schedule: LocalCronSchedule | null | undefined,
   intervalMs?: number,
   nextRunAtMs?: number,
+  zone?: string,
 ): string => {
   if (!schedule) {
     if (typeof intervalMs === "number" && intervalMs > 0) {
@@ -298,5 +300,5 @@ export const summarizeSchedule = (
     const date = new Date(schedule.atMs);
     return `Once at ${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}, ${formatClock(date.getHours(), date.getMinutes())}`;
   }
-  return summarizeCron(schedule.expr, schedule.tz, nextRunAtMs);
+  return summarizeCron(schedule.expr, schedule.tz || zone, nextRunAtMs);
 };

@@ -19,7 +19,6 @@ import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { Clock, Eye, Pause, Pencil, Play, Trash2, Wand2 } from "@/ui/icons";
 import type { IconComponent } from "@/ui/icons";
 import { draftOf, scheduleOf, type EveryUnit, type TimingDraft } from "./schedule-editing";
-import { ScheduleZoneBanner } from "./ScheduleZoneBanner";
 import "./updates-section.css";
 import "./schedule-section.css";
 
@@ -279,7 +278,7 @@ function ScheduleItem({
   const [error, setError] = useState<string | null>(null);
   const kind = getCronTriggerKind(job.payload);
   const Icon = KIND_ICON[kind] ?? Clock;
-  const cadence = summarizeSchedule(job.schedule, undefined, job.nextRunAtMs);
+  const cadence = summarizeSchedule(job.schedule, undefined, job.nextRunAtMs, job.zone);
   const where =
     job.payload.kind === "watch"
       ? job.payload.scriptPath
@@ -430,7 +429,6 @@ export function ScheduleSection({ active }: { active: boolean }) {
   );
   return (
     <div className="updates-section schedule-section sidebar-section__scroll" data-testid="schedule-section">
-      <ScheduleZoneBanner />
       {running.length > 0 ? (
         <>
           <h2 className="updates-section__heading">{t("schedule.upcoming")}</h2>

@@ -2832,16 +2832,6 @@
         "pickDays": "Válassz legalább egy napot.",
         "pickCron": "Adj meg egy cron-kifejezést."
       }
-    },
-    "zone": {
-      "title": "Most itt vagy: {place}",
-      "body": {
-        "one": "{count} ütemezés még mindig a(z) {place} szerinti időt használja.",
-        "other": "{count} ütemezés még mindig a(z) {place} szerinti időt használja."
-      },
-      "move": "Ütemezéseim áthelyezése",
-      "keep": "Időpontok megtartása",
-      "failed": "Ez nem sikerült. Próbáld újra."
     }
   }
 }

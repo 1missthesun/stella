@@ -2832,16 +2832,6 @@
         "pickDays": "Valitse vähintään yksi päivä.",
         "pickCron": "Anna cron-lauseke."
       }
-    },
-    "zone": {
-      "title": "Olet nyt kohteessa {place}",
-      "body": {
-        "one": "{count} ajastus käyttää yhä kohteen {place} aikaa.",
-        "other": "{count} ajastusta käyttää yhä kohteen {place} aikaa."
-      },
-      "move": "Siirrä ajastukseni",
-      "keep": "Pidä ajat",
-      "failed": "Se ei onnistunut. Yritä uudelleen."
     }
   }
 }

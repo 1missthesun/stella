@@ -1,27 +1,28 @@
 /**
- * The time zone the owner's schedules run in. A cron set without a zone runs
- * in it, so "every day at 9" means 9 where the user is. When a device finds
- * itself somewhere else, it asks once, with one click to move the schedules
- * there: their clock times stay, their zone changes. A one-off at a fixed
- * moment (a flight) is an instant, not a clock time, so it never moves.
+ * The user's time zone, which repeating schedules follow. A cron with no
+ * zone of its own runs at its clock time wherever the user is, so "every day
+ * at 8" is 8 local, and daylight saving comes with the zone. A one-off is an
+ * instant and never moves; each device shows it in its own zone.
+ *
+ * Devices report where they are. The phone decides, since it travels with
+ * the user; a computer's report counts only while no phone has reported
+ * recently, so a laptop left at home never pulls the schedules back.
  */
+
+export type ScheduleZoneSource = "phone" | "computer";
 
 /** What `schedules.zone` reads. */
 export type ScheduleZone = {
-  /** Where schedules run; absent until a device first reports its zone. */
+  /** The user's zone; absent until a device first reports one. */
   zone?: string;
-  /** The last zone the user was asked about, so each move is asked once. */
-  answered?: string;
+  /** The kind of device the zone came from. */
+  source?: ScheduleZoneSource;
+  /** When a phone last reported, so a phone no longer in use stops deciding. */
+  phoneReportedAt?: number;
 };
 
-export type ScheduleZoneNotice = {
-  /** Where the schedules run now. */
-  from: string;
-  /** Where this device is. */
-  to: string;
-  /** How many schedules would move. */
-  count: number;
-};
+/** A phone silent this long no longer decides the zone. */
+export const PHONE_ZONE_STALE_MS = 14 * 24 * 60 * 60_000;
 
 /** This device's IANA zone, or null when the platform cannot say. */
 export const deviceTimeZone = (): string | null => {
@@ -42,70 +43,53 @@ export const isUsableTimeZone = (zone: string): boolean => {
   }
 };
 
-const offsetMinutes = (zone: string, atMs: number): number | null => {
+/** Whether a report from `source` sets the user's zone. */
+export const zoneReportDecides = (
+  current: ScheduleZone,
+  source: ScheduleZoneSource,
+  nowMs: number,
+): boolean =>
+  source === "phone" ||
+  current.phoneReportedAt === undefined ||
+  nowMs - current.phoneReportedAt > PHONE_ZONE_STALE_MS;
+
+/** `UTC-07:00` for `America/Los_Angeles` in October. */
+export const zoneOffsetLabel = (zone: string, atMs: number): string => {
   try {
-    const parts = new Intl.DateTimeFormat("en-US", {
+    const name = new Intl.DateTimeFormat("en-US", {
       timeZone: zone,
-      year: "numeric",
-      month: "numeric",
-      day: "numeric",
-      hour: "numeric",
-      minute: "numeric",
-      hourCycle: "h23",
-    }).formatToParts(new Date(atMs));
-    const part = (type: Intl.DateTimeFormatPartTypes): number =>
-      Number(parts.find((entry) => entry.type === type)?.value);
-    const wall = Date.UTC(part("year"), part("month") - 1, part("day"), part("hour") % 24, part("minute"));
-    return Number.isFinite(wall) ? Math.round((wall - Math.floor(atMs / 60_000) * 60_000) / 60_000) : null;
+      timeZoneName: "longOffset",
+    })
+      .formatToParts(new Date(atMs))
+      .find((part) => part.type === "timeZoneName")?.value;
+    if (!name || name === "GMT") return "UTC";
+    return name.replace(/^GMT/, "UTC").replace("−", "-");
   } catch {
-    return null;
+    return "";
   }
 };
-
-/** Whether two zones keep the same clock now and half a year from now. */
-export const sameClock = (a: string, b: string, nowMs: number = Date.now()): boolean => {
-  if (a === b) return true;
-  const later = nowMs + 182 * 24 * 60 * 60_000;
-  const a1 = offsetMinutes(a, nowMs);
-  const b1 = offsetMinutes(b, nowMs);
-  const a2 = offsetMinutes(a, later);
-  const b2 = offsetMinutes(b, later);
-  return a1 !== null && a1 === b1 && a2 !== null && a2 === b2;
-};
-
-/** `America/New_York` as `New York`. */
-export const zoneLabel = (zone: string): string =>
-  (zone.split("/").pop() ?? zone).replace(/_/g, " ");
-
-type ZoneRow = { schedule: string; status: string };
-
-const cronZoneOf = (row: ZoneRow): string | null => {
-  try {
-    const parsed = JSON.parse(row.schedule) as { kind?: unknown; tz?: unknown };
-    return parsed.kind === "cron" && typeof parsed.tz === "string" && parsed.tz ? parsed.tz : null;
-  } catch {
-    return null;
-  }
-};
-
-/** The schedules a move from `from` would carry: live crons that run in that zone. */
-export const schedulesInZone = <T extends ZoneRow>(rows: readonly T[], from: string): T[] =>
-  rows.filter((row) => (row.status === "active" || row.status === "paused") && cronZoneOf(row) === from);
 
 /**
- * Whether this device should ask to move the schedules: it is somewhere
- * whose clock differs from the schedules' zone, it has not been asked about
- * this zone before, and there is something to move.
+ * The time as the user reads it: `Sunday, October 11, 2026, 4:40 PM in
+ * America/Los_Angeles (UTC-07:00)`. Falls back to UTC when the zone is
+ * unknown or unusable.
  */
-export const scheduleZoneNotice = (
-  rows: readonly ZoneRow[] | undefined,
-  zone: ScheduleZone | undefined,
-  device: string | null,
-  nowMs: number = Date.now(),
-): ScheduleZoneNotice | null => {
-  if (!rows || !zone?.zone || !device) return null;
-  if (zone.answered && sameClock(zone.answered, device, nowMs)) return null;
-  if (sameClock(zone.zone, device, nowMs)) return null;
-  const count = schedulesInZone(rows, zone.zone).length;
-  return count > 0 ? { from: zone.zone, to: device, count } : null;
+export const formatZonedNow = (atMs: number, zone?: string | null): string => {
+  const usable = zone && isUsableTimeZone(zone) ? zone : "UTC";
+  const value = new Date(atMs).toLocaleString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: usable,
+  });
+  const offset = zoneOffsetLabel(usable, atMs);
+  return usable === "UTC" ? `${value} UTC` : `${value} in ${usable}${offset ? ` (${offset})` : ""}`;
 };
+
+/** The `<current-time>` text: the exact instant, then the user's own clock. */
+export const formatTurnClock = (atMs: number, zone?: string | null): string =>
+  `${new Date(atMs).toISOString()} (${formatZonedNow(atMs, zone)})`;

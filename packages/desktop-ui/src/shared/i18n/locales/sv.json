@@ -2832,16 +2832,6 @@
         "pickDays": "Välj minst en dag.",
         "pickCron": "Ange ett cron-uttryck."
       }
-    },
-    "zone": {
-      "title": "Du är nu i {place}",
-      "body": {
-        "one": "{count} schema körs fortfarande efter tiden i {place}.",
-        "other": "{count} scheman körs fortfarande efter tiden i {place}."
-      },
-      "move": "Flytta mina scheman",
-      "keep": "Behåll tiderna",
-      "failed": "Det gick inte. Försök igen."
     }
   }
 }

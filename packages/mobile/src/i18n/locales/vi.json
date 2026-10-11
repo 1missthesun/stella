@@ -2814,15 +2814,6 @@
         "pickDays": "Chọn ít nhất một ngày.",
         "pickCron": "Nhập biểu thức cron."
       }
-    },
-    "zone": {
-      "title": "Bạn đang ở {place}",
-      "body": {
-        "other": "{count} lịch vẫn chạy theo giờ {place}."
-      },
-      "move": "Chuyển lịch của tôi",
-      "keep": "Giữ nguyên giờ",
-      "failed": "Không thực hiện được. Hãy thử lại."
     }
   }
 }

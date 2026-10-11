@@ -2832,16 +2832,6 @@
         "pickDays": "Kies minstens één dag.",
         "pickCron": "Voer een cron-expressie in."
       }
-    },
-    "zone": {
-      "title": "Je bent nu in {place}",
-      "body": {
-        "one": "{count} planning loopt nog op de tijd van {place}.",
-        "other": "{count} planningen lopen nog op de tijd van {place}."
-      },
-      "move": "Mijn planningen verplaatsen",
-      "keep": "Tijden behouden",
-      "failed": "Dat is niet gelukt. Probeer het opnieuw."
     }
   }
 }

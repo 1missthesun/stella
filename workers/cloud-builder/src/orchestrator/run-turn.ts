@@ -1,5 +1,6 @@
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
 import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
+import { formatTurnClock } from "@stella/contracts/schedule-zone";
 import { attachedFilesText } from "../prompt-context.js";
 import { formatMessageRefTag } from "@stella/contracts/reply-refs";
 import { buildCloudSkillsBlock } from "../cloud-skills.js";
@@ -1084,7 +1085,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         this.loadChatAttachmentImages(turn, executionSignal),
       ]);
       const { root } = await runtime.open();
-      const clock = new Date().toISOString();
+      const clock = formatTurnClock(Date.now(), turn.timeZone);
       const text = turn.hiddenMessage
         ? report.prompt
         : `${report.prompt.replace(/\s+$/u, "")}\n\n${formatMessageRefTag(promptSeq)}`;

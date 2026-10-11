@@ -5,7 +5,7 @@
 
 import type { LocalCronSchedule } from "../scheduling.js";
 import type { ReminderFire } from "../reminders.js";
-import type { ScheduleZone } from "../schedule-zone.js";
+import type { ScheduleZone, ScheduleZoneSource } from "../schedule-zone.js";
 
 export type ScheduleStatus = "active" | "paused" | "done";
 
@@ -55,6 +55,8 @@ export type ScheduleRow = {
   prompt: string;
   /** Serialized `LocalCronSchedule`. */
   schedule: string;
+  /** A cron's zone now: its own, or the user's when it follows them. */
+  zone?: string;
   nextRunAt: number;
   lastRunAt?: number;
   status: ScheduleStatus;
@@ -153,20 +155,18 @@ export type ScheduleCalls = {
     result: ReminderFire;
   };
   /**
-   * Answer the time zone question for `timeZone`, where a device now is.
-   * `move` carries every schedule running in the old zone there (same clock
-   * times) and makes it the zone new schedules run in; without it nothing
-   * moves and the question is not asked again for that zone. The first
-   * report, while no zone is set, just sets it.
+   * Where this device is. A phone's report sets the user's zone; a
+   * computer's only while no phone has reported recently. Repeating
+   * schedules with no zone of their own follow it at once.
    */
-  "schedules.setZone": {
-    args: { requestId: string; timeZone: string; move?: boolean };
-    result: { zone: string; moved: number };
+  "schedules.reportZone": {
+    args: { timeZone: string; source: ScheduleZoneSource };
+    result: ScheduleZone;
   };
 };
 
 export type ScheduleViews = {
-  /** The zone schedules run in, and the last zone the user was asked about. */
+  /** The user's zone, which repeating schedules follow, and where it came from. */
   "schedules.zone": { args: Record<string, never>; result: ScheduleZone };
   /** Live schedules: active ones soonest first, then paused ones. */
   "schedules.list": { args: Record<string, never>; result: ScheduleRow[] };

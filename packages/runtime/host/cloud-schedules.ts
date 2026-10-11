@@ -82,6 +82,7 @@ const toCronJob = (row: ScheduleRow): LocalCronJobRecord => {
     description: row.description,
     enabled: row.status === "active",
     schedule: JSON.parse(row.schedule) as LocalCronSchedule,
+    ...(row.zone ? { zone: row.zone } : {}),
     payload: payloadOf(row),
     nextRunAtMs: row.nextRunAt,
     ...(row.lastRunAt !== undefined ? { lastRunAtMs: row.lastRunAt } : {}),

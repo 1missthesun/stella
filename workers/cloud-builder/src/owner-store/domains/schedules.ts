@@ -55,7 +55,12 @@ import { ScheduledTurnError } from "../scheduled-turn.js";
 import { billingAccess } from "./billing.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
 import { runWatchCheck } from "../watch-runner.js";
-import { isUsableTimeZone, schedulesInZone, type ScheduleZone } from "@stella/contracts/schedule-zone";
+import {
+  isUsableTimeZone,
+  zoneReportDecides,
+  type ScheduleZone,
+  type ScheduleZoneSource,
+} from "@stella/contracts/schedule-zone";
 
 export const SCHEDULE_FIRE_JOB = "schedules.fire";
 export const scheduleJobId = (scheduleId: string): string => `schedule:${scheduleId}`;
@@ -178,6 +183,22 @@ export const SCHEDULES_ZONE_MIGRATION = {
   ],
 };
 
+/**
+ * The phone decides the user's zone, and repeating schedules follow it: a
+ * cron pinned to the user's own zone becomes one that follows them.
+ */
+export const SCHEDULES_ZONE_SOURCE_MIGRATION = {
+  id: "schedules.6-zone-source",
+  statements: [
+    `ALTER TABLE schedule_zone ADD COLUMN source TEXT`,
+    `ALTER TABLE schedule_zone ADD COLUMN phone_reported_at INTEGER`,
+    `UPDATE schedules SET schedule_json = json_remove(schedule_json, '$.tz')
+       WHERE json_valid(schedule_json)
+         AND json_extract(schedule_json, '$.kind') = 'cron'
+         AND json_extract(schedule_json, '$.tz') = (SELECT zone FROM schedule_zone WHERE id = 1)`,
+  ],
+};
+
 type Row = {
   schedule_id: string;
   kind: string;
@@ -210,7 +231,7 @@ const toScheduleKind = (value: string): ScheduleKind =>
 
 const toRoute = (value: string): ScheduleRoute => (value === "agent" ? "agent" : "orchestrator");
 
-const toScheduleRow = (row: Row): ScheduleRow => ({
+const toScheduleRow = (row: Row, ownerZone?: string): ScheduleRow => ({
   scheduleId: row.schedule_id,
   kind: toScheduleKind(row.kind),
   route: toRoute(row.route),
@@ -221,6 +242,7 @@ const toScheduleRow = (row: Row): ScheduleRow => ({
   ...(row.target_device_id ? { targetDeviceId: row.target_device_id } : {}),
   prompt: row.prompt,
   schedule: row.schedule_json,
+  ...zoneField(row.schedule_json, ownerZone),
   nextRunAt: row.next_run_at,
   ...(row.last_run_at !== null ? { lastRunAt: row.last_run_at } : {}),
   status: row.status as ScheduleStatus,
@@ -231,19 +253,32 @@ const toScheduleRow = (row: Row): ScheduleRow => ({
   updatedAt: row.updated_at,
 });
 
+const zoneField = (scheduleJson: string, ownerZone?: string): { zone?: string } => {
+  try {
+    const parsed = JSON.parse(scheduleJson) as { kind?: unknown; tz?: unknown };
+    if (parsed.kind !== "cron") return {};
+    const zone = typeof parsed.tz === "string" && parsed.tz.trim() ? parsed.tz.trim() : ownerZone;
+    return zone ? { zone } : {};
+  } catch {
+    return {};
+  }
+};
+
 const readRow = (db: OwnerDbReader, scheduleId: string): Row | null =>
   db.one<Row>("SELECT * FROM schedules WHERE schedule_id = ?", scheduleId);
 
 /** Active schedules soonest first, then paused ones. */
-const listRows = (db: OwnerDbReader): ScheduleRow[] =>
-  db
+const listRows = (db: OwnerDbReader): ScheduleRow[] => {
+  const { zone } = readZone(db);
+  return db
     .all<Row>(
       `SELECT * FROM schedules WHERE status IN ('active', 'paused')
         ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, next_run_at
         LIMIT ?`,
       MAX_SCHEDULES * 2,
     )
-    .map(toScheduleRow);
+    .map((row) => toScheduleRow(row, zone));
+};
 
 const bad = (message: string): never => {
   throw new RpcError("BAD_REQUEST", message);
@@ -285,87 +320,104 @@ export const normalizeSchedule = (value: unknown): LocalCronSchedule => {
 
 const scheduleParser: Parser<LocalCronSchedule> = (value) => normalizeSchedule(value);
 
-// ── The zone schedules run in ─────────────────────────────────────────────
+// ── The user's zone, which repeating schedules follow ─────────────────────
 
 const readZone = (db: OwnerDbReader): ScheduleZone => {
-  const row = db.one<{ zone: string | null; answered: string | null }>(
-    "SELECT zone, answered FROM schedule_zone WHERE id = 1",
+  const row = db.one<{ zone: string | null; source: string | null; phone_reported_at: number | null }>(
+    "SELECT zone, source, phone_reported_at FROM schedule_zone WHERE id = 1",
   );
   return {
     ...(row?.zone ? { zone: row.zone } : {}),
-    ...(row?.answered ? { answered: row.answered } : {}),
+    ...(row?.source === "phone" || row?.source === "computer" ? { source: row.source } : {}),
+    ...(row?.phone_reported_at != null ? { phoneReportedAt: row.phone_reported_at } : {}),
   };
 };
 
-/** A cron set without a zone runs in the owner's, so its clock time is theirs. */
-const inOwnerZone = (db: OwnerDbReader, schedule: LocalCronSchedule): LocalCronSchedule => {
-  if (schedule.kind !== "cron" || schedule.tz) return schedule;
-  const { zone } = readZone(db);
-  return zone ? { ...schedule, tz: zone } : schedule;
+/** The user's zone, for a cron with none of its own. */
+export const ownerZone = (db: OwnerDbReader): string | undefined => readZone(db).zone;
+
+/** The owner snapshot's view of the user's zone. */
+export const snapshotTimeZone = (db: OwnerDbReader): { timeZone?: string } => {
+  const zone = ownerZone(db);
+  return zone ? { timeZone: zone } : {};
+};
+
+/** A cron set in the user's own zone is their clock, so it follows them. */
+const followingOwner = (db: OwnerDbReader, schedule: LocalCronSchedule): LocalCronSchedule => {
+  if (schedule.kind !== "cron" || !schedule.tz) return schedule;
+  return schedule.tz === readZone(db).zone ? { kind: "cron", expr: schedule.expr } : schedule;
 };
 
 const zoneArgs = object({
-  requestId: string({ max: 128 }),
   timeZone: string({ max: 64 }),
-  move: optional(boolean()),
+  source: literal("phone", "computer"),
 });
 
-const setZone = (
+/**
+ * A device says where it is. Every live cron with no zone of its own is kept
+ * on the user's clock: re-timed when the zone moves, and an older one that
+ * ran in UTC adopts the user's zone.
+ */
+const reportZone = (
   ctx: OwnerContext,
-  input: ScheduleCalls["schedules.setZone"]["args"],
-): ScheduleCalls["schedules.setZone"]["result"] => {
+  input: { timeZone: string; source: ScheduleZoneSource },
+): ScheduleZone => {
   const timeZone = input.timeZone.trim();
   if (!timeZone || !isUsableTimeZone(timeZone)) bad(`"${input.timeZone}" is not a time zone Stella knows.`);
-  const move = input.move === true;
-  return withReceipt(ctx.db, ctx.now, input.requestId.trim(), "zone", { timeZone, move }, () => {
-    const current = readZone(ctx.db);
-    let moved = 0;
-    if (move && current.zone && current.zone !== timeZone) {
-      const rows = ctx.db.all<Row>("SELECT * FROM schedules WHERE status IN ('active', 'paused')");
-      for (const row of schedulesInZone(
-        rows.map((entry) => ({ ...entry, schedule: entry.schedule_json })),
-        current.zone,
-      )) {
-        const schedule = { ...(parseStored(row.schedule_json) as Extract<LocalCronSchedule, { kind: "cron" }>), tz: timeZone };
-        const next: Row = {
-          ...row,
-          schedule_json: JSON.stringify(schedule),
-          next_run_at: row.status === "active" ? computeNextRunAt(schedule, ctx.now) : row.next_run_at,
-          updated_at: ctx.now,
-        };
-        ctx.db.run(
-          "UPDATE schedules SET schedule_json = ?, next_run_at = ?, updated_at = ? WHERE schedule_id = ?",
-          next.schedule_json,
-          next.next_run_at,
-          next.updated_at,
-          next.schedule_id,
-        );
-        if (next.status === "active") arm(ctx, next);
-        moved += 1;
-      }
-    }
-    const zone = !current.zone || move ? timeZone : current.zone;
-    ctx.db.run(
-      `INSERT INTO schedule_zone (id, zone, answered, updated_at) VALUES (1, ?, ?, ?)
-       ON CONFLICT(id) DO UPDATE SET zone = excluded.zone, answered = excluded.answered,
-         updated_at = excluded.updated_at`,
-      zone,
-      timeZone,
-      ctx.now,
-    );
-    return { zone, moved };
-  }).result;
+  const current = readZone(ctx.db);
+  const phoneReportedAt = input.source === "phone" ? ctx.now : (current.phoneReportedAt ?? null);
+  const decides = zoneReportDecides(current, input.source, ctx.now);
+  const zone = decides ? timeZone : (current.zone ?? timeZone);
+  const source = decides ? input.source : (current.source ?? input.source);
+  ctx.db.run(
+    `INSERT INTO schedule_zone (id, zone, answered, source, phone_reported_at, updated_at) VALUES (1, ?, NULL, ?, ?, ?)
+     ON CONFLICT(id) DO UPDATE SET zone = excluded.zone, source = excluded.source,
+       phone_reported_at = excluded.phone_reported_at, updated_at = excluded.updated_at`,
+    zone,
+    source,
+    phoneReportedAt,
+    ctx.now,
+  );
+  retimeFollowing(ctx, zone);
+  return readZone(ctx.db);
 };
 
-const buildCron = (schedule: { expr: string; tz?: string }): Cron => {
+const retimeFollowing = (ctx: OwnerContext, zone: string): void => {
+  const rows = ctx.db.all<Row>("SELECT * FROM schedules WHERE status = 'active'");
+  for (const row of rows) {
+    let schedule: LocalCronSchedule;
+    try {
+      schedule = parseStored(row.schedule_json);
+    } catch {
+      continue;
+    }
+    if (schedule.kind !== "cron" || schedule.tz || row.active_fire_id || row.next_run_at <= ctx.now) continue;
+    let nextRunAt: number;
+    try {
+      nextRunAt = computeNextRunAt(schedule, ctx.now, zone);
+    } catch {
+      continue;
+    }
+    if (nextRunAt === row.next_run_at) continue;
+    ctx.db.run(
+      "UPDATE schedules SET next_run_at = ?, updated_at = ? WHERE schedule_id = ?",
+      nextRunAt,
+      ctx.now,
+      row.schedule_id,
+    );
+    arm(ctx, { ...row, next_run_at: nextRunAt });
+  }
+};
+
+const buildCron = (schedule: { expr: string; tz?: string }, zone?: string): Cron => {
   try {
-    return new Cron(schedule.expr, { timezone: schedule.tz?.trim() || undefined, catch: false });
+    return new Cron(schedule.expr, { timezone: schedule.tz?.trim() || zone || undefined, catch: false });
   } catch {
     return bad(`"${schedule.expr}" is not a cron expression Stella can read.`);
   }
 };
 
-export const computeNextRunAt = (schedule: LocalCronSchedule, nowMs: number): number => {
+export const computeNextRunAt = (schedule: LocalCronSchedule, nowMs: number, zone?: string): number => {
   if (schedule.kind === "at") return Math.max(schedule.atMs, nowMs);
   if (schedule.kind === "every") {
     const everyMs = Math.max(1, Math.floor(schedule.everyMs));
@@ -373,7 +425,7 @@ export const computeNextRunAt = (schedule: LocalCronSchedule, nowMs: number): nu
     if (nowMs < anchor) return anchor;
     return anchor + Math.max(1, Math.ceil((nowMs - anchor) / everyMs)) * everyMs;
   }
-  const next = buildCron(schedule).nextRun(new Date(nowMs));
+  const next = buildCron(schedule, zone).nextRun(new Date(nowMs));
   if (!next) return bad(`"${schedule.expr}" has no future run times. Pick a different schedule.`);
   return next.getTime();
 };
@@ -464,7 +516,7 @@ const arm = (ctx: OwnerContext, row: Pick<Row, "schedule_id" | "status" | "next_
 
 // ── Writes, replayed by request id ────────────────────────────────────────
 
-type Action = "create" | "update" | "remove" | "zone";
+type Action = "create" | "update" | "remove";
 
 /**
  * Run `write` once per request id. A retry with the same id and intent
@@ -532,7 +584,7 @@ const createSchedule = async (
   if (isAnonymous) signInRequired();
   const kind: ScheduleKind = input.kind ?? "task";
   const prompt = cleanPrompt(input.prompt);
-  const schedule = inOwnerZone(ctx.db, normalizeSchedule(input.schedule));
+  const schedule = followingOwner(ctx.db, normalizeSchedule(input.schedule));
   const description = cleanDescription(input.description, prompt);
   const conversationId = input.conversationId?.trim() || null;
   // A reminder runs nowhere: it needs no computer.
@@ -584,7 +636,7 @@ const createSchedule = async (
         target_device_id: targetDeviceId,
         prompt,
         schedule_json: JSON.stringify(schedule),
-        next_run_at: computeNextRunAt(schedule, ctx.now),
+        next_run_at: computeNextRunAt(schedule, ctx.now, ownerZone(ctx.db)),
         last_run_at: null,
         status: "active",
         description,
@@ -601,7 +653,7 @@ const createSchedule = async (
         ...columns.map((column) => row[column]),
       );
       arm(ctx, row);
-      return { ...toScheduleRow(row), ...(first ? { check: first.check } : {}) };
+      return { ...toScheduleRow(row, ownerZone(ctx.db)), ...(first ? { check: first.check } : {}) };
     },
   );
 };
@@ -625,7 +677,7 @@ const updateSchedule = async (
 ): Promise<{ replayed: boolean; result: ScheduleRow & { check?: WatchCheckResult } }> => {
   if (isAnonymous && input.status === "active") signInRequired();
   const prompt = input.prompt === undefined ? undefined : cleanPrompt(input.prompt);
-  const schedule = input.schedule === undefined ? undefined : inOwnerZone(ctx.db, normalizeSchedule(input.schedule));
+  const schedule = input.schedule === undefined ? undefined : followingOwner(ctx.db, normalizeSchedule(input.schedule));
   const script = input.script === undefined ? undefined : cleanScript(input.script);
   const requestId = input.requestId.trim();
   const existing = readRow(ctx.db, input.scheduleId);
@@ -663,12 +715,12 @@ const updateSchedule = async (
       if (schedule) {
         assertAllowed(schedule, ctx.now, kind);
         scheduleJson = JSON.stringify(schedule);
-        nextRunAt = computeNextRunAt(schedule, ctx.now);
+        nextRunAt = computeNextRunAt(schedule, ctx.now, ownerZone(ctx.db));
       }
       // Resuming re-anchors to now, so a schedule that slept through a dozen
       // fires wakes up once rather than catching up.
       if (input.status === "active" && row.status !== "active") {
-        nextRunAt = computeNextRunAt(parseStored(scheduleJson), ctx.now);
+        nextRunAt = computeNextRunAt(parseStored(scheduleJson), ctx.now, ownerZone(ctx.db));
       }
       const next: Row = {
         ...row,
@@ -718,7 +770,7 @@ const updateSchedule = async (
         next.schedule_id,
       );
       if (next.status !== row.status || next.next_run_at !== row.next_run_at) arm(ctx, next);
-      return { ...toScheduleRow(next), ...(first ? { check: first.check } : {}) };
+      return { ...toScheduleRow(next, ownerZone(ctx.db)), ...(first ? { check: first.check } : {}) };
     },
   );
 };
@@ -1115,7 +1167,7 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     oneShot = schedule.kind === "at";
     // Recurring schedules re-anchor from the fire, so an owner object that
     // slept through several fires wakes up once, not N times.
-    if (!oneShot) nextRunAt = computeNextRunAt(schedule, ctx.now + 1_000);
+    if (!oneShot) nextRunAt = computeNextRunAt(schedule, ctx.now + 1_000, ownerZone(ctx.db));
   } catch (error) {
     ctx.db.run("UPDATE schedules SET active_fire_id = ? WHERE schedule_id = ?", fireId, scheduleId);
     finishFire(ctx, scheduleId, fireId, {
@@ -1431,6 +1483,7 @@ export const schedulesDomain = {
     SCHEDULES_WATCHES_MIGRATION,
     SCHEDULES_DUE_MIGRATION,
     SCHEDULES_ZONE_MIGRATION,
+    SCHEDULES_ZONE_SOURCE_MIGRATION,
   ],
   views: {
     "schedules.list": {
@@ -1488,10 +1541,10 @@ export const schedulesDomain = {
       handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.reminderSnooze"]["args"]) =>
         setReminderState(ctx, args.fireId, { state: "snoozed", minutes: args.minutes }),
     },
-    "schedules.setZone": {
+    "schedules.reportZone": {
       scope: "owner",
       parse: zoneArgs,
-      handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.setZone"]["args"]) => setZone(ctx, args),
+      handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.reportZone"]["args"]) => reportZone(ctx, args),
     },
   },
   internal: {

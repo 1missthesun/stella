@@ -2832,16 +2832,6 @@
         "pickDays": "En az bir gün seçin.",
         "pickCron": "Bir cron ifadesi girin."
       }
-    },
-    "zone": {
-      "title": "Artık {place} konumundasınız",
-      "body": {
-        "one": "{count} zamanlama hâlâ {place} saatine göre çalışıyor.",
-        "other": "{count} zamanlama hâlâ {place} saatine göre çalışıyor."
-      },
-      "move": "Zamanlamalarımı taşı",
-      "keep": "Saatleri koru",
-      "failed": "Bu işlem olmadı. Tekrar deneyin."
     }
   }
 }

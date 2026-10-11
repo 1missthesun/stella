@@ -50,6 +50,7 @@ type ScheduleRow = {
   conversationId?: string;
   prompt: string;
   schedule: string;
+  zone?: string;
   nextRunAt: number;
   lastRunAt?: number;
   status: string;
@@ -86,7 +87,7 @@ const describeSchedule = (schedule: Record<string, unknown>): string => {
     return `every ${Math.round(schedule.everyMs / 1000)}s`;
   }
   if (schedule.kind === "cron" && typeof schedule.expr === "string") {
-    return `cron "${schedule.expr}"${typeof schedule.tz === "string" && schedule.tz ? ` (${schedule.tz})` : ""}`;
+    return `cron "${schedule.expr}" (${typeof schedule.tz === "string" && schedule.tz ? schedule.tz : "follows the user's time zone"})`;
   }
   return "unknown schedule";
 };
@@ -110,6 +111,7 @@ const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
         }
       : {}),
     schedule: parseStoredSchedule(row.schedule),
+    ...(row.zone ? { zone: row.zone } : {}),
     enabled: row.status === "active",
     ...(row.conversationId ? { conversationId: row.conversationId } : {}),
     nextRunAt: iso(row.nextRunAt),

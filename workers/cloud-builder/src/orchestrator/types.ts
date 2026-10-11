@@ -80,6 +80,8 @@ export type ChatTurnRequest = {
   // directive. Persisted per conversation so later turns without one (schedule
   // fires, agent-completion wakes) keep answering in the user's language.
   locale?: string;
+  /** The user's time zone from the owner snapshot, so the clock reads as theirs. */
+  timeZone?: string;
   // Drive paths of attached files. Persisted as provider-only prompt metadata
   // so every client supplies exact references, including on history replay.
   // Images also hydrate through the capability-scoped attachment route.

@@ -2814,15 +2814,6 @@
         "pickDays": "請至少選擇一天。",
         "pickCron": "請輸入 Cron 運算式。"
       }
-    },
-    "zone": {
-      "title": "你現在在{place}",
-      "body": {
-        "other": "{count} 個排程仍依{place}時間執行。"
-      },
-      "move": "移動我的排程",
-      "keep": "保留時間",
-      "failed": "操作未成功。請再試一次。"
     }
   }
 }

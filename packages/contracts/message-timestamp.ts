@@ -3,6 +3,7 @@ import {
   formatTimestampSystemReminder,
   wrapSystemReminder,
 } from "@stella/contracts/system-reminders";
+import { formatZonedNow } from "@stella/contracts/schedule-zone";
 
 export { wrapSystemReminder };
 
@@ -27,19 +28,11 @@ export const THIRTY_MINUTES_MS = 30 * 60 * 1000;
 export const formatDateTimeReminder = (
   timestamp: number,
   timezone?: string,
-): string => {
-  const tz = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
-  const value = new Date(timestamp).toLocaleString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: tz,
-  });
-  return `Current date and time: ${value}.`;
-};
+): string =>
+  `Current date and time: ${formatZonedNow(
+    timestamp,
+    timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC",
+  )}.`;
 
 // `Date#toLocale{Time,Date}String(locale, options)` builds a fresh
 // `Intl.DateTimeFormat` on every call (~16us each in JSC). History building

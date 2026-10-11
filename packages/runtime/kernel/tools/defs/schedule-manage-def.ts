@@ -46,7 +46,7 @@ export const SCHEDULE_SEARCH_TERMS = [
 export const SCHEDULE_DEFINITION_PROPERTY = {
   type: "object",
   description:
-    "When to fire: { kind: 'at', atMs } once at an epoch ms | { kind: 'every', everyMs, anchorMs? } | { kind: 'cron', expr, tz? } (5-field cron in the user's own time zone; pass an IANA tz only for a time that belongs to another place).",
+    "When to fire: { kind: 'at', atMs } once at an epoch ms | { kind: 'every', everyMs, anchorMs? } | { kind: 'cron', expr, tz? } (5-field cron; without tz it runs at that clock time wherever the user is, following their time zone; pass an IANA tz only for a time tied to a specific other place).",
   properties: {
     kind: { type: "string", enum: ["at", "every", "cron"] },
     atMs: { type: "number" },

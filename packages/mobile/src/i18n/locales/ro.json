@@ -2848,17 +2848,6 @@
         "pickDays": "Alege cel puțin o zi.",
         "pickCron": "Introdu o expresie cron."
       }
-    },
-    "zone": {
-      "title": "Acum ești în {place}",
-      "body": {
-        "few": "{count} programări rulează încă după ora din {place}.",
-        "one": "{count} programare rulează încă după ora din {place}.",
-        "other": "{count} de programări rulează încă după ora din {place}."
-      },
-      "move": "Mută-mi programările",
-      "keep": "Păstrează orele",
-      "failed": "Nu a funcționat. Încearcă din nou."
     }
   }
 }

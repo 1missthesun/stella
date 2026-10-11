@@ -42,6 +42,8 @@ export type OwnerSnapshot = {
    * gate from the owner's engines domain.
    */
   execution: CloudExecutionSelection;
+  /** The user's IANA time zone, as their devices report it; absent until one does. */
+  timeZone?: string;
   /**
    * Paired mobile devices allowed to submit against this owner's desktops
    * (Stage 3 placement). `mobilePublicKey` is the phone's pairing key so the

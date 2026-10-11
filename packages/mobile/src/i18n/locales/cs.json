@@ -2864,18 +2864,6 @@
         "pickDays": "Vyberte alespoň jeden den.",
         "pickCron": "Zadejte výraz cron."
       }
-    },
-    "zone": {
-      "title": "Teď jste v: {place}",
-      "body": {
-        "few": "{count} plány stále běží podle času: {place}.",
-        "many": "{count} plánu stále běží podle času: {place}.",
-        "one": "{count} plán stále běží podle času: {place}.",
-        "other": "{count} plánů stále běží podle času: {place}."
-      },
-      "move": "Přesunout moje plány",
-      "keep": "Ponechat časy",
-      "failed": "Nepodařilo se to. Zkuste to znovu."
     }
   }
 }

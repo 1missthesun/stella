@@ -1,4 +1,5 @@
 import type { ExecutionContextSnapshot } from "@stella/contracts/execution-context";
+import { formatTurnClock } from "@stella/contracts/schedule-zone";
 import type { ClaudeUsageLimit, ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import type { ClaudeSessionManifest } from "@stella/contracts/backend/claude-sessions";
@@ -182,7 +183,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
         version: 2,
         epoch: `${engine}:${turn.turnId}`,
         prepend: [],
-        clock: new Date(now).toISOString(),
+        clock: formatTurnClock(now, turn.timeZone),
         ...(turn.attachments?.length
           ? { attachments: [...turn.attachments] }
           : {}),

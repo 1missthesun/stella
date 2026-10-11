@@ -2832,16 +2832,6 @@
         "pickDays": "Wähle mindestens einen Tag.",
         "pickCron": "Gib einen Cron-Ausdruck ein."
       }
-    },
-    "zone": {
-      "title": "Du bist jetzt in {place}",
-      "body": {
-        "one": "{count} Zeitplan läuft noch nach der Zeit in {place}.",
-        "other": "{count} Zeitpläne laufen noch nach der Zeit in {place}."
-      },
-      "move": "Meine Zeitpläne verschieben",
-      "keep": "Zeiten beibehalten",
-      "failed": "Das hat nicht geklappt. Versuch es erneut."
     }
   }
 }

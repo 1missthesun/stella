@@ -25,6 +25,8 @@ export type MobileSchedule = {
   nextRunAtMs: number;
   /** Serialized LocalCronSchedule for crons; absent for heartbeats. */
   scheduleJson?: string;
+  /** Where a cron with no zone of its own runs now: the user's zone. */
+  zone?: string;
   /** Heartbeat cadence (ms); absent for crons. */
   intervalMs?: number;
   /** The computer a fire is offered to first; absent means the cloud. */
@@ -41,6 +43,7 @@ export type CloudScheduleRow = Pick<
   | "targetDeviceId"
   | "prompt"
   | "schedule"
+  | "zone"
   | "nextRunAt"
   | "status"
   | "description"
@@ -59,6 +62,7 @@ export const toMobileSchedule = (row: CloudScheduleRow): MobileSchedule => ({
   enabled: row.status === "active",
   nextRunAtMs: row.nextRunAt,
   scheduleJson: row.schedule,
+  ...(row.zone ? { zone: row.zone } : {}),
   ...(row.targetDeviceId ? { targetDeviceId: row.targetDeviceId } : {}),
   ...(row.lastError ? { lastError: row.lastError } : {}),
   running: false,
@@ -120,10 +124,11 @@ export const scheduleRowBadge = (
  */
 export const scheduleCadence = (
   schedule: Pick<MobileSchedule, "scheduleJson" | "intervalMs"> &
-    Partial<Pick<MobileSchedule, "nextRunAtMs">>,
+    Partial<Pick<MobileSchedule, "nextRunAtMs" | "zone">>,
 ): string =>
   summarizeSchedule(
     schedule.scheduleJson ? parseStoredSchedule(schedule.scheduleJson) : null,
     schedule.intervalMs,
     schedule.nextRunAtMs,
+    schedule.zone,
   );

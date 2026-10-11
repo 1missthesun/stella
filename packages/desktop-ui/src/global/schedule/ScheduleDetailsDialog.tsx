@@ -65,6 +65,7 @@ const cronToRow = (record: LocalCronJobRecord, t: Translate): DialogRow => ({
     record.schedule,
     undefined,
     record.nextRunAtMs,
+    record.zone,
   ),
   conversationId: record.conversationId,
 });

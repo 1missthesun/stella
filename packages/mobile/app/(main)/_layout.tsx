@@ -18,7 +18,7 @@ import {
 import { authClient } from "../../src/lib/auth-client";
 import { tearDownPushNotifications } from "../../src/lib/notifications";
 import { isGuest, setGuestMode } from "../../src/lib/guest-mode";
-import { useScheduleZonePrompt } from "../../src/lib/schedule-zone";
+import { useReportTimeZone } from "../../src/lib/schedule-zone";
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -131,7 +131,7 @@ export default function MainLayout() {
   const { isDark } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const session = authClient.useSession();
-  useScheduleZonePrompt(Boolean(session.data?.user) && !isGuest());
+  useReportTimeZone(Boolean(session.data?.user) && !isGuest());
 
   useEffect(() => {
     if (!hasAiConsent()) {

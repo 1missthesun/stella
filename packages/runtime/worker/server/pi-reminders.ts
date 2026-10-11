@@ -51,7 +51,7 @@ export const piUserReminders = async (
   input: { text: string; sentAt: number; previousUserAt?: number; timezone?: string },
 ): Promise<string[]> => {
   const reminders: string[] = [];
-  if (input.previousUserAt !== undefined && input.sentAt - input.previousUserAt >= THIRTY_MINUTES_MS) {
+  if (input.previousUserAt === undefined || input.sentAt - input.previousUserAt >= THIRTY_MINUTES_MS) {
     reminders.push(formatDateTimeReminder(input.sentAt, input.timezone));
   }
   reminders.push(...(await connectorHints(dataDir, input.text)));

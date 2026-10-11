@@ -120,6 +120,8 @@ export type LocalCronJobRecord = {
   description?: string
   enabled: boolean
   schedule: LocalCronSchedule
+  /** Where a cron with no zone of its own runs now: the user's zone. */
+  zone?: string
   payload: LocalCronPayload
   /**
    * Whether the cron should deliver an assistant message + OS notification

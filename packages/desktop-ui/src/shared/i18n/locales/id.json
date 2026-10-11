@@ -2814,15 +2814,6 @@
         "pickDays": "Pilih setidaknya satu hari.",
         "pickCron": "Masukkan ekspresi cron."
       }
-    },
-    "zone": {
-      "title": "Anda sekarang di {place}",
-      "body": {
-        "other": "{count} jadwal masih berjalan dengan waktu {place}."
-      },
-      "move": "Pindahkan jadwal saya",
-      "keep": "Pertahankan waktu",
-      "failed": "Gagal. Coba lagi."
     }
   }
 }

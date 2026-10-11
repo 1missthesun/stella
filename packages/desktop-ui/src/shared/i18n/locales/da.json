@@ -2832,16 +2832,6 @@
         "pickDays": "Vælg mindst én dag.",
         "pickCron": "Indtast et cron-udtryk."
       }
-    },
-    "zone": {
-      "title": "Du er nu i {place}",
-      "body": {
-        "one": "{count} tidsplan kører stadig efter tiden i {place}.",
-        "other": "{count} tidsplaner kører stadig efter tiden i {place}."
-      },
-      "move": "Flyt mine tidsplaner",
-      "keep": "Behold tidspunkter",
-      "failed": "Det gik ikke igennem. Prøv igen."
     }
   }
 }

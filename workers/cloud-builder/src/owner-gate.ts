@@ -85,6 +85,7 @@ import type {
   DeviceToolOutcome,
 } from "@stella/contracts/turn-plane/device-tools";
 import { snapshotEngines } from "./owner-store/domains/engines.js";
+import { snapshotTimeZone } from "./owner-store/domains/schedules.js";
 import type { StripeEvent } from "./billing/stripe.js";
 import { BillingConfigError } from "./billing/plans.js";
 import { capabilitySigningKey } from "./capability-signer.js";
@@ -758,6 +759,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         },
         ...snapshotDevices(ctx.db),
         ...snapshotEngines(ctx.db),
+        ...snapshotTimeZone(ctx.db),
         fetchedAt: now,
         ttlMs: SNAPSHOT_TTL_MS,
       };

@@ -2848,17 +2848,6 @@
         "pickDays": "Escolha pelo menos um dia.",
         "pickCron": "Digite uma expressão cron."
       }
-    },
-    "zone": {
-      "title": "Agora você está em {place}",
-      "body": {
-        "many": "{count} agendamentos ainda usam o horário de {place}.",
-        "one": "{count} agendamento ainda usa o horário de {place}.",
-        "other": "{count} agendamentos ainda usam o horário de {place}."
-      },
-      "move": "Mover meus agendamentos",
-      "keep": "Manter horários",
-      "failed": "Não deu certo. Tente novamente."
     }
   }
 }

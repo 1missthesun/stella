@@ -563,6 +563,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           : {}),
         ...(start.piAgent ? { piAgent: start.piAgent } : {}),
         ...(start.locale ? { locale: start.locale } : {}),
+        ...(snapshot.timeZone ? { timeZone: snapshot.timeZone } : {}),
         ...(start.attachments ? { attachments: start.attachments } : {}),
         ...(start.agentThreadControl
           ? {

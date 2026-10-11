@@ -2848,17 +2848,6 @@
         "pickDays": "Elige al menos un día.",
         "pickCron": "Introduce una expresión cron."
       }
-    },
-    "zone": {
-      "title": "Ahora estás en {place}",
-      "body": {
-        "many": "{count} programaciones siguen usando la hora de {place}.",
-        "one": "{count} programación sigue usando la hora de {place}.",
-        "other": "{count} programaciones siguen usando la hora de {place}."
-      },
-      "move": "Mover mis programaciones",
-      "keep": "Mantener horas",
-      "failed": "No se pudo completar. Inténtalo de nuevo."
     }
   }
 }

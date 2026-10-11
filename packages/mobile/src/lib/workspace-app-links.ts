@@ -4,6 +4,7 @@ import {
 } from "@stella/contracts/workspace-apps";
 import { router } from "expo-router";
 import { useEffect, useSyncExternalStore } from "react";
+import { AppState } from "react-native";
 import { env } from "../config/env";
 import { getAuthToken } from "./auth-token";
 
@@ -83,8 +84,23 @@ export function useWorkspaceApp(slug: string): WorkspaceApp | null | undefined {
     if (!known || Date.now() - fetchedAt > REFRESH_AFTER_MS)
       void refreshWorkspaceApps();
   }, [slug, known]);
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (next) => {
+      if (next === "active" && Date.now() - fetchedAt > REFRESH_AFTER_MS)
+        void refreshWorkspaceApps();
+    });
+    return () => subscription.remove();
+  }, []);
   if (app) return app.status === "ready" ? app : null;
   return snapshot.apps === null || snapshot.loading ? undefined : null;
+}
+
+/**
+ * A turn just ended, and it may have built or changed an app. Refetch the list
+ * while app cards are on screen so they show the new revision right away.
+ */
+export function refreshLinkedWorkspaceApps() {
+  if (listeners.size > 0) void refreshWorkspaceApps();
 }
 
 /** Open an app from the chat: the Apps tab takes the request and opens it. */

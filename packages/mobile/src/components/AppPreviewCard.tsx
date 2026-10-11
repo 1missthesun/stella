@@ -30,7 +30,7 @@ export const AppPreviewCard = memo(function AppPreviewCard({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const app = useWorkspaceApp(slug);
   const [token, setToken] = useState<string | null>(null);
-  const [previewFailed, setPreviewFailed] = useState(false);
+  const [failedRevision, setFailedRevision] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
     void getAuthToken()
@@ -44,6 +44,7 @@ export const AppPreviewCard = memo(function AppPreviewCard({
   }, []);
   if (app === null) return null;
   const title = app?.title ?? "";
+  const previewFailed = app !== undefined && failedRevision === app.revision;
   const previewUrl = app ? workspaceAppPreviewUrl(app) : null;
   const open = () => {
     tapLight();
@@ -78,7 +79,7 @@ export const AppPreviewCard = memo(function AppPreviewCard({
             contentFit="cover"
             contentPosition="top"
             transition={180}
-            onError={() => setPreviewFailed(true)}
+            onError={() => setFailedRevision(app.revision)}
             style={StyleSheet.absoluteFill}
             accessibilityIgnoresInvertColors
           />

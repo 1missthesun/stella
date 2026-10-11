@@ -18,6 +18,7 @@ import { WebView } from "react-native-webview";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { AppBackdrop } from "./AppBackdrop";
+import { Icon } from "./Icon";
 import { EmptyState } from "./EmptyState";
 import { startChatWith } from "../lib/ask-stella";
 import { publishBackOverride } from "../lib/main-shell-store";
@@ -377,18 +378,44 @@ function AppsHost({
                 disabled={opening !== null || app.status !== "ready"}
                 onPress={() => void open(app)}
                 style={{
-                  padding: 16,
-                  borderRadius: 12,
+                  alignItems: "center",
                   backgroundColor: colors.surface,
+                  borderRadius: 12,
+                  flexDirection: "row",
+                  gap: 12,
+                  padding: 12,
                 }}
               >
-                <Text style={{ color: colors.text, fontSize: 17 }}>
-                  {app.title}
-                </Text>
+                <View
+                  style={{
+                    alignItems: "center",
+                    backgroundColor: colors.surfaceInset,
+                    borderColor: colors.border,
+                    borderCurve: "continuous",
+                    borderRadius: 12,
+                    borderWidth: StyleSheet.hairlineWidth,
+                    height: 44,
+                    justifyContent: "center",
+                    width: 44,
+                  }}
+                >
+                  {app.icon ? (
+                    <Text style={{ fontSize: 24 }} maxFontSizeMultiplier={1}>
+                      {app.icon}
+                    </Text>
+                  ) : (
+                    <Icon name="apps" size={22} color={colors.text} />
+                  )}
+                </View>
+                <View style={{ flex: 1, gap: 2, minWidth: 0 }}>
+                  <Text style={{ color: colors.text, fontSize: 17 }}>
+                    {app.title}
+                  </Text>
+                  {app.error ? (
+                    <Text style={{ color: colors.text }}>{app.error}</Text>
+                  ) : null}
+                </View>
                 {opening === app.slug ? <ActivityIndicator /> : null}
-                {app.error ? (
-                  <Text style={{ color: colors.text }}>{app.error}</Text>
-                ) : null}
               </Pressable>
             ))}
           </ScrollView>

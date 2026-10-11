@@ -2131,13 +2131,12 @@
         "modelIdAriaLabel": "OpenRouter model-id"
       },
       "reasoning": {
-        "default": "Auto",
         "high": "Hoog",
         "label": "Redeneerinspanning",
         "low": "Laag",
+        "max": "Max",
         "medium": "Gemiddeld",
-        "minimal": "Minimaal",
-        "xhigh": "Max"
+        "xhigh": "Extra"
       },
       "refresh": "Modelcatalogus vernieuwen",
       "restrictedPlan": "Niet beschikbaar in het {plan}-abonnement",
@@ -2237,8 +2236,8 @@
     "reasoningEffort": {
       "high": "Hoog",
       "low": "Laag",
+      "max": "Max",
       "medium": "Gemiddeld",
-      "minimal": "Minimaal",
       "xhigh": "Extra"
     },
     "resetCustomizations": {

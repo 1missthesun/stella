@@ -2131,13 +2131,12 @@
         "modelIdAriaLabel": "OpenRouter मॉडल id"
       },
       "reasoning": {
-        "default": "स्वतः",
         "high": "अधिक",
         "label": "तर्क प्रयास",
         "low": "कम",
+        "max": "अधिकतम",
         "medium": "मध्यम",
-        "minimal": "न्यूनतम",
-        "xhigh": "अधिकतम"
+        "xhigh": "अतिरिक्त"
       },
       "refresh": "मॉडल सूची ताज़ा करें",
       "restrictedPlan": "{plan} प्लान पर उपलब्ध नहीं",
@@ -2237,8 +2236,8 @@
     "reasoningEffort": {
       "high": "अधिक",
       "low": "कम",
+      "max": "अधिकतम",
       "medium": "मध्यम",
-      "minimal": "न्यूनतम",
       "xhigh": "अतिरिक्त"
     },
     "resetCustomizations": {

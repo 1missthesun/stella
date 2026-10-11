@@ -28,26 +28,17 @@ import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import { useAccountProviders } from "@/features/cloud/cloud-engines-api";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useT } from "@/shared/i18n";
+import { DEFAULT_REASONING_EFFORT, REASONING_EFFORT_LEVELS, type ReasoningEffortLevel, } from "@stella/contracts/reasoning-effort";
 import "./ProviderModelPicker.css";
-export type ReasoningEffort =
-  | "default"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+export type ReasoningEffort = ReasoningEffortLevel;
 
 const REASONING_OPTIONS: ReadonlyArray<{
   id: ReasoningEffort;
   labelKey: string;
-}> = [
-    { id: "default", labelKey: "settings.modelPicker.reasoning.default" },
-    { id: "minimal", labelKey: "settings.modelPicker.reasoning.minimal" },
-    { id: "low", labelKey: "settings.modelPicker.reasoning.low" },
-    { id: "medium", labelKey: "settings.modelPicker.reasoning.medium" },
-    { id: "high", labelKey: "settings.modelPicker.reasoning.high" },
-    { id: "xhigh", labelKey: "settings.modelPicker.reasoning.xhigh" },
-];
+}> = REASONING_EFFORT_LEVELS.map((id) => ({
+    id,
+    labelKey: `settings.modelPicker.reasoning.${id}`,
+}));
 const STELLA_PROVIDER_KEY = "stella";
 const LOCAL_PROVIDER_KEY = "local";
 const OPENROUTER_PROVIDER_KEY = "openrouter";
@@ -965,13 +956,13 @@ const ModelRow = memo(function ModelRow({ model, selected, rowRestricted, restri
               <DropdownMenuTrigger asChild>
                 <button type="button" className="model-picker-model-reason" data-active={(selected &&
                     reasoningEffort &&
-                    reasoningEffort !== "default") ||
+                    reasoningEffort !== DEFAULT_REASONING_EFFORT) ||
                     undefined} aria-label={t("settings.modelPicker.reasoning.label")} title={t("settings.modelPicker.reasoning.label")} disabled={disabled || rowRestricted} onClick={(event) => event.stopPropagation()}>
                   <Lightbulb size={14} strokeWidth={1.75}/>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="bottom" align="end" sideOffset={6}>
-                <DropdownMenuRadioGroup value={reasoningEffort ?? "default"} onValueChange={(value) => onSelectReasoning?.(model.id, value as ReasoningEffort)}>
+                <DropdownMenuRadioGroup value={reasoningEffort ?? DEFAULT_REASONING_EFFORT} onValueChange={(value) => onSelectReasoning?.(model.id, value as ReasoningEffort)}>
                   {REASONING_OPTIONS.map((option) => (<DropdownMenuRadioItem key={option.id} value={option.id}>
                       {t(option.labelKey)}
                     </DropdownMenuRadioItem>))}

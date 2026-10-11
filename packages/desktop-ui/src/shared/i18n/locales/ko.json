@@ -2122,13 +2122,12 @@
         "modelIdAriaLabel": "OpenRouter 모델 id"
       },
       "reasoning": {
-        "default": "자동",
         "high": "높음",
         "label": "추론 강도",
         "low": "낮음",
+        "max": "최대",
         "medium": "보통",
-        "minimal": "최소",
-        "xhigh": "최대"
+        "xhigh": "매우 높음"
       },
       "refresh": "모델 카탈로그 새로 고침",
       "restrictedPlan": "{plan} 요금제에서는 사용할 수 없음",
@@ -2228,8 +2227,8 @@
     "reasoningEffort": {
       "high": "높음",
       "low": "낮음",
+      "max": "최대",
       "medium": "보통",
-      "minimal": "최소",
       "xhigh": "매우 높음"
     },
     "resetCustomizations": {

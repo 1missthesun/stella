@@ -2167,13 +2167,12 @@
         "modelIdAriaLabel": "معرّف نموذج OpenRouter"
       },
       "reasoning": {
-        "default": "تلقائي",
         "high": "مرتفع",
         "label": "مستوى التفكير",
         "low": "منخفض",
+        "max": "أقصى",
         "medium": "متوسط",
-        "minimal": "أدنى",
-        "xhigh": "أقصى"
+        "xhigh": "إضافي"
       },
       "refresh": "تحديث كتالوج النماذج",
       "restrictedPlan": "غير متاح في خطة {plan}",
@@ -2273,8 +2272,8 @@
     "reasoningEffort": {
       "high": "مرتفع",
       "low": "منخفض",
+      "max": "أقصى",
       "medium": "متوسط",
-      "minimal": "أدنى",
       "xhigh": "إضافي"
     },
     "resetCustomizations": {

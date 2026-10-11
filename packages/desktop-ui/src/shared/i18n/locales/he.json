@@ -2140,13 +2140,12 @@
         "modelIdAriaLabel": "מזהה מודל של OpenRouter"
       },
       "reasoning": {
-        "default": "אוטומטי",
         "high": "גבוה",
         "label": "עומק חשיבה",
         "low": "נמוך",
+        "max": "מקסימלי",
         "medium": "בינוני",
-        "minimal": "מינימלי",
-        "xhigh": "מקסימלי"
+        "xhigh": "מוגבר"
       },
       "refresh": "רענן את קטלוג המודלים",
       "restrictedPlan": "לא זמין בתוכנית {plan}",
@@ -2246,8 +2245,8 @@
     "reasoningEffort": {
       "high": "גבוה",
       "low": "נמוך",
+      "max": "מקסימלי",
       "medium": "בינוני",
-      "minimal": "מינימלי",
       "xhigh": "מוגבר"
     },
     "resetCustomizations": {

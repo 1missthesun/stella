@@ -12,6 +12,7 @@ import {
   type EngineReasoningPreferences,
   type EngineRoutingPreferences,
 } from "@/global/settings/lib/engine-model-routing";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 
 /**
  * The account's model selection lives on the server (`cloud_engine_settings`)
@@ -27,7 +28,15 @@ const CONVERSATION_AGENT_KEYS = ["orchestrator", "general"] as const;
 
 const toLocalEffort = (
   effort: CloudExecutionSelection["reasoningEffort"],
-): EngineReasoningEffort => (effort === "none" ? "default" : effort);
+): EngineReasoningEffort => normalizeReasoningEffortLevel(effort);
+
+const conversationEffort = (
+  preferences: EngineReasoningPreferences,
+): EngineReasoningEffort =>
+  normalizeReasoningEffortLevel(
+    preferences.reasoningEfforts.orchestrator ??
+      preferences.reasoningEfforts.general,
+  );
 
 export const sameCloudExecution = (
   left: CloudExecutionSelection,
@@ -36,11 +45,7 @@ export const sameCloudExecution = (
   left.engine === right.engine &&
   left.provider === right.provider &&
   left.model === right.model &&
-  // Managed Stella routes take their effort from the backend; a provider
-  // model keeps the effort its picker chose (the desktop has no field for it).
-  (left.engine === "stella" ||
-    left.engine === "provider" ||
-    left.reasoningEffort === right.reasoningEffort);
+  left.reasoningEffort === right.reasoningEffort;
 
 /**
  * The server selection equivalent to the local preferences, or null when the
@@ -76,7 +81,7 @@ export function cloudExecutionFromLocal(
           engine: "stella",
           provider: "stella",
           model: STELLA_DEFAULT_MODEL,
-          reasoningEffort: "default",
+          reasoningEffort: conversationEffort(preferences),
         };
       }
       if (!model.startsWith("stella/")) {
@@ -88,14 +93,14 @@ export function cloudExecutionFromLocal(
           engine: "provider",
           provider,
           model: modelId,
-          reasoningEffort: "default",
+          reasoningEffort: conversationEffort(preferences),
         };
       }
       return {
         engine: "stella",
         provider: "stella",
         model,
-        reasoningEffort: "default",
+        reasoningEffort: conversationEffort(preferences),
       };
     }
   }
@@ -106,21 +111,27 @@ export function localPatchForCloudExecution(
   preferences: MirroredModelPreferences,
   execution: CloudExecutionSelection,
 ): Partial<MirroredModelPreferences> & { codexModelExplicit?: boolean } {
-  if (execution.engine === "stella") {
-    return buildModelSelectionPatch(
-      preferences,
-      execution.model === STELLA_DEFAULT_MODEL ? "" : execution.model,
-      { assistant: true, configurableAgentKeys: [] },
-    );
-  }
-  if (execution.engine === "provider") {
-    // The runtime runs it on this computer's own key, or on the account's
+  if (execution.engine === "stella" || execution.engine === "provider") {
+    // A provider model runs on this computer's own key, or on the account's
     // through the model gateway when it has none.
-    return buildModelSelectionPatch(
+    const selected = buildModelSelectionPatch(
       preferences,
-      `${execution.provider}/${execution.model}`,
+      execution.engine === "provider"
+        ? `${execution.provider}/${execution.model}`
+        : execution.model === STELLA_DEFAULT_MODEL
+          ? ""
+          : execution.model,
       { assistant: true, configurableAgentKeys: [] },
     );
+    return {
+      ...selected,
+      ...buildEngineReasoningPatch(
+        { ...preferences, ...selected },
+        "default",
+        toLocalEffort(execution.reasoningEffort),
+        CONVERSATION_AGENT_KEYS,
+      ),
+    };
   }
   const engine =
     execution.engine === "anthropic" ? "claude_code_local" : "codex_cli";

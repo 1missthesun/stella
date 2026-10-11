@@ -2122,13 +2122,12 @@
         "modelIdAriaLabel": "OpenRouter のモデル ID"
       },
       "reasoning": {
-        "default": "自動",
         "high": "高",
         "label": "推論の強度",
         "low": "低",
+        "max": "最大",
         "medium": "中",
-        "minimal": "最小",
-        "xhigh": "最大"
+        "xhigh": "特大"
       },
       "refresh": "モデルカタログを更新",
       "restrictedPlan": "{plan} プランでは利用できません",
@@ -2228,8 +2227,8 @@
     "reasoningEffort": {
       "high": "高",
       "low": "低",
+      "max": "最大",
       "medium": "中",
-      "minimal": "最小",
       "xhigh": "特大"
     },
     "resetCustomizations": {

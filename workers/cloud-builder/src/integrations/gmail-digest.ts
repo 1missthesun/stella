@@ -1,10 +1,3 @@
-/**
- * The email digest's two outside calls: read the new mail in the owner's
- * Gmail through their Composio session, and ask one small model call which
- * of it matters. The model sees only short excerpts and answers with ids
- * and one line each; sender and subject come from Gmail, never the model.
- */
-
 import { createModels } from "@earendil-works/pi-ai/models";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { EmailDigestItem } from "@stella/contracts/backend/email-digest";
@@ -24,7 +17,6 @@ const SUBJECT_CHARS = 160;
 const SUMMARY_CHARS = 140;
 const MAX_OUTPUT_TOKENS = 700;
 const MODEL_TIMEOUT_MS = 60_000;
-/** A run's spend ceiling: far above one short completion, far below a turn. */
 const RUN_BUDGET_MICRO_CENTS = 25_000_000;
 
 export type GmailMessage = {
@@ -91,10 +83,6 @@ const toMessage = (raw: unknown): GmailMessage | null => {
   };
 };
 
-/**
- * Inbox mail received since `sinceMs`, newest first. Promotions and social
- * mail are left out before anything is read: they are never the point.
- */
 export const fetchGmailSince = async (
   config: ComposioConfig,
   sessionId: string,
@@ -169,7 +157,6 @@ const parseItems = (answer: string, messages: GmailMessage[]): EmailDigestItem[]
   });
 };
 
-/** The owner's chat model when it runs on Stella's managed lane; Stella's default otherwise. */
 export const digestExecution = (
   execution: CloudExecutionSelection,
 ): Extract<CloudExecutionSelection, { engine: "stella" }> =>
@@ -188,7 +175,6 @@ export type DigestModelInput = {
   messages: GmailMessage[];
 };
 
-/** One completion on the owner's model over the model gateway, billed to the owner. */
 export const pickImportant = async (input: DigestModelInput): Promise<{ items: EmailDigestItem[]; model: string }> => {
   const gateway = input.env.MODEL_GATEWAY;
   const origin = input.env.MODEL_GATEWAY_URL?.trim() ?? "";

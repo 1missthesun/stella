@@ -1,20 +1,3 @@
-/**
- * The email digest: the owner's object reads new Gmail on its own schedule
- * and keeps a short digest of only what matters, for every client to show.
- *
- * - **Start:** once Gmail is connected (`emailDigest.start`, or Gmail's
- *   status coming back connected), the first run reads the last day of mail.
- * - **Runs** (`emailDigest.run`, one job id) read inbox mail since the last
- *   check, drop what an earlier run already saw, and skip the model
- *   entirely when nothing is new. A run whose new mail holds nothing
- *   important records that, not an empty digest.
- * - **Cadence** follows the inbox: an average of new mail per hour sets the
- *   next check so a run sees a handful of messages, between
- *   `MIN_INTERVAL_MS` and `MAX_INTERVAL_MS`.
- * - A run that finds Gmail disconnected stops scheduling until it connects
- *   again.
- */
-
 import type {
   EmailDigest,
   EmailDigestFeed,
@@ -34,14 +17,12 @@ export const MIN_INTERVAL_MS = 15 * MIN;
 export const MAX_INTERVAL_MS = 4 * HOUR;
 const FIRST_RUN_DELAY_MS = 2_000;
 const FIRST_WINDOW_MS = 24 * HOUR;
-/** Mail can land with a received time a little before the previous check. */
 const OVERLAP_MS = 10 * MIN;
 const MESSAGES_PER_RUN = 4;
 const RATE_WEIGHT = 0.5;
 const SEEN_RETENTION_MS = 3 * 24 * HOUR;
 const KEPT_DIGESTS = 50;
 const FEED_DIGESTS = 30;
-/** A run marked running this long ago died with its isolate. */
 const STALE_RUN_MS = 5 * MIN;
 
 export const EMAIL_DIGEST_MIGRATION = {
@@ -100,10 +81,6 @@ const scheduleRun = (ctx: OwnerContext, at: number): void => {
   ctx.db.run("UPDATE email_digest_state SET next_check_at = ?, updated_at = ? WHERE id = 1", at, ctx.now);
 };
 
-/**
- * Turn digests on for a connected Gmail. Idempotent: a running schedule is
- * left as it is; a new or stopped one checks at once.
- */
 export const startEmailDigest = (ctx: OwnerContext): void => {
   const state = stateOf(ctx.db);
   if (state?.enabled === 1 && state.next_check_at !== null) return;
@@ -126,7 +103,6 @@ const gmailConnected = async (ctx: OwnerContext): Promise<boolean> => {
   }
 };
 
-/** The next check: about `MESSAGES_PER_RUN` new messages away, within the bounds. */
 export const nextInterval = (ratePerHour: number): number =>
   ratePerHour <= 0
     ? MAX_INTERVAL_MS

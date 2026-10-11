@@ -1,5 +1,8 @@
 import { pauseAgentThread } from "../agent-messaging.js";
-import { AGENT_PAUSED_REASON, agentPauseText } from "@stella/contracts/backend/agent-threads";
+import {
+  AGENT_PAUSED_REASON,
+  agentPauseText,
+} from "@stella/contracts/backend/agent-threads";
 import { piBrainHandoffPrompt } from "@stella/contracts/turn-plane/pi-brain";
 import type { AgentTool } from "@stella/runtime/kernel/agent-core/types.js";
 import {

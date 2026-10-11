@@ -401,7 +401,7 @@ const makePlusMenuStyles = (colors: Colors) =>
     },
     scrim: {
       // Non-glass backdrop behind the focused message menu: a LIGHT plain dark
-      // scrim (the app's sheet/modal convention — see TopSheet), kept subtle so
+      // scrim (the app's sheet/modal convention), kept subtle so
       // the menu's Liquid Glass refracts near-live chat and reads as authentic
       // frost instead of a muddied dark panel. It must NOT be a GlassView — a
       // second glass layer beneath the menu triggers Apple's glass-on-glass

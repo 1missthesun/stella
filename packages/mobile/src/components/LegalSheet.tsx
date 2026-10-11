@@ -65,7 +65,7 @@ const makeStyles = (colors: Colors) =>
       flex: 1,
       backgroundColor: colors.background,
       // Soft hairline on the leading (top) edge so the sheet reads against the
-      // page beneath, matching the TopSheet primitive's edge treatment.
+      // page beneath.
       borderTopColor: colors.border,
       borderTopWidth: StyleSheet.hairlineWidth,
     },

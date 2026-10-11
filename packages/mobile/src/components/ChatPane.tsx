@@ -880,12 +880,20 @@ export function ChatPane({
   const [replyPinSuppressForId, setReplyPinSuppressForId] = useState<
     string | null
   >(null);
-  const emptyReplyIdsRef = useRef(new Set<string>());
+  const settledReplyIdsRef = useRef<Set<string> | null>(null);
+  const settledForConversationRef = useRef(conversationId);
+  if (settledForConversationRef.current !== conversationId) {
+    settledForConversationRef.current = conversationId;
+    settledReplyIdsRef.current = null;
+  }
   const placedReplyIdRef = useRef<string | null>(null);
   const lastReplyHasText =
     lastMessage?.role === "assistant" && lastMessage.text.trim().length > 0;
   const landingReplyId =
-    lastMessage && lastReplyHasText && emptyReplyIdsRef.current.has(lastMessage.id)
+    lastMessage &&
+    lastReplyHasText &&
+    settledReplyIdsRef.current !== null &&
+    !settledReplyIdsRef.current.has(lastMessage.id)
       ? lastMessage.id
       : null;
   const placingReplyId = landingReplyId ?? placedReplyIdRef.current;
@@ -894,17 +902,34 @@ export function ChatPane({
     nudgeAfterSend: placeLatestTurnFor,
   } = scroll;
   useLayoutEffect(() => {
-    if (!lastMessage || lastMessage.role !== "assistant") return;
-    if (!lastReplyHasText) {
-      emptyReplyIdsRef.current.add(lastMessage.id);
+    if (historyLoading) return;
+    const settled = settledReplyIdsRef.current;
+    if (settled === null) {
+      settledReplyIdsRef.current = new Set(
+        visibleMessages
+          .filter(
+            (message) =>
+              message.role === "assistant" && message.text.trim().length > 0,
+          )
+          .map((message) => message.id),
+      );
       return;
     }
-    if (!emptyReplyIdsRef.current.delete(lastMessage.id)) return;
+    if (!lastMessage || !lastReplyHasText) return;
+    if (settled.has(lastMessage.id)) return;
+    settled.add(lastMessage.id);
     placedReplyIdRef.current = lastMessage.id;
     if (!shouldPlaceLatestTurn()) return;
     placeLatestTurnFor(lastMessage.id);
     setReplyPinSuppressForId(lastMessage.id);
-  }, [lastMessage, lastReplyHasText, shouldPlaceLatestTurn, placeLatestTurnFor]);
+  }, [
+    historyLoading,
+    lastMessage,
+    lastReplyHasText,
+    placeLatestTurnFor,
+    shouldPlaceLatestTurn,
+    visibleMessages,
+  ]);
   useEffect(() => {
     if (!replyPinSuppressForId) return;
     if (lastMessage?.id !== replyPinSuppressForId) {

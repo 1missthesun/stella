@@ -1,4 +1,5 @@
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator";
+import { isTopLevelAgent } from "@stella/contracts/agent-ledger";
 import {
   agentWorkCardSections,
   isAgentWorkArtifact,
@@ -164,17 +165,16 @@ export const groupActivityHubTasks = (
 };
 
 /**
- * The running top-level agents, as the top-bar indicator reads them out.
- * Governed by the owner, like desktop's top-level work units: an owned
- * subagent is never counted as separate work, so the count the indicator
- * reads out matches what desktop's own indicator would say.
+ * The running top-level agents, as the top-bar indicator and its menu read
+ * them out: only Stella's own agents, like desktop's top-level work units. An
+ * agent's own agents never count, whether or not their parent is listed.
  */
 export const runningActivityIndicatorEntries = (
   tasks: readonly MobileTask[],
 ): ActivityIndicatorEntry[] =>
-  groupActivityHubTasks(sortHubTasksByRecency(tasks))
-    .filter((group) => group.owner.status === "running")
-    .map((group) => ({ id: group.owner.id, title: group.owner.title.trim() }));
+  sortHubTasksByRecency(
+    tasks.filter((task) => isTopLevelAgent(task) && task.status === "running"),
+  ).map((task) => ({ id: task.id, title: task.title.trim() }));
 
 /** Full, newest-first artifact dataset for ownership and search. */
 export const collectActivityHubArtifacts = (

@@ -73,6 +73,7 @@ import { AgentAssistantUpdates } from "@/shell/AgentAssistantUpdates";
 import { CompactChildState } from "@/features/chat/components/CompactSubagentSummary";
 import { useContinuousAnimationGate } from "@/shared/hooks/use-continuous-animation-gate";
 import { ACTIVITY_INDICATOR_MENU_MAX_ROWS } from "@stella/contracts/activity-indicator";
+import { isTopLevelAgent } from "@stella/contracts/agent-ledger";
 import "@/app/chat/chat-workspace-strip.css";
 
 // Default per-section caps. The compact strip shows a small preview; the
@@ -775,7 +776,10 @@ export const WorkspaceSections = memo(function WorkspaceSections({
     );
   }, [allTasks]);
 
-  const groupedRows = useMemo(() => groupActivityTasks(allTasks), [allTasks]);
+  const groupedRows = useMemo(
+    () => groupActivityTasks(allTasks.filter(isTopLevelAgent)),
+    [allTasks],
+  );
 
   // Persist the expansion state so a relaunch (which restores this
   // conversation) brings the Activity rows back exactly as they looked —

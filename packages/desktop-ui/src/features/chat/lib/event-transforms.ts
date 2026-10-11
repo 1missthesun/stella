@@ -5,6 +5,7 @@ import {
 } from "@stella/contracts/agent-runtime"
 import type { AgentModelConfigSnapshot } from "@stella/contracts/agent-engine"
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator"
+import { isTopLevelAgent } from "@stella/contracts/agent-ledger"
 import { normalizeDisplayStatusText } from '../status-utils'
 import type {
   Attachment,
@@ -712,14 +713,22 @@ export type TopLevelActivityWorkUnit = {
 
 /**
  * The top-level Activity rows for a conversation, each built from the freshest
- * attempt of its task. Shared by everything that counts or names ambient work.
+ * attempt of its task. Shared by everything that counts or names ambient work,
+ * so only Stella's own agents are in it: an agent's own agents never count,
+ * whether or not their parent's row is loaded.
  */
 const latestTopLevelActivityRows = (
   tasks: readonly TaskItem[],
 ): ActivityRow[] => {
   const latestById = new Map<string, TaskItem>()
   for (const task of tasks) {
-    if (!isActivityFeedTask(task) || !isManagedActivityTask(task)) continue
+    if (
+      !isActivityFeedTask(task) ||
+      !isManagedActivityTask(task) ||
+      !isTopLevelAgent(task)
+    ) {
+      continue
+    }
     const current = latestById.get(task.id)
     if (
       !current ||
@@ -735,13 +744,7 @@ const latestTopLevelActivityRows = (
   return groupActivityTasks([...latestById.values()])
 }
 
-/**
- * The units represented by top-level Activity rows. A Manager hierarchy is
- * governed by its owner rather than its descendants: owned children never
- * become extra ambient work, even if one remains active while the Manager is
- * paused. Missing/detached parents already fail open as standalone rows in
- * `groupActivityTasks`, so adoption and detachment update the count naturally.
- */
+/** The units represented by top-level Activity rows, each counted by its own status. */
 export const deriveTopLevelActivityWorkUnits = (
   tasks: readonly TaskItem[],
 ): TopLevelActivityWorkUnit[] =>

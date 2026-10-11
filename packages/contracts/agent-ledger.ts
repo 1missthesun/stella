@@ -71,6 +71,15 @@ export const ledgerAgentFromThread = (
     : {}),
 });
 
+/**
+ * Whether an agent is one of the orchestrator's own: Stella started it, so it
+ * has no parent agent. Only these count toward push notifications, the
+ * top-bar agents list and the in-progress count; an agent's own agents never
+ * do, whatever engine runs them and wherever they run.
+ */
+export const isTopLevelAgent = (agent: { parentAgentId?: string }): boolean =>
+  !agent.parentAgentId;
+
 /** An agent's status as a task's: anything still working reads as running, and paused stays paused. */
 export const agentTaskStatus = (status: AgentStatus): TaskLifecycleStatus => {
   switch (status) {

@@ -426,20 +426,14 @@ export const dedupeAgentCompletionRows = (
 /**
  * Files a reply links, as pills under its bubble. Local links keep their
  * local viewer payload; links into the cloud world's drive become drive
- * entries (opened through a drive URL, never the local file system). A
- * file the row's completion section already shows is not repeated, and
- * developer source files keep their own diff presentation.
+ * entries (opened through a drive URL, never the local file system).
+ * Developer source files keep their own diff presentation.
  */
 export const deriveLinkedFiles = (
   text: string,
   timestamp: number,
-  sections: readonly AgentCompletionSection[],
 ): ConversationFileEntry[] => {
   if (!text || !text.includes("](")) return [];
-  const shown = new Set<string>();
-  for (const section of sections) {
-    for (const entry of section.files) shown.add(entry.path);
-  }
   return deriveConversationFiles([
     {
       _id: "linked-files",
@@ -447,9 +441,7 @@ export const deriveLinkedFiles = (
       type: "assistant_message",
       payload: { text },
     },
-  ]).filter(
-    (entry) => entry.payload.kind !== "source-diff" && !shown.has(entry.path),
-  );
+  ]).filter((entry) => entry.payload.kind !== "source-diff");
 };
 
 /** Resolve completion events on one timeline row through their exact start. */
@@ -906,11 +898,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           toolEvents,
           lifecycleIndex,
         );
-        const linkedFiles = deriveLinkedFiles(
-          text,
-          message.timestamp,
-          agentCompletionSections,
-        );
+        const linkedFiles = deriveLinkedFiles(text, message.timestamp);
         const isIntraTurn = isIntraTurnAssistantRuntime(runtimeMetadata);
         const row: AssistantRowViewModel = {
           kind: "assistant",

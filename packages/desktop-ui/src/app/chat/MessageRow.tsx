@@ -56,11 +56,7 @@ import {
   extractFileLinkTargets,
 } from "@stella/contracts/local-file-links";
 import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
-import {
-  placeReplyAttachments,
-  replyAttachmentPlacement,
-  replyAttachmentTarget,
-} from "@stella/contracts/reply-attachments";
+import { replyAttachmentPlacement } from "@stella/contracts/reply-attachments";
 import {
   evidenceCardDrivePath,
   useDriveEvidenceCards,
@@ -683,22 +679,7 @@ export const AssistantMessageRow = memo(
     );
     const linkedFiles = row.linkedFiles ?? [];
     const linkTargets = hasText ? extractFileLinkTargets(text) : [];
-    const fileTarget = (file: ConversationFileEntry) =>
-      file.cloudDriveFile
-        ? replyAttachmentTarget(file.cloudDriveFile.path, { driveRelative: true })
-        : file.path;
-    const completionFiles = conversationId
-      ? row.agentCompletion?.sections.flatMap((section) => section.files) ?? []
-      : [];
-    const attachmentTargets = [
-      ...new Set([
-        ...linkTargets,
-        ...placeReplyAttachments(completionFiles, fileTarget).media.map(fileTarget),
-      ]),
-    ];
-    const evidencePaths = attachmentTargets.filter(
-      (target) => !driveLinkPath(target),
-    );
+    const evidencePaths = linkTargets.filter((target) => !driveLinkPath(target));
     const evidencePathSet = new Set(evidencePaths);
     const linkedDrivePaths = [
       ...new Set(
@@ -708,16 +689,11 @@ export const AssistantMessageRow = memo(
         }),
       ),
     ];
-    const driveCards = useDriveEvidenceCards([
-      ...new Set(
-        attachmentTargets.flatMap((target) => {
-          const drivePath = driveLinkPath(target);
-          return drivePath && replyAttachmentPlacement(target) === "media"
-            ? [drivePath]
-            : [];
-        }),
+    const driveCards = useDriveEvidenceCards(
+      linkedDrivePaths.filter(
+        (drivePath) => replyAttachmentPlacement(drivePath) === "media",
       ),
-    ]);
+    );
     const previewedDrivePaths = new Set(
       driveCards.flatMap((card) => {
         const drivePath = evidenceCardDrivePath(card);
@@ -745,7 +721,7 @@ export const AssistantMessageRow = memo(
       : unpreviewableFiles;
     const fileKey = (file: ConversationFileEntry) =>
       file.cloudDriveFile ? `cloud:${file.cloudDriveFile.path}` : `local:${file.path}`;
-    const replyFiles = [...completionFiles, ...attachedFiles].filter(
+    const replyFiles = attachedFiles.filter(
       (file, index, all) =>
         (file.cloudDriveFile
           ? !previewedDrivePaths.has(file.cloudDriveFile.path)
@@ -754,7 +730,7 @@ export const AssistantMessageRow = memo(
     );
     // Links whose files the reply attaches keep their words in a sentence
     // (the Markdown pass unlinks them); a line made only of such links goes.
-    const hiddenFileKeys = [...completionFiles, ...linkedFiles]
+    const hiddenFileKeys = linkedFiles
       .map(fileKey)
       .concat(evidencePaths.map((filePath) => `local:${filePath}`))
       .concat(linkedDrivePaths.map((drivePath) => `cloud:${drivePath}`));

@@ -11,6 +11,11 @@
  * another computer's) is imported into the transcript before this computer
  * answers, and while the conversation is open, so its orchestrator and its
  * timeline have the whole conversation.
+ *
+ * A turn runs here only while the cloud has it as this computer's: one whose
+ * lease this process learns it lost (the cloud refused its renewal, or ended
+ * it after another host took the brain over) stops here instead of running
+ * on unseen, as a computer back from a pause would otherwise do.
  */
 import { parseClaudeUsageLimitCard, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import { randomUUID } from "node:crypto";
@@ -21,7 +26,7 @@ import { piJournalUserMessage, piTerminalNotice, type PiRemoteTurn, type PiUserM
 import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
 import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
 import { isAgentAttemptOutcome } from "@stella/contracts/agent-status";
-import { PI_BRAIN_ELSEWHERE_CODE } from "@stella/contracts/turn-plane/pi-brain";
+import { PI_BRAIN_ELSEWHERE_CODE, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import {
   checkpointToPublish,
   importJournal,
@@ -80,6 +85,8 @@ export type DesktopJournal = {
     /** Reacquire the lease of a turn a previous process opened, under its owner epoch. */
     adopt?: boolean;
     ownerGeneration?: string;
+    /** The turn's lease is gone: the cloud refused its renewal (`reason`), or it went unrenewed too long. */
+    onLeaseLost?: (reason: string) => void;
   }): Promise<{
     leaseToken: string;
     ownerGeneration: string;
@@ -115,6 +122,8 @@ const PAGE = 100;
 const REMOTE_TURN_STALE_MS = 30 * 60_000;
 /** Events after which the transcript may have something to mirror. */
 const MIRRORED_EVENTS = new Set(["entry_appended", "message_end", "tool_execution_end", "run_end"]);
+/** The writer's reason for a lease it stopped hearing renewed, which says nothing of whether the cloud moved on. */
+const LEASE_SILENCE = "lease_renewal_silence";
 
 /** A report of this computer's cloud agent, or that one of its messages settled without one. */
 const reportFor = (record: JournalReadRecord, deviceId: string): JournalAgentReport | undefined => {
@@ -171,6 +180,8 @@ export async function journalMirror(args: {
   onRemoteTurns?: (turns: PiRemoteTurn[]) => void;
   /** The cloud held Claude Code work here until the usage limit resets, or resumed it. */
   onUsageLimit?: (card: ClaudeUsageLimitCard, createdAtMs: number) => void;
+  /** The conversation's brain record, as the cloud has it now. */
+  readBrain?: () => Promise<PiBrainRecord | null>;
   context: Context;
 }): Promise<JournalMirror> {
   const { harness, root, journal, report, context } = args;
@@ -189,6 +200,8 @@ export async function journalMirror(args: {
   /** Turns whose lease this process holds (or re-adopted after a restart). */
   const held = new Set<string>();
   const ending = new Set<string>();
+  /** Turns the cloud no longer has as this computer's: stopped here, and never finished from here. */
+  const lost = new Set<string>();
   let running = false;
   let again = false;
   let stopped = false;
@@ -260,6 +273,11 @@ export async function journalMirror(args: {
             (localTurnId) => !ending.has(localTurnId) && record.turnId.endsWith(`:${localTurnId}`),
           );
           if (open && record.kind === "turn" && record.phase === "canceled") stoppedElsewhere = true;
+          // Ended by the cloud without this computer (a takeover, a lapsed lease): it stops here too.
+          else if (open && record.kind === "turn" && record.phase && record.phase !== "started") {
+            const localTurnId = [...held].find((id) => !ending.has(id) && record.turnId.endsWith(`:${id}`));
+            if (localTurnId) loseTurn(localTurnId);
+          }
           continue;
         }
         if (record.kind === "turn") {
@@ -301,6 +319,7 @@ export async function journalMirror(args: {
     });
 
   const finishWith = async (open: Readonly<JournalOpenTurn>) => {
+    if (lost.has(open.localTurnId)) return;
     const entries: EntryRecord[] = [];
     for (const id of open.entries) {
       const entry = await harness.commit(async (tx) => tx.entry(id as EntryId), context);
@@ -324,13 +343,52 @@ export async function journalMirror(args: {
     ending.delete(open.localTurnId);
   };
 
+  /**
+   * The cloud no longer has this turn as this computer's: what runs here
+   * would go nowhere, so Stella stops, as a Stop would end it.
+   */
+  const loseTurn = (localTurnId: string | undefined) => {
+    if (localTurnId) {
+      if (lost.has(localTurnId)) return;
+      lost.add(localTurnId);
+      held.delete(localTurnId);
+    }
+    void stopStella(harness, root, context).catch(report);
+  };
+
+  const brainHere = (record: PiBrainRecord | null) =>
+    !record || (record.host === "device" && record.deviceId === journal.deviceId);
+
+  /**
+   * A refusal of the turn's lease is final: it stops here. A lease that only
+   * went unrenewed (this process paused, or offline) is weighed by the brain
+   * record and the journal, which says whether the cloud ended the turn.
+   */
+  const leaseLost = (localTurnId: string) => (reason: string) => {
+    if (stopped || ending.has(localTurnId)) return;
+    if (reason !== LEASE_SILENCE) {
+      loseTurn(localTurnId);
+      return;
+    }
+    void (async () => {
+      const record = await args.readBrain?.();
+      if (record !== undefined && !brainHere(record)) {
+        loseTurn(localTurnId);
+        return;
+      }
+      await importNow();
+    })().catch(report);
+  };
+
   const mirror = async () => {
     const state = await doc();
     const syncId = state.syncId ?? randomUUID();
     let mirrored = state.mirrored ?? 0;
     let open: JournalOpenTurn | undefined = state.open && { ...state.open, entries: [...state.open.entries] };
     // A turn a previous process opened: take its lease back, or let it go
-    // when the journal no longer has it.
+    // when the journal no longer has it. One the cloud settled without this
+    // computer is let go as well.
+    if (open && lost.has(open.localTurnId)) open = undefined;
     if (open && !held.has(open.localTurnId)) {
       const turn = open;
       const userEntry = await harness.commit(async (tx) => tx.entry(Number(turn.localTurnId.split(":").at(-1)) as EntryId), context);
@@ -345,6 +403,7 @@ export async function journalMirror(args: {
                 hidden: piJournalUserMessage(user as PiUserMessage).hidden,
                 adopt: true,
                 ownerGeneration: turn.ownerGeneration,
+                onLeaseLost: leaseLost(turn.localTurnId),
               })
               .catch((error: unknown) => {
                 report(error);
@@ -404,6 +463,7 @@ export async function journalMirror(args: {
                       : localTurnId,
                   userMessageJson: JSON.stringify(journaled.message),
                   hidden: journaled.hidden,
+                  onLeaseLost: leaseLost(localTurnId),
                 })
                 .catch(async (error: unknown) => {
                   report(error);

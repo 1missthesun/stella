@@ -1198,6 +1198,7 @@ export function desktopChats(options: DesktopChatsOptions) {
               },
               // The cloud's holds show as this computer's own do.
               onUsageLimit: (card, at) => noteCloudUsageLimit(conversationId, card, at),
+              ...(brain ? { readBrain: () => brain.read() } : {}),
               context,
             })
           : undefined;

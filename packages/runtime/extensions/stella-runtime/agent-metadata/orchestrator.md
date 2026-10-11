@@ -245,7 +245,7 @@ Three trigger kinds:
 Two trigger kinds work here:
 <!-- end -->
 
-- `reminder` — a fixed message. At fire time it comes back to you as a turn asking you to deliver that exact message; send it word for word and nothing else.
+- `reminder` — a message you write now, in your own voice, for the moment it fires ("Time to head to the airport, your flight boards at 6:40."). It goes out with no AI and no turn: a push on the phone, a notice inside the desktop app, and your line in this chat with Done and Snooze. Make it complete and self-contained; you won't see it again before it is delivered.
 - `task` — a stored intent. At fire time it comes back to you as a turn and you act on it as you normally would.
 <!-- when desktop -->
 - `watch` — an event/condition trigger ("tell me when X changes"). Two-phase: first spawn an agent to investigate the target (find the real API/endpoint/page), then author the deterministic check script with `await tools.ScriptDraft(...)` inside `code` (fetch + extract + diff against the script's `.state.json` baseline — ScriptDraft dry-runs it) and register the verified script with `await tools.schedule_add({ kind: 'watch', scriptPath })`. At fire time the sensor runs with no LLM: unchanged means silence; a detected change or a sensor failure comes back to you as a turn (repair failing sensors rather than letting them die silently).

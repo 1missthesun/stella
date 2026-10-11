@@ -77,7 +77,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
   label: "Add schedule",
   workingText: "Adding schedule",
   description:
-    "Create a scheduled trigger. 'reminder' delivers message word for word; 'task' fires prompt as a turn to you; 'watch' runs a check script verified with ScriptDraft each cycle and escalates a change or failure to you as a turn.",
+    "Create a scheduled trigger. 'reminder' delivers message as written, with no AI: a phone push, an in-app notice on the desktop, and your line in the chat with Done and Snooze; 'task' fires prompt as a turn to you; 'watch' runs a check script verified with ScriptDraft each cycle and escalates a change or failure to you as a turn.",
   parameters: {
     type: "object",
     properties: {
@@ -94,7 +94,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
       message: {
         type: "string",
         description:
-          "kind='reminder': the exact user-facing text delivered at fire time.",
+          "kind='reminder': what you will say when it fires, written now in your own voice and complete. Delivered as is, with no AI.",
       },
       prompt: {
         type: "string",

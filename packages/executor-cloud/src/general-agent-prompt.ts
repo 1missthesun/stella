@@ -123,6 +123,13 @@ const driveSection = (
         "They are not the user's files any more — say so before you use one, and do not save one back to the drive unless the user asks for it.",
       );
     }
+    const untracked = drive.untracked;
+    if (untracked.length > 0) {
+      driveSentences.push(
+        `These are on disk under drive but the drive has no file at their paths — the user deleted them, or an earlier turn wrote them and they never reached the user: ${untracked.slice(0, 10).join(", ")}${untracked.length > 10 ? ", …" : ""}.`,
+        "Do not treat them as the user's current files: say so before you use one, and do not save one back to the drive unless the user asks for it.",
+      );
+    }
     // Same reason, the other direction: hydration does not download over a
     // copy it cannot prove it wrote, so these files are on disk in a version
     // the drive does not have. Unsaved work is invisible without this — the

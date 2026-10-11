@@ -32,7 +32,7 @@ import { GlassSurface } from "./glass";
 import { Icon } from "./Icon";
 import { StellaMarkHero } from "./stella-mark/StellaMarkHero";
 
-export type EmptyStateMotif = "files" | "schedule" | "apps";
+export type EmptyStateMotif = "files" | "schedule" | "apps" | "mail";
 
 const ART = 184;
 const CENTER = ART / 2;
@@ -106,10 +106,11 @@ export function EmptyState({
           <ScheduleMotif clock={clock} colors={colors} />
         ) : null}
         {motif === "apps" ? <AppsMotif clock={clock} colors={colors} /> : null}
+        {motif === "mail" ? <MailMotif clock={clock} colors={colors} /> : null}
         <View
           style={[
             styles.mark,
-            motif === "files" ? styles.markLow : null,
+            motif === "files" || motif === "mail" ? styles.markLow : null,
           ]}
         >
           <StellaMarkHero
@@ -369,6 +370,62 @@ function ScheduleMotif({
   );
 }
 
+const ENVELOPE_W = 96;
+const ENVELOPE_H = 66;
+
+function MailMotif({
+  clock,
+  colors,
+}: {
+  clock: SharedValue<number>;
+  colors: Colors;
+}) {
+  const uid = useId().replace(/[^a-zA-Z0-9-]/g, "");
+  const style = useAnimatedStyle(() => {
+    const angle = clock.value * TAU * 15;
+    return {
+      transform: [
+        { translateX: 0 },
+        { translateY: -40 - 3.5 * Math.sin(angle) },
+        { rotate: `${-4 + 1.6 * Math.cos(angle)}deg` },
+      ],
+    };
+  });
+  const line = fadeHex(colors.textMuted, 0.28);
+  return (
+    <Animated.View style={[styles.envelope, style]}>
+      <Svg width={ENVELOPE_W} height={ENVELOPE_H}>
+        <Defs>
+          <LinearGradient id={`${uid}-fill`} x1="0" y1="1" x2="1" y2="0">
+            <Stop offset={0} stopColor={BRAND[0]} />
+            <Stop offset={0.5} stopColor={BRAND[2]} />
+            <Stop offset={1} stopColor={BRAND[4]} />
+          </LinearGradient>
+        </Defs>
+        <Rect
+          x={0.5}
+          y={0.5}
+          width={ENVELOPE_W - 1}
+          height={ENVELOPE_H - 1}
+          rx={12}
+          fill={colors.surface}
+          stroke={colors.border}
+          strokeWidth={1}
+        />
+        <Path
+          d={`M10 12 L${ENVELOPE_W / 2} 36 L${ENVELOPE_W - 10} 12`}
+          fill="none"
+          stroke={`url(#${uid}-fill)`}
+          strokeWidth={3.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Rect x={14} y={48} width={30} height={4} rx={2} fill={line} />
+      </Svg>
+    </Animated.View>
+  );
+}
+
 const TILE = 32;
 const TILE_R = 70;
 const TILES = Array.from({ length: 6 }, (_, index) => index);
@@ -447,6 +504,13 @@ function AppTile({
 }
 
 const styles = StyleSheet.create({
+  envelope: {
+    height: ENVELOPE_H,
+    left: CENTER - ENVELOPE_W / 2,
+    position: "absolute",
+    top: CENTER - ENVELOPE_H / 2,
+    width: ENVELOPE_W,
+  },
   page: {
     height: PAGE_H,
     left: CENTER - PAGE_W / 2,

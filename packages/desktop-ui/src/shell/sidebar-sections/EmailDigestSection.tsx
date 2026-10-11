@@ -121,12 +121,8 @@ export function EmailDigestSection({ active }: { active: boolean }) {
 
   const checkNow = useCallback(async () => {
     setChecking(true);
-    try {
-      await backendClient.call("emailDigest.checkNow", {});
-    } catch {
-    } finally {
-      setChecking(false);
-    }
+    await backendClient.call("emailDigest.checkNow", {}).catch(() => undefined);
+    setChecking(false);
   }, []);
 
   const value = feed.value;

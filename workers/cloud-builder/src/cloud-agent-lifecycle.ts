@@ -79,6 +79,11 @@ export const cloudAgentTerminalCard = (
           },
         },
       };
+    case "paused":
+      return {
+        ...card,
+        event: { type: "agent-canceled", payload: { ...payload, error: "Paused." } },
+      };
     default:
       return null;
   }

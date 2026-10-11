@@ -525,6 +525,7 @@ export type RunnerPublicApi = {
     },
   ) => Promise<
     | { status: "ok"; finalText: string; threadId: string }
+    | { status: "canceled"; finalText: ""; error: string; threadId: string }
     | { status: "error"; finalText: ""; error: string; threadId?: string }
   >;
   createBackgroundAgent: (

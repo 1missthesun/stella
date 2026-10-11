@@ -1,3 +1,4 @@
+import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import { Effect } from "effect";
 import type { ThreadCompletedEvent } from "@stella/contracts/turn-plane/owner-events";
 import {
@@ -868,7 +869,7 @@ export const cancelExactAgentTurn = async (
     kind: "canceled" as const,
     payload: { message: "Stopped. Nothing was changed." },
     threadError:
-      reason === "Paused by orchestrator." ? reason : "The agent was stopped.",
+      reason === AGENT_PAUSED_REASON ? reason : "The agent was stopped.",
     terminateSandbox: true,
   };
   if (!admission.pending) {
@@ -901,7 +902,7 @@ export const cancelExactAgentTurn = async (
     if (agentExecution) {
       await agentExecution.interrupt(
         new Error(
-          reason === "Paused by orchestrator."
+          reason === AGENT_PAUSED_REASON
             ? reason
             : "The agent turn was stopped.",
         ),

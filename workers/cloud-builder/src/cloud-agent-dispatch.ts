@@ -28,7 +28,8 @@ export type CloudAgentControlStatus =
   | "resuming"
   | "completed"
   | "failed"
-  | "canceled";
+  | "canceled"
+  | "paused";
 
 const CLOUD_AGENT_CONTROL_STATUSES: readonly CloudAgentControlStatus[] = [
   "running",
@@ -37,6 +38,7 @@ const CLOUD_AGENT_CONTROL_STATUSES: readonly CloudAgentControlStatus[] = [
   "completed",
   "failed",
   "canceled",
+  "paused",
 ];
 
 export type CloudAgentControlReceipt = {

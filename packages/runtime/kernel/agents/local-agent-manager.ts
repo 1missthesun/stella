@@ -32,6 +32,7 @@ import {
   type Fiber,
 } from "effect";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
+import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import { AGENT_CONTROL_TOOL_NAMES } from "../tools/defs/task.js";
 import { sanitizeForLogs, truncate } from "../tools/utils.js";
 import { AgentSteering } from "../agent-runtime/agent-steering.js";
@@ -448,7 +449,7 @@ export const AGENT_ORPHANED_RESTART_CANCEL_REASON =
 // Sentinel set by the orchestrator's pause_agent tool so the runner
 // can suppress the hidden `[Task canceled]` follow-up turn that would
 // otherwise replace the user-facing reply with an empty silence.
-export const AGENT_PAUSE_CANCEL_REASON = "Paused by orchestrator.";
+export const AGENT_PAUSE_CANCEL_REASON = AGENT_PAUSED_REASON;
 export const DEFAULT_AGENT_ATTEMPT_TEARDOWN_TIMEOUT_MS = 5_000;
 /**
  * Requirements-free runtime for the manager's supervisory fibers (house

@@ -1,3 +1,4 @@
+import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import { isManagedModelAudience } from "@stella/contracts/gateway/capability";
 import type {
   TurnBrokerTurnStateCheckpointReceipt,
@@ -843,8 +844,8 @@ export class BuildSessionObject extends DurableObject<Env> {
         raw &&
         typeof raw === "object" &&
         !Array.isArray(raw) &&
-        (raw as Record<string, unknown>).reason === "Paused by orchestrator."
-          ? "Paused by orchestrator."
+        (raw as Record<string, unknown>).reason === AGENT_PAUSED_REASON
+          ? AGENT_PAUSED_REASON
           : "The agent was stopped.";
       return await this.cancelExactAgentTurn(cancellation, reason);
     }

@@ -393,7 +393,8 @@ export const createStellaHostRunner = (
           row.status === "running" ||
           row.status === "completed" ||
           row.status === "failed" ||
-          row.status === "canceled"
+          row.status === "canceled" ||
+          row.status === "paused"
             ? row.status
             : (() => {
                 throw new Error("Invalid cloud agent control status.");

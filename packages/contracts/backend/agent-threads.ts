@@ -17,6 +17,26 @@ export type AgentMessageDelivery = {
 };
 
 /**
+ * Why an attempt that someone paused ended, as every runtime reports it with
+ * a `canceled` outcome. The owner's records keep such an attempt as
+ * `paused`, never as canceled or failed.
+ */
+export const AGENT_PAUSED_REASON = "Paused by orchestrator.";
+
+/** The dispatch error code a device reports with a `canceled` agent attempt it paused. */
+export const AGENT_PAUSED_ERROR_CODE = "AGENT_PAUSED";
+
+/**
+ * The status an attempt ends in, from the outcome its runtime reported: a
+ * cancel for a pause is `paused`.
+ */
+export const agentThreadTerminalStatus = (
+  status: "completed" | "failed" | "canceled",
+  reason?: string | null,
+): "completed" | "failed" | "canceled" | "paused" =>
+  status === "canceled" && reason?.trim() === AGENT_PAUSED_REASON ? "paused" : status;
+
+/**
  * Agent threads: every background agent the owner has, cloud or desktop,
  * indexed in the owner's object for Activity, the running pill, reports and
  * the originating desktop's delivery.

@@ -1137,12 +1137,19 @@ export class StellaRuntimeHost {
               rpc: AGENT_RUN_RPC_OPTIONS,
             },
           );
-          return result.status === "ok"
-            ? { status: "ok", finalText: result.finalText }
-            : {
-                status: "error",
-                error: result.error || "The local agent failed.",
-              };
+          if (result.status === "ok") {
+            return { status: "ok", finalText: result.finalText };
+          }
+          if (result.status === "canceled") {
+            return {
+              status: "canceled",
+              error: result.error || "The agent was stopped.",
+            };
+          }
+          return {
+            status: "error",
+            error: result.error || "The local agent failed.",
+          };
         }
         const handoff = payload.handoff === true;
         // A schedule's prompt is runtime input, not a message the user typed.

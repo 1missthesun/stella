@@ -1,3 +1,7 @@
+import {
+  AGENT_PAUSED_ERROR_CODE,
+  AGENT_PAUSED_REASON,
+} from "@stella/contracts/backend/agent-threads";
 import { createHash } from "node:crypto";
 import type { BackendClient } from "@stella/contracts/backend/client";
 import {
@@ -2006,6 +2010,9 @@ export class ExecutionPlacementBridge {
         outcome: canceled ? "canceled" : failed ? "failed" : "completed",
         ...(resultJson ? { resultJson } : {}),
         ...(failed ? { errorCode: "LOCAL_EXECUTION_FAILED" } : {}),
+        ...(canceled && result.error === AGENT_PAUSED_REASON
+          ? { errorCode: AGENT_PAUSED_ERROR_CODE }
+          : {}),
         ...((failed || canceled) && (result.error || result.finalText)
           ? { errorMessage: boundedResult(result.error || result.finalText) }
           : {}),

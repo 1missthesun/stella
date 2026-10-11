@@ -5,6 +5,7 @@
  * service secret; now they are object-to-object calls.
  */
 
+import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import { PLACEMENT_PROTOCOL, type DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import {
@@ -300,7 +301,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
       turnId: input.turnId,
       attemptGeneration: input.attemptGeneration,
       cancelRequestId: input.cancelRequestId,
-      reason: "Paused by orchestrator.",
+      reason: AGENT_PAUSED_REASON,
     });
   },
 

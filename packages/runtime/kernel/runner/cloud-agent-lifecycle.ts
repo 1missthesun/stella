@@ -1,4 +1,7 @@
-import type { AgentLifecycleEvent } from "../agents/local-agent-manager.js";
+import {
+  AGENT_PAUSE_CANCEL_REASON,
+  type AgentLifecycleEvent,
+} from "../agents/local-agent-manager.js";
 import { forkDelayedCall } from "./cloud-effect-runtime.js";
 
 type CloudAgentThreadRow = {
@@ -171,6 +174,14 @@ const toLifecycleEvent = (
       type: "agent-completed",
       eventId: `${row.threadId}:${row.ownerGeneration}:${row.attemptGeneration}:agent-completed`,
       result: readResult(row) || "The cloud agent completed without a report.",
+    };
+  }
+  if (row.status === "paused") {
+    return {
+      ...base,
+      type: "agent-canceled",
+      eventId: `${row.threadId}:${row.ownerGeneration}:${row.attemptGeneration}:agent-canceled`,
+      error: AGENT_PAUSE_CANCEL_REASON,
     };
   }
   if (row.status === "canceled") {

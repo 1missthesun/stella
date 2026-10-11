@@ -287,7 +287,7 @@ export type CloudAgentControlReceipt = {
   ownerGeneration: string;
   attemptGeneration: number;
   threadUpdatedAt: number;
-  status: "running" | "completed" | "failed" | "canceled";
+  status: "running" | "completed" | "failed" | "canceled" | "paused";
 };
 
 export type CloudDispatchResult = CloudAgentControlReceipt & {

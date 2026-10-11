@@ -37,7 +37,7 @@ const LIVE_THREAD_STATUSES = new Set(["running", "resuming", "waiting_for_user"]
 export const agentThreadStatus = (status: string): TaskLifecycleStatus => {
   if (LIVE_THREAD_STATUSES.has(status)) return "running";
   if (status === "completed") return "completed";
-  if (status === "canceled") return "canceled";
+  if (status === "canceled" || status === "paused") return "canceled";
   return "error";
 };
 

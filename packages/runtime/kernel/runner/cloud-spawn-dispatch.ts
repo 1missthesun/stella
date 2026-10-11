@@ -159,7 +159,8 @@ const readStatus = (
   return status === "running" ||
     status === "completed" ||
     status === "failed" ||
-    status === "canceled"
+    status === "canceled" ||
+    status === "paused"
     ? status
     : null;
 };

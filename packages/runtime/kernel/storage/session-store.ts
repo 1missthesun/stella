@@ -126,7 +126,8 @@ export type CloudAgentControlStatus =
   | "running"
   | "completed"
   | "failed"
-  | "canceled";
+  | "canceled"
+  | "paused";
 
 /** Latest server-issued control authority for one desktop-origin cloud agent. */
 export type CloudAgentThreadControlRecord = {
@@ -600,7 +601,7 @@ export class SessionStore {
       record.attemptGeneration < 1 ||
       !Number.isSafeInteger(record.threadUpdatedAt) ||
       record.threadUpdatedAt < 0 ||
-      !["running", "completed", "failed", "canceled"].includes(record.status)
+      !["running", "completed", "failed", "canceled", "paused"].includes(record.status)
     ) {
       throw new Error("Invalid cloud agent control receipt.");
     }

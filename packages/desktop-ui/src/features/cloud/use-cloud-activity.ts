@@ -21,7 +21,7 @@ export const cloudPlacementLabel = (placement: string): string =>
 const threadStatus = (status: string): TaskLifecycleStatus => {
   if (status === "running") return "running";
   if (status === "completed") return "completed";
-  if (status === "canceled") return "canceled";
+  if (status === "canceled" || status === "paused") return "canceled";
   return "error";
 };
 

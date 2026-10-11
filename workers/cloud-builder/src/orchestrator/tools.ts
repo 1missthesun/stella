@@ -1,3 +1,4 @@
+import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import { piBrainHandoffPrompt } from "@stella/contracts/turn-plane/pi-brain";
 import type { AgentTool } from "@stella/runtime/kernel/agent-core/types.js";
 import {
@@ -731,7 +732,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
                   turnId: control.turnId,
                   attemptGeneration: control.attemptGeneration,
                   cancelRequestId,
-                  reason: "Paused by orchestrator.",
+                  reason: AGENT_PAUSED_REASON,
                 }),
                 ...(signal ? { signal } : {}),
               });
@@ -765,7 +766,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
                 // repeats the same status and advances nothing further.
                 finalControl = await this.rememberCloudAgentControlReceipt({
                   ...control,
-                  status: "canceled",
+                  status: "paused",
                   threadUpdatedAt: Math.max(
                     Date.now(),
                     control.threadUpdatedAt + 1,

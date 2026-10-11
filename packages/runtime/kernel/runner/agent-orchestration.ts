@@ -982,6 +982,7 @@ export const createAgentOrchestration = (
     },
   ): Promise<
     | { status: "ok"; finalText: string; threadId: string }
+    | { status: "canceled"; finalText: ""; error: string; threadId: string }
     | { status: "error"; finalText: ""; error: string; threadId?: string }
   > => {
     if (!context.state.localAgentManager) {
@@ -1076,6 +1077,15 @@ export const createAgentOrchestration = (
       return {
         status: "ok",
         finalText: settlement.result ?? "",
+        threadId,
+      };
+    }
+    // Paused or stopped here is not a failure: the requester learns which.
+    if (settlement.status === "canceled") {
+      return {
+        status: "canceled",
+        finalText: "",
+        error: settlement.error ?? "The agent was stopped.",
         threadId,
       };
     }

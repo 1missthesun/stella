@@ -1,3 +1,4 @@
+import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import type {
   AdmittedCloudChat,
   CloudChatPreparation,
@@ -698,7 +699,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     if (open.pausing) {
       await this.settlePiThreadAttempts(record, attempt.attemptGeneration, {
         status: "canceled",
-        errorMessage: "Paused by orchestrator.",
+        errorMessage: AGENT_PAUSED_REASON,
       });
       return;
     }
@@ -826,7 +827,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     let outcome: PiThreadOutcome;
     if (report.settled) {
       if (!attempt.pausing) return;
-      outcome = { status: "canceled", errorMessage: "Paused by orchestrator." };
+      outcome = { status: "canceled", errorMessage: AGENT_PAUSED_REASON };
     } else {
       const parsed = piReportOutcome(report.text);
       outcome =

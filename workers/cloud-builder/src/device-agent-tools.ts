@@ -42,6 +42,7 @@ const STATUSES: readonly CloudAgentControlStatus[] = [
   "completed",
   "failed",
   "canceled",
+  "paused",
 ];
 
 const receiptStatus = (status: string): CloudAgentControlStatus =>

@@ -31,7 +31,7 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import type { AgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
+import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
 import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { splitReplyRefs } from "@stella/contracts/reply-refs";
@@ -176,6 +176,7 @@ export type DesktopChatsOptions = {
   agentThreads?: {
     directory(conversationId: string): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
     message(args: { messageId: string; to: string; text: string; from: AgentMessageSender }): Promise<AgentMessageDelivery>;
+    pause(args: { conversationId: string; threadId: string; controlRequestId: string }): Promise<AgentPauseResult>;
   };
   /** One of Stella's agents started work (a spawn or a follow-up: `attempt` counts them). */
   agentStarted?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
@@ -213,6 +214,7 @@ type Chat = {
   startAgent: OpenStellaHarness["startAgent"];
   agentRecords: OpenStellaHarness["agentRecords"];
   messageAgent: OpenStellaHarness["messageAgent"];
+  pauseAgent: OpenStellaHarness["pauseAgent"];
   runPlacedAgent: OpenStellaHarness["runPlacedAgent"];
   steerPlacedAgent: OpenStellaHarness["steerPlacedAgent"];
   /** For a conversation stored in the cloud: its journal mirror. */
@@ -591,7 +593,34 @@ export function desktopChats(options: DesktopChatsOptions) {
           "Stella's cloud did not answer, so the message may not have been delivered.",
         );
       },
+      pause: async ({ key, threadId }) => {
+        // Another chat's agent here stops here; any other agent stops where it runs.
+        if ((await pauseLocalAgent(threadId)) === "paused") {
+          return { threadId, outcome: "paused", status: "paused", attemptGeneration: 0, where: "on this computer" };
+        }
+        if (!cloud) {
+          throw new Error(`No agent ${threadId} on this computer. This chat is stored only on this computer, so it can pause only agents here.`);
+        }
+        const id = createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${key}`).digest("hex").slice(0, 48);
+        return await within(
+          cloud.pause({ conversationId, threadId, controlRequestId: `pi-pause:${id}` }),
+          AGENT_MESSAGE_TIMEOUT_MS,
+          "Stella's cloud did not answer, so the pause may not have reached the agent. Check agent_status.",
+        );
+      },
     };
+  };
+
+  /** Pause one of Stella's agents on this computer, whichever chat started it. */
+  const pauseLocalAgent = async (threadId: string): Promise<"paused" | "not_running" | "not_found"> => {
+    const conversationId = (await threadIndex())[threadId];
+    if (!conversationId) return "not_found";
+    const chat = await ready(conversationId);
+    const record = (await chat.agentRecords(context)).find((agent) => agent.threadId === threadId);
+    if (!record) return "not_found";
+    if (record.status !== "running") return "not_running";
+    await chat.pauseAgent(threadId, context);
+    return "paused";
   };
 
   const open = (conversationId: string): Promise<Chat> => {
@@ -626,7 +655,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           deviceId: options.deviceId ?? "this-computer",
           label: "This computer",
         };
-        const { harness, refreshTools, startAgent, agentRecords, messageAgent, runPlacedAgent, steerPlacedAgent } =
+        const { harness, refreshTools, startAgent, agentRecords, messageAgent, pauseAgent, runPlacedAgent, steerPlacedAgent } =
           await openStellaHarness(
           {
             storage,
@@ -804,6 +833,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           startAgent,
           agentRecords,
           messageAgent,
+          pauseAgent,
           runPlacedAgent,
           steerPlacedAgent,
           ...(mirror ? { mirror } : {}),
@@ -1301,6 +1331,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       );
       return record.status === "running" ? "steered" : "resumed";
     },
+    /** A pause for one of Stella's agents here from another host (the cloud, another computer). */
+    pauseAgent: pauseLocalAgent,
     async deliverReport(conversationId: string, report: { requestId: string; text: string }): Promise<void> {
       if (await noteOnBrain(conversationId, report.requestId, report.text)) return;
       const chat = await ready(conversationId);

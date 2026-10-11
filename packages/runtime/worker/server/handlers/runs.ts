@@ -5,6 +5,7 @@ import {
   type RuntimeAttachmentRef,
   type RuntimeLocalAgentCancellationRequest,
   type RuntimeLocalAgentMessageRequest,
+  type RuntimeLocalAgentPauseRequest,
   type RuntimeLocalAgentSteerRequest,
   type RuntimeLocalAgentRequest,
   type RuntimeOneShotCompletionRequest,
@@ -20,6 +21,7 @@ import {
   cancelPiPlacement,
   piChatsFor,
   piDeliverAgentMessage,
+  piPauseAgent,
   piPlacementCanceled,
   piPlacedChat,
   piChatRouted,
@@ -355,6 +357,28 @@ export const runsHandlers: WorkerRpcHandlers = {
           String(payload.messageId ?? ""),
           String(payload.ownerGeneration ?? ""),
         ),
+      );
+      return { outcome };
+    }),
+
+  [METHOD_NAMES.INTERNAL_WORKER_PAUSE_LOCAL_AGENT]: (params) =>
+    Effect.gen(function* () {
+      const session = yield* WorkerSessions.sessionOrFail(
+        () => new RunnerUnavailableError(),
+      );
+      const payload = params as RuntimeLocalAgentPauseRequest;
+      const threadId = String(payload.threadId ?? "");
+      // One of pi's agents, when pi has one by that thread id.
+      const hostBus = yield* HostBus.Service;
+      const piOutcome = yield* fromPromise(() =>
+        piPauseAgent(session, hostBus, threadId),
+      );
+      if (piOutcome !== "not_found") return { outcome: piOutcome };
+      const runner = yield* fromPromise(() =>
+        session.runner.ensureInitialized(),
+      );
+      const outcome = yield* fromPromise(() =>
+        runner.pauseLocalAgent(threadId, String(payload.ownerGeneration ?? "")),
       );
       return { outcome };
     }),

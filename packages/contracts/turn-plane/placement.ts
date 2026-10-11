@@ -327,6 +327,16 @@ export type AgentMessageDeviceOutcome =
   | "not_found"
   | "refused";
 
+/**
+ * How an `agent-pause` landed: `paused` stopped a running agent,
+ * `not_running` found it idle, `not_found` found no such agent here.
+ */
+export type AgentPauseDeviceOutcome =
+  | "paused"
+  | "not_running"
+  | "not_found"
+  | "refused";
+
 /** Server -> device. */
 export type DevicePresenceServerFrame =
   | {
@@ -381,6 +391,18 @@ export type DevicePresenceServerFrame =
     }
   | {
       /**
+       * A `pause_agent` for an agent this device runs locally, from wherever
+       * the conversation runs now. The device stops it if it is running and
+       * answers with `agent-pause.ack`. `commandId` is stable across
+       * redeliveries; the device dedupes on it.
+       */
+      type: "agent-pause";
+      commandId: string;
+      threadId: string;
+      ownerGeneration: string;
+    }
+  | {
+      /**
        * Something tried to dispatch work here and this device has not agreed
        * to accept any. The device asks on its own screen and answers with a
        * `consent` frame. The dispatch that triggered this does not wait on the
@@ -428,6 +450,13 @@ export type DevicePresenceDeviceFrame =
       messageId: string;
       threadId: string;
       outcome: AgentMessageDeviceOutcome;
+    }
+  | {
+      /** How an `agent-pause` landed. */
+      type: "agent-pause.ack";
+      commandId: string;
+      threadId: string;
+      outcome: AgentPauseDeviceOutcome;
     }
   | {
       /**

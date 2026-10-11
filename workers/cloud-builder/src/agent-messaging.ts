@@ -14,7 +14,7 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import type { AgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
+import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
 
 /** The longest a framed message gets: the text plus its `<agent-message>` envelope. */
 export const AGENT_MESSAGE_FRAMED_MAX_CHARS = AGENT_MESSAGE_MAX_CHARS + 1_024;
@@ -90,6 +90,18 @@ export const sendAgentMessage = async (
     text: input.text,
     from: input.from,
   })) as AgentMessageDelivery;
+
+/** `pause_agent` for an agent wherever it runs, through the owner's agent threads. */
+export const pauseAgentThread = async (
+  caller: AgentMessagingCaller,
+  input: { conversationId: string; threadId: string; controlRequestId: string },
+): Promise<AgentPauseResult> =>
+  (await caller.ownerInternal("agentThreads.pause", {
+    ownerGeneration: caller.ownerGeneration,
+    conversationId: input.conversationId,
+    threadId: input.threadId,
+    controlRequestId: input.controlRequestId,
+  })) as AgentPauseResult;
 
 export const agentMessageResult = (
   delivery: AgentMessageDelivery,

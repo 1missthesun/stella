@@ -314,6 +314,11 @@ export const piChatsFor = (
           if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to message agents and sessions in the cloud.");
           return await runner.agentThreads.message(args);
         },
+        pause: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to pause agents running in the cloud or on your other devices.");
+          return await runner.agentThreads.pause(args);
+        },
       },
       journal: (conversationId) => cloudJournalFor(session, conversationId),
       cloudAgents: (conversationId) => cloudAgentsFor(session, conversationId),
@@ -525,6 +530,13 @@ export const piDeliverAgentMessage = async (
   hostBus: HostBus.Interface,
   message: { threadId: string; text: string; messageId: string },
 ) => (await piChatsFor(session, hostBus)).deliverAgentMessage(message.threadId, message.text, message.messageId);
+
+/**
+ * A pause from another host for one of this computer's pi agents;
+ * `not_found` when no pi conversation here has that agent.
+ */
+export const piPauseAgent = async (session: OpenSession, hostBus: HostBus.Interface, threadId: string) =>
+  await (await piChatsFor(session, hostBus)).pauseAgent(threadId);
 
 export const piDeliverReport = async (
   session: OpenSession,

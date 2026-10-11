@@ -554,6 +554,14 @@ export type RunnerPublicApi = {
     messageId: string,
     ownerGeneration: string,
   ) => Promise<import("@stella/contracts/turn-plane/placement").AgentMessageDeviceOutcome>;
+  /**
+   * A `pause_agent` for one of this computer's own agents, relayed by the
+   * cloud from wherever the conversation runs now.
+   */
+  pauseLocalAgent: (
+    threadId: string,
+    ownerGeneration: string,
+  ) => Promise<import("@stella/contracts/turn-plane/placement").AgentPauseDeviceOutcome>;
   /** Exact local-only cancel with a pre-create tombstone; never falls to cloud. */
   cancelBlockingLocalAgent: (
     agentId: string,
@@ -637,6 +645,9 @@ export type RunnerPublicApi = {
     message: (
       args: Omit<AgentThreadCalls["agentThreads.message"]["args"], "ownerGeneration">,
     ) => Promise<AgentThreadCalls["agentThreads.message"]["result"]>;
+    pause: (
+      args: Omit<AgentThreadCalls["agentThreads.pause"]["args"], "ownerGeneration">,
+    ) => Promise<AgentThreadCalls["agentThreads.pause"]["result"]>;
   };
   beginVoiceToolCallReceipt: RuntimeStore["beginVoiceToolCallReceipt"];
   completeVoiceToolCallReceipt: RuntimeStore["completeVoiceToolCallReceipt"];

@@ -1,4 +1,5 @@
-import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
+import { pauseAgentThread } from "../agent-messaging.js";
+import { AGENT_PAUSED_REASON, agentPauseText } from "@stella/contracts/backend/agent-threads";
 import { piBrainHandoffPrompt } from "@stella/contracts/turn-plane/pi-brain";
 import type { AgentTool } from "@stella/runtime/kernel/agent-core/types.js";
 import {
@@ -26,7 +27,6 @@ import { resolveCloudSpawnExecution } from "../cloud-spawn-model.js";
 import { sha256Hex } from "../hash.js";
 import { WORLD_ROOT, worldName } from "../workspace.js";
 import {
-  agentThreadElsewhereError,
   agentThreadElsewhereStatus,
   cancelDeviceAgent,
   continueDeviceAgent,
@@ -250,11 +250,21 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           : null;
       }
     };
+    /**
+     * The receipt of an agent this conversation started, or the thread of
+     * one another host started, which the owner's agent threads pause.
+     */
     const requirePausableAgentControl = async (
       threadId: string,
-    ): Promise<CloudAgentControlReceipt> => {
+    ): Promise<
+      | { kind: "own"; control: CloudAgentControlReceipt }
+      | { kind: "elsewhere"; threadId: string }
+    > => {
       try {
-        return await this.requireCloudAgentControlReceipt(threadId, "any");
+        return {
+          kind: "own",
+          control: await this.requireCloudAgentControlReceipt(threadId, "any"),
+        };
       } catch {
         const found = await resolveConversationAgentThread(
           deviceCaller,
@@ -262,9 +272,12 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         ).catch(() => null);
         if (!found) throw threadNotFound(threadId);
         if (found.kind === "elsewhere") {
-          throw agentThreadElsewhereError(found);
+          return { kind: "elsewhere", threadId: found.thread.threadId };
         }
-        return await this.rememberCloudAgentControlReceipt(found.control);
+        return {
+          kind: "own",
+          control: await this.rememberCloudAgentControlReceipt(found.control),
+        };
       }
     };
 
@@ -664,7 +677,26 @@ export abstract class OrchestratorTools extends OrchestratorPi {
                 : "paused",
             );
           }
-          const control = await requirePausableAgentControl(threadId);
+          const pausable = await requirePausableAgentControl(threadId);
+          if (pausable.kind === "elsewhere") {
+            const paused = await pauseAgentThread(deviceCaller, {
+              conversationId: turn.conversationId,
+              threadId: pausable.threadId,
+              controlRequestId: await sha256Hex(
+                JSON.stringify([
+                  "pause_agent",
+                  turn.turnId,
+                  pausable.threadId,
+                  toolCallId,
+                ]),
+              ),
+            });
+            return {
+              content: [{ type: "text", text: agentPauseText(paused) }],
+              details: paused,
+            };
+          }
+          const control = pausable.control;
           let disposition: "paused" | "pending" | "already_terminal";
           let finalControl = control;
           if (!isCloudAgentControlActive(control.status)) {

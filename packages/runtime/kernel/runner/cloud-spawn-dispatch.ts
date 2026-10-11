@@ -59,13 +59,13 @@ type CloudAgentControlStore = {
 export type CloudSpawnDispatcherOptions = {
   /**
    * The backend's desktop agent calls (`agentThreads.spawnFromDesktop`,
-   * `continueFromDesktop`, `cancel`). Requests are the stored JSON exactly as
-   * persisted, so a replay sends what the first attempt sent.
+   * `continueFromDesktop`). Requests are the stored JSON exactly as
+   * persisted, so a replay sends what the first attempt sent. A pause goes
+   * through `agentThreads.pause`, which any of the owner's hosts can send.
    */
   backend: {
     spawn: (args: Record<string, unknown>) => Promise<unknown>;
     continue: (args: Record<string, unknown>) => Promise<unknown>;
-    cancel: (args: Record<string, unknown>) => Promise<unknown>;
   };
   isSignedIn: () => boolean;
   deviceId: string;
@@ -99,24 +99,6 @@ type StoredContinueRequest = {
   controlRequestId: string;
 };
 
-type StoredCancelRequest = {
-  ownerGeneration: string;
-  threadId: string;
-  expectedAttemptGeneration: number;
-  expectedThreadUpdatedAt: number;
-  originDeviceId: string;
-  originConversationId: string;
-  controlRequestId: string;
-};
-
-type CancelResponse = {
-  canceled: boolean;
-  status: CloudAgentControlReceipt["status"];
-  threadId: string;
-  attemptGeneration: number;
-  threadUpdatedAt: number;
-  currentControl: Omit<CloudAgentControlReceipt, "ownerGeneration">;
-};
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object"
@@ -268,52 +250,6 @@ const parseRunningResult = (
  * The backend answers `{ canceled, control }`; receipts stored before the
  * move carried the control twice (top level and `currentControl`).
  */
-const parseCancelResponse = (raw: unknown): CancelResponse => {
-  const result = asRecord(raw);
-  const control = asRecord(result?.control);
-  const current = control ?? asRecord(result?.currentControl);
-  const source = control ?? result;
-  const threadId = readString(source, "threadId");
-  const status = readStatus(source);
-  const attemptGeneration = readGeneration(source, "attemptGeneration");
-  const threadUpdatedAt = readTimestamp(source, "threadUpdatedAt");
-  const currentThreadId = readString(current, "threadId");
-  const currentStatus = readStatus(current);
-  const currentAttemptGeneration = readGeneration(
-    current,
-    "attemptGeneration",
-  );
-  const currentThreadUpdatedAt = readTimestamp(current, "threadUpdatedAt");
-  if (
-    typeof result?.canceled !== "boolean" ||
-    !threadId ||
-    !status ||
-    attemptGeneration === null ||
-    threadUpdatedAt === null ||
-    currentThreadId !== threadId ||
-    !currentStatus ||
-    currentAttemptGeneration === null ||
-    currentThreadUpdatedAt === null
-  ) {
-    throw new Error(
-      "Stella's cloud returned no exact receipt for that pause request.",
-    );
-  }
-  return {
-    canceled: result.canceled,
-    status,
-    threadId,
-    attemptGeneration,
-    threadUpdatedAt,
-    currentControl: {
-      threadId,
-      attemptGeneration: currentAttemptGeneration,
-      threadUpdatedAt: currentThreadUpdatedAt,
-      status: currentStatus,
-    },
-  };
-};
-
 const persistControl = (
   options: CloudSpawnDispatcherOptions,
   receipt: CloudDispatchResult,
@@ -644,161 +580,6 @@ export const createCloudThreadController = (
       };
     } catch (error) {
       return { delivered: false, reason: readServerErrorText(error) };
-    }
-  },
-
-  cancelThread: async (request: {
-    threadId: string;
-    conversationId: string;
-    requestId: string;
-    ownerGeneration?: string;
-  }): Promise<{
-    canceled: boolean;
-    reason?: string;
-    control?: CloudAgentControlReceipt;
-  }> => {
-    try {
-      const fingerprint = operationFingerprint({
-        kind: "cancel",
-        threadId: request.threadId,
-        originConversationId: request.conversationId,
-      });
-      const persisted = options.store.getCloudAgentToolOperation(
-        request.requestId,
-      );
-      let operation = persisted
-        ? validateOperation(
-            persisted,
-            "cancel",
-            fingerprint,
-            request.ownerGeneration,
-          )
-        : null;
-      if (!operation?.resultJson && !options.isSignedIn()) {
-        return {
-          canceled: false,
-          reason:
-            "This cloud thread cannot be paused while this device is signed out.",
-        };
-      }
-      operation ??= await beginOperation(options, {
-        operationId: request.requestId,
-        kind: "cancel",
-        fingerprint,
-        ...(request.ownerGeneration
-          ? { explicitOwnerGeneration: request.ownerGeneration }
-          : {}),
-        buildRequest: async (ownerGeneration) => {
-          const current = options.store.getCloudAgentThreadControl(
-            request.threadId,
-            ownerGeneration,
-          );
-          if (!current || current.originConversationId !== request.conversationId) {
-            throw new Error(
-              `No durable cloud control receipt is available for thread ${request.threadId}.`,
-            );
-          }
-          return {
-            ownerGeneration,
-            threadId: request.threadId,
-            expectedAttemptGeneration: current.attemptGeneration,
-            expectedThreadUpdatedAt: current.threadUpdatedAt,
-            originDeviceId: options.deviceId,
-            originConversationId: request.conversationId,
-            controlRequestId: request.requestId,
-          } satisfies StoredCancelRequest;
-        },
-      });
-      const args = parseJsonRecord(operation.requestJson, "pause request");
-      const expectedAttemptGeneration = readGeneration(
-        args,
-        "expectedAttemptGeneration",
-      );
-      let result: CancelResponse;
-      if (operation.resultJson) {
-        result = parseCancelResponse(
-          parseJsonRecord(operation.resultJson, "pause result"),
-        );
-      } else {
-        result = parseCancelResponse(
-          await withControlTimeout(
-            options.backend.cancel(args),
-            "pause that agent",
-          ),
-        );
-        if (
-          result.threadId !== request.threadId ||
-          expectedAttemptGeneration === null ||
-          result.attemptGeneration !== expectedAttemptGeneration
-        ) {
-          throw new Error(
-            "Stella's cloud returned a pause receipt for a different attempt.",
-          );
-        }
-        const previous = options.store.getCloudAgentThreadControl(
-          request.threadId,
-          operation.ownerGeneration,
-        );
-        if (!previous) {
-          throw new Error(
-            `No durable cloud control receipt is available for thread ${request.threadId}.`,
-          );
-        }
-        options.store.putCloudAgentThreadControl({
-          threadId: request.threadId,
-          ownerGeneration: operation.ownerGeneration,
-          cloudConversationId: previous.cloudConversationId,
-          originConversationId: previous.originConversationId,
-          attemptGeneration: result.currentControl.attemptGeneration,
-          threadUpdatedAt: result.currentControl.threadUpdatedAt,
-          status: result.currentControl.status,
-        });
-        completeOperation(options, request.requestId, result);
-      }
-
-      const current = result.currentControl;
-      const control: CloudAgentControlReceipt = {
-        ...current,
-        ownerGeneration: operation.ownerGeneration,
-      };
-      if (
-        expectedAttemptGeneration === null ||
-        current.attemptGeneration > expectedAttemptGeneration
-      ) {
-        return {
-          canceled: false,
-          control,
-          reason:
-            "The cloud thread advanced to a newer attempt while the pause was completing; the newer attempt was not changed.",
-        };
-      }
-      if (
-        current.attemptGeneration < expectedAttemptGeneration ||
-        !result.canceled
-      ) {
-        return {
-          canceled: false,
-          control,
-          reason: "The cloud thread was not paused.",
-        };
-      }
-      if (current.status === "completed" || current.status === "failed") {
-        return {
-          canceled: false,
-          control,
-          reason: `The cloud thread had already ${current.status}; no running attempt was paused.`,
-        };
-      }
-      if (current.status === "running") {
-        return {
-          canceled: false,
-          control,
-          reason: "The cloud thread was not paused.",
-        };
-      }
-      return { canceled: true, control };
-    } catch (error) {
-      return { canceled: false, reason: readServerErrorText(error) };
     }
   },
 });

@@ -193,18 +193,8 @@ export const agentThreadElsewhereStatus = (
 ) => {
   const { thread } = resolution;
   const active = isAgentThreadLookupActive(thread);
-  const localOnly = thread.placement === "computer" && !thread.executorDeviceId;
   return {
-    content: [
-      {
-        type: "text" as const,
-        text: `${resolution.text} ${
-          localOnly
-            ? "Only that computer can message it."
-            : "send_message still reaches it, as a note from you."
-        }`,
-      },
-    ],
+    content: [{ type: "text" as const, text: resolution.text }],
     details: {
       thread_id: thread.threadId,
       status: active ? "active" : "paused",
@@ -214,17 +204,9 @@ export const agentThreadElsewhereStatus = (
       last_active_at: new Date(thread.updatedAt).toISOString(),
       ...(thread.executorDeviceId ? { device_id: thread.executorDeviceId } : {}),
       ...(thread.originDeviceId ? { started_from_device_id: thread.originDeviceId } : {}),
-      controllable_here: false,
     },
   };
 };
-
-export const agentThreadElsewhereError = (
-  resolution: Extract<ConversationAgentThreadResolution, { kind: "elsewhere" }>,
-): Error =>
-  new Error(
-    `${resolution.text} pause_agent from this conversation's cloud orchestrator cannot reach it, so nothing was paused.`,
-  );
 
 /** The ledger's current state of a device agent, as a receipt. */
 export const readDeviceAgent = async (

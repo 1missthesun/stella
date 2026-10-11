@@ -24,6 +24,7 @@ import {
   dispatchPath,
   executionDeviceRegistration,
   type AgentMessageDeviceOutcome,
+  type AgentPauseDeviceOutcome,
   type DeviceAvailability,
   type DevicePresenceDeviceFrame,
   type DevicePresenceServerFrame,
@@ -175,6 +176,14 @@ type PlacementBridgeOptions = {
     text: string;
     ownerGeneration: string;
   }) => Promise<AgentMessageDeviceOutcome>;
+  /**
+   * A `pause_agent` for an agent this computer runs on its own (no
+   * dispatch), from wherever the conversation runs now: stop it if running.
+   */
+  pauseLocalAgent?: (args: {
+    threadId: string;
+    ownerGeneration: string;
+  }) => Promise<AgentPauseDeviceOutcome>;
   /**
    * Something tried to dispatch work here and this computer has not agreed to
    * accept any. The host shows the question on this machine's own screen and
@@ -929,6 +938,9 @@ export class ExecutionPlacementBridge {
     "agent-message": async (frame) => {
       await this.deliverAgentMessage(frame);
     },
+    "agent-pause": async (frame) => {
+      await this.pauseLocalAgent(frame);
+    },
     "consent.request": (frame) => {
       // Only raise the question. This computer answers when its own user
       // does, and the attempt that triggered the ask has already been told
@@ -1027,6 +1039,29 @@ export class ExecutionPlacementBridge {
       }
     }
     this.send({ type: "agent-message.ack", messageId, threadId, outcome });
+  }
+
+  /** Pause one of this computer's own agents, then report back. */
+  private async pauseLocalAgent(
+    frame: Extract<DevicePresenceServerFrame, { type: "agent-pause" }>,
+  ): Promise<void> {
+    const { commandId, threadId } = frame;
+    if (typeof commandId !== "string" || typeof threadId !== "string") return;
+    let outcome: AgentPauseDeviceOutcome = "refused";
+    if (
+      frame.ownerGeneration === this.ownerGeneration &&
+      this.options.pauseLocalAgent
+    ) {
+      try {
+        outcome = await this.options.pauseLocalAgent({
+          threadId,
+          ownerGeneration: frame.ownerGeneration,
+        });
+      } catch (error) {
+        this.log("warn", "An agent pause was not applied.", error);
+      }
+    }
+    this.send({ type: "agent-pause.ack", commandId, threadId, outcome });
   }
 
   private settleClaim(

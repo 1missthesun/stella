@@ -1205,10 +1205,6 @@ describe("agent tools on a thread this conversation started elsewhere", () => {
           reason: `No durable cloud control receipt is available for thread ${request.threadId}.`,
         };
       },
-      cloudCancel: async (request) => ({
-        canceled: false,
-        reason: `No durable cloud control receipt is available for thread ${request.threadId}.`,
-      }),
       lookupConversationAgentThread: async (threadId, conversationId) => {
         lookups.push([threadId, conversationId]);
         const thread = ledger[threadId];
@@ -1235,7 +1231,6 @@ describe("agent tools on a thread this conversation started elsewhere", () => {
       device_id: "mac-1",
       started_from_device_id: THIS_COMPUTER,
       result: "Freed 42 GB.",
-      controllable_here: true,
     });
     expect((result.result as { note: string }).note).toContain("runs on Rahul's Mac");
     expect(lookups.at(-1)).toEqual(["thr-device-started-here", "conversation-1"]);
@@ -1252,14 +1247,10 @@ describe("agent tools on a thread this conversation started elsewhere", () => {
       status: "active",
       status_detail: "running",
       placement: "cloud",
-      controllable_here: false,
     });
-    expect((result.result as { note: string }).note).toContain(
-      "started by this conversation's orchestrator in Stella's cloud",
-    );
   });
 
-  it("send_message reaches a thread another computer started through the cloud, and pause_agent says which computer can", async () => {
+  it("send_message reaches a thread another computer started through the cloud", async () => {
     const ctx = stateContext();
     const input = await handleSendMessage(
       ctx,
@@ -1276,14 +1267,6 @@ describe("agent tools on a thread this conversation started elsewhere", () => {
       to: "thr-started-from-mac",
       text: "Also check the drafts.",
     });
-
-    const pause = await handleSpawnAgent(
-      ctx,
-      { action: "cancel", thread_id: "thr-started-from-mac" },
-      toolContext,
-    );
-    expect(pause.error).toContain("only Rahul's Mac can send it input or pause it");
-    expect(pause.error).toContain("so nothing was paused.");
   });
 
   it("send_message to a thread the cloud does not know returns the cloud's answer", async () => {
@@ -1308,9 +1291,7 @@ describe("agent tools on a thread this conversation started elsewhere", () => {
       { action: "cancel", thread_id: "thread-9" },
       toolContext,
     );
-    expect(pause.error).toBe(
-      "No durable cloud control receipt is available for thread thread-9.",
-    );
+    expect(pause.error).toBe("Thread not found: thread-9");
   });
 });
 

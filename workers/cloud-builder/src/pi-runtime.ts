@@ -89,7 +89,7 @@ import type {
   AgentDirectorySessionRow,
   AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import type { AgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
+import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
 import {
   STELLA_HARNESS_TOOL_NAMES,
   type StellaToolHost,
@@ -364,6 +364,10 @@ export type PiRuntimeOptions = {
       authority: PiAuthority,
       args: { messageId: string; to: string; text: string; from: AgentMessageSender },
     ): Promise<AgentMessageDelivery>;
+    pause(
+      authority: PiAuthority,
+      args: { controlRequestId: string; threadId: string },
+    ): Promise<AgentPauseResult>;
   };
   /**
    * Stella moves herself to one of the owner's computers: the conversation's
@@ -1129,6 +1133,13 @@ export class PiConversationRuntime {
           to,
           text,
           from,
+        });
+      },
+      pause: async ({ key, threadId }) => {
+        const { authority } = await this.#agentState();
+        return await threads.pause(authority, {
+          controlRequestId: `pi-pause:${authority.conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128),
+          threadId,
         });
       },
     };

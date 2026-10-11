@@ -604,6 +604,7 @@ export const createStellaHostRunner = (
     cancelBlockingLocalAgent: taskOrchestration.cancelBlockingLocalAgent,
     steerBlockingLocalAgent: taskOrchestration.steerBlockingLocalAgent,
     deliverLocalAgentMessage: taskOrchestration.deliverLocalAgentMessage,
+    pauseLocalAgent: taskOrchestration.pauseLocalAgent,
     cancelPlacementAutomation: orchestratorController.cancelPlacementAutomation,
     cancelLocalChat: orchestratorController.cancelLocalChat,
     cancelLocalChatByConversation:
@@ -679,6 +680,11 @@ export const createStellaHostRunner = (
         await context.backend.require().call("agentThreads.directory", { conversationId }),
       message: async (args) =>
         await context.backend.require().call("agentThreads.message", {
+          ...args,
+          ownerGeneration: await context.cloudOwnerGeneration(),
+        }),
+      pause: async (args) =>
+        await context.backend.require().call("agentThreads.pause", {
           ...args,
           ownerGeneration: await context.cloudOwnerGeneration(),
         }),

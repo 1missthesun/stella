@@ -91,6 +91,7 @@ import type {
 } from "@stella/contracts/scheduling";
 import type {
   AgentMessageDeviceOutcome,
+  AgentPauseDeviceOutcome,
   DispatchPayload,
   DispatchSummary,
 } from "@stella/contracts/turn-plane/placement";
@@ -1251,6 +1252,20 @@ export class StellaRuntimeHost {
         } | null>(
           METHOD_NAMES.INTERNAL_WORKER_DELIVER_AGENT_MESSAGE,
           { threadId, text, messageId, ownerGeneration },
+          {
+            ensureWorker: true,
+            recordActivity: true,
+            retryOnceOnDisconnect: false,
+          },
+        );
+        return result?.outcome ?? "refused";
+      },
+      pauseLocalAgent: async ({ threadId, ownerGeneration }) => {
+        const result = await this.requestWorker<{
+          outcome?: AgentPauseDeviceOutcome;
+        } | null>(
+          METHOD_NAMES.INTERNAL_WORKER_PAUSE_LOCAL_AGENT,
+          { threadId, ownerGeneration },
           {
             ensureWorker: true,
             recordActivity: true,

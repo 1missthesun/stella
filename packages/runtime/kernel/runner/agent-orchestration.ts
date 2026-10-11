@@ -16,7 +16,10 @@ import { createAgentLifecycleResponseTarget } from "../agent-runtime/response-ta
 import { persistThreadCustomMessage } from "../agent-runtime/thread-memory.js";
 import { resolvePlacedAgentModel } from "./placed-agent-model.js";
 import { resolveOrchestratorThreadKey } from "../thread-runtime.js";
-import { LocalAgentManager } from "../agents/local-agent-manager.js";
+import {
+  AGENT_PAUSE_CANCEL_REASON,
+  LocalAgentManager,
+} from "../agents/local-agent-manager.js";
 import { defaultAgentDirectory } from "../agents/agent-directory.js";
 import { writeRestartInterruptedSnapshot } from "../restart-continuation.js";
 import type {
@@ -30,7 +33,10 @@ import type {
 } from "../agents/local-agent-manager.js";
 import { AGENT_IDS, isLocalCliAgentId } from "@stella/contracts/agent-runtime";
 import type { RunnerContext } from "./types.js";
-import type { AgentMessageDeviceOutcome } from "@stella/contracts/turn-plane/placement";
+import type {
+  AgentMessageDeviceOutcome,
+  AgentPauseDeviceOutcome,
+} from "@stella/contracts/turn-plane/placement";
 import { buildAgentEventPrompt } from "./shared.js";
 import type { LocalChatEventRecord } from "../storage/shared.js";
 import type { ThreadActivityRecord } from "@stella/contracts/local-chat";
@@ -1226,6 +1232,34 @@ export const createAgentOrchestration = (
     return "steered" in delivery && delivery.steered ? "steered" : "queued";
   };
 
+  /**
+   * A `pause_agent` for one of this computer's own agents from wherever the
+   * conversation runs now, relayed by the cloud: it stops as a pause here
+   * does, so its parent hears "[Subagent paused]" and Stella is not woken.
+   */
+  const pauseLocalAgent = async (
+    threadId: string,
+    ownerGeneration: string,
+  ): Promise<AgentPauseDeviceOutcome> => {
+    const manager = context.state.localAgentManager;
+    const exactThreadId = threadId.trim();
+    if (!manager || !exactThreadId) return "not_found";
+    const record = context.runtimeStore.getAgentRecord?.(exactThreadId);
+    if (!record) return "not_found";
+    if (record.ownerGeneration && record.ownerGeneration !== ownerGeneration) {
+      return "refused";
+    }
+    const running =
+      record.status === "running" ||
+      manager.listActiveAgentRuns().some((run) => run.runId === exactThreadId);
+    if (!running) return "not_running";
+    const { canceled } = await cancelLocalAgent(
+      exactThreadId,
+      AGENT_PAUSE_CANCEL_REASON,
+    );
+    return canceled ? "paused" : "not_running";
+  };
+
   const shutdown = async (): Promise<void> => {
     await context.state.localAgentManager?.shutdown();
     shutdownSubagentRuntimes();
@@ -1238,6 +1272,7 @@ export const createAgentOrchestration = (
     cancelBlockingLocalAgent,
     steerBlockingLocalAgent,
     deliverLocalAgentMessage,
+    pauseLocalAgent,
     handleExternalAgentLifecycleEvent: handleAgentLifecycleEvent,
     hasDurableExternalLifecycleEvent: (event: AgentLifecycleEvent) =>
       hasDurableAgentLifecycleEvent(context, event),

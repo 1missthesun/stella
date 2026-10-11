@@ -2,8 +2,6 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { OwnerEvent } from "@stella/contracts/turn-plane/owner-events";
 import { placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import {
-  agentThreadElsewhereError,
-  agentThreadElsewhereStatus,
   cancelDeviceAgent,
   continueDeviceAgent,
   readDeviceAgent,
@@ -130,31 +128,8 @@ describe("a conversation finds agents it started somewhere else", () => {
     expect(steered).toEqual([{ dispatchId: "dsp-1", text: "Also empty the Downloads folder." }]);
 
     const paused = await cancelDeviceAgent(caller, found.control, "pause-agent-0001");
-    expect(paused).toMatchObject({ threadId, status: "canceled" });
+    expect(paused).toMatchObject({ threadId, status: "paused" });
     expect(canceled).toEqual(["dsp-1"]);
-  });
-
-  test("a thread started from another computer is found and described, and input or pause say who can reach it", async () => {
-    const { threadId } = await spawnFromDesktop();
-    const found = await resolveConversationAgentThread(cloudOrchestrator(), threadId);
-    expect(found?.kind).toBe("elsewhere");
-    if (found?.kind !== "elsewhere") throw new Error("expected a thread started elsewhere");
-
-    expect(found.text).toContain(`Thread ${threadId} (Adobe clones survey) runs on Rahul's Mac and is running`);
-    expect(found.text).toContain("started from omarchy");
-    expect(found.text).toContain("only omarchy can send it input or pause it");
-
-    const status = agentThreadElsewhereStatus(found);
-    expect(status.details).toMatchObject({
-      thread_id: threadId,
-      status: "active",
-      status_detail: "running",
-      device_id: "mac-1",
-      started_from_device_id: "desk-1",
-      controllable_here: false,
-    });
-    expect(status.content[0]?.text).toContain("send_message still reaches it, as a note from you.");
-    expect(agentThreadElsewhereError(found).message).toContain("so nothing was paused.");
   });
 
   test("a helper another agent started stays with that agent", async () => {
@@ -162,7 +137,7 @@ describe("a conversation finds agents it started somewhere else", () => {
     const found = await resolveConversationAgentThread(cloudOrchestrator(), threadId);
     expect(found?.kind).toBe("elsewhere");
     if (found?.kind !== "elsewhere") throw new Error("expected a helper thread");
-    expect(found.text).toContain("started by another agent of this conversation (thread thr-parent-agent)");
+    expect(found.text).toContain("Another agent of this conversation started it (thread thr-parent-agent)");
   });
 
   test("a desktop looks a thread up by its own conversation id and sees where it was started", async () => {

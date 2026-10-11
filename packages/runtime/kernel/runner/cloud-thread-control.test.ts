@@ -129,53 +129,6 @@ describe("desktop cloud thread controls", () => {
     });
   });
 
-  test("pause_agent falls through to an owned cloud cancellation", async () => {
-    const canceled: unknown[] = [];
-    const state = createStateContext(
-      "/tmp/stella-cloud-control-test",
-      agentApi({
-        cloudCancel: async (request) => {
-          canceled.push(request);
-          return {
-            canceled: true,
-            control: {
-              threadId: "thr-cloud",
-              ownerGeneration: OWNER_GENERATION,
-              attemptGeneration: 3,
-              threadUpdatedAt: 350,
-              status: "canceled",
-            },
-          };
-        },
-      }),
-    );
-
-    const result = await handleSpawnAgent(
-      state,
-      { action: "cancel", thread_id: "thr-cloud" },
-      { ...toolContext, ownerGeneration: OWNER_GENERATION },
-    );
-
-    expect(canceled).toEqual([
-      {
-        threadId: "thr-cloud",
-        conversationId: "local-conversation",
-        requestId: "request-1",
-        ownerGeneration: OWNER_GENERATION,
-      },
-    ]);
-    expect(result).toMatchObject({
-      result: {
-        thread_id: "thr-cloud",
-        canceled: true,
-        placement: "cloud",
-        attempt_generation: 3,
-        thread_updated_at: 350,
-        thread_status: "canceled",
-      },
-    });
-  });
-
   test("controller binds continuation delivery to the current device and conversation", async () => {
     const mutations: Array<{ ref: unknown; args: unknown }> = [];
     const actions: Array<{ ref: unknown; args: unknown }> = [];
@@ -248,22 +201,6 @@ describe("desktop cloud thread controls", () => {
         status: "running",
       },
     });
-    expect(
-      await controller.cancelThread({
-        threadId: "thr-cloud",
-        conversationId: "local-conversation",
-        requestId: "request-2",
-      }),
-    ).toEqual({
-      canceled: true,
-      control: {
-        threadId: "thr-cloud",
-        ownerGeneration: OWNER_GENERATION,
-        attemptGeneration: 4,
-        threadUpdatedAt: 450,
-        status: "canceled",
-      },
-    });
     expect(mutations).toEqual([
       {
         ref: "continue-ref",
@@ -277,20 +214,6 @@ describe("desktop cloud thread controls", () => {
           originDeviceId: "device-1",
           originConversationId: "local-conversation",
           controlRequestId: "request-1",
-        },
-      },
-    ]);
-    expect(actions).toEqual([
-      {
-        ref: "cancel-ref",
-        args: {
-          ownerGeneration: OWNER_GENERATION,
-          threadId: "thr-cloud",
-          expectedAttemptGeneration: 4,
-          expectedThreadUpdatedAt: 400,
-          originDeviceId: "device-1",
-          originConversationId: "local-conversation",
-          controlRequestId: "request-2",
         },
       },
     ]);
@@ -331,16 +254,6 @@ describe("desktop cloud thread controls", () => {
       }),
     ).toMatchObject({
       delivered: false,
-      reason: expect.stringContaining("No durable cloud control receipt"),
-    });
-    expect(
-      await controller.cancelThread({
-        threadId: "missing-thread",
-        conversationId: "local-conversation",
-        requestId: "missing-cancel",
-      }),
-    ).toMatchObject({
-      canceled: false,
       reason: expect.stringContaining("No durable cloud control receipt"),
     });
     expect({ mutations, actions }).toEqual({ mutations: 0, actions: 0 });
@@ -487,74 +400,6 @@ describe("desktop cloud thread controls", () => {
     }
   });
 
-  test("does not report an old pause as success when currentControl is a successor", async () => {
-    const { store } = createStore();
-    store.putCloudAgentThreadControl({
-      threadId: "thr-aba",
-      ownerGeneration: OWNER_GENERATION,
-      cloudConversationId: "cloud-conversation",
-      originConversationId: "local-conversation",
-      attemptGeneration: 4,
-      threadUpdatedAt: 400,
-      status: "running",
-    });
-    let actions = 0;
-    const controller = createCloudThreadController({
-      backendRefs: {
-        cloud_apps: {
-          continueMyCloudAgentFromDesktop: "continue-ref",
-          cancelMyCloudAgentThread: "cancel-ref",
-        },
-      },
-      deviceId: "device-1",
-      mutation: async () => ({}),
-      action: async () => {
-        actions += 1;
-        return {
-          canceled: true,
-          status: "canceled",
-          threadId: "thr-aba",
-          attemptGeneration: 4,
-          threadUpdatedAt: 450,
-          currentControl: {
-            threadId: "thr-aba",
-            attemptGeneration: 5,
-            threadUpdatedAt: 500,
-            status: "running",
-          },
-        };
-      },
-      getOwnerGeneration: async () => OWNER_GENERATION,
-      store,
-      isSignedIn: () => true,
-    });
-    const paused = await controller.cancelThread({
-      threadId: "thr-aba",
-      conversationId: "local-conversation",
-      requestId: "pause-aba-1",
-    });
-    expect(paused).toMatchObject({
-      canceled: false,
-      reason: expect.stringContaining("newer attempt"),
-      control: { attemptGeneration: 5, status: "running" },
-    });
-    expect(
-      store.getCloudAgentThreadControl("thr-aba", OWNER_GENERATION),
-    ).toMatchObject({
-      attemptGeneration: 5,
-      threadUpdatedAt: 500,
-      status: "running",
-    });
-    expect(
-      await controller.cancelThread({
-        threadId: "thr-aba",
-        conversationId: "local-conversation",
-        requestId: "pause-aba-1",
-      }),
-    ).toEqual(paused);
-    expect(actions).toBe(1);
-  });
-
   test("terminal control wins an equal-clock race and cannot be resurrected", () => {
     const { store } = createStore();
     const base = {
@@ -592,57 +437,6 @@ describe("desktop cloud thread controls", () => {
       attemptGeneration: 3,
       threadUpdatedAt: 150,
       status: "running",
-    });
-  });
-
-  test("does not claim a completed thread was canceled by a late pause", async () => {
-    const { store } = createStore();
-    store.putCloudAgentThreadControl({
-      threadId: "thr-terminal-race",
-      ownerGeneration: OWNER_GENERATION,
-      cloudConversationId: "cloud-conversation",
-      originConversationId: "local-conversation",
-      attemptGeneration: 6,
-      threadUpdatedAt: 600,
-      status: "completed",
-    });
-    const controller = createCloudThreadController({
-      backendRefs: {
-        cloud_apps: {
-          continueMyCloudAgentFromDesktop: "continue-ref",
-          cancelMyCloudAgentThread: "cancel-ref",
-        },
-      },
-      deviceId: "device-1",
-      mutation: async () => ({}),
-      action: async () => ({
-        canceled: true,
-        status: "completed",
-        threadId: "thr-terminal-race",
-        attemptGeneration: 6,
-        threadUpdatedAt: 600,
-        currentControl: {
-          threadId: "thr-terminal-race",
-          attemptGeneration: 6,
-          threadUpdatedAt: 600,
-          status: "completed",
-        },
-      }),
-      getOwnerGeneration: async () => OWNER_GENERATION,
-      store,
-      isSignedIn: () => true,
-    });
-
-    expect(
-      await controller.cancelThread({
-        threadId: "thr-terminal-race",
-        conversationId: "local-conversation",
-        requestId: "late-pause-1",
-      }),
-    ).toMatchObject({
-      canceled: false,
-      reason: expect.stringContaining("already completed"),
-      control: { status: "completed", attemptGeneration: 6 },
     });
   });
 

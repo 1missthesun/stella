@@ -13,6 +13,7 @@ import { guardedModelFetch } from "../guarded-model-fetch.js";
 import {
   AGENT_MESSAGE_FRAMED_MAX_CHARS,
   type AgentMessagingCaller,
+  pauseAgentThread,
   readAgentDirectory,
   sendAgentMessage,
 } from "../agent-messaging.js";
@@ -370,6 +371,11 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               ),
             message: async (authority, args) =>
               await sendAgentMessage(this.piOwnerCaller(authority), args),
+            pause: async (authority, args) =>
+              await pauseAgentThread(this.piOwnerCaller(authority), {
+                ...args,
+                conversationId: authority.conversationId,
+              }),
           },
           heartbeat: () => {
             void (async () => {

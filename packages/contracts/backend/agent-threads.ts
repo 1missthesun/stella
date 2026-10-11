@@ -37,6 +37,37 @@ export const agentThreadTerminalStatus = (
   status === "canceled" && reason?.trim() === AGENT_PAUSED_REASON ? "paused" : status;
 
 /**
+ * How a `pause_agent` landed, from any of the owner's hosts:
+ * - `paused`: it stopped, or is marked paused and stops the moment its
+ *   computer next connects (`note` says so).
+ * - `held`: it runs on a computer that is offline; the pause is kept and
+ *   applied as soon as that computer reconnects.
+ * - `not_running`: nothing was running.
+ */
+export type AgentPauseResult = {
+  threadId: string;
+  outcome: "paused" | "held" | "not_running";
+  status: string;
+  attemptGeneration: number;
+  /** Where it runs: "in Stella's cloud", "on omarchy". */
+  where: string;
+  note?: string;
+};
+
+/** What `pause_agent` tells the model about a pause the owner's agent threads made. */
+export const agentPauseText = (result: AgentPauseResult): string => {
+  const head =
+    result.outcome === "paused"
+      ? `Paused ${result.threadId}, which runs ${result.where}.`
+      : result.outcome === "held"
+        ? `The pause for ${result.threadId}, which runs ${result.where}, is recorded.`
+        : `${result.threadId}, which runs ${result.where}, was not running.`;
+  return [head, result.note, result.outcome === "not_running" ? "" : "Resume it later with send_message."]
+    .filter(Boolean)
+    .join(" ");
+};
+
+/**
  * Agent threads: every background agent the owner has, cloud or desktop,
  * indexed in the owner's object for Activity, the running pill, reports and
  * the originating desktop's delivery.
@@ -152,6 +183,20 @@ export type AgentThreadCalls = {
       from: AgentMessageSender;
     };
     result: AgentMessageDelivery;
+  };
+  /**
+   * `pause_agent` for any of the owner's agents, from any of the owner's
+   * hosts: it reaches the agent wherever it runs, and is held for a
+   * computer that is offline. Idempotent per `controlRequestId`.
+   */
+  "agentThreads.pause": {
+    args: {
+      ownerGeneration: string;
+      conversationId: string;
+      threadId: string;
+      controlRequestId: string;
+    };
+    result: AgentPauseResult;
   };
   /** Send a follow-up to a finished desktop-dispatched cloud thread. */
   "agentThreads.continueFromDesktop": {

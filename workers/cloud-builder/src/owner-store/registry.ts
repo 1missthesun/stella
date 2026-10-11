@@ -98,6 +98,13 @@ export type OwnerHost = {
   messageLocalAgent(input: LocalAgentMessage): Promise<{
     outcome: import("@stella/contracts/turn-plane/placement").AgentMessageDeviceOutcome | "unreachable" | "timeout";
   }>;
+  /**
+   * Pause an agent a device runs locally. `unreachable` means no live
+   * socket; `timeout` that no answer came, so it may still have landed.
+   */
+  pauseLocalAgent(input: LocalAgentPause): Promise<{
+    outcome: import("@stella/contracts/turn-plane/placement").AgentPauseDeviceOutcome | "unreachable" | "timeout";
+  }>;
   /** Stop a device attempt's dispatch. Idempotent per `cancelRequestId`. */
   cancelDeviceAgentTurn(input: {
     dispatchId: string;
@@ -162,6 +169,14 @@ export type LocalAgentMessage = {
   /** Stable across redeliveries; the device dedupes on it. */
   messageId: string;
   text: string;
+};
+
+export type LocalAgentPause = {
+  deviceId: string;
+  threadId: string;
+  ownerGeneration: string;
+  /** Stable across redeliveries; the device dedupes on it. */
+  commandId: string;
 };
 
 export type ScheduledTurnStart = {

@@ -5,6 +5,7 @@
 import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
 import type {
   AgentMessageDelivery,
+  AgentPauseResult,
   AgentThreadLookup,
 } from "@stella/contracts/backend/agent-threads";
 import type {
@@ -469,17 +470,17 @@ export type AgentToolApi = {
     /** The running attempt took the message instead of a new one starting. */
     steered?: boolean;
   }>;
-  /** Stop the current turn of an owned cloud thread. */
-  cloudCancel?: (request: {
+  /**
+   * Pause any agent of the owner that this computer does not run itself,
+   * through the owner's agent threads: wherever it runs, whichever device
+   * started it, and held for a computer that is offline. Throws with the
+   * reason when it could not be paused.
+   */
+  pauseAgentThread?: (request: {
     threadId: string;
     conversationId: string;
     requestId: string;
-    ownerGeneration?: string;
-  }) => Promise<{
-    canceled: boolean;
-    reason?: string;
-    control?: CloudAgentControlReceipt;
-  }>;
+  }) => Promise<AgentPauseResult>;
 };
 
 export type ToolHostOptions = {

@@ -19,31 +19,26 @@ export const agentThreadLookupLocation = (thread: AgentThreadLookup): string =>
       ? `locally on ${deviceName(thread.originDeviceLabel, thread.originDeviceId)}`
       : "in Stella's cloud";
 
-export const agentThreadLookupStartedByViewer = (
-  thread: AgentThreadLookup,
-  viewer: AgentThreadViewer,
-): boolean =>
-  viewer.host === "desktop"
-    ? thread.originDeviceId === viewer.deviceId
-    : !thread.originDeviceId && !thread.parentThreadId;
-
+/**
+ * Who hears from the thread, and that any host reaches it: control goes
+ * through the owner's agent threads, so where the conversation runs now
+ * never decides whether `send_message` or `pause_agent` can reach it.
+ */
 export const agentThreadLookupController = (
   thread: AgentThreadLookup,
   viewer: AgentThreadViewer,
 ): string => {
+  const reach = "send_message and pause_agent reach it from here.";
+  if (thread.parentThreadId) {
+    return `Another agent of this conversation started it (thread ${thread.parentThreadId}) and gets its report. ${reach}`;
+  }
   if (thread.originDeviceId) {
     const origin = deviceName(thread.originDeviceLabel, thread.originDeviceId);
-    if (viewer.host === "desktop" && viewer.deviceId === thread.originDeviceId) {
-      return "This computer started it.";
-    }
-    return `It was started from ${origin} while this conversation ran there, so only ${origin} can send it input or pause it, and its report returns there.`;
+    return viewer.host === "desktop" && viewer.deviceId === thread.originDeviceId
+      ? `This computer started it, and its report comes back to this conversation through this computer. ${reach}`
+      : `It was started from ${origin}, and its report comes back to this conversation through ${origin}. ${reach}`;
   }
-  if (thread.parentThreadId) {
-    return `It was started by another agent of this conversation (thread ${thread.parentThreadId}), which is the one that can send it input or pause it.`;
-  }
-  return viewer.host === "desktop"
-    ? "It was started by this conversation's orchestrator in Stella's cloud, so only the cloud can send it input or pause it. Its report still returns to this conversation."
-    : "It was started by this conversation.";
+  return `Its report comes back to this conversation. ${reach}`;
 };
 
 export const agentThreadLookupReport = (thread: AgentThreadLookup): string | undefined => {

@@ -188,8 +188,16 @@ const DEVICE_AVAILABILITY_CODES = new Set<string>([
 ]);
 const DEVICE_MESSAGE_JOB = "agentThreads.deviceMessage";
 const DEVICE_MESSAGE_RETRY_MS = 10_000;
-const DEVICE_MESSAGE_WAIT_MS = 60 * 60_000;
-const DEVICE_MESSAGE_TTL_MS = 24 * 60 * 60_000;
+/**
+ * How long a kept command waits for its computer: a message is stale after
+ * an hour, while a pause holds until the computer is back, so an agent on a
+ * laptop that slept over the weekend still stops when it wakes.
+ */
+const DEVICE_COMMAND_WAIT_MS: Record<DeviceCommandKind, number> = {
+  message: 60 * 60_000,
+  pause: 7 * 24 * 60 * 60_000,
+};
+const DEVICE_COMMAND_TTL_MS = 8 * 24 * 60 * 60_000;
 const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled", "paused"]);
 type TerminalStatus = "completed" | "failed" | "canceled" | "paused";
 /** What a paused attempt's journal card says. */
@@ -986,12 +994,7 @@ const stopDeviceAttempt = async (
   cancelRequestId: string,
 ): Promise<void> => {
   if (!ACTIVE_STATUSES.has(thread.status)) return;
-  const turn = ctx.db.one<TurnRow>(
-    `SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?
-       AND status IN ('running', 'resuming') ORDER BY created_at DESC LIMIT 1`,
-    thread.thread_id,
-    thread.attempt_generation,
-  );
+  const turn = runningTurn(ctx.db, thread);
   if (!turn) return;
   // Settle first: the gate reports the withdrawn dispatch as canceled, and
   // that report must find this attempt already closed rather than report
@@ -1318,9 +1321,30 @@ const DIRECTORY_SESSIONS_RECENT = 20;
 const LIVE_STATUSES_SQL = "('running', 'resuming', 'waiting_for_user')";
 const AGENT_MESSAGE_RECEIPT_TTL_MS = 24 * 60 * 60_000;
 
-/** The device a thread runs on: its executor, or the desktop a local thread lives on. */
-const threadDeviceId = (row: ThreadRow): string | null =>
-  row.executor_device_id ?? (row.placement === "computer" ? row.origin_device_id : null);
+/**
+ * Where a thread's attempts run, which is where every control for it goes:
+ * its BuildSession or pi agent in the cloud, the device a dispatch offered
+ * it to, or the desktop whose own Stella started it there. Messages and
+ * pauses both route by this, whoever sends them and wherever the
+ * conversation runs now.
+ */
+type ThreadExecutor =
+  | { kind: "cloud" }
+  | { kind: "dispatch"; deviceId: string }
+  | { kind: "local"; deviceId: string | null };
+
+const threadExecutor = (row: ThreadRow): ThreadExecutor =>
+  row.executor_device_id
+    ? { kind: "dispatch", deviceId: row.executor_device_id }
+    : row.placement === "computer"
+      ? { kind: "local", deviceId: row.origin_device_id }
+      : { kind: "cloud" };
+
+/** The device a thread runs on, or null for the cloud. */
+const threadDeviceId = (row: ThreadRow): string | null => {
+  const executor = threadExecutor(row);
+  return executor.kind === "cloud" ? null : executor.deviceId;
+};
 
 type DirectoryResult = AgentThreadCalls["agentThreads.directory"]["result"];
 
@@ -1485,11 +1509,12 @@ const deliverAgentMessage = async (
       { reason: "message_target_not_found" },
     );
   }
-  if (!thread.executor_device_id && thread.placement === "computer") {
-    return await messageLocalThread(ctx, thread, args);
+  const executor = threadExecutor(thread);
+  if (executor.kind === "local") {
+    return await messageLocalThread(ctx, thread, executor.deviceId, args);
   }
   if (ACTIVE_STATUSES.has(thread.status)) {
-    if (thread.executor_device_id) {
+    if (executor.kind === "dispatch") {
       await steerDeviceThread(ctx, thread, args.messageId, args.framed);
       return { delivered: "steered", threadId: to };
     }
@@ -1515,8 +1540,8 @@ const deliverAgentMessage = async (
         reason: "thread_starting",
       });
     }
-  } else if (thread.executor_device_id) {
-    await assertDeviceDestination(ctx, thread.executor_device_id);
+  } else if (executor.kind === "dispatch") {
+    await assertDeviceDestination(ctx, executor.deviceId);
   }
   const current = readThread(ctx.db, to);
   if (!current || current.attempt_generation !== thread.attempt_generation) {
@@ -1543,12 +1568,21 @@ const deliverAgentMessage = async (
 
 // ── Messages for agents a desktop runs locally ────────────────────────────
 
+/**
+ * What the owner keeps for a computer that is offline or slow to answer:
+ * a `send_message` or a `pause_agent` for an agent it runs locally, one
+ * outbox for both, offered again until the computer answers.
+ */
+type DeviceCommandKind = "message" | "pause";
+
 type DeviceMessageRow = {
   message_id: string;
   device_id: string;
   thread_id: string;
   owner_generation: string;
+  /** The framed message; empty for a pause. */
   text: string;
+  kind: DeviceCommandKind;
   created_at: number;
   attempts: number;
 };
@@ -1557,6 +1591,49 @@ const deviceMessageJobId = (messageId: string): string => `devmsg:${messageId}`;
 
 const deviceName = async (ctx: OwnerContext, deviceId: string): Promise<string> =>
   (await deviceLabels(ctx)).get(deviceId) || "that computer";
+
+/** Keep a command for a computer and offer it again until it answers. */
+const keepDeviceCommand = (
+  ctx: OwnerContext,
+  command: {
+    commandId: string;
+    deviceId: string;
+    threadId: string;
+    ownerGeneration: string;
+    kind: DeviceCommandKind;
+    text: string;
+  },
+): void => {
+  ctx.db.run("DELETE FROM agent_device_messages WHERE created_at < ?", ctx.now - DEVICE_COMMAND_TTL_MS);
+  ctx.db.run(
+    `INSERT INTO agent_device_messages
+       (message_id, device_id, thread_id, owner_generation, text, kind, created_at, attempts)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1) ON CONFLICT (message_id) DO NOTHING`,
+    command.commandId,
+    command.deviceId,
+    command.threadId,
+    command.ownerGeneration,
+    command.text,
+    command.kind,
+    ctx.now,
+  );
+  ctx.jobs.schedule(
+    DEVICE_MESSAGE_JOB,
+    ctx.now + DEVICE_MESSAGE_RETRY_MS,
+    { messageId: command.commandId },
+    { id: deviceMessageJobId(command.commandId) },
+  );
+};
+
+/** A newer message for a thread outranks a pause still waiting for its computer. */
+const supersedeKeptPauses = (ctx: OwnerContext, threadId: string): void => {
+  ctx.db.run(
+    `UPDATE agent_device_messages SET outcome = 'superseded', delivered_at = ?
+      WHERE thread_id = ? AND kind = 'pause' AND delivered_at IS NULL`,
+    ctx.now,
+    threadId,
+  );
+};
 
 /**
  * `send_message` to an agent a desktop's own Stella started and runs there.
@@ -1567,15 +1644,17 @@ const deviceName = async (ctx: OwnerContext, deviceId: string): Promise<string> 
 const messageLocalThread = async (
   ctx: OwnerContext,
   thread: ThreadRow,
+  homeDeviceId: string | null,
   args: { ownerGeneration: string; messageId: string; framed: string },
 ): Promise<MessageDelivery> => {
   const threadId = thread.thread_id;
-  if (!thread.origin_device_id) {
+  if (!homeDeviceId) {
     throw new RpcError("CONFLICT", `${threadId} has no computer to deliver the message to.`, {
       reason: "thread_local_to_device",
     });
   }
-  const deviceId = resolveCurrentDeviceId(ctx.db, thread.origin_device_id);
+  supersedeKeptPauses(ctx, threadId);
+  const deviceId = resolveCurrentDeviceId(ctx.db, homeDeviceId);
   const sent = await ctx.host.messageLocalAgent({
     deviceId,
     threadId,
@@ -1606,24 +1685,14 @@ const messageLocalThread = async (
         { reason: "message_refused" },
       );
   }
-  ctx.db.run("DELETE FROM agent_device_messages WHERE created_at < ?", ctx.now - DEVICE_MESSAGE_TTL_MS);
-  ctx.db.run(
-    `INSERT INTO agent_device_messages
-       (message_id, device_id, thread_id, owner_generation, text, created_at, attempts)
-     VALUES (?, ?, ?, ?, ?, ?, 1) ON CONFLICT (message_id) DO NOTHING`,
-    args.messageId,
+  keepDeviceCommand(ctx, {
+    commandId: args.messageId,
     deviceId,
     threadId,
-    args.ownerGeneration,
-    args.framed,
-    ctx.now,
-  );
-  ctx.jobs.schedule(
-    DEVICE_MESSAGE_JOB,
-    ctx.now + DEVICE_MESSAGE_RETRY_MS,
-    { messageId: args.messageId },
-    { id: deviceMessageJobId(args.messageId) },
-  );
+    ownerGeneration: args.ownerGeneration,
+    kind: "message",
+    text: args.framed,
+  });
   const name = await deviceName(ctx, deviceId);
   return {
     delivered: "queued",
@@ -1657,7 +1726,7 @@ const dropDeviceMessage = (ctx: OwnerContext, row: DeviceMessageRow, outcome: st
   );
 };
 
-/** One more offer of a kept message, rescheduled until the device answers. */
+/** One more offer of a kept command, rescheduled until the device answers. */
 const runDeviceMessage = async (ctx: OwnerContext, payload: { messageId?: unknown }): Promise<void> => {
   if (typeof payload?.messageId !== "string") return;
   const row = ctx.db.one<DeviceMessageRow>(
@@ -1665,13 +1734,17 @@ const runDeviceMessage = async (ctx: OwnerContext, payload: { messageId?: unknow
     payload.messageId,
   );
   if (!row) return;
-  if (ctx.now - row.created_at >= DEVICE_MESSAGE_WAIT_MS) {
+  if (ctx.now - row.created_at >= DEVICE_COMMAND_WAIT_MS[row.kind]) {
     dropDeviceMessage(ctx, row, "expired");
     return;
   }
   const thread = readThread(ctx.db, row.thread_id);
   if (!thread || (thread.owner_generation !== null && thread.owner_generation !== row.owner_generation)) {
     dropDeviceMessage(ctx, row, "not_found");
+    return;
+  }
+  if (row.kind === "pause") {
+    await runDevicePause(ctx, row, thread);
     return;
   }
   const sent = await ctx.host.messageLocalAgent({
@@ -1701,6 +1774,39 @@ const runDeviceMessage = async (ctx: OwnerContext, payload: { messageId?: unknow
   settleDeviceMessage(ctx, row, sent.outcome);
 };
 
+/** One more offer of a kept pause; the agent is marked paused when the device stops it. */
+const runDevicePause = async (ctx: OwnerContext, row: DeviceMessageRow, thread: ThreadRow): Promise<void> => {
+  if (!ACTIVE_STATUSES.has(thread.status)) {
+    settleDeviceMessage(ctx, row, "not_running");
+    return;
+  }
+  const sent = await ctx.host.pauseLocalAgent({
+    deviceId: resolveCurrentDeviceId(ctx.db, row.device_id),
+    threadId: row.thread_id,
+    ownerGeneration: row.owner_generation,
+    commandId: row.message_id,
+  });
+  ctx.db.run(
+    "UPDATE agent_device_messages SET attempts = attempts + 1 WHERE message_id = ?",
+    row.message_id,
+  );
+  if (sent.outcome === "unreachable" || sent.outcome === "timeout") {
+    ctx.jobs.schedule(
+      DEVICE_MESSAGE_JOB,
+      ctx.now + DEVICE_MESSAGE_RETRY_MS,
+      { messageId: row.message_id },
+      { id: deviceMessageJobId(row.message_id) },
+    );
+    return;
+  }
+  if (sent.outcome === "refused") {
+    dropDeviceMessage(ctx, { ...row, attempts: row.attempts + 1 }, sent.outcome);
+    return;
+  }
+  if (sent.outcome === "paused") await markLocalThreadPaused(ctx, thread);
+  settleDeviceMessage(ctx, row, sent.outcome);
+};
+
 /** A device just proved its presence: offer it everything kept for it now. */
 const flushDeviceMessages = (ctx: OwnerContext, raw: unknown): { scheduled: number } => {
   const { deviceId } = object({ deviceId: id(256) })(raw);
@@ -1718,6 +1824,201 @@ const flushDeviceMessages = (ctx: OwnerContext, raw: unknown): { scheduled: numb
     scheduled += 1;
   }
   return { scheduled };
+};
+
+// ── Pause, from any of the owner's hosts ──────────────────────────────────
+
+type PauseArgs = AgentThreadCalls["agentThreads.pause"]["args"];
+type PauseResult = AgentThreadCalls["agentThreads.pause"]["result"];
+
+/** The running turn of a thread's current attempt. */
+const runningTurn = (db: OwnerDbReader, thread: ThreadRow): TurnRow | null =>
+  db.one<TurnRow>(
+    `SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?
+       AND status IN ('running', 'resuming') ORDER BY created_at DESC LIMIT 1`,
+    thread.thread_id,
+    thread.attempt_generation,
+  );
+
+/**
+ * Stop the attempt a cloud thread is on, wherever its runtime is (its pi
+ * agent or its BuildSession), and record it paused.
+ */
+const pauseCloudAttempt = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  ownerGeneration: string,
+  cancelRequestId: string,
+): Promise<void> => {
+  const turn = runningTurn(ctx.db, thread);
+  if (!turn) throw threadChanged(thread.thread_id);
+  const outcome = await ctx.host.cancelAgentTurn({
+    threadId: thread.thread_id,
+    conversationId: thread.conversation_id,
+    turnId: turn.turn_id,
+    attemptGeneration: thread.attempt_generation,
+    ownerGeneration,
+    cancelRequestId,
+  });
+  if (outcome === "changed") throw threadChanged(thread.thread_id);
+  const now = Date.now();
+  ctx.db.run(
+    "UPDATE agent_turns SET status = 'canceled', updated_at = ? WHERE turn_id = ?",
+    now,
+    turn.turn_id,
+  );
+  ctx.db.run(
+    `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
+      WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+    now,
+    thread.thread_id,
+    thread.attempt_generation,
+  );
+  ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
+};
+
+/** A local thread its computer stopped for a pause: recorded, with its journal card. */
+const markLocalThreadPaused = async (ctx: OwnerContext, thread: ThreadRow): Promise<void> => {
+  ctx.db.run(
+    `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
+      WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+    ctx.now,
+    thread.thread_id,
+    thread.attempt_generation,
+  );
+  const paused = readThread(ctx.db, thread.thread_id);
+  if (paused?.status === "paused" && paused.attempt_generation === thread.attempt_generation) {
+    await postAgentLifecycleCard(ctx, paused, { kind: "paused" });
+  }
+};
+
+/** A device's name and whether it is connected now; unknown reads as offline. */
+const deviceStanding = async (
+  ctx: OwnerContext,
+  deviceId: string,
+): Promise<{ name: string; online: boolean }> => {
+  try {
+    const device = (await ctx.host.deviceDestinations()).find((candidate) => candidate.deviceId === deviceId);
+    return { name: device?.label || "that computer", online: device?.online === true };
+  } catch {
+    return { name: "that computer", online: false };
+  }
+};
+
+/**
+ * `pause_agent` for any agent the owner has, from any host: authorized by
+ * the owner, not by which device started the agent, and routed to where
+ * the agent runs. A computer that is offline gets the pause when it
+ * reconnects; the result says which happened.
+ */
+const pauseAgent = async (ctx: OwnerContext, args: PauseArgs): Promise<PauseResult> => {
+  if (!CONTROL_REQUEST_ID_PATTERN.test(args.controlRequestId)) {
+    throw new RpcError("BAD_REQUEST", "That pause request could not be sent. Try again.");
+  }
+  const receiptId = `pause:${args.controlRequestId}`;
+  const receipt = ctx.db.one<{ thread_id: string; result_json: string }>(
+    "SELECT thread_id, result_json FROM agent_cancel_receipts WHERE cancel_request_id = ?",
+    receiptId,
+  );
+  const requested = args.threadId.trim();
+  if (receipt) return JSON.parse(receipt.result_json) as PauseResult;
+  await assertGeneration(ctx, args.ownerGeneration);
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "agentThreads.pause",
+    { count: 60, windowMs: 10 * 60_000 },
+    "Too many pause requests. Wait a moment and try again.",
+  );
+  const thread = readConversationThread(ctx.db, args.conversationId, requested);
+  if (!thread || (thread.owner_generation !== null && thread.owner_generation !== args.ownerGeneration)) {
+    throw new RpcError(
+      "NOT_FOUND",
+      `No agent has the thread_id ${requested}. agent_status without a thread_id lists who you can reach.`,
+      { reason: "pause_target_not_found" },
+    );
+  }
+  const executor = threadExecutor(thread);
+  const device =
+    executor.kind === "cloud" || !executor.deviceId
+      ? null
+      : await deviceStanding(ctx, resolveCurrentDeviceId(ctx.db, executor.deviceId));
+  const where = device ? `on ${device.name}` : "in Stella's cloud";
+  let outcome: PauseResult["outcome"] = "paused";
+  let note: string | undefined;
+  if (!ACTIVE_STATUSES.has(thread.status)) {
+    outcome = "not_running";
+    note = thread.status === "paused" ? "It was already paused." : `It had already ${thread.status === "canceled" ? "stopped" : thread.status}; nothing was running.`;
+  } else if (executor.kind === "cloud") {
+    await pauseCloudAttempt(ctx, thread, args.ownerGeneration, args.controlRequestId);
+  } else if (executor.kind === "dispatch") {
+    await stopDeviceAttempt(ctx, thread, args.controlRequestId);
+    if (device && !device.online) {
+      note = `${device.name} is offline right now. The agent is recorded as paused, and it stops there the moment ${device.name} reconnects.`;
+    }
+  } else {
+    if (!executor.deviceId || !device) {
+      throw new RpcError("CONFLICT", `${thread.thread_id} has no computer to pause it on.`, {
+        reason: "thread_local_to_device",
+      });
+    }
+    const deviceId = resolveCurrentDeviceId(ctx.db, executor.deviceId);
+    const commandId = receiptId;
+    const sent = await ctx.host.pauseLocalAgent({
+      deviceId,
+      threadId: thread.thread_id,
+      ownerGeneration: args.ownerGeneration,
+      commandId,
+    });
+    switch (sent.outcome) {
+      case "paused":
+        await markLocalThreadPaused(ctx, thread);
+        break;
+      case "not_running":
+      case "not_found":
+        outcome = "not_running";
+        note = `${device.name} reports it is not running there now.`;
+        break;
+      case "refused":
+        throw new RpcError("CONFLICT", `${device.name} did not accept the pause for ${thread.thread_id}.`, {
+          reason: "pause_refused",
+        });
+      case "unreachable":
+      case "timeout":
+        keepDeviceCommand(ctx, {
+          commandId,
+          deviceId,
+          threadId: thread.thread_id,
+          ownerGeneration: args.ownerGeneration,
+          kind: "pause",
+          text: "",
+        });
+        outcome = "held";
+        note =
+          sent.outcome === "unreachable"
+            ? `${device.name} is offline right now, so it could not stop yet. The pause is held and applied the moment ${device.name} reconnects, unless you message the agent first.`
+            : `${device.name} did not answer in time. The pause is offered again until ${device.name} answers.`;
+        break;
+    }
+  }
+  const current = readThread(ctx.db, thread.thread_id)!;
+  const result: PauseResult = {
+    threadId: thread.thread_id,
+    outcome,
+    status: current.status,
+    attemptGeneration: current.attempt_generation,
+    where,
+    ...(note ? { note } : {}),
+  };
+  ctx.db.run(
+    `INSERT INTO agent_cancel_receipts (cancel_request_id, thread_id, result_json, created_at)
+     VALUES (?, ?, ?, ?) ON CONFLICT (cancel_request_id) DO NOTHING`,
+    receiptId,
+    thread.thread_id,
+    JSON.stringify(result),
+    ctx.now,
+  );
+  return result;
 };
 
 type CancelArgs = AgentThreadCalls["agentThreads.cancel"]["args"];
@@ -1763,13 +2064,7 @@ const cancelThread = async (ctx: OwnerContext, args: CancelArgs): Promise<Cancel
   ) {
     throw threadChanged(thread.thread_id);
   }
-  const turn = ctx.db.one<TurnRow>(
-    `SELECT * FROM agent_turns WHERE thread_id = ? AND attempt_generation = ?
-       AND status IN ('running', 'resuming') ORDER BY created_at DESC LIMIT 1`,
-    thread.thread_id,
-    thread.attempt_generation,
-  );
-  if (!turn) throw threadChanged(thread.thread_id);
+  if (!runningTurn(ctx.db, thread)) throw threadChanged(thread.thread_id);
   if (thread.executor_device_id) {
     await stopDeviceAttempt(ctx, thread, args.controlRequestId);
     const stopped: CancelResult = { canceled: true, control: control(readThread(ctx.db, thread.thread_id)!) };
@@ -1782,36 +2077,14 @@ const cancelThread = async (ctx: OwnerContext, args: CancelArgs): Promise<Cancel
     );
     return stopped;
   }
-  const outcome = await ctx.host.cancelAgentTurn({
-    threadId: thread.thread_id,
-    conversationId: thread.conversation_id,
-    turnId: turn.turn_id,
-    attemptGeneration: thread.attempt_generation,
-    ownerGeneration: args.ownerGeneration,
-    cancelRequestId: args.controlRequestId,
-  });
-  if (outcome === "changed") throw threadChanged(thread.thread_id);
-  const now = Date.now();
-  ctx.db.run(
-    "UPDATE agent_turns SET status = 'canceled', updated_at = ? WHERE turn_id = ?",
-    now,
-    turn.turn_id,
-  );
-  ctx.db.run(
-    `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
-      WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
-    now,
-    thread.thread_id,
-    thread.attempt_generation,
-  );
-  ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
+  await pauseCloudAttempt(ctx, thread, args.ownerGeneration, args.controlRequestId);
   const result: CancelResult = { canceled: true, control: control(readThread(ctx.db, thread.thread_id)!) };
   ctx.db.run(
     "INSERT INTO agent_cancel_receipts (cancel_request_id, thread_id, result_json, created_at) VALUES (?, ?, ?, ?)",
     args.controlRequestId,
     thread.thread_id,
     JSON.stringify(result),
-    now,
+    ctx.now,
   );
   return result;
 };
@@ -2293,6 +2566,12 @@ const messageParser = object({
   text: string({ max: AGENT_MESSAGE_MAX_CHARS * 2 }),
   from: object({ threadId: id(256), label: string({ max: 2_000 }) }),
 });
+const pauseParser = object({
+  ownerGeneration: generation,
+  conversationId: id(256),
+  threadId: id(256),
+  controlRequestId: id(),
+});
 
 export const agentThreadsDomain = {
   name: "agent-threads",
@@ -2350,6 +2629,14 @@ export const agentThreadsDomain = {
         "CREATE INDEX agent_device_messages_created ON agent_device_messages (created_at)",
       ],
     },
+    {
+      // The same outbox carries a `pause_agent` for an offline computer.
+      id: "agent-threads.8-device-commands",
+      statements: [
+        "ALTER TABLE agent_device_messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'message'",
+        "CREATE INDEX agent_device_messages_thread ON agent_device_messages (thread_id, kind) WHERE delivered_at IS NULL",
+      ],
+    },
   ],
   calls: {
     "agentThreads.page": {
@@ -2376,6 +2663,12 @@ export const agentThreadsDomain = {
       requireAccount: true,
       parse: messageParser,
       handler: messageAgent,
+    },
+    "agentThreads.pause": {
+      scope: "owner",
+      requireAccount: true,
+      parse: pauseParser,
+      handler: pauseAgent,
     },
     "agentThreads.spawnFromDesktop": {
       scope: "owner",
@@ -2556,6 +2849,7 @@ export const agentThreadsDomain = {
     "agentThreads.directory": async (ctx, raw) =>
       await agentDirectory(ctx, object({ ownerGeneration: generation, conversationId: id(256) })(raw)),
     "agentThreads.message": async (ctx, raw) => await messageAgent(ctx, messageParser(raw)),
+    "agentThreads.pause": async (ctx, raw) => await pauseAgent(ctx, pauseParser(raw)),
     "agentThreads.flushDeviceMessages": flushDeviceMessages,
     /**
      * Where each of a conversation's agents stands in these records, for the

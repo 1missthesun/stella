@@ -29,10 +29,9 @@ import {
   agentThreadLookupController,
   agentThreadLookupLocation,
   agentThreadLookupReport,
-  agentThreadLookupStartedByViewer,
-  describeAgentThreadLookup,
   isAgentThreadLookupActive,
 } from "@stella/contracts/backend/agent-thread-lookup";
+import { agentPauseText } from "@stella/contracts/backend/agent-threads";
 import type {
   AgentModelConfigSnapshot,
   CloudExecutionSelection,
@@ -261,18 +260,6 @@ const lookupConversationThread = async (
     .catch(() => null);
 };
 
-const unreachablePauseError = async (
-  ctx: StateContext,
-  threadId: string,
-  conversationId: string | undefined,
-): Promise<string | null> => {
-  const found = await lookupConversationThread(ctx, threadId, conversationId);
-  if (!found) return null;
-  const viewer = { host: "desktop" as const, deviceId: found.thisDeviceId };
-  if (agentThreadLookupStartedByViewer(found.thread, viewer)) return null;
-  return `${describeAgentThreadLookup(found.thread, viewer)} pause_agent from this computer cannot reach it, so nothing was paused.`;
-};
-
 const DELIVERY_NOTE =
   "Delivered. Delivery is not completion: the receiver works on it in its own time, and an agent's finished work still arrives in [Agent completed].";
 
@@ -494,7 +481,6 @@ const conversationThreadStatus = (
       ...(report !== undefined ? { result: report } : {}),
       ...(!active && thread.errorMessage ? { error: thread.errorMessage } : {}),
       current_time: new Date().toISOString(),
-      controllable_here: agentThreadLookupStartedByViewer(thread, viewer),
       note: `Read-only snapshot from Stella's cloud; the agent was NOT interrupted or messaged. It runs ${agentThreadLookupLocation(thread)}, not in this computer's runtime. ${agentThreadLookupController(thread, viewer)}`,
     },
   };
@@ -715,63 +701,44 @@ export const handleSpawnAgent = async (
         explicitThreadId,
         AGENT_PAUSE_CANCEL_REASON,
       );
-      if (!canceled.canceled) {
-        if (
-          context.agentType === AGENT_IDS.ORCHESTRATOR &&
-          ctx.agentApi.cloudCancel
-        ) {
-          const cloudCanceled = await ctx.agentApi.cloudCancel({
+      if (canceled.canceled) {
+        return {
+          result: {
+            thread_id: explicitThreadId,
+            status: "canceled",
+            canceled: true,
+          },
+        };
+      }
+      // Not one this computer runs: the owner's agent threads pause it
+      // wherever it runs, whichever device started it.
+      if (
+        ctx.agentApi.pauseAgentThread &&
+        !context.conversationId.startsWith("local_")
+      ) {
+        try {
+          const paused = await ctx.agentApi.pauseAgentThread({
             threadId: explicitThreadId,
             conversationId: context.conversationId,
             requestId: context.requestId,
-            ...(context.ownerGeneration
-              ? { ownerGeneration: context.ownerGeneration }
-              : {}),
           });
-          if (cloudCanceled.canceled) {
-            return {
-              result: {
-                thread_id: explicitThreadId,
-                status: "canceled",
-                canceled: true,
-                placement: "cloud",
-                ...(cloudCanceled.control
-                  ? {
-                      attempt_generation:
-                        cloudCanceled.control.attemptGeneration,
-                      thread_updated_at: cloudCanceled.control.threadUpdatedAt,
-                      thread_status: cloudCanceled.control.status,
-                    }
-                  : {}),
-              },
-            };
-          }
           return {
-            error:
-              (await unreachablePauseError(
-                ctx,
-                explicitThreadId,
-                context.conversationId,
-              )) ??
-              cloudCanceled.reason ??
-              `Thread not found: ${explicitThreadId}`,
+            result: {
+              thread_id: paused.threadId,
+              status: paused.outcome,
+              thread_status: paused.status,
+              where: paused.where,
+              note: agentPauseText(paused),
+            },
           };
+        } catch (error) {
+          return { error: (error as Error).message };
         }
-        return {
-          error:
-            (await unreachablePauseError(
-              ctx,
-              explicitThreadId,
-              context.conversationId,
-            )) ?? `Thread not found: ${explicitThreadId}`,
-        };
       }
       return {
-        result: {
-          thread_id: explicitThreadId,
-          status: "canceled",
-          canceled: true,
-        },
+        error: context.conversationId.startsWith("local_")
+          ? `No agent on this computer has thread_id ${explicitThreadId}. This chat is stored only on this computer, so it can pause only agents here.`
+          : `Thread not found: ${explicitThreadId}`,
       };
     }
     const localRecord = ctx.tasks.get(explicitThreadId);

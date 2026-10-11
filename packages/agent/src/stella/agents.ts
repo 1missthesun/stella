@@ -46,7 +46,7 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import type { AgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
+import { agentPauseText, type AgentMessageDelivery, type AgentPauseResult } from "@stella/contracts/backend/agent-threads";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
@@ -299,6 +299,11 @@ export type AgentDirectoryHost = {
     args: { key: string; to: string; text: string; from: AgentMessageSender; remoteStella?: true },
     context: Context,
   ): Promise<AgentMessageDelivery | undefined>;
+  /**
+   * Pause an agent this harness does not hold or reach itself, wherever it
+   * runs and whichever host started it, once per `key`.
+   */
+  pause?(args: { key: string; threadId: string }, context: Context): Promise<AgentPauseResult>;
 };
 
 const slug = (text: string): string =>
@@ -1229,16 +1234,21 @@ export function stellaAgents(host: StellaAgentsHost) {
       const threadId = args.thread_id.trim();
       const state = await api.snapshot(StellaAgentsDoc, api.conversationId, context);
       const agent = state?.agents[threadId];
-      if (!agent) throw new Error(`No agent ${threadId} here.`);
-      if (agent.remote) {
-        const pause = remoteHostOf(agent)?.pause;
-        if (!pause) throw new Error(`${threadId} cannot be paused from here.`);
+      if (agent && !agent.remote) {
+        const handle = await api.conversation(agent.conversationId as ConversationId, context);
+        await handle?.abort(context);
+        return { content: [{ type: "text", text: `Paused ${threadId}.` }] };
+      }
+      const pause = agent ? remoteHostOf(agent)?.pause : undefined;
+      if (pause) {
         await pause(threadId, context);
         return { content: [{ type: "text", text: `Paused ${threadId}.` }] };
       }
-      const handle = await api.conversation(agent.conversationId as ConversationId, context);
-      await handle?.abort(context);
-      return { content: [{ type: "text", text: `Paused ${threadId}.` }] };
+      // Started by another host, or out of this one's reach: the owner's
+      // agent threads pause it where it runs.
+      const paused = await host.directory?.pause?.({ key: String(api.taskId), threadId }, context);
+      if (paused) return { content: [{ type: "text", text: agentPauseText(paused) }] };
+      throw new Error(`No agent ${threadId} here. agent_status without a thread_id lists who you can reach.`);
     },
   });
 

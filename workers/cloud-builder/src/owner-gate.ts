@@ -90,6 +90,7 @@ import { BillingConfigError } from "./billing/plans.js";
 import { capabilitySigningKey } from "./capability-signer.js";
 import {
   type AgentMessageDeviceOutcome,
+  type AgentPauseDeviceOutcome,
   CLOUD_CAPABILITIES,
   DEVICE_PRESENCE_CLOSE,
   DEVICE_PRESENCE_MAX_FRAME_BYTES,
@@ -232,6 +233,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       cancelDispatch: (input) => this.cancelDispatch(input),
       steerDispatch: (input) => this.steerDispatch(input),
       messageLocalAgent: (input) => this.messageLocalAgent(input),
+      pauseLocalAgent: (input) => this.pauseLocalAgent(input),
       devices: () => this.devices(),
       homeChanged: (ownerGeneration, revision) =>
         this.homeContextCache().changed(ownerGeneration, revision),
@@ -1938,6 +1940,44 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       threadId: input.threadId,
       ownerGeneration: input.ownerGeneration,
       text: input.text,
+    });
+    return { outcome: await acknowledged };
+  }
+
+  /**
+   * Pause an agent a device runs locally, and wait for the device to say how
+   * it landed. `unreachable` means no live socket; `timeout` that no answer
+   * came in time, so it may still have landed.
+   */
+  async pauseLocalAgent(input: {
+    deviceId: string;
+    threadId: string;
+    ownerGeneration: string;
+    commandId: string;
+  }): Promise<{
+    outcome: AgentPauseDeviceOutcome | "unreachable" | "timeout";
+  }> {
+    const socket = this.liveSocket(input.deviceId);
+    if (!socket) return { outcome: "unreachable" };
+    const key = `${input.deviceId}:${input.commandId}`;
+    const acknowledged = withTimeout(
+      new Promise<AgentPauseDeviceOutcome>((resolve) => {
+        this.localAgentPauseAcks.set(key, (outcome) => {
+          this.localAgentPauseAcks.delete(key);
+          resolve(outcome);
+        });
+      }),
+      LOCAL_AGENT_MESSAGE_ACK_TIMEOUT_MS,
+      "agent pause acknowledgement timed out",
+    ).catch(() => {
+      this.localAgentPauseAcks.delete(key);
+      return "timeout" as const;
+    });
+    this.send(socket, {
+      type: "agent-pause",
+      commandId: input.commandId,
+      threadId: input.threadId,
+      ownerGeneration: input.ownerGeneration,
     });
     return { outcome: await acknowledged };
   }

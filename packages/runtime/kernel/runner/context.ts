@@ -576,8 +576,6 @@ export const createRunnerContext = ({
       await backend
         .require()
         .call("agentThreads.continueFromDesktop", args as never),
-    cancel: async (args: Record<string, unknown>) =>
-      await backend.require().call("agentThreads.cancel", args as never),
   };
   const isCloudSignedIn = () =>
     Boolean(
@@ -860,7 +858,28 @@ export const createRunnerContext = ({
       // this machine, so the spawn leaves the device entirely.
       cloudDispatch,
       cloudContinue: cloudThreadController.continueThread,
-      cloudCancel: cloudThreadController.cancelThread,
+      pauseAgentThread: async ({ threadId, conversationId, requestId }) => {
+        if (!backend.client() || !isCloudSignedIn()) {
+          throw new Error(
+            "Sign in to Stella to pause agents running in the cloud or on your other devices.",
+          );
+        }
+        const ownerGeneration = await getCloudOwnerGeneration();
+        const sanitized = `pause:${requestId}`.replace(/[^A-Za-z0-9._:-]/g, "_");
+        return await raceWithTimeoutError(
+          backend.require().call("agentThreads.pause", {
+            ownerGeneration,
+            conversationId,
+            threadId,
+            controlRequestId: sanitized.slice(0, 128),
+          }),
+          AGENT_MESSAGE_TIMEOUT_MS,
+          () =>
+            new Error(
+              "Stella's cloud did not answer, so the pause may not have reached the agent. Check agent_status, then try again.",
+            ),
+        );
+      },
       lookupConversationAgentThread: async (threadId, conversationId) => {
         const client = backend.client();
         if (

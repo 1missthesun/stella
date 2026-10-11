@@ -131,13 +131,13 @@ export type OwnerHost = {
     ownerGeneration: string;
     cancelRequestId: string;
   }): Promise<"canceled" | "changed">;
-  /** Append a card to a conversation's journal. Best effort. */
+  /** Append a card to a conversation's journal. Best effort: false when it was not taken. */
   postConversationCard(input: {
     conversationId: string;
     ownerGeneration: string;
     sourceTurnId: string;
     card: unknown;
-  }): Promise<void>;
+  }): Promise<boolean>;
   /**
    * The owner's cloud home content moved to `revision` under
    * `ownerGeneration`, so cached home context must be rebuilt.

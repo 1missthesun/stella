@@ -18,7 +18,7 @@ import { empty } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerCaller, OwnerContext, OwnerDb, OwnerDomain, OwnerPurgeMode } from "../registry.js";
-import { SCHEDULE_FIRE_JOB } from "./schedules.js";
+import { REMINDER_RETURN_JOB, SCHEDULE_FIRE_JOB } from "./schedules.js";
 
 export const ACCOUNT_PURGE_JOB = "account.purge";
 const ACCOUNT_PURGE_JOB_ID = "account.purge";
@@ -137,7 +137,11 @@ export const beginOwnerPurge = (ctx: OwnerContext, mode: OwnerPurgeMode): void =
 
 /** Pending scheduled fires must not start turns for data that is going away. */
 const cancelScheduleFires = (ctx: OwnerContext): void => {
-  const fires = ctx.db.all<{ id: string }>("SELECT id FROM owner_jobs WHERE kind = ?", SCHEDULE_FIRE_JOB);
+  const fires = ctx.db.all<{ id: string }>(
+    "SELECT id FROM owner_jobs WHERE kind IN (?, ?)",
+    SCHEDULE_FIRE_JOB,
+    REMINDER_RETURN_JOB,
+  );
   for (const fire of fires) ctx.jobs.cancel(fire.id);
 };
 

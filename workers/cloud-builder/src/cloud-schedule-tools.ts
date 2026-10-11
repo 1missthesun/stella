@@ -4,11 +4,10 @@
  * surface (see `defs/schedule-manage-def.ts`) over the owner's schedules in
  * the owner's object (`schedules.tool`).
  *
- * The cloud store holds one kind of entry: a prompt that fires as a fresh
- * orchestrator turn. The device's three trigger kinds map onto it:
- *  - task     — the prompt, verbatim
- *  - reminder — a prompt instructing the future turn to deliver the fixed
- *               message; a chat line is the only delivery channel here
+ * The cloud store keeps the device's trigger kinds:
+ *  - task     — the prompt, run at fire time
+ *  - reminder — the message itself, delivered with no model: a push to the
+ *               phone and Stella's line in the conversation
  *  - watch    — a device sensor script; not runnable in the cloud
  */
 
@@ -38,20 +37,9 @@ export type CloudScheduleToolContext = Readonly<{
 /** The cloud scheduler's floor; nothing can run more often than this. */
 export const CLOUD_SCHEDULE_MIN_EVERY_MS = 15 * 60_000;
 
-const REMINDER_PROMPT_PREFIX = "Reminder for the user";
-
-/** How a reminder is stored: a self-contained prompt for the future turn. */
-export const reminderPrompt = (message: string): string =>
-  `${REMINDER_PROMPT_PREFIX} (deliver this exact message to them now, and nothing else): ${message}`;
-
-const reminderMessageOf = (prompt: string): string | null => {
-  if (!prompt.startsWith(REMINDER_PROMPT_PREFIX)) return null;
-  const separator = prompt.indexOf("): ");
-  return separator >= 0 ? prompt.slice(separator + 3) : null;
-};
-
 type ScheduleRow = {
   scheduleId: string;
+  kind?: string;
   conversationId?: string;
   prompt: string;
   schedule: string;
@@ -98,7 +86,7 @@ const describeSchedule = (schedule: Record<string, unknown>): string => {
 
 /** The device `summarizeJob` shape so lists read the same on both hosts. */
 const summarizeRow = (row: ScheduleRow): Record<string, unknown> => {
-  const message = reminderMessageOf(row.prompt);
+  const message = row.kind === "reminder" ? row.prompt : null;
   return {
     jobId: row.scheduleId,
     name: row.description || (message ?? row.prompt).slice(0, 60),
@@ -242,9 +230,8 @@ export const createCloudScheduleTools = (
         const kind = asTrimmedString(args.kind);
         let prompt: string;
         if (kind === "reminder") {
-          const message = asTrimmedString(args.message);
-          if (!message) throw new Error('kind="reminder" requires message.');
-          prompt = reminderPrompt(message);
+          prompt = asTrimmedString(args.message);
+          if (!prompt) throw new Error('kind="reminder" requires message.');
         } else if (kind === "task") {
           prompt = asTrimmedString(args.prompt);
           if (!prompt) throw new Error('kind="task" requires prompt.');
@@ -260,6 +247,7 @@ export const createCloudScheduleTools = (
         const payload = await post(
           "create",
           {
+            kind,
             prompt,
             description,
             conversationId:
@@ -321,7 +309,7 @@ export const createCloudScheduleTools = (
         }
         const message = asTrimmedString(args.message);
         const prompt = asTrimmedString(args.prompt);
-        const nextPrompt = message ? reminderPrompt(message) : prompt || undefined;
+        const nextPrompt = message || prompt || undefined;
         const description =
           asTrimmedString(args.description) || asTrimmedString(args.name);
         const status =

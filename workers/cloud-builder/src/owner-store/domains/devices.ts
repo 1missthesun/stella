@@ -865,6 +865,36 @@ const flushDigest = async (ctx: OwnerContext): Promise<void> => {
   await sendPush(ctx, digestCopy(digest), "agent_activity:digest");
 };
 
+/**
+ * One Expo push message per token, in token order. Tokens Expo reports as
+ * gone are forgotten. False when the request itself did not go through.
+ */
+export const sendPushMessages = async (
+  ctx: OwnerContext,
+  tokens: readonly LivePushToken[],
+  messages: readonly Record<string, unknown>[],
+): Promise<boolean> => {
+  if (messages.length === 0) return true;
+  const response = await fetch(EXPO_PUSH_ENDPOINT, {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify(messages),
+    signal: AbortSignal.timeout(15_000),
+  }).catch(() => null);
+  if (!response?.ok) return false;
+  const parsed = (await response.json().catch(() => null)) as {
+    data?: Array<{ status?: string; details?: { error?: string } }>;
+  } | null;
+  (parsed?.data ?? []).forEach((ticket, index) => {
+    const error = ticket?.details?.error;
+    const token = tokens[index]?.token;
+    if (token && ticket?.status === "error" && (error === "DeviceNotRegistered" || error === "InvalidCredentials")) {
+      ctx.db.run("DELETE FROM push_tokens WHERE token = ?", token);
+    }
+  });
+  return true;
+};
+
 const sendPush = async (
   ctx: OwnerContext,
   copy: { title: string; body: string },
@@ -872,34 +902,21 @@ const sendPush = async (
 ): Promise<null> => {
   const tokens = livePushTokens(ctx);
   if (tokens.length === 0) return null;
-  const response = await fetch(EXPO_PUSH_ENDPOINT, {
-    method: "POST",
-    headers: { "content-type": "application/json", accept: "application/json" },
-    body: JSON.stringify(
-      tokens.map(({ token }) => ({
-        to: token,
-        title: copy.title,
-        body: copy.body,
-        sound: "default",
-        data: { kind: "agent_activity" },
-        categoryId: "agent_activity",
-        threadId: "agent_activity",
-        collapseId,
-        tag: collapseId,
-      })),
-    ),
-    signal: AbortSignal.timeout(15_000),
-  }).catch(() => null);
-  if (!response?.ok) return null;
-  const parsed = (await response.json().catch(() => null)) as {
-    data?: Array<{ status?: string; details?: { error?: string } }>;
-  } | null;
-  (parsed?.data ?? []).forEach((ticket, index) => {
-    const error = ticket?.details?.error;
-    if (ticket?.status === "error" && (error === "DeviceNotRegistered" || error === "InvalidCredentials")) {
-      ctx.db.run("DELETE FROM push_tokens WHERE token = ?", tokens[index]!.token);
-    }
-  });
+  await sendPushMessages(
+    ctx,
+    tokens,
+    tokens.map(({ token }) => ({
+      to: token,
+      title: copy.title,
+      body: copy.body,
+      sound: "default",
+      data: { kind: "agent_activity" },
+      categoryId: "agent_activity",
+      threadId: "agent_activity",
+      collapseId,
+      tag: collapseId,
+    })),
+  );
   return null;
 };
 

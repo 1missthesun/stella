@@ -1,7 +1,11 @@
 /**
- * Scheduled turns, fired from the owner object's alarm.
+ * Schedules, fired from the owner object's alarm.
  *
- * A schedule is a prompt plus a `LocalCronSchedule`. Each live schedule has
+ * A schedule is a prompt plus a `LocalCronSchedule`, of a kind: a `task`
+ * starts a run at fire time; a `reminder`'s prompt is the text Stella wrote
+ * when it was set, delivered with no model and no turn (a push to the
+ * phone, a card in the conversation every client shows as Stella's message,
+ * an in-app notice on the desktop). Each live schedule has
  * exactly one pending `schedules.fire` job, id `schedule:<id>`, at its
  * `next_run_at`; every write that moves the time or the status replaces it.
  * A fire claims the row (re-anchoring recurring schedules from the fire
@@ -19,19 +23,33 @@ import { Cron } from "croner";
 import type { LocalCronSchedule } from "@stella/contracts/scheduling";
 import type {
   ScheduleCalls,
+  ScheduleKind,
   ScheduleRow,
   ScheduleStatus,
   ScheduleToolResult,
 } from "@stella/contracts/backend/schedules";
-import { empty, literal, object, optional, string, type Parser } from "../args.js";
+import {
+  REMINDER_CARD_TYPE,
+  REMINDER_MAX_SNOOZE_MINUTES,
+  REMINDER_PUSH_CATEGORY,
+  REMINDER_PUSH_KIND,
+  type ReminderCard,
+  type ReminderFire,
+  type ReminderFireState,
+  type ReminderPushData,
+} from "@stella/contracts/reminders";
+import { empty, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../registry.js";
 import { ScheduledTurnError } from "../scheduled-turn.js";
 import { billingAccess } from "./billing.js";
+import { livePushTokens, sendPushMessages } from "./devices.js";
 
 export const SCHEDULE_FIRE_JOB = "schedules.fire";
 export const scheduleJobId = (scheduleId: string): string => `schedule:${scheduleId}`;
+export const REMINDER_RETURN_JOB = "schedules.reminderReturn";
+const reminderReturnJobId = (fireId: string): string => `reminder:${fireId}`;
 
 const MAX_SCHEDULES = 25;
 const MIN_INTERVAL_MS = 15 * 60_000;
@@ -83,8 +101,37 @@ export const SCHEDULES_MIGRATION = {
   ],
 };
 
+const LEGACY_REMINDER_PREFIX =
+  "Reminder for the user (deliver this exact message to them now, and nothing else): ";
+
+/**
+ * Reminders become their own kind. Ones stored as a prompt telling a turn to
+ * repeat the text keep just the text.
+ */
+export const SCHEDULES_KINDS_MIGRATION = {
+  id: "schedules.2-kinds",
+  statements: [
+    `ALTER TABLE schedules ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'`,
+    `UPDATE schedules SET kind = 'reminder', prompt = substr(prompt, ${LEGACY_REMINDER_PREFIX.length + 1})
+      WHERE substr(prompt, 1, ${LEGACY_REMINDER_PREFIX.length}) = '${LEGACY_REMINDER_PREFIX}'`,
+    `CREATE TABLE reminder_fires (
+       fire_id TEXT PRIMARY KEY,
+       schedule_id TEXT NOT NULL,
+       conversation_id TEXT,
+       text TEXT NOT NULL,
+       fired_at INTEGER NOT NULL,
+       state TEXT NOT NULL,
+       snoozed_until INTEGER,
+       pushed_at INTEGER,
+       updated_at INTEGER NOT NULL
+     )`,
+    `CREATE INDEX reminder_fires_fired ON reminder_fires (fired_at DESC)`,
+  ],
+};
+
 type Row = {
   schedule_id: string;
+  kind: string;
   conversation_id: string | null;
   target_device_id: string | null;
   prompt: string;
@@ -101,8 +148,11 @@ type Row = {
   updated_at: number;
 };
 
+const toScheduleKind = (value: string): ScheduleKind => (value === "reminder" ? "reminder" : "task");
+
 const toScheduleRow = (row: Row): ScheduleRow => ({
   scheduleId: row.schedule_id,
+  kind: toScheduleKind(row.kind),
   ...(row.conversation_id ? { conversationId: row.conversation_id } : {}),
   ...(row.target_device_id ? { targetDeviceId: row.target_device_id } : {}),
   prompt: row.prompt,
@@ -297,6 +347,7 @@ const signInRequired = (): never => {
 
 type CreateInput = {
   requestId: string;
+  kind?: ScheduleKind;
   prompt: string;
   schedule: LocalCronSchedule;
   description?: string;
@@ -306,17 +357,19 @@ type CreateInput = {
 
 const createSchedule = (ctx: OwnerContext, input: CreateInput, isAnonymous: boolean) => {
   if (isAnonymous) signInRequired();
+  const kind: ScheduleKind = input.kind ?? "task";
   const prompt = cleanPrompt(input.prompt);
   const schedule = normalizeSchedule(input.schedule);
   const description = cleanDescription(input.description, prompt);
   const conversationId = input.conversationId?.trim() || null;
-  const targetDeviceId = input.targetDeviceId?.trim() || null;
+  // A reminder runs nowhere: it needs no computer.
+  const targetDeviceId = kind === "reminder" ? null : input.targetDeviceId?.trim() || null;
   return withReceipt(
     ctx.db,
     ctx.now,
     input.requestId.trim(),
     "create",
-    { prompt, schedule, description, conversationId, targetDeviceId },
+    { kind, prompt, schedule, description, conversationId, targetDeviceId },
     (): ScheduleRow => {
       assertAllowed(schedule, ctx.now);
       const live =
@@ -328,6 +381,7 @@ const createSchedule = (ctx: OwnerContext, input: CreateInput, isAnonymous: bool
       }
       const row: Row = {
         schedule_id: `sch-${crypto.randomUUID().slice(0, 18)}`,
+        kind,
         conversation_id: conversationId,
         target_device_id: targetDeviceId,
         prompt,
@@ -457,6 +511,7 @@ const runNow = (ctx: OwnerContext, scheduleId: string): null => {
 
 const toolParser = object({
   action: literal("list", "create", "update", "remove"),
+  kind: optional(literal("reminder", "task")),
   requestId: optional(string({ max: 128 })),
   scheduleId: optional(string({ max: 128, pattern: ID_PATTERN })),
   prompt: optional(string({ max: MAX_PROMPT_CHARS * 2 })),
@@ -480,6 +535,7 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
       ctx,
       {
         requestId,
+        ...(args.kind ? { kind: args.kind } : {}),
         prompt: args.prompt!,
         schedule: args.schedule!,
         ...(args.description !== undefined ? { description: args.description } : {}),
@@ -512,6 +568,181 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
     removed: removed.result.removed,
     schedules: list(),
   };
+};
+
+// ── Reminders ─────────────────────────────────────────────────────────────
+
+const REMINDER_KEEP_MS = 30 * DAY_MS;
+const REMINDER_LIST_MS = 7 * DAY_MS;
+const REMINDER_LIST_LIMIT = 100;
+const REMINDER_PUSH_TITLE = "Reminder";
+
+type FireRow = {
+  fire_id: string;
+  schedule_id: string;
+  conversation_id: string | null;
+  text: string;
+  fired_at: number;
+  state: string;
+  snoozed_until: number | null;
+  pushed_at: number | null;
+  updated_at: number;
+};
+
+const toFireState = (value: string): ReminderFireState =>
+  value === "done" || value === "snoozed" ? value : "open";
+
+const toReminderFire = (row: FireRow): ReminderFire => ({
+  fireId: row.fire_id,
+  scheduleId: row.schedule_id,
+  ...(row.conversation_id ? { conversationId: row.conversation_id } : {}),
+  text: row.text,
+  firedAt: row.fired_at,
+  state: toFireState(row.state),
+  ...(row.snoozed_until !== null ? { snoozedUntil: row.snoozed_until } : {}),
+  updatedAt: row.updated_at,
+});
+
+const readFire = (db: OwnerDbReader, fireId: string): FireRow | null =>
+  db.one<FireRow>("SELECT * FROM reminder_fires WHERE fire_id = ?", fireId);
+
+const listFires = (db: OwnerDbReader, now: number): ReminderFire[] =>
+  db
+    .all<FireRow>(
+      `SELECT * FROM reminder_fires WHERE fired_at >= ? OR state = 'snoozed'
+        ORDER BY fired_at DESC LIMIT ?`,
+      now - REMINDER_LIST_MS,
+      REMINDER_LIST_LIMIT,
+    )
+    .map(toReminderFire);
+
+/** The delivery's row, once per fire id: a retried fire finds the first one. */
+const recordFire = (
+  ctx: OwnerContext,
+  fire: { fireId: string; scheduleId: string; conversationId: string | null; text: string },
+): FireRow => {
+  ctx.db.run(
+    `INSERT OR IGNORE INTO reminder_fires
+       (fire_id, schedule_id, conversation_id, text, fired_at, state, updated_at)
+     VALUES (?, ?, ?, ?, ?, 'open', ?)`,
+    fire.fireId,
+    fire.scheduleId,
+    fire.conversationId,
+    fire.text,
+    ctx.now,
+    ctx.now,
+  );
+  ctx.db.run(
+    "DELETE FROM reminder_fires WHERE fired_at < ? AND state != 'snoozed'",
+    ctx.now - REMINDER_KEEP_MS,
+  );
+  return readFire(ctx.db, fire.fireId)!;
+};
+
+const reminderPushMessages = (ctx: OwnerContext, fire: FireRow) => {
+  const tokens = livePushTokens(ctx);
+  const data: ReminderPushData = {
+    kind: REMINDER_PUSH_KIND,
+    fireId: fire.fire_id,
+    scheduleId: fire.schedule_id,
+    ...(fire.conversation_id ? { conversationId: fire.conversation_id } : {}),
+  };
+  const collapse = `reminder:${fire.fire_id}`.slice(0, 64);
+  const body = fire.text.length > 600 ? `${fire.text.slice(0, 599)}…` : fire.text;
+  return {
+    tokens,
+    messages: tokens.map((token) => ({
+      to: token.token,
+      title: REMINDER_PUSH_TITLE,
+      body,
+      data,
+      sound: "default",
+      priority: "high",
+      categoryId: REMINDER_PUSH_CATEGORY,
+      ...(token.platform === "android"
+        ? { tag: collapse }
+        : { threadId: REMINDER_PUSH_CATEGORY, collapseId: collapse, interruptionLevel: "time-sensitive" }),
+    })),
+  };
+};
+
+/**
+ * Deliver one reminder: the push once, and the card, which the journal takes
+ * once per fire. False when something has to be tried again.
+ */
+const deliverReminder = async (ctx: OwnerContext, ownerGeneration: string, fire: FireRow): Promise<boolean> => {
+  let delivered = true;
+  if (fire.pushed_at === null) {
+    const { tokens, messages } = reminderPushMessages(ctx, fire);
+    if (await sendPushMessages(ctx, tokens, messages)) {
+      ctx.db.run("UPDATE reminder_fires SET pushed_at = ? WHERE fire_id = ?", ctx.now, fire.fire_id);
+    } else {
+      delivered = false;
+    }
+  }
+  const conversationId = fire.conversation_id;
+  if (conversationId && !conversationId.startsWith("local_")) {
+    const card: ReminderCard = {
+      type: REMINDER_CARD_TYPE,
+      fireId: fire.fire_id,
+      scheduleId: fire.schedule_id,
+      text: fire.text,
+    };
+    const posted = await ctx.host.postConversationCard({
+      conversationId,
+      ownerGeneration,
+      sourceTurnId: `reminder:${fire.fire_id}`,
+      card,
+    });
+    if (!posted) delivered = false;
+  }
+  return delivered;
+};
+
+const setReminderState = (
+  ctx: OwnerContext,
+  fireId: string,
+  next: { state: "done" } | { state: "snoozed"; minutes: number },
+): ReminderFire => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "schedules.reminder", { count: 60, windowMs: 60_000 }, "Slow down a moment and try again.");
+  const row = readFire(ctx.db, fireId);
+  if (!row) throw new RpcError("NOT_FOUND", "That reminder is gone.");
+  const snoozedUntil = next.state === "snoozed" ? ctx.now + Math.round(next.minutes) * 60_000 : null;
+  ctx.db.run(
+    "UPDATE reminder_fires SET state = ?, snoozed_until = ?, updated_at = ? WHERE fire_id = ?",
+    next.state,
+    snoozedUntil,
+    ctx.now,
+    fireId,
+  );
+  if (snoozedUntil !== null) {
+    ctx.jobs.schedule(REMINDER_RETURN_JOB, snoozedUntil, { fireId }, { id: reminderReturnJobId(fireId) });
+  } else {
+    ctx.jobs.cancel(reminderReturnJobId(fireId));
+  }
+  return toReminderFire(readFire(ctx.db, fireId)!);
+};
+
+/** A snoozed reminder comes back as a fresh delivery, at the foot of the chat. */
+const reminderReturn = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
+  const { fireId } = object({ fireId: string({ max: 128 }) })(payload);
+  const old = readFire(ctx.db, fireId);
+  if (!old || old.state !== "snoozed" || old.snoozed_until === null) return;
+  if (old.snoozed_until > ctx.now) {
+    ctx.jobs.schedule(REMINDER_RETURN_JOB, old.snoozed_until, { fireId }, { id: reminderReturnJobId(fireId) });
+    return;
+  }
+  const snapshot = await ctx.host.snapshot();
+  if (!snapshot.writable) return;
+  const fresh = recordFire(ctx, {
+    fireId: `${old.fire_id.slice(0, 64)}.${old.snoozed_until.toString(36)}`,
+    scheduleId: old.schedule_id,
+    conversationId: old.conversation_id,
+    text: old.text,
+  });
+  if (!(await deliverReminder(ctx, snapshot.ownerGeneration, fresh))) {
+    throw new Error("The snoozed reminder could not be delivered yet.");
+  }
 };
 
 // ── Firing ────────────────────────────────────────────────────────────────
@@ -632,6 +863,23 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     });
     return;
   }
+  if (toScheduleKind(row.kind) === "reminder") {
+    // No model and no turn, so no scheduled-run budget either.
+    const delivery = recordFire(ctx, {
+      fireId,
+      scheduleId,
+      conversationId: row.conversation_id,
+      text: row.prompt,
+    });
+    const delivered = await deliverReminder(ctx, snapshot.ownerGeneration, delivery);
+    finishFire(
+      ctx,
+      scheduleId,
+      fireId,
+      delivered ? {} : { error: "The reminder could not be delivered everywhere yet.", oneShot, retry: { sameFire: true } },
+    );
+    return;
+  }
   if (!retrying) {
     const budget = dailyFires(ctx);
     try {
@@ -702,6 +950,7 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
 
 const createArgs = object({
   requestId: string({ max: 128 }),
+  kind: optional(literal("reminder", "task")),
   prompt: string({ max: MAX_PROMPT_CHARS * 2 }),
   schedule: scheduleParser,
   description: optional(string({ max: 1_000 })),
@@ -725,11 +974,15 @@ const removeArgs = object({
 
 export const schedulesDomain = {
   name: "schedules",
-  migrations: [SCHEDULES_MIGRATION],
+  migrations: [SCHEDULES_MIGRATION, SCHEDULES_KINDS_MIGRATION],
   views: {
     "schedules.list": {
       parse: empty(),
       read: (ctx) => listRows(ctx.db),
+    },
+    "schedules.reminders": {
+      parse: empty(),
+      read: (ctx) => listFires(ctx.db, ctx.now),
     },
   },
   calls: {
@@ -759,6 +1012,21 @@ export const schedulesDomain = {
       handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.runNow"]["args"]) =>
         runNow(ctx, args.scheduleId),
     },
+    "schedules.reminderDone": {
+      scope: "owner",
+      parse: object({ fireId: string({ max: 128, pattern: ID_PATTERN }) }),
+      handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.reminderDone"]["args"]) =>
+        setReminderState(ctx, args.fireId, { state: "done" }),
+    },
+    "schedules.reminderSnooze": {
+      scope: "owner",
+      parse: object({
+        fireId: string({ max: 128, pattern: ID_PATTERN }),
+        minutes: number({ min: 1, max: REMINDER_MAX_SNOOZE_MINUTES }),
+      }),
+      handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.reminderSnooze"]["args"]) =>
+        setReminderState(ctx, args.fireId, { state: "snoozed", minutes: args.minutes }),
+    },
   },
   internal: {
     "schedules.tool": (ctx: OwnerContext, args: unknown) => scheduleTool(ctx, args),
@@ -770,13 +1038,23 @@ export const schedulesDomain = {
       // owner snapshot, which the store retries with backoff.
       maxAttempts: 10,
     },
+    [REMINDER_RETURN_JOB]: {
+      run: reminderReturn,
+      maxAttempts: 6,
+    },
   },
   purge: (ctx) => {
     for (const { schedule_id } of ctx.db.all<{ schedule_id: string }>("SELECT schedule_id FROM schedules")) {
       ctx.jobs.cancel(scheduleJobId(schedule_id));
     }
+    for (const { fire_id } of ctx.db.all<{ fire_id: string }>(
+      "SELECT fire_id FROM reminder_fires WHERE state = 'snoozed'",
+    )) {
+      ctx.jobs.cancel(reminderReturnJobId(fire_id));
+    }
     ctx.db.run("DELETE FROM schedules");
     ctx.db.run("DELETE FROM schedule_receipts");
+    ctx.db.run("DELETE FROM reminder_fires");
     return { pending: false };
   },
 } satisfies OwnerDomain;

@@ -373,6 +373,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
           status: response.status,
         });
       }
+      return response.ok;
     } catch (error) {
       // A card is a receipt for work that already happened; losing one must
       // never fail anything else.
@@ -380,6 +381,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
         conversationId: input.conversationId,
         message: error instanceof Error ? error.message : String(error),
       });
+      return false;
     }
   },
 

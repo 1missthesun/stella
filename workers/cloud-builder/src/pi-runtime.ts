@@ -36,6 +36,7 @@ import type { Context } from "@earendil-works/chord";
 import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
+import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import {
   AssistantEntry,
   type EntryId,
@@ -651,14 +652,16 @@ const toolSpec = (tool: CloudCodeSourceAgentTool): StellaToolSpec => ({
     : {}),
 });
 
-/** A journal record as `importJournal` reads it; only messages are imported. */
+/** A journal record as `importJournal` reads it; messages are imported, and reminders as Stella's lines. */
 export type JournalRecordLike = {
   seq: number;
   kind: string;
   turnId: string;
+  createdAtMs?: number;
   role?: "user" | "assistant" | "toolResult";
   hidden?: boolean;
   payload?: unknown;
+  card?: unknown;
 };
 
 export class PiConversationRuntime {
@@ -2444,6 +2447,17 @@ export class PiConversationRuntime {
       const page = await read(after);
       const messages: JournalMessage[] = [];
       for (const record of page.records) {
+        const reminder = record.kind === "card" ? parseReminderCard(record.card) : null;
+        if (reminder) {
+          messages.push({
+            seq: record.seq,
+            turnId: record.turnId,
+            role: "assistant",
+            hidden: false,
+            message: reminderAssistantMessage(reminder, record.createdAtMs ?? Date.now()) as JournalMessage["message"],
+          });
+          continue;
+        }
         if (record.kind !== "message" || !record.role || record.turnId === currentTurnId) continue;
         let own = ran.get(record.turnId);
         if (own === undefined) {

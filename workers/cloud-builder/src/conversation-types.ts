@@ -199,6 +199,7 @@ export const CLOSE_INTERNAL = 1011;
 export type ConversationCard =
   | CloudAgentLifecycleCard
   | import("@stella/contracts/claude-usage-limit").ClaudeUsageLimitCard
+  | import("@stella/contracts/reminders").ReminderCard
   /**
    * A report of a cloud agent a computer's orchestrator started, for that
    * computer, which gives it to its orchestrator. Clients do not show it;

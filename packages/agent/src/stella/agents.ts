@@ -43,6 +43,7 @@ import {
   buildAgentDirectoryResult,
   formatAgentMessage,
   STELLA_MESSAGE_TARGET,
+  toolsOfflineText,
   type AgentDirectoryAgentRow,
   type AgentDirectorySessionRow,
   type AgentMessageSender,
@@ -50,6 +51,7 @@ import {
 import { agentPauseText, type AgentMessageDelivery, type AgentPauseResult } from "@stella/contracts/backend/agent-threads";
 import {
   AGENT_PAUSED_REASON,
+  isLiveAgentStatus,
   reportStatusOf,
   type AgentAttemptOutcome,
   type AgentStatus,
@@ -58,7 +60,7 @@ import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contr
 import { engineExtensionChange } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
-import { switchDestinationTool, type StellaExecutionHost } from "./execution.ts";
+import { switchDestinationTool, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
 import {
   describePlacement,
@@ -306,8 +308,8 @@ export type RemoteAgentHost = {
    * `model` is the one its caller asked for, which the host there runs it on.
    */
   start(args: { key: string; description: string; prompt: string; model?: string }, context: Context): Promise<{ threadId: string }>;
-  /** Another message for it: steers it there, or starts its next run. Once per `key`. */
-  message(args: { key: string; threadId: string; message: string }, context: Context): Promise<void>;
+  /** Another message for it: steers it there, starts its next run, or is held for its offline computer. Once per `key`. */
+  message(args: { key: string; threadId: string; message: string }, context: Context): Promise<AgentMessageDelivery | void>;
   /** Its status there, as one line. */
   status?(threadId: string, context: Context): Promise<string>;
   pause?(threadId: string, context: Context): Promise<void>;
@@ -1168,10 +1170,11 @@ export function stellaAgents(host: StellaAgentsHost) {
       );
       if (known?.remote) {
         if (!remote) return await messageThroughLedger(api, threadId, args.message, conversation, context);
-        await remote.message({ key: `message:${api.taskId}`, threadId, message: framed }, context);
+        const delivery = await remote.message({ key: `message:${api.taskId}`, threadId, message: framed }, context);
         await expectRemoteReport(api, api.conversationId, String(api.taskId), threadId, context);
-        return { content: [{ type: "text", text: `Delivered to ${threadId}.` }] };
+        return deliveredResult(delivery ?? { threadId });
       }
+      const running = (await api.snapshot(LiveDoc, known.conversationId as ConversationId, context))?.run !== undefined;
       await api.commit(async (tx) => {
         const state = await tx.doc(StellaAgentsDoc, api.conversationId);
         if (state.calls[String(api.taskId)]) return;
@@ -1184,7 +1187,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         );
         state.calls[String(api.taskId)] = { threadId, reporter };
       }, context);
-      return { content: [{ type: "text", text: `Delivered to ${threadId}.` }] };
+      return deliveredResult({ threadId, delivered: running ? "steered" : "resumed", ...(await toolsOfflineNote(known, context)) });
     },
   });
 
@@ -1207,6 +1210,33 @@ export function stellaAgents(host: StellaAgentsHost) {
     const placement = placementOf(agent.placement);
     if (!placement) return undefined;
     return host.remote?.(placement.kind === "device" ? { ...placement, whole: true } : placement);
+  };
+
+  /**
+   * The owner's computer an agent's placement names, as the device list has
+   * it now: where a whole agent runs, or where an agent here runs its tools.
+   * `seen` keeps one lookup per computer within a call.
+   */
+  const computerOf = async (
+    agent: AgentRecord,
+    context: Context,
+    seen = new Map<string, Promise<DeviceStanding | undefined>>(),
+  ): Promise<DeviceStanding | undefined> => {
+    const deviceId = agent.placement.kind === "device" ? agent.placement.deviceId : undefined;
+    if (!deviceId || !host.execution?.standing) return undefined;
+    let standing = seen.get(deviceId);
+    if (!standing) {
+      standing = host.execution.standing(deviceId, context).catch(() => undefined);
+      seen.set(deviceId, standing);
+    }
+    return await standing;
+  };
+
+  /** For a message to an agent here whose tools run on an offline computer: what it can and can't do now. */
+  const toolsOfflineNote = async (agent: AgentRecord, context: Context): Promise<{ note?: string }> => {
+    if (agent.remote) return {};
+    const computer = await computerOf(agent, context);
+    return computer && !computer.online ? { note: `${toolsOfflineText(computer.name, computer.lastSeenAt)}.` } : {};
   };
 
   const agentDetails = async (
@@ -1283,32 +1313,74 @@ export function stellaAgents(host: StellaAgentsHost) {
     return found;
   };
 
-  /** An agent under the orchestrator as `agent_status` lists it. */
+  /**
+   * An agent under the orchestrator as `agent_status` lists it. A whole agent
+   * elsewhere is listed as the owner's agent threads (`ledger`) know it, the
+   * place it runs on and whether that is online; one here says so, with the
+   * computer its tools run on and whether that is online.
+   */
   const directoryRow = async (
     api: ToolExecutionApi,
     agent: TreeAgent,
     conversationId: string,
     context: Context,
+    ledger?: readonly AgentDirectoryAgentRow[],
+    seen?: Map<string, Promise<DeviceStanding | undefined>>,
   ): Promise<AgentDirectoryAgentRow> => {
     const { record } = agent;
+    const placed = describePlacement(placementOf(record.placement) ?? host.rootPlacement);
     const row = {
       threadId: agent.threadId,
       conversationId,
       ...(agent.parentThreadId ? { parentThreadId: agent.parentThreadId } : {}),
       description: record.description,
-      where: describePlacement(placementOf(record.placement) ?? host.rootPlacement),
     };
     if (record.remote) {
+      const there = ledger?.find((entry) => entry.threadId === agent.threadId);
+      if (there) {
+        return {
+          ...row,
+          status: there.status,
+          where: there.where,
+          updatedAt: there.updatedAt,
+          ...(there.offline ? { offline: there.offline } : {}),
+        };
+      }
+      const computer = await computerOf(record, context, seen);
       const done = (record.answered?.length ?? 0) >= agent.given;
-      return { ...row, status: done ? remoteOutcome(record) : "running", updatedAt: record.startedAt ?? Date.now() };
+      const status = done ? remoteOutcome(record) : "running";
+      return {
+        ...row,
+        status,
+        where: computer?.name ?? placed,
+        updatedAt: record.startedAt ?? Date.now(),
+        ...(computer && !computer.online && isLiveAgentStatus(status)
+          ? { offline: computer.lastSeenAt !== undefined ? { lastSeenAt: computer.lastSeenAt } : {} }
+          : {}),
+      };
     }
+    const here = describePlacement(host.rootPlacement);
+    const computer = await computerOf(record, context, seen);
+    const tools =
+      record.placement.kind === host.rootPlacement.kind
+        ? undefined
+        : record.placement.kind === "cloud"
+          ? "in the cloud"
+          : `on ${computer?.name ?? placed}`;
+    const located = {
+      ...row,
+      where: tools ? `${here}, its tools ${tools}` : here,
+      ...(computer && !computer.online
+        ? { offline: { tools: computer.name, ...(computer.lastSeenAt !== undefined ? { lastSeenAt: computer.lastSeenAt } : {}) } }
+        : {}),
+    };
     const id = record.conversationId as ConversationId;
     const live = await api.snapshot(LiveDoc, id, context);
     const recent = await api.commit(async (tx) => (await tx.scanEntries({ conversationId: id, order: "descending" }, 10)).items, context);
     const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
     const at = (recent[0]?.model?.[0] as { timestamp?: number } | undefined)?.timestamp;
     return {
-      ...row,
+      ...located,
       status:
         live?.run !== undefined
           ? "running"
@@ -1325,15 +1397,16 @@ export function stellaAgents(host: StellaAgentsHost) {
   const directoryStatus = async (api: ToolExecutionApi, context: Context) => {
     const { self, root, parentThreadId } = await chainOf(api, context);
     const conversationId = (await host.directory?.conversationId(context).catch(() => undefined)) ?? STELLA_MESSAGE_TARGET;
-    const rows: AgentDirectoryAgentRow[] = [];
-    for (const agent of root === undefined ? [] : await agentTree(api, root, context)) {
-      rows.push(await directoryRow(api, agent, conversationId, context));
-    }
     const elsewhere = await host.directory?.list(context).catch((error: unknown) => ({
       agents: [],
       sessions: [],
       unavailable: `Agents and sessions elsewhere could not be listed right now (${error instanceof Error ? error.message : String(error)}).`,
     }));
+    const rows: AgentDirectoryAgentRow[] = [];
+    const seen = new Map<string, Promise<DeviceStanding | undefined>>();
+    for (const agent of root === undefined ? [] : await agentTree(api, root, context)) {
+      rows.push(await directoryRow(api, agent, conversationId, context, elsewhere?.agents, seen));
+    }
     const known = new Set(rows.map((row) => row.threadId));
     const listing = buildAgentDirectoryResult({
       caller: {
@@ -1381,9 +1454,9 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (target.record.remote) {
         const remote = remoteHostOf(target.record);
         if (!remote) return await messageThroughLedger(api, threadId, message, conversation, context);
-        await remote.message({ key, threadId, message: text }, context);
+        const delivery = await remote.message({ key, threadId, message: text }, context);
         await expectRemoteReport(api, target.parentConversationId, key, threadId, context);
-        return deliveredResult({ threadId });
+        return deliveredResult(delivery ?? { threadId });
       }
       const agentConversationId = target.record.conversationId as ConversationId;
       const running = (await api.snapshot(LiveDoc, agentConversationId, context))?.run !== undefined;
@@ -1397,7 +1470,11 @@ export function stellaAgents(host: StellaAgentsHost) {
         );
         state.calls[key] = { threadId, reporter };
       }, context);
-      return deliveredResult({ threadId, delivered: running ? "steered" : "resumed" });
+      return deliveredResult({
+        threadId,
+        delivered: running ? "steered" : "resumed",
+        ...(await toolsOfflineNote(target.record, context)),
+      });
     }
     const delivery = await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context);
     if (delivery) return deliveredResult(delivery);
@@ -1460,7 +1537,8 @@ export function stellaAgents(host: StellaAgentsHost) {
           : undefined);
       if (found) {
         const starter = found.parentConversationId === api.conversationId;
-        const row = await directoryRow(api, found, conversationId, context);
+        const ledger = found.record.remote ? (await host.directory?.list(context).catch(() => undefined))?.agents : undefined;
+        const row = await directoryRow(api, found, conversationId, context, ledger);
         const reachable = !found.record.remote || remoteHostOf(found.record) !== undefined || host.directory !== undefined;
         return statusResult({
           ...agentDirectoryEntry(row),

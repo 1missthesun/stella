@@ -26,7 +26,7 @@ import {
   type DeviceDestination,
   type DevicesResponse,
 } from "@stella/contracts/turn-plane/placement";
-import { deviceRefusal } from "../stella/execution.ts";
+import { deviceRefusal, deviceStanding, type DeviceStanding } from "../stella/execution.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
 
 /** How long a cloud container is kept for tools that stopped calling it. */
@@ -324,9 +324,17 @@ export const remoteToolEnvironment = (options: {
     };
   };
 
+  const standing = async (deviceId: string): Promise<DeviceStanding | undefined> => {
+    if (!remote) return undefined;
+    const listed = await remote.devices().catch(() => undefined);
+    const device = listed?.find((entry) => entry.deviceId === deviceId);
+    return device ? deviceStanding(device) : undefined;
+  };
+
   return {
     remote,
     prepare,
+    standing,
     run,
     /** `owner`'s tools left `from`: a cloud container's work is saved into the world and let go. */
     async moved(owner: string, from: StellaPlacement): Promise<void> {

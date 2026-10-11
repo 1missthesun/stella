@@ -115,9 +115,11 @@ export const scheduleRowBadge = (
  * too custom to summarize (the UI falls back to its localized "custom" copy).
  */
 export const scheduleCadence = (
-  schedule: Pick<MobileSchedule, "scheduleJson" | "intervalMs">,
+  schedule: Pick<MobileSchedule, "scheduleJson" | "intervalMs"> &
+    Partial<Pick<MobileSchedule, "nextRunAtMs">>,
 ): string =>
   summarizeSchedule(
     schedule.scheduleJson ? parseStoredSchedule(schedule.scheduleJson) : null,
     schedule.intervalMs,
+    schedule.nextRunAtMs,
   );

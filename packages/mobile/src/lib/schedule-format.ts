@@ -99,7 +99,6 @@ const formatIntervalEvery = (everyMs: number): string => {
   return `Every ${minutes} min`;
 };
 
-const WEEKDAY_FIELD_REGEX = /^([0-7])(?:[,-]([0-7]))?$/;
 const isAllOrStar = (value: string): boolean => value === "*" || value === "?";
 
 const parseClockTimeFromCron = (
@@ -108,64 +107,148 @@ const parseClockTimeFromCron = (
 ): { h: number; m: number } | null => {
   const h = Number(hour);
   const m = Number(minute);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  if (!Number.isInteger(h) || !Number.isInteger(m)) return null;
   if (h < 0 || h > 23 || m < 0 || m > 59) return null;
   return { h, m };
 };
 
-const summarizeCron = (expr: string): string => {
+const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6] as const;
+
+const parseWeekdays = (dow: string): Set<number> | null => {
+  if (isAllOrStar(dow)) return new Set(ALL_DAYS);
+  if (dow.toUpperCase() === "MON-FRI") return new Set([1, 2, 3, 4, 5]);
+  const days = new Set<number>();
+  for (const part of dow.split(",")) {
+    const match = part.match(/^([0-7])(?:-([0-7]))?$/);
+    if (!match) return null;
+    const start = Number(match[1]);
+    const end = match[2] === undefined ? start : Number(match[2]);
+    if (end < start) return null;
+    for (let day = start; day <= end; day += 1) days.add(day % 7);
+  }
+  return days.size > 0 ? days : null;
+};
+
+const shiftWeekdays = (days: Set<number>, delta: number): Set<number> =>
+  delta === 0
+    ? days
+    : new Set([...days].map((day) => (((day + delta) % 7) + 7) % 7));
+
+const describeWeekdays = (days: Set<number>): string => {
+  if (days.size === 7) return "Daily";
+  if (days.size === 2 && days.has(0) && days.has(6)) return "Weekends";
+  if (days.size === 1) return SHORT_WEEKDAYS[[...days][0]!];
+  const starts = ALL_DAYS.filter(
+    (day) => days.has(day) && !days.has((day + 6) % 7),
+  );
+  if (starts.length === 1 && days.size >= 3) {
+    const start = starts[0]!;
+    const end = (start + days.size - 1) % 7;
+    return `${SHORT_WEEKDAYS[start]}–${SHORT_WEEKDAYS[end]}`;
+  }
+  return ALL_DAYS.filter((day) => days.has(day))
+    .map((day) => SHORT_WEEKDAYS[day])
+    .join(", ");
+};
+
+const UTC_ZONES = new Set(["UTC", "ETC/UTC", "GMT", "ETC/GMT", "Z"]);
+
+type WallClock = { dayIndex: number; h: number; m: number };
+
+const dayIndexOf = (year: number, month: number, day: number): number =>
+  Math.floor(Date.UTC(year, month, day) / DAY_MS);
+
+const wallClockInZone = (atMs: number, tz: string): WallClock | null => {
+  if (!tz || UTC_ZONES.has(tz.toUpperCase())) {
+    const date = new Date(atMs);
+    return {
+      dayIndex: Math.floor(atMs / DAY_MS),
+      h: date.getUTCHours(),
+      m: date.getUTCMinutes(),
+    };
+  }
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: tz,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hourCycle: "h23",
+    }).formatToParts(new Date(atMs));
+    const part = (type: Intl.DateTimeFormatPartTypes): number =>
+      Number(parts.find((entry) => entry.type === type)?.value);
+    const year = part("year");
+    const month = part("month");
+    const day = part("day");
+    const h = part("hour") % 24;
+    const m = part("minute");
+    if (![year, month, day, h, m].every(Number.isFinite)) return null;
+    return { dayIndex: dayIndexOf(year, month - 1, day), h, m };
+  } catch {
+    return null;
+  }
+};
+
+const localWallClock = (atMs: number): WallClock => {
+  const date = new Date(atMs);
+  return {
+    dayIndex: dayIndexOf(date.getFullYear(), date.getMonth(), date.getDate()),
+    h: date.getHours(),
+    m: date.getMinutes(),
+  };
+};
+
+/**
+ * Moves a cron's wall-clock time from the zone it fires in (UTC when it names
+ * none, as on the backend) to the phone's zone, using the next run as the
+ * reference instant so daylight saving and day boundaries line up with the
+ * "Next" label beside it.
+ */
+const toLocalClock = (
+  time: { h: number; m: number },
+  tz: string | undefined,
+  nextRunAtMs: number | undefined,
+): { h: number; m: number; dayDelta: number } => {
+  if (nextRunAtMs === undefined || !Number.isFinite(nextRunAtMs)) {
+    return { ...time, dayDelta: 0 };
+  }
+  const zone = wallClockInZone(nextRunAtMs, tz?.trim() ?? "");
+  if (!zone || zone.h !== time.h || zone.m !== time.m) {
+    return { ...time, dayDelta: 0 };
+  }
+  const local = localWallClock(nextRunAtMs);
+  return { h: local.h, m: local.m, dayDelta: local.dayIndex - zone.dayIndex };
+};
+
+const summarizeCron = (
+  expr: string,
+  tz: string | undefined,
+  nextRunAtMs: number | undefined,
+): string => {
   const parts = expr.trim().split(/\s+/);
-  // Accept both 5-field (m h dom mon dow) and 6-field (s m h dom mon dow).
   const fields = parts.length === 6 ? parts.slice(1) : parts;
   if (fields.length !== 5) return expr;
   const [minute, hour, dom, mon, dow] = fields;
   const time = parseClockTimeFromCron(minute, hour);
-  const everyDom = isAllOrStar(dom);
-  const everyMon = isAllOrStar(mon);
-  if (!time || !everyMon) return expr;
-  const clock = padTime(time.h, time.m);
-
-  if (everyDom && isAllOrStar(dow)) {
-    return `Daily ${clock}`;
-  }
-
-  if (everyDom) {
-    const match = dow.match(WEEKDAY_FIELD_REGEX);
-    if (match) {
-      const start = Number(match[1]) % 7;
-      const end = match[2] !== undefined ? Number(match[2]) % 7 : start;
-      if (dow.includes(",")) {
-        const days = dow
-          .split(",")
-          .map((value) => Number(value) % 7)
-          .filter((value) => Number.isFinite(value));
-        if (days.length > 0 && days.every((value) => value >= 0 && value <= 6)) {
-          const labels = days.map((value) => SHORT_WEEKDAYS[value]);
-          return `${labels.join(", ")} ${clock}`;
-        }
-      }
-      if (start === end) {
-        return `${SHORT_WEEKDAYS[start]} ${clock}`;
-      }
-      return `${SHORT_WEEKDAYS[start]}–${SHORT_WEEKDAYS[end]} ${clock}`;
-    }
-    if (dow === "1-5" || dow.toUpperCase() === "MON-FRI") {
-      return `Weekdays ${clock}`;
-    }
-    if (dow === "0,6" || dow === "6,0") return `Weekends ${clock}`;
-  }
-
-  return expr;
+  if (!time || !isAllOrStar(dom) || !isAllOrStar(mon)) return expr;
+  const days = parseWeekdays(dow);
+  if (!days) return expr;
+  const local = toLocalClock(time, tz, nextRunAtMs);
+  const clock = padTime(local.h, local.m);
+  return `${describeWeekdays(shiftWeekdays(days, local.dayDelta))} ${clock}`;
 };
 
 /**
  * Natural-language one-liner for a stored schedule shape (or a heartbeat
- * interval). Falls back to the raw cron expression when the pattern is too
- * custom to summarize cheaply.
+ * interval), in the phone's time zone. Falls back to the raw cron expression
+ * when the pattern is too custom to summarize cheaply.
  */
 export const summarizeSchedule = (
   schedule: MobileScheduleShape | null | undefined,
   intervalMs?: number,
+  nextRunAtMs?: number,
 ): string => {
   if (!schedule) {
     if (typeof intervalMs === "number" && intervalMs > 0) {
@@ -178,7 +261,7 @@ export const summarizeSchedule = (
     const date = new Date(schedule.atMs);
     return `Once at ${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}, ${padTime(date.getHours(), date.getMinutes())}`;
   }
-  return summarizeCron(schedule.expr);
+  return summarizeCron(schedule.expr, schedule.tz, nextRunAtMs);
 };
 
 /** Best-effort parse of the runtime's serialized LocalCronSchedule JSON. */

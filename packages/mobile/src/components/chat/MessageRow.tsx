@@ -47,6 +47,7 @@ import { AppPreviewCard } from "../AppPreviewCard";
 import { MapRouteCard } from "../MapRouteCard";
 import type { AnchorRect } from "./PlusMenu";
 import { assistantBubbleNeedsBoundedWidth } from "../../lib/assistant-bubble-layout";
+import { presentAssistantText } from "../../lib/assistant-internal-text";
 import { artifactAttachmentTarget } from "../../lib/mobile-artifacts";
 import {
   resolveCloudDriveFileUri,
@@ -744,13 +745,13 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     }
     return receipts;
   }, [item.toolSteps]);
-  const bodyText = useMemo(
-    () =>
-      evidencePaths.length > 0
-        ? unlinkLocalFileLinks(item.text, evidencePaths)
-        : item.text,
-    [item.text, evidencePaths],
-  );
+  const bodyText = useMemo(() => {
+    const text =
+      item.role === "assistant" ? presentAssistantText(item.text) : item.text;
+    return evidencePaths.length > 0
+      ? unlinkLocalFileLinks(text, evidencePaths)
+      : text;
+  }, [item.role, item.text, evidencePaths]);
   const hasText = bodyText.trim().length > 0;
   // Apps the reply links (`stella://app/<slug>`) show as app cards under it.
   const linkedAppSlugs = useMemo(

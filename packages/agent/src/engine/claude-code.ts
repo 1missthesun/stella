@@ -45,7 +45,7 @@ import {
   type ClaudeCodeServedSearchToolName,
 } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
-import { placementOf, StellaPlacementDoc } from "../stella/placement.ts";
+import { describePlacement, placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella/placement.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
@@ -175,6 +175,8 @@ type CallRecord = {
   name: string;
   native: boolean;
   truncated?: string;
+  /** A built-in started after its file and shell tools moved away; its CLI was stopped and it was answered as not run. */
+  blocked?: true;
 };
 
 type NativeResult = { text: string; isError: boolean };
@@ -201,6 +203,12 @@ type Turn = {
   nextToolSet?: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
   /** Tool results the CLI's ended step never read; the next step is told them. */
   carried?: Message[];
+  /**
+   * Where the file and shell tools went while this CLI still has built-ins
+   * that must not run here: any built-in it starts stops the CLI, until the
+   * step restarts on the new tool set.
+   */
+  fenced?: string;
 };
 
 type TurnRequest = {
@@ -292,6 +300,9 @@ const backgroundWakeText = (wake: ClaudeCodeBackgroundWake): string =>
     "",
     "You were resumed for this. Continue the work that was waiting on it, or say what you found.",
   ].join("\n");
+
+const dropsBuiltins = (from: { nativeTools: readonly string[] }, to: { nativeTools: readonly string[] }): boolean =>
+  from.nativeTools.some((name) => !to.nativeTools.includes(name));
 
 const toolSetKey = (set: { tools: readonly ClaudeCodeToolSpec[]; nativeTools: readonly string[] }): string =>
   JSON.stringify([set.nativeTools, set.tools.map((tool) => tool.name)]);
@@ -534,6 +545,36 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     return { tools: set.tools, nativeTools };
   };
 
+  /**
+   * The session's file and shell tools left this computer while its CLI
+   * still holds built-ins: from now on a built-in it starts stops the CLI
+   * (`blockBuiltin`), until its step restarts on the new tool set.
+   */
+  const fence = (session: Session, placement: StellaPlacement | undefined) => {
+    const turn = session.turn;
+    const request = session.request;
+    if (!turn || turn.done || !request) return;
+    if (!dropsBuiltins(turn.toolSet, toolSetFor(session.binding, getCurrentTools(request.messages)))) return;
+    turn.fenced = placement && placement.kind !== "local" ? describePlacement(placement) : "another computer";
+  };
+
+  /**
+   * A fenced CLI started a built-in, which would run on this computer: the
+   * CLI is stopped before it can, the call is answered as not run, and the
+   * step carries on with the tools where they run now.
+   */
+  const blockBuiltin = (turn: Turn, record: CallRecord, toolUseId: string) => {
+    const where = turn.fenced ?? "another computer";
+    record.blocked = true;
+    const request = turn.session.request;
+    if (request && !turn.nextToolSet) turn.nextToolSet = toolSetFor(turn.session.binding, getCurrentTools(request.messages));
+    settleNative(toolUseId, {
+      text: `Not run: your file and shell tools now run on ${where}, so the built-in ${record.name} is off on this computer. Use the tools you have now.`,
+      isError: true,
+    });
+    if (turn.endStep?.() !== true) abortTurn(turn, `Your file and shell tools moved to ${where}, and Claude Code could not restart on them.`);
+  };
+
   const startTurn = async (
     session: Session,
     request: TurnRequest,
@@ -677,7 +718,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           if (event.type === "stream_event") answered();
           push(turn, { kind: "event", event: event as Record<string, any> });
         },
-        onNativeToolEnd: ({ toolUseId, result, isError }) => settleNative(toolUseId, { text: result, isError }),
+        onNativeToolEnd: ({ toolUseId, result, isError }) => {
+          if (calls.get(toolUseId)?.blocked) return;
+          settleNative(toolUseId, { text: result, isError });
+        },
         onStatus: (status) => {
           for (const listener of statusListeners) {
             try {
@@ -704,6 +748,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           const carried = turn.carried;
           turn.nextToolSet = undefined;
           turn.carried = undefined;
+          turn.fenced = undefined;
           turn.toolSet = next;
           return { ...next, prompt: movedPrompt(carried) };
         },
@@ -867,8 +912,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               output.content.push(call);
               const index = output.content.length - 1;
               blocks.set(cliIndex, { index, kind: "tool", json: "" });
-              calls.set(block.id, { turn, name, native });
+              const record: CallRecord = { turn, name, native };
+              calls.set(block.id, record);
               turn.callIds.add(block.id);
+              if (native && turn.fenced && turn.toolSet.nativeTools.includes(name)) blockBuiltin(turn, record, block.id);
               messageTools += 1;
               out.push({ type: "toolcall_start", contentIndex: index, partial: output });
             }
@@ -974,7 +1021,17 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const current = turn;
       const ours = results.length > 0 && results.every((message) => message.role === "toolResult" && current.callIds.has(message.toolCallId));
       const stopped = turn.abort.signal.aborted;
-      if (!ours || stopped || (turn.done && turn.queue.length === 0)) {
+      const replaced = !ours || stopped || (turn.done && turn.queue.length === 0);
+      const moved = !replaced && !turn.done && toolSetKey(turn.toolSet) !== toolSetKey(toolSet);
+      if (moved) {
+        turn.nextToolSet = toolSet;
+        turn.carried = results;
+      }
+      const restarted = moved && turn.endStep?.() === true;
+      if (!restarted) turn.carried = undefined;
+      // A CLI that keeps built-ins its tools left must not read these results and go on: a new turn takes them.
+      const stranded = moved && !restarted && dropsBuiltins(turn.toolSet, toolSet);
+      if (replaced || stranded) {
         holdUndelivered(session, turn.unsent);
         turn.unsent = [];
         abortTurn(turn, "Superseded.");
@@ -992,13 +1049,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         const fresh = unseen.filter((message) => !told.includes(message));
         const held = new Set(turn.unsent.map(messageKey));
         const waiting = [...turn.unsent, ...fresh.filter((message) => !held.has(messageKey(message)))];
-        const moved = !turn.done && toolSetKey(turn.toolSet) !== toolSetKey(toolSet);
-        if (moved) {
-          turn.nextToolSet = toolSet;
-          turn.carried = results;
-        }
-        const restarted = moved && turn.endStep?.() === true;
-        if (!restarted) turn.carried = undefined;
         if (waiting.length > 0) {
           const prompt = userPrompt(waiting);
           const steered = turn;
@@ -1244,8 +1294,12 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
                 piConversationId: api.conversationId,
               };
               const known = sessions.get(identity.sessionId);
-              if (known) known.binding = binding;
-              else sessions.set(identity.sessionId, { piSessionId: identity.sessionId, binding });
+              if (known) {
+                const wasRemote = known.binding.toolsRemote;
+                known.binding = binding;
+                if (!wasRemote && binding.toolsRemote) fence(known, placement);
+                else if (!binding.toolsRemote && known.turn) known.turn.fenced = undefined;
+              } else sessions.set(identity.sessionId, { piSessionId: identity.sessionId, binding });
               return undefined;
             },
           }),
@@ -1254,6 +1308,18 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             beforeTool: (call) => {
               const truncated = calls.get(call.id)?.truncated;
               return truncated ? { block: truncated } : undefined;
+            },
+            // A Stella tool (switch_destination) may have just moved the file and shell tools: a CLI
+            // still holding built-ins is fenced at once, not at the next request.
+            afterTool: async (call, _result, api, context) => {
+              if (calls.get(call.id)?.native !== false) return undefined;
+              const session = [...sessions.values()].find((candidate) => candidate.binding.piConversationId === api.conversationId);
+              if (!session || session.binding.toolsRemote || !session.turn || session.turn.done) return undefined;
+              const placement = placementOf(await api.snapshot(StellaPlacementDoc, api.conversationId, context));
+              if (!placement || placement.kind === "local") return undefined;
+              session.binding = { ...session.binding, toolsRemote: true };
+              fence(session, placement);
+              return undefined;
             },
           }),
         ],

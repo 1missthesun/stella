@@ -59,13 +59,6 @@ export const AGENTS_UNOWNED_SETTLED_KEY = "agentsUnownedSettledAt";
  */
 export const AGENT_OWNER_RECORD_LAG_MS = 10 * 60_000;
 export const PI_HEARTBEAT_MS = 30_000;
-/** The agent tools a pi-durable conversation's harness has itself. */
-export const PI_HARNESS_AGENT_TOOL_NAMES: ReadonlySet<string> = new Set([
-  "spawn_agent",
-  "send_message",
-  "agent_status",
-  "pause_agent",
-]);
 /**
  * While a chat turn runs, its alarm fires at least this often. The alarm is
  * what wakes a replaced object (a deploy, an eviction) so the wake can resume
@@ -87,18 +80,6 @@ export const CHAT_TURN_STARTED_AT_KEY = "turnStartedAt";
  * so the gateway's per-capability ledger keeps counting the turn's spend.
  */
 export const CHAT_TURN_MODEL_CAPABILITY_KEY = "turnModelCapability";
-
-/** Poll the BuildSession this often while a CLI turn waits for its terminal. */
-export const CLI_TURN_POLL_MS = 20_000;
-/** A tool forward waits this long for a resumed turn to rebuild its tools. */
-export const CLI_RUNTIME_WAIT_MS = 60_000;
-/** A dispatch refused while the previous attempt unwinds is resent this often. */
-export const CLI_DISPATCH_BUSY_RETRY_MS = 2_000;
-export const CLI_DISPATCH_BUSY_RETRIES = 10;
-/** Rows one CLI context block considers before its character budget. */
-export const CLI_CONTEXT_ROW_LIMIT = 400;
-/** The terminal's reply text as stored durably (DO values cap at 128 KiB). */
-export const CLI_TERMINAL_DURABLE_TEXT_MAX = 24_000;
 
 export const OWNER_PURGE_STALE_LEASE_GRACE_MS = 35_000;
 export const LOCAL_TURN_LEASE_MS = 30 * 60_000;

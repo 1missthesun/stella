@@ -416,12 +416,12 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       // checks it again with memory policy after read-only preparation.
       await assertExactTurnActive();
       this.activeTurnId = turn.turnId;
-      // An `anthropic` turn runs on the Claude Code CLI in the orchestrator
-      // container (`runCliTurn`); Stella-model and ChatGPT-plan turns run on
-      // pi-durable (`runPiTurn`).
+      // Every turn runs on pi-durable (`runPiTurn`). An `anthropic` turn's
+      // model is Claude Code, whose CLI runs in the orchestrator container
+      // (`claude-code-transport.ts`); it holds no model capability.
       const harnessExecution =
         turn.execution.engine === "anthropic" ? undefined : turn.execution;
-      if (turn.piAgent && harnessExecution?.engine !== "stella") {
+      if (turn.piAgent && turn.execution.engine !== "stella") {
         throw new Error(
           "A computer's cloud agents run on Stella's models; this conversation's cloud turns use another engine.",
         );
@@ -456,19 +456,35 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             .devices()
             .catch(() => null),
       );
-      const agentHome = this.cloudAgentHome(turn);
       if (!harnessExecution) {
-        return await this.runCliTurn({
+        const execution = turn.execution;
+        return await this.runPiTurn({
           turn,
           turnCancellation,
           executionSignal,
           resumeTurn,
           started,
-          agentHome,
-          preparationTimings,
-          measurePreparation,
+          execution,
+          capability: "",
+          relayFetch: async () => {
+            throw new Error("A Claude Code turn sends no model request through the gateway.");
+          },
+          gatewayOrigin: this.env.MODEL_GATEWAY_URL?.trim() ?? "",
+          homeWork: (() => {
+            const prefetched = this.cloudHomePreparations.get(turn.turnId)?.home;
+            this.cloudHomePreparations.delete(turn.turnId);
+            const loadHome = () => this.prepareCloudHomeContext(turn);
+            return (prefetched ? prefetched.catch(loadHome) : loadHome()).then(
+              (context) => {
+                Object.assign(preparationTimings, context.timings);
+                return context;
+              },
+            );
+          })(),
           canonicalPromptsWork,
           destinationsWork,
+          measurePreparation,
+          preparationTimings,
           assertExactTurnActive,
         });
       }
@@ -866,15 +882,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
   }
 
   /**
-   * One chat turn on the Claude Code CLI. Same claim, preparation, prompt
-   * row, terminal ladder and post-terminal work as Stella's own loop; what
-   * differs is who runs the model. No model capability is minted here, no
-   * relay session or summarizer exists (Claude Code compacts its own
-   * session), and the turn is dispatched once: a resumed turn that finds its
-   * dispatch record waits for that exact attempt's terminal instead.
-   */
-  /**
-   * A Stella-model turn of a conversation that runs on pi-durable. The turn
+   * A turn of a conversation that runs on pi-durable, on any engine. The turn
    * plane around it is unchanged: admission, owner fence, the turn's model
    * capability and guarded transport, watchdog, terminal delivery. pi owns
    * the run: the prompt goes to its root conversation under the turn id, so
@@ -946,7 +954,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             this.cloudAgentHome(turn),
             home.skillCatalog,
             home.memoryPreference.memoryEnabled,
-            "pi",
           )
         ).catalog,
       sources: {
@@ -1109,6 +1116,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       });
       this.currentPiRun = {
         abort: () => {
+          runtime.stopClaudeCode();
           void root.abort(pi.contextFor()).catch((error: unknown) => {
             log("error", "pi_turn_abort_failed", {
               turnId: turn.turnId,
@@ -1147,9 +1155,17 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         return json({ ok: false, canceled: true });
       }
       if (settled.status !== "done") {
-        throw new Error(
-          `Stella could not answer this turn (${settled.reason}).`,
-        );
+        // Claude Code's own reason (a login, a usage limit) is the user's to read.
+        const claudeCodeFailure =
+          args.execution.engine === "anthropic"
+            ? this.claudeCodeTransport().takeFailure(turn.turnId)
+            : undefined;
+        throw claudeCodeFailure
+          ? new CliTurnFailedError(
+              `Claude Code turn failed: ${claudeCodeFailure}`,
+              claudeCodeFailure,
+            )
+          : new Error(`Stella could not answer this turn (${settled.reason}).`);
       }
       const finalText = (await runtime.answer(settled, context)).trim();
       log("info", "pi_turn_answered", {
@@ -1160,6 +1176,9 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       return await this.completeChatTurn(turn, finalText, args.started);
     } finally {
       this.currentPiRun = undefined;
+      if (args.execution.engine === "anthropic") {
+        this.claudeCodeTransport().takeFailure(turn.turnId);
+      }
       unbind();
       await stream?.stop().catch(() => undefined);
       await this.ctx.storage

@@ -1,5 +1,4 @@
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
-import * as Deferred from "effect/Deferred";
 import { DurableObject } from "cloudflare:workers";
 import type {
   TurnExecution,
@@ -26,10 +25,6 @@ import {
 import { Journal } from "../journal.js";
 import { ConversationArchive } from "../archive.js";
 import { ConversationIndex } from "../index-flush.js";
-import type {
-  CloudCliTurnTerminal,
-  CloudOrchestratorToolCallResponse,
-} from "@stella/contracts/cloud-orchestrator-cli";
 import { ExactTurnCancellationLedger } from "../execution-placement-turn-cancellation.js";
 import type {
   Env,
@@ -37,7 +32,6 @@ import type {
   OwnerFencedTurn,
   LocalTurnLease,
   AgentsView,
-  CliTurnRuntime,
 } from "./types.js";
 import {
   AGENT_RUNTIME_KEY,
@@ -148,27 +142,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   protected eventSeqTail: Promise<unknown> = Promise.resolve();
   /** Persisted with accepted turns so cold-start index flushes stay fenced. */
   protected ownerGeneration?: string;
-
-  /**
-   * The Claude Code turn running in this isolate (`runCliTurn`), keyed by
-   * turn id: the tools its forwarded calls run against. In memory only; a
-   * resumed turn rebuilds it before it waits.
-   */
-  protected readonly cliRuntimes = new Map<string, CliTurnRuntime>();
-  /** Tool forwards that arrived before a resumed turn rebuilt its tools. */
-  protected readonly cliRuntimeWaiters = new Map<
-    string,
-    Array<Deferred.Deferred<void>>
-  >();
-  /** Wakes the waiting `runCliTurn` when its terminal frame lands. */
-  protected readonly cliTerminalWaiters = new Map<string, () => void>();
-  /** Terminal frames, full text, for the turn waiting in this isolate. */
-  protected readonly cliTerminals = new Map<string, CloudCliTurnTerminal>();
-  /** In-flight CLI tool calls, so a replayed forward joins the first one. */
-  protected readonly cliToolCalls = new Map<
-    string,
-    Promise<CloudOrchestratorToolCallResponse>
-  >();
 
   // Aborts the live turn's retry ladder:
   // classification reads it to refuse retries after a cancel/timeout, and an

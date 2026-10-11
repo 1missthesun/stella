@@ -303,10 +303,6 @@ export const cloudContextFailure = (
 export const terminalNotice = (kind: string): string =>
   (TERMINAL_NOTICE as Record<string, string>)[kind] ?? TERMINAL_NOTICE.failed;
 
-/** Correlates a committed assistant row with the deltas that preceded it. */
-export const newStreamId = (): string =>
-  `as_${crypto.randomUUID().replaceAll("-", "").slice(0, 16)}`;
-
 export const previewArgs = (args: unknown): string => {
   try {
     return JSON.stringify(args ?? {}).slice(0, TOOL_ARGS_PREVIEW_MAX);

@@ -13,13 +13,10 @@ import {
 import { checkpointMessages } from "@stella/runtime/kernel/agent-runtime/orchestrator-compaction.js";
 import {
   buildResidentContextMessages,
-  residentIdentityForCustomMessage,
   type ResidentContext,
 } from "@stella/runtime/kernel/agent-runtime/resident-context.js";
 import type { MemoryPolicy } from "@stella/contracts/turn-plane/memory-policy";
 import { WORLD_ROOT } from "./workspace.js";
-
-export const PROMPT_CONTEXT_KEY = "cloudPromptContext:v2";
 
 /** A compacted conversation's summary of the history it replaced. */
 export type ContextCheckpoint = {
@@ -55,16 +52,6 @@ export type PromptContext = {
   head: ResidentPrompt[];
   startSeq: number;
 };
-
-export const reusablePromptContext = (args: {
-  storedContext?: PromptContext;
-  journalEpoch: number;
-  ownerGeneration: string;
-}): PromptContext | undefined =>
-  args.storedContext?.journalEpoch === args.journalEpoch &&
-  args.storedContext.ownerGeneration === args.ownerGeneration
-    ? args.storedContext
-    : undefined;
 
 export const promptContextHistoryStartAfterSeq = (args: {
   previousContext?: PromptContext;
@@ -377,28 +364,3 @@ export const providerHistory = (args: {
     : []),
   ...materializeProviderContext(args.messages, args.context.epoch),
 ];
-
-/**
- * Resident prompts for an engine that keeps its own session (Claude Code):
- * what to send before this turn's message, and what that session will have
- * seen once it takes the turn. A fresh session (`seen` empty) gets the whole
- * head; a continuing one only what changed, as on a desktop thread.
- */
-export const sessionResidentPrompts = (args: {
-  resident: Omit<ResidentContext, "threadHistory">;
-  seen: readonly ResidentPrompt[];
-}): { prompts: ResidentPrompt[]; seen: ResidentPrompt[] } => {
-  const prompts = buildResidentContextMessages({
-    ...args.resident,
-    threadHistory: args.seen.map(residentHistoryEntry),
-  }).map(residentPrompt);
-  const latest = new Map<string, ResidentPrompt>();
-  for (const prompt of [...args.seen, ...prompts]) {
-    const identity = residentIdentityForCustomMessage({
-      customType: prompt.customType,
-      content: prompt.text,
-    });
-    if (identity) latest.set(identity, prompt);
-  }
-  return { prompts, seen: [...latest.values()] };
-};

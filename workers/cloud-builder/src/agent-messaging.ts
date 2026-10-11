@@ -5,12 +5,9 @@
  * which sees every placement and every conversation.
  */
 
-import type { AgentToolResult } from "@stella/runtime/kernel/agent-core/types.js";
 import {
   AGENT_MESSAGE_MAX_CHARS,
-  buildAgentDirectoryResult,
   type AgentDirectoryAgentRow,
-  type AgentDirectoryCaller,
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
@@ -43,46 +40,6 @@ export const readAgentDirectory = async (
     ownerGeneration: caller.ownerGeneration,
     conversationId,
   })) as AgentDirectory;
-
-export const agentDirectoryStatus = async (
-  caller: AgentMessagingCaller,
-  you: AgentDirectoryCaller,
-): Promise<AgentToolResult<unknown>> => {
-  const directory = await readAgentDirectory(caller, you.conversationId);
-  const listing = buildAgentDirectoryResult({ caller: you, ...directory });
-  return {
-    content: [{ type: "text", text: JSON.stringify(listing, null, 2) }],
-    details: listing,
-  };
-};
-
-/** `agent_status` on a session's thread_id: the row the listing shows for it. */
-export const sessionStatus = async (
-  caller: AgentMessagingCaller,
-  conversationId: string,
-  threadId: string,
-): Promise<AgentToolResult<unknown> | null> => {
-  const { sessions } = await readAgentDirectory(caller, conversationId);
-  const session = sessions.find((row) => row.conversationId === threadId);
-  if (!session) return null;
-  const title = session.title.trim() || "Untitled chat";
-  const status = session.active ? "running" : "idle";
-  return {
-    content: [
-      {
-        type: "text",
-        text: `Thread ${threadId} is another Stella session ("${title}"), ${status} in ${session.where}, last active ${new Date(session.updatedAt).toISOString()}. send_message queues a note as its next turn. This snapshot did not message it.`,
-      },
-    ],
-    details: {
-      thread_id: threadId,
-      title,
-      status,
-      where: session.where,
-      last_active_at: new Date(session.updatedAt).toISOString(),
-    },
-  };
-};
 
 export const sendAgentMessage = async (
   caller: AgentMessagingCaller,
@@ -143,25 +100,3 @@ export const controlAgentThread = async (
     ownerGeneration: caller.ownerGeneration,
     ...input,
   })) as AgentControlResult;
-
-export const agentMessageResult = (
-  delivery: AgentMessageDelivery,
-): AgentToolResult<unknown> => ({
-  content: [
-    {
-      type: "text",
-      text: delivery.note
-        ? `Queued for ${delivery.threadId}. ${delivery.note}`
-        : delivery.delivered === "steered"
-          ? `Delivered to ${delivery.threadId}. It is working and reads your message before its next step.`
-          : delivery.delivered === "resumed"
-            ? `Delivered to ${delivery.threadId}. It was idle, so your message started its next run.`
-            : `Delivered to ${delivery.threadId}. That Stella reads it as its next turn.`,
-    },
-  ],
-  details: {
-    thread_id: delivery.threadId,
-    delivered: delivery.delivered,
-    ...(delivery.note ? { note: delivery.note } : {}),
-  },
-});

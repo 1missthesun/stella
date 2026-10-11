@@ -124,6 +124,9 @@ import { resolveCloudSpawnExecution } from "../cloud-spawn-model.js";
  * brain's placement, the journal checkpoint, and the running-agents view.
  */
 export abstract class OrchestratorPi extends OrchestratorCloudAgents {
+  /** The transport pi's Claude Code engine runs this conversation's CLI turns on. */
+  protected abstract claudeCodeTransport(): import("./claude-code-transport.js").CloudClaudeCodeTransport;
+
   /** A model grant from the owner, unless a freeze landed while it was issued. */
   protected async acquireOwnerModelGrant(
     expected: LocalOwnerModelGrantExpectation,
@@ -376,6 +379,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           agentGuard: (authority, turnId) =>
             this.piAgentGuard(authority, turnId),
           deviceAgents: this.piDeviceAgents(),
+          claudeCode: this.claudeCodeTransport(),
           threadAgents: this.piThreadAgents(),
           // Her brief continues there once this turn ends (`runPiTurn`).
           moveBrain: async (authority, host, brief) => {
@@ -1313,6 +1317,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     const runtime = await this.openPiRuntime(gatewayOrigin);
     const { root } = await runtime.open();
     const { contextFor } = await import("../pi-runtime.js");
+    runtime.stopClaudeCode();
     await root.abort(contextFor());
   }
 

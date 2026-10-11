@@ -57,6 +57,13 @@ import {
   type OpenStellaHarness,
 } from "@stella/agent/harness";
 import { CHATGPT_PROVIDER_ID, chatGptModel, chatGptProvider } from "@stella/agent/provider/chatgpt";
+import {
+  CLAUDE_CODE_PROVIDER_ID,
+  createClaudeCodeEngine,
+  type ClaudeCodeEngine,
+  type ClaudeCodeSessionRecord,
+  type ClaudeCodeTransport,
+} from "@stella/agent/engine/claude-code";
 import { accountByokProvider, accountProviderModel } from "@stella/agent/provider/account-byok";
 import {
   STELLA_PROVIDER_ID,
@@ -193,10 +200,16 @@ const CLIENT_FRAME_BYTES = 512 * 1024;
 
 /**
  * A turn pi runs: on Stella's models, on the owner's ChatGPT plan through the
- * gateway's native lane, or on a provider key saved to the owner's account
- * through its BYOK lane.
+ * gateway's native lane, on a provider key saved to the owner's account
+ * through its BYOK lane, or on Claude Code, whose CLI runs in the
+ * conversation's orchestrator container (`PiRuntimeOptions.claudeCode`).
  */
-export type PiExecution = Extract<CloudExecutionSelection, { engine: "stella" | "chatgpt" | "provider" }>;
+export type PiExecution = CloudExecutionSelection;
+
+/** The scope the Claude Code engine knows this object's conversations by. */
+const CLAUDE_CODE_SCOPE = "cloud";
+/** Storage key prefix of each Claude Code session's record, by pi session id. */
+const CLAUDE_CODE_SESSION_KEY = "claudeCodeSession:";
 
 /** Whose agents these are, as the latest chat turn admitted them. */
 export type PiAuthority = {
@@ -448,6 +461,11 @@ export type PiRuntimeOptions = {
    * policy) on each of its requests, revoked by a purge or privacy change.
    */
   agentGuard?(authority: PiAuthority, turnId: string): Promise<PiAgentGuard>;
+  /**
+   * Runs one Claude Code CLI turn of the orchestrator in the conversation's
+   * orchestrator container, for a turn on the `anthropic` execution.
+   */
+  claudeCode?: ClaudeCodeTransport;
 };
 
 /** A tool the root conversation started or finished, for clients' live view. */
@@ -639,6 +657,8 @@ export type JournalRecordLike = {
 export class PiConversationRuntime {
   readonly #options: PiRuntimeOptions;
   readonly #models = createModels();
+  /** Claude Code as a pi engine, when this object can run its CLI. */
+  readonly #claudeCode: ClaudeCodeEngine | undefined;
   #opening: Promise<Opened> | undefined;
   #binding: PiTurnBinding | undefined;
   /** The bound turn's tools, built once per turn. */
@@ -669,6 +689,37 @@ export class PiConversationRuntime {
 
   constructor(options: PiRuntimeOptions) {
     this.#options = options;
+    const transport = options.claudeCode;
+    if (transport) {
+      const engine = createClaudeCodeEngine({
+        transport,
+        builtins: "never",
+        sessions: {
+          read: async (piSessionId) =>
+            await options.storage.get<ClaudeCodeSessionRecord>(`${CLAUDE_CODE_SESSION_KEY}${piSessionId}`),
+          write: async (piSessionId, record) => {
+            await options.storage.put(`${CLAUDE_CODE_SESSION_KEY}${piSessionId}`, record);
+          },
+        },
+        report: options.report,
+      });
+      this.#models.setProvider(engine.provider());
+      engine.onProviderChange((provider) => this.#models.setProvider(provider));
+      engine.onStatus((session, status) =>
+        options.log("claude_code_status", { role: session.role, state: status.state }),
+      );
+      this.#claudeCode = engine;
+    }
+  }
+
+  /** The chat turn bound now; waits for one while `signal` allows. */
+  async boundTurn(signal: AbortSignal): Promise<PiTurnBinding> {
+    return await this.#turn(signal);
+  }
+
+  /** Stop the Claude Code CLI turns this object runs, with the conversation's run. */
+  stopClaudeCode(): void {
+    this.#claudeCode?.abort(CLAUDE_CODE_SCOPE, { agents: true });
   }
 
   // ---- transports ---------------------------------------------------------
@@ -730,12 +781,15 @@ export class PiConversationRuntime {
   }
 
   async #mint(authority: PiAuthority, turnId: string): Promise<{ token: string; expiresAt: number }> {
+    const execution = authority.execution;
+    // A Claude Code turn's agents run as agent threads, never on a model here.
+    if (execution.engine === "anthropic") throw new Error("Agents of a Claude Code turn run in containers of their own.");
     const minted = await mintTurnCapability(this.#options.env, {
       ownerId: authority.ownerId,
       ownerGeneration: authority.ownerGeneration,
       turnId,
       conversationId: authority.conversationId,
-      execution: authority.execution,
+      execution,
       audience: authority.audience,
       budgetMicroCents: authority.budgetMicroCents,
       agentTypes: ["general"],
@@ -835,6 +889,10 @@ export class PiConversationRuntime {
 
   /** The orchestrator's model for a turn's execution. */
   #rootModel(execution: PiExecution) {
+    if (execution.engine === "anthropic") {
+      if (!this.#claudeCode) throw new Error("Claude Code can't run in this conversation's cloud.");
+      return this.#claudeCode.ensureModel(execution.model);
+    }
     return execution.engine === "chatgpt"
       ? { provider: CHATGPT_PROVIDER_ID, modelId: execution.model }
       : execution.engine === "provider"
@@ -1087,6 +1145,9 @@ export class PiConversationRuntime {
         threads.check(requested, (await this.#agentState()).authority);
         return { engine: THREAD_AGENT_ENGINE };
       },
+      // Claude Code's CLI runs only Stella's own turns here: her agents run
+      // as agent threads on her execution, in containers of their own.
+      defaultAgentModel: (caller) => (caller.model?.provider === CLAUDE_CODE_PROVIDER_ID ? "default" : undefined),
       engine: (id) => (id === THREAD_AGENT_ENGINE ? this.#threadAgentHost() : undefined),
       execution: this.#execution(),
       beginAgentRun: async (run, context) => {
@@ -1949,7 +2010,10 @@ export class PiConversationRuntime {
           agents: this.#agents(),
           tools: this.#tools(),
           // An agent's file and shell tools run in its container, through the attached tool host.
-          extensions: [piAttachedCoding((call, context) => this.#attachedTool(call, context))],
+          extensions: [
+            piAttachedCoding((call, context) => this.#attachedTool(call, context)),
+            ...(this.#claudeCode ? [this.#claudeCode.extension(CLAUDE_CODE_SCOPE)] : []),
+          ],
           onReport: this.#options.report,
         },
         BACKGROUND_CONTEXT,
@@ -2161,6 +2225,7 @@ export class PiConversationRuntime {
   #threadModel(execution: PiExecution, model: StellaModelSpec | undefined) {
     if (execution.engine === "chatgpt") return { provider: CHATGPT_PROVIDER_ID, modelId: execution.model };
     if (execution.engine === "provider") return { provider: execution.provider, modelId: execution.model };
+    if (execution.engine === "anthropic") throw new Error("A Claude Code agent thread runs in a container of its own.");
     if (!model) throw new Error("An agent on Stella's models needs its model.");
     return stellaModelRef("general", model.alias);
   }

@@ -1,4 +1,3 @@
-import type { AgentTool } from "@stella/runtime/kernel/agent-core/types.js";
 import type { AgentActivityEntry } from "@stella/contracts/conversation-agent-activity";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
@@ -10,7 +9,6 @@ import type { MintedTurnCapability } from "../capability-signer.js";
 import type { CloudAgentControlReceipt } from "../cloud-agent-dispatch.js";
 import type { TurnPhase } from "../conversation-types.js";
 import type { LocalTerminalPhase } from "../local-turn-protocol.js";
-import type { CloudCliTurnIdentity } from "@stella/contracts/cloud-orchestrator-cli";
 
 export type WakeReport = { prompt: string; lifecycleReport?: string };
 
@@ -265,17 +263,6 @@ export type ChatTurnResumeRecord = { turnId: string; count: number };
 export type PersistedChatTurnModelCapability = {
   turnId: string;
   capability: MintedTurnCapability;
-};
-
-/** What a forwarded CLI tool call runs against; see `cliRuntimes`. */
-export type CliTurnRuntime = {
-  identity: CloudCliTurnIdentity;
-  turn: ChatTurnRequest;
-  tools: AgentTool[];
-  /** The turn's execution signal: Stop and the watchdog abort tool work. */
-  signal: AbortSignal;
-  /** Sequential, as Stella's own loop runs tools. */
-  toolChain: Promise<unknown>;
 };
 
 export type CloudContextComponent =

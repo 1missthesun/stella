@@ -1,16 +1,17 @@
 /**
  * Wire contract for a cloud orchestrator chat turn run by the real Claude Code
  * CLI. When a conversation's execution engine is `anthropic`, the
- * OrchestratorSession Durable Object does not run Stella's Agent loop: it
- * dispatches the turn to a BuildSession as an agent turn with
+ * OrchestratorSession Durable Object runs the turn on pi with its Claude Code
+ * engine: each CLI turn is dispatched to a BuildSession as an agent turn with
  * `agentRole: "orchestrator"`, and the container executor runs `claude` with
- * the DO's own system prompt and tools.
+ * the system prompt and tools pi gives it.
  *
  *   DO --dispatch--> BuildSession --turn-input.json--> executor --> claude
  *   claude --MCP--> executor --broker--> BuildSession --internal--> DO
  *
- * The DO stays the single source of tools: the executor only advertises the
- * catalog it was handed and forwards every call back. Identity:
+ * pi stays the single source of tools: the executor only advertises the
+ * catalog it was handed and forwards every call back, where pi's own tool
+ * task answers it. Identity:
  *   - threadId is `orchestratorCliThreadId(conversationId)`;
  *   - turnId is the DO's chat turn id (the dispatch passes it as `turnId`);
  *   - attemptGeneration is the BuildSession attempt for that turn.

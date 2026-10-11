@@ -20,7 +20,6 @@
  * built-ins return: the fast path whenever tools are local.
  */
 import { isDeviceToolName } from "@stella/contracts/turn-plane/device-tools";
-import type { ToolMetadata } from "../tools/types.js";
 
 export type ClaudeCodeNativeToolRole = "orchestrator" | "worker";
 
@@ -115,7 +114,7 @@ export const resolveClaudeCodeNativeTools = (
  * ones the role must never hold.
  */
 export const withoutToolsReplacedByNative = <
-  T extends Pick<ToolMetadata, "name">,
+  T extends { name: string },
 >(
   tools: readonly T[],
   nativeTools: readonly string[],
@@ -143,7 +142,7 @@ export const isClaudeCodeNativeToolName = (toolName: string): boolean =>
  * anywhere else.
  */
 export const resolveClaudeCodeToolSet = <
-  T extends Pick<ToolMetadata, "name">,
+  T extends { name: string },
 >(args: {
   role: ClaudeCodeNativeToolRole;
   toolsAllowlist?: readonly string[];

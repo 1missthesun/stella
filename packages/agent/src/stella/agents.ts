@@ -329,6 +329,11 @@ export type StellaAgentsHost = {
     placement: StellaPlacement | undefined,
     context: Context,
   ): Promise<AgentModelChoice>;
+  /**
+   * The model an agent runs on when its caller names none, where the
+   * caller's own cannot run an agent here; absent, it runs on the caller's.
+   */
+  defaultAgentModel?(caller: RunsOn): string | undefined;
   /** Another engine on this host that runs whole agents (Claude Code on a computer), by its id. */
   engine?(id: string): RemoteAgentHost | undefined;
   /** Where the orchestrator itself runs. */
@@ -916,17 +921,17 @@ export function stellaAgents(host: StellaAgentsHost) {
         );
       }
       const callerAgent = await api.agent(context);
-      const requested = args.model?.trim();
+      const named = args.model?.trim();
+      const requested = named && named !== "default" ? named : host.defaultAgentModel?.(callerAgent);
       const description = args.description.trim() || "agent";
       // An agent's agent stays with it, its tools where it asked or where its
       // caller's run (the cloud, a computer), so its report climbs the chain
       // like any other. Only a whole agent leaves, and only Stella starts one.
       const whole = caller.agentType === "orchestrator" || (destination.kind === "device" && destination.whole === true);
       const placedRemote = whole ? host.remote?.(placement) : undefined;
-      const choice =
-        requested && requested !== "default"
-          ? await chooseAgentModel(requested, callerAgent, placedRemote ? placement : undefined, context)
-          : undefined;
+      const choice = requested
+        ? await chooseAgentModel(requested, callerAgent, placedRemote ? placement : undefined, context)
+        : undefined;
       if (placedRemote && choice && "runsOn" in choice) {
         throw new Error(`"${requested}" runs only where you are, not ${describePlacement(placement)}.`);
       }
@@ -956,7 +961,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 key: `spawn:${callKey}`,
                 description,
                 prompt: args.prompt,
-                ...(requested && requested !== "default" ? { model: requested } : {}),
+                ...(requested ? { model: requested } : {}),
               },
               context,
             )

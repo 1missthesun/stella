@@ -329,6 +329,13 @@ const thinkingLevelOf = (options: SimpleStreamOptions | undefined): ModelThinkin
 export type ClaudeCodeEngineOptions = {
   transport: ClaudeCodeTransport;
   sessions: ClaudeCodeSessionStore;
+  /**
+   * `never`: the CLI keeps none of its built-ins, so every file and shell
+   * call is a Stella tool that runs where the conversation's tools run (the
+   * cloud's CLI runs apart from them). Default `here`: built-ins run where
+   * the CLI does while the tools are local.
+   */
+  builtins?: "here" | "never";
   report?(error: unknown): void;
 };
 
@@ -1034,7 +1041,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
                   sessionKey: threadId ? `${conversationId}:${threadId}` : conversationId,
                   ...(agent.cwd ? { cwd: agent.cwd } : {}),
                 },
-                toolsRemote: placement !== undefined && placement.kind !== "local",
+                toolsRemote: options.builtins === "never" || (placement !== undefined && placement.kind !== "local"),
                 piConversationId: api.conversationId,
               };
               const known = sessions.get(identity.sessionId);

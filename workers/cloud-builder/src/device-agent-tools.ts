@@ -11,15 +11,8 @@
 
 import type {
   AgentThreadControl,
-  AgentThreadLookup,
   AgentThreadSummary,
 } from "@stella/contracts/backend/agent-threads";
-import {
-  agentThreadLookupControllable,
-  agentThreadLookupReport,
-  describeAgentThreadLookup,
-  isAgentThreadLookupActive,
-} from "@stella/contracts/backend/agent-thread-lookup";
 import type {
   CloudAgentControlReceipt,
   CloudAgentControlStatus,
@@ -62,9 +55,6 @@ const receiptOf = (
   ...(base.description ? { description: base.description } : {}),
   executorDeviceId: base.executorDeviceId,
 });
-
-export const DEVICE_AGENT_QUEUED_NOTE =
-  "That device is offline or isn't accepting work right now, so this agent is queued. It retries automatically for up to 60 minutes.";
 
 export const spawnDeviceAgent = async (
   caller: DeviceAgentCaller,
@@ -140,74 +130,6 @@ export const cancelDeviceAgent = async (
     ...(prior.description ? { description: prior.description } : {}),
     executorDeviceId: prior.executorDeviceId!,
   });
-};
-
-export const lookupConversationAgentThread = async (
-  caller: DeviceAgentCaller,
-  threadId: string,
-): Promise<AgentThreadLookup | null> =>
-  ((await caller.ownerInternal("agentThreads.conversationThread", {
-    ownerGeneration: caller.ownerGeneration,
-    conversationId: caller.conversationId,
-    threadId,
-  })) as AgentThreadLookup | null) ?? null;
-
-export type ConversationAgentThreadResolution =
-  | { kind: "adopted"; control: CloudAgentControlReceipt }
-  | { kind: "elsewhere"; thread: AgentThreadLookup; text: string };
-
-export const resolveConversationAgentThread = async (
-  caller: DeviceAgentCaller,
-  threadId: string,
-): Promise<ConversationAgentThreadResolution | null> => {
-  const thread = await lookupConversationAgentThread(caller, threadId);
-  if (!thread) return null;
-  if (
-    thread.executorDeviceId &&
-    !thread.originDeviceId &&
-    !thread.parentThreadId &&
-    thread.conversationId === caller.conversationId
-  ) {
-    const report = isAgentThreadLookupActive(thread) ? undefined : agentThreadLookupReport(thread);
-    return {
-      kind: "adopted",
-      control: {
-        threadId: thread.threadId,
-        attemptGeneration: thread.attemptGeneration,
-        threadUpdatedAt: thread.updatedAt,
-        status: receiptStatus(thread.status),
-        description: thread.description,
-        executorDeviceId: thread.executorDeviceId,
-        ...(report !== undefined ? { lifecycleReport: report } : {}),
-      },
-    };
-  }
-  return {
-    kind: "elsewhere",
-    thread,
-    text: describeAgentThreadLookup(thread, { host: "cloud" }),
-  };
-};
-
-export const agentThreadElsewhereStatus = (
-  resolution: Extract<ConversationAgentThreadResolution, { kind: "elsewhere" }>,
-) => {
-  const { thread } = resolution;
-  const active = isAgentThreadLookupActive(thread);
-  return {
-    content: [{ type: "text" as const, text: resolution.text }],
-    details: {
-      thread_id: thread.threadId,
-      status: active ? "active" : "paused",
-      status_detail: thread.status,
-      description: thread.description,
-      attempt_generation: thread.attemptGeneration,
-      controllable_here: agentThreadLookupControllable(thread),
-      last_active_at: new Date(thread.updatedAt).toISOString(),
-      ...(thread.executorDeviceId ? { device_id: thread.executorDeviceId } : {}),
-      ...(thread.originDeviceId ? { started_from_device_id: thread.originDeviceId } : {}),
-    },
-  };
 };
 
 /** The ledger's current state of a device agent, as a receipt. */

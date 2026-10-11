@@ -178,7 +178,8 @@ const selectPluralForm = (
   // never emits that category (English says "other" for 0).
   if (count === 0 && typeof forms.zero === "string") return forms.zero;
 
-  const category = pluralRulesFor(locale)?.select(count);
+  const rules = pluralRulesFor(locale);
+  const category = rules ? rules.select(count) : count === 1 ? "one" : "other";
   if (category) {
     const exact = forms[category as PluralCategory];
     if (typeof exact === "string") return exact;

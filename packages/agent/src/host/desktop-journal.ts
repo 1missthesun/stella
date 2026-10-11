@@ -352,79 +352,93 @@ export async function journalMirror(args: {
         open = undefined;
       }
     }
+    // A turn ends when the orchestrator goes idle. Idleness is read before
+    // the scan that follows it, so every entry of a run that had ended by
+    // then is in that scan: read after it, a run that finished meanwhile
+    // would close its turn without the replies it just wrote, and those
+    // would never be journaled.
+    const idleNow = async () => !(await harness.snapshot(LiveDoc, root.id, context))?.run;
+    let idle = await idleNow();
     for (;;) {
-      const page = await harness.commit(
-        async (tx) => (await tx.scanEntries({ conversationId: root.id, minEntryId: (mirrored + 1) as EntryId, order: "ascending" }, PAGE)).items,
-        context,
-      );
-      for (const entry of page) {
-        const message = entry.model?.[0];
-        // What stays on this computer (the onboarding greeting) is never journaled.
-        const localOnly = (entry.data as { localOnly?: unknown } | undefined)?.localOnly === true;
-        if (message && !localOnly && journalSeqOf(entry) === undefined) {
-          const said = message as Message & { source?: string; stella?: { hidden?: true } };
-          if (said.source === "voice" && (message.role === "user" || message.role === "assistant")) {
-            const journaled = message.role === "user" ? piJournalUserMessage(message as PiUserMessage) : undefined;
-            await journal.appendVoice({
-              appendId: `pi:${syncId}:${entry.id}`,
-              role: message.role,
-              payloadJson: JSON.stringify(journaled?.message ?? message),
-              hidden: journaled?.hidden ?? said.stella?.hidden === true,
-            });
-          } else if (entry.kind === "pi.user" && message.role === "user") {
-            if (open) await finishTurn(open);
-            const journaled = piJournalUserMessage(message as PiUserMessage);
-            const localTurnId = `pi:${syncId}:${entry.id}`;
-            // The writer retries what can succeed; a refusal is final, and the
-            // turn stays on this computer only. Refused because another host
-            // holds the brain, this computer's Stella stops: it does not answer
-            // beside the holder, and what it holds is now only a cache.
-            const ack = await journal
-              .begin({
-                localTurnId,
-                // The sender's own id when it gave one (a phone's placed chat).
-                clientMsgId:
-                  journaled.clientMsgId && CLIENT_MSG_ID_PATTERN.test(journaled.clientMsgId)
-                    ? journaled.clientMsgId
-                    : localTurnId,
-                userMessageJson: JSON.stringify(journaled.message),
-                hidden: journaled.hidden,
-              })
-              .catch(async (error: unknown) => {
-                report(error);
-                if ((error as { code?: unknown } | null)?.code === PI_BRAIN_ELSEWHERE_CODE) {
-                  await stopStella(harness, root, context).catch(report);
-                }
-                return undefined;
+      const openedBefore = open?.localTurnId;
+      for (;;) {
+        const page = await harness.commit(
+          async (tx) => (await tx.scanEntries({ conversationId: root.id, minEntryId: (mirrored + 1) as EntryId, order: "ascending" }, PAGE)).items,
+          context,
+        );
+        for (const entry of page) {
+          const message = entry.model?.[0];
+          // What stays on this computer (the onboarding greeting) is never journaled.
+          const localOnly = (entry.data as { localOnly?: unknown } | undefined)?.localOnly === true;
+          if (message && !localOnly && journalSeqOf(entry) === undefined) {
+            const said = message as Message & { source?: string; stella?: { hidden?: true } };
+            if (said.source === "voice" && (message.role === "user" || message.role === "assistant")) {
+              const journaled = message.role === "user" ? piJournalUserMessage(message as PiUserMessage) : undefined;
+              await journal.appendVoice({
+                appendId: `pi:${syncId}:${entry.id}`,
+                role: message.role,
+                payloadJson: JSON.stringify(journaled?.message ?? message),
+                hidden: journaled?.hidden ?? said.stella?.hidden === true,
               });
-            if (ack) held.add(localTurnId);
-            if (journaled.clientMsgId && !journaled.hidden) {
-              await recordMessageId(harness, root.id, journaled.clientMsgId, ack?.promptSeq ?? NO_MESSAGE_ID, context);
+            } else if (entry.kind === "pi.user" && message.role === "user") {
+              if (open) await finishTurn(open);
+              const journaled = piJournalUserMessage(message as PiUserMessage);
+              const localTurnId = `pi:${syncId}:${entry.id}`;
+              // The writer retries what can succeed; a refusal is final, and the
+              // turn stays on this computer only. Refused because another host
+              // holds the brain, this computer's Stella stops: it does not answer
+              // beside the holder, and what it holds is now only a cache.
+              const ack = await journal
+                .begin({
+                  localTurnId,
+                  // The sender's own id when it gave one (a phone's placed chat).
+                  clientMsgId:
+                    journaled.clientMsgId && CLIENT_MSG_ID_PATTERN.test(journaled.clientMsgId)
+                      ? journaled.clientMsgId
+                      : localTurnId,
+                  userMessageJson: JSON.stringify(journaled.message),
+                  hidden: journaled.hidden,
+                })
+                .catch(async (error: unknown) => {
+                  report(error);
+                  if ((error as { code?: unknown } | null)?.code === PI_BRAIN_ELSEWHERE_CODE) {
+                    await stopStella(harness, root, context).catch(report);
+                  }
+                  return undefined;
+                });
+              if (ack) held.add(localTurnId);
+              if (journaled.clientMsgId && !journaled.hidden) {
+                await recordMessageId(harness, root.id, journaled.clientMsgId, ack?.promptSeq ?? NO_MESSAGE_ID, context);
+              }
+              open = ack
+                ? { localTurnId, leaseToken: ack.leaseToken, ownerGeneration: ack.ownerGeneration, entries: [] }
+                : undefined;
+            } else if (open && (entry.kind === "pi.assistant" || entry.kind === "pi.tool-result")) {
+              open = { ...open, entries: [...open.entries, entry.id] };
             }
-            open = ack
-              ? { localTurnId, leaseToken: ack.leaseToken, ownerGeneration: ack.ownerGeneration, entries: [] }
-              : undefined;
-          } else if (open && (entry.kind === "pi.assistant" || entry.kind === "pi.tool-result")) {
-            open = { ...open, entries: [...open.entries, entry.id] };
           }
+          mirrored = entry.id;
         }
-        mirrored = entry.id;
+        const turn = open;
+        await save((current) => {
+          current.syncId = syncId;
+          current.mirrored = mirrored;
+          if (turn) current.open = turn;
+          else delete current.open;
+        });
+        if (page.length < PAGE) break;
       }
-      const turn = open;
-      await save((current) => {
-        current.syncId = syncId;
-        current.mirrored = mirrored;
-        if (turn) current.open = turn;
-        else delete current.open;
-      });
-      if (page.length < PAGE) break;
-    }
-    // The orchestrator went idle: the open turn is over.
-    if (open && !(await harness.snapshot(LiveDoc, root.id, context))?.run) {
-      await finishTurn(open);
-      await save((current) => {
-        delete current.open;
-      });
+      if (!open || !idle) break;
+      if (open.localTurnId === openedBefore) {
+        await finishTurn(open);
+        open = undefined;
+        await save((current) => {
+          delete current.open;
+        });
+        break;
+      }
+      // A prompt this scan opened may have run to its end already: weigh it again.
+      idle = await idleNow();
     }
     await publishCheckpoint(syncId).catch(report);
   };

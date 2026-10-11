@@ -11,10 +11,6 @@ import type { ChatMessage, ChatArtifact } from "../types";
 import type { JournalFile, JournalRecord } from "@stella/contracts/conversation-protocol";
 import { cloudFileArtifact } from "./cloud-file-payload";
 import { journalMirroredWake } from "@stella/contracts/conversation-journal-projection";
-import { extractFileLinkTargets } from "@stella/contracts/local-file-links";
-import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
-import { artifactAttachmentTarget, artifactId } from "./mobile-artifacts";
-import { displayPayloadForStellaFile, driveFileChatArtifact } from "./stella-file-links";
 
 const SUMMARY_MAX_CHARS = 160;
 
@@ -44,7 +40,8 @@ export function summaryExcerpt(result: string): string {
  *   - the turn that spawned a task carries the spawn card, which settles
  *     (done / failed) when the task's terminal card arrives;
  *   - the reply that relays a completed task's result carries a completion
- *     card with the task's produced files and a result excerpt;
+ *     card with a result excerpt and the task's produced files, which feed
+ *     the activity hub but never render on the reply;
  *   - files the journal reports under a spawn turn belong to that task, so
  *     they ride its completion card rather than the spawn turn's reply.
  * Rows anchor on the turn's visible replies by journal order, never on a
@@ -139,26 +136,6 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     });
   }
   completions.sort((a, b) => a.seq - b.seq);
-  const linkedFileArtifact = (target: string, createdAt: number): ChatArtifact => {
-    const drivePath = driveLinkPath(target);
-    const payload = drivePath
-      ? driveFileChatArtifact(drivePath, conversationId, createdAt).payload
-      : displayPayloadForStellaFile(target, createdAt);
-    return { id: artifactId(payload, conversationId), conversationId, payload };
-  };
-  const completionFiles = (completion: (typeof completions)[number]): ChatArtifact[] => {
-    const files = [
-      ...(filesByAgent.get(completion.agentId) ?? []).map(entry => cloudFileArtifact(entry.file, conversationId, entry.createdAt)),
-      ...extractFileLinkTargets(completion.result).map(target => linkedFileArtifact(target, completion.createdAt)),
-    ];
-    const seen = new Set<string>();
-    return files.filter(file => {
-      const key = artifactAttachmentTarget(file.payload) ?? file.id;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-  };
 
   const placed = new Set<string>();
   const relayed = new Set<string>();
@@ -169,7 +146,7 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     if (relayed.has(relayKey)) continue;
     relayed.add(relayKey);
     const title = titles.get(completion.agentId) || wakeTitles.get(completion.agentId) || "Task";
-    const files = completionFiles(completion);
+    const files = (filesByAgent.get(completion.agentId) ?? []).map(entry => cloudFileArtifact(entry.file, conversationId, entry.createdAt));
     const summary = summaryExcerpt(completion.result);
     const card: ChatArtifact = { id: `${completion.eventId}:completion`, conversationId, payload: {
       kind: "agent-work", state: "done", agentIds: [completion.agentId], total: 1, completed: 1,

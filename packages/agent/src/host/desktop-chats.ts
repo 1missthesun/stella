@@ -114,7 +114,7 @@ import {
   type DesktopExecutionRemote,
 } from "./desktop-execution.ts";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
-import { journalMirror, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
+import { journalMirror, journalTurnGate, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
 import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror } from "./desktop-local-log.ts";
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
 import { desktopContextSources } from "./desktop-sources.ts";
@@ -998,6 +998,11 @@ export function desktopChats(options: DesktopChatsOptions) {
           deviceId: options.deviceId ?? "this-computer",
           label: "This computer",
         };
+        // Stella's turn goes on once the journal mirror has the cloud's word on it.
+        let settleStanding!: (held: boolean) => void;
+        const standing = new Promise<boolean>((resolve) => {
+          settleStanding = resolve;
+        });
         const {
           harness,
           refreshTools,
@@ -1141,6 +1146,7 @@ export function desktopChats(options: DesktopChatsOptions) {
             ...(options.tools ? { tools: placedTools(options.tools(conversationId), execution, () => opened) } : {}),
             // An agent's file and shell tools run here, or wherever its tools were moved.
             extensions: [
+              journalTurnGate(standing),
               desktopCoding(execution.run),
               ...(claudeCodeEngine
                 ? [claudeCodeEngine.extension(conversationId, { searchElsewhere: runWherePlaced(execution.run) })]
@@ -1155,6 +1161,8 @@ export function desktopChats(options: DesktopChatsOptions) {
         const root = await harness.root(context, { agent: orchestrator });
         // A conversation from an older build keeps up with what the orchestrator is offered.
         if (offersAgentTools(await root.agent(context))) await root.configure(orchestrator, context);
+        // Stella's turn a previous process left running, read before anything here can resume it.
+        const resumed = (await harness.snapshot(LiveDoc, root.id, context))?.run !== undefined;
         // A conversation kept on this computer starts with what the agent
         // loops' chat log holds (imported as the mirror starts), and keeps up with it.
         const log = options.localLog?.(conversationId);
@@ -1199,9 +1207,11 @@ export function desktopChats(options: DesktopChatsOptions) {
               // The cloud's holds show as this computer's own do.
               onUsageLimit: (card, at) => noteCloudUsageLimit(conversationId, card, at),
               ...(brain ? { readBrain: () => brain.read() } : {}),
+              resumed,
               context,
             })
           : undefined;
+        void (mirror ? mirror.standing : Promise.resolve(true)).then(settleStanding);
         void mirror?.importNow().catch((error: unknown) => options.report(error));
         const idleCheck = setInterval(() => {
           void (async () => {

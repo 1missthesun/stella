@@ -50,18 +50,37 @@ export type JournalRecordKind = JournalKind;
  * fences so a delayed pre-rewind writer cannot recreate a removed suffix in
  * the new epoch; 6 adds atomic edit receipts for crash-safe rewind replay;
  * 7 adds retired turn fences; 8 moves transcript search into a
- * rollover-surviving FTS5 table.
+ * rollover-surviving FTS5 table; 9 searches agents' reports and messages too;
+ * 10 keeps the resident set's rows, bytes and tokens on `meta`.
  */
-export const JOURNAL_SCHEMA_VERSION = 8;
+export const JOURNAL_SCHEMA_VERSION = 10;
 
 // ---------------------------------------------------------------------------
 // Residency / rollover
 // ---------------------------------------------------------------------------
 
-export const HOT_MAX_ROWS = 2_000;
-export const HOT_MAX_BYTES = 24 * 1024 * 1024;
-export const HOT_TARGET_ROWS = 1_000;
-export const HOT_TARGET_BYTES = 12 * 1024 * 1024;
+/**
+ * Residency follows the conversation's compaction checkpoint: everything from
+ * the latest checkpoint on stays resident, because that is where every new
+ * transcript starts (`journalStart`), and only what is older is archived.
+ *
+ * Before any host compacted, at least one full context window of the largest
+ * model Stella runs stays resident: archiving waits until the resident model
+ * context passes RESIDENT_ROLLOVER_TOKENS and then keeps the newest
+ * RESIDENT_CONTEXT_TOKENS, so a cut moves a sizeable segment at once rather
+ * than a sliver every turn.
+ */
+export const RESIDENT_CONTEXT_TOKENS = 1_000_000;
+export const RESIDENT_ROLLOVER_TOKENS = 1_500_000;
+/**
+ * Byte backstop: past this, rows older than the newest
+ * RESIDENT_CONTEXT_TOKENS are archived even when a stale checkpoint would
+ * keep them.
+ */
+export const HOT_MAX_BYTES = 48 * 1024 * 1024;
+/** Rows one residency scan reads at a time, and at most in all. */
+export const CUT_SCAN_PAGE_ROWS = 1_000;
+export const CUT_SCAN_MAX_ROWS = 100_000;
 export const DB_PRESSURE_AGGRESSIVE_BYTES = 64 * 1024 * 1024;
 export const DB_PRESSURE_EMERGENCY_BYTES = 512 * 1024 * 1024;
 export const DB_PRESSURE_AGGRESSIVE_ROWS = 500;
@@ -102,12 +121,12 @@ export const REPAIR_SCAN_ROW_CAP = 400;
  */
 export { MAX_CATCHUP_RESUME_RECORDS as MAX_CATCH_UP_RECORDS } from "@stella/contracts/conversation-protocol";
 /**
- * Hot rows one running-agent rebuild reads. The fold is cached in the object's
- * memory and carried forward by newly appended rows, so this scan runs once per
- * object lifetime; it is capped at the resident hot set because anything older
- * has rolled into R2 and cannot be waited on from the `ready` path.
+ * Hot rows one statement of the running-agent fold reads. The fold is cached
+ * in the object's memory and carried forward by newly appended rows, so the
+ * full resident scan runs once per object lifetime, a page at a time; anything
+ * older has rolled into R2 and cannot be waited on from the `ready` path.
  */
-export const AGENT_ACTIVITY_SCAN_ROWS = 2_000;
+export const AGENT_ACTIVITY_SCAN_ROWS = 1_000;
 export const BACKFILL_BATCH_BYTES = 512 * 1024;
 export const MAX_SOCKETS_PER_CONVERSATION = 16;
 export const MAX_INCOMING_FRAME_BYTES = 64 * 1024;

@@ -490,9 +490,12 @@ const nodeReplWorkerMain = async (
       return callTool("$describe", { ...options, name });
     },
   );
-  // `history.sql` / `history.read` ride the tool-call path as the `$history`
-  // intrinsic; the host answers them from the conversation's cloud journal.
+  // `history.search` / `history.sql` / `history.read` ride the tool-call path
+  // as the `$history` intrinsic; the host answers them from the conversation's
+  // cloud journal.
   const history = Object.freeze({
+    search: (text: string, options: Record<string, unknown> = {}) =>
+      callTool("$history", { op: "search", text, options }),
     sql: (query: string, params: unknown[] = []) =>
       callTool("$history", { op: "sql", query, params }),
     read: (fromSeq: number, toSeq: number) =>

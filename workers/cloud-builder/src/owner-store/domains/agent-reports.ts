@@ -48,6 +48,7 @@ type ThreadRow = {
   status: string;
   result_json: string | null;
   error_message: string | null;
+  origin_delivery_ack_at: number | null;
   updated_at: number;
 };
 
@@ -236,6 +237,8 @@ export const deriveAgentReport = (
 ): void => {
   const thread = readThread(db, threadId);
   if (!thread || !REPORTABLE.has(thread.status)) return;
+  // Its device already took this attempt's report (`agentThreads.acknowledgeDelivery`).
+  if (thread.origin_delivery_ack_at !== null) return;
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
   if (
     db.one("SELECT 1 AS found FROM agent_events WHERE event_key = ?", reportId)
@@ -367,6 +370,17 @@ const settle = (
     createdAt: ctx.now,
   });
   ctx.jobs.cancel(deliveryJobId(row.report_id));
+  // A build that still reads `agentThreads.forDevice` must not take a report
+  // the outbox already delivered.
+  if (state === "delivered" && row.kind === "report") {
+    ctx.db.run(
+      `UPDATE agent_threads SET origin_delivery_ack_at = ?
+        WHERE thread_id = ? AND attempt_generation = ? AND origin_delivery_ack_at IS NULL`,
+      ctx.now,
+      row.thread_id,
+      row.attempt_generation,
+    );
+  }
   if (state === "dropped" && row.requester_kind === "agent") {
     deriveJobReports(ctx.db, row.requester_id, ctx.now);
   }

@@ -21,7 +21,7 @@ import {
   parseJournalCheckpointFirstKept,
 } from "@stella/contracts/journal-checkpoint";
 import { sha256Hex } from "../hash.js";
-import { runHistoryQuery } from "../history-sql.js";
+import { historySearchOptions, runHistoryQuery, searchHistory } from "../history-sql.js";
 import {
   APPEND_WINDOW_MAX_BYTES,
   APPEND_WINDOW_MAX_REQUESTS,
@@ -367,7 +367,16 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       params?: unknown;
       fromSeq?: unknown;
       toSeq?: unknown;
+      text?: unknown;
+      options?: unknown;
     } | null;
+    if (body?.op === "search") {
+      if (typeof body.text !== "string" || !body.text.trim()) {
+        throw new Error("history.search requires the text to look for.");
+      }
+      await this.archive.reindexArchivedSearch();
+      return searchHistory(this.ctx.storage, body.text, historySearchOptions(body.options));
+    }
     if (body?.op === "sql") {
       if (typeof body.query !== "string" || !body.query.trim()) {
         throw new Error("history.sql requires a non-empty query string.");
@@ -378,6 +387,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
           typeof value === "string" ||
           typeof value === "number",
       );
+      await this.archive.reindexArchivedSearch();
       return runHistoryQuery(this.ctx.storage, body.query, params);
     }
     if (body?.op === "read") {
@@ -394,7 +404,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       );
     }
     if (body?.op === "usageLimitHolds") return { holds: this.usageLimitHolds() };
-    throw new Error('history query op must be "sql", "read" or "usageLimitHolds".');
+    throw new Error('history query op must be "search", "sql", "read" or "usageLimitHolds".');
   }
 
   /**

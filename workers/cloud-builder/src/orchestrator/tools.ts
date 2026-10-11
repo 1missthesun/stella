@@ -2,7 +2,7 @@ import { AgentHome } from "../agent-home.js";
 import { createWorldMemory, ownerMemoryWorld } from "../world-memory.js";
 import type { CloudSkillCatalogSnapshot } from "../cloud-home-store.js";
 import { WORLD_ROOT, worldName } from "../workspace.js";
-import { runHistoryQuery } from "../history-sql.js";
+import { historySearchOptions, runHistoryQuery, searchHistory } from "../history-sql.js";
 import {
   type CloudCodeSourceAgentTool,
   createCloudCodeAgentTool,
@@ -212,6 +212,10 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       ...(memoryEnabled
         ? {
             history: {
+              search: async (text: string, options: unknown) => {
+                await this.archive.reindexArchivedSearch();
+                return searchHistory(this.ctx.storage, text, historySearchOptions(options));
+              },
               sql: (query: string, params: readonly SqlStorageValue[]) =>
                 runHistoryQuery(this.ctx.storage, query, params),
               read: (fromSeq: number, toSeq: number) =>

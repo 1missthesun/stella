@@ -40,6 +40,7 @@ import {
 import {
   AGENT_ACTIVITY_SCAN_ROWS,
   CONTEXT_SCAN_ROW_CAP,
+  CUT_SCAN_PAGE_ROWS,
   INITIAL_WINDOW_RECORDS,
   JOURNAL_SCHEMA_VERSION,
   REPAIR_SCAN_ROW_CAP,
@@ -87,7 +88,10 @@ const DDL = [
      next_seq         INTEGER NOT NULL DEFAULT 0,
      hot_min_seq      INTEGER NOT NULL DEFAULT 0,
      index_synced_seq INTEGER NOT NULL DEFAULT -1,
-     deleted_at       INTEGER
+     deleted_at       INTEGER,
+     hot_rows         INTEGER NOT NULL DEFAULT 0,
+     hot_bytes        INTEGER NOT NULL DEFAULT 0,
+     hot_tokens       INTEGER NOT NULL DEFAULT 0
    )`,
   `CREATE TABLE IF NOT EXISTS journal (
      seq           INTEGER PRIMARY KEY,
@@ -267,6 +271,7 @@ const MIGRATIONS: Array<{
   to: number;
   statements: string[];
   backfillTranscriptSearch?: boolean;
+  reindexArchivedSearch?: boolean;
 }> = [
   {
     to: 2,
@@ -327,7 +332,34 @@ const MIGRATIONS: Array<{
     ],
     backfillTranscriptSearch: true,
   },
+  {
+    to: 9,
+    statements: [],
+    backfillTranscriptSearch: true,
+    reindexArchivedSearch: true,
+  },
+  {
+    to: 10,
+    statements: [
+      `ALTER TABLE meta ADD COLUMN hot_rows INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE meta ADD COLUMN hot_bytes INTEGER NOT NULL DEFAULT 0`,
+      `ALTER TABLE meta ADD COLUMN hot_tokens INTEGER NOT NULL DEFAULT 0`,
+      `UPDATE meta SET
+         hot_rows = (SELECT COUNT(*) FROM journal),
+         hot_bytes = (SELECT COALESCE(SUM(bytes), 0) FROM journal),
+         hot_tokens = (SELECT COALESCE(SUM(tokens), 0) FROM journal)
+       WHERE id = 0`,
+    ],
+  },
 ];
+
+/**
+ * Below `ceilingSeq`, rows were archived before agents' reports and messages
+ * were searched; `reindexedThrough` is the first seq of the last segment
+ * re-read for them so far.
+ */
+const SEARCH_REINDEX_KEY = "searchReindex";
+type SearchReindex = { ceilingSeq: number; reindexedThrough: number };
 
 /** Durable witness of the highest epoch this DO name has ever used. */
 const EPOCH_WITNESS_KEY = "conversationEpoch";
@@ -663,12 +695,20 @@ export class Journal {
       await this.ctx.storage.put(EPOCH_WITNESS_KEY, meta.epoch);
     }
     if (meta.schema_version !== JOURNAL_SCHEMA_VERSION) {
+      let reindexArchived = false;
       for (const migration of MIGRATIONS) {
         if (meta.schema_version >= migration.to) continue;
         for (const statement of migration.statements) this.sql.exec(statement);
         if (migration.backfillTranscriptSearch) {
           this.backfillTranscriptSearch();
         }
+        if (migration.reindexArchivedSearch) reindexArchived = true;
+      }
+      if (reindexArchived && meta.hot_min_seq > 0) {
+        await this.ctx.storage.put<SearchReindex>(SEARCH_REINDEX_KEY, {
+          ceilingSeq: meta.hot_min_seq,
+          reindexedThrough: -1,
+        });
       }
       this.sql.exec(
         `UPDATE meta SET schema_version = ? WHERE id = 0`,
@@ -726,12 +766,52 @@ export class Journal {
            FROM journal
           WHERE kind = 'message'
             AND role IN ('user', 'assistant')
-            AND hidden = 0
-            AND spill_key IS NULL
           ORDER BY seq ASC`,
       )
       .toArray();
     for (const row of rows) this.indexStoredMessage(row);
+  }
+
+  /**
+   * Archived segments not yet re-read for search: those cut before agents'
+   * reports and messages were indexed. Oldest first.
+   */
+  async searchReindexPending(): Promise<SegmentRow[]> {
+    const state = await this.ctx.storage.get<SearchReindex>(SEARCH_REINDEX_KEY);
+    if (!state) return [];
+    const pending = this.sql
+      .exec<SegmentRow>(
+        `SELECT * FROM segments
+          WHERE state = 'committed' AND first_seq > ? AND first_seq < ?
+          ORDER BY first_seq ASC`,
+        state.reindexedThrough,
+        state.ceilingSeq,
+      )
+      .toArray();
+    if (pending.length === 0) await this.ctx.storage.delete(SEARCH_REINDEX_KEY);
+    return pending;
+  }
+
+  /**
+   * Index what an archived segment holds that search used to skip (hidden
+   * prompts, and messages whose payload spilled to R2, by their preview), and
+   * remember the segment is done.
+   */
+  async reindexArchivedSegment(firstSeq: number, rows: readonly JournalRow[]): Promise<void> {
+    const state = await this.ctx.storage.get<SearchReindex>(SEARCH_REINDEX_KEY);
+    if (!state) return;
+    this.transactionSync(() => {
+      for (const row of rows) {
+        if (row.kind !== "message") continue;
+        const unindexed = (row.role === "user" && row.hidden === 1) || ((row.role === "user" || row.role === "assistant") && row.spill_key !== null);
+        if (!unindexed) continue;
+        this.indexStoredMessage(row);
+      }
+    });
+    await this.ctx.storage.put<SearchReindex>(SEARCH_REINDEX_KEY, {
+      ...state,
+      reindexedThrough: Math.max(state.reindexedThrough, firstSeq),
+    });
   }
 
   private indexStoredMessage(
@@ -946,7 +1026,14 @@ export class Journal {
           .join(", ")})`,
         ...values,
       );
-      this.sql.exec(`UPDATE meta SET next_seq = ? WHERE id = 0`, seq + 1);
+      this.sql.exec(
+        `UPDATE meta SET next_seq = ?, hot_rows = hot_rows + 1,
+                hot_bytes = hot_bytes + ?, hot_tokens = hot_tokens + ?
+          WHERE id = 0`,
+        seq + 1,
+        typeof columns.bytes === "number" ? columns.bytes : 0,
+        typeof columns.tokens === "number" ? columns.tokens : 0,
+      );
       return { seq, inserted: true };
     });
   }
@@ -2037,16 +2124,10 @@ export class Journal {
       // Every resident row, not a fixed tail: an agent is reported as running
       // precisely because nothing has settled it, so its `agent-started` row is
       // as old as the agent, and a tail cap would silently retire exactly the
-      // long-running agents this answer exists for. The scan is bounded by the
-      // hot set (older rows have rolled into R2 and cannot be read from here)
-      // and happens once per object lifetime.
-      this.foldAgentActivityRows(
-        cached,
-        this.selectRows(`ORDER BY seq ASC`),
-        headSeq,
-      );
+      // long-running agents this answer exists for. The catch-up below reads
+      // the whole hot set a page at a time (older rows have rolled into R2 and
+      // cannot be read from here), once per object lifetime.
       this.agentActivity = cached;
-      return runningAgentEntries(cached.state, limit);
     }
     // Catch the cache up completely. A bounded read keeps one statement small,
     // so a long gap costs several of them rather than one unbounded row set —
@@ -2241,18 +2322,6 @@ export class Journal {
     return rows[0] ?? null;
   }
 
-  /** Rollover boundary candidates: terminal turns, oldest first. */
-  terminalTurnBoundaries(limit: number): Array<{ last_seq: number }> {
-    return this.sql
-      .exec<{ last_seq: number }>(
-        `SELECT last_seq FROM turns
-          WHERE state = 'terminal' AND last_seq IS NOT NULL
-          ORDER BY last_seq ASC LIMIT ?`,
-        limit,
-      )
-      .toArray();
-  }
-
   /** True when `seq + 1` is a plain user message — a safe history boundary. */
   isCutBoundary(seq: number): boolean {
     const rows = this.sql
@@ -2378,14 +2447,18 @@ export class Journal {
   // Segments / rollover bookkeeping
   // -------------------------------------------------------------------------
 
-  hotStats(): { rows: number; bytes: number } {
+  /**
+   * The resident set's size, kept on `meta` by every insert and every
+   * committed segment, so measuring it never reads the journal.
+   */
+  hotStats(): { rows: number; bytes: number; tokens: number } {
     const row = this.sql
-      .exec<{
-        rows: number;
-        bytes: number | null;
-      }>(`SELECT COUNT(*) AS rows, SUM(bytes) AS bytes FROM journal`)
-      .one();
-    return { rows: row.rows, bytes: row.bytes ?? 0 };
+      .exec<{ rows: number; bytes: number; tokens: number }>(
+        `SELECT hot_rows AS rows, hot_bytes AS bytes, hot_tokens AS tokens
+           FROM meta WHERE id = 0`,
+      )
+      .toArray()[0];
+    return row ?? { rows: 0, bytes: 0, tokens: 0 };
   }
 
   databaseSize(): number {
@@ -2393,12 +2466,14 @@ export class Journal {
   }
 
   /**
-   * The highest seq that rollover would like to archive so the resident set
-   * lands at the given targets. Returns null when the hot set is already at or
-   * under both. This is a WISH, not a boundary: the caller still has to find a
-   * legal cut at or below it.
+   * The highest seq rollover would like to archive so the resident set lands
+   * at `targetRows` rows and `targetBytes` bytes: the storage-pressure tiers.
+   * Null when the hot set is already within both. This is a WISH, not a
+   * boundary: the caller still has to find a legal cut at or below it.
    */
   desiredCutSeq(targetRows: number, targetBytes: number): number | null {
+    const total = this.hotStats();
+    if (total.rows <= targetRows && total.bytes <= targetBytes) return null;
     const rows = this.sql
       .exec<{
         seq: number;
@@ -2408,8 +2483,6 @@ export class Journal {
         Math.max(targetRows, 1) + 1,
       )
       .toArray();
-    const total = this.hotStats();
-    if (total.rows <= targetRows && total.bytes <= targetBytes) return null;
     let kept = 0;
     let keptBytes = 0;
     for (const row of rows) {
@@ -2421,6 +2494,57 @@ export class Journal {
       keptBytes += row.bytes;
     }
     return null;
+  }
+
+  /**
+   * The newest seq older than the newest `keepTokens` of model context: what
+   * rollover may archive while a full context window of that size stays
+   * resident. Null when the resident model context is no larger. Reads
+   * metadata a page at a time and stops at `maxRows`, keeping everything when
+   * that many rows still hold less.
+   */
+  seqBeforeContextTokens(keepTokens: number, maxRows: number): number | null {
+    let kept = 0;
+    let before = this.meta().next_seq;
+    let read = 0;
+    while (read < maxRows) {
+      const page = this.sql
+        .exec<{ seq: number; tokens: number; counted: number }>(
+          `SELECT seq, tokens,
+                  (kind = 'message' AND model_skip = 0) AS counted
+             FROM journal WHERE seq < ? ORDER BY seq DESC LIMIT ?`,
+          before,
+          Math.min(CUT_SCAN_PAGE_ROWS, maxRows - read),
+        )
+        .toArray();
+      if (page.length === 0) return null;
+      for (const row of page) {
+        if (kept >= keepTokens) return row.seq;
+        if (row.counted) kept += row.tokens;
+      }
+      read += page.length;
+      before = page[page.length - 1]!.seq;
+    }
+    return null;
+  }
+
+  /**
+   * Terminal turn ends at or below `ceiling`, newest first: where a cut that
+   * keeps everything above `ceiling` resident may land.
+   */
+  terminalTurnBoundariesAtOrBelow(
+    ceiling: number,
+    limit: number,
+  ): Array<{ last_seq: number }> {
+    return this.sql
+      .exec<{ last_seq: number }>(
+        `SELECT last_seq FROM turns
+          WHERE state = 'terminal' AND last_seq IS NOT NULL AND last_seq <= ?
+          ORDER BY last_seq DESC LIMIT ?`,
+        ceiling,
+        limit,
+      )
+      .toArray();
   }
 
   pendingSegment(): SegmentRow | null {
@@ -2461,6 +2585,23 @@ export class Journal {
       this.sql.exec(
         `UPDATE segments SET state = 'committed' WHERE first_seq = ?`,
         firstSeq,
+      );
+      const removed = this.sql
+        .exec<{ rows: number; bytes: number | null; tokens: number | null }>(
+          `SELECT COUNT(*) AS rows, SUM(bytes) AS bytes, SUM(tokens) AS tokens
+             FROM journal WHERE seq >= ? AND seq <= ?`,
+          firstSeq,
+          lastSeq,
+        )
+        .one();
+      this.sql.exec(
+        `UPDATE meta SET hot_rows = MAX(0, hot_rows - ?),
+                hot_bytes = MAX(0, hot_bytes - ?),
+                hot_tokens = MAX(0, hot_tokens - ?)
+          WHERE id = 0`,
+        removed.rows,
+        removed.bytes ?? 0,
+        removed.tokens ?? 0,
       );
       this.sql.exec(
         `DELETE FROM journal WHERE seq >= ? AND seq <= ?`,

@@ -17,6 +17,7 @@ import {
   cloudContextFailure,
 } from "./support.js";
 import { OrchestratorTurnQueue } from "./turn-queue.js";
+import { JOURNAL_CHECKPOINT_KEY } from "./constants.js";
 
 /**
  * Dev acceptance probes and the canonical prompt/journal checks behind them.
@@ -303,6 +304,20 @@ export abstract class OrchestratorDevAcceptance extends OrchestratorTurnQueue {
       sealed: this.purged(),
       indexSyncedSeq: meta.index_synced_seq,
       hot: this.journal.hotStats(),
+      checkpoint: await this.ctx.storage
+        .get<{ throughSeq: number; epoch: number; summary: string }>(
+          JOURNAL_CHECKPOINT_KEY,
+        )
+        .then((stored) =>
+          stored
+            ? {
+                throughSeq: stored.throughSeq,
+                epoch: stored.epoch,
+                summaryChars: stored.summary.length,
+                summaryHead: stored.summary.slice(0, 240),
+              }
+            : null,
+        ),
       inbox: this.journal.inboxSize(),
       databaseBytes: this.journal.databaseSize(),
       storedBytes: this.journal.storedBytes(),

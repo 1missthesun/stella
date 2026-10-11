@@ -117,6 +117,7 @@ import {
   journalImportAfter,
   JournalSyncDoc,
   noteCheckpointPublished,
+  recordEngineCompaction,
   type JournalMessage,
   type JournalStart,
 } from "@stella/agent/stella/journal-sync";
@@ -714,6 +715,22 @@ export class PiConversationRuntime {
       engine.onStatus((session, status) =>
         options.log("claude_code_status", { role: session.role, state: status.state }),
       );
+      // Claude Code compacts its own context; pi never does for it. Its
+      // summary is the root's compaction, which the turn then publishes as
+      // the conversation's checkpoint.
+      engine.onCompaction((session, compaction) => {
+        if (session.role !== "orchestrator" || session.threadId) return;
+        void (async () => {
+          const { harness, root } = await this.open();
+          const recorded = await recordEngineCompaction(
+            harness,
+            root,
+            { ...compaction, engine: "claude-code" },
+            contextFor(),
+          );
+          options.log("claude_code_compaction_recorded", { recorded, summaryChars: compaction.summary.length });
+        })().catch((error: unknown) => options.report(error));
+      });
       this.#claudeCode = engine;
     }
   }
@@ -1243,7 +1260,8 @@ export class PiConversationRuntime {
         const authority = ended?.authority ?? this.#state?.authority;
         if (!authority) return;
         const outcome = agentRunOutcome(end);
-        if (outcome) {
+        // Answered with agents of its own still at work: its attempt stays open.
+        if (outcome && !end?.waiting) {
           await this.#recordAgentRun(run, authority, ended?.turnId ?? `pi:${authority.conversationId}:${run.runId}`, context, outcome).catch(
             (error: unknown) => this.#options.report(error),
           );

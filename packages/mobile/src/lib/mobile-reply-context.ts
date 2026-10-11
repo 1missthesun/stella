@@ -65,9 +65,11 @@ export function summaryExcerpt(result: string): string {
  * Lifecycle cards onto transcript rows, matching desktop:
  *   - the turn that spawned a task carries the spawn card, which settles
  *     (done / failed) when the task's terminal card arrives;
- *   - the reply that relays a completed task's result carries a completion
- *     card with a result excerpt and the task's produced files, which feed
- *     the activity hub but never render on the reply;
+ *   - the reply that relays a settled task's outcome carries a completion
+ *     card (and so the task's pill) whether the task completed, failed or
+ *     was canceled; a completed one adds a result excerpt and the task's
+ *     produced files, which feed the activity hub but never render on the
+ *     reply;
  *   - files the journal reports under a spawn turn belong to that task, so
  *     they ride its completion card and never attach to any reply.
  * Rows anchor on the turn's visible replies by journal order, never on a
@@ -104,7 +106,7 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
   const starts = new Map<string, ChatArtifact>();
   const agentByTurn = new Map<string, string>();
   const filesByAgent = new Map<string, Array<{ file: JournalFile; createdAt: number }>>();
-  const completions: Array<{ eventId: string; agentId: string; turnId: string; seq: number; createdAt: number; result: string }> = [];
+  const completions: Array<{ eventId: string; agentId: string; turnId: string; seq: number; createdAt: number; result: string; failed: boolean }> = [];
   for (const record of records) {
     if (record.kind !== "card") continue;
     if (record.card.type === "files") {
@@ -136,10 +138,13 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
       if (artifact?.payload.kind === "agent-work") {
         artifact.payload = { ...artifact.payload, state: "done", completed: event.type === "agent-completed" ? 1 : 0, failed: event.type !== "agent-completed" };
       }
-      if (event.type === "agent-completed") {
+      const paused = event.type !== "agent-completed" && event.payload.status === "paused";
+      if (!paused) {
         completions.push({
           eventId: record.card.eventId, agentId: id, turnId: record.turnId, seq: record.seq,
-          createdAt: record.createdAtMs, result: typeof event.payload.result === "string" ? event.payload.result : "",
+          createdAt: record.createdAtMs,
+          result: event.type === "agent-completed" && typeof event.payload.result === "string" ? event.payload.result : "",
+          failed: event.type !== "agent-completed",
         });
       }
     }
@@ -182,11 +187,12 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
   const wakeTitles = new Map<string, string>();
   for (const [turnId, turnRecords] of turns) {
     const wake = journalMirroredWake(turnRecords);
-    if (!wake || wake.outcome.kind !== "completed") continue;
+    if (!wake || wake.outcome.kind === "paused") continue;
     if (wake.description) wakeTitles.set(wake.threadId, wake.description);
+    const failed = wake.outcome.kind !== "completed";
     completions.push({
       eventId: `cloud:${turnId}:wake:${wake.record.seq}`, agentId: wake.threadId, turnId, seq: wake.record.seq,
-      createdAt: wake.record.createdAtMs, result: wake.outcome.body,
+      createdAt: wake.record.createdAtMs, result: failed ? "" : wake.outcome.body, failed,
     });
   }
   completions.sort((a, b) => a.seq - b.seq);
@@ -202,7 +208,8 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     const files = (filesByAgent.get(completion.agentId) ?? []).map(entry => cloudFileArtifact(entry.file, conversationId, entry.createdAt));
     const summary = summaryExcerpt(completion.result);
     const card: ChatArtifact = { id: `${completion.eventId}:completion`, conversationId, payload: {
-      kind: "agent-work", state: "done", agentIds: [completion.agentId], total: 1, completed: 1,
+      kind: "agent-work", state: "done", agentIds: [completion.agentId], total: 1,
+      completed: completion.failed ? 0 : 1, ...(completion.failed ? { failed: true } : {}),
       title, subtitle: "", createdAt: completion.createdAt, completion: true,
       agents: [{ agentId: completion.agentId, title, files: files.map(file => file.payload), ...(summary ? { summary } : {}) }],
     } };

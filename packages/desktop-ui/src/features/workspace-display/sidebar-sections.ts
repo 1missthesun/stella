@@ -26,6 +26,7 @@ export const SIDEBAR_SECTIONS = [
   "apps",
   "browser",
   "updates",
+  "email",
   "takeover",
 ] as const;
 // Kept for the sections that render inside the panel body. Home is a real
@@ -37,6 +38,7 @@ export const PANEL_SIDEBAR_SECTIONS = [
   "apps",
   "browser",
   "updates",
+  "email",
   "takeover",
 ] as const;
 
@@ -91,7 +93,7 @@ const restoreTabKind = (
  * Surfaces that only ever have one tab: opening one again focuses the tab
  * already open instead of adding another.
  */
-const SINGLE_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set(["updates"]);
+const SINGLE_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set(["updates", "email"]);
 
 /** Drop repeats of a single-tab surface (layouts saved before the rule). */
 const withoutRepeats = (tabs: SidebarTab[]): SidebarTab[] => {

@@ -2695,6 +2695,22 @@
         "one": "{count} dosyayı görüntüle",
         "other": "{count} dosyayı görüntüle"
       }
+    },
+    "emailDigest": {
+      "title": "E-posta",
+      "connectTitle": "Önemli e-postalar",
+      "connectBody": "Gmail'i bağlayın; Stella gün boyunca gelen kutunuzu kontrol edip yalnızca önemli yeni e-postaların kısa bir özetini yazsın.",
+      "connect": "Gmail'i bağla",
+      "connecting": "Google bekleniyor…",
+      "connectError": "Gmail bağlanamadı. Tekrar deneyin.",
+      "unavailable": "Gmail'i bağlamak için Stella'ya giriş yapın.",
+      "checkNow": "Şimdi kontrol et",
+      "checking": "Gelen kutusu kontrol ediliyor…",
+      "checked": "{when} kontrol edildi",
+      "firstDigest": "İlk özetiniz yolda",
+      "nothingNew": "Yeni bir şey yok",
+      "error": "Gelen kutusu kontrol edilemedi. Stella yakında tekrar deneyecek.",
+      "justNow": "Az önce"
     }
   },
   "sidebar": {

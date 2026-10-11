@@ -2677,6 +2677,22 @@
       "viewFiles": {
         "other": "查看 {count} 個檔案"
       }
+    },
+    "emailDigest": {
+      "title": "郵件",
+      "connectTitle": "重要的郵件",
+      "connectBody": "連接 Gmail 後，Stella 會在一天中查看你的收件匣，只為重要的新郵件寫一份簡短摘要。",
+      "connect": "連接 Gmail",
+      "connecting": "正在等待 Google…",
+      "connectError": "Gmail 未能連接，請再試一次。",
+      "unavailable": "登入 Stella 以連接 Gmail。",
+      "checkNow": "立即查看",
+      "checking": "正在查看收件匣…",
+      "checked": "{when}已查看",
+      "firstDigest": "你的第一份摘要即將送達",
+      "nothingNew": "沒有新內容",
+      "error": "無法查看收件匣，Stella 稍後會再試。",
+      "justNow": "剛剛"
     }
   },
   "sidebar": {

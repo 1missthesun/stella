@@ -2695,6 +2695,22 @@
         "one": "{count} bestand bekijken",
         "other": "{count} bestanden bekijken"
       }
+    },
+    "emailDigest": {
+      "title": "E-mail",
+      "connectTitle": "De e-mail die ertoe doet",
+      "connectBody": "Koppel Gmail en Stella controleert je inbox gedurende de dag en schrijft een kort overzicht van alleen de belangrijke nieuwe mail.",
+      "connect": "Gmail koppelen",
+      "connecting": "Wachten op Google…",
+      "connectError": "Gmail is niet gekoppeld. Probeer het opnieuw.",
+      "unavailable": "Log in bij Stella om Gmail te koppelen.",
+      "checkNow": "Nu controleren",
+      "checking": "Inbox controleren…",
+      "checked": "Gecontroleerd {when}",
+      "firstDigest": "Je eerste overzicht komt eraan",
+      "nothingNew": "Niets nieuws",
+      "error": "Kon je inbox niet controleren. Stella probeert het snel opnieuw.",
+      "justNow": "Zojuist"
     }
   },
   "sidebar": {

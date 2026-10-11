@@ -2711,6 +2711,22 @@
         "one": "Vedi {count} file",
         "other": "Vedi {count} file"
       }
+    },
+    "emailDigest": {
+      "title": "Email",
+      "connectTitle": "Le email che contano",
+      "connectBody": "Collega Gmail e Stella controllerà la tua posta in arrivo durante la giornata, scrivendo un breve riepilogo solo delle nuove email importanti.",
+      "connect": "Collega Gmail",
+      "connecting": "In attesa di Google…",
+      "connectError": "Gmail non si è collegato. Riprova.",
+      "unavailable": "Accedi a Stella per collegare Gmail.",
+      "checkNow": "Controlla ora",
+      "checking": "Controllo della posta…",
+      "checked": "Controllato {when}",
+      "firstDigest": "Il tuo primo riepilogo è in arrivo",
+      "nothingNew": "Niente di nuovo",
+      "error": "Impossibile controllare la posta. Stella riproverà a breve.",
+      "justNow": "Proprio ora"
     }
   },
   "sidebar": {

@@ -2695,6 +2695,22 @@
         "one": "Προβολή {count} αρχείου",
         "other": "Προβολή {count} αρχείων"
       }
+    },
+    "emailDigest": {
+      "title": "Email",
+      "connectTitle": "Τα email που μετράνε",
+      "connectBody": "Συνδέστε το Gmail και η Stella θα ελέγχει τα εισερχόμενά σας μέσα στη μέρα, γράφοντας μια σύντομη σύνοψη μόνο των σημαντικών νέων μηνυμάτων.",
+      "connect": "Σύνδεση Gmail",
+      "connecting": "Αναμονή για Google…",
+      "connectError": "Το Gmail δεν συνδέθηκε. Δοκιμάστε ξανά.",
+      "unavailable": "Συνδεθείτε στη Stella για να συνδέσετε το Gmail.",
+      "checkNow": "Έλεγχος τώρα",
+      "checking": "Έλεγχος εισερχομένων…",
+      "checked": "Ελέγχθηκε {when}",
+      "firstDigest": "Η πρώτη σας σύνοψη έρχεται",
+      "nothingNew": "Τίποτα νέο",
+      "error": "Δεν ήταν δυνατός ο έλεγχος. Η Stella θα ξαναδοκιμάσει σύντομα.",
+      "justNow": "Μόλις τώρα"
     }
   },
   "sidebar": {

@@ -2711,6 +2711,22 @@
         "one": "Voir {count} fichier",
         "other": "Voir {count} fichiers"
       }
+    },
+    "emailDigest": {
+      "title": "E-mail",
+      "connectTitle": "Les e-mails qui comptent",
+      "connectBody": "Connectez Gmail et Stella vérifie votre boîte de réception au fil de la journée, puis rédige un court résumé des seuls nouveaux e-mails importants.",
+      "connect": "Connecter Gmail",
+      "connecting": "En attente de Google…",
+      "connectError": "Gmail ne s'est pas connecté. Réessayez.",
+      "unavailable": "Connectez-vous à Stella pour connecter Gmail.",
+      "checkNow": "Vérifier",
+      "checking": "Vérification de votre boîte…",
+      "checked": "Vérifié {when}",
+      "firstDigest": "Votre premier résumé arrive",
+      "nothingNew": "Rien de nouveau",
+      "error": "Impossible de vérifier votre boîte. Stella réessaiera bientôt.",
+      "justNow": "À l'instant"
     }
   },
   "sidebar": {

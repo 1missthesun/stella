@@ -2677,6 +2677,22 @@
       "viewFiles": {
         "other": "Xem {count} tệp"
       }
+    },
+    "emailDigest": {
+      "title": "Email",
+      "connectTitle": "Những email quan trọng",
+      "connectBody": "Kết nối Gmail và Stella sẽ kiểm tra hộp thư của bạn trong ngày, rồi viết bản tóm tắt ngắn chỉ những email mới quan trọng.",
+      "connect": "Kết nối Gmail",
+      "connecting": "Đang chờ Google…",
+      "connectError": "Không kết nối được Gmail. Hãy thử lại.",
+      "unavailable": "Đăng nhập Stella để kết nối Gmail.",
+      "checkNow": "Kiểm tra ngay",
+      "checking": "Đang kiểm tra hộp thư…",
+      "checked": "Đã kiểm tra {when}",
+      "firstDigest": "Bản tóm tắt đầu tiên đang đến",
+      "nothingNew": "Không có gì mới",
+      "error": "Không kiểm tra được hộp thư. Stella sẽ thử lại sớm.",
+      "justNow": "Vừa xong"
     }
   },
   "sidebar": {

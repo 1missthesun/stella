@@ -2695,6 +2695,22 @@
         "one": "{count} fájl megtekintése",
         "other": "{count} fájl megtekintése"
       }
+    },
+    "emailDigest": {
+      "title": "E-mail",
+      "connectTitle": "A fontos e-mailek",
+      "connectBody": "Csatlakoztasd a Gmailt, és a Stella a nap folyamán átnézi a beérkezett leveleidet, majd rövid összefoglalót ír csak a fontos új levelekről.",
+      "connect": "Gmail csatlakoztatása",
+      "connecting": "Várakozás a Google-ra…",
+      "connectError": "A Gmail nem csatlakozott. Próbáld újra.",
+      "unavailable": "Jelentkezz be a Stellába a Gmail csatlakoztatásához.",
+      "checkNow": "Ellenőrzés most",
+      "checking": "Beérkezett levelek ellenőrzése…",
+      "checked": "Ellenőrizve {when}",
+      "firstDigest": "Az első összefoglalód úton van",
+      "nothingNew": "Nincs újdonság",
+      "error": "Nem sikerült ellenőrizni a leveleidet. A Stella hamarosan újra próbálja.",
+      "justNow": "Épp most"
     }
   },
   "sidebar": {

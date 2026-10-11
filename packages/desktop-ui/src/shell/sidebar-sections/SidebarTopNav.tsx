@@ -52,6 +52,8 @@ export function SidebarTopNav() {
         return "Browser";
       case "updates":
         return "Updates";
+      case "email":
+        return "Email";
       case "takeover":
         return "Sign in";
       case "home":

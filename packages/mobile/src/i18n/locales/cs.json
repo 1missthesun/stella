@@ -2727,6 +2727,22 @@
         "one": "Zobrazit {count} soubor",
         "other": "Zobrazit {count} souborů"
       }
+    },
+    "emailDigest": {
+      "title": "E-mail",
+      "connectTitle": "E-maily, na kterých záleží",
+      "connectBody": "Propojte Gmail a Stella bude během dne kontrolovat vaši schránku a psát krátký přehled jen důležité nové pošty.",
+      "connect": "Propojit Gmail",
+      "connecting": "Čekání na Google…",
+      "connectError": "Gmail se nepropojil. Zkuste to znovu.",
+      "unavailable": "Pro propojení Gmailu se přihlaste do Stelly.",
+      "checkNow": "Zkontrolovat",
+      "checking": "Kontroluji schránku…",
+      "checked": "Zkontrolováno {when}",
+      "firstDigest": "Váš první přehled je na cestě",
+      "nothingNew": "Nic nového",
+      "error": "Schránku se nepodařilo zkontrolovat. Stella to brzy zkusí znovu.",
+      "justNow": "Právě teď"
     }
   },
   "sidebar": {

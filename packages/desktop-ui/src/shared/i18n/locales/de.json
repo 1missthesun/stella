@@ -2695,6 +2695,22 @@
         "one": "{count} Datei ansehen",
         "other": "{count} Dateien ansehen"
       }
+    },
+    "emailDigest": {
+      "title": "E-Mail",
+      "connectTitle": "Die E-Mails, die zählen",
+      "connectBody": "Verbinde Gmail, und Stella prüft deinen Posteingang über den Tag und schreibt eine kurze Übersicht nur der wichtigen neuen Mails.",
+      "connect": "Gmail verbinden",
+      "connecting": "Warte auf Google…",
+      "connectError": "Gmail wurde nicht verbunden. Versuch es noch einmal.",
+      "unavailable": "Melde dich bei Stella an, um Gmail zu verbinden.",
+      "checkNow": "Jetzt prüfen",
+      "checking": "Posteingang wird geprüft…",
+      "checked": "Geprüft {when}",
+      "firstDigest": "Deine erste Übersicht ist unterwegs",
+      "nothingNew": "Nichts Neues",
+      "error": "Posteingang konnte nicht geprüft werden. Stella versucht es bald erneut.",
+      "justNow": "Gerade eben"
     }
   },
   "sidebar": {

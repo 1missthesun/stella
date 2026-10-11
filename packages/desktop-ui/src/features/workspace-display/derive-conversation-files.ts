@@ -18,6 +18,7 @@ import { extractFileLinkTargets } from "@stella/contracts/local-file-links";
 import {
   cloudWorldDriveName,
   driveLinkPath,
+  isCloudWorldAppPath,
 } from "@stella/contracts/cloud-world-paths";
 import {
   isDisplayTabPayload,
@@ -129,6 +130,7 @@ export function deriveConversationFiles(
     for (const filePath of extractFileLinkTargets(
       responseTextForFileLinks(event),
     )) {
+      if (isCloudWorldAppPath(filePath)) continue;
       // A drive link names a drive file, never a
       // file on this machine. The journal's files card for the same path
       // (with real size and type) is the richer record: keep it when the

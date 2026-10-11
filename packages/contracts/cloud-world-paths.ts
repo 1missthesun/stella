@@ -57,6 +57,17 @@ export const isCloudWorkspacePath = (filePath: string): boolean => {
   return trimmed === "/workspace" || trimmed.startsWith("/workspace/");
 };
 
+const WORLD_APPS_RE = /^\/workspace\/(?:forks\/[^/]+\/)?world\/apps(?:\/|$)/;
+
+/**
+ * True when `filePath` is inside the world's apps folder
+ * (`/workspace/world/apps/<slug>/...`): the source, manifest and build status
+ * of a cloud app Stella builds and hosts. Those are the app's own workings,
+ * shown in Apps, never files of the user's.
+ */
+export const isCloudWorldAppPath = (filePath: string): boolean =>
+  WORLD_APPS_RE.test(filePath.trim());
+
 export const cloudWorldDriveName = (drivePath: string): string =>
   drivePath.slice(drivePath.lastIndexOf("/") + 1);
 

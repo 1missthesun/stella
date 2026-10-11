@@ -2,6 +2,7 @@ import {
   LegendList,
   type LegendListRenderItemProps,
 } from "@legendapp/list/react-native";
+import { isCloudWorldAppPath } from "@stella/contracts/cloud-world-paths";
 import { generatedImageFileName } from "@stella/contracts/generated-image-name";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -150,7 +151,8 @@ export function FilesPage() {
       merged.push(file);
     }
     for (const artifact of hubArtifacts) {
-      if (!artifactPrimaryFilePath(artifact.payload)) continue;
+      const filePath = artifactPrimaryFilePath(artifact.payload);
+      if (!filePath || isCloudWorldAppPath(filePath)) continue;
       const key = artifactFileKey(artifact);
       const known = byKey.get(key);
       if (known) {

@@ -2,6 +2,7 @@ import {
   cloudWorldDriveName,
   driveLinkPath,
   isCloudWorkspacePath,
+  isCloudWorldAppPath,
 } from "@stella/contracts/cloud-world-paths";
 import {
   extractFileLinkTargets,
@@ -227,7 +228,7 @@ const toConversationFile = (
   conversationId: string,
 ): ConversationFile | null => {
   const raw = found.path.trim();
-  if (!raw) return null;
+  if (!raw || isCloudWorldAppPath(raw)) return null;
   const absolute = isAbsoluteLocalFilePath(raw);
   const drivePath =
     driveLinkPath(raw) ?? (absolute || /^[a-z][a-z0-9+.-]*:/i.test(raw) ? null : raw.replace(/^\/+/, ""));

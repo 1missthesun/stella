@@ -6,7 +6,6 @@ import {
   cancelAnimation,
   makeMutable,
   runOnJS,
-  runOnUI,
   withSpring,
   type WithSpringConfig,
 } from "react-native-reanimated";
@@ -82,7 +81,6 @@ function setLive(live: boolean) {
 
 function begin(side: DrawerSide) {
   setState({ live: true, side });
-  watchDrag();
 }
 
 function claimSide(side: DrawerSide) {
@@ -201,7 +199,6 @@ function rubber(over: number) {
 const dismissKeyboard = () => Keyboard.dismiss();
 
 const dragOwner = makeMutable(0);
-const dragMovedAt = makeMutable(0);
 const dragOrigin = makeMutable(0);
 const dragTravel = makeMutable(1);
 
@@ -222,14 +219,12 @@ function grab(
   dragTravel.value = travel;
   dragOrigin.value = drawerProgress.value - (sign * translationX) / travel;
   dragOwner.value = owner;
-  dragMovedAt.value = Date.now();
   runOnJS(begin)(sign === 1 ? "start" : "end");
 }
 
 function track(owner: number, translationX: number) {
   "worklet";
   if (dragOwner.value !== owner) return;
-  dragMovedAt.value = Date.now();
   const raw =
     dragOrigin.value + (drawerSign.value * translationX) / dragTravel.value;
   drawerProgress.value = raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
@@ -243,36 +238,6 @@ function release(owner: number, velocityX: number) {
   const open = drawerProgress.value + v * 0.2 > 0.5;
   runOnJS(setOpen)(open);
   settleDrawer(open, v);
-}
-
-/** A finger that stops moving this long without lifting has been lost. */
-const LOST_TOUCH_MS = 1500;
-
-function abandonDrag(owner: number) {
-  "worklet";
-  release(owner, 0);
-}
-
-let dragWatch: ReturnType<typeof setInterval> | null = null;
-
-/**
- * A drag whose end never arrives (the system took the touch, or the touch
- * was lost) would leave the stage part-open. While a drag is held, a touch
- * that has not moved for a while is treated as released where it is.
- */
-function watchDrag() {
-  if (dragWatch) return;
-  dragWatch = setInterval(() => {
-    const owner = dragOwner.value;
-    if (owner === 0) {
-      if (dragWatch) clearInterval(dragWatch);
-      dragWatch = null;
-      return;
-    }
-    if (Date.now() - dragMovedAt.value > LOST_TOUCH_MS) {
-      runOnUI(abandonDrag)(owner);
-    }
-  }, 250);
 }
 
 /**

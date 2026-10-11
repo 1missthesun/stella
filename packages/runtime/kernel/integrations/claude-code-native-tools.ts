@@ -142,7 +142,9 @@ export const isClaudeCodeNativeToolName = (toolName: string): boolean =>
  * tools run: native where the CLI runs, Stella's routed ones (`toolsAway`)
  * anywhere else.
  */
-export const resolveClaudeCodeToolSet = <T extends Pick<ToolMetadata, "name">>(args: {
+export const resolveClaudeCodeToolSet = <
+  T extends Pick<ToolMetadata, "name">,
+>(args: {
   role: ClaudeCodeNativeToolRole;
   toolsAllowlist?: readonly string[];
   catalog: readonly T[];

@@ -1953,7 +1953,11 @@ class ClaudeCodeSessionRuntime {
         { remaining: MAX_STEP_RECOVERIES_PER_TURN },
       );
       let current = request;
-      for (let changes = 0; !request.vanilla && changes < MAX_TOOL_SET_CHANGES_PER_TURN; changes += 1) {
+      for (
+        let changes = 0;
+        !request.vanilla && changes < MAX_TOOL_SET_CHANGES_PER_TURN;
+        changes += 1
+      ) {
         const change = current.toolSetAfterStep?.();
         if (!change) break;
         if (!response.delivered && response.message.trim()) {

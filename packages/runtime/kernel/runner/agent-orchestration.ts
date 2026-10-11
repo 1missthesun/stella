@@ -860,9 +860,7 @@ export const createAgentOrchestration = (
             settled: resource.settled,
           }),
         ...(toolWorkspaceRoot ? { toolWorkspaceRoot } : {}),
-        ...(workingDirectory
-          ? { agentWorkingDirectory: workingDirectory }
-          : {}),
+        ...(workingDirectory ? { agentWorkingDirectory: workingDirectory } : {}),
         ...(steering ? { steering } : {}),
         compactionScheduler: context.state.compactionScheduler,
         onProgress,

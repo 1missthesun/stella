@@ -23,6 +23,7 @@ DEV-CONTEXT.md
 /workers/*/.dev.vars
 /workers/*/node_modules/
 /workers/*/.wrangler/
+/workers/cloud-builder/wrangler.preview-*.jsonc
 /workers/*/tests/fixtures/.wrangler/
 /workers/cloud-builder/.image/
 /packages/executor-cloud/node_modules/

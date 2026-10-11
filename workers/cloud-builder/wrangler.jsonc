@@ -326,6 +326,171 @@
       "deleted_classes": ["OwnerTransferCoordinator"],
     },
   ],
+  // Per-agent Worker Previews (DEPLOY.md, "Previews"). Deploy them only with
+  // `bun run preview -- up`: it targets the separate Worker
+  // stella-v2-cloud-builder-preview, never this dev Worker, creates the
+  // Preview's own D1 database in place of PREVIEW_D1_DATABASE_ID, and passes
+  // the Preview's own URL as CLOUD_BUILDER_PUBLIC_URL. Durable Objects and
+  // containers are separate per Preview automatically. R2 and APP_ROUTES are
+  // test resources shared by every Preview (objects expire after 14 days);
+  // service bindings reach the dev Workers. Secrets come from the preview
+  // Worker's base config (`bun run preview -- setup-secrets`).
+  "previews": {
+    "vars": {
+      "TELEMETRY_ENVIRONMENT": "development",
+      "TURN_TIMEOUT_MS": "900000",
+      "SANDBOX_IDLE_TIMEOUT_MS": "600000",
+      "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
+      "SANDBOX_SNAPSHOTS": "1",
+      "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
+      "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-dev.fromyou.workers.dev",
+      "ENABLE_DEV_ACCEPTANCE_PROBES": "1",
+      "STELLA_TEST_ACCOUNTS": "1",
+      "STELLA_DEPLOYMENT_IDENTITY": "dev:outgoing-bulldog-865",
+      "MODEL_GATEWAY_URL": "https://stella-v2-model-gateway-dev.fromyou.workers.dev",
+      // The dev model gateway trusts this key id (its CAPABILITY_JWKS).
+      "CAPABILITY_SIGNING_KID": "builder-preview-1",
+      "R2_S3_ENDPOINT": "https://f34b91c9c7dc22f0aef0ba855a9f026f.r2.cloudflarestorage.com",
+      "R2_DRIVE_BUCKET": "stella-v2-drive-preview",
+      "R2_MEDIA_BUCKET": "stella-v2-media-preview",
+      "R2_CANVAS_SHARES_BUCKET": "stella-canvas-shares",
+      "R2_BACKUP_BUCKET": "stella-v2-app-builds-preview",
+      "CANVAS_SHARE_BASE_URL": "https://stellashare.app",
+      "CANVAS_OWNER_SITE_URL": "https://stella-website-dev.fromyou.workers.dev",
+      "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
+    },
+    "observability": {
+      "enabled": true,
+      "logs": {
+        "enabled": true,
+        "invocation_logs": true,
+        "persist": true,
+      },
+      "traces": {
+        "enabled": true,
+        "head_sampling_rate": 1,
+        "persist": true,
+      },
+    },
+    "artifacts": [
+      {
+        "binding": "ARTIFACTS",
+        "namespace": "stella-app-dev",
+      },
+    ],
+    "send_email": [{ "name": "EMAIL" }],
+    "worker_loaders": [
+      {
+        "binding": "LOADER",
+      },
+    ],
+    "services": [
+      {
+        "binding": "TELEMETRY",
+        "service": "stella-v2-telemetry-dev",
+        "entrypoint": "TelemetryService",
+      },
+      {
+        "binding": "BROWSER_GATEWAY",
+        "service": "stella-v2-browser-gateway-dev",
+      },
+      {
+        "binding": "MODEL_GATEWAY",
+        "service": "stella-v2-model-gateway-dev",
+      },
+      {
+        "binding": "MODEL_GATEWAY_CONTROL",
+        "service": "stella-v2-model-gateway-dev",
+        "entrypoint": "ModelGatewayControl",
+      },
+    ],
+    "r2_buckets": [
+      {
+        "binding": "APP_BUILDS",
+        "bucket_name": "stella-v2-app-builds-preview",
+      },
+      {
+        "binding": "BACKUP_BUCKET",
+        "bucket_name": "stella-v2-app-builds-preview",
+      },
+      {
+        "binding": "AGENT_HOME",
+        "bucket_name": "stella-v2-agent-home-preview",
+      },
+      {
+        "binding": "CONVERSATION_ARCHIVE",
+        "bucket_name": "stella-v2-conversation-archive-preview",
+      },
+      {
+        "binding": "WORLDS_BUCKET",
+        "bucket_name": "stella-v2-worlds-preview",
+      },
+      {
+        "binding": "DRIVE",
+        "bucket_name": "stella-v2-drive-preview",
+      },
+      {
+        "binding": "MEDIA",
+        "bucket_name": "stella-v2-media-preview",
+      },
+      {
+        "binding": "CANVAS_SHARES",
+        "bucket_name": "stella-canvas-shares",
+      },
+    ],
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "PREVIEW_D1_DATABASE_NAME",
+        "database_id": "PREVIEW_D1_DATABASE_ID",
+        "migrations_dir": "migrations",
+      },
+    ],
+    "kv_namespaces": [
+      {
+        "binding": "APP_ROUTES",
+        "id": "fe8608f6b0b84b069c414d65b2721a3b",
+      },
+      {
+        // Read-only network policy, shared with the dev model gateway.
+        "binding": "ASN_POLICY",
+        "id": "a255c73f45c94af094c46f604aaa50e8",
+      },
+    ],
+    // No `containers`: Previews accept only fixed-image container apps, and
+    // the Sandbox object picks its image and instance size per start
+    // (scheduling_policy "durable_object"), which Wrangler refuses under
+    // `previews`. Agent sandboxes therefore cannot start in a Preview.
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "Sandbox",
+          "class_name": "Sandbox",
+        },
+        {
+          "name": "BUILD_SESSIONS",
+          "class_name": "BuildSession",
+        },
+        {
+          "name": "ORCHESTRATOR_SESSIONS",
+          "class_name": "OrchestratorSession",
+        },
+        {
+          "name": "OWNER_GATES",
+          "class_name": "OwnerGate",
+        },
+        {
+          "name": "MODEL_GATEWAY_OWNERS",
+          "class_name": "OwnerRelayGate",
+          "script_name": "stella-v2-model-gateway-dev",
+        },
+        {
+          "name": "WORLDS",
+          "class_name": "WorldStore",
+        },
+      ],
+    },
+  },
   "env": {
     "bn118": {
       "name": "stella-v2-cloud-builder-basic-nightingale-118",

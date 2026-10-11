@@ -44,7 +44,11 @@ node .agents/skills/verify-stella/control-stella.mjs session launch --account pr
 ```
 
 The harness targets `STELLA_BACKEND_URL` (default: the dev cloud-builder
-worker, `https://stella-v2-cloud-builder-dev.fromyou.workers.dev`). It reads
+worker, `https://stella-v2-cloud-builder-dev.fromyou.workers.dev`). To test a
+backend change, point it at your own Preview instead of deploying dev:
+`cd workers/cloud-builder && env -u CLOUDFLARE_API_TOKEN bun run preview -- up --name <name>`
+prints the URL to export as `STELLA_BACKEND_URL`, and `preview -- down` removes
+it. DEPLOY.md, "Previews", covers what a Preview isolates and its limits. It reads
 `STELLA_ADMIN_API_SECRET` from the environment or the gitignored
 `workers/cloud-builder/.dev.vars`. For a non-Electron client, mint a session
 directly:

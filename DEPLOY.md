@@ -4,6 +4,97 @@ Commit to `master`, `git fetch` + rebase before deploying, push after. Other
 sessions deploy dev too. Never print secrets: pipe them into `wrangler secret put`.
 Nothing user-facing deploys on push except the R2 asset workflows noted below.
 
+**To test a backend change, don't deploy dev: start your own Preview**
+(next section). Dev is one shared deployment, and every agent's test deploy
+replaces the one before it. Deploy dev only to ship a change that is already
+on `master`.
+
+## Previews: your own backend for testing
+
+`bun run preview -- up` (from `workers/cloud-builder`) deploys your tree's
+cloud-builder as a [Worker Preview](https://developers.cloudflare.com/workers/previews/)
+and prints its URL. Every Preview is a separate copy of the backend, so it
+cannot overwrite dev or another agent's Preview.
+
+```bash
+cd workers/cloud-builder
+env -u CLOUDFLARE_API_TOKEN bun run preview -- up --name <short-name>   # ~1 min; rerun to update
+export STELLA_BACKEND_URL=https://<short-name>-stella-v2-cloud-builder-preview.fromyou.workers.dev
+node ../../.agents/skills/verify-stella/cloud-turn.mjs --prompt "Reply with exactly: ok"
+node ../../.agents/skills/verify-stella/control-stella.mjs session launch --account pro
+env -u CLOUDFLARE_API_TOKEN bun run preview -- down --name <short-name>  # when finished
+```
+
+`--name` defaults to the git branch (at most 31 characters of `a-z0-9-`).
+`bun run preview -- list` shows the Previews that exist. Delete yours when you
+are done.
+
+How it is isolated:
+
+- Every Preview lives under its own Worker, `stella-v2-cloud-builder-preview`,
+  never `stella-v2-cloud-builder-dev`. `up` cannot change dev's code, vars,
+  secrets or routes.
+- **Durable Objects** (conversations, owner gates, worlds, sessions) get a
+  separate namespace per Preview from Cloudflare. They are deleted with the
+  Preview.
+- **D1**: `up` creates `stella-v2-preview-<name>`, applies this tree's
+  migrations to it, and binds it. `down` deletes it. Test accounts, sessions
+  and every other row exist only there.
+- **R2 and KV**: Previews share test resources (`stella-v2-*-preview` buckets
+  with 14-day expiry, KV `stella-v2-app-routes-preview`). Keys are
+  per-owner, and owners are unique per Preview. `ASN_POLICY` is dev's,
+  which is read-only. `CANVAS_SHARES` is the shared `stella-canvas-shares`,
+  as in dev.
+- **Secrets** come from the preview Worker's base config, so a new Preview
+  has them with no setup: `BETTER_AUTH_SECRET`, `OWNER_SECRETS_KEK`,
+  `OAUTH_STATE_SECRET` and `MEDIA_SIGNING_SECRET` are Preview-only random
+  values, and `STELLA_ADMIN_API_SECRET` and `BUILDER_SERVICE_SECRET` equal
+  dev's, so existing tooling works unchanged. `CAPABILITY_SIGNING_KEY` is the
+  `builder-preview-1` key, which the dev model gateway trusts (its
+  `CAPABILITY_JWKS`). To give one Preview a third-party key (Exa, fal,
+  Stripe test, …):
+  `... | bunx wrangler preview secret put NAME --worker-name stella-v2-cloud-builder-preview --name <name>`.
+- Configuration is the `previews` block of `wrangler.jsonc`. The Preview's own
+  URL is passed as `CLOUD_BUILDER_PUBLIC_URL` (JWT issuer, turn broker), and
+  `STELLA_AUTH_URL` is unset, so auth callbacks use that URL too.
+
+What a Preview cannot do yet (Cloudflare limits, 2026-10):
+
+- **No agent sandboxes.** Previews accept only fixed-image container apps.
+  The `Sandbox` object picks its image and instance size per start
+  (`scheduling_policy: "durable_object"`), which Wrangler refuses under
+  `previews`. Chat turns, the orchestrator, auth, billing and every HTTP or RPC
+  route work. Anything that starts a container (background agents, cloud
+  shell, app builds) still needs dev.
+- **Service bindings reach the dev Workers**: model gateway, browser gateway,
+  telemetry. A Preview can't bind to another Worker's Preview, so a change
+  that spans cloud-builder and the gateway still needs a dev gateway deploy.
+  The gateway's calls back into cloud-builder (`BillingControl`: owner
+  enforcement and usage) go to **dev** cloud-builder. For a Preview's owners,
+  that means inert per-owner records in dev's `OwnerGate` namespace, under
+  owner ids dev has never issued. No dev user is affected.
+- **The desktop's own model calls fail with HTTP 401.** The desktop exchanges
+  its sign-in token for a capability directly at the dev gateway, which only
+  trusts dev-issued JWTs. Cloud turns (`cloud-turn.mjs`, the desktop's cloud
+  lane) work, and so does sign-in. Local agents on Stella models do not.
+- Cron Triggers, queue consumers and the `auth-dev.stella.sh` route don't run
+  on Previews. `wrangler tail` doesn't support Previews either. Logs and
+  traces are persisted at full sampling under the Preview's Observability tab
+  in the dashboard.
+- Each Preview's URL is public, like dev's. Test accounts are enabled on it.
+
+One-time setup (already done; listed for rebuilding or rotating). Create the
+buckets and KV namespace named in the `previews` block. Set the preview Worker's
+`subdomain` to `{"enabled": false, "previews_enabled": true}` (API
+`PATCH /accounts/<id>/workers/workers/stella-v2-cloud-builder-preview`;
+without it the URL answers error 1042). Then put the base secrets:
+`bun run preview -- setup-secrets --capability-key-file <pem>`. It reads
+`STELLA_ADMIN_API_SECRET` and `BUILDER_SERVICE_SECRET` from the environment
+or `.dev.vars`. To rotate the capability key, generate a P-256 key, put its
+public JWK as `builder-preview-1` in the model gateway's dev
+`CAPABILITY_JWKS`, deploy the gateway, and rerun `setup-secrets`. Base
+secrets only reach Previews created afterwards.
+
 ## What ships how
 
 | You changed | Ship it with | Users get it |

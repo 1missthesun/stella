@@ -33,6 +33,14 @@ teardown) is faster to drive headless:
   the attached tool host locally (`docker run --rm --entrypoint sh
   stella-v2-cloud-builder-dev-sandboxsmall:<version>`), where stderr is on the
   terminal instead of in a diagnostic event three minutes later.
+- Test an unmerged backend change on your own Preview: `bun run preview -- up
+  --name <name>` in `workers/cloud-builder`, then
+  `STELLA_BACKEND_URL=<printed url> node .agents/skills/verify-stella/cloud-turn.mjs ...`.
+  It has its own Durable Objects and D1, so its owners, conversations and
+  history never mix with dev's. It has no agent containers, so verify
+  sandbox and background-agent behavior on dev. `wrangler tail` does not
+  attach to Previews; read the Preview's logs in the dashboard
+  (Observability, persisted at full sampling).
 - A worker-only `bun run deploy:dev` takes about two minutes; one that
   rebuilds the image takes six. Never deploy while a cloud thread is
   `running`: the deploy replaces the isolate running it and the turn is

@@ -65,6 +65,11 @@ location, the same one source builds use for `VITE_STELLA_BACKEND_URL`:
 STELLA_BACKEND_URL=https://stella-v2-cloud-builder-dev.fromyou.workers.dev
 ```
 
+Dev is shared, so don't deploy it to test an unmerged backend change. Run
+your own isolated Preview instead (`bun run preview -- up` in
+`workers/cloud-builder`, then point `STELLA_BACKEND_URL` at the URL it
+prints). DEPLOY.md, "Previews", covers it.
+
 ### Test accounts
 
 Launch Electron with a signed-in Pro test account:

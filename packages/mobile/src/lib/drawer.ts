@@ -6,7 +6,6 @@ import {
   cancelAnimation,
   makeMutable,
   runOnJS,
-  runOnUI,
   withSpring,
   type WithSpringConfig,
 } from "react-native-reanimated";
@@ -94,12 +93,6 @@ function claimSide(side: DrawerSide) {
 
 function rested() {
   if (!state.open) setLive(false);
-  settled();
-}
-
-function settled() {
-  resyncDrawer();
-  setTimeout(resyncDrawer, 250);
 }
 
 function settleDrawer(open: boolean, velocity = 0) {
@@ -108,35 +101,9 @@ function settleDrawer(open: boolean, velocity = 0) {
     open ? 1 : 0,
     { ...(open ? OPEN : CLOSE), velocity },
     (done) => {
-      if (!done) return;
-      if (open) runOnJS(settled)();
-      else runOnJS(rested)();
+      if (done && !open) runOnJS(rested)();
     },
   );
-}
-
-const NUDGE = 0.0001;
-
-function nudge() {
-  "worklet";
-  const rest = drawerProgress.value;
-  if (rest !== 0 && rest !== 1) return;
-  const moved = rest === 0 ? NUDGE : 1 - NUDGE;
-  drawerProgress.value = moved;
-  requestAnimationFrame(() => {
-    if (drawerProgress.value === moved) drawerProgress.value = rest;
-  });
-}
-
-/**
- * Re-send the drawer's resting styles. A React commit that lands after the
- * settle's last frame (a slow release near the end makes that spring short)
- * can leave the stage, panel and chevron showing a frame from mid-flight;
- * Reanimated skips props it believes it already applied, so this moves the
- * value a hair and back to make every style apply again.
- */
-export function resyncDrawer() {
-  runOnUI(nudge)();
 }
 
 export function openDrawer(side: DrawerSide = "start") {

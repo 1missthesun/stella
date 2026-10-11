@@ -35,7 +35,6 @@ import {
   drawerSign,
   drawerVeil,
   openDrawer,
-  resyncDrawer,
   useDrawerLive,
   useDrawerMetrics,
   useDrawerClosePan,
@@ -111,10 +110,6 @@ export function DrawerStage({
       }
     },
   );
-
-  useEffect(() => {
-    resyncDrawer();
-  }, [open, live, side]);
 
   useEffect(() => {
     if (!open) return;

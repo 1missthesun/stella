@@ -154,6 +154,12 @@ export function BrainSection({
         onFallbackPress={onOpenProviders}
       />
 
+      {accountsFor ? (
+        <View style={styles.accounts}>
+          <EngineAccountSection provider={accountsFor} embedded="panel" />
+        </View>
+      ) : null}
+
       <View style={styles.models} accessibilityRole="radiogroup">
         {loadingModels ? (
           <ActivityIndicator
@@ -190,12 +196,6 @@ export function BrainSection({
           />
         ) : null}
       </View>
-
-      {accountsFor ? (
-        <View style={styles.accounts}>
-          <EngineAccountSection provider={accountsFor} embedded="panel" />
-        </View>
-      ) : null}
 
       {settings.supportsEffortSelection ? (
         <View style={styles.thinking}>
@@ -251,6 +251,7 @@ const makeStyles = (colors: Colors) =>
       marginVertical: 12,
     },
     accounts: {
+      marginBottom: 4,
       marginLeft: 42,
     },
     thinking: {

@@ -38,7 +38,12 @@ import {
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
 import { createHash } from "node:crypto";
-import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
+import {
+  CLAUDE_CODE_SERVED_SEARCH_TOOLS,
+  claudeCodeServedSearchCall,
+  resolveClaudeCodeToolSet,
+  type ClaudeCodeServedSearchToolName,
+} from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import { placementOf, StellaPlacementDoc } from "../stella/placement.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
@@ -145,7 +150,22 @@ export type ClaudeCodeSessionStore = {
 type Binding = {
   session: ClaudeCodeSessionRef;
   toolsRemote: boolean;
+  /** The host runs a served Grep and Glob where the tools are (`ClaudeCodeExtensionOptions.searchElsewhere`). */
+  servesSearch: boolean;
   piConversationId: number;
+};
+
+/**
+ * What the host gives one conversation's engine extension: a served Grep or
+ * Glob, as the device `Grep`, run where the conversation's tools run now;
+ * undefined when they run on this computer.
+ */
+export type ClaudeCodeExtensionOptions = {
+  searchElsewhere?(
+    call: { toolName: "Grep"; params: Record<string, unknown> },
+    api: ToolExecutionApi,
+    context: Context,
+  ): Promise<ToolExecutionResult | undefined>;
 };
 
 type QueueItem = { kind: "event"; event: Record<string, any> } | { kind: "end" };
@@ -497,7 +517,14 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
 
   const toolSetFor = (binding: Binding, tools: readonly { name: string; description: string; parameters: unknown }[]) => {
     const offered = new Set(tools.map((tool) => tool.name));
-    const catalog = tools.filter((tool) => !(ENGINE_ONLY_TOOLS as readonly string[]).includes(tool.name)).map(toolSpec);
+    const catalog = [
+      ...tools.filter((tool) => !(ENGINE_ONLY_TOOLS as readonly string[]).includes(tool.name)).map(toolSpec),
+      ...(binding.toolsRemote && binding.servesSearch
+        ? CLAUDE_CODE_SERVED_SEARCH_TOOLS.filter((tool) => offered.has(tool.name)).map(
+            (tool): ClaudeCodeToolSpec => ({ name: tool.name, description: tool.description, parameters: structuredClone(tool.parameters) }),
+          )
+        : []),
+    ];
     const set = resolveClaudeCodeToolSet({
       role: binding.session.role,
       catalog,
@@ -1150,14 +1177,29 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       },
     }));
 
-  const engineOnly = (name: (typeof ENGINE_ONLY_TOOLS)[number]) =>
+  /**
+   * Claude Code's Grep and Glob: a built-in's result as the CLI reported it,
+   * or, while the tools run elsewhere, Stella's served one run there.
+   */
+  const engineOnly = (name: ClaudeCodeServedSearchToolName, extensionOptions: ClaudeCodeExtensionOptions) =>
     defineTool({
       name,
       description: `Claude Code's ${name}.`,
       parameters: Type.Object({}, { additionalProperties: true }),
-      async execute(_args, api, context) {
+      async execute(args, api, context) {
         if (isNativeCall(api.callId)) return await nativeOutcome(api, context);
-        return INTERRUPTED;
+        if (!calls.has(api.callId)) return INTERRUPTED;
+        const ran = await extensionOptions.searchElsewhere?.(
+          claudeCodeServedSearchCall(name, (asRecord(args) ?? {}) as Record<string, unknown>),
+          api,
+          context,
+        );
+        return (
+          ran ?? {
+            content: [{ type: "text", text: `Your file and shell tools run on this computer again: use your built-in ${name}.` }],
+            isError: true,
+          }
+        );
       },
     });
 
@@ -1174,10 +1216,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       }
       return { provider: CLAUDE_CODE_PROVIDER_ID, modelId };
     },
-    extension(conversationId: string): Extension {
+    extension(conversationId: string, extensionOptions: ClaudeCodeExtensionOptions = {}): Extension {
       return defineExtension({
         name: CLAUDE_CODE_ENGINE_EXTENSION,
-        tools: ENGINE_ONLY_TOOLS.map(engineOnly),
+        tools: ENGINE_ONLY_TOOLS.map((name) => engineOnly(name, extensionOptions)),
         wraps: WRAPPED_TOOLS.map(wrapBuiltin),
         hooks: [
           hook(GenerationTask, {
@@ -1198,6 +1240,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
                   ...(agent.cwd ? { cwd: agent.cwd } : {}),
                 },
                 toolsRemote: options.builtins === "never" || (placement !== undefined && placement.kind !== "local"),
+                servesSearch: extensionOptions.searchElsewhere !== undefined,
                 piConversationId: api.conversationId,
               };
               const known = sessions.get(identity.sessionId);

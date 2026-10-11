@@ -34,6 +34,7 @@ export type AgentDirectoryAgentRow = {
   /** "this computer", "cloud", or a device's name. */
   where: string;
   updatedAt: number;
+  offline?: { lastSeenAt?: number };
 };
 
 export type AgentDirectorySessionRow = {
@@ -98,10 +99,17 @@ export const selectAgentRoster = (rows: readonly AgentDirectoryAgentRow[]) => {
   };
 };
 
+const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefined =>
+  row.offline
+    ? `${row.where} is offline${
+        row.offline.lastSeenAt !== undefined ? ` (last seen ${formatAge(row.offline.lastSeenAt, now)})` : ""
+      }, so this status may be out of date; it reports when ${row.where} reconnects`
+    : undefined;
+
 const rosterLine = (row: AgentDirectoryAgentRow, now: number): string =>
   [
     `- ${row.threadId}`,
-    row.status,
+    row.offline ? `${row.status}, computer offline` : row.status,
     row.where,
     `last active ${formatAge(row.updatedAt, now)}`,
     ...(row.parentThreadId ? [`started by ${row.parentThreadId}`] : []),
@@ -136,14 +144,18 @@ export const renderAgentRoster = (
   ].join("\n");
 };
 
-const agentEntry = (row: AgentDirectoryAgentRow, now: number) => ({
-  thread_id: row.threadId,
-  description: row.description,
-  status: row.status,
-  where: row.where,
-  last_active: formatAge(row.updatedAt, now),
-  ...(row.parentThreadId ? { started_by: row.parentThreadId } : {}),
-});
+export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now()) => {
+  const offline = offlineText(row, now);
+  return {
+    thread_id: row.threadId,
+    description: row.description,
+    status: row.status,
+    where: row.where,
+    last_active: formatAge(row.updatedAt, now),
+    ...(row.parentThreadId ? { started_by: row.parentThreadId } : {}),
+    ...(offline ? { computer: offline } : {}),
+  };
+};
 
 /**
  * The model-facing listing. Agents are this conversation's; sessions are the
@@ -170,11 +182,11 @@ export const buildAgentDirectoryResult = (input: {
     caller.threadId
       ? row.parentThreadId === caller.threadId
       : !row.parentThreadId;
-  const subagents = kept.filter(isOwn).map((row) => agentEntry(row, now));
+  const subagents = kept.filter(isOwn).map((row) => agentDirectoryEntry(row, now));
   const teammates = kept
     .filter((row) => !isOwn(row))
     .map((row) => ({
-      ...agentEntry(row, now),
+      ...agentDirectoryEntry(row, now),
       ...(row.threadId === caller.parentThreadId ? { relation: "started you" } : {}),
     }));
   const sessions = input.sessions

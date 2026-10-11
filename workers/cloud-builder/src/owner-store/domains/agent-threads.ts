@@ -24,7 +24,7 @@ import {
   type ClaudeUsageLimit,
   type ClaudeUsageLimitCard,
 } from "@stella/contracts/claude-usage-limit";
-import { agentAttemptOutcomeOf, agentStatusOf } from "@stella/contracts/agent-status";
+import { agentAttemptOutcomeOf, agentStatusOf, isLiveAgentStatus } from "@stella/contracts/agent-status";
 import {
   AGENT_PAUSED_REASON,
   agentThreadTerminalStatus,
@@ -49,8 +49,13 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import { findDeviceDestination, SELECTED_DEVICE_NEEDS_CONSENT } from "@stella/contracts/turn-plane/placement";
 import {
+  findDeviceDestination,
+  SELECTED_DEVICE_NEEDS_CONSENT,
+  type DeviceDestination,
+} from "@stella/contracts/turn-plane/placement";
+import {
+  agentMessageDelivery,
   AGENT_PROMPT_MAX_CHARS,
   AGENT_THREAD_PAGE_MAX,
   RUNNING_AGENT_THREADS_LIMIT,
@@ -957,6 +962,14 @@ const deviceThreadForCloud = (ctx: OwnerContext, raw: unknown): AgentThreadSumma
   return summary(readCloudDeviceThread(ctx, args), ctx.ownerId);
 };
 
+const devicePresence = async (ctx: OwnerContext): Promise<Map<string, DeviceDestination>> => {
+  try {
+    return new Map((await ctx.host.deviceDestinations()).map((device) => [device.deviceId, device]));
+  } catch {
+    return new Map();
+  }
+};
+
 /** The owner's device names by id; empty when the gate can't list them. */
 const deviceLabels = async (ctx: OwnerContext): Promise<Map<string, string>> => {
   const labels = new Map<string, string>();
@@ -1518,19 +1531,28 @@ const agentDirectory = async (
       rows.set(row.thread_id, row);
     }
   }
-  const labels = [...rows.values()].some((row) => threadDeviceId(row) !== null)
-    ? await deviceLabels(ctx)
-    : new Map<string, string>();
+  const devices = [...rows.values()].some((row) => threadDeviceId(row) !== null)
+    ? await devicePresence(ctx)
+    : new Map<string, DeviceDestination>();
   const agents = [...rows.values()].map((row): AgentDirectoryAgentRow => {
     const deviceId = threadDeviceId(row);
+    const device = deviceId ? devices.get(resolveCurrentDeviceId(ctx.db, deviceId)) : undefined;
+    const status = normalizeAgentDirectoryStatus(row.status);
+    const live = isLiveAgentStatus(status);
     return {
       threadId: row.thread_id,
       conversationId: args.conversationId,
       ...(row.parent_thread_id !== null ? { parentThreadId: row.parent_thread_id } : {}),
       description: row.description,
-      status: normalizeAgentDirectoryStatus(row.status),
-      where: deviceId ? (labels.get(deviceId) ?? "another computer") : "cloud",
-      updatedAt: row.updated_at,
+      status,
+      where: deviceId ? (device?.label?.trim() || "another computer") : "cloud",
+      updatedAt:
+        live && device?.online && device.lastSeenAt !== undefined
+          ? Math.max(row.updated_at, device.lastSeenAt)
+          : row.updated_at,
+      ...(live && deviceId && devices.size > 0 && !device?.online
+        ? { offline: device?.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {} }
+        : {}),
     };
   });
   const sessions = ctx.db
@@ -1625,12 +1647,7 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
   return delivery;
 };
 
-const messageDelivery = (result: AgentControlResult): MessageDelivery => ({
-  delivered:
-    result.outcome === "steered" || result.outcome === "resumed" ? result.outcome : "queued",
-  threadId: result.threadId,
-  ...(result.note ? { note: result.note } : {}),
-});
+const messageDelivery = (result: AgentControlResult): MessageDelivery => agentMessageDelivery(result);
 
 /**
  * Whether the sender is the one that started the thread: its conversation's

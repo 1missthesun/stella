@@ -1564,24 +1564,19 @@ type MessageDelivery = AgentThreadCalls["agentThreads.message"]["result"];
  * an agent takes it through {@link controlAgent}: a running one reads it
  * before its next model call, an idle one resumes with it as its next
  * attempt, under the same parent, so its report still goes where it always
- * did. From whoever started the agent it arrives as an instruction, from
- * anyone else as a note. Idempotent per `messageId`.
+ * did. It always names its sender: from whoever started the agent it is
+ * marked as theirs and is an instruction, from anyone else it is a note.
+ * `"stella"` from an agent is its conversation. Idempotent per `messageId`.
  */
 const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<MessageDelivery> => {
   if (!CONTROL_REQUEST_ID_PATTERN.test(args.messageId)) {
     throw new RpcError("BAD_REQUEST", "That message could not be sent. Try again.");
   }
-  const to = args.to.trim();
   const text = args.text.trim();
   if (!text || text.length > AGENT_MESSAGE_MAX_CHARS) {
     throw new RpcError("BAD_REQUEST", `A message must be 1 to ${AGENT_MESSAGE_MAX_CHARS} characters.`);
   }
-  if (to === STELLA_MESSAGE_TARGET) {
-    throw new RpcError(
-      "BAD_REQUEST",
-      `"${STELLA_MESSAGE_TARGET}" names the sender's own Stella; send its conversation id instead.`,
-    );
-  }
+  const to = senderStella(ctx, args.to.trim(), args.from);
   if (to === args.from.threadId) {
     throw new RpcError("BAD_REQUEST", "That thread_id is the sender's own.");
   }
@@ -1649,6 +1644,33 @@ const sentByStarter = (thread: ThreadRow, from: AgentMessageSender): boolean =>
     ? from.threadId === thread.parent_thread_id
     : from.threadId === thread.conversation_id || from.threadId === thread.origin_conversation_id;
 
+/**
+ * `"stella"` from an agent: the conversation it works in (its thread's, or
+ * the caller's `conversationId`), whose Stella it reaches as a note. Any
+ * other target is returned as it is.
+ */
+const senderStella = (
+  ctx: OwnerContext,
+  to: string,
+  from: AgentMessageSender,
+  callerConversationId?: string,
+): string => {
+  if (to.toLowerCase() !== STELLA_MESSAGE_TARGET) return to;
+  const sender = isPlacementThreadId(from.threadId)
+    ? (placementAliasThreadId(ctx.db, from.threadId, callerConversationId) ?? from.threadId)
+    : from.threadId;
+  const conversationId =
+    readThread(ctx.db, sender)?.conversation_id ??
+    (callerConversationId !== from.threadId ? callerConversationId : undefined);
+  if (!conversationId) {
+    throw new RpcError(
+      "BAD_REQUEST",
+      `"${STELLA_MESSAGE_TARGET}" reaches the Stella an agent works for; from Stella, message an agent by its thread_id.`,
+    );
+  }
+  return conversationId;
+};
+
 const RESUME_TEXT = "Continue where you left off.";
 
 const deliverAgentMessage = async (
@@ -1695,7 +1717,7 @@ const deliverAgentMessage = async (
       kind: args.kind,
       thread,
       ownerGeneration: args.ownerGeneration,
-      text: sentByStarter(thread, args.from) ? args.text : formatAgentMessage(args.from, args.text),
+      text: formatAgentMessage(args.from, args.text, { starter: sentByStarter(thread, args.from) }),
       source: args.source,
       detail: { from: args.from.threadId },
       next: { clientMsgId: args.commandId, fingerprint: "agent-message" },
@@ -2383,13 +2405,8 @@ const controlRequest = async (ctx: OwnerContext, args: ControlArgs): Promise<Age
   if (!text || text.length > AGENT_MESSAGE_MAX_CHARS) {
     throw new RpcError("BAD_REQUEST", `A message must be 1 to ${AGENT_MESSAGE_MAX_CHARS} characters.`);
   }
-  if (requested === STELLA_MESSAGE_TARGET) {
-    throw new RpcError(
-      "BAD_REQUEST",
-      `"${STELLA_MESSAGE_TARGET}" names the sender's own Stella; send its conversation id instead.`,
-    );
-  }
-  if (requested === command.from.threadId) {
+  const target = senderStella(ctx, requested, command.from, args.conversationId);
+  if (target === command.from.threadId) {
     throw new RpcError("BAD_REQUEST", "That thread_id is the sender's own.");
   }
   await assertGeneration(ctx, args.ownerGeneration);
@@ -2400,7 +2417,7 @@ const controlRequest = async (ctx: OwnerContext, args: ControlArgs): Promise<Age
     { count: 120, windowMs: 10 * 60_000 },
     "Too many agent messages at once. Wait a moment and try again.",
   );
-  const resolved = readConversationThread(ctx.db, args.conversationId, requested)?.thread_id ?? requested;
+  const resolved = readConversationThread(ctx.db, args.conversationId, target)?.thread_id ?? target;
   return await deliverAgentMessage(ctx, {
     ownerGeneration: args.ownerGeneration,
     commandId,

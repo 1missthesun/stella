@@ -17,6 +17,8 @@ export type StellaAgentRole = {
   threadId?: string;
   /** The conversation that started this agent. */
   parentConversationId?: number;
+  /** Who started it, by the thread id its messages and send_message use. */
+  startedBy?: { threadId: string; label: string };
 };
 
 export const StellaAgentDoc = defineDoc<StellaAgentRole>({

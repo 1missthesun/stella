@@ -16,6 +16,7 @@ import {
   renderExecutionDevices,
   renderMediaAccess,
 } from "@stella/contracts/execution-context";
+import { STELLA_MESSAGE_TARGET } from "@stella/contracts/agent-directory";
 import { renderStellaPrompt, stellaPromptTools } from "@stella/contracts/stella-prompts";
 import {
   CORE_MEMORY_INJECTED_MAX_CHARS,
@@ -84,6 +85,25 @@ const workingDirectory: PromptSection["render"] = async (input, context) => {
     lines.push(`The project's instructions for agents, from ${file.value}:`, startupDoc(file.value, shown)!);
   }
   return lines.join("\n\n");
+};
+
+/**
+ * An agent's own address and its starter's, so it can answer whoever wrote
+ * to it without looking anyone up first.
+ */
+const agentIdentity: PromptSection["render"] = async (input, context) => {
+  const agent = await role(input, context);
+  if (agent.agentType === "orchestrator" || !agent.threadId) return undefined;
+  const starter = agent.startedBy
+    ? agent.startedBy.label === "Stella"
+      ? `Stella started you; its thread_id is ${agent.startedBy.threadId} ("${STELLA_MESSAGE_TARGET}" also reaches it).`
+      : `The agent "${agent.startedBy.label}" started you; its thread_id is ${agent.startedBy.threadId}.`
+    : `Stella started you; send_message to "${STELLA_MESSAGE_TARGET}" reaches it.`;
+  return [
+    `Your thread_id is ${agent.threadId}.`,
+    starter,
+    'Every message from Stella or another agent arrives as `<agent-message from="…" thread_id="…">`, marked `relation="started you"` when it is from whoever started you; answer it with send_message to that thread_id.',
+  ].join(" ");
 };
 
 /** Sections the orchestrator alone carries. */
@@ -173,6 +193,7 @@ export function stellaPromptExtension(sources: StellaContextSources) {
         return snapshot && renderExecutionDestination(snapshot);
       }),
       section("working-directory", workingDirectory),
+      section("agent-identity", agentIdentity),
       section("media-access", async (input, context) => {
         const snapshot = await sources.executionContext(input.conversationId, context);
         return snapshot && renderMediaAccess(snapshot);

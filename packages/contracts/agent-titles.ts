@@ -67,7 +67,7 @@ const WAKE_THREAD_RE =
   /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?(?:^thread_id:\s*(\S+)|\(thread ([^)]+)\))/m;
 const WAKE_DESCRIPTION_RE =
   /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/m;
-const AGENT_NOTE_RE = /^<agent-message from="([^"\n]*)" thread_id="([^"\n]*)">/;
+const AGENT_NOTE_RE = /^<agent-message from="([^"\n]*)" thread_id="([^"\n]*)"(?: relation="[^"\n]*")?>/;
 
 const CARD_STATUS: Record<string, TaskLifecycleStatus> = {
   "agent-started": "running",

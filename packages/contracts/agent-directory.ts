@@ -220,13 +220,22 @@ export type AgentMessageSender = {
 const escapeAttribute = (value: string) =>
   value.replace(/[\r\n]+/g, " ").replace(/"/g, "'").trim().slice(0, 200);
 
+/** What the sender is to the receiver when it started the receiver. */
+export const AGENT_MESSAGE_STARTER_RELATION = "started you";
+
 /**
- * A message from another agent, as the receiver reads it. It is a peer's
- * note, never the user's instruction; the receiver answers with send_message
- * to `thread_id`. Chat readers know a note by this framing (`isPiAgentText`
- * in `pi-chat`) and never show one sent to Stella.
+ * A message from Stella or another agent, as the receiver reads it. Every
+ * message names its sender, so the receiver can answer with send_message to
+ * `thread_id`. From the receiver's starter (`starter`) it is marked
+ * `relation="started you"` and is an instruction; from anyone else it is a
+ * peer's note, never the user's instruction. Chat readers know a message by
+ * this framing (`isPiAgentText` in `pi-chat`) and never show it as the user's.
  */
-export const formatAgentMessage = (from: AgentMessageSender, text: string): string =>
-  `<agent-message from="${escapeAttribute(from.label)}" thread_id="${escapeAttribute(
-    from.threadId,
-  )}">\n${text.trim()}\n</agent-message>`;
+export const formatAgentMessage = (
+  from: AgentMessageSender,
+  text: string,
+  options?: { starter?: boolean },
+): string =>
+  `<agent-message from="${escapeAttribute(from.label)}" thread_id="${escapeAttribute(from.threadId)}"${
+    options?.starter ? ` relation="${AGENT_MESSAGE_STARTER_RELATION}"` : ""
+  }>\n${text.trim()}\n</agent-message>`;

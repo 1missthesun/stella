@@ -14,6 +14,7 @@ import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";
 import { NativeMenu } from "../NativeMenu";
 import type { NativeMenuItem } from "../NativeMenu.types";
+import { EngineAccountSection } from "../EngineAccountsSettings";
 import { ProviderMark } from "./ProviderMark";
 import {
   ChoiceRow,
@@ -86,9 +87,11 @@ export function BrainSection({
       ? `All ${models.length} models`
       : current?.kind === "provider"
         ? "Manage"
-        : current?.engine !== "stella"
-          ? "Accounts"
-          : null;
+        : null;
+  const accountsFor =
+    current?.kind === "engine" && current.engine !== "stella"
+      ? current.engine
+      : null;
 
   const switchTo = (brain: Brain) => {
     if (brain.id === settings.brainId) return;
@@ -188,6 +191,12 @@ export function BrainSection({
         ) : null}
       </View>
 
+      {accountsFor ? (
+        <View style={styles.accounts}>
+          <EngineAccountSection provider={accountsFor} embedded="panel" />
+        </View>
+      ) : null}
+
       {settings.supportsEffortSelection ? (
         <View style={styles.thinking}>
           <SectionLabel>Thinking</SectionLabel>
@@ -240,6 +249,10 @@ const makeStyles = (colors: Colors) =>
     spinner: {
       alignSelf: "flex-start",
       marginVertical: 12,
+    },
+    accounts: {
+      marginLeft: 42,
+      marginTop: 8,
     },
     thinking: {
       marginTop: 18,

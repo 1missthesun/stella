@@ -101,10 +101,9 @@ export function ChatSettingsPanel({ width }: { width: number }) {
           </View>
         </Rise>
 
-        <View style={styles.spacer} />
-
         {showDestinations ? (
           <Rise i={i++} animated from="end">
+            <View style={styles.firstSection} />
             <SectionLabel>
               {t("mobile.settings.computer.sectionLabel")}
             </SectionLabel>
@@ -286,6 +285,9 @@ const makeStyles = (colors: Colors) =>
       minHeight: "100%",
       paddingHorizontal: KIT.gutter,
     },
+    firstSection: {
+      height: 24,
+    },
     contentTop: {
       minHeight: undefined,
     },
@@ -298,10 +300,6 @@ const makeStyles = (colors: Colors) =>
       fontFamily: fonts.display.semiBold,
       fontSize: 27,
       letterSpacing: -0.6,
-    },
-    spacer: {
-      flex: 1,
-      minHeight: 28,
     },
     header: {
       marginBottom: 22,

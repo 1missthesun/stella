@@ -35,7 +35,7 @@ const FILE_ROWS_FILTER = `(
     payload_json LIKE '%"attachments"%'
     OR (payload_json LIKE '%agent-thread%' AND payload_json LIKE '%](%')))
   OR (kind = 'message' AND role = 'toolResult' AND (
-    payload_json LIKE '%"toolName":"html"%' OR payload_json LIKE '%"toolName":"image_gen"%'))
+    payload_json LIKE '%"toolName":"html"%' OR payload_json LIKE '%"toolName":"%image_gen"%'))
   OR (kind = 'card' AND (
     payload_json LIKE '%"type":"files"%' OR payload_json LIKE '%agent-completed%'))
 )`;

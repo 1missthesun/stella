@@ -2,6 +2,7 @@ import {
   LegendList,
   type LegendListRenderItemProps,
 } from "@legendapp/list/react-native";
+import { generatedImageFileName } from "@stella/contracts/generated-image-name";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -62,10 +63,25 @@ const UNKNOWN_COMPUTER = "computer:unknown";
 
 type FileRow = ConversationFile & { title: string; bucket: SourceFilter };
 
-const fileName = (artifact: ChatArtifact): string => {
-  const filePath = artifactPrimaryFilePath(artifact.payload);
+const fileName = (file: ConversationFile): string => {
+  if (file.name?.trim()) return file.name.trim();
+  const payload = file.artifact.payload;
+  const filePath = artifactPrimaryFilePath(payload);
   const name = filePath?.split(/[?#]/)[0]?.split(/[\\/]/).pop();
-  return name || artifactTitle(artifact.payload);
+  if (
+    name &&
+    payload.kind === "media" &&
+    payload.asset.kind === "image" &&
+    payload.presentation === "inline-image"
+  ) {
+    return generatedImageFileName({
+      prompt: payload.prompt,
+      index: 0,
+      count: payload.asset.filePaths.length,
+      extension: /\.([A-Za-z0-9]{1,8})$/.exec(name)?.[1] ?? "png",
+    });
+  }
+  return name || artifactTitle(payload);
 };
 
 /**
@@ -127,6 +143,7 @@ export function FilesPage() {
       merged.push(file);
     }
     for (const artifact of hubArtifacts) {
+      if (!artifactPrimaryFilePath(artifact.payload)) continue;
       const key = artifactFileKey(artifact);
       const known = byKey.get(key);
       if (known) {
@@ -155,7 +172,7 @@ export function FilesPage() {
             ? `computer:${deviceId}`
             : UNKNOWN_COMPUTER
           : file.source.kind;
-      return { ...file, title: fileName(file.artifact), bucket };
+      return { ...file, title: fileName(file), bucket };
     });
   }, [driveRows, hubArtifacts, journal.files, preferredAccess?.desktopDeviceId]);
 

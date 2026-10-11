@@ -77,6 +77,7 @@ import { useConversationAgentLedger } from "./use-conversation-agent-ledger";
 import { mergeJournalTasks } from "./mobile-task-merge";
 import { planCloudTranscriptDisplay } from "./cloud-transcript-display";
 import { useChatAttachmentPreviews } from "./use-chat-attachment-previews";
+import { useClaudeUsageLimitNotice } from "./claude-usage-limit-notice";
 import { reuseEqualChatMessages } from "./structural-sharing";
 import { TrailingTask } from "./trailing-task";
 import type { ChatMessage } from "../types";
@@ -578,6 +579,11 @@ export const useCloudCanonicalChatThread = (
   const destinationSwitch = useMemo(
     () => latestDestinationSwitch(state.records),
     [state.records],
+  );
+
+  useClaudeUsageLimitNotice(
+    threadId === "cloud" ? authority.conversationId : null,
+    state.records,
   );
 
   const projected = useStableChatMessages(

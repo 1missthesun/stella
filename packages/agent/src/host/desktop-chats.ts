@@ -5,6 +5,7 @@
  * `PiChatRequest`s with it and forwards a watched conversation's events to
  * the app (`@stella/contracts/pi-chat`).
  */
+import { CLAUDE_USAGE_LIMIT_RESUMED_TEXT, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -540,6 +541,30 @@ export function desktopChats(options: DesktopChatsOptions) {
       event = { type: "engine_status", state: "usage-limit-end", text: status.text, resumed: status.resumed };
     }
     if (event) options.emit({ conversationId, events: [event] });
+  };
+  /**
+   * A hold the cloud journaled: Stella's cloud turn or a cloud agent waiting
+   * on the Claude usage limit. A hold whose reset passed long ago, or a
+   * resume from long ago, is history an import replays, not news.
+   */
+  const CLOUD_USAGE_LIMIT_STALE_MS = 15 * 60_000;
+  const noteCloudUsageLimit = (conversationId: string, card: ClaudeUsageLimitCard, at: number) => {
+    const key = `cloud:${card.threadId ?? "stella"}`;
+    const now = Date.now();
+    if (card.state === "held") {
+      if (card.until !== undefined && card.until < now - CLOUD_USAGE_LIMIT_STALE_MS) return;
+      noteUsageLimit(conversationId, key, {
+        state: "usage-limit",
+        text: "",
+        ...(card.until !== undefined ? { until: card.until } : {}),
+      });
+      return;
+    }
+    noteUsageLimit(conversationId, key, {
+      state: "usage-limit-end",
+      text: CLAUDE_USAGE_LIMIT_RESUMED_TEXT,
+      resumed: now - at < CLOUD_USAGE_LIMIT_STALE_MS,
+    });
   };
   const claudeCodeEngine = options.claudeCodeEngine;
   if (claudeCodeEngine) {
@@ -1133,6 +1158,8 @@ export function desktopChats(options: DesktopChatsOptions) {
               onRemoteTurns: (turns) => {
                 if (opened?.watchers) options.emit({ conversationId, events: [{ type: "remote_turns", turns }] });
               },
+              // The cloud's holds show as this computer's own do.
+              onUsageLimit: (card, at) => noteCloudUsageLimit(conversationId, card, at),
               context,
             })
           : undefined;

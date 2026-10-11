@@ -133,11 +133,11 @@ const openLinuxParent = async (args: {
         );
         created = true;
       }
+      handles.push(next);
       if (created && args.owner) {
         await next.chown(args.owner.uid, args.owner.gid);
       }
       await assertDirectory(next, args.owner);
-      handles.push(next);
       current = next;
     }
     return {
@@ -238,15 +238,15 @@ const openWorkspaceFile = async (args: {
           ...(args.owner ? { owner: args.owner } : {}),
         });
   const entryPath = path.join(anchored.entryParent, basename);
+  let handle: FileHandle | undefined;
   try {
-    const handle = await open(entryPath, args.flags | NO_FOLLOW, args.mode);
+    handle = await open(entryPath, args.flags | NO_FOLLOW, args.mode);
     const metadata = await handle.stat();
     if (
       !metadata.isFile() ||
       metadata.nlink !== 1 ||
       !ownedBy(metadata, args.expectedFileOwner)
     ) {
-      await handle.close();
       throw new Error(
         "Workspace file must be a regular, singly linked, workspace-owned file.",
       );
@@ -258,7 +258,7 @@ const openWorkspaceFile = async (args: {
       parentHandles: anchored.handles,
     };
   } catch (error) {
-    await closeAll(anchored.handles);
+    await closeAll(handle ? [...anchored.handles, handle] : anchored.handles);
     throw error;
   }
 };
@@ -359,8 +359,7 @@ export const readWorkspaceFileNoFollow = async (
     }
     return { path: opened.displayPath, bytes, stat };
   } finally {
-    await opened.handle.close();
-    await closeAll(opened.parentHandles);
+    await closeAll([...opened.parentHandles, opened.handle]);
   }
 };
 
@@ -391,8 +390,7 @@ export const withWorkspaceFileNoFollow = async <T>(
     await assertEntryStillOpenedFile(opened);
     return value;
   } finally {
-    await opened.handle.close();
-    await closeAll(opened.parentHandles);
+    await closeAll([...opened.parentHandles, opened.handle]);
   }
 };
 
@@ -415,8 +413,7 @@ export const statWorkspaceFileNoFollow = async (
     await assertEntryStillOpenedFile(opened);
     return metadata;
   } finally {
-    await opened.handle.close();
-    await closeAll(opened.parentHandles);
+    await closeAll([...opened.parentHandles, opened.handle]);
   }
 };
 
@@ -548,8 +545,7 @@ export const writeWorkspaceBytesNoFollow = async (
     return opened.displayPath;
   } finally {
     intended.fill(0);
-    await opened.handle.close();
-    await closeAll(opened.parentHandles);
+    await closeAll([...opened.parentHandles, opened.handle]);
   }
 };
 
@@ -600,7 +596,6 @@ export const unlinkWorkspaceFileNoFollow = async (
     await unlink(opened.entryPath);
     return opened.displayPath;
   } finally {
-    await opened.handle.close();
-    await closeAll(opened.parentHandles);
+    await closeAll([...opened.parentHandles, opened.handle]);
   }
 };

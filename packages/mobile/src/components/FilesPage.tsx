@@ -84,6 +84,13 @@ const fileName = (file: ConversationFile): string => {
   return name || artifactTitle(payload);
 };
 
+const titledArtifact = (artifact: ChatArtifact, title: string): ChatArtifact => {
+  const payload = artifact.payload;
+  if (payload.kind === "agent-work" || payload.kind === "map-route") return artifact;
+  if (artifactTitle(payload) === title) return artifact;
+  return { ...artifact, payload: { ...payload, title } };
+};
+
 /**
  * The Files page: every file Stella produced or shared in the conversation,
  * wherever it lives (the cloud drive, one of the owner's computers, or an
@@ -172,7 +179,13 @@ export function FilesPage() {
             ? `computer:${deviceId}`
             : UNKNOWN_COMPUTER
           : file.source.kind;
-      return { ...file, title: fileName(file), bucket };
+      const title = fileName(file);
+      return {
+        ...file,
+        artifact: titledArtifact(file.artifact, title),
+        title,
+        bucket,
+      };
     });
   }, [driveRows, hubArtifacts, journal.files, preferredAccess?.desktopDeviceId]);
 

@@ -211,8 +211,9 @@ const localArtifact = (
   filePath: string,
   conversationId: string,
   createdAt: number,
+  name?: string,
 ): ChatArtifact => {
-  const payload = displayPayloadForStellaFile(filePath, createdAt);
+  const payload = displayPayloadForStellaFile(filePath, createdAt, name);
   return {
     id: `${conversationId}:${payload.kind}:${filePath}`,
     conversationId,
@@ -244,7 +245,7 @@ const toConversationFile = (
   const name = found.name?.trim();
   return {
     key: `path:${raw}`,
-    artifact: localArtifact(raw, conversationId, entry.createdAt),
+    artifact: localArtifact(raw, conversationId, entry.createdAt, name),
     createdAt: entry.createdAt,
     ...(name ? { name } : {}),
     source: isCloudWorkspacePath(raw)

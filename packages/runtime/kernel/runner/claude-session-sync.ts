@@ -57,6 +57,9 @@ export type ClaudeSessionSyncBackend = {
 };
 
 export type ClaudeSessionRestoreResult = {
+  decision: "native" | "rebuild";
+  reason?: "sync_behind_log" | "cli_older_than_origin";
+  requestedJournalSeq?: number;
   threadId: string;
   sessionId: string;
   engine: ClaudeSessionEngine;
@@ -85,6 +88,7 @@ export type ClaudeSessionSync = ClaudeSessionSyncSink & {
     threadId: string;
     configDir: string | null;
     cwd: string;
+    atJournalSeq?: number;
   }): Promise<ClaudeSessionRestoreResult | null>;
 };
 
@@ -803,6 +807,48 @@ export const createClaudeSessionSync = (options: {
     await fs.mkdir(args.cwd, { recursive: true });
     const workingFolder = await resolveClaudeWorkingFolder(args.cwd);
     const projectDir = claudeSessionProjectDir(args.configDir, workingFolder);
+    const localCliVersion = await claudeCliVersion();
+    const behindReason: ClaudeSessionRestoreResult["reason"] =
+      args.atJournalSeq !== undefined &&
+      (manifest.journalSeq === undefined || manifest.journalSeq < args.atJournalSeq)
+        ? "sync_behind_log"
+        : !claudeCliCanResume(localCliVersion, manifest.cliVersion)
+          ? "cli_older_than_origin"
+          : undefined;
+    const summary = {
+      threadId: manifest.threadId,
+      sessionId: manifest.sessionId,
+      engine: manifest.engine,
+      conversationId: manifest.conversationId,
+      projectDir,
+      workingFolder,
+      originDeviceId: manifest.deviceId,
+      originCwd: manifest.originCwd,
+      cliVersion: manifest.cliVersion,
+      localCliVersion,
+      cliCompatible: claudeCliCanResume(localCliVersion, manifest.cliVersion),
+      ...(manifest.journalCursor ? { journalCursor: manifest.journalCursor } : {}),
+      ...(manifest.journalSeq !== undefined ? { journalSeq: manifest.journalSeq } : {}),
+      ...(args.atJournalSeq !== undefined ? { requestedJournalSeq: args.atJournalSeq } : {}),
+      syncedAt: manifest.updatedAt,
+    };
+    if (behindReason) {
+      repo.consumeRestored(manifest.threadId, manifest.sessionId);
+      logger.warn("claude-session-sync.restore-rebuild", {
+        threadId: manifest.threadId,
+        reason: behindReason,
+        journalSeq: manifest.journalSeq ?? null,
+        requestedJournalSeq: args.atJournalSeq ?? null,
+      });
+      return {
+        decision: "rebuild",
+        reason: behindReason,
+        ...summary,
+        files: 0,
+        bytes: 0,
+        keptLocalFiles: 0,
+      };
+    }
     const ordered = [
       ...files.filter((file) => file.path !== mainPath),
       ...files.filter((file) => file.path === mainPath),
@@ -863,7 +909,6 @@ export const createClaudeSessionSync = (options: {
       now: Date.now(),
     });
     if (keptLocalFiles > 0) scheduleDrain(0);
-    const localCliVersion = await claudeCliVersion();
     logger.info("claude-session-sync.restored", {
       threadId: manifest.threadId,
       sessionId: manifest.sessionId,
@@ -872,23 +917,11 @@ export const createClaudeSessionSync = (options: {
       keptLocalFiles,
     });
     return {
-      threadId: manifest.threadId,
-      sessionId: manifest.sessionId,
-      engine: manifest.engine,
-      conversationId: manifest.conversationId,
-      projectDir,
-      workingFolder,
+      decision: "native",
+      ...summary,
       files: ordered.length,
       bytes,
       keptLocalFiles,
-      originDeviceId: manifest.deviceId,
-      originCwd: manifest.originCwd,
-      cliVersion: manifest.cliVersion,
-      localCliVersion,
-      cliCompatible: claudeCliCanResume(localCliVersion, manifest.cliVersion),
-      ...(manifest.journalCursor ? { journalCursor: manifest.journalCursor } : {}),
-      ...(manifest.journalSeq !== undefined ? { journalSeq: manifest.journalSeq } : {}),
-      syncedAt: manifest.updatedAt,
     };
   };
 

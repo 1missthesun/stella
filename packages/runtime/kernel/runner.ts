@@ -620,7 +620,7 @@ export const createStellaHostRunner = (
     publishLinkedFiles: (text: string) => {
       context.linkedFilePublisher.publishText(text);
     },
-    restoreClaudeCodeSession: async ({ threadId, cwd }) => {
+    restoreClaudeCodeSession: async ({ threadId, cwd, atJournalSeq }) => {
       const claudeConfig = await getClaudeCodeConfig();
       const workingFolder =
         cwd?.trim() ||
@@ -636,6 +636,7 @@ export const createStellaHostRunner = (
         threadId,
         configDir: claudeConfig.configDir ?? null,
         cwd: workingFolder,
+        ...(atJournalSeq !== undefined ? { atJournalSeq } : {}),
       });
     },
     flushClaudeSessionSync: (timeoutMs) => claudeSessionSync.flush(timeoutMs),

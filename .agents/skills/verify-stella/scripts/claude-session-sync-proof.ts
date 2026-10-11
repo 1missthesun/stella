@@ -17,6 +17,7 @@ import {
   resolveClaudeWorkingFolder,
 } from "../../../../packages/runtime/kernel/integrations/claude-code-session-files";
 import { shutdownClaudeCodeRuntime } from "../../../../packages/runtime/kernel/integrations/claude-code-session-runtime";
+import { createToolHost } from "../../../../packages/runtime/kernel/tools/host";
 
 const argv = process.argv.slice(2);
 const mode = argv[0];
@@ -101,7 +102,13 @@ const main = async () => {
   const report: Record<string, unknown> = { mode, threadId, host: os.hostname(), cwd, dataDir };
 
   if (mode === "restore" || mode === "restore-resume") {
-    const restored = await sync.restore({ threadId, configDir: process.env.CLAUDE_CONFIG_DIR ?? null, cwd });
+    const atJournalSeq = flag("--at-journal-seq");
+    const restored = await sync.restore({
+      threadId,
+      configDir: process.env.CLAUDE_CONFIG_DIR ?? null,
+      cwd,
+      ...(atJournalSeq ? { atJournalSeq: Number(atJournalSeq) } : {}),
+    });
     report.restore = restored;
     if (!restored) throw new Error("No synced session for this thread.");
     report.restoredLines = sessionLineCount(path.join(restored.projectDir, `${restored.sessionId}.jsonl`));
@@ -122,6 +129,30 @@ const main = async () => {
   const workingFolder = await resolveClaudeWorkingFolder(cwd);
   const projectDir = claudeSessionProjectDir(process.env.CLAUDE_CONFIG_DIR ?? null, workingFolder);
   const orchestrator = flag("--role") === "orchestrator";
+  const orchestratorTools = orchestrator
+    ? {
+        catalog: createToolHost({
+          stellaAppDir: repoRoot,
+          stellaDataDir: dataDir,
+          enableShellShims: false,
+          recoverStaleSecrets: false,
+          askUser: async () => ({}),
+          requestSecureInput: async () => ({}),
+          useSecureValue: async () => ({}),
+        } as never).getToolCatalog("orchestrator", { agentEngine: "claude_code_local" }),
+        allowlist: (
+          /^tools:\s*(.+)$/m.exec(
+            readFileSync(
+              path.join(repoRoot, "packages/runtime/extensions/stella-runtime/agent-metadata/orchestrator.md"),
+              "utf8",
+            ),
+          )?.[1] ?? ""
+        )
+          .split(",")
+          .map((name) => name.trim())
+          .filter(Boolean),
+      }
+    : null;
   const journalSeq = flag("--journal-seq");
   const runTurn = (orchestrator ? runExternalOrchestratorTurn : runExternalSubagentTurn) as (
     options: unknown,
@@ -134,9 +165,9 @@ const main = async () => {
     agentType: orchestrator ? "orchestrator" : "general",
     userPrompt: prompt,
     ...(journalSeq ? { cloudJournalSeq: Number(journalSeq) } : {}),
-    ...(orchestrator
+    ...(orchestratorTools
       ? {
-          toolCatalog: [],
+          toolCatalog: orchestratorTools.catalog,
           callbacks: { onToolStart: () => {}, onToolEnd: () => {}, onError: () => {}, onEnd: () => {} },
         }
       : {}),
@@ -144,6 +175,7 @@ const main = async () => {
       systemPrompt: "You are a Stella general agent running a session continuity proof.",
       agentEngine: "claude_code_local",
       activeThreadId: threadId,
+      ...(orchestratorTools ? { toolsAllowlist: orchestratorTools.allowlist } : {}),
       ...(threadHistory ? { threadHistory } : {}),
     },
     toolExecutor: async () => ({ error: "No Stella tools in this proof." }),

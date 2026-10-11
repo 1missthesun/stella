@@ -521,6 +521,7 @@ export type RunnerPublicApi = {
   restoreClaudeCodeSession: (args: {
     threadId: string;
     cwd?: string;
+    atJournalSeq?: number;
   }) => Promise<
     import("./claude-session-sync.js").ClaudeSessionRestoreResult | null
   >;

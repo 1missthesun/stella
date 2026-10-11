@@ -222,7 +222,7 @@
 
 .user-ask__other {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 8px;
   min-height: 46px;
   padding: 4px 6px 4px 12px;
@@ -232,7 +232,7 @@
   flex: 1;
   min-width: 0;
   max-height: 160px;
-  padding: 7px 0;
+  padding: 8.5px 0;
   border: none;
   background: transparent;
   color: var(--text-strong);
@@ -251,11 +251,11 @@
 .user-ask__other-confirm {
   display: inline-flex;
   flex: none;
-  align-self: center;
   align-items: center;
   justify-content: center;
   width: 32px;
   height: 32px;
+  margin-bottom: 3px;
   border: none;
   border-radius: 999px;
   background: var(--interactive);

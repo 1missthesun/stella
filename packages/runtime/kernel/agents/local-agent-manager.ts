@@ -1357,6 +1357,7 @@ export class LocalAgentManager {
     return (
       task.status === "completed" &&
       task.agentType === AGENT_IDS.GENERAL &&
+      !this.reportsFromLedger(task) &&
       this.hasActiveDescendants(task.threadId)
     );
   }
@@ -1498,6 +1499,9 @@ export class LocalAgentManager {
         "descendantFinalParked" in task &&
         task.descendantFinalParked)
     );
+  }
+  reportsFromLedger(task: AgentTask) {
+    return task.storageMode === "cloud" && Boolean(task.ownerGeneration);
   }
   lifecycleEventId(task: AgentTask, type: string) {
     return task.storageMode === "cloud" && task.ownerGeneration
@@ -2487,6 +2491,17 @@ export class LocalAgentManager {
         // resident. Never evict across a failed local-outbox admission.
         return;
       }
+    }
+    if (
+      !task.terminalEventEmitted &&
+      task.status !== "paused" &&
+      this.reportsFromLedger(task) &&
+      task.cloudTerminalReceiptGeneration === attempt.generation
+    ) {
+      task.terminalEventEmitted = true;
+      task.terminalLifecycleReceiptGeneration = attempt.generation;
+      task.descendantWakePending = false;
+      this.persistTask(task);
     }
     // Emit task lifecycle event
     if (!task.terminalEventEmitted) {

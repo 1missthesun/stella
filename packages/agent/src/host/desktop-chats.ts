@@ -208,6 +208,7 @@ export type DesktopChatsOptions = {
     directory(conversationId: string): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
     message(args: { messageId: string; to: string; text: string; from: AgentMessageSender }): Promise<AgentMessageDelivery>;
     pause(args: { conversationId: string; threadId: string; controlRequestId: string }): Promise<AgentPauseResult>;
+    note(args: { noteId: string; conversationId: string; fromThreadId: string; text: string }): Promise<void>;
   };
   /**
    * One of Stella's agents, or one of theirs, started work (a spawn or a
@@ -948,9 +949,9 @@ export function desktopChats(options: DesktopChatsOptions) {
                       },
                     }
                   : {}),
-                // Stella reads them where she runs: here, or as a note placed there.
+                reportsFromLedger: () => !conversationId.startsWith("local_"),
                 deliverReport: async (report, context) => {
-                  if (report.settled) return;
+                  if (report.settled || report.ledger) return;
                   if (await noteOnBrain(conversationId, report.requestId, report.text)) return;
                   // The harness is open by then: reports run once it resumes.
                   const root = await harness.conversation(report.rootConversationId, context);
@@ -960,7 +961,15 @@ export function desktopChats(options: DesktopChatsOptions) {
                   );
                 },
                 deliverNote: async (note, context) => {
-                  if (await noteOnBrain(conversationId, note.requestId, note.text)) return;
+                  if (!conversationId.startsWith("local_") && options.agentThreads) {
+                    await options.agentThreads.note({
+                      noteId: `note:${createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${note.requestId}`).digest("hex").slice(0, 48)}`,
+                      conversationId,
+                      fromThreadId: note.threadId,
+                      text: note.text,
+                    });
+                    return;
+                  }
                   const root = await harness.conversation(note.rootConversationId, context);
                   if (!root) throw new Error("Stella is not reachable from here.");
                   // Read by the model, never shown: the user did not write it.

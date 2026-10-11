@@ -14,6 +14,7 @@
  */
 
 import { deleteConversationAgentEvents } from "./domains/agent-events.js";
+import { AGENT_REPORT_JOB, deleteConversationAgentReports } from "./domains/agent-reports.js";
 import type { JobDef, OwnerContext, OwnerDb, OwnerJobs, PurgeDef } from "./registry.js";
 
 /** Orchestrator purges per hook call; the caller calls again while pending. */
@@ -96,6 +97,7 @@ const deleteThreadRows = (db: OwnerDb, jobs: OwnerJobs, conversationId: string):
     jobs.cancel(`devmsg:${command_id}`);
     db.run("DELETE FROM agent_commands WHERE command_id = ?", command_id);
   }
+  deleteConversationAgentReports(db, jobs, conversationId);
   deleteConversationAgentEvents(db, conversationId);
   db.run("DELETE FROM agent_threads WHERE conversation_id = ?", conversationId);
 };
@@ -149,7 +151,7 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
     return { pending: true };
   }
   // Every conversation is gone; what is left has no conversation to name.
-  for (const kind of ["agentThreads.dispatch", "agentThreads.deviceMessage", CONVERSATION_PURGE_JOB]) {
+  for (const kind of ["agentThreads.dispatch", "agentThreads.deviceMessage", AGENT_REPORT_JOB, CONVERSATION_PURGE_JOB]) {
     for (const { id } of ctx.db.all<{ id: string }>(
       "SELECT id FROM owner_jobs WHERE kind = ?",
       kind,
@@ -165,6 +167,7 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
     "agent_message_receipts",
     "agent_device_messages",
     "agent_commands",
+    "agent_report_outbox",
     "agent_events",
   ]) {
     ctx.db.run(`DELETE FROM ${table}`);

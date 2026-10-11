@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import {
   mkdirSync,
   readFileSync,
@@ -1081,15 +1082,34 @@ export const buildExternalThreadUpdatesDelta = (args: {
     (text) => text.trim().length > 0,
   );
   const seen = args.seen;
+  const batchReportKeys = new Set<string>();
+  const reportKeyOf = (row: {
+    customMessage?: { eventId?: string };
+  }): string | null => {
+    const eventId = row.customMessage?.eventId;
+    return eventId && parseAgentReportId(eventId)
+      ? `report-id:${eventId}`
+      : null;
+  };
   const isRowCoveredElsewhere = (
-    row: { timestamp: number },
+    row: { timestamp: number; customMessage?: { eventId?: string } },
     text: string,
-  ): boolean =>
-    promptTexts.has(text) ||
-    contextTexts.some((context) => context.includes(text)) ||
-    (seen !== undefined &&
-      ((seen.since !== undefined && row.timestamp < seen.since) ||
-        shownTextHashes(text).some((hash) => seen.textHashes.has(hash))));
+  ): boolean => {
+    const reportKey = reportKeyOf(row);
+    if (
+      reportKey &&
+      (batchReportKeys.has(reportKey) || seen?.textHashes.has(reportKey))
+    ) {
+      return true;
+    }
+    return (
+      promptTexts.has(text) ||
+      contextTexts.some((context) => context.includes(text)) ||
+      (seen !== undefined &&
+        ((seen.since !== undefined && row.timestamp < seen.since) ||
+          shownTextHashes(text).some((hash) => seen.textHashes.has(hash))))
+    );
+  };
   // Middle elision for a report beyond its rendering budget: the head
   // carries the task framing and the TAIL carries outcomes and blockers, so
   // both must survive; only the middle may be elided, marked. The result
@@ -1149,7 +1169,11 @@ export const buildExternalThreadUpdatesDelta = (args: {
   // unexamined row. Rows are packed WHOLE: a first row too large for the
   // budget becomes its own dedicated single-row batch instead of losing its
   // tail.
-  type SelectedRow = { text: string; customType: string };
+  type SelectedRow = {
+    text: string;
+    customType: string;
+    reportKey?: string;
+  };
   const prefixRows: SelectedRow[] = [];
   let serializedChars = 0;
   let dedicatedOversized = false;
@@ -1176,7 +1200,13 @@ export const buildExternalThreadUpdatesDelta = (args: {
       truncated = true;
       break;
     }
-    prefixRows.push({ text, customType: row.customMessage!.customType });
+    const reportKey = reportKeyOf(row);
+    if (reportKey) batchReportKeys.add(reportKey);
+    prefixRows.push({
+      text,
+      customType: row.customMessage!.customType,
+      ...(reportKey ? { reportKey } : {}),
+    });
     serializedChars += cost;
     coveredCount += 1;
     coveredLastEntryId = row.entryId ?? coveredLastEntryId;
@@ -1295,7 +1325,10 @@ export const buildExternalThreadUpdatesDelta = (args: {
     deliveredTextHashes: [
       ...prefixRows,
       ...(latestRow ? [latestRow] : []),
-    ].flatMap((row) => shownTextHashes(row.text)),
+    ].flatMap((row) => [
+      ...shownTextHashes(row.text),
+      ...(row.reportKey ? [row.reportKey] : []),
+    ]),
   };
 };
 

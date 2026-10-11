@@ -412,6 +412,11 @@ export const piChatsFor = (
           if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to pause agents running in the cloud or on your other devices.");
           return await runner.agentThreads.pause(args);
         },
+        note: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to send Stella a note from an agent.");
+          await runner.agentThreads.note(args);
+        },
       },
       journal: (conversationId) => cloudJournalFor(session, conversationId),
       cloudAgents: (conversationId) => cloudAgentsFor(session, conversationId),

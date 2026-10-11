@@ -376,9 +376,7 @@ export type PiRuntimeOptions = {
   waitUntil(work: Promise<unknown>): void;
   report(error: unknown): void;
   log(event: string, fields: Record<string, unknown>): void;
-  /** An agent's report for the orchestrator, as a hidden wake turn. */
-  deliverReport(report: AgentReport, authority: PiAuthority, agent: PiAgentInfo): Promise<void>;
-  /** A note an agent sent the orchestrator (`send_message` to "stella"), as a hidden wake turn. */
+  /** A note an agent sent the orchestrator (`send_message` to "stella"), through the owner's report outbox. */
   deliverNote(note: AgentNote, authority: PiAuthority): Promise<void>;
   /**
    * A report of an agent a computer's orchestrator started here: it goes
@@ -386,6 +384,7 @@ export type PiRuntimeOptions = {
    * this conversation's orchestrator. `turnId` is the latest turn.
    */
   deliverOriginReport?(report: AgentReport & { origin: { deviceId: string } }, turnId: string, agent: PiAgentInfo): Promise<void>;
+  noteLedgerReport(report: AgentReport, turnId: string, agent: PiAgentInfo): void;
   /**
    * A report of an agent thread's agent: it settles the thread's attempt in
    * the owner's agent threads, which hand it to whoever started the thread.
@@ -1180,6 +1179,7 @@ export class PiConversationRuntime {
           .catch((error: unknown) => this.#options.report(error));
         this.#options.log("pi_agent_run_ended", { threadId: run.threadId, turnId: ended?.turnId });
       },
+      reportsFromLedger: () => true,
       deliverReport: async (report, context) => {
         const { authority } = await this.#agentState();
         if (report.origin && "agentThread" in report.origin) {
@@ -1218,7 +1218,11 @@ export class PiConversationRuntime {
         const filesKey = deliveredFilesKey(report.threadId);
         const files = await this.#options.storage.get<PiDeliveredFile[]>(filesKey);
         const info = await this.#agentInfo(report.threadId, context);
-        await this.#options.deliverReport(report, authority, files?.length ? { ...info, files } : info);
+        this.#options.noteLedgerReport(
+          report,
+          this.#binding?.turnId ?? this.#state?.lastTurnId ?? `pi:${authority.conversationId}`,
+          files?.length ? { ...info, files } : info,
+        );
         if (files) await this.#options.storage.delete(filesKey);
       },
       deliverNote: async (note) => {

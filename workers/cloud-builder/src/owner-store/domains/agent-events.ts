@@ -254,6 +254,10 @@ export const endedKind = (applied: AgentChangeApplied): AgentEventKind => {
 export const startedKind = (applied: AgentChangeApplied): AgentEventKind =>
   applied.threadBefore?.status === "paused" ? "resumed" : "attempt_started";
 
+export const agentChangeHooks: Array<
+  (db: OwnerDb, threadId: string, now: number) => void
+> = [];
+
 export const recordAgentChange = <T>(
   db: OwnerDb,
   change: AgentChange,
@@ -318,6 +322,7 @@ const applyAgentChange = <T>(
     ...(change.detail ? { detail: change.detail } : {}),
     createdAt: change.now,
   });
+  for (const hook of agentChangeHooks) hook(db, change.threadId, change.now);
   return value;
 };
 

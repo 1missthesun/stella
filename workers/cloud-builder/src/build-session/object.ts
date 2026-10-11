@@ -123,7 +123,6 @@ import {
   deliverTerminal,
   expireCurrentAgentTurn,
   handleOrchestratorTurnStatus,
-  wakeParentConversation,
 } from "../build-session/terminal-delivery.js";
 import {
   abortUnpublishedTurnStateOperation,
@@ -717,18 +716,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     options: { preservePendingTerminal?: boolean } = {},
   ): Promise<boolean> {
     return deliverTerminal(this.self, turn, pendingInput, options);
-  }
-
-  private wakeParentConversation(
-    turn: TurnRequest,
-    completion: {
-      status: "completed" | "failed" | "canceled";
-      threadUpdatedAt: number;
-      resultJson?: string;
-      errorMessage?: string;
-    },
-  ): Promise<void> {
-    return wakeParentConversation(this.self, turn, completion);
   }
 
   async alarm(): Promise<void> {

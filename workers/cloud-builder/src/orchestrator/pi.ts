@@ -36,12 +36,6 @@ import {
   OWNER_EVENT_VERSION,
   type OwnerEvent,
 } from "@stella/contracts/turn-plane/owner-events";
-import {
-  type CloudTurnStartRequest,
-  TURN_OWNER_GENERATION_HEADER,
-  TURN_PLANE_PROTOCOL,
-} from "@stella/contracts/turn-plane/turn-start";
-import { HEADER_TURN_AUTH_KIND } from "../turn-start-request.js";
 import { CLOUD_HISTORY_TOKEN_BUDGET } from "@stella/executor-cloud/prune-history";
 import {
   type JournalCheckpoint,
@@ -57,7 +51,6 @@ import {
   spawnDeviceAgent,
 } from "../device-agent-tools.js";
 import {
-  agentCompletionPromptText,
   agentLifecycleReport,
   dispatchCloudAgentTurn,
   isCloudAgentControlActive,
@@ -79,6 +72,7 @@ import {
 import type { CloudBrowserClient } from "../cloud-browser.js";
 import { createCloudWebTool } from "../cloud-web-tool.js";
 import { unwrapRpc } from "../owner-store/errors.js";
+import { sha256Hex } from "../hash.js";
 import {
   type CloudConnectorDeclines,
   CloudConnectorDirectory,
@@ -89,7 +83,7 @@ import {
   listIntegrationCatalog,
 } from "../integrations/catalog.js";
 import { sleepWithAbort } from "@stella/runtime/kernel/tools/effect-runtime.js";
-import { HEADER_OWNER, utf8Length } from "../conversation-types.js";
+import { utf8Length } from "../conversation-types.js";
 import { localTurnId as makeLocalTurnId } from "../local-turn-protocol.js";
 import type {
   OwnerFencedTurn,
@@ -276,8 +270,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           report: (error) =>
             log("error", "pi_runtime_report", { message: errorMessage(error) }),
           log: (event, fields) => log("info", event, fields),
-          deliverReport: (report, authority, agent) =>
-            this.deliverPiAgentReport(report, authority, agent),
           deliverNote: (note, authority) =>
             this.deliverPiAgentNote(note, authority),
           // A computer's cloud agent reports to that computer: its journal
@@ -325,6 +317,22 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             });
           },
           deliverThreadReport: (report) => this.deliverPiThreadReport(report),
+          noteLedgerReport: (report, turnId, agent) => {
+            if (!agent.running) {
+              this.publishPiAgentTerminal(
+                report.threadId,
+                agent,
+                piReportOutcome(report),
+              );
+            }
+            if (agent.files?.length) {
+              this.publishTurnFilesCard(
+                turnId,
+                `pi-files:${report.requestId}`,
+                agent.files,
+              );
+            }
+          },
           // Every client draws the agents' rows from these cards, as it does
           // the loop's; which of them run is pi's to say (`runningAgents`).
           agentStarted: (event) =>
@@ -707,119 +715,28 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     };
   }
 
-  /**
-   * A hidden wake turn on this conversation for one of its pi agents, from
-   * the turn plane's service side: what Stella reads is the prompt, and no
-   * client shows it. Idempotent per `clientMsgId`.
-   */
-  protected async startPiAgentWake(
-    authority: import("../pi-runtime.js").PiAuthority,
-    wake: { clientMsgId: string; prompt: string },
-  ): Promise<Response> {
-    const start: CloudTurnStartRequest = {
-      protocol: TURN_PLANE_PROTOCOL,
-      clientMsgId: wake.clientMsgId,
-      prompt: wake.prompt,
-      lane: "wake",
-      source: "agent-thread",
-      hiddenMessage: true,
-    };
-    return await this.handleTurnStart(
-      new Request("https://orchestrator-session/turn", {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [HEADER_OWNER]: authority.ownerId,
-          [HEADER_TURN_AUTH_KIND]: "service",
-          [TURN_OWNER_GENERATION_HEADER]: authority.ownerGeneration,
-        },
-        body: JSON.stringify(start),
-      }),
-    );
-  }
-
-  /** A note one of this conversation's pi agents sent Stella: a hidden wake turn, as its report is. */
+  /** A note one of this conversation's pi agents sent Stella, through the owner's report outbox. */
   protected async deliverPiAgentNote(
     note: import("@stella/agent/stella/agents").AgentNote,
     authority: import("../pi-runtime.js").PiAuthority,
   ): Promise<void> {
-    const response = await this.startPiAgentWake(authority, {
-      clientMsgId: note.requestId.slice(0, 64),
-      prompt: note.text.slice(0, AGENT_MESSAGE_FRAMED_MAX_CHARS),
-    });
-    const body = await response.text().catch(() => "");
-    if (response.status !== 202 && response.status !== 200) {
-      throw new Error(
-        `Stella did not take the agent's message (${response.status}): ${body.slice(0, 300)}`,
-      );
-    }
-    log("info", "pi_agent_note_delivered", {
+    unwrapRpc(
+      await this.ownerGate(authority.ownerId).ownerInternal({
+        name: "agentReports.note",
+        args: {
+          noteId: `note:${(await sha256Hex(`${authority.conversationId}:${note.requestId}`)).slice(0, 48)}`,
+          conversationId: authority.conversationId,
+          ownerGeneration: authority.ownerGeneration,
+          fromThreadId: note.threadId,
+          text: note.text.slice(0, AGENT_MESSAGE_FRAMED_MAX_CHARS),
+        },
+        ownerGeneration: authority.ownerGeneration,
+      }),
+    );
+    log("info", "pi_agent_note_queued", {
       conversationId: authority.conversationId,
       threadId: note.threadId,
       requestId: note.requestId,
-      status: response.status,
-    });
-  }
-
-  protected async deliverPiAgentReport(
-    report: import("@stella/agent/stella/agents").AgentReport,
-    authority: import("../pi-runtime.js").PiAuthority,
-    agent: import("../pi-runtime.js").PiAgentInfo,
-  ): Promise<void> {
-    const limit = AGENT_MESSAGE_FRAMED_MAX_CHARS;
-    const prompt =
-      report.text.length <= limit
-        ? report.text
-        : `${report.text.slice(0, limit - 40)}\n[report truncated]`;
-    const response = await this.startPiAgentWake(authority, {
-      clientMsgId: report.requestId.slice(0, 64),
-      prompt,
-    });
-    const body = await response.text().catch(() => "");
-    if (response.status !== 202 && response.status !== 200) {
-      throw new Error(
-        `The agent's report was refused (${response.status}): ${body.slice(0, 300)}`,
-      );
-    }
-    log("info", "pi_agent_report_delivered", {
-      conversationId: authority.conversationId,
-      threadId: report.threadId,
-      requestId: report.requestId,
-      status: response.status,
-    });
-    // The agent's attempt ends on the turn its report wakes.
-    const wakeTurnId = (() => {
-      try {
-        return (JSON.parse(body) as { turnId?: unknown }).turnId;
-      } catch {
-        return undefined;
-      }
-    })();
-    if (typeof wakeTurnId !== "string" || !wakeTurnId) return;
-    // Its cards follow the wake's prompt, which the turn writes once it runs.
-    const now = Date.now();
-    // What the agent saved to the drive and linked, as the loop's agents' files card.
-    if (agent.files?.length) {
-      await this.stageWakeCard(wakeTurnId, {
-        writerKey: `pi-files:${report.requestId}`,
-        createdAt: now,
-        card: {
-          type: "files",
-          files: agent.files.map((file) => ({ ...file, stored: true })),
-        },
-      });
-    }
-    // A message since has it working again: this report does not end it.
-    if (agent.running) return;
-    const card = this.piAgentTerminalCard(
-      report.threadId,
-      agent,
-      piReportOutcome(report),
-    );
-    await this.stageWakeCard(wakeTurnId, {
-      writerKey: card.eventId,
-      createdAt: now + 1,
-      card,
     });
   }
 
@@ -1240,56 +1157,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       completedAt: terminal.completedAt,
     });
     await this.deferOwnerEvents(events);
-    if (!next.originDeviceId) {
-      const completion = {
-        status: terminal.status,
-        ...(terminal.resultJson ? { resultJson: terminal.resultJson } : {}),
-        ...(terminal.errorMessage
-          ? { errorMessage: terminal.errorMessage }
-          : {}),
-      };
-      const wake: CloudTurnStartRequest = {
-        protocol: TURN_PLANE_PROTOCOL,
-        clientMsgId: `wake:${next.threadId}:${latest.attemptGeneration}`.slice(
-          0,
-          64,
-        ),
-        prompt: agentCompletionPromptText({
-          threadId: next.threadId,
-          description: next.description,
-          ...completion,
-        }),
-        lane: "wake",
-        source: "agent-thread",
-        hiddenMessage: true,
-        agentThreadControl: {
-          lifecycleReport: agentLifecycleReport(completion),
-          threadId: next.threadId,
-          attemptGeneration: latest.attemptGeneration,
-          threadUpdatedAt: terminal.completedAt,
-          status: terminal.status,
-        },
-      };
-      const response = await this.handleTurnStart(
-        new Request("https://orchestrator-session/turn", {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            [HEADER_OWNER]: next.ownerId,
-            [HEADER_TURN_AUTH_KIND]: "service",
-            [TURN_OWNER_GENERATION_HEADER]: next.ownerGeneration,
-          },
-          body: JSON.stringify(wake),
-        }),
-      );
-      const body = await response.text().catch(() => "");
-      if (response.status !== 202 && response.status !== 200) {
-        // pi delivers the report again; the kept decision repeats this wake.
-        throw new Error(
-          `The agent's report was refused (${response.status}): ${body.slice(0, 300)}`,
-        );
-      }
-    }
     await this.updatePiThreadRecord(next.threadId, (current) => ({
       ...current,
       attempts: current.attempts.filter(

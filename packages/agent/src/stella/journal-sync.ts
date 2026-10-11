@@ -320,16 +320,7 @@ export async function importJournal(
   for (const record of messages) {
     if (record.seq <= imported) continue;
     if ("report" in record) {
-      const { text } = record.report;
-      // Only an agent this conversation started reports to its orchestrator.
-      const known = await harness.commit((tx) => noteRemoteReport(tx, root.id, record.report), context);
-      if (known && text) {
-        await root.submit(
-          { type: "input", requestId: requestId(record.seq), content: [{ type: "text", text }], whenBusy: "followUp" },
-          context,
-        );
-        written += 1;
-      }
+      await harness.commit((tx) => noteRemoteReport(tx, root.id, record.report), context);
       continue;
     }
     await root.submit(

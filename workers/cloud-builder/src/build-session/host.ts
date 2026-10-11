@@ -298,15 +298,6 @@ export interface BuildSessionInternals {
       errorMessage?: string;
     },
   ): Promise<string>;
-  wakeParentConversation(
-    turn: TurnRequest,
-    completion: {
-      status: "completed" | "failed" | "canceled";
-      threadUpdatedAt: number;
-      resultJson?: string;
-      errorMessage?: string;
-    },
-  ): Promise<void>;
   alarm(): Promise<void>;
   runScheduledTurnAlarm(): Promise<void>;
   runAlarmWithLease(turn: TurnRequest): Promise<void>;

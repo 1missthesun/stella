@@ -364,7 +364,9 @@ export const handleSendMessage = async (
 
   const session =
     threadId === context.conversationId
-      ? { conversationId: threadId }
+      ? isLocalOnlyChat
+        ? { conversationId: threadId }
+        : null
       : (api.readLocalSession?.(threadId) ?? null);
   if (session && api.messageStellaSession) {
     try {

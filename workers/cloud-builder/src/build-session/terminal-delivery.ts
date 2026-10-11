@@ -2,21 +2,11 @@ import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import { agentAttemptOutcomeOf } from "@stella/contracts/agent-status";
 import { Effect } from "effect";
 import type { ThreadCompletedEvent } from "@stella/contracts/turn-plane/owner-events";
-import {
-  TURN_OWNER_GENERATION_HEADER,
-  TURN_PLANE_PROTOCOL,
-  type CloudTurnStartRequest,
-} from "@stella/contracts/turn-plane/turn-start";
 import { runToolEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
-import {
-  agentCompletionPromptText,
-  agentLifecycleReport,
-} from "../cloud-agent-dispatch.js";
 import {
   CLOUD_CLI_TURN_DO_PATHS,
   type CloudCliTurnTerminal,
 } from "@stella/contracts/cloud-orchestrator-cli";
-import { HEADER_OWNER } from "../conversation-hub.js";
 import {
   purgeOrchestratorCliTurnStore,
   readOrchestratorCliTerminal,
@@ -34,12 +24,9 @@ import {
   nextTurnEventSeq,
   purgeThreadTranscript,
 } from "../thread-transcript.js";
-import { HEADER_TURN_AUTH_KIND } from "../turn-start-request.js";
 import type { BuildSessionInternals } from "./host.js";
 import {
   AGENT_WATCHDOG_DEADLINE_KEY,
-  HEADER_CONVERSATION_ID,
-  ORCHESTRATOR_INTERNAL_ORIGIN,
   OWNER_PURGE_STALE_LEASE_GRACE_MS,
   callOrchestratorCliTurnRoute,
   errorMessage,
@@ -81,7 +68,6 @@ export type TerminalDeliveryHost = Pick<
   | "settleAgentTransientBackup"
   | "terminateCurrentAgentSession"
   | "unregisterTurnLease"
-  | "wakeParentConversation"
 >;
 
 /**
@@ -263,17 +249,6 @@ export const deliverTerminal = async (
             completedAt,
           } satisfies ThreadCompletedEvent,
         ]);
-        // The projection above is how the UI learns the thread ended; it is
-        // NOT how the parent conversation learns. The control plane used to do both in
-        // one mutation, so the wake rode on the callback's latency and its
-        // retry ladder. The parent session lives one Durable Object away, so
-        // it is woken directly.
-        await host.wakeParentConversation(turn, {
-          status: pending.kind,
-          threadUpdatedAt: completedAt,
-          ...(resultJson ? { resultJson } : {}),
-          ...(errorMessage ? { errorMessage } : {}),
-        });
       }
     }
     if (owns) {
@@ -477,98 +452,6 @@ export const handleOrchestratorTurnStatus = async (
     return json({ state: "terminal", terminal: recorded });
   }
   return json({ state: "unknown" });
-};
-
-const agentCompletionText = async (
-  _host: TerminalDeliveryHost,
-  turn: TurnRequest,
-  completion: {
-    status: "completed" | "failed" | "canceled";
-    resultJson?: string;
-    errorMessage?: string;
-  },
-): Promise<string> =>
-  agentCompletionPromptText({
-    threadId: turn.threadId ?? "",
-    ...(turn.description ? { description: turn.description } : {}),
-    ...completion,
-  });
-
-/**
- * Wake the conversation that spawned this thread with the agent's report.
- *
- * This is the one delivery a projection cannot do: the parent needs a turn,
- * not a row. It used to be a control-plane mutation reached through the thread
- * completion callback, which meant the report's latency was the control
- * plane's and a lost callback lost the wake. The parent's Durable Object is
- * one hop away, so it is called directly with exactly the trusted headers
- * the public turn-start route stamps after it verifies a service caller.
- *
- * `clientMsgId` is derived from the thread and its attempt, and every field
- * the parent fingerprints (prompt, lane, source, hiddenMessage, control
- * receipt) is fixed with the terminal decision — so a redelivery is admitted
- * as a replay rather than refused as a different message under the same id.
- *
- * Desktop-origin threads are delivered by the originating device's own
- * subscription to the owner's thread projection; waking here as well would put the
- * same report in two orchestrators. The dispatcher always sets
- * `originConversationId` alongside `originDeviceId`.
- */
-export const wakeParentConversation = async (
-  host: TerminalDeliveryHost,
-  turn: TurnRequest,
-  completion: {
-    status: "completed" | "failed" | "canceled";
-    threadUpdatedAt: number;
-    resultJson?: string;
-    errorMessage?: string;
-  },
-): Promise<void> => {
-  const conversationId = turn.conversationId?.trim() ?? "";
-  if (turn.kind !== "agent" || !turn.threadId || !conversationId) return;
-  if (turn.originDeviceId) {
-    log("info", "thread_wake_skipped_desktop_origin", {
-      threadId: turn.threadId,
-      turnId: turn.turnId,
-    });
-    return;
-  }
-  const body: CloudTurnStartRequest = {
-    protocol: TURN_PLANE_PROTOCOL,
-    clientMsgId: `wake:${turn.threadId}:${turn.attemptGeneration ?? 1}`.slice(
-      0,
-      64,
-    ),
-    prompt: await agentCompletionText(host, turn, completion),
-    lane: "wake",
-    source: "agent-thread",
-    hiddenMessage: true,
-    agentThreadControl: {
-      lifecycleReport: agentLifecycleReport(completion),
-      threadId: turn.threadId,
-      attemptGeneration: turn.attemptGeneration ?? 1,
-      threadUpdatedAt: completion.threadUpdatedAt,
-      status: completion.status,
-    },
-  };
-  const response = await host.env.ORCHESTRATOR_SESSIONS.getByName(
-    conversationId,
-  ).fetch(`${ORCHESTRATOR_INTERNAL_ORIGIN}/turn`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      [HEADER_OWNER]: turn.ownerId,
-      [HEADER_TURN_AUTH_KIND]: "service",
-      [HEADER_CONVERSATION_ID]: conversationId,
-      [TURN_OWNER_GENERATION_HEADER]: turn.ownerGeneration,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    await response.body?.cancel().catch(() => undefined);
-    throw new Error(`Agent completion wake was refused (${response.status}).`);
-  }
-  await response.body?.cancel().catch(() => undefined);
 };
 
 /**

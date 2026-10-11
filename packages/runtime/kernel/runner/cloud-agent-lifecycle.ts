@@ -274,6 +274,14 @@ export const createCloudAgentLifecycleMonitor = (
       }
       await options.onControlReceipt?.(row);
       if (!event?.eventId) return;
+      if (
+        row.status === "completed" ||
+        row.status === "failed" ||
+        row.status === "canceled"
+      ) {
+        await acknowledge(row);
+        return;
+      }
       const failures = failedAttempts.get(event.eventId) ?? 0;
       if (
         failures >= MAX_DELIVERY_ATTEMPTS &&

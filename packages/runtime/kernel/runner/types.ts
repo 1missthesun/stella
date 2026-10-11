@@ -737,6 +737,12 @@ export type RunnerPublicApi = {
     pause: (
       args: Omit<AgentThreadCalls["agentThreads.pause"]["args"], "ownerGeneration">,
     ) => Promise<AgentThreadCalls["agentThreads.pause"]["result"]>;
+    note: (args: {
+      noteId: string;
+      conversationId: string;
+      fromThreadId: string;
+      text: string;
+    }) => Promise<void>;
   };
   beginVoiceToolCallReceipt: RuntimeStore["beginVoiceToolCallReceipt"];
   completeVoiceToolCallReceipt: RuntimeStore["completeVoiceToolCallReceipt"];

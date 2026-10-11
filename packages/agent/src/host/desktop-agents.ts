@@ -30,6 +30,7 @@ export function desktopAgentsHost(
     /** Reports and notes for Stella, which go where she runs. */
     deliverReport?: StellaAgentsHost["deliverReport"];
     deliverNote?: StellaAgentsHost["deliverNote"];
+    reportsFromLedger?: StellaAgentsHost["reportsFromLedger"];
     directory?: StellaAgentsHost["directory"];
     /** The Stella data directory (`~/.stella`): new agents start in a folder of their own under it. */
     dataDir?: string;
@@ -47,6 +48,7 @@ export function desktopAgentsHost(
     ...(options.engine ? { engine: options.engine } : {}),
     ...(options.deliverReport ? { deliverReport: options.deliverReport } : {}),
     ...(options.deliverNote ? { deliverNote: options.deliverNote } : {}),
+    ...(options.reportsFromLedger ? { reportsFromLedger: options.reportsFromLedger } : {}),
     ...(options.directory ? { directory: options.directory } : {}),
     ...(options.dataDir ? { agentDirectory: (threadId: string) => defaultAgentDirectory(options.dataDir!, threadId) } : {}),
     ...(options.execution ? { execution: options.execution } : {}),

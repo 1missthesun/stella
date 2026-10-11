@@ -51,6 +51,7 @@ import {
   CONVERSATION_AGENT_THREADS_MAX,
 } from "@stella/contracts/backend/agent-threads";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
+import { agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
@@ -65,6 +66,7 @@ import { TURN_ATTACHMENTS_MAX } from "@stella/contracts/turn-plane/turn-start";
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { endedKind, recordAgentChange, startedKind } from "./agent-events.js";
+import { queueStellaNote } from "./agent-reports.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { array, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -765,7 +767,7 @@ const settleDeviceAttempt = async (
     status === "completed" || status === "paused"
       ? null
       : clip(outcome.errorMessage?.trim() || `The agent ${status === "canceled" ? "was stopped" : "failed"}.`, 2_000);
-  const thread = recordAgentChange(
+  recordAgentChange(
     ctx.db,
     { threadId: turn.thread_id, turnId, kind: endedKind, outcome: status, source, now: ctx.now },
     () => {
@@ -793,32 +795,6 @@ const settleDeviceAttempt = async (
       return current;
     },
   );
-  if (!thread) return;
-  // A pause reports to no one: whoever asked for it already knows.
-  if (thread.origin_device_id || status === "paused") return;
-  try {
-    await ctx.host.deliverAgentCompletion({
-      ownerGeneration: thread.owner_generation ?? "",
-      conversationId: thread.conversation_id,
-      threadId: thread.thread_id,
-      attemptGeneration: thread.attempt_generation,
-      description: thread.description,
-      status,
-      ...(outcome.resultJson ? { resultJson: outcome.resultJson } : {}),
-      ...(errorMessage ? { errorMessage } : {}),
-      threadUpdatedAt: ctx.now,
-    });
-  } catch (error) {
-    // The result is durable on the thread row; the requester still reads it
-    // with agent_status even when the wake is lost.
-    console.error(
-      JSON.stringify({
-        event: "device_agent_delivery_failed",
-        threadId: thread.thread_id,
-        message: error instanceof Error ? error.message : String(error),
-      }),
-    );
-  }
 };
 
 /** The gate reports every terminal dispatch it ran for a device thread. */
@@ -1686,11 +1662,12 @@ const deliverAgentMessage = async (
     to,
   );
   if (conversation) {
-    await ctx.host.startAgentMessageTurn({
-      ownerGeneration: args.ownerGeneration,
+    queueStellaNote(ctx, {
+      noteId: `msg:${(await sha256Hex(args.commandId)).slice(0, 48)}`,
       conversationId: to,
-      clientMsgId: `msg:${(await sha256Hex(args.commandId)).slice(0, 48)}`,
-      prompt: formatAgentMessage(args.from, args.text),
+      ownerGeneration: args.ownerGeneration,
+      fromThreadId: args.from.threadId,
+      text: formatAgentMessage(args.from, args.text),
     });
     return { threadId: to, command: args.kind, outcome: "queued" };
   }
@@ -1828,6 +1805,24 @@ const controlAgent = async (
     result,
     waitingForDevice: !("hold" in routed) && routed.waitingForDevice === true,
   };
+};
+
+export const deliverReportToAgent = async (
+  ctx: OwnerContext,
+  args: { reportId: string; parentThreadId: string; ownerGeneration: string; text: string; fromThreadId: string },
+): Promise<void> => {
+  const thread = readThread(ctx.db, args.parentThreadId);
+  if (!thread) throw new RpcError("NOT_FOUND", `No agent has the thread_id ${args.parentThreadId}.`);
+  await controlAgent(ctx, {
+    commandId: args.reportId,
+    kind: "message",
+    thread,
+    ownerGeneration: args.ownerGeneration,
+    text: args.text,
+    source: "owner:report-outbox",
+    detail: { from: args.fromThreadId, reportId: args.reportId },
+    next: { clientMsgId: agentReportReceipt(args.reportId), fingerprint: "agent-report" },
+  });
 };
 
 const readCommand = (db: OwnerDbReader, commandId: string): CommandRow | null =>

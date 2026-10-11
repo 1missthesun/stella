@@ -6,6 +6,7 @@
  */
 
 import type { AgentEventViews } from "./agent-events.js";
+import type { AgentReportCalls, AgentReportViews } from "./agent-reports.js";
 import type { AgentThreadCalls, AgentThreadViews } from "./agent-threads.js";
 import type { AppSourceCalls } from "./app-source.js";
 import type { BillingCalls, BillingViews } from "./billing.js";
@@ -36,6 +37,7 @@ type SystemCalls = {
 export type BackendCalls = SystemCalls &
   ConversationCalls &
   AgentThreadCalls &
+  AgentReportCalls &
   BillingCalls &
   DeviceCalls &
   AppSourceCalls &
@@ -58,6 +60,7 @@ export type BackendCalls = SystemCalls &
 export type BackendViews = ConversationViews &
   AgentThreadViews &
   AgentEventViews &
+  AgentReportViews &
   BillingViews &
   DeviceViews &
   HomeViews &

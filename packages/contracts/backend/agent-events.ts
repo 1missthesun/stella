@@ -27,6 +27,12 @@ export const AGENT_EVENT_KINDS = [
   "brain_lease_moved",
   "brain_lease_taken_over",
   "brain_lease_refused",
+  "report",
+  "report_deferred",
+  "report_offered",
+  "report_delivered",
+  "report_dropped",
+  "report_failed",
 ] as const;
 
 export type AgentEventKind = (typeof AGENT_EVENT_KINDS)[number];

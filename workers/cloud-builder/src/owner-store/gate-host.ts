@@ -36,6 +36,7 @@ import type {
 import { RpcError } from "./errors.js";
 import { DispatchError, type AgentTurnDispatch, type OwnerHost } from "./registry.js";
 import { startScheduledTurn } from "./scheduled-turn.js";
+import { AGENT_REPORT_TARGET_PATH, parseAgentReportTarget } from "../agent-report-target.js";
 
 /** Idempotency keys of the dispatches the agent-thread ledger submits. */
 export const DEVICE_AGENT_DISPATCH_PREFIX = "agent-thread:";
@@ -222,7 +223,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
     const text = agentCompletionPromptText(input);
     const response = await startOrchestratorTurn(deps, input, {
       protocol: TURN_PLANE_PROTOCOL,
-      clientMsgId: `wake:${input.threadId}:${input.attemptGeneration}`.slice(0, 64),
+      clientMsgId: input.clientMsgId,
       prompt: text,
       lane: "wake",
       source: "agent-thread",
@@ -235,10 +236,34 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
         status: input.status,
       },
     });
-    await response.body?.cancel().catch(() => undefined);
     if (!response.ok) {
+      const body = (await response.json().catch(() => null)) as { error?: { code?: unknown } } | null;
+      if (body?.error?.code === "idempotency_conflict") return;
       throw new Error(`Agent completion wake was refused (${response.status}).`);
     }
+    await response.body?.cancel().catch(() => undefined);
+  },
+
+  async agentReportTarget(input) {
+    const response = await deps.env.ORCHESTRATOR_SESSIONS.getByName(input.conversationId).fetch(
+      `${ORCHESTRATOR_INTERNAL_ORIGIN}${AGENT_REPORT_TARGET_PATH}`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [HEADER_OWNER]: deps.ownerId(),
+          [HEADER_TURN_AUTH_KIND]: "service",
+          [HEADER_CONVERSATION_ID]: input.conversationId,
+          [TURN_OWNER_GENERATION_HEADER]: input.ownerGeneration,
+        },
+        body: "{}",
+      },
+    );
+    if (!response.ok) {
+      await response.body?.cancel().catch(() => undefined);
+      throw new Error(`The conversation did not say where its brain runs (${response.status}).`);
+    }
+    return parseAgentReportTarget(await response.json().catch(() => null));
   },
 
   async startAgentMessageTurn(input) {

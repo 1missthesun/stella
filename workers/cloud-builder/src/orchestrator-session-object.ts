@@ -38,6 +38,10 @@ import {
   log,
 } from "./orchestrator/support.js";
 import { OrchestratorTurnStart } from "./orchestrator/turn-start.js";
+import { AGENT_REPORT_TARGET_PATH } from "./agent-report-target.js";
+import type { AgentReportTarget } from "./owner-store/registry.js";
+import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
+import { PI_BRAIN_KEY } from "./orchestrator/constants.js";
 
 /**
  * The cloud orchestrator: Stella's delegation-only agent loop running inside
@@ -289,6 +293,32 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
    * go to, before each Slack turn. Internal: only the Worker reaches it. A
    * conversation already owned by someone else refuses.
    */
+  private async handleAgentReportTarget(request: Request): Promise<Response> {
+    const ownerId = request.headers.get(HEADER_OWNER)?.trim() ?? "";
+    if (!ownerId || request.headers.get(HEADER_TURN_AUTH_KIND)?.trim() !== "service") {
+      return json({ error: "Service callers only." }, 403);
+    }
+    const brain = (await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ?? null;
+    if (!brain) return json({ kind: "sender" } satisfies AgentReportTarget);
+    if (brain.host === "cloud") return json({ kind: "cloud" } satisfies AgentReportTarget);
+    const holder = await this.piBrainHolderState(ownerId, brain.deviceId);
+    const claim = await this.claimPiBrain({
+      claimant: { host: "cloud" },
+      claimEpoch: null,
+      holder: { forEpoch: brain.epoch, ...holder },
+    });
+    const target: AgentReportTarget =
+      claim.record?.host === "device" && claim.decision.kind === "elsewhere"
+        ? { kind: "device", deviceId: claim.record.deviceId, epoch: claim.record.epoch }
+        : { kind: "cloud" };
+    log("info", "agent_report_target", {
+      target: target.kind,
+      ...(target.kind === "device" ? { deviceId: target.deviceId, epoch: target.epoch } : {}),
+      takenOver: claim.takenOver,
+    });
+    return json(target);
+  }
+
   private async handleSlackBind(request: Request): Promise<Response> {
     const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
     const text = (value: unknown, max = 128): string | null =>
@@ -410,6 +440,9 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     }
     if (url.pathname === "/pi-brain") {
       return this.handlePiBrain(request);
+    }
+    if (url.pathname === AGENT_REPORT_TARGET_PATH) {
+      return this.handleAgentReportTarget(request);
     }
     // A pi agent's container daemon (its drive and its delivered files),
     // under its lease's own credential.

@@ -5,6 +5,7 @@
 
 import { empty } from "./args.js";
 import { agentEventsDomain } from "./domains/agent-events.js";
+import { agentReportsDomain } from "./domains/agent-reports.js";
 import { agentThreadsDomain } from "./domains/agent-threads.js";
 import { appSourceDomain } from "./domains/app-source.js";
 import { billingDomain } from "./domains/billing.js";
@@ -67,6 +68,7 @@ export const ownerDomains: OwnerDomain[] = [
   userAsksDomain,
   claudeSessionsDomain,
   agentEventsDomain,
+  agentReportsDomain,
 ];
 
 export const ownerRegistry = createOwnerRegistry(ownerDomains);

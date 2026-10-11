@@ -214,6 +214,7 @@ export type AgentReport = {
    * one report per message it sent.
    */
   settled?: true;
+  ledger?: true;
 };
 
 /** A note an agent sent its Stella (`send_message` to "stella"), arriving at the orchestrator. */
@@ -352,6 +353,7 @@ export type StellaAgentsHost = {
    * root conversation. The cloud sends it through its turn plane instead.
    */
   deliverNote?(note: AgentNote, context: Context): Promise<void>;
+  reportsFromLedger?(): boolean;
   /** An agent's report reached the orchestrator: the desktop tells the user. */
   agentReported?(agent: {
     threadId: string;
@@ -686,6 +688,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             context,
           );
         }
+        const fromLedger = report !== undefined && host.reportsFromLedger?.() === true;
         if (report !== undefined && (self.agentType === "orchestrator" || self.parentConversationId === undefined)) {
           const delivery: AgentReport = {
             rootConversationId: runtime.conversationId,
@@ -695,7 +698,9 @@ export function stellaAgents(host: StellaAgentsHost) {
             requestId: `agent-report:${reporter.id}`,
             ...(origin ? { origin } : {}),
           };
-          if (host.deliverReport) {
+          if (fromLedger) {
+            await host.deliverReport?.({ ...delivery, ledger: true }, context);
+          } else if (host.deliverReport) {
             await host.deliverReport(delivery, context);
           } else {
             const root = await runtime.conversation(runtime.conversationId, context);
@@ -715,7 +720,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         await runtime.commit(async (tx) => {
           // A report to an agent is the next message to that agent, carried
           // by a reporter in the conversation that started it.
-          if (report !== undefined && self.agentType !== "orchestrator" && self.parentConversationId !== undefined && self.threadId) {
+          if (!fromLedger && report !== undefined && self.agentType !== "orchestrator" && self.parentConversationId !== undefined && self.threadId) {
             await tx.createTask(
               Reporter,
               { threadId: self.threadId, conversationId: runtime.conversationId, message: report },

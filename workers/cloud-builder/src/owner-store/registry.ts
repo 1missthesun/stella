@@ -120,6 +120,7 @@ export type OwnerHost = {
    * spawned it. Desktop requesters read their own `forDevice` delivery.
    */
   deliverAgentCompletion(input: AgentCompletionDelivery): Promise<void>;
+  agentReportTarget(input: { conversationId: string; ownerGeneration: string }): Promise<AgentReportTarget>;
   /** Stop one exact running attempt. `changed` means it is no longer that attempt. */
   cancelAgentTurn(input: {
     threadId: string;
@@ -251,7 +252,13 @@ export type AgentCompletionDelivery = {
   resultJson?: string;
   errorMessage?: string;
   threadUpdatedAt: number;
+  clientMsgId: string;
 };
+
+export type AgentReportTarget =
+  | { kind: "cloud" }
+  | { kind: "device"; deviceId: string; epoch: number }
+  | { kind: "sender" };
 
 export class DispatchError extends Error {
   readonly retryable: boolean;

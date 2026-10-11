@@ -15,6 +15,7 @@ import { createRunnerPiTools } from "./runner/pi-tools.js";
 import { createRuntimeInitialization } from "./runner/runtime-initialization.js";
 import { createAgentOrchestration } from "./runner/agent-orchestration.js";
 import { createCloudAgentLifecycleMonitor } from "./runner/cloud-agent-lifecycle.js";
+import { createAgentReportInbox } from "./runner/agent-report-inbox.js";
 import {
   completeComputerThread,
   createComputerAgentCloudRecords,
@@ -55,6 +56,7 @@ import {
   readRestartInterruptionState,
 } from "./restart-continuation.js";
 import type {
+  PiReportDelivery,
   RunnerPublicApi,
   StellaHostRunnerOptions,
 } from "./runner/types.js";
@@ -397,6 +399,51 @@ export const createStellaHostRunner = (
     sendMessage: orchestratorController.sendMessage,
     cloudAgentRecords: computerAgentCloudRecords,
   });
+  const deliverOrchestratorNote: PiReportDelivery = async (note) => {
+    if (desktopPiChatEnabled(getAgentRuntimeEngine(context.stellaDataDir))) {
+      const deliver = context.state.piReportDelivery;
+      if (!deliver) {
+        throw new Error("Stella's chat is not ready to take this yet.");
+      }
+      await deliver(note);
+      return;
+    }
+    const ownerGeneration = note.conversationId.startsWith("local_")
+      ? undefined
+      : await context.cloudOwnerGeneration().catch(() => undefined);
+    await orchestratorController.sendMessage({
+      conversationId: note.conversationId,
+      text: note.text,
+      uiVisibility: "hidden",
+      agentType: AGENT_IDS.ORCHESTRATOR,
+      deliverAs: "steer",
+      customType: AGENT_MESSAGE_CUSTOM_TYPE,
+      eventId: note.requestId,
+      display: false,
+      ...(ownerGeneration ? { ownerGeneration } : {}),
+    });
+  };
+  const agentReportInbox = createAgentReportInbox({
+    deviceId: context.deviceId,
+    getOwnerGeneration: async () =>
+      (await context.backend.ownerIdentity()).ownerGeneration,
+    watchReports: (args, onUpdate, onError) => {
+      const client = context.backend.client();
+      if (!client) return null;
+      return client.watch("agentReports.forDevice", args, onUpdate, onError);
+    },
+    acknowledge: async (args) =>
+      await context.backend.require().call("agentReports.acknowledge", args),
+    canStart: () =>
+      context.state.hasConnectedAccount === true &&
+      Boolean(context.state.authToken?.trim()) &&
+      Boolean(context.backend.client()),
+    hasDurableLifecycleEvent:
+      taskOrchestration.hasDurableExternalLifecycleEvent,
+    onLifecycleEvent: (event) =>
+      taskOrchestration.handleExternalAgentLifecycleEvent(event),
+    onNote: (note) => deliverOrchestratorNote(note),
+  });
   const cloudAgentLifecycle = createCloudAgentLifecycleMonitor({
     deviceId: context.deviceId,
     getOwnerGeneration: async () =>
@@ -462,9 +509,11 @@ export const createStellaHostRunner = (
       !context.state.authToken?.trim()
     ) {
       cloudAgentLifecycle.stop();
+      agentReportInbox.stop();
       return;
     }
     queueMicrotask(() => cloudAgentLifecycle.start());
+    queueMicrotask(() => agentReportInbox.start());
   };
   restartCloudAgentLifecycle();
   // Convert restart authorization and pre-cancel thread evidence before any
@@ -560,6 +609,7 @@ export const createStellaHostRunner = (
       context.backend.setBackendUrl(value);
       scheduleRemotePromptRevalidation();
       queueMicrotask(() => cloudAgentLifecycle.start());
+      queueMicrotask(() => agentReportInbox.start());
       computerAgentCloudRecords.resume();
       claudeSessionSync.resume();
     },
@@ -581,33 +631,11 @@ export const createStellaHostRunner = (
       if (note) context.state.brainNote = note;
       else delete context.state.brainNote;
     },
-    deliverOrchestratorNote: async (note) => {
-      if (desktopPiChatEnabled(getAgentRuntimeEngine(context.stellaDataDir))) {
-        const deliver = context.state.piReportDelivery;
-        if (!deliver) {
-          throw new Error("Stella's chat is not ready to take this yet.");
-        }
-        await deliver(note);
-        return;
-      }
-      const ownerGeneration = note.conversationId.startsWith("local_")
-        ? undefined
-        : await context.cloudOwnerGeneration().catch(() => undefined);
-      await orchestratorController.sendMessage({
-        conversationId: note.conversationId,
-        text: note.text,
-        uiVisibility: "hidden",
-        agentType: AGENT_IDS.ORCHESTRATOR,
-        deliverAs: "steer",
-        customType: AGENT_MESSAGE_CUSTOM_TYPE,
-        eventId: note.requestId,
-        display: false,
-        ...(ownerGeneration ? { ownerGeneration } : {}),
-      });
-    },
+    deliverOrchestratorNote,
     start: runtimeInitialization.start,
     stop: async () => {
       cloudAgentLifecycle.stop();
+      agentReportInbox.stop();
       await runtimeInitialization.stop();
     },
     waitUntilInitialized: async () => {
@@ -788,6 +816,12 @@ export const createStellaHostRunner = (
           ...args,
           ownerGeneration: await context.cloudOwnerGeneration(),
         }),
+      note: async (args) => {
+        await context.backend.require().call("agentReports.note", {
+          ...args,
+          ownerGeneration: await context.cloudOwnerGeneration(),
+        });
+      },
     },
     beginVoiceToolCallReceipt: (request) =>
       context.runtimeStore.beginVoiceToolCallReceipt(request),

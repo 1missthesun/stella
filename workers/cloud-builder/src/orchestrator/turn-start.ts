@@ -180,11 +180,32 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       // While that computer can't take it (offline, not ready, gone) or its
       // lease lapsed, this object takes the brain over under the next epoch
       // and answers it; the computer, once back, finds the lease moved.
+      const placedHere = authKind === "service" && start.source === "placement";
       const brain =
-        authKind === "user" && lane === "chat" && !start.piAgent
+        (authKind === "user" || placedHere) && lane === "chat" && !start.piAgent
           ? await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)
           : undefined;
-      if (brain?.host === "device") {
+      if (brain?.host === "device" && placedHere) {
+        const holder = await this.piBrainHolderState(ownerId, brain.deviceId);
+        const claim = await this.claimPiBrain({
+          claimant: { host: "cloud" },
+          claimEpoch: null,
+          holder: {
+            forEpoch: brain.epoch,
+            ...(holder.gone
+              ? holder
+              : holder.seenAt !== undefined
+                ? { seenAt: holder.seenAt }
+                : {}),
+          },
+        });
+        if (claim.record?.host === "device") {
+          log("info", "pi_brain_turn_unleased", {
+            deviceId: claim.record.deviceId,
+            epoch: claim.record.epoch,
+          });
+        }
+      } else if (brain?.host === "device") {
         const holder = await this.piBrainHolderState(ownerId, brain.deviceId);
         let claim = await this.claimPiBrain({
           claimant: { host: "cloud" },

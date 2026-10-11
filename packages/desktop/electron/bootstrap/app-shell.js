@@ -137,7 +137,7 @@ const finalizeWindowLaunch = (context) => {
     // the user enables it in System Settings and returns to Stella, retry start.
     if (process.platform === "darwin") {
         app.on("browser-window-focus", () => {
-            if (!hasMacPermission("accessibility", false)) {
+            if (context.state.isQuitting || !hasMacPermission("accessibility", false)) {
                 return;
             }
             services.globalInputHook.start();

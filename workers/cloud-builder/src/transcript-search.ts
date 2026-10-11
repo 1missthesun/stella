@@ -121,7 +121,6 @@ export class TranscriptSearchIndex {
 
   index(row: TranscriptSearchRow): void {
     this.remove(row.seq);
-    if (row.spillKey !== null) return;
     const raw = extractMessageText(row.payload);
     const kind = historySearchKind(row.role, row.hidden, raw);
     if (!kind) return;

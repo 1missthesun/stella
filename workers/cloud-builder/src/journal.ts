@@ -749,7 +749,6 @@ export class Journal {
            FROM journal
           WHERE kind = 'message'
             AND role IN ('user', 'assistant')
-            AND spill_key IS NULL
           ORDER BY seq ASC`,
       )
       .toArray();
@@ -776,13 +775,19 @@ export class Journal {
     return pending;
   }
 
-  /** Index one archived segment's hidden prompts, and remember it is done. */
+  /**
+   * Index what an archived segment holds that search used to skip (hidden
+   * prompts, and messages whose payload spilled to R2, by their preview), and
+   * remember the segment is done.
+   */
   async reindexArchivedSegment(firstSeq: number, rows: readonly JournalRow[]): Promise<void> {
     const state = await this.ctx.storage.get<SearchReindex>(SEARCH_REINDEX_KEY);
     if (!state) return;
     this.transactionSync(() => {
       for (const row of rows) {
-        if (row.kind !== "message" || row.role !== "user" || row.hidden !== 1 || row.spill_key !== null) continue;
+        if (row.kind !== "message") continue;
+        const unindexed = (row.role === "user" && row.hidden === 1) || ((row.role === "user" || row.role === "assistant") && row.spill_key !== null);
+        if (!unindexed) continue;
         this.indexStoredMessage(row);
       }
     });

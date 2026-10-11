@@ -845,11 +845,14 @@ export function stellaAgents(host: StellaAgentsHost) {
             agent.reported.push(settled.answer);
             if (busy && answer?.stopReason !== "error") {
               end = { ...end, waiting: true };
+              // An empty answer (it already answered with send_message) sends nothing.
+              const said = textOf(answer);
               return {
                 status: "running",
-                checkpoint: gated
-                  ? { phase: "report", status: "completed", waiting: true }
-                  : { phase: "report", report: textOf(answer) || "(no reply)", status: "completed", waiting: true, reply: true },
+                checkpoint:
+                  gated || !said
+                    ? { phase: "report", status: "completed", waiting: true }
+                    : { phase: "report", report: said, status: "completed", waiting: true, reply: true },
               };
             }
             return next(

@@ -1,8 +1,9 @@
 /**
  * What pi adds to the chat column:
- * its transcript (for the rows the conversation's record does not hold yet),
- * the assistant message in flight, and the run's state. The record itself
- * (journal or chat log) is what the column shows, whatever the engine.
+ * its transcript (for the rows the conversation's record does not hold yet)
+ * and the run's state. A reply shows once pi has it whole, never while its
+ * text streams in. The record itself (journal or chat log) is what the column
+ * shows, whatever the engine.
  * Sending goes through the usual composer path, whose `startStream` submits
  * to pi.
  */
@@ -14,7 +15,7 @@ import {
   subscribePiChat,
   watchPiChat,
 } from "./pi-chat-store";
-import { piStreamingOverlay, projectPiChat } from "./pi-chat-records";
+import { projectPiChat } from "./pi-chat-records";
 
 const NO_SUBSCRIPTION = () => () => {};
 
@@ -32,16 +33,10 @@ export const usePiChat = (conversationId: string | null) => {
   );
   const state = useSyncExternalStore(enabled ? subscribe : NO_SUBSCRIPTION, () => piChatSnapshot(conversationId));
 
-  // Streamed text changes only `streaming`; the rows rebuild on new entries.
   const projection = useMemo(
     () => projectPiChat({ entries: state.entries, requestIds: state.requestIds }),
     [state.entries, state.requestIds],
   );
-  const streamingAssistants = useMemo(
-    () => piStreamingOverlay({ streaming: state.streaming }, projection.turn),
-    [state.streaming, projection.turn],
-  );
-
   const runningTool = useMemo(() => {
     const running = Object.entries(state.tools).filter(([, tool]) => tool.status === "running");
     const last = running[running.length - 1];
@@ -68,7 +63,6 @@ export const usePiChat = (conversationId: string | null) => {
 
   return {
     projection,
-    streamingAssistants,
     // A turn running elsewhere (placed in the cloud or on another computer) is running here too.
     isStreaming: state.running || state.queued.length > 0 || state.remote.length > 0,
     runtimeStatusText: state.retry
@@ -83,7 +77,6 @@ export const usePiChat = (conversationId: string | null) => {
     hasToolActivity: Object.keys(state.tools).length > 0,
     isToolActive: runningTool !== null,
     answerLanded,
-    pendingUserMessageId: state.running ? (projection.turn.userMessageId ?? null) : null,
     failure: state.failure ?? null,
     cancelCurrentStream: cancel,
   };

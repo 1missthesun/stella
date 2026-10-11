@@ -216,6 +216,12 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         presenceSessionId: attachment.presenceSessionId,
         serverTimeMs: now,
       });
+      if (device!.remoteExecution === "asking") {
+        this.send(socket, {
+          type: "consent.request",
+          requestedAt: device!.remoteExecutionAskedAt ?? now,
+        });
+      }
       this.deviceToolRelayState?.onDeviceConnected(attachment.deviceId, socket);
       const flushed = await this.ownerStore().internalCall(
         "agentThreads.flushDeviceMessages",
@@ -524,8 +530,8 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         errorCode: SELECTED_DEVICE_NEEDS_CONSENT,
         errorMessage:
           args.remoteExecution === "declined"
-            ? "That computer is set not to accept work from your other devices. Enable it in the device list, or allow it on that computer."
-            : "That computer has not agreed to run work sent from elsewhere yet. It is asking on its own screen; you can also tap Enable for it in the device list.",
+            ? "That computer is set not to accept work from your other devices. Allow it on that computer, in its device list."
+            : "That computer has not agreed to run work sent from elsewhere yet. It is asking on its own screen.",
       };
     }
     if (
@@ -577,12 +583,20 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       });
       return;
     }
-    const socket = this.connectedSocket(args.deviceId);
+    this.askDeviceConsent(args.deviceId, args.now, args.requesterLabel);
+  }
+
+  protected askDeviceConsent(
+    deviceId: string,
+    requestedAt: number,
+    requesterLabel?: string,
+  ): void {
+    const socket = this.connectedSocket(deviceId);
     if (!socket) return;
     this.send(socket, {
       type: "consent.request",
-      requestedAt: args.now,
-      ...(args.requesterLabel ? { requesterLabel: args.requesterLabel } : {}),
+      requestedAt,
+      ...(requesterLabel ? { requesterLabel } : {}),
     });
   }
 

@@ -103,6 +103,7 @@ export type OwnerHost = {
    * Pause an agent a device runs locally. `unreachable` means no live
    * socket; `timeout` that no answer came, so it may still have landed.
    */
+  askDeviceConsent(input: { deviceId: string; requestedAt: number }): void;
   pauseLocalAgent(input: LocalAgentPause): Promise<{
     outcome: import("@stella/contracts/turn-plane/placement").AgentPauseDeviceOutcome | "unreachable" | "timeout";
   }>;

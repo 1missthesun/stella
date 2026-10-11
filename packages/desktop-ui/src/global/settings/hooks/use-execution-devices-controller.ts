@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
+import type {
+  DeviceDestination,
+  DeviceRemoteExecution,
+} from "@stella/contracts/turn-plane/placement";
 import { listExecutionDevices } from "@/features/cloud/placement-client";
 import { backendClient, backendUrl } from "@/platform/backend/backend-client";
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { getDeviceIdOrNull } from "@/platform/electron/device";
+import { getElectronApi } from "@/platform/electron/electron";
 
 /** Presence goes stale quickly, so re-read while the list is on screen. */
 const DEVICE_POLL_INTERVAL_MS = 15_000;
@@ -86,10 +90,9 @@ export function useExecutionDevicesController() {
   }, [currentDeviceId, devices]);
 
   /**
-   * Answer the consent question for one device from this signed-in session.
-   *
-   * The gate's reply is the authority on the resulting state, so the row takes
-   * what came back rather than assuming the requested value.
+   * This computer answers for itself, on its own presence socket. For any
+   * other computer, turning it on asks on that computer's screen, and only
+   * its answer there enables it; the gate's reply says which state it is in.
    */
   const setRemoteExecution = useCallback(
     async (deviceId: string, enabled: boolean): Promise<boolean> => {
@@ -97,18 +100,29 @@ export function useExecutionDevicesController() {
       setPendingDeviceId(deviceId);
       setError((current) => (current === "update" ? null : current));
       try {
-        const result = await backendClient.call("devices.setRemoteExecution", {
-          deviceId,
-          enabled,
-        });
+        const own =
+          deviceId === currentDeviceId
+            ? getElectronApi()?.remoteExecution
+            : undefined;
+        let remoteExecution: DeviceRemoteExecution;
+        if (own) {
+          await own.answer(enabled);
+          remoteExecution = enabled ? "enabled" : "declined";
+        } else {
+          const result = await backendClient.call(
+            "devices.setRemoteExecution",
+            { deviceId, enabled },
+          );
+          remoteExecution = result.remoteExecution;
+        }
         writeSeq.current += 1;
         setDevices((current) =>
           (current ?? []).map((device) =>
             device.deviceId === deviceId
               ? {
                   ...device,
-                  remoteExecution: result.remoteExecution,
-                  remoteExecutionEnabled: result.remoteExecution === "enabled",
+                  remoteExecution,
+                  remoteExecutionEnabled: remoteExecution === "enabled",
                 }
               : device,
           ),
@@ -121,7 +135,7 @@ export function useExecutionDevicesController() {
         setPendingDeviceId(null);
       }
     },
-    [pendingDeviceId],
+    [currentDeviceId, pendingDeviceId],
   );
 
   return {

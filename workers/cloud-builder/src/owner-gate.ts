@@ -235,6 +235,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       steerDispatch: (input) => this.steerDispatch(input),
       messageLocalAgent: (input) => this.messageLocalAgent(input),
       pauseLocalAgent: (input) => this.pauseLocalAgent(input),
+      askDeviceConsent: (input) => this.askDeviceConsent(input.deviceId, input.requestedAt),
       devices: () => this.devices(),
       homeChanged: (ownerGeneration, revision) =>
         this.homeContextCache().changed(ownerGeneration, revision),

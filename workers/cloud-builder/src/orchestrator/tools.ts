@@ -274,7 +274,10 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           threadId,
         ).catch(() => null);
         if (!found || found.kind === "elsewhere") {
-          return { kind: "elsewhere", threadId: found?.thread.threadId ?? threadId };
+          return {
+            kind: "elsewhere",
+            threadId: found?.thread.threadId ?? threadId,
+          };
         }
         return {
           kind: "own",
@@ -343,13 +346,22 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       if (control.executorDeviceId) return;
       await toolContext
         .ownerInternal("agentEvents.append", {
-          key: `command_routed:${command}:${turn.turnId}:${toolCallId}`.slice(0, 512),
+          key: `command_routed:${command}:${turn.turnId}:${toolCallId}`.slice(
+            0,
+            512,
+          ),
           kind: "command_routed",
           source: `cloud:${turn.conversationId}`,
           threadId: control.threadId,
           conversationId: turn.conversationId,
           attemptGeneration: control.attemptGeneration,
-          detail: { command, executor: "cloud", via: "conversation", outcome, toolCallId },
+          detail: {
+            command,
+            executor: "cloud",
+            via: "conversation",
+            outcome,
+            toolCallId,
+          },
         })
         .catch(() => undefined);
     };

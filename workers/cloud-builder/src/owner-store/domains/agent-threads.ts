@@ -477,7 +477,9 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
       ...(thread.origin_conversation_id
         ? { originConversationId: thread.origin_conversation_id }
         : {}),
-      ...(thread.parent_thread_id ? { parentThreadId: thread.parent_thread_id } : {}),
+      ...(thread.parent_thread_id && !thread.origin_device_id
+        ? { parentThreadId: thread.parent_thread_id }
+        : {}),
     });
     ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
   } catch (error) {
@@ -1144,6 +1146,7 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
       args.originConversationId,
       args.targetDeviceId ?? null,
       args.model ?? null,
+      ...(args.parentThreadId ? [args.parentThreadId] : []),
     ]),
   );
   const replay = replayAttempt(ctx.db, args.clientMsgId, fingerprint, args.ownerGeneration);
@@ -1206,13 +1209,14 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
   const threadId = `thr-${crypto.randomUUID().replaceAll("-", "").slice(0, 18)}`;
   ctx.db.run(
     `INSERT INTO agent_threads
-       (thread_id, conversation_id, owner_generation, origin_device_id, origin_conversation_id,
+       (thread_id, conversation_id, owner_generation, parent_thread_id, origin_device_id, origin_conversation_id,
         executor_device_id, requested_model, description, placement, agent_type, execution_json,
         attempt_generation, status, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'general', ?, 1, 'running', ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'general', ?, 1, 'running', ?, ?)`,
     threadId,
     conversationId,
     args.ownerGeneration,
+    args.parentThreadId ?? null,
     args.originDeviceId,
     args.originConversationId,
     targetDeviceId,
@@ -2696,6 +2700,7 @@ export const agentThreadsDomain = {
         execution: optional(executionParser),
         targetDeviceId: optional(id(256)),
         model: optional(string({ max: 256 })),
+        parentThreadId: optional(id()),
       }),
       handler: spawnFromDesktop,
     },

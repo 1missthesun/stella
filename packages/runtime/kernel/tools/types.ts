@@ -281,6 +281,7 @@ export type CloudDispatchRequest = {
   targetDeviceId?: string;
   /** Device target: the `spawn_agent` model that device runs the agent on. */
   requestedModel?: string;
+  parentThreadId?: string;
 };
 
 export type CloudAgentControlReceipt = {

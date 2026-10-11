@@ -85,6 +85,7 @@ type StoredSpawnRequest = {
   conversationId?: string;
   targetDeviceId?: string;
   model?: string;
+  parentThreadId?: string;
 };
 
 type StoredContinueRequest = {
@@ -354,6 +355,7 @@ export const createCloudSpawnDispatcher = (
         : {}),
       ...(request.targetDeviceId ? { targetDeviceId: request.targetDeviceId } : {}),
       ...(request.requestedModel ? { requestedModel: request.requestedModel } : {}),
+      ...(request.parentThreadId ? { parentThreadId: request.parentThreadId } : {}),
     });
     const persisted = options.store.getCloudAgentToolOperation(
       request.requestId,
@@ -393,6 +395,9 @@ export const createCloudSpawnDispatcher = (
             ? { targetDeviceId: request.targetDeviceId }
             : {}),
           ...(request.requestedModel ? { model: request.requestedModel } : {}),
+          ...(request.parentThreadId
+            ? { parentThreadId: request.parentThreadId }
+            : {}),
         } satisfies StoredSpawnRequest;
       },
     });
@@ -413,31 +418,34 @@ export const createCloudSpawnDispatcher = (
         await withTimeout(options.backend.spawn(requestArgs)),
         operation.ownerGeneration,
       );
-    let result: CloudDispatchResult;
-    try {
-      result = await send();
-    } catch (error) {
-      const text = readServerErrorText(error);
-      if (
-        Object.hasOwn(requestArgs, "conversationId") &&
-        /conversation not found/i.test(text)
-      ) {
-        const { conversationId: _staleConversationId, ...replacement } =
-          requestArgs;
-        const replacementJson = JSON.stringify(replacement);
-        const updated =
-          options.store.updatePendingCloudAgentToolOperationRequest(
-            request.requestId,
-            requestJson,
-            replacementJson,
-          );
-        requestJson = updated.requestJson;
-        requestArgs = parseJsonRecord(requestJson, "spawn request");
-        result = await send();
-      } else {
-        throw new Error(text);
+    const sendDroppingStaleFields = async (): Promise<CloudDispatchResult> => {
+      for (;;) {
+        try {
+          return await send();
+        } catch (error) {
+          const text = readServerErrorText(error);
+          const staleField =
+            Object.hasOwn(requestArgs, "conversationId") &&
+            /conversation not found/i.test(text)
+              ? "conversationId"
+              : Object.hasOwn(requestArgs, "parentThreadId") &&
+                  /parentThreadId is not allowed/i.test(text)
+                ? "parentThreadId"
+                : null;
+          if (!staleField) throw new Error(text);
+          const { [staleField]: _stale, ...replacement } = requestArgs;
+          const updated =
+            options.store.updatePendingCloudAgentToolOperationRequest(
+              request.requestId,
+              requestJson,
+              JSON.stringify(replacement),
+            );
+          requestJson = updated.requestJson;
+          requestArgs = parseJsonRecord(requestJson, "spawn request");
+        }
       }
-    }
+    };
+    const result = await sendDroppingStaleFields();
     persistControl(options, result, request.conversationId, request.description);
     completeOperation(options, request.requestId, result);
     cloudConversationIds.set(request.conversationId, result.conversationId);

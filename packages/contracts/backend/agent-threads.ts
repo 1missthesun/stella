@@ -150,6 +150,7 @@ export type AgentThreadCalls = {
       targetDeviceId?: string;
       /** Device target: the `spawn_agent` model that device runs the agent on. */
       model?: string;
+      parentThreadId?: string;
     };
     result: AgentThreadControl;
   };

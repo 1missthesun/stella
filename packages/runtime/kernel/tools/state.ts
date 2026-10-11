@@ -944,6 +944,9 @@ export const handleSpawnAgent = async (
         ...(targetDeviceId && toOptionalString(args.model)
           ? { requestedModel: toOptionalString(args.model)! }
           : {}),
+        ...(context.agentType !== AGENT_IDS.ORCHESTRATOR && parentAgentId
+          ? { parentThreadId: parentAgentId }
+          : {}),
       });
     } catch (error) {
       return { error: (error as Error).message };

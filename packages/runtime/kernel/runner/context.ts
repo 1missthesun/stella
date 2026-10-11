@@ -12,6 +12,8 @@ import type {
   AgentDirectoryListing,
   AgentThreadStatusRead,
   SpawnModelSupport,
+  ToolHostOptions,
+  AgentToolApi,
 } from "../tools/types.js";
 import {
   normalizeAgentDirectoryStatus,
@@ -65,8 +67,10 @@ import { renderSkillCatalogBlock } from "../shared/skill-catalog.js";
 import type {
   RunnerContext,
   ParsedAgentLike,
+  PiCloudAgentThreads,
   StellaHostRunnerOptions,
 } from "./types.js";
+import { parseSpawnAgentModel } from "../tools/state.js";
 import {
   AGENT_IDS,
   agentHasCapability,
@@ -798,6 +802,113 @@ export const createRunnerContext = ({
     },
   };
 
+  const resolveCloudExecutionSelection: NonNullable<
+    ToolHostOptions["resolveCloudExecutionSelection"]
+  > = async ({ model: modelOverride, spawnEngine, reasoningEffort }) => {
+    const agent = resolveAgent(context, AGENT_IDS.GENERAL);
+    const configuredModel = getConfiguredModel(
+      context,
+      AGENT_IDS.GENERAL,
+      agent,
+    );
+    const model = modelOverride ?? configuredModel;
+    const resolvedLlm = await resolveRunnerLlmRouteWithMetadata(
+      context,
+      AGENT_IDS.GENERAL,
+      model,
+      reasoningEffort,
+    );
+    const { modelConfigSnapshot } = resolveEffectiveAgentExecutionConfig(
+      context,
+      {
+        agentType: AGENT_IDS.GENERAL,
+        model,
+        resolvedLlm,
+        ...(spawnEngine ? { spawnEngine } : {}),
+        ...(reasoningEffort ? { spawnReasoningEffort: reasoningEffort } : {}),
+      },
+    );
+    if (!modelConfigSnapshot) {
+      throw new Error("Could not resolve the General agent's cloud model.");
+    }
+    return toCloudExecutionSelection(modelConfigSnapshot);
+  };
+
+  const pauseAgentThread: NonNullable<AgentToolApi["pauseAgentThread"]> = async ({
+    threadId,
+    conversationId,
+    requestId,
+  }) => {
+    if (!backend.client() || !isCloudSignedIn()) {
+      throw new Error(
+        "Sign in to Stella to pause agents running in the cloud or on your other devices.",
+      );
+    }
+    const ownerGeneration = await getCloudOwnerGeneration();
+    const sanitized = `pause:${requestId}`.replace(/[^A-Za-z0-9._:-]/g, "_");
+    return await raceWithTimeoutError(
+      backend.require().call("agentThreads.pause", {
+        ownerGeneration,
+        conversationId,
+        threadId,
+        controlRequestId: sanitized.slice(0, 128),
+      }),
+      AGENT_MESSAGE_TIMEOUT_MS,
+      () =>
+        new Error(
+          "Stella's cloud did not answer, so the pause may not have reached the agent. Check agent_status, then try again.",
+        ),
+    );
+  };
+
+  const piCloudAgentThreads: PiCloudAgentThreads = {
+    start: async ({ conversationId, requestId, description, prompt, model }) => {
+      const selection = parseSpawnAgentModel(model, (modelName) => {
+        try {
+          spawnModelSupport.validateSpawnModel(modelName);
+          return true;
+        } catch {
+          return false;
+        }
+      });
+      if (selection.kind === "model") {
+        await spawnModelSupport.validateSpawnModelWithMetadata(
+          selection.model,
+          selection.reasoningEffort,
+        );
+      }
+      const execution = await resolveCloudExecutionSelection({
+        ...(selection.kind === "model"
+          ? { model: selection.model, spawnEngine: { engine: "default" } as const }
+          : {}),
+        ...(selection.kind === "engine" ? { spawnEngine: selection.engine } : {}),
+        ...(selection.reasoningEffort
+          ? { reasoningEffort: selection.reasoningEffort }
+          : {}),
+      });
+      const { threadId } = await cloudDispatch({
+        conversationId,
+        requestId,
+        description,
+        prompt,
+        execution,
+      });
+      return { threadId };
+    },
+    message: async (request) => {
+      const result = await cloudThreadController.continueThread(request);
+      if (!result.delivered) {
+        throw new Error(
+          result.reason ?? `${request.threadId} did not take the message.`,
+        );
+      }
+      return result.steered ? "steered" : "resumed";
+    },
+    pause: async (request) => {
+      await pauseAgentThread(request);
+    },
+  };
+
   const toolHost = createToolHost({
     stellaAppDir,
     stellaDataDir,
@@ -816,39 +927,7 @@ export const createRunnerContext = ({
     ...(requestConnectorConnection ? { requestConnectorConnection } : {}),
     ...(switchExecutionDestination ? { switchExecutionDestination } : {}),
     ...spawnModelSupport,
-    resolveCloudExecutionSelection: async ({
-      model: modelOverride,
-      spawnEngine,
-      reasoningEffort,
-    }): Promise<CloudExecutionSelection> => {
-      const agent = resolveAgent(context, AGENT_IDS.GENERAL);
-      const configuredModel = getConfiguredModel(
-        context,
-        AGENT_IDS.GENERAL,
-        agent,
-      );
-      const model = modelOverride ?? configuredModel;
-      const resolvedLlm = await resolveRunnerLlmRouteWithMetadata(
-        context,
-        AGENT_IDS.GENERAL,
-        model,
-        reasoningEffort,
-      );
-      const { modelConfigSnapshot } = resolveEffectiveAgentExecutionConfig(
-        context,
-        {
-          agentType: AGENT_IDS.GENERAL,
-          model,
-          resolvedLlm,
-          ...(spawnEngine ? { spawnEngine } : {}),
-          ...(reasoningEffort ? { spawnReasoningEffort: reasoningEffort } : {}),
-        },
-      );
-      if (!modelConfigSnapshot) {
-        throw new Error("Could not resolve the General agent's cloud model.");
-      }
-      return toCloudExecutionSelection(modelConfigSnapshot);
-    },
+    resolveCloudExecutionSelection,
     scheduleApi,
     webSearch: async (query, searchOptions) => {
       const handler = context.state?.webSearch;
@@ -875,28 +954,7 @@ export const createRunnerContext = ({
       // this machine, so the spawn leaves the device entirely.
       cloudDispatch,
       cloudContinue: cloudThreadController.continueThread,
-      pauseAgentThread: async ({ threadId, conversationId, requestId }) => {
-        if (!backend.client() || !isCloudSignedIn()) {
-          throw new Error(
-            "Sign in to Stella to pause agents running in the cloud or on your other devices.",
-          );
-        }
-        const ownerGeneration = await getCloudOwnerGeneration();
-        const sanitized = `pause:${requestId}`.replace(/[^A-Za-z0-9._:-]/g, "_");
-        return await raceWithTimeoutError(
-          backend.require().call("agentThreads.pause", {
-            ownerGeneration,
-            conversationId,
-            threadId,
-            controlRequestId: sanitized.slice(0, 128),
-          }),
-          AGENT_MESSAGE_TIMEOUT_MS,
-          () =>
-            new Error(
-              "Stella's cloud did not answer, so the pause may not have reached the agent. Check agent_status, then try again.",
-            ),
-        );
-      },
+      pauseAgentThread,
       lookupConversationAgentThread: async (threadId, conversationId) => {
         const client = backend.client();
         if (
@@ -1097,6 +1155,7 @@ export const createRunnerContext = ({
     getDefaultConversationId,
     cloudTranscript,
     brainLeases,
+    piCloudAgentThreads,
     cloudOwnerGeneration: getCloudOwnerGeneration,
     linkedFilePublisher,
     loadExecutionContext: async () => {

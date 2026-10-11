@@ -99,7 +99,7 @@ import {
 import { openBunSqliteStorage } from "../storage/bun-sqlite.ts";
 import { isDeviceToolName } from "@stella/contracts/turn-plane/device-tools";
 import { deviceRefusal } from "../stella/execution.ts";
-import { placementOf, StellaPlacementDoc } from "../stella/placement.ts";
+import { placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella/placement.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
 import {
   desktopCoding,
@@ -180,6 +180,13 @@ export type DesktopChatsOptions = {
    */
   claudeCode?(conversationId: string): DesktopEngineAgents | undefined;
   /**
+   * For a conversation stored in the cloud: cloud agents started with a
+   * model, run as the owner's agent threads on that model (a Stella model,
+   * Codex, Claude Code, a model on a key saved to the account); their
+   * reports come back as `deliverReport`s.
+   */
+  cloudThreads?(conversationId: string): DesktopEngineAgents | undefined;
+  /**
    * For a conversation stored in the cloud: how its tools reach the owner's
    * other computers and a cloud container, once they are moved there.
    */
@@ -257,12 +264,12 @@ export type DesktopChatsOptions = {
   report(error: unknown): void;
 };
 
-/** Agents another engine on this computer runs as a whole (`DesktopChatsOptions.claudeCode`). */
+/** Agents another engine runs as a whole (`DesktopChatsOptions.claudeCode`, `cloudThreads`). */
 export type DesktopEngineAgents = {
-  /** Start one, once per `key`, on `model` (`claude-code` or `claude-code/<model>`). */
+  /** Start one, once per `key`, on `model`. */
   start(args: { key: string; description: string; prompt: string; model: string }): Promise<{ threadId: string }>;
   /** Another message for it: steers it while it runs, or starts its next run. */
-  message(args: { key: string; threadId: string; message: string }): Promise<"steered" | "resumed">;
+  message(args: { key: string; threadId: string; description: string; message: string }): Promise<"steered" | "resumed">;
   status(threadId: string): Promise<string>;
   pause(threadId: string): Promise<void>;
 };
@@ -296,6 +303,8 @@ const context = BACKGROUND_CONTEXT;
 
 /** The engine id, and model head, of agents that run on Claude Code here. */
 const CLAUDE_CODE_ENGINE = "claude-code";
+/** The engine id of cloud agents started with a model (`cloudThreads`). */
+const CLOUD_THREAD_ENGINE = "cloud-thread";
 
 /** The response language a conversation's latest message asked for, so it holds across restarts. */
 const LocaleDoc = defineDoc<{ locale?: string }>({
@@ -597,7 +606,16 @@ export function desktopChats(options: DesktopChatsOptions) {
    * key or plan), with an optional `:<effort>`. Anything else fails; it never
    * runs on another model.
    */
-  const agentModel = async (conversationId: string, requested: string): Promise<AgentModelChoice> => {
+  const agentModel = async (
+    conversationId: string,
+    requested: string,
+    placement?: StellaPlacement,
+  ): Promise<AgentModelChoice> => {
+    if (placement?.kind === "cloud") {
+      if (!options.cloudThreads?.(conversationId)) throw new Error("This conversation can't start cloud agents on a chosen model.");
+      return { engine: CLOUD_THREAD_ENGINE };
+    }
+    if (placement) return { there: true };
     const effort = /^(.+):(minimal|low|medium|high|xhigh)$/.exec(requested.trim());
     const reference = (effort?.[1] ?? requested).trim();
     if (reference.split("/")[0]!.toLowerCase() === CLAUDE_CODE_ENGINE) {
@@ -616,12 +634,15 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
 
   /**
-   * A conversation's Claude Code agents as its Stella reaches them: a message
-   * one takes mid-run, and a pause, settle what Stella waits for, as its
-   * reports do (`noteEngineReport`).
+   * A conversation's agents on another engine as its Stella reaches them: a
+   * message one takes mid-run, and a pause, settle what Stella waits for, as
+   * its reports do (`noteEngineReport`).
    */
-  const claudeCodeHost = (conversationId: string, chat: () => Chat | undefined): RemoteAgentHost | undefined => {
-    const engine = options.claudeCode?.(conversationId);
+  const engineHost = (
+    engine: DesktopEngineAgents | undefined,
+    defaultModel: string,
+    chat: () => Chat | undefined,
+  ): RemoteAgentHost | undefined => {
     if (!engine) return undefined;
     const settle = async (threadId: string, requestId: string, status?: "paused") => {
       const opened = chat();
@@ -631,11 +652,19 @@ export function desktopChats(options: DesktopChatsOptions) {
         context,
       );
     };
+    const descriptionOf = async (threadId: string) => {
+      const opened = chat();
+      const agents = opened ? (await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context))?.agents : undefined;
+      return agents?.[threadId]?.description ?? threadId;
+    };
     return {
       start: async ({ key, description, prompt, model }) =>
-        await engine.start({ key, description, prompt, model: model ?? CLAUDE_CODE_ENGINE }),
+        await engine.start({ key, description, prompt, model: model ?? defaultModel }),
       message: async ({ key, threadId, message }) => {
-        if ((await engine.message({ key, threadId, message })) === "steered") await settle(threadId, `steered:${key}`);
+        const description = await descriptionOf(threadId);
+        if ((await engine.message({ key, threadId, description, message })) === "steered") {
+          await settle(threadId, `steered:${key}`);
+        }
       },
       status: async (threadId) => await engine.status(threadId),
       pause: async (threadId) => {
@@ -865,12 +894,16 @@ export function desktopChats(options: DesktopChatsOptions) {
                 const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
                 return Math.max(1, Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId).length);
               };
-              const claudeCode = claudeCodeHost(conversationId, () => opened);
+              const engines = new Map<string, RemoteAgentHost>();
+              const claudeCode = engineHost(options.claudeCode?.(conversationId), CLAUDE_CODE_ENGINE, () => opened);
+              if (claudeCode) engines.set(CLAUDE_CODE_ENGINE, claudeCode);
+              const cloudThreads = engineHost(options.cloudThreads?.(conversationId), "default", () => opened);
+              if (cloudThreads) engines.set(CLOUD_THREAD_ENGINE, cloudThreads);
               return desktopAgentsHost({
                 ...(options.deviceId ? { deviceId: options.deviceId } : {}),
                 ...(cloud ? { cloud } : {}),
-                agentModel: (requested) => agentModel(conversationId, requested),
-                ...(claudeCode ? { engine: (id) => (id === CLAUDE_CODE_ENGINE ? claudeCode : undefined) } : {}),
+                agentModel: (requested, _caller, placement) => agentModel(conversationId, requested, placement),
+                engine: (id) => engines.get(id),
                 directory: directoryFor(conversationId),
                 dataDir: options.dataDir,
                 execution: execution.host,

@@ -398,6 +398,7 @@ export type RunnerContext = {
   cloudTranscript: import("./cloud-transcript-write.js").CloudTranscriptWriter;
   /** This computer's view of each cloud conversation's brain lease. */
   brainLeases: import("./brain-lease.js").BrainLeaseView;
+  piCloudAgentThreads: PiCloudAgentThreads;
   /** The signed-in owner's current data epoch, which cloud writes are fenced by. */
   cloudOwnerGeneration: () => Promise<string>;
   linkedFilePublisher: import("../device-files/linked-file-publisher.js").LinkedFilePublisher;
@@ -486,9 +487,37 @@ export type PiAgentEngine = {
   steer: (message: { key: string; agentKey: string; message: string }) => Promise<boolean>;
 };
 
+/**
+ * Cloud agents pi's Stella starts on a model it names: dispatched through the
+ * owner's agent threads as a cloud placement here is, so their reports come
+ * back to this computer the same way.
+ */
+export type PiCloudAgentThreads = {
+  start: (request: {
+    conversationId: string;
+    requestId: string;
+    description: string;
+    prompt: string;
+    model: string;
+  }) => Promise<{ threadId: string }>;
+  message: (request: {
+    conversationId: string;
+    threadId: string;
+    requestId: string;
+    description: string;
+    message: string;
+  }) => Promise<"steered" | "resumed">;
+  pause: (request: {
+    conversationId: string;
+    threadId: string;
+    requestId: string;
+  }) => Promise<void>;
+};
+
 export type RunnerPublicApi = {
   deviceId: string;
   hookEmitter: HookEmitter;
+  piCloudAgentThreads: PiCloudAgentThreads;
   setPiReportDelivery: (delivery: PiReportDelivery | null) => void;
   setPiAgentEngine: (engine: PiAgentEngine | null) => void;
   deliverOrchestratorNote: PiReportDelivery;

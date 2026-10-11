@@ -59,6 +59,8 @@ import {
 import { CHATGPT_PROVIDER_ID, chatGptModel, chatGptProvider } from "@stella/agent/provider/chatgpt";
 import { accountByokProvider, accountProviderModel } from "@stella/agent/provider/account-byok";
 import {
+  STELLA_PROVIDER_ID,
+  stellaModelId,
   stellaProvider,
   type StellaGatewayAccess,
   type StellaModelSpec,
@@ -236,6 +238,29 @@ export type PiDeviceAgents = {
 };
 
 /**
+ * Agents Stella starts here on a model of their own (Claude Code in a
+ * container, Codex, a model on a key saved to the account, another Stella
+ * model for a caller off Stella's models): each runs as one of the owner's
+ * agent threads on that execution, as the loop's are, and its report comes
+ * back as a wake turn.
+ */
+export type PiThreadAgents = {
+  /** Throws when nothing in the cloud runs `model`. */
+  check(model: string, authority: PiAuthority): void;
+  start(
+    args: { key: string; description: string; prompt: string; model: string },
+    authority: PiAuthority,
+    parentTurnId: string,
+  ): Promise<{ threadId: string }>;
+  message(args: { key: string; threadId: string; message: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
+  status(threadId: string, authority: PiAuthority, parentTurnId: string): Promise<string>;
+  pause(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
+};
+
+/** The engine id of `PiThreadAgents` agents in pi's records. */
+const THREAD_AGENT_ENGINE = "agent-thread";
+
+/**
  * One run of an agent pi runs here, at any depth, for the owner's agent
  * threads: every agent gets one row, under the agent that started it. An
  * agent thread's own agent is left out; its thread records its attempts.
@@ -382,6 +407,8 @@ export type PiRuntimeOptions = {
    * agent threads as the loop's are; their reports come back as wake turns.
    */
   deviceAgents?: PiDeviceAgents;
+  /** Agents started here on a model of their own, as the owner's agent threads. */
+  threadAgents?: PiThreadAgents;
   /**
    * The owner's agent threads, for the agents' directory (`agent-messaging`):
    * this conversation's agents elsewhere and the owner's other sessions, and
@@ -1049,6 +1076,19 @@ export class PiConversationRuntime {
       },
       remote: (placement) =>
         placement.kind === "device" && placement.whole ? this.#deviceAgentHost(placement.deviceId) : undefined,
+      // Another Stella model runs here for a caller on Stella's models; any
+      // other model runs as an agent thread on its own execution.
+      agentModel: async (requested, caller, placement) => {
+        if (placement) return { there: true };
+        if (requested.startsWith("stella/") && caller.model?.provider === STELLA_PROVIDER_ID) {
+          return { runsOn: { model: { provider: STELLA_PROVIDER_ID, modelId: stellaModelId("general", requested) } } };
+        }
+        const threads = this.#options.threadAgents;
+        if (!threads) throw new Error(`Agents here can't run on "${requested}". Omit model to use the configured one.`);
+        threads.check(requested, (await this.#agentState()).authority);
+        return { engine: THREAD_AGENT_ENGINE };
+      },
+      engine: (id) => (id === THREAD_AGENT_ENGINE ? this.#threadAgentHost() : undefined),
       execution: this.#execution(),
       beginAgentRun: async (run, context) => {
         const authority = await this.#runAuthority(run, context);
@@ -1213,6 +1253,35 @@ export class PiConversationRuntime {
           controlRequestId: `pi-pause:${authority.conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128),
           threadId,
         });
+      },
+    };
+  }
+
+  /** The host of agents started here on a model of their own (`PiThreadAgents`). */
+  #threadAgentHost(): RemoteAgentHost | undefined {
+    const threads = this.#options.threadAgents;
+    if (!threads) return undefined;
+    const scope = async () => {
+      const { authority } = await this.#agentState();
+      return { authority, parentTurnId: this.#binding?.turnId ?? this.#state?.lastTurnId ?? `pi:${authority.conversationId}` };
+    };
+    return {
+      start: async (args) => {
+        if (!args.model) throw new Error("An agent thread here needs the model it runs on.");
+        const { authority, parentTurnId } = await scope();
+        return await threads.start({ ...args, model: args.model }, authority, parentTurnId);
+      },
+      message: async (args) => {
+        const { authority, parentTurnId } = await scope();
+        await threads.message(args, authority, parentTurnId);
+      },
+      status: async (threadId) => {
+        const { authority, parentTurnId } = await scope();
+        return await threads.status(threadId, authority, parentTurnId);
+      },
+      pause: async (threadId) => {
+        const { authority, parentTurnId } = await scope();
+        await threads.pause({ key: `pause:${threadId}:${Date.now()}`, threadId }, authority, parentTurnId);
       },
     };
   }

@@ -551,6 +551,7 @@ export const createStellaHostRunner = (
       if (delivery) context.state.piReportDelivery = delivery;
       else delete context.state.piReportDelivery;
     },
+    piCloudAgentThreads: context.piCloudAgentThreads,
     setPiAgentEngine: (engine) => {
       if (engine) context.state.piAgentEngine = engine;
       else delete context.state.piAgentEngine;

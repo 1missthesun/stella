@@ -59,6 +59,10 @@ import {
 import {
   agentCompletionPromptText,
   agentLifecycleReport,
+  dispatchCloudAgentTurn,
+  isCloudAgentControlActive,
+  steerContainerAgent,
+  toolScopedId,
   type CloudAgentControlReceipt,
   type PiHarnessAgentControl,
   type PiHarnessAgentControlResult,
@@ -119,6 +123,7 @@ import {
   log,
 } from "./support.js";
 import { OrchestratorCloudAgents } from "./cloud-agents.js";
+import { resolveCloudSpawnExecution } from "../cloud-spawn-model.js";
 
 /**
  * pi-durable: the conversation's pi runtime, pi agents and threads, the
@@ -363,6 +368,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           agentGuard: (authority, turnId) =>
             this.piAgentGuard(authority, turnId),
           deviceAgents: this.piDeviceAgents(),
+          threadAgents: this.piThreadAgents(),
           // Her brief continues there once this turn ends (`runPiTurn`).
           moveBrain: async (authority, host, brief) => {
             const handoff: BrainHandoff = {
@@ -545,6 +551,158 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           requestId(authority, args.key),
         );
         await this.ctx.storage.put(receiptKey(args.threadId), next);
+      },
+    };
+  }
+
+  /**
+   * Agents a cloud pi conversation starts on a model of their own: each is
+   * one of the owner's agent threads on that execution (Claude Code or Codex
+   * in a container, a model on a key saved to the account, a Stella model),
+   * dispatched, messaged and paused as the loop's own cloud agents are; its
+   * report comes back as a wake turn. Control receipts are kept per thread.
+   */
+  protected piThreadAgents(): import("../pi-runtime.js").PiThreadAgents {
+    type Authority = import("../pi-runtime.js").PiAuthority;
+    const executionOf = (model: string, authority: Authority) =>
+      resolveCloudSpawnExecution(model, authority.execution);
+    const scopedId = (
+      authority: Authority,
+      parentTurnId: string,
+      purpose: "thread" | "turn" | "message",
+      key: string,
+    ) =>
+      toolScopedId({
+        ownerGeneration: authority.ownerGeneration,
+        parentTurnId: `pi:${authority.conversationId}`,
+        purpose,
+        toolCallId: `${purpose === "thread" ? "" : parentTurnId}:${key}`,
+      });
+    const dispatch = async (
+      authority: Authority,
+      parentTurnId: string,
+      attempt: Parameters<typeof dispatchCloudAgentTurn>[0]["attempt"],
+    ) =>
+      await this.rememberCloudAgentControlReceipt(
+        await dispatchCloudAgentTurn({
+          dependencies: {
+            env: this.env,
+            ownerGateAdmit: async (input) =>
+              await this.ownerGateAdmit(input.ownerId, {
+                lane: "agent",
+                turnId: input.turnId,
+                conversationId: input.conversationId,
+                expectedGeneration: input.expectedGeneration,
+              }),
+            releaseOwnerGate: async (input) => await this.releaseOwnerGate(input),
+            deliverOwnerEvents: async (events) =>
+              await this.deferOwnerEvents([...events]),
+            startPiThread: async (input) => await this.startPiThread(input),
+          },
+          caller: {
+            ownerId: authority.ownerId,
+            ownerGeneration: authority.ownerGeneration,
+            conversationId: authority.conversationId,
+            parentTurnId,
+            agentDepth: 0,
+          },
+          attempt,
+        }),
+      );
+    return {
+      check: (model, authority) => {
+        executionOf(model, authority);
+      },
+      start: async (args, authority, parentTurnId) => {
+        const threadId = await scopedId(authority, parentTurnId, "thread", args.key);
+        const turnId = await scopedId(authority, parentTurnId, "turn", args.key);
+        const control = await dispatch(authority, parentTurnId, {
+          threadId,
+          attemptGeneration: 1,
+          turnId,
+          clientMsgId: turnId,
+          description: args.description,
+          prompt: args.prompt,
+          execution: executionOf(args.model, authority),
+        });
+        return { threadId: control.threadId };
+      },
+      message: async (args, authority, parentTurnId) => {
+        const prior = await this.requireCloudAgentControlReceipt(args.threadId, "any");
+        if (isCloudAgentControlActive(prior.status)) {
+          const steer = {
+            ownerId: authority.ownerId,
+            ownerGeneration: authority.ownerGeneration,
+            threadId: prior.threadId,
+            messageId: await scopedId(authority, parentTurnId, "message", args.key),
+            text: args.message,
+          };
+          // A pi agent here, or else an agent in its own container.
+          const piSteered = await this.steerPiThread(steer);
+          const steered =
+            piSteered.accepted || piSteered.reason === "not_running"
+              ? piSteered
+              : await steerContainerAgent({ ...steer, env: this.env });
+          if (!steered.accepted && steered.reason === "busy") {
+            throw new Error(
+              `${prior.threadId} is starting up or just finishing in its container. Send the message again in a moment.`,
+            );
+          }
+          if (steered.accepted) {
+            await this.rememberCloudAgentControlReceipt({
+              ...prior,
+              turnId: steered.turnId,
+              status: "running",
+              threadUpdatedAt: Math.max(Date.now(), prior.threadUpdatedAt + 1),
+            });
+            return;
+          }
+        }
+        const turnId = await scopedId(authority, parentTurnId, "turn", args.key);
+        await dispatch(authority, parentTurnId, {
+          threadId: prior.threadId,
+          attemptGeneration: prior.attemptGeneration + 1,
+          turnId,
+          clientMsgId: turnId,
+          description: prior.description ?? "Continued task",
+          prompt: args.message,
+          execution: prior.execution ?? authority.execution,
+        });
+      },
+      status: async (threadId) => {
+        const control = await this.requireCloudAgentControlReceipt(threadId, "any");
+        return `${control.status} in Stella's cloud`;
+      },
+      pause: async (args, authority, parentTurnId) => {
+        const control = await this.requireCloudAgentControlReceipt(args.threadId, "any");
+        if (!isCloudAgentControlActive(control.status) || !control.turnId) return;
+        const paused = await this.pausePiThread({
+          ownerId: authority.ownerId,
+          ownerGeneration: authority.ownerGeneration,
+          threadId: control.threadId,
+          turnId: control.turnId,
+          attemptGeneration: control.attemptGeneration,
+        });
+        if (paused !== "unknown") return;
+        const teardown = await this.env.BUILD_SESSIONS.getByName(control.threadId).fetch(
+          "https://build-session/cancel",
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              ownerId: authority.ownerId,
+              ownerGeneration: authority.ownerGeneration,
+              turnId: control.turnId,
+              attemptGeneration: control.attemptGeneration,
+              cancelRequestId: await scopedId(authority, parentTurnId, "message", args.key),
+              reason: AGENT_PAUSED_REASON,
+            }),
+          },
+        );
+        await teardown.body?.cancel().catch(() => undefined);
+        if (!teardown.ok && teardown.status !== 409) {
+          throw new Error(`Could not pause ${control.threadId}. Try again.`);
+        }
       },
     };
   }

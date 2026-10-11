@@ -239,7 +239,7 @@ const claudeCodeAgentsFor = (
       });
     },
     message: async ({ key, threadId, message }) => {
-      const outcome = await runner().deliverLocalAgentMessage(threadId, message, `pi:${key}`, "");
+      const outcome = await runner().deliverLocalAgentMessage(threadId, message, `pi:${key}`.slice(0, 128), "");
       if (outcome === "steered") return "steered";
       if (outcome === "resumed" || outcome === "queued") return "resumed";
       throw new Error(`No Claude Code agent ${threadId} on this computer takes messages now.`);
@@ -250,6 +250,34 @@ const claudeCodeAgentsFor = (
     },
     pause: async (threadId) => {
       await runner().pauseLocalAgent(threadId, "");
+    },
+  };
+};
+
+/**
+ * Cloud agents pi's Stella starts on a model it names, for a conversation
+ * stored in the cloud: the runner dispatches them through the owner's agent
+ * threads as its own cloud placements, and their reports come back the same way.
+ */
+const cloudAgentThreadsFor = (
+  session: OpenSession,
+  conversationId: string,
+): import("@stella/agent/host/desktop-chats").DesktopEngineAgents | undefined => {
+  if (conversationId.startsWith("local_")) return undefined;
+  const threads = () => {
+    const runner = session.runnerCell.get();
+    if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to run agents in the cloud.");
+    return runner.piCloudAgentThreads;
+  };
+  const requestId = (key: string) => `pi:${conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128);
+  return {
+    start: async ({ key, description, prompt, model }) =>
+      await threads().start({ conversationId, requestId: requestId(`start:${key}`), description, prompt, model }),
+    message: async ({ key, threadId, description, message }) =>
+      await threads().message({ conversationId, threadId, requestId: requestId(`message:${key}`), description, message }),
+    status: async () => "runs in Stella's cloud",
+    pause: async (threadId) => {
+      await threads().pause({ conversationId, threadId, requestId: requestId(`pause:${threadId}:${Date.now()}`) });
     },
   };
 };
@@ -388,6 +416,7 @@ export const piChatsFor = (
       journal: (conversationId) => cloudJournalFor(session, conversationId),
       cloudAgents: (conversationId) => cloudAgentsFor(session, conversationId),
       claudeCode: (conversationId) => claudeCodeAgentsFor(session, conversationId),
+      cloudThreads: (conversationId) => cloudAgentThreadsFor(session, conversationId),
       execution: (conversationId) => executionRemoteFor(session, conversationId),
       brain: (conversationId) => brainFor(session, hostBus, conversationId),
       // A conversation stored in the cloud lists this computer's agents in

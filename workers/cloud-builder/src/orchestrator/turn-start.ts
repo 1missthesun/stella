@@ -192,8 +192,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           holder: { forEpoch: brain.epoch, ...holder },
         });
         const placeOn =
-          claim.decision.kind === "elsewhere" &&
-          claim.record?.host === "device"
+          claim.decision.kind === "elsewhere" && claim.record?.host === "device"
             ? claim.record
             : undefined;
         if (placeOn) {

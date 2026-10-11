@@ -101,36 +101,12 @@
         "label": "גרור קבצים לכאן"
       },
       "endResource": {
-        "category": {
-          "audio": "אודיו",
-          "canvas": "קנבס",
-          "code": "קוד",
-          "document": "מסמך",
-          "file": "קובץ",
-          "image": "תמונה",
-          "link": "קישור",
-          "media": "מדיה",
-          "model3d": "מודל תלת-ממדי",
-          "pdf": "PDF",
-          "slides": "שקפים",
-          "spreadsheet": "גיליון אלקטרוני",
-          "table": "טבלה",
-          "text": "טקסט",
-          "trash": "אשפה",
-          "video": "וידאו"
-        },
         "fileChangeCount": {
           "one": "שינוי {count} בקובץ",
           "other": "{count} שינויים בקבצים",
           "two": "{count} שינויים בקבצים"
         },
-        "imageCount": {
-          "one": "תמונה {count}",
-          "other": "{count} תמונות",
-          "two": "{count} תמונות"
-        },
-        "openInPanel": "פתח בפאנל",
-        "openPreview": "פתח תצוגה מקדימה"
+        "openInPanel": "פתח בפאנל"
       },
       "fileCategory": {
         "archive": "ארכיון",
@@ -246,9 +222,7 @@
       "openWith": {
         "loading": "טוען…",
         "otherWaysLabel": "פתח בדרכים אחרות",
-        "otherWaysTitle": "פתח בדרכים אחרות…",
-        "triggerLabel": "פתח",
-        "triggerTitle": "פתח באמצעות…"
+        "otherWaysTitle": "פתח בדרכים אחרות…"
       },
       "pdfViewer": {
         "hostRequired": "מציג ה-PDF דורש את סביבת ההרצה של Electron.",

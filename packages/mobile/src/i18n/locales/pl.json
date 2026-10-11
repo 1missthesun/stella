@@ -104,38 +104,13 @@
         "label": "Upuść pliki tutaj"
       },
       "endResource": {
-        "category": {
-          "audio": "Audio",
-          "canvas": "Kanwa",
-          "code": "Kod",
-          "document": "Dokument",
-          "file": "Plik",
-          "image": "Obraz",
-          "link": "Link",
-          "media": "Multimedia",
-          "model3d": "Model 3D",
-          "pdf": "PDF",
-          "slides": "Slajdy",
-          "spreadsheet": "Arkusz",
-          "table": "Tabela",
-          "text": "Tekst",
-          "trash": "Kosz",
-          "video": "Wideo"
-        },
         "fileChangeCount": {
           "few": "{count} zmiany w plikach",
           "many": "{count} zmian w plikach",
           "one": "{count} zmiana w plikach",
           "other": "{count} zmiany w plikach"
         },
-        "imageCount": {
-          "few": "{count} obrazy",
-          "many": "{count} obrazów",
-          "one": "{count} obraz",
-          "other": "{count} obrazu"
-        },
-        "openInPanel": "Otwórz w panelu",
-        "openPreview": "Otwórz podgląd"
+        "openInPanel": "Otwórz w panelu"
       },
       "fileCategory": {
         "archive": "Archiwum",
@@ -252,9 +227,7 @@
       "openWith": {
         "loading": "Ładowanie…",
         "otherWaysLabel": "Otwórz w inny sposób",
-        "otherWaysTitle": "Otwórz w inny sposób…",
-        "triggerLabel": "Otwórz",
-        "triggerTitle": "Otwórz za pomocą…"
+        "otherWaysTitle": "Otwórz w inny sposób…"
       },
       "pdfViewer": {
         "hostRequired": "Przeglądarka PDF wymaga środowiska hosta Electron.",

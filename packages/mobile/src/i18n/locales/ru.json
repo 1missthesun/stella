@@ -104,38 +104,13 @@
         "label": "Перетащите файлы сюда"
       },
       "endResource": {
-        "category": {
-          "audio": "Аудио",
-          "canvas": "Холст",
-          "code": "Код",
-          "document": "Документ",
-          "file": "Файл",
-          "image": "Изображение",
-          "link": "Ссылка",
-          "media": "Медиа",
-          "model3d": "3D-модель",
-          "pdf": "PDF",
-          "slides": "Слайды",
-          "spreadsheet": "Таблица",
-          "table": "Таблица",
-          "text": "Текст",
-          "trash": "Корзина",
-          "video": "Видео"
-        },
         "fileChangeCount": {
           "few": "{count} изменения файлов",
           "many": "{count} изменений файлов",
           "one": "{count} изменение файла",
           "other": "{count} изменения файлов"
         },
-        "imageCount": {
-          "few": "{count} изображения",
-          "many": "{count} изображений",
-          "one": "{count} изображение",
-          "other": "{count} изображения"
-        },
-        "openInPanel": "Открыть на панели",
-        "openPreview": "Открыть предпросмотр"
+        "openInPanel": "Открыть на панели"
       },
       "fileCategory": {
         "archive": "Архив",
@@ -252,9 +227,7 @@
       "openWith": {
         "loading": "Загрузка…",
         "otherWaysLabel": "Открыть другими способами",
-        "otherWaysTitle": "Открыть другими способами…",
-        "triggerLabel": "Открыть",
-        "triggerTitle": "Открыть с помощью…"
+        "otherWaysTitle": "Открыть другими способами…"
       },
       "pdfViewer": {
         "hostRequired": "Для просмотра PDF нужна среда Electron.",

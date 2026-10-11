@@ -101,36 +101,12 @@
         "label": "Déposez les fichiers ici"
       },
       "endResource": {
-        "category": {
-          "audio": "Audio",
-          "canvas": "Canevas",
-          "code": "Code",
-          "document": "Document",
-          "file": "Fichier",
-          "image": "Image",
-          "link": "Lien",
-          "media": "Média",
-          "model3d": "Modèle 3D",
-          "pdf": "PDF",
-          "slides": "Diapositives",
-          "spreadsheet": "Tableur",
-          "table": "Tableau",
-          "text": "Texte",
-          "trash": "Corbeille",
-          "video": "Vidéo"
-        },
         "fileChangeCount": {
           "many": "{count} modifications de fichiers",
           "one": "{count} modification de fichier",
           "other": "{count} modifications de fichiers"
         },
-        "imageCount": {
-          "many": "{count} images",
-          "one": "{count} image",
-          "other": "{count} images"
-        },
-        "openInPanel": "Ouvrir dans le panneau",
-        "openPreview": "Ouvrir l’aperçu"
+        "openInPanel": "Ouvrir dans le panneau"
       },
       "fileCategory": {
         "archive": "Archive",
@@ -246,9 +222,7 @@
       "openWith": {
         "loading": "Chargement…",
         "otherWaysLabel": "Ouvrir autrement",
-        "otherWaysTitle": "Ouvrir autrement…",
-        "triggerLabel": "Ouvrir",
-        "triggerTitle": "Ouvrir avec…"
+        "otherWaysTitle": "Ouvrir autrement…"
       },
       "pdfViewer": {
         "hostRequired": "La visionneuse PDF nécessite l’environnement hôte Electron.",

@@ -31,32 +31,6 @@
     inset 0 0 0 999px color-mix(in oklch, var(--foreground) 5%, transparent);
 }
 
-.end-resource-card__main {
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  text-align: left;
-  cursor: default;
-  transition: transform 60ms ease;
-}
-
-.end-resource-card__main:active {
-  transform: translateY(0.5px);
-}
-
-.end-resource-card__main:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-  border-radius: var(--radius-md);
-}
-
 .end-resource-card__icon {
   display: inline-flex;
   align-items: center;
@@ -81,39 +55,6 @@
   text-overflow: ellipsis;
   font-weight: var(--weight-semibold);
   color: var(--text-strong);
-}
-
-.end-resource-card__subtitle {
-  position: relative;
-  display: inline-block;
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.01em;
-  color: var(--text-weak);
-  min-height: 1em;
-}
-
-.end-resource-card__subtitle-default,
-.end-resource-card__subtitle-hover {
-  transition: opacity 120ms ease;
-}
-
-.end-resource-card__subtitle-hover {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  color: var(--text-base);
-}
-
-.end-resource-card__main:hover .end-resource-card__subtitle-default {
-  opacity: 0;
-}
-
-.end-resource-card__main:hover .end-resource-card__subtitle-hover {
-  opacity: 1;
-}
-
-.end-resource-card > .open-with-menu__trigger {
-  flex-shrink: 0;
 }
 
 .end-resource-link {

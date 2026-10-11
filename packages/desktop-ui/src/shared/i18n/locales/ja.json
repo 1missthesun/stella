@@ -95,32 +95,10 @@
         "label": "ここにファイルをドロップ"
       },
       "endResource": {
-        "category": {
-          "audio": "オーディオ",
-          "canvas": "キャンバス",
-          "code": "コード",
-          "document": "ドキュメント",
-          "file": "ファイル",
-          "image": "画像",
-          "link": "リンク",
-          "media": "メディア",
-          "model3d": "3D モデル",
-          "pdf": "PDF",
-          "slides": "スライド",
-          "spreadsheet": "スプレッドシート",
-          "table": "テーブル",
-          "text": "テキスト",
-          "trash": "ゴミ箱",
-          "video": "動画"
-        },
         "fileChangeCount": {
           "other": "{count} 件のファイル変更"
         },
-        "imageCount": {
-          "other": "{count} 枚の画像"
-        },
-        "openInPanel": "パネルで開く",
-        "openPreview": "プレビューを開く"
+        "openInPanel": "パネルで開く"
       },
       "fileCategory": {
         "archive": "アーカイブ",
@@ -234,9 +212,7 @@
       "openWith": {
         "loading": "読み込み中…",
         "otherWaysLabel": "別の方法で開く",
-        "otherWaysTitle": "別の方法で開く…",
-        "triggerLabel": "開く",
-        "triggerTitle": "アプリを選んで開く…"
+        "otherWaysTitle": "別の方法で開く…"
       },
       "pdfViewer": {
         "hostRequired": "PDF ビューアには Electron のホストランタイムが必要です。",

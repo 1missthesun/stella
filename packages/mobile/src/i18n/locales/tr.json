@@ -98,34 +98,11 @@
         "label": "Dosyaları buraya bırakın"
       },
       "endResource": {
-        "category": {
-          "audio": "Ses",
-          "canvas": "Tuval",
-          "code": "Kod",
-          "document": "Belge",
-          "file": "Dosya",
-          "image": "Görsel",
-          "link": "Bağlantı",
-          "media": "Medya",
-          "model3d": "3B Model",
-          "pdf": "PDF",
-          "slides": "Slaytlar",
-          "spreadsheet": "E-tablo",
-          "table": "Tablo",
-          "text": "Metin",
-          "trash": "Çöp Kutusu",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "one": "{count} dosya değişikliği",
           "other": "{count} dosya değişikliği"
         },
-        "imageCount": {
-          "one": "{count} görsel",
-          "other": "{count} görsel"
-        },
-        "openInPanel": "Panelde aç",
-        "openPreview": "Önizlemeyi aç"
+        "openInPanel": "Panelde aç"
       },
       "fileCategory": {
         "archive": "Arşiv",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Yükleniyor…",
         "otherWaysLabel": "Başka yollarla aç",
-        "otherWaysTitle": "Başka yollarla aç…",
-        "triggerLabel": "Aç",
-        "triggerTitle": "Birlikte aç…"
+        "otherWaysTitle": "Başka yollarla aç…"
       },
       "pdfViewer": {
         "hostRequired": "PDF görüntüleyici Electron ana çalışma ortamını gerektirir.",

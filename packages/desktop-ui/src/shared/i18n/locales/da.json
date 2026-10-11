@@ -98,34 +98,11 @@
         "label": "Slip filer her"
       },
       "endResource": {
-        "category": {
-          "audio": "Lyd",
-          "canvas": "Canvas",
-          "code": "Kode",
-          "document": "Dokument",
-          "file": "Fil",
-          "image": "Billede",
-          "link": "Link",
-          "media": "Medier",
-          "model3d": "3D-model",
-          "pdf": "PDF",
-          "slides": "Dias",
-          "spreadsheet": "Regneark",
-          "table": "Tabel",
-          "text": "Tekst",
-          "trash": "Papirkurv",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "one": "{count} filændring",
           "other": "{count} filændringer"
         },
-        "imageCount": {
-          "one": "{count} billede",
-          "other": "{count} billeder"
-        },
-        "openInPanel": "Åbn i panel",
-        "openPreview": "Åbn forhåndsvisning"
+        "openInPanel": "Åbn i panel"
       },
       "fileCategory": {
         "archive": "Arkiv",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Indlæser…",
         "otherWaysLabel": "Åbn på andre måder",
-        "otherWaysTitle": "Åbn på andre måder…",
-        "triggerLabel": "Åbn",
-        "triggerTitle": "Åbn med…"
+        "otherWaysTitle": "Åbn på andre måder…"
       },
       "pdfViewer": {
         "hostRequired": "PDF-fremviseren kræver Electron-værtsmiljøet.",

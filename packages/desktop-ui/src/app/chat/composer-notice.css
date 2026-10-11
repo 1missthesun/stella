@@ -5,7 +5,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: min(50rem, 100%);
+  width: min(50rem, calc(100% - 96px));
   margin: 0 auto 10px;
   padding: 12px 40px 12px 14px;
   border: 1px solid var(--border);
@@ -127,4 +127,10 @@
 .composer-notice--compact .composer-notice__dismiss {
   top: 6px;
   right: 6px;
+}
+
+@media (max-width: 600px) {
+  .composer-notice:not(.composer-notice--compact) {
+    width: calc(100% - 16px);
+  }
 }

@@ -95,32 +95,10 @@
         "label": "将文件拖放到此处"
       },
       "endResource": {
-        "category": {
-          "audio": "音频",
-          "canvas": "画布",
-          "code": "代码",
-          "document": "文档",
-          "file": "文件",
-          "image": "图像",
-          "link": "链接",
-          "media": "媒体",
-          "model3d": "3D 模型",
-          "pdf": "PDF",
-          "slides": "幻灯片",
-          "spreadsheet": "电子表格",
-          "table": "表格",
-          "text": "文本",
-          "trash": "废纸篓",
-          "video": "视频"
-        },
         "fileChangeCount": {
           "other": "{count} 处文件更改"
         },
-        "imageCount": {
-          "other": "{count} 张图像"
-        },
-        "openInPanel": "在面板中打开",
-        "openPreview": "打开预览"
+        "openInPanel": "在面板中打开"
       },
       "fileCategory": {
         "archive": "压缩包",
@@ -234,9 +212,7 @@
       "openWith": {
         "loading": "加载中…",
         "otherWaysLabel": "用其他方式打开",
-        "otherWaysTitle": "用其他方式打开…",
-        "triggerLabel": "打开",
-        "triggerTitle": "打开方式…"
+        "otherWaysTitle": "用其他方式打开…"
       },
       "pdfViewer": {
         "hostRequired": "PDF 查看器需要 Electron 宿主运行时。",

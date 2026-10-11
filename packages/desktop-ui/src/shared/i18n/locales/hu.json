@@ -98,34 +98,11 @@
         "label": "Húzd ide a fájlokat"
       },
       "endResource": {
-        "category": {
-          "audio": "Hang",
-          "canvas": "Vászon",
-          "code": "Kód",
-          "document": "Dokumentum",
-          "file": "Fájl",
-          "image": "Kép",
-          "link": "Hivatkozás",
-          "media": "Média",
-          "model3d": "3D modell",
-          "pdf": "PDF",
-          "slides": "Diák",
-          "spreadsheet": "Táblázat",
-          "table": "Tábla",
-          "text": "Szöveg",
-          "trash": "Kuka",
-          "video": "Videó"
-        },
         "fileChangeCount": {
           "one": "{count} fájlmódosítás",
           "other": "{count} fájlmódosítás"
         },
-        "imageCount": {
-          "one": "{count} kép",
-          "other": "{count} kép"
-        },
-        "openInPanel": "Megnyitás panelen",
-        "openPreview": "Előnézet megnyitása"
+        "openInPanel": "Megnyitás panelen"
       },
       "fileCategory": {
         "archive": "Archívum",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Betöltés…",
         "otherWaysLabel": "Megnyitás más módon",
-        "otherWaysTitle": "Megnyitás más módon…",
-        "triggerLabel": "Megnyitás",
-        "triggerTitle": "Megnyitás ezzel…"
+        "otherWaysTitle": "Megnyitás más módon…"
       },
       "pdfViewer": {
         "hostRequired": "A PDF-megjelenítőhöz az Electron gazdakörnyezet szükséges.",

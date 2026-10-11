@@ -110,24 +110,6 @@
         "label": "أفلت الملفات هنا"
       },
       "endResource": {
-        "category": {
-          "audio": "صوت",
-          "canvas": "اللوحة",
-          "code": "كود",
-          "document": "مستند",
-          "file": "ملف",
-          "image": "صورة",
-          "link": "رابط",
-          "media": "وسائط",
-          "model3d": "نموذج ثلاثي الأبعاد",
-          "pdf": "PDF",
-          "slides": "شرائح",
-          "spreadsheet": "جدول بيانات",
-          "table": "جدول",
-          "text": "نص",
-          "trash": "المهملات",
-          "video": "فيديو"
-        },
         "fileChangeCount": {
           "few": "{count} تغييرات في الملفات",
           "many": "{count} تغييرًا في الملفات",
@@ -136,16 +118,7 @@
           "two": "{count} تغييران في الملفات",
           "zero": "{count} تغيير في الملفات"
         },
-        "imageCount": {
-          "few": "{count} صور",
-          "many": "{count} صورة",
-          "one": "{count} صورة",
-          "other": "{count} صورة",
-          "two": "{count} صورتان",
-          "zero": "{count} صورة"
-        },
-        "openInPanel": "افتح في اللوحة",
-        "openPreview": "افتح المعاينة"
+        "openInPanel": "افتح في اللوحة"
       },
       "fileCategory": {
         "archive": "أرشيف",
@@ -264,9 +237,7 @@
       "openWith": {
         "loading": "جارٍ التحميل…",
         "otherWaysLabel": "افتح بطرق أخرى",
-        "otherWaysTitle": "افتح بطرق أخرى…",
-        "triggerLabel": "فتح",
-        "triggerTitle": "فتح باستخدام…"
+        "otherWaysTitle": "افتح بطرق أخرى…"
       },
       "pdfViewer": {
         "hostRequired": "يتطلب عارض PDF بيئة تشغيل Electron المضيفة.",

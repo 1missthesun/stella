@@ -98,34 +98,11 @@
         "label": "Pudota tiedostot tähän"
       },
       "endResource": {
-        "category": {
-          "audio": "Ääni",
-          "canvas": "Kanvas",
-          "code": "Koodi",
-          "document": "Asiakirja",
-          "file": "Tiedosto",
-          "image": "Kuva",
-          "link": "Linkki",
-          "media": "Media",
-          "model3d": "3D-malli",
-          "pdf": "PDF",
-          "slides": "Diat",
-          "spreadsheet": "Laskentataulukko",
-          "table": "Taulukko",
-          "text": "Teksti",
-          "trash": "Roskakori",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "one": "{count} tiedostomuutos",
           "other": "{count} tiedostomuutosta"
         },
-        "imageCount": {
-          "one": "{count} kuva",
-          "other": "{count} kuvaa"
-        },
-        "openInPanel": "Avaa paneelissa",
-        "openPreview": "Avaa esikatselu"
+        "openInPanel": "Avaa paneelissa"
       },
       "fileCategory": {
         "archive": "Arkisto",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Ladataan…",
         "otherWaysLabel": "Avaa muilla tavoin",
-        "otherWaysTitle": "Avaa muilla tavoin…",
-        "triggerLabel": "Avaa",
-        "triggerTitle": "Avaa sovelluksella…"
+        "otherWaysTitle": "Avaa muilla tavoin…"
       },
       "pdfViewer": {
         "hostRequired": "PDF-katselin vaatii Electron-isäntäympäristön.",

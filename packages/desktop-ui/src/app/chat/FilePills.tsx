@@ -70,7 +70,7 @@ const FilePillView = ({
         </span>
       </button>
       {localFilePath ? (
-        <OpenWithMenu filePath={localFilePath} variant="plus" />
+        <OpenWithMenu filePath={localFilePath} />
       ) : null}
     </span>
   );

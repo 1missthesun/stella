@@ -2,7 +2,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 0 16px 8px;
+  width: min(50rem, calc(100% - 96px));
+  margin: 0 auto 10px;
   padding: 8px 10px;
   border: 1px solid var(--border-weak);
   border-radius: 12px;
@@ -11,6 +12,7 @@
 }
 
 .cloud-browser-intervention--compact {
+  width: 100%;
   align-items: flex-start;
   flex-wrap: wrap;
   margin: 0 0 8px;
@@ -99,5 +101,11 @@
 
   .cloud-browser-intervention__actions {
     width: 100%;
+  }
+}
+
+@media (max-width: 600px) {
+  .cloud-browser-intervention:not(.cloud-browser-intervention--compact) {
+    width: calc(100% - 16px);
   }
 }

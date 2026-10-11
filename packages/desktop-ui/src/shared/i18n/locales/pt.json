@@ -101,36 +101,12 @@
         "label": "Solte os arquivos aqui"
       },
       "endResource": {
-        "category": {
-          "audio": "Áudio",
-          "canvas": "Canvas",
-          "code": "Código",
-          "document": "Documento",
-          "file": "Arquivo",
-          "image": "Imagem",
-          "link": "Link",
-          "media": "Mídia",
-          "model3d": "Modelo 3D",
-          "pdf": "PDF",
-          "slides": "Slides",
-          "spreadsheet": "Planilha",
-          "table": "Tabela",
-          "text": "Texto",
-          "trash": "Lixeira",
-          "video": "Vídeo"
-        },
         "fileChangeCount": {
           "many": "{count} alterações de arquivo",
           "one": "{count} alteração de arquivo",
           "other": "{count} alterações de arquivo"
         },
-        "imageCount": {
-          "many": "{count} imagens",
-          "one": "{count} imagem",
-          "other": "{count} imagens"
-        },
-        "openInPanel": "Abrir no painel",
-        "openPreview": "Abrir prévia"
+        "openInPanel": "Abrir no painel"
       },
       "fileCategory": {
         "archive": "Arquivo compactado",
@@ -246,9 +222,7 @@
       "openWith": {
         "loading": "Carregando…",
         "otherWaysLabel": "Abrir de outras formas",
-        "otherWaysTitle": "Abrir de outras formas…",
-        "triggerLabel": "Abrir",
-        "triggerTitle": "Abrir com…"
+        "otherWaysTitle": "Abrir de outras formas…"
       },
       "pdfViewer": {
         "hostRequired": "O visualizador de PDF exige o runtime host do Electron.",

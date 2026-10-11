@@ -98,34 +98,11 @@
         "label": "Dateien hier ablegen"
       },
       "endResource": {
-        "category": {
-          "audio": "Audio",
-          "canvas": "Canvas",
-          "code": "Code",
-          "document": "Dokument",
-          "file": "Datei",
-          "image": "Bild",
-          "link": "Link",
-          "media": "Medien",
-          "model3d": "3D-Modell",
-          "pdf": "PDF",
-          "slides": "Folien",
-          "spreadsheet": "Tabelle",
-          "table": "Tabelle",
-          "text": "Text",
-          "trash": "Papierkorb",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "one": "{count} Dateiänderung",
           "other": "{count} Dateiänderungen"
         },
-        "imageCount": {
-          "one": "{count} Bild",
-          "other": "{count} Bilder"
-        },
-        "openInPanel": "Im Panel öffnen",
-        "openPreview": "Vorschau öffnen"
+        "openInPanel": "Im Panel öffnen"
       },
       "fileCategory": {
         "archive": "Archiv",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Wird geladen…",
         "otherWaysLabel": "Anders öffnen",
-        "otherWaysTitle": "Anders öffnen…",
-        "triggerLabel": "Öffnen",
-        "triggerTitle": "Öffnen mit…"
+        "otherWaysTitle": "Anders öffnen…"
       },
       "pdfViewer": {
         "hostRequired": "Der PDF-Viewer erfordert die Electron-Host-Laufzeit.",

@@ -95,32 +95,10 @@
         "label": "Letakkan berkas di sini"
       },
       "endResource": {
-        "category": {
-          "audio": "Audio",
-          "canvas": "Kanvas",
-          "code": "Kode",
-          "document": "Dokumen",
-          "file": "Berkas",
-          "image": "Gambar",
-          "link": "Tautan",
-          "media": "Media",
-          "model3d": "Model 3D",
-          "pdf": "PDF",
-          "slides": "Slide",
-          "spreadsheet": "Lembar kerja",
-          "table": "Tabel",
-          "text": "Teks",
-          "trash": "Sampah",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "other": "{count} perubahan berkas"
         },
-        "imageCount": {
-          "other": "{count} gambar"
-        },
-        "openInPanel": "Buka di panel",
-        "openPreview": "Buka pratinjau"
+        "openInPanel": "Buka di panel"
       },
       "fileCategory": {
         "archive": "Arsip",
@@ -234,9 +212,7 @@
       "openWith": {
         "loading": "Memuat…",
         "otherWaysLabel": "Buka dengan cara lain",
-        "otherWaysTitle": "Buka dengan cara lain…",
-        "triggerLabel": "Buka",
-        "triggerTitle": "Buka dengan…"
+        "otherWaysTitle": "Buka dengan cara lain…"
       },
       "pdfViewer": {
         "hostRequired": "Penampil PDF memerlukan runtime host Electron.",

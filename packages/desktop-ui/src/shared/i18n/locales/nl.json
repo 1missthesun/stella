@@ -98,34 +98,11 @@
         "label": "Sleep bestanden hierheen"
       },
       "endResource": {
-        "category": {
-          "audio": "Audio",
-          "canvas": "Canvas",
-          "code": "Code",
-          "document": "Document",
-          "file": "Bestand",
-          "image": "Afbeelding",
-          "link": "Link",
-          "media": "Media",
-          "model3d": "3D-model",
-          "pdf": "PDF",
-          "slides": "Dia's",
-          "spreadsheet": "Spreadsheet",
-          "table": "Tabel",
-          "text": "Tekst",
-          "trash": "Prullenmand",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "one": "{count} bestandswijziging",
           "other": "{count} bestandswijzigingen"
         },
-        "imageCount": {
-          "one": "{count} afbeelding",
-          "other": "{count} afbeeldingen"
-        },
-        "openInPanel": "In paneel openen",
-        "openPreview": "Voorbeeld openen"
+        "openInPanel": "In paneel openen"
       },
       "fileCategory": {
         "archive": "Archief",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Laden…",
         "otherWaysLabel": "Op andere manieren openen",
-        "otherWaysTitle": "Op andere manieren openen…",
-        "triggerLabel": "Openen",
-        "triggerTitle": "Openen met…"
+        "otherWaysTitle": "Op andere manieren openen…"
       },
       "pdfViewer": {
         "hostRequired": "De PDF-viewer vereist de Electron-hostruntime.",

@@ -98,34 +98,11 @@
         "label": "Drop files here"
       },
       "endResource": {
-        "category": {
-          "audio": "Audio",
-          "canvas": "Canvas",
-          "code": "Code",
-          "document": "Document",
-          "file": "File",
-          "image": "Image",
-          "link": "Link",
-          "media": "Media",
-          "model3d": "3D Model",
-          "pdf": "PDF",
-          "slides": "Slides",
-          "spreadsheet": "Spreadsheet",
-          "table": "Table",
-          "text": "Text",
-          "trash": "Trash",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "one": "{count} file change",
           "other": "{count} file changes"
         },
-        "imageCount": {
-          "one": "{count} image",
-          "other": "{count} images"
-        },
-        "openInPanel": "Open in panel",
-        "openPreview": "Open preview"
+        "openInPanel": "Open in panel"
       },
       "fileCategory": {
         "archive": "Archive",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Loading…",
         "otherWaysLabel": "Open in other ways",
-        "otherWaysTitle": "Open in other ways…",
-        "triggerLabel": "Open",
-        "triggerTitle": "Open with…"
+        "otherWaysTitle": "Open in other ways…"
       },
       "pdfViewer": {
         "hostRequired": "PDF viewer requires the Electron host runtime.",

@@ -98,34 +98,11 @@
         "label": "Släpp filer här"
       },
       "endResource": {
-        "category": {
-          "audio": "Ljud",
-          "canvas": "Canvas",
-          "code": "Kod",
-          "document": "Dokument",
-          "file": "Fil",
-          "image": "Bild",
-          "link": "Länk",
-          "media": "Media",
-          "model3d": "3D-modell",
-          "pdf": "PDF",
-          "slides": "Presentation",
-          "spreadsheet": "Kalkylark",
-          "table": "Tabell",
-          "text": "Text",
-          "trash": "Papperskorg",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "one": "{count} filändring",
           "other": "{count} filändringar"
         },
-        "imageCount": {
-          "one": "{count} bild",
-          "other": "{count} bilder"
-        },
-        "openInPanel": "Öppna i panel",
-        "openPreview": "Öppna förhandsvisning"
+        "openInPanel": "Öppna i panel"
       },
       "fileCategory": {
         "archive": "Arkiv",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Laddar…",
         "otherWaysLabel": "Öppna på andra sätt",
-        "otherWaysTitle": "Öppna på andra sätt…",
-        "triggerLabel": "Öppna",
-        "triggerTitle": "Öppna med…"
+        "otherWaysTitle": "Öppna på andra sätt…"
       },
       "pdfViewer": {
         "hostRequired": "PDF-visaren kräver Electron-värdmiljön.",

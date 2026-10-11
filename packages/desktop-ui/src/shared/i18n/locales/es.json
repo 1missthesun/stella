@@ -101,36 +101,12 @@
         "label": "Suelta los archivos aquí"
       },
       "endResource": {
-        "category": {
-          "audio": "Audio",
-          "canvas": "Lienzo",
-          "code": "Código",
-          "document": "Documento",
-          "file": "Archivo",
-          "image": "Imagen",
-          "link": "Enlace",
-          "media": "Multimedia",
-          "model3d": "Modelo 3D",
-          "pdf": "PDF",
-          "slides": "Diapositivas",
-          "spreadsheet": "Hoja de cálculo",
-          "table": "Tabla",
-          "text": "Texto",
-          "trash": "Papelera",
-          "video": "Vídeo"
-        },
         "fileChangeCount": {
           "many": "{count} cambios de archivo",
           "one": "{count} cambio de archivo",
           "other": "{count} cambios de archivo"
         },
-        "imageCount": {
-          "many": "{count} imágenes",
-          "one": "{count} imagen",
-          "other": "{count} imágenes"
-        },
-        "openInPanel": "Abrir en el panel",
-        "openPreview": "Abrir vista previa"
+        "openInPanel": "Abrir en el panel"
       },
       "fileCategory": {
         "archive": "Archivo comprimido",
@@ -246,9 +222,7 @@
       "openWith": {
         "loading": "Cargando…",
         "otherWaysLabel": "Abrir de otras formas",
-        "otherWaysTitle": "Abrir de otras formas…",
-        "triggerLabel": "Abrir",
-        "triggerTitle": "Abrir con…"
+        "otherWaysTitle": "Abrir de otras formas…"
       },
       "pdfViewer": {
         "hostRequired": "El visor de PDF requiere el entorno de ejecución de Electron.",

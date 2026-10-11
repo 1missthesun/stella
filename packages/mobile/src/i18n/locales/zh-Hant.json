@@ -95,32 +95,10 @@
         "label": "把檔案拖放到這裡"
       },
       "endResource": {
-        "category": {
-          "audio": "音訊",
-          "canvas": "畫布",
-          "code": "程式碼",
-          "document": "文件",
-          "file": "檔案",
-          "image": "圖片",
-          "link": "連結",
-          "media": "媒體",
-          "model3d": "3D 模型",
-          "pdf": "PDF",
-          "slides": "簡報",
-          "spreadsheet": "試算表",
-          "table": "表格",
-          "text": "文字",
-          "trash": "垃圾桶",
-          "video": "影片"
-        },
         "fileChangeCount": {
           "other": "{count} 項檔案變更"
         },
-        "imageCount": {
-          "other": "{count} 張圖片"
-        },
-        "openInPanel": "在面板中開啟",
-        "openPreview": "開啟預覽"
+        "openInPanel": "在面板中開啟"
       },
       "fileCategory": {
         "archive": "壓縮檔",
@@ -234,9 +212,7 @@
       "openWith": {
         "loading": "載入中…",
         "otherWaysLabel": "用其他方式開啟",
-        "otherWaysTitle": "用其他方式開啟…",
-        "triggerLabel": "開啟",
-        "triggerTitle": "開啟方式…"
+        "otherWaysTitle": "用其他方式開啟…"
       },
       "pdfViewer": {
         "hostRequired": "PDF 檢視器需要 Electron 主機執行環境。",

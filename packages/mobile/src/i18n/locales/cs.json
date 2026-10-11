@@ -104,38 +104,13 @@
         "label": "Přetáhněte soubory sem"
       },
       "endResource": {
-        "category": {
-          "audio": "Zvuk",
-          "canvas": "Plátno",
-          "code": "Kód",
-          "document": "Dokument",
-          "file": "Soubor",
-          "image": "Obrázek",
-          "link": "Odkaz",
-          "media": "Média",
-          "model3d": "3D model",
-          "pdf": "PDF",
-          "slides": "Snímky",
-          "spreadsheet": "Tabulka",
-          "table": "Tabulka",
-          "text": "Text",
-          "trash": "Koš",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "few": "{count} změny souborů",
           "many": "{count} změny souborů",
           "one": "{count} změna souboru",
           "other": "{count} změn souborů"
         },
-        "imageCount": {
-          "few": "{count} obrázky",
-          "many": "{count} obrázku",
-          "one": "{count} obrázek",
-          "other": "{count} obrázků"
-        },
-        "openInPanel": "Otevřít v panelu",
-        "openPreview": "Otevřít náhled"
+        "openInPanel": "Otevřít v panelu"
       },
       "fileCategory": {
         "archive": "Archiv",
@@ -252,9 +227,7 @@
       "openWith": {
         "loading": "Načítání…",
         "otherWaysLabel": "Otevřít jinými způsoby",
-        "otherWaysTitle": "Otevřít jinými způsoby…",
-        "triggerLabel": "Otevřít",
-        "triggerTitle": "Otevřít v…"
+        "otherWaysTitle": "Otevřít jinými způsoby…"
       },
       "pdfViewer": {
         "hostRequired": "Prohlížeč PDF vyžaduje hostitelské prostředí Electron.",

@@ -31,10 +31,6 @@
   box-shadow: var(--focus-ring);
 }
 
-.open-with-menu__trigger-label {
-  font-weight: var(--weight-medium);
-}
-
 /* Bare chevron variant used by the agent-completion file pills: no border,
    no background, no circle — just the naked icon after the filename, muted
    to the pill's secondary ink. Hover lifts it to strong ink so it reads as

@@ -95,32 +95,10 @@
         "label": "Thả tệp vào đây"
       },
       "endResource": {
-        "category": {
-          "audio": "Âm thanh",
-          "canvas": "Canvas",
-          "code": "Mã",
-          "document": "Tài liệu",
-          "file": "Tệp",
-          "image": "Hình ảnh",
-          "link": "Liên kết",
-          "media": "Phương tiện",
-          "model3d": "Mô hình 3D",
-          "pdf": "PDF",
-          "slides": "Trang trình bày",
-          "spreadsheet": "Bảng tính",
-          "table": "Bảng",
-          "text": "Văn bản",
-          "trash": "Thùng rác",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "other": "{count} thay đổi tệp"
         },
-        "imageCount": {
-          "other": "{count} hình ảnh"
-        },
-        "openInPanel": "Mở trong bảng",
-        "openPreview": "Mở bản xem trước"
+        "openInPanel": "Mở trong bảng"
       },
       "fileCategory": {
         "archive": "Tệp nén",
@@ -234,9 +212,7 @@
       "openWith": {
         "loading": "Đang tải…",
         "otherWaysLabel": "Mở theo cách khác",
-        "otherWaysTitle": "Mở theo cách khác…",
-        "triggerLabel": "Mở",
-        "triggerTitle": "Mở bằng…"
+        "otherWaysTitle": "Mở theo cách khác…"
       },
       "pdfViewer": {
         "hostRequired": "Trình xem PDF cần môi trường chạy Electron.",

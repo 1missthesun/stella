@@ -98,34 +98,11 @@
         "label": "फ़ाइलें यहाँ छोड़ें"
       },
       "endResource": {
-        "category": {
-          "audio": "ऑडियो",
-          "canvas": "कैनवास",
-          "code": "कोड",
-          "document": "दस्तावेज़",
-          "file": "फ़ाइल",
-          "image": "छवि",
-          "link": "लिंक",
-          "media": "मीडिया",
-          "model3d": "3D मॉडल",
-          "pdf": "PDF",
-          "slides": "स्लाइड",
-          "spreadsheet": "स्प्रेडशीट",
-          "table": "तालिका",
-          "text": "टेक्स्ट",
-          "trash": "ट्रैश",
-          "video": "वीडियो"
-        },
         "fileChangeCount": {
           "one": "{count} फ़ाइल बदलाव",
           "other": "{count} फ़ाइल बदलाव"
         },
-        "imageCount": {
-          "one": "{count} छवि",
-          "other": "{count} छवियाँ"
-        },
-        "openInPanel": "पैनल में खोलें",
-        "openPreview": "पूर्वावलोकन खोलें"
+        "openInPanel": "पैनल में खोलें"
       },
       "fileCategory": {
         "archive": "संग्रह",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "लोड हो रहा है…",
         "otherWaysLabel": "अन्य तरीकों से खोलें",
-        "otherWaysTitle": "अन्य तरीकों से खोलें…",
-        "triggerLabel": "खोलें",
-        "triggerTitle": "इसके साथ खोलें…"
+        "otherWaysTitle": "अन्य तरीकों से खोलें…"
       },
       "pdfViewer": {
         "hostRequired": "PDF व्यूअर के लिए Electron होस्ट रनटाइम आवश्यक है।",

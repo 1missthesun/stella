@@ -1,11 +1,11 @@
 /**
  * Drop-up menu offering external apps to open a chat artifact with.
  *
- * Lives on the right edge of `EndResourceCard`. The trigger is a slim
- * pill so it doesn't fight the card's primary "open in panel" click
- * target. The menu prefers opening upward (chat artifacts typically
- * sit near the bottom of the viewport during streaming) but Radix
- * auto-flips to a drop-down when the card is near the top.
+ * Lives on the right edge of a file pill, whose body is the primary
+ * open target; the bare chevron only exposes the "open in other ways"
+ * menu. The menu prefers opening upward (chat artifacts typically sit
+ * near the bottom of the viewport during streaming) but Radix auto-flips
+ * to a drop-down when the pill is near the top.
  */
 
 import { ChevronDown } from "@/ui/icons";
@@ -28,19 +28,7 @@ type Opener = {
   kind: "app" | "default" | "reveal";
 };
 
-export const OpenWithMenu = ({
-  filePath,
-  variant = "button",
-}: {
-  filePath: string;
-  /**
-   * `"button"` — the default slim "Open ▾" pill used by `EndResourceCard`.
-   * `"plus"` — a bare chrome-less chevron trigger used by the file pills on the
-   * agent completion card, where the pill body itself is the primary open
-   * target and the "+" only exposes the "open in other ways" menu.
-   */
-  variant?: "button" | "plus";
-}) => {
+export const OpenWithMenu = ({ filePath }: { filePath: string }) => {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [openerResult, setOpenerResult] = useState<{
@@ -93,29 +81,15 @@ export const OpenWithMenu = ({
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        {variant === "plus" ? (
-          <button
-            type="button"
-            className="open-with-menu__trigger open-with-menu__trigger--chevron"
-            onClick={(event) => event.stopPropagation()}
-            title={t("app.chat.openWith.otherWaysTitle")}
-            aria-label={t("app.chat.openWith.otherWaysLabel")}
-          >
-            <ChevronDown size={12} strokeWidth={2} aria-hidden />
-          </button>
-        ) : (
-          <button
-            type="button"
-            className="open-with-menu__trigger"
-            onClick={(event) => event.stopPropagation()}
-            title={t("app.chat.openWith.triggerTitle")}
-          >
-            <span className="open-with-menu__trigger-label">
-              {t("app.chat.openWith.triggerLabel")}
-            </span>
-            <ChevronDown size={12} strokeWidth={2} aria-hidden />
-          </button>
-        )}
+        <button
+          type="button"
+          className="open-with-menu__trigger open-with-menu__trigger--chevron"
+          onClick={(event) => event.stopPropagation()}
+          title={t("app.chat.openWith.otherWaysTitle")}
+          aria-label={t("app.chat.openWith.otherWaysLabel")}
+        >
+          <ChevronDown size={12} strokeWidth={2} aria-hidden />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         side="top"

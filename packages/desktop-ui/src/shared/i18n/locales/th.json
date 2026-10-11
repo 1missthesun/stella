@@ -95,32 +95,10 @@
         "label": "วางไฟล์ที่นี่"
       },
       "endResource": {
-        "category": {
-          "audio": "เสียง",
-          "canvas": "แคนวาส",
-          "code": "โค้ด",
-          "document": "เอกสาร",
-          "file": "ไฟล์",
-          "image": "รูปภาพ",
-          "link": "ลิงก์",
-          "media": "สื่อ",
-          "model3d": "โมเดล 3 มิติ",
-          "pdf": "PDF",
-          "slides": "สไลด์",
-          "spreadsheet": "สเปรดชีต",
-          "table": "ตาราง",
-          "text": "ข้อความ",
-          "trash": "ถังขยะ",
-          "video": "วิดีโอ"
-        },
         "fileChangeCount": {
           "other": "การเปลี่ยนแปลงไฟล์ {count} รายการ"
         },
-        "imageCount": {
-          "other": "{count} รูปภาพ"
-        },
-        "openInPanel": "เปิดในแผง",
-        "openPreview": "เปิดตัวอย่าง"
+        "openInPanel": "เปิดในแผง"
       },
       "fileCategory": {
         "archive": "ไฟล์บีบอัด",
@@ -234,9 +212,7 @@
       "openWith": {
         "loading": "กำลังโหลด…",
         "otherWaysLabel": "เปิดด้วยวิธีอื่น",
-        "otherWaysTitle": "เปิดด้วยวิธีอื่น…",
-        "triggerLabel": "เปิด",
-        "triggerTitle": "เปิดด้วย…"
+        "otherWaysTitle": "เปิดด้วยวิธีอื่น…"
       },
       "pdfViewer": {
         "hostRequired": "โปรแกรมดู PDF ต้องใช้รันไทม์โฮสต์ Electron",

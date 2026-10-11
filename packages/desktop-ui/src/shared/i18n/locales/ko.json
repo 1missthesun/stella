@@ -95,32 +95,10 @@
         "label": "여기에 파일을 놓으세요"
       },
       "endResource": {
-        "category": {
-          "audio": "오디오",
-          "canvas": "캔버스",
-          "code": "코드",
-          "document": "문서",
-          "file": "파일",
-          "image": "이미지",
-          "link": "링크",
-          "media": "미디어",
-          "model3d": "3D 모델",
-          "pdf": "PDF",
-          "slides": "슬라이드",
-          "spreadsheet": "스프레드시트",
-          "table": "표",
-          "text": "텍스트",
-          "trash": "휴지통",
-          "video": "동영상"
-        },
         "fileChangeCount": {
           "other": "파일 변경 {count}건"
         },
-        "imageCount": {
-          "other": "이미지 {count}개"
-        },
-        "openInPanel": "패널에서 열기",
-        "openPreview": "미리보기 열기"
+        "openInPanel": "패널에서 열기"
       },
       "fileCategory": {
         "archive": "압축 파일",
@@ -234,9 +212,7 @@
       "openWith": {
         "loading": "불러오는 중…",
         "otherWaysLabel": "다른 방법으로 열기",
-        "otherWaysTitle": "다른 방법으로 열기…",
-        "triggerLabel": "열기",
-        "triggerTitle": "다음으로 열기…"
+        "otherWaysTitle": "다른 방법으로 열기…"
       },
       "pdfViewer": {
         "hostRequired": "PDF 뷰어에는 Electron 호스트 런타임이 필요합니다.",

@@ -39,10 +39,8 @@ import type {
   ChannelEnvelope,
 } from "@/features/chat/lib/event-transforms";
 import { Markdown } from "@/app/chat/Markdown";
-import {
-  EndResourceCard,
-  SourceDiffEndResource,
-} from "@/app/chat/EndResourceCard";
+import { SourceDiffEndResource } from "@/app/chat/SourceDiffEndResource";
+import { localFilePathForPayload } from "@/features/workspace-display/path-to-viewer";
 import { InlineGeneratedImageStrip } from "@/app/chat/InlineGeneratedImageCard";
 import { WebSearchResultsStrip } from "@/app/chat/WebSearchResultsStrip";
 import { MapRouteCards } from "@/app/chat/MapRouteCard";
@@ -704,21 +702,36 @@ export const AssistantMessageRow = memo(
     const unpreviewableFiles = linkedFiles.filter(
       (file) => file.cloudDriveFile || !evidencePathSet.has(file.path),
     );
-    // A canvas this turn produced is an attachment of the reply, not a
+    // A file this turn produced is an attachment of the reply, not a
     // citation of it: it belongs in the same strip under the bubble that the
     // reply's other files use, never in the reply-preview chip above it.
-    const canvasPayload =
-      row.resourcePayload?.kind === "canvas-html" ? row.resourcePayload : null;
-    const attachedFiles = canvasPayload
-      ? [
-          ...unpreviewableFiles,
-          {
-            path: canvasPayload.filePath,
-            timestamp: canvasPayload.createdAt,
-            payload: canvasPayload,
-          },
-        ]
-      : unpreviewableFiles;
+    const resourcePayload = row.resourcePayload;
+    const resourceShownElsewhere =
+      !resourcePayload ||
+      resourcePayload.kind === "source-diff" ||
+      (resourcePayload.kind === "media" &&
+        resourcePayload.presentation === "inline-image") ||
+      (resourcePayload.kind === "office" && Boolean(row.officePreviewRef));
+    const resourceFilePath =
+      resourcePayload && !resourceShownElsewhere
+        ? localFilePathForPayload(resourcePayload)
+        : null;
+    const attachedFiles =
+      resourcePayload && resourceFilePath
+        ? [
+            ...unpreviewableFiles,
+            {
+              path: resourceFilePath,
+              timestamp:
+                ("createdAt" in resourcePayload
+                  ? resourcePayload.createdAt
+                  : undefined) ??
+                row.timestampMs ??
+                0,
+              payload: resourcePayload,
+            },
+          ]
+        : unpreviewableFiles;
     const fileKey = (file: ConversationFileEntry) =>
       file.cloudDriveFile ? `cloud:${file.cloudDriveFile.path}` : `local:${file.path}`;
     const replyFiles = attachedFiles.filter(
@@ -870,8 +883,6 @@ export const AssistantMessageRow = memo(
               batchId={row.id}
               payloads={row.sourceDiffPayloads}
             />
-          ) : row.resourcePayload && row.resourcePayload.kind !== "canvas-html" ? (
-            <EndResourceCard payload={row.resourcePayload} />
           ) : null}
           {row.customSlot ? row.customSlot : null}
         </div>

@@ -101,36 +101,12 @@
         "label": "Trage fișierele aici"
       },
       "endResource": {
-        "category": {
-          "audio": "Audio",
-          "canvas": "Canvas",
-          "code": "Cod",
-          "document": "Document",
-          "file": "Fișier",
-          "image": "Imagine",
-          "link": "Link",
-          "media": "Media",
-          "model3d": "Model 3D",
-          "pdf": "PDF",
-          "slides": "Prezentare",
-          "spreadsheet": "Foaie de calcul",
-          "table": "Tabel",
-          "text": "Text",
-          "trash": "Coș de gunoi",
-          "video": "Video"
-        },
         "fileChangeCount": {
           "few": "{count} modificări de fișiere",
           "one": "{count} modificare de fișier",
           "other": "{count} de modificări de fișiere"
         },
-        "imageCount": {
-          "few": "{count} imagini",
-          "one": "{count} imagine",
-          "other": "{count} de imagini"
-        },
-        "openInPanel": "Deschide în panou",
-        "openPreview": "Deschide previzualizarea"
+        "openInPanel": "Deschide în panou"
       },
       "fileCategory": {
         "archive": "Arhivă",
@@ -246,9 +222,7 @@
       "openWith": {
         "loading": "Se încarcă…",
         "otherWaysLabel": "Deschide în alte moduri",
-        "otherWaysTitle": "Deschide în alte moduri…",
-        "triggerLabel": "Deschide",
-        "triggerTitle": "Deschide cu…"
+        "otherWaysTitle": "Deschide în alte moduri…"
       },
       "pdfViewer": {
         "hostRequired": "Vizualizatorul PDF necesită mediul de rulare Electron.",

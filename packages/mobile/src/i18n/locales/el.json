@@ -98,34 +98,11 @@
         "label": "Αφήστε τα αρχεία εδώ"
       },
       "endResource": {
-        "category": {
-          "audio": "Ήχος",
-          "canvas": "Καμβάς",
-          "code": "Κώδικας",
-          "document": "Έγγραφο",
-          "file": "Αρχείο",
-          "image": "Εικόνα",
-          "link": "Σύνδεσμος",
-          "media": "Πολυμέσα",
-          "model3d": "Μοντέλο 3D",
-          "pdf": "PDF",
-          "slides": "Διαφάνειες",
-          "spreadsheet": "Υπολογιστικό φύλλο",
-          "table": "Πίνακας",
-          "text": "Κείμενο",
-          "trash": "Απορρίμματα",
-          "video": "Βίντεο"
-        },
         "fileChangeCount": {
           "one": "{count} αλλαγή αρχείου",
           "other": "{count} αλλαγές αρχείων"
         },
-        "imageCount": {
-          "one": "{count} εικόνα",
-          "other": "{count} εικόνες"
-        },
-        "openInPanel": "Άνοιγμα στο πλαίσιο",
-        "openPreview": "Άνοιγμα προεπισκόπησης"
+        "openInPanel": "Άνοιγμα στο πλαίσιο"
       },
       "fileCategory": {
         "archive": "Αρχειοθήκη",
@@ -240,9 +217,7 @@
       "openWith": {
         "loading": "Φόρτωση…",
         "otherWaysLabel": "Άνοιγμα με άλλους τρόπους",
-        "otherWaysTitle": "Άνοιγμα με άλλους τρόπους…",
-        "triggerLabel": "Άνοιγμα",
-        "triggerTitle": "Άνοιγμα με…"
+        "otherWaysTitle": "Άνοιγμα με άλλους τρόπους…"
       },
       "pdfViewer": {
         "hostRequired": "Η προβολή PDF απαιτεί το περιβάλλον εκτέλεσης Electron.",

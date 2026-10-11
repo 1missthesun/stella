@@ -13,7 +13,7 @@ import {
   type JournalRecord,
   type JournalTurnRecord,
 } from "./conversation-protocol.js";
-import { legacyReportStatus, type AgentAttemptOutcome } from "./agent-status.js";
+import type { AgentAttemptOutcome } from "./agent-status.js";
 import {
   splitReplyRefs,
   toReplyPreview,
@@ -60,9 +60,9 @@ export const journalMessageTimestamp = (
     : record.createdAtMs;
 
 const WAKE_THREAD_RE =
-  /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?(?:^thread_id:\s*(\S+)|\(thread ([^)]+)\))/mu;
+  /^\[(?:Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\][\s\S]*?(?:^thread_id:\s*(\S+)|\(thread ([^)]+)\))/mu;
 const WAKE_DESCRIPTION_RE =
-  /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/mu;
+  /^\[(?:Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/mu;
 
 /**
  * The task named by a hidden lifecycle wake prompt (`[Agent completed]` and
@@ -82,7 +82,15 @@ export const lifecycleWakeTask = (
 };
 
 const WAKE_KIND_RE =
-  /^\[(Agent completed|Task failed|Task canceled|Subagent paused)\]/m;
+  /^\[(Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\]/m;
+const WAKE_OUTCOMES: Readonly<Record<string, AgentAttemptOutcome>> = {
+  "Agent completed": "completed",
+  "Agent failed": "failed",
+  "Agent canceled": "canceled",
+  "Task failed": "failed",
+  "Task canceled": "canceled",
+  "Subagent paused": "paused",
+};
 const WAKE_TRAILER_RE = /^(?:agent_state|presentation|routing|error):/;
 
 /**
@@ -111,7 +119,37 @@ export const lifecycleWakeOutcome = (
     }
     body = [first, ...rest].join("\n").trim();
   }
-  return { kind: legacyReportStatus(text), body };
+  return { kind: WAKE_OUTCOMES[kind] ?? "failed", body };
+};
+
+export type JournalMirroredWake = {
+  record: JournalMessageRecord;
+  threadId: string;
+  description?: string;
+  outcome: { kind: AgentAttemptOutcome; body: string };
+};
+
+export const journalMirroredWake = (
+  turnRecords: readonly JournalRecord[],
+): JournalMirroredWake | null => {
+  const carded = new Set<string>();
+  for (const record of turnRecords) {
+    if (record.kind === "card" && record.card.type === "agent-lifecycle") {
+      carded.add(record.card.event.payload.agentId);
+    }
+  }
+  let wake: JournalMirroredWake | null = null;
+  for (const record of turnRecords) {
+    if (record.kind !== "message" || record.role !== "user" || !record.hidden) {
+      continue;
+    }
+    const text = messageText(record.payload);
+    const task = lifecycleWakeTask(text);
+    const outcome = task ? lifecycleWakeOutcome(text) : null;
+    if (!task || !outcome || carded.has(task.threadId)) continue;
+    wake = { record, ...task, outcome };
+  }
+  return wake;
 };
 
 /**

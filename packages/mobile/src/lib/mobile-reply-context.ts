@@ -10,6 +10,11 @@ import { journalAgents } from "@stella/contracts/agent-titles";
 import type { ChatMessage, ChatArtifact } from "../types";
 import type { JournalFile, JournalRecord } from "@stella/contracts/conversation-protocol";
 import { cloudFileArtifact } from "./cloud-file-payload";
+import { journalMirroredWake } from "@stella/contracts/conversation-journal-projection";
+import { extractFileLinkTargets } from "@stella/contracts/local-file-links";
+import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
+import { artifactAttachmentTarget, artifactId } from "./mobile-artifacts";
+import { displayPayloadForStellaFile, driveFileChatArtifact } from "./stella-file-links";
 
 const SUMMARY_MAX_CHARS = 160;
 
@@ -117,12 +122,54 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     }
   }
 
+  const turns = new Map<string, JournalRecord[]>();
+  for (const record of records) {
+    const turn = turns.get(record.turnId);
+    if (turn) turn.push(record);
+    else turns.set(record.turnId, [record]);
+  }
+  const wakeTitles = new Map<string, string>();
+  for (const [turnId, turnRecords] of turns) {
+    const wake = journalMirroredWake(turnRecords);
+    if (!wake || wake.outcome.kind !== "completed") continue;
+    if (wake.description) wakeTitles.set(wake.threadId, wake.description);
+    completions.push({
+      eventId: `cloud:${turnId}:wake:${wake.record.seq}`, agentId: wake.threadId, turnId, seq: wake.record.seq,
+      createdAt: wake.record.createdAtMs, result: wake.outcome.body,
+    });
+  }
+  completions.sort((a, b) => a.seq - b.seq);
+  const linkedFileArtifact = (target: string, createdAt: number): ChatArtifact => {
+    const drivePath = driveLinkPath(target);
+    const payload = drivePath
+      ? driveFileChatArtifact(drivePath, conversationId, createdAt).payload
+      : displayPayloadForStellaFile(target, createdAt);
+    return { id: artifactId(payload, conversationId), conversationId, payload };
+  };
+  const completionFiles = (completion: (typeof completions)[number]): ChatArtifact[] => {
+    const files = [
+      ...(filesByAgent.get(completion.agentId) ?? []).map(entry => cloudFileArtifact(entry.file, conversationId, entry.createdAt)),
+      ...extractFileLinkTargets(completion.result).map(target => linkedFileArtifact(target, completion.createdAt)),
+    ];
+    const seen = new Set<string>();
+    return files.filter(file => {
+      const key = artifactAttachmentTarget(file.payload) ?? file.id;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+
   const placed = new Set<string>();
+  const relayed = new Set<string>();
   for (const completion of completions) {
     const message = anchorAfter(completion.turnId, completion.seq);
     if (!message) continue;
-    const title = titles.get(completion.agentId) || "Task";
-    const files = (filesByAgent.get(completion.agentId) ?? []).map(entry => cloudFileArtifact(entry.file, conversationId, entry.createdAt));
+    const relayKey = `${message.id}\n${completion.agentId}`;
+    if (relayed.has(relayKey)) continue;
+    relayed.add(relayKey);
+    const title = titles.get(completion.agentId) || wakeTitles.get(completion.agentId) || "Task";
+    const files = completionFiles(completion);
     const summary = summaryExcerpt(completion.result);
     const card: ChatArtifact = { id: `${completion.eventId}:completion`, conversationId, payload: {
       kind: "agent-work", state: "done", agentIds: [completion.agentId], total: 1, completed: 1,

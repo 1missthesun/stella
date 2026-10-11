@@ -25,6 +25,10 @@ import { Image } from "expo-image";
 import { extractPlainText } from "react-native-nitro-markdown";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { driveLinkPath } from "@stella/contracts/cloud-world-paths";
+import {
+  placeReplyAttachments,
+  replyAttachmentTarget,
+} from "@stella/contracts/reply-attachments";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import {
   extractFileLinkTargets,
@@ -48,7 +52,7 @@ import { AppPreviewCard } from "../AppPreviewCard";
 import { MapRouteCard } from "../MapRouteCard";
 import type { AnchorRect } from "./PlusMenu";
 import { assistantBubbleNeedsBoundedWidth } from "../../lib/assistant-bubble-layout";
-import { artifactPrimaryFilePath } from "../../lib/mobile-artifacts";
+import { artifactAttachmentTarget } from "../../lib/mobile-artifacts";
 import {
   resolveCloudDriveFileUri,
   useCloudDriveFileUri,
@@ -701,9 +705,29 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     () => consolidateRowArtifacts(item.artifacts ?? [], item.tasks ?? []),
     [item.artifacts, item.tasks],
   );
+  const completionQuotes = useMemo(
+    () => rowCompletionQuotes(consolidated.agentWork),
+    [consolidated.agentWork],
+  );
+  const relayedQuotes = useMemo(
+    () => [
+      ...(quotesForwarded ? [] : completionQuotes),
+      ...(carriedQuotes ?? []),
+    ],
+    [completionQuotes, quotesForwarded, carriedQuotes],
+  );
+  const relayedFiles = useMemo(
+    () =>
+      placeReplyAttachments(
+        relayedQuotes.flatMap((quote) => quote.files),
+        (file) => artifactAttachmentTarget(file.payload),
+      ),
+    [relayedQuotes],
+  );
   // Every file this reply hands over, in the order it named them: the loose
-  // file artifacts of the turn, then the files its own text links. Generated
-  // images keep their own full-width presentation, so they stay out of it.
+  // file artifacts of the turn, the files its own text links, then the media
+  // of the reports it relays. Generated images keep their own full-width
+  // presentation, so they stay out of it.
   const evidencePaths = useMemo(() => {
     if (item.role !== "assistant") return [];
     const paths: string[] = [];
@@ -714,12 +738,16 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       ) {
         continue;
       }
-      const filePath = artifactPrimaryFilePath(artifact.payload);
+      const filePath = artifactAttachmentTarget(artifact.payload);
       if (filePath) paths.push(filePath);
     }
     paths.push(...extractFileLinkTargets(item.text ?? ""));
+    for (const file of relayedFiles.media) {
+      const filePath = artifactAttachmentTarget(file.payload);
+      if (filePath) paths.push(filePath);
+    }
     return paths;
-  }, [consolidated.looseFiles, item.role, item.text]);
+  }, [consolidated.looseFiles, item.role, item.text, relayedFiles.media]);
   // A drive file can be named twice: drive-relative as an artifact, and as a
   // `stella://drive/...` or world-absolute link. The strip shows each file
   // once, by the link, which is the one that opens from the drive.
@@ -974,11 +1002,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   // agent, noise writes are filtered and declared deliverables lead. The
   // minimal agent rows no longer surface file pills — agent-produced files
   // stay reachable through the activity hub — so `agentFiles` is unused here.
-  const {
-    agentWork: agentWorkArtifacts,
-    maps: mapArtifacts,
-    looseFiles,
-  } = consolidated;
+  const { maps: mapArtifacts, looseFiles } = consolidated;
   const isStandIn = isStandInArtifactRow(item);
   // Assistant text no longer streams, so there is no partial-render window to
   // protect: every card mounts as soon as its artifact reaches the row.
@@ -996,36 +1020,26 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     showMapArtifacts ||
     (showGeneratedImages && !hasText) ||
     linkedAppSlugs.length > 0;
-  // Desktop renders the complete markdown body once, then attaches activity
-  // and artifact cards at the row boundary. Keep the same shape on mobile:
-  // stored text offsets still describe event chronology, but must never become
-  // character-level insertion points that split prose (or markdown) in two.
-  const groupAgentWorkArtifacts = agentWorkArtifacts;
   // Desktop parity: a task whose result this reply relays is quoted ABOVE
-  // the bubble the iMessage way; the files it produced ride as pills at the
-  // bottom of the reply bubble itself. A settled follow-up keeps its spawn
-  // row.
-  const completionQuotes = rowCompletionQuotes(groupAgentWorkArtifacts);
-  const relayedQuotes = [
-    ...(quotesForwarded ? [] : completionQuotes),
-    ...(carriedQuotes ?? []),
-  ];
+  // the bubble the iMessage way; its media joins the reply's media under the
+  // bubble and its other files ride as pills at the bottom of the bubble. A
+  // settled follow-up keeps its spawn row.
   const quotedThreadIds = new Set(
     [...completionQuotes, ...relayedQuotes].map((quote) => quote.ref.threadId),
   );
-  // Files a relayed task produced, minus any the evidence strip already shows
-  // because the reply links them.
-  const evidencePathSet = new Set(evidencePaths);
+  // Files a relayed task produced that are not media, minus any the evidence
+  // strip already shows because the reply links them.
+  const evidenceTargets = new Set(
+    evidencePaths.map((filePath) => replyAttachmentTarget(filePath)),
+  );
   const replyFiles = onOpenArtifact
-    ? relayedQuotes
-        .flatMap((quote) => quote.files)
-        .filter((file, index, all) => {
-          const filePath = artifactPrimaryFilePath(file.payload);
-          return (
-            !(filePath && evidencePathSet.has(filePath)) &&
-            all.findIndex((other) => other.id === file.id) === index
-          );
-        })
+    ? relayedFiles.pills.filter((file, index, all) => {
+        const target = artifactAttachmentTarget(file.payload);
+        return (
+          !(target && evidenceTargets.has(target)) &&
+          all.findIndex((other) => other.id === file.id) === index
+        );
+      })
     : [];
   const showReplyFiles = !isStandIn && replyFiles.length > 0;
   // Everything the reply attaches sits at the bottom of its bubble; a reply

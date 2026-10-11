@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { Context, Layer } from "effect";
 import { METHOD_NAMES } from "@stella/contracts/protocol";
 import type { WorkerPeerLike } from "../peer-broker.js";
+import type { UserAskResolution } from "@stella/contracts/user-ask";
 import type { ConnectCardOutcome } from "./types.js";
 
 /**
@@ -38,6 +39,11 @@ export interface Interface {
     payload: Record<string, unknown>,
     signal?: AbortSignal,
   ) => Promise<ConnectCardOutcome>;
+  readonly requestUserAsk: (
+    method: string,
+    payload: { toolCallId?: string; conversationId?: string },
+    signal?: AbortSignal,
+  ) => Promise<UserAskResolution>;
 }
 
 export class Service extends Context.Service<Service, Interface>()(
@@ -84,12 +90,52 @@ export const make = (peer: WorkerPeerLike): Interface => {
     }
   };
 
+  const requestUserAsk = async (
+    method: string,
+    payload: { toolCallId?: string; conversationId?: string },
+    signal?: AbortSignal,
+  ): Promise<UserAskResolution> => {
+    const stopped = (): UserAskResolution => ({
+      outcome: "canceled",
+      askId: "",
+      at: Date.now(),
+      note: "The run was stopped before the user answered.",
+    });
+    if (signal?.aborted) return stopped();
+    const request = peer.request<UserAskResolution>(method, payload, {
+      retryOnDisconnect: true,
+    });
+    if (!signal) return await request;
+    let onAbort: (() => void) | undefined;
+    const aborted = new Promise<"aborted">((resolve) => {
+      onAbort = () => resolve("aborted");
+      signal.addEventListener("abort", onAbort, { once: true });
+    });
+    try {
+      const winner = await Promise.race([request, aborted]);
+      if (winner !== "aborted") return winner;
+      void peer
+        .request(METHOD_NAMES.HOST_ASK_USER_CANCEL, {
+          ...(payload.toolCallId ? { toolCallId: payload.toolCallId } : {}),
+          ...(payload.conversationId
+            ? { conversationId: payload.conversationId }
+            : {}),
+        })
+        .catch(() => undefined);
+      void request.catch(() => undefined);
+      return stopped();
+    } finally {
+      if (onAbort) signal.removeEventListener("abort", onAbort);
+    }
+  };
+
   return {
     notify: (method, params) => peer.notify(method, params),
     request: (method, params, options) => peer.request(method, params, options),
     activeRequestHandlerCount: () => peer.activeRequestHandlerCount?.() ?? 0,
     attachedClientCount: () => peer.attachedCount?.() ?? 1,
     requestConnectCard,
+    requestUserAsk,
   };
 };
 

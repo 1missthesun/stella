@@ -400,6 +400,34 @@ export class UserAskService {
         }
         return { ok: true };
     }
+    withdraw(payload) {
+        const toolCallId = typeof payload?.toolCallId === "string" ? payload.toolCallId : "";
+        const conversationId = typeof payload?.conversationId === "string" ? payload.conversationId : "";
+        if (!toolCallId) {
+            return { ok: false };
+        }
+        let withdrawn = false;
+        for (const [askId, record] of [...this.asks]) {
+            if (record.ask.toolCallId !== toolCallId) {
+                continue;
+            }
+            if (conversationId && record.ask.conversationId !== conversationId) {
+                continue;
+            }
+            const wasPending = this.pending.has(askId);
+            this.closeRecord(askId, "canceled");
+            if (wasPending) {
+                this.pending.resolve(askId, {
+                    outcome: "canceled",
+                    askId,
+                    at: Date.now(),
+                    note: "The run was stopped before the user answered.",
+                });
+            }
+            withdrawn = true;
+        }
+        return { ok: withdrawn };
+    }
     cancelAll() {
         for (const askId of [...this.asks.keys()]) {
             this.cancel({ askId });

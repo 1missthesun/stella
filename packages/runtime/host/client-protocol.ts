@@ -71,6 +71,7 @@ export const RUNTIME_HOST_HANDLERS = [
   "askUser",
   "requestSecureInput",
   "useSecureValue",
+  "cancelUserAsk",
   "requestLlmCredentials",
   "requestConnectorTokenStore",
   "requestConnectorCredential",

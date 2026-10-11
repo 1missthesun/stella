@@ -89,11 +89,12 @@ export const createRequestSecureInputTool = (
     },
     required: ["purpose", "fields"],
   },
-  execute: (args, context) =>
+  execute: (args, context, extras) =>
     handleRequestSecureInput(
       { requestSecureInput: options.requestSecureInput },
       args,
       context,
+      extras?.signal,
     ),
 });
 

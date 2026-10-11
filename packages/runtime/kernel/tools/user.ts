@@ -43,9 +43,13 @@ export type SecureValueUseRequest = {
 };
 
 export type UserToolsConfig = {
-  askUser?: (request: AskUserRequest) => Promise<UserAskResolution>;
+  askUser?: (
+    request: AskUserRequest,
+    signal?: AbortSignal,
+  ) => Promise<UserAskResolution>;
   requestSecureInput?: (
     request: SecureInputRequest,
+    signal?: AbortSignal,
   ) => Promise<UserAskResolution>;
   useSecureValue?: (
     request: SecureValueUseRequest,
@@ -73,6 +77,7 @@ export const handleAskUser = async (
   config: UserToolsConfig,
   args: Record<string, unknown>,
   context?: ToolContext,
+  signal?: AbortSignal,
 ): Promise<ToolResult> => {
   if (!config.askUser) {
     return { error: "Asking the user is not supported on this device." };
@@ -89,7 +94,7 @@ export const handleAskUser = async (
       blocking,
       urgency,
       ...contextFields(context, args),
-    });
+    }, signal);
     return userAskResolutionResult(resolution, questions);
   } catch (error) {
     return { error: (error as Error).message || "The ask failed." };
@@ -149,6 +154,7 @@ export const handleRequestSecureInput = async (
   config: UserToolsConfig,
   args: Record<string, unknown>,
   context?: ToolContext,
+  signal?: AbortSignal,
 ): Promise<ToolResult> => {
   if (!config.requestSecureInput) {
     return { error: "Secure input is not supported on this device." };
@@ -170,7 +176,7 @@ export const handleRequestSecureInput = async (
       fields,
       urgency: clampUrgency(args.urgency),
       ...contextFields(context, args),
-    });
+    }, signal);
     return userAskResolutionResult(resolution);
   } catch (error) {
     return { error: (error as Error).message || "Secure input failed." };

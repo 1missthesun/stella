@@ -2485,6 +2485,13 @@ export class StellaRuntimeHost {
       },
     );
     peer.registerRequestHandler(
+      METHOD_NAMES.HOST_ASK_USER_CANCEL,
+      async (params) => {
+        if (!this.options.hostHandlers.cancelUserAsk) return { ok: false };
+        return await this.options.hostHandlers.cancelUserAsk(params);
+      },
+    );
+    peer.registerRequestHandler(
       METHOD_NAMES.HOST_SECURE_INPUT_REQUEST,
       async (params) => {
         return await this.options.hostHandlers.requestSecureInput(params);

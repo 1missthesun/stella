@@ -118,14 +118,18 @@ export const layer = Layer.effect(
       appendLocalChatEvent: (args) => {
         storage.appendChatEventAndNotify(args);
       },
-      askUser: async (payload) =>
-        await hostBus.request(METHOD_NAMES.HOST_ASK_USER_REQUEST, payload, {
-          retryOnDisconnect: true,
-        }),
-      requestSecureInput: async (payload) =>
-        await hostBus.request(METHOD_NAMES.HOST_SECURE_INPUT_REQUEST, payload, {
-          retryOnDisconnect: true,
-        }),
+      askUser: (payload, signal) =>
+        hostBus.requestUserAsk(
+          METHOD_NAMES.HOST_ASK_USER_REQUEST,
+          payload,
+          signal,
+        ),
+      requestSecureInput: (payload, signal) =>
+        hostBus.requestUserAsk(
+          METHOD_NAMES.HOST_SECURE_INPUT_REQUEST,
+          payload,
+          signal,
+        ),
       useSecureValue: async (payload) =>
         await hostBus.request(METHOD_NAMES.HOST_SECURE_VALUE_USE, payload, {
           retryOnDisconnect: true,

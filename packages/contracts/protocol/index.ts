@@ -112,6 +112,7 @@ export const METHOD_NAMES = {
   DISCOVERY_LIST_BROWSER_PROFILES: "discovery.listBrowserProfiles",
   HOST_DEVICE_IDENTITY_GET: "host.deviceIdentity.get",
   HOST_ASK_USER_REQUEST: "host.askUser.request",
+  HOST_ASK_USER_CANCEL: "host.askUser.cancel",
   HOST_SECURE_INPUT_REQUEST: "host.secureInput.request",
   HOST_SECURE_VALUE_USE: "host.secureValue.use",
   HOST_LLM_CREDENTIALS_REQUEST: "host.llmCredentials.request",

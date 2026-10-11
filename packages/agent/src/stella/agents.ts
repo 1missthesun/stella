@@ -170,6 +170,11 @@ export type AgentRunEnd = {
   aborted?: true;
   /** Why it failed: the host refused the run, it ended without an answer, or its answer is an error. */
   error?: string;
+  /**
+   * It answered while agents it started still run, so it is not done: its
+   * attempt stays open and nothing reports its end.
+   */
+  waiting?: true;
 };
 
 /** How a run ended, for the owner's records; undefined when it did not settle (its host is closing). */
@@ -547,6 +552,10 @@ type ReporterInput = {
   report?: true;
   /** A note from an agent that did not start it, which waits while it is paused like a report. */
   note?: true;
+  /** Its first message, the brief it was started with. */
+  brief?: true;
+  /** A `note` Stella sent: its answer goes back like an answer to its starter's message. */
+  fromStella?: true;
 };
 type ReporterState =
   | {
@@ -559,7 +568,71 @@ type ReporterState =
       /** How the run ended; absent on a checkpoint written before it was recorded. */
       status?: AgentAttemptOutcome;
       paused?: true;
+      /**
+       * It answered while agents it started still run. A turn its brief or
+       * another agent's report or note started reports nothing then; an
+       * answer to its starter's or the user's message goes back as a note
+       * (`reply`), since the agent is not done.
+       */
+      waiting?: true;
+      reply?: true;
     };
+
+const REPORTER_TASK = "stella.agent-reporter";
+const LIVE_TASK_STATUSES = ["pending", "running", "waiting", "completing"] as const;
+
+/** What `agentsBusy` reads, from whichever handle the caller holds. */
+type BusyReader = {
+  agents(conversationId: ConversationId): Promise<Readonly<{ agents: Readonly<Record<string, AgentRecord>> }> | undefined>;
+  running(conversationId: ConversationId): Promise<boolean>;
+  reporters(conversationId: ConversationId): Promise<ReadonlyArray<{ id: number; input: ReporterInput }>>;
+};
+
+/** Reporters still carrying a message in a conversation (one per message to one of its agents). */
+const liveReporters = async (
+  tx: Pick<Tx, "scanTasks">,
+  conversationId: ConversationId,
+): Promise<Array<{ id: number; input: ReporterInput }>> => {
+  const found: Array<{ id: number; input: ReporterInput }> = [];
+  for (const status of LIVE_TASK_STATUSES) {
+    let cursor: Parameters<Tx["scanTasks"]>[2];
+    do {
+      const page = await tx.scanTasks({ conversationId, kind: REPORTER_TASK, status }, 100, cursor);
+      for (const task of page.items) found.push({ id: Number(task.id), input: task.input as unknown as ReporterInput });
+      cursor = page.next;
+    } while (cursor !== undefined);
+  }
+  return found;
+};
+
+/**
+ * Whether any agent a conversation started is still at work: running, its
+ * answer still on its way back, or waiting on agents of its own.
+ */
+const agentsBusy = async (read: BusyReader, conversationId: ConversationId, depth = 0): Promise<boolean> => {
+  const own = Object.entries((await read.agents(conversationId))?.agents ?? {}).filter(
+    ([, agent]) => !agent.remote && agent.conversationId >= 0,
+  );
+  if (own.length === 0) return false;
+  const carrying = new Set((await read.reporters(conversationId)).map((reporter) => reporter.input.threadId));
+  for (const [threadId, agent] of own) {
+    if (carrying.has(threadId)) return true;
+    const id = agent.conversationId as ConversationId;
+    if (await read.running(id)) return true;
+    if (depth + 1 < MAX_AGENT_DEPTH && (await agentsBusy(read, id, depth + 1))) return true;
+  }
+  return false;
+};
+
+/** `agentsBusy` through a handle that commits and returns (a tool call's api, the harness). */
+const busyReader = (
+  store: Pick<ToolExecutionApi, "snapshot"> & { commit<T>(change: (tx: Tx) => Promise<T>, context: Context): Promise<T> },
+  context: Context,
+): BusyReader => ({
+  agents: (id) => store.snapshot(StellaAgentsDoc, id, context),
+  running: async (id) => (await store.snapshot(LiveDoc, id, context))?.run !== undefined,
+  reporters: (id) => store.commit((tx) => liveReporters(tx, id), context),
+});
 
 /** An agent somewhere under the orchestrator, and the conversation that started it. */
 type TreeAgent = {
@@ -700,6 +773,48 @@ export function stellaAgents(host: StellaAgentsHost) {
           if (settled?.status === "unanswered" && settled.reason === "aborted") end = { aborted: true };
           else if (refused !== undefined || settled === undefined) end = { error: refused ?? "The agent did not run." };
           else if (settled.status === "unanswered") end = { error: settled.reason };
+          // Whether it answered with agents of its own still at work, and so
+          // is not done; for a turn that only carried another agent's words,
+          // also whether more of them are still on their way to it.
+          const gated =
+            reporter.input.brief === true ||
+            reporter.input.report === true ||
+            (reporter.input.note === true && reporter.input.fromStella !== true);
+          let busy = false;
+          if (settled?.status === "done" && settled.type === "input" && !siblings?.agents[threadId]?.origin) {
+            const read: BusyReader = {
+              agents: (id) => runtime.snapshot(StellaAgentsDoc, id, context),
+              running: async (id) => (await runtime.snapshot(LiveDoc, id, context))?.run !== undefined,
+              reporters: async (id) => {
+                let found: Array<{ id: number; input: ReporterInput }> = [];
+                await runtime.commit(async (tx) => {
+                  found = await liveReporters(tx, id);
+                  return undefined;
+                }, context);
+                return found;
+              },
+            };
+            busy = await (async () => {
+              if (await agentsBusy(read, agentConversationId)) return true;
+              if (!gated) return false;
+              const others = (await read.reporters(runtime.conversationId)).filter(
+                (other) =>
+                  other.id !== Number(reporter.id) &&
+                  other.input.threadId === threadId &&
+                  (other.input.report === true || other.input.note === true),
+              );
+              for (const other of others) {
+                let pending = true;
+                await runtime.commit(async (tx) => {
+                  const submission = await tx.submissionByRequest(agentConversationId, `agent-msg:${other.id}`);
+                  pending = submission === undefined || submission.status === "queued" || submission.status === "placed";
+                  return undefined;
+                }, context);
+                if (pending) return true;
+              }
+              return false;
+            })().catch(() => false);
+          }
           await runtime.commit(async (tx) => {
             const next = (report?: string, status?: AgentAttemptOutcome): { status: "running"; checkpoint: ReporterState } => ({
               status: "running",
@@ -728,6 +843,15 @@ export function stellaAgents(host: StellaAgentsHost) {
             };
             if (agent.reported.includes(settled.answer)) return next();
             agent.reported.push(settled.answer);
+            if (busy && answer?.stopReason !== "error") {
+              end = { ...end, waiting: true };
+              return {
+                status: "running",
+                checkpoint: gated
+                  ? { phase: "report", status: "completed", waiting: true }
+                  : { phase: "report", report: textOf(answer) || "(no reply)", status: "completed", waiting: true, reply: true },
+              };
+            }
             return next(
               completedReport({
                 threadId,
@@ -744,7 +868,51 @@ export function stellaAgents(host: StellaAgentsHost) {
         }
       },
       report: async (reporter, runtime, context) => {
-        const { report, paused } = reporter.state.checkpoint;
+        const { report, paused, waiting, reply } = reporter.state.checkpoint;
+        if (waiting) {
+          // Not done: nothing reports its end. An answer to its starter's or
+          // the user's message still goes back, as a note from it.
+          const self = await roleOf(runtime, runtime.conversationId, context);
+          const toStella = self.agentType === "orchestrator" || self.parentConversationId === undefined;
+          const description =
+            (await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context))?.agents[reporter.input.threadId]?.description ??
+            reporter.input.threadId;
+          const framed =
+            reply && report !== undefined
+              ? formatAgentMessage(
+                  { threadId: reporter.input.threadId, label: description },
+                  reporter.input.fromUser
+                    ? `The user wrote to me in my thread: ${JSON.stringify(bounded(reporter.input.message))}\n\nMy answer, while agents I started are still working: ${report}`
+                    : report,
+                )
+              : undefined;
+          if (framed && toStella) {
+            const note: AgentNote = {
+              rootConversationId: runtime.conversationId,
+              threadId: reporter.input.threadId,
+              text: framed,
+              requestId: `agent-reply:${reporter.id}`,
+            };
+            if (host.deliverNote) {
+              await host.deliverNote(note, context);
+            } else {
+              const root = await runtime.conversation(runtime.conversationId, context);
+              const hidden: TextContent & { stella: { hidden: true } } = { type: "text", text: framed, stella: { hidden: true } };
+              await root?.submit({ type: "input", content: [hidden], whenBusy: "followUp", requestId: note.requestId }, context);
+            }
+          }
+          await runtime.commit(async (tx) => {
+            if (framed && !toStella && self.threadId && self.parentConversationId !== undefined) {
+              await tx.createTask(
+                Reporter,
+                { threadId: self.threadId, conversationId: runtime.conversationId, message: framed, note: true },
+                { ownership: { kind: "conversation" }, background: true, conversationId: self.parentConversationId as ConversationId },
+              );
+            }
+            return { status: "terminal", outcome: { status: "completed", result: null } };
+          }, context);
+          return;
+        }
         const status: AgentAttemptOutcome | undefined =
           reporter.state.checkpoint.status ?? (paused ? "paused" : report === undefined ? undefined : reportStatusOf({ text: report }));
         const self = await roleOf(runtime, runtime.conversationId, context);
@@ -944,7 +1112,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     }
     const reporter = await tx.createTask(
       Reporter,
-      { threadId, conversationId: child.id, message: args.prompt },
+      { threadId, conversationId: child.id, message: args.prompt, brief: true },
       { ownership: { kind: "conversation" }, background: true, conversationId: parentConversationId },
     );
     state.calls[args.callKey] = { threadId, reporter };
@@ -1420,12 +1588,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     const recent = await api.commit(async (tx) => (await tx.scanEntries({ conversationId: id, order: "descending" }, 10)).items, context);
     const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
     const at = (recent[0]?.model?.[0] as { timestamp?: number } | undefined)?.timestamp;
+    const paused = live?.run === undefined && (record.paused === true || stoppedShort(recent));
+    // Idle while agents it started still work: it is not done.
+    const waiting = live?.run === undefined && !paused && (await agentsBusy(busyReader(api, context), id).catch(() => false));
     return {
       ...located,
       status:
-        live?.run !== undefined
+        live?.run !== undefined || waiting
           ? "running"
-          : record.paused || stoppedShort(recent)
+          : paused
             ? "paused"
             : latest?.stopReason === "error"
               ? "failed"
@@ -1506,7 +1677,13 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (state.calls[key]) return;
         const reporter = await tx.createTask(
           Reporter,
-          { threadId, conversationId: agentConversationId, message: text, note: true },
+          {
+            threadId,
+            conversationId: agentConversationId,
+            message: text,
+            note: true,
+            ...(self.agentType === "orchestrator" ? { fromStella: true as const } : {}),
+          },
           { ownership: { kind: "conversation" }, background: true, conversationId: target.parentConversationId },
         );
         state.calls[key] = { threadId, reporter };
@@ -1734,8 +1911,12 @@ export function stellaAgents(host: StellaAgentsHost) {
       harness.commit(async (tx) => (await tx.scanEntries({ conversationId, order: "descending" }, 40)).items, context),
     ]);
     const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
-    const running = live?.run !== undefined;
-    const paused = !running && (found.record.paused === true || stoppedShort(recent));
+    const idlePaused = live?.run === undefined && (found.record.paused === true || stoppedShort(recent));
+    // Idle while agents it started still work: it is not done.
+    const running =
+      live?.run !== undefined ||
+      (!idlePaused && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
+    const paused = !running && idlePaused;
     return {
       status: running ? "running" : latest?.stopReason === "error" ? "error" : "completed",
       ...(paused ? { paused: true as const } : {}),
@@ -1813,8 +1994,12 @@ export function stellaAgents(host: StellaAgentsHost) {
       const latest = answers[0];
       const prose = answers.map(textOf).filter((text) => text.trim()).reverse().slice(-5);
       const oldest = first?.model?.[0] as { timestamp?: number } | undefined;
-      const running = live?.run !== undefined;
-      const paused = !running && (agent.paused === true || stoppedShort(recent));
+      const idlePaused = live?.run === undefined && (agent.paused === true || stoppedShort(recent));
+      // Idle while agents it started still work: it is not done.
+      const running =
+        live?.run !== undefined ||
+        (!idlePaused && (await agentsBusy(busyReader(harness, context), conversationId).catch(() => false)));
+      const paused = !running && idlePaused;
       records.push({
         threadId,
         description: agent.description,

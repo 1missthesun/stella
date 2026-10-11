@@ -267,6 +267,7 @@ const MIGRATIONS: Array<{
   to: number;
   statements: string[];
   backfillTranscriptSearch?: boolean;
+  reindexArchivedSearch?: boolean;
 }> = [
   {
     to: 2,
@@ -327,7 +328,21 @@ const MIGRATIONS: Array<{
     ],
     backfillTranscriptSearch: true,
   },
+  {
+    to: 9,
+    statements: [],
+    backfillTranscriptSearch: true,
+    reindexArchivedSearch: true,
+  },
 ];
+
+/**
+ * Below `ceilingSeq`, rows were archived before agents' reports and messages
+ * were searched; `reindexedThrough` is the first seq of the last segment
+ * re-read for them so far.
+ */
+const SEARCH_REINDEX_KEY = "searchReindex";
+type SearchReindex = { ceilingSeq: number; reindexedThrough: number };
 
 /** Durable witness of the highest epoch this DO name has ever used. */
 const EPOCH_WITNESS_KEY = "conversationEpoch";
@@ -663,12 +678,20 @@ export class Journal {
       await this.ctx.storage.put(EPOCH_WITNESS_KEY, meta.epoch);
     }
     if (meta.schema_version !== JOURNAL_SCHEMA_VERSION) {
+      let reindexArchived = false;
       for (const migration of MIGRATIONS) {
         if (meta.schema_version >= migration.to) continue;
         for (const statement of migration.statements) this.sql.exec(statement);
         if (migration.backfillTranscriptSearch) {
           this.backfillTranscriptSearch();
         }
+        if (migration.reindexArchivedSearch) reindexArchived = true;
+      }
+      if (reindexArchived && meta.hot_min_seq > 0) {
+        await this.ctx.storage.put<SearchReindex>(SEARCH_REINDEX_KEY, {
+          ceilingSeq: meta.hot_min_seq,
+          reindexedThrough: -1,
+        });
       }
       this.sql.exec(
         `UPDATE meta SET schema_version = ? WHERE id = 0`,
@@ -726,12 +749,47 @@ export class Journal {
            FROM journal
           WHERE kind = 'message'
             AND role IN ('user', 'assistant')
-            AND hidden = 0
             AND spill_key IS NULL
           ORDER BY seq ASC`,
       )
       .toArray();
     for (const row of rows) this.indexStoredMessage(row);
+  }
+
+  /**
+   * Archived segments not yet re-read for search: those cut before agents'
+   * reports and messages were indexed. Oldest first.
+   */
+  async searchReindexPending(): Promise<SegmentRow[]> {
+    const state = await this.ctx.storage.get<SearchReindex>(SEARCH_REINDEX_KEY);
+    if (!state) return [];
+    const pending = this.sql
+      .exec<SegmentRow>(
+        `SELECT * FROM segments
+          WHERE state = 'committed' AND first_seq > ? AND first_seq < ?
+          ORDER BY first_seq ASC`,
+        state.reindexedThrough,
+        state.ceilingSeq,
+      )
+      .toArray();
+    if (pending.length === 0) await this.ctx.storage.delete(SEARCH_REINDEX_KEY);
+    return pending;
+  }
+
+  /** Index one archived segment's hidden prompts, and remember it is done. */
+  async reindexArchivedSegment(firstSeq: number, rows: readonly JournalRow[]): Promise<void> {
+    const state = await this.ctx.storage.get<SearchReindex>(SEARCH_REINDEX_KEY);
+    if (!state) return;
+    this.transactionSync(() => {
+      for (const row of rows) {
+        if (row.kind !== "message" || row.role !== "user" || row.hidden !== 1 || row.spill_key !== null) continue;
+        this.indexStoredMessage(row);
+      }
+    });
+    await this.ctx.storage.put<SearchReindex>(SEARCH_REINDEX_KEY, {
+      ...state,
+      reindexedThrough: Math.max(state.reindexedThrough, firstSeq),
+    });
   }
 
   private indexStoredMessage(

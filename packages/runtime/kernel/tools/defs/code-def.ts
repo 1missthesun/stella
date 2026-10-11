@@ -11,7 +11,7 @@ export { CODE_TOOL_NAME };
 
 /** Shared by the device and cloud `code` descriptions. */
 export const CODE_TOOL_HISTORY_SENTENCE =
-  "history: await history.sql(query, params) runs one read-only SELECT over this conversation's history, and await history.read(fromSeq, toSeq) returns its full records for a seq range.";
+  "history: await history.search(text, { kinds, limit, order }) finds messages and agent reports in this conversation's whole history, await history.sql(query, params) runs one read-only SELECT over it, and await history.read(fromSeq, toSeq) returns its full records for a seq range.";
 
 export const CODE_TOOL_DESCRIPTION =
   "Run JavaScript with top-level await in Stella's persistent code runtime; bindings persist within one generation (use var for reusable names). Globals: codeRuntime, sky, browser, connect, history, and tools; the stella-computer and stella-browser skills document sky and browser, and codeRuntime.help() lists its helpers. End with an expression to return its value, or call codeRuntime.write(...); console.log is not an output channel. A long cell yields a cell_id: call code again with it to read new output or terminate it. tools exposes allowed Stella tools: tools.$list() for exact names (bracket notation for non-identifier names, such as tools[\"mcp.server/tool\"](...)), tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete schema. Use Promise.all for independent calls. Nested calls keep permissions, cancellation, and file tracking; tools requiring explicit approval must be called directly. " +

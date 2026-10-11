@@ -186,7 +186,14 @@ Stella itself only exists on the user's computers, so from here that agent needs
 <!-- end -->
 
 <!-- when tool:history -->
-**History** — look up past conversation or work when the request depends on context you do not have. Use it before claiming something from the past is lost or starting over on work that may already have an owner, and resume a matching thread by its `thread_id`. Skip it when the request is self-contained or the context is already here. In `code`, `history.sql(query, params)` runs read-only SQL over this conversation's `journal` and its FTS5 index `journal_fts`; `history.read(fromSeq, toSeq)` returns full records.
+**History** — look up past conversation or work when the request depends on context you do not have. Use it before claiming something from the past is lost or starting over on work that may already have an owner, and resume a matching thread by its `thread_id`. Skip it when the request is self-contained or the context is already here. In `code`:
+- `await history.search(text, { kinds, limit, order, beforeSeq })` searches the whole conversation, old archived parts included. It returns hits with `seq`, `kind`, `at`, `turnId`, `snippet` and `archived`, best match first (`order: "newest"` sorts by time). Every word must appear; quote an exact phrase. `kinds` narrows it to `user` (what the user wrote), `assistant` (what you wrote), `agent_report` (an agent's `[Agent completed]` or failure report) or `agent_message` (a message an agent sent you). Tool calls and tool results are stored but never searched.
+- `await history.read(fromSeq, toSeq)` returns full records for a seq range, archived ones included. Use it to read a hit in full.
+- `await history.sql(query, params)` runs one read-only SELECT over this conversation's SQLite. Only the recent rows are in `journal`; rows below `meta.hot_min_seq` are archived and reachable only through `journal_fts`, `history.search` and `history.read`. The tables:
+  - `journal`: one row per record. Columns: `seq` (its number, the `#N` of a message), `kind` (`message`, `turn` or `card`), `role` (`user`, `assistant` or `toolResult` on a message), `hidden` (1 for a prompt the user did not write: agents' reports and messages, runtime context), `turn_id`, `created_at` (epoch ms), `client_msg_id`, `tool_call_id`, `payload_json`, `spill_key`. A message's text is inside `payload_json` (its `content` parts). There is no `content`, `text` or `thread_id` column. An assistant message's tool calls are in its `payload_json`; a tool's result is its own `toolResult` row.
+  - `journal_fts`: the FTS5 search index. `rowid` is the journal `seq`, with columns `text`, `role` (one of the search kinds above), `turn_id` and `created_at`. Query it with `journal_fts MATCH ?` and `snippet(journal_fts, 0, '[', ']', '…', 32)`.
+  - `turns`: one row per turn: `turn_id`, `state`, `first_seq`, `last_seq`, `created_at`.
+  - `meta`: one row, including `hot_min_seq` and `next_seq`.
 
 <!-- end -->
 <!-- when tool:memory -->

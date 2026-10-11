@@ -50,9 +50,9 @@ export type JournalRecordKind = JournalKind;
  * fences so a delayed pre-rewind writer cannot recreate a removed suffix in
  * the new epoch; 6 adds atomic edit receipts for crash-safe rewind replay;
  * 7 adds retired turn fences; 8 moves transcript search into a
- * rollover-surviving FTS5 table.
+ * rollover-surviving FTS5 table; 9 searches agents' reports and messages too.
  */
-export const JOURNAL_SCHEMA_VERSION = 8;
+export const JOURNAL_SCHEMA_VERSION = 9;
 
 // ---------------------------------------------------------------------------
 // Residency / rollover

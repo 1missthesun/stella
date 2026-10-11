@@ -469,6 +469,7 @@ const buildWorkerModule = (
     "    });",
     '    const __historyCall = (method, args) => __dispatch("$history", [{ method, args }]);',
     "    const history = Object.freeze({",
+    '      search: (text, options = {}) => __historyCall("search", [text, options]),',
     '      sql: (query, params = []) => __historyCall("sql", [query, params]),',
     '      read: (fromSeq, toSeq) => __historyCall("read", [fromSeq, toSeq]),',
     "    });",

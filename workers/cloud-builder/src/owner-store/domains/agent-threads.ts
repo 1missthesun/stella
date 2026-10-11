@@ -63,7 +63,7 @@ import {
 } from "@stella/contracts/backend/agent-threads";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
 import { readMainConversationId } from "./conversations.js";
-import { agentReportReceipt } from "@stella/contracts/backend/agent-reports";
+import { agentReportId, agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
@@ -2733,6 +2733,18 @@ const acknowledgeDelivery = (
         thread.thread_id,
       ),
   );
+  // A build that still reads this path took the report, so the report
+  // outbox must not hand the same report to Stella again.
+  const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
+  ctx.db.run(
+    `UPDATE agent_report_outbox SET state = 'delivered', delivered_via = ?, updated_at = ?, delivered_at = ?
+      WHERE report_id = ? AND state IN ('pending', 'offered')`,
+    `device-ack:${args.originDeviceId}`,
+    ctx.now,
+    ctx.now,
+    reportId,
+  );
+  ctx.jobs.cancel(`agent-report:${reportId}`);
   return { acknowledged: true, superseded: false };
 };
 

@@ -531,6 +531,32 @@ export class ConversationArchive {
     };
   }
 
+  /**
+   * Re-read the segments archived before agents' reports and messages were
+   * searched, once, so their hidden prompts join the search index. Each
+   * segment is remembered as done, so an interrupted pass resumes.
+   */
+  async reindexArchivedSearch(): Promise<void> {
+    if (!this.bucket || this.sealed || this.journal.isDeleted()) return;
+    const running = this.reindexing;
+    if (running) return await running;
+    const work = this.track(
+      (async () => {
+        for (const segment of await this.journal.searchReindexPending()) {
+          if (this.sealed || this.journal.isDeleted()) return;
+          const rows = await this.readSegment(segment);
+          await this.journal.reindexArchivedSegment(segment.first_seq, rows);
+        }
+      })().finally(() => {
+        this.reindexing = null;
+      }),
+    );
+    this.reindexing = work;
+    await work;
+  }
+
+  private reindexing: Promise<void> | null = null;
+
   private async readSegment(segment: SegmentRow): Promise<JournalRow[]> {
     if (!this.bucket) return [];
     const object = await withTimeout(

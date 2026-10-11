@@ -173,6 +173,7 @@ export type CloudConnectClient = Readonly<{
  * conversation's own SQLite, plus rows rolled out of it into R2 segments.
  */
 export type CloudHistoryClient = Readonly<{
+  search(text: string, options: unknown): Promise<unknown>;
   sql(query: string, params: readonly SqlStorageValue[]): unknown;
   read(fromSeq: number, toSeq: number): Promise<unknown>;
 }>;
@@ -513,7 +514,7 @@ const invokeCloudConnect = async (
   }
 };
 
-/** `history.sql(...)` / `history.read(...)` — forwarded to the host. */
+/** `history.search(...)` / `history.sql(...)` / `history.read(...)` — forwarded to the host. */
 const historyIntrinsic =
   (client: CloudHistoryClient | undefined): CloudCodeIntrinsic =>
   async (input) => {
@@ -523,6 +524,11 @@ const historyIntrinsic =
       throw new Error("history is unavailable in this session.");
     }
     switch (request.method) {
+      case "search":
+        if (typeof args[0] !== "string" || !args[0].trim()) {
+          throw new Error("history.search requires the text to look for.");
+        }
+        return await client.search(args[0], args[1] ?? {});
       case "sql":
         if (typeof args[0] !== "string" || !args[0].trim()) {
           throw new Error("history.sql requires a non-empty query string.");

@@ -35,7 +35,7 @@ import {
 import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import { PLACED_AGENT_PAUSED } from "../stella/agents.ts";
 import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
-import { parseAgentReportId } from "@stella/contracts/backend/agent-reports";
+import { agentReportReceipt, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { splitReplyRefs } from "@stella/contracts/reply-refs";
@@ -151,6 +151,10 @@ const PROVIDER_RETRY_MS = 5_000;
 /** How long the agents' directory waits for the cloud; a message waits out the cloud's own device wait. */
 const DIRECTORY_TIMEOUT_MS = 5_000;
 const AGENT_MESSAGE_TIMEOUT_MS = 15_000;
+/** The request id the report inbox gives a ledger report: this prefix and its report id. */
+const AGENT_REPORT_REQUEST_PREFIX = "agent-report:";
+/** How many of the newest entries a report's receipt is looked for in. */
+const PROMPT_DEDUPE_SCAN = 400;
 
 export type DesktopChatsOptions = {
   /** The Stella data directory (`~/.stella`). */
@@ -1106,7 +1110,8 @@ export function desktopChats(options: DesktopChatsOptions) {
                       endAgentRun: async (run, _context, end) => {
                         const outcome = agentRunOutcome(end);
                         agentRunEnded?.({ conversationId, threadId: run.threadId, interrupted: outcome === undefined });
-                        if (!run.parentThreadId || !outcome || !subagentEnded) return;
+                        // Answered with agents of its own still at work: its attempt stays open.
+                        if (!run.parentThreadId || !outcome || end?.waiting || !subagentEnded) return;
                         subagentEnded({
                           conversationId,
                           threadId: run.threadId,
@@ -1433,6 +1438,21 @@ export function desktopChats(options: DesktopChatsOptions) {
    * the cloud with other devices' turns, imported first, waiting at most a
    * moment for the journal; one kept on this computer with another engine's.
    */
+  /** Whether a prompt with this client id is among the transcript's recent prompts. */
+  const transcriptHasPrompt = async (chat: Chat, clientMsgId: string): Promise<boolean> => {
+    const recent = await chat.harness.commit(
+      async (tx) => (await tx.scanEntries({ conversationId: chat.root.id, order: "descending" }, PROMPT_DEDUPE_SCAN)).items,
+      context,
+    );
+    return recent.some((entry) => {
+      if (entry.kind !== "pi.user") return false;
+      const content = (entry.model?.[0] as { content?: unknown } | undefined)?.content;
+      return (
+        Array.isArray(content) &&
+        content.some((part) => (part as { stella?: { clientMsgId?: unknown } } | null)?.stella?.clientMsgId === clientMsgId)
+      );
+    });
+  };
   const caughtUp = async (chat: Chat): Promise<void> => {
     await chat.localLog?.importNow().catch((error: unknown) => options.report(error));
     if (!chat.mirror) return;
@@ -1877,7 +1897,19 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (await noteOnBrain(conversationId, report.requestId, report.text)) return;
       const chat = await ready(conversationId);
       await caughtUp(chat);
-      const hidden: TextContent & { stella: { hidden: true } } = { type: "text", text: report.text, stella: { hidden: true } };
+      // A ledger report carries its receipt, the client id the cloud and
+      // every computer give its prompt; one already in the transcript (taken
+      // on another computer, or by an earlier build) is not taken again.
+      const reportId = report.requestId.startsWith(AGENT_REPORT_REQUEST_PREFIX)
+        ? report.requestId.slice(AGENT_REPORT_REQUEST_PREFIX.length)
+        : undefined;
+      const receipt = reportId && parseAgentReportId(reportId) ? agentReportReceipt(reportId) : undefined;
+      if (receipt && (await transcriptHasPrompt(chat, receipt))) return;
+      const hidden: TextContent & { stella: { hidden: true; clientMsgId?: string } } = {
+        type: "text",
+        text: report.text,
+        stella: { hidden: true, ...(receipt ? { clientMsgId: receipt } : {}) },
+      };
       await chat.root.submit({ type: "input", content: [hidden], whenBusy: "followUp", requestId: report.requestId }, context);
     },
     /**

@@ -6,11 +6,12 @@ import { tapMedium } from "../../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
+import { useT } from "../../i18n";
 
 const SNOOZES = [
-  { label: "10 minutes", minutes: () => 10 },
-  { label: "1 hour", minutes: () => 60 },
-  { label: "Tomorrow morning", minutes: () => tomorrowMorningMinutes(new Date()) },
+  { label: "reminders.snooze10", minutes: () => 10 },
+  { label: "reminders.snooze60", minutes: () => 60 },
+  { label: "reminders.snoozeTomorrow", minutes: () => tomorrowMorningMinutes(new Date()) },
 ] as const;
 
 const formatTime = (ms: number): string => {
@@ -28,6 +29,7 @@ export const ReminderActions = memo(function ReminderActions({
   mark: ReminderMark;
   colors: Colors;
 }) {
+  const t = useT();
   const fires = useReminderFires(true);
   const [busy, setBusy] = useState(false);
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -38,7 +40,7 @@ export const ReminderActions = memo(function ReminderActions({
     tapMedium();
     setBusy(true);
     void action()
-      .catch(() => Alert.alert("Couldn't update the reminder", "Try again in a moment."))
+      .catch(() => Alert.alert(t("reminders.failed")))
       .finally(() => setBusy(false));
   };
 
@@ -49,24 +51,24 @@ export const ReminderActions = memo(function ReminderActions({
     };
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: [...SNOOZES.map((choice) => choice.label), "Cancel"], cancelButtonIndex: SNOOZES.length },
+        { options: [...SNOOZES.map((choice) => t(choice.label)), t("common.cancel")], cancelButtonIndex: SNOOZES.length },
         pick,
       );
       return;
     }
-    Alert.alert("Snooze", undefined, [
-      ...SNOOZES.map((choice, index) => ({ text: choice.label, onPress: () => pick(index) })),
-      { text: "Cancel", style: "cancel" as const },
+    Alert.alert(t("reminders.snooze"), undefined, [
+      ...SNOOZES.map((choice, index) => ({ text: t(choice.label), onPress: () => pick(index) })),
+      { text: t("common.cancel"), style: "cancel" as const },
     ]);
   };
 
   if (fire.state !== "open") {
     const label =
       fire.state === "done"
-        ? "Done"
+        ? t("reminders.doneState")
         : fire.snoozedUntil && fire.snoozedUntil > Date.now()
-          ? `Snoozed until ${formatTime(fire.snoozedUntil)}`
-          : "Snoozed";
+          ? t("reminders.snoozedUntil", { time: formatTime(fire.snoozedUntil) })
+          : t("reminders.snoozed");
     return (
       <Text style={styles.settled} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
         {label}
@@ -82,7 +84,7 @@ export const ReminderActions = memo(function ReminderActions({
         style={({ pressed }) => [styles.button, styles.primary, (pressed || busy) && styles.dimmed]}
       >
         <Text style={[styles.label, styles.primaryLabel]} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          Done
+          {t("reminders.done")}
         </Text>
       </Pressable>
       <Pressable
@@ -92,7 +94,7 @@ export const ReminderActions = memo(function ReminderActions({
         style={({ pressed }) => [styles.button, (pressed || busy) && styles.dimmed]}
       >
         <Text style={styles.label} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          Snooze
+          {t("reminders.snooze")}
         </Text>
       </Pressable>
     </View>

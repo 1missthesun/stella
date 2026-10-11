@@ -85,12 +85,12 @@ const USER_ASK_ACTIONS = [
 const REMINDER_ACTIONS = [
   {
     identifier: REMINDER_ACTION_DONE,
-    buttonTitle: "Done",
+    buttonTitle: i18nFallback.t("reminders.done"),
     options: { opensAppToForeground: false },
   },
   {
     identifier: REMINDER_ACTION_SNOOZE,
-    buttonTitle: "Snooze 10 min",
+    buttonTitle: i18nFallback.t("reminders.snoozeFor"),
     options: { opensAppToForeground: false },
   },
 ];

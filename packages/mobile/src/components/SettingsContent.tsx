@@ -74,16 +74,6 @@ const GRADIENT_COLOR_OPTIONS: { value: GradientColor; labelKey: string }[] = [
   { value: "strong", labelKey: "mobile.settings.backgroundColor.strong" },
 ];
 
-function maskEmail(email: string): string {
-  const at = email.indexOf("@");
-  if (at <= 0) return "••••••••";
-  const local = email.slice(0, at);
-  const domain = email.slice(at);
-  const head = local.slice(0, 1);
-  const asterisks = "*".repeat(Math.max(local.length - 1, 4));
-  return `${head}${asterisks}${domain}`;
-}
-
 /**
  * The Settings tab: everything about the account and the app on one page,
  * top to bottom from who you are to the fine print — Account (identity and
@@ -123,7 +113,6 @@ export function SettingsContent() {
   );
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
-  const [emailRevealed, setEmailRevealed] = useState(false);
 
   useEffect(() => subscribeNotificationsMuted(setMutedLocal), []);
   const [voiceEnabled, setVoiceEnabledLocal] = useState(() =>
@@ -134,10 +123,6 @@ export function SettingsContent() {
   const user = session.data?.user;
   const email = user?.email ?? "";
   const userName = user?.name?.trim() ?? "";
-
-  useEffect(() => {
-    setEmailRevealed(false);
-  }, [email]);
 
   // Appearance, notifications, and legal work without a session; everything
   // that needs an identity (plan, computers, cloud, sign-out) hides.
@@ -286,33 +271,15 @@ export function SettingsContent() {
                 {email ? (
                   <Text
                     style={userName ? settingsStyles.rowSub : styles.identityName}
-                    numberOfLines={1}
+                    numberOfLines={2}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    selectable
                   >
-                    {emailRevealed ? email : maskEmail(email)}
+                    {email}
                   </Text>
                 ) : null}
               </View>
-              {email ? (
-                <Pressable
-                  onPress={() => {
-                    tapLight();
-                    setEmailRevealed((revealed) => !revealed);
-                  }}
-                  hitSlop={10}
-                  accessibilityLabel={
-                    emailRevealed
-                      ? t("mobile.settings.hideEmailLabel")
-                      : t("mobile.settings.showEmailLabel")
-                  }
-                  style={styles.emailToggle}
-                >
-                  <Icon
-                    name={emailRevealed ? "eye-off" : "eye"}
-                    size={18}
-                    color={colors.textMuted}
-                  />
-                </Pressable>
-              ) : null}
             </View>
           ) : showLoadingHeader ? (
             <Text style={settingsStyles.hint}>
@@ -702,12 +669,7 @@ const makeStyles = (colors: Colors) =>
       fontSize: 16,
       letterSpacing: -0.3,
     },
-    emailToggle: {
-      alignItems: "center",
-      height: 28,
-      justifyContent: "center",
-      width: 28,
-    },
+
     dimmed: {
       opacity: 0.6,
     },

@@ -234,6 +234,8 @@ export function useChatScroll(
         }
       } else if (
         distFromBottom > nearBottomLimit &&
+        offsetDelta < -0.5 &&
+        !bouncingBackFromTail &&
         pendingSendAnchorRef.current === null &&
         followTargetOffsetRef.current === null &&
         !followRafRef.current &&
@@ -499,8 +501,7 @@ export function useChatScroll(
   const clearActiveAssistantLayout = useCallback(() => {
     activeAssistantHeightRef.current = 0;
     assistantLayoutBaselineRef.current = null;
-    stopFollowLoop();
-  }, [stopFollowLoop]);
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     pendingSendAnchorRef.current = null;

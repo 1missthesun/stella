@@ -1532,20 +1532,18 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   }
 
   /**
-   * What happened to this conversation's brain lease: a move, a takeover,
-   * or a refused claim. Logged; the owner's agent event log takes these
-   * once it records conversation-scoped events.
+   * What happened to this conversation's brain lease (a move, a takeover,
+   * a refused claim), logged and appended to the owner's agent event log
+   * under the lease's epoch, once per event.
    */
   protected notePiBrainLease(
     kind: "moved" | "taken_over" | "refused",
     record: PiBrainRecord,
     detail: Record<string, unknown> = {},
   ): void {
-    log("info", `pi_brain_lease_${kind}`, {
-      conversationId: this.conversationId(),
-      host: record.host,
-      ...(record.host === "device" ? { deviceId: record.deviceId } : {}),
-      epoch: record.epoch,
+    const conversationId = this.conversationId();
+    const fields = {
+      host: record.host === "cloud" ? "cloud" : record.deviceId,
       ...(record.previous
         ? {
             previousHost:
@@ -1555,8 +1553,49 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             previousEpoch: record.previous.epoch,
           }
         : {}),
+      ...(record.leaseExpiresAt !== undefined
+        ? { leaseExpiresAt: record.leaseExpiresAt }
+        : {}),
       ...detail,
+    };
+    log("info", `pi_brain_lease_${kind}`, {
+      conversationId,
+      epoch: record.epoch,
+      ...fields,
     });
+    const ownerId = this.journal.ownerId();
+    if (!ownerId) return;
+    const key =
+      kind === "refused"
+        ? `brain_lease:${conversationId}:${record.epoch}:refused:${String(detail.claimant ?? "")}:${String(detail.turnId ?? detail.claimEpoch ?? "")}`
+        : `brain_lease:${conversationId}:${record.epoch}:${kind}`;
+    const append = async () => {
+      const owner = await this.resolveOwnerForCaller({ ownerId });
+      if (!owner) return;
+      unwrapRpc(
+        await this.ownerGate(ownerId).ownerInternal({
+          name: "agentEvents.append",
+          args: {
+            key: key.slice(0, 512),
+            kind: `brain_lease_${kind}`,
+            source: `conversation:${conversationId}`.slice(0, 512),
+            conversationId,
+            brainEpoch: record.epoch,
+            detail: fields,
+          },
+          ownerGeneration: owner.ownerGeneration,
+        }),
+      );
+    };
+    this.ctx.waitUntil(
+      append().catch((error: unknown) => {
+        log("error", "pi_brain_lease_event_failed", {
+          conversationId,
+          kind,
+          message: errorMessage(error),
+        });
+      }),
+    );
   }
 
   /**

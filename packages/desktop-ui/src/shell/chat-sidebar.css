@@ -72,7 +72,10 @@
 }
 
 .chat-panel-tab--wide .composer-context-peek-anchor,
-.chat-panel-tab--wide .chat-sidebar-shell {
+.chat-panel-tab--wide .chat-sidebar-shell,
+.chat-panel-tab--wide .connector-connect-card,
+.chat-panel-tab--wide .composer-notice,
+.chat-panel-tab--wide .cloud-browser-intervention {
   width: 100%;
   max-width: min(50rem, calc(100% - 48px));
 }

@@ -455,24 +455,28 @@ export const projectCloudConversationMessages = (args: {
       });
     }
 
-    // Files the turn itself produced (an orchestrator-direct `html`,
-    // `image_gen`, …) ride the turn's last reply. Files a spawned task
-    // produced are reported under the same turn id but belong to the task's
-    // completion card, which `projectMobileLifecycle` places on the reply
-    // that relays the result — desktop parity.
-    const turnSpawnedAgent = turn.some(
-      (record) =>
-        record.kind === "card" &&
-        record.card.type === "agent-lifecycle" &&
-        record.card.event.type === "agent-started",
+    // Only what this turn's own `html` and `image_gen` calls made rides its
+    // last reply, as on desktop. Any other file a files card names (an
+    // agent's output, a report's links) is never attached to a reply.
+    const ownOutputPaths = new Set<string>();
+    for (const { payload } of toolResults.values()) {
+      const toolName =
+        typeof payload.toolName === "string"
+          ? (payload.toolName.split("__").at(-1) ?? payload.toolName)
+          : "";
+      const details = asRecord(payload.details);
+      if (toolName === "html" && typeof details?.filePath === "string") {
+        ownOutputPaths.add(details.filePath);
+      }
+      if (toolName === "image_gen") {
+        for (const path of stringList(details?.drivePaths)) ownOutputPaths.add(path);
+      }
+    }
+    const files = turn.flatMap((record) =>
+      record.kind === "card" && record.card.type === "files"
+        ? record.card.files.filter((file) => ownOutputPaths.has(file.path))
+        : [],
     );
-    const files = turnSpawnedAgent
-      ? []
-      : turn.flatMap((record) =>
-          record.kind === "card" && record.card.type === "files"
-            ? record.card.files
-            : [],
-        );
     if (files.length) {
       const createdAt = turn.at(-1)?.createdAtMs ?? 0;
       const artifacts: ChatArtifact[] = files.map((file) =>

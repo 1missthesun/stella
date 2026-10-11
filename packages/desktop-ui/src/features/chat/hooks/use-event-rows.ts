@@ -444,6 +444,12 @@ export const deriveLinkedFiles = (
   ]).filter((entry) => entry.payload.kind !== "source-diff");
 };
 
+const isOwnTurnToolEvent = (event: EventRecord): boolean => {
+  if (event.type !== "tool_result") return true;
+  const agentType = asNonEmptyString(event.payload?.agentType);
+  return !agentType || agentType === "orchestrator";
+};
+
 /** Resolve completion events on one timeline row through their exact start. */
 export const projectAgentCompletionSections = (
   toolEvents: readonly EventRecord[],
@@ -874,21 +880,22 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
             ? assistantScrollFollowKey(replyToUserMessageId, indexWithinTurn)
             : message._id;
         const toolEvents = message.toolEvents;
+        const ownToolEvents = toolEvents.filter(isOwnTurnToolEvent);
         const resourcePayload = deriveTurnResource(
-          toolEvents,
+          ownToolEvents,
           text,
-          getCwd(toolEvents),
+          getCwd(ownToolEvents),
           { developerResourcesEnabled: developerResourcePreviewsEnabled },
         );
-        const inlineImagePayloads = deriveTurnInlineImagePayloads(toolEvents);
+        const inlineImagePayloads = deriveTurnInlineImagePayloads(ownToolEvents);
         const webSearchResults = deriveTurnWebSearchResults(toolEvents);
         const mapArtifacts = deriveTurnMapArtifacts(toolEvents);
         const askRecords = deriveTurnAskRecords(toolEvents);
-        const sourceDiffPayloads = collectTurnSourceDiffPayloads(toolEvents, {
+        const sourceDiffPayloads = collectTurnSourceDiffPayloads(ownToolEvents, {
           developerResourcesEnabled: developerResourcePreviewsEnabled,
           assistantText: text,
         });
-        const officePreviewRef = getOfficePreviewRef(toolEvents);
+        const officePreviewRef = getOfficePreviewRef(ownToolEvents);
         const voiceSession = payload?.metadata?.voiceSession;
         const backgroundWorks = buildBackgroundWorks(toolEvents);
         const backgroundWork = backgroundWorks[0];

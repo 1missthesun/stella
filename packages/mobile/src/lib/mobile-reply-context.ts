@@ -43,7 +43,7 @@ export function summaryExcerpt(result: string): string {
  *     card with a result excerpt and the task's produced files, which feed
  *     the activity hub but never render on the reply;
  *   - files the journal reports under a spawn turn belong to that task, so
- *     they ride its completion card rather than the spawn turn's reply.
+ *     they ride its completion card and never attach to any reply.
  * Rows anchor on the turn's visible replies by journal order, never on a
  * particular reply existing at the moment a card is read.
  */
@@ -137,7 +137,6 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
   }
   completions.sort((a, b) => a.seq - b.seq);
 
-  const placed = new Set<string>();
   const relayed = new Set<string>();
   for (const completion of completions) {
     const message = anchorAfter(completion.turnId, completion.seq);
@@ -153,17 +152,7 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
       title, subtitle: "", createdAt: completion.createdAt, completion: true,
       agents: [{ agentId: completion.agentId, title, files: files.map(file => file.payload), ...(summary ? { summary } : {}) }],
     } };
-    attach(message, [card, ...files]);
-    placed.add(completion.agentId);
-  }
-  // A task's files with no relayed result yet stay on the spawn turn's reply.
-  for (const [turnId, agentId] of agentByTurn) {
-    if (placed.has(agentId)) continue;
-    const files = filesByAgent.get(agentId);
-    const message = assistantsByTurn.get(turnId)?.at(-1)?.message;
-    if (!files?.length || !message) continue;
-    attach(message, files.map(entry => cloudFileArtifact(entry.file, conversationId, entry.createdAt)));
-    placed.add(agentId);
+    attach(message, [card]);
   }
   // A spawn that only recorded its description (a locally executed turn
   // mirrored into the journal) still names the task: its description is the

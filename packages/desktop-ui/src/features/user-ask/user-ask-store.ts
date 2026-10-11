@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { UserAsk, UserAskAnswer } from "@stella/contracts/user-ask";
 import type { UserAskRecord } from "@stella/contracts/user-ask-deck";
-import { userAskIsOpen } from "@stella/contracts/user-ask";
+import { userAskAwaitsAnswer } from "@stella/contracts/user-ask";
 import { getElectronApi } from "@/platform/electron/electron";
 
 const EMPTY_ASKS: readonly UserAsk[] = [];
@@ -41,7 +41,7 @@ const upsertAsk = (incoming: unknown) => {
   if (!isUsableAsk(incoming)) return;
   const current = openAsks.find((ask) => ask.askId === incoming.askId);
   if (current && current.revision > incoming.revision) return;
-  if (!userAskIsOpen(incoming.state) || answered.has(incoming.askId)) {
+  if (!userAskAwaitsAnswer(incoming.state) || answered.has(incoming.askId)) {
     dropAsk(incoming.askId);
     return;
   }
@@ -72,7 +72,9 @@ const dropAsk = (askId: unknown) => {
 const replaceAsks = (rows: unknown) => {
   const usable = (Array.isArray(rows) ? rows : [])
     .filter(isUsableAsk)
-    .filter((ask) => userAskIsOpen(ask.state) && !answered.has(ask.askId));
+    .filter(
+      (ask) => userAskAwaitsAnswer(ask.state) && !answered.has(ask.askId),
+    );
   openAsks = byCreation(usable);
   emit();
 };

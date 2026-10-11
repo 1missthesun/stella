@@ -15,7 +15,7 @@ import {
   USER_ASK_SEAL_ALGORITHM,
   USER_ASK_STATES,
   clampUrgency,
-  userAskIsOpen,
+  userAskAwaitsAnswer,
   type UserAsk,
   type UserAskAnswer,
   type UserAskDetail,
@@ -192,7 +192,7 @@ const parseAskRows = (rows: readonly unknown[]): readonly UserAsk[] => {
   const asks: UserAsk[] = [];
   for (const row of rows) {
     const ask = normalizeUserAsk(row);
-    if (ask && userAskIsOpen(ask.state)) asks.push(ask);
+    if (ask && userAskAwaitsAnswer(ask.state)) asks.push(ask);
   }
   asks.sort((left, right) => left.createdAt - right.createdAt);
   return asks;

@@ -776,6 +776,7 @@ type ObservedToolUse = {
   toolName: string;
   toolArgs: ClaudeToolArgs;
 };
+const callsThroughMcp = (toolName: string) => toolName.startsWith("mcp__");
 export const createClaudeNativeToolUseCorrelator = () => {
   const queued = new Map<string, string[]>();
   const waiters = new Map<string, ((id: string) => void)[]>();
@@ -849,7 +850,8 @@ export const createClaudeNativeToolUseCorrelator = () => {
   };
 
   const observe = (args: ObservedToolUse) => {
-    if (observedIds.has(args.toolCallId)) return;
+    if (!callsThroughMcp(args.toolName) || observedIds.has(args.toolCallId))
+      return;
     observedIds.add(args.toolCallId);
     const key = claudeToolKey(args.toolName, args.toolArgs);
     const waiter = waiters.get(key)?.shift();
@@ -876,7 +878,11 @@ export const createClaudeNativeToolUseCorrelator = () => {
       const truncated = getClaudeCodeTruncatedToolUseFromStreamEvent(event);
       for (const raw of content) {
         const block = asObject(raw);
-        if (block?.type !== "tool_use" || typeof block.name !== "string") {
+        if (
+          block?.type !== "tool_use" ||
+          typeof block.name !== "string" ||
+          !callsThroughMcp(block.name)
+        ) {
           continue;
         }
         const key = claudeToolKey(block.name, asObject(block.input) ?? {});
@@ -940,7 +946,8 @@ export const createClaudeNativeToolUseCorrelator = () => {
         if (
           block?.type === "tool_use" &&
           typeof block.id === "string" &&
-          typeof block.name === "string"
+          typeof block.name === "string" &&
+          callsThroughMcp(block.name)
         ) {
           streamingBlocks.set(index, {
             toolCallId: block.id,

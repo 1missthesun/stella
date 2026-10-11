@@ -433,7 +433,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       // (`claude-code-transport.ts`); it holds no model capability.
       const harnessExecution =
         turn.execution.engine === "anthropic" ? undefined : turn.execution;
-      if (turn.piAgent && turn.execution.engine !== "stella") {
+      if (turn.piAgent?.originDeviceId && turn.execution.engine !== "stella") {
         throw new Error(
           "A computer's cloud agents run on Stella's models; this conversation's cloud turns use another engine.",
         );

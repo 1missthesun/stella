@@ -5,7 +5,11 @@
  * starts a run at fire time; a `reminder`'s prompt is the text Stella wrote
  * when it was set, delivered with no model and no turn (a push to the
  * phone, a card in the conversation every client shows as Stella's message,
- * an in-app notice on the desktop). Each live schedule has
+ * an in-app notice on the desktop); a `watch` runs its check script with no
+ * model (`../watch-runner.ts`) and only a finding or a failure wakes AI, its
+ * prompt saying what to do with a finding. What wakes AI goes to the
+ * conversation's orchestrator, or with `route: agent` straight to an agent
+ * of it, whose report comes back like any finished job. Each live schedule has
  * exactly one pending `schedules.fire` job, id `schedule:<id>`, at its
  * `next_run_at`; every write that moves the time or the status replaces it.
  * A fire claims the row (re-anchoring recurring schedules from the fire
@@ -21,12 +25,16 @@
 
 import { Cron } from "croner";
 import type { LocalCronSchedule } from "@stella/contracts/scheduling";
-import type {
-  ScheduleCalls,
-  ScheduleKind,
-  ScheduleRow,
-  ScheduleStatus,
-  ScheduleToolResult,
+import {
+  WATCH_MIN_INTERVAL_MS,
+  WATCH_SCRIPT_MAX_CHARS,
+  type ScheduleCalls,
+  type ScheduleKind,
+  type ScheduleRoute,
+  type ScheduleRow,
+  type ScheduleStatus,
+  type ScheduleToolResult,
+  type WatchCheckResult,
 } from "@stella/contracts/backend/schedules";
 import {
   REMINDER_CARD_TYPE,
@@ -38,13 +46,14 @@ import {
   type ReminderFireState,
   type ReminderPushData,
 } from "@stella/contracts/reminders";
-import { empty, literal, number, object, optional, string, type Parser } from "../args.js";
+import { boolean, empty, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../registry.js";
 import { ScheduledTurnError } from "../scheduled-turn.js";
 import { billingAccess } from "./billing.js";
 import { livePushTokens, sendPushMessages } from "./devices.js";
+import { runWatchCheck } from "../watch-runner.js";
 
 export const SCHEDULE_FIRE_JOB = "schedules.fire";
 export const scheduleJobId = (scheduleId: string): string => `schedule:${scheduleId}`;
@@ -129,9 +138,36 @@ export const SCHEDULES_KINDS_MIGRATION = {
   ],
 };
 
+/**
+ * Cloud watches and routing: who handles a fire that needs AI, a watch's
+ * script and the state it carries between checks, and a finding waiting to
+ * be handed over.
+ */
+export const SCHEDULES_WATCHES_MIGRATION = {
+  id: "schedules.3-watches",
+  statements: [
+    `ALTER TABLE schedules ADD COLUMN route TEXT NOT NULL DEFAULT 'orchestrator'`,
+    `ALTER TABLE schedules ADD COLUMN once INTEGER NOT NULL DEFAULT 0`,
+    `ALTER TABLE schedules ADD COLUMN script TEXT`,
+    `ALTER TABLE schedules ADD COLUMN state_json TEXT`,
+    `ALTER TABLE schedules ADD COLUMN pending_finding TEXT`,
+    `ALTER TABLE schedules ADD COLUMN last_check_at INTEGER`,
+    `ALTER TABLE schedules ADD COLUMN last_finding TEXT`,
+    `ALTER TABLE schedules ADD COLUMN failing_since INTEGER`,
+  ],
+};
+
 type Row = {
   schedule_id: string;
   kind: string;
+  route: string;
+  once: number;
+  script: string | null;
+  state_json: string | null;
+  pending_finding: string | null;
+  last_check_at: number | null;
+  last_finding: string | null;
+  failing_since: number | null;
   conversation_id: string | null;
   target_device_id: string | null;
   prompt: string;
@@ -148,11 +184,18 @@ type Row = {
   updated_at: number;
 };
 
-const toScheduleKind = (value: string): ScheduleKind => (value === "reminder" ? "reminder" : "task");
+const toScheduleKind = (value: string): ScheduleKind =>
+  value === "reminder" || value === "watch" ? value : "task";
+
+const toRoute = (value: string): ScheduleRoute => (value === "agent" ? "agent" : "orchestrator");
 
 const toScheduleRow = (row: Row): ScheduleRow => ({
   scheduleId: row.schedule_id,
   kind: toScheduleKind(row.kind),
+  route: toRoute(row.route),
+  ...(row.once ? { once: true } : {}),
+  ...(row.last_check_at !== null ? { lastCheckAt: row.last_check_at } : {}),
+  ...(row.last_finding ? { lastFinding: row.last_finding } : {}),
   ...(row.conversation_id ? { conversationId: row.conversation_id } : {}),
   ...(row.target_device_id ? { targetDeviceId: row.target_device_id } : {}),
   prompt: row.prompt,
@@ -252,11 +295,41 @@ const intervalMs = (schedule: LocalCronSchedule, nowMs: number): number | null =
   return first && second ? second.getTime() - first.getTime() : null;
 };
 
-const assertAllowed = (schedule: LocalCronSchedule, nowMs: number): void => {
+const assertAllowed = (schedule: LocalCronSchedule, nowMs: number, kind: ScheduleKind = "task"): void => {
   const interval = intervalMs(schedule, nowMs);
-  if (interval !== null && interval < MIN_INTERVAL_MS) {
-    bad(`Schedules can run at most once every ${MIN_INTERVAL_MS / 60_000} minutes. Space this one out.`);
+  // A watch's check runs no model, so it may look more often.
+  const floor = kind === "watch" ? WATCH_MIN_INTERVAL_MS : MIN_INTERVAL_MS;
+  if (interval !== null && interval < floor) {
+    bad(`${kind === "watch" ? "Watches" : "Schedules"} can run at most once every ${floor / 60_000} minutes. Space this one out.`);
   }
+  if (kind === "watch" && schedule.kind === "at") {
+    bad("A watch checks again and again: give it an every or cron schedule.");
+  }
+};
+
+const cleanScript = (value: string | undefined): string => {
+  const script = (value ?? "").trim();
+  if (!script) bad("A watch needs its check script.");
+  if (script.length > WATCH_SCRIPT_MAX_CHARS) bad(`A watch script must be under ${WATCH_SCRIPT_MAX_CHARS} characters.`);
+  return script;
+};
+
+/**
+ * A watch's first check, run before it is saved: a script that cannot run
+ * is refused with its error, and one that runs starts from the state it
+ * returned. What it found already is reported, not handed over.
+ */
+const firstCheck = async (
+  ctx: OwnerContext,
+  scheduleId: string,
+  script: string,
+): Promise<{ check: WatchCheckResult; stateJson: string | null }> => {
+  const run = await runWatchCheck(ctx.env, { ownerId: ctx.ownerId, scheduleId, script, stateJson: null });
+  if (!run.ok) {
+    bad(`The watch script failed its first check, so it was not saved. Fix it and try again.\n${run.error}`);
+  }
+  const ran = run as Extract<typeof run, { ok: true }>;
+  return { check: { ok: true, found: ran.found, durationMs: ran.durationMs }, stateJson: ran.stateJson };
 };
 
 const cleanPrompt = (value: string): string => {
@@ -353,9 +426,16 @@ type CreateInput = {
   description?: string;
   conversationId?: string;
   targetDeviceId?: string;
+  route?: ScheduleRoute;
+  script?: string;
+  once?: boolean;
 };
 
-const createSchedule = (ctx: OwnerContext, input: CreateInput, isAnonymous: boolean) => {
+const createSchedule = async (
+  ctx: OwnerContext,
+  input: CreateInput,
+  isAnonymous: boolean,
+): Promise<{ replayed: boolean; result: ScheduleRow & { check?: WatchCheckResult } }> => {
   if (isAnonymous) signInRequired();
   const kind: ScheduleKind = input.kind ?? "task";
   const prompt = cleanPrompt(input.prompt);
@@ -364,14 +444,31 @@ const createSchedule = (ctx: OwnerContext, input: CreateInput, isAnonymous: bool
   const conversationId = input.conversationId?.trim() || null;
   // A reminder runs nowhere: it needs no computer.
   const targetDeviceId = kind === "reminder" ? null : input.targetDeviceId?.trim() || null;
+  const route: ScheduleRoute = kind === "reminder" ? "orchestrator" : (input.route ?? "orchestrator");
+  const script = kind === "watch" ? cleanScript(input.script) : null;
+  const once = kind === "watch" && input.once === true;
+  const requestId = input.requestId.trim();
+  const intent = { kind, prompt, schedule, description, conversationId, targetDeviceId, route, script, once };
+  const scheduleId = `sch-${crypto.randomUUID().slice(0, 18)}`;
+  // The first check awaits, so it runs before the receipt's write; a replay
+  // of the same request skips it and answers with the first result.
+  const replay = ctx.db.one<{ request_id: string }>(
+    "SELECT request_id FROM schedule_receipts WHERE request_id = ?",
+    requestId,
+  );
+  let first: { check: WatchCheckResult; stateJson: string | null } | null = null;
+  if (script && !replay) {
+    assertAllowed(schedule, ctx.now, kind);
+    first = await firstCheck(ctx, scheduleId, script);
+  }
   return withReceipt(
     ctx.db,
     ctx.now,
-    input.requestId.trim(),
+    requestId,
     "create",
-    { kind, prompt, schedule, description, conversationId, targetDeviceId },
-    (): ScheduleRow => {
-      assertAllowed(schedule, ctx.now);
+    intent,
+    (): ScheduleRow & { check?: WatchCheckResult } => {
+      assertAllowed(schedule, ctx.now, kind);
       const live =
         ctx.db.one<{ n: number }>(
           "SELECT COUNT(*) AS n FROM schedules WHERE status IN ('active', 'paused')",
@@ -380,8 +477,16 @@ const createSchedule = (ctx: OwnerContext, input: CreateInput, isAnonymous: bool
         bad(`You already have ${MAX_SCHEDULES} schedules. Remove one before adding another.`);
       }
       const row: Row = {
-        schedule_id: `sch-${crypto.randomUUID().slice(0, 18)}`,
+        schedule_id: scheduleId,
         kind,
+        route,
+        once: once ? 1 : 0,
+        script,
+        state_json: first?.stateJson ?? null,
+        pending_finding: null,
+        last_check_at: first ? ctx.now : null,
+        last_finding: first?.check.ok && first.check.found ? first.check.found : null,
+        failing_since: null,
         conversation_id: conversationId,
         target_device_id: targetDeviceId,
         prompt,
@@ -403,7 +508,7 @@ const createSchedule = (ctx: OwnerContext, input: CreateInput, isAnonymous: bool
         ...columns.map((column) => row[column]),
       );
       arm(ctx, row);
-      return toScheduleRow(row);
+      return { ...toScheduleRow(row), ...(first ? { check: first.check } : {}) };
     },
   );
 };
@@ -415,16 +520,35 @@ type UpdateInput = {
   schedule?: LocalCronSchedule;
   description?: string;
   status?: "active" | "paused";
+  route?: ScheduleRoute;
+  script?: string;
+  once?: boolean;
 };
 
-const updateSchedule = (ctx: OwnerContext, input: UpdateInput, isAnonymous: boolean) => {
+const updateSchedule = async (
+  ctx: OwnerContext,
+  input: UpdateInput,
+  isAnonymous: boolean,
+): Promise<{ replayed: boolean; result: ScheduleRow & { check?: WatchCheckResult } }> => {
   if (isAnonymous && input.status === "active") signInRequired();
   const prompt = input.prompt === undefined ? undefined : cleanPrompt(input.prompt);
   const schedule = input.schedule === undefined ? undefined : normalizeSchedule(input.schedule);
+  const script = input.script === undefined ? undefined : cleanScript(input.script);
+  const requestId = input.requestId.trim();
+  const existing = readRow(ctx.db, input.scheduleId);
+  if (script !== undefined && existing && toScheduleKind(existing.kind) !== "watch") {
+    bad("Only a watch has a check script.");
+  }
+  const replay = ctx.db.one<{ request_id: string }>(
+    "SELECT request_id FROM schedule_receipts WHERE request_id = ?",
+    requestId,
+  );
+  // A new script proves itself first and starts over from its own state.
+  const first = script !== undefined && existing && !replay ? await firstCheck(ctx, existing.schedule_id, script) : null;
   return withReceipt(
     ctx.db,
     ctx.now,
-    input.requestId.trim(),
+    requestId,
     "update",
     {
       scheduleId: input.scheduleId,
@@ -432,15 +556,19 @@ const updateSchedule = (ctx: OwnerContext, input: UpdateInput, isAnonymous: bool
       schedule: schedule ?? null,
       description: input.description === undefined ? null : input.description.trim(),
       status: input.status ?? null,
+      route: input.route ?? null,
+      script: script ?? null,
+      once: input.once ?? null,
     },
-    (): ScheduleRow => {
+    (): ScheduleRow & { check?: WatchCheckResult } => {
       const row = readRow(ctx.db, input.scheduleId);
       if (!row) throw new RpcError("NOT_FOUND", `No schedule with id ${input.scheduleId}.`);
+      const kind = toScheduleKind(row.kind);
       const nextPrompt = prompt ?? row.prompt;
       let scheduleJson = row.schedule_json;
       let nextRunAt = row.next_run_at;
       if (schedule) {
-        assertAllowed(schedule, ctx.now);
+        assertAllowed(schedule, ctx.now, kind);
         scheduleJson = JSON.stringify(schedule);
         nextRunAt = computeNextRunAt(schedule, ctx.now);
       }
@@ -457,21 +585,47 @@ const updateSchedule = (ctx: OwnerContext, input: UpdateInput, isAnonymous: bool
         status: input.status ?? row.status,
         description:
           input.description === undefined ? row.description : cleanDescription(input.description, nextPrompt),
+        route: kind === "reminder" ? row.route : (input.route ?? row.route),
+        once: kind === "watch" && input.once !== undefined ? (input.once ? 1 : 0) : row.once,
+        ...(first
+          ? {
+              script: script ?? row.script,
+              state_json: first.stateJson,
+              pending_finding: null,
+              last_check_at: ctx.now,
+              last_finding: first.check.ok && first.check.found ? first.check.found : null,
+              failing_since: null,
+              last_error: null,
+              last_error_at: null,
+            }
+          : {}),
         updated_at: ctx.now,
       };
       ctx.db.run(
         `UPDATE schedules SET prompt = ?, schedule_json = ?, next_run_at = ?, status = ?,
-                description = ?, updated_at = ? WHERE schedule_id = ?`,
+                description = ?, route = ?, once = ?, script = ?, state_json = ?, pending_finding = ?,
+                last_check_at = ?, last_finding = ?, failing_since = ?, last_error = ?, last_error_at = ?,
+                updated_at = ? WHERE schedule_id = ?`,
         next.prompt,
         next.schedule_json,
         next.next_run_at,
         next.status,
         next.description,
+        next.route,
+        next.once,
+        next.script,
+        next.state_json,
+        next.pending_finding,
+        next.last_check_at,
+        next.last_finding,
+        next.failing_since,
+        next.last_error,
+        next.last_error_at,
         next.updated_at,
         next.schedule_id,
       );
       if (next.status !== row.status || next.next_run_at !== row.next_run_at) arm(ctx, next);
-      return toScheduleRow(next);
+      return { ...toScheduleRow(next), ...(first ? { check: first.check } : {}) };
     },
   );
 };
@@ -511,7 +665,10 @@ const runNow = (ctx: OwnerContext, scheduleId: string): null => {
 
 const toolParser = object({
   action: literal("list", "create", "update", "remove"),
-  kind: optional(literal("reminder", "task")),
+  kind: optional(literal("reminder", "task", "watch")),
+  route: optional(literal("orchestrator", "agent")),
+  script: optional(string({ max: WATCH_SCRIPT_MAX_CHARS + 1_000 })),
+  once: optional(boolean()),
   requestId: optional(string({ max: 128 })),
   scheduleId: optional(string({ max: 128, pattern: ID_PATTERN })),
   prompt: optional(string({ max: MAX_PROMPT_CHARS * 2 })),
@@ -531,7 +688,7 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
   if (args.action === "create") {
     if (!args.prompt) bad("prompt is required.");
     if (!args.schedule) bad("schedule is required.");
-    const created = createSchedule(
+    const created = await createSchedule(
       ctx,
       {
         requestId,
@@ -540,14 +697,24 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
         schedule: args.schedule!,
         ...(args.description !== undefined ? { description: args.description } : {}),
         ...(args.conversationId !== undefined ? { conversationId: args.conversationId } : {}),
+        ...(args.route !== undefined ? { route: args.route } : {}),
+        ...(args.script !== undefined ? { script: args.script } : {}),
+        ...(args.once !== undefined ? { once: args.once } : {}),
       },
       isAnonymous,
     );
-    return { ok: true, replayed: created.replayed, schedule: created.result, schedules: list() };
+    const { check, ...schedule } = created.result;
+    return {
+      ok: true,
+      replayed: created.replayed,
+      schedule,
+      ...(check ? { check } : {}),
+      schedules: list(),
+    };
   }
   if (!args.scheduleId) bad("scheduleId is required.");
   if (args.action === "update") {
-    const updated = updateSchedule(
+    const updated = await updateSchedule(
       ctx,
       {
         requestId,
@@ -556,10 +723,20 @@ const scheduleTool = async (ctx: OwnerContext, raw: unknown): Promise<ScheduleTo
         ...(args.schedule !== undefined ? { schedule: args.schedule } : {}),
         ...(args.description !== undefined ? { description: args.description } : {}),
         ...(args.status !== undefined ? { status: args.status } : {}),
+        ...(args.route !== undefined ? { route: args.route } : {}),
+        ...(args.script !== undefined ? { script: args.script } : {}),
+        ...(args.once !== undefined ? { once: args.once } : {}),
       },
       isAnonymous,
     );
-    return { ok: true, replayed: updated.replayed, schedule: updated.result, schedules: list() };
+    const { check, ...schedule } = updated.result;
+    return {
+      ok: true,
+      replayed: updated.replayed,
+      schedule,
+      ...(check ? { check } : {}),
+      schedules: list(),
+    };
   }
   const removed = removeSchedule(ctx, { requestId, scheduleId: args.scheduleId! });
   return {
@@ -880,27 +1057,61 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     );
     return;
   }
-  if (!retrying) {
-    const budget = dailyFires(ctx);
-    try {
-      enforceOwnerRateLimit(
-        ctx.db,
-        ctx.now,
-        SCHEDULE_FIRE_JOB,
-        { count: budget.count, windowMs: DAY_MS },
-        "Daily scheduled runs are used up.",
-      );
-    } catch (error) {
-      if (!(error instanceof RpcError) || error.code !== "RATE_LIMITED") throw error;
-      // A fact about the account, not a transient failure: wait for the next
-      // slot rather than retrying into the same wall.
-      finishFire(ctx, scheduleId, fireId, {
-        error: `This run was skipped: today's ${budget.count} scheduled runs on the ${planLabel(budget.plan)} plan are used up.`,
-        oneShot,
-      });
-      return;
-    }
+  if (toScheduleKind(row.kind) === "watch") {
+    await fireWatch(ctx, row, fireId, retrying, snapshot.ownerGeneration);
+    return;
   }
+  if (!retrying && !spendRun(ctx, scheduleId, fireId, oneShot)) return;
+  const started = await startRun(ctx, row, fireId, snapshot.ownerGeneration, {
+    prompt: row.prompt,
+    ...(toRoute(row.route) === "agent" ? { agent: { description: row.description } } : {}),
+  });
+  finishFire(ctx, scheduleId, fireId, started.ok ? {} : { ...started.outcome, oneShot });
+};
+
+/**
+ * One of the owner's daily scheduled runs, for a fire about to wake AI.
+ * When they are used up the fire is closed with why, and this is false.
+ */
+const spendRun = (ctx: OwnerContext, scheduleId: string, fireId: string, oneShot: boolean): boolean => {
+  const budget = dailyFires(ctx);
+  try {
+    enforceOwnerRateLimit(
+      ctx.db,
+      ctx.now,
+      SCHEDULE_FIRE_JOB,
+      { count: budget.count, windowMs: DAY_MS },
+      "Daily scheduled runs are used up.",
+    );
+    return true;
+  } catch (error) {
+    if (!(error instanceof RpcError) || error.code !== "RATE_LIMITED") throw error;
+    // A fact about the account, not a transient failure: wait for the next
+    // slot rather than retrying into the same wall.
+    finishFire(ctx, scheduleId, fireId, {
+      error: `This run was skipped: today's ${budget.count} scheduled runs on the ${planLabel(budget.plan)} plan are used up.`,
+      oneShot,
+    });
+    return false;
+  }
+};
+
+type StartOutcome =
+  | { ok: true }
+  | { ok: false; outcome: { error: string; retry?: { sameFire: boolean } } };
+
+/**
+ * Start a fire's run in the schedule's conversation: a turn of its
+ * orchestrator, or with `agent` an agent of it.
+ */
+const startRun = async (
+  ctx: OwnerContext,
+  row: Row,
+  fireId: string,
+  ownerGeneration: string,
+  run: { prompt: string; agent?: { description: string } },
+): Promise<StartOutcome> => {
+  const scheduleId = row.schedule_id;
   // Conversation ids are minted here and pinned before the start, so every
   // retry of this fire and every later fire reports into the same thread.
   let conversationId = row.conversation_id ?? crypto.randomUUID();
@@ -909,12 +1120,13 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   }
   const start = async (id: string) =>
     await ctx.host.startScheduledTurn({
-      ownerGeneration: snapshot.ownerGeneration,
+      ownerGeneration,
       conversationId: id,
       clientMsgId: `schedule:${fireId}`,
-      prompt: row.prompt,
+      prompt: run.prompt,
       title: row.description,
       ...(row.target_device_id ? { targetDeviceId: row.target_device_id } : {}),
+      ...(run.agent ? { agent: run.agent } : {}),
     });
   try {
     try {
@@ -936,26 +1148,154 @@ const fire = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
     // fire. Anything else may have started; its retry reuses the fire id,
     // which the start replays instead of running the prompt twice.
     const definite = error instanceof ScheduledTurnError;
-    finishFire(ctx, scheduleId, fireId, {
-      error: message,
-      oneShot,
-      ...(!definite || error.retryable ? { retry: { sameFire: !definite } } : {}),
+    return {
+      ok: false,
+      outcome: {
+        error: message,
+        ...(!definite || error.retryable ? { retry: { sameFire: !definite } } : {}),
+      },
+    };
+  }
+  return { ok: true };
+};
+
+// ── Watches ───────────────────────────────────────────────────────────────
+
+const watchFoundPrompt = (row: Row, found: string): string =>
+  [
+    `[Watch "${row.description}" found something] (${row.schedule_id})`,
+    found,
+    "",
+    `When it was set up, the user asked: ${row.prompt}`,
+    row.once ? "It has done its job and stops checking now." : "It keeps checking on its schedule.",
+    "Handle the finding as they asked: tell them, ask them, or act.",
+  ].join("\n");
+
+const watchAgentPrompt = (row: Row, found: string): string =>
+  [
+    row.prompt,
+    "",
+    `A watch ("${row.description}") just found what the user was waiting for:`,
+    found,
+    "",
+    "The user approved this when they set the watch up, so go ahead now, then report what you did.",
+  ].join("\n");
+
+const watchFailedPrompt = (row: Row, error: string): string =>
+  [
+    `[Watch "${row.description}" failed] (${row.schedule_id})`,
+    error,
+    "",
+    `It was set up for: ${row.prompt}`,
+    "It keeps trying on its schedule. Repair it: find out what changed, rewrite the check script and replace it with schedule_update({ jobId, script }), which checks it once before saving. Tell the user only if it can't be fixed.",
+  ].join("\n");
+
+/**
+ * A watch's fire: its script runs with no model. Nothing found is the end of
+ * it. A finding is handed to the orchestrator, or to an agent when the user
+ * already approved the action; it waits on the row until it is, so a busy
+ * or refused start never loses it and never runs the check again for it. A
+ * failing script is reported once per failing streak, for repair.
+ */
+const fireWatch = async (
+  ctx: OwnerContext,
+  row: Row,
+  fireId: string,
+  retrying: boolean,
+  ownerGeneration: string,
+): Promise<void> => {
+  const scheduleId = row.schedule_id;
+  let found = row.pending_finding ?? "";
+  let failure = "";
+  if (!found) {
+    if (!row.script) {
+      finishFire(ctx, scheduleId, fireId, { error: "This watch has no check script.", pause: true });
+      return;
+    }
+    const run = await runWatchCheck(ctx.env, {
+      ownerId: ctx.ownerId,
+      scheduleId,
+      script: row.script,
+      stateJson: row.state_json,
     });
+    const current = readRow(ctx.db, scheduleId);
+    if (!current) return;
+    // Its script was replaced while this one ran: the new one starts its own state.
+    if (current.script !== row.script) {
+      finishFire(ctx, scheduleId, fireId, {});
+      return;
+    }
+    if (run.ok) {
+      ctx.db.run(
+        `UPDATE schedules SET state_json = ?, last_check_at = ?, failing_since = NULL, pending_finding = ?,
+                last_finding = COALESCE(?, last_finding) WHERE schedule_id = ?`,
+        run.stateJson,
+        ctx.now,
+        run.found || null,
+        run.found || null,
+        scheduleId,
+      );
+      if (!run.found) {
+        finishFire(ctx, scheduleId, fireId, {});
+        return;
+      }
+      found = run.found;
+    } else {
+      ctx.db.run(
+        "UPDATE schedules SET last_check_at = ?, failing_since = COALESCE(failing_since, ?) WHERE schedule_id = ?",
+        ctx.now,
+        ctx.now,
+        scheduleId,
+      );
+      if (current.failing_since !== null) {
+        finishFire(ctx, scheduleId, fireId, { error: run.error });
+        return;
+      }
+      failure = run.error;
+    }
+  }
+  if (!retrying && !spendRun(ctx, scheduleId, fireId, false)) return;
+  const toAgent = Boolean(found) && toRoute(row.route) === "agent";
+  const started = await startRun(
+    ctx,
+    row,
+    fireId,
+    ownerGeneration,
+    found
+      ? {
+          prompt: toAgent ? watchAgentPrompt(row, found) : watchFoundPrompt(row, found),
+          ...(toAgent ? { agent: { description: row.description } } : {}),
+        }
+      : { prompt: watchFailedPrompt(row, failure) },
+  );
+  if (!started.ok) {
+    finishFire(ctx, scheduleId, fireId, started.outcome);
     return;
   }
-  finishFire(ctx, scheduleId, fireId, {});
+  if (found) {
+    // Handed over. A one-off watch has answered its question.
+    ctx.db.run(
+      `UPDATE schedules SET pending_finding = NULL, status = CASE WHEN once = 1 THEN 'done' ELSE status END
+        WHERE schedule_id = ?`,
+      scheduleId,
+    );
+  }
+  finishFire(ctx, scheduleId, fireId, failure ? { error: failure } : {});
 };
 
 // ── Domain ────────────────────────────────────────────────────────────────
 
 const createArgs = object({
   requestId: string({ max: 128 }),
-  kind: optional(literal("reminder", "task")),
+  kind: optional(literal("reminder", "task", "watch")),
   prompt: string({ max: MAX_PROMPT_CHARS * 2 }),
   schedule: scheduleParser,
   description: optional(string({ max: 1_000 })),
   conversationId: optional(string({ max: 128 })),
   targetDeviceId: optional(string({ max: 256 })),
+  route: optional(literal("orchestrator", "agent")),
+  script: optional(string({ max: WATCH_SCRIPT_MAX_CHARS + 1_000 })),
+  once: optional(boolean()),
 });
 
 const updateArgs = object({
@@ -965,6 +1305,9 @@ const updateArgs = object({
   schedule: optional(scheduleParser),
   description: optional(string({ max: 1_000 })),
   status: optional(literal("active", "paused")),
+  route: optional(literal("orchestrator", "agent")),
+  script: optional(string({ max: WATCH_SCRIPT_MAX_CHARS + 1_000 })),
+  once: optional(boolean()),
 });
 
 const removeArgs = object({
@@ -974,7 +1317,7 @@ const removeArgs = object({
 
 export const schedulesDomain = {
   name: "schedules",
-  migrations: [SCHEDULES_MIGRATION, SCHEDULES_KINDS_MIGRATION],
+  migrations: [SCHEDULES_MIGRATION, SCHEDULES_KINDS_MIGRATION, SCHEDULES_WATCHES_MIGRATION],
   views: {
     "schedules.list": {
       parse: empty(),
@@ -989,14 +1332,14 @@ export const schedulesDomain = {
     "schedules.create": {
       scope: "owner",
       parse: createArgs,
-      handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.create"]["args"]) =>
-        createSchedule(ctx, args, ctx.caller?.isAnonymous ?? false).result,
+      handler: async (ctx: OwnerContext, args: ScheduleCalls["schedules.create"]["args"]) =>
+        (await createSchedule(ctx, args, ctx.caller?.isAnonymous ?? false)).result,
     },
     "schedules.update": {
       scope: "owner",
       parse: updateArgs,
-      handler: (ctx: OwnerContext, args: ScheduleCalls["schedules.update"]["args"]) =>
-        updateSchedule(ctx, args, ctx.caller?.isAnonymous ?? false).result,
+      handler: async (ctx: OwnerContext, args: ScheduleCalls["schedules.update"]["args"]) =>
+        (await updateSchedule(ctx, args, ctx.caller?.isAnonymous ?? false)).result,
     },
     "schedules.remove": {
       scope: "owner",

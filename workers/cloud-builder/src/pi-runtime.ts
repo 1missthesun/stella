@@ -2148,7 +2148,7 @@ export class PiConversationRuntime {
    * as someone else's.
    */
   async originAgent(
-    request: { op: "start" | "message" | "pause"; threadId: string; description?: string; originDeviceId: string },
+    request: { op: "start" | "message" | "pause"; threadId: string; description?: string; originDeviceId?: string },
     prompt: string,
     turnId: string,
     context: Context,
@@ -2163,13 +2163,16 @@ export class PiConversationRuntime {
       context,
     );
     if (request.op === "start") {
+      // Without an origin, a schedule started it for this conversation's own orchestrator.
       await agents.startAgent(
         {
-          key: `origin:${request.originDeviceId}:${request.threadId}`,
+          key: request.originDeviceId
+            ? `origin:${request.originDeviceId}:${request.threadId}`
+            : `schedule:${request.threadId}`,
           description: request.description ?? request.threadId,
           prompt,
           threadId: request.threadId,
-          origin: { deviceId: request.originDeviceId },
+          ...(request.originDeviceId ? { origin: { deviceId: request.originDeviceId } } : {}),
         },
         context,
       );

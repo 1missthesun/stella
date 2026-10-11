@@ -1,8 +1,9 @@
 /**
- * Starts a scheduled prompt as a turn: through the gate's `submit()` for a
- * named desktop (which runs it in the cloud when that desktop can't take
- * it), or straight on the conversation's orchestrator otherwise, the same
- * service-authenticated start the gate's cloud branch makes.
+ * Starts a scheduled prompt: through the gate's `submit()` for a named
+ * desktop (which runs it in the cloud when that desktop can't take it), or
+ * straight on the conversation's orchestrator otherwise, the same
+ * service-authenticated start the gate's cloud branch makes. A start with
+ * `agent` begins an agent of the orchestrator rather than a turn of it.
  */
 
 import { PLACEMENT_PROTOCOL } from "@stella/contracts/turn-plane/placement";
@@ -55,6 +56,7 @@ const startOnDesktop = async (
         prompt: input.prompt,
         conversationId: input.conversationId,
         clientMsgId: input.clientMsgId,
+        ...(input.agent ? { scheduledAgent: { description: input.agent.description } } : {}),
       },
     },
     expectedGeneration: input.ownerGeneration,
@@ -76,7 +78,8 @@ const startInCloud = async (
 ): Promise<void> => {
   const request: CloudTurnStartRequest = {
     protocol: TURN_PLANE_PROTOCOL,
-    clientMsgId: input.clientMsgId,
+    // An agent's brief is the agent's, not the conversation's (`pia:`).
+    clientMsgId: input.agent ? `pia:${input.clientMsgId}` : input.clientMsgId,
     prompt: input.prompt,
     lane: "schedule",
     // The prompt is the model's own wake instruction, not the owner's
@@ -84,6 +87,15 @@ const startInCloud = async (
     source: "schedule",
     hiddenMessage: true,
     ...(input.title.trim() ? { title: input.title.trim().slice(0, TURN_TITLE_MAX_CHARS) } : {}),
+    ...(input.agent
+      ? {
+          piAgent: {
+            op: "start" as const,
+            threadId: scheduledAgentThreadId(input.clientMsgId),
+            description: input.agent.description.slice(0, 1_000),
+          },
+        }
+      : {}),
   };
   const response = await deps.env.ORCHESTRATOR_SESSIONS.getByName(input.conversationId).fetch(
     `${ORCHESTRATOR_INTERNAL_ORIGIN}/turn`,
@@ -121,6 +133,10 @@ const startInCloud = async (
     },
   );
 };
+
+/** One agent per fire, so a retried start finds the agent the first one began. */
+const scheduledAgentThreadId = (clientMsgId: string): string =>
+  `thr-${clientMsgId.replace(/[^A-Za-z0-9]/g, "").slice(-24)}`;
 
 export const startScheduledTurn = async (
   deps: GateHostDependencies,

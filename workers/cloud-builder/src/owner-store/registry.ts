@@ -203,6 +203,11 @@ export type ScheduledTurnStart = {
   title: string;
   /** Run on this desktop; absent runs in the cloud. */
   targetDeviceId?: string;
+  /**
+   * Start the prompt as an agent of the conversation's orchestrator instead
+   * of an orchestrator turn; its report comes back to the orchestrator.
+   */
+  agent?: { description: string };
 };
 
 export type AgentTurnDispatch = {

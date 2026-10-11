@@ -313,6 +313,14 @@ export const parseDispatchPayload = (
     }
     payload.handoff = true;
   }
+  if (value.scheduledAgent !== undefined) {
+    const agent = isRecord(value.scheduledAgent) ? value.scheduledAgent : null;
+    const description = bounded(agent?.description, MAX_DISPATCH_DESCRIPTION_CHARS);
+    if (!description || kind !== "chat") {
+      return fail("payload.scheduledAgent must name the agent on a chat dispatch.");
+    }
+    payload.scheduledAgent = { description };
+  }
   return { ok: true, payload };
 };
 
@@ -404,6 +412,9 @@ export const parseDispatchSubmitRequest = (
   if (!payload.ok) return fail(payload.message);
   if (payload.payload.conversationId !== conversationId) {
     return fail("payload.conversationId does not match the dispatch.");
+  }
+  if (payload.payload.scheduledAgent && ingress !== "schedule") {
+    return fail("payload.scheduledAgent is for a schedule's dispatch.");
   }
   const request: DispatchSubmitRequest = {
     protocol: PLACEMENT_PROTOCOL,

@@ -242,9 +242,11 @@ export const parseCloudTurnStartRequest = (
       !["start", "message", "pause"].includes(agent.op as string) ||
       typeof agent.threadId !== "string" ||
       !PI_AGENT_THREAD_ID_PATTERN.test(agent.threadId) ||
-      typeof agent.originDeviceId !== "string" ||
-      !agent.originDeviceId.trim() ||
-      agent.originDeviceId.length > 256 ||
+      (agent.originDeviceId !== undefined &&
+        (typeof agent.originDeviceId !== "string" ||
+          !agent.originDeviceId.trim() ||
+          agent.originDeviceId.length > 256)) ||
+      (agent.originDeviceId === undefined && agent.op !== "start") ||
       (agent.description !== undefined &&
         (typeof agent.description !== "string" || agent.description.length > 1_000))
     ) {
@@ -253,7 +255,9 @@ export const parseCloudTurnStartRequest = (
     request.piAgent = {
       op: agent.op as "start" | "message" | "pause",
       threadId: agent.threadId,
-      originDeviceId: agent.originDeviceId.trim(),
+      ...(typeof agent.originDeviceId === "string"
+        ? { originDeviceId: agent.originDeviceId.trim() }
+        : {}),
       ...(typeof agent.description === "string" && agent.description.trim()
         ? { description: agent.description.trim() }
         : {}),
@@ -292,6 +296,10 @@ export const serviceOnlyTurnFields = (
   if (request.hiddenMessage !== undefined) fields.push("hiddenMessage");
   if (request.agentThreadControl !== undefined) {
     fields.push("agentThreadControl");
+  }
+  // An agent of this conversation's own orchestrator is a schedule's to start.
+  if (request.piAgent !== undefined && request.piAgent.originDeviceId === undefined) {
+    fields.push("piAgent");
   }
   return fields;
 };

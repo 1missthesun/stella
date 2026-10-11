@@ -220,6 +220,16 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       ...(payload.handoff || row.ingress === "schedule"
         ? { hiddenMessage: true }
         : {}),
+      // A schedule's agent, its computer away: it starts here instead.
+      ...(row.ingress === "schedule" && payload.scheduledAgent
+        ? {
+            piAgent: {
+              op: "start" as const,
+              threadId: `thr-${row.dispatch_id.replace(/[^A-Za-z0-9]/g, "").slice(-24)}`,
+              description: payload.scheduledAgent.description.slice(0, 1_000),
+            },
+          }
+        : {}),
     };
     const handoffKey = cloudChatHandoffKey(row.dispatch_id);
     let handoff = await this.ctx.storage.get<CloudChatHandoff>(handoffKey);

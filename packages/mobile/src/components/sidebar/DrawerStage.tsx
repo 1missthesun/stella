@@ -34,6 +34,7 @@ import {
   drawerProgress,
   drawerSign,
   drawerVeil,
+  isDrawerOpen,
   openDrawer,
   useDrawerLive,
   useDrawerMetrics,
@@ -390,8 +391,11 @@ function FloatingChevron({
       transform: [{ rotate: `${interpolate(v, [0, 1], [0, 90], CLAMP)}deg` }],
     };
   });
-  const press = open ? closeDrawer : () => openDrawer(side);
   const label = open ? closeLabel : openLabel;
+  const press = () => {
+    if (isDrawerOpen(side)) closeDrawer();
+    else openDrawer(side);
+  };
   const pressRef = useRef(press);
   pressRef.current = press;
   const pressed = useSharedValue(0);

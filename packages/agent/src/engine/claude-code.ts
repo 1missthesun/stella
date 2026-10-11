@@ -103,7 +103,11 @@ export type ClaudeCodeTurnSpec = {
   onNativeToolEnd(end: { toolUseId: string; result: string; isError: boolean }): void;
   onStatus(status: ClaudeCodeStatus): void;
   onSessionId(sessionId: string): void;
-  control(inject: (input: { text: string; images: ImageContent[] }) => boolean): void;
+  control(turn: {
+    inject(input: { text: string; images: ImageContent[] }): boolean;
+    /** End the CLI's step at this tool boundary, unanswered; `toolSetAfterStep` then carries the turn on. */
+    endStep(): boolean;
+  }): void;
   toolSetAfterStep(): { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[]; prompt: string } | undefined;
 };
 
@@ -151,8 +155,11 @@ type Turn = {
   waiting: Map<string, (outcome: ClaudeCodeToolOutcome) => void>;
   early: Map<string, ClaudeCodeToolOutcome>;
   inject?: (input: { text: string; images: ImageContent[] }) => boolean;
+  endStep?: () => boolean;
   toolSet: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
   nextToolSet?: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
+  /** Tool results the CLI's ended step never read; the next step is told them. */
+  carried?: Message[];
 };
 
 type TurnRequest = {
@@ -229,6 +236,18 @@ const messageKey = (message: Message): string | undefined => {
 };
 
 const clip = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max)}\n[...truncated]` : text);
+
+const toolSetKey = (set: { tools: readonly ClaudeCodeToolSpec[]; nativeTools: readonly string[] }): string =>
+  JSON.stringify([set.nativeTools, set.tools.map((tool) => tool.name)]);
+
+const TOOLS_MOVED_PROMPT = "Your file and shell tools changed where they run; use the tools you have now and carry on with the task.";
+
+const movedPrompt = (carried: readonly Message[] | undefined): string => {
+  const results = carried ? renderBounded(carried, REBUILD_MAX_CHARS) : "";
+  return results
+    ? `${TOOLS_MOVED_PROMPT}\n\n<tool_results>\nWhat the calls you just made returned. They finished before the switch; do not repeat them:\n\n${results}\n</tool_results>`
+    : TOOLS_MOVED_PROMPT;
+};
 
 const renderMessage = (message: Message): string | undefined => {
   switch (message.role) {
@@ -560,18 +579,18 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             void saveRecord(session);
           }
         },
-        control: (inject) => {
+        control: ({ inject, endStep }) => {
           turn.inject = inject;
+          turn.endStep = endStep;
         },
         toolSetAfterStep: () => {
           const next = turn.nextToolSet;
           if (!next) return undefined;
+          const carried = turn.carried;
           turn.nextToolSet = undefined;
+          turn.carried = undefined;
           turn.toolSet = next;
-          return {
-            ...next,
-            prompt: "Your file and shell tools changed where they run; use the tools you have now and carry on with the task.",
-          };
+          return { ...next, prompt: movedPrompt(carried) };
         },
       })
       .then(
@@ -850,9 +869,16 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         });
         const held = new Set(turn.unsent.map(messageKey));
         const waiting = [...turn.unsent, ...fresh.filter((message) => !held.has(messageKey(message)))];
+        const moved = !turn.done && toolSetKey(turn.toolSet) !== toolSetKey(toolSet);
+        if (moved) {
+          turn.nextToolSet = toolSet;
+          turn.carried = results;
+        }
+        const restarted = moved && turn.endStep?.() === true;
+        if (!restarted) turn.carried = undefined;
         if (waiting.length > 0) {
           const prompt = userPrompt(waiting);
-          if (!turn.done && prompt.text && turn.inject?.({ text: prompt.text, images: prompt.images })) {
+          if (!restarted && !turn.done && prompt.text && turn.inject?.({ text: prompt.text, images: prompt.images })) {
             noteSeen(session, waiting);
             turn.unsent = [];
           } else {
@@ -866,6 +892,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             const record = calls.get(message.toolCallId);
             if (!record || record.native) continue;
             calls.delete(message.toolCallId);
+            if (restarted) continue;
             const outcome: ClaudeCodeToolOutcome = {
               content: typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content,
               ...(message.isError ? { isError: true } : {}),
@@ -878,9 +905,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               turn.early.set(message.toolCallId, outcome);
             }
           }
-          const before = JSON.stringify(turn.toolSet.nativeTools) + JSON.stringify(turn.toolSet.tools.map((tool) => tool.name));
-          const after = JSON.stringify(toolSet.nativeTools) + JSON.stringify(toolSet.tools.map((tool) => tool.name));
-          if (before !== after) turn.nextToolSet = toolSet;
         }
       }
     }

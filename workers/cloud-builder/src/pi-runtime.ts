@@ -566,7 +566,7 @@ type Opened = {
   root: Conversation;
   rootSession: string;
   refreshTools(): void;
-  agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "pauseAgent">;
+  agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "pauseAgent" | "agentStanding">;
 };
 
 /** A cloud tool as the harness offers it. */
@@ -1828,7 +1828,7 @@ export class PiConversationRuntime {
       if (kept) this.#state = kept;
       this.#setModels(kept);
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
-      const { harness, refreshTools, startAgent, messageAgent, pauseAgent } = await openStellaHarness(
+      const { harness, refreshTools, startAgent, messageAgent, pauseAgent, agentStanding } = await openStellaHarness(
         {
           storage,
           models: this.#models,
@@ -1852,7 +1852,13 @@ export class PiConversationRuntime {
       // Work an eviction cut off held containers this isolate never leased.
       await this.#sweepLeases().catch((error: unknown) => this.#options.report(error));
       harness.resume();
-      return { harness, root, rootSession, refreshTools, agents: { startAgent, messageAgent, pauseAgent } };
+      return {
+        harness,
+        root,
+        rootSession,
+        refreshTools,
+        agents: { startAgent, messageAgent, pauseAgent, agentStanding },
+      };
     })().catch((error: unknown) => {
       this.#opening = undefined;
       throw error;
@@ -2153,6 +2159,46 @@ export class PiConversationRuntime {
     const paused = agents.pauseAgent(threadId, context);
     paused.catch((error: unknown) => this.#options.report(error));
     await Promise.race([paused, waitFor(ORIGIN_PAUSE_HOLD_MS)]);
+  }
+
+  /**
+   * A control the owner's agent threads routed to one of this harness's
+   * agents, at any depth: a message it reads as its starter's (already
+   * framed as a note when someone else sent it), or a pause. Once per
+   * `commandId`. `not_found` unless this harness holds the agent for this
+   * owner and generation.
+   */
+  async controlHarnessAgent(
+    input: {
+      ownerId: string;
+      ownerGeneration: string;
+      threadId: string;
+      commandId: string;
+      kind: "message" | "pause";
+      text?: string;
+    },
+    context: Context,
+  ): Promise<"steered" | "resumed" | "paused" | "not_running" | "not_found"> {
+    const kept = this.#state ?? (await this.#options.storage.get<PiAgentState>(PI_AGENT_STATE_KEY));
+    if (!kept || kept.authority.ownerId !== input.ownerId || kept.authority.ownerGeneration !== input.ownerGeneration) {
+      return "not_found";
+    }
+    const { agents } = await this.open();
+    const standing = await agents.agentStanding(input.threadId, context);
+    if (!standing) return "not_found";
+    const running = standing.status === "running";
+    if (input.kind === "pause") {
+      if (!running) return "not_running";
+      const paused = agents.pauseAgent(input.threadId, context);
+      paused.catch((error: unknown) => this.#options.report(error));
+      await Promise.race([paused, waitFor(ORIGIN_PAUSE_HOLD_MS)]);
+      return "paused";
+    }
+    await agents.messageAgent(
+      { key: `control:${input.commandId}`, threadId: input.threadId, message: input.text ?? "", fromOrchestrator: true },
+      context,
+    );
+    return running ? "steered" : "resumed";
   }
 
   /** The attempt an agent thread's report answers, from the call key its message was given under. */

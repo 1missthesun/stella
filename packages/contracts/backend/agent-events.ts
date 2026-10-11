@@ -20,6 +20,10 @@ export const AGENT_EVENT_KINDS = [
   "attempt_ended",
   "parent_linked",
   "delivery_acknowledged",
+  "command_received",
+  "command_routed",
+  "command_delivered",
+  "command_dropped",
 ] as const;
 
 export type AgentEventKind = (typeof AGENT_EVENT_KINDS)[number];

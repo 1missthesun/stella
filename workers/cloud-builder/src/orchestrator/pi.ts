@@ -55,6 +55,8 @@ import {
   agentCompletionPromptText,
   agentLifecycleReport,
   type CloudAgentControlReceipt,
+  type PiHarnessAgentControl,
+  type PiHarnessAgentControlResult,
   type PiThreadPause,
   type PiThreadPauseResult,
   type PiThreadStart,
@@ -384,7 +386,10 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                 authority.conversationId,
               ),
             message: async (authority, args) =>
-              await sendAgentMessage(this.piOwnerCaller(authority), args),
+              await sendAgentMessage(this.piOwnerCaller(authority), {
+                ...args,
+                conversationId: authority.conversationId,
+              }),
             pause: async (authority, args) =>
               await pauseAgentThread(this.piOwnerCaller(authority), {
                 ...args,
@@ -1228,6 +1233,26 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     const { contextFor } = await import("../pi-runtime.js");
     await runtime.pauseThreadAgent(input.threadId, contextFor());
     return "paused";
+  }
+
+  /**
+   * A message or a pause the owner's agent threads route to an agent this
+   * conversation's pi harness runs (its row's `harness`), whichever host
+   * sent it. A conversation pi never ran here holds no such agent.
+   */
+  async controlPiHarnessAgent(
+    input: PiHarnessAgentControl,
+  ): Promise<PiHarnessAgentControlResult> {
+    if (
+      !this.piRuntime &&
+      (await this.ctx.storage.get<string>(AGENT_RUNTIME_KEY)) !== "pi" &&
+      !(await this.ctx.storage.get<boolean>(PI_LIVE_KEY))
+    ) {
+      return "not_found";
+    }
+    const runtime = await this.openPiRuntime(this.piGatewayOrigin());
+    const { contextFor } = await import("../pi-runtime.js");
+    return await runtime.controlHarnessAgent(input, contextFor());
   }
 
   /**

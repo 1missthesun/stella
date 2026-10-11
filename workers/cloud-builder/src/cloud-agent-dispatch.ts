@@ -685,6 +685,27 @@ export type PiThreadPause = Readonly<{
 export type PiThreadPauseResult = "paused" | "terminal" | "changed" | "unknown";
 
 /**
+ * A message or a pause for an agent a conversation's pi harness runs
+ * (`OrchestratorSession.controlPiHarnessAgent`), routed by the owner's
+ * agent threads.
+ */
+export type PiHarnessAgentControl = Readonly<{
+  ownerId: string;
+  ownerGeneration: string;
+  threadId: string;
+  commandId: string;
+  kind: "message" | "pause";
+  text?: string;
+}>;
+
+export type PiHarnessAgentControlResult =
+  | "steered"
+  | "resumed"
+  | "paused"
+  | "not_running"
+  | "not_found";
+
+/**
  * `busy`: the thread's container agent is starting up or finishing and takes
  * no input this moment; sent again shortly, it either reaches the agent or
  * finds it finished.

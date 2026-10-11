@@ -254,8 +254,8 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       }
     };
     /**
-     * The receipt of an agent this conversation started, or the thread of
-     * one another host started, which the owner's agent threads pause.
+     * The receipt of an agent this conversation started, or else the thread
+     * the owner's agent threads pause wherever it runs, whoever started it.
      */
     const requirePausableAgentControl = async (
       threadId: string,
@@ -273,9 +273,8 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           deviceCaller,
           threadId,
         ).catch(() => null);
-        if (!found) throw threadNotFound(threadId);
-        if (found.kind === "elsewhere") {
-          return { kind: "elsewhere", threadId: found.thread.threadId };
+        if (!found || found.kind === "elsewhere") {
+          return { kind: "elsewhere", threadId: found?.thread.threadId ?? threadId };
         }
         return {
           kind: "own",
@@ -330,6 +329,30 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         ...(signal ? { signal } : {}),
       });
 
+    /**
+     * A control this conversation applied to its own cloud agent itself (its
+     * exact-replay path), in that agent's event log like every routed one.
+     * Best effort: the control already happened.
+     */
+    const logOwnControl = async (
+      control: CloudAgentControlReceipt,
+      command: "message" | "pause",
+      outcome: string,
+      toolCallId: string,
+    ): Promise<void> => {
+      if (control.executorDeviceId) return;
+      await toolContext
+        .ownerInternal("agentEvents.append", {
+          key: `command_routed:${command}:${turn.turnId}:${toolCallId}`.slice(0, 512),
+          kind: "command_routed",
+          source: `cloud:${turn.conversationId}`,
+          threadId: control.threadId,
+          conversationId: turn.conversationId,
+          attemptGeneration: control.attemptGeneration,
+          detail: { command, executor: "cloud", via: "conversation", outcome, toolCallId },
+        })
+        .catch(() => undefined);
+    };
     const toolFingerprint = async (
       kind: CloudAgentToolKind,
       semanticInput: unknown,
@@ -493,6 +516,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
                   to: threadId,
                   text: args.message,
                   from: { threadId: turn.conversationId, label: "Stella" },
+                  conversationId: turn.conversationId,
                 }),
               );
             }
@@ -582,6 +606,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
               admitted,
               disposition,
             );
+            await logOwnControl(admitted, "message", disposition, toolCallId);
           }
           const control = outcome.control;
           return {
@@ -818,6 +843,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
             finalControl,
             disposition,
           );
+          await logOwnControl(finalControl, "pause", disposition, toolCallId);
           return pauseResult(
             outcome.control,
             outcome.disposition === "pending" ||

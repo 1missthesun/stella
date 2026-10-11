@@ -14,7 +14,12 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
+import type {
+  AgentControlCommand,
+  AgentControlResult,
+  AgentMessageDelivery,
+  AgentPauseResult,
+} from "@stella/contracts/backend/agent-threads";
 
 /** The longest a framed message gets: the text plus its `<agent-message>` envelope. */
 export const AGENT_MESSAGE_FRAMED_MAX_CHARS = AGENT_MESSAGE_MAX_CHARS + 1_024;
@@ -79,29 +84,71 @@ export const sessionStatus = async (
   };
 };
 
+/**
+ * `send_message` to an agent or a session, through the owner's one control
+ * path: the ledger records it and routes it to wherever the target runs.
+ */
 export const sendAgentMessage = async (
   caller: AgentMessagingCaller,
-  input: { messageId: string; to: string; text: string; from: AgentMessageSender },
-): Promise<AgentMessageDelivery> =>
-  (await caller.ownerInternal("agentThreads.message", {
-    ownerGeneration: caller.ownerGeneration,
-    messageId: input.messageId,
-    to: input.to,
-    text: input.text,
-    from: input.from,
-  })) as AgentMessageDelivery;
+  input: {
+    messageId: string;
+    to: string;
+    text: string;
+    from: AgentMessageSender;
+    /** The sender's conversation. */
+    conversationId: string;
+  },
+): Promise<AgentMessageDelivery> => {
+  const result = await controlAgentThread(caller, {
+    conversationId: input.conversationId,
+    threadId: input.to,
+    commandId: input.messageId,
+    command: { kind: "message", text: input.text, from: input.from },
+  });
+  return {
+    delivered:
+      result.outcome === "steered" || result.outcome === "resumed" ? result.outcome : "queued",
+    threadId: result.threadId,
+    ...(result.note ? { note: result.note } : {}),
+  };
+};
 
-/** `pause_agent` for an agent wherever it runs, through the owner's agent threads. */
+/** `pause_agent` for an agent wherever it runs, through the owner's one control path. */
 export const pauseAgentThread = async (
   caller: AgentMessagingCaller,
   input: { conversationId: string; threadId: string; controlRequestId: string },
-): Promise<AgentPauseResult> =>
-  (await caller.ownerInternal("agentThreads.pause", {
-    ownerGeneration: caller.ownerGeneration,
+): Promise<AgentPauseResult> => {
+  const result = await controlAgentThread(caller, {
     conversationId: input.conversationId,
     threadId: input.threadId,
-    controlRequestId: input.controlRequestId,
-  })) as AgentPauseResult;
+    commandId: input.controlRequestId,
+    command: { kind: "pause" },
+  });
+  return {
+    threadId: result.threadId,
+    outcome:
+      result.outcome === "held" || result.outcome === "not_running" ? result.outcome : "paused",
+    status: result.status ?? "unknown",
+    attemptGeneration: result.attemptGeneration ?? 0,
+    where: result.where ?? "in Stella's cloud",
+    ...(result.note ? { note: result.note } : {}),
+  };
+};
+
+/** One control for any of the owner's agents (`agentThreads.control`). */
+export const controlAgentThread = async (
+  caller: AgentMessagingCaller,
+  input: {
+    conversationId: string;
+    threadId: string;
+    commandId: string;
+    command: AgentControlCommand;
+  },
+): Promise<AgentControlResult> =>
+  (await caller.ownerInternal("agentThreads.control", {
+    ownerGeneration: caller.ownerGeneration,
+    ...input,
+  })) as AgentControlResult;
 
 export const agentMessageResult = (
   delivery: AgentMessageDelivery,

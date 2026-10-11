@@ -15,6 +15,7 @@ import type {
   AgentThreadSummary,
 } from "@stella/contracts/backend/agent-threads";
 import {
+  agentThreadLookupControllable,
   agentThreadLookupReport,
   describeAgentThreadLookup,
   isAgentThreadLookupActive,
@@ -201,6 +202,7 @@ export const agentThreadElsewhereStatus = (
       status_detail: thread.status,
       description: thread.description,
       attempt_generation: thread.attemptGeneration,
+      controllable_here: agentThreadLookupControllable(thread),
       last_active_at: new Date(thread.updatedAt).toISOString(),
       ...(thread.executorDeviceId ? { device_id: thread.executorDeviceId } : {}),
       ...(thread.originDeviceId ? { started_from_device_id: thread.originDeviceId } : {}),

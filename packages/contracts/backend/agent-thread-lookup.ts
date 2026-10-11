@@ -20,15 +20,27 @@ export const agentThreadLookupLocation = (thread: AgentThreadLookup): string =>
       : "in Stella's cloud";
 
 /**
+ * Whether a control sent from here reaches the thread. Control goes through
+ * the owner's agent threads, which route it to wherever the thread runs, so
+ * the device that started it never decides this; only a computer agent with
+ * no computer on record is out of reach.
+ */
+export const agentThreadLookupControllable = (thread: AgentThreadLookup): boolean =>
+  thread.placement !== "computer" || Boolean(thread.executorDeviceId || thread.originDeviceId);
+
+/**
  * Who hears from the thread, and that any host reaches it: control goes
- * through the owner's agent threads, so where the conversation runs now
- * never decides whether `send_message` or `pause_agent` can reach it.
+ * through the owner's agent threads, so neither where the conversation runs
+ * now nor which device started the thread decides whether `send_message` or
+ * `pause_agent` can reach it.
  */
 export const agentThreadLookupController = (
   thread: AgentThreadLookup,
   viewer: AgentThreadViewer,
 ): string => {
-  const reach = "send_message and pause_agent reach it from here.";
+  const reach = agentThreadLookupControllable(thread)
+    ? "From here or any other of your devices, send_message steers it or resumes it once it stops, and pause_agent pauses it: Stella's cloud routes both to wherever it runs, and holds them for a computer that is offline."
+    : "No computer is on record for it, so nothing can reach it to message or pause it.";
   if (thread.parentThreadId) {
     return `Another agent of this conversation started it (thread ${thread.parentThreadId}) and gets its report. ${reach}`;
   }

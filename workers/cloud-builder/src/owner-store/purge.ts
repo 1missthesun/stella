@@ -88,6 +88,14 @@ const deleteThreadRows = (db: OwnerDb, jobs: OwnerJobs, conversationId: string):
     jobs.cancel(`devmsg:${message_id}`);
     db.run("DELETE FROM agent_device_messages WHERE message_id = ?", message_id);
   }
+  for (const { command_id } of db.all<{ command_id: string }>(
+    `SELECT command_id FROM agent_commands
+      WHERE thread_id IN (SELECT thread_id FROM agent_threads WHERE conversation_id = ?)`,
+    conversationId,
+  )) {
+    jobs.cancel(`devmsg:${command_id}`);
+    db.run("DELETE FROM agent_commands WHERE command_id = ?", command_id);
+  }
   deleteConversationAgentEvents(db, conversationId);
   db.run("DELETE FROM agent_threads WHERE conversation_id = ?", conversationId);
 };
@@ -156,6 +164,7 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
     "agent_cancel_receipts",
     "agent_message_receipts",
     "agent_device_messages",
+    "agent_commands",
     "agent_events",
   ]) {
     ctx.db.run(`DELETE FROM ${table}`);

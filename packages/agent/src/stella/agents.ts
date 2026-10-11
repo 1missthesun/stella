@@ -1024,7 +1024,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!known) return await messageOther(api, threadId, args.message, conversation, context);
       const remote = known?.remote ? remoteHostOf(known) : undefined;
       if (known?.remote) {
-        if (!remote) throw new Error(`${threadId} runs where this conversation cannot reach it now.`);
+        // No way from this host to where it runs: the owner's agent threads route it there.
+        if (!remote) return await messageThroughLedger(api, threadId, args.message, conversation, context);
         await remote.message({ key: `message:${api.taskId}`, threadId, message: args.message }, context);
         await expectRemoteReport(api, api.conversationId, String(api.taskId), threadId, context);
         return { content: [{ type: "text", text: `Delivered to ${threadId}.` }] };
@@ -1257,7 +1258,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       const key = `note:${api.taskId}`;
       if (target.record.remote) {
         const remote = remoteHostOf(target.record);
-        if (!remote) throw new Error(`${threadId} runs where this conversation cannot reach it now.`);
+        if (!remote) return await messageThroughLedger(api, threadId, message, conversation, context);
         await remote.message({ key, threadId, message: text }, context);
         await expectRemoteReport(api, target.parentConversationId, key, threadId, context);
         return deliveredResult({ threadId });
@@ -1279,6 +1280,26 @@ export function stellaAgents(host: StellaAgentsHost) {
     const delivery = await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context);
     if (delivery) return deliveredResult(delivery);
     throw new Error(`No agent or Stella session has thread_id ${threadId}. agent_status without a thread_id lists who you can reach.`);
+  };
+
+  /**
+   * `send_message` the owner's agent threads carry: they authorize it by
+   * owner, never by the host that started the agent, and route it to
+   * wherever the agent runs now. Once per call.
+   */
+  const messageThroughLedger = async (
+    api: ToolExecutionApi,
+    threadId: string,
+    message: string,
+    conversation: string | undefined,
+    context: Context,
+  ) => {
+    assertMessageSize(message);
+    const { self } = await chainOf(api, context);
+    const from = senderOf(self, conversation ?? STELLA_MESSAGE_TARGET);
+    const delivery = await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context);
+    if (delivery) return deliveredResult(delivery);
+    throw new Error(`${threadId} runs where this conversation cannot reach it now.`);
   };
 
   const agentStatus = defineTool({

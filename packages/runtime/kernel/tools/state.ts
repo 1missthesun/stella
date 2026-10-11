@@ -26,6 +26,7 @@ import {
   placementRemoteThreadAgentId,
 } from "@stella/contracts/placement-thread-id";
 import {
+  agentThreadLookupControllable,
   agentThreadLookupController,
   agentThreadLookupLocation,
   agentThreadLookupReport,
@@ -391,6 +392,8 @@ export const handleSendMessage = async (
     }
   }
 
+  // A receipt this computer keeps for a cloud thread it started only makes
+  // its follow-up exact; without one, the owner's agent threads take it.
   if (isOrchestrator && api.cloudContinue) {
     const continued = await api.cloudContinue({
       threadId,
@@ -407,11 +410,7 @@ export const handleSendMessage = async (
     }
   }
 
-  if (
-    !isLocalOnlyChat &&
-    (!context.fromUser || placedHere) &&
-    api.messageCloudThread
-  ) {
+  if (!isLocalOnlyChat && api.messageCloudThread) {
     try {
       const outcome = await api.messageCloudThread({
         messageId: agentMessageId(context.requestId),
@@ -482,6 +481,7 @@ const conversationThreadStatus = (
         ? { started_from_device_id: thread.originDeviceId }
         : {}),
       attempt_generation: thread.attemptGeneration,
+      controllable_here: agentThreadLookupControllable(thread),
       last_active_at: new Date(thread.updatedAt).toISOString(),
       ...(report !== undefined ? { result: report } : {}),
       ...(!active && thread.errorMessage ? { error: thread.errorMessage } : {}),

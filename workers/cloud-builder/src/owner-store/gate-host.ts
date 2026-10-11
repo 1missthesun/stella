@@ -189,6 +189,21 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
     return steered.accepted;
   },
 
+  async controlHarnessAgent(input) {
+    return {
+      outcome: await deps.env.ORCHESTRATOR_SESSIONS.getByName(
+        input.conversationId,
+      ).controlPiHarnessAgent({
+        ownerId: deps.ownerId(),
+        ownerGeneration: input.ownerGeneration,
+        threadId: input.threadId,
+        commandId: input.commandId,
+        kind: input.kind,
+        ...(input.text !== undefined ? { text: input.text } : {}),
+      }),
+    };
+  },
+
   async cancelDeviceAgentTurn(input) {
     const result = await deps.cancelDispatch({
       dispatchId: input.dispatchId,

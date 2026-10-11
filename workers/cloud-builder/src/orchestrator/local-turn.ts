@@ -801,9 +801,62 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       );
     }
 
-    const existing =
+    const pending =
       await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
     markTiming("preflightMs");
+    const brainClaim = parsePiBrainClaim(body.brain);
+    let brainAck: PiBrainClaimAck | undefined;
+    if (pending?.turnId !== turnId) {
+      if (
+        this.journal.storedBytes() + utf8Length(userMessageJson) >
+        CONVERSATION_MAX_STORED_BYTES
+      ) {
+        return json(
+          {
+            code: "conversation_full",
+            message:
+              "This conversation has reached its size limit. Start a new conversation to keep going.",
+          },
+          413,
+        );
+      }
+
+      // A computer from before the lease journals as it always did; one that
+      // claims it answers only as the brain's holder, or by taking it over
+      // from a holder that can't answer.
+      if (brainClaim) {
+        const current = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
+        const holder =
+          current?.host === "device" && current.deviceId !== deviceId
+            ? {
+                forEpoch: current.epoch,
+                ...(await this.piBrainHolderState(
+                  caller.ownerId,
+                  current.deviceId,
+                )),
+              }
+            : undefined;
+        const claim = await this.claimPiBrain({
+          claimant: { host: "device", deviceId },
+          claimEpoch: brainClaim.epoch,
+          ...(holder ? { holder } : {}),
+          turnId,
+        });
+        if (claim.decision.kind === "elsewhere" && claim.record) {
+          return this.piBrainElsewhereResponse(claim.record);
+        }
+        brainAck = {
+          record: claim.record,
+          ...(claim.takenOver ? { takenOver: true as const } : {}),
+        };
+      }
+      markTiming("brainClaimMs");
+    }
+
+    const existing =
+      pending?.turnId === turnId
+        ? pending
+        : await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
     if (existing) {
       // A replay is rare and renews a lease an earlier register fenced, so it
       // keeps the separate snapshot refresh.
@@ -822,16 +875,18 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         } else {
           await this.expireLocalLease(existing, true);
         }
-        return json(
-          {
-            code: existing.cancelRequested ? "turn_finished" : "turn_expired",
-            message: existing.cancelRequested
-              ? "That local turn was canceled."
-              : "That local turn lease expired.",
-            turnId: existing.turnId,
-          },
-          409,
-        );
+        if (existing.turnId === turnId) {
+          return json(
+            {
+              code: existing.cancelRequested ? "turn_finished" : "turn_expired",
+              message: existing.cancelRequested
+                ? "That local turn was canceled."
+                : "That local turn lease expired.",
+              turnId: existing.turnId,
+            },
+            409,
+          );
+        }
       }
       if (
         existing.turnId !== turnId ||
@@ -952,53 +1007,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         );
       }
     }
-
-    if (
-      this.journal.storedBytes() + utf8Length(userMessageJson) >
-      CONVERSATION_MAX_STORED_BYTES
-    ) {
-      return json(
-        {
-          code: "conversation_full",
-          message:
-            "This conversation has reached its size limit. Start a new conversation to keep going.",
-        },
-        413,
-      );
-    }
-
-    // A computer from before the lease journals as it always did; one that
-    // claims it answers only as the brain's holder, or by taking it over
-    // from a holder that can't answer.
-    const brainClaim = parsePiBrainClaim(body.brain);
-    let brainAck: PiBrainClaimAck | undefined;
-    if (brainClaim) {
-      const current = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
-      const holder =
-        current?.host === "device" && current.deviceId !== deviceId
-          ? {
-              forEpoch: current.epoch,
-              ...(await this.piBrainHolderState(
-                caller.ownerId,
-                current.deviceId,
-              )),
-            }
-          : undefined;
-      const claim = await this.claimPiBrain({
-        claimant: { host: "device", deviceId },
-        claimEpoch: brainClaim.epoch,
-        ...(holder ? { holder } : {}),
-        turnId,
-      });
-      if (claim.decision.kind === "elsewhere" && claim.record) {
-        return this.piBrainElsewhereResponse(claim.record);
-      }
-      brainAck = {
-        record: claim.record,
-        ...(claim.takenOver ? { takenOver: true as const } : {}),
-      };
-    }
-    markTiming("brainClaimMs");
 
     const lease: LocalTurnLease = {
       ownerId: caller.ownerId,

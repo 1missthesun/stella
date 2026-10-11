@@ -716,6 +716,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
   protected async expireLocalLease(
     lease: LocalTurnLease,
     resumeQueued: boolean,
+    notice: string = TERMINAL_NOTICE.timeout,
   ): Promise<void> {
     const current =
       await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
@@ -742,7 +743,7 @@ export abstract class OrchestratorTurnQueue extends OrchestratorTurnLifecycle {
           phase: "timeout",
           lane: "chat",
           source: "desktop",
-          notice: TERMINAL_NOTICE.timeout,
+          notice,
           createdAt: now,
         });
         terminalSeq = row.seq;

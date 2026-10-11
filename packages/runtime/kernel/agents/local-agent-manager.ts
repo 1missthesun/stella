@@ -32,7 +32,10 @@ import {
   type Fiber,
 } from "effect";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
-import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
+import {
+  AGENT_PAUSED_REASON,
+  isAgentPauseReason,
+} from "@stella/contracts/agent-status";
 import { AGENT_CONTROL_TOOL_NAMES } from "../tools/defs/task.js";
 import { sanitizeForLogs, truncate } from "../tools/utils.js";
 import { AgentSteering } from "../agent-runtime/agent-steering.js";
@@ -229,7 +232,7 @@ export type LocalAgentManagerOptions = {
     agentId: string;
     attemptGeneration: number;
     ownerGeneration?: string;
-    status: "completed" | "canceled" | "error";
+    status: "completed" | "canceled" | "paused" | "error";
     result?: string;
     error?: string;
   }): Promise<unknown>;
@@ -470,7 +473,13 @@ const LOCAL_TERMINAL_RECOVERY_SLICE_MS = 4;
 export const LOCAL_TERMINAL_RECOVERY_LEDGER_PREFIX =
   "runtime.localTerminalLifecycleRecovery:";
 const isTerminalSnapshotStatus = (status: string) =>
-  status === "completed" || status === "error" || status === "canceled";
+  status === "completed" ||
+  status === "error" ||
+  status === "canceled" ||
+  status === "paused";
+/** Stopped before it finished: canceled for good, or paused until a message resumes it. */
+const isStoppedStatus = (status: string | undefined) =>
+  status === "canceled" || status === "paused";
 export class LocalAgentManager {
   defaultMaxConcurrent: number;
   opts: LocalAgentManagerOptions;
@@ -628,7 +637,7 @@ export class LocalAgentManager {
     if (!this.opts.completeCloudAgentRecord) return;
     const terminalRecords = [
       ...additionalRecords,
-      ...(["completed", "error", "canceled"] as const).flatMap(
+      ...(["completed", "error", "canceled", "paused"] as const).flatMap(
         (status) => this.opts.listAgentRecordsByStatus?.(status) ?? [],
       ),
     ];
@@ -649,11 +658,11 @@ export class LocalAgentManager {
       }
       seen.add(recoveryKey);
       const status =
-        record.status === "completed"
-          ? "completed"
-          : record.status === "canceled"
-            ? "canceled"
-            : "error";
+        record.status === "completed" ||
+        record.status === "canceled" ||
+        record.status === "paused"
+          ? record.status
+          : "error";
       const recovery = Promise.resolve()
         .then(async () => {
           // Re-admit the deterministic start before its terminal. A crash
@@ -837,7 +846,7 @@ export class LocalAgentManager {
     );
     const terminalRecords = [
       ...additionalRecords,
-      ...(["completed", "error", "canceled"] as const).flatMap(
+      ...(["completed", "error", "canceled", "paused"] as const).flatMap(
         (status) => this.opts.listAgentRecordsByStatus?.(status) ?? [],
       ),
     ];
@@ -896,7 +905,7 @@ export class LocalAgentManager {
     const type =
       current.status === "completed"
         ? "agent-completed"
-        : current.status === "canceled"
+        : isStoppedStatus(current.status)
           ? "agent-canceled"
           : "agent-failed";
     const eventId = `${current.threadId}:${generation}:${type}`;
@@ -918,6 +927,7 @@ export class LocalAgentManager {
       ...(current.status === "completed"
         ? { result: current.result }
         : { error: current.error }),
+      ...(current.status === "paused" ? { status: "paused" } : {}),
       ...(current.status === "canceled" &&
       current.error === AGENT_ORPHANED_RESTART_CANCEL_REASON
         ? { audience: "display-only" }
@@ -1212,7 +1222,7 @@ export class LocalAgentManager {
     if (
       task.status === "completed" ||
       task.status === "error" ||
-      task.status === "canceled"
+      isStoppedStatus(task.status)
     ) {
       this.settleAgentThread(task.threadId);
     }
@@ -1390,7 +1400,7 @@ export class LocalAgentManager {
       cursor = state.parentAgentId;
     }
     const owner = this.getAgentState(parent);
-    if (!owner || owner.status === "error" || owner.status === "canceled") {
+    if (!owner || owner.status === "error" || isStoppedStatus(owner.status)) {
       return {
         kind: "user_thread",
         reason: "owner-terminal",
@@ -1448,7 +1458,7 @@ export class LocalAgentManager {
       task.descendantFinalParked ||
       (task.status !== "completed" &&
         task.status !== "error" &&
-        task.status !== "canceled")
+        !isStoppedStatus(task.status))
     ) {
       return;
     }
@@ -2163,7 +2173,7 @@ export class LocalAgentManager {
           if (
             !isCurrentAttempt() ||
             attempt.controller.signal.aborted ||
-            task.status === "canceled"
+            isStoppedStatus(task.status)
           )
             return;
           if (typeof chunk !== "string" || !chunk) return;
@@ -2183,7 +2193,7 @@ export class LocalAgentManager {
           if (
             !isCurrentAttempt() ||
             attempt.controller.signal.aborted ||
-            task.status === "canceled"
+            isStoppedStatus(task.status)
           ) {
             return;
           }
@@ -2215,7 +2225,7 @@ export class LocalAgentManager {
           if (
             !isCurrentAttempt() ||
             attempt.controller.signal.aborted ||
-            task.status === "canceled"
+            isStoppedStatus(task.status)
           ) {
             return;
           }
@@ -2247,7 +2257,7 @@ export class LocalAgentManager {
           if (
             !isCurrentAttempt() ||
             attempt.controller.signal.aborted ||
-            task.status === "canceled"
+            isStoppedStatus(task.status)
           ) {
             return;
           }
@@ -2317,8 +2327,8 @@ export class LocalAgentManager {
       }
       if (!isCurrentAttempt()) return;
       task.completedAt = Date.now();
-      if (attempt.controller.signal.aborted || task.status === "canceled") {
-        task.status = "canceled";
+      if (attempt.controller.signal.aborted || isStoppedStatus(task.status)) {
+        task.status = task.status === "paused" ? "paused" : "canceled";
         task.error = task.error ?? "Canceled";
       } else if (result.interrupted) {
         task.status = "canceled";
@@ -2334,7 +2344,7 @@ export class LocalAgentManager {
       if (!isCurrentAttempt()) return;
       task.completedAt = Date.now();
       if (attempt.controller.signal.aborted) {
-        task.status = "canceled";
+        task.status = task.status === "paused" ? "paused" : "canceled";
         task.error = task.error ?? "Canceled";
       } else {
         task.status = "error";
@@ -2456,11 +2466,11 @@ export class LocalAgentManager {
         }
       }
       const status =
-        task.status === "completed"
-          ? "completed"
-          : task.status === "canceled"
-            ? "canceled"
-            : "error";
+        task.status === "completed" ||
+        task.status === "canceled" ||
+        task.status === "paused"
+          ? task.status
+          : "error";
       try {
         await this.opts.completeCloudAgentRecord({
           agentId: task.cloudAgentId ?? task.threadId,
@@ -2540,9 +2550,10 @@ export class LocalAgentManager {
         } catch (error) {
           if (task.storageMode !== "cloud") throw error;
         }
-      } else if (task.status === "canceled") {
+      } else if (isStoppedStatus(task.status)) {
         const canceledEvent = {
           type: "agent-canceled",
+          ...(task.status === "paused" ? { status: "paused" } : {}),
           conversationId: task.conversationId,
           eventId: this.lifecycleEventId(task, "agent-canceled"),
           rootRunId: task.rootRunId,
@@ -2876,6 +2887,9 @@ export class LocalAgentManager {
     return this.supervisoryScopeClosePromise;
   }
   async cancelAgent(agentId: string, reason?: string) {
+    // A pause arrives as the cancel that carries its reason; the attempt it
+    // stops ends paused, which a message resumes.
+    const stoppedStatus = isAgentPauseReason(reason) ? "paused" : "canceled";
     const local = this.tasks.get(agentId);
     if (local) {
       const wasParked =
@@ -2883,7 +2897,7 @@ export class LocalAgentManager {
       if (
         (local.status === "completed" && !wasParked) ||
         local.status === "error" ||
-        local.status === "canceled"
+        isStoppedStatus(local.status)
       ) {
         await this.cascadeCancelChildren(agentId, reason);
         return { canceled: true };
@@ -2904,7 +2918,7 @@ export class LocalAgentManager {
         ...(local.parentAgentId ? { parentAgentId: local.parentAgentId } : {}),
       };
       local.error = canceledError;
-      local.status = "canceled";
+      local.status = stoppedStatus;
       local.descendantFinalParked = false;
       local.descendantWakePending = false;
       local.completedAt = Date.now();
@@ -2944,6 +2958,7 @@ export class LocalAgentManager {
         this.persistTask(local);
         cancellationEvent = {
           type: "agent-canceled",
+          ...(stoppedStatus === "paused" ? { status: "paused" } : {}),
           conversationId: local.conversationId,
           eventId: cancellationEventId,
           rootRunId: local.rootRunId,
@@ -2992,7 +3007,7 @@ export class LocalAgentManager {
         );
         if (
           local.attemptGeneration === canceledGeneration &&
-          local.status === "canceled"
+          isStoppedStatus(local.status)
         ) {
           local.cloudStartReceiptGeneration = canceledGeneration;
           local.cloudTerminalReceiptGeneration = canceledGeneration;
@@ -3004,7 +3019,7 @@ export class LocalAgentManager {
           await this.emitAgentLifecycleEventOnce(cancellationEvent);
           if (
             local.attemptGeneration === canceledGeneration &&
-            local.status === "canceled"
+            isStoppedStatus(local.status)
           ) {
             local.terminalEventEmitted = true;
             local.terminalLifecycleReceiptGeneration = canceledGeneration;
@@ -3039,7 +3054,7 @@ export class LocalAgentManager {
           persisted.descendantBoundaryState?.consumedEventIds ?? [];
         this.opts.saveAgentRecord?.({
           ...persisted,
-          status: "canceled",
+          status: stoppedStatus,
           completedAt: Date.now(),
           error: reason ?? "Canceled",
           descendantBoundaryState:
@@ -3057,6 +3072,7 @@ export class LocalAgentManager {
         const generation = persisted.attemptGeneration;
         await this.emitAgentLifecycleEventOnce({
           type: "agent-canceled",
+          ...(stoppedStatus === "paused" ? { status: "paused" } : {}),
           conversationId: persisted.conversationId,
           eventId: `${persisted.threadId}:${generation}:agent-canceled`,
           rootRunId: persisted.rootRunId,
@@ -3071,7 +3087,7 @@ export class LocalAgentManager {
         if (
           current &&
           current.attemptGeneration === generation &&
-          current.status === "canceled"
+          isStoppedStatus(current.status)
         ) {
           this.opts.saveAgentRecord?.({
             ...current,
@@ -3104,7 +3120,7 @@ export class LocalAgentManager {
         if (
           current &&
           current.attemptGeneration === persisted.attemptGeneration &&
-          current.status === "canceled"
+          isStoppedStatus(current.status)
         ) {
           this.opts.saveAgentRecord?.({
             ...current,
@@ -3237,7 +3253,7 @@ export class LocalAgentManager {
       }
       if (
         isChildReport &&
-        (persisted.status === "error" || persisted.status === "canceled")
+        (persisted.status === "error" || isStoppedStatus(persisted.status))
       ) {
         // A child report must never resurrect a parent the user paused or
         // that failed. Refusing to wake it is not a delivery: leave the
@@ -3279,14 +3295,14 @@ export class LocalAgentManager {
       return { delivered: true };
     }
     if (isChildReport) {
-      if (task.status === "error" || task.status === "canceled") {
+      if (task.status === "error" || isStoppedStatus(task.status)) {
         return { delivered: false, reason: "owner-terminal" };
       }
     }
     if (
       task.status === "completed" ||
       task.status === "error" ||
-      task.status === "canceled"
+      isStoppedStatus(task.status)
     ) {
       logMessage(task);
       if (rootRunId) {

@@ -157,7 +157,7 @@ function AgentReplyPreview({
 }: {
   reference: Extract<ReplyRef, { kind: "agent" }>;
   conversationId: string;
-  status?: "running" | "completed" | "error" | "canceled";
+  status?: "running" | "completed" | "error" | "canceled" | "paused";
   liveTitle?: string;
   /** Replay diagnostics identity of the completion this bubble quotes. */
   completionEventId?: string;
@@ -185,7 +185,7 @@ function AgentReplyPreview({
       ? t("app.chat.replyPreview.statusRunning")
       : shownStatus === "error"
         ? t("app.chat.replyPreview.statusFailed")
-        : shownStatus === "canceled"
+        : shownStatus === "canceled" || shownStatus === "paused"
           ? t("app.chat.replyPreview.statusPaused")
           : t("app.chat.replyPreview.statusDone");
   return (

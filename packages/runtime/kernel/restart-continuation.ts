@@ -203,7 +203,7 @@ export type RestartThreadRecordLike = {
   conversationId: string;
   agentType: string;
   description: string;
-  status: "running" | "completed" | "error" | "canceled";
+  status: "running" | "completed" | "error" | "canceled" | "paused";
   result?: string;
   error?: string;
   updatedAt: number;
@@ -929,13 +929,15 @@ export type ThreadStateSentinels = {
   restartCancelReasons: string[];
 };
 
+/** Paused: recorded so, or by a build before `paused`, as a cancel with a pause reason. */
 export const isPausedThreadRecord = (
   record: Pick<RestartThreadRecordLike, "status" | "error">,
   sentinels: ThreadStateSentinels,
 ): boolean =>
-  record.status === "canceled" &&
-  typeof record.error === "string" &&
-  sentinels.pausedReasons.includes(record.error);
+  record.status === "paused" ||
+  (record.status === "canceled" &&
+    typeof record.error === "string" &&
+    sentinels.pausedReasons.includes(record.error));
 
 /**
  * Live current-state label for a thread that was running at shutdown.
@@ -971,6 +973,7 @@ export const describeCurrentThreadState = (
         resumable: true,
         paused: false,
       };
+    case "paused":
     case "canceled": {
       if (isPausedThreadRecord(record, sentinels)) {
         return {
@@ -1203,8 +1206,10 @@ const fireRestartContinuationTurnEffect = (
     );
     const facts = buildThreadFacts(refs, deps);
     const interruptedIds = new Set(refs.map((ref) => ref.threadId));
-    const pausedThreads = deps
-      .listAgentRecordsByStatus("canceled")
+    const pausedThreads = [
+      ...deps.listAgentRecordsByStatus("paused"),
+      ...deps.listAgentRecordsByStatus("canceled"),
+    ]
       .filter(
         (record) =>
           record.conversationId === conversationId &&

@@ -715,7 +715,7 @@ export const handleSpawnAgent = async (
         return {
           result: {
             thread_id: explicitThreadId,
-            status: "canceled",
+            status: "paused",
             canceled: true,
           },
         };
@@ -753,13 +753,13 @@ export const handleSpawnAgent = async (
     }
     const localRecord = ctx.tasks.get(explicitThreadId);
     if (!localRecord) return { error: `Thread not found: ${explicitThreadId}` };
-    localRecord.status = "error";
+    localRecord.status = "paused";
     localRecord.error = AGENT_PAUSE_CANCEL_REASON;
     localRecord.completedAt = Date.now();
     return {
       result: {
         thread_id: explicitThreadId,
-        status: "canceled",
+        status: "paused",
         canceled: true,
       },
     };

@@ -447,6 +447,14 @@ export abstract class OrchestratorTurnLifecycle extends OrchestratorOwner {
       this.live = null;
       this.hub.endTurn(turn.turnId);
     }
+    // A wake turn that ended before it wrote its prompt still settles what
+    // its staged cards report.
+    void this.publishStagedWakeCards(turn.turnId).catch((error: unknown) =>
+      log("error", "conversation_wake_cards_failed", {
+        turnId: turn.turnId,
+        message: errorMessage(error),
+      }),
+    );
   }
 
   /**

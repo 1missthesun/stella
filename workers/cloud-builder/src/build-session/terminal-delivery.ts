@@ -1,4 +1,5 @@
 import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
+import { agentAttemptOutcomeOf } from "@stella/contracts/agent-status";
 import { Effect } from "effect";
 import type { ThreadCompletedEvent } from "@stella/contracts/turn-plane/owner-events";
 import {
@@ -253,7 +254,10 @@ export const deliverTerminal = async (
             threadId: turn.threadId,
             turnId: turn.turnId,
             attemptGeneration: turn.attemptGeneration ?? 1,
-            status: pending.kind,
+            status: agentAttemptOutcomeOf({
+              status: pending.kind,
+              reason: pending.threadError,
+            }),
             ...(resultJson ? { resultJson } : {}),
             ...(errorMessage ? { errorMessage } : {}),
             completedAt,

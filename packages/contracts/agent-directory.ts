@@ -1,3 +1,5 @@
+import { agentStatusOf, isLiveAgentStatus, type AgentStatus } from "./agent-status.js";
+
 /**
  * What `agent_status` without a thread_id returns, and how `send_message`
  * frames a message between agents. Desktop and cloud both build their
@@ -20,13 +22,8 @@ export const AGENT_ROSTER_SLOTS = 16;
 
 const DIRECTORY_SESSION_LIMIT = 10;
 
-export type AgentDirectoryStatus =
-  | "running"
-  | "waiting"
-  | "paused"
-  | "completed"
-  | "failed"
-  | "canceled";
+/** An agent's status as the directory lists it: the shared vocabulary. */
+export type AgentDirectoryStatus = AgentStatus;
 
 export type AgentDirectoryAgentRow = {
   threadId: string;
@@ -58,31 +55,13 @@ export type AgentDirectoryCaller = {
 
 export type AgentDirectoryStatusValue = string | undefined | null;
 
-/** Collapses the hosts' status vocabularies into the directory's. */
+/**
+ * Any host's status word in the shared vocabulary. A word no host writes
+ * reads as paused: stopped, and resumable with a message.
+ */
 export const normalizeAgentDirectoryStatus = (
   status: AgentDirectoryStatusValue,
-): AgentDirectoryStatus => {
-  switch (status) {
-    case "running":
-    case "resuming":
-    case "queued":
-    case "pending":
-      return "running";
-    case "waiting_for_user":
-    case "waiting":
-      return "waiting";
-    case "completed":
-      return "completed";
-    case "failed":
-    case "error":
-      return "failed";
-    case "canceled":
-    case "cancelled":
-      return "canceled";
-    default:
-      return "paused";
-  }
-};
+): AgentDirectoryStatus => agentStatusOf(status) ?? "paused";
 
 const formatAge = (timestamp: number, now: number): string => {
   const ageMs = Math.max(0, now - timestamp);
@@ -92,8 +71,7 @@ const formatAge = (timestamp: number, now: number): string => {
   return `${Math.floor(ageMs / 86_400_000)}d ago`;
 };
 
-const isLive = (status: AgentDirectoryStatus) =>
-  status === "running" || status === "waiting";
+const isLive = (status: AgentDirectoryStatus) => isLiveAgentStatus(status);
 
 const newestFirst = (a: AgentDirectoryAgentRow, b: AgentDirectoryAgentRow) =>
   b.updatedAt - a.updatedAt || a.threadId.localeCompare(b.threadId);

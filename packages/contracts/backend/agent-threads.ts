@@ -4,6 +4,7 @@ import type {
   AgentDirectorySessionRow,
   AgentMessageSender,
 } from "../agent-directory.js";
+import { agentAttemptOutcomeOf, type AgentAttemptOutcome, type AgentStatus } from "../agent-status.js";
 
 /**
  * How a `send_message` landed: `steered` into a running agent, `resumed` an
@@ -16,25 +17,16 @@ export type AgentMessageDelivery = {
   note?: string;
 };
 
-/**
- * Why an attempt that someone paused ended, as every runtime reports it with
- * a `canceled` outcome. The owner's records keep such an attempt as
- * `paused`, never as canceled or failed.
- */
-export const AGENT_PAUSED_REASON = "Paused by orchestrator.";
-
-/** The dispatch error code a device reports with a `canceled` agent attempt it paused. */
-export const AGENT_PAUSED_ERROR_CODE = "AGENT_PAUSED";
+export { AGENT_PAUSED_ERROR_CODE, AGENT_PAUSED_REASON } from "../agent-status.js";
 
 /**
  * The status an attempt ends in, from the outcome its runtime reported: a
- * cancel for a pause is `paused`.
+ * `paused` outcome, or a cancel an older runtime tagged as a pause.
  */
 export const agentThreadTerminalStatus = (
-  status: "completed" | "failed" | "canceled",
+  status: "completed" | "failed" | "canceled" | "paused",
   reason?: string | null,
-): "completed" | "failed" | "canceled" | "paused" =>
-  status === "canceled" && reason?.trim() === AGENT_PAUSED_REASON ? "paused" : status;
+): AgentAttemptOutcome => agentAttemptOutcomeOf({ status, reason });
 
 /**
  * How a `pause_agent` landed, from any of the owner's hosts:
@@ -255,7 +247,12 @@ export type AgentThreadCalls = {
       ownerGeneration: string;
       originDeviceId: string;
       attemptGeneration: number;
-      status: "completed" | "failed" | "canceled";
+      /**
+       * `paused` from builds with the shared vocabulary; older ones send a
+       * pause as `canceled` with `AGENT_PAUSED_REASON`, which still reads as
+       * paused.
+       */
+      status: AgentAttemptOutcome;
       result?: string;
       error?: string;
     };
@@ -288,7 +285,10 @@ export type AgentThreadCalls = {
 
 export type ComputerThreadRecord = {
   threadId: string;
+  /** In the words builds before the shared vocabulary read: a pause reads as `canceled`. */
   status: "running" | "completed" | "error" | "canceled";
+  /** The thread's status in the shared vocabulary; absent from older backends. */
+  agentStatus?: AgentStatus;
   description: string;
   attemptGeneration: number;
   startedAt: number;

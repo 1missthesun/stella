@@ -1140,9 +1140,9 @@ export class StellaRuntimeHost {
           if (result.status === "ok") {
             return { status: "ok", finalText: result.finalText };
           }
-          if (result.status === "canceled") {
+          if (result.status === "canceled" || result.status === "paused") {
             return {
-              status: "canceled",
+              status: result.status,
               error: result.error || "The agent was stopped.",
             };
           }

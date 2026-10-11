@@ -404,7 +404,7 @@ export type LocalChatAgentReport = {
   threadId: string;
   description: string;
   agentType: string;
-  status: "running" | "completed" | "error" | "canceled";
+  status: "running" | "completed" | "error" | "canceled" | "paused";
   result?: string;
   error?: string;
   startedAt: number;

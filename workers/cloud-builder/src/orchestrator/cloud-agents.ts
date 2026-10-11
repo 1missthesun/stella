@@ -18,6 +18,7 @@ import {
 } from "../cloud-agent-dispatch.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import { MAX_ROW_BYTES, utf8Length } from "../conversation-types.js";
+import type { AppendCardInput } from "../journal.js";
 import type { WakeReport, ChatTurnRequest } from "./types.js";
 import { WAKE_REPORT_INLINE_MAX_BYTES } from "./constants.js";
 import { errorMessage, log } from "./support.js";
@@ -27,6 +28,11 @@ import { OrchestratorDevAcceptance } from "./dev-acceptance.js";
  * Cloud agents: control receipts, wake reports, steering wakes into a running
  * turn, and agent cards.
  */
+type CardPayload = AppendCardInput["card"];
+
+/** Where a wake turn's staged cards are kept; the length keeps one turn's prefix from matching another's. */
+const wakeCardPrefix = (turnId: string): string => `wakeCard:${turnId.length}:${turnId}:`;
+
 export abstract class OrchestratorCloudAgents extends OrchestratorDevAcceptance {
   /**
    * Advances the durable control receipt for one reusable cloud-agent thread.
@@ -237,6 +243,47 @@ export abstract class OrchestratorCloudAgents extends OrchestratorDevAcceptance 
    * so a direct tool such as `image_gen` publishes its own. Same card shape
    * the clients already render for thread output.
    */
+  /**
+   * A card for a wake turn's journal that must follow that turn's prompt
+   * (a pi agent's report wakes Stella, then its cards end the agent). The
+   * wake is queued before its prompt is written, so the card waits here
+   * until the prompt is in the journal, or the turn ends without one.
+   */
+  protected async stageWakeCard(
+    turnId: string,
+    entry: { writerKey: string; createdAt: number; card: CardPayload },
+  ): Promise<void> {
+    await this.ctx.storage.put(`${wakeCardPrefix(turnId)}${entry.writerKey}`, entry);
+    if (
+      this.journal.hasRow(`turn:${turnId}:prompt`) ||
+      this.journal.turnState(turnId)?.state === "terminal"
+    ) {
+      await this.publishStagedWakeCards(turnId);
+    }
+  }
+
+  /** The cards staged for a wake turn, after its prompt (`stageWakeCard`). */
+  protected async publishStagedWakeCards(turnId: string): Promise<void> {
+    const staged = await this.ctx.storage.list<{
+      writerKey: string;
+      createdAt: number;
+      card: CardPayload;
+    }>({ prefix: wakeCardPrefix(turnId) });
+    if (staged.size === 0) return;
+    for (const entry of [...staged.values()].sort((a, b) => a.createdAt - b.createdAt)) {
+      const appended = this.journal.appendCard({
+        turnId,
+        createdAt: entry.createdAt,
+        card: entry.card,
+        writer: "orchestrator",
+        writerKey: entry.writerKey,
+      });
+      this.journal.setTurnSpan(turnId, appended.seq);
+      if (appended.inserted) this.publish(appended.record);
+    }
+    await this.ctx.storage.delete([...staged.keys()]);
+  }
+
   protected publishTurnFilesCard(
     turnId: string,
     writerKey: string,

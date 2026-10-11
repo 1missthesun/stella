@@ -377,12 +377,13 @@ export const piChatsFor = (
         void (async () => {
           const runner = session.runnerCell.get();
           if (!runner) return;
+          const status = agent.status === "failed" ? "error" : agent.status;
           await runner.computerAgents.complete({
             agentId: agent.threadId,
             attemptGeneration: agent.attempt,
-            status: agent.failed ? "error" : "completed",
+            status,
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
-            ...(body ? (agent.failed ? { error: body } : { result: body }) : {}),
+            ...(body ? (status === "completed" ? { result: body } : { error: body }) : {}),
           });
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },
@@ -396,9 +397,8 @@ export const piChatsFor = (
           await runner.computerAgents.complete({
             agentId: agent.threadId,
             attemptGeneration: agent.attempt,
-            status: "canceled",
+            status: "paused",
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
-            error: "Paused.",
           });
         })().catch((error) => console.warn("[pi-chat] computer thread pause failed", error));
       },

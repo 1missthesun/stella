@@ -1,3 +1,4 @@
+import { AGENT_PAUSED_REASON } from "@stella/contracts/agent-status";
 import type { RuntimeStore } from "../storage/runtime-store.js";
 import type { AgentToolSnapshot } from "../tools/types.js";
 import {
@@ -10,7 +11,7 @@ const NO_AUTH_RETRY_MS = 4_000;
 const BASE_RETRY_MS = 500;
 const MAX_RETRY_MS = 60_000;
 
-type LocalTerminalStatus = "completed" | "error" | "canceled";
+type LocalTerminalStatus = "completed" | "error" | "canceled" | "paused";
 
 type ComputerAgentStartPayload = {
   conversationId: string;
@@ -103,17 +104,41 @@ const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
       ),
   );
 
+/**
+ * `computerThreads.complete` with an attempt's outcome. A pause goes as
+ * `paused`; a backend from before the shared vocabulary refuses that status,
+ * so it gets the cancel carrying the pause reason it reads as paused.
+ */
+export const completeComputerThread = async (
+  call: (args: Record<string, unknown>) => Promise<unknown>,
+  args: Record<string, unknown> & {
+    status: "completed" | "failed" | "canceled" | "paused";
+    error?: string;
+  },
+): Promise<unknown> => {
+  if (args.status !== "paused") return await call(args);
+  try {
+    return await call(args);
+  } catch (error) {
+    if (asRecord(error)?.code !== "BAD_REQUEST") throw error;
+    return await call({ ...args, status: "canceled", error: AGENT_PAUSED_REASON });
+  }
+};
+
+const snapshotStatus = (record: Record<string, unknown>): unknown =>
+  record.agentStatus === "paused" ? "paused" : record.status;
+
 const parseSnapshot = (value: unknown): AgentToolSnapshot | null => {
   const record = asRecord(value);
   if (!record) return null;
   const id = record.id ?? record.threadId;
-  const status = record.status;
+  const status = snapshotStatus(record);
   const description = record.description;
   const startedAt = record.startedAt;
   const completedAt = record.completedAt;
   if (
     typeof id !== "string" ||
-    !["running", "completed", "error", "canceled"].includes(
+    !["running", "completed", "error", "canceled", "paused"].includes(
       typeof status === "string" ? status : "",
     ) ||
     typeof description !== "string" ||
@@ -374,7 +399,7 @@ export const createComputerAgentCloudRecords = (
         entry.payloadJson,
       );
       await withTimeout(
-        options.backend.complete({
+        completeComputerThread(options.backend.complete, {
           threadId: entry.threadId,
           originDeviceId: options.deviceId,
           attemptGeneration: entry.attemptGeneration,

@@ -16,7 +16,7 @@
 
 /** How one agent stands on this computer. `attempt` is the newest one it started. */
 export type ComputerAgentStanding = {
-  status: "running" | "completed" | "error" | "canceled";
+  status: "running" | "completed" | "error" | "canceled" | "paused";
   attempt: number;
   /** Why it stopped short, for a canceled or failed one. */
   error?: string;
@@ -38,7 +38,7 @@ export const reconcileComputerAgents = async (args: {
   complete(input: {
     threadId: string;
     attemptGeneration: number;
-    status: "completed" | "failed" | "canceled";
+    status: "completed" | "failed" | "canceled" | "paused";
     error?: string;
   }): Promise<unknown>;
   cancel(input: { threadId: string; attemptGeneration: number; reason: string }): Promise<unknown>;
@@ -63,7 +63,7 @@ export const reconcileComputerAgents = async (args: {
         threadId: thread.threadId,
         attemptGeneration: thread.attemptGeneration,
         status: here.status === "error" ? "failed" : here.status,
-        ...(here.status !== "completed"
+        ...(here.status !== "completed" && here.status !== "paused"
           ? { error: here.error?.trim() || INTERRUPTED_AGENT_REASON }
           : {}),
       });

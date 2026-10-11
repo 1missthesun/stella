@@ -62,7 +62,7 @@ export const cloudAgentTerminalCard = (
         ...card,
         event: {
           type: "agent-completed",
-          payload: { ...payload, result: control.lifecycleReport ?? "" },
+          payload: { ...payload, result: control.lifecycleReport ?? "", status: "completed" },
         },
       };
     case "failed":
@@ -76,6 +76,7 @@ export const cloudAgentTerminalCard = (
             ...(control.lifecycleReport
               ? { error: control.lifecycleReport }
               : {}),
+            status: control.status,
           },
         },
       };
@@ -84,7 +85,7 @@ export const cloudAgentTerminalCard = (
         ...card,
         event: {
           type: "agent-canceled",
-          payload: { ...payload, error: "Paused." },
+          payload: { ...payload, error: "Paused.", status: "paused" },
         },
       };
     default:

@@ -336,7 +336,8 @@ export type TaskLifecycleStatus =
   | "running"
   | "completed"
   | "error"
-  | "canceled";
+  | "canceled"
+  | "paused";
 
 /**
  * Redacted task-scoped tool state used by the Activity summary engine.
@@ -364,7 +365,10 @@ export type TaskLifecycleFeedEventType =
 export const isTerminalTaskLifecycleStatus = (
   status: TaskLifecycleStatus | undefined,
 ): status is TerminalTaskLifecycleStatus =>
-  status === "completed" || status === "error" || status === "canceled";
+  status === "completed" ||
+  status === "error" ||
+  status === "canceled" ||
+  status === "paused";
 
 export const shouldIgnoreTerminalTaskFeedEvent = (args: {
   currentStatus?: TaskLifecycleStatus;
@@ -387,7 +391,8 @@ export const AGENT_RUN_FINISH_OUTCOMES = {
   CANCELED: "canceled",
 } as const satisfies Record<string, TerminalTaskLifecycleStatus>;
 
-export type AgentRunFinishOutcome = TerminalTaskLifecycleStatus;
+/** How a run (not an agent) finished; a run is never paused, its agent is. */
+export type AgentRunFinishOutcome = Exclude<TerminalTaskLifecycleStatus, "paused">;
 
 export const TOOL_IDS = {
   NO_RESPONSE: "NoResponse",

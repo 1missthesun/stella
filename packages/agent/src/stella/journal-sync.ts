@@ -20,6 +20,7 @@ import {
   type Harness,
 } from "@earendil-works/pi-durable";
 import type { JournalCheckpoint, JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
+import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import { noteRemoteReport } from "./agents.ts";
 
 /** One journaled message, as a reader of the journal gets it. */
@@ -41,7 +42,7 @@ export type JournalMessage = {
  */
 export type JournalAgentReport = {
   seq: number;
-  report: { threadId: string; requestId: string; text?: string };
+  report: { threadId: string; requestId: string; text?: string; status?: AgentAttemptOutcome };
 };
 
 /** The journal turn a transcript is mirroring now. */

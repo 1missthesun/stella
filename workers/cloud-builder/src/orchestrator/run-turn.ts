@@ -102,6 +102,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     this.journal.setTurnSpan(turn.turnId, prompt.seq);
     this.publish(prompt.record);
     this.publishAgentTerminal(turn, report);
+    await this.publishStagedWakeCards(turn.turnId);
   }
 
   protected async finishPreCanceledTurn(

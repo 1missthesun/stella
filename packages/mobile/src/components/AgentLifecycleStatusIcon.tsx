@@ -13,6 +13,7 @@ export const AGENT_LIFECYCLE_STATUS_ICONS = {
   completed: "check-circle",
   error: "alert-circle",
   canceled: "circle",
+  paused: "circle",
 } as const satisfies Record<TaskLifecycleStatus, IconName>;
 
 export function AgentLifecycleStatusIcon({

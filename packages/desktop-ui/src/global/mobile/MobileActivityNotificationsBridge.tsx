@@ -137,7 +137,8 @@ export function collectActivityNotifications(
     if (
       !record.terminalNotified &&
       eligibleForTerminalNotification &&
-      task.status !== "canceled"
+      task.status !== "canceled" &&
+      task.status !== "paused"
     ) {
       record.terminalNotified = true;
       kinds.push({

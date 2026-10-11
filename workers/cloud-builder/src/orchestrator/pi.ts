@@ -1,4 +1,9 @@
 import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
+import {
+  agentAttemptOutcomeOf,
+  reportStatusOf,
+  type AgentAttemptOutcome,
+} from "@stella/contracts/agent-status";
 import type {
   AdmittedCloudChat,
   CloudChatPreparation,
@@ -273,7 +278,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               this.publishPiAgentTerminal(
                 report.threadId,
                 agent,
-                piReportOutcome(report.text),
+                piReportOutcome(report),
               );
             }
             const appended = this.journal.appendCard({
@@ -285,6 +290,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                 threadId: report.threadId,
                 requestId: report.requestId,
                 text: report.text,
+                ...(report.status ? { status: report.status } : {}),
                 ...(report.settled ? { settled: true as const } : {}),
               },
               writer: "orchestrator",
@@ -331,7 +337,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             this.publishPiAgentTerminal(
               event.threadId,
               event,
-              { kind: "canceled", body: "Paused." },
+              { kind: "paused", body: "Paused." },
               event.turnId,
             ),
           agentsChanged: () => this.refreshAgentsSoon(),
@@ -622,22 +628,31 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       }
     })();
     if (typeof wakeTurnId !== "string" || !wakeTurnId) return;
+    // Its cards follow the wake's prompt, which the turn writes once it runs.
+    const now = Date.now();
     // What the agent saved to the drive and linked, as the loop's agents' files card.
     if (agent.files?.length) {
-      this.publishTurnFilesCard(
-        wakeTurnId,
-        `pi-files:${report.requestId}`,
-        agent.files,
-      );
+      await this.stageWakeCard(wakeTurnId, {
+        writerKey: `pi-files:${report.requestId}`,
+        createdAt: now,
+        card: {
+          type: "files",
+          files: agent.files.map((file) => ({ ...file, stored: true })),
+        },
+      });
     }
     // A message since has it working again: this report does not end it.
     if (agent.running) return;
-    this.publishPiAgentTerminal(
+    const card = this.piAgentTerminalCard(
       report.threadId,
       agent,
-      piReportOutcome(report.text),
-      wakeTurnId,
+      piReportOutcome(report),
     );
+    await this.stageWakeCard(wakeTurnId, {
+      writerKey: card.eventId,
+      createdAt: now + 1,
+      card,
+    });
   }
 
   /**
@@ -709,18 +724,32 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   protected publishPiAgentTerminal(
     threadId: string,
     agent: import("../pi-runtime.js").PiAgentInfo,
-    outcome: { kind: "completed" | "failed" | "canceled"; body: string },
+    outcome: { kind: AgentAttemptOutcome; body: string },
     turnId = `pi-agent:${threadId}`,
   ): void {
+    this.publishAgentLifecycleCard(
+      turnId,
+      Date.now(),
+      this.piAgentTerminalCard(threadId, agent, outcome),
+    );
+  }
+
+  protected piAgentTerminalCard(
+    threadId: string,
+    agent: import("../pi-runtime.js").PiAgentInfo,
+    outcome: { kind: AgentAttemptOutcome; body: string },
+  ): import("@stella/contracts/cloud-agent-lifecycle").CloudAgentLifecycleCard {
     const identity = { agentId: threadId, attemptGeneration: agent.attempt };
-    this.publishAgentLifecycleCard(turnId, Date.now(), {
+    // A pause's card has always been the attempt's canceled card; its id stays.
+    const cardKind = outcome.kind === "paused" ? "canceled" : outcome.kind;
+    return {
       type: "agent-lifecycle",
-      eventId: `pi-agent:${threadId}:${agent.attempt}:${outcome.kind}`,
+      eventId: `pi-agent:${threadId}:${agent.attempt}:${cardKind}`,
       event:
         outcome.kind === "completed"
           ? {
               type: "agent-completed",
-              payload: { ...identity, result: outcome.body },
+              payload: { ...identity, result: outcome.body, status: "completed" },
             }
           : {
               type:
@@ -728,9 +757,10 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               payload: {
                 ...identity,
                 ...(outcome.body ? { error: outcome.body } : {}),
+                status: outcome.kind,
               },
             },
-    });
+    };
   }
 
   /**
@@ -909,14 +939,16 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       if (!attempt.pausing) return;
       outcome = { status: "canceled", errorMessage: AGENT_PAUSED_REASON };
     } else {
-      const parsed = piReportOutcome(report.text);
+      const parsed = piReportOutcome(report);
       outcome =
         parsed.kind === "completed"
           ? {
               status: "completed",
               resultJson: JSON.stringify({ finalText: parsed.body }),
             }
-          : {
+          : parsed.kind === "paused"
+            ? { status: "canceled", errorMessage: AGENT_PAUSED_REASON }
+            : {
               status: parsed.kind,
               errorMessage:
                 parsed.body ||
@@ -1038,7 +1070,10 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       threadId: next.threadId,
       turnId: latest.turnId,
       attemptGeneration: latest.attemptGeneration,
-      status: terminal.status,
+      status: agentAttemptOutcomeOf({
+        status: terminal.status,
+        reason: terminal.errorMessage,
+      }),
       ...(terminal.resultJson ? { resultJson: terminal.resultJson } : {}),
       ...(terminal.errorMessage ? { errorMessage: terminal.errorMessage } : {}),
       completedAt: terminal.completedAt,

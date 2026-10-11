@@ -503,6 +503,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     this.journal.setTurnSpan(turn.turnId, promptRow.seq);
     this.publish(promptRow.record);
     this.publishAgentTerminal(turn, report);
+    await this.publishStagedWakeCards(turn.turnId);
     const startedRow = this.journal.appendTurn({
       turnId: turn.turnId,
       writer: "orchestrator",

@@ -19,6 +19,7 @@ import { LiveDoc, watchEvents, type AgentEventStream, type Conversation, type En
 import { piJournalUserMessage, piTerminalNotice, type PiRemoteTurn, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
 import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
+import { isAgentAttemptOutcome } from "@stella/contracts/agent-status";
 import {
   checkpointToPublish,
   importJournal,
@@ -114,7 +115,15 @@ const MIRRORED_EVENTS = new Set(["entry_appended", "message_end", "tool_executio
 /** A report of this computer's cloud agent, or that one of its messages settled without one. */
 const reportFor = (record: JournalReadRecord, deviceId: string): JournalAgentReport | undefined => {
   const card = record.card as
-    | { type?: unknown; reportFor?: unknown; threadId?: unknown; requestId?: unknown; text?: unknown; settled?: unknown }
+    | {
+        type?: unknown;
+        reportFor?: unknown;
+        threadId?: unknown;
+        requestId?: unknown;
+        text?: unknown;
+        settled?: unknown;
+        status?: unknown;
+      }
     | undefined;
   if (record.kind !== "card" || card?.type !== "agent-report" || card.reportFor !== deviceId) return undefined;
   if (typeof card.threadId !== "string" || typeof card.requestId !== "string") return undefined;
@@ -122,7 +131,12 @@ const reportFor = (record: JournalReadRecord, deviceId: string): JournalAgentRep
   if (text === undefined && card.settled !== true) return undefined;
   return {
     seq: record.seq,
-    report: { threadId: card.threadId, requestId: card.requestId, ...(text === undefined ? {} : { text }) },
+    report: {
+      threadId: card.threadId,
+      requestId: card.requestId,
+      ...(text === undefined ? {} : { text }),
+      ...(isAgentAttemptOutcome(card.status) ? { status: card.status } : {}),
+    },
   };
 };
 

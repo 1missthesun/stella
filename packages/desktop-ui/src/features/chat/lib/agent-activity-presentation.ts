@@ -196,6 +196,7 @@ export const agentPresentationFallback = (
     case "running":
       return "Working…";
     case "canceled":
+    case "paused":
       return "Paused";
     case "error":
       return "Failed";

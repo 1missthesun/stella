@@ -15,7 +15,10 @@ import { createRunnerPiTools } from "./runner/pi-tools.js";
 import { createRuntimeInitialization } from "./runner/runtime-initialization.js";
 import { createAgentOrchestration } from "./runner/agent-orchestration.js";
 import { createCloudAgentLifecycleMonitor } from "./runner/cloud-agent-lifecycle.js";
-import { createComputerAgentCloudRecords } from "./runner/computer-agent-cloud-records.js";
+import {
+  completeComputerThread,
+  createComputerAgentCloudRecords,
+} from "./runner/computer-agent-cloud-records.js";
 import { createClaudeSessionSync } from "./runner/claude-session-sync.js";
 import {
   claudeSessionSyncSink,
@@ -714,7 +717,11 @@ export const createStellaHostRunner = (
           running: async () =>
             await backend.call("computerThreads.running", fence),
           complete: async (input) =>
-            await backend.call("computerThreads.complete", { ...fence, ...input }),
+            await completeComputerThread(
+              async (args) =>
+                await backend.call("computerThreads.complete", args as never),
+              { ...fence, ...input },
+            ),
           cancel: async (input) =>
             await backend.call("computerThreads.cancel", { ...fence, ...input }),
           // The agent loops' own record first: after a restart it already

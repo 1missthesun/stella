@@ -63,7 +63,7 @@ export function TaskReportButton({
 }: {
   reference: Extract<ReplyRef, { kind: "agent" }>;
   conversationId: string;
-  status?: "running" | "completed" | "error" | "canceled";
+  status?: "running" | "completed" | "error" | "canceled" | "paused";
   liveTitle?: string;
   /** A quiet text link that flows at the end of the reply's last paragraph. */
   inline?: boolean;

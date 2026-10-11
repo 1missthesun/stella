@@ -270,6 +270,8 @@ export type PiThreadReport = {
   threadId: string;
   requestId: string;
   text: string;
+  /** How the run it reports ended. */
+  status?: import("@stella/contracts/agent-status").AgentAttemptOutcome;
   /** One of its messages was answered within another report, or its run was paused. */
   settled?: true;
   /** The attempt whose message it answers, when known. */
@@ -1109,6 +1111,7 @@ export class PiConversationRuntime {
             threadId: report.threadId,
             requestId: report.requestId,
             text: report.text,
+            ...(report.status ? { status: report.status } : {}),
             ...(report.settled ? { settled: true as const } : {}),
             ...(attemptGeneration !== undefined ? { attemptGeneration } : {}),
             ...(files?.length ? { files } : {}),

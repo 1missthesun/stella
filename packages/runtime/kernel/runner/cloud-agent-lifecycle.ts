@@ -180,6 +180,7 @@ const toLifecycleEvent = (
     return {
       ...base,
       type: "agent-canceled",
+      status: "paused" as const,
       eventId: `${row.threadId}:${row.ownerGeneration}:${row.attemptGeneration}:agent-canceled`,
       error: AGENT_PAUSE_CANCEL_REASON,
     };

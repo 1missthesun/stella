@@ -62,10 +62,10 @@ export const buildAgentEventPrompt = (
 
   const lines: string[] = [];
   const toParentAgent = options?.recipient === "parent_agent";
-  const isPausedChild =
+  const paused =
     event.type === "agent-canceled" &&
-    event.error === AGENT_PAUSE_CANCEL_REASON &&
-    toParentAgent;
+    (event.status === "paused" || event.error === AGENT_PAUSE_CANCEL_REASON);
+  const isPausedChild = paused && toParentAgent;
   if (event.type === "agent-completed") {
     lines.push("[Agent completed]");
     if (event.description) {
@@ -84,8 +84,7 @@ export const buildAgentEventPrompt = (
   }
   if (
     event.type === "agent-canceled" &&
-    (event.error === AGENT_SHUTDOWN_CANCEL_REASON ||
-      (event.error === AGENT_PAUSE_CANCEL_REASON && !toParentAgent))
+    (event.error === AGENT_SHUTDOWN_CANCEL_REASON || (paused && !toParentAgent))
   ) {
     return null;
   }

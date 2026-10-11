@@ -19,6 +19,7 @@ export function AgentLifecycleStatusIcon({
     case "error":
       return <AlertCircle {...props} />;
     case "canceled":
+    case "paused":
       return <Circle {...props} />;
   }
 }

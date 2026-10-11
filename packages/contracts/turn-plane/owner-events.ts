@@ -125,7 +125,8 @@ export type ThreadCompletedEvent = OwnerEventBase & {
   conversationId?: string;
   turnId: string;
   attemptGeneration: number;
-  status: "completed" | "failed" | "canceled" | "waiting_for_user";
+  /** `paused` from builds with the shared vocabulary; older ones send `canceled` with the pause reason. */
+  status: "completed" | "failed" | "canceled" | "paused" | "waiting_for_user";
   resultJson?: string;
   errorMessage?: string;
   completedAt: number;

@@ -294,7 +294,7 @@ export const runsHandlers: WorkerRpcHandlers = {
           }
           return result.status === "ok"
             ? { status: "ok" as const, finalText: result.finalText, threadId: result.threadId }
-            : { status: "error" as const, finalText: "" as const, error: result.error, threadId: result.threadId };
+            : { status: result.status, finalText: "" as const, error: result.error, threadId: result.threadId };
         });
       }
       const runner = yield* fromPromise(() =>

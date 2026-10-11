@@ -412,6 +412,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     });
     this.journal.setTurnSpan(lease.turnId, promptRow.seq);
     if (promptRow.inserted) this.publish(promptRow.record);
+    await this.publishStagedWakeCards(lease.turnId);
     const startedRow = this.journal.appendTurn({
       turnId: lease.turnId,
       writer: `desktop:${lease.deviceId}`,

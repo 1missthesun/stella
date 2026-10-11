@@ -31,6 +31,7 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
+import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
 import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
@@ -213,6 +214,8 @@ export type DesktopChatsOptions = {
     conversationId: string;
     threadId: string;
     description: string;
+    /** How the run it reports ended. */
+    status: AgentAttemptOutcome;
     failed: boolean;
     report: string;
     attempt: number;
@@ -1411,13 +1414,24 @@ export function desktopChats(options: DesktopChatsOptions) {
      */
     async agentStatus(
       threadId: string,
-    ): Promise<{ conversationId: string; status: "running" | "completed" | "error" | "canceled"; attempt: number } | undefined> {
+    ): Promise<
+      { conversationId: string; status: "running" | "completed" | "error" | "canceled" | "paused"; attempt: number } | undefined
+    > {
       const conversationId = (await threadIndex())[threadId];
       if (!conversationId) return undefined;
       const chat = await open(conversationId);
       const record = await chat.agentStanding(threadId, context);
       if (!record) return undefined;
-      return { conversationId, status: record.paused ? "canceled" : record.status, attempt: record.attempt };
+      return {
+        conversationId,
+        status:
+          record.agentStatus === "failed"
+            ? "error"
+            : record.agentStatus === "paused" || record.agentStatus === "canceled"
+              ? record.agentStatus
+              : record.status,
+        attempt: record.attempt,
+      };
     },
     /** Whether any conversation has work in flight here, so the process must stay up. */
     busy(): boolean {

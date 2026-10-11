@@ -1,3 +1,9 @@
+import {
+  isAgentAttemptOutcome,
+  type AgentAttemptOutcome,
+  type AgentStatus,
+} from "./agent-status.js";
+
 /** Durable chat decorations. Payloads match the on-device lifecycle events. */
 type LifecycleIdentity = {
   agentId: string;
@@ -19,10 +25,18 @@ export type CloudAgentLifecycleEvent =
       type: "agent-progress";
       payload: LifecycleIdentity & { statusText: string };
     }
-  | { type: "agent-completed"; payload: LifecycleIdentity & { result: string } }
+  | {
+      type: "agent-completed";
+      payload: LifecycleIdentity & { result: string; status?: "completed" };
+    }
   | {
       type: "agent-failed" | "agent-canceled";
-      payload: LifecycleIdentity & { error?: string };
+      /**
+       * `status` says how the attempt ended in the shared vocabulary. A pause
+       * is an `agent-canceled` card with `status: "paused"`, so a client that
+       * reads only the type still sees the agent stop.
+       */
+      payload: LifecycleIdentity & { error?: string; status?: AgentAttemptOutcome };
     };
 
 export type CloudAgentLifecycleCard = {
@@ -107,7 +121,11 @@ export const parseCloudAgentLifecycleCard = (
             ...card,
             event: {
               type: event.type,
-              payload: { ...identity, result: payload.result },
+              payload: {
+                ...identity,
+                result: payload.result,
+                ...(payload.status === "completed" ? { status: "completed" as const } : {}),
+              },
             },
           }
         : null;
@@ -124,10 +142,26 @@ export const parseCloudAgentLifecycleCard = (
             ...(typeof payload.error === "string"
               ? { error: payload.error }
               : {}),
+            ...(isAgentAttemptOutcome(payload.status) ? { status: payload.status } : {}),
           },
         },
       };
     default:
       return null;
+  }
+};
+
+/** The status a lifecycle card leaves its agent in, in the shared vocabulary. */
+export const cloudAgentLifecycleStatus = (event: CloudAgentLifecycleEvent): AgentStatus => {
+  switch (event.type) {
+    case "agent-started":
+    case "agent-progress":
+      return "running";
+    case "agent-completed":
+      return "completed";
+    case "agent-failed":
+      return event.payload.status ?? "failed";
+    case "agent-canceled":
+      return event.payload.status ?? "canceled";
   }
 };

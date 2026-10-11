@@ -27,7 +27,7 @@ import {
   legacyTablesPresent,
 } from "./legacy-import.js";
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 const FTS_TOKENIZER = "'porter unicode61 remove_diacritics 2'";
 
@@ -438,7 +438,7 @@ CREATE TABLE IF NOT EXISTS cloud_agent_thread_controls (
   attempt_generation INTEGER NOT NULL,
   thread_updated_at INTEGER NOT NULL,
   status TEXT NOT NULL CHECK (
-    status IN ('running', 'completed', 'failed', 'canceled')
+    status IN ('running', 'completed', 'failed', 'canceled', 'paused')
   ),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
@@ -765,7 +765,58 @@ const MIGRATIONS: Migration[] = [
       db.exec(CLAUDE_SESSION_SYNC_SCHEMA_SQL);
     },
   },
+  {
+    version: 9,
+    apply: (db) => {
+      allowPausedCloudAgentControls(db);
+    },
+  },
 ];
+
+/**
+ * A control receipt records a paused cloud agent as `paused`. Tables made
+ * before that refuse the status in their CHECK, which SQLite cannot alter,
+ * so the table is rebuilt with its rows. A table that already allows it is
+ * left alone, so the rebuild runs at most once whatever version it lands in.
+ */
+const allowPausedCloudAgentControls = (db: SqliteDatabase): void => {
+  const table = db
+    .prepare(
+      "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'cloud_agent_thread_controls'",
+    )
+    .get() as { sql?: string } | undefined;
+  if (!table?.sql || table.sql.includes("'paused'")) return;
+  db.exec(`
+ALTER TABLE cloud_agent_thread_controls RENAME TO cloud_agent_thread_controls_before_paused;
+DROP INDEX IF EXISTS idx_cloud_agent_thread_controls_origin;
+CREATE TABLE cloud_agent_thread_controls (
+  thread_id TEXT NOT NULL,
+  owner_generation TEXT NOT NULL,
+  cloud_conversation_id TEXT NOT NULL,
+  origin_conversation_id TEXT NOT NULL,
+  attempt_generation INTEGER NOT NULL,
+  thread_updated_at INTEGER NOT NULL,
+  status TEXT NOT NULL CHECK (
+    status IN ('running', 'completed', 'failed', 'canceled', 'paused')
+  ),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  description TEXT,
+  PRIMARY KEY (thread_id, owner_generation)
+);
+INSERT INTO cloud_agent_thread_controls (
+  thread_id, owner_generation, cloud_conversation_id, origin_conversation_id,
+  attempt_generation, thread_updated_at, status, created_at, updated_at, description
+)
+SELECT
+  thread_id, owner_generation, cloud_conversation_id, origin_conversation_id,
+  attempt_generation, thread_updated_at, status, created_at, updated_at, description
+FROM cloud_agent_thread_controls_before_paused;
+DROP TABLE cloud_agent_thread_controls_before_paused;
+CREATE INDEX IF NOT EXISTS idx_cloud_agent_thread_controls_origin
+  ON cloud_agent_thread_controls(owner_generation, origin_conversation_id, updated_at);
+`);
+};
 
 /**
  * Every external-content FTS5 index the schema owns. Their rows are keyed by

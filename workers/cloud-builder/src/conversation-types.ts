@@ -190,6 +190,8 @@ export type ConversationCard =
       threadId: string;
       requestId: string;
       text: string;
+      /** How the run it reports ended; readers use this, not the text's heading. */
+      status?: import("@stella/contracts/agent-status").AgentAttemptOutcome;
       /** One of the agent's messages settled without a report of its own (answered within another, or paused). */
       settled?: true;
     }

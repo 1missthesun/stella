@@ -488,6 +488,7 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   // hub wiring above need them.
   protected abstract cancelTurn(turnId: string): Promise<void>;
   protected abstract journalStoppedPrompt(turn: ChatTurnRequest): Promise<void>;
+  protected abstract publishStagedWakeCards(turnId: string): Promise<void>;
   protected abstract claimOrphanedTurnResume(): Promise<{
     turn: ChatTurnRequest;
     resume: boolean;

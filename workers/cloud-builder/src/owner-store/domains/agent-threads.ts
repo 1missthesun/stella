@@ -18,8 +18,8 @@
  * `forDevice` delivery; a cloud requester is woken (see `settleDeviceAttempt`).
  */
 
+import { agentAttemptOutcomeOf, agentStatusOf } from "@stella/contracts/agent-status";
 import {
-  AGENT_PAUSED_ERROR_CODE,
   AGENT_PAUSED_REASON,
   agentThreadTerminalStatus,
   newAgentThreadId,
@@ -355,10 +355,10 @@ const agentLifecycleCard = (
               payload: { ...identity, description: row.description, agentType: row.agent_type },
             }
           : outcome.kind === "completed"
-            ? { type: "agent-completed", payload: { ...identity, result: text } }
+            ? { type: "agent-completed", payload: { ...identity, result: text, status: "completed" } }
             : {
                 type: outcome.kind === "failed" ? "agent-failed" : "agent-canceled",
-                payload: { ...identity, ...(text ? { error: text } : {}) },
+                payload: { ...identity, ...(text ? { error: text } : {}), status: outcome.kind },
               },
     },
   };
@@ -691,12 +691,7 @@ const settleDeviceAttempt = async (
 ): Promise<void> => {
   const turn = readTurn(ctx.db, turnId);
   if (!turn?.thread_id || TERMINAL_STATUSES.has(turn.status)) return;
-  ctx.db.run(
-    "UPDATE agent_turns SET status = ?, updated_at = ? WHERE turn_id = ?",
-    status === "paused" ? "canceled" : status,
-    ctx.now,
-    turnId,
-  );
+  ctx.db.run("UPDATE agent_turns SET status = ?, updated_at = ? WHERE turn_id = ?", status, ctx.now, turnId);
   ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turnId);
   const thread = readThread(ctx.db, turn.thread_id);
   if (
@@ -765,9 +760,7 @@ const deviceSettled = async (ctx: OwnerContext, raw: unknown): Promise<{ settled
   const status: TerminalStatus =
     args.state === "blocked"
       ? "failed"
-      : args.state === "canceled" && args.errorCode === AGENT_PAUSED_ERROR_CODE
-        ? "paused"
-        : agentThreadTerminalStatus(args.state, args.errorMessage);
+      : agentAttemptOutcomeOf({ status: args.state, reason: args.errorMessage, errorCode: args.errorCode });
   await settleDeviceAttempt(ctx, args.turnId, status, {
     ...(args.resultJson ? { resultJson: args.resultJson } : {}),
     ...(args.errorMessage
@@ -1015,7 +1008,7 @@ const stopDeviceAttempt = async (
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
   ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
   ctx.db.run(
-    "UPDATE agent_turns SET status = 'canceled', updated_at = ? WHERE turn_id = ?",
+    "UPDATE agent_turns SET status = 'paused', updated_at = ? WHERE turn_id = ?",
     ctx.now,
     turn.turn_id,
   );
@@ -1906,7 +1899,7 @@ const pauseCloudAttempt = async (
   if (outcome === "changed") throw threadChanged(thread.thread_id);
   const now = Date.now();
   ctx.db.run(
-    "UPDATE agent_turns SET status = 'canceled', updated_at = ? WHERE turn_id = ?",
+    "UPDATE agent_turns SET status = 'paused', updated_at = ? WHERE turn_id = ?",
     now,
     turn.turn_id,
   );
@@ -2326,6 +2319,7 @@ const computerRecord = (row: ThreadRow): ComputerThreadRecord => {
     completedAt: row.status === "running" ? null : row.updated_at,
     result,
     error: row.status === "paused" ? AGENT_PAUSED_REASON : row.error_message,
+    ...(agentStatusOf(row.status) ? { agentStatus: agentStatusOf(row.status)! } : {}),
   };
 };
 
@@ -2802,7 +2796,7 @@ export const agentThreadsDomain = {
         ownerGeneration: generation,
         originDeviceId: id(256),
         attemptGeneration: number({ int: true, min: 1 }),
-        status: literal("completed", "failed", "canceled"),
+        status: literal("completed", "failed", "canceled", "paused"),
         result: optional(string({ max: 30_000 })),
         error: optional(string({ max: 10_000 })),
       }),

@@ -291,7 +291,7 @@ export const createBackgroundExitWake = (deps: BackgroundExitWakeDeps) => {
           entry.conversationId,
         );
         if (!isCurrent()) return;
-        if (status === "canceled") {
+        if (status === "canceled" || status === "paused") {
           // The user stopped this thread on purpose. Its leftovers finishing
           // is not a reason to start it up again.
           clearEntry(key, entry);

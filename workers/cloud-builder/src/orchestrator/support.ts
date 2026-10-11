@@ -1,3 +1,4 @@
+import { reportStatusOf, type AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
 import { resolveManagedModelDescriptor } from "@stella/model-catalog/gateway-resolution";
 import {
@@ -31,27 +32,22 @@ export class OwnerFenceLeaseConflictError extends Error {}
 export class OwnerFenceRegistrationUncertainError extends Error {}
 
 /**
- * How a pi agent's report (`[Agent completed]` / `[Task failed]`) ended, and
- * its result or error, for the agent's lifecycle card.
+ * How a pi agent's report ended (its own `status`, or for a report an older
+ * build wrote, its heading), and its result or error, for the agent's
+ * lifecycle card.
  */
-export const piReportOutcome = (
-  text: string,
-): { kind: "completed" | "failed" | "canceled"; body: string } => {
+export const piReportOutcome = (report: {
+  text: string;
+  status?: AgentAttemptOutcome;
+}): { kind: AgentAttemptOutcome; body: string } => {
   const field = (name: string) => {
     const match = new RegExp(
       `(?:^|\\n)${name}: ([\\s\\S]*?)(?=\\n(?:agent_state|routing|presentation):|$)`,
-    ).exec(text);
+    ).exec(report.text);
     return match?.[1]?.trim() ?? "";
   };
-  if (text.startsWith("[Agent completed]"))
-    return { kind: "completed", body: field("result") };
-  if (
-    text.startsWith("[Task canceled]") ||
-    text.startsWith("[Subagent paused]")
-  ) {
-    return { kind: "canceled", body: field("error") };
-  }
-  return { kind: "failed", body: field("error") };
+  const kind = reportStatusOf(report);
+  return { kind, body: field(kind === "completed" ? "result" : "error") };
 };
 
 /** One list, pi's own first where both name an agent, oldest start first. */

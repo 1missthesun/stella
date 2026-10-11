@@ -880,7 +880,7 @@ export const createAgentOrchestration = (
           },
         },
         hookEmitter: context.hookEmitter,
-      }).finally(() => context.toolHost.endBrowserTurn(runId, "close-tabs"));
+      }).finally(() => closeAgentBrowserTurn(runId));
       return result;
     },
     toolExecutor: (
@@ -1012,6 +1012,22 @@ export const createAgentOrchestration = (
     },
   });
 
+  /**
+   * Close the browser tabs an agent's run opened. The run's outcome is
+   * already decided: a browser that is slow or gone while its tabs close
+   * must not turn a finished run into a failure.
+   */
+  const closeAgentBrowserTurn = async (runId: string): Promise<void> => {
+    try {
+      await context.toolHost.endBrowserTurn(runId, "close-tabs");
+    } catch (error) {
+      console.warn(
+        "[agent-orchestration] Closing the agent's browser tabs failed after its run ended:",
+        error instanceof Error ? error.message : error,
+      );
+    }
+  };
+
   const runBlockingLocalAgent = async (
     request: Omit<AgentToolRequest, "storageMode"> & {
       executionId?: string;
@@ -1019,7 +1035,12 @@ export const createAgentOrchestration = (
     },
   ): Promise<
     | { status: "ok"; finalText: string; threadId: string }
-    | { status: "canceled"; finalText: ""; error: string; threadId: string }
+    | {
+        status: "canceled" | "paused";
+        finalText: "";
+        error: string;
+        threadId: string;
+      }
     | { status: "error"; finalText: ""; error: string; threadId?: string }
   > => {
     if (!context.state.localAgentManager) {
@@ -1120,9 +1141,9 @@ export const createAgentOrchestration = (
       };
     }
     // Paused or stopped here is not a failure: the requester learns which.
-    if (settlement.status === "canceled") {
+    if (settlement.status === "canceled" || settlement.status === "paused") {
       return {
-        status: "canceled",
+        status: settlement.status,
         finalText: "",
         error: settlement.error ?? "The agent was stopped.",
         threadId,

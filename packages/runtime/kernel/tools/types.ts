@@ -208,7 +208,7 @@ export type ShellRecord = {
 export type AgentRecord = {
   id: string;
   description: string;
-  status: "running" | "completed" | "error";
+  status: "running" | "completed" | "error" | "paused";
   result?: string;
   error?: string;
   startedAt: number;

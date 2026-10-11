@@ -1,6 +1,5 @@
 import {
   AGENT_PAUSED_ERROR_CODE,
-  AGENT_PAUSED_REASON,
 } from "@stella/contracts/backend/agent-threads";
 import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
 import { createHash } from "node:crypto";
@@ -89,7 +88,8 @@ export type ExecutionPlacementDesktopSubmit = {
 export type ExecutionPlacementAvailability = DeviceAvailability;
 
 export type ExecutionPlacementRunResult = {
-  status: "ok" | "error" | "canceled";
+  /** `paused`: someone paused it before it answered; it resumes with a message. */
+  status: "ok" | "error" | "canceled" | "paused";
   finalText?: string;
   error?: string;
 };
@@ -2062,7 +2062,8 @@ export class ExecutionPlacementBridge {
         }
         return;
       }
-      const canceled = result.status === "canceled";
+      const paused = result.status === "paused";
+      const canceled = result.status === "canceled" || paused;
       const failed = result.status === "error";
       const resultJson =
         result.status === "ok"
@@ -2072,9 +2073,7 @@ export class ExecutionPlacementBridge {
         outcome: canceled ? "canceled" : failed ? "failed" : "completed",
         ...(resultJson ? { resultJson } : {}),
         ...(failed ? { errorCode: "LOCAL_EXECUTION_FAILED" } : {}),
-        ...(canceled && result.error === AGENT_PAUSED_REASON
-          ? { errorCode: AGENT_PAUSED_ERROR_CODE }
-          : {}),
+        ...(paused ? { errorCode: AGENT_PAUSED_ERROR_CODE } : {}),
         ...((failed || canceled) && (result.error || result.finalText)
           ? { errorMessage: boundedResult(result.error || result.finalText) }
           : {}),

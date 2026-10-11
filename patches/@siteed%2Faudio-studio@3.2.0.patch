@@ -173,3 +173,257 @@ index eb871c52380986c4e233dff4fd87a7a0d2c9afdf..e45b20a2c718fffac50812c06cadc44b
                      Log.e("RecordingActionReceiver", "$action failed: $message", cause)
                      isProcessingAction.set(false)
                  }
+diff --git a/ios/AudioStreamManager.swift b/ios/AudioStreamManager.swift
+index 4d69b16200e46024ee132584412ee68d97db975e..d77a1ff0a7e65741c017e3ffe73aa703148d39cc 100644
+--- a/ios/AudioStreamManager.swift
++++ b/ios/AudioStreamManager.swift
+@@ -51,6 +51,7 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+     var isRecording = false
+     var isPaused = false
+     var isPrepared = false  // Add this new state flag
++    private(set) var lastStartFailure: String?
+     
+     // Move static variables to class level
+     private var debugBufferCounter = 0
+@@ -499,7 +500,13 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+             // Now restart the engine if it was paused due to background
+             do {
+                 // Reinstall tap with hardware format to ensure we have good input
+-                _ = installTapWithHardwareFormat()
++                guard installTapWithHardwareFormat() != nil else {
++                    throw NSError(
++                        domain: "AudioStreamManager",
++                        code: 1,
++                        userInfo: [NSLocalizedDescriptionKey: lastStartFailure ?? "Failed to install audio tap after returning from background"]
++                    )
++                }
+                 // Restart the engine
+                 try audioEngine.start()
+                 Logger.debug("AudioStreamManager", "Successfully restarted audio engine after returning from background")
+@@ -806,10 +813,11 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+     ///   - customTapBlock: Optional custom tap block for specialized processing (like in fallback)
+     ///   - prepareEngine: Whether to call prepare() on the engine after installing the tap (default: true)
+     /// - Returns: The hardware input format that was used for the tap
++    @discardableResult
+     private func installTapWithHardwareFormat(
+         customTapBlock: ((AVAudioPCMBuffer, AVAudioTime) -> Void)? = nil,
+         prepareEngine: Bool = true
+-    ) -> AVAudioFormat {
++    ) -> AVAudioFormat? {
+         // Get the hardware input format
+         let inputNode = audioEngine.inputNode
+         let inputHardwareFormat = inputNode.inputFormat(forBus: 0)
+@@ -853,25 +861,26 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+             bufferSize = 1024 // Default
+         }
+         
+-        // Validate hardware format before installing tap (#223)
+         if inputHardwareFormat.channelCount == 0 || inputHardwareFormat.sampleRate == 0 {
+-            Logger.debug("AudioStreamManager", "Invalid hardware format: channels=\(inputHardwareFormat.channelCount), sampleRate=\(inputHardwareFormat.sampleRate). Using fallback.")
+-            let fallbackSampleRate = Double(recordingSettings?.sampleRate ?? 16000)
+-            let fallbackChannels = AVAudioChannelCount(recordingSettings?.numberOfChannels ?? 1)
+-            guard let fallbackFormat = AVAudioFormat(standardFormatWithSampleRate: fallbackSampleRate, channels: fallbackChannels) else {
+-                Logger.debug("AudioStreamManager", "Failed to create fallback format")
+-                return inputHardwareFormat
+-            }
+-            inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: fallbackFormat, block: tapBlock)
+-            Logger.debug("AudioStreamManager", "Tap installed with fallback format")
+-            if prepareEngine {
+-                audioEngine.prepare()
+-            }
+-            return fallbackFormat
++            let message = "Microphone input is unavailable (channels=\(inputHardwareFormat.channelCount), sampleRate=\(inputHardwareFormat.sampleRate))"
++            Logger.debug("AudioStreamManager", message)
++            lastStartFailure = message
++            delegate?.audioStreamManager(self, didFailWithError: message)
++            return nil
+         }
+ 
+-        // Install the tap with hardware format
+-        inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputHardwareFormat, block: tapBlock)
++        do {
++            try AudioStudioExceptionCatcher.catchException {
++                inputNode.installTap(onBus: 0, bufferSize: bufferSize, format: inputHardwareFormat, block: tapBlock)
++            }
++        } catch {
++            let message = "Could not install microphone tap: \(error.localizedDescription)"
++            Logger.debug("AudioStreamManager", message)
++            inputNode.removeTap(onBus: 0)
++            lastStartFailure = message
++            delegate?.audioStreamManager(self, didFailWithError: message)
++            return nil
++        }
+         Logger.debug("AudioStreamManager", "Tap installed with hardware-compatible format")
+         
+         // Prepare the engine if requested
+@@ -891,6 +900,7 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+     func prepareRecording(settings: RecordingSettings) -> Bool {
+         // Store settings first before doing anything else
+         recordingSettings = settings
++        lastStartFailure = nil
+         
+         // Skip if already prepared or recording
+         guard !isPrepared && !isRecording else {
+@@ -1006,7 +1016,11 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+             Logger.debug("AudioStreamManager", "  - compression enabled: \(settings.output.compressed.enabled)")
+ 
+             // Use our shared tap installation method
+-            let tapFormat = installTapWithHardwareFormat()
++            guard let tapFormat = installTapWithHardwareFormat() else {
++                isPrepared = true
++                cleanupPreparation()
++                return false
++            }
+ 
+             // Log tap configuration
+             Logger.debug("AudioStreamManager", "Final Tap Configuration (Using Hardware Format):")
+@@ -1127,12 +1141,16 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+     ///   - settings: The recording settings to use.
+     /// - Returns: A StartRecordingResult object if recording starts successfully, or nil otherwise.
+     func startRecording(settings: RecordingSettings) -> StartRecordingResult? {
++        lastStartFailure = nil
+         // If already prepared, use the prepared state
+         if isPrepared {
+             Logger.debug("Using prepared recording state")
+             
+             // Install tap with hardware format
+-            _ = installTapWithHardwareFormat()
++            guard installTapWithHardwareFormat() != nil else {
++                cleanupPreparation()
++                return nil
++            }
+             Logger.debug("Tap was reinstalled during recording start")
+         } else {
+             // If not prepared, prepare now
+@@ -1918,41 +1936,32 @@ class AudioStreamManager: NSObject, AudioDeviceManagerDelegate {
+         // PERFORMANCE OPTIMIZATION: Move all slow operations to background
+         let capturedShowNotification = recordingSettings?.showNotification == true
+         
+-        // Queue notification and audio session cleanup for background
+-        DispatchQueue.global(qos: .utility).async { [weak self] in
+-            guard let self = self else { return }
+-            
+-            if capturedShowNotification {
+-                // Clean up notifications on main queue but don't wait
+-                DispatchQueue.main.async {
+-                    self.mediaInfoUpdateTimer?.invalidate()
+-                    self.mediaInfoUpdateTimer = nil
+-                    
+-                    // Clean up notification manager
+-                    self.notificationManager?.stopUpdates()
+-                    self.notificationManager = nil
+-                    
+-                    // Clean up media controls
+-                    UIApplication.shared.endReceivingRemoteControlEvents()
+-                    self.remoteCommandCenter?.pauseCommand.isEnabled = false
+-                    self.remoteCommandCenter?.playCommand.isEnabled = false
+-                    self.notificationView?.nowPlayingInfo = nil
+-                }
+-            }
+-            
+-            // Reset audio session in background
+-            do {
+-                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+-            } catch {
+-                Logger.debug("Background: Error deactivating audio session: \(error)")
+-            }
+-            
+-            // Reset audio engine in background
+-            DispatchQueue.main.async {
+-                self.audioEngine.reset()
++        if capturedShowNotification {
++            // Clean up notifications on main queue but don't wait
++            DispatchQueue.main.async { [weak self] in
++                guard let self = self else { return }
++                self.mediaInfoUpdateTimer?.invalidate()
++                self.mediaInfoUpdateTimer = nil
++                
++                // Clean up notification manager
++                self.notificationManager?.stopUpdates()
++                self.notificationManager = nil
++                
++                // Clean up media controls
++                UIApplication.shared.endReceivingRemoteControlEvents()
++                self.remoteCommandCenter?.pauseCommand.isEnabled = false
++                self.remoteCommandCenter?.playCommand.isEnabled = false
++                self.notificationView?.nowPlayingInfo = nil
+             }
+         }
+         
++        audioEngine.reset()
++        do {
++            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
++        } catch {
++            Logger.debug("Error deactivating audio session: \(error)")
++        }
++        
+         guard let settings = recordingSettings else {
+             Logger.debug("Recording settings is nil.")
+             stopping = false // Reset stopping flag before returning nil
+diff --git a/ios/AudioStudioExceptionCatcher.h b/ios/AudioStudioExceptionCatcher.h
+new file mode 100644
+index 0000000000000000000000000000000000000000..7541f7f45df5f94ea2d27e95fb6c1be9c88df480
+--- /dev/null
++++ b/ios/AudioStudioExceptionCatcher.h
+@@ -0,0 +1,11 @@
++#import <Foundation/Foundation.h>
++
++NS_ASSUME_NONNULL_BEGIN
++
++@interface AudioStudioExceptionCatcher : NSObject
++
+++ (BOOL)catchException:(NS_NOESCAPE void (^)(void))block error:(NSError * _Nullable * _Nullable)error;
++
++@end
++
++NS_ASSUME_NONNULL_END
+diff --git a/ios/AudioStudioExceptionCatcher.m b/ios/AudioStudioExceptionCatcher.m
+new file mode 100644
+index 0000000000000000000000000000000000000000..3b7cc44a17072452d2e23d3764ea25a18d0a3211
+--- /dev/null
++++ b/ios/AudioStudioExceptionCatcher.m
+@@ -0,0 +1,20 @@
++#import "AudioStudioExceptionCatcher.h"
++
++@implementation AudioStudioExceptionCatcher
++
+++ (BOOL)catchException:(NS_NOESCAPE void (^)(void))block error:(NSError * _Nullable * _Nullable)error {
++  @try {
++    block();
++    return YES;
++  } @catch (NSException *exception) {
++    if (error != NULL) {
++      NSString *reason = exception.reason ?: exception.name;
++      *error = [NSError errorWithDomain:exception.name
++                                   code:1
++                               userInfo:@{NSLocalizedDescriptionKey: reason}];
++    }
++    return NO;
++  }
++}
++
++@end
+diff --git a/ios/AudioStudioModule.swift b/ios/AudioStudioModule.swift
+index 36272743a9c977f8a2f55f0bd08fd2719ced5d45..8cb1c2e251610eb3e4583306662824a98b010c1c 100644
+--- a/ios/AudioStudioModule.swift
++++ b/ios/AudioStudioModule.swift
+@@ -262,6 +262,7 @@ public class AudioStudioModule: Module, AudioStreamManagerDelegate, AudioDeviceM
+                     // and AVAudioEngine come up.
+                     self.audioLifecycleQueue.async {
+                         let result = self.streamManager.startRecording(settings: settings)
++                        let failure = self.streamManager.lastStartFailure
+                         DispatchQueue.main.async {
+                             if let result = result {
+                                 var resultDict: [String: Any] = [
+@@ -284,8 +285,9 @@ public class AudioStudioModule: Module, AudioStreamManagerDelegate, AudioDeviceM
+                                 Logger.info("AudioStudioModule", "Recording started successfully")
+                                 promise.resolve(resultDict)
+                             } else {
+-                                Logger.error("AudioStudioModule", "Failed to start recording")
+-                                promise.reject("ERROR", "Failed to start recording.")
++                                let reason = failure ?? "Failed to start recording."
++                                Logger.error("AudioStudioModule", "Failed to start recording: \(reason)")
++                                promise.reject("ERROR", reason)
+                             }
+                         }
+                     }

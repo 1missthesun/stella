@@ -7,6 +7,7 @@ export type MobileAudioMode = {
 export type RecordingAudioLease = number;
 
 type ApplyAudioMode = (mode: MobileAudioMode) => Promise<void>;
+type DeactivateAudioSession = () => Promise<void>;
 
 /**
  * Serializes process-global audio-mode changes and gives recording immediate
@@ -19,7 +20,10 @@ export class AudioSessionCoordinator {
   private nextLease = 0;
   private operations: Promise<void> = Promise.resolve();
 
-  constructor(private readonly applyAudioMode: ApplyAudioMode) {}
+  constructor(
+    private readonly applyAudioMode: ApplyAudioMode,
+    private readonly deactivateAudioSession: DeactivateAudioSession = async () => {},
+  ) {}
 
   acquireRecording(
     mode: MobileAudioMode = { playsInSilentMode: true },
@@ -83,6 +87,15 @@ export class AudioSessionCoordinator {
       // its queued recording mode runs next. The playback caller must not start
       // a player in the meantime.
       return this.activeRecordingLease === null;
+    });
+  }
+
+  releasePlayback(): Promise<void> {
+    if (this.activeRecordingLease !== null) return Promise.resolve();
+
+    return this.enqueue(async () => {
+      if (this.activeRecordingLease !== null) return;
+      await this.deactivateAudioSession();
     });
   }
 

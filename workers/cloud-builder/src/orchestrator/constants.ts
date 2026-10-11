@@ -82,7 +82,7 @@ export const CHAT_TURN_STARTED_AT_KEY = "turnStartedAt";
 export const CHAT_TURN_MODEL_CAPABILITY_KEY = "turnModelCapability";
 
 export const OWNER_PURGE_STALE_LEASE_GRACE_MS = 35_000;
-export const LOCAL_TURN_LEASE_MS = 30 * 60_000;
+export const LOCAL_TURN_LEASE_MS = 2 * 60_000;
 export const LOCAL_TURN_CANCEL_GRACE_MS = 45_000;
 // `userMessageJson` is nested inside the outer JSON request, so the Worker
 // temporarily retains the request bytes, decoded outer text, parsed nested

@@ -141,6 +141,7 @@ import { useChatSearch } from "../lib/chat-search";
 import { canStartPostSendPlacement } from "../lib/chat-post-send-placement";
 import { resolveChatDataChangeScrollOwner } from "../lib/chat-scroll-ownership";
 import { useChatScroll } from "../lib/use-chat-scroll";
+import { refreshLinkedWorkspaceApps } from "../lib/workspace-app-links";
 import { useKeyboardInset } from "../lib/use-keyboard-inset";
 import { notifySuccess, tapMedium, tapLight } from "../lib/haptics";
 import {
@@ -950,6 +951,12 @@ export function ChatPane({
     spokenAssistantIdsRef.current.add(latestAssistant.id);
     void speakReply(latestAssistant.text, latestAssistant.id);
   }, [visibleMessages, readAloud.enabled, streaming]);
+
+  const wasStreamingRef = useRef(streaming);
+  useEffect(() => {
+    if (wasStreamingRef.current && !streaming) refreshLinkedWorkspaceApps();
+    wasStreamingRef.current = streaming;
+  }, [streaming]);
 
   const [realtimeVoiceOpen, setRealtimeVoiceOpen] = useState(false);
   const [voiceEnabled, setVoiceEnabledLocal] = useState(() =>

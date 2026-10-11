@@ -309,7 +309,7 @@ const deltaPrompt = (delta: readonly Message[]): { text: string; images: ImageCo
     update
       ? `<conversation_updates>\n${
           interrupted
-            ? "Your previous step was interrupted (Stella restarted). What happened since, including the results of the tool calls you made; do not repeat them:"
+            ? "Your previous step was interrupted (stopped, paused, or Stella restarted). What happened since, including the results of the tool calls you made; do not repeat them:"
             : "What happened in this conversation since you last saw it:"
         }\n\n${update}\n</conversation_updates>`
       : "",
@@ -838,7 +838,8 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const results = tail.filter((message) => message.role === "toolResult");
       const current = turn;
       const ours = results.length > 0 && results.every((message) => message.role === "toolResult" && current.callIds.has(message.toolCallId));
-      if (!ours || (turn.done && turn.queue.length === 0)) {
+      const stopped = turn.abort.signal.aborted;
+      if (!ours || stopped || (turn.done && turn.queue.length === 0)) {
         abortTurn(turn, "Superseded.");
         turn = undefined;
       } else {

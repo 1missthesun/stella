@@ -140,6 +140,8 @@ const FOLLOW_MS = 2_000;
 const FOLLOW_WINDOW_MS = 60_000;
 /** How long where a conversation's brain runs is trusted before it is read again. */
 const BRAIN_TTL_MS = 5_000;
+/** How often a watched conversation reads again where its Stella runs, for the app's picker. */
+const BRAIN_WATCH_MS = 10_000;
 /** How long a moved brain's brief waits for Stella's turn here to end. */
 const BRAIN_HANDOFF_WAIT_MS = 5 * 60_000;
 /** How long the owner's device list and media access are trusted before they are read again. */
@@ -478,9 +480,11 @@ export function desktopChats(options: DesktopChatsOptions) {
     let host = otherHost(record);
     if (host?.host === "device") {
       const { deviceId } = host;
+      // A list that can't be read now says nothing of the holder: the record stands.
       const listed = await options.execution?.(conversationId)?.devices().catch(() => undefined);
       const device = listed?.find((entry) => entry.deviceId === deviceId);
-      if (!device?.online) host = null;
+      if (listed && !device?.online) host = null;
+      else if (!host.label && device?.label) host = { ...host, label: device.label };
     }
     rememberBrain(conversationId, { record, host });
     return host;
@@ -1260,7 +1264,13 @@ export function desktopChats(options: DesktopChatsOptions) {
         }, IDLE_CHECK_MS);
         idleCheck.unref?.();
         let following = false;
+        let brainReadAt = 0;
         const followCheck = setInterval(() => {
+          // Another device moving Stella shows in no turn here: while the app looks, read where she runs.
+          if (opened?.watchers && mirror && Date.now() - brainReadAt >= BRAIN_WATCH_MS) {
+            brainReadAt = Date.now();
+            void brainHost(conversationId).catch((error: unknown) => options.report(error));
+          }
           if (!mirror || following || !opened) return;
           const watched =
             opened.watchers > 0 && (mirror.remoteTurns().length > 0 || Date.now() < opened.followUntil);

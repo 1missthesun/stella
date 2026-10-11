@@ -47,7 +47,7 @@ export function useConversationBrain(conversationId: string | null) {
         void read().catch(() => undefined);
       }
     };
-    refresh();
+    void read().catch(() => undefined);
     const timer = window.setInterval(refresh, REFRESH_MS);
     window.addEventListener("focus", refresh);
     const unsubscribe = api()?.onEvents(

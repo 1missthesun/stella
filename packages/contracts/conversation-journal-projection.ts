@@ -13,7 +13,7 @@ import {
   type JournalRecord,
   type JournalTurnRecord,
 } from "./conversation-protocol.js";
-import { legacyReportStatus, type AgentAttemptOutcome } from "./agent-status.js";
+import type { AgentAttemptOutcome } from "./agent-status.js";
 import {
   splitReplyRefs,
   toReplyPreview,
@@ -60,9 +60,9 @@ export const journalMessageTimestamp = (
     : record.createdAtMs;
 
 const WAKE_THREAD_RE =
-  /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?(?:^thread_id:\s*(\S+)|\(thread ([^)]+)\))/mu;
+  /^\[(?:Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\][\s\S]*?(?:^thread_id:\s*(\S+)|\(thread ([^)]+)\))/mu;
 const WAKE_DESCRIPTION_RE =
-  /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/mu;
+  /^\[(?:Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/mu;
 
 /**
  * The task named by a hidden lifecycle wake prompt (`[Agent completed]` and
@@ -82,7 +82,15 @@ export const lifecycleWakeTask = (
 };
 
 const WAKE_KIND_RE =
-  /^\[(Agent completed|Task failed|Task canceled|Subagent paused)\]/m;
+  /^\[(Agent completed|Agent failed|Agent canceled|Task failed|Task canceled|Subagent paused)\]/m;
+const WAKE_OUTCOMES: Readonly<Record<string, AgentAttemptOutcome>> = {
+  "Agent completed": "completed",
+  "Agent failed": "failed",
+  "Agent canceled": "canceled",
+  "Task failed": "failed",
+  "Task canceled": "canceled",
+  "Subagent paused": "paused",
+};
 const WAKE_TRAILER_RE = /^(?:agent_state|presentation|routing|error):/;
 
 /**
@@ -111,7 +119,7 @@ export const lifecycleWakeOutcome = (
     }
     body = [first, ...rest].join("\n").trim();
   }
-  return { kind: legacyReportStatus(text), body };
+  return { kind: WAKE_OUTCOMES[kind] ?? "failed", body };
 };
 
 /**

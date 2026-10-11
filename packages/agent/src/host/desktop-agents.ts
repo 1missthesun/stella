@@ -22,6 +22,7 @@ export function desktopAgentsHost(
     agentReported?: StellaAgentsHost["agentReported"];
     agentPaused?: StellaAgentsHost["agentPaused"];
     beginAgentRun?: StellaAgentsHost["beginAgentRun"];
+    endAgentRun?: StellaAgentsHost["endAgentRun"];
     ensureModel?: StellaAgentsHost["ensureModel"];
     /** Reports and notes for Stella, which go where she runs. */
     deliverReport?: StellaAgentsHost["deliverReport"];
@@ -37,6 +38,7 @@ export function desktopAgentsHost(
     ...(options.agentReported ? { agentReported: options.agentReported } : {}),
     ...(options.agentPaused ? { agentPaused: options.agentPaused } : {}),
     ...(options.beginAgentRun ? { beginAgentRun: options.beginAgentRun } : {}),
+    ...(options.endAgentRun ? { endAgentRun: options.endAgentRun } : {}),
     ...(options.ensureModel ? { ensureModel: options.ensureModel } : {}),
     ...(options.deliverReport ? { deliverReport: options.deliverReport } : {}),
     ...(options.deliverNote ? { deliverNote: options.deliverNote } : {}),

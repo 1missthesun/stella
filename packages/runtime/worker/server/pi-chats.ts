@@ -12,6 +12,7 @@ import {
   type RuntimeChatPayload,
 } from "@stella/contracts/protocol";
 import { appendMessageRefTag } from "@stella/contracts/reply-refs";
+import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
 import {
   getAgentRuntimeEngine,
@@ -325,7 +326,8 @@ export const piChatsFor = (
       execution: (conversationId) => executionRemoteFor(session, conversationId),
       brain: (conversationId) => brainFor(session, hostBus, conversationId),
       // A conversation stored in the cloud lists this computer's agents in
-      // the owner's agent threads, where a paired phone shows and messages them.
+      // the owner's agent threads, where a paired phone shows and messages
+      // them: Stella's own, and each agent's own under the agent that started it.
       agentStarted: (agent) => {
         if (agent.conversationId.startsWith("local_")) return;
         void (async () => {
@@ -338,8 +340,27 @@ export const piChatsFor = (
             agentType: "general",
             attemptGeneration: agent.attempt,
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
+            ...(agent.parentThreadId ? { parentAgentId: agent.parentThreadId } : {}),
           });
         })().catch((error) => console.warn("[pi-chat] computer thread start failed", error));
+      },
+      // An agent's own agent ended a run; its report went to that agent.
+      subagentEnded: (agent) => {
+        if (agent.conversationId.startsWith("local_")) return;
+        void (async () => {
+          const runner = session.runnerCell.get();
+          if (!runner) return;
+          await runner.computerAgents.complete({
+            agentId: agent.threadId,
+            attemptGeneration: agent.attempt,
+            ownerGeneration: await runner.cloudJournal.ownerGeneration(),
+            ...(agent.outcome === "completed"
+              ? { status: "completed" as const, ...(agent.text ? { result: agent.text.slice(0, 30_000) } : {}) }
+              : agent.outcome === "failed"
+                ? { status: "error" as const, error: (agent.text || "The agent failed.").slice(0, 10_000) }
+                : { status: "canceled" as const, error: AGENT_PAUSED_REASON }),
+          });
+        })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },
       agentReported: (agent) => {
         // The loop's notice for a finished task.

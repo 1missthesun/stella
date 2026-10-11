@@ -21,10 +21,10 @@ export const ASK_USER_TOOL_LABEL = "Ask the user";
 export const ASK_USER_TOOL_WORKING_TEXT = "Asking";
 
 export const ASK_USER_TOOL_DESCRIPTION =
-  "Ask the user a short question instead of guessing or stalling, or up to four related questions at once; they appear in one card, one question at a time, on every device, and answering once clears it everywhere. For each question the user picks an option, types their own answer, or skips it; a skipped question comes back as skipped. Prefer a timed ask: give every question a default_choice and the work continues with those defaults if nobody answers, and you adapt if an answer arrives later. Set blocking only for actions that are hard to undo (spending money, deleting things, sending as the user). Keep working on anything that does not depend on the answer.";
+  "Show the user a go/no-go card for a real gate, and use it rarely: every ask interrupts the user and can push to their phone. By default, decide: when one option is reasonable, take it and say what you chose so the user can redirect. Ask only for an explicit go-ahead (deploying or releasing, spending money, deleting the user's data, sending or posting as the user), for something that needs the user's hands or consent (sign-in, 2FA, an approval), or for a genuine fork where no option is defensible without the user's preference and a wrong pick would be costly to redo. Never ask about cosmetic, reversible or cheap-to-redo choices, things the user already decided or left up to you, or to confirm something already done. Ask open-ended or discussion questions in plain prose, not a card. Batch related questions into one ask, up to four; they appear one at a time on every device, and answering once clears it everywhere. The user picks an option, types their own answer, or skips; a skipped question comes back as skipped. Give every question a default_choice: the work continues with those defaults if nobody answers, and you adapt if an answer arrives later. Set blocking only for actions that are hard to undo (spending money, deleting things, sending as the user). Keep working on anything that does not depend on the answer.";
 
 export const ASK_USER_TOOL_PROMPT_SNIPPET =
-  "Ask the user short questions with options (`ask_user`) rather than guessing; give each a default_choice and use a timeout unless the action is hard to undo";
+  "Ask the user for a go-ahead or consent (`ask_user`) only at a real gate; otherwise decide and say what you chose. Give each question a default_choice and use a timeout unless the action is hard to undo";
 
 export const ASK_USER_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",
@@ -135,7 +135,7 @@ export const prepareAskUser = (
       return {
         ok: false,
         error: options.orchestrator
-          ? `Your asks are always timed so you are never stuck waiting: give every question a default_choice set to one of its option ids ("${missing.question}" has none). For a hard-to-undo action, have the agent doing it ask instead.`
+          ? `Your asks are always timed: give every question a default_choice set to one of its option ids ("${missing.question}" has none). For a hard-to-undo action, have the agent doing it ask instead.`
           : `A timed ask needs default_choice on every question, set to one of its option ids, so the work can continue without an answer ("${missing.question}" has none). Use blocking only for hard-to-undo actions.`,
       };
     }

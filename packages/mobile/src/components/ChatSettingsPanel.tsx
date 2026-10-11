@@ -119,7 +119,7 @@ export function ChatSettingsPanel({ width }: { width: number }) {
         {settings ? (
           <>
             <Rise i={i++} animated from="end">
-              <Hairline />
+              <Hairline space={14} />
               <BrainSection
                 settings={settings}
                 active={active}

@@ -72,7 +72,7 @@ const SECTIONS: Section[] = [
   {
     provider: "chatgpt",
     titleKey: "mobile.engineAccounts.chatgptSection",
-    connectKey: "mobile.engineAccounts.connectChatgpt",
+    connectKey: "settings.engineAccounts.addChatgpt",
   },
 ];
 
@@ -794,9 +794,11 @@ function ProviderSection({
                   (panel ? styles.pressed : settingsStyles.rowPressed),
               ]}
             >
-              <View style={[styles.avatar, panel && styles.panelAvatar]}>
-                <Text style={styles.avatarText}>{accountInitials(row)}</Text>
-              </View>
+              {panel ? null : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{accountInitials(row)}</Text>
+                </View>
+              )}
               <View style={settingsStyles.rowCopy}>
                 <Text
                   style={[settingsStyles.rowLabel, panel && styles.panelLabel]}
@@ -814,7 +816,11 @@ function ProviderSection({
                 ) : null}
               </View>
               {row.active ? (
-                <Icon name="check" size={20} color={colors.accent} />
+                panel ? (
+                  <View style={styles.panelActive} />
+                ) : (
+                  <Icon name="check" size={20} color={colors.accent} />
+                )
               ) : null}
               {Platform.OS === "ios" ? (
                 <NativeMenu
@@ -880,7 +886,7 @@ function ProviderSection({
               style={[
                 styles.avatar,
                 styles.addAvatar,
-                panel && styles.panelAvatar,
+                panel && styles.panelHidden,
               ]}
             >
               {registration.who ? (
@@ -910,40 +916,53 @@ function ProviderSection({
             </Text>
           </Pressable>
         ))}
-        <Pressable
-          onPress={() => startConnect()}
-          disabled={busy || connectId !== null}
-          accessibilityRole="button"
-          style={({ pressed }) => [
-            settingsStyles.row,
-            panel && styles.panelRow,
-            accounts.length + registrations.length > 0 &&
-              !panel &&
-              settingsStyles.rowDivider,
-            pressed && (panel ? styles.pressed : settingsStyles.rowPressed),
-            (busy || connectId !== null) && settingsStyles.rowDisabled,
-          ]}
-        >
-          <View
-            style={[
-              styles.avatar,
-              styles.addAvatar,
-              panel && styles.panelAvatar,
+        {panel ? (
+          <Pressable
+            onPress={() => startConnect()}
+            disabled={busy || connectId !== null}
+            accessibilityRole="button"
+            hitSlop={{ top: 6, bottom: 6 }}
+            style={({ pressed }) => [
+              styles.panelAdd,
+              (pressed || busy || connectId !== null) && styles.pressed,
             ]}
           >
-            <Icon name="plus" size={18} color={colors.text} />
-          </View>
-          <Text style={[settingsStyles.rowLabel, panel && styles.panelLabel]}>
-            {t(section.connectKey)}
-          </Text>
-        </Pressable>
+            <Icon
+              name="plus"
+              size={14}
+              color={colors.textInteractive}
+              weight="semibold"
+            />
+            <Text style={styles.panelAddLabel} numberOfLines={1}>
+              {t(section.connectKey)}
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => startConnect()}
+            disabled={busy || connectId !== null}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              settingsStyles.row,
+              accounts.length + registrations.length > 0 &&
+                settingsStyles.rowDivider,
+              pressed && settingsStyles.rowPressed,
+              (busy || connectId !== null) && settingsStyles.rowDisabled,
+            ]}
+          >
+            <View style={[styles.avatar, styles.addAvatar]}>
+              <Icon name="plus" size={18} color={colors.text} />
+            </View>
+            <Text style={settingsStyles.rowLabel}>{t(section.connectKey)}</Text>
+          </Pressable>
+        )}
       </View>
       {!chatgpt && !embedded ? (
         <Text style={[settingsStyles.rowSub, styles.sectionNote]}>
           {t("mobile.engineAccounts.claudeNote")}
         </Text>
       ) : null}
-      {!chatgpt ? (
+      {!chatgpt && !panel ? (
         <Text
           style={[
             settingsStyles.rowSub,
@@ -1142,7 +1161,25 @@ const makeStyles = (colors: Colors) =>
     embeddedPasteCard: { marginBottom: 12, marginHorizontal: 12, marginTop: 0 },
     embeddedNote: { marginBottom: 12, paddingHorizontal: 12 },
     panelRow: { paddingHorizontal: 0 },
-    panelAvatar: { backgroundColor: colors.surface },
+    panelHidden: { display: "none" },
+    panelActive: {
+      backgroundColor: colors.accent,
+      borderRadius: 3,
+      height: 6,
+      width: 6,
+    },
+    panelAdd: {
+      alignItems: "center",
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      gap: 5,
+      minHeight: 32,
+    },
+    panelAddLabel: {
+      color: colors.textInteractive,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 16,
+    },
     panelLabel: {
       fontFamily: fonts.sans.semiBold,
       fontSize: 17,

@@ -252,7 +252,6 @@ const makeStyles = (colors: Colors) =>
     },
     accounts: {
       marginLeft: 42,
-      marginTop: 8,
     },
     thinking: {
       marginTop: 18,

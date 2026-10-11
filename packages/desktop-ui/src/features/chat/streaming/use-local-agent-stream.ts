@@ -2,11 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { showToast } from "@/ui/toast";
 import { resolveAgentNotReadyToast } from "./agent-stream-errors";
 import {
-  executionTargetStore,
-  getExecutionTargetSnapshot,
-} from "@/features/execution-placement/execution-target-store";
-import { presentComposerNotice } from "@/features/chat/composer-notice-store";
-import {
   isStellaLimitOrAuthReason,
   resolveStellaProviderErrorToast,
 } from "./stella-provider-error-toast";
@@ -135,11 +130,9 @@ export function useLocalAgentStream({
             ...(args.messageMetadata
               ? { messageMetadata: args.messageMetadata }
               : {}),
-            // The composer's destination: the cloud or another computer
-            // runs it, and its turn comes back through the conversation's
-            // journal.
+            // Where the conversation's Stella runs takes the send; its turn
+            // comes back through the conversation's journal.
             ...(storageMode ? { storageMode } : {}),
-            executionTarget: getExecutionTargetSnapshot(),
           },
         );
         // The cloud journals a placed message under its dispatch id.
@@ -174,24 +167,6 @@ export function useLocalAgentStream({
         // carries the Sign in / Upgrade / BYOK CTAs).
         if (isStellaLimitOrAuthReason(reason)) {
           showToast(resolveStellaProviderErrorToast(reason));
-        } else if (
-          reason &&
-          /cross-device execution is not ready/i.test(reason)
-        ) {
-          // The picked destination (Cloud or another computer) could not
-          // take the send. Pin it above the composer, which still holds
-          // the message, with a way to run it here instead.
-          presentComposerNotice({
-            conversationId: activeConversationId,
-            kind: "limit",
-            title: "Couldn't send to the selected destination",
-            description:
-              "This computer isn't connected for Cloud or other computers yet. Try again in a moment, or run it on this computer.",
-            action: {
-              label: "Run on this computer",
-              onClick: () => executionTargetStore.set({ mode: "automatic" }),
-            },
-          });
         } else {
           const toast = resolveAgentNotReadyToast(reason);
           showToast({

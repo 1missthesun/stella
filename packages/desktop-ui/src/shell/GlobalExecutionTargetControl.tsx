@@ -28,6 +28,12 @@ import {
 import { AppWindowMac, Check, Globe } from "@/ui/icons";
 import { platformCapabilities } from "@/platform/capabilities";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
+import { useUiState } from "@/context/ui-state";
+import { showToast } from "@/ui/toast";
+import {
+  conversationBrainAvailable,
+  useConversationBrain,
+} from "@/features/execution-placement/conversation-brain";
 
 /** Live presence goes stale quickly; refresh while the picker is open. */
 const DEVICE_POLL_INTERVAL_MS = 15_000;
@@ -49,6 +55,18 @@ const BLOCKER_LABELS: Record<DeviceExecutionBlocker, string> = {
   notReady: "Not ready",
 };
 
+const moveErrorMessage = (error: unknown): string =>
+  (error instanceof Error ? error.message : String(error)).replace(
+    /^Error invoking remote method '[^']*': (?:\w*Error: )?/u,
+    "",
+  );
+
+/**
+ * Where Stella runs. In the desktop app it is the open conversation's brain:
+ * picking a place moves her there, as her own `switch_destination` does, so
+ * every device's messages run there from then on. The website keeps a
+ * per-send target.
+ */
 export function GlobalExecutionTargetControl() {
   const isPrivate = useChatStorageMode() === "local";
   const { isCloudConversationReady: authCloudReady } = useCloudConversationSession();
@@ -57,9 +75,22 @@ export function GlobalExecutionTargetControl() {
   const [open, setOpen] = useState(false);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const storedTarget = useExecutionTarget();
+  const movesBrain = conversationBrainAvailable();
+  const { state: uiState } = useUiState();
+  const brainConversationId =
+    movesBrain && isCloudConversationReady && hasConnectedAccount
+      ? uiState.conversationId
+      : null;
+  const { brain, moving, move } = useConversationBrain(brainConversationId);
+  const brainTarget: DesktopExecutionTarget =
+    !brain || brain.here ? AUTOMATIC_EXECUTION_TARGET : brain.target;
   // Cloud and other computers need a signed-in account; signed out, sends
   // run here (see `getExecutionTargetSnapshot`), so the picker says so.
-  const target = hasConnectedAccount ? storedTarget : AUTOMATIC_EXECUTION_TARGET;
+  const target = !hasConnectedAccount
+    ? AUTOMATIC_EXECUTION_TARGET
+    : movesBrain
+      ? brainTarget
+      : storedTarget;
   // Placement lives on the backend worker; the device list is an HTTPS read
   // of the owner's gate there.
   const socketOrigin =
@@ -131,13 +162,27 @@ export function GlobalExecutionTargetControl() {
     target.mode === "cloud"
       ? "Cloud"
       : target.mode === "device"
-        ? (selectedDevice?.label ?? "Computer")
+        ? (selectedDevice?.label ??
+          (brain && !brain.here ? brain.label : undefined) ??
+          "Computer")
         : platformCapabilities.automaticExecutionLabel;
   const TriggerIcon = target.mode === "cloud" ? Globe : AppWindowMac;
 
   const choose = (next: DesktopExecutionTarget) => {
-    executionTargetStore.set(next);
     setOpen(false);
+    if (!movesBrain) {
+      executionTargetStore.set(next);
+      return;
+    }
+    if (!brainConversationId) return;
+    if (JSON.stringify(next) === JSON.stringify(target)) return;
+    void move(next).catch((error: unknown) => {
+      showToast({
+        title: "Stella couldn't move",
+        description: moveErrorMessage(error),
+        variant: "error",
+      });
+    });
   };
 
   if (isPrivate) return null;
@@ -149,6 +194,7 @@ export function GlobalExecutionTargetControl() {
           type="button"
           className="sidebar-footer-button execution-target-button"
           data-active={open || undefined}
+          aria-busy={moving || undefined}
           aria-label={`Run on ${label}`}
           aria-pressed={open}
         >

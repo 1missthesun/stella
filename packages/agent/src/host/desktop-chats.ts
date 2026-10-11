@@ -50,6 +50,7 @@ import {
   type PiChatEventsPayload,
   type PiChatAgentsResult,
   type PiChatBrainResult,
+  type PiChatMoveTarget,
   type PiChatOlderResult,
   type PiChatRequest,
   type PiChatWatchResult,
@@ -492,6 +493,19 @@ export function desktopChats(options: DesktopChatsOptions) {
     const chat = await chats.get(conversationId)?.catch(() => undefined);
     if (chat) chat.followUntil = Date.now() + FOLLOW_WINDOW_MS;
     return true;
+  };
+  /** The user moving Stella from the app's picker. */
+  const moveBrain = async (conversationId: string, target: PiChatMoveTarget): Promise<PiChatBrainResult> => {
+    const chat = await open(conversationId);
+    const placement: StellaPlacement =
+      target.mode === "cloud"
+        ? { kind: "cloud" }
+        : target.mode === "device"
+          ? { kind: "device", deviceId: target.deviceId }
+          : { kind: "local" };
+    const moved = await chat.execution.pinBrain(placement, context);
+    if ("error" in moved) throw new Error(moved.error);
+    return await brainPlacement(conversationId);
   };
   const elsewhere = (placement: Extract<PiChatBrainResult, { here: false }>) =>
     `Stella for this chat runs ${placement.target.mode === "cloud" ? "in the cloud" : `on ${placement.label ?? placement.target.deviceId}`} now, so this computer does not answer it.`;
@@ -1850,6 +1864,8 @@ export function desktopChats(options: DesktopChatsOptions) {
           return linkedFiles(request.conversationId);
         case "brain":
           return brainPlacement(request.conversationId);
+        case "move":
+          return moveBrain(request.conversationId, request.target);
       }
     },
     /** End every shell command the chats' agents have running on this computer. */

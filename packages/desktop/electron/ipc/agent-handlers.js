@@ -45,9 +45,9 @@ export const registerAgentHandlers = (options) => {
             throw new Error("Stella runtime not available");
         }
         const op = request?.op;
-        // Sending and stopping act on the selected conversation only; a
-        // window may stop watching one it has left.
-        const conversationId = op === "submit" || op === "abort"
+        // Sending, stopping and moving Stella act on the selected
+        // conversation only; a window may stop watching one it has left.
+        const conversationId = op === "submit" || op === "abort" || op === "move"
             ? requireMatchingCloudConversationId(request?.conversationId, options.uiState?.conversationId)
             : typeof request?.conversationId === "string"
                 ? request.conversationId.trim()

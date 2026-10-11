@@ -199,8 +199,6 @@ export type PiChatSend = {
   agentType?: string;
   /** Where the conversation is stored; a conversation kept here only runs here. */
   storageMode?: "cloud" | "local";
-  /** Where the user asked this message to run (the composer's destination). */
-  executionTarget?: { mode: "automatic" } | { mode: "cloud" } | { mode: "device"; deviceId: string };
   /** Where the conversation's Stella runs could not take this send, so this computer answers it, as with no record. */
   followSender?: boolean;
 };
@@ -233,7 +231,16 @@ export type PiChatRequest =
    * Where the conversation's brain runs (`PiChatBrainResult`): a send for a
    * conversation whose Stella runs elsewhere is placed there.
    */
-  | { op: "brain"; conversationId: string };
+  | { op: "brain"; conversationId: string }
+  /**
+   * The user moving Stella from the app's picker, as her own
+   * `switch_destination` moves her: that host takes the conversation's turns
+   * from the next message (`PiChatBrainResult`, or a thrown refusal).
+   * "automatic" is this computer.
+   */
+  | { op: "move"; conversationId: string; target: PiChatMoveTarget };
+
+export type PiChatMoveTarget = { mode: "automatic" } | { mode: "cloud" } | { mode: "device"; deviceId: string };
 
 /**
  * Where a conversation's Stella runs (`@stella/contracts/turn-plane/pi-brain`):

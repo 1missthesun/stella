@@ -229,31 +229,6 @@ class HostEvents extends EventEmitter {
   }
 }
 /**
- * Where a send the user pointed at the cloud or another computer runs; null
- * when it runs on this computer (a conversation kept here always does).
- */
-const placedChatTarget = (
-  send: Pick<PiChatSend, "storageMode" | "executionTarget"> | null | undefined,
-  ownDeviceId: string | undefined,
-): PlacedChatTarget | null => {
-  const target: NonNullable<PiChatSend["executionTarget"]> =
-    send?.storageMode === "local"
-      ? { mode: "automatic" }
-      : send?.executionTarget && typeof send.executionTarget === "object"
-        ? send.executionTarget
-        : { mode: "automatic" };
-  if (target.mode === "cloud") return { mode: "cloud" };
-  if (
-    target.mode === "device" &&
-    typeof target.deviceId === "string" &&
-    target.deviceId.trim() &&
-    target.deviceId.trim() !== ownDeviceId
-  ) {
-    return { mode: "device", deviceId: target.deviceId.trim() };
-  }
-  return null;
-};
-/**
  * A placement that failed because where it went is out of reach (no network,
  * placement not ready here, the cloud failing), not one the owner gate
  * refused for the request itself.
@@ -1810,27 +1785,19 @@ export class StellaRuntimeHost {
   }
   /** The pi-durable chat (`@stella/contracts/pi-chat`). */
   async piChat(request: PiChatRequest) {
-    // A send the user pointed elsewhere runs there as a placed chat. Its
-    // turn reaches this computer's transcript through the journal, which
-    // the worker reads closely until it shows.
-    let target: PlacedChatTarget | null =
-      request?.op === "submit"
-        ? placedChatTarget(request.send, this.deviceIdentity?.deviceId)
-        : null;
     // A conversation whose Stella runs elsewhere (the cloud, another
-    // computer) answers there: this computer takes none of its turns
-    // while that host can take them.
-    let brainTarget = false;
-    if (request?.op === "submit" && !target) {
-      const brain = await this.brainTarget(
-        request.conversationId,
-        request.send?.storageMode,
-      );
-      if (brain) {
-        target = brain;
-        brainTarget = true;
-      }
-    }
+    // computer, wherever the user's picker or her own switch moved her)
+    // answers there as a placed chat: this computer takes none of its turns
+    // while that host can take them. Its turn reaches this computer's
+    // transcript through the journal, which the worker reads closely until
+    // it shows.
+    const target =
+      request?.op === "submit"
+        ? await this.brainTarget(
+            request.conversationId,
+            request.send?.storageMode,
+          )
+        : null;
     if (target && request.op === "submit") {
       const send: PiChatSend = request.send ?? {};
       try {
@@ -1864,7 +1831,7 @@ export class StellaRuntimeHost {
       } catch (error) {
         // Where Stella runs is out of reach: this computer answers, and its
         // turn takes the brain lease over from that host.
-        if (!brainTarget || !placementUnavailable(error)) throw error;
+        if (!placementUnavailable(error)) throw error;
         console.warn(
           "[pi-chat] Where Stella runs could not take this message; this computer answers it.",
           error,

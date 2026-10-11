@@ -609,9 +609,10 @@ const saveImagesToDrive = async (args: {
     contentType: string;
     contentBase64: string;
   }> = [];
+  const { fetchImpl } = args;
   for (const [index, image] of args.images.entries()) {
     throwIfAborted(args.signal);
-    const response = await args.fetchImpl(image.url, {
+    const response = await fetchImpl(image.url, {
       signal: withTimeout(DOWNLOAD_TIMEOUT_MS, args.signal),
       redirect: "follow",
     });

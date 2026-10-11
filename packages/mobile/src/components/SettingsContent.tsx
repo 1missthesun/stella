@@ -583,16 +583,6 @@ export function SettingsContent() {
             colors={colors}
             onPress={() => void Linking.openURL(`${env.siteUrl}/privacy`)}
           />
-          <LinkRow
-            label={t("mobile.settings.carPlayDiagnostics")}
-            accessibilityLabel={t(
-              "mobile.settings.openCarPlayDiagnosticsLabel",
-            )}
-            divided
-            styles={settingsStyles}
-            colors={colors}
-            onPress={() => router.push("/carplay-diagnostics")}
-          />
         </View>
       </View>
 

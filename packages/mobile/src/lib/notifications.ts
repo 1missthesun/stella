@@ -1,4 +1,5 @@
-import { AppState, Platform } from "react-native";
+import { Platform } from "react-native";
+import { isPhoneInForeground } from "../carplay/native";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
@@ -118,7 +119,7 @@ const scheduleUserAskRepeats = (askId: string) => {
             stopUserAskRepeats(askId);
             return;
           }
-          if (AppState.currentState === "active") return;
+          if (isPhoneInForeground()) return;
           try {
             await Notifications.scheduleNotificationAsync({
               content: {
@@ -157,7 +158,7 @@ Notifications.setNotificationHandler({
     );
     if (ask) {
       void refreshUserAsks();
-      if (AppState.currentState === "active") return { ...SILENT };
+      if (isPhoneInForeground()) return { ...SILENT };
       if (ask.level >= USER_ASK_MAX_URGENCY) {
         scheduleUserAskRepeats(ask.askId);
         return {
@@ -170,7 +171,7 @@ Notifications.setNotificationHandler({
       }
     }
     // Don't surface pushes over the app the user is currently looking at.
-    const isForeground = AppState.currentState === "active";
+    const isForeground = isPhoneInForeground();
     if (isForeground) return { ...SILENT };
     return {
       shouldShowAlert: true,

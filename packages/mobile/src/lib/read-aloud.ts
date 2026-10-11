@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createAudioPlayer, type AudioPlayer } from "expo-audio";
+import { createAudioPlayer, setIsAudioActiveAsync, type AudioPlayer } from "expo-audio";
 import { Alert } from "react-native";
 import { VOICE_TTS_STREAM_CANCEL_PATH } from "@stella/contracts/backend/voice";
 import { getAuthToken } from "./auth-token";
@@ -19,6 +19,10 @@ const READ_ALOUD_KEY = "stella-mobile.read-aloud-enabled";
 // drifted from the server default.)
 // Reload a stalled native player from the same session, never synthesize again.
 const STREAM_START_TIMEOUT_MS = 8000;
+// AVPlayer that opens the playlist before its first segment exists sits silent
+// until the start timeout replaces it, so playback waits for a real segment.
+const PLAYLIST_READY_TIMEOUT_MS = 20_000;
+const PLAYLIST_READY_POLL_MS = 250;
 // Progressive HLS playback is resilient to transient segment/playlist/network
 // failures. Native players (AVPlayer/ExoPlayer) give up on a segment fetch that
 // fails past their small built-in retry budget, stalling mid-message. When that
@@ -78,6 +82,25 @@ export type ReadAloudState = {
 };
 
 let playbackState: ReadAloudState | null = null;
+
+// Starting the microphone while a just-stopped speech clip still holds the
+// playback session makes the recorder read a 0 Hz input format or time out,
+// and it aborts the app. Dictation that follows speech this closely first
+// deactivates the session and lets it settle, matching a start from idle.
+const RECENT_SPEECH_MS = 2000;
+const SESSION_RELEASE_MS = 400;
+let lastPlayerReleasedAt = 0;
+
+/** Resolves once a just-stopped clip has released the audio session. */
+export async function waitForReadAloudRelease() {
+  if (Date.now() - lastPlayerReleasedAt > RECENT_SPEECH_MS) return;
+  try {
+    await setIsAudioActiveAsync(false);
+  } catch {
+    /* the session may already be inactive */
+  }
+  await new Promise((resolve) => setTimeout(resolve, SESSION_RELEASE_MS));
+}
 let playbackAbort: AbortController | null = null;
 
 const abortPlaybackWork = () => {
@@ -221,6 +244,7 @@ export function stopReadAloud() {
   const player = currentPlayer;
   currentPlayer = null;
   if (player) {
+    lastPlayerReleasedAt = Date.now();
     try {
       player.pause();
       player.remove();
@@ -283,7 +307,58 @@ export function resumeReadAloud() {
   setPlaybackState({ messageId: playbackState.messageId, status: "playing" });
 }
 
-export async function speakReply(text: string, messageId?: string) {
+export type PreparedSpeech = {
+  stream: Promise<{ ticket: string; uri: string }>;
+  cancel: () => void;
+  claim: () => void;
+};
+
+/**
+ * Starts synthesis ahead of playback, so the next clip is ready by the time
+ * the current one ends. `cancel` ends the synthesis unless a speakReply call
+ * has claimed the stream.
+ */
+export function prepareSpeech(text: string): PreparedSpeech | null {
+  const spoken = stripForSpeech(text);
+  if (!spoken) return null;
+  const controller = new AbortController();
+  let ticket: string | null = null;
+  let claimed = false;
+  let canceled = false;
+  const stream = prepareReadAloudStream(spoken, controller.signal).then((prepared) => {
+    ticket = prepared.ticket;
+    if (canceled) cancelStreamSession(prepared.ticket);
+    return prepared;
+  });
+  stream.catch(() => undefined);
+  return {
+    stream,
+    claim: () => {
+      claimed = true;
+    },
+    cancel: () => {
+      if (claimed || canceled) return;
+      canceled = true;
+      controller.abort();
+      if (ticket) cancelStreamSession(ticket);
+    },
+  };
+}
+
+export type SpeakReplyOptions = {
+  /** Keep playing when the app leaves the foreground, ducking other audio. */
+  background?: boolean;
+  /** Never raise a phone alert; a failed clip just ends. */
+  quiet?: boolean;
+  /** Synthesis already started with prepareSpeech for this same text. */
+  prepared?: PreparedSpeech;
+};
+
+export async function speakReply(
+  text: string,
+  messageId?: string,
+  options: SpeakReplyOptions = {},
+) {
   const spoken = stripForSpeech(text);
   if (!spoken) return;
 
@@ -298,10 +373,11 @@ export async function speakReply(text: string, messageId?: string) {
 
   // Generate once. Playback retries reuse the ticket's existing audio.
   try {
-    await tryStreamReply(spoken, id, generation, signal);
+    await tryStreamReply(spoken, id, generation, signal, options);
   } catch (error) {
     if (generation !== playbackGeneration || signal.aborted) return;
     stopReadAloud();
+    if (options.quiet) return;
     console.warn("[read-aloud] could not start speech", error);
     Alert.alert(
       "Couldn’t read aloud",
@@ -316,8 +392,12 @@ async function tryStreamReply(
   id: string | null,
   generation: number,
   signal: AbortSignal,
+  options: SpeakReplyOptions,
 ): Promise<boolean> {
-  const { ticket, uri } = await prepareReadAloudStream(text, signal);
+  options.prepared?.claim();
+  const { ticket, uri } = options.prepared
+    ? await options.prepared.stream
+    : await prepareReadAloudStream(text, signal);
   if (generation !== playbackGeneration || signal.aborted) {
     // Superseded before playback began — end the background synthesis so it
     // does not run to completion unheard.
@@ -329,7 +409,16 @@ async function tryStreamReply(
   // `uri` is a live HLS playlist that grows as Gemini generates, so playback
   // begins on the first segment instead of waiting for the whole clip.
 
-  if (!(await configurePlaybackAudioSession())) {
+  const [, sessionReady] = await Promise.all([
+    waitForPlaylistReady(uri, signal),
+    configurePlaybackAudioSession({ background: options.background }),
+  ]);
+  if (generation !== playbackGeneration || signal.aborted) {
+    cancelStreamSession(ticket);
+    return true;
+  }
+
+  if (!sessionReady) {
     if (generation === playbackGeneration) stopReadAloud();
     else cancelStreamSession(ticket);
     return true;
@@ -339,7 +428,25 @@ async function tryStreamReply(
     return true;
   }
 
-  return await playHlsResilient(uri, id, generation, 0);
+  return await playHlsResilient(uri, id, generation, 0, options.quiet === true);
+}
+
+// The playlist route holds each read until the first segment lands, or answers
+// "still generating". Poll it until it lists a segment, the stream fails for
+// good, or the wait runs out; the native player then opens a playable list.
+async function waitForPlaylistReady(uri: string, signal: AbortSignal) {
+  const deadline = Date.now() + PLAYLIST_READY_TIMEOUT_MS;
+  while (!signal.aborted && Date.now() < deadline) {
+    try {
+      const response = await fetch(uri, { signal, headers: { "cache-control": "no-cache" } });
+      const body = await response.text();
+      if (response.ok) return;
+      if (!/"retryable"\s*:\s*true|retryAfterMs|still being generated/i.test(body)) return;
+    } catch {
+      if (signal.aborted) return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, PLAYLIST_READY_POLL_MS));
+  }
 }
 
 // A player is disposable; the generation session is not. Both startup and
@@ -351,6 +458,7 @@ async function playHlsResilient(
   id: string | null,
   generation: number,
   startAt: number,
+  quiet = false,
 ): Promise<boolean> {
   disposeHlsPlayback?.();
   return await new Promise<boolean>((resolve) => {
@@ -372,6 +480,7 @@ async function playHlsResilient(
       player = null;
       if (currentPlayer === p) currentPlayer = null;
       if (!p) return;
+      lastPlayerReleasedAt = Date.now();
       try {
         p.pause();
       } catch {
@@ -408,6 +517,14 @@ async function playHlsResilient(
     const giveUp = () => {
       dispose();
       if (superseded()) return;
+      if (quiet) {
+        hlsResume = null;
+        const ticket = currentStreamTicket;
+        currentStreamTicket = null;
+        if (ticket) cancelStreamSession(ticket);
+        setPlaybackState(null);
+        return;
+      }
       hlsResume = { uri, id, at: lastTime };
       setPlaybackState({ messageId: id, status: "paused" });
       console.warn(
@@ -461,7 +578,7 @@ async function playHlsResilient(
       // Also covers native failures that never emit a playback error event.
       startTimer = setTimeout(retry, STREAM_START_TIMEOUT_MS);
       try {
-        const p = createAudioPlayer({ uri });
+        const p = createAudioPlayer({ uri }, { preferredForwardBufferDuration: 1 });
         player = p;
         currentPlayer = p;
         let seeked = at <= 0.25;

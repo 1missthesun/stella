@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "../../src/lib/secure-store";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import { useRouter } from "expo-router";

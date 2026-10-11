@@ -966,21 +966,6 @@
       "missingConfigBody": "ตั้งค่า EXPO_PUBLIC_STELLA_BACKEND_URL ก่อนเริ่มใช้แอป",
       "missingConfigTitle": "เพิ่มตัวแปรสภาพแวดล้อมของแอปมือถือ"
     },
-    "carPlayDiagnostics": {
-      "clear": "ล้าง",
-      "clearLabel": "ล้างข้อมูลวินิจฉัย",
-      "clipboardEmpty": "(ไม่มีการบันทึกข้อมูลวินิจฉัย CarPlay)",
-      "copied": "คัดลอกแล้ว ✓",
-      "copyAll": "คัดลอกทั้งหมด",
-      "copyAllLabel": "คัดลอกข้อมูลวินิจฉัยทั้งหมด",
-      "empty": "ยังไม่มีการบันทึกข้อมูลวินิจฉัย CarPlay เชื่อมต่อ CarPlay สักครั้งแล้วกลับมาที่นี่",
-      "refresh": "รีเฟรช",
-      "refreshLabel": "รีเฟรชข้อมูลวินิจฉัย",
-      "subtitle": {
-        "other": "บันทึกร่องรอยจากการเชื่อมต่อ CarPlay ({count} บรรทัด ใหม่สุดก่อน) คัดลอกและส่งข้อมูลนี้มาหลังเกิดปัญหาในรถ"
-      },
-      "title": "การวินิจฉัย CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "ส่งข้อความถึง Stella",
       "createFailed": "ไม่สามารถสร้างแชตได้ โปรดลองอีกครั้ง",
@@ -1356,7 +1341,6 @@
         "relative": "สัมพัทธ์",
         "strong": "เข้ม"
       },
-      "carPlayDiagnostics": "การวินิจฉัย CarPlay",
       "chatStorage": {
         "description": "เข้าถึงแชทของคุณได้จากทุกอุปกรณ์ ปิดเพื่อเก็บประวัติแชทแยกไว้เฉพาะบนอุปกรณ์นี้ เมื่อเปิดกลับมา แชทเหล่านั้นจะไม่ถูกอัปโหลด ผู้ให้บริการ AI ยังคงประมวลผลข้อความของคุณ"
       },
@@ -1386,7 +1370,6 @@
       "hideEmailLabel": "ซ่อนอีเมล",
       "loadingSession": "กำลังโหลดเซสชัน…",
       "notificationsSection": "การแจ้งเตือน",
-      "openCarPlayDiagnosticsLabel": "เปิดการวินิจฉัย CarPlay",
       "openPrivacyLabel": "เปิดนโยบายความเป็นส่วนตัว",
       "openTermsLabel": "เปิดข้อกำหนดการให้บริการ",
       "paired": {

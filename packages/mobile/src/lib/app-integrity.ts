@@ -10,7 +10,7 @@ import {
 } from "@stella/contracts/app-integrity";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { utf8ToBytes } from "@noble/hashes/utils.js";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { Platform } from "react-native";
 import { env } from "../config/env";
 

@@ -975,22 +975,6 @@
       "missingConfigBody": "Stel EXPO_PUBLIC_STELLA_BACKEND_URL in voordat je de app start.",
       "missingConfigTitle": "Voeg de mobiele omgevingsvariabelen toe"
     },
-    "carPlayDiagnostics": {
-      "clear": "Wissen",
-      "clearLabel": "Diagnostiek wissen",
-      "clipboardEmpty": "(geen CarPlay-diagnostiek vastgelegd)",
-      "copied": "Gekopieerd ✓",
-      "copyAll": "Alles kopiëren",
-      "copyAllLabel": "Alle diagnostiek kopiëren",
-      "empty": "Nog geen CarPlay-diagnostiek vastgelegd. Maak één keer verbinding met CarPlay en kom hier terug.",
-      "refresh": "Vernieuwen",
-      "refreshLabel": "Diagnostiek vernieuwen",
-      "subtitle": {
-        "one": "Sporen van de CarPlay-verbinding ({count} regel, nieuwste eerst). Kopieer en stuur deze op als er iets misgaat in de auto.",
-        "other": "Sporen van de CarPlay-verbinding ({count} regels, nieuwste eerst). Kopieer en stuur deze op als er iets misgaat in de auto."
-      },
-      "title": "CarPlay-diagnostiek"
-    },
     "chat": {
       "composerPlaceholder": "Bericht aan Stella",
       "createFailed": "Kan geen chat aanmaken. Probeer het opnieuw.",
@@ -1366,7 +1350,6 @@
         "relative": "Relatief",
         "strong": "Sterk"
       },
-      "carPlayDiagnostics": "CarPlay-diagnostiek",
       "chatStorage": {
         "description": "Bekijk je chats op al je apparaten. Schakel dit uit om een aparte chatgeschiedenis alleen op dit apparaat te houden. Bij het terugzetten worden die chats niet geüpload. AI-aanbieders verwerken je berichten nog steeds."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "E-mailadres verbergen",
       "loadingSession": "Sessie laden…",
       "notificationsSection": "Meldingen",
-      "openCarPlayDiagnosticsLabel": "CarPlay-diagnostiek openen",
       "openPrivacyLabel": "Privacybeleid openen",
       "openTermsLabel": "Servicevoorwaarden openen",
       "paired": {

@@ -13,6 +13,8 @@ import { ttsObjectKey } from "./ticket.js";
 
 /** Short enough that the first segment plays almost at once. */
 const TARGET_SEGMENT_SEC = 2.0;
+/** The first segment is cut early so a listener hears speech sooner. */
+const FIRST_SEGMENT_SEC = 0.6;
 const MAX_SEGMENTS = 600;
 const MAX_AUDIO_BYTES = 24 * 1024 * 1024;
 /** Bounds the provider stream; well past what 8,000 characters take. */
@@ -232,7 +234,8 @@ export const synthesizeHls = async (input: {
       frames.push(mp3.slice(cursor, cursor + frame.frameLen));
       duration += frame.durationSec;
       cursor += frame.frameLen;
-      if (duration >= TARGET_SEGMENT_SEC) await flush();
+      const target = manifest.segments.length === 0 ? FIRST_SEGMENT_SEC : TARGET_SEGMENT_SEC;
+      if (duration >= target) await flush();
     }
     mp3 = cursor > 0 ? mp3.slice(cursor) : mp3;
   };

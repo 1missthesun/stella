@@ -975,22 +975,6 @@
       "missingConfigBody": "Aseta EXPO_PUBLIC_STELLA_BACKEND_URL ennen sovelluksen käynnistämistä.",
       "missingConfigTitle": "Lisää mobiilin ympäristömuuttujat"
     },
-    "carPlayDiagnostics": {
-      "clear": "Tyhjennä",
-      "clearLabel": "Tyhjennä diagnostiikka",
-      "clipboardEmpty": "(CarPlay-diagnostiikkaa ei ole tallennettu)",
-      "copied": "Kopioitu ✓",
-      "copyAll": "Kopioi kaikki",
-      "copyAllLabel": "Kopioi kaikki diagnostiikkatiedot",
-      "empty": "CarPlay-diagnostiikkaa ei ole vielä tallennettu. Yhdistä CarPlayhin kerran ja palaa sitten tänne.",
-      "refresh": "Päivitä",
-      "refreshLabel": "Päivitä diagnostiikka",
-      "subtitle": {
-        "one": "Merkintöjä CarPlay-yhteydestä ({count} rivi, uusin ensin). Kopioi ja lähetä nämä, jos autossa jokin toimii oudosti.",
-        "other": "Merkintöjä CarPlay-yhteydestä ({count} riviä, uusin ensin). Kopioi ja lähetä nämä, jos autossa jokin toimii oudosti."
-      },
-      "title": "CarPlay-diagnostiikka"
-    },
     "chat": {
       "composerPlaceholder": "Kirjoita Stellalle",
       "createFailed": "Keskustelua ei voitu luoda. Yritä uudelleen.",
@@ -1366,7 +1350,6 @@
         "relative": "Suhteellinen",
         "strong": "Voimakas"
       },
-      "carPlayDiagnostics": "CarPlay-diagnostiikka",
       "chatStorage": {
         "description": "Käytä keskustelujasi kaikilla laitteilla. Poista käytöstä, jos haluat pitää erillisen keskusteluhistorian vain tällä laitteella. Kun otat asetuksen takaisin käyttöön, näitä keskusteluja ei ladata pilveen. Tekoälypalvelut käsittelevät viestejäsi edelleen."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "Piilota sähköposti",
       "loadingSession": "Ladataan istuntoa…",
       "notificationsSection": "Ilmoitukset",
-      "openCarPlayDiagnosticsLabel": "Avaa CarPlay-diagnostiikka",
       "openPrivacyLabel": "Avaa tietosuojakäytäntö",
       "openTermsLabel": "Avaa käyttöehdot",
       "paired": {

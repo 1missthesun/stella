@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { Platform } from "react-native";
 import { assert, assertObject } from "./assert";
 import { getBackendClient } from "./backend";

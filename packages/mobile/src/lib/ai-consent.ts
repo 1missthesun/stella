@@ -9,7 +9,7 @@
  * BEFORE any data leaves the device.
  */
 
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 
 // Version 4 names Meta Muse as the direct transcription recipient. Do not
 // silently treat consent naming xAI as consent to a different company.

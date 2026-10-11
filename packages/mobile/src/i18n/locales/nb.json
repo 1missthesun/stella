@@ -975,22 +975,6 @@
       "missingConfigBody": "Angi EXPO_PUBLIC_STELLA_BACKEND_URL før du starter appen.",
       "missingConfigTitle": "Legg til miljøvariabler for mobil"
     },
-    "carPlayDiagnostics": {
-      "clear": "Tøm",
-      "clearLabel": "Tøm diagnostikken",
-      "clipboardEmpty": "(ingen CarPlay-diagnostikk registrert)",
-      "copied": "Kopiert ✓",
-      "copyAll": "Kopier alt",
-      "copyAllLabel": "Kopier all diagnostikk",
-      "empty": "Ingen CarPlay-diagnostikk er registrert ennå. Koble til CarPlay én gang, og kom tilbake hit.",
-      "refresh": "Oppdater",
-      "refreshLabel": "Oppdater diagnostikken",
-      "subtitle": {
-        "one": "Spor fra CarPlay-tilkoblingen ({count} linje, nyeste først). Kopier og send disse hvis noe oppfører seg rart i bilen.",
-        "other": "Spor fra CarPlay-tilkoblingen ({count} linjer, nyeste først). Kopier og send disse hvis noe oppfører seg rart i bilen."
-      },
-      "title": "CarPlay-diagnostikk"
-    },
     "chat": {
       "composerPlaceholder": "Skriv til Stella",
       "createFailed": "Kunne ikke opprette en chat. Prøv igjen.",
@@ -1366,7 +1350,6 @@
         "relative": "Relativ",
         "strong": "Sterk"
       },
-      "carPlayDiagnostics": "CarPlay-diagnostikk",
       "chatStorage": {
         "description": "Få tilgang til samtalene dine på alle enheter. Slå av for å beholde en egen samtalehistorikk bare på denne enheten. Når du slår på igjen, lastes ikke de samtalene opp. KI-leverandører behandler fortsatt meldingene dine."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "Skjul e-post",
       "loadingSession": "Laster økt…",
       "notificationsSection": "Varsler",
-      "openCarPlayDiagnosticsLabel": "Åpne CarPlay-diagnostikk",
       "openPrivacyLabel": "Åpne personvernerklæringen",
       "openTermsLabel": "Åpne Vilkår for bruk",
       "paired": {

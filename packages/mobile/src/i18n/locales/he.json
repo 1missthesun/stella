@@ -984,23 +984,6 @@
       "missingConfigBody": "הגדירו את EXPO_PUBLIC_STELLA_BACKEND_URL לפני הפעלת האפליקציה.",
       "missingConfigTitle": "הוסיפו את משתני הסביבה של האפליקציה הניידת"
     },
-    "carPlayDiagnostics": {
-      "clear": "נקה",
-      "clearLabel": "ניקוי האבחון",
-      "clipboardEmpty": "(לא נרשמו נתוני אבחון של CarPlay)",
-      "copied": "הועתק ✓",
-      "copyAll": "העתקת הכול",
-      "copyAllLabel": "העתקת כל נתוני האבחון",
-      "empty": "עדיין לא נרשמו נתוני אבחון של CarPlay. התחברו פעם אחת ל-CarPlay ואז חזרו לכאן.",
-      "refresh": "רענון",
-      "refreshLabel": "רענון האבחון",
-      "subtitle": {
-        "one": "עקבות מחיבור ה-CarPlay ({count} שורה, החדשות ראשונות). העתיקו ושלחו אותן אם משהו מתנהג מוזר ברכב.",
-        "other": "עקבות מחיבור ה-CarPlay ({count} שורות, החדשות ראשונות). העתיקו ושלחו אותן אם משהו מתנהג מוזר ברכב.",
-        "two": "עקבות מחיבור ה-CarPlay ({count} שורות, החדשות ראשונות). העתיקו ושלחו אותן אם משהו מתנהג מוזר ברכב."
-      },
-      "title": "אבחון CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "כתבו ל-Stella",
       "createFailed": "לא ניתן ליצור צ׳אט. יש לנסות שוב.",
@@ -1376,7 +1359,6 @@
         "relative": "יחסי",
         "strong": "חזק"
       },
-      "carPlayDiagnostics": "אבחון CarPlay",
       "chatStorage": {
         "description": "גישה לצ'אטים שלכם מכל המכשירים. כבו כדי לשמור היסטוריית צ'אטים נפרדת במכשיר הזה בלבד. בהפעלה מחדש הצ'אטים האלה לא יועלו. ספקי ה-AI עדיין מעבדים את ההודעות שלכם."
       },
@@ -1406,7 +1388,6 @@
       "hideEmailLabel": "הסתרת האימייל",
       "loadingSession": "טוען התחברות…",
       "notificationsSection": "התראות",
-      "openCarPlayDiagnosticsLabel": "פתיחת אבחון CarPlay",
       "openPrivacyLabel": "פתיחת מדיניות הפרטיות",
       "openTermsLabel": "פתיחת תנאי השירות",
       "paired": {

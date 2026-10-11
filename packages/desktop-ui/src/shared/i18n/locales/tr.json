@@ -975,22 +975,6 @@
       "missingConfigBody": "Uygulamayı başlatmadan önce EXPO_PUBLIC_STELLA_BACKEND_URL değerini ayarlayın.",
       "missingConfigTitle": "Mobil ortam değişkenlerini ekleyin"
     },
-    "carPlayDiagnostics": {
-      "clear": "Temizle",
-      "clearLabel": "Tanılamayı temizle",
-      "clipboardEmpty": "(CarPlay tanılama kaydı yok)",
-      "copied": "Kopyalandı ✓",
-      "copyAll": "Tümünü kopyala",
-      "copyAllLabel": "Tüm tanılama kayıtlarını kopyala",
-      "empty": "Henüz CarPlay tanılama kaydı yok. Bir kez CarPlay'e bağlanın, sonra buraya dönün.",
-      "refresh": "Yenile",
-      "refreshLabel": "Tanılamayı yenile",
-      "subtitle": {
-        "one": "CarPlay bağlantısından kayıtlar ({count} satır, en yenisi başta). Arabada bir şey ters giderse bunları kopyalayıp gönderin.",
-        "other": "CarPlay bağlantısından kayıtlar ({count} satır, en yenisi başta). Arabada bir şey ters giderse bunları kopyalayıp gönderin."
-      },
-      "title": "CarPlay tanılama"
-    },
     "chat": {
       "composerPlaceholder": "Stella'ya mesaj yazın",
       "createFailed": "Sohbet oluşturulamadı. Lütfen tekrar deneyin.",
@@ -1366,7 +1350,6 @@
         "relative": "Göreli",
         "strong": "Güçlü"
       },
-      "carPlayDiagnostics": "CarPlay tanılama",
       "chatStorage": {
         "description": "Sohbetlerinize tüm cihazlarınızdan erişin. Yalnızca bu cihazda ayrı bir sohbet geçmişi tutmak için kapatın. Geri açtığınızda bu sohbetler yüklenmez. Yapay zekâ sağlayıcıları mesajlarınızı yine de işler."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "E-postayı gizle",
       "loadingSession": "Oturum yükleniyor…",
       "notificationsSection": "Bildirimler",
-      "openCarPlayDiagnosticsLabel": "CarPlay tanılamayı aç",
       "openPrivacyLabel": "Gizlilik Politikasını aç",
       "openTermsLabel": "Hizmet Koşullarını aç",
       "paired": {

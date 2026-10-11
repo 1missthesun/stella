@@ -5,7 +5,7 @@ import type {
 } from "@better-fetch/fetch";
 import type { ClientStore } from "better-auth/client";
 import * as Linking from "expo-linking";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 import { Platform } from "react-native";
 import { env } from "../config/env";
 import { verifyOneTimeToken } from "./verify-one-time-token";

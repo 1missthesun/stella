@@ -984,23 +984,6 @@
       "missingConfigBody": "Imposta EXPO_PUBLIC_STELLA_BACKEND_URL prima di avviare l'app.",
       "missingConfigTitle": "Aggiungi le variabili d'ambiente mobile"
     },
-    "carPlayDiagnostics": {
-      "clear": "Cancella",
-      "clearLabel": "Cancella la diagnostica",
-      "clipboardEmpty": "(nessuna diagnostica CarPlay registrata)",
-      "copied": "Copiato ✓",
-      "copyAll": "Copia tutto",
-      "copyAllLabel": "Copia tutta la diagnostica",
-      "empty": "Nessuna diagnostica CarPlay registrata. Connettiti a CarPlay una volta, poi torna qui.",
-      "refresh": "Aggiorna",
-      "refreshLabel": "Aggiorna la diagnostica",
-      "subtitle": {
-        "many": "Tracce della connessione CarPlay ({count} di righe, dalle più recenti). Copiale e inviacele se qualcosa non funziona in auto.",
-        "one": "Tracce della connessione CarPlay ({count} riga, dalla più recente). Copiale e inviacele se qualcosa non funziona in auto.",
-        "other": "Tracce della connessione CarPlay ({count} righe, dalle più recenti). Copiale e inviacele se qualcosa non funziona in auto."
-      },
-      "title": "Diagnostica CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "Scrivi a Stella",
       "createFailed": "Impossibile creare una chat. Riprova.",
@@ -1376,7 +1359,6 @@
         "relative": "Relativo",
         "strong": "Intenso"
       },
-      "carPlayDiagnostics": "Diagnostica CarPlay",
       "chatStorage": {
         "description": "Accedi alle tue chat da tutti i dispositivi. Disattiva per mantenere una cronologia separata solo su questo dispositivo. Riattivandolo, quelle chat non verranno caricate. I fornitori di IA continuano a elaborare i tuoi messaggi."
       },
@@ -1406,7 +1388,6 @@
       "hideEmailLabel": "Nascondi l'email",
       "loadingSession": "Caricamento della sessione…",
       "notificationsSection": "Notifiche",
-      "openCarPlayDiagnosticsLabel": "Apri la diagnostica CarPlay",
       "openPrivacyLabel": "Apri l'Informativa sulla privacy",
       "openTermsLabel": "Apri i Termini di servizio",
       "paired": {

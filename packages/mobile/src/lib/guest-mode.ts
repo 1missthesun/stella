@@ -1,4 +1,4 @@
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./secure-store";
 
 const GUEST_KEY = "stella-mobile_guest-mode";
 

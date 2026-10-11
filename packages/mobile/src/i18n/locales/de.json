@@ -975,22 +975,6 @@
       "missingConfigBody": "Setze EXPO_PUBLIC_STELLA_BACKEND_URL, bevor du die App startest.",
       "missingConfigTitle": "Mobile Umgebungsvariablen hinzufügen"
     },
-    "carPlayDiagnostics": {
-      "clear": "Löschen",
-      "clearLabel": "Diagnose löschen",
-      "clipboardEmpty": "(keine CarPlay-Diagnose aufgezeichnet)",
-      "copied": "Kopiert ✓",
-      "copyAll": "Alles kopieren",
-      "copyAllLabel": "Gesamte Diagnose kopieren",
-      "empty": "Noch keine CarPlay-Diagnose aufgezeichnet. Verbinde dich einmal mit CarPlay und komm dann zurück.",
-      "refresh": "Aktualisieren",
-      "refreshLabel": "Diagnose aktualisieren",
-      "subtitle": {
-        "one": "Spuren der CarPlay-Verbindung ({count} Zeile, neueste zuerst). Kopiere sie und schick sie uns, wenn im Auto etwas schiefläuft.",
-        "other": "Spuren der CarPlay-Verbindung ({count} Zeilen, neueste zuerst). Kopiere sie und schick sie uns, wenn im Auto etwas schiefläuft."
-      },
-      "title": "CarPlay-Diagnose"
-    },
     "chat": {
       "composerPlaceholder": "Nachricht an Stella",
       "createFailed": "Der Chat konnte nicht erstellt werden. Bitte versuche es erneut.",
@@ -1366,7 +1350,6 @@
         "relative": "Relativ",
         "strong": "Kräftig"
       },
-      "carPlayDiagnostics": "CarPlay-Diagnose",
       "chatStorage": {
         "description": "Greife auf all deinen Geräten auf deine Chats zu. Deaktiviere die Option, um einen separaten Chatverlauf nur auf diesem Gerät zu behalten. Beim Zurückschalten werden diese Chats nicht hochgeladen. KI-Anbieter verarbeiten deine Nachrichten weiterhin."
       },
@@ -1396,7 +1379,6 @@
       "hideEmailLabel": "E-Mail-Adresse ausblenden",
       "loadingSession": "Sitzung wird geladen…",
       "notificationsSection": "Benachrichtigungen",
-      "openCarPlayDiagnosticsLabel": "CarPlay-Diagnose öffnen",
       "openPrivacyLabel": "Datenschutzrichtlinie öffnen",
       "openTermsLabel": "Nutzungsbedingungen öffnen",
       "paired": {

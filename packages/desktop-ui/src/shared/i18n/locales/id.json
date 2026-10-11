@@ -966,21 +966,6 @@
       "missingConfigBody": "Atur EXPO_PUBLIC_STELLA_BACKEND_URL sebelum memulai aplikasi.",
       "missingConfigTitle": "Tambahkan variabel lingkungan seluler"
     },
-    "carPlayDiagnostics": {
-      "clear": "Bersihkan",
-      "clearLabel": "Bersihkan diagnostik",
-      "clipboardEmpty": "(tidak ada diagnostik CarPlay yang terekam)",
-      "copied": "Tersalin ✓",
-      "copyAll": "Salin semua",
-      "copyAllLabel": "Salin semua diagnostik",
-      "empty": "Belum ada diagnostik CarPlay yang terekam. Hubungkan ke CarPlay sekali, lalu kembali ke sini.",
-      "refresh": "Segarkan",
-      "refreshLabel": "Segarkan diagnostik",
-      "subtitle": {
-        "other": "Jejak dari koneksi CarPlay ({count} baris, terbaru dulu). Salin dan kirimkan ini setelah ada yang bermasalah di mobil."
-      },
-      "title": "Diagnostik CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "Pesan untuk Stella",
       "createFailed": "Tidak dapat membuat obrolan. Silakan coba lagi.",
@@ -1356,7 +1341,6 @@
         "relative": "Relatif",
         "strong": "Tegas"
       },
-      "carPlayDiagnostics": "Diagnostik CarPlay",
       "chatStorage": {
         "description": "Akses obrolan Anda di semua perangkat. Nonaktifkan untuk menyimpan riwayat obrolan terpisah hanya di perangkat ini. Saat diaktifkan kembali, obrolan tersebut tidak akan diunggah. Penyedia AI tetap memproses pesan Anda."
       },
@@ -1386,7 +1370,6 @@
       "hideEmailLabel": "Sembunyikan email",
       "loadingSession": "Memuat sesi…",
       "notificationsSection": "Notifikasi",
-      "openCarPlayDiagnosticsLabel": "Buka diagnostik CarPlay",
       "openPrivacyLabel": "Buka Kebijakan Privasi",
       "openTermsLabel": "Buka Ketentuan Layanan",
       "paired": {

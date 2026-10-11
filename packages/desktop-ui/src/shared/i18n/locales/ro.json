@@ -984,23 +984,6 @@
       "missingConfigBody": "Setează EXPO_PUBLIC_STELLA_BACKEND_URL înainte de a porni aplicația.",
       "missingConfigTitle": "Adaugă variabilele de mediu pentru mobil"
     },
-    "carPlayDiagnostics": {
-      "clear": "Șterge",
-      "clearLabel": "Șterge diagnosticarea",
-      "clipboardEmpty": "(nicio diagnosticare CarPlay înregistrată)",
-      "copied": "Copiat ✓",
-      "copyAll": "Copiază tot",
-      "copyAllLabel": "Copiază toată diagnosticarea",
-      "empty": "Nicio diagnosticare CarPlay înregistrată încă. Conectează-te o dată la CarPlay, apoi revino aici.",
-      "refresh": "Reîmprospătează",
-      "refreshLabel": "Reîmprospătează diagnosticarea",
-      "subtitle": {
-        "few": "Urme ale conexiunii CarPlay ({count} linii, cele mai recente primele). Copiază-le și trimite-ni-le după ce ceva se comportă ciudat în mașină.",
-        "one": "Urme ale conexiunii CarPlay ({count} linie, cea mai recentă prima). Copiază-le și trimite-ni-le după ce ceva se comportă ciudat în mașină.",
-        "other": "Urme ale conexiunii CarPlay ({count} de linii, cele mai recente primele). Copiază-le și trimite-ni-le după ce ceva se comportă ciudat în mașină."
-      },
-      "title": "Diagnosticare CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "Scrie-i Stellei",
       "createFailed": "Nu s-a putut crea un chat. Încearcă din nou.",
@@ -1376,7 +1359,6 @@
         "relative": "Relativ",
         "strong": "Intens"
       },
-      "carPlayDiagnostics": "Diagnosticare CarPlay",
       "chatStorage": {
         "description": "Accesează-ți conversațiile pe toate dispozitivele. Dezactivează pentru a păstra un istoric separat doar pe acest dispozitiv. La reactivare, acele conversații nu vor fi încărcate. Furnizorii de IA îți procesează în continuare mesajele."
       },
@@ -1406,7 +1388,6 @@
       "hideEmailLabel": "Ascunde e-mailul",
       "loadingSession": "Se încarcă sesiunea…",
       "notificationsSection": "Notificări",
-      "openCarPlayDiagnosticsLabel": "Deschide diagnosticarea CarPlay",
       "openPrivacyLabel": "Deschide Politica de confidențialitate",
       "openTermsLabel": "Deschide Termenii și condițiile",
       "paired": {

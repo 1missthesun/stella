@@ -984,23 +984,6 @@
       "missingConfigBody": "Defina EXPO_PUBLIC_STELLA_BACKEND_URL antes de iniciar o app.",
       "missingConfigTitle": "Adicione as variáveis de ambiente do mobile"
     },
-    "carPlayDiagnostics": {
-      "clear": "Limpar",
-      "clearLabel": "Limpar o diagnóstico",
-      "clipboardEmpty": "(nenhum diagnóstico do CarPlay registrado)",
-      "copied": "Copiado ✓",
-      "copyAll": "Copiar tudo",
-      "copyAllLabel": "Copiar todo o diagnóstico",
-      "empty": "Nenhum diagnóstico do CarPlay registrado ainda. Conecte-se ao CarPlay uma vez e volte aqui.",
-      "refresh": "Atualizar",
-      "refreshLabel": "Atualizar o diagnóstico",
-      "subtitle": {
-        "many": "Registro da conexão com o CarPlay ({count} de linhas, as mais recentes primeiro). Copie e envie isto quando algo se comportar mal no carro.",
-        "one": "Registro da conexão com o CarPlay ({count} linha, a mais recente primeiro). Copie e envie isto quando algo se comportar mal no carro.",
-        "other": "Registro da conexão com o CarPlay ({count} linhas, as mais recentes primeiro). Copie e envie isto quando algo se comportar mal no carro."
-      },
-      "title": "Diagnóstico do CarPlay"
-    },
     "chat": {
       "composerPlaceholder": "Escreva para a Stella",
       "createFailed": "Não foi possível criar um chat. Tente novamente.",
@@ -1376,7 +1359,6 @@
         "relative": "Relativo",
         "strong": "Intenso"
       },
-      "carPlayDiagnostics": "Diagnóstico do CarPlay",
       "chatStorage": {
         "description": "Acesse suas conversas em todos os dispositivos. Desative para manter um histórico separado apenas neste dispositivo. Ao reativar, essas conversas não serão enviadas. Os provedores de IA continuam processando suas mensagens."
       },
@@ -1406,7 +1388,6 @@
       "hideEmailLabel": "Ocultar o e-mail",
       "loadingSession": "Carregando a sessão…",
       "notificationsSection": "Notificações",
-      "openCarPlayDiagnosticsLabel": "Abrir o diagnóstico do CarPlay",
       "openPrivacyLabel": "Abrir a Política de Privacidade",
       "openTermsLabel": "Abrir os Termos de Serviço",
       "paired": {

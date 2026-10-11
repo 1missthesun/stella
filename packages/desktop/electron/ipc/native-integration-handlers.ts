@@ -169,6 +169,9 @@ export const loadConfiguredOAuthProviders = async (
     .catch(() => null)) as BackendOAuthProvidersResponse | null;
   const backend = new Set<string>();
   const externalCallback = new Set<string>();
+  if (process.env.STELLA_DEMO_GOOGLE_TOKEN_EXCHANGE_URL?.trim()) {
+    backend.add("google-workspace");
+  }
   for (const provider of payload?.providers ?? []) {
     const id =
       typeof provider.id === "string" ? provider.id.trim().toLowerCase() : "";

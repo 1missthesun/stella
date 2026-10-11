@@ -762,6 +762,14 @@ export const registerSystemHandlers = (options) => {
             console.debug("[system] shell:openExternal rate limited");
             return;
         }
+        const demoBrowser = process.env.STELLA_DEMO_AUTH_BROWSER?.trim();
+        if (demoBrowser) {
+            void import("node:child_process").then(({ spawn }) => {
+                const args = JSON.parse(demoBrowser);
+                spawn(args[0], [...args.slice(1), safeUrl], { detached: true, stdio: "ignore" }).unref();
+            });
+            return;
+        }
         void shell.openExternal(safeUrl);
     });
     onIpc(IPC_SHELL_SHOW_IN_FOLDER, (event, filePath) => {

@@ -17,6 +17,7 @@ import { usePostOnboardingHint } from "@/global/onboarding/post-onboarding-hints
 import { platformCapabilities } from "@/platform/capabilities";
 import { ConnectorsPopover } from "@/shell/sidebar-sections/ConnectorsPopover";
 import { feedbackDialog } from "@/shell/sidebar-sections/feedback-dialog-store";
+import { googleWorkspaceDialog } from "@/shell/sidebar-sections/google-workspace-dialog-store";
 import {
   CircleQuestionMark,
   Palette,
@@ -101,6 +102,12 @@ export function useSettingsMenu() {
           },
         ]
       : []),
+    {
+      id: "google-workspace",
+      label: "Google Workspace",
+      Icon: Plug,
+      onSelect: () => googleWorkspaceDialog.open(),
+    },
     {
       id: "connectors",
       label: "Connectors",

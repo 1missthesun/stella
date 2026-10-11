@@ -102,6 +102,8 @@
     "@googleapis/drive": "^26.0.2",
     "@googleapis/gmail": "^22.0.1",
     "@googleapis/people": "^12.0.1",
+    "@googleapis/sheets": "^18.1.1",
+    "@googleapis/tasks": "^17.0.1",
     "@legendapp/list": "3.6.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "@noble/ciphers": "^2.4.0",

@@ -775,6 +775,11 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
     cwd: repoRoot,
     env: {
       ...isolatedElectronEnvironment(),
+      ...Object.fromEntries(
+        Object.entries(process.env).filter(([key]) =>
+          key.startsWith("STELLA_DEMO_") || key === "STELLA_GOOGLE_OAUTH_REVIEW",
+        ),
+      ),
       ...(modelGateway ? { STELLA_MODEL_GATEWAY_URL: modelGateway } : {}),
       ...(browserBridge ? { STELLA_BROWSER_BRIDGE: browserBridge } : {}),
       ...providerHomes,

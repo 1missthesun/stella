@@ -12,6 +12,7 @@ import { registerDisplayHandlers } from "../ipc/display-handlers.js";
 import { registerHomeHandlers } from "../ipc/home-handlers.js";
 import { registerLocalChatHandlers } from "../ipc/local-chat-handlers.js";
 import { registerNativeIntegrationHandlers } from "../ipc/native-integration-handlers.js";
+import { deleteConnectorAccessTokens, loadConnectorTokenPayload, } from "@stella/runtime/kernel/connectors/oauth";
 import { registerOnboardingHandlers } from "../ipc/onboarding-handlers.js";
 import { app, BrowserWindow, shell } from "electron";
 import { toggleRealtimeVoice, } from "../services/realtime-voice-control.js";
@@ -399,6 +400,27 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     });
     registerNativeIntegrationHandlers({
         getStellaAppDir: lifecycle.getStellaDataDir,
+        requestPreregisteredOAuth: (payload) => services.connectorCredentialService.requestPreregisteredOAuth({
+            ...payload,
+            presentation: "headless",
+        }),
+        disconnectGoogleWorkspace: async () => {
+            const stellaAppDir = lifecycle.getStellaDataDir();
+            if (!stellaAppDir)
+                return { ok: false };
+            const payload = await loadConnectorTokenPayload(stellaAppDir, "google-workspace");
+            const token = payload?.refreshToken ?? payload?.accessToken;
+            if (token) {
+                await fetch("https://oauth2.googleapis.com/revoke", {
+                    method: "POST",
+                    headers: { "content-type": "application/x-www-form-urlencoded" },
+                    body: new URLSearchParams({ token }),
+                    signal: AbortSignal.timeout(15_000),
+                }).catch(() => null);
+            }
+            await deleteConnectorAccessTokens(stellaAppDir, ["google-workspace"]);
+            return { ok: true };
+        },
         requestExternalOAuthApproval: (payload) => services.connectorOAuthService.requestExternalOAuthApproval(payload),
         getAuthToken: () => services.authService.getAuthToken(),
         getBackendUrl: () => services.authService.getBackendUrl(),

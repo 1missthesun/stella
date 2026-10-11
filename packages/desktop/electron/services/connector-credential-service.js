@@ -18,6 +18,14 @@ import {
   IPC_CONNECTOR_CREDENTIAL_REQUEST,
   IPC_CONNECTOR_CREDENTIAL_COMPLETE,
 } from "@stella/contracts/desktop/ipc-channels";
+const openAuthorizationUrl = async (url) => {
+    const demoBrowser = process.env.STELLA_DEMO_AUTH_BROWSER?.trim();
+    if (!demoBrowser)
+        return shell.openExternal(url);
+    const { spawn } = await import("node:child_process");
+    const args = JSON.parse(demoBrowser);
+    spawn(args[0], [...args.slice(1), url], { detached: true, stdio: "ignore" }).unref();
+};
 const REQUEST_TIMEOUT_MS = 5 * 60 * 1000;
 export class ConnectorCredentialService {
     options;
@@ -296,6 +304,9 @@ export class ConnectorCredentialService {
         }
     }
     backendTokenExchangeEndpoint() {
+        const demoEndpoint = process.env.STELLA_DEMO_GOOGLE_TOKEN_EXCHANGE_URL?.trim();
+        if (demoEndpoint)
+            return demoEndpoint;
         const backendUrl = this.options
             .getBackendUrl?.()
             ?.trim()
@@ -478,7 +489,7 @@ export class ConnectorCredentialService {
                             authToken: backendAuthToken,
                         }
                         : undefined,
-                    openUrl: (url) => shell.openExternal(url),
+                    openUrl: (url) => openAuthorizationUrl(url),
                     signal: args.signal,
                 });
             }
@@ -490,7 +501,7 @@ export class ConnectorCredentialService {
                     oauthResource: args.oauthResource ?? undefined,
                     callbackId: args.callbackId,
                     scopes: args.scopes,
-                    openUrl: (url) => shell.openExternal(url),
+                    openUrl: (url) => openAuthorizationUrl(url),
                     signal: args.signal,
                 });
             }

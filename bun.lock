@@ -10,6 +10,8 @@
         "@googleapis/drive": "^26.0.2",
         "@googleapis/gmail": "^22.0.1",
         "@googleapis/people": "^12.0.1",
+        "@googleapis/sheets": "^18.1.1",
+        "@googleapis/tasks": "^17.0.1",
         "@legendapp/list": "3.6.0",
         "@modelcontextprotocol/sdk": "^1.32.0",
         "@noble/ciphers": "^2.4.0",
@@ -989,6 +991,10 @@
     "@googleapis/gmail": ["@googleapis/gmail@22.0.1", "", { "dependencies": { "googleapis-common": "^9.0.0" } }, "sha512-v/RGUAWmYQQWLivB/tUcoecxC4ortqvtfzaRloUfcv6hogMyenq8HxdJDShFtSEGVF4of+H+b4xiL6yBlxcTmA=="],
 
     "@googleapis/people": ["@googleapis/people@12.0.1", "", { "dependencies": { "googleapis-common": "^9.0.0" } }, "sha512-8I5c9wfiPUxxbaPIyOQUG3MkTviyKWsnj4uYBgCcS5y0PY3q2xjjQlnCem72m6DMn3EVjUoD+MxdHE8cEmmA/g=="],
+
+    "@googleapis/sheets": ["@googleapis/sheets@18.1.1", "", { "dependencies": { "googleapis-common": "^9.0.0" } }, "sha512-T2AOp0AhDdZ3imQyy3d8AnRMdPFwibKKcmKttWxLBKeiJKmE9p7RFrBpdbswpJ1d3cPdO5kvcYDuKajUFqwraA=="],
+
+    "@googleapis/tasks": ["@googleapis/tasks@17.0.1", "", { "dependencies": { "googleapis-common": "^9.0.0" } }, "sha512-/6v3HqFtRXr5bjE0QKSOCUI/YlEJ4US0Oxu6v3rrxvCZibxtNcu05P741P9aFryUhipouRqaBDv4qqWq3p36+A=="],
 
     "@hono/node-server": ["@hono/node-server@1.19.14", "", { "peerDependencies": { "hono": "^4" } }, "sha512-GwtvgtXxnWsucXvbQXkRgqksiH2Qed37H9xHZocE5sA3N8O8O8/8FA3uclQXxXVzc9XBZuEOMK7+r02FmSpHtw=="],
 

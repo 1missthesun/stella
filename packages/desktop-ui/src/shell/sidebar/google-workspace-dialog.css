@@ -1,0 +1,108 @@
+[data-component="dialog"]:has(.google-workspace-dialog) [data-slot="dialog-container"] {
+  width: min(calc(100vw - 32px), 760px);
+  height: min(calc(100vh - 32px), 940px);
+}
+
+.google-workspace-dialog__body {
+  padding: 0 20px 18px;
+}
+
+.google-workspace-dialog__status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-inset);
+}
+
+.google-workspace-dialog__status[data-connected] {
+  border-color: color-mix(in srgb, #34a853 55%, var(--border));
+}
+
+.google-workspace-dialog__status-copy {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.google-workspace-dialog__status-title {
+  color: var(--text-strong);
+  font-weight: var(--weight-medium);
+}
+
+.google-workspace-dialog__status[data-connected] .google-workspace-dialog__status-title {
+  color: #34a853;
+}
+
+.google-workspace-dialog__status-sub {
+  color: var(--text-weak);
+  font-size: var(--font-size-sm);
+}
+
+.google-workspace-dialog__error {
+  margin: 0 0 12px;
+  color: var(--text-danger, #e5484d);
+  font-size: var(--font-size-sm);
+}
+
+.google-workspace-dialog__scopes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.google-workspace-dialog__scope {
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.google-workspace-dialog__scope-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+}
+
+.google-workspace-dialog__scope-name {
+  color: var(--text-strong);
+  font-weight: var(--weight-medium);
+}
+
+.google-workspace-dialog__scope-id,
+.google-workspace-dialog__identity code {
+  color: var(--text-weak);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+}
+
+.google-workspace-dialog__scope-uses,
+.google-workspace-dialog__scope-why {
+  margin: 6px 0 0;
+  color: var(--text-strong);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}
+
+.google-workspace-dialog__scope-why {
+  color: var(--text-weak);
+}
+
+.google-workspace-dialog__scope-why span {
+  font-weight: var(--weight-medium);
+}
+
+.google-workspace-dialog__identity {
+  margin: 12px 0 2px;
+  color: var(--text-weak);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}

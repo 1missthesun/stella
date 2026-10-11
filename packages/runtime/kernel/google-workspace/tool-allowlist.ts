@@ -23,6 +23,8 @@ export const GOOGLE_WORKSPACE_TOOL_ALLOWLIST = [
   "drive.createFolder",
   "drive.downloadFile",
   "drive.renameFile",
+  "drive.moveFile",
+  "drive.trashFile",
   // Calendar (no delete in v1)
   "calendar.list",
   "calendar.createEvent",
@@ -30,18 +32,32 @@ export const GOOGLE_WORKSPACE_TOOL_ALLOWLIST = [
   "calendar.getEvent",
   "calendar.findFreeTime",
   "calendar.updateEvent",
+  "calendar.deleteEvent",
   "calendar.respondToEvent",
   // Gmail (no batch destructive ops in v1)
   "gmail.search",
   "gmail.get",
   "gmail.downloadAttachment",
   "gmail.modify",
+  "gmail.modifyThread",
   "gmail.send",
   "gmail.createDraft",
   "gmail.sendDraft",
   "gmail.listLabels",
   "gmail.createLabel",
-  // Time helpers
+  // Sheets (write-capable; no destructive batch ops in v1)
+  "sheets.create",
+  "sheets.getSpreadsheet",
+  "sheets.getValues",
+  "sheets.updateValues",
+  "sheets.appendValues",
+  "sheets.addSheet",
+  // Tasks (no delete in v1)
+  "tasks.listTaskLists",
+  "tasks.list",
+  "tasks.create",
+  "tasks.update",
+  "tasks.complete",
   "time.getCurrentDate",
   "time.getCurrentTime",
   "time.getTimeZone",
@@ -55,9 +71,8 @@ export type GoogleWorkspaceToolName =
 export const canonicalizeGoogleWorkspaceToolName = (name: string): string =>
   name.replace(/_/g, ".");
 
-export const toGoogleWorkspaceToolRegistrationName = (
-  name: string,
-): string => canonicalizeGoogleWorkspaceToolName(name).replace(/\./g, "_");
+export const toGoogleWorkspaceToolRegistrationName = (name: string): string =>
+  canonicalizeGoogleWorkspaceToolName(name).replace(/\./g, "_");
 
 export const getGoogleWorkspaceToolAliases = (name: string): string[] => {
   const canonicalName = canonicalizeGoogleWorkspaceToolName(name);

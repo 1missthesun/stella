@@ -29,6 +29,7 @@ import {
   terminatePiChatCommands,
   piChatsBusy,
   piAgentEngineFor,
+  piBackgroundExitTarget,
   piDeliverReport,
   reconcileComputerAgents,
   resumePiChats,
@@ -565,6 +566,9 @@ export const layer = Layer.effect(
                     );
                     builtRunner?.setPiAgentEngine(
                       piAgentEngineFor(session, hostBus),
+                    );
+                    builtRunner?.setBackgroundExitTarget(
+                      piBackgroundExitTarget(session, hostBus),
                     );
                     builtRunner?.setBrainNote(
                       async ({ conversationId, host, id, text }) =>

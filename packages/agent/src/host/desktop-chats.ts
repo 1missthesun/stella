@@ -239,6 +239,7 @@ export type DesktopChatsOptions = {
    * it; this is for the owner's records. Stella's own end in `agentReported`
    * and `agentPaused`.
    */
+  agentRunEnded?(agent: { conversationId: string; threadId: string; interrupted: boolean }): void;
   subagentEnded?(agent: {
     conversationId: string;
     threadId: string;
@@ -932,7 +933,7 @@ export function desktopChats(options: DesktopChatsOptions) {
             }),
             agents: (() => {
               const cloud = options.cloudAgents?.(conversationId);
-              const { agentStarted, agentReported, agentPaused, subagentEnded } = options;
+              const { agentStarted, agentReported, agentPaused, subagentEnded, agentRunEnded } = options;
               /** How many runs Stella has given one of its agents: the attempt a run is. */
               const attempts = async (threadId: string) => {
                 if (!opened) return 1;
@@ -978,11 +979,12 @@ export function desktopChats(options: DesktopChatsOptions) {
                   });
                 },
                 // Stella's own end when their reports reach her (`agentReported`, `agentPaused`).
-                ...(subagentEnded
+                ...(subagentEnded || agentRunEnded
                   ? {
                       endAgentRun: async (run, _context, end) => {
                         const outcome = agentRunOutcome(end);
-                        if (!run.parentThreadId || !outcome) return;
+                        agentRunEnded?.({ conversationId, threadId: run.threadId, interrupted: outcome === undefined });
+                        if (!run.parentThreadId || !outcome || !subagentEnded) return;
                         subagentEnded({
                           conversationId,
                           threadId: run.threadId,

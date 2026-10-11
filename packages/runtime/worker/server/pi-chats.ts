@@ -444,7 +444,16 @@ export const piChatsFor = (
       // A conversation stored in the cloud lists this computer's agents in
       // the owner's agent threads, where a paired phone shows and messages
       // them: Stella's own, and each agent's own under the agent that started it.
+      agentRunEnded: ({ conversationId, threadId, interrupted }) => {
+        const runner = session.runnerCell.get();
+        if (!runner) return;
+        const owner = { conversationId, agentId: threadId };
+        const runningSessionIds = runner.backgroundExits.runningSessions(owner);
+        if (runningSessionIds.length === 0) return;
+        runner.backgroundExits.arm({ ...owner, runningSessionIds, ...(interrupted ? { interrupted: true } : {}) });
+      },
       agentStarted: (agent) => {
+        session.runnerCell.get()?.backgroundExits.disarm({ conversationId: agent.conversationId, agentId: agent.threadId });
         if (agent.conversationId.startsWith("local_")) return;
         void (async () => {
           const runner = session.runnerCell.get();
@@ -535,6 +544,15 @@ export const piChatsFor = (
   chatsBySession.set(session, chats);
   return chats;
 };
+
+export const piBackgroundExitTarget = (
+  session: OpenSession,
+  hostBus: HostBus.Interface,
+): import("../../kernel/runner/types.js").BackgroundExitTarget => ({
+  status: async (agentId) => (await (await piChatsFor(session, hostBus)).agentStatus(agentId))?.status ?? "canceled",
+  deliver: async ({ agentId, eventId, text }) =>
+    (await (await piChatsFor(session, hostBus)).deliverAgentMessage(agentId, text, eventId)) !== "not_found",
+});
 
 /**
  * Resume the conversations a previous runtime process left with pi work in

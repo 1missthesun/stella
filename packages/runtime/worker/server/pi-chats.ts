@@ -546,6 +546,11 @@ export const piPlacedChat = async (
     attachments?: RuntimeChatPayload["attachments"];
     /** A schedule's prompt: read by Stella, never shown; its answer shows. */
     scheduled?: boolean;
+    /**
+     * Stella's brief to herself after she moved here, or a note for her from
+     * where she ran before: read by her, never shown; her answer shows.
+     */
+    handoff?: boolean;
   },
 ) => {
   const chats = await piChatsFor(session, hostBus);
@@ -565,10 +570,13 @@ export const piPlacedChat = async (
   const content = piUserContent(payload, prepared);
   // The sender binds its pending message to this id: the journal row keeps it.
   content[0] = { ...content[0]!, stella: { ...content[0]!.stella, clientMsgId: requestId } } as typeof content[number];
-  if (run.scheduled) {
+  if (run.scheduled || run.handoff) {
     for (const [index, part] of content.entries()) {
       if (part.type !== "text") continue;
-      content[index] = { ...part, stella: { ...part.stella, hidden: true, source: "schedule" } } as typeof part;
+      content[index] = {
+        ...part,
+        stella: { ...part.stella, hidden: true, ...(run.scheduled ? { source: "schedule" } : {}) },
+      } as typeof part;
     }
   }
   const canceled = piPlacementCanceled(session, "chat", run.placementRunId);

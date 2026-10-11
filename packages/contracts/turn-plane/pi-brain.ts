@@ -208,6 +208,9 @@ export const parsePiBrainHost = (value: unknown): PiBrainHost | undefined => {
   return { host: "device", deviceId, ...(label ? { label } : {}) };
 };
 
-/** The prompt that continues a conversation where its brain moved: Stella's brief to herself. */
+/**
+ * The prompt that continues a conversation where its brain moved: Stella's
+ * brief to herself. Every host reads it hidden; it is not the user's message.
+ */
 export const piBrainHandoffPrompt = (from: string, brief: string): string =>
-  `[You moved this chat here from ${from} with switch_destination. This is your brief, not a new message from the user.]\n\n${brief}`;
+  `[You moved this chat here from ${from} with switch_destination, and you run here now: do not move again for this brief. This is your brief, not a new message from the user.]\n\n${brief}`;

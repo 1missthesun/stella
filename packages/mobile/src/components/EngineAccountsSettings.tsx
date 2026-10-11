@@ -14,6 +14,7 @@ import {
 import * as Clipboard from "expo-clipboard";
 import * as WebBrowser from "expo-web-browser";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { authClient } from "../lib/auth-client";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   isEngineConnectionUsable,
@@ -96,6 +97,39 @@ const announceChatGptPlanUse = async (t: ReturnType<typeof useT>) => {
       },
       { text: t("mobile.common.done"), style: "cancel" },
     ],
+  );
+};
+
+const CLAUDE_SYNC_NOTICE_KEY = "stella-mobile.claude-sync-notice-seen";
+
+/**
+ * That full Claude Code sessions, tool outputs included, sync to Stella's
+ * cloud: said once per user on this phone, after the first Claude account
+ * they add here.
+ */
+const announceClaudeSync = async (
+  t: ReturnType<typeof useT>,
+  userId: string | null,
+) => {
+  if (!userId) return;
+  const key = `${CLAUDE_SYNC_NOTICE_KEY}:${userId}`;
+  try {
+    if (await AsyncStorage.getItem(key)) return;
+  } catch {
+    // Storage unavailable: show it this time.
+  }
+  Alert.alert(
+    t("settings.engineAccounts.claudeTitle"),
+    t("mobile.engineAccounts.claudeSyncNote"),
+    [
+      {
+        text: t("common.gotIt"),
+        onPress: () => {
+          void AsyncStorage.setItem(key, "1").catch(() => undefined);
+        },
+      },
+    ],
+    { cancelable: false },
   );
 };
 
@@ -271,6 +305,9 @@ export function useEngineConnect(
   /** The user asked to type it themselves, or the clipboard let us down. */
   const [manualEntry, setManualEntry] = useState(false);
   const onConnectedRef = useRef(onConnected);
+  const session = authClient.useSession();
+  const userIdRef = useRef<string | null>(null);
+  userIdRef.current = session.data?.user?.id ?? null;
   /** The provider's sign-in page of the attempt in progress. */
   const authorizeUrl = useRef<string | null>(null);
   /** The options of the attempt in progress, for "Start again". */
@@ -390,6 +427,7 @@ export function useEngineConnect(
         });
         resetAttempt();
         onConnectedRef.current?.();
+        void announceClaudeSync(t, userIdRef.current);
       } catch (error) {
         Alert.alert(
           t("mobile.engineAccounts.errorTitle"),
@@ -952,16 +990,6 @@ function ProviderSection({
           {t("mobile.engineAccounts.claudeNote")}
         </Text>
       ) : null}
-      {!chatgpt && !panel ? (
-        <Text
-          style={[
-            settingsStyles.rowSub,
-            embedded ? styles.embeddedNote : styles.sectionNote,
-          ]}
-        >
-          {t("mobile.engineAccounts.claudeSyncNote")}
-        </Text>
-      ) : null}
 
       {connectId ? (
         <View
@@ -1142,7 +1170,6 @@ const makeStyles = (colors: Colors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
     },
     embeddedPasteCard: { marginBottom: 12, marginHorizontal: 12, marginTop: 0 },
-    embeddedNote: { marginBottom: 12, paddingHorizontal: 12 },
     panelRow: { paddingHorizontal: 0 },
     panelHidden: { display: "none" },
     panelActive: {

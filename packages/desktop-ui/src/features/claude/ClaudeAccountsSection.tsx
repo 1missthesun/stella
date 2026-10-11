@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import type { EngineConnection, EngineSettings } from "@stella/contracts/backend/engines";
+import type {
+  EngineConnection,
+  EngineSettings,
+} from "@stella/contracts/backend/engines";
 import type { ClaudeLocalConfig } from "@stella/contracts/claude-local-accounts";
 import { Button } from "@/ui/button";
 import {
@@ -21,6 +24,10 @@ import {
   type EngineAccountPlace,
 } from "@/features/cloud/EngineAccountRow";
 import { ClaudeLoginPrompt } from "./ClaudeLoginPrompt";
+import {
+  ClaudeSyncNoticeDialog,
+  useClaudeSyncNotice,
+} from "./ClaudeSyncNotice";
 import { useClaudeLocalAccounts } from "./use-claude-local-accounts";
 import { useClaudeLogin, type ClaudeLoginTarget } from "./use-claude-login";
 
@@ -64,14 +71,25 @@ export function ClaudeAccountsSection({
     };
   }, [local.available]);
 
+  const syncNotice = useClaudeSyncNotice();
   const login = useClaudeLogin({
     onSignedIn: (result, target) => {
+      syncNotice.announce();
       showToast({
         title: result.email
-          ? t(target.place === "cloud" ? `${K}.signedInCloudAs` : `${K}.signedInComputerAs`, {
-              email: result.email,
-            })
-          : t(target.place === "cloud" ? `${K}.signedInCloud` : `${K}.signedInComputer`),
+          ? t(
+              target.place === "cloud"
+                ? `${K}.signedInCloudAs`
+                : `${K}.signedInComputerAs`,
+              {
+                email: result.email,
+              },
+            )
+          : t(
+              target.place === "cloud"
+                ? `${K}.signedInCloud`
+                : `${K}.signedInComputer`,
+            ),
       });
       if (target.place === "local") void reloadLocal();
     },
@@ -85,7 +103,10 @@ export function ClaudeAccountsSection({
         if (done) showToast({ title: done });
       } catch (error) {
         showToast({
-          title: error instanceof Error && error.message ? error.message : t(`${K}.errorGeneric`),
+          title:
+            error instanceof Error && error.message
+              ? error.message
+              : t(`${K}.errorGeneric`),
           variant: "error",
         });
       } finally {
@@ -101,7 +122,9 @@ export function ClaudeAccountsSection({
     (row): row is EngineConnection => row.provider === "anthropic",
   );
   const localFor = (email: string | undefined): ClaudeLocalConfig | undefined =>
-    local.configs.find((config) => config.loggedIn && sameEmail(config.email, email));
+    local.configs.find(
+      (config) => config.loggedIn && sameEmail(config.email, email),
+    );
   const unlistedLocal = local.configs.filter(
     (config) =>
       config.loggedIn &&
@@ -113,18 +136,31 @@ export function ClaudeAccountsSection({
   );
   const disabled = busy || refreshing;
 
-  const computerPlace = (config: ClaudeLocalConfig | undefined): EngineAccountPlace[] =>
+  const computerPlace = (
+    config: ClaudeLocalConfig | undefined,
+  ): EngineAccountPlace[] =>
     local.available
-      ? [{ key: "computer", label: t(`${K}.placeComputer`), signedIn: Boolean(config) }]
+      ? [
+          {
+            key: "computer",
+            label: t(`${K}.placeComputer`),
+            signedIn: Boolean(config),
+          },
+        ]
       : [];
-  const signOutHereItem = (config: ClaudeLocalConfig | undefined): EngineAccountMenuItem[] =>
+  const signOutHereItem = (
+    config: ClaudeLocalConfig | undefined,
+  ): EngineAccountMenuItem[] =>
     config && !config.isDefault
       ? [
           {
             key: "out-here",
             label: t(`${K}.signOutComputer`),
             onSelect: () =>
-              void run(() => local.signOut(config.configId), t(`${K}.signedOut`)),
+              void run(
+                () => local.signOut(config.configId),
+                t(`${K}.signedOut`),
+              ),
           },
         ]
       : [];
@@ -160,7 +196,9 @@ export function ClaudeAccountsSection({
         variant="ghost"
         className="pill-btn"
         disabled={disabled || login.open || (!cloudAvailable && !canSignInHere)}
-        onClick={() => startLogin({ place: cloudAvailable ? "cloud" : "local" })}
+        onClick={() =>
+          startLogin({ place: cloudAvailable ? "cloud" : "local" })
+        }
       >
         {t(`${K}.addClaude`)}
       </Button>
@@ -168,11 +206,7 @@ export function ClaudeAccountsSection({
 
   return (
     <>
-      <EngineAccountHeader
-        title={t(`${K}.claudeTitle`)}
-        description={t(`${K}.claudeSyncNote`)}
-        control={addControl}
-      />
+      <EngineAccountHeader title={t(`${K}.claudeTitle`)} control={addControl} />
       {accounts.map((account) => {
         const config = localFor(account.email);
         const places = account.places ?? [];
@@ -194,7 +228,10 @@ export function ClaudeAccountsSection({
             key: "in-here",
             label: t(`${K}.signInComputer`),
             onSelect: () =>
-              startLogin({ place: "local", ...(account.email ? { email: account.email } : {}) }),
+              startLogin({
+                place: "local",
+                ...(account.email ? { email: account.email } : {}),
+              }),
           });
         }
         if (cloudAvailable && !inCloud) {
@@ -202,7 +239,10 @@ export function ClaudeAccountsSection({
             key: "in-cloud",
             label: t(`${K}.signInCloud`),
             onSelect: () =>
-              startLogin({ place: "cloud", ...(account.email ? { email: account.email } : {}) }),
+              startLogin({
+                place: "cloud",
+                ...(account.email ? { email: account.email } : {}),
+              }),
           });
         }
         const tail: EngineAccountMenuItem[] = [...signOutHereItem(config)];
@@ -233,12 +273,21 @@ export function ClaudeAccountsSection({
             key={account.accountId}
             id={account.accountId}
             title={title}
-            initials={accountInitials({ label: account.label, ...(account.email ? { email: account.email } : {}) })}
+            initials={accountInitials({
+              label: account.label,
+              ...(account.email ? { email: account.email } : {}),
+            })}
             {...(plan ? { subtitle: plan } : {})}
             places={[
               ...computerPlace(config),
               ...(cloudAvailable
-                ? [{ key: "cloud", label: t(`${K}.placeCloud`), signedIn: inCloud }]
+                ? [
+                    {
+                      key: "cloud",
+                      label: t(`${K}.placeCloud`),
+                      signedIn: inCloud,
+                    },
+                  ]
                 : []),
               ...others,
             ]}
@@ -249,7 +298,10 @@ export function ClaudeAccountsSection({
               : {
                   onPick: () =>
                     void run(() =>
-                      cloudEnginesApi.setActiveAccount("anthropic", account.accountId),
+                      cloudEnginesApi.setActiveAccount(
+                        "anthropic",
+                        account.accountId,
+                      ),
                     ),
                 })}
             items={items}
@@ -264,7 +316,10 @@ export function ClaudeAccountsSection({
             key={`local:${config.configId}`}
             id={`local:${config.configId}`}
             title={config.email!}
-            initials={accountInitials({ label: config.email!, email: config.email! })}
+            initials={accountInitials({
+              label: config.email!,
+              email: config.email!,
+            })}
             {...(plan ? { subtitle: plan } : {})}
             places={computerPlace(config)}
             active={false}
@@ -275,7 +330,8 @@ export function ClaudeAccountsSection({
                     {
                       key: "in-cloud",
                       label: t(`${K}.signInCloud`),
-                      onSelect: () => startLogin({ place: "cloud", email: config.email! }),
+                      onSelect: () =>
+                        startLogin({ place: "cloud", email: config.email! }),
                     },
                   ]
                 : []
@@ -297,7 +353,8 @@ export function ClaudeAccountsSection({
             {
               key: "again",
               label: t(`${K}.signInAgain`),
-              onSelect: () => startLogin({ place: "local", configId: config.configId }),
+              onSelect: () =>
+                startLogin({ place: "local", configId: config.configId }),
             },
           ]}
           tail={[
@@ -315,14 +372,18 @@ export function ClaudeAccountsSection({
         </div>
       ) : canSignInHere && local.defaultSignedOut ? (
         <div className="settings-row">
-          <div className="settings-row-sublabel">{t(`${K}.defaultSignedOut`)}</div>
+          <div className="settings-row-sublabel">
+            {t(`${K}.defaultSignedOut`)}
+          </div>
           <div className="settings-row-control">
             <Button
               type="button"
               variant="ghost"
               className="pill-btn"
               disabled={disabled || login.open}
-              onClick={() => startLogin({ place: "local", configId: "default" })}
+              onClick={() =>
+                startLogin({ place: "local", configId: "default" })
+              }
             >
               {t(`${K}.signIn`)}
             </Button>
@@ -330,6 +391,10 @@ export function ClaudeAccountsSection({
         </div>
       ) : null}
       <ClaudeLoginPrompt login={login} />
+      <ClaudeSyncNoticeDialog
+        open={syncNotice.open}
+        onDismiss={syncNotice.dismiss}
+      />
     </>
   );
 }

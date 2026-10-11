@@ -27,9 +27,12 @@ import {
 } from "../cloud-prompt.js";
 import { resolveOpenToolCall } from "../tool-replay.js";
 import { Journal } from "../journal.js";
+import type { ClaudeSessionManifest } from "@stella/contracts/backend/claude-sessions";
+import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
   type CloudCliTurnIdentity,
   type CloudCliTurnTerminal,
+  type CloudOrchestratorCliAdoptedSession,
   type CloudOrchestratorToolCallResponse,
   orchestratorCliThreadId,
   parseCloudOrchestratorCliTurnSpec,
@@ -239,6 +242,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     }
     this.cliRuntimeWaiters.delete(turn.turnId);
 
+    let dispatchSpec = spec;
     let dispatched = Boolean(prior);
     let completed = false;
     let deliveredThrough: number | undefined;
@@ -253,7 +257,19 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
         if (promptSeq === undefined) {
           throw new ChatTurnNotResumableError("prompt_row");
         }
-        const context = await this.cliPromptContext(promptSeq);
+        const adoption = await this.cliSessionAdoption(turn, promptSeq);
+        // An adopted session has seen the conversation, but none of this
+        // object's resident blocks.
+        const context = adoption
+          ? {
+              block: `[This conversation now runs in Stella's cloud: the computer it ran on before (device ${adoption.deviceId}) isn't answering, so your session moved here. Files and shells on that computer aren't here.]`,
+              kind: "history" as const,
+              residentSeen: [] as ResidentPrompt[],
+              rows: 0,
+              startSeq: promptSeq,
+            }
+          : await this.cliPromptContext(promptSeq);
+        if (adoption) dispatchSpec = { ...spec, adoptSession: adoption };
         this.journal.setTurnContext(turn.turnId, context.startSeq, promptSeq);
         // A seeded session starts with nothing; a continuing one has seen
         // what its last delivered turn carried.
@@ -325,7 +341,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
               identity,
               execution,
               prompt,
-              spec,
+              spec: dispatchSpec,
               clientMsgId: turn.clientMsgId,
               signal: executionSignal,
             });
@@ -517,6 +533,71 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     this.journal.setTurnSpan(turn.turnId, startedRow.seq);
     this.publish(startedRow.record);
     return promptRow.seq;
+  }
+
+  /**
+   * A computer's synced Claude Code session (`claudeSessions`) to resume in
+   * the container, when this cloud session did not run the conversation's
+   * last turn (a computer did, holding the brain until the cloud took it
+   * over or it moved) and that computer's sync covers it. Null keeps the
+   * cloud's own session, rebuilt from the log when it is behind.
+   */
+  protected async cliSessionAdoption(
+    turn: ChatTurnRequest,
+    promptSeq: number,
+  ): Promise<CloudOrchestratorCliAdoptedSession | null> {
+    const prior = this.ctx.storage.sql
+      .exec<{ seq: number | null }>(
+        `SELECT MIN(seq) AS seq FROM journal
+          WHERE kind = 'message' AND role = 'user'
+            AND turn_id = (
+              SELECT turn_id FROM journal
+               WHERE kind = 'message' AND role = 'user' AND seq < ?
+               ORDER BY seq DESC LIMIT 1
+            )`,
+        promptSeq,
+      )
+      .toArray()[0]?.seq;
+    if (typeof prior !== "number") return null;
+    const delivered = await this.getTurnState<OrchestratorCliDelivered>(
+      ORCHESTRATOR_CLI_DELIVERED_KEY,
+    );
+    if (
+      delivered &&
+      delivered.journalEpoch === this.journal.meta().epoch &&
+      delivered.seq >= prior
+    ) {
+      return null;
+    }
+    const response = (await this.env.OWNER_GATES.getByName(turn.ownerId)
+      .ownerInternal({
+        name: "claudeSessions.latestForRestore",
+        args: { threadId: turn.conversationId },
+        ownerGeneration: turn.ownerGeneration,
+      })
+      .catch(() => null)) as RpcResponse | null;
+    const manifest = response?.ok
+      ? (response.value as ClaudeSessionManifest | null)
+      : null;
+    if (
+      !manifest ||
+      manifest.engine !== "claude_code_local" ||
+      manifest.conversationId !== turn.conversationId ||
+      (manifest.journalSeq ?? -1) < prior
+    ) {
+      return null;
+    }
+    log("info", "orchestrator_cli_session_adopted", {
+      turnId: turn.turnId,
+      deviceId: manifest.deviceId,
+      sessionJournalSeq: manifest.journalSeq,
+      priorPromptSeq: prior,
+    });
+    return {
+      threadId: manifest.threadId,
+      sessionId: manifest.sessionId,
+      deviceId: manifest.deviceId,
+    };
   }
 
   /**

@@ -567,5 +567,22 @@ export const claudeSessionsDomain = {
       handler: readChunk,
     },
   },
+  internal: {
+    // The cloud resuming a computer's synced session after it took the
+    // brain over (`@stella/contracts/cloud-orchestrator-cli`).
+    "claudeSessions.latestForRestore": (ctx: OwnerContext, raw: unknown) =>
+      latestSession(ctx, object({ threadId: threadIdArg })(raw)),
+    "claudeSessions.readChunkForRestore": async (ctx: OwnerContext, raw: unknown) =>
+      await readChunk(
+        ctx,
+        object({
+          threadId: threadIdArg,
+          sessionId: sessionIdArg,
+          path: string({ min: 1, max: 1_024 }),
+          generation: number({ int: true, min: 1 }),
+          index: number({ int: true, min: 0 }),
+        })(raw),
+      ),
+  },
   purge: (ctx) => purgeClaudeSessions(ctx),
 } satisfies OwnerDomain;

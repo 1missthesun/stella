@@ -126,6 +126,11 @@ export type AgentTurnInput = CloudCliTurnRoleInput & {
   /** Builder-derived HMAC key; consumed before any model/tool process exists. */
   nativeStateIntegrityKey: string;
   rebuildNativeSession?: boolean;
+  /**
+   * Builder-written: another host's synced Claude Code session sits in the
+   * thread's native state root to resume natively (orchestrator turns).
+   */
+  adoptedNativeSession?: { sessionId: string; cliVersion: string };
   /** One-shot pointer to the Builder-owned, short-lived turn broker. */
   turnBroker: TurnBrokerInput;
   /** Short-lived capability for exporting and pushing this world's projection. */

@@ -25,6 +25,14 @@ export const cloudNativeStateRoot = (threadHash: string): string => {
 };
 
 /**
+ * Where, inside a thread's emptied root, the BuildSession writes another
+ * host's synced Claude Code session (`<session>.jsonl` and its folder, by
+ * their synced paths) for the executor to move under the CLI's working
+ * folder and resume.
+ */
+export const CLOUD_ADOPTED_SESSION_DIR = ".adopted-session";
+
+/**
  * Root-only (0700) parent of the owner's cloud Claude Code logins, one
  * `CLAUDE_CONFIG_DIR` per account named by the hex SHA-256 of the account's
  * lowercased email. `claude auth login` writes its credential there and

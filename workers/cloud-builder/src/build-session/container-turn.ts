@@ -41,6 +41,7 @@ import {
 } from "../turn-credential-broker.js";
 import type { TurnBrokerRecord } from "../turn-credential-broker.js";
 import { readOrchestratorCliSpec } from "../orchestrator-cli-turn-store.js";
+import { writeAdoptedClaudeSession } from "./claude-session-adoption.js";
 import { restoreTurnStateArchive } from "../turn-state-archive.js";
 import { parseTurnStateCheckpointRequest } from "../turn-state-checkpoint.js";
 import type {
@@ -1089,6 +1090,7 @@ export const attachAgentWorld = async (
   session: ExecutionSession;
   coldContainerStartMs: number;
   restoreMs: number;
+  adoptedSession?: { sessionId: string; cliVersion: string };
 }> => {
   const { turn, execution: turnExecution, sandbox } = args;
   const worldRoot = WORLD_ROOT;
@@ -1192,20 +1194,56 @@ export const attachAgentWorld = async (
   restoreMs = phaseMs(restoreStarted);
 
   let nativeRestoreMs = 0;
+  let adoptedSession: { sessionId: string; cliVersion: string } | undefined;
   if (
     turn.execution?.engine === "anthropic" &&
     !args.turnStateThreadRestore?.native
   ) {
-    const cleared = await session.exec(
-      `rm -rf -- ${cloudNativeStateRoot(await nativeStateThreadHash(turn))}`,
-      { origin: "internal", timeout: args.commandTimeoutMs },
-    );
-    if (!cleared.success) {
-      throw new AgentTurnError(
-        "Stella could not rebuild this thread's Claude session.",
-      );
+    const stateRoot = cloudNativeStateRoot(await nativeStateThreadHash(turn));
+    const clear = async () => {
+      const cleared = await session.exec(`rm -rf -- ${stateRoot}`, {
+        origin: "internal",
+        timeout: args.commandTimeoutMs,
+      });
+      if (!cleared.success) {
+        throw new AgentTurnError(
+          "Stella could not rebuild this thread's Claude session.",
+        );
+      }
+      turnExecution.assertActive();
+    };
+    await clear();
+    // Behind the log here, but another host's synced session covers it:
+    // that session resumes natively instead of a rebuild.
+    const adopt =
+      turn.agentRole === "orchestrator"
+        ? (
+            turn.orchestratorCli ??
+            readOrchestratorCliSpec(host.ctx.storage.sql, {
+              turnId: turn.turnId,
+              attemptGeneration: turn.attemptGeneration!,
+            })
+          )?.adoptSession
+        : undefined;
+    if (adopt) {
+      const adoptStarted = performance.now();
+      adoptedSession = await writeAdoptedClaudeSession({
+        gates: host.env.OWNER_GATES,
+        ownerId: turn.ownerId,
+        ownerGeneration: turn.ownerGeneration,
+        session,
+        stateRoot,
+        adopt,
+      }).catch((error: unknown) => {
+        log("error", "claude_session_adoption_failed", {
+          turnId: turn.turnId,
+          message: errorMessage(error),
+        });
+        return undefined;
+      });
+      if (!adoptedSession) await clear();
+      nativeRestoreMs = phaseMs(adoptStarted);
     }
-    turnExecution.assertActive();
   }
   if (args.turnStateThreadRestore?.native) {
     const nativeRestoreStarted = performance.now();
@@ -1247,7 +1285,12 @@ export const attachAgentWorld = async (
     totalAttachMs: phaseMs(attachStarted),
     ...(head ? { observedHeadRevision: head.revision } : {}),
   });
-  return { session, coldContainerStartMs, restoreMs };
+  return {
+    session,
+    coldContainerStartMs,
+    restoreMs,
+    ...(adoptedSession ? { adoptedSession } : {}),
+  };
 };
 
 /**
@@ -1282,7 +1325,7 @@ export const runAgentAttempt = async (
 }> => {
   const { turn, execution: turnExecution, sandbox } = args;
   const world = await host.attachAgentWorld(args);
-  const { session, coldContainerStartMs, restoreMs } = world;
+  const { session, coldContainerStartMs, restoreMs, adoptedSession } = world;
   await host.event(
     turn,
     "auto",
@@ -1451,7 +1494,9 @@ export const runAgentAttempt = async (
         nativeStateIntegrityKey,
         rebuildNativeSession:
           turn.execution?.engine === "anthropic" &&
-          !args.turnStateThreadRestore?.native,
+          !args.turnStateThreadRestore?.native &&
+          !adoptedSession,
+        ...(adoptedSession ? { adoptedNativeSession: adoptedSession } : {}),
         turnBroker: { credentialsPath: brokerCredentialsPath },
         world: {
           origin: host.env.CLOUD_BUILDER_PUBLIC_URL.replace(/\/+$/u, ""),

@@ -5,7 +5,9 @@ import {
   chmod,
   mkdtemp,
   mkdir,
+  readdir,
   readFile,
+  rename,
   rm,
   stat,
   writeFile,
@@ -17,10 +19,19 @@ import type {
   CloudExecutionSelection,
 } from "@stella/contracts/agent-engine";
 import {
+  CLOUD_ADOPTED_SESSION_DIR,
   CLOUD_CLAUDE_ACCOUNTS_ROOT,
   cloudNativeStateRoot,
   isCloudClaudeAccountKey,
 } from "@stella/contracts/cloud-native-state";
+import { isClaudeSessionId } from "@stella/contracts/backend/claude-sessions";
+import {
+  claudeCliCanResume,
+  claudeCliVersion,
+  claudeSessionProjectDir,
+  resolveClaudeWorkingFolder,
+  stripClaudeThinkingFromSessionFile,
+} from "@stella/runtime/kernel/integrations/claude-code-session-files.js";
 import type { CloudCliTurnRole } from "@stella/contracts/cloud-orchestrator-cli";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-isolation.js";
@@ -29,6 +40,7 @@ import {
   ClaudeCodeCompactionLoopError,
   claudeCodeSubscriptionLimitOf,
   getClaudeCodeStatusChangeFromStreamEvent,
+  isRejectedThinkingSignatureError,
   MAX_COMPACTIONS_PER_TURN,
 } from "@stella/runtime/kernel/integrations/claude-code-session-runtime.js";
 import { CLOUD_HOST_STATE } from "./cloud-process-isolation.js";
@@ -652,12 +664,18 @@ export const runCloudClaude = async (options: {
       steered: [],
     };
   }
-  const sessionId = deterministicUuid(profile.sessionKey);
-  const markerPath = path.join(stateRoot, "session-started");
-  const resume = await stat(markerPath).then(
-    () => true,
-    () => false,
+  const markerPath = path.join(stateRoot, NATIVE_SESSION_MARKER);
+  const marked = await readFile(markerPath, "utf8").then(
+    (text) => text.trim(),
+    () => undefined,
   );
+  const resume = marked !== undefined;
+  // The marker names the session the root holds: this thread's own, or
+  // another host's synced session it adopted.
+  const sessionId =
+    marked && isClaudeSessionId(marked)
+      ? marked
+      : deterministicUuid(profile.sessionKey);
   const mcpConfig = await createCloudClaudeMcpConfig(options.mcpServerConfig);
   // One latch, two sources: the caller's cancellation and our own
   // compaction-loop verdict both have to reach one child process. A turn
@@ -903,6 +921,45 @@ export const cloudAgentProgressFromStream =
     }
   };
 
+const NATIVE_SESSION_MARKER = "session-started";
+
+/**
+ * Move another host's synced session (written by the BuildSession under
+ * `CLOUD_ADOPTED_SESSION_DIR`) under this CLI's working folder and mark it
+ * as the session to resume. False when it can't resume here: this CLI is
+ * older than the one that wrote it, or the transcript is missing.
+ */
+const adoptSyncedSession = async (args: {
+  stateRoot: string;
+  cwd: string;
+  sessionId: string;
+  cliVersion: string;
+}): Promise<boolean> => {
+  const source = path.join(args.stateRoot, CLOUD_ADOPTED_SESSION_DIR);
+  if (!isClaudeSessionId(args.sessionId)) return false;
+  if (!claudeCliCanResume(await claudeCliVersion(), args.cliVersion)) return false;
+  const entries = await readdir(source).catch(() => [] as string[]);
+  if (!entries.includes(`${args.sessionId}.jsonl`)) return false;
+  await mkdir(args.cwd, { recursive: true, mode: 0o700 });
+  const projectDir = claudeSessionProjectDir(
+    args.stateRoot,
+    await resolveClaudeWorkingFolder(args.cwd),
+  );
+  await mkdir(projectDir, { recursive: true, mode: 0o700 });
+  for (const entry of entries) {
+    if (entry !== `${args.sessionId}.jsonl` && entry !== args.sessionId) continue;
+    await rename(path.join(source, entry), path.join(projectDir, entry));
+  }
+  await rm(source, { recursive: true, force: true });
+  await chmod(args.stateRoot, 0o700);
+  await writeFile(
+    path.join(args.stateRoot, NATIVE_SESSION_MARKER),
+    `${args.sessionId}\n`,
+    { mode: 0o600 },
+  );
+  return true;
+};
+
 export const runNativeAgentTurn = async (options: {
   profile: CloudClaudeRoleProfile;
   prompt: string;
@@ -915,6 +972,12 @@ export const runNativeAgentTurn = async (options: {
   authoritativeHistoryCursor: string;
   stateIntegrityKey: string;
   recoveryHistory?: AgentHistoryRow[];
+  /**
+   * Another host's synced session the BuildSession wrote into the root, to
+   * resume natively; `history` rebuilds instead when it can't resume here.
+   */
+  adoptedSession?: { sessionId: string; cliVersion: string };
+  history?: AgentHistoryRow[];
   /** Test-only override; production always uses the root-only image path. */
   nativeStateRoot?: string;
   claudeMcpServerConfig?: CloudClaudeMcpServerConfig;
@@ -940,9 +1003,30 @@ export const runNativeAgentTurn = async (options: {
     );
   }
   let inputPrompt = options.prompt;
-  if (options.recoveryHistory !== undefined) {
+  const adopted =
+    options.recoveryHistory === undefined && options.adoptedSession
+      ? await adoptSyncedSession({
+          stateRoot,
+          cwd: options.profile.cwd,
+          ...options.adoptedSession,
+        }).catch((error: unknown) => {
+          console.error(
+            `adopting the synced Claude session failed: ${error instanceof Error ? error.message : String(error)}`,
+          );
+          return false;
+        })
+      : false;
+  const recoveryHistory =
+    options.recoveryHistory ??
+    (options.adoptedSession && !adopted ? (options.history ?? []) : undefined);
+  if (options.adoptedSession && !adopted) {
+    await rm(stateRoot, { recursive: true, force: true });
+  }
+  if (adopted) {
+    // Another host's session: nothing of this cloud's sealed state to check.
+  } else if (recoveryHistory !== undefined) {
     inputPrompt = buildNativeSessionRecoveryPrompt({
-      history: options.recoveryHistory,
+      history: recoveryHistory,
       expectedCursor: options.authoritativeHistoryCursor,
       prompt: options.prompt,
     });
@@ -956,18 +1040,39 @@ export const runNativeAgentTurn = async (options: {
       integrityKey: options.stateIntegrityKey,
     });
   }
-  const result = await runCloudClaude({
-    profile: options.profile,
-    inputPrompt,
-    systemPrompt: options.systemPrompt,
-    execution: options.execution,
-    claudeAccount: options.claudeAccount,
-    stateRoot,
-    mcpServerConfig,
-    ...(options.onStreamEvent ? { onStreamEvent: options.onStreamEvent } : {}),
-    ...(options.cancellation ? { cancellation: options.cancellation } : {}),
-    ...(options.inbox ? { inbox: options.inbox } : {}),
-  });
+  const run = () =>
+    runCloudClaude({
+      profile: options.profile,
+      inputPrompt,
+      systemPrompt: options.systemPrompt,
+      execution: options.execution,
+      claudeAccount: options.claudeAccount,
+      stateRoot,
+      mcpServerConfig,
+      ...(options.onStreamEvent ? { onStreamEvent: options.onStreamEvent } : {}),
+      ...(options.cancellation ? { cancellation: options.cancellation } : {}),
+      ...(options.inbox ? { inbox: options.inbox } : {}),
+    });
+  let result = await run();
+  // Thinking signed under the other host's login may not verify here: the
+  // session goes on without its thinking blocks, as the desktop does.
+  if (
+    adopted &&
+    result.error &&
+    isRejectedThinkingSignatureError(result.error) &&
+    !options.cancellation?.aborted &&
+    (await stripClaudeThinkingFromSessionFile(
+      path.join(
+        claudeSessionProjectDir(
+          stateRoot,
+          await resolveClaudeWorkingFolder(options.profile.cwd),
+        ),
+        `${options.adoptedSession!.sessionId}.jsonl`,
+      ),
+    )) > 0
+  ) {
+    result = await run();
+  }
   const messages = transcript({
     prompt: options.prompt,
     steered: result.steered,

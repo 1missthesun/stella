@@ -405,6 +405,7 @@ export interface BuildSessionInternals {
     session: ExecutionSession;
     coldContainerStartMs: number;
     restoreMs: number;
+    adoptedSession?: { sessionId: string; cliVersion: string };
   }>;
   runAgentAttempt(args: {
     turn: TurnRequest;

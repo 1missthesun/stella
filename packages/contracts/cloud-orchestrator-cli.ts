@@ -35,11 +35,46 @@ export type CloudOrchestratorToolDescriptor = {
   parameters: Record<string, unknown>;
 };
 
+/**
+ * A Claude Code session another host ran for this conversation and synced
+ * (`@stella/contracts/backend/claude-sessions`): a computer whose brain lease
+ * the cloud took over, or one it moved from. The container resumes it
+ * natively when the cloud's own session is behind, rather than rebuilding
+ * from the log.
+ */
+export type CloudOrchestratorCliAdoptedSession = {
+  /** The synced session's thread: the computer's orchestrator thread key. */
+  threadId: string;
+  sessionId: string;
+  /** The computer it ran on, as the user's device list names it. */
+  deviceId: string;
+};
+
 /** What the DO sends for its CLI turn, and what turn-input.json carries. */
 export type CloudOrchestratorCliTurnSpec = {
   /** The DO's full orchestrator system prompt for this turn. */
   systemPrompt: string;
   toolCatalog: CloudOrchestratorToolDescriptor[];
+  adoptSession?: CloudOrchestratorCliAdoptedSession;
+};
+
+const ADOPTED_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9-]{0,127}$/;
+
+const parseAdoptedSession = (
+  value: unknown,
+): CloudOrchestratorCliAdoptedSession | undefined => {
+  if (!isRecord(value)) return undefined;
+  const { threadId, sessionId, deviceId } = value;
+  return typeof threadId === "string" &&
+    threadId.length > 0 &&
+    threadId.length <= 512 &&
+    typeof sessionId === "string" &&
+    ADOPTED_SESSION_ID.test(sessionId) &&
+    typeof deviceId === "string" &&
+    deviceId.length > 0 &&
+    deviceId.length <= 256
+    ? { threadId, sessionId, deviceId }
+    : undefined;
 };
 
 /**
@@ -118,7 +153,12 @@ export const parseCloudOrchestratorCliTurnSpec = (
   ) {
     return null;
   }
-  return { systemPrompt, toolCatalog: catalog };
+  const adoptSession = parseAdoptedSession(value.adoptSession);
+  return {
+    systemPrompt,
+    toolCatalog: catalog,
+    ...(adoptSession ? { adoptSession } : {}),
+  };
 };
 
 // ---------------------------------------------------------------------------

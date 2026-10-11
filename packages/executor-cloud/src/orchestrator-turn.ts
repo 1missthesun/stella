@@ -738,6 +738,12 @@ export const runOrchestratorTurn = async (args: {
         ...(input.rebuildNativeSession === true
           ? { recoveryHistory: input.history ?? [] }
           : {}),
+        ...(input.rebuildNativeSession !== true && input.adoptedNativeSession
+          ? {
+              adoptedSession: input.adoptedNativeSession,
+              history: input.history ?? [],
+            }
+          : {}),
         claudeMcpServerConfig: mcpHost.mcpServerConfig,
         cancellation: turnCancellation,
         onStreamEvent: (event) => {

@@ -388,7 +388,7 @@ describe("chat durable outbox", () => {
     const records = appendDesktopChatOutboxRecord([], {
       ...pending("computer-send", "hello", 1),
       executionTarget: { mode: "device", deviceId: "desktop" },
-      execution: { engine: "stella", provider: "stella", model: "stella/sonnet", reasoningEffort: "default" },
+      execution: { engine: "stella", provider: "stella", model: "stella/sonnet", reasoningEffort: "medium" },
     }).records;
     expect(records[0]!.execution).toBeUndefined();
   });

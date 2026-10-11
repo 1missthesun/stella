@@ -22,6 +22,7 @@ import {
 } from "@stella/contracts/turn-plane/device-tools";
 import {
   DEVICES_PATH,
+  findDeviceDestination,
   type DeviceDestination,
   type DevicesResponse,
 } from "@stella/contracts/turn-plane/placement";
@@ -257,17 +258,18 @@ export const remoteToolEnvironment = (options: {
     if (target.kind === "cloud") return { placement: { kind: "cloud" } };
     const listed = await remote.devices().catch(() => undefined);
     if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
-    const device = listed.find((entry) => entry.deviceId === target.deviceId);
+    const device = findDeviceDestination(listed, target.deviceId);
     if (!device) {
       return {
-        error: `No connected device has device_id ${target.deviceId}. Use a device_id from the connected devices list, "cloud", or "local" for this computer.`,
+        error: `No connected device has the device_id or name ${target.deviceId}. Use a device_id from the connected devices list, "cloud", or "local" for this computer.`,
       };
     }
-    const name = device.label?.trim() || target.deviceId;
+    if (device.deviceId === options.deviceId) return { placement: { kind: "local" } };
+    const name = device.label?.trim() || device.deviceId;
     const refusal = deviceRefusal(device, name);
     if (refusal) return { error: refusal };
     const described = await remote
-      .deviceTool(target.deviceId, `describe:${crypto.randomUUID()}`, { kind: "describe" })
+      .deviceTool(device.deviceId, `describe:${crypto.randomUUID()}`, { kind: "describe" })
       .catch((error: unknown) => ({ ok: false as const, code: "failed" as const, message: error instanceof Error ? error.message : String(error) }));
     if (!described.ok) return { error: `${name} could not take tool calls: ${described.message.replace(/^That computer/u, "it")}` };
     if (!("description" in described)) return { error: `${name} did not describe itself.` };
@@ -275,7 +277,7 @@ export const remoteToolEnvironment = (options: {
     return {
       placement: {
         kind: "device",
-        deviceId: target.deviceId,
+        deviceId: device.deviceId,
         label: name,
         home,
         ...(hostname ? { hostname } : {}),

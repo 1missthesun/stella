@@ -4,7 +4,10 @@ import {
   toCapabilityAudience,
   type ManagedCapabilityAudience,
 } from "./capabilities.js";
-import type { DeviceDestination } from "./turn-plane/placement.js";
+import {
+  currentDeviceDestinations,
+  type DeviceDestination,
+} from "./turn-plane/placement.js";
 
 export type ExecutionDestination =
   | { kind: "cloud" }
@@ -68,7 +71,7 @@ export const createExecutionContextSnapshot = (args: {
           label: labelText(args.destination.label),
         },
   devicesKnown: args.devices !== null,
-  devices: [...(args.devices ?? [])]
+  devices: currentDeviceDestinations(args.devices ?? [])
     .sort((a, b) =>
       a.deviceId < b.deviceId ? -1 : a.deviceId > b.deviceId ? 1 : 0,
     )

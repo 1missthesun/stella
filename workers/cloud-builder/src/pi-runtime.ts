@@ -76,6 +76,7 @@ import {
 } from "@stella/agent/provider/stella";
 import { StellaAgentDoc } from "@stella/agent/stella/agent-doc";
 import { deviceRefusal, type StellaExecutionHost } from "@stella/agent/stella/execution";
+import { findDeviceDestination } from "@stella/contracts/turn-plane/placement";
 import { placementOf, StellaPlacementDoc, type StellaPlacement } from "@stella/agent/stella/placement";
 import type { PiBrainHost } from "@stella/contracts/turn-plane/pi-brain";
 import {
@@ -1602,17 +1603,17 @@ export class PiConversationRuntime {
         const gate = this.#gate(authority);
         const listed = await gate.devices().catch(() => undefined);
         if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
-        const device = listed.devices.find((entry) => entry.deviceId === target.deviceId);
+        const device = findDeviceDestination(listed.devices, target.deviceId);
         if (!device) {
           return {
-            error: `No connected device has device_id ${target.deviceId}. Use a device_id from the connected devices list, or "cloud".`,
+            error: `No connected device has the device_id or name ${target.deviceId}. Use a device_id from the connected devices list, or "cloud".`,
           };
         }
-        const name = device.label?.trim() || target.deviceId;
+        const name = device.label?.trim() || device.deviceId;
         const refusal = deviceRefusal(device, name);
         if (refusal) return { error: refusal };
         const described = await gate
-          .deviceTool({ deviceId: target.deviceId, requestId: `describe:${crypto.randomUUID()}`, call: { kind: "describe" } })
+          .deviceTool({ deviceId: device.deviceId, requestId: `describe:${crypto.randomUUID()}`, call: { kind: "describe" } })
           .catch((error: unknown) => ({ ok: false as const, code: "failed" as const, message: error instanceof Error ? error.message : String(error) }));
         if (!described.ok) return { error: `${name} could not take tool calls: ${described.message.replace(/^That computer/u, "it")}` };
         if (!("description" in described)) return { error: `${name} did not describe itself.` };
@@ -1620,7 +1621,7 @@ export class PiConversationRuntime {
         return {
           placement: {
             kind: "device",
-            deviceId: target.deviceId,
+            deviceId: device.deviceId,
             label: name,
             home,
             ...(hostname ? { hostname } : {}),

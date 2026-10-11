@@ -1,10 +1,16 @@
-import { afterEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   ConversationSocket,
   type ConversationSocketEvent,
 } from "../cloud-conversation-socket";
 
 const originalWebSocket = globalThis.WebSocket;
+const originalFetch = globalThis.fetch;
+
+beforeEach(() => {
+  globalThis.fetch = (async () =>
+    new Response(null, { status: 404 })) as unknown as typeof fetch;
+});
 
 class FakeWebSocket {
   static readonly CONNECTING = 0;
@@ -61,8 +67,7 @@ const installFakeWebSocket = (): void => {
 };
 
 const settle = async (): Promise<void> => {
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 };
 
 const ready = (args: {
@@ -103,6 +108,7 @@ const sentFrames = (socket: FakeWebSocket): Record<string, unknown>[] =>
     .map((value) => JSON.parse(value) as Record<string, unknown>);
 
 afterEach(() => {
+  globalThis.fetch = originalFetch;
   Object.defineProperty(globalThis, "WebSocket", {
     configurable: true,
     writable: true,

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ bridge: vi.fn() }));
 
@@ -9,6 +9,12 @@ vi.mock("@/platform/interior/interior-bridge", () => ({
 import { ConversationSocket } from "@/features/cloud/conversation-socket";
 
 const originalWebSocket = globalThis.WebSocket;
+const originalFetch = globalThis.fetch;
+
+beforeEach(() => {
+  globalThis.fetch = (async () =>
+    new Response(null, { status: 404 })) as unknown as typeof fetch;
+});
 
 class CapturingWebSocket {
   static readonly OPEN = 1;
@@ -37,8 +43,7 @@ const startSocket = async (): Promise<URL> => {
     onEvent: () => undefined,
   });
   socket.start();
-  await Promise.resolve();
-  await Promise.resolve();
+  await new Promise((resolve) => setTimeout(resolve, 0));
   const transport = CapturingWebSocket.instances[0];
   socket.stop();
   if (!transport) throw new Error("socket was not created");
@@ -46,6 +51,7 @@ const startSocket = async (): Promise<URL> => {
 };
 
 afterEach(() => {
+  globalThis.fetch = originalFetch;
   Object.defineProperty(globalThis, "WebSocket", {
     configurable: true,
     writable: true,

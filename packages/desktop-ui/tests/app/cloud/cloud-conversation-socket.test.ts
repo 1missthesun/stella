@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import {
   decodeServerFrame,
   type JournalRecord,
@@ -10,6 +10,12 @@ import {
 import { journalRecordsToMessageRecords } from "../../../src/features/cloud/journal-message-records";
 
 const originalWebSocket = globalThis.WebSocket;
+const originalFetch = globalThis.fetch;
+
+beforeEach(() => {
+  globalThis.fetch = (async () =>
+    new Response(null, { status: 404 })) as unknown as typeof fetch;
+});
 
 class FakeWebSocket {
   static readonly CONNECTING = 0;
@@ -55,6 +61,7 @@ class FakeWebSocket {
 }
 
 afterEach(() => {
+  globalThis.fetch = originalFetch;
   Object.defineProperty(globalThis, "WebSocket", {
     configurable: true,
     writable: true,
@@ -87,8 +94,7 @@ describe("cloud conversation journal compatibility", () => {
 
     try {
       socket.start();
-      await Promise.resolve();
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       const transport = FakeWebSocket.instances[0];
       if (!transport) throw new Error("socket was not created");
       const url = new URL(transport.url);
@@ -202,8 +208,7 @@ describe("cloud conversation journal compatibility", () => {
 
     try {
       socket.start();
-      await Promise.resolve();
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       const transport = FakeWebSocket.instances[0];
       expect(transport).toBeDefined();
       if (!transport) throw new Error("socket was not created");
@@ -302,8 +307,7 @@ describe("cloud conversation journal compatibility", () => {
 
     try {
       socket.start();
-      await Promise.resolve();
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       const transport = FakeWebSocket.instances[0];
       if (!transport) throw new Error("socket was not created");
       transport.open();
@@ -398,8 +402,7 @@ describe("cloud conversation journal compatibility", () => {
 
     try {
       socket.start();
-      await Promise.resolve();
-      await Promise.resolve();
+      await new Promise((resolve) => setTimeout(resolve, 0));
       const transport = FakeWebSocket.instances[0];
       if (!transport) throw new Error("socket was not created");
       transport.open();

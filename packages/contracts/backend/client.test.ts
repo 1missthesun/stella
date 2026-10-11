@@ -53,7 +53,9 @@ const createClient = (options: { tokens?: string[]; fetch?: typeof fetch } = {})
     },
     WebSocket: FakeSocket as never,
     maxReconnectDelayMs: 1,
-    ...(options.fetch ? { fetch: options.fetch } : {}),
+    fetch:
+      options.fetch ??
+      ((async () => new Response(null, { status: 404 })) as unknown as typeof fetch),
   });
   return { client, tokenCalls };
 };

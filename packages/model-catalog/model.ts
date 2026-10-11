@@ -54,7 +54,7 @@ export type ModelConfig = {
   fallbackProviderOptions?: Record<string, Record<string, JSONValue>>;
 };
 
-/** The backend-owned reasoning effort for a managed model route. */
+/** A managed route's reasoning effort when the client names none. */
 export const getManagedReasoningEffort = (
   config: ModelConfig,
 ): string | undefined => {

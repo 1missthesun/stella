@@ -18,6 +18,7 @@ import type {
 } from "./types.js";
 import { parseSpawnAgentModel } from "../tools/spawn-model.js";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
+import { parseReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import type {
   AgentModelConfigSnapshot,
   AgentModelReasoningEffort,
@@ -489,11 +490,11 @@ export const resolveSpawnReasoningEffortForModel = (
 ): Exclude<ModelThinkingLevel, "off"> | undefined => {
   const effortOrder: readonly ModelThinkingLevel[] = [
     "off",
-    "minimal",
     "low",
     "medium",
     "high",
     "xhigh",
+    "max",
   ];
   const requestedIndex = effortOrder.indexOf(requested);
   const supported = supportedThinkingLevels(model);
@@ -557,14 +558,11 @@ export const resolveEffectiveAgentExecutionConfig = (
     capturedSubscriptionHarness &&
     agentEngine === "codex_cli";
   const savedReasoningEffort =
-    args.configuredReasoningEffort ??
+    parseReasoningEffortLevel(args.configuredReasoningEffort) ??
+    parseReasoningEffortLevel(args.sampledEngineConfig?.reasoningEffort) ??
     getReasoningEffort(context.stellaDataDir, args.agentType);
   const spawnReasoningEffort = args.spawnReasoningEffort;
   const inheritedReasoningEffort = args.modelConfigSnapshot?.reasoningEffort;
-  const sampledEngineReasoningEffort =
-    args.sampledEngineConfig?.reasoningEffort === "none"
-      ? undefined
-      : args.sampledEngineConfig?.reasoningEffort;
   const effectiveReasoningEffort = inheritedReasoningEffort
     ? inheritedReasoningEffort === "none"
       ? undefined
@@ -575,10 +573,7 @@ export const resolveEffectiveAgentExecutionConfig = (
           args.resolvedLlm.model,
           spawnReasoningEffort,
         )
-      : (spawnReasoningEffort ??
-        (savedReasoningEffort !== "default"
-          ? savedReasoningEffort
-          : (sampledEngineReasoningEffort ?? savedReasoningEffort)));
+      : (spawnReasoningEffort ?? savedReasoningEffort);
   if (
     spawnReasoningEffort &&
     (agentEngine === "default" || usesInProcessSubscriptionHarness)

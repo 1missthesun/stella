@@ -2131,13 +2131,12 @@
         "modelIdAriaLabel": "id μοντέλου OpenRouter"
       },
       "reasoning": {
-        "default": "Αυτόματα",
         "high": "Υψηλή",
         "label": "Προσπάθεια συλλογισμού",
         "low": "Χαμηλή",
+        "max": "Μέγιστη",
         "medium": "Μεσαία",
-        "minimal": "Ελάχιστη",
-        "xhigh": "Μέγιστη"
+        "xhigh": "Επιπλέον"
       },
       "refresh": "Ανανέωση καταλόγου μοντέλων",
       "restrictedPlan": "Μη διαθέσιμο στο πρόγραμμα {plan}",
@@ -2237,8 +2236,8 @@
     "reasoningEffort": {
       "high": "Υψηλή",
       "low": "Χαμηλή",
+      "max": "Μέγιστη",
       "medium": "Μεσαία",
-      "minimal": "Ελάχιστη",
       "xhigh": "Επιπλέον"
     },
     "resetCustomizations": {

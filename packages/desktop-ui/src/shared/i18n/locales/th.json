@@ -2122,13 +2122,12 @@
         "modelIdAriaLabel": "id โมเดลของ OpenRouter"
       },
       "reasoning": {
-        "default": "อัตโนมัติ",
         "high": "สูง",
         "label": "ระดับการให้เหตุผล",
         "low": "ต่ำ",
+        "max": "สูงสุด",
         "medium": "ปานกลาง",
-        "minimal": "น้อยที่สุด",
-        "xhigh": "สูงสุด"
+        "xhigh": "สูงพิเศษ"
       },
       "refresh": "รีเฟรชแคตตาล็อกโมเดล",
       "restrictedPlan": "ไม่พร้อมใช้งานในแผน {plan}",
@@ -2228,8 +2227,8 @@
     "reasoningEffort": {
       "high": "สูง",
       "low": "ต่ำ",
+      "max": "สูงสุด",
       "medium": "ปานกลาง",
-      "minimal": "น้อยที่สุด",
       "xhigh": "สูงพิเศษ"
     },
     "resetCustomizations": {

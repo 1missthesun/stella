@@ -1,5 +1,6 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
+import { REASONING_EFFORT_LEVELS } from "@stella/contracts/reasoning-effort";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import type { CloudAttachment } from "./cloud-composer-store";
 import type { DesktopExecutionTarget } from "../execution-placement/execution-target-store";
@@ -100,14 +101,12 @@ const isNullableBoundedString = (
 ): value is string | null => value === null || isBoundedString(value, maximum);
 
 const EXECUTION_ENGINES = new Set(["stella", "anthropic", "chatgpt"]);
-const REASONING_EFFORTS = new Set([
-  "default",
+/** Queued items written before the current ladder still carry legacy values. */
+const REASONING_EFFORTS = new Set<string>([
   "none",
+  ...REASONING_EFFORT_LEVELS,
+  "default",
   "minimal",
-  "low",
-  "medium",
-  "high",
-  "xhigh",
 ]);
 
 const isExecution = (value: unknown): value is CloudExecutionSelection => {

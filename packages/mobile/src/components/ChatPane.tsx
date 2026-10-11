@@ -1354,8 +1354,8 @@ export function ChatPane({
   const modelPickerOptions = useMemo<PlusMenuOption[]>(() => {
     if (!composerModelPicker?.pinned) return [];
     const disabled = Boolean(composerModelPicker.loading);
-    // No effort options means the selection's effort is backend-owned
-    // (Stella-managed models), so the thinking entry is hidden entirely.
+    // No effort options means the selected model cannot reason, so the
+    // thinking entry is hidden entirely.
     const thinkingOptions: PlusMenuOption[] =
       composerModelPicker.effortOptions.length === 0
         ? []

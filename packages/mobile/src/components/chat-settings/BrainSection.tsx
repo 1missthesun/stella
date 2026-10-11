@@ -206,7 +206,7 @@ export function BrainSection({
 export function ThinkingRow({ settings }: { settings: ModelSettings }) {
   const colors = useColors();
   const styles = makeStyles(colors);
-  const effort = settings.effort === "none" ? "default" : settings.effort;
+  const effort = settings.effort;
   return (
     <View>
       <SectionLabel>Thinking</SectionLabel>

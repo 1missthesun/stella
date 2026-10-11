@@ -40,6 +40,11 @@ import {
   type CodexServiceTier,
 } from "@stella/contracts/agent-engine";
 import {
+  DEFAULT_REASONING_EFFORT,
+  normalizeReasoningEffortLevel,
+  type ReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
+import {
   DEFAULT_USER_ASK_ESCALATION_POLICY,
   normalizeUserAskEscalationPolicy,
   type UserAskEscalationPolicy,
@@ -48,13 +53,7 @@ import {
 type AgentEngine = AgentRuntimeEngine;
 export { DEFAULT_CODEX_MODEL } from "@stella/contracts/agent-engine";
 export const DEFAULT_CLAUDE_CODE_MODEL = "default";
-export type ReasoningEffort =
-  | "default"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+export type ReasoningEffort = ReasoningEffortLevel;
 export type ImageGenerationProvider =
   | "stella"
   | "openai"
@@ -215,7 +214,7 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   defaultModels: {},
   modelOverrides: {},
   assistantPropagatedAgents: [],
-  // Missing entries use the selected model's own default reasoning effort.
+  // Missing entries use DEFAULT_REASONING_EFFORT.
   reasoningEfforts: {},
   stellaConversationModelOverrides: {},
   stellaConversationReasoningEfforts: {},
@@ -223,10 +222,10 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   useNativeClaudeCodeRuntime: false,
   codexModel: DEFAULT_CODEX_MODEL,
   codexModelExplicit: false,
-  codexReasoningEffort: "default",
+  codexReasoningEffort: DEFAULT_REASONING_EFFORT,
   codexServiceTier: DEFAULT_CODEX_SERVICE_TIER,
   claudeCodeModel: DEFAULT_CLAUDE_CODE_MODEL,
-  claudeCodeReasoningEffort: "default",
+  claudeCodeReasoningEffort: DEFAULT_REASONING_EFFORT,
   maxAgentConcurrency: DEFAULT_MAX_AGENT_CONCURRENCY,
   imageGeneration: { provider: "stella" },
   realtimeVoice: { provider: "stella" },
@@ -325,10 +324,9 @@ const normalizeStoredPreferences = (
   codexReasoningEffort: normalizeReasoningEffort(parsed.codexReasoningEffort),
   codexServiceTier: normalizeCodexServiceTier(parsed.codexServiceTier),
   claudeCodeModel: normalizeClaudeCodeModel(parsed.claudeCodeModel),
-  claudeCodeReasoningEffort:
-    normalizeReasoningEffort(parsed.claudeCodeReasoningEffort) === "minimal"
-      ? "low"
-      : normalizeReasoningEffort(parsed.claudeCodeReasoningEffort),
+  claudeCodeReasoningEffort: normalizeReasoningEffort(
+    parsed.claudeCodeReasoningEffort,
+  ),
   maxAgentConcurrency: normalizeConcurrency(parsed.maxAgentConcurrency),
   imageGeneration: normalizeImageGenerationPreferences(parsed.imageGeneration),
   realtimeVoice: normalizeRealtimeVoicePreferences(parsed.realtimeVoice),
@@ -695,10 +693,7 @@ export const updateLocalModelPreferences = (
     claudeCodeReasoningEffort:
       patch.claudeCodeReasoningEffort === undefined
         ? prefs.claudeCodeReasoningEffort
-        : normalizeReasoningEffort(patch.claudeCodeReasoningEffort) ===
-            "minimal"
-          ? "low"
-          : normalizeReasoningEffort(patch.claudeCodeReasoningEffort),
+        : normalizeReasoningEffort(patch.claudeCodeReasoningEffort),
     maxAgentConcurrency:
       patch.maxAgentConcurrency === undefined
         ? prefs.maxAgentConcurrency
@@ -898,19 +893,8 @@ const normalizeClaudeCodeModel = (value: unknown): string => {
   return trimmed.length > 0 ? trimmed : DEFAULT_CLAUDE_CODE_MODEL;
 };
 
-const normalizeReasoningEffort = (value: unknown): ReasoningEffort => {
-  if (
-    value === "default" ||
-    value === "minimal" ||
-    value === "low" ||
-    value === "medium" ||
-    value === "high" ||
-    value === "xhigh"
-  ) {
-    return value;
-  }
-  return "default";
-};
+const normalizeReasoningEffort = (value: unknown): ReasoningEffort =>
+  normalizeReasoningEffortLevel(value);
 
 export const normalizeCodexServiceTier = (value: unknown): CodexServiceTier =>
   value === "fast" ? "fast" : DEFAULT_CODEX_SERVICE_TIER;

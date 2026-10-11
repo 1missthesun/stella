@@ -5,6 +5,7 @@ import type {
   LegacyCloudExecutionSelection,
 } from "@stella/contracts/agent-engine";
 import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
+import { DEFAULT_REASONING_EFFORT } from "@stella/contracts/reasoning-effort";
 import { Button } from "@/ui/button";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
@@ -43,7 +44,7 @@ export function ProviderAccountsCard() {
     setSwitching(true);
     try {
       const reasoningEffort: AgentModelReasoningEffort =
-        connections?.execution.reasoningEffort ?? "default";
+        connections?.execution.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
       const execution: LegacyCloudExecutionSelection =
         engine === "stella"
           ? {

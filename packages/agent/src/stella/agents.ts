@@ -746,16 +746,20 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   /**
    * What an agent runs on, from its caller: Stella's alias as a general
-   * agent, or else the caller's own model at the caller's thinking level (a
-   * ChatGPT plan turn is admitted for one reasoning effort).
+   * agent, or else the caller's own model, at the caller's thinking level
+   * either way (a ChatGPT plan turn is admitted for one reasoning effort).
    */
   const childRun = (caller: RunsOn): RunsOn => {
     const parent = caller.model;
+    const thinking = caller.thinkingLevel ? { thinkingLevel: caller.thinkingLevel } : {};
     if (parent?.provider !== STELLA_PROVIDER_ID) {
-      return { model: parent, ...(caller.thinkingLevel ? { thinkingLevel: caller.thinkingLevel } : {}) };
+      return { model: parent, ...thinking };
     }
     const parsed = parseStellaModelId(parent.modelId);
-    return { model: parsed ? { provider: STELLA_PROVIDER_ID, modelId: stellaModelId("general", parsed.alias) } : parent };
+    return {
+      model: parsed ? { provider: STELLA_PROVIDER_ID, modelId: stellaModelId("general", parsed.alias) } : parent,
+      ...thinking,
+    };
   };
 
   /**
@@ -878,7 +882,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       model: Type.Optional(
         Type.String({
           description:
-            "Optional model for the agent: a Stella model such as `stella/default`, a model on the user's own key or plan as `<provider>/<model>` (such as `codex/gpt-6.1-sol`), or Claude Code as `claude-code` or `claude-code/<model>`. Add `:low`, `:medium`, `:high` or `:xhigh` to set its reasoning. Omit to use the configured model.",
+            "Optional model for the agent: a Stella model such as `stella/default`, a model on the user's own key or plan as `<provider>/<model>` (such as `codex/gpt-6.1-sol`), or Claude Code as `claude-code` or `claude-code/<model>`. Add `:low`, `:medium`, `:high`, `:xhigh` or `:max` to set its reasoning. Omit to use the configured model.",
         }),
       ),
       destination: Type.Optional(

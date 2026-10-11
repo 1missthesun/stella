@@ -21,7 +21,8 @@ import { useModelCatalog } from "@/global/settings/hooks/use-model-catalog";
 import { getStellaResolvedModelName } from "@/global/settings/lib/model-catalog";
 import { buildModelDefaultsMap, buildResolvedModelDefaultsMap, getConfigurableAgents, getLocalModelDefaults, getModelPickerDisplayLabel, normalizeModelOverrides, } from "@/global/settings/lib/model-defaults";
 import { buildEngineReasoningPatch, buildRecentModelSelectionPatch, getActiveEngineModelId, } from "@/global/settings/lib/engine-model-routing";
-import { listReasoningEffortOptions, supportsReasoningEffortSelection, } from "@/global/settings/lib/reasoning-effort-options";
+import { listReasoningEffortOptions, } from "@/global/settings/lib/reasoning-effort-options";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { buildRecentModelRows, createKnownModelIdPredicate, readRecentModels, recordRecentModel, } from "@/global/settings/lib/recent-models";
 import { showToast } from "@/ui/toast";
 import { useT } from "@/shared/i18n";
@@ -131,20 +132,13 @@ export function MiniModelPicker() {
     const triggerLabel = preferences === null
         ? t("app.chat.miniModelPicker.loading")
         : getModelPickerDisplayLabel(currentId || defaultModelId, modelNamesById);
-    const reasoningEffortOptions = listReasoningEffortOptions(committedEngine);
-    const savedReasoningEffort = committedEngine === "codex_cli"
-        ? (preferences?.codexReasoningEffort ?? "default")
+    const reasoningEffortOptions = listReasoningEffortOptions();
+    const currentReasoningEffort = normalizeReasoningEffortLevel(committedEngine === "codex_cli"
+        ? preferences?.codexReasoningEffort
         : committedEngine === "claude_code_local"
-            ? (preferences?.claudeCodeReasoningEffort ?? "default")
+            ? preferences?.claudeCodeReasoningEffort
             : (preferences?.reasoningEfforts?.orchestrator ??
-                preferences?.reasoningEfforts?.general ??
-                "default");
-    // Stella-managed models never show an effort control: the backend owns
-    // their effort. BYOK / local models and the engines default to medium.
-    const showReasoningControl = supportsReasoningEffortSelection(committedEngine, currentId);
-    const currentReasoningEffort = savedReasoningEffort === "default"
-        ? "medium"
-        : savedReasoningEffort;
+                preferences?.reasoningEfforts?.general));
     const isKnownModelId = useMemo(() => createKnownModelIdPredicate(new Set(allModels.map((model) => model.id))), [allModels]);
     const recentRows = useMemo(() => buildRecentModelRows({
         currentId,
@@ -210,14 +204,14 @@ export function MiniModelPicker() {
         </button>
       </PopoverTrigger>
       <PopoverContent side="top" align="end" sideOffset={8} className="mini-model-picker-popover" aria-label={t("app.chat.miniModelPicker.popoverLabel")}>
-        {showReasoningControl ? (<div className="mini-model-picker-reasoning">
+        <div className="mini-model-picker-reasoning">
           <Lightbulb size={14} strokeWidth={1.75} className="mini-model-picker-reasoning-icon" aria-hidden/>
           <div className="mini-model-picker-reasoning-options" role="radiogroup" aria-label={t("app.chat.miniModelPicker.reasoningEffortLabel")}>
             {reasoningEffortOptions.map((option) => (<button key={option.id} type="button" role="radio" aria-checked={currentReasoningEffort === option.id} data-active={currentReasoningEffort === option.id || undefined} disabled={!preferences || pending} onClick={() => handleReasoningEffortSelect(option.id)}>
-                {option.label}
+                {t(option.labelKey)}
               </button>))}
           </div>
-        </div>) : null}
+        </div>
         {recentRows.length > 0 ? (<div className="mini-model-picker-rows" role="listbox" aria-label={t("app.chat.miniModelPicker.modelsLabel")}>
             {recentRows.map((row) => {
                 const selected = row.id === currentId;

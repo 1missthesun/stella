@@ -2,12 +2,9 @@
  * Reasoning-effort choices shared by the sidebar model picker and the
  * composer's pinned mini picker, so both surfaces present the same ladder.
  */
-export type ReasoningEffortOptionId =
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
+
+export type ReasoningEffortOptionId = ReasoningEffortLevel;
 
 export type ReasoningEffortOption = {
   id: ReasoningEffortOptionId;
@@ -21,11 +18,6 @@ export type ReasoningEffortOption = {
 };
 
 export const REASONING_EFFORT_OPTIONS: readonly ReasoningEffortOption[] = [
-  {
-    id: "minimal",
-    label: "Minimal",
-    labelKey: "settings.reasoningEffort.minimal",
-  },
   { id: "low", label: "Low", labelKey: "settings.reasoningEffort.low" },
   {
     id: "medium",
@@ -33,32 +25,24 @@ export const REASONING_EFFORT_OPTIONS: readonly ReasoningEffortOption[] = [
     labelKey: "settings.reasoningEffort.medium",
   },
   { id: "high", label: "High", labelKey: "settings.reasoningEffort.high" },
-  { id: "xhigh", label: "Extra", labelKey: "settings.reasoningEffort.xhigh" },
+  { id: "xhigh", label: "XHigh", labelKey: "settings.reasoningEffort.xhigh" },
+  { id: "max", label: "Max", labelKey: "settings.reasoningEffort.max" },
 ];
 
-/**
- * Claude Code has no "minimal" tier (it is normalized to "low" on write),
- * so the picker hides that pill while the engine is committed.
- */
-export function listReasoningEffortOptions(
-  engine: string,
-): readonly ReasoningEffortOption[] {
-  return REASONING_EFFORT_OPTIONS.filter(
-    (option) => engine !== "claude_code_local" || option.id !== "minimal",
-  );
+/** Every engine and model shows the same ladder; each maps it to its own levels. */
+export function listReasoningEffortOptions(): readonly ReasoningEffortOption[] {
+  return REASONING_EFFORT_OPTIONS;
 }
 
 /**
- * Whether the user may choose a reasoning effort for the current selection.
- * Stella-managed models never expose one: the backend owns their effort and
- * the model gateway ignores any client-sent value. The Codex / Claude Code
- * engines and BYOK / local models keep their own effort setting.
+ * Whether the user may choose a reasoning effort for the current selection:
+ * any selected model, Stella's own included, plus the Codex / Claude Code
+ * engines.
  */
 export function supportsReasoningEffortSelection(
   engine: string,
   selectedModelId: string | null | undefined,
 ): boolean {
   if (engine === "codex_cli" || engine === "claude_code_local") return true;
-  const trimmed = selectedModelId?.trim() ?? "";
-  return trimmed.length > 0 && !trimmed.startsWith("stella/");
+  return (selectedModelId?.trim() ?? "").length > 0;
 }

@@ -34,6 +34,7 @@ import type {
   VoiceRuntimeSnapshot,
 } from "../index.js";
 import type { AgentStreamEvent } from "../agent-stream.js";
+import type { ReasoningEffortLevel } from "../reasoning-effort.js";
 import type { AuthSessionSnapshot } from "../auth-session.js";
 import type { StellaBrowserBridgeStatus } from "../browser-bridge-status.js";
 import type {
@@ -609,7 +610,7 @@ export type OneShotCompletionRequest = {
   temperature?: number;
   fallbackAgentTypes?: string[];
   model?: string;
-  reasoningEffort?: "none" | "low" | "medium" | "high";
+  reasoningEffort?: "none" | ReasoningEffortLevel;
   utility?: boolean;
   sessionKey?: string;
   closeSession?: boolean;
@@ -660,13 +661,7 @@ export type FileResult = { ok: boolean; path?: string; error?: string };
 
 export type PromptPresetSummary = { id: string; name: string; agentId: string };
 
-export type ReasoningEffortPreference =
-  | "default"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+export type ReasoningEffortPreference = ReasoningEffortLevel;
 
 export type LocalModelPreferences = {
   defaultModels: Record<string, string>;

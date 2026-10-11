@@ -1,5 +1,6 @@
 import type { CatalogModel } from "./model-catalog";
 import { DEFAULT_CODEX_MODEL } from "@stella/contracts/agent-engine";
+import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 
 export type ModelPickerEngine = "default" | "codex_cli" | "claude_code_local";
 
@@ -12,13 +13,7 @@ export type EngineRoutingPreferences = {
   claudeCodeModel: string;
 };
 
-export type EngineReasoningEffort =
-  | "default"
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high"
-  | "xhigh";
+export type EngineReasoningEffort = ReasoningEffortLevel;
 
 export type EngineReasoningPreferences = {
   agentRuntimeEngine: ModelPickerEngine;
@@ -133,12 +128,6 @@ export function resolveChatGptEngineModel(
   const resolved = resolveChatGptModelSelection(saved, liveIds, fallback);
   if (!resolved) return { kind: "unavailable" };
   return { kind: "rerouted", modelId: resolved, savedModel: saved ?? "" };
-}
-
-export function normalizeClaudeCodeReasoningEffort(
-  effort: EngineReasoningEffort,
-): EngineReasoningEffort {
-  return effort === "minimal" ? "low" : effort;
 }
 
 export function toChatGptModelId(modelId: string): string {
@@ -463,12 +452,8 @@ export function buildEngineReasoningPatch(
 
   if (engine === "default") {
     for (const key of agentKeys) {
-      if (effort === "default") delete nextReasoning[key];
-      else nextReasoning[key] = effort;
-    }
-    for (const key of agentKeys) {
-      if (nextReasoning[key]) stellaReasoning[key] = nextReasoning[key];
-      else delete stellaReasoning[key];
+      nextReasoning[key] = effort;
+      stellaReasoning[key] = effort;
     }
     return {
       reasoningEfforts: nextReasoning,
@@ -478,8 +463,7 @@ export function buildEngineReasoningPatch(
 
   if (engine === "codex_cli") {
     delete nextReasoning.general;
-    if (effort === "default") delete nextReasoning.orchestrator;
-    else nextReasoning.orchestrator = effort;
+    nextReasoning.orchestrator = effort;
     return {
       reasoningEfforts: nextReasoning,
       codexReasoningEffort: effort,
@@ -489,7 +473,7 @@ export function buildEngineReasoningPatch(
   for (const key of agentKeys) delete nextReasoning[key];
   return {
     reasoningEfforts: nextReasoning,
-    claudeCodeReasoningEffort: normalizeClaudeCodeReasoningEffort(effort),
+    claudeCodeReasoningEffort: effort,
   };
 }
 
@@ -507,21 +491,19 @@ export function buildEngineTransitionReasoningPatch(
       !Object.prototype.hasOwnProperty.call(stellaReasoning, key);
     if (shouldCapture) {
       const effort = next[key];
-      if (effort && effort !== "default") stellaReasoning[key] = effort;
+      if (effort) stellaReasoning[key] = effort;
       else delete stellaReasoning[key];
     }
   }
   if (engine === "default") {
     for (const key of CONVERSATION_AGENT_KEYS) {
       const effort = stellaReasoning[key];
-      if (effort && effort !== "default") next[key] = effort;
+      if (effort) next[key] = effort;
       else delete next[key];
     }
   } else if (engine === "codex_cli") {
     delete next.general;
-    if (preferences.codexReasoningEffort === "default")
-      delete next.orchestrator;
-    else next.orchestrator = preferences.codexReasoningEffort;
+    next.orchestrator = preferences.codexReasoningEffort;
   } else {
     delete next.orchestrator;
     delete next.general;

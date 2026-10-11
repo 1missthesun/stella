@@ -35,6 +35,7 @@ import { BACKGROUND_CONTEXT, withAbortSignal } from "@earendil-works/chord/conte
 import type { Context } from "@earendil-works/chord";
 import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import {
   AssistantEntry,
   type EntryId,
@@ -489,11 +490,11 @@ export const contextFor = (signal?: AbortSignal): Context =>
   signal ? withAbortSignal(signal, BACKGROUND_CONTEXT) : BACKGROUND_CONTEXT;
 
 /**
- * The thinking level of a turn's reasoning effort. A ChatGPT plan's default
- * is its provider's (medium); Stella's models think only when asked.
+ * The thinking level of a turn's reasoning effort, for every engine alike.
+ * A stored legacy value reads as medium.
  */
-export const thinkingLevelFor = (effort: AgentModelReasoningEffort, engine: PiExecution["engine"] = "stella"): ModelThinkingLevel =>
-  effort === "none" ? "off" : effort === "default" ? (engine === "stella" ? "off" : "medium") : effort;
+export const thinkingLevelFor = (effort: AgentModelReasoningEffort | string): ModelThinkingLevel =>
+  effort === "none" ? "off" : normalizeReasoningEffortLevel(effort);
 
 const MEMORY_FIELDS: Record<string, keyof Omit<StellaMemory, "enabled">> = {
   "~/.stella/core-memory.md": "core",
@@ -1138,7 +1139,14 @@ export class PiConversationRuntime {
       agentModel: async (requested, caller, placement) => {
         if (placement) return { there: true };
         if (requested.startsWith("stella/") && caller.model?.provider === STELLA_PROVIDER_ID) {
-          return { runsOn: { model: { provider: STELLA_PROVIDER_ID, modelId: stellaModelId("general", requested) } } };
+          const effort = /^(.+):(low|medium|high|xhigh|max)$/.exec(requested);
+          const thinkingLevel = (effort?.[2] as ModelThinkingLevel | undefined) ?? caller.thinkingLevel;
+          return {
+            runsOn: {
+              model: { provider: STELLA_PROVIDER_ID, modelId: stellaModelId("general", effort?.[1] ?? requested) },
+              ...(thinkingLevel ? { thinkingLevel } : {}),
+            },
+          };
         }
         const threads = this.#options.threadAgents;
         if (!threads) throw new Error(`Agents here can't run on "${requested}". Omit model to use the configured one.`);
@@ -2207,15 +2215,7 @@ export class PiConversationRuntime {
         threadId: attempt.threadId,
         origin: { agentThread: true },
         model: this.#threadModel(attempt.authority.execution, attempt.model),
-        // A ChatGPT plan or provider-key agent is admitted for its execution's reasoning effort.
-        ...(attempt.authority.execution.engine !== "stella"
-          ? {
-              thinkingLevel: thinkingLevelFor(
-                attempt.authority.execution.reasoningEffort,
-                attempt.authority.execution.engine,
-              ),
-            }
-          : {}),
+        thinkingLevel: thinkingLevelFor(attempt.authority.execution.reasoningEffort),
       },
       context,
     );

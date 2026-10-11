@@ -597,17 +597,11 @@ function ChatSurface(props: {
       pinned: composerModelPinned,
       label: cloudModelSettings.label,
       loading: cloudModelSettings.loading && !cloudModelSettings.execution,
-      effortLabel:
-        cloudModelSettings.effort === "default"
-          ? t("settings.agentModelPicker.default")
-          : t(`settings.reasoningEffort.${cloudModelSettings.effort}`),
+      effortLabel: t(`settings.reasoningEffort.${cloudModelSettings.effort}`),
       effortOptions: cloudModelSettings.supportsEffortSelection
         ? REASONING_OPTIONS.map((option) => ({
             ...option,
-            label:
-              option.id === "default"
-                ? t("settings.agentModelPicker.default")
-                : t(`settings.reasoningEffort.${option.id}`),
+            label: t(`settings.reasoningEffort.${option.id}`),
             selected: option.id === cloudModelSettings.effort,
           }))
         : [],

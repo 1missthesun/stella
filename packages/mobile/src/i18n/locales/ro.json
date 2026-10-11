@@ -2140,13 +2140,12 @@
         "modelIdAriaLabel": "id model OpenRouter"
       },
       "reasoning": {
-        "default": "Auto",
         "high": "Ridicat",
         "label": "Efort de raționare",
         "low": "Scăzut",
+        "max": "Maxim",
         "medium": "Mediu",
-        "minimal": "Minim",
-        "xhigh": "Maxim"
+        "xhigh": "Extra"
       },
       "refresh": "Reîmprospătează catalogul de modele",
       "restrictedPlan": "Indisponibil în planul {plan}",
@@ -2246,8 +2245,8 @@
     "reasoningEffort": {
       "high": "Ridicat",
       "low": "Scăzut",
+      "max": "Maxim",
       "medium": "Mediu",
-      "minimal": "Minim",
       "xhigh": "Extra"
     },
     "resetCustomizations": {

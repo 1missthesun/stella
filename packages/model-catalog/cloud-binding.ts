@@ -1,5 +1,9 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { chatGptRequestViolation } from "@stella/contracts/chatgpt-siwc";
+import {
+  REASONING_EFFORT_LEVELS,
+  normalizeReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
 
 /**
  * The execution fields the binding validators read. Structurally satisfied
@@ -46,21 +50,26 @@ const nativeRequestedModel = (requestedModel: string): string | null => {
     : null;
 };
 
+/**
+ * The efforts a request may carry for the authorized level: the level
+ * itself, or a lower one the client mapped it to because the model has no
+ * such level (ChatGPT has no `max`, so it sends `xhigh`).
+ */
 const expectedNativeEfforts = (
   execution: CloudExecutionBinding,
 ): ReadonlySet<string> => {
-  if (execution.reasoningEffort === "default") return new Set();
-  if (execution.reasoningEffort === "none") return new Set(["none", "off"]);
-  return new Set([execution.reasoningEffort]);
+  const effort: unknown = execution.reasoningEffort;
+  if (effort === "none") return new Set(["none", "off"]);
+  const level = normalizeReasoningEffortLevel(effort);
+  return new Set(
+    REASONING_EFFORT_LEVELS.slice(0, REASONING_EFFORT_LEVELS.indexOf(level) + 1),
+  );
 };
 
 const validateNativeReasoning = (args: {
   execution: CloudExecutionBinding;
   requestJson: Record<string, unknown>;
 }): CloudBindingError | null => {
-  // Connected subscription defaults belong to the provider. Stella is
-  // neither paying for nor pinning that account's provider-side tier.
-  if (args.execution.reasoningEffort === "default") return null;
   const effort = asRecord(args.requestJson.reasoning)?.effort;
   if (
     typeof effort !== "string" ||

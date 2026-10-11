@@ -1,6 +1,10 @@
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { STELLA_DEFAULT_MODEL } from "@stella/contracts/stella-api";
+import {
+  DEFAULT_REASONING_EFFORT,
+  parseReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
 import type {
   AgentModelConfigSnapshot,
   AgentModelReasoningEffort,
@@ -18,19 +22,8 @@ import { canonicalStellaModelReference } from "../model-routing-stella.js";
 
 export const normalizeCapturedReasoningEffort = (
   value: string | undefined,
-): AgentModelReasoningEffort | undefined => {
-  if (
-    value === "none" ||
-    value === "minimal" ||
-    value === "low" ||
-    value === "medium" ||
-    value === "high" ||
-    value === "xhigh"
-  ) {
-    return value;
-  }
-  return undefined;
-};
+): AgentModelReasoningEffort | undefined =>
+  value === "none" ? "none" : parseReasoningEffortLevel(value);
 
 const STELLA_MODEL_PREFIX = "stella/";
 
@@ -151,7 +144,7 @@ export const restoreSpawnEngineFromModelConfig = (
 export const toCloudExecutionSelection = (
   snapshot: AgentModelConfigSnapshot,
 ): CloudExecutionSelection => {
-  const reasoningEffort = snapshot.reasoningEffort ?? "default";
+  const reasoningEffort = snapshot.reasoningEffort ?? DEFAULT_REASONING_EFFORT;
   if (snapshot.engine === "default") {
     const route = snapshot.routeModel.trim();
     const slash = route.indexOf("/");

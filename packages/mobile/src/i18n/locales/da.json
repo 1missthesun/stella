@@ -2131,13 +2131,12 @@
         "modelIdAriaLabel": "OpenRouter-model-id"
       },
       "reasoning": {
-        "default": "Auto",
         "high": "Høj",
         "label": "Ræsonneringsindsats",
         "low": "Lav",
+        "max": "Maks.",
         "medium": "Mellem",
-        "minimal": "Minimal",
-        "xhigh": "Maks."
+        "xhigh": "Ekstra"
       },
       "refresh": "Opdater modelkataloget",
       "restrictedPlan": "Ikke tilgængelig på {plan}-planen",
@@ -2237,8 +2236,8 @@
     "reasoningEffort": {
       "high": "Høj",
       "low": "Lav",
+      "max": "Maks.",
       "medium": "Mellem",
-      "minimal": "Minimal",
       "xhigh": "Ekstra"
     },
     "resetCustomizations": {

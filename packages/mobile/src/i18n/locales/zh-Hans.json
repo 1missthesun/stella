@@ -2122,13 +2122,12 @@
         "modelIdAriaLabel": "OpenRouter 模型 ID"
       },
       "reasoning": {
-        "default": "自动",
         "high": "高",
         "label": "推理强度",
         "low": "低",
+        "max": "最高",
         "medium": "中",
-        "minimal": "极低",
-        "xhigh": "最高"
+        "xhigh": "超高"
       },
       "refresh": "刷新模型目录",
       "restrictedPlan": "{plan} 套餐不可用",
@@ -2228,8 +2227,8 @@
     "reasoningEffort": {
       "high": "高",
       "low": "低",
+      "max": "最高",
       "medium": "中",
-      "minimal": "极低",
       "xhigh": "超高"
     },
     "resetCustomizations": {

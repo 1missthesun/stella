@@ -2131,13 +2131,12 @@
         "modelIdAriaLabel": "OpenRouter modellazonosító"
       },
       "reasoning": {
-        "default": "Auto",
         "high": "Magas",
         "label": "Gondolkodási ráfordítás",
         "low": "Alacsony",
+        "max": "Max",
         "medium": "Közepes",
-        "minimal": "Minimális",
-        "xhigh": "Max"
+        "xhigh": "Extra"
       },
       "refresh": "Modellkatalógus frissítése",
       "restrictedPlan": "Nem érhető el a(z) {plan} csomagban",
@@ -2237,8 +2236,8 @@
     "reasoningEffort": {
       "high": "Magas",
       "low": "Alacsony",
+      "max": "Max",
       "medium": "Közepes",
-      "minimal": "Minimális",
       "xhigh": "Extra"
     },
     "resetCustomizations": {

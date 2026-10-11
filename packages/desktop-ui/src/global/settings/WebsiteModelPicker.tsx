@@ -13,6 +13,10 @@ import { useModelCatalog } from "./hooks/use-model-catalog";
 import { ProviderModelPanel } from "./ProviderModelPanel";
 import { getStellaResolvedModelName } from "./lib/model-catalog";
 import { useT } from "@/shared/i18n";
+import {
+  normalizeReasoningEffortLevel,
+  type ReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
 
 /** The website saves the same account route that cloud turn dispatch reads. */
 export function WebsiteModelPicker({
@@ -38,8 +42,9 @@ export function WebsiteModelPicker({
   const [error, setError] = useState<string | null>(null);
   const current = execution?.engine === "stella" ? execution.model : "";
   const selected = models.find((model) => model.id === current);
+  const reasoningEffort = normalizeReasoningEffortLevel(execution?.reasoningEffort);
 
-  const select = async (model: string) => {
+  const select = async (model: string, effort: ReasoningEffortLevel = reasoningEffort) => {
     if (pending || !isAuthenticated || !model) return;
     setPending(true);
     setError(null);
@@ -48,8 +53,7 @@ export function WebsiteModelPicker({
         engine: "stella" as const,
         provider: "stella" as const,
         model,
-        // Stella-managed models take their effort from the backend config.
-        reasoningEffort: "default" as const,
+        reasoningEffort: effort,
       };
       await cloudEnginesApi.setExecution(next);
       publishCloudExecutionSelection(next);
@@ -72,6 +76,8 @@ export function WebsiteModelPicker({
         disabled={!active || !isAuthenticated || !connections || pending}
         ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")}
         onSelect={(model) => void select(model)}
+        reasoningEffort={reasoningEffort}
+        onSelectReasoning={(model, effort) => void select(model, effort)}
         hideDefaultRow
         hideSelectedTitle
         onRefresh={() => void refresh()}

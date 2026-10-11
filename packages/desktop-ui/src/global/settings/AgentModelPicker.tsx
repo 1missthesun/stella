@@ -11,7 +11,8 @@ import { useModelCatalog } from "@/global/settings/hooks/use-model-catalog";
 import { useClaudeCodeModelCatalog } from "@/global/settings/hooks/use-claude-code-model-catalog";
 import { getStellaResolvedModelName } from "@/global/settings/lib/model-catalog";
 import { buildModelDefaultsMap, buildResolvedModelDefaultsMap, getConfigurableAgents, getDefaultModelOptionLabel, getModelPickerDisplayLabel, getLocalModelDefaults, normalizeModelOverrides, } from "@/global/settings/lib/model-defaults";
-import { listReasoningEffortOptions, supportsReasoningEffortSelection, type ReasoningEffortOptionId, } from "@/global/settings/lib/reasoning-effort-options";
+import { listReasoningEffortOptions, type ReasoningEffortOptionId, } from "@/global/settings/lib/reasoning-effort-options";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { recordRecentModel } from "@/global/settings/lib/recent-models";
 import { getPlanLabel, isRestrictedModelOverrideAudience, } from "@/global/billing/audience";
 import { announceChatGptPlanUse, ChatGptPlanInUse } from "@/features/chatgpt/ChatGptBrand";
@@ -28,7 +29,7 @@ type ImageGenerationPreferences = {
     provider: ImageGenerationProvider;
     model?: string;
 };
-type ReasoningEffort = "default" | ReasoningEffortOptionId;
+type ReasoningEffort = ReasoningEffortOptionId;
 type LocalModelPreferences = {
     defaultModels: Record<string, string>;
     modelOverrides: Record<string, string>;
@@ -868,22 +869,15 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             },
         ];
     }, [claudeCodeModels, selectedClaudeCodeModel, t]);
-    const savedReasoningEffort = committedEngine === "codex_cli"
-        ? (preferences?.codexReasoningEffort ?? "default")
+    const currentReasoningEffort = normalizeReasoningEffortLevel(committedEngine === "codex_cli"
+        ? preferences?.codexReasoningEffort
         : committedEngine === "claude_code_local"
-            ? (preferences?.claudeCodeReasoningEffort ?? "default")
+            ? preferences?.claudeCodeReasoningEffort
             : activeAssistant
                 ? (preferences?.reasoningEfforts?.orchestrator ??
-                    preferences?.reasoningEfforts?.general ??
-                    "default")
-                : (preferences?.reasoningEfforts?.[activeAgent] ?? "default");
-    // Stella-managed models never show an effort control: the backend owns
-    // their effort. BYOK / local models and the engines default to medium.
-    const showReasoningControl = supportsReasoningEffortSelection(committedEngine, current);
-    const currentReasoningEffort = savedReasoningEffort === "default"
-        ? "medium"
-        : savedReasoningEffort;
-    const reasoningEffortOptions = listReasoningEffortOptions(committedEngine);
+                    preferences?.reasoningEfforts?.general)
+                : preferences?.reasoningEfforts?.[activeAgent]);
+    const reasoningEffortOptions = listReasoningEffortOptions();
     const reasoningDisabled = pendingAgent !== null ||
         (committedEngine === "codex_cli" &&
             chatGptConnection !== "connected");
@@ -988,7 +982,7 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
             <ProviderOnlyPicker providers={voiceProviderOptions} value={current || "stella"} onSelect={(key) => void handleVoiceProviderSelect(key)} disabled={!preferences || pendingAgent !== null} ariaLabel={t("settings.agentModelPicker.voiceProviderAriaLabel")}/>
             <VoiceCatalogPicker voiceProvider={voicePreferences.provider} selectedVoices={voicePreferences.voices} readAloudProvider={voicePreferences.readAloudProvider} onSelectVoice={(underlyingProvider, voiceId) => void handleVoiceSelect(underlyingProvider, voiceId)} onSelectReadAloudProvider={(provider) => void handleReadAloudProviderSelect(provider)} onSelectReadAloudVoice={(voiceId) => void handleReadAloudVoiceSelect(voiceId)} disabled={!preferences || pendingAgent !== null}/>
           </>) : (<>
-            <ProviderModelPanel value={current} defaultLabel={defaultLabel} currentLabel={currentLabel} groups={groups} disabled={!ready || pendingAgent !== null} restrictStellaPicks={restrictedStellaPicks} restrictedPlanLabel={restrictedPlanLabel} ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")} onSelect={handleSelect} hideSelectedTitle hideDefaultRow selectedRowExtra={showReasoningControl ? reasoningControl : null} collapsibleGroups activeSectionKey={activeSectionKey} hiddenProviders={HIDDEN_CATALOG_PROVIDERS} sectionOrder={SECTION_ORDER} onExtraSectionExpanded={handleExtraSectionExpanded} onRefresh={handleCatalogRefresh} catalogError={catalogError} refreshing={refreshing ||
+            <ProviderModelPanel value={current} defaultLabel={defaultLabel} currentLabel={currentLabel} groups={groups} disabled={!ready || pendingAgent !== null} restrictStellaPicks={restrictedStellaPicks} restrictedPlanLabel={restrictedPlanLabel} ariaLabel={t("settings.agentModelPicker.assistantPickerAriaLabel")} onSelect={handleSelect} hideSelectedTitle hideDefaultRow selectedRowExtra={reasoningControl} collapsibleGroups activeSectionKey={activeSectionKey} hiddenProviders={HIDDEN_CATALOG_PROVIDERS} sectionOrder={SECTION_ORDER} onExtraSectionExpanded={handleExtraSectionExpanded} onRefresh={handleCatalogRefresh} catalogError={catalogError} refreshing={refreshing ||
                 ((claudeCodeSectionOpen || committedEngine === "claude_code_local") &&
                     claudeCodeModelsLoading)} extraSections={[
                 {

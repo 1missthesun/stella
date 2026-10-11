@@ -2131,13 +2131,12 @@
         "modelIdAriaLabel": "OpenRouter model kimliği"
       },
       "reasoning": {
-        "default": "Otomatik",
         "high": "Yüksek",
         "label": "Akıl yürütme düzeyi",
         "low": "Düşük",
+        "max": "En yüksek",
         "medium": "Orta",
-        "minimal": "En az",
-        "xhigh": "En yüksek"
+        "xhigh": "Ekstra"
       },
       "refresh": "Model kataloğunu yenile",
       "restrictedPlan": "{plan} planında kullanılamaz",
@@ -2237,8 +2236,8 @@
     "reasoningEffort": {
       "high": "Yüksek",
       "low": "Düşük",
+      "max": "En yüksek",
       "medium": "Orta",
-      "minimal": "En az",
       "xhigh": "Ekstra"
     },
     "resetCustomizations": {

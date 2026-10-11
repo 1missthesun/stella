@@ -5,6 +5,13 @@ import type {
 } from "../storage/runtime-store.js";
 import { forkDelayedCall } from "./cloud-effect-runtime.js";
 import { parseJournalCheckpoint, type JournalCheckpoint } from "@stella/contracts/journal-checkpoint";
+import {
+  parsePiBrainRecord,
+  PI_BRAIN_ELSEWHERE_CODE,
+  type PiBrainClaim,
+  type PiBrainRecord,
+} from "@stella/contracts/turn-plane/pi-brain";
+import type { BrainLeaseView } from "./brain-lease.js";
 
 export type CloudTranscriptBeginRequest = {
   conversationId: string;
@@ -41,6 +48,12 @@ export type CloudTranscriptBeginRequest = {
    * that begin no longer exists.
    */
   adoptExisting?: boolean;
+  /**
+   * Claim the conversation's brain lease with this turn (the default where
+   * the writer has a lease view). False journals it as a computer from
+   * before the lease did.
+   */
+  claimBrain?: boolean;
 };
 
 export type CloudTranscriptBeginAck = {
@@ -59,6 +72,12 @@ export type CloudTranscriptBeginAck = {
   promptSeq?: number;
   /** Set on a renewal ACK, which only extends `leaseToken`/`expiresAt`. */
   renewed?: true;
+  /**
+   * The brain lease as the begin left it, for a claiming begin a backend
+   * with the lease answered: its record, and whether this turn took it
+   * over from a holder that could not answer.
+   */
+  brain?: { record: PiBrainRecord | null; takenOver?: true };
 };
 
 export type CloudTranscriptHistory = {
@@ -78,6 +97,18 @@ export class CloudTranscriptAlreadyAdmittedError extends Error {
   constructor() {
     super("The cloud conversation already admitted this message.");
     this.name = "CloudTranscriptAlreadyAdmittedError";
+  }
+}
+
+/** The turn was refused: another host holds the conversation's brain lease. */
+export class CloudTranscriptBrainElsewhereError extends Error {
+  readonly code = PI_BRAIN_ELSEWHERE_CODE;
+  constructor(
+    message: string,
+    readonly record: PiBrainRecord | null,
+  ) {
+    super(message);
+    this.name = "CloudTranscriptBrainElsewhereError";
   }
 }
 
@@ -134,6 +165,8 @@ export type CloudJournalAppendRequest = {
 export type CloudTranscriptWriterOptions = {
   deviceId: string;
   store: RuntimeStore;
+  /** Where a begin's claim on the brain lease comes from and its answer goes. */
+  brainLeases?: BrainLeaseView;
   /** The runtime's backend JWT, or null while signed out. */
   getAuthToken: () => string | null;
   /** Builder origin from the backend, or null when realtime is not configured. */
@@ -247,6 +280,7 @@ type BeginPayload = {
   clientMsgId: string;
   userMessageJson: string;
   hidden?: boolean;
+  brain?: PiBrainClaim;
 };
 
 type RenewPayload = {
@@ -292,7 +326,10 @@ type AttemptResult =
         | "turn_finished"
         | "turn_canceled"
         | "owner_generation_stale"
-        | "idempotency_conflict";
+        | "idempotency_conflict"
+        | typeof PI_BRAIN_ELSEWHERE_CODE;
+      message?: string;
+      record?: PiBrainRecord | null;
     }
   | { kind: "retry"; delayMs: number; reason: string };
 
@@ -393,6 +430,20 @@ const parseBeginAck = (value: unknown): CloudTranscriptBeginAck | null => {
     candidate.promptSeq >= 0
       ? { promptSeq: candidate.promptSeq }
       : {}),
+    ...parseBrainAck(candidate.brain),
+  };
+};
+
+const parseBrainAck = (
+  value: unknown,
+): Pick<CloudTranscriptBeginAck, "brain"> => {
+  if (!value || typeof value !== "object") return {};
+  const brain = value as { record?: unknown; takenOver?: unknown };
+  if (brain.record !== null && (!brain.record || typeof brain.record !== "object")) return {};
+  const record = brain.record === null ? null : parsePiBrainRecord(brain.record);
+  if (brain.record !== null && !record) return {};
+  return {
+    brain: { record, ...(brain.takenOver === true ? { takenOver: true as const } : {}) },
   };
 };
 
@@ -770,6 +821,9 @@ export const createCloudTranscriptWriter = (
     if (response.ok) {
       if (entry.kind === "finish") return { kind: "ack" };
       const ack = parseBeginAck(await response.json().catch(() => null));
+      if (ack?.brain) {
+        options.brainLeases?.note(entry.conversationId, ack.brain.record);
+      }
       if (ack) {
         return {
           kind: "ack",
@@ -786,7 +840,21 @@ export const createCloudTranscriptWriter = (
     if (response.status === 409) {
       const body = (await response.json().catch(() => null)) as {
         code?: unknown;
+        message?: unknown;
+        record?: unknown;
       } | null;
+      if (body?.code === PI_BRAIN_ELSEWHERE_CODE) {
+        const record = parsePiBrainRecord(body.record);
+        if (record) options.brainLeases?.note(entry.conversationId, record);
+        return {
+          kind: "terminal",
+          reason: PI_BRAIN_ELSEWHERE_CODE,
+          ...(typeof body.message === "string" && body.message.trim()
+            ? { message: body.message.trim().slice(0, 500) }
+            : {}),
+          record,
+        };
+      }
       if (
         body?.code === "lease_mismatch" ||
         body?.code === "turn_expired" ||
@@ -1264,7 +1332,13 @@ export const createCloudTranscriptWriter = (
             const error =
               result.reason === "turn_finished"
                 ? new CloudTranscriptAlreadyAdmittedError()
-                : new Error(
+                : result.reason === PI_BRAIN_ELSEWHERE_CODE
+                  ? new CloudTranscriptBrainElsewhereError(
+                      result.message ??
+                        "Stella for this chat runs on another host now.",
+                      result.record ?? null,
+                    )
+                  : new Error(
                     result.reason === "conversation_deleted"
                       ? "The cloud conversation was deleted before the local turn could start."
                       : "The cloud local turn no longer owns the conversation.",
@@ -1450,6 +1524,9 @@ export const createCloudTranscriptWriter = (
         clientMsgId: request.clientMsgId,
         userMessageJson: request.userMessageJson,
         ...(request.hidden ? { hidden: true } : {}),
+        ...(options.brainLeases && request.claimBrain !== false
+          ? { brain: options.brainLeases.claim(request.conversationId) }
+          : {}),
       };
       const id = outboxId(
         "begin",

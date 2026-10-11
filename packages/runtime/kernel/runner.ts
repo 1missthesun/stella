@@ -271,6 +271,8 @@ export const createStellaHostRunner = (
   const claudeSessionSync = createClaudeSessionSync({
     deviceId: context.deviceId,
     db: context.runtimeStore.db,
+    leaseSuperseded: (conversationId, epoch) =>
+      context.brainLeases.superseded(conversationId, epoch),
     getAuthToken: () => context.state.authToken?.trim() || null,
     getBackend: () => {
       const client = context.backend.client();
@@ -287,6 +289,7 @@ export const createStellaHostRunner = (
   setClaudeSessionSyncSink(claudeSessionSync);
   resumeClaudeSessionSync = claudeSessionSync.resume;
   claudeSessionSync.resume();
+  context.brainLeases.onChange(() => claudeSessionSync.wake());
   const buildAgentContextWithResolvedRoute = async (
     args:
       | Parameters<typeof buildAgentContext>[1]
@@ -693,6 +696,10 @@ export const createStellaHostRunner = (
       });
     },
     appendCloudJournal: (request) => context.cloudTranscript.append(request),
+    brainLeases: {
+      note: (conversationId, record) => context.brainLeases.note(conversationId, record),
+      holds: (conversationId) => context.brainLeases.holds(conversationId),
+    },
     cloudJournal: {
       begin: (request) => context.cloudTranscript.begin(request),
       promptSeq: (conversationId, ack) =>

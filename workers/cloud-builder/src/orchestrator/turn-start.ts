@@ -177,53 +177,76 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       }
       // Stella runs on one of the owner's computers: a message the user
       // sent from elsewhere is placed there, and this object answers none.
-      // While that computer can't take it (offline, not ready, gone), this
-      // object answers it as with no record, which stays for once it's back.
+      // While that computer can't take it (offline, not ready, gone) or its
+      // lease lapsed, this object takes the brain over under the next epoch
+      // and answers it; the computer, once back, finds the lease moved.
       const brain =
         authKind === "user" && lane === "chat" && !start.piAgent
           ? await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)
           : undefined;
-      const refusal =
-        brain?.host === "device"
-          ? await this.piBrainDeviceRefusal(ownerId, brain.deviceId)
-          : undefined;
-      if (brain?.host === "device" && refusal) {
-        log("info", "pi_brain_unavailable", {
-          deviceId: brain.deviceId,
-          reason: refusal,
+      if (brain?.host === "device") {
+        const holder = await this.piBrainHolderState(ownerId, brain.deviceId);
+        let claim = await this.claimPiBrain({
+          claimant: { host: "cloud" },
+          claimEpoch: null,
+          holder: { forEpoch: brain.epoch, ...holder },
         });
-      } else if (brain?.host === "device") {
-        try {
-          const dispatchId = await this.placeOnPiBrain({
-            ownerId,
-            deviceId: brain.deviceId,
-            clientMsgId: start.clientMsgId,
-            prompt: start.prompt,
-            ...(start.attachments?.length
-              ? { attachments: start.attachments }
-              : {}),
-            ...(start.locale ? { locale: start.locale } : {}),
-          });
-          log("info", "pi_brain_turn_placed", {
-            deviceId: brain.deviceId,
-            dispatchId,
-          });
-          return json(
-            {
-              protocol: TURN_PLANE_PROTOCOL,
-              conversationId,
-              turnId: `placed:${dispatchId}`,
-              accepted: true,
-              replayed: false,
-              createdConversation: false,
-            } satisfies CloudTurnStartResponse,
-            202,
-          );
-        } catch (error) {
-          // It went away meanwhile: this object answers instead.
-          log("info", "pi_brain_turn_unplaced", {
-            deviceId: brain.deviceId,
-            message: errorMessage(error),
+        const placeOn =
+          claim.decision.kind === "elsewhere" &&
+          claim.record?.host === "device"
+            ? claim.record
+            : undefined;
+        if (placeOn) {
+          try {
+            const dispatchId = await this.placeOnPiBrain({
+              ownerId,
+              deviceId: placeOn.deviceId,
+              clientMsgId: start.clientMsgId,
+              prompt: start.prompt,
+              ...(start.attachments?.length
+                ? { attachments: start.attachments }
+                : {}),
+              ...(start.locale ? { locale: start.locale } : {}),
+            });
+            log("info", "pi_brain_turn_placed", {
+              deviceId: placeOn.deviceId,
+              epoch: placeOn.epoch,
+              dispatchId,
+            });
+            return json(
+              {
+                protocol: TURN_PLANE_PROTOCOL,
+                conversationId,
+                turnId: `placed:${dispatchId}`,
+                accepted: true,
+                replayed: false,
+                createdConversation: false,
+              } satisfies CloudTurnStartResponse,
+              202,
+            );
+          } catch (error) {
+            // It went away meanwhile: this object takes the brain over.
+            log("info", "pi_brain_turn_unplaced", {
+              deviceId: placeOn.deviceId,
+              message: errorMessage(error),
+            });
+            claim = await this.claimPiBrain({
+              claimant: { host: "cloud" },
+              claimEpoch: placeOn.epoch,
+              holder: {
+                forEpoch: placeOn.epoch,
+                refusal: "the placement failed",
+              },
+            });
+          }
+        }
+        if (claim.record?.host === "device") {
+          // The computer took it back meanwhile and the placement failed:
+          // this object answers once without the lease, as a computer
+          // from before the lease would.
+          log("info", "pi_brain_turn_unleased", {
+            deviceId: claim.record.deviceId,
+            epoch: claim.record.epoch,
           });
         }
       }

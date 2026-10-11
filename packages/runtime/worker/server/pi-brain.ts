@@ -32,6 +32,8 @@ export const brainFor = (
     });
     const body = (await response.json().catch(() => null)) as (PiBrainResponse & { error?: string }) | null;
     if (!response.ok || !body) throw new Error(body?.error ?? `Where Stella runs could not be read (${response.status}).`);
+    // Both engines' turns claim the lease with what this computer last saw.
+    session.runnerCell.get()?.brainLeases.note(conversationId, body.record);
     return body.record;
   };
   return {

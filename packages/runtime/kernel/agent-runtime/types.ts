@@ -211,6 +211,14 @@ export type BaseRunOptions = {
   ownerGeneration?: string;
   cloudJournalSeq?: number;
   resolveClaudeResumeJournalSeq?: () => Promise<number | undefined>;
+  /** The conversation's brain lease epoch this turn runs under; its synced Claude session is tagged with it. */
+  brainLeaseEpoch?: number;
+  /**
+   * The lease moved since this process last ran the conversation (taken over
+   * here, or held elsewhere in between): a live Claude session here is a
+   * cache, and a synced one that covers the log replaces it.
+   */
+  brainLeaseMoved?: boolean;
   userMessageId: string;
   uiVisibility?: "visible" | "hidden";
   agentType: string;

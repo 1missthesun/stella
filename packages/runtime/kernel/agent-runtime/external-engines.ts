@@ -25,6 +25,7 @@ import type {
 import {
   checkClaudeCodeAuth,
   claudeCodeResumableSessionId,
+  closeClaudeCodeSessionWhenIdle,
   runClaudeCodeTurn,
   shutdownClaudeCodeRuntime,
   type ClaudeCodeTurnRequest,
@@ -815,14 +816,14 @@ const prepareClaudeSessionResume = async (args: {
   engine: "claude_code_local" | "claude_code_local_vanilla";
   cwd: string | undefined;
   orchestrator: boolean;
-}): Promise<void> => {
+}): Promise<"native" | "rebuild" | "none"> => {
   const sink = claudeSessionSyncSink();
-  if (!sink || !args.cwd) return;
+  if (!sink || !args.cwd) return "none";
   const pending = sink.takeRestored({
     threadId: args.threadKey,
     engine: args.engine,
   });
-  if (pending) return;
+  if (pending) return "native";
   const configDir = (await getClaudeCodeConfig()).configDir ?? null;
   if (!args.orchestrator) {
     const prepared = await sink.prepareLocalResume({
@@ -836,12 +837,12 @@ const prepareClaudeSessionResume = async (args: {
         threadKey: args.threadKey,
       });
     }
-    return;
+    return prepared ? "native" : "none";
   }
   const atJournalSeq = await args.opts
     .resolveClaudeResumeJournalSeq?.()
     .catch(() => undefined);
-  if (atJournalSeq === undefined) return;
+  if (atJournalSeq === undefined) return "none";
   const decision = await sink.restoreForResume({
     threadId: args.threadKey,
     configDir,
@@ -852,7 +853,11 @@ const prepareClaudeSessionResume = async (args: {
     threadKey: args.threadKey,
     atJournalSeq,
     decision,
+    ...(args.opts.brainLeaseMoved
+      ? { brainLeaseMoved: true, brainLeaseEpoch: args.opts.brainLeaseEpoch }
+      : {}),
   });
+  return decision;
 };
 
 const adoptRestoredClaudeSession = async (args: {
@@ -2345,11 +2350,38 @@ const runClaudeHostedTurn = async (
   });
 
   const deliversHistoryIncrementally = args.session.kind === "orchestrator";
-  const inProcessSessionId = deliversHistoryIncrementally
+  const liveSessionId = deliversHistoryIncrementally
     ? claudeCodeResumableSessionId(sessionKey, localCliCwd)
     : undefined;
   const syncsSession = syncsClaudeSession(args.opts);
-  if (syncsSession && !persistedSessionId && !inProcessSessionId) {
+  // The brain lease moved since this process last ran the conversation: its
+  // live session is a cache. The synced session that covers the log where
+  // this host takes over (the previous holder's, after a failover) replaces
+  // it and resumes natively; with the sync behind, the live session stays
+  // and gets the missed turns as history.
+  const takeoverRestore =
+    syncsSession &&
+    !persistedSessionId &&
+    liveSessionId &&
+    deliversHistoryIncrementally &&
+    args.opts.brainLeaseMoved
+      ? await prepareClaudeSessionResume({
+          opts: args.opts,
+          threadKey,
+          engine: sessionEngine,
+          cwd: localCliCwd,
+          orchestrator: true,
+        })
+      : undefined;
+  if (takeoverRestore === "native") closeClaudeCodeSessionWhenIdle(sessionKey);
+  const inProcessSessionId =
+    takeoverRestore === "native" ? undefined : liveSessionId;
+  if (
+    syncsSession &&
+    !persistedSessionId &&
+    !inProcessSessionId &&
+    takeoverRestore === undefined
+  ) {
     await prepareClaudeSessionResume({
       opts: args.opts,
       threadKey,
@@ -2487,6 +2519,9 @@ const runClaudeHostedTurn = async (
                 ...(journalCursor ? { journalCursor } : {}),
                 ...(typeof args.opts.cloudJournalSeq === "number"
                   ? { journalSeq: args.opts.cloudJournalSeq }
+                  : {}),
+                ...(typeof args.opts.brainLeaseEpoch === "number"
+                  ? { leaseEpoch: args.opts.brainLeaseEpoch }
                   : {}),
               }),
           }

@@ -10,7 +10,12 @@ import type {
 } from "../cloud-chat-admission.js";
 import { PLACEMENT_PROTOCOL } from "@stella/contracts/turn-plane/placement";
 import {
+  decidePiBrainClaim,
+  movePiBrain,
   piBrainHandoffPrompt,
+  renewPiBrainLease,
+  takeOverPiBrain,
+  type PiBrainClaimDecision,
   type PiBrainHost,
   type PiBrainRecord,
 } from "@stella/contracts/turn-plane/pi-brain";
@@ -1412,37 +1417,146 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
 
   protected async setPiBrain(host: PiBrainHost): Promise<PiBrainRecord> {
     const prior = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
-    const record: PiBrainRecord = {
-      ...host,
-      epoch: (prior?.epoch ?? 0) + 1,
-      updatedAt: Date.now(),
-    };
+    const record = movePiBrain(prior, host, Date.now());
     await this.ctx.storage.put(PI_BRAIN_KEY, record);
-    log("info", "pi_brain_moved", {
-      host: record.host,
-      ...(record.host === "device" ? { deviceId: record.deviceId } : {}),
-      epoch: record.epoch,
-    });
+    this.notePiBrainLease("moved", record);
     return record;
   }
 
   /**
-   * Why the computer this conversation's Stella runs on can't take a turn
-   * now, as pi's `switch_destination` would refuse a move there; undefined
-   * when it can.
+   * Whether the computer holding this conversation's brain can take a turn
+   * now, as pi's `switch_destination` would refuse a move there (`refusal`
+   * undefined when it can), and when the owner gate last heard its presence
+   * heartbeat, which renews its lease.
    */
-  protected async piBrainDeviceRefusal(
+  protected async piBrainHolderState(
     ownerId: string,
     deviceId: string,
-  ): Promise<string | undefined> {
+  ): Promise<{ refusal?: string; seenAt?: number }> {
     const listed = await this.ownerGate(ownerId)
       .devices()
       .catch(() => undefined);
-    if (!listed) return "the devices list could not be read";
+    if (!listed) return { refusal: "the devices list could not be read" };
     const device = listed.devices.find((entry) => entry.deviceId === deviceId);
-    if (!device) return "not connected";
+    if (!device) return { refusal: "not connected" };
     const { deviceRefusal } = await import("@stella/agent/stella/execution");
-    return deviceRefusal(device, device.label?.trim() || deviceId);
+    const refusal = deviceRefusal(device, device.label?.trim() || deviceId);
+    if (refusal) return { refusal };
+    return { seenAt: Math.max(device.lastSeenAt ?? 0, Date.now()) };
+  }
+
+  /**
+   * A host's claim on this conversation's brain for a turn it would answer:
+   * the record's holder renews its lease, a host that finds the holder
+   * unavailable or lapsed takes the lease over under the next epoch, and
+   * any other claim is refused (`decidePiBrainClaim`). `holder` is the
+   * holding computer's state, read before this so no request interleaves
+   * between the record read and its write; a record that moved meanwhile
+   * is weighed without it.
+   */
+  protected async claimPiBrain(args: {
+    claimant: PiBrainHost;
+    claimEpoch: number | null;
+    holder?: { forEpoch: number; refusal?: string; seenAt?: number };
+    turnId?: string;
+  }): Promise<{
+    decision: PiBrainClaimDecision;
+    record: PiBrainRecord | null;
+    takenOver: boolean;
+  }> {
+    const now = Date.now();
+    const stored =
+      (await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ?? null;
+    const holder =
+      stored && args.holder?.forEpoch === stored.epoch
+        ? args.holder
+        : undefined;
+    let record = stored;
+    if (record && holder?.seenAt !== undefined && !holder.refusal) {
+      const renewed = renewPiBrainLease(record, holder.seenAt);
+      if (renewed) {
+        record = renewed;
+        await this.ctx.storage.put(PI_BRAIN_KEY, record);
+      }
+    }
+    const decision = decidePiBrainClaim({
+      record,
+      claimant: args.claimant,
+      claimEpoch: args.claimEpoch,
+      ...(holder?.refusal !== undefined
+        ? { holderRefusal: holder.refusal }
+        : {}),
+      now,
+    });
+    if (decision.kind === "holder" && record) {
+      const renewed = renewPiBrainLease(record, now);
+      if (renewed) {
+        record = renewed;
+        await this.ctx.storage.put(PI_BRAIN_KEY, record);
+      }
+      return { decision, record, takenOver: false };
+    }
+    if (decision.kind === "takeover" && record) {
+      const prior = record;
+      record = takeOverPiBrain(prior, args.claimant, now);
+      await this.ctx.storage.put(PI_BRAIN_KEY, record);
+      this.notePiBrainLease("taken_over", record, {
+        reason: decision.reason,
+        ...(holder?.refusal ? { holderRefusal: holder.refusal } : {}),
+        ...(args.turnId ? { turnId: args.turnId } : {}),
+      });
+      return { decision, record, takenOver: true };
+    }
+    // The object's own claim on a live holder is routine: it places there.
+    if (
+      decision.kind === "elsewhere" &&
+      record &&
+      args.claimant.host === "device"
+    ) {
+      this.notePiBrainLease("refused", record, {
+        reason: decision.reason,
+        claimant: args.claimant.deviceId,
+        claimEpoch: args.claimEpoch,
+        ...(args.turnId ? { turnId: args.turnId } : {}),
+      });
+    }
+    return { decision, record, takenOver: false };
+  }
+
+  /** The holding computer journaled or renewed a turn: it is up, so its lease runs on. */
+  protected async renewPiBrainHolder(deviceId: string): Promise<void> {
+    const record = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
+    if (record?.host !== "device" || record.deviceId !== deviceId) return;
+    const renewed = renewPiBrainLease(record, Date.now());
+    if (renewed) await this.ctx.storage.put(PI_BRAIN_KEY, renewed);
+  }
+
+  /**
+   * What happened to this conversation's brain lease: a move, a takeover,
+   * or a refused claim. Logged; the owner's agent event log takes these
+   * once it records conversation-scoped events.
+   */
+  protected notePiBrainLease(
+    kind: "moved" | "taken_over" | "refused",
+    record: PiBrainRecord,
+    detail: Record<string, unknown> = {},
+  ): void {
+    log("info", `pi_brain_lease_${kind}`, {
+      conversationId: this.conversationId(),
+      host: record.host,
+      ...(record.host === "device" ? { deviceId: record.deviceId } : {}),
+      epoch: record.epoch,
+      ...(record.previous
+        ? {
+            previousHost:
+              record.previous.host === "cloud"
+                ? "cloud"
+                : record.previous.deviceId,
+            previousEpoch: record.previous.epoch,
+          }
+        : {}),
+      ...detail,
+    });
   }
 
   /**

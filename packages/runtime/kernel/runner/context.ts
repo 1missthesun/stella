@@ -6,6 +6,7 @@ import {
   createCloudThreadController,
 } from "./cloud-spawn-dispatch.js";
 import { createCloudTranscriptWriter } from "./cloud-transcript-write.js";
+import { createBrainLeaseView } from "./brain-lease.js";
 import { createToolHost } from "../tools/host.js";
 import type {
   AgentDirectoryListing,
@@ -682,9 +683,11 @@ export const createRunnerContext = ({
     },
   });
 
+  const brainLeases = createBrainLeaseView(deviceId);
   const cloudTranscript = createCloudTranscriptWriter({
     deviceId,
     store: runtimeStore,
+    brainLeases,
     onAssistantRecords: (payloadJsons: string[]) => {
       for (const payloadJson of payloadJsons) {
         linkedFilePublisher.publishText(assistantPayloadText(payloadJson));
@@ -1093,6 +1096,7 @@ export const createRunnerContext = ({
     notifyThreadActivityUpdated,
     getDefaultConversationId,
     cloudTranscript,
+    brainLeases,
     cloudOwnerGeneration: getCloudOwnerGeneration,
     linkedFilePublisher,
     loadExecutionContext: async () => {

@@ -1982,9 +1982,50 @@ export class StellaRuntimeHost {
       };
     }
   }
+  /**
+   * Where a conversation's Stella runs when not here: the host holding its
+   * brain lease, while that host can take turns (`@stella/contracts/turn-plane/pi-brain`).
+   * Null when this computer answers: it holds the lease, there is none, or
+   * the holder can't answer and this computer's turn takes the lease over.
+   * Both engines ask the same: pi's chat and the agent loops' Claude Code.
+   */
+  async brainTarget(
+    conversationId: string,
+    storageMode: unknown,
+  ): Promise<PlacedChatTarget | null> {
+    if (storageMode === "local" || conversationId.startsWith("local_")) {
+      return null;
+    }
+    const brain = await this.requestWorker<PiChatBrainResult>(
+      METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
+      { op: "brain", conversationId },
+      {
+        ensureWorker: true,
+        recordActivity: false,
+      },
+    ).catch(() => null);
+    return brain && brain.here === false && brain.target ? brain.target : null;
+  }
   async startChat(payload: PlacedChatPayload) {
     const target = placedChatTarget(payload, this.deviceIdentity?.deviceId);
     if (target) return await this.startPlacedChat(payload, target);
+    // Claude Code's Stella answers where the brain is, as pi's does; when
+    // that host can't take the send, this computer answers and its turn
+    // takes the lease over.
+    const brain = payload.handoff
+      ? null
+      : await this.brainTarget(payload.conversationId, payload.storageMode);
+    if (brain) {
+      try {
+        return await this.startPlacedChat(payload, brain);
+      } catch (error) {
+        if (!placementUnavailable(error)) throw error;
+        console.warn(
+          "[chat] Where Stella runs could not take this message; this computer answers it.",
+          error,
+        );
+      }
+    }
     return await this.requestWorker(
       METHOD_NAMES.INTERNAL_WORKER_START_CHAT,
       payload,
@@ -2017,21 +2058,13 @@ export class StellaRuntimeHost {
     // computer) answers there: this computer takes none of its turns
     // while that host can take them.
     let brainTarget = false;
-    if (
-      request?.op === "submit" &&
-      !target &&
-      request.send?.storageMode !== "local"
-    ) {
-      const brain = await this.requestWorker<PiChatBrainResult>(
-        METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
-        { op: "brain", conversationId: request.conversationId },
-        {
-          ensureWorker: true,
-          recordActivity: false,
-        },
-      ).catch(() => null);
-      if (brain && brain.here === false && brain.target) {
-        target = brain.target;
+    if (request?.op === "submit" && !target) {
+      const brain = await this.brainTarget(
+        request.conversationId,
+        request.send?.storageMode,
+      );
+      if (brain) {
+        target = brain;
         brainTarget = true;
       }
     }
@@ -2066,8 +2099,8 @@ export class StellaRuntimeHost {
           placed: { runId: placed.runId, userMessageId: placed.userMessageId },
         };
       } catch (error) {
-        // Where Stella runs is out of reach: this computer answers, as
-        // with no record, which stays for once that host is back.
+        // Where Stella runs is out of reach: this computer answers, and its
+        // turn takes the brain lease over from that host.
         if (!brainTarget || !placementUnavailable(error)) throw error;
         console.warn(
           "[pi-chat] Where Stella runs could not take this message; this computer answers it.",

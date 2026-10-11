@@ -1119,6 +1119,7 @@ export class StellaRuntimeHost {
                     executionId: placementLocalAgentThreadId(
                       dispatch.dispatchId,
                     ),
+                    remoteThreadId,
                   }
                 : {
                     threadId: placementLocalAgentThreadId(dispatch.dispatchId),

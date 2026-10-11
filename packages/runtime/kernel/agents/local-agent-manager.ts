@@ -77,6 +77,7 @@ type AgentTask = {
   toolWorkspaceRoot?: string;
   /** Where the agent starts; it is not confined there. */
   workingDirectory?: string;
+  remoteThreadId?: string;
   attachments?: AgentToolRequest["attachments"];
   agentDepth: number;
   maxAgentDepth?: number;
@@ -1255,6 +1256,7 @@ export class LocalAgentManager {
       ...(task.workingDirectory
         ? { workingDirectory: task.workingDirectory }
         : {}),
+      ...(task.remoteThreadId ? { remoteThreadId: task.remoteThreadId } : {}),
       status: task.status === "pending" || isParked ? "running" : task.status,
       attemptGeneration: task.attemptGeneration,
       ...(task.rootRunId ? { rootRunId: task.rootRunId } : {}),
@@ -1646,6 +1648,9 @@ export class LocalAgentManager {
         ? { toolWorkspaceRoot: record.toolWorkspaceRoot }
         : {}),
       ...(workingDirectory ? { workingDirectory } : {}),
+      ...(record.remoteThreadId
+        ? { remoteThreadId: record.remoteThreadId }
+        : {}),
       recentActivity: [`Continuing thread: ${truncate(prompt, 200)}`],
       lastActivityAt: Date.now(),
       activeToolCount: 0,
@@ -2611,6 +2616,9 @@ export class LocalAgentManager {
         ? { toolWorkspaceRoot: request.toolWorkspaceRoot }
         : {}),
       ...(workingDirectory ? { workingDirectory } : {}),
+      ...(request.remoteThreadId?.trim()
+        ? { remoteThreadId: request.remoteThreadId.trim() }
+        : {}),
       ...(request.attachments?.length
         ? { attachments: request.attachments }
         : {}),

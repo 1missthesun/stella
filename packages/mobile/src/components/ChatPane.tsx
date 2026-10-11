@@ -1,4 +1,10 @@
 import type { ReplyRef } from "@stella/contracts/reply-refs";
+import {
+  agentIdCanonicalizer,
+  agentIdsOf,
+  projectAgentLabels,
+  type AgentLabelRow,
+} from "@stella/contracts/agent-labels";
 import { AgentReportSheet, ReplyFocus, type AgentReplyRef } from "./ReplyFocus";
 import { type ReplyAgentStatus } from "./ReplyPreview";
 import {
@@ -700,26 +706,19 @@ export function ChatPane({
     [sessionAskRecords, visibleMessages],
   );
   const hiddenAgentChipIds = useMemo(() => {
-    const hidden = new Set<string>();
-    let previousKey: string | null = null;
-    for (const message of listMessages) {
-      if (message.role !== "assistant") {
-        previousKey = null;
-        continue;
-      }
+    const rows: AgentLabelRow[] = listMessages.map((message) => {
+      if (message.role !== "assistant") return { id: message.id, role: "user" };
       const context = replyContexts.contexts.get(message.id);
-      const ids = new Set<string>();
-      if (context?.kind === "agent") ids.add(context.threadId);
-      for (const quote of rowCompletionQuotes(
+      const agentIds = rowCompletionQuotes(
         consolidateRowArtifacts(message.artifacts ?? [], message.tasks ?? []).agentWork,
-      )) {
-        ids.add(quote.ref.threadId);
-      }
-      const key = ids.size > 0 ? [...ids].sort().join("\u0000") : null;
-      if (key && key === previousKey && context?.kind !== "message") {
-        hidden.add(message.id);
-      }
-      previousKey = key;
+      ).map((quote) => quote.ref.threadId);
+      if (context?.kind === "agent") agentIds.push(context.threadId);
+      return { id: message.id, role: "assistant", ...(agentIds.length ? { agentIds } : {}) };
+    });
+    const labeled = projectAgentLabels(rows, agentIdCanonicalizer(agentIdsOf(rows)));
+    const hidden = new Set<string>();
+    for (const row of rows) {
+      if (row.agentIds?.length && !labeled.has(row.id)) hidden.add(row.id);
     }
     return hidden;
   }, [listMessages, replyContexts]);

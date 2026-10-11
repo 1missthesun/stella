@@ -42,6 +42,7 @@ import {
   CONVERSATION_AGENT_THREADS_MAX,
 } from "@stella/contracts/backend/agent-threads";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
+import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { CloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
@@ -241,6 +242,44 @@ const control = (row: ThreadRow): AgentThreadControl => ({
 
 const readThread = (db: OwnerDbReader, threadId: string): ThreadRow | null =>
   db.one<ThreadRow>("SELECT * FROM agent_threads WHERE thread_id = ?", threadId);
+
+const PLACEMENT_ALIAS_SCAN_MAX = 500;
+
+const placementAliasThreadId = (
+  db: OwnerDbReader,
+  alias: string,
+  conversationId?: string,
+): string | null => {
+  const queries = conversationId
+    ? (["conversation_id", "origin_conversation_id"] as const).map((column) =>
+        db.all<{ thread_id: string }>(
+          `SELECT thread_id FROM agent_threads WHERE ${column} = ? AND executor_device_id IS NOT NULL`,
+          conversationId,
+        ),
+      )
+    : [
+        db.all<{ thread_id: string }>(
+          `SELECT thread_id FROM agent_threads WHERE executor_device_id IS NOT NULL
+            ORDER BY updated_at DESC LIMIT ?`,
+          PLACEMENT_ALIAS_SCAN_MAX,
+        ),
+      ];
+  for (const rows of queries) {
+    const match = rows.find((row) => placementRemoteThreadAgentId(row.thread_id) === alias);
+    if (match) return match.thread_id;
+  }
+  return null;
+};
+
+const readConversationThread = (
+  db: OwnerDbReader,
+  conversationId: string,
+  threadId: string,
+): ThreadRow | null => {
+  if (!isPlacementThreadId(threadId)) return readThread(db, threadId);
+  const resolved = placementAliasThreadId(db, threadId, conversationId);
+  return resolved ? readThread(db, resolved) : null;
+};
 
 const readTurn = (db: OwnerDbReader, turnId: string): TurnRow | null =>
   db.one<TurnRow>("SELECT * FROM agent_turns WHERE turn_id = ?", turnId);
@@ -704,7 +743,7 @@ const readCloudDeviceThread = (
   ctx: OwnerContext,
   args: { threadId: string; conversationId: string; ownerGeneration: string },
 ): ThreadRow => {
-  const thread = readThread(ctx.db, args.threadId);
+  const thread = readConversationThread(ctx.db, args.conversationId, args.threadId);
   if (
     !thread ||
     !thread.executor_device_id ||
@@ -824,7 +863,7 @@ const lookupConversationThread = async (
   ctx: OwnerContext,
   args: { conversationId: string; threadId: string; ownerGeneration?: string },
 ): Promise<AgentThreadLookup | null> => {
-  const thread = readThread(ctx.db, args.threadId);
+  const thread = readConversationThread(ctx.db, args.conversationId, args.threadId);
   if (
     !thread ||
     (thread.conversation_id !== args.conversationId &&
@@ -881,11 +920,10 @@ const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<
   const destination = await assertDeviceDestination(ctx, thread.executor_device_id!);
   ctx.db.run(
     `UPDATE agent_threads SET
-       status = 'running', attempt_generation = ?, description = ?,
+       status = 'running', attempt_generation = ?,
        result_json = NULL, error_message = NULL, updated_at = ?
      WHERE thread_id = ?`,
     thread.attempt_generation + 1,
-    clip(args.description.trim(), 1_000),
     ctx.now,
     thread.thread_id,
   );
@@ -1235,11 +1273,10 @@ const continueFromDesktop = async (
   const attemptGeneration = thread.attempt_generation + 1;
   ctx.db.run(
     `UPDATE agent_threads SET
-       status = 'running', attempt_generation = ?, description = ?,
+       status = 'running', attempt_generation = ?,
        origin_delivery_ack_at = NULL, result_json = NULL, error_message = NULL, updated_at = ?
      WHERE thread_id = ?`,
     attemptGeneration,
-    clip(args.description.trim(), 1_000),
     ctx.now,
     thread.thread_id,
   );
@@ -1403,7 +1440,7 @@ const deliverAgentMessage = async (
   ctx: OwnerContext,
   args: { ownerGeneration: string; messageId: string; to: string; framed: string },
 ): Promise<MessageDelivery> => {
-  const { to } = args;
+  const to = isPlacementThreadId(args.to) ? (placementAliasThreadId(ctx.db, args.to) ?? args.to) : args.to;
   const conversation = ctx.db.one<{ conversation_id: string }>(
     "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
     to,
@@ -2082,12 +2119,11 @@ export const applyAgentThreadEvent = (
       }
       db.run(
         `UPDATE agent_threads SET
-           status = 'running', attempt_generation = ?, description = ?, execution_json = ?,
+           status = 'running', attempt_generation = ?, execution_json = ?,
            origin_delivery_ack_at = NULL, result_json = NULL, error_message = NULL,
            updated_at = MAX(updated_at, ?)
          WHERE thread_id = ?`,
         event.attemptGeneration,
-        clip(event.description, 1_000),
         JSON.stringify(event.execution),
         event.createdAt,
         thread.thread_id,
@@ -2468,7 +2504,7 @@ export const agentThreadsDomain = {
     "agentThreads.get": {
       parse: object({ conversationId: id(), threadId: id() }),
       read: (ctx, args) => {
-        const row = readThread(ctx.db, args.threadId);
+        const row = readConversationThread(ctx.db, args.conversationId, args.threadId);
         return row && row.conversation_id === args.conversationId ? summary(row, ctx.ownerId) : null;
       },
     },

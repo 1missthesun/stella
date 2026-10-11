@@ -23,10 +23,27 @@ it("hides adjacent answers and keeps a return after unrelated conversation", () 
   expect(rows[0]).not.toHaveProperty("replyCount");
 });
 
-it("prefers the work label over a repeated quotation and suppresses repeated labels", () => {
+it("prefers the work label over a repeated quotation and marks the agent once", () => {
   const rows = withReplyContext([user("u2"), reply("r1", [message, agent]), reply("r2", [agent])]);
   expect(refs(rows[1]!)).toEqual([agent]);
   expect(refs(rows[2]!)).toEqual([]);
+  expect((rows[1] as AssistantRowViewModel).agentLabelIds).toEqual([agent.threadId]);
+  expect((rows[2] as AssistantRowViewModel).agentLabelIds).toBeUndefined();
+});
+
+it("marks the spawn and stays quiet until another agent", () => {
+  const other = { kind: "agent", threadId: "b1", title: "Other" } as const;
+  const rows = withReplyContext([
+    user("u1"),
+    reply("spawn", undefined, { replyToUserMessageId: "u1", backgroundWork: { threadIds: [agent.threadId] } as AssistantRowViewModel["backgroundWork"] }),
+    reply("update", [agent]),
+    user("u2"),
+    reply("plain", undefined, { replyToUserMessageId: "u2" }),
+    reply("again", [agent]),
+    reply("switch", [other]),
+  ]);
+  const labels = rows.map((row) => (row.kind === "assistant" ? row.agentLabelIds : undefined));
+  expect(labels).toEqual([undefined, [agent.threadId], undefined, undefined, undefined, undefined, ["b1"]]);
 });
 
 it("treats a completion as adjacent to the exchange that spawned its task", () => {

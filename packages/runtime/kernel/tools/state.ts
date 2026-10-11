@@ -20,6 +20,11 @@ import {
   type AgentDirectorySessionRow,
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
+import { followUpLabel } from "@stella/contracts/agent-titles";
+import {
+  isPlacementThreadId,
+  placementRemoteThreadAgentId,
+} from "@stella/contracts/placement-thread-id";
 import {
   agentThreadLookupController,
   agentThreadLookupLocation,
@@ -77,25 +82,6 @@ const toOptionalString = (value: unknown): string | undefined => {
   return trimmed.length > 0 ? trimmed : undefined;
 };
 
-
-/**
- * `send_message` asks the caller for no description, but the cloud
- * continuation mutation still requires a non-empty one and this device holds no
- * mirror of the cloud thread's current title. Local threads keep their spawn
- * name; only the cloud path needs a label, so derive it from the follow-up.
- */
-const cloudContinuationLabel = (message: string): string => {
-  const firstLine = message
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^task\s*:\s*/i, "");
-  if (!firstLine) {
-    return "Follow-up";
-  }
-  return firstLine.length > 80
-    ? `${firstLine.slice(0, 77).trimEnd()}...`
-    : firstLine;
-};
 
 const logWorkingIndicatorTrace = (
   label: string,
@@ -353,15 +339,21 @@ export const handleSendMessage = async (
     requested.toLowerCase() === STELLA_MESSAGE_TARGET
       ? context.conversationId
       : requested;
-  if (threadId === selfThreadId) {
+  const caller = callerThreadId
+    ? (api.readLocalAgentThread?.(callerThreadId) ?? null)
+    : null;
+  const signedThreadId = caller?.remoteThreadId ?? selfThreadId;
+  if (
+    threadId === selfThreadId ||
+    threadId === signedThreadId ||
+    (isPlacementThreadId(selfThreadId) &&
+      placementRemoteThreadAgentId(threadId) === selfThreadId)
+  ) {
     return { error: "That thread_id is you. Message another agent or session." };
   }
   const sender: AgentMessageSender = {
-    threadId: selfThreadId,
-    label: isOrchestrator
-      ? "Stella"
-      : (callerThreadId && api.readLocalAgentThread?.(callerThreadId)?.description) ||
-        "An agent",
+    threadId: signedThreadId,
+    label: isOrchestrator ? "Stella" : caller?.description || "An agent",
   };
   const framed = formatAgentMessage(sender, message);
   const isLocalOnlyChat = context.conversationId.startsWith("local_");
@@ -414,7 +406,7 @@ export const handleSendMessage = async (
   if (isOrchestrator && api.cloudContinue) {
     const continued = await api.cloudContinue({
       threadId,
-      description: cloudContinuationLabel(message),
+      description: followUpLabel(message),
       message,
       conversationId: context.conversationId,
       requestId: context.requestId,

@@ -933,6 +933,9 @@ export const createRunnerContext = ({
                 ? { parentAgentId: record.parentAgentId }
                 : {}),
               description: record.description,
+              ...(record.remoteThreadId
+                ? { remoteThreadId: record.remoteThreadId }
+                : {}),
             }
           : null;
       },

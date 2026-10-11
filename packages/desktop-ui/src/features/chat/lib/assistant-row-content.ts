@@ -23,6 +23,16 @@ import type {
 export const assistantRowHasVisibleContent = (
   row: AssistantRowViewModel,
 ): boolean =>
+  assistantRowHasOwnContent(row) || (row.agentLabelIds?.length ?? 0) > 0;
+
+/**
+ * Content a row paints apart from its agent pill. Spawn and completion rows
+ * paint no card of their own: the agent they concern is named by the pill,
+ * which only appears where the conversation turns to another agent.
+ */
+export const assistantRowHasOwnContent = (
+  row: AssistantRowViewModel,
+): boolean =>
   row.text.trim().length > 0 ||
   Boolean(row.officePreviewRef) ||
   Boolean(row.resourcePayload) ||
@@ -34,8 +44,7 @@ export const assistantRowHasVisibleContent = (
   (row.sourceDiffPayloads?.length ?? 0) > 0 ||
   Boolean(row.customSlot) ||
   Boolean(row.voiceSession) ||
-  (row.backgroundWork?.threadIds.length ?? 0) > 0 ||
-  (row.agentCompletion?.sections.length ?? 0) > 0;
+  (row.agentCompletion?.sections.some((section) => section.files.length > 0) ?? false);
 /**
  * Whether a timeline row produces a rendered box at all. User rows always
  * render; assistant rows render when they have visible content. A reply

@@ -266,6 +266,7 @@ export const runsHandlers: WorkerRpcHandlers = {
           const result = await chats.runPlacedAgent(payload.conversationId, {
             agentKey,
             runKey,
+            ...(payload.remoteThreadId ? { threadId: payload.remoteThreadId } : {}),
             description: payload.description,
             prompt: withAttachedFiles(payload.prompt, attachments),
           });

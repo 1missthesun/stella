@@ -23,7 +23,9 @@ const entryFor = (conversationId: string): Entry => {
 };
 
 const sameAgent = (a: JournalAgent | undefined, b: JournalAgent | undefined) =>
-  a?.title === b?.title && a?.status === b?.status;
+  a?.title === b?.title &&
+  a?.status === b?.status &&
+  (a?.followUpTitles ?? []).join("\u0000") === (b?.followUpTitles ?? []).join("\u0000");
 
 export const publishJournalAgents = (
   conversationId: string,

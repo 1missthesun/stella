@@ -33,6 +33,7 @@ type CloudAgentControlStore = {
     attemptGeneration: number;
     threadUpdatedAt: number;
     status: CloudAgentControlReceipt["status"];
+    description?: string;
   }) => CloudAgentThreadControlRecord;
   getCloudAgentToolOperation: (
     operationId: string,
@@ -316,6 +317,7 @@ const persistControl = (
   options: CloudSpawnDispatcherOptions,
   receipt: CloudDispatchResult,
   originConversationId: string,
+  description?: string,
 ): CloudAgentControlReceipt => {
   options.store.putCloudAgentThreadControl({
     threadId: receipt.threadId,
@@ -325,6 +327,7 @@ const persistControl = (
     attemptGeneration: receipt.attemptGeneration,
     threadUpdatedAt: receipt.threadUpdatedAt,
     status: receipt.status,
+    ...(description ? { description } : {}),
   });
   // The tool outcome is the immutable receipt for this operation, even if a
   // terminal subscription raced ahead and the mutable thread-control row is
@@ -498,7 +501,7 @@ export const createCloudSpawnDispatcher = (
         throw new Error(text);
       }
     }
-    persistControl(options, result, request.conversationId);
+    persistControl(options, result, request.conversationId, request.description);
     completeOperation(options, request.requestId, result);
     cloudConversationIds.set(request.conversationId, result.conversationId);
     return result;
@@ -571,7 +574,7 @@ export const createCloudThreadController = (
             threadId: request.threadId,
             expectedAttemptGeneration: current.attemptGeneration,
             expectedTerminalUpdatedAt: current.threadUpdatedAt,
-            description: request.description,
+            description: current.description ?? request.description,
             prompt: request.message,
             originDeviceId: options.deviceId,
             originConversationId: request.conversationId,

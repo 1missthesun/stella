@@ -13,6 +13,7 @@ import {
 import { AGENT_PAUSE_CANCEL_REASON } from "@stella/runtime/kernel/agents/local-agent-manager";
 import { createAgentTools } from "@stella/runtime/kernel/tools/defs/task.js";
 import type { AgentThreadLookup } from "@stella/contracts/backend/agent-threads";
+import { placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import type {
   AgentThreadStatusMessage,
   AgentThreadStatusRead,
@@ -1310,5 +1311,62 @@ describe("agent tools on a thread this conversation started elsewhere", () => {
     expect(pause.error).toBe(
       "No durable cloud control receipt is available for thread thread-9.",
     );
+  });
+});
+
+describe("send_message from an agent another device placed here", () => {
+  const CLOUD_ID = "thr-placedfrommac01";
+  const LOCAL_ID = placementRemoteThreadAgentId(CLOUD_ID);
+  const agentContext = {
+    conversationId: "conversation-1",
+    deviceId: "mac-1",
+    requestId: "request-1",
+    agentType: AGENT_IDS.GENERAL,
+    agentId: LOCAL_ID,
+  };
+  const placedContext = (remoteThreadId?: string) => {
+    const messaged: Array<{ to: string; from: { threadId: string; label: string } }> = [];
+    const ctx = createStateContext("/tmp", {
+      createAgent: async () => ({ threadId: "never" }),
+      getAgent: async () => null,
+      cancelAgent: async () => ({ canceled: false }),
+      sendAgentMessage: async () => ({ delivered: false }),
+      readLocalAgentThread: (threadId) =>
+        threadId === LOCAL_ID
+          ? {
+              threadId,
+              conversationId: "conversation-1",
+              description: "Disk cleanup",
+              ...(remoteThreadId ? { remoteThreadId } : {}),
+            }
+          : null,
+      messageCloudThread: async ({ to, from }) => {
+        messaged.push({ to, from });
+        return { delivered: "queued", threadId: to };
+      },
+    });
+    return { ctx, messaged };
+  };
+
+  it("signs the note with its cloud thread id, not the local placement id", async () => {
+    const { ctx, messaged } = placedContext(CLOUD_ID);
+    await expect(
+      handleSendMessage(ctx, { thread_id: "cloud-conversation", message: "Found it." }, agentContext),
+    ).resolves.toMatchObject({ result: { status: "delivered" } });
+    expect(messaged).toEqual([
+      { to: "cloud-conversation", from: { threadId: CLOUD_ID, label: "Disk cleanup" } },
+    ]);
+  });
+
+  it("treats both its cloud id and its placement id as itself", async () => {
+    for (const remoteThreadId of [CLOUD_ID, undefined]) {
+      const { ctx, messaged } = placedContext(remoteThreadId);
+      for (const target of [CLOUD_ID, LOCAL_ID]) {
+        await expect(
+          handleSendMessage(ctx, { thread_id: target, message: "Hi." }, agentContext),
+        ).resolves.toEqual({ error: "That thread_id is you. Message another agent or session." });
+      }
+      expect(messaged).toEqual([]);
+    }
   });
 });

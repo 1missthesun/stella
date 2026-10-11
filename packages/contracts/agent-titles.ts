@@ -10,7 +10,27 @@ export type AgentTitleRecord = {
 export type JournalAgent = {
   title?: string;
   status?: TaskLifecycleStatus;
+  /** Labels derived from follow-ups sent to it, which never name the agent. */
+  followUpTitles?: string[];
 };
+
+/**
+ * The label a follow-up `send_message` gives a continued cloud thread: its
+ * first line, clipped. Older runs stored it as the thread's description, so
+ * a description equal to one of these is the follow-up, not the agent's name.
+ */
+export const followUpLabel = (message: string): string => {
+  const firstLine = message
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^task\s*:\s*/i, "");
+  if (!firstLine) return "Follow-up";
+  return firstLine.length > 80 ? `${firstLine.slice(0, 77).trimEnd()}...` : firstLine;
+};
+
+/** Whether a title is only a follow-up's label for this agent. */
+export const isFollowUpTitle = (agent: JournalAgent | undefined, title: string | undefined): boolean =>
+  Boolean(title && agent?.followUpTitles?.includes(title.trim()));
 
 const LIVE_THREAD_STATUSES = new Set(["running", "resuming", "waiting_for_user"]);
 
@@ -137,6 +157,7 @@ export const journalAgents = (
   const hinted = new Map<string, string>();
   const spawnDescriptions = new Map<string, string>();
   const messageTargets = new Map<string, string>();
+  const followUps = new Map<string, Set<string>>();
   const agentFor = (threadId: string): JournalAgent => {
     let agent = agents.get(threadId);
     if (!agent) {
@@ -178,6 +199,12 @@ export const journalAgents = (
         } else if (entry.name === "send_message") {
           const target = nonEmpty(args?.thread_id);
           if (target) messageTargets.set(callId, target);
+          const message = nonEmpty(args?.message);
+          if (target && message) {
+            const labels = followUps.get(target) ?? new Set<string>();
+            labels.add(followUpLabel(message));
+            followUps.set(target, labels);
+          }
         }
       }
       continue;
@@ -205,7 +232,7 @@ export const journalAgents = (
       const text = payloadText(payload);
       const wake = wakeAgent(text);
       if (wake) {
-        hint(wake.threadId, wake.title);
+        if (!followUps.get(wake.threadId)?.has(wake.title ?? "")) hint(wake.threadId, wake.title);
         settle(wake.threadId, wake.status);
       }
       const note = agentNoteSender(text);
@@ -215,9 +242,14 @@ export const journalAgents = (
       }
     }
   }
+  for (const [threadId, labels] of followUps) {
+    const agent = agentFor(threadId);
+    agent.followUpTitles = [...labels];
+    if (agent.title && labels.has(agent.title)) delete agent.title;
+  }
   for (const [threadId, title] of hinted) {
     const agent = agentFor(threadId);
-    if (!agent.title) agent.title = title;
+    if (!agent.title && !followUps.get(threadId)?.has(title)) agent.title = title;
   }
   return agents;
 };

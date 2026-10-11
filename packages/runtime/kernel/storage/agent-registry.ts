@@ -54,6 +54,8 @@ export type PersistedAgentRecord = {
   toolWorkspaceRoot?: string;
   /** Where the agent starts; it is not confined there. */
   workingDirectory?: string;
+  /** The cloud thread another device placed here, which names this agent everywhere else. */
+  remoteThreadId?: string;
   status: TaskLifecycleStatus;
   /** Persisted ownership epoch so lifecycle ids remain unique after restart. */
   attemptGeneration: number;
@@ -119,6 +121,7 @@ export type AgentRecordInput = {
   modelConfigSnapshot?: unknown;
   toolWorkspaceRoot?: string;
   workingDirectory?: string;
+  remoteThreadId?: string;
   status: string;
   startedAt: number;
   completedAt?: number | null;
@@ -164,9 +167,9 @@ export class AgentRegistry {
            started_at, completed_at, result, error, updated_at, root_run_id,
            attempt_generation, cloud_terminal_receipt_generation,
            terminal_lifecycle_receipt_generation, descendant_boundary_state_json,
-           record_revision
+           remote_thread_id, record_revision
          )
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
          ON CONFLICT(thread_id) DO UPDATE SET
            conversation_id = excluded.conversation_id,
            storage_mode = excluded.storage_mode,
@@ -192,6 +195,7 @@ export class AgentRegistry {
            cloud_terminal_receipt_generation = excluded.cloud_terminal_receipt_generation,
            terminal_lifecycle_receipt_generation = excluded.terminal_lifecycle_receipt_generation,
            descendant_boundary_state_json = excluded.descendant_boundary_state_json,
+           remote_thread_id = COALESCE(agent.remote_thread_id, excluded.remote_thread_id),
            record_revision = agent.record_revision + 1
          WHERE excluded.attempt_generation >= agent.attempt_generation
            AND excluded.conversation_id = agent.conversation_id
@@ -225,6 +229,7 @@ export class AgentRegistry {
         record.cloudTerminalReceiptGeneration ?? null,
         record.terminalLifecycleReceiptGeneration ?? null,
         toJsonValueString(record.descendantBoundaryState) ?? null,
+        record.remoteThreadId ?? null,
       ) as { record_revision?: number } | undefined;
     this.hooks.refreshThreadSearchText(record.threadId);
     return revisionRow?.record_revision ?? null;
@@ -265,6 +270,9 @@ export class AgentRegistry {
       ...(row.working_directory
         ? { workingDirectory: row.working_directory }
         : {}),
+      ...(row.remote_thread_id
+        ? { remoteThreadId: row.remote_thread_id }
+        : {}),
       status: row.status,
       attemptGeneration: row.attempt_generation,
       recordRevision: row.record_revision,
@@ -298,7 +306,7 @@ export class AgentRegistry {
     started_at, completed_at, result, error, updated_at, root_run_id,
     attempt_generation, cloud_terminal_receipt_generation,
     terminal_lifecycle_receipt_generation, descendant_boundary_state_json,
-    record_revision
+    record_revision, remote_thread_id
   `;
 
   getAgentRecord(threadId: string): PersistedAgentRecord | null {

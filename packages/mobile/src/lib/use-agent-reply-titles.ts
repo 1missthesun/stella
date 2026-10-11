@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ChatArtifact, ChatMessage } from "../types";
 import { agentThreadStatus } from "@stella/contracts/agent-titles";
+import { CONVERSATION_AGENT_THREADS_MAX } from "@stella/contracts/backend/agent-threads";
+import { isPlacementThreadId, placementAliases } from "@stella/contracts/placement-thread-id";
 import { getBackendClient } from "./backend";
 
 const GENERIC_TITLE = "Task";
@@ -126,26 +128,50 @@ export function useAgentReplyTitles(
     } catch {
       return;
     }
-    const stops = key.split("\n").map((threadId) =>
-      client.watch(
-        "agentThreads.get",
-        { conversationId, threadId },
-        (thread) => {
-          if (!thread) return;
-          const description = thread.description?.trim();
-          const next: CloudAgent = {
-            ...(description && !untitled(description, threadId) ? { title: description } : {}),
-            state: cloudState(thread.status),
-          };
-          setAgents((current) => {
-            const previous = current.get(threadId);
-            if (previous?.title === next.title && previous?.state === next.state) return current;
-            return new Map(current).set(threadId, next);
-          });
-        },
-        () => {},
-      ),
-    );
+    const record = (threadId: string, thread: { description?: string; status: string }) => {
+      const description = thread.description?.trim();
+      const next: CloudAgent = {
+        ...(description && !untitled(description, threadId) ? { title: description } : {}),
+        state: cloudState(thread.status),
+      };
+      setAgents((current) => {
+        const previous = current.get(threadId);
+        if (previous?.title === next.title && previous?.state === next.state) return current;
+        return new Map(current).set(threadId, next);
+      });
+    };
+    const threadIds = key.split("\n");
+    const placed = new Set(threadIds.filter(isPlacementThreadId));
+    const stops = threadIds
+      .filter((threadId) => !placed.has(threadId))
+      .map((threadId) =>
+        client.watch(
+          "agentThreads.get",
+          { conversationId, threadId },
+          (thread) => {
+            if (thread) record(threadId, thread);
+          },
+          () => {},
+        ),
+      );
+    if (placed.size > 0) {
+      stops.push(
+        client.watch(
+          "agentThreads.forConversation",
+          { conversationId, limit: CONVERSATION_AGENT_THREADS_MAX },
+          (page) => {
+            const threads = page?.threads ?? [];
+            const aliases = placementAliases(threads.map((thread) => thread.threadId));
+            for (const threadId of placed) {
+              const cloudId = aliases.get(threadId);
+              const thread = cloudId ? threads.find((entry) => entry.threadId === cloudId) : undefined;
+              if (thread) record(threadId, thread);
+            }
+          },
+          () => {},
+        ),
+      );
+    }
     return () => {
       for (const stop of stops) stop();
     };

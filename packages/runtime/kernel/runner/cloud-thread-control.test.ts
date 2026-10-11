@@ -719,4 +719,60 @@ describe("desktop cloud thread controls", () => {
     expect(await controller.continueThread(request)).toEqual(first);
     expect(mutations).toBe(1);
   });
+
+  test("a follow-up keeps the name the thread was spawned with", async () => {
+    const continued: Array<Record<string, unknown>> = [];
+    const { store } = createStore();
+    const base = {
+      threadId: "thr-named",
+      ownerGeneration: OWNER_GENERATION,
+      cloudConversationId: "cloud-conversation",
+      originConversationId: "local-conversation",
+    };
+    store.putCloudAgentThreadControl({
+      ...base,
+      attemptGeneration: 1,
+      threadUpdatedAt: 100,
+      status: "running",
+      description: "Disk cleanup",
+    });
+    store.putCloudAgentThreadControl({
+      ...base,
+      attemptGeneration: 1,
+      threadUpdatedAt: 200,
+      status: "completed",
+      description: "Ignored later name",
+    });
+    expect(
+      store.getCloudAgentThreadControl("thr-named", OWNER_GENERATION)?.description,
+    ).toBe("Disk cleanup");
+    const controller = createCloudThreadController({
+      backendRefs: { cloud_apps: { continueMyCloudAgentFromDesktop: "continue-ref" } },
+      deviceId: "device-1",
+      mutation: async (_ref, args) => {
+        continued.push(args as Record<string, unknown>);
+        return {
+          threadId: "thr-named",
+          conversationId: "cloud-conversation",
+          attemptGeneration: 2,
+          threadUpdatedAt: 300,
+          status: "running",
+        };
+      },
+      action: async () => {
+        throw new Error("not used");
+      },
+      getOwnerGeneration: async () => OWNER_GENERATION,
+      store,
+      isSignedIn: () => true,
+    });
+    await controller.continueThread({
+      threadId: "thr-named",
+      description: "Also check Downloads",
+      message: "Also check Downloads.",
+      conversationId: "local-conversation",
+      requestId: "request-named",
+    });
+    expect(continued.map((args) => args.description)).toEqual(["Disk cleanup"]);
+  });
 });

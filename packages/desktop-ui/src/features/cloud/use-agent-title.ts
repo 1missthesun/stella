@@ -1,5 +1,11 @@
+import { useMemo } from "react";
 import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
-import { agentThreadStatus } from "@stella/contracts/agent-titles";
+import { agentThreadStatus, isFollowUpTitle } from "@stella/contracts/agent-titles";
+import { CONVERSATION_AGENT_THREADS_MAX } from "@stella/contracts/backend/agent-threads";
+import {
+  isPlacementThreadId,
+  placementRemoteThreadAgentId,
+} from "@stella/contracts/placement-thread-id";
 import { isPrivateConversationId } from "@/features/chat/services/chat-storage-preference";
 import { fallbackTaskDescription } from "@/features/chat/lib/event-transforms";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
@@ -29,6 +35,32 @@ export type AgentCard = {
   status?: TaskLifecycleStatus;
 };
 
+/**
+ * The cloud thread an agent id names. A device-placed agent cited by its
+ * local placement id resolves to the conversation's cloud thread whose id
+ * hashes to it.
+ */
+function useCloudThreadId(conversationId: string, threadId: string, enabled: boolean): string {
+  const placed = enabled && isPlacementThreadId(threadId);
+  const page = useBackendView(
+    "agentThreads.forConversation",
+    placed ? { conversationId, limit: CONVERSATION_AGENT_THREADS_MAX } : "skip",
+  );
+  const threads = page.value?.threads;
+  return useMemo(() => {
+    if (!placed || !threads) return threadId;
+    const match = threads.find(
+      (thread) => placementRemoteThreadAgentId(thread.threadId) === threadId,
+    );
+    return match?.threadId ?? threadId;
+  }, [placed, threadId, threads]);
+}
+
+/**
+ * An agent's title and status. The cloud agent list is the authority for
+ * the title; the transcript's own titles are a first guess while it loads
+ * and the fallback for agents the cloud never held.
+ */
 export function useAgentCard(
   conversationId: string,
   threadId: string,
@@ -36,29 +68,34 @@ export function useAgentCard(
   localStatus?: TaskLifecycleStatus,
 ): AgentCard {
   const { isCloudConversationReady, ownerSubject } = useCloudConversationSession();
+  const cloudEnabled =
+    Boolean(threadId) && isCloudConversationReady && !isPrivateConversationId(conversationId);
+  const cloudThreadId = useCloudThreadId(conversationId, threadId, cloudEnabled);
   const journal = useJournalAgent(conversationId, threadId);
-  const titles = [...candidates, journal?.title];
-  const derived = fallbackTaskDescription(threadId);
-  const known = firstTitle(titles, threadId, (title) => title !== derived);
+  const cloudJournal = useJournalAgent(conversationId, cloudThreadId);
   const lookup = useBackendView(
     "agentThreads.get",
-    (!known || (!localStatus && (!journal?.status || journal.status === "running"))) &&
-      threadId &&
-      isCloudConversationReady &&
-      !isPrivateConversationId(conversationId)
-      ? { conversationId, threadId }
-      : "skip",
+    cloudEnabled ? { conversationId, threadId: cloudThreadId } : "skip",
   );
   const thread =
     lookup.value && cloudConversationBelongsToOwnerSubject(lookup.value, ownerSubject)
       ? lookup.value
       : null;
+  const notFollowUp = (title: string) =>
+    !isFollowUpTitle(journal, title) && !isFollowUpTitle(cloudJournal, title);
+  const cloudTitle = thread ? plainTitle(thread.description, cloudThreadId) : "";
+  const titles = [...candidates, cloudJournal?.title, journal?.title];
+  const derived = fallbackTaskDescription(threadId);
   const title =
-    known ||
-    (thread ? plainTitle(thread.description, threadId) : "") ||
+    (cloudTitle && notFollowUp(cloudTitle) ? cloudTitle : "") ||
+    firstTitle(titles, threadId, (value) => value !== derived && notFollowUp(value)) ||
+    cloudTitle ||
     firstTitle(titles, threadId, () => true);
   const status =
-    localStatus ?? (thread ? agentThreadStatus(thread.status) : undefined) ?? journal?.status;
+    localStatus ??
+    (thread ? agentThreadStatus(thread.status) : undefined) ??
+    cloudJournal?.status ??
+    journal?.status;
   return {
     ...(title ? { title } : {}),
     ...(status ? { status } : {}),

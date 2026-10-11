@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import type { OwnerEvent } from "@stella/contracts/turn-plane/owner-events";
+import { placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import {
   agentThreadElsewhereError,
   agentThreadElsewhereStatus,
@@ -22,10 +23,14 @@ const OTHER_CONV = "7a1f3b8d-2c4e-4d6f-9a0b-1c2d3e4f5a6b";
 let h: OwnerStoreHarness;
 let steered: Array<{ dispatchId: string; text: string }>;
 let canceled: string[];
+let dispatched: Array<{ turnId: string; description: string }>;
+let completions: string[];
 
 beforeEach(async () => {
   steered = [];
   canceled = [];
+  dispatched = [];
+  completions = [];
   let dispatches = 0;
   h = createOwnerStoreHarness({
     host: {
@@ -33,13 +38,19 @@ beforeEach(async () => {
         { deviceId: "mac-1", label: "Rahul's Mac", remoteExecutionEnabled: true, online: true },
         { deviceId: "desk-1", label: "omarchy", remoteExecutionEnabled: true, online: true },
       ],
-      dispatchDeviceAgentTurn: async () => ({ dispatchId: `dsp-${++dispatches}` }),
+      dispatchDeviceAgentTurn: async (input) => {
+        dispatched.push({ turnId: input.turnId, description: input.description });
+        return { dispatchId: `dsp-${++dispatches}` };
+      },
       steerDeviceAgentTurn: async (input) => {
         steered.push({ dispatchId: input.dispatchId, text: input.text });
         return { delivered: true };
       },
       cancelDeviceAgentTurn: async (input) => {
         canceled.push(input.dispatchId);
+      },
+      deliverAgentCompletion: async (input) => {
+        completions.push(input.description);
       },
     },
   });
@@ -178,3 +189,74 @@ describe("a conversation finds agents it started somewhere else", () => {
     expect(await resolveConversationAgentThread(cloudOrchestrator(), "thr-missing")).toBeNull();
   });
 });
+
+describe("a device-placed agent cited by its local placement id", () => {
+  test("resolves to the cloud thread in that conversation's lookups and view", async () => {
+    const { threadId } = await spawnFromCloud();
+    const alias = placementRemoteThreadAgentId(threadId);
+
+    expect(await resolveConversationAgentThread(cloudOrchestrator(), alias)).toMatchObject({
+      kind: "adopted",
+      control: { threadId, description: "Disk cleanup", executorDeviceId: "mac-1" },
+    });
+    expect(await h.call("agentThreads.lookup", { conversationId: CONV, threadId: alias })).toMatchObject({
+      threadId,
+      description: "Disk cleanup",
+    });
+    const view = await h.watch("agentThreads.get", { conversationId: CONV, threadId: alias });
+    expect(view()).toMatchObject({ threadId, description: "Disk cleanup" });
+
+    expect(await resolveConversationAgentThread(cloudOrchestrator(OTHER_CONV), alias)).toBeNull();
+    expect(
+      await resolveConversationAgentThread(cloudOrchestrator(), placementRemoteThreadAgentId("thr-missing")),
+    ).toBeNull();
+  });
+
+  test("a message to it reaches the running cloud thread", async () => {
+    const { threadId } = await spawnFromCloud();
+    const response = await h.store.internalCall("agentThreads.message", {
+      ownerGeneration: GEN,
+      messageId: "msg:alias-0001",
+      to: placementRemoteThreadAgentId(threadId),
+      text: "Also check Downloads.",
+      from: { threadId: CONV, label: "Stella" },
+    });
+    expect(response).toMatchObject({ ok: true, value: { delivered: "steered", threadId } });
+    expect(steered).toHaveLength(1);
+  });
+});
+
+describe("a follow-up to a device agent", () => {
+  test("keeps the agent's name instead of the follow-up's label", async () => {
+    const { threadId } = await spawnFromCloud();
+    const settled = await h.store.internalCall("agentThreads.deviceSettled", {
+      turnId: dispatched[0]!.turnId,
+      state: "completed",
+      resultJson: JSON.stringify({ finalText: "Freed 42 GB." }),
+    });
+    expect(settled).toMatchObject({ ok: true, value: { settled: true } });
+
+    const continued = await h.store.internalCall("agentThreads.continueOnDevice", {
+      ownerGeneration: GEN,
+      conversationId: CONV,
+      threadId,
+      controlRequestId: "continue-0001",
+      description: "Also empty the Downloads folder.",
+      prompt: "Also empty the Downloads folder.",
+    });
+    expect(continued).toMatchObject({ ok: true, value: { threadId, status: "running" } });
+    await h.runJobs(Date.now() + 1_000);
+
+    expect(await h.call("agentThreads.lookup", { conversationId: CONV, threadId })).toMatchObject({
+      description: "Disk cleanup",
+    });
+    expect(dispatched.map((turn) => turn.description)).toEqual(["Disk cleanup", "Disk cleanup"]);
+    await h.store.internalCall("agentThreads.deviceSettled", {
+      turnId: dispatched[1]!.turnId,
+      state: "completed",
+      resultJson: JSON.stringify({ finalText: "Emptied Downloads." }),
+    });
+    expect(completions).toEqual(["Disk cleanup", "Disk cleanup"]);
+  });
+});
+

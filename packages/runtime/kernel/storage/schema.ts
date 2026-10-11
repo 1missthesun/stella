@@ -27,7 +27,7 @@ import {
   legacyTablesPresent,
 } from "./legacy-import.js";
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 const FTS_TOKENIZER = "'porter unicode61 remove_diacritics 2'";
 
@@ -180,7 +180,8 @@ CREATE TABLE IF NOT EXISTS agent (
   cloud_terminal_receipt_generation INTEGER,
   terminal_lifecycle_receipt_generation INTEGER,
   descendant_boundary_state_json TEXT,
-  record_revision INTEGER NOT NULL DEFAULT 0
+  record_revision INTEGER NOT NULL DEFAULT 0,
+  remote_thread_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_agent_conversation_updated
   ON agent(conversation_id, updated_at, thread_id);
@@ -441,6 +442,7 @@ CREATE TABLE IF NOT EXISTS cloud_agent_thread_controls (
   ),
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
+  description TEXT,
   PRIMARY KEY (thread_id, owner_generation)
 );
 CREATE INDEX IF NOT EXISTS idx_cloud_agent_thread_controls_origin
@@ -698,6 +700,19 @@ const MIGRATIONS: Migration[] = [
         db.exec("ALTER TABLE agent ADD COLUMN working_directory TEXT;");
       } catch {
         /* column already exists */
+      }
+    },
+  },
+  {
+    version: 7,
+    apply: (db) => {
+      for (const statement of [
+        "ALTER TABLE agent ADD COLUMN remote_thread_id TEXT;",
+        "ALTER TABLE cloud_agent_thread_controls ADD COLUMN description TEXT;",
+      ]) {
+        try {
+          db.exec(statement);
+        } catch {}
       }
     },
   },

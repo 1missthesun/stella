@@ -47,6 +47,7 @@ import {
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
 import type { AgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
+import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
 import { switchDestinationTool, type StellaExecutionHost } from "./execution.ts";
@@ -198,6 +199,8 @@ export type PlacedAgentRun = {
   agentKey: string;
   /** This run (a continued agent runs again under the same `agentKey`). */
   runKey: string;
+  /** Its thread id at the host that placed it, which names it everywhere else. */
+  threadId?: string;
   description: string;
   prompt: string;
   /** The host that placed it canceled it: it stops, or never starts. */
@@ -1111,7 +1114,12 @@ export function stellaAgents(host: StellaAgentsHost) {
   ) => {
     assertMessageSize(message);
     const { self, root } = await chainOf(api, context);
-    if (threadId === self.threadId) throw new Error("That thread_id is you. Message another agent or session.");
+    if (
+      threadId === self.threadId ||
+      (self.threadId && isPlacementThreadId(threadId) && placementRemoteThreadAgentId(self.threadId) === threadId)
+    ) {
+      throw new Error("That thread_id is you. Message another agent or session.");
+    }
     const from = senderOf(self, conversation ?? STELLA_MESSAGE_TARGET);
     const target = root === undefined ? undefined : (await agentTree(api, root, context)).find((agent) => agent.threadId === threadId);
     if (target && !target.record.origin && (target.reports || target.record.remote)) {
@@ -1427,6 +1435,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           runsOn,
           placement: host.rootPlacement,
           detached: true,
+          ...(args.threadId ? { threadId: args.threadId } : {}),
         }),
       context,
     );

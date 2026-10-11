@@ -48,7 +48,6 @@ import { WebSearchResultsStrip } from "@/app/chat/WebSearchResultsStrip";
 import { MapRouteCards } from "@/app/chat/MapRouteCard";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
 import { OfficePreviewCard } from "@/app/chat/OfficePreviewCard";
-import { BackgroundWorkCard } from "@/app/chat/BackgroundWorkCard";
 import { FilePills } from "@/app/chat/FilePills";
 import type { ConversationFileEntry } from "@/features/workspace-display/derive-conversation-files";
 import { MessageAttachments } from "@/app/chat/evidence/MessageAttachments";
@@ -66,6 +65,7 @@ import { AppPreviewCard } from "@/features/cloud/AppPreviewCard";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import { VoiceSessionCard } from "@/app/chat/VoiceSessionCard";
 import { ReplyPreview } from "@/app/chat/ReplyPreview";
+import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { ReplyReportLinks } from "@/app/chat/ReplyReportLinks";
 import { AgentUpdateCard } from "@/features/app-source/AppSourceCards";
 import { sanitizeAttachmentImageUrl } from "@/shared/lib/url-safety";
@@ -637,7 +637,6 @@ type AssistantRowProps = {
   row: AssistantRowViewModel;
   conversationId?: string | null;
   agentModelConfigByThread?: AgentModelConfigsByThread;
-  hideAgentChip?: boolean;
 };
 
 export const AssistantMessageRow = memo(
@@ -646,7 +645,6 @@ export const AssistantMessageRow = memo(
   function AssistantMessageRow({
     row,
     conversationId,
-    hideAgentChip = false,
   }: AssistantRowProps) {
     const reply = useMessageReply();
     const text = row.text;
@@ -654,9 +652,28 @@ export const AssistantMessageRow = memo(
     const hasWebSearchResults = (row.webSearchResults?.length ?? 0) > 0;
     const hasMapArtifacts = (row.mapArtifacts?.length ?? 0) > 0;
     const hasVoiceSession = Boolean(row.voiceSession);
-    const hasBackgroundWork = Boolean(
-      row.backgroundWork && row.backgroundWork.threadIds.length > 0,
+    const labelIds = row.agentLabelIds ?? [];
+    const pillCompletions = (row.agentCompletion?.sections ?? []).filter((section) =>
+      labelIds.includes(section.agentId),
     );
+    const pillRefs: ReplyRef[] = [
+      ...(row.replyRefs ?? []).filter((ref) => ref.kind === "message"),
+      ...labelIds
+        .filter((threadId) => !pillCompletions.some((section) => section.agentId === threadId))
+        .map(
+          (threadId): ReplyRef => ({
+            kind: "agent",
+            threadId,
+            title:
+              row.backgroundWork?.descriptions?.[threadId] ??
+              row.replyRefs?.find(
+                (ref): ref is Extract<ReplyRef, { kind: "agent" }> =>
+                  ref.kind === "agent" && ref.threadId === threadId,
+              )?.title ??
+              "",
+          }),
+        ),
+    ];
     const hasAgentCompletion = Boolean(
       row.agentCompletion && row.agentCompletion.sections.length > 0,
     );
@@ -762,12 +779,10 @@ export const AssistantMessageRow = memo(
           {hasVoiceSession && row.voiceSession && (
             <VoiceSessionCard durationMs={row.voiceSession.durationMs} />
           )}
-          {conversationId &&
-          !hideAgentChip &&
-          ((row.replyRefs && row.replyRefs.length > 0) || hasAgentCompletion) ? (
+          {conversationId && (pillRefs.length > 0 || pillCompletions.length > 0) ? (
             <ReplyPreview
-              refs={row.replyRefs ?? []}
-              completions={row.agentCompletion?.sections}
+              refs={pillRefs}
+              completions={pillCompletions}
               conversationId={conversationId}
             />
           ) : null}
@@ -844,29 +859,6 @@ export const AssistantMessageRow = memo(
           {row.agentCompletion?.sections.map((section) => (
             <AgentUpdateCard key={`update:${section.agentId}`} agentId={section.agentId} />
           ))}
-          {hasBackgroundWork && row.backgroundWork ? (
-            <BackgroundWorkCard
-              threadIds={row.backgroundWork.threadIds}
-              completedThreadIds={row.backgroundWork.completedThreadIds}
-              pausedThreadIds={row.backgroundWork.pausedThreadIds}
-              failedThreadIds={row.backgroundWork.failedThreadIds}
-              supersededThreadIds={row.backgroundWork.supersededThreadIds}
-              spawnedAtMs={row.backgroundWork.spawnedAtMs}
-              descriptions={row.backgroundWork.descriptions}
-              statusTexts={row.backgroundWork.statusTexts}
-              followUpThreadIds={row.backgroundWork.followUpThreadIds}
-              cardId={row.backgroundWork.cardId}
-              startEventIdsByThread={row.backgroundWork.startEventIdsByThread}
-              attemptGenerationsByThread={
-                row.backgroundWork.attemptGenerationsByThread
-              }
-              rootRunIdsByThread={row.backgroundWork.rootRunIdsByThread}
-              terminalEventIdsByThread={
-                row.backgroundWork.terminalEventIdsByThread
-              }
-              conversationId={conversationId ?? ""}
-            />
-          ) : null}
           {hasWebSearchResults && row.webSearchResults && (
             <WebSearchResultsStrip results={row.webSearchResults} />
           )}
@@ -893,6 +885,5 @@ export const AssistantMessageRow = memo(
   (prev, next) =>
     prev.conversationId === next.conversationId &&
     prev.agentModelConfigByThread === next.agentModelConfigByThread &&
-    prev.hideAgentChip === next.hideAgentChip &&
     eventRowEqual(prev.row, next.row),
 );

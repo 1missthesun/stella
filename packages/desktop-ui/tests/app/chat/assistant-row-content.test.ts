@@ -80,23 +80,22 @@ describe("assistantRowHasVisibleContent", () => {
     ["sourceDiffPayloads", { sourceDiffPayloads: [{} as never] }],
     ["customSlot", { customSlot: {} as never }],
     ["voiceSession", { voiceSession: {} as never }],
+    ["agentLabelIds", { agentLabelIds: ["t1"] }],
     [
-      "backgroundWork",
-      {
-        backgroundWork: {
-          threadIds: ["t1"],
-          descriptions: {},
-          spawnedAtMs: {},
-          completedThreadIds: [],
-          supersededThreadIds: [],
-        } as never,
-      },
-    ],
-    [
-      "agentCompletion",
-      { agentCompletion: { sections: [{} as never] } as never },
+      "agentCompletion files",
+      { agentCompletion: { sections: [{ files: [{}] } as never] } as never },
     ],
   ];
+
+  it("drops a spawn or completion row that has no label of its own", () => {
+    expect(
+      assistantRowHasVisibleContent({
+        ...baseRow(),
+        backgroundWork: { threadIds: ["t1"], descriptions: {}, spawnedAtMs: {} } as never,
+        agentCompletion: { sections: [{ files: [] } as never] } as never,
+      }),
+    ).toBe(false);
+  });
 
   it.each(visibleFieldCases)(
     "keeps a row that carries only %s",

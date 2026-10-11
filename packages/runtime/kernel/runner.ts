@@ -369,7 +369,18 @@ export const createStellaHostRunner = (
       row.placement === "computer" &&
       row.executorDeviceId === null &&
       !context.runtimeStore.getAgentRecord?.(row.threadId),
-    onLifecycleEvent: taskOrchestration.handleExternalAgentLifecycleEvent,
+    onLifecycleEvent: (event) => {
+      const spawned =
+        event.agentId && event.ownerGeneration
+          ? context.runtimeStore.getCloudAgentThreadControl(
+              event.agentId,
+              event.ownerGeneration,
+            )?.description
+          : undefined;
+      return taskOrchestration.handleExternalAgentLifecycleEvent(
+        spawned ? { ...event, description: spawned } : event,
+      );
+    },
     onControlReceipt: (row) => {
       context.runtimeStore.putCloudAgentThreadControl({
         threadId: row.threadId,

@@ -4,6 +4,13 @@ import {
   titleNamesThread,
   type ReplyContextRow,
 } from "@stella/contracts/reply-context";
+import {
+  agentIdCanonicalizer,
+  agentIdsOf,
+  projectAgentLabels,
+  type AgentLabelRow,
+} from "@stella/contracts/agent-labels";
+import { assistantRowHasOwnContent } from "./assistant-row-content";
 
 export type ReplyContextOptions = {
   /**
@@ -101,9 +108,35 @@ export function withReplyContext(
     };
   });
   const { contexts } = projectReplyContexts(input);
+  const labelRows: AgentLabelRow[] = rows.map((row) => {
+    if (row.kind === "user") {
+      return { id: row.id, role: "user", ...(row.hidden || rendersNothing(row) ? { hidden: true } : {}) };
+    }
+    const agentIds = [
+      ...(row.backgroundWork?.threadIds ?? []),
+      ...(row.spawnedThreadIds ?? []),
+      ...(row.agentCompletion?.sections.map((section) => section.agentId) ?? []),
+      ...(row.replyRefs ?? []).flatMap((ref) => (ref.kind === "agent" ? [ref.threadId] : [])),
+    ];
+    const paints =
+      assistantRowHasOwnContent(row) || Boolean(row.backgroundWork) || Boolean(row.agentCompletion);
+    return {
+      id: row.id,
+      role: "assistant",
+      ...(paints ? {} : { hidden: true }),
+      ...(agentIds.length ? { agentIds } : {}),
+    };
+  });
+  const labels = projectAgentLabels(labelRows, agentIdCanonicalizer(agentIdsOf(labelRows)));
   return rows.map((row) => {
-    if (row.kind !== "assistant" || !row.replyRefs?.length) return row;
+    if (row.kind !== "assistant") return row;
+    const agentLabelIds = labels.get(row.id);
+    if (!row.replyRefs?.length && !agentLabelIds) return row;
     const visible = contexts.get(row.id);
-    return { ...row, replyRefs: visible ? [visible] : [] };
+    return {
+      ...row,
+      ...(row.replyRefs ? { replyRefs: visible ? [visible] : [] } : {}),
+      ...(agentLabelIds ? { agentLabelIds } : {}),
+    };
   });
 }

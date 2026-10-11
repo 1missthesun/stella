@@ -137,6 +137,7 @@ export type CloudAgentThreadControlRecord = {
   attemptGeneration: number;
   threadUpdatedAt: number;
   status: CloudAgentControlStatus;
+  description?: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -554,6 +555,7 @@ export class SessionStore {
            attempt_generation AS attemptGeneration,
            thread_updated_at AS threadUpdatedAt,
            status,
+           description,
            created_at AS createdAt,
            updated_at AS updatedAt
          FROM cloud_agent_thread_controls
@@ -561,9 +563,13 @@ export class SessionStore {
          LIMIT 1`,
       )
       .get(threadId, ownerGeneration) as
-      | CloudAgentThreadControlRecord
+      | (Omit<CloudAgentThreadControlRecord, "description"> & {
+          description: string | null;
+        })
       | undefined;
-    return row ?? null;
+    if (!row) return null;
+    const { description, ...control } = row;
+    return description ? { ...control, description } : control;
   }
 
   /**
@@ -579,6 +585,7 @@ export class SessionStore {
     attemptGeneration: number;
     threadUpdatedAt: number;
     status: CloudAgentControlStatus;
+    description?: string;
   }): CloudAgentThreadControlRecord {
     const threadId = asTrimmedString(record.threadId);
     const ownerGeneration = asTrimmedString(record.ownerGeneration);
@@ -649,13 +656,15 @@ export class SessionStore {
                attempt_generation,
                thread_updated_at,
                status,
+               description,
                created_at,
                updated_at
-             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
              ON CONFLICT(thread_id, owner_generation) DO UPDATE SET
                attempt_generation = excluded.attempt_generation,
                thread_updated_at = excluded.thread_updated_at,
                status = excluded.status,
+               description = COALESCE(cloud_agent_thread_controls.description, excluded.description),
                updated_at = excluded.updated_at`,
           )
           .run(
@@ -666,9 +675,17 @@ export class SessionStore {
             record.attemptGeneration,
             record.threadUpdatedAt,
             record.status,
+            record.description?.trim() || null,
             now,
             now,
           );
+      } else if (existing && !existing.description && record.description?.trim()) {
+        this.cached
+          .prepare(
+            `UPDATE cloud_agent_thread_controls SET description = ?
+             WHERE thread_id = ? AND owner_generation = ? AND description IS NULL`,
+          )
+          .run(record.description.trim(), threadId, ownerGeneration);
       }
       const stored = this.getCloudAgentThreadControl(threadId, ownerGeneration);
       if (!stored)

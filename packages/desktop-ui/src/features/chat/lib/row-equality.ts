@@ -425,6 +425,7 @@ const assistantRowEqual = (
   JSON.stringify(a.responseTarget ?? null) ===
     JSON.stringify(b.responseTarget ?? null) &&
   replyRefsKey(a.replyRefs) === replyRefsKey(b.replyRefs) &&
+  (a.agentLabelIds ?? []).join(" ") === (b.agentLabelIds ?? []).join(" ") &&
   (a.spawnedThreadIds ?? []).join(" ") === (b.spawnedThreadIds ?? []).join(" ") &&
   (a.spawnedDescriptions ?? []).join("\u001f") === (b.spawnedDescriptions ?? []).join("\u001f") &&
   (a.officePreviewRef?.sessionId ?? null) ===

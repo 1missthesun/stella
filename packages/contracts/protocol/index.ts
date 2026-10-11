@@ -612,6 +612,8 @@ export type RuntimeLocalAgentRequest = {
    * remote agent thread continued on this device). Defaults to `threadId`.
    */
   executionId?: string;
+  /** The cloud thread this agent is, when another device placed it here. */
+  remoteThreadId?: string;
   /**
    * The requester's `spawn_agent` model selector. A selector this device
    * cannot run fails the agent with the reason.

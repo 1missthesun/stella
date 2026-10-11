@@ -98,6 +98,11 @@ export type AssistantRowViewModel = {
    * preview above the bubble; each entry opens focus on its target.
    */
   replyRefs?: ReplyRef[];
+  /**
+   * Agents this row's reply pill names: set only where the conversation
+   * turns to a different agent (`@stella/contracts/agent-labels`).
+   */
+  agentLabelIds?: string[];
   /** User turn this assistant row belongs to (for inline-image coalescing). */
   replyToUserMessageId?: string;
   /**

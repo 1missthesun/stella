@@ -252,6 +252,7 @@ export type AgentToolRequest = {
   maxAgentDepth?: number;
   parentAgentId?: string;
   threadId?: string;
+  remoteThreadId?: string;
   storageMode: "cloud" | "local";
   /** Required by the local manager whenever storageMode is cloud. */
   ownerGeneration?: string;
@@ -379,6 +380,7 @@ export type LocalAgentThreadIdentity = {
   conversationId: string;
   parentAgentId?: string;
   description: string;
+  remoteThreadId?: string;
 };
 
 export type AgentToolApi = {

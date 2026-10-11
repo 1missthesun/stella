@@ -5,7 +5,7 @@
    leading slot that doubles as the status tell (static star while the
    title shimmer carries the running motion, a quiet grey check once done,
    an arrow for `send_message` follow-ups) and a trailing chevron as the
-   click-through affordance. Shared by BackgroundWorkCard and
+   click-through affordance. Shared by
    the task quote bubble (ReplyPreview) and FilePills.
    ============================================================ */
 

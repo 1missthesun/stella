@@ -16,11 +16,11 @@ import {
   EVIDENCE_TILE_WIDTH,
   type EvidenceCard,
 } from "@stella/contracts/chat-evidence";
+import { isReplyMediaKind } from "@stella/contracts/reply-attachments";
 import {
   describeEvidenceSources,
   evidencePlaybackMimeType,
   evidenceTitleFor,
-  isMediaSourceKind,
   pillCardFor,
   EVIDENCE_MEDIA_CAP,
   EVIDENCE_PILL_CAP,
@@ -119,7 +119,7 @@ export const useChatEvidence = (args: {
     [pathKey],
   );
   const mediaSources = useMemo(
-    () => sources.filter((source) => isMediaSourceKind(source.kind)),
+    () => sources.filter((source) => isReplyMediaKind(source.kind)),
     [sources],
   );
   const [previews, setPreviews] = useState<Record<string, PreviewState>>({});
@@ -169,7 +169,7 @@ export const useChatEvidence = (args: {
     let overflowCount = 0;
 
     for (const source of sources) {
-      if (!isMediaSourceKind(source.kind)) {
+      if (!isReplyMediaKind(source.kind)) {
         if (pills.length >= EVIDENCE_PILL_CAP) {
           overflowCount += 1;
           continue;

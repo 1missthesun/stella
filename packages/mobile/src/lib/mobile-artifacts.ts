@@ -1,3 +1,4 @@
+import { replyAttachmentTarget } from "@stella/contracts/reply-attachments";
 import type {
   ChatArtifact,
   MobileDisplayPayload,
@@ -263,6 +264,16 @@ export const artifactPrimaryFilePath = (
     case "map-route":
       return null;
   }
+};
+
+export const artifactAttachmentTarget = (
+  payload: MobileDisplayPayload,
+): string | null => {
+  const filePath = artifactPrimaryFilePath(payload);
+  if (!filePath) return null;
+  return replyAttachmentTarget(filePath, {
+    driveRelative: (payload as { driveBacked?: boolean }).driveBacked === true,
+  });
 };
 
 export const artifactTitle = (payload: MobileDisplayPayload): string => {

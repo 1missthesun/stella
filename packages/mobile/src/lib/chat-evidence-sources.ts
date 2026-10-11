@@ -24,12 +24,6 @@ export type EvidenceSource = {
   order: number;
 };
 
-/** Rows: these three kinds have a cheap real preview on a phone. */
-const MEDIA_KINDS = new Set<EvidenceSourceKind>(["image", "video", "audio"]);
-
-export const isMediaSourceKind = (kind: EvidenceSourceKind): boolean =>
-  MEDIA_KINDS.has(kind);
-
 /** How many of each row the strip shows before it says "+N more". */
 export const EVIDENCE_MEDIA_CAP = 8;
 export const EVIDENCE_PILL_CAP = 8;

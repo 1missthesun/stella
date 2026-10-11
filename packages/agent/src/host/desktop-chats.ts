@@ -92,6 +92,7 @@ import {
   type ModelPick,
   type StellaCredentialAccess,
 } from "../provider/byok.ts";
+import { CHATGPT_PROVIDER_ID } from "../provider/chatgpt.ts";
 import {
   accountByokProvider,
   accountProviderModel,
@@ -748,6 +749,11 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (!pick && !stellaDefault) {
       throw new Error(
         `"${requested}" isn't a model agents run on here. Name a Stella model ("stella/<model>"), a model on your own key or plan ("<provider>/<model>", such as "codex/<model>"), or Claude Code ("claude-code" or "claude-code/<model>").`,
+      );
+    }
+    if (pick?.kind === "direct" && pick.provider === CHATGPT_PROVIDER_ID && !(await hasOwnKey(pick.provider, pick.modelId))) {
+      throw new Error(
+        `"${reference}" runs on your ChatGPT plan, and this computer isn't signed in to ChatGPT. Sign in with ChatGPT in Stella's settings on this computer, or pick another model.`,
       );
     }
     const model = await modelOfPick(pick, "general");

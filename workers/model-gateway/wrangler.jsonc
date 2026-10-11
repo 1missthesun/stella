@@ -32,8 +32,9 @@
     // JSON `GatewayJwks` holding the PUBLIC ES256 keys of the capability
     // issuer (cloud-builder's `CAPABILITY_SIGNING_KID`s). Ops
     // Keep the public keys in deployment config so future deploys cannot
-    // accidentally restore the fail-closed empty placeholder.
-    "CAPABILITY_JWKS": "{\"keys\":[{\"kid\":\"builder-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"_zTj5c7FMbjcMng9baQbQRXtkHak6jk4-1boqSnt59A\",\"y\":\"tR-kttYxzHOPR__VorAqBes7AkaI9uvAiyuM7h7DMEk\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-bn118-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"3B2uhLMZ0nFNovFPfyHOqiVeXac4vJO0YhR1F7U1xQc\",\"y\":\"_vW3crzH0DnvV5yjUqvxa9qH5_lygAfXR7FWiI7MLAA\",\"alg\":\"ES256\",\"use\":\"sig\"}}]}",
+    // accidentally restore the fail-closed empty placeholder. `builder-preview-1`
+    // signs for the per-agent cloud-builder Previews (DEPLOY.md, "Previews").
+    "CAPABILITY_JWKS": "{\"keys\":[{\"kid\":\"builder-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"_zTj5c7FMbjcMng9baQbQRXtkHak6jk4-1boqSnt59A\",\"y\":\"tR-kttYxzHOPR__VorAqBes7AkaI9uvAiyuM7h7DMEk\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-bn118-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"3B2uhLMZ0nFNovFPfyHOqiVeXac4vJO0YhR1F7U1xQc\",\"y\":\"_vW3crzH0DnvV5yjUqvxa9qH5_lygAfXR7FWiI7MLAA\",\"alg\":\"ES256\",\"use\":\"sig\"}},{\"kid\":\"builder-preview-1\",\"issuer\":\"stella-cloud-builder\",\"jwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"fNbXqGJFsWaRGpdQmkq-4KmWvbqUVpWzbiPzbVoWyAk\",\"y\":\"gITvf5FUWXr6wCD8-rKlCTsE_FnZt-DXkC-cr5wZeTI\",\"alg\":\"ES256\",\"use\":\"sig\"}}]}",
   },
   // The default models run on OpenRouter. Every other provider key
   // (FIREWORKS_, DEEPSEEK_, XAI_, OPENAI_, ANTHROPIC_, GOOGLE_AI_,

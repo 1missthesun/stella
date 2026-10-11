@@ -2759,6 +2759,22 @@
         "two": "اعرض {count} ملفين",
         "zero": "اعرض {count} ملف"
       }
+    },
+    "emailDigest": {
+      "title": "البريد",
+      "connectTitle": "البريد الذي يهمّك",
+      "connectBody": "اربط Gmail وستفحص Stella بريدك على مدار اليوم، ثم تكتب ملخصًا قصيرًا للرسائل الجديدة المهمة فقط.",
+      "connect": "ربط Gmail",
+      "connecting": "بانتظار Google…",
+      "connectError": "لم يتم ربط Gmail. حاول مرة أخرى.",
+      "unavailable": "سجّل الدخول إلى Stella لربط Gmail.",
+      "checkNow": "افحص الآن",
+      "checking": "جارٍ فحص بريدك…",
+      "checked": "تم الفحص {when}",
+      "firstDigest": "ملخصك الأول في الطريق",
+      "nothingNew": "لا جديد",
+      "error": "تعذّر فحص بريدك. ستحاول Stella مرة أخرى قريبًا.",
+      "justNow": "الآن"
     }
   },
   "sidebar": {

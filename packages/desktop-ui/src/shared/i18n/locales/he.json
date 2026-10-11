@@ -2711,6 +2711,22 @@
         "other": "הצג {count} קבצים",
         "two": "הצג {count} קבצים"
       }
+    },
+    "emailDigest": {
+      "title": "אימייל",
+      "connectTitle": "המיילים שחשובים",
+      "connectBody": "חברו את Gmail ו-Stella תבדוק את תיבת הדואר שלכם במהלך היום ותכתוב תקציר קצר של המיילים החדשים החשובים בלבד.",
+      "connect": "חיבור Gmail",
+      "connecting": "ממתין ל-Google…",
+      "connectError": "Gmail לא התחבר. נסו שוב.",
+      "unavailable": "התחברו ל-Stella כדי לחבר את Gmail.",
+      "checkNow": "בדיקה עכשיו",
+      "checking": "בודק את תיבת הדואר…",
+      "checked": "נבדק {when}",
+      "firstDigest": "התקציר הראשון שלכם בדרך",
+      "nothingNew": "אין חדש",
+      "error": "לא ניתן היה לבדוק את תיבת הדואר. Stella תנסה שוב בקרוב.",
+      "justNow": "עכשיו"
     }
   },
   "sidebar": {

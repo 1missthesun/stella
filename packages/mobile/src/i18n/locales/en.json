@@ -2695,6 +2695,22 @@
         "one": "View {count} file",
         "other": "View {count} files"
       }
+    },
+    "emailDigest": {
+      "title": "Email",
+      "connectTitle": "The email that matters",
+      "connectBody": "Connect Gmail and Stella checks your inbox through the day, then writes a short digest of only the important new mail.",
+      "connect": "Connect Gmail",
+      "connecting": "Waiting for Google…",
+      "connectError": "Gmail didn't connect. Try again.",
+      "unavailable": "Sign in to Stella to connect Gmail.",
+      "checkNow": "Check now",
+      "checking": "Checking your inbox…",
+      "checked": "Checked {when}",
+      "firstDigest": "Your first digest is on its way",
+      "nothingNew": "Nothing new",
+      "error": "Couldn't check your inbox. Stella will try again soon.",
+      "justNow": "Just now"
     }
   },
   "sidebar": {

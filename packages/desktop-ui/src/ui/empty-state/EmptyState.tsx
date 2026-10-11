@@ -32,6 +32,7 @@ const MARK_SIZE = { regular: 58, compact: 40 } as const;
 
 const MARK_SPOT: Partial<Record<EmptyStateMotif, "low" | "right" | "inside">> = {
   files: "low",
+  mail: "low",
   unavailable: "right",
   preview: "right",
   blank: "right",

@@ -2695,6 +2695,22 @@
         "one": "{count} फ़ाइल देखें",
         "other": "{count} फ़ाइलें देखें"
       }
+    },
+    "emailDigest": {
+      "title": "ईमेल",
+      "connectTitle": "ज़रूरी ईमेल",
+      "connectBody": "Gmail कनेक्ट करें और Stella दिन भर आपका इनबॉक्स देखेगी, फिर सिर्फ़ ज़रूरी नए ईमेल का छोटा सा सारांश लिखेगी।",
+      "connect": "Gmail कनेक्ट करें",
+      "connecting": "Google का इंतज़ार…",
+      "connectError": "Gmail कनेक्ट नहीं हुआ। फिर से कोशिश करें।",
+      "unavailable": "Gmail कनेक्ट करने के लिए Stella में साइन इन करें।",
+      "checkNow": "अभी देखें",
+      "checking": "इनबॉक्स देखा जा रहा है…",
+      "checked": "{when} देखा गया",
+      "firstDigest": "आपका पहला सारांश आ रहा है",
+      "nothingNew": "कुछ नया नहीं",
+      "error": "इनबॉक्स नहीं देख पाए। Stella जल्द फिर कोशिश करेगी।",
+      "justNow": "अभी"
     }
   },
   "sidebar": {

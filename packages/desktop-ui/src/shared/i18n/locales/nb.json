@@ -2695,6 +2695,22 @@
         "one": "Vis {count} fil",
         "other": "Vis {count} filer"
       }
+    },
+    "emailDigest": {
+      "title": "E-post",
+      "connectTitle": "E-posten som betyr noe",
+      "connectBody": "Koble til Gmail, så sjekker Stella innboksen din gjennom dagen og skriver en kort oversikt over bare den viktige nye e-posten.",
+      "connect": "Koble til Gmail",
+      "connecting": "Venter på Google…",
+      "connectError": "Gmail ble ikke koblet til. Prøv igjen.",
+      "unavailable": "Logg på Stella for å koble til Gmail.",
+      "checkNow": "Sjekk nå",
+      "checking": "Sjekker innboksen…",
+      "checked": "Sjekket {when}",
+      "firstDigest": "Den første oversikten din er på vei",
+      "nothingNew": "Ingenting nytt",
+      "error": "Kunne ikke sjekke innboksen. Stella prøver igjen snart.",
+      "justNow": "Akkurat nå"
     }
   },
   "sidebar": {

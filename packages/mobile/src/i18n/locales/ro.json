@@ -2711,6 +2711,22 @@
         "one": "Vezi {count} fișier",
         "other": "Vezi {count} de fișiere"
       }
+    },
+    "emailDigest": {
+      "title": "E-mail",
+      "connectTitle": "E-mailurile care contează",
+      "connectBody": "Conectează Gmail și Stella îți verifică inboxul pe parcursul zilei, apoi scrie un scurt rezumat doar al e-mailurilor noi importante.",
+      "connect": "Conectează Gmail",
+      "connecting": "Se așteaptă Google…",
+      "connectError": "Gmail nu s-a conectat. Încearcă din nou.",
+      "unavailable": "Conectează-te la Stella pentru a conecta Gmail.",
+      "checkNow": "Verifică acum",
+      "checking": "Se verifică inboxul…",
+      "checked": "Verificat {when}",
+      "firstDigest": "Primul tău rezumat e pe drum",
+      "nothingNew": "Nimic nou",
+      "error": "Inboxul nu a putut fi verificat. Stella va reîncerca în curând.",
+      "justNow": "Chiar acum"
     }
   },
   "sidebar": {

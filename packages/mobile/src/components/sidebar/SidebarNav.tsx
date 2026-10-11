@@ -19,6 +19,7 @@ export type SidebarPlace = Exclude<MainTabId, "settings">;
 export const SIDEBAR_PLACES: readonly SidebarPlace[] = [
   "chat",
   "schedule",
+  "email",
   "apps",
   "files",
 ];
@@ -26,6 +27,7 @@ export const SIDEBAR_PLACES: readonly SidebarPlace[] = [
 const PLACE_LABEL_KEYS: Record<SidebarPlace, string> = {
   chat: "mobile.nav.chat",
   schedule: "mobile.activityHub.tabs.schedule",
+  email: "shell.emailDigest.title",
   apps: "mobile.nav.apps",
   files: "mobile.activityHub.tabs.files",
 };

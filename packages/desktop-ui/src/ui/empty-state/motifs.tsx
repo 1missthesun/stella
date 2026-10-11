@@ -9,7 +9,8 @@ export type EmptyStateMotif =
   | "changes"
   | "apps"
   | "trash"
-  | "updates";
+  | "updates"
+  | "mail";
 
 const ART = 148;
 const CENTER = ART / 2;
@@ -339,6 +340,47 @@ function UpdatesMotif() {
   );
 }
 
+const ENVELOPE_W = 84;
+const ENVELOPE_H = 58;
+
+function MailMotif() {
+  const id = useGradientId();
+  return (
+    <>
+      {[
+        { x: -30, y: -64, w: 58, delay: -1.2 },
+        { x: 44, y: 34, w: 46, delay: -3.6 },
+      ].map((row) => (
+        <Layer key={row.y} x={row.x} y={row.y} w={row.w} h={14} delay={row.delay} className="es-float es-float--row">
+          <rect x={0.75} y={0.75} width={row.w - 1.5} height={12.5} rx={6.25} className="es-card" />
+          <circle cx={7.5} cy={7} r={2.6} fill={row.y < 0 ? BRAND[1] : BRAND[4]} />
+          <rect x={14} y={5.5} width={row.w - 24} height={3} rx={1.5} className="es-line" />
+        </Layer>
+      ))}
+      <Layer x={0} y={-24} w={ENVELOPE_W} h={ENVELOPE_H} rotate={-4} className="es-float">
+        <BrandGradient id={id} />
+        <rect
+          x={0.75}
+          y={0.75}
+          width={ENVELOPE_W - 1.5}
+          height={ENVELOPE_H - 1.5}
+          rx={10}
+          className="es-card"
+        />
+        <path
+          d={`M8 10 L${ENVELOPE_W / 2} 31 L${ENVELOPE_W - 8} 10`}
+          fill="none"
+          stroke={`url(#${id})`}
+          strokeWidth={3}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <rect x={12} y={42} width={26} height={3} rx={1.5} className="es-line" />
+      </Layer>
+    </>
+  );
+}
+
 const TRAY_W = 104;
 
 function TrashMotif({ layer }: { layer: "back" | "front" }) {
@@ -395,5 +437,7 @@ export function EmptyStateMotifArt({
       return <TrashMotif layer="back" />;
     case "updates":
       return <UpdatesMotif />;
+    case "mail":
+      return <MailMotif />;
   }
 }

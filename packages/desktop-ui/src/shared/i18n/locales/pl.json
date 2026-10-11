@@ -2727,6 +2727,22 @@
         "one": "Zobacz {count} plik",
         "other": "Zobacz {count} pliku"
       }
+    },
+    "emailDigest": {
+      "title": "E-mail",
+      "connectTitle": "E-maile, które się liczą",
+      "connectBody": "Połącz Gmaila, a Stella będzie w ciągu dnia sprawdzać Twoją skrzynkę i pisać krótkie podsumowanie tylko ważnych nowych wiadomości.",
+      "connect": "Połącz Gmaila",
+      "connecting": "Czekam na Google…",
+      "connectError": "Nie udało się połączyć Gmaila. Spróbuj ponownie.",
+      "unavailable": "Zaloguj się do Stelli, aby połączyć Gmaila.",
+      "checkNow": "Sprawdź teraz",
+      "checking": "Sprawdzanie skrzynki…",
+      "checked": "Sprawdzono {when}",
+      "firstDigest": "Twoje pierwsze podsumowanie jest w drodze",
+      "nothingNew": "Nic nowego",
+      "error": "Nie udało się sprawdzić skrzynki. Stella wkrótce spróbuje ponownie.",
+      "justNow": "Przed chwilą"
     }
   },
   "sidebar": {

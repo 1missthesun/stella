@@ -104,6 +104,7 @@ const EMPTY_RUNNING_AGENTS: readonly ActivityIndicatorEntry[] = [];
 /** Pages whose name the top bar carries, centred between its controls. */
 const PAGE_TITLE_KEYS: Partial<Record<MainTabId, string>> = {
   schedule: "mobile.activityHub.tabs.schedule",
+  email: "shell.emailDigest.title",
   apps: "mobile.nav.apps",
   files: "mobile.activityHub.tabs.files",
 };
@@ -534,6 +535,7 @@ function MainStack() {
           {/* Tabs switch instantly; pages pushed from a tab (Cloud Home)
               keep the slide. */}
           <Stack.Screen name="schedule" options={TAB_SCREEN_OPTIONS} />
+          <Stack.Screen name="email" options={TAB_SCREEN_OPTIONS} />
           <Stack.Screen name="apps" options={TAB_SCREEN_OPTIONS} />
           <Stack.Screen name="files" options={TAB_SCREEN_OPTIONS} />
           <Stack.Screen name="settings" options={TAB_SCREEN_OPTIONS} />

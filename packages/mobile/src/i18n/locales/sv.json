@@ -2695,6 +2695,22 @@
         "one": "Visa {count} fil",
         "other": "Visa {count} filer"
       }
+    },
+    "emailDigest": {
+      "title": "E-post",
+      "connectTitle": "Mejlen som spelar roll",
+      "connectBody": "Anslut Gmail så kollar Stella din inkorg under dagen och skriver en kort sammanfattning av bara de viktiga nya mejlen.",
+      "connect": "Anslut Gmail",
+      "connecting": "Väntar på Google…",
+      "connectError": "Gmail anslöts inte. Försök igen.",
+      "unavailable": "Logga in på Stella för att ansluta Gmail.",
+      "checkNow": "Kolla nu",
+      "checking": "Kollar inkorgen…",
+      "checked": "Kollad {when}",
+      "firstDigest": "Din första sammanfattning är på väg",
+      "nothingNew": "Inget nytt",
+      "error": "Kunde inte kolla inkorgen. Stella försöker igen snart.",
+      "justNow": "Precis nu"
     }
   },
   "sidebar": {

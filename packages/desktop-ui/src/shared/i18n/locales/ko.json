@@ -2677,6 +2677,22 @@
       "viewFiles": {
         "other": "파일 {count}개 보기"
       }
+    },
+    "emailDigest": {
+      "title": "이메일",
+      "connectTitle": "중요한 이메일만",
+      "connectBody": "Gmail을 연결하면 Stella가 하루 동안 받은편지함을 확인하고 중요한 새 메일만 짧게 요약해 드립니다.",
+      "connect": "Gmail 연결",
+      "connecting": "Google 대기 중…",
+      "connectError": "Gmail이 연결되지 않았습니다. 다시 시도하세요.",
+      "unavailable": "Gmail을 연결하려면 Stella에 로그인하세요.",
+      "checkNow": "지금 확인",
+      "checking": "받은편지함 확인 중…",
+      "checked": "{when} 확인함",
+      "firstDigest": "첫 요약을 준비하고 있습니다",
+      "nothingNew": "새 소식 없음",
+      "error": "받은편지함을 확인하지 못했습니다. Stella가 곧 다시 시도합니다.",
+      "justNow": "방금"
     }
   },
   "sidebar": {

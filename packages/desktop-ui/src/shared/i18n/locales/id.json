@@ -2677,6 +2677,22 @@
       "viewFiles": {
         "other": "Lihat {count} berkas"
       }
+    },
+    "emailDigest": {
+      "title": "Email",
+      "connectTitle": "Email yang penting",
+      "connectBody": "Hubungkan Gmail dan Stella akan memeriksa kotak masuk Anda sepanjang hari, lalu menulis ringkasan singkat hanya untuk email baru yang penting.",
+      "connect": "Hubungkan Gmail",
+      "connecting": "Menunggu Google…",
+      "connectError": "Gmail tidak terhubung. Coba lagi.",
+      "unavailable": "Masuk ke Stella untuk menghubungkan Gmail.",
+      "checkNow": "Periksa sekarang",
+      "checking": "Memeriksa kotak masuk…",
+      "checked": "Diperiksa {when}",
+      "firstDigest": "Ringkasan pertama Anda sedang disiapkan",
+      "nothingNew": "Tidak ada yang baru",
+      "error": "Tidak dapat memeriksa kotak masuk. Stella akan mencoba lagi segera.",
+      "justNow": "Baru saja"
     }
   },
   "sidebar": {

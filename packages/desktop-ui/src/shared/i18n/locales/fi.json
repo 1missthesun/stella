@@ -2695,6 +2695,22 @@
         "one": "Näytä {count} tiedosto",
         "other": "Näytä {count} tiedostoa"
       }
+    },
+    "emailDigest": {
+      "title": "Sähköposti",
+      "connectTitle": "Sähköposti, jolla on väliä",
+      "connectBody": "Yhdistä Gmail, niin Stella tarkistaa saapuneet viestisi päivän mittaan ja kirjoittaa lyhyen koosteen vain tärkeistä uusista viesteistä.",
+      "connect": "Yhdistä Gmail",
+      "connecting": "Odotetaan Googlea…",
+      "connectError": "Gmailin yhdistäminen epäonnistui. Yritä uudelleen.",
+      "unavailable": "Kirjaudu Stellaan yhdistääksesi Gmailin.",
+      "checkNow": "Tarkista nyt",
+      "checking": "Tarkistetaan saapuneita…",
+      "checked": "Tarkistettu {when}",
+      "firstDigest": "Ensimmäinen koosteesi on tulossa",
+      "nothingNew": "Ei mitään uutta",
+      "error": "Saapuneita ei voitu tarkistaa. Stella yrittää pian uudelleen.",
+      "justNow": "Juuri nyt"
     }
   },
   "sidebar": {

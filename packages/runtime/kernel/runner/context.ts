@@ -604,8 +604,10 @@ export const createRunnerContext = ({
   });
   /**
    * This conversation's agents: the local rows, plus the cloud's for agents
-   * placed elsewhere (a local row wins). Agent rows only, never a transcript;
-   * when the cloud does not answer, the local rows alone.
+   * placed elsewhere. A local row wins, except for an agent another host
+   * placed here: that one is its cloud row, listed once under its cloud id.
+   * Agent rows only, never a transcript; when the cloud does not answer, the
+   * local rows alone.
    */
   const readConversationAgents = async (
     conversationId: string,
@@ -614,17 +616,25 @@ export const createRunnerContext = ({
     cloudSessions?: AgentDirectorySessionRow[];
     cloudUnavailable?: true;
   }> => {
-    const agents: AgentDirectoryAgentRow[] = (
-      context.runtimeStore?.listConversationAgents(conversationId) ?? []
-    ).map((row) => ({
-      threadId: row.threadId,
-      conversationId: row.conversationId,
-      ...(row.parentAgentId ? { parentThreadId: row.parentAgentId } : {}),
-      description: row.description,
-      status: normalizeAgentDirectoryStatus(row.status),
-      where: THIS_COMPUTER,
-      updatedAt: row.updatedAt,
-    }));
+    const local = new Map<string, AgentDirectoryAgentRow>();
+    const placedHere = new Set<string>();
+    for (const row of context.runtimeStore?.listConversationAgents(
+      conversationId,
+    ) ?? []) {
+      const threadId = row.remoteThreadId ?? row.threadId;
+      if (row.remoteThreadId) placedHere.add(threadId);
+      if (local.has(threadId)) continue;
+      local.set(threadId, {
+        threadId,
+        conversationId: row.conversationId,
+        ...(row.parentAgentId ? { parentThreadId: row.parentAgentId } : {}),
+        description: row.description,
+        status: normalizeAgentDirectoryStatus(row.status),
+        where: THIS_COMPUTER,
+        updatedAt: row.updatedAt,
+      });
+    }
+    const agents = [...local.values()];
     const client = backend.client();
     if (!client || !isCloudSignedIn() || conversationId.startsWith("local_")) {
       return { agents };
@@ -635,10 +645,14 @@ export const createRunnerContext = ({
       () => new Error("Stella's cloud did not answer the agent directory."),
     ).catch(() => null);
     if (!cloud) return { agents, cloudUnavailable: true };
-    const known = new Set(agents.map((row) => row.threadId));
+    const cloudIds = new Set(cloud.agents.map((row) => row.threadId));
+    const kept = agents.filter(
+      (row) => !(placedHere.has(row.threadId) && cloudIds.has(row.threadId)),
+    );
+    const known = new Set(kept.map((row) => row.threadId));
     return {
       agents: [
-        ...agents,
+        ...kept,
         ...cloud.agents.filter((row) => !known.has(row.threadId)),
       ],
       cloudSessions: cloud.sessions,

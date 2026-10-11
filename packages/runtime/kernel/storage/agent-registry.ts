@@ -30,6 +30,7 @@ export type ConversationAgentListing = {
   threadId: string;
   conversationId: string;
   parentAgentId?: string;
+  remoteThreadId?: string;
   description: string;
   status: string;
   updatedAt: number;
@@ -337,8 +338,8 @@ export class AgentRegistry {
    * every depth. Reads the agent rows only, never a transcript.
    */
   listConversationAgents(conversationId: string): ConversationAgentListing[] {
-    const columns = `thread_id, conversation_id, parent_agent_id, description,
-      status, updated_at`;
+    const columns = `thread_id, conversation_id, parent_agent_id, remote_thread_id,
+      description, status, updated_at`;
     const live = this.cached
       .prepare(
         `SELECT ${columns} FROM agent
@@ -358,6 +359,7 @@ export class AgentRegistry {
       threadId: row.thread_id,
       conversationId: row.conversation_id,
       ...(row.parent_agent_id ? { parentAgentId: row.parent_agent_id } : {}),
+      ...(row.remote_thread_id ? { remoteThreadId: row.remote_thread_id } : {}),
       description: row.description,
       status: row.status,
       updatedAt: row.updated_at,

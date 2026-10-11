@@ -2719,14 +2719,20 @@
       "connect": "Conectează Gmail",
       "connecting": "Se așteaptă Google…",
       "connectError": "Gmail nu s-a conectat. Încearcă din nou.",
-      "unavailable": "Conectează-te la Stella pentru a conecta Gmail.",
       "checkNow": "Verifică acum",
       "checking": "Se verifică inboxul…",
       "checked": "Verificat {when}",
       "firstDigest": "Primul tău rezumat e pe drum",
       "nothingNew": "Nimic nou",
       "error": "Inboxul nu a putut fi verificat. Stella va reîncerca în curând.",
-      "justNow": "Chiar acum"
+      "justNow": "Chiar acum",
+      "loadErrorTitle": "Rezumatul nu s-a putut încărca",
+      "loadErrorBody": "Stella nu își poate accesa serverele acum. Verifică conexiunea și încearcă din nou.",
+      "retry": "Încearcă din nou",
+      "nothingNewSince": "Nimic nou de la {time}",
+      "minutesAgo": "acum {count} min",
+      "hoursAgo": "acum {count} h",
+      "daysAgo": "acum {count} z"
     }
   },
   "sidebar": {

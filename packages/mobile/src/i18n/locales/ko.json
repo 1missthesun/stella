@@ -2685,14 +2685,20 @@
       "connect": "Gmail 연결",
       "connecting": "Google 대기 중…",
       "connectError": "Gmail이 연결되지 않았습니다. 다시 시도하세요.",
-      "unavailable": "Gmail을 연결하려면 Stella에 로그인하세요.",
       "checkNow": "지금 확인",
       "checking": "받은편지함 확인 중…",
       "checked": "{when} 확인함",
       "firstDigest": "첫 요약을 준비하고 있습니다",
       "nothingNew": "새 소식 없음",
       "error": "받은편지함을 확인하지 못했습니다. Stella가 곧 다시 시도합니다.",
-      "justNow": "방금"
+      "justNow": "방금",
+      "loadErrorTitle": "요약을 불러오지 못했습니다",
+      "loadErrorBody": "Stella가 지금 서버에 연결할 수 없습니다. 연결을 확인하고 다시 시도하세요.",
+      "retry": "다시 시도",
+      "nothingNewSince": "{time} 이후 새 소식 없음",
+      "minutesAgo": "{count}분 전",
+      "hoursAgo": "{count}시간 전",
+      "daysAgo": "{count}일 전"
     }
   },
   "sidebar": {

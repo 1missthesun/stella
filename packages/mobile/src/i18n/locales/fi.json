@@ -2703,14 +2703,20 @@
       "connect": "Yhdistä Gmail",
       "connecting": "Odotetaan Googlea…",
       "connectError": "Gmailin yhdistäminen epäonnistui. Yritä uudelleen.",
-      "unavailable": "Kirjaudu Stellaan yhdistääksesi Gmailin.",
       "checkNow": "Tarkista nyt",
       "checking": "Tarkistetaan saapuneita…",
       "checked": "Tarkistettu {when}",
       "firstDigest": "Ensimmäinen koosteesi on tulossa",
       "nothingNew": "Ei mitään uutta",
       "error": "Saapuneita ei voitu tarkistaa. Stella yrittää pian uudelleen.",
-      "justNow": "Juuri nyt"
+      "justNow": "Juuri nyt",
+      "loadErrorTitle": "Koostetta ei voitu ladata",
+      "loadErrorBody": "Stella ei juuri nyt tavoita palvelimiaan. Tarkista yhteys ja yritä uudelleen.",
+      "retry": "Yritä uudelleen",
+      "nothingNewSince": "Ei mitään uutta klo {time} jälkeen",
+      "minutesAgo": "{count} min sitten",
+      "hoursAgo": "{count} t sitten",
+      "daysAgo": "{count} pv sitten"
     }
   },
   "sidebar": {

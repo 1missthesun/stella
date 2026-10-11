@@ -2685,14 +2685,20 @@
       "connect": "Kết nối Gmail",
       "connecting": "Đang chờ Google…",
       "connectError": "Không kết nối được Gmail. Hãy thử lại.",
-      "unavailable": "Đăng nhập Stella để kết nối Gmail.",
       "checkNow": "Kiểm tra ngay",
       "checking": "Đang kiểm tra hộp thư…",
       "checked": "Đã kiểm tra {when}",
       "firstDigest": "Bản tóm tắt đầu tiên đang đến",
       "nothingNew": "Không có gì mới",
       "error": "Không kiểm tra được hộp thư. Stella sẽ thử lại sớm.",
-      "justNow": "Vừa xong"
+      "justNow": "Vừa xong",
+      "loadErrorTitle": "Không tải được bản tóm tắt",
+      "loadErrorBody": "Stella hiện không kết nối được máy chủ. Hãy kiểm tra kết nối và thử lại.",
+      "retry": "Thử lại",
+      "nothingNewSince": "Không có gì mới kể từ {time}",
+      "minutesAgo": "{count} phút trước",
+      "hoursAgo": "{count} giờ trước",
+      "daysAgo": "{count} ngày trước"
     }
   },
   "sidebar": {

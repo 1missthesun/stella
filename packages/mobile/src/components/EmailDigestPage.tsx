@@ -32,17 +32,20 @@ type Connection = "checking" | "connected" | "disconnected" | "unavailable";
 const threadUrl = (threadId: string) =>
   `https://mail.google.com/mail/u/0/#all/${encodeURIComponent(threadId)}`;
 
-const relative = (locale: string, at: number, now: number): string => {
-  const minutes = Math.round((at - now) / 60_000);
-  if (typeof Intl.RelativeTimeFormat === "function") {
-    const format = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
-    if (Math.abs(minutes) < 60) return format.format(minutes, "minute");
-    const hours = Math.round(minutes / 60);
-    if (Math.abs(hours) < 24) return format.format(hours, "hour");
-    return format.format(Math.round(hours / 24), "day");
-  }
+type Translate = ReturnType<typeof useT>;
+
+const relative = (t: Translate, at: number, now: number): string => {
+  const minutes = Math.max(1, Math.round((now - at) / 60_000));
+  if (minutes < 60) return t("shell.emailDigest.minutesAgo", { count: minutes });
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return t("shell.emailDigest.hoursAgo", { count: hours });
+  return t("shell.emailDigest.daysAgo", { count: Math.round(hours / 24) });
+};
+
+const clockTime = (locale: string, at: number, now: number): string => {
+  const sameDay = new Date(at).toDateString() === new Date(now).toDateString();
   return new Date(at).toLocaleString(locale, {
-    weekday: "short",
+    ...(sameDay ? {} : { weekday: "short" }),
     hour: "numeric",
     minute: "2-digit",
   });
@@ -136,7 +139,25 @@ export function EmailDigestPage() {
     );
   }
 
-  if (connection === "disconnected" || connection === "unavailable") {
+  if (connection === "unavailable" && !feed) {
+    return (
+      <View style={styles.root}>
+        <EmptyState
+          motif="mail"
+          message={t("shell.emailDigest.loadErrorBody")}
+          action={{
+            label: t("shell.emailDigest.retry"),
+            onPress: () => {
+              setConnection("checking");
+              void refresh();
+            },
+          }}
+        />
+      </View>
+    );
+  }
+
+  if (connection === "disconnected") {
     return (
       <View style={styles.root}>
         <EmptyState
@@ -187,7 +208,7 @@ export function EmailDigestPage() {
               ? t("shell.emailDigest.checking")
               : status?.lastCheckedAt !== undefined
                 ? t("shell.emailDigest.checked", {
-                    when: relative(locale, status.lastCheckedAt, now),
+                    when: relative(t, status.lastCheckedAt, now),
                   })
                 : t("shell.emailDigest.firstDigest")}
           </Text>
@@ -211,7 +232,11 @@ export function EmailDigestPage() {
         <View style={styles.quiet} testID="mobile-email-digest-quiet">
           <Icon name="check" size={14} color={colors.accent} />
           <Text style={styles.quietText} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-            {t("shell.emailDigest.nothingNew")}
+            {latestDigestAt > 0
+              ? t("shell.emailDigest.nothingNewSince", {
+                  time: clockTime(locale, latestDigestAt, now),
+                })
+              : t("shell.emailDigest.nothingNew")}
           </Text>
         </View>
       ) : null}
@@ -226,11 +251,7 @@ export function EmailDigestPage() {
         <DigestGroup
           key={digest.digestId}
           digest={digest}
-          heading={
-            now - digest.createdAt < 60_000
-              ? t("shell.emailDigest.justNow")
-              : relative(locale, digest.createdAt, now)
-          }
+          heading={relative(t, digest.createdAt, now)}
           styles={styles}
         />
       ))}

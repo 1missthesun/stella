@@ -2719,14 +2719,20 @@
       "connect": "חיבור Gmail",
       "connecting": "ממתין ל-Google…",
       "connectError": "Gmail לא התחבר. נסו שוב.",
-      "unavailable": "התחברו ל-Stella כדי לחבר את Gmail.",
       "checkNow": "בדיקה עכשיו",
       "checking": "בודק את תיבת הדואר…",
       "checked": "נבדק {when}",
       "firstDigest": "התקציר הראשון שלכם בדרך",
       "nothingNew": "אין חדש",
       "error": "לא ניתן היה לבדוק את תיבת הדואר. Stella תנסה שוב בקרוב.",
-      "justNow": "עכשיו"
+      "justNow": "עכשיו",
+      "loadErrorTitle": "לא ניתן לטעון את התקציר",
+      "loadErrorBody": "Stella לא מצליחה להגיע לשרתים שלה כרגע. בדקו את החיבור ונסו שוב.",
+      "retry": "נסו שוב",
+      "nothingNewSince": "אין חדש מאז {time}",
+      "minutesAgo": "לפני {count} דק׳",
+      "hoursAgo": "לפני {count} שע׳",
+      "daysAgo": "לפני {count} ימים"
     }
   },
   "sidebar": {

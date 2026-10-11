@@ -2735,14 +2735,20 @@
       "connect": "Подключить Gmail",
       "connecting": "Ожидание Google…",
       "connectError": "Gmail не подключился. Попробуйте ещё раз.",
-      "unavailable": "Войдите в Stella, чтобы подключить Gmail.",
       "checkNow": "Проверить",
       "checking": "Проверка входящих…",
       "checked": "Проверено {when}",
       "firstDigest": "Первая сводка уже готовится",
       "nothingNew": "Ничего нового",
       "error": "Не удалось проверить входящие. Stella скоро попробует снова.",
-      "justNow": "Только что"
+      "justNow": "Только что",
+      "loadErrorTitle": "Не удалось загрузить сводку",
+      "loadErrorBody": "Stella сейчас не может связаться со своими серверами. Проверьте подключение и попробуйте ещё раз.",
+      "retry": "Повторить",
+      "nothingNewSince": "Ничего нового с {time}",
+      "minutesAgo": "{count} мин назад",
+      "hoursAgo": "{count} ч назад",
+      "daysAgo": "{count} д назад"
     }
   },
   "sidebar": {

@@ -2735,14 +2735,20 @@
       "connect": "Połącz Gmaila",
       "connecting": "Czekam na Google…",
       "connectError": "Nie udało się połączyć Gmaila. Spróbuj ponownie.",
-      "unavailable": "Zaloguj się do Stelli, aby połączyć Gmaila.",
       "checkNow": "Sprawdź teraz",
       "checking": "Sprawdzanie skrzynki…",
       "checked": "Sprawdzono {when}",
       "firstDigest": "Twoje pierwsze podsumowanie jest w drodze",
       "nothingNew": "Nic nowego",
       "error": "Nie udało się sprawdzić skrzynki. Stella wkrótce spróbuje ponownie.",
-      "justNow": "Przed chwilą"
+      "justNow": "Przed chwilą",
+      "loadErrorTitle": "Nie udało się wczytać podsumowania",
+      "loadErrorBody": "Stella nie może teraz połączyć się ze swoimi serwerami. Sprawdź połączenie i spróbuj ponownie.",
+      "retry": "Spróbuj ponownie",
+      "nothingNewSince": "Nic nowego od {time}",
+      "minutesAgo": "{count} min temu",
+      "hoursAgo": "{count} godz. temu",
+      "daysAgo": "{count} dn. temu"
     }
   },
   "sidebar": {

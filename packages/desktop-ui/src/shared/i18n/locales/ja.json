@@ -2685,14 +2685,20 @@
       "connect": "Gmail を接続",
       "connecting": "Google を待っています…",
       "connectError": "Gmail に接続できませんでした。もう一度お試しください。",
-      "unavailable": "Gmail を接続するには Stella にサインインしてください。",
       "checkNow": "今すぐ確認",
       "checking": "受信トレイを確認中…",
       "checked": "{when}に確認",
       "firstDigest": "最初のまとめを準備中です",
       "nothingNew": "新着なし",
       "error": "受信トレイを確認できませんでした。まもなく再試行します。",
-      "justNow": "たった今"
+      "justNow": "たった今",
+      "loadErrorTitle": "まとめを読み込めませんでした",
+      "loadErrorBody": "Stella がサーバーに接続できません。接続を確認して、もう一度お試しください。",
+      "retry": "再試行",
+      "nothingNewSince": "{time} 以降、新着なし",
+      "minutesAgo": "{count}分前",
+      "hoursAgo": "{count}時間前",
+      "daysAgo": "{count}日前"
     }
   },
   "sidebar": {

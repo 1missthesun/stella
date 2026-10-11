@@ -2703,14 +2703,20 @@
       "connect": "Σύνδεση Gmail",
       "connecting": "Αναμονή για Google…",
       "connectError": "Το Gmail δεν συνδέθηκε. Δοκιμάστε ξανά.",
-      "unavailable": "Συνδεθείτε στη Stella για να συνδέσετε το Gmail.",
       "checkNow": "Έλεγχος τώρα",
       "checking": "Έλεγχος εισερχομένων…",
       "checked": "Ελέγχθηκε {when}",
       "firstDigest": "Η πρώτη σας σύνοψη έρχεται",
       "nothingNew": "Τίποτα νέο",
       "error": "Δεν ήταν δυνατός ο έλεγχος. Η Stella θα ξαναδοκιμάσει σύντομα.",
-      "justNow": "Μόλις τώρα"
+      "justNow": "Μόλις τώρα",
+      "loadErrorTitle": "Δεν φορτώθηκε η σύνοψη",
+      "loadErrorBody": "Η Stella δεν μπορεί να συνδεθεί με τους διακομιστές της. Ελέγξτε τη σύνδεσή σας και δοκιμάστε ξανά.",
+      "retry": "Δοκιμάστε ξανά",
+      "nothingNewSince": "Τίποτα νέο από τις {time}",
+      "minutesAgo": "πριν από {count} λ.",
+      "hoursAgo": "πριν από {count} ώ.",
+      "daysAgo": "πριν από {count} ημ."
     }
   },
   "sidebar": {

@@ -2703,14 +2703,20 @@
       "connect": "Anslut Gmail",
       "connecting": "Väntar på Google…",
       "connectError": "Gmail anslöts inte. Försök igen.",
-      "unavailable": "Logga in på Stella för att ansluta Gmail.",
       "checkNow": "Kolla nu",
       "checking": "Kollar inkorgen…",
       "checked": "Kollad {when}",
       "firstDigest": "Din första sammanfattning är på väg",
       "nothingNew": "Inget nytt",
       "error": "Kunde inte kolla inkorgen. Stella försöker igen snart.",
-      "justNow": "Precis nu"
+      "justNow": "Precis nu",
+      "loadErrorTitle": "Kunde inte läsa in sammanfattningen",
+      "loadErrorBody": "Stella når inte sina servrar just nu. Kontrollera anslutningen och försök igen.",
+      "retry": "Försök igen",
+      "nothingNewSince": "Inget nytt sedan {time}",
+      "minutesAgo": "för {count} min sedan",
+      "hoursAgo": "för {count} tim sedan",
+      "daysAgo": "för {count} d sedan"
     }
   },
   "sidebar": {

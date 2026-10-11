@@ -99,9 +99,12 @@ export function EmailDigestSection({ active }: { active: boolean }) {
     }
   }, []);
 
+  const liveEnabled = feed.value?.status.enabled;
+  const liveCheckedAt = feed.value?.status.lastCheckedAt;
+
   useEffect(() => {
     if (active) void refresh();
-  }, [active, epoch, refresh]);
+  }, [active, epoch, refresh, liveEnabled, liveCheckedAt]);
 
   const connect = useCallback(async () => {
     setConnecting(true);

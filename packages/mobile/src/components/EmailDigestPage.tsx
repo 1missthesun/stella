@@ -76,9 +76,12 @@ export function EmailDigestPage() {
     }
   }, []);
 
+  const liveEnabled = feed?.status.enabled;
+  const liveCheckedAt = feed?.status.lastCheckedAt;
+
   useEffect(() => {
     if (signedIn && appVisible) void refresh();
-  }, [appVisible, refresh, signedIn]);
+  }, [appVisible, refresh, signedIn, liveEnabled, liveCheckedAt]);
 
   useEffect(() => {
     if (!waiting || !appVisible) return;

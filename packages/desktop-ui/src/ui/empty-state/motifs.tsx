@@ -348,8 +348,8 @@ function MailMotif() {
   return (
     <>
       {[
-        { x: -22, y: -46, w: 58, delay: -1.2 },
-        { x: 26, y: 46, w: 50, delay: -3.6 },
+        { x: -30, y: -64, w: 58, delay: -1.2 },
+        { x: 44, y: 34, w: 46, delay: -3.6 },
       ].map((row) => (
         <Layer key={row.y} x={row.x} y={row.y} w={row.w} h={14} delay={row.delay} className="es-float es-float--row">
           <rect x={0.75} y={0.75} width={row.w - 1.5} height={12.5} rx={6.25} className="es-card" />
@@ -357,7 +357,7 @@ function MailMotif() {
           <rect x={14} y={5.5} width={row.w - 24} height={3} rx={1.5} className="es-line" />
         </Layer>
       ))}
-      <Layer x={0} y={0} w={ENVELOPE_W} h={ENVELOPE_H} rotate={-4} className="es-float">
+      <Layer x={0} y={-24} w={ENVELOPE_W} h={ENVELOPE_H} rotate={-4} className="es-float">
         <BrandGradient id={id} />
         <rect
           x={0.75}

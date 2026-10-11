@@ -176,12 +176,6 @@ export type DesktopChatsOptions = {
   journal?(conversationId: string): DesktopJournal | undefined;
   /** For a conversation stored in the cloud: its cloud agents, run in its object. */
   cloudAgents?(conversationId: string): RemoteAgentHost | undefined;
-  /**
-   * Claude Code agents on this computer for a conversation, started with a
-   * `claude-code[/<model>]` model: they run on Claude Code as a whole, and
-   * their reports come back as `deliverReport`s.
-   */
-  claudeCode?(conversationId: string): DesktopEngineAgents | undefined;
   claudeCodeEngine?: ClaudeCodeEngine;
   userReminders?(input: {
     conversationId: string;
@@ -277,7 +271,7 @@ export type DesktopChatsOptions = {
   report(error: unknown): void;
 };
 
-/** Agents another engine runs as a whole (`DesktopChatsOptions.claudeCode`, `cloudThreads`). */
+/** Agents another runtime runs as a whole (`DesktopChatsOptions.cloudThreads`). */
 export type DesktopEngineAgents = {
   /** Start one, once per `key`, on `model`. */
   start(args: { key: string; description: string; prompt: string; model: string }): Promise<{ threadId: string }>;
@@ -314,8 +308,6 @@ type Chat = {
 
 const context = BACKGROUND_CONTEXT;
 
-/** The engine id, and model head, of agents that run on Claude Code here. */
-const CLAUDE_CODE_ENGINE = "claude-code";
 /** The engine id of cloud agents started with a model (`cloudThreads`). */
 const CLOUD_THREAD_ENGINE = "cloud-thread";
 
@@ -655,10 +647,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (placement) return { there: true };
     const effort = /^(.+):(minimal|low|medium|high|xhigh)$/.exec(requested.trim());
     const reference = (effort?.[1] ?? requested).trim();
-    if (reference.split("/")[0]!.toLowerCase() === CLAUDE_CODE_ENGINE && !claudeCodeEngine) {
-      if (!options.claudeCode?.(conversationId)) throw new Error("Claude Code agents can't start from this conversation here.");
-      return { engine: CLAUDE_CODE_ENGINE };
-    }
     const stellaDefault = reference.toLowerCase() === "stella";
     const pick = stellaDefault ? undefined : parseModelPick(reference);
     if (!pick && !stellaDefault) {
@@ -941,8 +929,6 @@ export function desktopChats(options: DesktopChatsOptions) {
                 return Math.max(1, Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId).length);
               };
               const engines = new Map<string, RemoteAgentHost>();
-              const claudeCode = engineHost(options.claudeCode?.(conversationId), CLAUDE_CODE_ENGINE, () => opened);
-              if (claudeCode) engines.set(CLAUDE_CODE_ENGINE, claudeCode);
               const cloudThreads = engineHost(options.cloudThreads?.(conversationId), "default", () => opened);
               if (cloudThreads) engines.set(CLOUD_THREAD_ENGINE, cloudThreads);
               return desktopAgentsHost({

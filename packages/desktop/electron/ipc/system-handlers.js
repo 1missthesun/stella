@@ -16,7 +16,6 @@ import { ensureStellaDataDirSeeded } from "@stella/runtime/kernel/home/stella-ho
 import { loadAgentSystemPrompt } from "@stella/runtime/kernel/agents/home-agent-prompt";
 import { deletePromptPreset, isCustomizablePromptAgentId, listPromptPresets, readPromptPreset, savePromptPreset, } from "@stella/runtime/kernel/prompts/prompt-presets";
 import { getPromptPresetSelection, setPromptPresetSelection, } from "@stella/runtime/kernel/preferences/local-preferences";
-import { desktopPiChatEnabled } from "@stella/contracts/pi-chat";
 import { getModels } from "@stella/runtime/kernel/model-catalog";
 import { deleteLocalLlmCredential, getLocalLlmCredential, listLocalLlmCredentials, saveLocalLlmCredential, } from "@stella/runtime/kernel/storage/llm-credentials";
 import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, getLocalLlmOAuthApiKey, listLocalLlmOAuthCredentials, saveLocalLlmOAuthCredential, } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
@@ -72,7 +71,6 @@ import {
   IPC_PREFERENCES_READ_ALOUD_CHANGED,
   IPC_PREFERENCES_SET_READ_ALOUD,
   IPC_VOICE_PREFERENCES_CHANGED,
-  IPC_PI_CHAT_ENABLED_CHANGED,
   IPC_USER_ASK_ANSWER,
   IPC_USER_ASK_CANCEL,
   IPC_USER_ASK_LIST,
@@ -1245,7 +1243,6 @@ export const registerSystemHandlers = (options) => {
         const previousRealtimeVoice = payload?.realtimeVoice !== undefined
             ? getLocalModelPreferences(stellaAppDir).realtimeVoice
             : null;
-        const previousPiChat = desktopPiChatEnabled(getLocalModelPreferences(stellaAppDir).agentRuntimeEngine);
         const nextDefaultModels = sanitizeStringRecord(payload?.defaultModels);
         const nextOverrides = sanitizeStringRecord(payload?.modelOverrides);
         const nextAssistantPropagatedAgents = sanitizeStringList(payload?.assistantPropagatedAgents);
@@ -1322,20 +1319,6 @@ export const registerSystemHandlers = (options) => {
             patch.memoryEnabled = payload.memoryEnabled === true;
         }
         const saved = updateLocalModelPreferences(stellaAppDir, patch);
-        // Moving onto or off Claude Code moves the chat between its paths.
-        const piChat = desktopPiChatEnabled(saved.agentRuntimeEngine);
-        if (piChat !== previousPiChat) {
-            for (const window of BrowserWindow.getAllWindows()) {
-                if (window.isDestroyed() || window.webContents.isDestroyed())
-                    continue;
-                try {
-                    window.webContents.send(IPC_PI_CHAT_ENABLED_CHANGED, piChat);
-                }
-                catch {
-                    // Ignore renderer delivery failures while a window closes.
-                }
-            }
-        }
         if (previousRealtimeVoice &&
             hasRealtimeVoiceSessionRouteChanged(previousRealtimeVoice, saved.realtimeVoice)) {
             for (const window of BrowserWindow.getAllWindows()) {

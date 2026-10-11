@@ -101,7 +101,6 @@ export function useCompanionBridge(conversationId: string | null): void {
   const {
     tasks,
     isStreaming,
-    reasoningText,
     sendContextlessMessage,
     cancelCurrentStream,
   } = conversation;
@@ -147,7 +146,6 @@ export function useCompanionBridge(conversationId: string | null): void {
       workState: isStreaming
         ? getWorkingIndicatorCharacterState({
             toolName: activeToolName ?? undefined,
-            isReasoning: Boolean(reasoningText),
           })
         : null,
       runningAgentCount,
@@ -159,7 +157,6 @@ export function useCompanionBridge(conversationId: string | null): void {
       latestAssistant,
       isStreaming,
       activeToolName,
-      reasoningText,
       runningAgentCount,
       readAloudPlaying,
     ],

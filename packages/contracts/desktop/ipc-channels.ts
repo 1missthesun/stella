@@ -212,22 +212,11 @@ export const IPC_DICTATION_PLAY_SOUND = "dictation:playSound" as const;
 // ── Agent ───────────────────────────────────────────────────────────────────
 
 export const IPC_AGENT_ONE_SHOT_COMPLETION = "agent:oneShotCompletion" as const;
-export const IPC_AGENT_HEALTH_CHECK = "agent:healthCheck" as const;
-export const IPC_AGENT_GET_ACTIVE_RUN = "agent:getActiveRun" as const;
-export const IPC_AGENT_GET_SESSION_STARTED_AT =
-  "agent:getAppSessionStartedAt" as const;
-export const IPC_AGENT_START_CHAT = "agent:startChat" as const;
 export const IPC_AGENT_SEND_INPUT = "agent:sendInput" as const;
-export const IPC_AGENT_CANCEL_CHAT = "agent:cancelChat" as const;
-export const IPC_AGENT_RESUME = "agent:resume" as const;
 export const IPC_AGENT_EVENT = "agent:event" as const;
 /** The pi-durable chat: requests (`PiChatRequest`), and a watched conversation's events. */
 export const IPC_PI_CHAT_REQUEST = "piChat:request" as const;
 export const IPC_PI_CHAT_EVENTS = "piChat:events" as const;
-/** Whether the desktop chat runs on pi-durable: unless the user's engine is Claude Code. */
-export const IPC_PI_CHAT_ENABLED = "piChat:enabled" as const;
-/** Sent to every window when the user's engine moves the chat onto or off pi-durable. */
-export const IPC_PI_CHAT_ENABLED_CHANGED = "piChat:enabledChanged" as const;
 /**
  * Fired by the main process whenever the runtime client transitions
  * between connected and disconnected — most importantly after the

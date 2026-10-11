@@ -42,14 +42,12 @@ import {
 } from "./secure-input.js";
 import { createScheduleManageTools } from "./schedule-manage.js";
 import { createScriptDraftTool } from "./script-draft.js";
-import { createAgentTools } from "./task.js";
 import { createConnectorStatusTool } from "./connector-status.js";
 import { createSwitchDestinationTool } from "./switch-destination.js";
 import { createWebTool } from "./web.js";
 import { writeTool } from "./write.js";
 import { createWriteStdinTool } from "./write-stdin.js";
 
-import type { StateContext } from "../state.js";
 import type { NodeReplKernelRegistry } from "../../computer-use/kernel.js";
 
 export type BuildBuiltinToolsContext = ToolHostOptions & {
@@ -61,8 +59,6 @@ export type BuildBuiltinToolsContext = ToolHostOptions & {
   stellaDataDir: string;
   /** Initialized PTY shell state shared by Bash / write_stdin. */
   shellState: ShellState;
-  /** Initialized state context for the durable spawn_agent / send_message / pause_agent tools. */
-  stateContext: StateContext;
   /** ToolHost-owned persistent Node kernels, disposed with the host. */
   nodeReplRegistry: NodeReplKernelRegistry;
   /**
@@ -158,7 +154,6 @@ export const buildBuiltinTools = (
         : {}),
     }),
   );
-  tools.push(...createAgentTools(options.stateContext));
   tools.push(
     createSwitchDestinationTool({
       ...(options.getCloudBackendAuth

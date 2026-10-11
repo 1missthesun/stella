@@ -24,11 +24,9 @@ import {
   piPauseAgent,
   piPlacementCanceled,
   piPlacedChat,
-  piChatRouted,
 } from "../pi-chats.js";
 import * as WorkerSessions from "../sessions.js";
 import { fromPromise, type WorkerRpcHandlers } from "../rpc.js";
-import type { AgentEventPayload } from "../types.js";
 import {
   isPlacementThreadId,
   placementRemoteThreadAgentId,
@@ -54,110 +52,6 @@ const withAttachedFiles = (
 };
 
 export const runsHandlers: WorkerRpcHandlers = {
-  [METHOD_NAMES.INTERNAL_WORKER_GET_ACTIVE]: () =>
-    Effect.gen(function* () {
-      const sessions = yield* WorkerSessions.Service;
-      // Tolerate the runner still building (post-ready window): no runner ⇒
-      // no active run.
-      return (
-        sessions.current()?.runnerCell.get()?.getActiveOrchestratorRun() ?? null
-      );
-    }),
-
-  // Worker-side replay: read everything past `lastSeq` for `runId` from
-  // the persistent ring buffer. This is the path Electron takes after a
-  // restart — by the time the host reconnects, the in-memory host buffer
-  // is gone but the worker still has every event.
-  [METHOD_NAMES.INTERNAL_WORKER_RESUME_EVENTS]: (params) =>
-    Effect.gen(function* () {
-      const sessions = yield* WorkerSessions.Service;
-      const payload = params as { runId?: unknown; lastSeq?: unknown };
-      const runId =
-        typeof payload?.runId === "string" ? payload.runId.trim() : "";
-      if (!runId) {
-        return { events: [] as AgentEventPayload[], exhausted: true };
-      }
-      const lastSeq = Number.isFinite(Number(payload?.lastSeq))
-        ? Number(payload.lastSeq)
-        : 0;
-      const session = sessions.current();
-      if (!session) {
-        return { events: [] as AgentEventPayload[], exhausted: true };
-      }
-      return session.runEvents.resumeAfter({ runId, lastSeq });
-    }),
-
-  // Host ack — every event the host successfully forwards to the renderer
-  // gets acked back so the worker can prune. Best-effort: under-acking
-  // just retains rows longer; over-acking before the renderer actually
-  // saw an event would lose it on reconnect, so the host should only
-  // ack after `webContents.send` resolves.
-  [METHOD_NAMES.INTERNAL_WORKER_ACK_EVENTS]: (params) =>
-    Effect.gen(function* () {
-      const sessions = yield* WorkerSessions.Service;
-      const payload = params as { runId?: unknown; lastSeq?: unknown };
-      const runId =
-        typeof payload?.runId === "string" ? payload.runId.trim() : "";
-      const lastSeq = Number.isFinite(Number(payload?.lastSeq))
-        ? Number(payload.lastSeq)
-        : Number.NaN;
-      if (!runId || !Number.isFinite(lastSeq)) {
-        return { pruned: 0 };
-      }
-      const pruned = sessions.current()?.runEvents.ack({ runId, lastSeq }) ?? 0;
-      return { pruned };
-    }),
-
-  // Probe used by a reconnecting host to discover which runs are still
-  // worth subscribing to — combines the live runner's active run with
-  // retained event-log rows (a run that just completed but whose terminal
-  // event hasn't been acked is still resumable).
-  [METHOD_NAMES.INTERNAL_WORKER_LIST_ACTIVE_RUNS]: () =>
-    Effect.gen(function* () {
-      const sessions = yield* WorkerSessions.Service;
-      const session = sessions.current();
-      const runner = session?.runnerCell.get() ?? null;
-      const activeRun = runner?.getActiveOrchestratorRun() ?? null;
-      const activeAgentRuns = runner?.listActiveAgentRuns() ?? [];
-      const result: Array<{
-        runId: string;
-        conversationId: string;
-        kind: "active" | "buffered";
-        uiVisibility?: "visible" | "hidden";
-      }> = [];
-      const seenRunIds = new Set<string>();
-      if (activeRun) {
-        result.push({
-          runId: activeRun.runId,
-          conversationId: activeRun.conversationId,
-          kind: "active",
-        });
-        seenRunIds.add(activeRun.runId);
-      }
-      for (const agentRun of activeAgentRuns) {
-        if (seenRunIds.has(agentRun.runId)) continue;
-        result.push({
-          runId: agentRun.runId,
-          conversationId: agentRun.conversationId,
-          kind: "active",
-          uiVisibility: "hidden",
-        });
-        seenRunIds.add(agentRun.runId);
-      }
-      const activeRunId = activeRun?.runId ?? null;
-      for (const buffered of session?.runEvents.listBufferedRuns() ?? []) {
-        if (buffered.runId === activeRunId || seenRunIds.has(buffered.runId)) {
-          continue;
-        }
-        result.push({
-          runId: buffered.runId,
-          conversationId: buffered.conversationId,
-          kind: "buffered",
-        });
-      }
-      return { runs: result };
-    }),
-
   [METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION]: (params) =>
     Effect.gen(function* () {
       const session = yield* WorkerSessions.sessionOrFail(
@@ -173,11 +67,10 @@ export const runsHandlers: WorkerRpcHandlers = {
         scheduled?: boolean;
         attachments?: RuntimeAttachmentRef[];
       };
-      // On pi-durable the host's own turns (schedule fires, watch
-      // escalations, heartbeats) and the chats other devices place here run
-      // in the conversation's harness; under Claude Code they keep its path.
-      if (piChatRouted(session) && automation.executionPlacementRunId) {
-        const hostBus = yield* HostBus.Service;
+      // The host's own turns (schedule fires, watch escalations, heartbeats)
+      // and the chats other devices place here run in the conversation's harness.
+      const hostBus = yield* HostBus.Service;
+      if (automation.executionPlacementRunId) {
         const placementRunId = automation.executionPlacementRunId;
         return yield* fromPromise(() =>
           piPlacedChat(session, hostBus, {
@@ -190,39 +83,13 @@ export const runsHandlers: WorkerRpcHandlers = {
           }),
         );
       }
-      if (piChatRouted(session)) {
-        const hostBus = yield* HostBus.Service;
-        return yield* fromPromise(async () =>
-          (await piChatsFor(session, hostBus)).automation(automation.conversationId, {
-            requestId: automation.userMessageEventId || `automation:${crypto.randomUUID()}`,
-            prompt: automation.userPrompt,
-            visible: automation.userAuthoredPrompt === true,
-            ...(automation.rejectIfBusy ? { rejectIfBusy: true } : {}),
-          }),
-        );
-      }
-      return yield* fromPromise(() =>
-        session.agentRuns.runAutomation(
-          params as {
-            conversationId: string;
-            userPrompt: string;
-            rejectIfBusy?: boolean;
-            executionPlacementRunId?: string;
-            ownerGeneration?: string;
-            agentType?: string;
-            modelOverride?: string;
-            toolWorkspaceRoot?: string;
-            attachments?: RuntimeAttachmentRef[];
-            connectorDeliveryTarget?: {
-              requestId: string;
-              conversationId: string;
-              provider?: string;
-              externalMessageId?: string;
-            };
-            userMessageEventId?: string;
-            userAuthoredPrompt?: boolean;
-          },
-        ),
+      return yield* fromPromise(async () =>
+        (await piChatsFor(session, hostBus)).automation(automation.conversationId, {
+          requestId: automation.userMessageEventId || `automation:${crypto.randomUUID()}`,
+          prompt: automation.userPrompt,
+          visible: automation.userAuthoredPrompt === true,
+          ...(automation.rejectIfBusy ? { rejectIfBusy: true } : {}),
+        }),
       );
     }),
 
@@ -239,15 +106,7 @@ export const runsHandlers: WorkerRpcHandlers = {
         );
       }
       const reason = typeof payload.reason === "string" ? payload.reason : undefined;
-      if (yield* fromPromise(() => cancelPiPlacement(session, runId, reason))) {
-        return { canceled: true };
-      }
-      const runner = yield* fromPromise(() =>
-        session.runner.ensureInitialized(),
-      );
-      return yield* fromPromise(() =>
-        runner.cancelPlacementAutomation(runId, reason),
-      );
+      return { canceled: yield* fromPromise(() => cancelPiPlacement(session, runId, reason)) };
     }),
 
   [METHOD_NAMES.INTERNAL_WORKER_RUN_BLOCKING_AGENT]: (params) =>
@@ -265,67 +124,46 @@ export const runsHandlers: WorkerRpcHandlers = {
           ...(payload.attachments ? { attachments: payload.attachments } : {}),
         }),
       );
-      // On pi-durable an agent another device placed here runs in the
-      // conversation's harness, on the model its requester named; its answer
-      // goes back through the placement. One on Claude Code runs on the
-      // runner's agent manager, as every agent does where Claude Code is the
-      // engine (whose non-Claude Code agents run on pi in turn).
+      // An agent another device placed here runs in the conversation's
+      // harness, on the model its requester named (Claude Code included);
+      // its answer goes back through the placement.
       const requestedModel = payload.requestedModel?.trim();
       const pickedModel = requestedModel && requestedModel !== "default" ? requestedModel : undefined;
-      const onClaudeCode = pickedModel !== undefined && /^claude-code(?:[/:]|$)/i.test(pickedModel);
-      if (piChatRouted(session) && !onClaudeCode) {
-        const hostBus = yield* HostBus.Service;
-        const agentKey = payload.remoteThreadId
-          ? piPlacedAgentKey(payload.remoteThreadId)
-          : payload.threadId || payload.executionId || crypto.randomUUID();
-        const runKey = payload.executionId || agentKey;
-        return yield* fromPromise(async () => {
-          const chats = await piChatsFor(session, hostBus);
-          const canceled = payload.threadId || payload.executionId ? piPlacementCanceled(session, "agent", runKey) : null;
-          if (canceled) return { status: "error" as const, finalText: "" as const, error: canceled, threadId: agentKey };
-          const result = await chats.runPlacedAgent(payload.conversationId, {
-            agentKey,
-            runKey,
-            ...(payload.remoteThreadId ? { threadId: payload.remoteThreadId } : {}),
-            description: payload.description,
-            prompt: withAttachedFiles(payload.prompt, attachments),
-            ...(pickedModel ? { model: pickedModel } : {}),
-          }).catch((error: unknown) => {
-            if (!pickedModel) throw error;
-            return {
-              threadId: agentKey,
-              status: "error" as const,
-              error: `This device couldn't run the agent on "${pickedModel}": ${error instanceof Error ? error.message : String(error)}`,
-            };
-          });
-          // The report goes back to a chat on another device; the files it
-          // links are here, so this computer shares them.
-          if (result.status === "ok" && result.finalText) {
-            await session.runner
-              .ensureInitialized()
-              .then((runner) => runner.publishLinkedFiles(result.finalText))
-              .catch(() => undefined);
-          }
-          return result.status === "ok"
-            ? { status: "ok" as const, finalText: result.finalText, threadId: result.threadId }
-            : { status: result.status, finalText: "" as const, error: result.error, threadId: result.threadId };
-        });
-      }
-      const runner = yield* fromPromise(() =>
-        session.runner.ensureInitialized(),
-      );
+      const hostBus = yield* HostBus.Service;
+      const agentKey = payload.remoteThreadId
+        ? piPlacedAgentKey(payload.remoteThreadId)
+        : payload.threadId || payload.executionId || crypto.randomUUID();
+      const runKey = payload.executionId || agentKey;
       return yield* fromPromise(async () => {
-        const result = await runner.runBlockingLocalAgent({
-          ...payload,
-          agentType: payload.agentType ?? "general",
-          ...(attachments.length > 0 ? { attachments } : {}),
+        const chats = await piChatsFor(session, hostBus);
+        const canceled = payload.threadId || payload.executionId ? piPlacementCanceled(session, "agent", runKey) : null;
+        if (canceled) return { status: "error" as const, finalText: "" as const, error: canceled, threadId: agentKey };
+        const result = await chats.runPlacedAgent(payload.conversationId, {
+          agentKey,
+          runKey,
+          ...(payload.remoteThreadId ? { threadId: payload.remoteThreadId } : {}),
+          description: payload.description,
+          prompt: withAttachedFiles(payload.prompt, attachments),
+          ...(pickedModel ? { model: pickedModel } : {}),
+        }).catch((error: unknown) => {
+          if (!pickedModel) throw error;
+          return {
+            threadId: agentKey,
+            status: "error" as const,
+            error: `This device couldn't run the agent on "${pickedModel}": ${error instanceof Error ? error.message : String(error)}`,
+          };
         });
         // The report goes back to a chat on another device; the files it
         // links are here, so this computer shares them.
         if (result.status === "ok" && result.finalText) {
-          runner.publishLinkedFiles(result.finalText);
+          await session.runner
+            .ensureInitialized()
+            .then((runner) => runner.publishLinkedFiles(result.finalText))
+            .catch(() => undefined);
         }
-        return result;
+        return result.status === "ok"
+          ? { status: "ok" as const, finalText: result.finalText, threadId: result.threadId }
+          : { status: result.status, finalText: "" as const, error: result.error, threadId: result.threadId };
       });
     }),
 
@@ -335,7 +173,6 @@ export const runsHandlers: WorkerRpcHandlers = {
         () => new RunnerUnavailableError(),
       );
       const payload = params as RuntimeLocalAgentSteerRequest;
-      // One of pi's placed agents, when it runs there.
       const hostBus = yield* HostBus.Service;
       const delivered = yield* fromPromise(async () =>
         (await piChatsFor(session, hostBus)).steerPlacedAgent({
@@ -344,17 +181,7 @@ export const runsHandlers: WorkerRpcHandlers = {
           message: String(payload.text ?? ""),
         }),
       );
-      if (delivered) return { delivered };
-      const runner = yield* fromPromise(() =>
-        session.runner.ensureInitialized(),
-      );
-      return yield* fromPromise(() =>
-        runner.steerBlockingLocalAgent(
-          String(payload.agentId ?? ""),
-          String(payload.text ?? ""),
-          String(payload.messageId ?? ""),
-        ),
-      );
+      return { delivered };
     }),
 
   [METHOD_NAMES.INTERNAL_WORKER_DELIVER_AGENT_MESSAGE]: (params) =>
@@ -363,26 +190,13 @@ export const runsHandlers: WorkerRpcHandlers = {
         () => new RunnerUnavailableError(),
       );
       const payload = params as RuntimeLocalAgentMessageRequest;
-      // One of pi's agents, when pi has one by that thread id.
       const hostBus = yield* HostBus.Service;
-      const piOutcome = yield* fromPromise(() =>
+      const outcome = yield* fromPromise(() =>
         piDeliverAgentMessage(session, hostBus, {
           threadId: String(payload.threadId ?? ""),
           text: String(payload.text ?? ""),
           messageId: String(payload.messageId ?? ""),
         }),
-      );
-      if (piOutcome !== "not_found") return { outcome: piOutcome };
-      const runner = yield* fromPromise(() =>
-        session.runner.ensureInitialized(),
-      );
-      const outcome = yield* fromPromise(() =>
-        runner.deliverLocalAgentMessage(
-          String(payload.threadId ?? ""),
-          String(payload.text ?? ""),
-          String(payload.messageId ?? ""),
-          String(payload.ownerGeneration ?? ""),
-        ),
       );
       return { outcome };
     }),
@@ -394,17 +208,9 @@ export const runsHandlers: WorkerRpcHandlers = {
       );
       const payload = params as RuntimeLocalAgentPauseRequest;
       const threadId = String(payload.threadId ?? "");
-      // One of pi's agents, when pi has one by that thread id.
       const hostBus = yield* HostBus.Service;
-      const piOutcome = yield* fromPromise(() =>
-        piPauseAgent(session, hostBus, threadId),
-      );
-      if (piOutcome !== "not_found") return { outcome: piOutcome };
-      const runner = yield* fromPromise(() =>
-        session.runner.ensureInitialized(),
-      );
       const outcome = yield* fromPromise(() =>
-        runner.pauseLocalAgent(threadId, String(payload.ownerGeneration ?? "")),
+        piPauseAgent(session, hostBus, threadId),
       );
       return { outcome };
     }),
@@ -425,15 +231,11 @@ export const runsHandlers: WorkerRpcHandlers = {
       const reason = typeof payload.reason === "string" ? payload.reason : undefined;
       const executionId = typeof payload.executionId === "string" ? payload.executionId.trim() : "";
       const runKey = executionId || agentId;
-      if (yield* fromPromise(() => cancelPiPlacedAgent(session, { agentKey: piPlacedAgentKey(agentId), runKey, ...(reason ? { reason } : {}) }))) {
-        return { canceled: true };
-      }
-      const runner = yield* fromPromise(() =>
-        session.runner.ensureInitialized(),
-      );
-      return yield* fromPromise(() =>
-        runner.cancelBlockingLocalAgent(agentId, reason, executionId || undefined),
-      );
+      return {
+        canceled: yield* fromPromise(() =>
+          cancelPiPlacedAgent(session, { agentKey: piPlacedAgentKey(agentId), runKey, ...(reason ? { reason } : {}) }),
+        ),
+      };
     }),
 
   [METHOD_NAMES.INTERNAL_WORKER_CREATE_BACKGROUND_AGENT]: (params) =>
@@ -442,58 +244,16 @@ export const runsHandlers: WorkerRpcHandlers = {
         () => new RunnerUnavailableError(),
       );
       const payload = params as RuntimeLocalAgentRequest;
-      // On pi-durable an agent the app starts (an app-source merge, memory
-      // sync) is a pi agent of the conversation's orchestrator.
-      if (piChatRouted(session)) {
-        const hostBus = yield* HostBus.Service;
-        return yield* fromPromise(async () =>
-          (await piChatsFor(session, hostBus)).startAgent(payload.conversationId, {
-            key: payload.threadId || crypto.randomUUID(),
-            description: payload.description,
-            prompt: payload.prompt,
-          }),
-        );
-      }
-      const runner = yield* fromPromise(() =>
-        session.runner.ensureInitialized(),
-      );
-      return yield* fromPromise(() =>
-        runner.createBackgroundAgent({
-          ...payload,
-          agentType: payload.agentType ?? "general",
+      // An agent the app starts (an app-source merge, memory sync) is a pi
+      // agent of the conversation's orchestrator.
+      const hostBus = yield* HostBus.Service;
+      return yield* fromPromise(async () =>
+        (await piChatsFor(session, hostBus)).startAgent(payload.conversationId, {
+          key: payload.threadId || crypto.randomUUID(),
+          description: payload.description,
+          prompt: payload.prompt,
         }),
       );
-    }),
-
-  [METHOD_NAMES.INTERNAL_WORKER_GET_AGENT_SNAPSHOT]: (params) =>
-    Effect.gen(function* () {
-      const sessions = yield* WorkerSessions.Service;
-      // Tolerate the runner still building (post-ready window): a fresh
-      // worker has no in-memory agent yet, so a missing snapshot is the
-      // right answer.
-      const runner = sessions.current()?.runnerCell.get() ?? null;
-      if (!runner) return null;
-      return yield* fromPromise(() =>
-        runner.getLocalAgentSnapshot((params as { agentId: string }).agentId),
-      );
-    }),
-
-  [METHOD_NAMES.INTERNAL_WORKER_APPEND_THREAD_MESSAGE]: (params) =>
-    Effect.gen(function* () {
-      // Don't drop the message if the runner is still building (post-ready
-      // window) — wait for the background build, then append.
-      const session = yield* WorkerSessions.sessionOrFail(
-        () => new RunnerUnavailableError(),
-      );
-      const runner = yield* session.runner.joined;
-      runner.appendThreadMessage(
-        params as {
-          threadKey: string;
-          role: "user" | "assistant";
-          content: string;
-        },
-      );
-      return { ok: true };
     }),
 
   [METHOD_NAMES.INTERNAL_WORKER_WEB_SEARCH]: (params) =>

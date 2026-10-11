@@ -18,7 +18,6 @@
  * mismatch on either side is a compile error.
  */
 import type {
-  AgentHealth,
   AllUserSignalsResult,
   BrowserDataResult,
   BrowserProfile,
@@ -120,19 +119,11 @@ import type {
 } from "./onboarding.js";
 import type { UiState } from "./ui.js";
 import {
-  IPC_AGENT_CANCEL_CHAT,
   IPC_AGENT_EVENT,
-  IPC_PI_CHAT_ENABLED,
-  IPC_PI_CHAT_ENABLED_CHANGED,
   IPC_PI_CHAT_EVENTS,
   IPC_PI_CHAT_REQUEST,
-  IPC_AGENT_GET_ACTIVE_RUN,
-  IPC_AGENT_GET_SESSION_STARTED_AT,
-  IPC_AGENT_HEALTH_CHECK,
   IPC_AGENT_ONE_SHOT_COMPLETION,
-  IPC_AGENT_RESUME,
   IPC_AGENT_SEND_INPUT,
-  IPC_AGENT_START_CHAT,
   IPC_APP_HARD_RESET,
   IPC_APP_QUIT_FOR_RESTART,
   IPC_APP_RELAUNCH,
@@ -631,49 +622,6 @@ export type OneShotCompletionRequest = {
   sessionIdleTtlMs?: number;
 };
 
-export type StartChatRequest = {
-  conversationId: string;
-  userPrompt: string;
-  selectedText?: string | null;
-  chatContext?: ChatContext | null;
-  deviceId?: string;
-  platform?: string;
-  timezone?: string;
-  /** BCP-47 locale for the user's preferred response language. */
-  locale?: string;
-  mode?: string;
-  messageMetadata?: Record<string, unknown>;
-  attachments?: Array<{
-    url: string;
-    mimeType?: string;
-  }>;
-  userMessageEventId?: string;
-  userMessageTimestamp?: number;
-  agentType?: string;
-  storageMode?: "cloud" | "local";
-  clientRequestId?: string;
-  executionTarget?: ExecutionTarget;
-};
-
-export type StartChatResult = {
-  requestId: string;
-  runId?: string;
-  userMessageId?: string;
-  accepted?: boolean;
-  deduplicated?: boolean;
-};
-
-export type ResumeConversationResult = {
-  activeRun: {
-    runId: string;
-    conversationId: string;
-    requestId?: string;
-    userMessageId?: string;
-    uiVisibility?: "visible" | "hidden";
-  } | null;
-  events: AgentStreamEvent[];
-};
-
 export type RuntimeAvailabilitySnapshot = {
   connected: boolean;
   ready: boolean;
@@ -1107,17 +1055,6 @@ export type IpcInvokeContract = {
     [payload: OneShotCompletionRequest],
     { text: string }
   >;
-  [IPC_AGENT_HEALTH_CHECK]: Invoke<[], AgentHealth | null>;
-  [IPC_AGENT_GET_ACTIVE_RUN]: Invoke<
-    [],
-    {
-      runId: string;
-      conversationId: string;
-      uiVisibility?: "visible" | "hidden";
-    } | null
-  >;
-  [IPC_AGENT_GET_SESSION_STARTED_AT]: Invoke<[], number>;
-  [IPC_AGENT_START_CHAT]: Invoke<[payload: StartChatRequest], StartChatResult>;
   [IPC_AGENT_SEND_INPUT]: Invoke<
     [
       payload: {
@@ -1128,21 +1065,6 @@ export type IpcInvokeContract = {
       },
     ],
     { delivered: boolean }
-  >;
-  [IPC_AGENT_RESUME]: Invoke<
-    [
-      payload: {
-        conversationId: string;
-        lastSeq: number;
-        /**
-         * Highest worker/recorder seq the renderer has seen. `lastSeq` is
-         * main's wire cursor; only this one is a valid cursor into the host
-         * run-event log.
-         */
-        lastSourceSeq?: number;
-      },
-    ],
-    ResumeConversationResult
   >;
   [IPC_DEVTEST_TRIGGER_VITE_ERROR]: Invoke<[], OkResult>;
   [IPC_DEVTEST_FIX_VITE_ERROR]: Invoke<[], OkResult>;
@@ -1750,7 +1672,6 @@ export type IpcInvokeContract = {
 export type IpcSendContract = {
   [IPC_UI_STATE_KV_SNAPSHOT]: [];
   /** Synchronous: whether the desktop chat runs on pi-durable. */
-  [IPC_PI_CHAT_ENABLED]: [];
   [IPC_UI_STATE_KV_APPLY]: [changes: Record<string, string | null>];
   [IPC_UI_STATE_KV_CLEAR]: [];
   [IPC_WINDOW_MINIMIZE]: [];
@@ -1799,7 +1720,6 @@ export type IpcSendContract = {
   [IPC_COMPANION_SEND]: [payload: CompanionSendRequest];
   [IPC_COMPANION_STOP]: [];
   [IPC_COMPANION_PUBLISH_STATE]: [state: CompanionState];
-  [IPC_AGENT_CANCEL_CHAT]: [runId: string];
   [IPC_SYSTEM_OPEN_FDA]: [];
   [IPC_SHELL_OPEN_EXTERNAL]: [url: string];
   [IPC_SHELL_SHOW_IN_FOLDER]: [filePath: string];
@@ -1866,7 +1786,6 @@ export type IpcEventContract = {
   [IPC_COMPANION_VISIBLE_CHANGED]: CompanionVisibility;
   [IPC_AGENT_EVENT]: AgentStreamEvent;
   [IPC_PI_CHAT_EVENTS]: PiChatEventsPayload;
-  [IPC_PI_CHAT_ENABLED_CHANGED]: boolean;
   [IPC_RUNTIME_AVAILABILITY]: RuntimeAvailabilitySnapshot;
   [IPC_AUTH_SESSION_INVALIDATED]: void;
   [IPC_PREFERENCES_READ_ALOUD_CHANGED]: boolean;

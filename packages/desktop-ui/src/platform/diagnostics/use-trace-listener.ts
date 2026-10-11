@@ -1,14 +1,9 @@
 /**
- * Hook that captures agent IPC stream events and conversation events
- * into the global trace store. Runs independently of the streaming chat
- * hook — captures ALL events without runId filtering, so sub-agent
- * tool calls and lifecycle events are visible.
+ * Hook that captures conversation events into the global trace store,
+ * sub-agent tool calls and lifecycle events included.
  */
 import { useEffect, useRef } from "react";
-import {
-  AGENT_IDS,
-  AGENT_STREAM_EVENT_TYPES,
-} from "@stella/contracts/agent-runtime";
+import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import type { EventRecord } from "@stella/contracts/local-chat";
 import {
   isAgentStartedEvent,
@@ -23,10 +18,6 @@ import {
   getEventText,
 } from "@/features/chat/lib/event-transforms";
 import {
-  traceToolStart,
-  traceToolEnd,
-  traceAgentError,
-  traceStreamEnd,
   traceTaskStarted,
   traceTaskCompleted,
   traceTaskCanceled,
@@ -34,96 +25,9 @@ import {
   traceTaskProgress,
   traceUserMessage,
   traceAssistantMessage,
-  registerRunAgent,
-  unregisterRunAgent,
-  clearRunToolStarts,
   addTrace,
   formatTraceSnippet,
 } from "@/platform/diagnostics/trace-store";
-/**
- * Persistent IPC listener that captures all agent stream events
- * into the trace store. Unlike handleAgentEvent in use-streaming-chat,
- * this does NOT filter by runId, so sub-agent events are captured.
- */
-export function useTraceIpcListener(enabled: boolean) {
-  useEffect(() => {
-    if (!enabled || !window.electronAPI?.agent?.onStream) return;
-    const cleanup = window.electronAPI.agent.onStream((event) => {
-      if (event.agentType) {
-        registerRunAgent(event.runId, event.agentType);
-      }
-      switch (event.type) {
-        case AGENT_STREAM_EVENT_TYPES.TOOL_START:
-          traceToolStart(
-            event.toolName ?? "unknown",
-            event.toolCallId,
-            event.runId,
-            event.args,
-          );
-          break;
-        case AGENT_STREAM_EVENT_TYPES.TOOL_END:
-          traceToolEnd(
-            event.toolName ?? "unknown",
-            event.toolCallId,
-            event.resultPreview,
-            event.runId,
-          );
-          break;
-        case AGENT_STREAM_EVENT_TYPES.RUN_FINISHED:
-          if (event.outcome === "error") {
-            traceAgentError(
-              event.error ?? event.reason ?? "unknown error",
-              true,
-              event.runId,
-            );
-          } else {
-            traceStreamEnd(
-              event.runId,
-              `${event.outcome ?? "completed"} ${(event.finalText ?? "").slice(0, 160)}`.trim(),
-            );
-          }
-          // Run is terminal — drop its runId→agent mapping so completed
-          // runs don't accumulate in the trace store (memory). The trace
-          // entries above already captured the agent, so lookup loss after
-          // this point is fine. Also sweep any tool-start timings still open
-          // for this run: a run that ends mid-tool (canceled/errored) emits no
-          // matching TOOL_END, so those entries would otherwise leak.
-          unregisterRunAgent(event.runId);
-          clearRunToolStarts(event.runId);
-          break;
-        case AGENT_STREAM_EVENT_TYPES.AGENT_STARTED:
-          traceTaskStarted(
-            event.agentId ?? "unknown",
-            event.agentType ?? "unknown",
-            event.description ?? "",
-            event.parentAgentId,
-          );
-          break;
-        case AGENT_STREAM_EVENT_TYPES.AGENT_COMPLETED:
-          traceTaskCompleted(event.agentId ?? "unknown", event.result);
-          break;
-        case AGENT_STREAM_EVENT_TYPES.AGENT_CANCELED:
-          traceTaskCanceled(event.agentId ?? "unknown", event.error);
-          break;
-        case AGENT_STREAM_EVENT_TYPES.AGENT_FAILED:
-          traceTaskFailed(event.agentId ?? "unknown", event.error);
-          break;
-        case AGENT_STREAM_EVENT_TYPES.AGENT_PROGRESS:
-          traceTaskProgress(event.agentId ?? "unknown", event.statusText ?? "");
-          break;
-        // "stream" events are high-frequency text deltas — skip for trace
-      }
-    });
-    addTrace("system", "trace-listener-attached", "IPC trace listener started");
-    return () => {
-      cleanup();
-    };
-  }, [enabled]);
-}
-// Cap on the de-dup id set so a long-lived conversation can't grow it
-// without bound. Set preserves insertion order, so trimming from the front
-// drops the oldest seen ids; re-tracing one of those is harmless (idempotent
-// trace entries by id are still deduped within MAX_ENTRIES upstream).
 const MAX_SEEN_IDS = 5000;
 /**
  * Monitors the conversation event feed and emits trace entries for

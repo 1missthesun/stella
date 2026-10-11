@@ -23,7 +23,6 @@ import { createExtensionRuntimeApi } from "../extensions/runtime-api.js";
 import { modelRuntime } from "../model-runtime.js";
 import { createRuntimeLogger } from "../debug.js";
 import type { RunnerContext } from "./types.js";
-import { joinWithTimeout } from "../shared/supervised-scope.js";
 import { recordBootStep } from "../../observability/boot-timing.js";
 
 const logger = createRuntimeLogger("runtime-init");
@@ -465,28 +464,6 @@ export const createRuntimeInitialization = (
   };
 
   /**
-   * F1: idle gate for the hot-reload path. A reload is safe when no
-   * orchestrator session is streaming and no subagent task is running.
-   * Returns the first reason the runtime is busy so callers can log /
-   * retry intelligently.
-   */
-  const computeBusyReason = (): string | null => {
-    if (context.state.activeOrchestratorRunId) {
-      return `orchestrator run ${context.state.activeOrchestratorRunId} is active`;
-    }
-    // The only orchestrator-side busy condition is an active run, gated
-    // above by `activeOrchestratorRunId`.
-    const activeAgents =
-      context.state.localAgentManager?.getActiveAgentCount() ?? 0;
-    if (activeAgents > 0) {
-      return `${activeAgents} subagent task${
-        activeAgents === 1 ? "" : "s"
-      } running`;
-    }
-    return null;
-  };
-
-  /**
    * F1 entry point. Idle-checks, sweeps user-extension hooks/tools, and
    * re-runs the loader. Bundled hooks and built-in tools are untouched.
    * Returns one of:
@@ -503,13 +480,6 @@ export const createRuntimeInitialization = (
   ): Promise<ExtensionReloadResult> => {
     if (!context.state.isInitialized) {
       return { status: "not-initialized" };
-    }
-    const busyReason = computeBusyReason();
-    if (busyReason) {
-      if (options.logBusy !== false) {
-        logger.info("extensions.reload.deferred", { reason: busyReason });
-      }
-      return { status: "busy", reason: busyReason };
     }
     logger.info("extensions.reload.start");
     // Load-then-swap to keep the reload atomic w.r.t. the orchestrator
@@ -733,89 +703,24 @@ export const createRuntimeInitialization = (
     await completion?.catch(() => undefined);
   };
 
-  /**
-   * Hard cap on how long shutdown will wait for background compactions
-   * to settle. Cracked summarization LLM calls or network stalls would
-   * otherwise pin the worker indefinitely; after this deadline we
-   * proceed with SQLite teardown and any unfinished compaction's write
-   * will fail-and-log against the closed handle (the run was already
-   * "fire-and-forget" from the user's POV — it had nothing to lose).
-   */
-  const COMPACTION_DRAIN_TIMEOUT_MS = 5_000;
-
-  const drainCompactionsWithTimeout = async (): Promise<void> => {
-    try {
-      // Effect-bounded drain: the losing sleep arm is fiber-interrupted
-      // (the old `clearTimeout`), and a timeout leaves the abandoned drain
-      // promise to the scheduler's own shutdown join below.
-      const result = await initRuntime.runPromise(
-        Effect.raceFirst(
-          Effect.map(
-            Effect.promise(() => context.state.compactionScheduler.drain()),
-            () => "drained" as const,
-          ),
-          Effect.map(
-            Effect.sleep(COMPACTION_DRAIN_TIMEOUT_MS),
-            () => "timeout" as const,
-          ),
-        ),
-      );
-      if (result === "timeout") {
-        logger.warn("compaction-scheduler.drain-timeout", {
-          timeoutMs: COMPACTION_DRAIN_TIMEOUT_MS,
-        });
-      }
-    } catch (error) {
-      logger.warn("compaction-scheduler.drain-failed", {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  };
-
-  /**
-   * Hard cap on joining the supervised run-fiber tree after interruption
-   * has been delivered. Interruption aborts every unit cooperatively; this
-   * only bounds a wedged native promise (which no JavaScript runtime can
-   * force-kill) so worker exit cannot pin indefinitely. The external
-   * resources such a promise might hold are still reaped: the tool host
-   * shutdown below kills tool/shell child processes unconditionally.
-   */
-  const SUPERVISOR_JOIN_TIMEOUT_MS = 15_000;
-
   const stopRuntime = async (): Promise<void> => {
-    logger.warn("runner.stop", {
-      activeOrchestratorRunId: context.state.activeOrchestratorRunId,
-      activeSupervisedRuns: context.state.supervisor.activeRunCount(),
-      conversationCallbacks: context.state.conversationCallbacks.size,
-      runCallbacksByRunId: context.state.runCallbacksByRunId.size,
-    });
+    logger.warn("runner.stop", {});
     stopExtensionWatcher();
     context.state.isRunning = false;
     context.state.isInitialized = false;
     // Re-arm the boot latch so a restarted runner's waiters park again
     // instead of observing the previous generation as already open.
     context.state.initializationStarted.reset();
-    // This join is deliberately before the backend client, task, tool-host, and ultimately
+    // This join is deliberately before the backend client, tool-host, and ultimately
     // session-storage teardown. Even a user extension factory that ignores its
     // abort signal must settle before its captured services can be closed.
     await stopInitialization();
     deps.disposeBackendClient();
-    // The cloud journal writer holds a retry timer and an in-memory queue.
-    // Stopping it before the backend client is gone would be pointless (it
-    // needs a token to flush) and leaving it running keeps a timer alive past
-    // shutdown, so it is dropped here alongside the client it depends on.
+    // The cloud journal writer holds a retry timer and an in-memory queue,
+    // dropped here alongside the client it depends on.
     context.cloudTranscript.stop();
-    // Cancel every live orchestrator turn cooperatively first (the
-    // supervisor fires each run's registered abort), then cancel agent
-    // tasks (awaited: lifecycle events + managed-child cascades), then
-    // interrupt the whole supervised fiber tree — root turn fibers and
-    // subagent attempt fibers — and join their teardown before any shared
-    // resource (tool host, store) is torn down beneath them.
-    context.state.supervisor.abortAllRuns();
-    // Disarm before task cancellation or tool-host shutdown can terminate a
-    // watched shell. Those exits are teardown noise and must not resurrect a
-    // thread while the runner itself is stopping. dispose() is synchronous;
-    // it cancels timers/watchers without joining background processes.
+    // Disarm before tool-host shutdown can terminate a watched shell: those
+    // exits are teardown noise and must not wake an agent.
     context.state.backgroundExitWake?.dispose();
     const tasksShutdown = Promise.resolve(deps.shutdownTasks()).catch(
       (error) => {
@@ -824,59 +729,8 @@ export const createRuntimeInitialization = (
         });
       },
     );
-    // Kill tool-owned child processes (shells, CLIs) now: every turn is
-    // already aborted, and reaping accelerates their unwind so the join
-    // below is short.
     await context.toolHost.shutdown();
     await tasksShutdown;
-    await joinWithTimeout(
-      context.state.supervisor.shutdown(),
-      SUPERVISOR_JOIN_TIMEOUT_MS,
-      () => {
-        logger.warn("runner.stop.supervisor-join-timeout", {
-          timeoutMs: SUPERVISOR_JOIN_TIMEOUT_MS,
-          liveFibers: context.state.supervisor.liveFiberCount(),
-        });
-      },
-    );
-    // Interrupt the run coordinator's drain fiber and join any in-flight
-    // queued-turn admission before the lane state is torn down beneath it.
-    // The runner is not restarted on this instance, so coordinator shutdown
-    // is terminal (a fresh runner builds a fresh coordinator).
-    await joinWithTimeout(
-      context.state.runCoordinator?.shutdown() ?? Promise.resolve(),
-      SUPERVISOR_JOIN_TIMEOUT_MS,
-      () => {
-        logger.warn("runner.stop.run-coordinator-join-timeout", {
-          timeoutMs: SUPERVISOR_JOIN_TIMEOUT_MS,
-        });
-      },
-    );
-    context.state.activeOrchestratorRunId = null;
-    context.state.activeOrchestratorConversationId = null;
-    context.state.activeOrchestratorUiVisibility = "visible";
-    context.state.activeOrchestratorSession = null;
-    context.state.cloudThreads.clear();
-    const shutdownError = new Error("Stella runtime is shutting down");
-    for (const turn of context.state.queuedOrchestratorTurns) {
-      turn.cancel?.(shutdownError);
-    }
-    context.state.queuedOrchestratorTurns.length = 0;
-    context.state.conversationCallbacks.clear();
-    context.state.runCallbacksByRunId.clear();
-    // Give in-flight background compactions their historical 5s grace to
-    // finish SQLite writes, then interrupt whatever remains and join it —
-    // an interrupted compaction aborts its LLM call and skips its store
-    // write, so nothing races the store handle teardown. The join is bounded:
-    // a wedged LLM promise that ignores its abort must not hang worker stop;
-    // past the bound its store writes are already fenced off by the abort
-    // signal.
-    await drainCompactionsWithTimeout();
-    await joinWithTimeout(
-      context.state.compactionScheduler.shutdown(),
-      10_000,
-      () => logger.warn("runner.stop.compaction-shutdown-timeout", {}),
-    );
   };
 
   const stop = (): Promise<void> => {

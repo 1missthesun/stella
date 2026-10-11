@@ -1,10 +1,7 @@
 import type {
-  RuntimeActiveRun,
   RuntimeAutomationTurnRequest,
   RuntimeAutomationTurnResult,
 } from "@stella/contracts/protocol";
-
-type Awaitable<T> = T | Promise<T>;
 
 export type PiRunnerAuthHandle = {
   setAuthToken: (value: string | null) => void;
@@ -29,7 +26,6 @@ export type StellaHostRunnerTarget = {
     runAutomationTurn: (
       payload: RuntimeAutomationTurnRequest,
     ) => Promise<RuntimeAutomationTurnResult>;
-    getActiveOrchestratorRun: () => Awaitable<RuntimeActiveRun | null>;
   } | null;
 };
 

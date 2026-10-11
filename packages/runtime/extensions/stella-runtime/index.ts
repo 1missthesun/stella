@@ -1,12 +1,5 @@
 import { loadParsedAgentsFromDir } from "../../kernel/agents/markdown-agent-loader.js";
-import type {
-  ExtensionFactory,
-  HookDefinition,
-} from "../../kernel/extensions/types.js";
-import { createConnectorAvailabilityReminderHook } from "./hooks/connector-availability-reminder.hook.js";
-import { createConnectorFormatReminderHook } from "./hooks/connector-format-reminder.hook.js";
-import { createStaleUserReminderHook } from "./hooks/stale-user-reminder.hook.js";
-import { createThreadSummariesRecordHook } from "./hooks/thread-summaries-record.hook.js";
+import type { ExtensionFactory } from "../../kernel/extensions/types.js";
 import { resolveRuntimeSourceAsset } from "../../kernel/shared/runtime-paths.js";
 
 const bundledAgentMetadataDir = () =>
@@ -30,8 +23,6 @@ export const loadStellaRuntimeAgents = (
  * hardcoded calls inside the kernel:
  *
  *   - Agent registration from bundled runtime metadata and prompt bodies
- *   - Stale-user reminder
- *   - Thread-summaries record (post-subagent finalize, capability-gated)
  *
  * Lives in `runtime/extensions/stella-runtime/` so power users can fork
  * any of these behaviors in place. The kernel has no special "bundled"
@@ -46,34 +37,6 @@ const stellaRuntimeExtension: ExtensionFactory = (pi, services) => {
   for (const agent of loadStellaRuntimeAgents(services.stellaDataDir)) {
     pi.registerAgent(agent);
   }
-
-  // Orchestrator + subagent lifecycle hooks. Each `create…Hook` returns
-  // a HookDefinition closing over whatever subset of services it
-  // needs; we register them via a single helper to keep the factory
-  // body flat.
-  const register = <E extends Parameters<typeof pi.on>[0]>(
-    hook: HookDefinition<E>,
-  ): void => {
-    pi.on(hook.event, hook.handler, hook.filter);
-  };
-
-  register(createStaleUserReminderHook());
-  // Connector-format reminder: one hidden `<system-reminder>` on the
-  // single turn where the user's routing surface changes (desktop ⇄
-  // connector / connector ⇄ different connector). Cheap — the
-  // transition decision is precomputed in `prepareOrchestratorRun`.
-  register(createConnectorFormatReminderHook());
-  // Connector-availability reminder: deterministic keyword match of each
-  // user message against the connector catalog; injects a hidden
-  // connected/not-connected note for the orchestrator, deduped once per
-  // active context window (compaction resets eligibility; declines win).
-  register(
-    createConnectorAvailabilityReminderHook({
-      stellaDataDir: services.stellaDataDir,
-      store: services.store,
-    }),
-  );
-  register(createThreadSummariesRecordHook({ store: services.store }));
 };
 
 export default stellaRuntimeExtension;

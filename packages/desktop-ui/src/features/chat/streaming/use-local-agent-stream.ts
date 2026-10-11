@@ -1,32 +1,5 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { showToast } from "@/ui/toast";
-import { useResumeAgentRun } from "../hooks/use-resume-agent-run";
-import {
-  attachmentsForStartChat,
-  initialStoreState,
-  streamStoreReducer,
-} from "./store";
-import { useReasoningBatcher } from "./use-reasoning-batcher";
-import {
-  clearConversationTaskDecorations,
-  getConversationTaskDecorationsSnapshot,
-  subscribeConversationTaskDecorations,
-} from "./task-decoration-store";
-import { useAgentEventHandler } from "./use-agent-event-handler";
-import { useApplyResumeSnapshot } from "./use-resume-snapshot";
-import {
-  reconcileStreamingAssistantCanonicalMessage,
-  streamingAssistantOverlayId,
-} from "./streaming-types";
-import { notifyChatContentGrowth } from "@/shell/chat-scroll-follow";
 import { resolveAgentNotReadyToast } from "./agent-stream-errors";
 import {
   executionTargetStore,
@@ -37,20 +10,46 @@ import {
   isStellaLimitOrAuthReason,
   resolveStellaProviderErrorToast,
 } from "./stella-provider-error-toast";
-import type { ElectronAgentApi } from "@/shared/types/electron";
-import type { ReplyRef } from "@stella/contracts/reply-refs";
+import { abortPiChat, submitPiChat } from "@/features/chat/pi/pi-chat-store";
+import type { ChatContext } from "@/shared/types/electron";
 import type { AttachmentRef } from "./chat-types";
-import type {
-  AgentResponseTarget,
-  StreamingAssistantOverlay,
-} from "./streaming-types";
 
-type StartChatPayload = Parameters<ElectronAgentApi["startChat"]>[0];
+type StartChatAttachment = {
+  url: string;
+  mimeType?: string;
+  name?: string;
+  previewUrl?: string;
+  kind?: AttachmentRef["kind"];
+  size?: number;
+  path?: string;
+};
+
+const attachmentsForStartChat = (
+  attachments: AttachmentRef[] | undefined,
+): StartChatAttachment[] | undefined => {
+  if (!attachments?.length) return undefined;
+  const mapped = attachments
+    .filter(
+      (a): a is AttachmentRef & { url: string } =>
+        typeof a.url === "string" && a.url.length > 0,
+    )
+    .map((a) => {
+      const item: StartChatAttachment = { url: a.url };
+      if (a.mimeType) item.mimeType = a.mimeType;
+      if (a.name) item.name = a.name;
+      if (a.previewUrl) item.previewUrl = a.previewUrl;
+      if (a.kind) item.kind = a.kind;
+      if (typeof a.size === "number") item.size = a.size;
+      if (a.path) item.path = a.path;
+      return item;
+    });
+  return mapped.length ? mapped : undefined;
+};
 
 export type LocalAgentStartArgs = {
   userPrompt: string;
-  selectedText?: StartChatPayload["selectedText"];
-  chatContext?: StartChatPayload["chatContext"];
+  selectedText?: string | null;
+  chatContext?: ChatContext | null;
   deviceId?: string;
   platform?: string;
   timezone?: string;
@@ -66,277 +65,34 @@ export type LocalAgentStartArgs = {
 
 type LocalAgentStreamOptions = {
   activeConversationId: string | null;
-  storageMode?: StartChatPayload["storageMode"];
-  onRunStarted?: (event: {
-    runId: string;
-    conversationId: string;
-    userMessageId?: string;
-  }) => void;
-  onRunFinished?: (event: {
-    runId: string;
-    conversationId: string;
-    userMessageId?: string;
-    outcome: "completed" | "error" | "canceled";
-  }) => void;
+  storageMode?: "cloud" | "local";
 };
 
-type StreamingAssistantsUpdate =
-  | StreamingAssistantOverlay[]
-  | ((current: StreamingAssistantOverlay[]) => StreamingAssistantOverlay[]);
-import { abortPiChat, piChatEnabled, submitPiChat } from "@/features/chat/pi/pi-chat-store";
+/**
+ * Sends the composer's message to the conversation's harness. Its timeline
+ * and run state come from the pi chat store, keyed by the request id; the
+ * runtime prepares the rest of the send (attachments, chat context).
+ */
 export function useLocalAgentStream({
   activeConversationId,
   storageMode,
-  onRunStarted,
-  onRunFinished,
 }: LocalAgentStreamOptions) {
-  const [storeState, dispatch] = useReducer(
-    streamStoreReducer,
-    initialStoreState,
-  );
   const [pendingUserMessageId, setPendingUserMessageId] = useState<
     string | null
   >(null);
-
-  /**
-   * Assistant messages the renderer is showing ahead of SQLite for the
-   * active conversation. Merged into `displayMessages` so a reply is a
-   * regular assistant row rather than a separate "tail" overlay. Entries
-   * keep owning the visible text while present, even after SQLite has
-   * persisted the matching `(userMessageId, indexInTurn)` slot.
-   */
-  const [streamingAssistants, setStreamingAssistants] = useState<
-    StreamingAssistantOverlay[]
-  >([]);
-  const streamingAssistantsRef = useRef<StreamingAssistantOverlay[]>([]);
-  const commitStreamingAssistants = useCallback(
-    (update: StreamingAssistantsUpdate) => {
-      const current = streamingAssistantsRef.current;
-      const next = typeof update === "function" ? update(current) : update;
-      if (next === current) return;
-      streamingAssistantsRef.current = next;
-      setStreamingAssistants(next);
-    },
-    [],
-  );
-  const activeConversationIdRef = useRef(activeConversationId);
-  const activeRunIdByConversationRef = useRef(
-    storeState.activeRunIdByConversation,
-  );
-  const lastSeqByConversationRef = useRef(new Map<string, number>());
-  const resumeSeqByConversationRef = useRef(new Map<string, number>());
-  const resumeSourceSeqByConversationRef = useRef(new Map<string, number>());
-  const seenSourceEventKeysRef = useRef(new Set<string>());
-  const terminalRunIdsRef = useRef(new Set<string>());
-  const pendingRequestIdsRef = useRef(new Set<string>());
-
-  /**
-   * Next slot index per `userMessageId` for the in-flight run. A run emits
-   * several assistant messages — preamble, then the post-tool answer — and
-   * each lands in its own 1-based slot within the turn.
-   */
-  const nextSlotIndexByUserMessageIdRef = useRef(new Map<string, number>());
   const startAttemptRef = useRef(0);
-  const agentStreamCleanupRef = useRef<(() => void) | null>(null);
-  const activeRunId = activeConversationId
-    ? (storeState.activeRunIdByConversation[activeConversationId] ?? null)
-    : null;
-  const activeRun = activeRunId
-    ? (storeState.runsById[activeRunId] ?? null)
-    : null;
-  const isStreaming = Boolean(activeRun && !activeRun.terminal);
-  const runtimeStatusText = activeRun?.statusText ?? null;
-  const isCompacting = Boolean(activeRun?.compacting);
-  const activeToolEntry = Object.entries(activeRun?.activeToolCalls ?? {}).at(
-    -1,
-  );
-  const activeToolCallId = activeToolEntry?.[0] ?? null;
-  const activeToolName = activeToolEntry?.[1]?.toolName ?? null;
-  const latestCompletedTool = activeRun?.latestCompletedTool ?? null;
-  const hasToolActivity = Boolean(activeRun?.hasToolActivity);
-  const isToolActive = Boolean(activeToolName);
-  const answerLanded = Boolean(activeRun?.answerLanded && !isToolActive);
-  const reasoningText = "";
-
-  /** RUN_STARTED for a visible run: start the turn's slot numbering over. */
-  const beginStreamingRun = useCallback(
-    (args: { runId: string; userMessageId: string | null }) => {
-      if (args.userMessageId) {
-        nextSlotIndexByUserMessageIdRef.current.set(args.userMessageId, 1);
-      }
-    },
-    [],
-  );
-
-  // Publish whole replies immediately so their measured bubble can take over
-  // the working indicator's surface without a second, sequential entrance.
-  const finalizeMessageBoundary = useCallback(
-    (args: {
-      runId: string;
-      userMessageId: string | null;
-      responseTarget?: AgentResponseTarget | null;
-      canonicalMessageId?: string;
-      canonicalText?: string;
-      replyRefs?: ReplyRef[];
-      followedByToolCall?: boolean;
-    }) => {
-      if (!args.userMessageId) return;
-      const userMessageId = args.userMessageId;
-      const indexInTurn =
-        nextSlotIndexByUserMessageIdRef.current.get(userMessageId) ?? 1;
-      nextSlotIndexByUserMessageIdRef.current.set(
-        userMessageId,
-        indexInTurn + 1,
-      );
-      const slotId = streamingAssistantOverlayId(userMessageId, indexInTurn);
-      const canonicalText = args.canonicalText ?? "";
-      commitStreamingAssistants((current) => {
-        if (current.some((slot) => slot._id === slotId)) {
-          return reconcileStreamingAssistantCanonicalMessage(current, {
-            userMessageId,
-            indexInTurn,
-            ...(args.canonicalMessageId
-              ? { canonicalMessageId: args.canonicalMessageId }
-              : {}),
-            canonicalText,
-            ...(args.replyRefs ? { replyRefs: args.replyRefs } : {}),
-          });
-        }
-        return [
-          ...current,
-          {
-            _id: slotId,
-            userMessageId,
-            indexInTurn,
-            text: canonicalText,
-            ...(args.responseTarget
-              ? { responseTarget: args.responseTarget }
-              : {}),
-            ...(args.replyRefs && args.replyRefs.length > 0
-              ? { replyRefs: args.replyRefs }
-              : {}),
-            timestamp: Date.now(),
-            runId: args.runId,
-            ...(args.canonicalMessageId
-              ? { canonicalMessageId: args.canonicalMessageId }
-              : {}),
-            locked: true,
-          },
-        ];
-      });
-      notifyChatContentGrowth();
-    },
-    [commitStreamingAssistants],
-  );
-
-  /**
-   * RUN_FINISHED needs no slot work: every message already arrived whole and
-   * locked at its own boundary. Kept as a no-op so the event handler's
-   * lifecycle contract stays uniform across the four callbacks.
-   */
-  const finalizeRunOnFinish = useCallback(() => {}, []);
-  activeConversationIdRef.current = activeConversationId;
-  activeRunIdByConversationRef.current = storeState.activeRunIdByConversation;
-  const reasoning = useReasoningBatcher();
-  const lifecycleCallbacks = useMemo(
-    () => ({
-      onRunStarted,
-      onRunFinished,
-    }),
-    [onRunFinished, onRunStarted],
-  );
-  useEffect(
-    () => () => {
-      if (agentStreamCleanupRef.current) {
-        agentStreamCleanupRef.current();
-        agentStreamCleanupRef.current = null;
-      }
-    },
-    [],
-  );
-  const resetStreamingState = useCallback(() => {
-    setPendingUserMessageId(null);
-    commitStreamingAssistants([]);
-    nextSlotIndexByUserMessageIdRef.current.clear();
-
-    const conversationId = activeConversationIdRef.current;
-    if (conversationId) {
-      clearConversationTaskDecorations(conversationId);
-      dispatch({
-        type: "clear-conversation-run",
-        conversationId,
-      });
-    }
-  }, [commitStreamingAssistants]);
-  const handleAgentEvent = useAgentEventHandler({
-    dispatch,
-    refs: {
-      activeConversationIdRef,
-      activeRunIdByConversationRef,
-      lastSeqByConversationRef,
-      resumeSeqByConversationRef,
-      resumeSourceSeqByConversationRef,
-      seenSourceEventKeysRef,
-      terminalRunIdsRef,
-      pendingRequestIdsRef,
-    },
-    streaming: {
-      setPendingUserMessageId,
-      beginStreamingRun,
-      finalizeMessageBoundary,
-      finalizeRunOnFinish,
-    },
-    reasoning,
-    lifecycle: lifecycleCallbacks,
-  });
-  const ensureAgentStreamSubscription = useCallback(() => {
-    if (!window.electronAPI?.agent.onStream || agentStreamCleanupRef.current) {
-      return;
-    }
-    agentStreamCleanupRef.current = window.electronAPI.agent.onStream(
-      (event) => {
-        handleAgentEvent(event);
-      },
-    );
-  }, [handleAgentEvent]);
-  const applyResumeSnapshot = useApplyResumeSnapshot({
-    dispatch,
-    refs: {
-      activeConversationIdRef,
-    },
-    streaming: {
-      setPendingUserMessageId,
-    },
-  });
-  useResumeAgentRun({
-    activeConversationId,
-    refs: {
-      resumeSeqByConversationRef,
-      resumeSourceSeqByConversationRef,
-    },
-    actions: {
-      ensureAgentStreamSubscription,
-      applyResumeSnapshot,
-      handleAgentEvent,
-      clearReplayedStreamingState: resetStreamingState,
-    },
-  });
   useEffect(() => {
-    commitStreamingAssistants([]);
-    nextSlotIndexByUserMessageIdRef.current.clear();
-    seenSourceEventKeysRef.current.clear();
     const timeoutId = window.setTimeout(() => {
       setPendingUserMessageId(null);
     }, 0);
     return () => window.clearTimeout(timeoutId);
-  }, [activeConversationId, commitStreamingAssistants]);
+  }, [activeConversationId]);
   const startStream = useCallback(
     async (args: LocalAgentStartArgs): Promise<boolean> => {
       if (!activeConversationId || !window.electronAPI) {
         args.onStartFailed?.();
         return false;
       }
-      ensureAgentStreamSubscription();
       if (args.userMessageEventId && args.mode !== "follow_up") {
         setPendingUserMessageId(args.userMessageEventId);
       }
@@ -359,62 +115,17 @@ export function useLocalAgentStream({
         if (attemptId !== startAttemptRef.current) {
           return false;
         }
-        // On pi-durable the message goes to the conversation's harness;
-        // its timeline and run state come from the pi chat store, keyed
-        // by this request id. The runtime prepares the rest of the send
-        // (attachments, chat context) as it does for the agent loops.
-        if (piChatEnabled()) {
-          const placed = await submitPiChat(
-            activeConversationId,
-            args.userMessageEventId || crypto.randomUUID(),
-            args.userPrompt ?? "",
-            {
-              ...(typeof args.selectedText !== "undefined"
-                ? { selectedText: args.selectedText }
-                : {}),
-              ...(startChatContext ? { chatContext: startChatContext } : {}),
-              ...(startChatAttachments?.length
-                ? { attachments: startChatAttachments }
-                : {}),
-              deviceId: args.deviceId,
-              platform: args.platform,
-              timezone: args.timezone,
-              ...(args.locale ? { locale: args.locale } : {}),
-              mode: args.mode,
-              ...(args.messageMetadata
-                ? { messageMetadata: args.messageMetadata }
-                : {}),
-              // The composer's destination: the cloud or another
-              // computer runs it, and its turn comes back through the
-              // conversation's journal.
-              ...(storageMode ? { storageMode } : {}),
-              executionTarget: getExecutionTargetSnapshot(),
-            },
-          );
-          // The cloud journals a placed message under its dispatch id.
-          if (
-            placed &&
-            args.userMessageEventId &&
-            placed.userMessageId !== args.userMessageEventId
-          ) {
-            args.onUserMessageAccepted?.(placed.userMessageId);
-            setPendingUserMessageId((current) =>
-              current === args.userMessageEventId
-                ? placed.userMessageId
-                : current,
-            );
-          }
-          return true;
-        }
-        const { requestId, userMessageId } =
-          await window.electronAPI.agent.startChat({
-            conversationId: activeConversationId,
-            userPrompt: args.userPrompt,
+        const placed = await submitPiChat(
+          activeConversationId,
+          args.userMessageEventId || crypto.randomUUID(),
+          args.userPrompt ?? "",
+          {
             ...(typeof args.selectedText !== "undefined"
               ? { selectedText: args.selectedText }
               : {}),
-            ...(typeof startChatContext !== "undefined"
-              ? { chatContext: startChatContext }
+            ...(startChatContext ? { chatContext: startChatContext } : {}),
+            ...(startChatAttachments?.length
+              ? { attachments: startChatAttachments }
               : {}),
             deviceId: args.deviceId,
             platform: args.platform,
@@ -424,23 +135,24 @@ export function useLocalAgentStream({
             ...(args.messageMetadata
               ? { messageMetadata: args.messageMetadata }
               : {}),
-            ...(startChatAttachments?.length
-              ? { attachments: startChatAttachments }
-              : {}),
-            ...(args.userMessageEventId
-              ? { userMessageEventId: args.userMessageEventId }
-              : {}),
-            ...(Number.isFinite(args.userMessageTimestamp)
-              ? { userMessageTimestamp: args.userMessageTimestamp }
-              : {}),
-            storageMode,
+            // The composer's destination: the cloud or another computer
+            // runs it, and its turn comes back through the conversation's
+            // journal.
+            ...(storageMode ? { storageMode } : {}),
             executionTarget: getExecutionTargetSnapshot(),
-          });
-        pendingRequestIdsRef.current.add(requestId);
-        if (userMessageId && args.userMessageEventId) {
-          args.onUserMessageAccepted?.(userMessageId);
+          },
+        );
+        // The cloud journals a placed message under its dispatch id.
+        if (
+          placed &&
+          args.userMessageEventId &&
+          placed.userMessageId !== args.userMessageEventId
+        ) {
+          args.onUserMessageAccepted?.(placed.userMessageId);
           setPendingUserMessageId((current) =>
-            current === args.userMessageEventId ? userMessageId : current,
+            current === args.userMessageEventId
+              ? placed.userMessageId
+              : current,
           );
         }
         return true;
@@ -492,58 +204,17 @@ export function useLocalAgentStream({
         return false;
       }
     },
-    [activeConversationId, ensureAgentStreamSubscription, storageMode],
-  );
-  const queueStream = useCallback(
-    (args: LocalAgentStartArgs) => {
-      void startStream(args);
-    },
-    [startStream],
+    [activeConversationId, storageMode],
   );
   const cancelCurrentStream = useCallback(() => {
-    if (activeRunId && window.electronAPI?.agent.cancelChat) {
-      window.electronAPI.agent.cancelChat(activeRunId);
-      return;
-    }
-    // No run here yet (the send is still being placed) or any more (it was
-    // handed to the cloud): the runtime stops what it placed for the
-    // conversation, by its exact dispatch.
+    // The runtime stops the conversation's run, and what it placed
+    // elsewhere for it, by its exact dispatch.
     if (activeConversationId) abortPiChat(activeConversationId);
-  }, [activeConversationId, activeRunId]);
-
-  // Only lifecycle/status decoration for this conversation invalidates the
-  // shell task projection. Live reasoning remains in the per-agent store.
-  const subscribeDecorations = useCallback(
-    (listener: () => void) =>
-      subscribeConversationTaskDecorations(activeConversationId, listener),
-    [activeConversationId],
-  );
-  const getDecorations = useCallback(
-    () => getConversationTaskDecorationsSnapshot(activeConversationId),
-    [activeConversationId],
-  );
-  const taskDecorations = useSyncExternalStore(
-    subscribeDecorations,
-    getDecorations,
-  );
+  }, [activeConversationId]);
   return {
-    taskDecorations,
-    runtimeStatusText,
-    isCompacting,
-    activeToolCallId,
-    activeToolName,
-    latestCompletedTool,
-    hasToolActivity,
-    isToolActive,
-    answerLanded,
-    reasoningText,
-    streamingAssistants,
-    isStreaming,
     pendingUserMessageId,
     setPendingUserMessageId,
     startStream,
-    queueStream,
     cancelCurrentStream,
-    resetStreamingState,
   };
 }

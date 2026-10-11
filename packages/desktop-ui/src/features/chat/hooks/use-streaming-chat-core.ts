@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
 import { getPlatform } from "@/platform/electron/platform";
 import { useChatStore } from "@/context/chat-store-context";
 import { getOrCreateDeviceId } from "@/platform/electron/device-id";
@@ -47,10 +46,6 @@ type UseStreamingChatOptions = {
 };
 
 const createLocalMessageId = () => `local-${crypto.randomUUID()}`;
-
-const ADMISSION_GRACE_AFTER_RUN_MS = 30_000;
-
-const EMPTY_SETTLED_IDS: ReadonlySet<string> = new Set();
 
 /**
  * Bounded preview of quoted / "Ask Stella" context stored on the sent message.
@@ -168,9 +163,6 @@ export function useStreamingChatCore({
   const queueDrainPausedRef = useRef(false);
   const pendingSendRef = useRef<symbol | null>(null);
   const [isSending, setIsSending] = useState(false);
-  const [admissionSettledIds, setAdmissionSettledIds] =
-    useState<ReadonlySet<string>>(EMPTY_SETTLED_IDS);
-  const admissionTimersRef = useRef(new Map<string, number>());
   const activeConversationIdRef = useRef(activeConversationId);
   activeConversationIdRef.current = activeConversationId;
   const { isLocalStorage, storageMode } = useChatStore();
@@ -206,76 +198,7 @@ export function useStreamingChatCore({
     );
   }, []);
 
-  const handleRunStarted = useCallback((event: { userMessageId?: string }) => {
-    const userMessageId = event.userMessageId;
-    if (!userMessageId) return;
-    queuedStreamPayloadsRef.current = queuedStreamPayloadsRef.current.filter(
-      (message) => message.id !== userMessageId,
-    );
-    if (drainingQueuedMessageIdRef.current === userMessageId) {
-      drainingQueuedMessageIdRef.current = null;
-      drainingQueuedPayloadsRef.current = [];
-    }
-    setQueuedUserMessages((current) =>
-      removeQueuedUserMessageById(current, userMessageId),
-    );
-  }, []);
-
-  const handleRunFinished = useCallback(
-    (event: {
-      userMessageId?: string;
-      outcome: "completed" | "error" | "canceled";
-    }) => {
-      if (event.userMessageId && event.outcome !== "completed") {
-        setOptimisticEvents((current) =>
-          current.filter((message) => message._id !== event.userMessageId),
-        );
-      }
-      const finishedMessageId = event.userMessageId;
-      if (
-        finishedMessageId &&
-        event.outcome === "completed" &&
-        !admissionTimersRef.current.has(finishedMessageId)
-      ) {
-        const timer = window.setTimeout(() => {
-          admissionTimersRef.current.delete(finishedMessageId);
-          setAdmissionSettledIds((current) => {
-            if (current.has(finishedMessageId)) return current;
-            const next = new Set(current);
-            next.add(finishedMessageId);
-            return next;
-          });
-        }, ADMISSION_GRACE_AFTER_RUN_MS);
-        admissionTimersRef.current.set(finishedMessageId, timer);
-      }
-      if (
-        event.userMessageId &&
-        drainingQueuedMessageIdRef.current === event.userMessageId
-      ) {
-        drainingQueuedMessageIdRef.current = null;
-        drainingQueuedPayloadsRef.current = [];
-      }
-      // A terminal outcome for the active run must not discard renderer-owned
-      // follow-ups. If they have not been accepted yet, the idle-drain effect
-      // will send them as the next turn. A drain that did start is removed by
-      // `handleRunStarted`, so a later run error/cancel cannot replay it.
-    },
-    [],
-  );
-
   const {
-    taskDecorations,
-    runtimeStatusText,
-    isCompacting,
-    activeToolCallId,
-    activeToolName,
-    latestCompletedTool,
-    hasToolActivity,
-    isToolActive,
-    answerLanded,
-    reasoningText,
-    streamingAssistants,
-    isStreaming,
     pendingUserMessageId,
     setPendingUserMessageId,
     startStream,
@@ -283,14 +206,7 @@ export function useStreamingChatCore({
   } = useLocalAgentStream({
     activeConversationId,
     storageMode,
-    onRunStarted: handleRunStarted,
-    onRunFinished: handleRunFinished,
-  }) as Omit<
-    ReturnType<typeof useLocalAgentStream>,
-    "setPendingUserMessageId"
-  > & {
-    setPendingUserMessageId: Dispatch<SetStateAction<string | null>>;
-  };
+  });
 
   useEffect(() => {
     queuedStreamPayloadsRef.current = [];
@@ -303,22 +219,7 @@ export function useStreamingChatCore({
     setOptimisticEvents([]);
     setQueuedUserMessages([]);
     setPendingUserMessageId(null);
-    for (const timer of admissionTimersRef.current.values()) {
-      window.clearTimeout(timer);
-    }
-    admissionTimersRef.current.clear();
-    setAdmissionSettledIds(EMPTY_SETTLED_IDS);
   }, [activeConversationId, setPendingUserMessageId]);
-
-  useEffect(
-    () => () => {
-      for (const timer of admissionTimersRef.current.values()) {
-        window.clearTimeout(timer);
-      }
-      admissionTimersRef.current.clear();
-    },
-    [],
-  );
 
   const clearOptimisticMessage = useCallback(
     (messageId: string) => {
@@ -333,7 +234,7 @@ export function useStreamingChatCore({
   );
 
   const drainQueuedMessagesIfIdle = useCallback(() => {
-    if (isStreaming || !activeConversationId) return;
+    if (!activeConversationId) return;
     if (drainingQueuedMessageIdRef.current) return;
     if (queueDrainPausedRef.current) return;
     // Flush the ENTIRE queue in one drain: every message still waiting when
@@ -444,7 +345,6 @@ export function useStreamingChatCore({
   }, [
     activeConversationId,
     clearOptimisticMessage,
-    isStreaming,
     issueDequeueTimestamp,
     setPendingUserMessageId,
     startStream,
@@ -454,17 +354,9 @@ export function useStreamingChatCore({
   useEffect(() => {
     if (!pendingUserMessageId) return;
 
-    // Once the runtime is no longer streaming AND we've seen a
-    // persisted assistant_message that targets the pending user
-    // message, drop `pendingUserMessageId` so composer / scroll
-    // gating logic stops treating the turn as in-flight. Do NOT wipe
-    // `streamingAssistants` here: active live rows keep owning the
-    // visible text and borrow SQLite metadata as it arrives. A
-    // multi-message run (preamble + post-tool answer) persists each row
-    // as its own SQLite write, often across two `localChat:updated`
-    // snapshots; clearing on the first snapshot would still drop the
-    // second row's live stream for one tick.
-    if (isStreaming) return;
+    // Once a persisted assistant_message targets the pending user message,
+    // drop `pendingUserMessageId` so composer / scroll gating logic stops
+    // treating the turn as in-flight.
     const hasAssistantReply = persistedMessages.some((message) => {
       if (message.type !== "assistant_message") return false;
       if (!message.payload || typeof message.payload !== "object") return false;
@@ -474,12 +366,7 @@ export function useStreamingChatCore({
     if (hasAssistantReply) {
       setPendingUserMessageId(null);
     }
-  }, [
-    isStreaming,
-    pendingUserMessageId,
-    persistedMessages,
-    setPendingUserMessageId,
-  ]);
+  }, [pendingUserMessageId, persistedMessages, setPendingUserMessageId]);
 
   const acknowledgeMessages = useCallback((messages: readonly MessageRecord[]) => {
     const persistedIds = acceptedUserMessageIds(messages);
@@ -640,22 +527,10 @@ export function useStreamingChatCore({
   );
 
   return {
-    taskDecorations,
     optimisticEvents,
     acknowledgeMessages,
-    admissionSettledIds,
     queuedUserMessages,
-    runtimeStatusText,
-    isCompacting,
-    activeToolCallId,
-    activeToolName,
-    latestCompletedTool,
-    hasToolActivity,
-    isToolActive,
-    reasoningText,
-    streamingAssistants,
-    isStreaming: isSending || isStreaming,
-    answerLanded: !isSending && answerLanded,
+    isSending,
     pendingUserMessageId,
     removeQueuedUserMessage,
     sendMessage,

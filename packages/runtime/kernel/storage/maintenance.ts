@@ -127,8 +127,6 @@ import { getFileLogger } from "../../observability/file-logger.js";
 import { openSqliteConnection } from "./database.js";
 import { forkFixedRateFiber } from "./effect-runtime.js";
 import { deleteLegacyRunEventBatch } from "./entry-retention.js";
-import { pruneRunAdmissions } from "./run-admission.js";
-import { pruneRunTasks } from "./run-task.js";
 import {
   EXTERNAL_CONTENT_FTS_TABLES,
   SCHEMA_VERSION,
@@ -140,7 +138,6 @@ import type { SqliteDatabase } from "./shared.js";
 
 const MiB = 1024 * 1024;
 const GiB = 1024 * MiB;
-const RUN_ADMISSION_PRUNE_INTERVAL_MS = 60 * 60 * 1000;
 
 export type MaintenanceSettings = {
   intervalMs: number;
@@ -756,10 +753,6 @@ export class DatabaseMaintenance {
   private searchIndexDisabled = false;
   private searchIndexDeferrals = 0;
   private readonly loggedSkips = new Set<string>();
-  /** performance.now() of the last run_admission retention pass. */
-  private lastAdmissionPruneAt: number | null = null;
-  /** performance.now() of the last run_task/tool_intent retention pass. */
-  private lastRunTaskPruneAt: number | null = null;
 
   constructor(private readonly options: DatabaseMaintenanceOptions) {
     this.settings = { ...MAINTENANCE_DEFAULTS, ...stripUndefined(options) };
@@ -922,8 +915,6 @@ export class DatabaseMaintenance {
 
     this.checkpoint(connection);
     this.sweepLegacyRunEvents(connection);
-    this.pruneRunAdmissions(connection);
-    this.pruneRunTasks(connection);
 
     if (
       !this.analyzeDone &&
@@ -1109,83 +1100,6 @@ export class DatabaseMaintenance {
     }
     if (this.sweepDrained) {
       this.logger?.process("storage.maintenance.run-event-sweep-drained", {});
-    }
-  }
-
-  /**
-   * Retention for `run_admission` (rows older than 30 days). Cheap — one
-   * indexed DELETE over a table with one row per user send — and run at
-   * most once per `RUN_ADMISSION_PRUNE_INTERVAL_MS` of idle ticks.
-   */
-  private pruneRunAdmissions(connection: SqliteDatabase): void {
-    const startedAt = performance.now();
-    if (
-      this.lastAdmissionPruneAt !== null &&
-      startedAt - this.lastAdmissionPruneAt < RUN_ADMISSION_PRUNE_INTERVAL_MS
-    ) {
-      return;
-    }
-    this.lastAdmissionPruneAt = startedAt;
-    let deleted = 0;
-    try {
-      deleted = pruneRunAdmissions(connection);
-    } catch (error) {
-      // Never cost the rest of the tick: BUSY retries next idle tick, any
-      // other failure is logged once and retried after the interval.
-      if (isSqliteBusyError(error)) {
-        this.lastAdmissionPruneAt = null;
-        return;
-      }
-      this.logOnce(
-        "run-admission-prune-failed",
-        "storage.maintenance.run-admission-prune-failed",
-        { error: (error as Error)?.message ?? String(error) },
-      );
-      return;
-    }
-    if (deleted > 0) {
-      this.logger?.process("storage.maintenance.run-admission-prune", {
-        deleted,
-        ms: elapsedMs(startedAt),
-      });
-    }
-  }
-
-  /**
-   * Retention for older builds' durable runs: terminal `run_task` rows and
-   * unowned `tool_intent` rows older than 7 days. Both tables hold one row per
-   * run or tool call, so a pass is one indexed DELETE each; at most once per
-   * `RUN_ADMISSION_PRUNE_INTERVAL_MS` of idle ticks.
-   */
-  private pruneRunTasks(connection: SqliteDatabase): void {
-    const startedAt = performance.now();
-    if (
-      this.lastRunTaskPruneAt !== null &&
-      startedAt - this.lastRunTaskPruneAt < RUN_ADMISSION_PRUNE_INTERVAL_MS
-    ) {
-      return;
-    }
-    this.lastRunTaskPruneAt = startedAt;
-    let deleted = 0;
-    try {
-      deleted = pruneRunTasks(connection);
-    } catch (error) {
-      if (isSqliteBusyError(error)) {
-        this.lastRunTaskPruneAt = null;
-        return;
-      }
-      this.logOnce(
-        "run-task-prune-failed",
-        "storage.maintenance.run-task-prune-failed",
-        { error: (error as Error)?.message ?? String(error) },
-      );
-      return;
-    }
-    if (deleted > 0) {
-      this.logger?.process("storage.maintenance.run-task-prune", {
-        deleted,
-        ms: elapsedMs(startedAt),
-      });
     }
   }
 

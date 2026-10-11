@@ -1,19 +1,17 @@
 /**
- * What pi adds to the chat column while a conversation runs on pi-durable:
+ * What pi adds to the chat column:
  * its transcript (for the rows the conversation's record does not hold yet),
  * the assistant message in flight, and the run's state. The record itself
  * (journal or chat log) is what the column shows, whatever the engine.
  * Sending goes through the usual composer path, whose `startStream` submits
- * to pi in this mode.
+ * to pi.
  */
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { piMessageText } from "@stella/contracts/pi-chat";
 import {
   abortPiChat,
-  piChatEnabled,
   piChatSnapshot,
   subscribePiChat,
-  subscribePiChatEnabled,
   watchPiChat,
 } from "./pi-chat-store";
 import { piStreamingOverlay, projectPiChat } from "./pi-chat-records";
@@ -21,8 +19,7 @@ import { piStreamingOverlay, projectPiChat } from "./pi-chat-records";
 const NO_SUBSCRIPTION = () => () => {};
 
 export const usePiChat = (conversationId: string | null) => {
-  // The user's engine can move the chat onto or off pi while it is open.
-  const enabled = useSyncExternalStore(subscribePiChatEnabled, piChatEnabled) && Boolean(conversationId);
+  const enabled = Boolean(conversationId);
 
   useEffect(() => {
     if (!enabled || !conversationId) return;
@@ -70,7 +67,6 @@ export const usePiChat = (conversationId: string | null) => {
   }, [conversationId]);
 
   return {
-    enabled,
     projection,
     streamingAssistants,
     // A turn running elsewhere (placed in the cloud or on another computer) is running here too.

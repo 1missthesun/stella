@@ -58,7 +58,6 @@ export type ChatColumnConversation = {
     loadOlder: () => void;
   };
   streaming: {
-    reasoningText: string;
     isStreaming: boolean;
     runtimeStatusText?: string | null;
     activeToolCallId?: string | null;

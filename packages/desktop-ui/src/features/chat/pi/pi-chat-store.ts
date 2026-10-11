@@ -1,6 +1,5 @@
 /**
- * The desktop chat on pi-durable (unless the user's engine is Claude Code,
- * whose turns keep their own path).
+ * The desktop chat on pi-durable.
  *
  * One `PiChatState` per watched conversation, folded with the shared reducer
  * from the runtime's event batches (`piChat:events`). Watching asks the
@@ -39,13 +38,6 @@ const api = () => (typeof window === "undefined" ? undefined : window.electronAP
 
 /** Whether this runtime has pi-durable at all, whatever the engine. */
 export const piChatAvailable = (): boolean => api() !== undefined;
-
-/** Whether the desktop chat runs on pi-durable now; the user's engine can move it. */
-export const piChatEnabled = (): boolean => api()?.isEnabled() === true;
-
-/** Calls `listener` when the chat moves onto or off pi-durable. */
-export const subscribePiChatEnabled = (listener: () => void): (() => void) =>
-  api()?.onEnabledChanged(() => listener()) ?? (() => {});
 
 const publish = (entry: Watched) => {
   for (const listener of entry.listeners) listener();

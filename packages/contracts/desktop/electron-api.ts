@@ -26,19 +26,11 @@ import type {
   TypedIpcRenderer,
 } from "./ipc-contract.js";
 import {
-  IPC_AGENT_CANCEL_CHAT,
   IPC_AGENT_EVENT,
-  IPC_PI_CHAT_ENABLED,
-  IPC_PI_CHAT_ENABLED_CHANGED,
   IPC_PI_CHAT_EVENTS,
   IPC_PI_CHAT_REQUEST,
-  IPC_AGENT_GET_ACTIVE_RUN,
-  IPC_AGENT_GET_SESSION_STARTED_AT,
-  IPC_AGENT_HEALTH_CHECK,
   IPC_AGENT_ONE_SHOT_COMPLETION,
-  IPC_AGENT_RESUME,
   IPC_AGENT_SEND_INPUT,
-  IPC_AGENT_START_CHAT,
   IPC_APP_HARD_RESET,
   IPC_APP_QUIT_FOR_RESTART,
   IPC_APP_RELAUNCH,
@@ -755,37 +747,14 @@ export const createElectronApi = (
     },
 
     /** The desktop chat on pi-durable (`@stella/contracts/pi-chat`). */
-    piChat: (() => {
-      let enabled = (() => {
-        try {
-          return ipc.sendSync(IPC_PI_CHAT_ENABLED) === true;
-        } catch {
-          return false;
-        }
-      })();
-      // Registered before any page listener, so a listener reads the new value.
-      ipc.on(IPC_PI_CHAT_ENABLED_CHANGED, (_event, next) => {
-        enabled = next === true;
-      });
-      return {
-        /** Whether the desktop chat runs on pi-durable: unless the user's engine is Claude Code. */
-        isEnabled: () => enabled,
-        /** Called when the user's engine moves the chat onto or off pi-durable. */
-        onEnabledChanged: on(IPC_PI_CHAT_ENABLED_CHANGED),
-        request: invoker(IPC_PI_CHAT_REQUEST),
-        onEvents: on(IPC_PI_CHAT_EVENTS),
-      };
-    })(),
+    piChat: {
+      request: invoker(IPC_PI_CHAT_REQUEST),
+      onEvents: on(IPC_PI_CHAT_EVENTS),
+    },
 
     agent: {
       oneShotCompletion: invoker(IPC_AGENT_ONE_SHOT_COMPLETION),
-      healthCheck: invoker(IPC_AGENT_HEALTH_CHECK),
-      getActiveRun: invoker(IPC_AGENT_GET_ACTIVE_RUN),
-      getAppSessionStartedAt: invoker(IPC_AGENT_GET_SESSION_STARTED_AT),
-      startChat: invoker(IPC_AGENT_START_CHAT),
       sendInput: invoker(IPC_AGENT_SEND_INPUT),
-      cancelChat: sender(IPC_AGENT_CANCEL_CHAT),
-      resumeConversationExecution: invoker(IPC_AGENT_RESUME),
       onStream: on(IPC_AGENT_EVENT),
       /**
        * Runtime client availability transitions. The host adapter fires this

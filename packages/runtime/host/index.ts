@@ -1,5 +1,5 @@
 import { EventEmitter } from "node:events";
-import { existsSync, promises as fs, readFileSync } from "node:fs";
+import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { hostname } from "node:os";
@@ -13,10 +13,6 @@ import {
 } from "@stella/contracts/backend/client";
 import { resolveBundledRuntimeFile } from "../kernel/shared/runtime-paths.js";
 import { getFileLogger } from "../observability/file-logger.js";
-import {
-  isRestartContinuationEnabled,
-  recordRestartShutdown,
-} from "../kernel/restart-continuation.js";
 import { LocalSchedulerService } from "../kernel/local-scheduler-service.js";
 import {
   createCloudSchedules,
@@ -24,7 +20,6 @@ import {
   isCloudSchedulePayload,
 } from "./cloud-schedules.js";
 import { createScheduleScriptAuthEnv } from "../kernel/shared/schedule-scripts.js";
-import { AGENT_STREAM_EVENT_TYPES } from "@stella/contracts/agent-runtime";
 import {
   createExecutionPlacementBridge,
   PlacementRouteError,
@@ -75,8 +70,6 @@ import type { BrowserType } from "@stella/contracts";
 import type { DiscoveryKnowledgeSeedPayload } from "@stella/contracts/discovery";
 import type {
   HostDeviceIdentity,
-  RuntimeAgentEventPayload,
-  RuntimeActiveRun,
   RuntimeAttachmentRef,
   RuntimeAutomationTurnResult,
   RuntimeChatPayload,
@@ -159,10 +152,6 @@ type WorkerRequestOptions = {
   retryOnceOnDisconnect?: boolean;
   rpc?: Parameters<JsonRpcPeer["request"]>[2];
 };
-type AgentEventBuffer = {
-  events: RuntimeAgentEventPayload[];
-  updatedAt: number;
-};
 type PlacedChatPayload = RuntimeChatPayload & {
   /** The orchestrator moved this chat here; the prompt is its brief. */
   handoff?: boolean;
@@ -200,12 +189,8 @@ const loadSqliteDatabaseCtorSync = (): new (path: string) => SqliteDatabase => {
   }
   throw new Error("No compatible SQLite builtin is available.");
 };
-const AGENT_EVENT_BUFFER_LIMIT = 1_000;
-const AGENT_EVENT_BUFFER_TTL_MS = 10 * 60 * 1_000;
-const DESTINATION_HANDOFF_POLL_MS = 500;
-const DESTINATION_HANDOFF_MAX_WAIT_MS = 3 * 60 * 1_000;
+const DESTINATION_HANDOFF_DELAY_MS = 500;
 const PLACED_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
-const SYNTHETIC_RUN_EVENT_SEQ_FLOOR = 1e10;
 const parseDisplayUpdateParams = (params: unknown) => {
   if (params && typeof params === "object") {
     const record = params as Record<string, unknown>;
@@ -218,56 +203,14 @@ const parseDisplayUpdateParams = (params: unknown) => {
   }
   throw new Error("Invalid host display update payload.");
 };
-const pruneAgentEventBuffers = (buffers: Map<string, AgentEventBuffer>) => {
-  const now = Date.now();
-  for (const [runId, buffer] of buffers.entries()) {
-    if (now - buffer.updatedAt > AGENT_EVENT_BUFFER_TTL_MS) {
-      buffers.delete(runId);
-    }
-  }
-};
-const bufferAgentEvent = (
-  buffers: Map<string, AgentEventBuffer>,
-  event: RuntimeAgentEventPayload,
-) => {
-  const existing = buffers.get(event.runId);
-  if (existing) {
-    existing.events.push(event);
-    if (existing.events.length > AGENT_EVENT_BUFFER_LIMIT) {
-      existing.events.splice(
-        0,
-        existing.events.length - AGENT_EVENT_BUFFER_LIMIT,
-      );
-    }
-    existing.updatedAt = Date.now();
-    return;
-  }
-  buffers.set(event.runId, { events: [event], updatedAt: Date.now() });
-};
 /**
- * "Busy" for the purposes of stale-worker restarts: anything that a worker
- * kill would visibly interrupt. `activeRun`/`activeAgentCount` come from the
- * worker's active-run registry (the authoritative in-flight signal); voice
- * fields cover a live voice orchestrator turn; `piBusy` covers pi turns and
- * agents, which the runner fields do not see. A `null` health snapshot
- * means the worker is unreachable, so there is nothing to preserve.
+ * "Busy" for the purposes of stale-worker restarts: a pi turn or agent in
+ * flight, which a worker kill would visibly interrupt. A `null` health
+ * snapshot means the worker is unreachable, so there is nothing to preserve.
  */
 export const isWorkerBusyForRestart = (
   health: WorkerHealthSnapshot | null | undefined,
-) =>
-  health != null &&
-  (health.voiceBusy === true ||
-    (health.pendingVoiceRequestCount ?? 0) > 0 ||
-    health.piBusy === true ||
-    health.activeRun != null ||
-    health.activeAgentCount > 0);
-export const shouldAckWorkerRunEvent = (
-  event: Pick<RuntimeAgentEventPayload, "seq" | "type">,
-) => {
-  if (!Number.isFinite(event.seq)) return false;
-  if (event.seq >= SYNTHETIC_RUN_EVENT_SEQ_FLOOR) return false;
-  return event.type !== AGENT_STREAM_EVENT_TYPES.RUN_FINISHED;
-};
+) => health != null && health.piBusy === true;
 /**
  * The host's event bus, plus a tap on every event so the runtime can forward
  * them to its clients without keeping a list of names.
@@ -321,7 +264,6 @@ export class StellaRuntimeHost {
   options: StellaRuntimeHostOptions;
   workerMode: "child" | "inproc" = "child";
   events = new HostEvents();
-  agentEventBuffers = new Map<string, AgentEventBuffer>();
   workerController: RuntimeWorkerLifecycleController;
   workerHealthCache: WorkerHealthSnapshot | null = null;
   schedulerService: LocalSchedulerService | null = null;
@@ -371,8 +313,6 @@ export class StellaRuntimeHost {
   /** What each conversation runs elsewhere, for Stop (`ConversationPlacements`). */
   placements = new ConversationPlacements();
   pendingDestinationHandoffs = new Map<string, { canceled: boolean }>();
-  pendingRunEventAcks = new Map<string, number>();
-  runEventAckTimer: HostTimerHandle | null = null;
   /** The desktop database the execution placement bridge keeps its proofs in. */
   hostDatabase: SqliteDatabase | null = null;
   constructor(options: StellaRuntimeHostOptions) {
@@ -528,29 +468,6 @@ export class StellaRuntimeHost {
    */
   getRuntimeControlPaths() {
     return resolveRuntimePaths(this.options.initializeParams.stellaAppDir);
-  }
-  /**
-   * Authorize one graceful worker-replacement episode before sending the
-   * signal that starts Effect teardown. The worker snapshots its active rows
-   * against this episode before cancellation, and the replacement worker only
-   * accepts exact episode matches. Synchronous/best-effort by design: failure
-   * must never hold the process open or turn a crash into false continuation.
-   */
-  writeRestartContinuationRecord(reason: string) {
-    if (!isRestartContinuationEnabled(process.env)) return;
-    try {
-      if (
-        recordRestartShutdown(this.options.initializeParams.stellaDataDirPath, {
-          reason,
-        })
-      ) {
-        getFileLogger()?.process("host.restart-continuation-record", {
-          reason,
-        });
-      }
-    } catch {
-      // Best-effort shutdown bookkeeping.
-    }
   }
   getPendingWorkerRestart() {
     return this.pendingStaleWorkerRestart;
@@ -1389,19 +1306,10 @@ export class StellaRuntimeHost {
     this.events.emit("runtime-ready", await this.health());
   }
   async stop(options?: { killWorker?: boolean }) {
-    if (options?.killWorker) {
-      this.writeRestartContinuationRecord(
-        this.pendingStaleWorkerRestart?.reason ?? "app-shutdown",
-      );
-    }
     this.started = false;
     this.hostReady = false;
     this.workerHealthCache = null;
     this.workerGeneration = 0;
-    this.agentEventBuffers.clear();
-    this.pendingRunEventAcks.clear();
-    this.runEventAckTimer?.cancel();
-    this.runEventAckTimer = null;
     this.deferredRuntimeReload = false;
     this.restartInProgress = false;
     this.restartRequestedDuringRestart = false;
@@ -1438,7 +1346,6 @@ export class StellaRuntimeHost {
   async restartWorker(reason = "runtime-reload") {
     const startedAt = Date.now();
     this.events.emit("runtime-reloading", { reason: "worker-restart" });
-    this.writeRestartContinuationRecord(reason);
     if (this.workerMode === "inproc") {
       // The worker is this process. It exits once this returns, and the
       // attached client starts a fresh one.
@@ -1470,11 +1377,6 @@ export class StellaRuntimeHost {
   async ensureWorkerStarted() {
     await this.workerController.ensureStarted();
     return { ok: true };
-  }
-  emitPlacedRunEvent(event: RuntimeAgentEventPayload) {
-    bufferAgentEvent(this.agentEventBuffers, event);
-    pruneAgentEventBuffers(this.agentEventBuffers);
-    this.events.emit("run-event", event);
   }
   async readPlacedAttachment(attachment: {
     url?: unknown;
@@ -1660,7 +1562,6 @@ export class StellaRuntimeHost {
       target.mode === "cloud"
         ? dispatch.dispatchId
         : (payload.userMessageEventId ?? idempotencyKey);
-    let lastRevision = -1;
     let terminal = false;
     const placed: PlacedDispatch = {
       dispatchId: dispatch.dispatchId,
@@ -1671,81 +1572,24 @@ export class StellaRuntimeHost {
       subscription: null,
     };
     this.placedDispatchByRunId.set(runId, placed);
-    this.emitPlacedRunEvent({
-      type: AGENT_STREAM_EVENT_TYPES.RUN_STARTED,
-      seq: SYNTHETIC_RUN_EVENT_SEQ_FLOOR + 1,
-      runId,
-      requestId,
-      conversationId: payload.conversationId,
-      userMessageId,
-      agentType: "orchestrator",
-    });
-    const finish = (status: { state: string; errorMessage?: string }) => {
+    const finish = () => {
       if (terminal) return;
       terminal = true;
       placed.subscription?.unsubscribe();
       this.placedDispatchByRunId.delete(runId);
-      const outcome =
-        status.state === "completed"
-          ? "completed"
-          : status.state === "canceled"
-            ? "canceled"
-            : "error";
-      this.emitPlacedRunEvent({
-        type: AGENT_STREAM_EVENT_TYPES.RUN_FINISHED,
-        seq: Number.MAX_SAFE_INTEGER,
-        runId,
-        requestId,
-        conversationId: payload.conversationId,
-        userMessageId,
-        agentType: "orchestrator",
-        outcome,
-        persisted: true,
-        ...(status.errorMessage
-          ? { error: status.errorMessage, reason: status.errorMessage }
-          : {}),
-      });
     };
     const onStatus = (status: DispatchSummary | null | undefined) => {
       if (!status || status.dispatchId !== dispatch.dispatchId || terminal)
         return;
       if (["completed", "failed", "canceled"].includes(status.state)) {
         this.placements.ended(status.dispatchId);
-        finish(status);
+        finish();
         return;
       }
-      // The placement run ends at hand-off. The conversation socket
-      // owns the cloud turn's subsequent liveness, and `placements` keeps
-      // its dispatch for Stop until it ends.
-      // Balance RUN_STARTED so desktop replay cannot retain a phantom run.
-      if (isCloudHandedOff(status)) {
-        finish({ state: "completed" });
-        return;
-      }
-      if (Number.isFinite(status.revision) && status.revision > lastRevision) {
-        lastRevision = status.revision;
-        const statusText =
-          status.state === "offering" || status.state === "computer_claimed"
-            ? "Connecting"
-            : status.state === "computer_accepted" ||
-                status.state === "computer_running" ||
-                status.state === "cloud_running"
-              ? "Working"
-              : status.state === "cloud_committed"
-                ? "Starting"
-                : null;
-        if (statusText) {
-          this.emitPlacedRunEvent({
-            type: AGENT_STREAM_EVENT_TYPES.STATUS,
-            seq: SYNTHETIC_RUN_EVENT_SEQ_FLOOR + 2 + lastRevision,
-            runId,
-            requestId,
-            conversationId: payload.conversationId,
-            userMessageId,
-            statusText,
-          });
-        }
-      }
+      // The placement run ends at hand-off. The conversation socket owns the
+      // cloud turn's subsequent liveness, and `placements` keeps its
+      // dispatch for Stop until it ends.
+      if (isCloudHandedOff(status)) finish();
     };
     placed.subscription = bridge.watchDispatch(dispatch.dispatchId, onStatus);
     onStatus(dispatch);
@@ -1756,51 +1600,6 @@ export class StellaRuntimeHost {
   async healthCheck() {
     const health = await this.getWorkerHealth({ ensureWorker: false });
     return health?.health ?? null;
-  }
-  async getActiveRun() {
-    const placed = this.placedDispatchByRunId.values().next().value;
-    if (placed) {
-      return {
-        runId: placed.runId,
-        conversationId: placed.conversationId,
-        requestId: placed.requestId,
-        userMessageId: placed.userMessageId,
-      };
-    }
-    const health = await this.getWorkerHealth({ ensureWorker: false });
-    return health?.activeRun ?? null;
-  }
-  async listActiveRuns() {
-    try {
-      const local = await this.requestWorker<{
-        runs?: RuntimeActiveRun[];
-      } | null>(
-        METHOD_NAMES.INTERNAL_WORKER_LIST_ACTIVE_RUNS,
-        {},
-        { ensureWorker: false, recordActivity: false },
-      );
-      return {
-        ...local,
-        runs: [
-          ...(local?.runs ?? []),
-          ...[...this.placedDispatchByRunId.values()].map((placed) => ({
-            runId: placed.runId,
-            conversationId: placed.conversationId,
-            requestId: placed.requestId,
-            userMessageId: placed.userMessageId,
-          })),
-        ],
-      };
-    } catch {
-      return {
-        runs: [...this.placedDispatchByRunId.values()].map((placed) => ({
-          runId: placed.runId,
-          conversationId: placed.conversationId,
-          requestId: placed.requestId,
-          userMessageId: placed.userMessageId,
-        })),
-      };
-    }
   }
   async listModels(request: unknown = {}) {
     return await this.requestWorker(
@@ -1894,15 +1693,8 @@ export class StellaRuntimeHost {
     const pending = { canceled: false };
     this.pendingDestinationHandoffs.set(conversationId, pending);
     void (async () => {
-      const deadline = Date.now() + DESTINATION_HANDOFF_MAX_WAIT_MS;
-      await hostRuntime.runPromise(Effect.sleep(DESTINATION_HANDOFF_POLL_MS));
-      while (!pending.canceled && Date.now() < deadline) {
-        const health = await this.getWorkerHealth({
-          ensureWorker: false,
-        }).catch(() => null);
-        if (health?.activeRun?.conversationId !== conversationId) break;
-        await hostRuntime.runPromise(Effect.sleep(DESTINATION_HANDOFF_POLL_MS));
-      }
+      // A moment for the turn that moved it to finish its reply here first.
+      await hostRuntime.runPromise(Effect.sleep(DESTINATION_HANDOFF_DELAY_MS));
       if (pending.canceled) return;
       if (this.pendingDestinationHandoffs.get(conversationId) === pending) {
         this.pendingDestinationHandoffs.delete(conversationId);
@@ -2005,35 +1797,6 @@ export class StellaRuntimeHost {
       },
     ).catch(() => null);
     return brain && brain.here === false && brain.target ? brain.target : null;
-  }
-  async startChat(payload: PlacedChatPayload) {
-    const target = placedChatTarget(payload, this.deviceIdentity?.deviceId);
-    if (target) return await this.startPlacedChat(payload, target);
-    // Claude Code's Stella answers where the brain is, as pi's does; when
-    // that host can't take the send, this computer answers and its turn
-    // takes the lease over.
-    const brain = payload.handoff
-      ? null
-      : await this.brainTarget(payload.conversationId, payload.storageMode);
-    if (brain) {
-      try {
-        return await this.startPlacedChat(payload, brain);
-      } catch (error) {
-        if (!placementUnavailable(error)) throw error;
-        console.warn(
-          "[chat] Where Stella runs could not take this message; this computer answers it.",
-          error,
-        );
-      }
-    }
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_START_CHAT,
-      payload,
-      {
-        ensureWorker: true,
-        recordActivity: true,
-      },
-    );
   }
   async sendAgentInput(payload: unknown) {
     return await this.requestWorker(
@@ -2173,92 +1936,6 @@ export class StellaRuntimeHost {
       if (status !== undefined && isDispatchEnded(status)) this.placements.ended(dispatchId);
     }
   }
-  async cancelChat(runId: string) {
-    const placed = this.placedDispatchByRunId.get(runId);
-    if (placed) {
-      const bridge = this.hostExecutionPlacementBridge;
-      if (!bridge) throw new Error("Execution placement is unavailable.");
-      await bridge.cancelDispatch({
-        dispatchId: placed.dispatchId,
-        cancelRequestId: `cancel:${placed.dispatchId}`,
-        reason: "Canceled by the user.",
-      });
-      return { ok: true, cancelled: true };
-    }
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_CANCEL,
-      { runId },
-      { ensureWorker: false, recordActivity: true },
-    );
-  }
-  async cancelChatByConversation(conversationId: string) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_CANCEL_BY_CONVERSATION,
-      { conversationId },
-      { ensureWorker: false, recordActivity: true },
-    );
-  }
-  async resumeRunEvents(payload: { runId: string; lastSeq: number }) {
-    pruneAgentEventBuffers(this.agentEventBuffers);
-    // Fast path: host-side in-memory buffer covers the renderer-reload
-    // case (renderer reloads but host process is still alive). Falls
-    // through to the worker for the host-restart case where the buffer
-    // is gone but the worker still has the persistent event log.
-    const buffer = this.agentEventBuffers.get(payload.runId);
-    if (buffer) {
-      const oldestSeq = buffer.events[0]?.seq ?? null;
-      const events = buffer.events.filter(
-        (event) => event.seq > payload.lastSeq,
-      );
-      const exhausted = oldestSeq !== null && payload.lastSeq < oldestSeq - 1;
-      if (events.length > 0 || !exhausted) {
-        return { events, exhausted };
-      }
-    }
-    // Worker fallback. We only call this when the in-memory buffer
-    // missed — keeps the cost off the hot path during normal streaming.
-    try {
-      const remote = await this.requestWorker(
-        METHOD_NAMES.INTERNAL_WORKER_RESUME_EVENTS,
-        { runId: payload.runId, lastSeq: payload.lastSeq },
-        { ensureWorker: false, recordActivity: false },
-      );
-      return remote;
-    } catch {
-      return { events: [], exhausted: true };
-    }
-  }
-  /**
-   * Ack an event the host has successfully forwarded to the renderer.
-   * Best-effort and async-fire-and-forget — a missed ack just keeps
-   * the row in the worker's ring buffer a little longer; the periodic
-   * sweep eventually drops aged entries regardless.
-   */
-  flushRunEventAcks() {
-    if (this.runEventAckTimer) {
-      this.runEventAckTimer.cancel();
-      this.runEventAckTimer = null;
-    }
-    const pending = this.pendingRunEventAcks;
-    if (pending.size === 0) return;
-    this.pendingRunEventAcks = new Map();
-    for (const [runId, lastSeq] of pending) {
-      void this.requestWorker(
-        METHOD_NAMES.INTERNAL_WORKER_ACK_EVENTS,
-        { runId, lastSeq },
-        { ensureWorker: false, recordActivity: false },
-      ).catch(() => undefined);
-    }
-  }
-  scheduleRunEventAck(runId: string, lastSeq: number) {
-    if (!runId || !Number.isFinite(lastSeq)) return;
-    const previous = this.pendingRunEventAcks.get(runId) ?? 0;
-    this.pendingRunEventAcks.set(runId, Math.max(previous, lastSeq));
-    if (this.runEventAckTimer) return;
-    this.runEventAckTimer = forkDelayed(150, () => {
-      this.flushRunEventAcks();
-    });
-  }
   async runAutomationTurn(payload: unknown) {
     return await this.requestWorker<RuntimeAutomationTurnResult>(
       METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION,
@@ -2309,23 +1986,6 @@ export class StellaRuntimeHost {
     return await this.requestWorker(
       METHOD_NAMES.INTERNAL_WORKER_CREATE_BACKGROUND_AGENT,
       payload,
-      {
-        ensureWorker: true,
-        recordActivity: true,
-      },
-    );
-  }
-  async getLocalAgentSnapshot(agentId: string) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_GET_AGENT_SNAPSHOT,
-      { agentId },
-      { ensureWorker: false, recordActivity: false },
-    );
-  }
-  async appendThreadMessage(args: unknown) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_APPEND_THREAD_MESSAGE,
-      args,
       {
         ensureWorker: true,
         recordActivity: true,
@@ -2652,7 +2312,6 @@ export class StellaRuntimeHost {
                 recordActivity: true,
               },
             ),
-          getActiveOrchestratorRun: async () => await this.getActiveRun(),
         }),
       },
       // Pop a native banner whenever a scheduled fire delivers a message.
@@ -2787,8 +2446,7 @@ export class StellaRuntimeHost {
       ...(this.hasPendingWorkerRestartIntent() || this.restartInProgress
         ? { pendingWorkerRestart: true }
         : {}),
-      activeRunId: workerHealth?.activeRun?.runId ?? null,
-      activeAgentCount: workerHealth?.activeAgentCount ?? 0,
+      busy: workerHealth?.piBusy === true,
     };
   }
   /**
@@ -3116,30 +2774,6 @@ export class StellaRuntimeHost {
         this.events.emit("runtime-lagged", params);
       },
     );
-    peer.registerNotificationHandler(NOTIFICATION_NAMES.RUN_EVENT, (params) => {
-      const payload = params;
-      bufferAgentEvent(this.agentEventBuffers, payload);
-      pruneAgentEventBuffers(this.agentEventBuffers);
-      this.events.emit("run-event", payload);
-      // Ack only ordinary recorder events. Terminal events must remain
-      // replayable until the retention sweep, otherwise an Electron
-      // restart between host receipt and renderer resume can strand the
-      // UI in an active run. Synthetic task seqs are Date.now-scale and
-      // would prune lower ordinary run seqs, including terminal rows.
-      if (payload.runId && shouldAckWorkerRunEvent(payload)) {
-        this.scheduleRunEventAck(payload.runId, payload.seq);
-      }
-      if (payload.type === AGENT_STREAM_EVENT_TYPES.RUN_FINISHED) {
-        if (this.hasPendingWorkerRestartIntent()) {
-          // A deferred worker restart is waiting for the worker to go idle;
-          // give immediate follow-up runs a moment to register before the
-          // unified gate re-checks.
-          forkDelayed(500, () => {
-            void this.flushWorkerRestart();
-          });
-        }
-      }
-    });
     peer.registerNotificationHandler(
       NOTIFICATION_NAMES.VOICE_AGENT_EVENT,
       (params) => {

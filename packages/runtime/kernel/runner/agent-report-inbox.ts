@@ -2,7 +2,8 @@ import type {
   AgentReportOutcome,
   DeviceAgentReport,
 } from "@stella/contracts/backend/agent-reports";
-import type { AgentLifecycleEvent } from "../agents/local-agent-manager.js";
+import { formatAgentTerminalStateSystemReminder } from "@stella/contracts/system-reminders";
+import { boundParentAgentReport } from "./agent-report-bounds.js";
 import { forkDelayedCall } from "./cloud-effect-runtime.js";
 
 type AgentReportInboxOptions = {
@@ -18,9 +19,8 @@ type AgentReportInboxOptions = {
     ownerGeneration: string;
     reportId: string;
   }) => Promise<unknown>;
-  hasDurableLifecycleEvent: (event: AgentLifecycleEvent) => boolean;
-  onLifecycleEvent: (event: AgentLifecycleEvent) => void | Promise<void>;
-  onNote: (note: {
+  /** Stella reads it hidden, once per `requestId`. */
+  deliver: (note: {
     conversationId: string;
     requestId: string;
     text: string;
@@ -71,38 +71,40 @@ const parseReport = (value: unknown): DeviceAgentReport | null => {
   };
 };
 
-export const agentReportLifecycleEvent = (
-  report: DeviceAgentReport,
-): AgentLifecycleEvent => {
-  const base = {
-    conversationId: report.conversationId,
-    eventId: report.reportId,
-    agentId: report.threadId,
-    agentType: report.agentType,
-    description: report.description,
-    attemptGeneration: report.attemptGeneration,
-    ownerGeneration: report.ownerGeneration,
-    audience: "orchestrator-only" as const,
-  };
+const MAX_REPORT_ERROR_CHARS = 30_000;
+
+/** What Stella reads for one report: the agent's outcome, as a hidden reminder. */
+export const agentReportText = (report: DeviceAgentReport): string => {
+  const lines: string[] = [];
   if (report.outcome === "completed") {
-    return {
-      ...base,
-      type: "agent-completed",
-      result: report.text || "The agent completed without a report.",
-    };
+    lines.push("[Agent completed]");
+    if (report.description) lines.push(`description: ${report.description}`);
+  } else {
+    lines.push(report.outcome === "canceled" ? "[Task canceled]" : "[Task failed]");
   }
-  if (report.outcome === "canceled") {
-    return {
-      ...base,
-      type: "agent-canceled",
-      error: report.text || "The agent was canceled.",
-    };
+  if (report.threadId) lines.push(`thread_id: ${report.threadId}`);
+  if (report.agentType) lines.push(`agent_type: ${report.agentType}`);
+  if (report.outcome !== "completed" && report.description) {
+    lines.push(`description: ${report.description}`);
   }
-  return {
-    ...base,
-    type: "agent-failed",
-    error: report.text || "The agent failed.",
-  };
+  if (report.outcome === "completed") {
+    lines.push(
+      `result: ${boundParentAgentReport(report.text || "The agent completed without a report.", report.threadId)}`,
+      "agent_state: paused; use send_message on the same thread if follow-up work is needed.",
+      "presentation: for a report or dense result, present it as a canvas with the `html` tool (write the complete HTML document yourself) and keep the chat reply short; for a quick answer, reply directly in chat. Be concise and human-friendly — the user delegated this and lacks the context, so say what happened in plain terms rather than implementation detail. End the reply with a `refs` block citing this thread_id (see Replies in your instructions) so the update attaches to the work it reports on.",
+    );
+  } else {
+    const error =
+      report.text || (report.outcome === "canceled" ? "The agent was canceled." : "The agent failed.");
+    lines.push(
+      `error: ${
+        error.length <= MAX_REPORT_ERROR_CHARS
+          ? error
+          : `${error.slice(0, MAX_REPORT_ERROR_CHARS)}\n[truncated ${error.length - MAX_REPORT_ERROR_CHARS} chars]`
+      }`,
+    );
+  }
+  return formatAgentTerminalStateSystemReminder(lines);
 };
 
 export const createAgentReportInbox = (options: AgentReportInboxOptions) => {
@@ -126,26 +128,15 @@ export const createAgentReportInbox = (options: AgentReportInboxOptions) => {
       return;
     inFlight.add(report.reportId);
     try {
-      if (report.kind === "note") {
-        await options.onNote({
-          conversationId: report.conversationId,
-          requestId: report.reportId,
-          text: report.text,
-        });
-        await options.acknowledge({
-          deviceId: options.deviceId,
-          ownerGeneration: report.ownerGeneration,
-          reportId: report.reportId,
-        });
-        return;
-      }
-      const event = agentReportLifecycleEvent(report);
-      if (!options.hasDurableLifecycleEvent(event)) {
-        await options.onLifecycleEvent(event);
-      }
-      if (!options.hasDurableLifecycleEvent(event)) {
-        throw new Error("The report is not durable in the orchestrator yet.");
-      }
+      await options.deliver(
+        report.kind === "note"
+          ? { conversationId: report.conversationId, requestId: report.reportId, text: report.text }
+          : {
+              conversationId: report.conversationId,
+              requestId: `agent-report:${report.reportId}`,
+              text: agentReportText(report),
+            },
+      );
       await options.acknowledge({
         deviceId: options.deviceId,
         ownerGeneration: report.ownerGeneration,

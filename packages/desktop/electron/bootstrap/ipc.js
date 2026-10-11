@@ -387,12 +387,8 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     });
     registerAgentHandlers({
         getStellaHostRunner: lifecycle.getRunner,
-        getAppSessionStartedAt: () => state.appSessionStartedAt,
-        isHostAuthAuthenticated: () => services.authService.getHostAuthAuthenticated(),
-        getActiveCloudConversationCacheAuthority: () => services.localChatHistoryService.getActiveCloudConversationCacheAuthority(),
         uiState: services.uiStateService.state,
         stellaAppDir: config.stellaAppDir,
-        getStellaDataDir: lifecycle.getStellaDataDir,
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     registerRuntimeAvailabilityBridge({

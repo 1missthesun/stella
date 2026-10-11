@@ -4,14 +4,8 @@
 
 import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
 import type {
-  AgentMessageDelivery,
-  AgentPauseResult,
-  AgentThreadLookup,
-} from "@stella/contracts/backend/agent-threads";
-import type {
   AgentDirectoryAgentRow,
   AgentDirectorySessionRow,
-  AgentMessageSender,
 } from "@stella/contracts/agent-directory";
 import type {
   AgentModelConfigSnapshot,
@@ -385,105 +379,6 @@ export type LocalAgentThreadIdentity = {
   remoteThreadId?: string;
 };
 
-export type AgentToolApi = {
-  /**
-   * Read-only snapshot backing `agent_status`. Implementations must not
-   * deliver input to, resume, or cancel the thread. `null` = unknown thread.
-   */
-  readAgentThreadStatus?: (
-    threadId: string,
-  ) => Promise<AgentThreadStatusRead | null>;
-  lookupConversationAgentThread?: (
-    threadId: string,
-    conversationId: string,
-  ) => Promise<{ thread: AgentThreadLookup; thisDeviceId: string } | null>;
-  createAgent: (request: AgentToolRequest) => Promise<{ threadId: string }>;
-  getAgent: (threadId: string) => Promise<AgentToolSnapshot | null>;
-  cancelAgent: (
-    threadId: string,
-    reason?: string,
-  ) => Promise<{ canceled: boolean }>;
-  sendAgentMessage?: (
-    threadId: string,
-    message: string,
-    from: "orchestrator" | "subagent",
-    options?: {
-      rootRunId?: string;
-      /**
-       * The owner's instruction (`external-input`), a subagent's report
-       * (`child-report`), or another agent's note delivered verbatim
-       * (`agent-message`). None of them changes who the thread reports to.
-       */
-      deliveryKind?: "child-report" | "external-input" | "agent-message";
-      modelConfigSnapshot?: AgentModelConfigSnapshot;
-    },
-  ) => Promise<{
-    delivered: boolean;
-    reason?: string;
-    /** A finished, paused, or evicted thread started its next attempt. */
-    resumed?: boolean;
-    /** A running turn took the message before its next step. */
-    steered?: boolean;
-  }>;
-  /** This computer's agent row for a thread, read without loading its transcript. */
-  readLocalAgentThread?: (threadId: string) => LocalAgentThreadIdentity | null;
-  /** A conversation on this computer, as a `send_message` target. */
-  readLocalSession?: (conversationId: string) => AgentDirectorySessionRow | null;
-  /** Agents and sessions the caller can reach, local rows merged with the cloud's. */
-  readAgentDirectory?: (conversationId: string) => Promise<AgentDirectoryListing>;
-  /** Hands an already-framed message to a conversation's Stella on this computer. */
-  messageStellaSession?: (request: {
-    conversationId: string;
-    text: string;
-  }) => Promise<{ delivered: "steered" | "queued" }>;
-  /**
-   * Delivers through the owner's cloud index to an agent or session this
-   * computer cannot reach itself. `null` when this device is signed out.
-   */
-  messageCloudThread?: (request: {
-    messageId: string;
-    to: string;
-    text: string;
-    from: AgentMessageSender;
-  }) => Promise<AgentMessageDelivery | null>;
-  /**
-   * Hands a cloud-placed spawn to Stella's cloud runtime and returns the
-   * cloud thread it created. Injected only by hosts that can reach the
-   * backend as the signed-in user; when it is missing, `spawn_agent` refuses
-   * cloud placements outright rather than running cloud-subject work on this
-   * machine.
-   */
-  cloudDispatch?: (
-    request: CloudDispatchRequest,
-  ) => Promise<CloudDispatchResult>;
-  /** Continue an owned cloud thread from the current desktop conversation. */
-  cloudContinue?: (request: {
-    threadId: string;
-    description: string;
-    message: string;
-    conversationId: string;
-    requestId: string;
-    ownerGeneration?: string;
-  }) => Promise<{
-    delivered: boolean;
-    reason?: string;
-    control?: CloudAgentControlReceipt;
-    /** The running attempt took the message instead of a new one starting. */
-    steered?: boolean;
-  }>;
-  /**
-   * Pause any agent of the owner that this computer does not run itself,
-   * through the owner's agent threads: wherever it runs, whichever device
-   * started it, and held for a computer that is offline. Throws with the
-   * reason when it could not be paused.
-   */
-  pauseAgentThread?: (request: {
-    threadId: string;
-    conversationId: string;
-    requestId: string;
-  }) => Promise<AgentPauseResult>;
-};
-
 export type ToolHostOptions = {
   stellaAppDir: string;
   /**
@@ -511,36 +406,6 @@ export type ToolHostOptions = {
   stellaMediaCliPath?: string;
   stellaXApiCliPath?: string;
   cliBridgeSocketPath?: string;
-  agentApi?: AgentToolApi;
-  /**
-   * Validates a plain model-reference string passed to spawn_agent's `model`
-   * parameter. Throws with the standard route-failure message when the model
-   * cannot be resolved, so the spawn fails loudly instead of falling back.
-   */
-  validateSpawnModel?: (modelName: string) => void;
-  validateSpawnModelWithMetadata?: (
-    modelName: string,
-    reasoningEffort?: SpawnReasoningEffort,
-  ) => Promise<void>;
-  /** Resolve and freeze a spawn's effective engine/model configuration. */
-  captureSpawnModelConfig?: (args: {
-    agentType: string;
-    spawnEngine: SpawnEngineSelection;
-    /** Omitted/default model selection samples the configured General engine. */
-    useConfiguredEngine?: boolean;
-    model?: string;
-    spawnReasoningEffort?: SpawnReasoningEffort;
-  }) => Promise<AgentModelConfigSnapshot | undefined>;
-  /**
-   * Resolves a cloud spawn against the current General-agent preferences.
-   * Explicit spawn pins are applied before serialization. Local-only routes
-   * throw instead of being mapped to a different cloud credential.
-   */
-  resolveCloudExecutionSelection?: (request: {
-    model?: string;
-    spawnEngine?: SpawnEngineSelection;
-    reasoningEffort?: SpawnReasoningEffort;
-  }) => Promise<CloudExecutionSelection>;
   scheduleApi?: ScheduleToolApi;
   extensionTools?: import("../extensions/types.js").ToolDefinition[];
   /**
@@ -724,12 +589,3 @@ export type ToolDefinition = {
   execute: ToolHandler;
 };
 
-/** How a requested `spawn_agent` model is checked and captured. */
-export type SpawnModelSupport = Required<
-  Pick<
-    ToolHostOptions,
-    | "validateSpawnModel"
-    | "validateSpawnModelWithMetadata"
-    | "captureSpawnModelConfig"
-  >
->;

@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { Context, Effect, Layer } from "effect";
-import { METHOD_NAMES, NOTIFICATION_NAMES } from "@stella/contracts/protocol";
+import { METHOD_NAMES } from "@stella/contracts/protocol";
 import { resolveBundledRuntimeFile } from "../../../kernel/shared/runtime-paths.js";
 // Runner subgraph imported as types only — the values are loaded lazily by
 // RunnerModule (a dynamic import the entry starts right after the transport
@@ -115,18 +115,9 @@ export const layer = Layer.effect(
       stellaAppDir: init.stellaAppDir,
       stellaDataDir: init.stellaDataDirPath,
       runtimeStore: storage.runtimeStore,
-      listLocalChatEvents: (conversationId, maxItems) =>
-        storage.chatStore.chat.listEvents(conversationId, maxItems),
-      openLocalChatEventWindow: (conversationId, maxItems) =>
-        storage.chatStore.chat.openEventWindow(conversationId, maxItems),
       appendLocalChatEvent: (args) => {
         storage.appendChatEventAndNotify(args);
       },
-      notifyThreadActivityUpdated: (payload) => {
-        hostBus.notify(NOTIFICATION_NAMES.THREAD_ACTIVITY_UPDATED, payload);
-      },
-      getDefaultConversationId: () =>
-        storage.chatStore.chat.getOrCreateDefaultConversationId(),
       askUser: async (payload) =>
         await hostBus.request(METHOD_NAMES.HOST_ASK_USER_REQUEST, payload, {
           retryOnDisconnect: true,
@@ -151,11 +142,6 @@ export const layer = Layer.effect(
           payload as Record<string, unknown>,
           signal,
         ),
-      switchExecutionDestination: async (payload) =>
-        (await hostBus.request(
-          METHOD_NAMES.HOST_EXECUTION_DESTINATION_SWITCH,
-          payload,
-        )) as { ok: true } | { ok: false; error: string },
       requestRuntimeAuthRefresh: async (payload) =>
         await hostBus.request(METHOD_NAMES.HOST_RUNTIME_AUTH_REFRESH, payload, {
           retryOnDisconnect: true,

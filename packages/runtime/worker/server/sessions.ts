@@ -19,7 +19,6 @@ import {
   updateRuntimeTelemetryAuth,
 } from "../../observability/runtime-telemetry.js";
 import { forkDelayed, workerRuntime } from "../effect-runtime.js";
-import type { VoiceRuntimeService } from "../voice/service.js";
 import { ProtocolMismatchError } from "./errors.js";
 import * as HostBus from "./host-bus.js";
 import * as ModelCatalog from "./model-catalog.js";
@@ -28,42 +27,34 @@ import {
   closePiChats,
   terminatePiChatCommands,
   piChatsBusy,
-  piAgentEngineFor,
   piBackgroundExitTarget,
   piDeliverReport,
   reconcileComputerAgents,
   resumePiChats,
 } from "./pi-chats.js";
-import { brainFor } from "./pi-brain.js";
 import * as SessionConfig from "./session/config.js";
 import * as SessionStorage from "./session/storage.js";
-import * as RunEventBus from "./session/run-events.js";
 import * as CredentialBrokers from "./session/brokers.js";
 import * as CliBridge from "./session/cli-bridge.js";
 import * as RunnerCell from "./session/runner-cell.js";
 import * as RunnerHandle from "./session/runner.js";
 import * as AgentRuns from "./session/agent-runs.js";
-import * as VoiceRuntime from "./session/voice.js";
 import type { WorkerInitializationState } from "./types.js";
 
 export type SessionServices =
   | SessionConfig.Service
   | SessionStorage.Service
-  | RunEventBus.Service
   | CredentialBrokers.Service
   | CliBridge.Service
   | RunnerCell.Service
   | RunnerHandle.Service
-  | AgentRuns.Service
-  | VoiceRuntime.Service;
+  | AgentRuns.Service;
 
 /**
  * The per-initialize session graph. Composition order is load-bearing:
  * `Layer.provideMerge` builds dependencies bottom-up (SessionConfig first,
- * VoiceRuntime last) and scope finalizers run LIFO, reproducing the old
- * `stopWorkerServices` teardown order EXACTLY: voice → runner (await
- * in-flight build, stop, drain compactions) → runEventLog.stop → cli bridge
- * stop → credential brokers cleared → db.close.
+ * AgentRuns last) and scope finalizers run LIFO: runner (await in-flight
+ * build, stop) → cli bridge stop → credential brokers cleared → db.close.
  *
  * Service-graph evaluation (M5 phase 4): 12 services across two tiers
  * (worker: ModelCatalog/HostBus/WorkerSessions; session: the nine below).
@@ -93,8 +84,7 @@ const sessionLayer = (
         );
       }),
     );
-  return timed("layerVoice", VoiceRuntime.layer).pipe(
-    Layer.provideMerge(timed("layerAgentRuns", AgentRuns.layer)),
+  return timed("layerAgentRuns", AgentRuns.layer).pipe(
     Layer.provideMerge(
       timed("layerRunnerHandle", RunnerHandle.layer).pipe(
         // Registered after RunnerHandle's own finalizer, so it runs first
@@ -118,7 +108,6 @@ const sessionLayer = (
         ),
       ),
     ),
-    Layer.provideMerge(timed("layerRunEvents", RunEventBus.layer)),
     Layer.provideMerge(timed("layerCliBridge", CliBridge.layer)),
     Layer.provideMerge(timed("layerBrokers", CredentialBrokers.layer)),
     Layer.provideMerge(timed("layerStorage", SessionStorage.layer)),
@@ -194,12 +183,10 @@ export type OpenSession = {
   readonly context: Context.Context<SessionServices>;
   readonly config: SessionConfig.Interface;
   readonly storage: SessionStorage.Interface;
-  readonly runEvents: RunEventBus.Interface;
   readonly brokers: CredentialBrokers.Interface;
   readonly runnerCell: RunnerCell.Interface;
   readonly runner: RunnerHandle.Interface;
   readonly agentRuns: AgentRuns.Interface;
-  readonly voice: VoiceRuntimeService;
 };
 
 export type InitializeResult = {
@@ -511,12 +498,10 @@ export const layer = Layer.effect(
               context,
               config: Context.get(context, SessionConfig.Service),
               storage: Context.get(context, SessionStorage.Service),
-              runEvents: Context.get(context, RunEventBus.Service),
               brokers: Context.get(context, CredentialBrokers.Service),
               runnerCell: Context.get(context, RunnerCell.Service),
               runner: Context.get(context, RunnerHandle.Service),
               agentRuns: Context.get(context, AgentRuns.Service),
-              voice: Context.get(context, VoiceRuntime.Service).service,
             };
             currentSession = session;
             // Let the background runner build proceed once the initialize
@@ -542,21 +527,13 @@ export const layer = Layer.effect(
             });
 
             // Post-ready warmups — off the initialize response path, as a
-            // forked 0-delay fiber (the old setTimeout(0) block): backfill
-            // orphaned run events, then wait out the background runner build
-            // for startup logging.
+            // forked 0-delay fiber (the old setTimeout(0) block): wait out
+            // the background runner build for startup logging.
             forkDelayed(0, () => {
               void (async () => {
                 const startupStartedAt = Date.now();
                 let runnerOutcome: BootOutcome = "success";
                 await Promise.allSettled([
-                  (async () => {
-                    if (currentSession?.scope === scope) {
-                      timeline.time("runEventBackfill", () =>
-                        session.runEvents.startupBackfill(),
-                      );
-                    }
-                  })(),
                   (async () => {
                     const builtRunner =
                       await session.runner.awaitBuildSettled();
@@ -564,18 +541,8 @@ export const layer = Layer.effect(
                     builtRunner?.setPiReportDelivery((report) =>
                       piDeliverReport(session, hostBus, report),
                     );
-                    builtRunner?.setPiAgentEngine(
-                      piAgentEngineFor(session, hostBus),
-                    );
                     builtRunner?.setBackgroundExitTarget(
                       piBackgroundExitTarget(session, hostBus),
-                    );
-                    builtRunner?.setBrainNote(
-                      async ({ conversationId, host, id, text }) =>
-                        (await brainFor(session, hostBus, conversationId)?.note(
-                          host,
-                          { id, text },
-                        )) ?? false,
                     );
                     // The initialize-time warm below no-ops while the runner
                     // is still building; warm once it exists, as before.
@@ -664,18 +631,8 @@ export const layer = Layer.effect(
       // Everything a worker shutdown would interrupt, the work the host
       // cannot observe after a disconnect included.
       const session = currentSession;
-      const voicePinned =
-        (session?.voice.isBusy() ?? false) ||
-        (session?.voice.getPendingRequestCount() ?? 0) > 0;
       const requestPinned = hostBus.activeRequestHandlerCount() > 0;
-      const runner = session?.runnerCell.get() ?? null;
-      return Boolean(
-        runner?.getActiveOrchestratorRun() ||
-          (runner?.getActiveAgentCount() ?? 0) > 0 ||
-          (session ? piChatsBusy(session) : false) ||
-          requestPinned ||
-          voicePinned,
-      );
+      return Boolean((session ? piChatsBusy(session) : false) || requestPinned);
     };
 
     // Idle-shutdown keep-alive: only a DB reclaim or index build that is

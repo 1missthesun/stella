@@ -1,58 +1,23 @@
 import type { Api, Model } from "@earendil-works/pi-ai";
 import type { ImageCapTarget } from "../shared/image-caps.js";
-import type { AgentMessage } from "../agent-core/types.js";
-import type { CloudThread } from "./orchestrator-launch.js";
-import type { BackgroundCompactionScheduler } from "../agent-runtime/compaction-scheduler.js";
 import type { BackgroundExitWake } from "./background-exit-wake.js";
-import type { KernelRunSupervisor } from "./supervision/run-supervisor.js";
-import type { RunCoordinator } from "./run-coordinator.js";
-import type {
-  RuntimeAssistantMessageEvent,
-  RuntimeEndEvent,
-  RuntimeErrorEvent,
-  RuntimeExecutionSessionHandle,
-  RuntimeReasoningEvent,
-  RuntimeRunStartedEvent,
-  RuntimeStatusEvent,
-  RuntimeToolEndEvent,
-  RuntimeToolStartEvent,
-  RuntimeUserMessageEvent,
-} from "../agent-runtime.js";
-import type { RuntimeAgentEventPayload } from "@stella/contracts/protocol";
 import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
 import type { HookEmitter } from "../extensions/hook-emitter.js";
-import type { LocalContextEvent } from "../storage/shared.js";
-import type { LocalChatEventWindow } from "../storage/event-window.js";
 import type {
   ScheduleToolApi,
-  SpawnModelSupport,
-  AgentToolRequest,
-  AgentToolSnapshot,
   ToolContext,
   ToolUpdateCallback,
   ToolMetadata,
   ToolResult,
 } from "../tools/types.js";
 import type { ToolDefinition } from "../extensions/types.js";
-import type {
-  LocalAgentManager,
-  AgentLifecycleEvent,
-} from "../agents/local-agent-manager.js";
 import type { RuntimeStore } from "../storage/runtime-store.js";
 import type {} from "@stella/contracts";
 import type {
   HostRuntimeAuthRefreshResult,
-  RuntimeActiveRun,
   RuntimeAuthRefreshSource,
-  RuntimeAttachmentRef,
-  RuntimeAutomationTurnRequest,
-  RuntimeAutomationTurnResult,
-  RuntimeVoiceOrchestratorConfig,
-  RuntimeVoiceOrchestratorConfigRequest,
-  RuntimePromptMessage,
 } from "@stella/contracts/protocol";
 import type { LocalChatAppendEventArgs } from "../storage/shared.js";
-import type { ThreadActivityUpdatedPayload } from "@stella/contracts/local-chat";
 import type { DeviceSigner } from "../home/device.js";
 
 export type StellaHostRunnerOptions = {
@@ -106,7 +71,6 @@ export type StellaHostRunnerOptions = {
    * inline connector connect card (ConnectorConnectService) and resolve
    * with the user's outcome. The abort signal cancels the pending card.
    */
-  switchExecutionDestination?: import("../tools/defs/switch-destination.js").ExecutionDestinationSwitcher;
   requestConnectorConnection?: (
     payload: {
       id: string;
@@ -132,119 +96,13 @@ export type StellaHostRunnerOptions = {
   getDeviceSigner?: () => Promise<DeviceSigner> | DeviceSigner;
   scheduleApi?: ScheduleToolApi;
   runtimeStore: RuntimeStore;
-  listLocalChatEvents?: (
-    conversationId: string,
-    maxItems: number,
-  ) => LocalContextEvent[];
-  /** Bounded queries over the `listLocalChatEvents(conversationId, maxItems)`
-   * window; the orchestrator context build reads only the rows it consumes.
-   * Absent: callers fall back to `listLocalChatEvents`. */
-  openLocalChatEventWindow?: (
-    conversationId: string,
-    maxItems: number,
-  ) => LocalChatEventWindow;
   appendLocalChatEvent?: (args: LocalChatAppendEventArgs) => void;
-  /** Fired after every `runtime_agents` write with the durable keyed row. */
-  notifyThreadActivityUpdated?: (payload: ThreadActivityUpdatedPayload) => void;
-  getDefaultConversationId?: () => string;
-};
-
-export type ChatPayload = {
-  conversationId: string;
-  userMessageId: string;
-  userPrompt: string;
-  promptMessages?: RuntimePromptMessage[];
-  userMessageMetadata?: { context: Record<string, unknown> };
-  attachments?: RuntimeAttachmentRef[];
-  agentType?: string;
-  storageMode?: "cloud" | "local";
-  ownerGeneration?: string;
-};
-
-export type RuntimeSendMessageInput = {
-  conversationId: string;
-  text: string;
-  uiVisibility?: "visible" | "hidden";
-  agentType?: string;
-  ownerGeneration?: string;
-  deliverAs?: "steer" | "followUp";
-  callbackRunId?: string;
-  responseTarget?: RuntimeAgentEventPayload["responseTarget"];
-  customType?: string;
-  eventId?: string;
-  display?: boolean;
-  timestamp?: number;
-};
-
-export type RuntimeSendUserMessageInput = RuntimeSendMessageInput & {
-  metadata?: Record<string, unknown>;
-};
-
-export type ActiveOrchestratorSession = RuntimeExecutionSessionHandle & {
-  conversationId: string;
-  agentType: string;
-  storageMode?: "cloud" | "local";
-  ownerGeneration?: string;
-  uiVisibility: "visible" | "hidden";
-  queueCallbackSwitch: (callbacks: AgentCallbacks) => void;
-  queueMessage: (message: AgentMessage, delivery: "steer" | "followUp") => void;
 };
 
 export type AgentHealth = {
   ready: boolean;
   reason?: string;
   engine?: string;
-};
-
-export type AgentCallbacks = {
-  onRunStarted?: (event: RuntimeRunStartedEvent) => void;
-  onUserMessage?: (event: RuntimeUserMessageEvent) => void;
-  onAssistantMessage?: (event: RuntimeAssistantMessageEvent) => void;
-  onAgentReasoning?: (
-    event: RuntimeReasoningEvent & {
-      agentId: string;
-      rootRunId?: string;
-      /** The task's spawn description, so downstream task snapshots built
-       *  from reasoning-only streams keep a real display name. */
-      description?: string;
-    },
-  ) => void;
-  onStatus?: (event: RuntimeStatusEvent) => void;
-  onToolStart: (event: RuntimeToolStartEvent) => void;
-  onToolEnd: (event: RuntimeToolEndEvent) => void;
-  onError: (event: RuntimeErrorEvent) => void;
-  onEnd: (event: RuntimeEndEvent) => void;
-  onInterrupted?: (event: {
-    runId: string;
-    agentType: string;
-    userMessageId?: string;
-    uiVisibility?: "visible" | "hidden";
-    reason: string;
-  }) => void;
-  onAgentEvent?: (event: AgentLifecycleEvent) => void;
-};
-
-export type QueuedOrchestratorTurn = {
-  priority: "user" | "system";
-  execute: () => Promise<void>;
-  cancel?: (reason: unknown) => void;
-};
-
-/**
- * A user chat message that arrived while a run was already active on the
- * conversation and was injected into the live run as steering. If the run is interrupted, fails
- * fatally, or is otherwise torn down before the message is delivered, the
- * agent's in-memory queues are discarded and the user would never get a
- * reply. We mirror the message here so a fresh reply turn can be fired after
- * the active run drains, and prune the mirror once the message is actually
- * delivered to the model so an already-answered message is not re-answered.
- * See `flushPendingFollowUpReplies` in `orchestrator.ts` and
- * `prunePendingFollowUpReplies` in `shared.ts`.
- */
-export type PendingFollowUpReply = {
-  text: string;
-  /** Queued-message id used to prune the mirror on delivery. */
-  userMessageId?: string;
 };
 
 export type ParsedAgentLike = {
@@ -277,7 +135,6 @@ export type RunnerState = {
    * instead of polling for the assignment.
    */
   initializationStarted: import("../shared/readiness-latch.js").ReadinessLatch;
-  localAgentManager: LocalAgentManager | null;
   /**
    * Watches `Bash` sessions a finished run left running and wakes
    * the owning thread when they exit. Null until the runner is initialized
@@ -286,67 +143,7 @@ export type RunnerState = {
   backgroundExitWake: BackgroundExitWake | null;
   /** Who a background exit wakes, and how it stands (`setBackgroundExitTarget`). */
   backgroundExitTarget?: BackgroundExitTarget;
-  activeOrchestratorRunId: string | null;
-  activeOrchestratorConversationId: string | null;
-  activeOrchestratorUiVisibility: "visible" | "hidden";
-  activeOrchestratorSession: ActiveOrchestratorSession | null;
-  /**
-   * The orchestrator controller's `sendMessage`, bound once the controller
-   * exists so tools built earlier can reach a conversation's Stella.
-   */
-  sendRuntimeMessage?: (input: RuntimeSendMessageInput) => Promise<void>;
   piReportDelivery?: PiReportDelivery;
-  piAgentEngine?: PiAgentEngine;
-  /** Places what Stella reads hidden at the host holding a conversation's brain lease. */
-  brainNote?: BrainNote;
-  /**
-   * The thread each cloud conversation's last turn here ran, hidden prompt
-   * rows included, keyed by `conversationId`. The next cloud turn extends it
-   * while the journal holds nothing else (`cloudThreadExtendingCanonical`).
-   */
-  cloudThreads: Map<string, CloudThread>;
-  /**
-   * Per-thread background compaction scheduler. Holds at most one
-   * in-flight compaction per `threadKey`; finalize* paths schedule
-   * fire-and-forget after `onEnd` fires so users never wait on the
-   * summarization LLM. Drained on worker shutdown so SQLite writes
-   * complete before the store handle tears down. See
-   * `runtime/kernel/agent-runtime/compaction-scheduler.ts`.
-   */
-  compactionScheduler: BackgroundCompactionScheduler;
-  queuedOrchestratorTurns: QueuedOrchestratorTurn[];
-  /**
-   * Effect-owned run coordinator for the orchestrator lane: single writer
-   * for run admission (`activeOrchestrator*` fields) and sole consumer of
-   * `queuedOrchestratorTurns`, with a structurally single-flight,
-   * interruptible drain. Installed on first use via `ensureRunCoordinator`
-   * and shut down (drain fiber interrupted and joined) in
-   * `runtime-initialization.ts:stop`. See
-   * `runtime/kernel/runner/run-coordinator.ts`.
-   */
-  runCoordinator: RunCoordinator | null;
-  /**
-   * Per-conversation buffer of user chat messages that were injected into an
-   * active run as steering. Populated when a user message lands on a live
-   * streaming session; cleared when that run completes normally (the agent
-   * loop drains and answers the steers before `agent_end`) and flushed into a
-   * fresh reply turn when the run is interrupted or fails before draining.
-   */
-  pendingFollowUpReplies: Map<string, PendingFollowUpReply[]>;
-  /**
-   * Fiber supervision tree for orchestrator turns and subagent attempts.
-   * Every run registers its cooperative abort at admission (`registerRun`)
-   * and its root fiber at launch (`startRun`); subagent attempts spawned
-   * with a `rootRunId` join that run's cancellation scope. This keyed
-   * structure replaced the `activeRunAbortControllers` map:
-   * `cancelLocalChat` and worker shutdown look up, abort, interrupt, and
-   * join through the run scopes, so teardown of child processes, streams,
-   * and pending tool calls is joined rather than fire-and-forget. See
-   * `runtime/kernel/runner/supervision/run-supervisor.ts`.
-   */
-  supervisor: KernelRunSupervisor;
-  conversationCallbacks: Map<string, AgentCallbacks>;
-  runCallbacksByRunId: Map<string, AgentCallbacks>;
   loadedAgents: ParsedAgentLike[];
   /**
    * Late-bound web search handler. Wired by `createStellaHostRunner` so the
@@ -386,18 +183,7 @@ export type RunnerContext = {
   getDeviceSigner?: StellaHostRunnerOptions["getDeviceSigner"];
   scheduleApi?: ScheduleToolApi;
   runtimeStore: RuntimeStore;
-  listLocalChatEvents?: StellaHostRunnerOptions["listLocalChatEvents"];
-  openLocalChatEventWindow?: StellaHostRunnerOptions["openLocalChatEventWindow"];
   appendLocalChatEvent?: StellaHostRunnerOptions["appendLocalChatEvent"];
-  notifyThreadActivityUpdated?: StellaHostRunnerOptions["notifyThreadActivityUpdated"];
-  getDefaultConversationId?: StellaHostRunnerOptions["getDefaultConversationId"];
-  /**
-   * A conversation's agents as `agent_status` lists them: local rows plus the
-   * cloud's, the local row winning; local rows alone when the cloud is silent.
-   */
-  readConversationAgentRows: (
-    conversationId: string,
-  ) => Promise<import("@stella/contracts/agent-directory").AgentDirectoryAgentRow[]>;
   /** Desktop's writer into a cloud conversation's DO-resident transcript. */
   cloudTranscript: import("./cloud-transcript-write.js").CloudTranscriptWriter;
   /** This computer's view of each cloud conversation's brain lease. */
@@ -409,8 +195,6 @@ export type RunnerContext = {
   paths: RunnerPaths;
   state: RunnerState;
   hookEmitter: HookEmitter;
-  /** `spawn_agent`'s model check and capture, for agents placed on this device. */
-  spawnModelSupport: SpawnModelSupport;
   toolHost: {
     getToolCatalog: (
       agentType?: string,
@@ -483,32 +267,6 @@ export type PiReportDelivery = (report: {
 }) => Promise<void>;
 
 /**
- * Runs a LocalAgentManager agent whose model is not Claude Code on pi, the
- * desktop's own agent engine: the manager keeps the agent, and pi runs it.
- */
-export type PiAgentEngine = {
-  run: (run: {
-    conversationId: string;
-    /** The agent, the same for each of its runs. */
-    agentKey: string;
-    runKey: string;
-    threadId: string;
-    description: string;
-    prompt: string;
-    /** The pick it runs on (`stella/...`, `<provider>/<model>[:effort]`); absent, Stella's default. */
-    model?: string;
-    /** Where its file and shell tools start, when not on this computer. */
-    placement?: import("@stella/agent/stella/placement").StellaPlacement;
-    signal: AbortSignal;
-  }) => Promise<
-    | { status: "ok"; finalText: string }
-    | { status: "error" | "paused" | "canceled"; error: string }
-  >;
-  /** A message for its run; false when it is not running. */
-  steer: (message: { key: string; agentKey: string; message: string }) => Promise<boolean>;
-};
-
-/**
  * Cloud agents pi's Stella starts on a model it names: dispatched through the
  * owner's agent threads as a cloud placement here is, so their reports come
  * back to this computer the same way.
@@ -535,18 +293,6 @@ export type PiCloudAgentThreads = {
   }) => Promise<void>;
 };
 
-/**
- * What Stella reads hidden (an agent's report) for a conversation whose
- * brain lease another host holds, placed there once per `id`. False when
- * that host can't take it now, for this computer to take instead.
- */
-export type BrainNote = (note: {
-  conversationId: string;
-  host: import("@stella/contracts/turn-plane/pi-brain").PiBrainHost;
-  id: string;
-  text: string;
-}) => Promise<boolean>;
-
 export type RunnerPublicApi = {
   deviceId: string;
   hookEmitter: HookEmitter;
@@ -567,8 +313,6 @@ export type RunnerPublicApi = {
     disarm: (owner: { conversationId: string; agentId: string }) => void;
     runningSessions: (owner: { conversationId: string; agentId: string }) => string[];
   };
-  setPiAgentEngine: (engine: PiAgentEngine | null) => void;
-  setBrainNote: (note: BrainNote | null) => void;
   deliverOrchestratorNote: PiReportDelivery;
   setBackendUrl: (value: string | null) => void;
   setAuthToken: (value: string | null) => void;
@@ -584,13 +328,6 @@ export type RunnerPublicApi = {
   >;
   killAllShells: () => Promise<void>;
   killShellsByPort: (port: number) => void;
-  executeTool: (
-    toolName: string,
-    toolArgs: Record<string, unknown>,
-    context: ToolContext,
-    signal?: AbortSignal,
-    onUpdate?: ToolUpdateCallback,
-  ) => Promise<ToolResult>;
   /** Stella's tools for the pi-durable harness. */
   piTools: import("./pi-tools.js").RunnerPiTools;
   agentHealthCheck: () => AgentHealth;
@@ -610,15 +347,6 @@ export type RunnerPublicApi = {
     text: string;
     results: Array<{ title: string; url: string; snippet: string }>;
   }>;
-  handleLocalChat: (
-    payload: ChatPayload,
-    callbacks: AgentCallbacks,
-  ) => Promise<{ runId: string }>;
-  sendMessage: (input: RuntimeSendMessageInput) => Promise<void>;
-  sendUserMessage: (input: RuntimeSendUserMessageInput) => Promise<void>;
-  runAutomationTurn: (
-    payload: RuntimeAutomationTurnRequest,
-  ) => Promise<RuntimeAutomationTurnResult>;
   /**
    * Share the local files and folders `text` links with the owner's other
    * devices: an agent report written here, delivered to a chat elsewhere.
@@ -632,94 +360,6 @@ export type RunnerPublicApi = {
     import("./claude-session-sync.js").ClaudeSessionRestoreResult | null
   >;
   flushClaudeSessionSync: (timeoutMs?: number) => Promise<boolean>;
-  runBlockingLocalAgent: (
-    request: Omit<AgentToolRequest, "storageMode"> & {
-      executionId?: string;
-      requestedModel?: string;
-    },
-  ) => Promise<
-    | { status: "ok"; finalText: string; threadId: string }
-    | {
-        status: "canceled" | "paused";
-        finalText: "";
-        error: string;
-        threadId: string;
-      }
-    | { status: "error"; finalText: ""; error: string; threadId?: string }
-  >;
-  createBackgroundAgent: (
-    request: Omit<AgentToolRequest, "storageMode">,
-  ) => Promise<{ threadId: string }>;
-  getActiveAgentCount: () => number;
-  listActiveAgentRuns: () => RuntimeActiveRun[];
-  getLocalAgentSnapshot: (agentId: string) => Promise<AgentToolSnapshot | null>;
-  cancelLocalAgent: (
-    agentId: string,
-    reason?: string,
-  ) => Promise<{ canceled: boolean }>;
-  /** New input for a running placed agent; never resumes a finished one. */
-  steerBlockingLocalAgent: (
-    agentId: string,
-    text: string,
-    messageId: string,
-  ) => Promise<{ delivered: boolean }>;
-  /**
-   * Another agent's `send_message` for one of this computer's own agents,
-   * relayed by the cloud: steers it if running, resumes it if idle.
-   */
-  deliverLocalAgentMessage: (
-    threadId: string,
-    text: string,
-    messageId: string,
-    ownerGeneration: string,
-  ) => Promise<import("@stella/contracts/turn-plane/placement").AgentMessageDeviceOutcome>;
-  /**
-   * A `pause_agent` for one of this computer's own agents, relayed by the
-   * cloud from wherever the conversation runs now.
-   */
-  pauseLocalAgent: (
-    threadId: string,
-    ownerGeneration: string,
-  ) => Promise<import("@stella/contracts/turn-plane/placement").AgentPauseDeviceOutcome>;
-  /** Exact local-only cancel with a pre-create tombstone; never falls to cloud. */
-  cancelBlockingLocalAgent: (
-    agentId: string,
-    reason?: string,
-    executionId?: string,
-  ) => Promise<{ canceled: boolean }>;
-  /** Durable pre-cancel plus exact joining cancel for a placement chat run. */
-  cancelPlacementAutomation: (
-    runId: string,
-    reason?: string,
-  ) => Promise<{ canceled: boolean }>;
-  /**
-   * The single joining cancel path: interrupts the run's fiber tree and
-   * resolves only after every owned resource (provider streams, tools,
-   * engine turns, subagent attempts) has torn down and the run's one
-   * truthful terminal was emitted. Bounded by the per-resource abandonment
-   * graces, so it can never hang.
-   */
-  cancelLocalChat: (runId: string) => Promise<boolean>;
-  /**
-   * Cancel the active orchestrator run for the given local conversation,
-   * if one exists. Resolves `true` (after the joining cancel) if a run was
-   * cancelled, so callers don't need to track runIds.
-   */
-  cancelLocalChatByConversation: (conversationId: string) => Promise<boolean>;
-  getActiveOrchestratorRun: () => RuntimeActiveRun | null;
-  appendThreadMessage: (args: {
-    threadKey: string;
-    role: "user" | "assistant";
-    content: string;
-    /**
-     * Stamp the user-message timestamp tag (and thirty-minute suppression)
-     * onto the persisted content — the durable-store equivalent of the
-     * metadata the retired local-events projection added at read time.
-     */
-    decorateUserTimestampTag?: boolean;
-    timezone?: string;
-  }) => void;
-  appendCloudJournal: import("./cloud-transcript-write.js").CloudTranscriptWriter["append"];
   /** This computer's view of each cloud conversation's brain lease, which reads of the record feed. */
   brainLeases: Pick<import("./brain-lease.js").BrainLeaseView, "note" | "holds" | "claim" | "beganUnder">;
   /**
@@ -777,11 +417,6 @@ export type RunnerPublicApi = {
       text: string;
     }) => Promise<void>;
   };
-  beginVoiceToolCallReceipt: RuntimeStore["beginVoiceToolCallReceipt"];
-  completeVoiceToolCallReceipt: RuntimeStore["completeVoiceToolCallReceipt"];
-  getVoiceOrchestratorConfig: (
-    payload: RuntimeVoiceOrchestratorConfigRequest,
-  ) => Promise<RuntimeVoiceOrchestratorConfig>;
   googleWorkspaceGetAuthStatus: () => Promise<{
     connected: boolean;
     unavailable?: boolean;

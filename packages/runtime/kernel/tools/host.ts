@@ -48,14 +48,13 @@ import {
   type ShellSessionAccess,
   type ShellState,
 } from "./shell.js";
-import { createStateContext, type StateContext } from "./state.js";
 import {
   createShellToolHandlers,
   mergeToolHandlers,
   registerExtensionToolHandlers,
 } from "./registry.js";
 import { buildBuiltinTools } from "./defs/index.js";
-import { AGENT_CONTROL_TOOL_NAMES } from "./defs/task.js";
+import { AGENT_CONTROL_TOOL_NAMES } from "./defs/agent-orchestration-def.js";
 import type { ToolDefinition as BuiltinToolDefinition } from "./types.js";
 import { sanitizeToolError, sanitizeToolResult } from "./safety.js";
 import { describeToolCatalogEntry, searchToolCatalog } from "./code-catalog.js";
@@ -218,11 +217,6 @@ export const createToolHost = ({
   requestBrowserExtensionConnect,
   requestConnectorConnection,
   switchExecutionDestination,
-  agentApi,
-  validateSpawnModel,
-  validateSpawnModelWithMetadata,
-  captureSpawnModelConfig,
-  resolveCloudExecutionSelection,
   scheduleApi,
   extensionTools,
   webSearch,
@@ -245,14 +239,6 @@ export const createToolHost = ({
     getCloudBackendAuth,
     cliBridgeSocketPath,
   });
-  const stateContext: StateContext = createStateContext(
-    stateRoot,
-    agentApi,
-    validateSpawnModel,
-    validateSpawnModelWithMetadata,
-    resolveCloudExecutionSelection,
-    captureSpawnModelConfig,
-  );
   let executeTool: (
     toolName: string,
     toolArgs: Record<string, unknown>,
@@ -510,14 +496,12 @@ export const createToolHost = ({
       : {}),
     ...(requestConnectorConnection ? { requestConnectorConnection } : {}),
     ...(switchExecutionDestination ? { switchExecutionDestination } : {}),
-    agentApi,
     scheduleApi,
     extensionTools,
     webSearch,
     getStellaSiteAuth,
     getCloudBackendAuth,
     shellState,
-    stateContext,
     nodeReplRegistry,
     executeTool: executeNestedToolCall,
   });

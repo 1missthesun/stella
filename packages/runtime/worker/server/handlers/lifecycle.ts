@@ -53,21 +53,12 @@ export const lifecycleHandlers: WorkerRpcHandlers = {
             ? { reason: runnerReadyError }
             : { reason: "Stella runtime is still initializing" }),
         } satisfies AgentHealth);
-      const activeRun =
-        runner?.getActiveOrchestratorRun() ??
-        runner?.listActiveAgentRuns()[0] ??
-        null;
       return {
         health,
-        activeRun,
-        activeAgentCount: runner?.getActiveAgentCount() ?? 0,
         protocolVersion: STELLA_RUNTIME_PROTOCOL_VERSION,
         pid: process.pid,
         deviceId: session?.config.deviceId ?? null,
-        voiceBusy: session?.voice.isBusy() ?? false,
-        pendingVoiceRequestCount: session?.voice.getPendingRequestCount() ?? 0,
-        // pi turns and agents run outside the legacy runner, so the runner
-        // fields above read idle while pi works. Same check idle shutdown uses.
+        // Turns and agents in flight; the same check idle shutdown uses.
         piBusy: session ? piChatsBusy(session) : false,
       };
     }),
@@ -77,10 +68,6 @@ export const lifecycleHandlers: WorkerRpcHandlers = {
       const sessions = yield* WorkerSessions.Service;
       const session = sessions.current();
       const runner = session?.runnerCell.get() ?? null;
-      const activeRun =
-        runner?.getActiveOrchestratorRun() ??
-        runner?.listActiveAgentRuns()[0] ??
-        null;
       return {
         ready: Boolean(runner?.agentHealthCheck().ready),
         hostPid: process.pid,
@@ -88,8 +75,7 @@ export const lifecycleHandlers: WorkerRpcHandlers = {
         workerRunning: true,
         workerGeneration: 0,
         deviceId: session?.config.deviceId ?? null,
-        activeRunId: activeRun?.runId ?? null,
-        activeAgentCount: runner?.getActiveAgentCount() ?? 0,
+        busy: session ? piChatsBusy(session) : false,
       };
     }),
 

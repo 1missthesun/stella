@@ -19,10 +19,7 @@ import {
 import { takePendingComposerDraft } from "@/global/onboarding/chat/pending-handoff";
 import { useStreamingChat } from "@/features/chat/hooks/use-streaming-chat";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
-import {
-  useTraceEventMonitor,
-  useTraceIpcListener,
-} from "@/platform/diagnostics/use-trace-listener";
+import { useTraceEventMonitor } from "@/platform/diagnostics/use-trace-listener";
 import { buildActivityTasks } from "@/features/chat/lib/event-transforms";
 import { useCapturedChatContext } from "./use-captured-chat-context";
 import { useChatScrollManagement } from "./use-chat-scroll-management";
@@ -51,7 +48,6 @@ import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conve
 import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-message-ids";
 import type { LegendListRef } from "@legendapp/list/react";
 import type { EventRecord } from "@stella/contracts/local-chat";
-import type { StreamingAssistantOverlay } from "@/features/chat/streaming/streaming-types";
 import type { ChatContext } from "@/shared/types/electron";
 
 type TabComposerMemory = {
@@ -70,7 +66,6 @@ const OPEN_BOTTOM_SETTLE_MS = 600;
 // Frames the height must hold still before an opening chat is shown.
 const OPEN_BOTTOM_STABLE_FRAMES = 3;
 const NO_NEWER_CLOUD_MESSAGES = () => false;
-const EMPTY_STREAMING_ASSISTANTS: StreamingAssistantOverlay[] = [];
 const EMPTY_EVENTS: EventRecord[] = [];
 const NO_JOURNALED_TURNS: ReturnType<typeof journaledPiTurns> = new Map();
 const NO_PI_PENDING_ROWS: ReturnType<typeof piPendingRows> = {
@@ -293,39 +288,23 @@ export function useFullShellChat({
     activeConversationId ?? undefined,
   );
   const {
-    taskDecorations: localTaskDecorations,
     optimisticEvents: localOptimisticEvents,
     acknowledgeMessages: acknowledgeLocalMessages,
-    admissionSettledIds: localAdmissionSettledIds,
-    runtimeStatusText: localRuntimeStatusText,
-    isCompacting: localIsCompacting,
-    activeToolCallId: localActiveToolCallId,
-    activeToolName: localActiveToolName,
-    latestCompletedTool: localLatestCompletedTool,
-    hasToolActivity: localHasToolActivity,
-    isToolActive: localIsToolActive,
-    reasoningText: localReasoningText,
-    streamingAssistants: localStreamingAssistants,
-    isStreaming: localIsStreaming,
-    answerLanded: localAnswerLanded,
-    pendingUserMessageId: localPendingUserMessageId,
     queuedUserMessages: localQueuedUserMessages,
     removeQueuedUserMessage: localRemoveQueuedUserMessage,
     sendMessage: localSendMessage,
-    cancelCurrentStream: localCancelCurrentStream,
   } = useStreamingChat({
     conversationId: activeConversationId,
     persistedMessages: localPersistedMessages,
   });
   const localTasks = useMemo(
-    () => buildActivityTasks(threadActivityRecords, localTaskDecorations),
-    [threadActivityRecords, localTaskDecorations],
+    () => buildActivityTasks(threadActivityRecords),
+    [threadActivityRecords],
   );
-  // The chat runs on pi-durable unless the engine is Claude Code. Whatever
-  // the engine, a conversation shows one record: the journal for one stored
-  // in the cloud, the chat log for one kept on this computer. Pi adds only
-  // what that record does not hold yet, so a model pick never changes what
-  // the chat, Activity or Files show.
+  // A conversation shows one record: the journal for one stored in the
+  // cloud, the chat log for one kept on this computer. Pi adds only what
+  // that record does not hold yet, so a model pick never changes what the
+  // chat, Activity or Files show.
   const piChat = usePiChat(activeConversationId);
   const cloudChat = useCloudChatBridge({
     conversationId: activeConversationId,
@@ -339,14 +318,14 @@ export function useFullShellChat({
     conversationId: cloudChat.conversation.state.conversationId,
     records: cloudChat.records,
     enabled: cloudFeaturesEnabled && isLocalStorage && !cloudChat.isWebShell,
-    onCancel: localCancelCurrentStream,
+    onCancel: piChat.cancelCurrentStream,
   });
   const isPrivateChat = storageMode === "local";
   const journalState = cloudChat.conversation.state;
-  const ownDeviceId = useOwnDeviceId(piChat.enabled && cloudFeaturesEnabled);
+  const ownDeviceId = useOwnDeviceId(cloudFeaturesEnabled);
   const journaledTurns = useMemo(
     () =>
-      piChat.enabled && cloudFeaturesEnabled
+      cloudFeaturesEnabled
         ? journaledPiTurns(
             cloudChat.records,
             piChat.projection.turns,
@@ -357,7 +336,6 @@ export function useFullShellChat({
       cloudChat.records,
       cloudFeaturesEnabled,
       ownDeviceId,
-      piChat.enabled,
       piChat.projection.turns,
     ],
   );
@@ -371,7 +349,7 @@ export function useFullShellChat({
     ? (cloudChat.records[0]?.createdAtMs ?? null)
     : (cloudChat.persistedMessages[0]?.timestamp ?? null);
   const piPending = useMemo(() => {
-    if (!piChat.enabled || !activeConversationId || !recordLoaded) {
+    if (!activeConversationId || !recordLoaded) {
       return NO_PI_PENDING_ROWS;
     }
     if (recordHasOlder && recordStartMs === null) return NO_PI_PENDING_ROWS;
@@ -394,7 +372,6 @@ export function useFullShellChat({
     cloudChat.persistedMessages,
     cloudFeaturesEnabled,
     journaledTurns,
-    piChat.enabled,
     piChat.projection,
     recordHasOlder,
     recordLoaded,
@@ -433,12 +410,9 @@ export function useFullShellChat({
   const awaitingMessageAdmission = useMemo(() => {
     const persistedIds = acceptedUserMessageIds(persistedMessages);
     return localOptimisticEvents.some(
-      (event) =>
-        event.type === "user_message" &&
-        !persistedIds.has(event._id) &&
-        !localAdmissionSettledIds.has(event._id),
+      (event) => event.type === "user_message" && !persistedIds.has(event._id),
     );
-  }, [localAdmissionSettledIds, localOptimisticEvents, persistedMessages]);
+  }, [localOptimisticEvents, persistedMessages]);
   // Activity and Files read the same record plus the agents pi ran in this
   // conversation (pi's agents keep their lifecycle in its transcript), and a
   // cloud conversation's Files also take the links in its replies, as the
@@ -473,91 +447,19 @@ export function useFullShellChat({
     : localOptimisticEvents;
   // The web shell has no in-memory overlay: a cloud reply becomes visible when
   // its journal row commits, not before.
-  const streamingAssistants = piChat.enabled
-    ? piStreamingAssistants
-    : cloudChat.isWebShell
-      ? EMPTY_STREAMING_ASSISTANTS
-      : localStreamingAssistants;
-  // Desktop placement stops owning a run when the cloud accepts it.
-  // Follow the canonical turn while no local execution owns the controls.
-  // Remember the canonical turn this window executed. Its live-clear frame
-  // can lag local completion; falling back to it would resurrect the dots.
-  const locallyOwnedCloudTurnRef = useRef<string | null>(null);
-  const cloudLiveTurnId = cloudChat.conversation.state.live?.turnId ?? null;
-  useLayoutEffect(() => {
-    if (
-      localIsStreaming &&
-      cloudLiveTurnId &&
-      (localHasToolActivity || localAnswerLanded)
-    ) {
-      locallyOwnedCloudTurnRef.current = cloudLiveTurnId;
-    }
-  }, [
-    localIsStreaming,
-    cloudLiveTurnId,
-    localHasToolActivity,
-    localAnswerLanded,
-  ]);
-  const localTurnHandedOff =
-    !localIsStreaming &&
-    Boolean(cloudLiveTurnId) &&
-    locallyOwnedCloudTurnRef.current === cloudLiveTurnId;
-  const useCloudRun =
-    cloudChat.isWebShell || (!localIsStreaming && cloudChat.isStreaming);
-  const runtimeStatusText = piChat.enabled
-    ? piChat.runtimeStatusText
-    : useCloudRun
-      ? cloudChat.runtimeStatusText
-      : localRuntimeStatusText;
-  const isCompacting = piChat.enabled
-    ? piChat.isCompacting
-    : useCloudRun
-      ? false
-      : localIsCompacting;
-  const activeToolCallId = piChat.enabled
-    ? piChat.activeToolCallId
-    : useCloudRun
-      ? cloudChat.activeToolCallId
-      : localActiveToolCallId;
-  const activeToolName = piChat.enabled
-    ? piChat.activeToolName
-    : useCloudRun
-      ? localTurnHandedOff
-        ? null
-        : cloudChat.activeToolName
-      : localActiveToolName;
-  const latestCompletedTool = piChat.enabled
-    ? piChat.latestCompletedTool
-    : useCloudRun
-      ? null
-      : localLatestCompletedTool;
-  const hasToolActivity = piChat.enabled
-    ? piChat.hasToolActivity
-    : useCloudRun
-      ? Boolean(cloudChat.activeToolName)
-      : localHasToolActivity;
-  const isToolActive = piChat.enabled
-    ? piChat.isToolActive
-    : useCloudRun
-      ? Boolean(activeToolName)
-      : localIsToolActive;
-  const reasoningText = useCloudRun || piChat.enabled ? "" : localReasoningText;
-  const isStreaming = piChat.enabled
-    ? piChat.isStreaming || awaitingMessageAdmission
-    : cloudChat.isStreaming || localIsStreaming || awaitingMessageAdmission;
+  const streamingAssistants = piStreamingAssistants;
+  const runtimeStatusText = piChat.runtimeStatusText;
+  const isCompacting = piChat.isCompacting;
+  const activeToolCallId = piChat.activeToolCallId;
+  const activeToolName = piChat.activeToolName;
+  const latestCompletedTool = piChat.latestCompletedTool;
+  const hasToolActivity = piChat.hasToolActivity;
+  const isToolActive = piChat.isToolActive;
+  const isStreaming = piChat.isStreaming || awaitingMessageAdmission;
   // The committed reply hands off before the terminal turn frame arrives.
-  const answerLanded =
-    !awaitingMessageAdmission &&
-    (piChat.enabled
-      ? piChat.answerLanded
-      : useCloudRun
-        ? cloudChat.answerLanded || localTurnHandedOff
-        : localAnswerLanded);
-  const pendingUserMessageId = piChat.enabled
-    ? piChat.pendingUserMessageId && recordUserId(piChat.pendingUserMessageId)
-    : cloudChat.isWebShell
-      ? cloudChat.pendingUserMessageId
-      : localPendingUserMessageId;
+  const answerLanded = !awaitingMessageAdmission && piChat.answerLanded;
+  const pendingUserMessageId =
+    piChat.pendingUserMessageId && recordUserId(piChat.pendingUserMessageId);
   const queuedUserMessages = cloudChat.isWebShell
     ? []
     : localQueuedUserMessages;
@@ -567,11 +469,7 @@ export function useFullShellChat({
   const sendMessage = cloudChat.isWebShell
     ? cloudChat.sendMessage
     : localSendMessage;
-  const cancelCurrentStream = piChat.enabled
-    ? piChat.cancelCurrentStream
-    : useCloudRun
-      ? cloudChat.cancelCurrentStream
-      : localCancelCurrentStream;
+  const cancelCurrentStream = piChat.cancelCurrentStream;
   // Page only the selected history; local and cloud cursors never mix.
   const hasOlderMessages = isPrivateChat
     ? localMessageFeed.hasOlderMessages
@@ -627,7 +525,6 @@ export function useFullShellChat({
     optimisticEvents,
     streamingAssistants,
   });
-  useTraceIpcListener(traceEnabled);
   // Opt-in event trace consumes the union of activity + message + the
   // per-turn tool events. The hook's internal `seenIds` set keeps it
   // idempotent across re-runs, so we can rebuild the list cheaply on
@@ -978,7 +875,6 @@ export function useFullShellChat({
         loadOlder: loadOlderFiles,
       },
       streaming: {
-        reasoningText,
         isStreaming,
         answerLanded,
         runtimeStatusText,
@@ -1024,7 +920,6 @@ export function useFullShellChat({
       persistedFiles,
       queuedUserMessages,
       removeQueuedUserMessage,
-      reasoningText,
       runtimeStatusText,
       isCompacting,
       isStreaming,
@@ -1105,7 +1000,6 @@ export function useFullShellChat({
       loadOlderMessages,
       loadNewerMessages,
       loadLatestMessages,
-      reasoningText,
       isStreaming,
       pendingUserMessageId,
       queuedUserMessages,
@@ -1124,7 +1018,6 @@ export function useFullShellChat({
       loadOlderMessages,
       loadNewerMessages,
       loadLatestMessages,
-      reasoningText,
       isStreaming,
       pendingUserMessageId,
       queuedUserMessages,

@@ -1810,9 +1810,16 @@ export function stellaAgents(host: StellaAgentsHost) {
       const state = await api.snapshot(StellaAgentsDoc, api.conversationId, context);
       const agent = state?.agents[threadId];
       if (agent && !agent.remote) {
+        const waiting =
+          (await api.snapshot(LiveDoc, agent.conversationId as ConversationId, context))?.run === undefined &&
+          (await agentsBusy(busyReader(api, context), agent.conversationId as ConversationId).catch(() => false));
         await markPaused(api, api.conversationId as ConversationId, threadId, context);
         const handle = await api.conversation(agent.conversationId as ConversationId, context);
         await handle?.abort(context);
+        // Idle while agents it started work, its attempt is still open: it ends paused.
+        if (waiting && (await roleOf(api, api.conversationId, context)).agentType === "orchestrator") {
+          await host.agentPaused?.({ threadId, description: agent.description }, context);
+        }
         return { content: [{ type: "text", text: `Paused ${threadId}.` }] };
       }
       const pause = agent ? remoteHostOf(agent)?.pause : undefined;
@@ -1881,8 +1888,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     const found = await treeAgent(harness, threadId, context);
     const agent = found?.record;
     if (!found || !agent || agent.remote) throw new Error(`No agent ${threadId} here.`);
+    const waiting =
+      (await harness.snapshot(LiveDoc, agent.conversationId as ConversationId, context))?.run === undefined &&
+      (await agentsBusy(busyReader(harness, context), agent.conversationId as ConversationId).catch(() => false));
     await markPaused(harness, found.parentConversationId, threadId, context);
     await (await harness.conversation(agent.conversationId as ConversationId, context))?.abort(context);
+    // Idle while agents it started work, its attempt is still open: it ends paused.
+    if (waiting && found.parentConversationId === (await harness.root(context)).id) {
+      await host.agentPaused?.({ threadId, description: agent.description }, context);
+    }
   };
 
   /**

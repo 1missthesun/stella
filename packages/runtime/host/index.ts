@@ -1049,18 +1049,9 @@ export class StellaRuntimeHost {
         // A schedule's prompt is runtime input, not a message the user typed.
         const scheduled = dispatch.ingress === "schedule";
         const userAuthored = !handoff && !scheduled;
-        if (userAuthored) {
-          await this.appendLocalChatEvent({
-            conversationId: dispatch.conversationId,
-            eventId: userMessageEventId,
-            type: "user_message",
-            payload: {
-              text: prompt,
-              source: "execution-placement",
-              dispatchId: dispatch.dispatchId,
-            },
-          });
-        }
+        // A placed chat's conversation is stored in the cloud: its journal
+        // is its one record, which the turn below writes. A copy in this
+        // computer's chat log would show beside it.
         const result = await this.requestWorker<RuntimeAutomationTurnResult>(
           METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION,
           {
@@ -1092,18 +1083,6 @@ export class StellaRuntimeHost {
           },
         );
         if (result.status === "ok") {
-          if (result.finalText) {
-            await this.appendLocalChatEvent({
-              conversationId: dispatch.conversationId,
-              eventId: `placement-assistant:${dispatch.dispatchId}`,
-              type: "assistant_message",
-              payload: {
-                text: result.finalText,
-                source: "execution-placement",
-                dispatchId: dispatch.dispatchId,
-              },
-            });
-          }
           return { status: "ok", finalText: result.finalText };
         }
         return {
@@ -2226,14 +2205,6 @@ export class StellaRuntimeHost {
       throw createRuntimeUnavailableError("Local scheduler is not available.");
     }
     return this.schedulerService;
-  }
-  async appendLocalChatEvent(payload: unknown) {
-    await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_LOCAL_CHAT_APPEND_EVENT,
-      payload,
-      { ensureWorker: true, recordActivity: true },
-    );
-    this.events.emit("local-chat-updated", null);
   }
   async initializeHostServices() {
     await this.stopHostServices();

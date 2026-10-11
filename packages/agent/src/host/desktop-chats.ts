@@ -35,6 +35,7 @@ import {
 import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
 import { PLACED_AGENT_PAUSED } from "../stella/agents.ts";
 import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
+import { parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { splitReplyRefs } from "@stella/contracts/reply-refs";
@@ -982,8 +983,8 @@ export function desktopChats(options: DesktopChatsOptions) {
     const chat = await ready(conversationId);
     const record = await chat.agentStanding(threadId, context);
     if (!record) return "not_found";
-    if (record.status !== "running") return "not_running";
-    claudeCodeEngine?.abort(conversationId, { threadId });
+    // Idle, it is paused all the same: what its agents report waits for a message that resumes it.
+    if (record.status === "running") claudeCodeEngine?.abort(conversationId, { threadId });
     await chat.pauseAgent(threadId, context);
     return "paused";
   };
@@ -1838,16 +1839,25 @@ export function desktopChats(options: DesktopChatsOptions) {
       threadId: string,
       text: string,
       messageId: string,
-    ): Promise<"steered" | "resumed" | "not_found"> {
+    ): Promise<"steered" | "resumed" | "queued" | "not_found"> {
       const conversationId = (await threadIndex())[threadId];
       if (!conversationId || !text.trim()) return "not_found";
       const chat = await ready(conversationId);
       const record = await chat.agentStanding(threadId, context);
       if (!record) return "not_found";
+      // The ledger hands an agent the reports of the agents it started under their report ids.
+      const report = parseAgentReportId(messageId) !== null;
       await chat.messageAgent(
-        { key: `device:${messageId.trim() || crypto.randomUUID()}`, threadId, message: text, fromOrchestrator: true },
+        {
+          key: `device:${messageId.trim() || crypto.randomUUID()}`,
+          threadId,
+          message: text,
+          fromOrchestrator: true,
+          ...(report ? { report: true as const } : {}),
+        },
         context,
       );
+      if (report && record.holdsReports) return "queued";
       return record.status === "running" ? "steered" : "resumed";
     },
     /** A pause for one of Stella's agents here from another host (the cloud, another computer). */

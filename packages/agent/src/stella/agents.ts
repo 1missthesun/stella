@@ -99,6 +99,11 @@ type AgentRecord = {
   /** It was started here for another host's orchestrator, which gets its reports. */
   origin?: AgentOrigin;
   held?: string[];
+  /**
+   * Its starter paused it, running or not: what the agents it started report
+   * is held for it (`held`) rather than run, until a message resumes it.
+   */
+  paused?: true;
   steers?: Array<{ key: string; message: string }>;
   carried?: { runKey: string; messages: string[]; settled?: true };
 };
@@ -462,6 +467,20 @@ const stoppedShort = (entries: readonly { kind: string; model?: readonly unknown
   return stop === "aborted" || stop === "toolUse";
 };
 
+/** Mark one of the agents a conversation started paused (`AgentRecord.paused`). */
+const markPaused = async (
+  store: Pick<ToolExecutionApi, "commit">,
+  starter: ConversationId,
+  threadId: string,
+  context: Context,
+): Promise<void> => {
+  await store.commit(async (tx) => {
+    const agent = (await tx.doc(StellaAgentsDoc, starter)).agents[threadId];
+    if (agent) agent.paused = true;
+    return undefined;
+  }, context);
+};
+
 /** Any message's text: a user message's content may be a plain string. */
 const messageText = (message: { content?: unknown } | undefined): string =>
   typeof message?.content === "string"
@@ -524,6 +543,8 @@ type ReporterInput = {
   message: string;
   /** The user wrote the message in the agent's thread, not the parent. */
   fromUser?: true;
+  /** The report of an agent it started, which waits while it is paused. */
+  report?: true;
 };
 type ReporterState =
   | {
@@ -607,8 +628,15 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (carried === undefined) {
           await runtime.commit(async (tx) => {
             const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
+            if (agent?.paused && reporter.input.report) {
+              agent.held = [...(agent.held ?? []), message];
+              return { status: "terminal", outcome: { status: "completed", result: null } };
+            }
             const held = agent?.held ?? [];
-            if (agent) delete agent.held;
+            if (agent) {
+              delete agent.held;
+              delete agent.paused;
+            }
             return { status: "running", checkpoint: { phase: "deliver", carried: held } };
           }, context);
           return;
@@ -772,7 +800,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           if (!fromLedger && report !== undefined && self.agentType !== "orchestrator" && self.parentConversationId !== undefined && self.threadId) {
             await tx.createTask(
               Reporter,
-              { threadId: self.threadId, conversationId: runtime.conversationId, message: report },
+              { threadId: self.threadId, conversationId: runtime.conversationId, message: report, report: true },
               {
                 ownership: { kind: "conversation" },
                 background: true,
@@ -1384,7 +1412,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       status:
         live?.run !== undefined
           ? "running"
-          : stoppedShort(recent)
+          : record.paused || stoppedShort(recent)
             ? "paused"
             : latest?.stopReason === "error"
               ? "failed"
@@ -1589,6 +1617,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       const state = await api.snapshot(StellaAgentsDoc, api.conversationId, context);
       const agent = state?.agents[threadId];
       if (agent && !agent.remote) {
+        await markPaused(api, api.conversationId as ConversationId, threadId, context);
         const handle = await api.conversation(agent.conversationId as ConversationId, context);
         await handle?.abort(context);
         return { content: [{ type: "text", text: `Paused ${threadId}.` }] };
@@ -1656,8 +1685,10 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   /** Pause one of the orchestrator's agents, or one of theirs, by thread id (for the host that started it). */
   const pauseAgentByThread = async (harness: Harness, threadId: string, context: Context): Promise<void> => {
-    const agent = (await treeAgent(harness, threadId, context))?.record;
-    if (!agent || agent.remote) throw new Error(`No agent ${threadId} here.`);
+    const found = await treeAgent(harness, threadId, context);
+    const agent = found?.record;
+    if (!found || !agent || agent.remote) throw new Error(`No agent ${threadId} here.`);
+    await markPaused(harness, found.parentConversationId, threadId, context);
     await (await harness.conversation(agent.conversationId as ConversationId, context))?.abort(context);
   };
 
@@ -1670,7 +1701,10 @@ export function stellaAgents(host: StellaAgentsHost) {
     harness: Harness,
     threadId: string,
     context: Context,
-  ): Promise<{ status: StellaAgentRecord["status"]; paused?: true; agentStatus: AgentStatus; attempt: number } | undefined> => {
+  ): Promise<
+    | { status: StellaAgentRecord["status"]; paused?: true; holdsReports?: true; agentStatus: AgentStatus; attempt: number }
+    | undefined
+  > => {
     const found = await treeAgent(harness, threadId, context);
     if (!found) return undefined;
     const attempt = Math.max(1, found.given);
@@ -1688,10 +1722,11 @@ export function stellaAgents(host: StellaAgentsHost) {
     ]);
     const latest = recent.find((entry) => entry.kind === "pi.assistant")?.model?.[0] as AssistantMessage | undefined;
     const running = live?.run !== undefined;
-    const paused = !running && stoppedShort(recent);
+    const paused = !running && (found.record.paused === true || stoppedShort(recent));
     return {
       status: running ? "running" : latest?.stopReason === "error" ? "error" : "completed",
       ...(paused ? { paused: true as const } : {}),
+      ...(found.record.paused ? { holdsReports: true as const } : {}),
       agentStatus: running ? "running" : paused ? "paused" : latest?.stopReason === "error" ? "failed" : "completed",
       attempt,
     };
@@ -1766,6 +1801,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       const prose = answers.map(textOf).filter((text) => text.trim()).reverse().slice(-5);
       const oldest = first?.model?.[0] as { timestamp?: number } | undefined;
       const running = live?.run !== undefined;
+      const paused = !running && (agent.paused === true || stoppedShort(recent));
       records.push({
         threadId,
         description: agent.description,
@@ -1775,10 +1811,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         updatedAt: latest?.timestamp ?? oldest?.timestamp ?? Date.now(),
         assistantMessages: prose,
         ...(latest?.stopReason === "error" && latest.errorMessage ? { error: latest.errorMessage } : {}),
-        ...(!running && stoppedShort(recent) ? { paused: true as const } : {}),
+        ...(paused ? { paused: true as const } : {}),
         agentStatus: running
           ? "running"
-          : stoppedShort(recent)
+          : paused
             ? "paused"
             : latest?.stopReason === "error"
               ? "failed"
@@ -1801,6 +1837,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       message: string;
       /** The orchestrator that started it wrote this, not the user in its thread. */
       fromOrchestrator?: boolean;
+      /** The report of an agent it started, which waits while it is paused. */
+      report?: true;
     },
     context: Context,
   ): Promise<void> => {
@@ -1829,6 +1867,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           conversationId: agent.conversationId,
           message: args.message,
           ...(args.fromOrchestrator ? {} : { fromUser: true as const }),
+          ...(args.report ? { report: true as const } : {}),
         },
         { ownership: { kind: "conversation" }, background: true, conversationId: home },
       );

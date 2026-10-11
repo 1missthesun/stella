@@ -2751,6 +2751,16 @@ class ClaudeCodeSessionRuntime {
     child.once("close", (code) => {
       consumeStdout(true);
       processState.closed = true;
+      if (session.resumeReady) {
+        try {
+          request.onSessionCheckpoint?.({
+            sessionId: processState.finalSessionId,
+            configDir: processState.claudeConfigDir,
+            cwd: request.cwd ?? process.cwd(),
+            final: true,
+          });
+        } catch {}
+      }
       const ownsSessionProcess = session.process === processState;
       if (ownsSessionProcess) {
         resetSessionMcpClients(

@@ -149,7 +149,12 @@ const main = async () => {
   report.sessionId = sessionId;
   report.sessionFile = sessionId ? path.join(projectDir, `${sessionId}.jsonl`) : null;
   report.sessionLines = sessionId ? sessionLineCount(path.join(projectDir, `${sessionId}.jsonl`)) : 0;
+  shutdownClaudeCodeRuntime();
+  await new Promise((resolve) => setTimeout(resolve, 3_000));
   report.flushed = await sync.flush(120_000);
+  report.sessionBytesLocal = report.sessionFile && existsSync(String(report.sessionFile))
+    ? readFileSync(String(report.sessionFile)).length
+    : 0;
   const manifest = await client.call("claudeSessions.latest", { threadId });
   report.cloud = manifest
     ? {

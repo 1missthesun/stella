@@ -955,10 +955,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             },
           }
         : {}),
-      thinkingLevel: pi.thinkingLevelFor(
-        args.execution.reasoningEffort,
-        args.execution.engine,
-      ),
+      thinkingLevel: pi.thinkingLevelFor(args.execution.reasoningEffort),
       tools: async () =>
         (
           await this.createTools(

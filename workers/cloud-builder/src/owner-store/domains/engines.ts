@@ -26,10 +26,16 @@
 
 import {
   isLegacyCloudExecution,
+  type AgentModelReasoningEffort,
   type CloudExecutionSelection,
   type LegacyCloudExecutionSelection,
 } from "@stella/contracts/agent-engine";
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
+import {
+  DEFAULT_REASONING_EFFORT,
+  REASONING_EFFORT_LEVELS,
+  normalizeReasoningEffortLevel,
+} from "@stella/contracts/reasoning-effort";
 import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import { cloudSandboxAccess } from "./billing.js";
 import {
@@ -266,7 +272,7 @@ export const DEFAULT_EXECUTION: LegacyCloudExecutionSelection = {
   provider: "stella",
   // Opaque managed default; the cloud-model endpoint resolves it per audience.
   model: "stella/default",
-  reasoningEffort: "default",
+  reasoningEffort: DEFAULT_REASONING_EFFORT,
 };
 
 // --- Encryption (AES-256-GCM under OWNER_SECRETS_KEK) ---------------------
@@ -365,7 +371,13 @@ const decryptPayload = async (
 const EXECUTION_ENGINES = ["stella", "anthropic", "chatgpt"] as const;
 /** A provider's model id: catalog ids include `/`, `:` and `~` (OpenRouter). */
 const PROVIDER_MODEL_ID = /^[A-Za-z0-9~][A-Za-z0-9._:/@~+-]{0,191}$/;
-const REASONING_EFFORTS = ["default", "none", "minimal", "low", "medium", "high", "xhigh"] as const;
+/** Every level, plus the legacy values older clients and stored rows carry. */
+const REASONING_EFFORTS = ["none", ...REASONING_EFFORT_LEVELS, "default", "auto", "minimal"] as const;
+
+const normalizeExecutionEffort = (
+  effort: (typeof REASONING_EFFORTS)[number],
+): AgentModelReasoningEffort =>
+  effort === "none" ? "none" : normalizeReasoningEffortLevel(effort);
 
 const MANAGED_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,191}$/;
 const ENGINE_NATIVE_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,191}$/;
@@ -401,7 +413,7 @@ const parseExecution = (value: unknown, path?: string): CloudExecutionSelection 
     if (!PROVIDER_MODEL_ID.test(model)) {
       throw new RpcError("BAD_REQUEST", "Cloud execution model must be a model id of 1–192 safe characters.");
     }
-    return { ...input, model };
+    return { ...input, model, reasoningEffort: normalizeExecutionEffort(input.reasoningEffort) };
   }
   const input = parseExecutionShape(value, path);
   if (input.engine !== input.provider) {
@@ -428,7 +440,7 @@ const parseExecution = (value: unknown, path?: string): CloudExecutionSelection 
   return {
     ...input,
     model,
-    reasoningEffort: input.engine === "stella" ? "default" : input.reasoningEffort,
+    reasoningEffort: normalizeExecutionEffort(input.reasoningEffort),
   } as CloudExecutionSelection;
 };
 

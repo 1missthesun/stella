@@ -18,6 +18,7 @@ import type {
   AgentModelReasoningEffort,
   CloudExecutionSelection,
 } from "@stella/contracts/agent-engine";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import {
   CLOUD_ADOPTED_SESSION_DIR,
   CLOUD_CLAUDE_ACCOUNTS_ROOT,
@@ -361,17 +362,14 @@ export const resolveClaudeReasoningArgs = (
   switch (effort) {
     case "none":
       return ["--thinking", "disabled"];
-    case "default":
-      return [];
-    case "minimal":
     case "low":
-      return ["--effort", "low", "--thinking", "enabled"];
-    case "xhigh":
-      return ["--effort", "max", "--thinking", "enabled"];
-    case "high":
-      return ["--effort", "high", "--thinking", "enabled"];
     case "medium":
-      return ["--effort", "medium", "--thinking", "enabled"];
+    case "high":
+    case "xhigh":
+    case "max":
+      return ["--effort", effort, "--thinking", "enabled"];
+    default:
+      return ["--effort", normalizeReasoningEffortLevel(effort), "--thinking", "enabled"];
   }
 };
 

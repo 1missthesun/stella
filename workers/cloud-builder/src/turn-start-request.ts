@@ -6,6 +6,7 @@
  */
 
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
+import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   orchestratorCliThreadId,
@@ -93,7 +94,10 @@ export const parseCloudExecutionSelection = (
     engine: value.engine,
     provider: value.provider,
     model: value.model,
-    reasoningEffort: value.reasoningEffort,
+    reasoningEffort:
+      value.reasoningEffort === "none"
+        ? "none"
+        : normalizeReasoningEffortLevel(value.reasoningEffort),
   } as CloudExecutionSelection;
 };
 

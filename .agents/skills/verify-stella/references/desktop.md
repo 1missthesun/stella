@@ -61,7 +61,7 @@ The harness runs an isolated browser bridge by default, so the Browser section s
 The optional `--model-gateway <origin>` overrides gateway discovery for a specific
 deployment; omit it to verify discovery from the signed-in catalog.
 
-Doctor exits successfully only when the recorded Electron process is alive, CDP has Stella's full-window page target (`index.html?window=full`; the run also exposes `overlay.html?window=overlay` and, when enabled, the two companion targets), the full-window top bar `.shell-topbar-full` exists, Electron device identity is available, and the runtime host answers its health check. A painted shell alone is not healthy.
+Doctor exits successfully only when the recorded Electron process is alive, CDP has Stella's full-window page target (`index.html?window=full`; the run also exposes `overlay.html?window=overlay` and, when enabled, the two companion targets), the full-window top bar `.shell-topbar-full` exists, Electron device identity is available, and the runtime worker answers a request (the model catalog, which main serves only from a connected runtime worker). A painted shell alone is not healthy.
 
 Never attach by process name or window title. The pointer under `.run/current.json` is the ownership boundary.
 

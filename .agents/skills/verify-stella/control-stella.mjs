@@ -52,12 +52,12 @@ const HOST_HEALTH_EXPRESSION = String.raw`
   if (typeof deviceId !== "string" || deviceId.trim().length === 0) {
     throw new Error("Electron device identity is empty.");
   }
-  const healthCheck = window.electronAPI?.agent?.healthCheck;
-  if (typeof healthCheck !== "function") {
-    throw new Error("Stella runtime health bridge is unavailable.");
+  const listModels = window.electronAPI?.system?.listLlmModels;
+  if (typeof listModels !== "function") {
+    throw new Error("Stella runtime model bridge is unavailable.");
   }
-  const runtimeHealth = await healthCheck();
-  if (!runtimeHealth || typeof runtimeHealth !== "object") {
+  const catalog = await listModels();
+  if (!catalog || typeof catalog !== "object") {
     throw new Error("Stella runtime host is unavailable.");
   }
   return true;

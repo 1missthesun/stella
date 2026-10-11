@@ -2927,11 +2927,19 @@ const recentThreads = (db: OwnerDbReader, ownerId: string, limit: number): Agent
     .all<ThreadRow>("SELECT * FROM agent_threads ORDER BY updated_at DESC, thread_id DESC LIMIT ?", limit)
     .map((row) => summary(row, ownerId));
 
+/**
+ * A conversation's agents for its clients: the ones it holds and the ones it
+ * started whose rows sit in another cloud conversation (a desktop's cloud
+ * agents), so each client reads one list.
+ */
+const CONVERSATION_THREADS_SQL = "(conversation_id = ? OR origin_conversation_id = ?)";
+
 const runningThreads = (db: OwnerDbReader, ownerId: string, conversationId: string): AgentThreadSummary[] =>
   db
     .all<ThreadRow>(
-      `SELECT * FROM agent_threads WHERE conversation_id = ? AND status IN ('running', 'resuming')
+      `SELECT * FROM agent_threads WHERE ${CONVERSATION_THREADS_SQL} AND status IN ${LIVE_STATUSES_SQL}
         ORDER BY updated_at DESC LIMIT ?`,
+      conversationId,
       conversationId,
       RUNNING_AGENT_THREADS_LIMIT,
     )
@@ -3244,8 +3252,9 @@ export const agentThreadsDomain = {
       read: (ctx, args) => {
         const limit = args.limit ?? 30;
         const rows = ctx.db.all<ThreadRow>(
-          `SELECT * FROM agent_threads WHERE conversation_id = ?
+          `SELECT * FROM agent_threads WHERE ${CONVERSATION_THREADS_SQL}
            ORDER BY updated_at DESC, thread_id DESC LIMIT ?`,
+          args.conversationId,
           args.conversationId,
           limit + 1,
         );
@@ -3259,7 +3268,10 @@ export const agentThreadsDomain = {
       parse: object({ conversationId: id(), threadId: id() }),
       read: (ctx, args) => {
         const row = readConversationThread(ctx.db, args.conversationId, args.threadId);
-        return row && row.conversation_id === args.conversationId ? summary(row, ctx.ownerId) : null;
+        return row &&
+          (row.conversation_id === args.conversationId || row.origin_conversation_id === args.conversationId)
+          ? summary(row, ctx.ownerId)
+          : null;
       },
     },
     "agentThreads.forDevice": {

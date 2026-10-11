@@ -5,7 +5,7 @@ import { Icon, type IconName } from "./Icon";
  * The phone's half of desktop's one activity icon vocabulary
  * (`desktop-ui` `AgentLifecycleStatusIcon`): a dotted circle while an agent
  * runs, a tick once it is done, an alert ring when it failed, a bare ring when
- * it was canceled. The names map onto the same Lucide shapes desktop draws, so
+ * it was canceled, a pause mark while it waits paused. The names map onto the same Lucide shapes desktop draws, so
  * the two apps read as one product rather than two icon sets.
  */
 export const AGENT_LIFECYCLE_STATUS_ICONS = {
@@ -13,7 +13,7 @@ export const AGENT_LIFECYCLE_STATUS_ICONS = {
   completed: "check-circle",
   error: "alert-circle",
   canceled: "circle",
-  paused: "circle",
+  paused: "pause",
 } as const satisfies Record<TaskLifecycleStatus, IconName>;
 
 export function AgentLifecycleStatusIcon({

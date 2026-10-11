@@ -1,4 +1,6 @@
 import type { TaskLifecycleStatus } from "./agent-runtime";
+import { agentTaskStatus } from "./agent-ledger";
+import { isAgentAttemptOutcome, legacyReportStatus } from "./agent-status";
 
 export type AgentTitleRecord = {
   kind: string;
@@ -31,15 +33,6 @@ export const followUpLabel = (message: string): string => {
 /** Whether a title is only a follow-up's label for this agent. */
 export const isFollowUpTitle = (agent: JournalAgent | undefined, title: string | undefined): boolean =>
   Boolean(title && agent?.followUpTitles?.includes(title.trim()));
-
-const LIVE_THREAD_STATUSES = new Set(["running", "resuming", "waiting_for_user"]);
-
-export const agentThreadStatus = (status: string): TaskLifecycleStatus => {
-  if (LIVE_THREAD_STATUSES.has(status)) return "running";
-  if (status === "completed") return "completed";
-  if (status === "canceled" || status === "paused") return "canceled";
-  return "error";
-};
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -76,13 +69,6 @@ const WAKE_DESCRIPTION_RE =
   /^\[(?:Agent completed|Task failed|Task canceled|Subagent paused)\][\s\S]*?^description:\s*(.+)$/m;
 const AGENT_NOTE_RE = /^<agent-message from="([^"\n]*)" thread_id="([^"\n]*)">/;
 
-const WAKE_STATUS: Record<string, TaskLifecycleStatus> = {
-  "Agent completed": "completed",
-  "Task failed": "error",
-  "Task canceled": "canceled",
-  "Subagent paused": "canceled",
-};
-
 const CARD_STATUS: Record<string, TaskLifecycleStatus> = {
   "agent-started": "running",
   "agent-progress": "running",
@@ -90,6 +76,12 @@ const CARD_STATUS: Record<string, TaskLifecycleStatus> = {
   "agent-failed": "error",
   "agent-canceled": "canceled",
 };
+
+/** A lifecycle card's status: the outcome it carries, else its type's. */
+const cardStatus = (type: string, payload: Record<string, unknown> | null): TaskLifecycleStatus | undefined =>
+  (type === "agent-failed" || type === "agent-canceled") && isAgentAttemptOutcome(payload?.status)
+    ? agentTaskStatus(payload.status)
+    : CARD_STATUS[type];
 
 const LIVE_DELIVERIES = new Set(["steered", "resumed", "delivered_agent_still_working"]);
 
@@ -101,7 +93,7 @@ const wakeAgent = (
   const threadId = nonEmpty(match?.[1] ?? match?.[2]);
   if (!kind || !threadId) return null;
   const title = nonEmpty(WAKE_DESCRIPTION_RE.exec(text)?.[1]);
-  return { threadId, ...(title ? { title } : {}), status: WAKE_STATUS[kind] ?? "completed" };
+  return { threadId, ...(title ? { title } : {}), status: agentTaskStatus(legacyReportStatus(text)) };
 };
 
 export const agentNoteSender = (
@@ -124,7 +116,7 @@ const lifecycleCard = (
   const threadId = nonEmpty(payload?.agentId);
   if (!threadId || typeof event?.type !== "string") return null;
   const title = event.type === "agent-started" ? nonEmpty(payload?.description) : undefined;
-  const status = CARD_STATUS[event.type];
+  const status = cardStatus(event.type, payload);
   return { threadId, ...(title ? { title } : {}), ...(status ? { status } : {}) };
 };
 

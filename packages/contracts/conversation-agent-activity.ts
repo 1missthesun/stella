@@ -22,13 +22,19 @@
  * running.
  */
 
-import { parseCloudAgentLifecycleCard } from "./cloud-agent-lifecycle.js";
+import { agentTaskStatus } from "./agent-ledger.js";
+import { legacyReportStatus } from "./agent-status.js";
+import {
+  cloudAgentLifecycleStatus,
+  parseCloudAgentLifecycleCard,
+} from "./cloud-agent-lifecycle.js";
 
 export type AgentActivityStatus =
   | "running"
   | "completed"
   | "error"
-  | "canceled";
+  | "canceled"
+  | "paused";
 
 export type AgentActivityEntry = {
   agentId: string;
@@ -97,19 +103,9 @@ export const lifecycleWakeTarget = (
   return description ? { threadId, description } : { threadId };
 };
 
-const WAKE_STATUS: readonly [RegExp, AgentActivityStatus][] = [
-  [/^\[Agent completed\]/mu, "completed"],
-  [/^\[Subagent paused\]/mu, "completed"],
-  [/^\[Task failed\]/mu, "error"],
-  [/^\[Task canceled\]/mu, "canceled"],
-];
-
-const wakeStatus = (text: string): AgentActivityStatus | null => {
-  for (const [pattern, status] of WAKE_STATUS) {
-    if (pattern.test(text)) return status;
-  }
-  return null;
-};
+/** A wake prompt's outcome, read from its heading: the fallback for chats with no ledger row. */
+const wakeStatus = (text: string): AgentActivityStatus =>
+  agentTaskStatus(legacyReportStatus(text));
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -321,15 +317,7 @@ export const foldAgentActivity = (
         }
         continue;
       }
-      settle(
-        agentId,
-        event.type === "agent-completed"
-          ? "completed"
-          : event.type === "agent-failed"
-            ? "error"
-            : "canceled",
-        record.createdAtMs,
-      );
+      settle(agentId, agentTaskStatus(cloudAgentLifecycleStatus(event)), record.createdAtMs);
       continue;
     }
     if (record.kind !== "message") continue;
@@ -337,9 +325,8 @@ export const foldAgentActivity = (
     if (record.role === "user" && record.hidden) {
       const text = agentActivityMessageText(record.payload);
       const target = lifecycleWakeTarget(text);
-      const status = wakeStatus(text);
-      if (!target || !status || state.carded.has(target.threadId)) continue;
-      settle(target.threadId, status, record.createdAtMs);
+      if (!target || state.carded.has(target.threadId)) continue;
+      settle(target.threadId, wakeStatus(text), record.createdAtMs);
       continue;
     }
 

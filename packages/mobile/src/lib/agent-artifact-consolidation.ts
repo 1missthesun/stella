@@ -257,7 +257,9 @@ export const settledAgentWorkCards = (
           ? "Failed"
           : task.status === "canceled"
             ? "Canceled"
-            : "Finished"
+            : task.status === "paused"
+              ? "Paused"
+              : "Finished"
       : done
         ? "Finished"
         : "Working in background";

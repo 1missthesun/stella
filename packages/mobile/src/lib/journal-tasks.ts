@@ -9,6 +9,12 @@ import {
   lifecycleWakeOutcome,
   lifecycleWakeTask,
 } from "@stella/contracts/conversation-journal-projection";
+import {
+  agentTaskStatus,
+  type AgentLedger,
+  type LedgerAgent,
+} from "@stella/contracts/agent-ledger";
+import { cloudAgentLifecycleStatus } from "@stella/contracts/cloud-agent-lifecycle";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -22,20 +28,6 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
  */
 export const bareToolName = (name: string): string =>
   name.includes("__") ? (name.split("__").at(-1) ?? name) : name;
-
-const WAKE_STATUS: readonly [RegExp, MobileTask["status"]][] = [
-  [/^\[Agent completed\]/mu, "completed"],
-  [/^\[Subagent paused\]/mu, "completed"],
-  [/^\[Task failed\]/mu, "error"],
-  [/^\[Task canceled\]/mu, "canceled"],
-];
-
-const wakeStatus = (text: string): MobileTask["status"] | null => {
-  for (const [pattern, status] of WAKE_STATUS) {
-    if (pattern.test(text)) return status;
-  }
-  return null;
-};
 
 const toolResultThreadId = (record: JournalMessageRecord): string | null => {
   const details = asRecord(record.payload.details);
@@ -265,11 +257,7 @@ export const collectJournalTasks = (
       }
       settle(
         id,
-        event.type === "agent-completed"
-          ? "completed"
-          : event.type === "agent-failed"
-            ? "error"
-            : "canceled",
+        agentTaskStatus(cloudAgentLifecycleStatus(event)),
         record.createdAtMs,
         event.type === "agent-completed"
           ? { resultText: event.payload.result }
@@ -282,16 +270,15 @@ export const collectJournalTasks = (
     if (record.role === "user" && record.hidden) {
       const text = messageText(record.payload);
       const task = lifecycleWakeTask(text);
-      const status = wakeStatus(text);
-      if (!task || !status || carded.has(task.threadId)) continue;
       const outcome = lifecycleWakeOutcome(text);
+      if (!task || !outcome || carded.has(task.threadId)) continue;
       settle(
         task.threadId,
-        status,
+        agentTaskStatus(outcome.kind),
         record.createdAtMs,
         outcome?.kind === "completed"
           ? { resultText: outcome.body }
-          : { errorMessage: outcome?.body },
+          : { errorMessage: outcome.body },
       );
       continue;
     }
@@ -323,4 +310,58 @@ export const collectJournalTasks = (
   }
 
   return [...tasks.values()];
+};
+
+const ledgerTask = (id: string, row: LedgerAgent, base?: MobileTask): MobileTask => {
+  const status = agentTaskStatus(row.status);
+  const {
+    statusText,
+    authoritativeRunning: _authoritativeRunning,
+    completedAt,
+    errorMessage,
+    ...rest
+  } = base ?? { id, title: row.title, createdAt: row.createdAtMs };
+  const failure = status === "error" ? (row.errorMessage ?? errorMessage) : undefined;
+  return {
+    ...rest,
+    id,
+    title: row.title || rest.title,
+    agentType: row.agentType,
+    ...(row.parentAgentId ? { parentAgentId: row.parentAgentId } : {}),
+    status,
+    createdAt: base?.createdAt ?? row.createdAtMs,
+    updatedAt: Math.max(row.updatedAtMs, base?.updatedAt ?? 0),
+    ...(status === "running"
+      ? { authoritativeRunning: true as const, ...(statusText ? { statusText } : {}) }
+      : { completedAt: completedAt ?? row.updatedAtMs }),
+    ...(failure ? { errorMessage: failure } : {}),
+  };
+};
+
+/**
+ * The conversation's tasks with the agent ledger's word on each: an agent
+ * it has a row for takes that row's status and title, whatever the journal
+ * fold or the conversation's running list said, so a lost card can't leave
+ * it running and a paused one reads paused. The ledger's other agents join
+ * the list. An agent it has no row for (one from before ledger rows) keeps
+ * the journal's word, as does every agent while the ledger has not loaded.
+ */
+export const applyAgentLedger = (
+  tasks: readonly MobileTask[],
+  ledger: AgentLedger,
+): MobileTask[] => {
+  if (!ledger.ready) return [...tasks];
+  const covered = new Set<string>();
+  const merged = tasks.map((task) => {
+    const row = ledger.agents.get(task.id);
+    if (!row) return task;
+    covered.add(row.agentId);
+    return ledgerTask(task.id, row, task);
+  });
+  for (const row of ledger.agents.values()) {
+    if (!row || covered.has(row.agentId)) continue;
+    covered.add(row.agentId);
+    merged.push(ledgerTask(row.agentId, row));
+  }
+  return merged;
 };

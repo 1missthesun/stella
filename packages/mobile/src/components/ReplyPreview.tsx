@@ -27,7 +27,13 @@ export const replyTitle = (ref: ReplyRef) =>
     : ref.preview || "Message";
 
 const statusLabel = (status: ReplyAgentStatus | undefined) =>
-  status === "running" ? "Working" : status === "error" ? "Failed" : "Done";
+  status === "running"
+    ? "Working"
+    : status === "error"
+      ? "Failed"
+      : status === "paused"
+        ? "Paused"
+        : "Done";
 
 export function ReplyPreview({
   reference,
@@ -76,7 +82,7 @@ export function ReplyPreview({
                 <ActivityIndicator size="small" color={colors.textMuted} style={styles.spinner} />
               ) : (
                 <Icon
-                  name={status === "error" ? "alert-circle" : "check"}
+                  name={status === "error" ? "alert-circle" : status === "paused" ? "pause" : "check"}
                   size={14}
                   color={status === "error" ? colors.danger : colors.textMuted}
                 />

@@ -25,6 +25,7 @@ import {
 import { messageText } from "@stella/contracts/conversation-protocol";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import { parseCloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
+import { legacyReportStatus } from "@stella/contracts/agent-status";
 import { getChatStorageMode } from "@/features/chat/services/chat-storage-preference";
 import { resolveAuthSessionCacheScope } from "@/global/auth/lib/auth-session-scope";
 import { getAuthSessionSnapshot } from "@/global/auth/services/auth-session";
@@ -131,7 +132,11 @@ const createLocalFeed = (args: {
         id: event._id,
         kind: "say",
         text: agentFailedUpdate(
-          event.type === "agent-failed" ? "failed" : "was canceled",
+          payload.status === "paused"
+            ? "was paused"
+            : event.type === "agent-failed"
+              ? "failed"
+              : "was canceled",
           error,
         ),
       };
@@ -270,7 +275,11 @@ const mapCloudRecord = (record: JournalRecord): ConversationUpdate | null => {
         id: `cloud:${record.seq}`,
         kind: "say",
         text: agentFailedUpdate(
-          event.type === "agent-failed" ? "failed" : "was canceled",
+          event.payload.status === "paused"
+            ? "was paused"
+            : event.type === "agent-failed"
+              ? "failed"
+              : "was canceled",
           event.payload.error?.trim() ?? "",
         ),
       };
@@ -373,15 +382,19 @@ const createPiFeed = (args: {
   let unsubscribe: (() => void) | null = null;
 
   const reportUpdate = (entry: PiEntry, text: string): ConversationUpdate => {
-    const failed = !text.startsWith("[Agent completed]");
+    const outcome = legacyReportStatus(text);
     const body =
       /\n(?:result|error): ([\s\S]*?)(?=\n(?:agent_state|routing|presentation): |$)/.exec(text)?.[1]?.trim() ?? "";
     return {
       id: `pi:${entry.id}`,
       kind: "say",
-      text: failed
-        ? agentFailedUpdate(text.startsWith("[Task canceled]") ? "was canceled" : "failed", body)
-        : agentCompletedUpdate(body),
+      text:
+        outcome === "completed"
+          ? agentCompletedUpdate(body)
+          : agentFailedUpdate(
+              outcome === "canceled" ? "was canceled" : outcome === "paused" ? "was paused" : "failed",
+              body,
+            ),
     };
   };
 

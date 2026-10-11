@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ChatArtifact, ChatMessage } from "../types";
-import { agentThreadStatus } from "@stella/contracts/agent-titles";
-import { CONVERSATION_AGENT_THREADS_MAX } from "@stella/contracts/backend/agent-threads";
-import { isPlacementThreadId, placementAliases } from "@stella/contracts/placement-thread-id";
-import { getBackendClient } from "./backend";
+import { agentTaskStatus } from "@stella/contracts/agent-ledger";
+import type { MobileAgentState } from "./mobile-reply-context";
+import { useConversationAgentLedger } from "./use-conversation-agent-ledger";
 
 const GENERIC_TITLE = "Task";
 
@@ -13,29 +12,25 @@ const untitled = (title: string | undefined, threadId: string): boolean => {
   return !value || value === threadId || value === GENERIC_TITLE;
 };
 
-type AgentState = "running" | "completed" | "error";
+type AgentState = MobileAgentState;
 
 type CloudAgent = { title?: string; state?: AgentState };
 
-const unresolvedThreadIds = (messages: readonly ChatMessage[]): string[] => {
+/** Every agent the transcript cites or carries a work card for, oldest first. */
+const transcriptAgentIds = (messages: readonly ChatMessage[]): string[] => {
   const ids = new Set<string>();
   for (const message of messages) {
     for (const ref of message.replyRefs ?? []) {
-      if (ref.kind !== "agent") continue;
-      const state = message.agentStates?.[ref.threadId];
-      if (untitled(ref.title, ref.threadId) || !state || state === "running") ids.add(ref.threadId);
+      if (ref.kind === "agent") ids.add(ref.threadId);
     }
     for (const artifact of message.artifacts ?? []) {
       const payload = artifact.payload;
       if (payload.kind !== "agent-work") continue;
-      for (const agent of payload.agents ?? []) {
-        if (agent.agentId && untitled(agent.title, agent.agentId)) ids.add(agent.agentId);
-      }
-      const only = payload.agentIds?.length === 1 ? payload.agentIds[0] : undefined;
-      if (only && untitled(payload.title, only)) ids.add(only);
+      for (const agent of payload.agents ?? []) if (agent.agentId) ids.add(agent.agentId);
+      for (const id of payload.agentIds ?? []) ids.add(id);
     }
   }
-  return [...ids].sort();
+  return [...ids];
 };
 
 const titledRef = (ref: ReplyRef, agents: ReadonlyMap<string, CloudAgent>): ReplyRef => {
@@ -106,76 +101,37 @@ const titledMessage = (
   };
 };
 
-const cloudState = (status: string): AgentState => {
-  const state = agentThreadStatus(status);
-  return state === "running" || state === "completed" ? state : "error";
+const cloudState = (status: Parameters<typeof agentTaskStatus>[0]): AgentState => {
+  const state = agentTaskStatus(status);
+  return state === "canceled" ? "error" : state;
 };
 
+/**
+ * The transcript with each cited agent's title and status from the agent
+ * ledger. Its status wins over what the journal's cards said; a title
+ * replaces only a missing one, since older runs stored a follow-up's label
+ * as the description. An agent the ledger has no row for keeps the
+ * journal's word, as does every agent while the ledger has not loaded.
+ */
 export function useAgentReplyTitles(
   conversationId: string | null,
   messages: ChatMessage[],
 ): ChatMessage[] {
-  const key = useMemo(() => unresolvedThreadIds(messages).join("\n"), [messages]);
-  const [agents, setAgents] = useState<ReadonlyMap<string, CloudAgent>>(() => new Map());
-  useEffect(() => {
-    setAgents(new Map());
-  }, [conversationId]);
-  useEffect(() => {
-    if (!conversationId || !key) return;
-    let client: ReturnType<typeof getBackendClient>;
-    try {
-      client = getBackendClient();
-    } catch {
-      return;
-    }
-    const record = (threadId: string, thread: { description?: string; status: string }) => {
-      const description = thread.description?.trim();
-      const next: CloudAgent = {
-        ...(description && !untitled(description, threadId) ? { title: description } : {}),
-        state: cloudState(thread.status),
-      };
-      setAgents((current) => {
-        const previous = current.get(threadId);
-        if (previous?.title === next.title && previous?.state === next.state) return current;
-        return new Map(current).set(threadId, next);
+  const ids = useMemo(() => transcriptAgentIds(messages), [messages]);
+  const ledger = useConversationAgentLedger(conversationId, ids);
+  const agents = useMemo(() => {
+    const known = new Map<string, CloudAgent>();
+    if (!ledger.ready) return known;
+    for (const id of ids) {
+      const row = ledger.agents.get(id);
+      if (!row) continue;
+      known.set(id, {
+        ...(row.title && !untitled(row.title, id) ? { title: row.title } : {}),
+        state: cloudState(row.status),
       });
-    };
-    const threadIds = key.split("\n");
-    const placed = new Set(threadIds.filter(isPlacementThreadId));
-    const stops = threadIds
-      .filter((threadId) => !placed.has(threadId))
-      .map((threadId) =>
-        client.watch(
-          "agentThreads.get",
-          { conversationId, threadId },
-          (thread) => {
-            if (thread) record(threadId, thread);
-          },
-          () => {},
-        ),
-      );
-    if (placed.size > 0) {
-      stops.push(
-        client.watch(
-          "agentThreads.forConversation",
-          { conversationId, limit: CONVERSATION_AGENT_THREADS_MAX },
-          (page) => {
-            const threads = page?.threads ?? [];
-            const aliases = placementAliases(threads.map((thread) => thread.threadId));
-            for (const threadId of placed) {
-              const cloudId = aliases.get(threadId);
-              const thread = cloudId ? threads.find((entry) => entry.threadId === cloudId) : undefined;
-              if (thread) record(threadId, thread);
-            }
-          },
-          () => {},
-        ),
-      );
     }
-    return () => {
-      for (const stop of stops) stop();
-    };
-  }, [conversationId, key]);
+    return known;
+  }, [ids, ledger]);
   return useMemo(
     () => (agents.size === 0 ? messages : messages.map((message) => titledMessage(message, agents))),
     [messages, agents],

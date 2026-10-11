@@ -42,6 +42,7 @@ import {
   nextLocalCloudEventOverlayExpiry,
 } from "./journal-activity-files";
 import {
+  journalActivityTasks,
   mergeCloudConversationTasks,
   useCloudConversationActivity,
 } from "./use-cloud-activity";
@@ -422,11 +423,16 @@ export function useCloudChatBridge({
         : isPrivate ? localFiles : EMPTY_EVENTS,
     [isPrivate, canonicalFiles, enabled, localFiles, mayUseLocalOverlay, overlayNowMs],
   );
+  const ledgerUnreachable = enabled && cloudActivity.hasLoaded && !cloudActivity.ledgerReady;
+  const journalTasks = useMemo(
+    () => (ledgerUnreachable ? journalActivityTasks(completeRecords) : EMPTY_TASKS),
+    [completeRecords, ledgerUnreachable],
+  );
   const tasks = useMemo(
     () =>
       enabled && cloudActivity.hasLoaded
         ? mergeCloudConversationTasks(
-            cloudActivity.tasks,
+            ledgerUnreachable ? journalTasks : cloudActivity.tasks,
             localCloudTaskOverlay(
               conversation.state.status,
               localTasks,
@@ -438,6 +444,8 @@ export function useCloudChatBridge({
       isPrivate,
       cloudActivity.hasLoaded,
       cloudActivity.tasks,
+      journalTasks,
+      ledgerUnreachable,
       conversation.state.status,
       enabled,
       localTasks,

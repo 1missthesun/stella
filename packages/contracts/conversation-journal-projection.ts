@@ -13,6 +13,7 @@ import {
   type JournalRecord,
   type JournalTurnRecord,
 } from "./conversation-protocol.js";
+import { legacyReportStatus, type AgentAttemptOutcome } from "./agent-status.js";
 import {
   splitReplyRefs,
   toReplyPreview,
@@ -91,7 +92,7 @@ const WAKE_TRAILER_RE = /^(?:agent_state|presentation|routing|error):/;
  */
 export const lifecycleWakeOutcome = (
   text: string,
-): { kind: "completed" | "failed" | "canceled"; body: string } | null => {
+): { kind: AgentAttemptOutcome; body: string } | null => {
   const kind = WAKE_KIND_RE.exec(text)?.[1];
   if (!kind) return null;
   const lines = text.split(/\r?\n/);
@@ -110,15 +111,7 @@ export const lifecycleWakeOutcome = (
     }
     body = [first, ...rest].join("\n").trim();
   }
-  return {
-    kind:
-      kind === "Agent completed"
-        ? "completed"
-        : kind === "Task failed"
-          ? "failed"
-          : "canceled",
-    body,
-  };
+  return { kind: legacyReportStatus(text), body };
 };
 
 /**

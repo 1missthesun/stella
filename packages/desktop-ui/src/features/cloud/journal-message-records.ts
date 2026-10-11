@@ -113,7 +113,11 @@ const mirroredLifecycleEvents = (
               _id: `cloud:${turnId}:wake:${record.seq}:agent-${outcome.kind}`,
               timestamp,
               type: outcome.kind === "failed" ? "agent-failed" : "agent-canceled",
-              payload: { ...base, ...(outcome.body ? { error: outcome.body } : {}) },
+              payload: {
+                ...base,
+                ...(outcome.body ? { error: outcome.body } : {}),
+                ...(outcome.kind === "paused" ? { status: "paused" } : {}),
+              },
             };
       continue;
     }

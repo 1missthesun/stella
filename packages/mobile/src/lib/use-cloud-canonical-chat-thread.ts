@@ -68,10 +68,12 @@ import {
 import { collectActivityHubArtifacts } from "./activity-hub-model";
 import { canonicalWorkingState } from "./canonical-working-state";
 import {
+  applyAgentLedger,
   collectJournalTasks,
   markAuthoritativeRunning,
   settleUnlistedTasks,
 } from "./journal-tasks";
+import { useConversationAgentLedger } from "./use-conversation-agent-ledger";
 import { mergeJournalTasks } from "./mobile-task-merge";
 import { planCloudTranscriptDisplay } from "./cloud-transcript-display";
 import { useChatAttachmentPreviews } from "./use-chat-attachment-previews";
@@ -883,13 +885,15 @@ export const useCloudCanonicalChatThread = (
     () => collectActivityHubArtifacts(messages),
     [messages],
   );
-  // Background work is read from the journal, where every placement records
-  // it, including agents running on a paired computer. Which of it is running
-  // is the server's list (`ready.agents`, then each `agents` frame), the only
-  // source that names an agent whose start row is below the window, which
-  // after any real time away is most of them. It is seeded into the record
-  // fold so a row this device holds draws it; a row the fold left running and
-  // the list does not name has ended (`settleUnlistedTasks`).
+  // Background work is the agent ledger's: each agent's status and title,
+  // and which of them run, wherever they run (`applyAgentLedger`). The
+  // journal places them in the chat and stands in for an agent the ledger
+  // has no row for, or while it has not loaded. That fallback takes which
+  // agents run from the server's list (`ready.agents`, then each `agents`
+  // frame), the only source that names an agent whose start row is below the
+  // window. It is seeded into the record fold so a row this device holds
+  // draws it; a row the fold left running and the list does not name has
+  // ended (`settleUnlistedTasks`).
   const runningAgents = state.runningAgents;
   const journalTasks = useMemo(
     () => collectJournalTasks(state.records, runningAgents),
@@ -900,7 +904,7 @@ export const useCloudCanonicalChatThread = (
     [journalTasks, runningAgents],
   );
   const localConversationTasks = local.conversationTasks;
-  const conversationTasks = useMemo(
+  const foldedTasks = useMemo(
     () =>
       settleUnlistedTasks(
         markAuthoritativeRunning(
@@ -911,6 +915,21 @@ export const useCloudCanonicalChatThread = (
         state.runningAgentsAtMs,
       ),
     [authoritativeTasks, localConversationTasks, runningAgents, state.runningAgentsAtMs],
+  );
+  const ledgerCheckIds = useMemo(
+    () => [
+      ...foldedTasks.filter((task) => task.status === "running").map((task) => task.id),
+      ...runningAgents.map((agent) => agent.agentId),
+    ],
+    [foldedTasks, runningAgents],
+  );
+  const agentLedger = useConversationAgentLedger(
+    authority.conversationId || null,
+    ledgerCheckIds,
+  );
+  const conversationTasks = useMemo(
+    () => applyAgentLedger(foldedTasks, agentLedger),
+    [agentLedger, foldedTasks],
   );
   const canonicalCancellationRef = useRef<{
     dispatchId: string;

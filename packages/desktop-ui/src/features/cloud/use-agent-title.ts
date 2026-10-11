@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
-import { agentThreadStatus, isFollowUpTitle } from "@stella/contracts/agent-titles";
+import { ledgerThreadTaskStatus } from "@stella/contracts/agent-ledger";
+import { isFollowUpTitle } from "@stella/contracts/agent-titles";
 import { CONVERSATION_AGENT_THREADS_MAX } from "@stella/contracts/backend/agent-threads";
 import {
   isPlacementThreadId,
@@ -57,9 +58,10 @@ function useCloudThreadId(conversationId: string, threadId: string, enabled: boo
 }
 
 /**
- * An agent's title and status. The cloud agent list is the authority for
- * the title; the transcript's own titles are a first guess while it loads
- * and the fallback for agents the cloud never held.
+ * An agent's title and status. The agent ledger is the authority for both:
+ * its row's status wins over this computer's own record of the agent and
+ * over the journal. Those stand in while the row loads, for an agent the
+ * ledger never held, and for a chat stored only on this computer.
  */
 export function useAgentCard(
   conversationId: string,
@@ -92,8 +94,8 @@ export function useAgentCard(
     cloudTitle ||
     firstTitle(titles, threadId, () => true);
   const status =
+    (thread ? ledgerThreadTaskStatus(thread.status) : undefined) ??
     localStatus ??
-    (thread ? agentThreadStatus(thread.status) : undefined) ??
     cloudJournal?.status ??
     journal?.status;
   return {

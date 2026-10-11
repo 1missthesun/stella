@@ -18,11 +18,13 @@ export type CloudAgentThread = {
   conversationId: string;
   /** Absent when the desktop dispatched the agent — no cloud turn above it. */
   parentTurnId?: string;
+  /** The agent that started it, when another agent did. */
+  parentThreadId?: string;
   description: string;
   /** Where the thread runs: "cloud" or "computer". */
   placement: string;
   agentType: string;
-  // "running" | "completed" | "failed" | "canceled".
+  /** In the shared vocabulary (`@stella/contracts/agent-status`). */
   status: string;
   resultJson?: string;
   errorMessage?: string;

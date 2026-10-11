@@ -153,7 +153,7 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
   const stateFor = (threadId: string): MobileAgentState | undefined => {
     const status = journal.get(threadId)?.status;
     if (!status) return undefined;
-    return status === "running" ? "running" : status === "completed" ? "completed" : "error";
+    return status === "running" || status === "completed" || status === "paused" ? status : "error";
   };
   const statesFor = (refs: readonly ReplyRef[]) => {
     const states: Record<string, MobileAgentState> = {};
@@ -170,7 +170,7 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
 }
 
 /** Lifecycle state of a task as the transcript's work cards last saw it. */
-export type MobileAgentState = "running" | "completed" | "error";
+export type MobileAgentState = "running" | "completed" | "error" | "paused";
 
 export type MobileReplyContexts = ReplyContextProjection & {
   /** Latest known state per agent thread, for the quoted task's status glyph. */

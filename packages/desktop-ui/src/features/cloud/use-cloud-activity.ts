@@ -6,8 +6,14 @@
  * badge says where it ran.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
+import { ledgerThreadTaskStatus } from "@stella/contracts/agent-ledger";
 import { CONVERSATION_AGENT_THREADS_MAX } from "@stella/contracts/backend/agent-threads";
+import { isPlacementThreadId, placementAliases } from "@stella/contracts/placement-thread-id";
+import {
+  emptyAgentActivityState,
+  foldAgentActivity,
+  type AgentActivityRecordInput,
+} from "@stella/contracts/conversation-agent-activity";
 import type { TaskItem } from "@/features/chat/lib/event-transforms";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { useBackendView } from "@/platform/backend/use-backend-view";
@@ -17,13 +23,6 @@ import type { CloudAgentThread } from "./cloud-api";
 /** Human label for where a thread ran. */
 export const cloudPlacementLabel = (placement: string): string =>
   placement === "computer" ? "Computer" : "Cloud";
-
-const threadStatus = (status: string): TaskLifecycleStatus => {
-  if (status === "running") return "running";
-  if (status === "completed") return "completed";
-  if (status === "canceled" || status === "paused") return "canceled";
-  return "error";
-};
 
 /** The agent's own report — the same prose a local agent leaves behind. */
 export const cloudThreadReport = (
@@ -44,12 +43,13 @@ export const cloudThreadReport = (
 };
 
 export const cloudThreadToTask = (thread: CloudAgentThread): TaskItem => {
-  const status = threadStatus(thread.status);
+  const status = ledgerThreadTaskStatus(thread.status);
   const report = cloudThreadReport(thread);
   return {
     id: thread.threadId,
     description: thread.description,
     agentType: thread.agentType || "general",
+    ...(thread.parentThreadId ? { parentAgentId: thread.parentThreadId } : {}),
     source: "stella",
     // Cloud activity has its own cancel/resume authority. Until those controls
     // are integrated, local lifecycle actions must never target this row.
@@ -104,7 +104,7 @@ const projectCloudActivity = (
     tasks,
     placements,
     threadsById,
-    hasRunning: threads.some((thread) => thread.status === "running"),
+    hasRunning: tasks.some((task) => task.status === "running"),
   };
 };
 
@@ -136,6 +136,12 @@ export const useCloudActivity = (): CloudActivity => {
 export type CloudConversationActivity = CloudActivity & {
   /** False only while the authenticated conversation query is unresolved. */
   hasLoaded: boolean;
+  /**
+   * The agent ledger answered for this conversation. False while it loads,
+   * when it cannot be reached, and for a chat it holds nothing for; the chat
+   * then reads its agents from the journal.
+   */
+  ledgerReady: boolean;
   /** True while an older cursor exists or that cursor is being loaded. */
   hasOlder: boolean;
   isLoadingOlder: boolean;
@@ -245,6 +251,11 @@ export const useCloudConversationActivity = (
     ((page.value?.hasMore ?? false) || isLoadingOlder) &&
     limit < CONVERSATION_AGENT_THREADS_MAX;
   const canLoadMore = page.status === "ready" && page.value.hasMore;
+  const ledgerReady =
+    enabled &&
+    pageScopeIsCurrent &&
+    page.value !== undefined &&
+    running.value !== undefined;
   const loadOlder = useCallback(() => {
     if (pageScopeIsCurrent && canLoadMore) {
       setLimit((current) =>
@@ -256,26 +267,33 @@ export const useCloudConversationActivity = (
     () => ({
       ...projectCloudActivity(threads),
       hasLoaded,
+      ledgerReady,
       hasOlder,
       isLoadingOlder,
       loadOlder,
     }),
-    [hasLoaded, hasOlder, isLoadingOlder, loadOlder, threads],
+    [hasLoaded, hasOlder, isLoadingOlder, ledgerReady, loadOlder, threads],
   );
 };
 
 /**
  * Cloud rows own durable identity/status. Desktop runtime rows only decorate
  * a matching running row with lower-latency operational detail, or bridge the
- * brief interval before the cloud row becomes observable.
+ * brief interval before the cloud row becomes observable. A runtime row under
+ * the placement id a device ran a cloud thread by is that thread's row, so an
+ * agent never lists twice.
  */
 export const mergeCloudConversationTasks = (
   canonical: readonly TaskItem[],
   operational: readonly TaskItem[],
 ): TaskItem[] => {
   if (canonical.length === 0) return [...operational];
+  const aliases = operational.some((task) => isPlacementThreadId(task.id))
+    ? placementAliases(canonical.map((task) => task.id))
+    : null;
+  const canonicalId = (id: string) => aliases?.get(id) ?? id;
   const operationalById = new Map(
-    operational.map((task) => [task.id, task] as const),
+    operational.map((task) => [canonicalId(task.id), task] as const),
   );
   const canonicalIds = new Set(canonical.map((task) => task.id));
   const merged = canonical.map((task) => {
@@ -292,7 +310,29 @@ export const mergeCloudConversationTasks = (
     };
   });
   for (const task of operational) {
-    if (!canonicalIds.has(task.id)) merged.push(task);
+    if (!canonicalIds.has(canonicalId(task.id))) merged.push(task);
   }
   return merged;
 };
+
+/**
+ * A cloud conversation's agents folded from its journal: what the chat shows
+ * only while the agent ledger cannot be reached.
+ */
+export const journalActivityTasks = (
+  records: readonly AgentActivityRecordInput[],
+): TaskItem[] =>
+  [...foldAgentActivity(emptyAgentActivityState(), records).entries.values()].map(
+    (entry): TaskItem => ({
+      id: entry.agentId,
+      description: entry.title,
+      agentType: entry.agentType ?? "general",
+      source: "stella",
+      readOnly: true,
+      status: entry.status,
+      startedAtMs: entry.createdAtMs,
+      lastUpdatedAtMs: entry.updatedAtMs,
+      ...(entry.statusText ? { statusText: entry.statusText } : {}),
+      ...(entry.completedAtMs !== undefined ? { completedAtMs: entry.completedAtMs } : {}),
+    }),
+  );

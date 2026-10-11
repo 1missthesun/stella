@@ -95,6 +95,9 @@ type AgentRecord = {
   failed?: true;
   /** It was started here for another host's orchestrator, which gets its reports. */
   origin?: AgentOrigin;
+  held?: string[];
+  steers?: Array<{ key: string; message: string }>;
+  carried?: { runKey: string; messages: string[]; settled?: true };
 };
 
 /**
@@ -520,7 +523,10 @@ type ReporterInput = {
   fromUser?: true;
 };
 type ReporterState =
-  | { phase: "deliver" }
+  | {
+      phase: "deliver";
+      carried?: string[];
+    }
   | {
       phase: "report";
       report?: string;
@@ -581,6 +587,16 @@ export function stellaAgents(host: StellaAgentsHost) {
       deliver: async (reporter, runtime, context) => {
         const { threadId, message } = reporter.input;
         const agentConversationId = reporter.input.conversationId as ConversationId;
+        const carried = reporter.state.checkpoint.carried;
+        if (carried === undefined) {
+          await runtime.commit(async (tx) => {
+            const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
+            const held = agent?.held ?? [];
+            if (agent) delete agent.held;
+            return { status: "running", checkpoint: { phase: "deliver", carried: held } };
+          }, context);
+          return;
+        }
         const self = await roleOf(runtime, runtime.conversationId, context);
         const siblings = await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context);
         const run: AgentRun = {
@@ -599,6 +615,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         let refused: string | undefined;
         // How the run ended, for the host once its report is settled.
         let end: AgentRunEnd = {};
+        let submitted = false;
         try {
           try {
             await host.beginAgentRun?.(run, context);
@@ -608,14 +625,21 @@ export function stellaAgents(host: StellaAgentsHost) {
             const model = host.ensureModel ? (await runtime.snapshot(AgentDoc, agentConversationId, context))?.model : undefined;
             if (model) await host.ensureModel?.(model, context);
             const submission = await agent.submit(
-              { type: "input", content: message, whenBusy: "steer", requestId: `agent-msg:${reporter.id}` },
+              {
+                type: "input",
+                content: [...carried, message].join("\n\n"),
+                whenBusy: "steer",
+                requestId: `agent-msg:${reporter.id}`,
+              },
               context,
             );
+            submitted = true;
             settled = await submission.wait(context);
           } catch (error) {
             if (context.abortSignal?.aborted) throw error;
             refused = error instanceof Error ? error.message : String(error);
           }
+          const withdrawn = settled?.status === "unanswered" && settled.reason === "aborted" && settled.entry === undefined;
           if (settled?.status === "unanswered" && settled.reason === "aborted") end = { aborted: true };
           else if (refused !== undefined || settled === undefined) end = { error: refused ?? "The agent did not run." };
           else if (settled.status === "unanswered") end = { error: settled.reason };
@@ -628,6 +652,9 @@ export function stellaAgents(host: StellaAgentsHost) {
             const state = await tx.doc(StellaAgentsDoc, runtime.conversationId);
             const agent = state.agents[threadId];
             const description = agent?.description ?? threadId;
+            if (agent && (withdrawn || (!submitted && carried.length > 0))) {
+              agent.held = [...carried, ...(withdrawn ? [message] : []), ...(agent.held ?? [])];
+            }
             if (refused !== undefined || settled === undefined) {
               return next(failedReport({ threadId, description, error: refused ?? "The agent did not run." }), "failed");
             }
@@ -1734,8 +1761,22 @@ export function stellaAgents(host: StellaAgentsHost) {
     const agent = record ? await harness.conversation(record.conversationId as ConversationId, context) : undefined;
     if (!agent) return { threadId, status: "error", error: "The agent could not start here." };
     if (args.signal?.aborted) return stoppedPlacedRun(threadId, args.signal);
+    const carried = await harness.commit(async (tx) => {
+      const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
+      if (!current) return [];
+      if (current.carried?.runKey === args.runKey) return current.carried.messages;
+      const messages = current.held ?? [];
+      delete current.held;
+      current.carried = { runKey: args.runKey, messages };
+      return messages;
+    }, context);
     const submission = await agent.submit(
-      { type: "input", content: args.prompt, whenBusy: "steer", requestId: `placed:${args.runKey}` },
+      {
+        type: "input",
+        content: [...carried, args.prompt].join("\n\n"),
+        whenBusy: "steer",
+        requestId: `placed:${args.runKey}`,
+      },
       context,
     );
     const stop = async () => {
@@ -1745,6 +1786,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     args.signal?.addEventListener("abort", () => void stop().catch(() => undefined), { once: true });
     if (args.signal?.aborted) await stop();
     const settled = await submission.wait(context);
+    await keepWithdrawn(harness, root.id, threadId, args.runKey, settled, [...carried, args.prompt], context);
     if (args.signal?.aborted) return stoppedPlacedRun(threadId, args.signal);
     // Paused here (its conversation aborted) before it answered.
     if (settled.status === "unanswered" && settled.reason === "aborted") {
@@ -1759,6 +1801,35 @@ export function stellaAgents(host: StellaAgentsHost) {
     return { threadId, status: "ok", finalText: textOf(message) };
   };
 
+  const keepWithdrawn = async (
+    harness: Harness,
+    rootId: ConversationId,
+    threadId: string,
+    runKey: string,
+    settled: { status: string; reason?: string; entry?: EntryId },
+    given: string[],
+    context: Context,
+  ): Promise<void> => {
+    const unread = (record: { status: string; reason?: string; entry?: EntryId } | undefined) =>
+      record?.status === "unanswered" && record.reason === "aborted" && record.entry === undefined;
+    await harness.commit(async (tx) => {
+      const record = (await tx.doc(StellaAgentsDoc, rootId)).agents[threadId];
+      if (!record) return;
+      const steers = record.steers ?? [];
+      const outcomes = await Promise.all(
+        steers.map((steer) => tx.submissionByRequest(record.conversationId as ConversationId, `steer:${steer.key}`)),
+      );
+      const withdrawn = steers.filter((_, index) => unread(outcomes[index])).map((steer) => steer.message);
+      const pending = steers.filter((_, index) => outcomes[index] === undefined || outcomes[index]?.status === "queued");
+      const first = record.carried?.runKey !== runKey || !record.carried.settled;
+      if (record.carried?.runKey === runKey) record.carried.settled = true;
+      const held = [...(first && unread(settled) ? given : []), ...withdrawn];
+      if (pending.length > 0) record.steers = pending;
+      else delete record.steers;
+      if (held.length > 0) record.held = [...(record.held ?? []), ...held];
+    }, context);
+  };
+
   /** A message for an agent another host placed here, from that host; it reads it before its next step. */
   const steerPlacedAgent = async (
     harness: Harness,
@@ -1770,7 +1841,12 @@ export function stellaAgents(host: StellaAgentsHost) {
     const threadId = state?.calls[`placed:${args.agentKey}`]?.threadId;
     const record = threadId ? state?.agents[threadId] : undefined;
     const agent = record && !record.remote ? await harness.conversation(record.conversationId as ConversationId, context) : undefined;
-    if (!agent) return false;
+    if (!agent || !threadId) return false;
+    await harness.commit(async (tx) => {
+      const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
+      if (!current || current.steers?.some((steer) => steer.key === args.key)) return;
+      current.steers = [...(current.steers ?? []), { key: args.key, message: args.message }];
+    }, context);
     await agent.submit({ type: "input", content: args.message, whenBusy: "steer", requestId: `steer:${args.key}` }, context);
     return true;
   };

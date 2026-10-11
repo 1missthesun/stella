@@ -151,6 +151,8 @@ export type AgentThreadControl = {
   threadUpdatedAt: number;
   status: string;
   waitingForDevice?: boolean;
+  /** How a message it was given landed, for a follow-up that carried one. */
+  delivery?: AgentMessageDelivery;
 };
 
 type Origin = { originDeviceId: string; originConversationId: string };

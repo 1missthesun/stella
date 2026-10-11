@@ -1038,7 +1038,7 @@ const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<
   if (replay) return replay;
   await assertGeneration(ctx, args.ownerGeneration);
   const thread = readCloudDeviceThread(ctx, args);
-  const { waitingForDevice } = await controlAgent(ctx, {
+  const { result, waitingForDevice } = await controlAgent(ctx, {
     commandId: args.controlRequestId,
     kind: "message",
     thread,
@@ -1051,6 +1051,7 @@ const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<
   return {
     ...control(readThread(ctx.db, thread.thread_id)!),
     ...(waitingForDevice ? { waitingForDevice: true } : {}),
+    delivery: agentMessageDelivery(result),
   };
 };
 
@@ -1546,10 +1547,7 @@ const agentDirectory = async (
       description: row.description,
       status,
       where: deviceId ? (device?.label?.trim() || "another computer") : "cloud",
-      updatedAt:
-        live && device?.online && device.lastSeenAt !== undefined
-          ? Math.max(row.updated_at, device.lastSeenAt)
-          : row.updated_at,
+      updatedAt: row.updated_at,
       ...(live && deviceId && devices.size > 0 && !device?.online
         ? { offline: device?.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {} }
         : {}),
@@ -2224,6 +2222,9 @@ const commandResult = async (
   const current = readThread(ctx.db, threadId) ?? input.thread;
   let outcome: AgentControlOutcome;
   let note: string | undefined;
+  const offlineName = device
+    ? `${device.name}${device.lastSeenAt !== undefined ? ` (last seen ${new Date(device.lastSeenAt).toISOString()})` : ""}`
+    : "that computer";
   if ("hold" in routed) {
     const name = device?.name ?? "that computer";
     outcome = "held";
@@ -2233,8 +2234,11 @@ const commandResult = async (
           ? `${name} is offline right now, so it could not stop yet. The pause is held and applied the moment ${name} reconnects, unless you message the agent first.`
           : `${name} did not answer in time. The pause is offered again until ${name} answers.`
         : routed.hold === "unreachable"
-          ? `${name} is offline. The message waits and is delivered to ${threadId} when ${name} reconnects, if that is within an hour.`
+          ? `${offlineName} is offline. The message waits and is delivered to ${threadId} when ${name} reconnects, if that is within an hour.`
           : `${name} did not answer in time. The message is offered to ${threadId} again until ${name} answers, for up to an hour.`;
+  } else if (input.kind !== "pause" && routed.outcome === "resumed" && routed.waitingForDevice && device && !device.online) {
+    outcome = "held";
+    note = `${offlineName} is offline. The message is held, and ${threadId}'s next run starts with it when ${device.name} reconnects.`;
   } else {
     outcome = routed.outcome;
     note = routed.note;
@@ -2546,10 +2550,15 @@ const markLocalThreadPaused = async (
 const deviceStanding = async (
   ctx: OwnerContext,
   deviceId: string,
-): Promise<{ name: string; online: boolean }> => {
+): Promise<{ name: string; online: boolean; lastSeenAt?: number }> => {
   try {
-    const device = (await ctx.host.deviceDestinations()).find((candidate) => candidate.deviceId === deviceId);
-    return { name: device?.label || "that computer", online: device?.online === true };
+    const current = resolveCurrentDeviceId(ctx.db, deviceId);
+    const device = (await ctx.host.deviceDestinations()).find((candidate) => candidate.deviceId === current);
+    return {
+      name: device?.label?.trim() || "that computer",
+      online: device?.online === true,
+      ...(device?.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {}),
+    };
   } catch {
     return { name: "that computer", online: false };
   }

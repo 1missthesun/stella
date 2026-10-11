@@ -39,7 +39,7 @@ import type {
 } from "../tools/types.js";
 
 /** One parsed stream-json line from the CLI: untrusted JSON, read defensively. */
-type ClaudeStreamEvent = Record<string, any>;
+export type ClaudeStreamEvent = Record<string, any>;
 type ClaudeToolArgs = Record<string, any>;
 /** One Stella or native tool call a step started, for side-effect reconciliation. */
 type McpCallRecord = {
@@ -105,6 +105,8 @@ export type ClaudeCodeTurnRequest = {
   attachments?: readonly { url: string; mimeType?: string }[];
   tools: readonly ToolMetadata[];
   nativeTools?: readonly string[];
+  nativeToolCallIds?: boolean;
+  boundToolInactivity?: boolean;
   autoCompactWindowTokens?: number;
   autoCompactTriggerPct?: number;
   abortSignal?: AbortSignal;
@@ -156,6 +158,7 @@ export type ClaudeCodeTurnRequest = {
   }): void;
   onStatusChange?(status: ClaudeCodeStatusChange): void;
   onStream?(chunk: string): void;
+  onStreamEvent?(event: ClaudeStreamEvent): void;
   onModelRound?(round: { messageId?: string; toolCallCount: number }): void;
   onProtocolInit?(init: {
     tools: string[];
@@ -1879,6 +1882,7 @@ class ClaudeCodeSessionRuntime {
         // tool_use.id distinguishes invocations within it; Stella run IDs can
         // change during crash recovery and must not alter replay identity.
         identityScope: request.sessionKey,
+        ...(request.nativeToolCallIds ? { nativeToolCallIds: true } : {}),
         claimNativeToolUseId: (toolName, toolArgs, signal) =>
           nativeToolUseCorrelator.claim(toolName, toolArgs, signal),
         checkToolUseIntegrity: (toolName, toolArgs, signal) =>
@@ -1909,6 +1913,7 @@ class ClaudeCodeSessionRuntime {
           const toolResult = await executeToolWithInactivityBound({
             toolName,
             signal,
+            ...(request.boundToolInactivity === false ? { timeoutMs: 0 } : {}),
             run: (boundedSignal, onActivity) =>
               request.executeTool(
                 toolCallId,
@@ -2702,6 +2707,9 @@ class ClaudeCodeSessionRuntime {
           if (status) {
             current.request.onStatusChange?.(status);
           }
+          try {
+            current.request.onStreamEvent?.(parsedLine);
+          } catch {}
           if (modelFallback && !session.modelFallbackNotified) {
             session.modelFallbackNotified = true;
             current.request.onStatusChange?.({

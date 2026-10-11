@@ -16,6 +16,7 @@ import {
   type Registry,
   type Storage,
 } from "@earendil-works/pi-durable";
+import { CLAUDE_CODE_ENGINE_EXTENSION, engineExtensionChange } from "./engine/selection.ts";
 import { STELLA_PROVIDER_ID, stellaModelId } from "./provider/stella.ts";
 import {
   stellaAgents,
@@ -55,7 +56,7 @@ export const stellaHarnessSettings = (overrides: Partial<HarnessSettings> = {}):
 export const orchestratorAgent = (model: ModelRef) => ({
   model,
   tools: null,
-  extensions: { remove: [StellaCoding, { name: STELLA_AGENT_TOOLS }] },
+  extensions: { remove: [StellaCoding, { name: STELLA_AGENT_TOOLS }], ...engineExtensionChange(model) },
 });
 
 /** Whether a root conversation's agent still offers what an agent has (it was configured by an older build). */
@@ -131,12 +132,21 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
   };
   refreshTools();
   for (const extension of options.extensions ?? []) registry.install(extension);
+  const base = options.settings ?? stellaHarnessSettings();
+  const settings: HarnessSettings = {
+    ...base,
+    get extensions() {
+      return (base.extensions ?? registry.snapshot().installed()).filter(
+        (extension) => extension.name !== CLAUDE_CODE_ENGINE_EXTENSION,
+      );
+    },
+  };
   const harness = await Harness.open(
     options.storage,
     {
       models: options.models,
       registry,
-      settings: options.settings ?? stellaHarnessSettings(),
+      settings,
       ...(options.env ? { env: options.env } : {}),
       onReport: options.onReport ?? ((error) => console.error("[stella-agent]", error)),
     },

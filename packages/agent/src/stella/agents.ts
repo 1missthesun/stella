@@ -54,6 +54,7 @@ import {
   type AgentStatus,
 } from "@stella/contracts/agent-status";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
+import { engineExtensionChange } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
 import { switchDestinationTool, type StellaExecutionHost } from "./execution.ts";
@@ -824,7 +825,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       // An agent has file, shell and agent tools, not the orchestrator's
       // (it copied the starter's selection); one at the depth limit cannot
       // start agents.
-      extensions: agentToolSelection,
+      extensions: { ...agentToolSelection, ...engineExtensionChange(runsOn.model) },
       tools: depth >= MAX_AGENT_DEPTH ? { remove: [spawnAgent, pauseAgent] } : null,
     });
     const role = await tx.doc(StellaAgentDoc, child.id);

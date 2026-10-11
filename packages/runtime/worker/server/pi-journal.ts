@@ -12,6 +12,9 @@ import { JOURNAL_CHECKPOINT_PATH, type JournalCheckpointPublish } from "@stella/
 
 const READ_TIMEOUT_MS = 30_000;
 
+const promptSeqs = new Map<string, number>();
+export const latestPromptSeq = (conversationId: string): number | undefined => promptSeqs.get(conversationId);
+
 export const cloudJournalFor = (
   session: OpenSession,
   conversationId: string,
@@ -101,6 +104,7 @@ export const cloudJournalFor = (
         ...(turn.adopt ? { adoptExisting: true } : {}),
       });
       const promptSeq = turn.hidden ? undefined : await runner().cloudJournal.promptSeq(conversationId, ack);
+      if (promptSeq !== undefined) promptSeqs.set(conversationId, Math.max(promptSeqs.get(conversationId) ?? 0, promptSeq));
       return { leaseToken: ack.leaseToken, ownerGeneration, ...(promptSeq === undefined ? {} : { promptSeq }) };
     },
     finish: async (turn) => {

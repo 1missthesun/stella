@@ -25,7 +25,8 @@ import { STELLA_PROVIDER_ID } from "./stella.ts";
 export type ModelPick =
   | { kind: "stella"; alias: string }
   | { kind: "direct"; provider: string; modelId: string }
-  | { kind: "local"; raw: string; modelId: string; baseUrl: string };
+  | { kind: "local"; raw: string; modelId: string; baseUrl: string }
+  | { kind: "engine"; engine: string; modelId: string };
 
 export const LOCAL_PROVIDER_ID = "local";
 const DEFAULT_LOCAL_BASE_URL = "http://127.0.0.1:11434/v1";
@@ -59,7 +60,7 @@ const PROVIDER_ALIASES: Record<string, string> = {
 };
 /** Providers whose models pi-ai splits across several: the first that has the model runs it. */
 const PROVIDER_FAMILIES: Record<string, string[]> = { moonshotai: ["moonshotai", "kimi-coding"] };
-/** Picks for an engine that runs its own turns (Claude Code): the orchestrator stays on Stella. */
+/** Picks for an engine pi runs as a provider (Claude Code). */
 const ENGINE_PROVIDERS = new Set(["claude-code"]);
 
 /** `local/<model>` or `local/<encoded base URL>/<model>`. */
@@ -85,11 +86,15 @@ export const parseModelPick = (pick: string | undefined): ModelPick | undefined 
   const trimmed = pick?.trim();
   if (!trimmed) return undefined;
   if (trimmed.startsWith("stella/")) return { kind: "stella", alias: trimmed };
+  if (ENGINE_PROVIDERS.has(trimmed.toLowerCase())) return { kind: "engine", engine: trimmed.toLowerCase(), modelId: "default" };
   const slash = trimmed.indexOf("/");
   if (slash <= 0) return undefined;
   const provider = trimmed.slice(0, slash);
   const modelId = trimmed.slice(slash + 1).trim();
-  if (!modelId || ENGINE_PROVIDERS.has(provider)) return undefined;
+  if (ENGINE_PROVIDERS.has(provider.toLowerCase())) {
+    return { kind: "engine", engine: provider.toLowerCase(), modelId: modelId || "default" };
+  }
+  if (!modelId) return undefined;
   if (provider === LOCAL_PROVIDER_ID) return parseLocal(modelId);
   return { kind: "direct", provider: PROVIDER_ALIASES[provider] ?? provider, modelId };
 };
@@ -338,7 +343,7 @@ export function byokModels(models: MutableModels, resolveDirect?: DirectModelRes
 
   return {
     /** The model a BYOK pick runs on, registered; or why it can't run. */
-    ensure(pick: Exclude<ModelPick, { kind: "stella" }>): ModelRef | { error: string } {
+    ensure(pick: Exclude<ModelPick, { kind: "stella" | "engine" }>): ModelRef | { error: string } {
       if (pick.kind === "local") return ensureLocal(pick);
       if (pick.provider === CHATGPT_PROVIDER_ID) return ensureChatGpt(pick.modelId);
       return resolveDirect ? ensureRouted(resolveDirect, pick) : ensureDirect(pick);

@@ -36,6 +36,7 @@ import { cloudAgentsFor } from "./pi-cloud-agents.js";
 import { brainFor } from "./pi-brain.js";
 import { executionRemoteFor } from "./pi-execution.js";
 import { cloudJournalFor } from "./pi-journal.js";
+import { claudeCodeEngineFor } from "./claude-code-engine.js";
 import { piModelUsage } from "./pi-usage.js";
 import {
   createRemoteDeviceSigner,
@@ -331,7 +332,9 @@ export const piChatsFor = (
   chats = Promise.all([
     import("@stella/agent/host/desktop-chats"),
     import("../../kernel/model-routing.js"),
-  ]).then(([{ desktopChats }, { resolveDirectLlmRoute }]) =>
+    import("../../kernel/integrations/claude-code-agent-runtime.js"),
+    claudeCodeEngineFor(session),
+  ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine]) =>
     desktopChats({
       dataDir: session.config.get().stellaDataDirPath,
       deviceId: session.config.deviceId,
@@ -339,7 +342,13 @@ export const piChatsFor = (
       siteAuth: () => session.runnerCell.get()?.getStellaSiteAuth() ?? null,
       memoryEnabled: () => loadLocalPreferences(session.config.get().stellaDataDirPath).memoryEnabled,
       executionContext: async () => await session.runnerCell.get()?.loadExecutionContext(),
-      stellaModel: () => getModelOverride(session.config.get().stellaDataDirPath, "orchestrator"),
+      stellaModel: () => {
+        const dataDir = session.config.get().stellaDataDirPath;
+        return getAgentRuntimeEngine(dataDir) === "claude_code_local"
+          ? getClaudeCodeAgentModelId(dataDir, undefined, "orchestrator")
+          : getModelOverride(dataDir, "orchestrator");
+      },
+      claudeCodeEngine,
       credentials: {
         apiKey: (provider) => getAccessibleLocalLlmApiKey(session.config.get().stellaDataDirPath, provider),
         oauthToken: (provider) => getAccessibleLocalLlmOAuthApiKey(session.config.get().stellaDataDirPath, provider),

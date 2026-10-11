@@ -689,7 +689,7 @@ export type RunnerPublicApi = {
   }) => void;
   appendCloudJournal: import("./cloud-transcript-write.js").CloudTranscriptWriter["append"];
   /** This computer's view of each cloud conversation's brain lease, which reads of the record feed. */
-  brainLeases: Pick<import("./brain-lease.js").BrainLeaseView, "note" | "holds">;
+  brainLeases: Pick<import("./brain-lease.js").BrainLeaseView, "note" | "holds" | "claim" | "beganUnder">;
   /**
    * A cloud-stored conversation's journal for a transcript this computer
    * mirrors into it (pi-durable): the local-turn begin and finish, the
@@ -701,6 +701,7 @@ export type RunnerPublicApi = {
     finish: import("./cloud-transcript-write.js").CloudTranscriptWriter["finish"];
     append: import("./cloud-transcript-write.js").CloudTranscriptWriter["append"];
     history: import("./cloud-transcript-write.js").CloudTranscriptWriter["history"];
+    priorTurnPromptSeq: import("./cloud-transcript-write.js").CloudTranscriptWriter["priorTurnPromptSeq"];
     ownerGeneration: () => Promise<string>;
   };
   /**

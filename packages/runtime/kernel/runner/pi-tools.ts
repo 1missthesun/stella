@@ -81,6 +81,8 @@ export type RunnerPiTools = {
   run: (call: PiToolCall) => Promise<AgentToolResult<unknown>>;
   /** A cloud agent's tool call on this computer, or this computer described for it. */
   runDevice: (call: DeviceToolCall, signal?: AbortSignal) => Promise<DeviceToolResult | DeviceToolDescription>;
+  shellEnvironment: (owner: { conversationId: string; agentId?: string; cwd: string }) => Record<string, string>;
+  cliBridgeSocketPath?: string;
 };
 
 const offeredTools = (
@@ -116,6 +118,23 @@ const describeComputer = (): DeviceToolDescription => ({
 });
 
 export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
+  ...(context.cliBridgeSocketPath ? { cliBridgeSocketPath: context.cliBridgeSocketPath } : {}),
+  shellEnvironment: ({ conversationId, agentId, cwd }) =>
+    context.toolHost.buildAgentShellEnvironment(
+      {
+        executionHost: "device",
+        conversationId,
+        deviceId: context.deviceId,
+        requestId: runIdFor(agentId ?? conversationId),
+        runId: runIdFor(agentId ?? conversationId),
+        agentType: agentId ? AGENT_IDS.GENERAL : AGENT_IDS.ORCHESTRATOR,
+        stellaAppDir: context.stellaAppDir,
+        stellaDataDir: context.stellaDataDir,
+        agentWorkingDirectory: cwd,
+        ...(agentId ? { agentId } : {}),
+      },
+      cwd,
+    ),
   specs: (agentType) => {
     const offered = offeredTools(context, agentType);
     return offered.map((tool) => ({

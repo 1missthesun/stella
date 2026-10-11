@@ -757,6 +757,8 @@ export const createStellaHostRunner = (
     brainLeases: {
       note: (conversationId, record) => context.brainLeases.note(conversationId, record),
       holds: (conversationId) => context.brainLeases.holds(conversationId),
+      claim: (conversationId) => context.brainLeases.claim(conversationId),
+      beganUnder: (conversationId, epoch) => context.brainLeases.beganUnder(conversationId, epoch),
     },
     cloudJournal: {
       begin: (request) => context.cloudTranscript.begin(request),
@@ -765,6 +767,8 @@ export const createStellaHostRunner = (
       finish: (request) => context.cloudTranscript.finish(request),
       append: (request) => context.cloudTranscript.append(request),
       history: (conversationId) => context.cloudTranscript.history(conversationId),
+      priorTurnPromptSeq: (conversationId, throughSeq) =>
+        context.cloudTranscript.priorTurnPromptSeq(conversationId, throughSeq),
       ownerGeneration: () => context.cloudOwnerGeneration(),
     },
     computerAgents: {

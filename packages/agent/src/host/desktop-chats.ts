@@ -114,6 +114,8 @@ import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
 import { desktopContextSources } from "./desktop-sources.ts";
 import { stopStella } from "../stella/stop.ts";
+import type { ClaudeCodeEngine } from "../engine/claude-code.ts";
+import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
 
 /** The newest entries a client gets when it attaches, and per older page. */
 const HISTORY_PAGE = 200;
@@ -179,6 +181,7 @@ export type DesktopChatsOptions = {
    * their reports come back as `deliverReport`s.
    */
   claudeCode?(conversationId: string): DesktopEngineAgents | undefined;
+  claudeCodeEngine?: ClaudeCodeEngine;
   /**
    * For a conversation stored in the cloud: cloud agents started with a
    * model, run as the owner's agent threads on that model (a Stella model,
@@ -498,6 +501,11 @@ export function desktopChats(options: DesktopChatsOptions) {
       : {},
   );
   const byok = byokModels(models, options.resolveDirectModel);
+  const claudeCodeEngine = options.claudeCodeEngine;
+  if (claudeCodeEngine) {
+    models.setProvider(claudeCodeEngine.provider());
+    claudeCodeEngine.onProviderChange((provider) => models.setProvider(provider));
+  }
   let gateway: Promise<{ access: StellaGatewayAccess; gatewayOrigin: string }> | undefined;
   /** Each Stella model alias in use, resolved for the orchestrator and agents. */
   const specsByAlias = new Map<string, Promise<StellaModelSpec[]>>();
@@ -590,6 +598,12 @@ export function desktopChats(options: DesktopChatsOptions) {
       await ensureProvider(alias);
       return stellaModelRef(agentType, alias);
     }
+    if (pick.kind === "engine") {
+      if (pick.engine !== CLAUDE_CODE_PROVIDER_ID || !claudeCodeEngine) {
+        throw new Error(`${pick.engine} doesn't run on this computer.`);
+      }
+      return claudeCodeEngine.ensureModel(pick.modelId);
+    }
     if (pick.kind === "direct" && isAccountProviderId(pick.provider) && !(await hasOwnKey(pick.provider, pick.modelId))) {
       return await ensureAccountModel(pick.provider, pick.modelId);
     }
@@ -619,7 +633,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (placement) return { there: true };
     const effort = /^(.+):(minimal|low|medium|high|xhigh)$/.exec(requested.trim());
     const reference = (effort?.[1] ?? requested).trim();
-    if (reference.split("/")[0]!.toLowerCase() === CLAUDE_CODE_ENGINE) {
+    if (reference.split("/")[0]!.toLowerCase() === CLAUDE_CODE_ENGINE && !claudeCodeEngine) {
       if (!options.claudeCode?.(conversationId)) throw new Error("Claude Code agents can't start from this conversation here.");
       return { engine: CLAUDE_CODE_ENGINE };
     }
@@ -693,7 +707,15 @@ export function desktopChats(options: DesktopChatsOptions) {
     const accountProvider = ref ? accountProviderOfRegistryId(ref.provider) : undefined;
     if (ref && accountProvider) await ensureAccountModel(accountProvider, ref.modelId);
     else if (!ref || ref.provider === STELLA_PROVIDER_ID) await ensureProvider(aliasOf(ref));
-    else byok.restore(ref);
+    else restoreOwnModel(ref);
+  };
+
+  const restoreOwnModel = (ref: ModelRef): void => {
+    if (onClaudeCode(ref)) {
+      claudeCodeEngine?.ensureModel(ref.modelId);
+      return;
+    }
+    byok.restore(ref);
   };
 
   /** The alias a conversation's agent runs on. */
@@ -825,6 +847,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     const record = await chat.agentStanding(threadId, context);
     if (!record) return "not_found";
     if (record.status !== "running") return "not_running";
+    claudeCodeEngine?.abort(conversationId, { threadId });
     await chat.pauseAgent(threadId, context);
     return "paused";
   };
@@ -1004,7 +1027,10 @@ export function desktopChats(options: DesktopChatsOptions) {
             })(),
             ...(options.tools ? { tools: placedTools(options.tools(conversationId), execution, () => opened) } : {}),
             // An agent's file and shell tools run here, or wherever its tools were moved.
-            extensions: [desktopCoding(execution.run)],
+            extensions: [
+              desktopCoding(execution.run),
+              ...(claudeCodeEngine ? [claudeCodeEngine.extension(conversationId)] : []),
+            ],
             env: environments.env,
             onReport: options.report,
           },
@@ -1029,14 +1055,14 @@ export function desktopChats(options: DesktopChatsOptions) {
           if (agent.remote) continue;
           const model = (await (await harness.conversation(agent.conversationId as ConversationId, context))?.agent(context))?.model;
           if (model && accountProviderOfRegistryId(model.provider)) accountRefs.push(model);
-          else if (model && model.provider !== STELLA_PROVIDER_ID) byok.restore(model);
+          else if (model && model.provider !== STELLA_PROVIDER_ID) restoreOwnModel(model);
           // A finished agent's alias is registered when it is next messaged.
           else if (model && (await harness.snapshot(LiveDoc, agent.conversationId as ConversationId, context))?.run) {
             aliases.add(aliasOf(model));
           }
         }
         if (rootModel && accountProviderOfRegistryId(rootModel.provider)) accountRefs.push(rootModel);
-        else if (rootModel && rootModel.provider !== STELLA_PROVIDER_ID) byok.restore(rootModel);
+        else if (rootModel && rootModel.provider !== STELLA_PROVIDER_ID) restoreOwnModel(rootModel);
         else aliases.add(aliasOf(rootModel));
         if (aliases.size === 0 && accountRefs.length === 0) void harness.resume();
         else
@@ -1264,18 +1290,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       const placement = await brainPlacement(conversationId);
       if (!placement.here) throw new Error(elsewhere(placement));
     }
-    // The model the user picked: one of Stella's, or one on their own key.
-    const model = await pickedModel();
     const chat = await open(conversationId);
-    const agent = await chat.root.agent(context);
-    const thinkingLevel = options.thinkingLevel?.() ?? "off";
-    if (
-      agent.model?.provider !== model.provider ||
-      agent.model?.modelId !== model.modelId ||
-      agent.thinkingLevel !== thinkingLevel
-    ) {
-      await chat.root.configure({ model, thinkingLevel }, context);
-    }
+    await followPickedModel(chat);
     // The tool catalog follows the runtime's (extension tools come and go).
     chat.refreshTools();
     const locale = sent.locale;
@@ -1293,6 +1309,20 @@ export function desktopChats(options: DesktopChatsOptions) {
       context,
     );
     return { submissionId: submission.id };
+  };
+
+  const followPickedModel = async (chat: Chat): Promise<void> => {
+    // The model the user picked: one of Stella's, or one on their own key.
+    const model = await pickedModel();
+    const agent = await chat.root.agent(context);
+    const thinkingLevel = options.thinkingLevel?.() ?? "off";
+    const moved = agent.model?.provider !== model.provider || agent.model?.modelId !== model.modelId;
+    if (moved || agent.thinkingLevel !== thinkingLevel) {
+      await chat.root.configure(
+        { model, thinkingLevel, ...(moved ? { extensions: orchestratorAgent(model).extensions } : {}) },
+        context,
+      );
+    }
   };
 
   /** The conversation open and its model ready, for work the host starts in it. */
@@ -1374,6 +1404,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     },
   ): Promise<{ status: "ok"; finalText: string } | { status: "busy" | "error"; finalText: ""; error: string }> => {
     await caughtUp(chat);
+    await followPickedModel(chat);
     const placement = turn.placementRunId ? placements.get(turn.placementRunId) : undefined;
     if (placement?.canceled) return { status: "error", finalText: "", error: "Canceled." };
     let submission;
@@ -1666,6 +1697,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           return submit(request.conversationId, request.requestId, request.text);
         case "abort": {
           const chat = await open(request.conversationId);
+          claudeCodeEngine?.abort(request.conversationId);
           await stopStella(chat.harness, chat.root, context);
           return { ok: true };
         }
@@ -1695,6 +1727,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       await environments.terminateCommands(context);
     },
     async close(): Promise<void> {
+      for (const conversationId of chats.keys()) claudeCodeEngine?.close(conversationId);
       const opened = await Promise.all([...chats.values()].map((chat) => chat.catch(() => undefined)));
       chats.clear();
       for (const chat of opened) {

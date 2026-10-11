@@ -8,7 +8,10 @@ import { migrateDesktopDatabase } from "../../../../packages/runtime/kernel/stor
 import { SessionStore } from "../../../../packages/runtime/kernel/storage/session-store";
 import { createClaudeSessionSync } from "../../../../packages/runtime/kernel/runner/claude-session-sync";
 import { setClaudeSessionSyncSink } from "../../../../packages/runtime/kernel/integrations/claude-code-session-sync-sink";
-import { runExternalSubagentTurn } from "../../../../packages/runtime/kernel/agent-runtime/external-engines";
+import {
+  runExternalOrchestratorTurn,
+  runExternalSubagentTurn,
+} from "../../../../packages/runtime/kernel/agent-runtime/external-engines";
 import {
   claudeSessionProjectDir,
   resolveClaudeWorkingFolder,
@@ -118,13 +121,25 @@ const main = async () => {
     : undefined;
   const workingFolder = await resolveClaudeWorkingFolder(cwd);
   const projectDir = claudeSessionProjectDir(process.env.CLAUDE_CONFIG_DIR ?? null, workingFolder);
-  const result = await runExternalSubagentTurn({
+  const orchestrator = flag("--role") === "orchestrator";
+  const journalSeq = flag("--journal-seq");
+  const runTurn = (orchestrator ? runExternalOrchestratorTurn : runExternalSubagentTurn) as (
+    options: unknown,
+  ) => Promise<unknown>;
+  const result = await runTurn({
     executionHost: "device",
     conversationId,
     storageMode: "cloud",
     userMessageId: randomUUID(),
-    agentType: "general",
+    agentType: orchestrator ? "orchestrator" : "general",
     userPrompt: prompt,
+    ...(journalSeq ? { cloudJournalSeq: Number(journalSeq) } : {}),
+    ...(orchestrator
+      ? {
+          toolCatalog: [],
+          callbacks: { onToolStart: () => {}, onToolEnd: () => {}, onError: () => {}, onEnd: () => {} },
+        }
+      : {}),
     agentContext: {
       systemPrompt: "You are a Stella general agent running a session continuity proof.",
       agentEngine: "claude_code_local",

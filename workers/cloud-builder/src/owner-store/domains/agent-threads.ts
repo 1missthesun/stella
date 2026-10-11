@@ -22,6 +22,7 @@ import {
   AGENT_PAUSED_ERROR_CODE,
   AGENT_PAUSED_REASON,
   agentThreadTerminalStatus,
+  newAgentThreadId,
   type AgentThreadCalls,
   type AgentThreadControl,
   type AgentThreadLookup,
@@ -78,6 +79,7 @@ type ThreadRow = {
   parent_thread_id: string | null;
   executor_device_id: string | null;
   requested_model: string | null;
+  harness: string | null;
   origin_device_id: string | null;
   origin_conversation_id: string | null;
   origin_delivery_ack_at: number | null;
@@ -218,6 +220,15 @@ export const AGENT_THREADS_DEVICE_EXECUTOR_MIGRATION = {
 export const AGENT_THREADS_REQUESTED_MODEL_MIGRATION = {
   id: "agent-threads.5-requested-model",
   statements: ["ALTER TABLE agent_threads ADD COLUMN requested_model TEXT"],
+};
+
+/**
+ * Agents a conversation's pi harness runs (`ThreadSpawnedEvent.harness`):
+ * one row each, so every agent has one, while the harness keeps its attempts.
+ */
+export const AGENT_THREADS_HARNESS_MIGRATION = {
+  id: "agent-threads.9-harness",
+  statements: ["ALTER TABLE agent_threads ADD COLUMN harness TEXT"],
 };
 
 /** Agents no longer get isolated world forks. */
@@ -840,7 +851,7 @@ const spawnOnDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<A
   const destination = await assertDeviceDestination(ctx, args.targetDeviceId);
   const raced = replayAttempt(ctx.db, args.clientMsgId, fingerprint, args.ownerGeneration);
   if (raced) return raced;
-  const threadId = `thr-${crypto.randomUUID().replaceAll("-", "").slice(0, 18)}`;
+  const threadId = newAgentThreadId();
   ctx.db.run(
     `INSERT INTO agent_threads
        (thread_id, conversation_id, owner_generation, parent_turn_id, parent_thread_id,
@@ -1206,7 +1217,7 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
       conversationId,
     );
   }
-  const threadId = `thr-${crypto.randomUUID().replaceAll("-", "").slice(0, 18)}`;
+  const threadId = newAgentThreadId();
   ctx.db.run(
     `INSERT INTO agent_threads
        (thread_id, conversation_id, owner_generation, parent_thread_id, origin_device_id, origin_conversation_id,
@@ -1334,6 +1345,7 @@ const AGENT_MESSAGE_RECEIPT_TTL_MS = 24 * 60 * 60_000;
  */
 type ThreadExecutor =
   | { kind: "cloud" }
+  | { kind: "harness" }
   | { kind: "dispatch"; deviceId: string }
   | { kind: "local"; deviceId: string | null };
 
@@ -1342,13 +1354,26 @@ const threadExecutor = (row: ThreadRow): ThreadExecutor =>
     ? { kind: "dispatch", deviceId: row.executor_device_id }
     : row.placement === "computer"
       ? { kind: "local", deviceId: row.origin_device_id }
-      : { kind: "cloud" };
+      : row.harness !== null
+        ? { kind: "harness" }
+        : { kind: "cloud" };
 
 /** The device a thread runs on, or null for the cloud. */
 const threadDeviceId = (row: ThreadRow): string | null => {
   const executor = threadExecutor(row);
-  return executor.kind === "cloud" ? null : executor.deviceId;
+  return executor.kind === "cloud" || executor.kind === "harness" ? null : executor.deviceId;
 };
+
+/**
+ * A control for an agent its conversation's pi harness runs: the harness
+ * takes it from the agents and Stella there, not through these records yet.
+ */
+const harnessControlRefused = (threadId: string, reason: string): RpcError =>
+  new RpcError(
+    "NOT_FOUND",
+    `${threadId} runs inside its conversation's Stella in the cloud, which controls it; message or pause it from there.`,
+    { reason },
+  );
 
 type DirectoryResult = AgentThreadCalls["agentThreads.directory"]["result"];
 
@@ -1527,6 +1552,7 @@ const deliverAgentMessage = async (
   }
   const message = sentByStarter(thread, args.from) ? args.text : formatAgentMessage(args.from, args.text);
   const executor = threadExecutor(thread);
+  if (executor.kind === "harness") throw harnessControlRefused(to, "message_target_not_found");
   if (executor.kind === "local") {
     return await messageLocalThread(ctx, thread, executor.deviceId, { ...args, framed: message });
   }
@@ -1956,6 +1982,7 @@ const pauseAgent = async (ctx: OwnerContext, args: PauseArgs): Promise<PauseResu
     );
   }
   const executor = threadExecutor(thread);
+  if (executor.kind === "harness") throw harnessControlRefused(thread.thread_id, "pause_target_not_found");
   const device =
     executor.kind === "cloud" || !executor.deviceId
       ? null
@@ -2403,8 +2430,8 @@ export const applyAgentThreadEvent = (
           `INSERT INTO agent_threads
              (thread_id, conversation_id, owner_generation, parent_turn_id, parent_thread_id,
               origin_device_id, origin_conversation_id, description, placement,
-              agent_type, execution_json, attempt_generation, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'cloud', 'general', ?, ?, 'running', ?, ?)`,
+              agent_type, execution_json, harness, attempt_generation, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'cloud', 'general', ?, ?, ?, 'running', ?, ?)`,
           event.threadId,
           event.conversationId,
           event.ownerGeneration,
@@ -2414,10 +2441,19 @@ export const applyAgentThreadEvent = (
           event.originConversationId ?? null,
           clip(event.description, 1_000),
           JSON.stringify(event.execution),
+          event.harness ?? null,
           event.attemptGeneration,
           event.createdAt,
           event.createdAt,
         );
+        return;
+      }
+      // A pi harness names its agents uniquely only within its conversation:
+      // another agent's row with the same id is not this one.
+      if (
+        event.harness !== undefined &&
+        (thread.harness !== event.harness || thread.conversation_id !== event.conversationId)
+      ) {
         return;
       }
       // An attempt this object already recorded (a desktop spawn) or an
@@ -2448,6 +2484,7 @@ export const applyAgentThreadEvent = (
     case "thread.completed": {
       const thread = readThread(db, event.threadId);
       if (!thread) return;
+      if (event.conversationId !== undefined && thread.conversation_id !== event.conversationId) return;
       if (thread.owner_generation !== null && thread.owner_generation !== event.ownerGeneration) return;
       if (event.attemptGeneration < thread.attempt_generation) return;
       if (
@@ -2654,6 +2691,7 @@ export const agentThreadsDomain = {
         "CREATE INDEX agent_device_messages_thread ON agent_device_messages (thread_id, kind) WHERE delivered_at IS NULL",
       ],
     },
+    AGENT_THREADS_HARNESS_MIGRATION,
   ],
   calls: {
     "agentThreads.page": {
@@ -2906,7 +2944,7 @@ export const agentThreadsDomain = {
         .all<ThreadRow>(
           `SELECT * FROM agent_threads
             WHERE (origin_conversation_id = ? OR (origin_conversation_id IS NULL AND conversation_id = ?))
-              AND parent_thread_id IS NULL AND status IN ${LIVE_STATUSES_SQL}
+              AND parent_thread_id IS NULL AND harness IS NULL AND status IN ${LIVE_STATUSES_SQL}
             ORDER BY created_at ASC LIMIT ?`,
           args.conversationId,
           args.conversationId,

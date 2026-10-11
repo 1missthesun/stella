@@ -332,3 +332,11 @@ export const RUNNING_AGENT_THREADS_LIMIT = 64;
 export const AGENT_THREAD_PAGE_MAX = 50;
 export const CONVERSATION_AGENT_THREADS_MAX = 500;
 export const AGENT_PROMPT_MAX_CHARS = 8_000;
+
+/**
+ * A new agent's id in the owner's agent threads: `thr-` and 18 hex digits.
+ * Every agent the cloud starts takes one; agents a harness names itself keep
+ * the id they already show.
+ */
+export const newAgentThreadId = (): string =>
+  `thr-${crypto.randomUUID().replaceAll("-", "").slice(0, 18)}`;

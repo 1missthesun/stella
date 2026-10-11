@@ -22,6 +22,11 @@ import {
   type ExecutionCapability,
 } from "@stella/contracts/turn-plane/placement";
 import { sha256Hex } from "@stella/contracts/turn-plane/pairing-proof";
+import { newAgentThreadId } from "@stella/contracts/backend/agent-threads";
+import {
+  OWNER_EVENT_VERSION,
+  type OwnerEvent,
+} from "@stella/contracts/turn-plane/owner-events";
 import {
   type CloudAgentTurnStartRequest,
   type CloudAgentTurnStartResponse,
@@ -460,7 +465,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     // A fresh thread per placed agent: the gate cannot read a durable
     // thread's attempt generation, and guessing one would resume the wrong
     // attempt.
-    const threadId = `thr-${crypto.randomUUID().slice(0, 18)}`;
+    const threadId = newAgentThreadId();
     const request: CloudAgentTurnStartRequest = {
       protocol: TURN_PLANE_PROTOCOL,
       kind: "agent",
@@ -483,7 +488,7 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       ...(row.parent_turn_id ? { parentTurnId: row.parent_turn_id } : {}),
     };
     if (runsAsPiAgent(request.execution)) {
-      return await this.startPiPlacedAgent(
+      const started = await this.startPiPlacedAgent(
         row,
         {
           ...request,
@@ -491,6 +496,8 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         },
         now,
       );
+      await this.recordPlacedAgent(row, request, now);
+      return started;
     }
     const response = await sessions
       .getByName(threadId)
@@ -505,6 +512,11 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       });
     if (!response.ok) return await this.cloudRefusal(row, response, now);
     const started = (await response.json()) as CloudAgentTurnStartResponse;
+    await this.recordPlacedAgent(
+      row,
+      { ...request, threadId: started.threadId ?? threadId },
+      now,
+    );
     return await this.patchDispatch(
       row,
       {
@@ -573,9 +585,51 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
     );
   }
 
+  /**
+   * The owner's agent threads learn of an agent placed in the cloud, which
+   * runs as its BuildSession or pi agent reports it: without the row, its
+   * completion would land nowhere. The session does not record it itself,
+   * since this gate admitted it. Best effort: the agent already started.
+   */
+  protected async recordPlacedAgent(
+    row: DispatchRow,
+    request: CloudAgentTurnStartRequest,
+    now: number,
+  ): Promise<void> {
+    try {
+      await this.applyOwnerEvents([
+        {
+          v: OWNER_EVENT_VERSION,
+          key: `${request.threadId}:1`,
+          ownerId: this.ownerId(),
+          ownerGeneration: row.owner_generation,
+          emittedAt: now,
+          kind: "thread.spawned",
+          threadId: request.threadId,
+          conversationId: row.conversation_id,
+          parentTurnId: row.parent_turn_id ?? row.dispatch_id,
+          agentDepth: 1,
+          attemptGeneration: 1,
+          description: request.description,
+          prompt: request.prompt,
+          execution: request.execution,
+          placement: "cloud",
+          createdAt: now,
+        },
+      ]);
+    } catch (error) {
+      log("error", "dispatch_cloud_agent_record_failed", {
+        dispatchId: row.dispatch_id,
+        threadId: request.threadId,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   // ── Submit, status, cancel ────────────────────────────────────────────
 
   // Implemented by `OwnerGate`.
+  abstract applyOwnerEvents(events: OwnerEvent[]): Promise<void>;
   abstract admitWithFenceLease(input: {
     admission: OwnerGateAdmitInput;
     lease: OwnerGateFenceLeaseRequest;

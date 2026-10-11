@@ -106,12 +106,23 @@ export type ThreadSpawnedEvent = OwnerEventBase & {
   placement: "cloud";
   originDeviceId?: string;
   originConversationId?: string;
+  /**
+   * `pi`: an agent its conversation's pi harness started and runs (one of
+   * Stella's own there, an agent's helper, or a computer's agent there). The
+   * harness owns its attempts and reports; the thread only records them.
+   */
+  harness?: "pi";
   createdAt: number;
 };
 
 export type ThreadCompletedEvent = OwnerEventBase & {
   kind: "thread.completed";
   threadId: string;
+  /**
+   * The thread's conversation, from a producer whose thread ids are only
+   * unique within it (a pi harness's): the event applies to no other.
+   */
+  conversationId?: string;
   turnId: string;
   attemptGeneration: number;
   status: "completed" | "failed" | "canceled" | "waiting_for_user";

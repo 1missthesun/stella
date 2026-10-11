@@ -16,6 +16,7 @@ import {
   type ComposerNoticeKind,
 } from "@/features/chat/composer-notice-store";
 import { useT } from "@/shared/i18n";
+import { ClaudeSignInNotice } from "@/features/claude/ClaudeSignInNotice";
 import "./composer-notice.css";
 
 const KIND_ICON: Record<ComposerNoticeKind, typeof LogIn> = {
@@ -39,6 +40,17 @@ export const ComposerNotice = ({
   useEffect(() => registerComposerNoticeSurface(), []);
 
   if (!notice) return null;
+
+  if (notice.claudeSignIn) {
+    return (
+      <ClaudeSignInNotice
+        key={notice.id}
+        notice={notice}
+        compact={compact}
+        onDismiss={() => dismissComposerNotice(notice.id)}
+      />
+    );
+  }
 
   const Icon = KIND_ICON[notice.kind];
   const iconSize = compact ? 14 : 16;

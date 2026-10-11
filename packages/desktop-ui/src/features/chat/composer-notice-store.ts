@@ -38,6 +38,11 @@ export type ComposerNotice = {
   description?: string;
   action?: ComposerNoticeAction;
   secondaryAction?: ComposerNoticeAction;
+  /**
+   * Claude Code on this computer needs a sign-in: the card's button runs
+   * the same Claude sign-in as Settings, in place, for `email` when named.
+   */
+  claudeSignIn?: { email?: string };
 };
 
 export type ComposerNoticeInput = Omit<ComposerNotice, "id"> & {

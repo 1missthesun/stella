@@ -14,6 +14,7 @@ export type StellaProviderErrorKind =
   | 'chatgpt-auth'
   | 'chatgpt-usage-limit'
   | 'claude-code-login'
+  | 'claude-code-usage-limit'
   | 'content-blocked'
   | 'context-limit'
   | 'free-allowance-exhausted'
@@ -138,6 +139,7 @@ const providerCredentialMatchers = [
 ] as const
 
 const claudeCodeLoginRequiredMatcher = '[claude-code/login-required]'
+const claudeCodeUsageLimitMatcher = '[claude-code/usage-limit]'
 
 const modelRestrictionMatchers = [
   'unsupported stella model selection',
@@ -322,6 +324,9 @@ export const classifyStellaProviderError = (
   if (normalized.includes(claudeCodeLoginRequiredMatcher)) {
     return { kind: 'claude-code-login', message }
   }
+  if (normalized.includes(claudeCodeUsageLimitMatcher)) {
+    return { kind: 'claude-code-usage-limit', message }
+  }
   if (
     includesAny(normalized, signInRequiredMatchers) ||
     signInRequiredCodePattern.test(normalized)
@@ -414,6 +419,7 @@ const LIMIT_OR_AUTH_KINDS = new Set<StellaProviderErrorKind>([
   'chatgpt-auth',
   'chatgpt-usage-limit',
   'claude-code-login',
+  'claude-code-usage-limit',
   'free-allowance-exhausted',
   'provider-access',
   'rate-limit',

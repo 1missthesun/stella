@@ -183,48 +183,17 @@
   }
 }
 
-/* A reply arrives whole, so it pops in once instead of growing into place. */
+/* A reply arrives whole, so it pops in once instead of growing into place:
+   the mirror of the sent bubble, springing out of its tail corner on the line
+   the working indicator held. */
 .event-row--assistant--just-arrived .event-item.assistant {
-  --bubble-pop-rise: 10px;
-  --bubble-pop-scale: 0.9;
+  --bubble-pop-rise: 14px;
+  --bubble-pop-scale: 0.84;
   animation:
     bubble-pop 360ms var(--bubble-spring) both,
-    bubble-pop-fade 140ms ease-out both;
+    bubble-pop-fade 120ms ease-out both;
   transform-origin: left bottom;
   will-change: opacity, transform;
-}
-
-.event-row--assistant[data-reply-morph] .event-item.assistant {
-  animation: none;
-}
-
-.event-row--assistant[data-reply-morph="hold"] .event-item.assistant {
-  opacity: 0;
-}
-
-.assistant-message-text--morphing {
-  position: relative;
-  isolation: isolate;
-  background: transparent;
-}
-
-.reply-morph-layer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  z-index: -1;
-  overflow: hidden;
-  pointer-events: none;
-  contain: layout paint style;
-}
-
-.reply-morph-ghost {
-  position: absolute;
-  left: 0;
-  top: 0;
-  margin: 0;
-  background: transparent;
-  animation: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

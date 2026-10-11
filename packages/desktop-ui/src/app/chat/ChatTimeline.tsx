@@ -62,7 +62,10 @@ import {
   InlineWorkingIndicator,
   type InlineWorkingIndicatorMountProps,
 } from "./InlineWorkingIndicator";
-import { createReplyMorphController, ReplyMorphContext } from "./reply-morph";
+import {
+  createReplyHandoffController,
+  ReplyHandoffContext,
+} from "./reply-handoff";
 import type { QueuedUserMessage } from "@/features/chat/hooks/queued-user-messages";
 import {
   buildChatTimelineItems,
@@ -349,7 +352,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   contentContainerStyle,
 }: ChatTimelineProps) {
   const t = useT();
-  const [replyMorphController] = useState(createReplyMorphController);
+  const [replyHandoffController] = useState(createReplyHandoffController);
   const askRecords = useConversationUserAskRecords(conversationId);
   const listItems = useMemo<TimelineListItem[]>(() => {
     const items = buildChatTimelineItems({
@@ -534,7 +537,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   }
 
   return (
-    <ReplyMorphContext.Provider value={replyMorphController}>
+    <ReplyHandoffContext.Provider value={replyHandoffController}>
       <LegendList<TimelineListItem>
         ref={listRef}
         data={listItems}
@@ -561,6 +564,6 @@ export const ChatTimeline = memo(function ChatTimeline({
         contentContainerStyle={contentContainerStyle}
         style={{ height: "100%", width: "100%" }}
       />
-    </ReplyMorphContext.Provider>
+    </ReplyHandoffContext.Provider>
   );
 });

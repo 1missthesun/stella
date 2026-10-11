@@ -128,7 +128,6 @@ export function StellaMarkIndicator({
   size = DEFAULT_SIZE,
   state = "thinking",
   faceColor,
-  settled = false,
 }: {
   /** True while a run is in flight — the mark runs the thinking bounce. */
   active: boolean;
@@ -136,7 +135,6 @@ export function StellaMarkIndicator({
   state?: WorkingIndicatorCharacterState;
   /** The bubble fill, used to punch the character's eyes through the mark. */
   faceColor?: string;
-  settled?: boolean;
 }) {
   const reduceMotion = useReducedMotion();
   const appVisible = useAppVisible();
@@ -150,9 +148,7 @@ export function StellaMarkIndicator({
   /** Linear millisecond ramp; every periodic term derives from it. */
   const clock = useSharedValue(0);
   /** Linear 0..1 morph ramp — the spring shape is applied in the worklets. */
-  const morphT = useSharedValue(
-    settled && active && state === "thinking" ? 1 : 0,
-  );
+  const morphT = useSharedValue(0);
 
   const [running, setRunning] = useState(() =>
     shouldRunContinuousAnimation({

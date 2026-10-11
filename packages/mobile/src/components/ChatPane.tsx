@@ -132,7 +132,10 @@ import {
   WORKING_INDICATOR_SLOT_HEIGHT,
 } from "./WorkingIndicator";
 import type { WorkingIndicatorState } from "./working-indicator-state";
-import { createReplyMorphController, ReplyMorphContext } from "./reply-morph";
+import {
+  createReplyHandoffController,
+  ReplyHandoffContext,
+} from "./reply-handoff";
 import { useDictation } from "../lib/dictation";
 import { canSubmitFinalizedDictation } from "../lib/dictation-send";
 import { hasAiConsent, requestAiConsent } from "../lib/ai-consent";
@@ -644,7 +647,9 @@ export function ChatPane({
   // clipped by it. The composer's keyboard lift is a transform, so this
   // measured height stays constant across keyboard show/hide.
   const [footerHeight, setFooterHeight] = useState(0);
-  const [replyMorphController] = useState(createReplyMorphController);
+  const [replyHandoffController] = useState(
+    createReplyHandoffController,
+  );
   // The list runs under the composer, so its reserved inset is exactly the
   // overlay; the chat tail supplies the gap between the last row and it.
   const listBottomInsetPx = footerHeight;
@@ -1911,7 +1916,7 @@ export function ChatPane({
     ],
   );
   return (
-    <ReplyMorphContext.Provider value={replyMorphController}>
+    <ReplyHandoffContext.Provider value={replyHandoffController}>
       <View
         ref={rootRef}
         collapsable={false}
@@ -2232,7 +2237,7 @@ export function ChatPane({
           onClose={() => setRealtimeVoiceOpen(false)}
         />
       </View>
-    </ReplyMorphContext.Provider>
+    </ReplyHandoffContext.Provider>
   );
 }
 

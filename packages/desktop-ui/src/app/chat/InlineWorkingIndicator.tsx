@@ -14,10 +14,10 @@
  *    inline indicator only follows the orchestrator's thinking/tool lifecycle.
  *  - It appears only after `SHOW_DELAY_MS` of continuous work, so a reply
  *    that lands sooner never shows it.
- *  - Inside a chat timeline the reply-morph controller decides how it leaves:
- *    when a reply arrives with the deactivation the indicator's bubble grows
- *    into the reply bubble (see `reply-morph.ts`) and the slot is vacated at
- *    once; otherwise it plays the short grow-out. Outside a timeline it
+ *  - Inside a chat timeline the reply-handoff controller decides how it leaves:
+ *    an arriving reply vacates its slot in the same frame and pops in on the
+ *    line it held (see `reply-handoff.ts`); otherwise it plays the short
+ *    grow-out. Outside a timeline it
  *    falls back to the ordinary grow-out after the `MIN_VISIBLE_MS` floor, an
  *    immediate exit (`exitImmediately`), or the handoff clear (`handoff`).
  *  - The parent mounts the indicator unconditionally and toggles `active` so
@@ -29,7 +29,6 @@
  *    idle chat carries no ghost gutter.
  */
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
 import { notifyChatContentGrowth } from "@/shell/chat-scroll-follow";
 import {
   getInlineWorkingIndicatorExitDelayMs,
@@ -39,7 +38,7 @@ import {
   type InlineWorkingIndicatorProps,
 } from "@/features/chat/working-indicator-state";
 import { WorkingIndicator } from "./WorkingIndicator";
-import { useReplyMorphController } from "./reply-morph";
+import { useReplyHandoffController } from "./reply-handoff";
 import "./indicators.css";
 
 export type {
@@ -101,33 +100,27 @@ export function InlineWorkingIndicator({
   const [leaving, setLeaving] = useState(false);
   const exitTimerRef = useRef<number | null>(null);
   const showTimerRef = useRef<number | null>(null);
-  const rootRef = useRef<HTMLDivElement>(null);
   const leavingRef = useRef(false);
   leavingRef.current = leaving;
-  const morphController = useReplyMorphController();
+  const handoffController = useReplyHandoffController();
+  const renderShellRef = useRef(renderShell);
+  renderShellRef.current = renderShell;
 
   useEffect(() => {
-    if (!morphController) return;
-    return morphController.attachIndicator({
-      pill: () =>
-        leavingRef.current
-          ? null
-          : (rootRef.current?.querySelector<HTMLElement>(
-              ".inline-working-indicator__indicator",
-            ) ?? null),
+    if (!handoffController) return;
+    return handoffController.attachIndicator({
+      shown: () => renderShellRef.current,
       vacate: () => {
         if (exitTimerRef.current !== null) {
           window.clearTimeout(exitTimerRef.current);
           exitTimerRef.current = null;
         }
-        flushSync(() => {
-          setRenderShell(false);
-          setLeaving(false);
-          setEntering(false);
-        });
+        setRenderShell(false);
+        setLeaving(false);
+        setEntering(false);
       },
       exit: () => {
-        if (exitTimerRef.current !== null) return;
+        if (!renderShellRef.current || exitTimerRef.current !== null) return;
         setLeaving(true);
         exitTimerRef.current = window.setTimeout(() => {
           exitTimerRef.current = null;
@@ -136,7 +129,7 @@ export function InlineWorkingIndicator({
         }, EXIT_ANIMATION_MS);
       },
     });
-  }, [morphController]);
+  }, [handoffController]);
   const activatedAtRef = useRef<number | null>(null);
   const wasActiveRef = useRef(false);
   const showingThinking = active && !runningTool;
@@ -180,7 +173,7 @@ export function InlineWorkingIndicator({
 
     if (active) {
       clearTimer();
-      morphController?.indicatorReactivated();
+      handoffController?.indicatorReactivated();
       if (!wasActiveRef.current) {
         activatedAtRef.current = Date.now();
       }
@@ -199,9 +192,9 @@ export function InlineWorkingIndicator({
     wasActiveRef.current = false;
     setEntering(false);
     if (!renderShell) return;
-    if (morphController) {
+    if (handoffController) {
       if (!leavingRef.current) {
-        morphController.indicatorDeactivated(Boolean(handoff));
+        handoffController.indicatorDeactivated(Boolean(handoff));
       }
       return;
     }
@@ -236,7 +229,7 @@ export function InlineWorkingIndicator({
     return () => {
       clearTimer();
     };
-  }, [active, renderShell, exitImmediately, handoff, morphController]);
+  }, [active, renderShell, exitImmediately, handoff, handoffController]);
 
   useEffect(
     () => () => {
@@ -268,7 +261,6 @@ export function InlineWorkingIndicator({
 
   return (
     <div
-      ref={rootRef}
       className={`inline-working-indicator${entering ? " inline-working-indicator--entering" : ""}${leaving ? " inline-working-indicator--leaving" : ""}${leaving && handoff ? " inline-working-indicator--handoff" : ""}${showInner ? "" : " inline-working-indicator--vacated"}`}
       aria-live="polite"
     >

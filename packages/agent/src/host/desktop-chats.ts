@@ -438,6 +438,20 @@ export function desktopChats(options: DesktopChatsOptions) {
   /** The record's host, unless that is this computer. */
   const otherHost = (record: PiBrainRecord | null) =>
     record && !(record.host === "device" && record.deviceId === options.deviceId) ? record : null;
+  const placementOfHost = (host: PiBrainRecord | null): PiChatBrainResult =>
+    !host
+      ? { here: true }
+      : host.host === "cloud"
+        ? { here: false, target: { mode: "cloud" } }
+        : { here: false, target: { mode: "device", deviceId: host.deviceId }, ...(host.label ? { label: host.label } : {}) };
+  /** What this computer reads of where Stella runs; the app's picker hears when that changes. */
+  const rememberBrain = (conversationId: string, entry: { record: PiBrainRecord | null; host: PiBrainRecord | null }) => {
+    const before = brains.get(conversationId);
+    brains.set(conversationId, { ...entry, at: Date.now() });
+    const brain = placementOfHost(entry.host);
+    if (before && JSON.stringify(placementOfHost(before.host)) === JSON.stringify(brain)) return;
+    options.emit({ conversationId, events: [{ type: "brain", brain }] });
+  };
   /**
    * The host this computer's turns for the conversation go to: the one its
    * record names, while that host is up. With no record, or one naming a
@@ -457,7 +471,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       record = await brain.read();
     } catch {
       // The cloud is out of reach (offline, signed out), and so is every host it would pass a turn to.
-      brains.set(conversationId, { record: known?.record ?? null, host: null, at: Date.now() });
+      rememberBrain(conversationId, { record: known?.record ?? null, host: null });
       return null;
     }
     let host = otherHost(record);
@@ -467,17 +481,12 @@ export function desktopChats(options: DesktopChatsOptions) {
       const device = listed?.find((entry) => entry.deviceId === deviceId);
       if (!device?.online) host = null;
     }
-    brains.set(conversationId, { record, host, at: Date.now() });
+    rememberBrain(conversationId, { record, host });
     return host;
   };
   /** Whether this computer takes the conversation's turns, or where a send goes instead. */
-  const brainPlacement = async (conversationId: string): Promise<PiChatBrainResult> => {
-    const host = await brainHost(conversationId);
-    if (!host) return { here: true };
-    return host.host === "cloud"
-      ? { here: false, target: { mode: "cloud" } }
-      : { here: false, target: { mode: "device", deviceId: host.deviceId }, ...(host.label ? { label: host.label } : {}) };
-  };
+  const brainPlacement = async (conversationId: string): Promise<PiChatBrainResult> =>
+    placementOfHost(await brainHost(conversationId));
   /**
    * What Stella reads hidden and the user did not write (an agent's report
    * or note) for a conversation whose brain runs elsewhere, once per
@@ -1003,7 +1012,7 @@ export function desktopChats(options: DesktopChatsOptions) {
               if (opened && (await opened.harness.snapshot(LiveDoc, opened.root.id, context))?.run === undefined) return;
             }
           },
-          brainMoved: (record) => brains.set(conversationId, { record, host: otherHost(record), at: Date.now() }),
+          brainMoved: (record) => rememberBrain(conversationId, { record, host: otherHost(record) }),
           report: options.report,
         });
         const destination: ExecutionDestination = {
@@ -1216,6 +1225,11 @@ export function desktopChats(options: DesktopChatsOptions) {
               // A turn running elsewhere shows as running to whoever watches.
               onRemoteTurns: (turns) => {
                 if (opened?.watchers) options.emit({ conversationId, events: [{ type: "remote_turns", turns }] });
+                // Another host answering may have taken Stella over: read again where she runs.
+                if (turns.length > 0) {
+                  brains.delete(conversationId);
+                  void brainHost(conversationId).catch((error: unknown) => options.report(error));
+                }
               },
               // The cloud's holds show as this computer's own do.
               onUsageLimit: (card, at) => noteCloudUsageLimit(conversationId, card, at),

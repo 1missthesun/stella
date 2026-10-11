@@ -102,15 +102,47 @@ const remoteCall = (toolName: string, args: Record<string, unknown>): { toolName
   }
 };
 
+type PlacedRun = (
+  placement: Exclude<StellaPlacement, { kind: "local" }>,
+  call: RemoteToolCall,
+  context: Context,
+) => Promise<{ content: ToolResultContent; isError?: true }>;
+
+/**
+ * One device-shaped call where the conversation's tools run now, through
+ * `run`; undefined while they run on this computer.
+ */
+export const runWherePlaced =
+  (run: PlacedRun) =>
+  async (
+    call: { toolName: DeviceToolName; params: Record<string, unknown> },
+    api: ToolExecutionApi<JsonValue>,
+    context: Context,
+  ): Promise<{ content: ToolResultContent; isError?: true } | undefined> => {
+    const placement = placementOf(await api.snapshot(StellaPlacementDoc, api.conversationId, context));
+    if (!placement || placement.kind === "local") return undefined;
+    const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
+    return await run(
+      placement,
+      {
+        piConversationId: api.conversationId,
+        ...(role?.threadId ? { threadId: role.threadId } : {}),
+        callId: api.callId,
+        toolName: call.toolName,
+        params: call.params,
+      },
+      context,
+    );
+  };
+
 /**
  * The agents' `stella-coding` on this computer: pi's own tools, which run
  * here through the ExecutionEnv, and wherever else the conversation's tools
  * were moved through `run`.
  */
-export const desktopCoding = (
-  run: (placement: Exclude<StellaPlacement, { kind: "local" }>, call: RemoteToolCall, context: Context) => Promise<{ content: ToolResultContent; isError?: true }>,
-): Extension =>
-  defineExtension({
+export const desktopCoding = (run: PlacedRun): Extension => {
+  const elsewhere = runWherePlaced(run);
+  return defineExtension({
     name: STELLA_CODING_EXTENSION,
     tools: [
       { ...createBashTool(), name: "Bash" },
@@ -121,25 +153,13 @@ export const desktopCoding = (
       (tool): ToolRegistration => ({
         ...tool,
         async execute(args: unknown, api: ToolExecutionApi<JsonValue>, context: Context) {
-          const placement = placementOf(await api.snapshot(StellaPlacementDoc, api.conversationId, context));
-          if (!placement || placement.kind === "local") return await tool.execute(args as never, api as never, context);
-          const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
-          const { toolName, params } = remoteCall(tool.name, (args ?? {}) as Record<string, unknown>);
-          return await run(
-            placement,
-            {
-              piConversationId: api.conversationId,
-              ...(role?.threadId ? { threadId: role.threadId } : {}),
-              callId: api.callId,
-              toolName,
-              params,
-            },
-            context,
-          );
+          const ran = await elsewhere(remoteCall(tool.name, (args ?? {}) as Record<string, unknown>), api, context);
+          return ran ?? (await tool.execute(args as never, api as never, context));
         },
       }),
     ),
   });
+};
 
 /**
  * One conversation's execution host on this computer: where its tools can

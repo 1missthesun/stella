@@ -107,6 +107,7 @@ import { placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
 import {
   desktopCoding,
+  runWherePlaced,
   desktopExecution,
   type DesktopBrain,
   type DesktopExecution,
@@ -1141,7 +1142,9 @@ export function desktopChats(options: DesktopChatsOptions) {
             // An agent's file and shell tools run here, or wherever its tools were moved.
             extensions: [
               desktopCoding(execution.run),
-              ...(claudeCodeEngine ? [claudeCodeEngine.extension(conversationId)] : []),
+              ...(claudeCodeEngine
+                ? [claudeCodeEngine.extension(conversationId, { searchElsewhere: runWherePlaced(execution.run) })]
+                : []),
             ],
             env: environments.env,
             onReport: options.report,

@@ -33,6 +33,14 @@ import type { StellaPlacement } from "../stella/placement.ts";
 const CLOUD_IDLE_MS = 10 * 60_000;
 const LIST_TIMEOUT_MS = 15_000;
 const RELEASE_TIMEOUT_MS = 60_000;
+/** What a file call, or a shell call past its own wait, has to answer in. */
+const CALL_ANSWER_MS = 60_000;
+/** A shell call's own wait, as the container's tools default and cap it. */
+const SHELL_WAIT_DEFAULT_MS = 120_000;
+const STDIN_WAIT_DEFAULT_MS = 30_000;
+const SHELL_WAIT_MAX_MS = 600_000;
+/** A cloud container comes up on the first call after it was let go. */
+const CLOUD_START_MS = 120_000;
 
 /** One file or shell call for tools that run elsewhere. */
 export type RemoteToolCall = {
@@ -143,6 +151,31 @@ export const httpExecutionRemote = (
 
 const failed = (text: string): DeviceToolResult => ({ text, isError: true });
 
+const shellWait = (value: unknown, fallback: number): number =>
+  typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.min(value, SHELL_WAIT_MAX_MS) : fallback;
+
+/**
+ * How long one call may take to come back before it is given up: a file
+ * call a minute, a shell call its own wait and that minute, and the cloud
+ * the time a container takes to come up as well.
+ */
+const callDeadlineMs = (placement: Exclude<StellaPlacement, { kind: "local" }>, call: RemoteToolCall): number => {
+  const work =
+    call.toolName === "Bash" || call.toolName === "exec_command"
+      ? call.params.run_in_background === true
+        ? 0
+        : shellWait(call.params.timeout_ms, SHELL_WAIT_DEFAULT_MS)
+      : call.toolName === "write_stdin"
+        ? shellWait(call.params.yield_time_ms, STDIN_WAIT_DEFAULT_MS)
+        : 0;
+  return work + CALL_ANSWER_MS + (placement.kind === "cloud" ? CLOUD_START_MS : 0);
+};
+
+const unanswered = (where: string, call: RemoteToolCall, deadlineMs: number): DeviceToolResult =>
+  failed(
+    `${where} did not answer ${call.toolName} within ${Math.round(deadlineMs / 1000)} s, so the call was given up; it may still have run there. Check before you repeat a change, try again, or switch_destination back to this computer and carry on here.`,
+  );
+
 /**
  * One conversation's tools away from this computer: whether a place can take
  * them now (`prepare`), one call there (`run`), and letting a cloud container
@@ -186,6 +219,9 @@ export const remoteToolEnvironment = (options: {
     signal?: AbortSignal,
   ): Promise<DeviceToolResult> => {
     if (!remote) return failed("Sign in to Stella to run tools away from this computer.");
+    const deadlineMs = callDeadlineMs(placement, call);
+    const deadline = AbortSignal.timeout(deadlineMs);
+    const callSignal = signal ? AbortSignal.any([signal, deadline]) : deadline;
     if (placement.kind === "cloud") {
       const scope = scopeOf(call.owner);
       touch(scope);
@@ -198,10 +234,11 @@ export const remoteToolEnvironment = (options: {
             toolName: call.toolName,
             params: call.params,
           },
-          signal,
+          callSignal,
         );
       } catch (error) {
         if (signal?.aborted) throw error;
+        if (deadline.aborted) return unanswered("The cloud workspace", call, deadlineMs);
         return failed(
           `The cloud workspace did not run it: ${error instanceof Error ? error.message : String(error)} Try again, or switch_destination back to this computer.`,
         );
@@ -225,10 +262,11 @@ export const remoteToolEnvironment = (options: {
           conversationId,
           ...(call.threadId ? { threadId: call.threadId } : {}),
         },
-        signal,
+        callSignal,
       );
     } catch (error) {
       if (signal?.aborted) throw error;
+      if (deadline.aborted) return unanswered(name, call, deadlineMs);
       outcome = { ok: false, code: "failed", message: error instanceof Error ? error.message : String(error) };
     }
     if (!outcome.ok) {

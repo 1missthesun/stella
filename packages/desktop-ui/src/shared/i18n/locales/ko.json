@@ -1950,6 +1950,7 @@
       "pastePlaceholderUrl": "여기에 주소 붙여넣기",
       "placeCloud": "클라우드",
       "placeComputer": "이 컴퓨터",
+      "placeInUse": "{place}: 사용 중",
       "placeOtherComputer": "다른 컴퓨터",
       "placeSignedIn": "{place}: 로그인됨",
       "placeSignedOut": "{place}: 로그인 안 됨",
@@ -1977,7 +1978,8 @@
       "statusPlanUsageOff": "ChatGPT 요금제 사용이 활성화되지 않음",
       "statusReauth": "계속 사용하려면 다시 로그인하세요",
       "statusSignedOut": "로그아웃됨",
-      "useAccount": "이 계정 사용"
+      "useAccount": "이 계정 사용",
+      "useInCloud": "클라우드에서 사용"
     },
     "engineModels": {
       "ariaLabel": "{engine} 모델",

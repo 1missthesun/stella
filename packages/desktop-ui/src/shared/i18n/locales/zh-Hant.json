@@ -1950,6 +1950,7 @@
       "pastePlaceholderUrl": "在此貼上網址",
       "placeCloud": "雲端",
       "placeComputer": "這台電腦",
+      "placeInUse": "{place}：使用中",
       "placeOtherComputer": "其他電腦",
       "placeSignedIn": "{place}：已登入",
       "placeSignedOut": "{place}：未登入",
@@ -1977,7 +1978,8 @@
       "statusPlanUsageOff": "未啟用 ChatGPT 方案使用",
       "statusReauth": "重新登入以繼續使用",
       "statusSignedOut": "已登出",
-      "useAccount": "使用此帳號"
+      "useAccount": "使用此帳號",
+      "useInCloud": "在雲端使用"
     },
     "engineModels": {
       "ariaLabel": "{engine} 模型",

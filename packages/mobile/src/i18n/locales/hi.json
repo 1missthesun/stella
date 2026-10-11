@@ -1959,6 +1959,7 @@
       "pastePlaceholderUrl": "पता यहां पेस्ट करें",
       "placeCloud": "क्लाउड",
       "placeComputer": "यह कंप्यूटर",
+      "placeInUse": "{place}: उपयोग में",
       "placeOtherComputer": "दूसरा कंप्यूटर",
       "placeSignedIn": "{place}: साइन इन है",
       "placeSignedOut": "{place}: साइन इन नहीं है",
@@ -1986,7 +1987,8 @@
       "statusPlanUsageOff": "ChatGPT प्लान का उपयोग चालू नहीं है",
       "statusReauth": "इसका उपयोग जारी रखने के लिए फिर से साइन इन करें",
       "statusSignedOut": "साइन आउट है",
-      "useAccount": "यह खाता इस्तेमाल करें"
+      "useAccount": "यह खाता इस्तेमाल करें",
+      "useInCloud": "क्लाउड में इस्तेमाल करें"
     },
     "engineModels": {
       "ariaLabel": "{engine} मॉडल",

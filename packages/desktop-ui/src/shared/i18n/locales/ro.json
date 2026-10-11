@@ -1968,6 +1968,7 @@
       "pastePlaceholderUrl": "Lipește adresa aici",
       "placeCloud": "Cloud",
       "placeComputer": "Acest computer",
+      "placeInUse": "{place}: în uz",
       "placeOtherComputer": "Alt computer",
       "placeSignedIn": "{place}: conectat",
       "placeSignedOut": "{place}: neconectat",
@@ -1995,7 +1996,8 @@
       "statusPlanUsageOff": "Utilizarea abonamentului ChatGPT nu este activată",
       "statusReauth": "Conectează-te din nou ca să-l folosești în continuare",
       "statusSignedOut": "Deconectat",
-      "useAccount": "Folosește acest cont"
+      "useAccount": "Folosește acest cont",
+      "useInCloud": "Folosește în cloud"
     },
     "engineModels": {
       "ariaLabel": "Modele {engine}",

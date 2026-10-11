@@ -1968,6 +1968,7 @@
       "pastePlaceholderUrl": "הדביקו את הכתובת כאן",
       "placeCloud": "ענן",
       "placeComputer": "המחשב הזה",
+      "placeInUse": "{place}: בשימוש",
       "placeOtherComputer": "מחשב אחר",
       "placeSignedIn": "{place}: מחובר",
       "placeSignedOut": "{place}: לא מחובר",
@@ -1995,7 +1996,8 @@
       "statusPlanUsageOff": "השימוש במינוי ChatGPT לא מופעל",
       "statusReauth": "צריך להתחבר מחדש כדי להמשיך להשתמש בו",
       "statusSignedOut": "מנותק",
-      "useAccount": "שימוש בחשבון הזה"
+      "useAccount": "שימוש בחשבון הזה",
+      "useInCloud": "שימוש בענן"
     },
     "engineModels": {
       "ariaLabel": "מודלים של {engine}",

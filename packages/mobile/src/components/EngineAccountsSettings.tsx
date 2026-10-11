@@ -610,9 +610,9 @@ function ProviderSection({
     );
   };
 
-  /** Whether a row can become the account in use. */
+  /** Whether a row can become the account the cloud uses. */
   const canUse = (row: EngineConnection): boolean =>
-    !row.active && (!chatgpt || isEngineConnectionUsable(row));
+    !row.active && isEngineConnectionUsable(row);
 
   const confirm = (
     title: string,

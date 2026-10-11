@@ -1959,6 +1959,7 @@
       "pastePlaceholderUrl": "Plak het adres hier",
       "placeCloud": "Cloud",
       "placeComputer": "Deze computer",
+      "placeInUse": "{place}: in gebruik",
       "placeOtherComputer": "Een andere computer",
       "placeSignedIn": "{place}: ingelogd",
       "placeSignedOut": "{place}: niet ingelogd",
@@ -1986,7 +1987,8 @@
       "statusPlanUsageOff": "Gebruik van ChatGPT-abonnement is niet ingeschakeld",
       "statusReauth": "Log opnieuw in om het te blijven gebruiken",
       "statusSignedOut": "Afgemeld",
-      "useAccount": "Dit account gebruiken"
+      "useAccount": "Dit account gebruiken",
+      "useInCloud": "Gebruiken in de cloud"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modellen",

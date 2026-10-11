@@ -33,10 +33,11 @@ import { useClaudeLogin, type ClaudeLoginTarget } from "./use-claude-login";
 
 /**
  * The owner's Claude accounts. Stella keeps only who each account is and
- * which one is active; every place (each computer, and the owner's cloud)
- * runs Claude Code on its own sign-in, made with Claude Code's own
- * `claude auth login`. Each row shows where the account is signed in.
- * Switching is manual only: picking a row makes that account the active one.
+ * which one each place uses; every place (each computer, and the owner's
+ * cloud) runs Claude Code on its own sign-in, made with Claude Code's own
+ * `claude auth login`. Each row shows where the account is signed in and
+ * where it is in use. Picking a row makes it the account this computer uses
+ * (in a browser, the cloud's); the menu does the same for the cloud.
  */
 
 const K = "settings.engineAccounts";
@@ -136,6 +137,8 @@ export function ClaudeAccountsSection({
   );
   const disabled = busy || refreshing;
 
+  const usedHere = (config: ClaudeLocalConfig | undefined) =>
+    Boolean(config && config.configId === local.activeConfigId);
   const computerPlace = (
     config: ClaudeLocalConfig | undefined,
   ): EngineAccountPlace[] =>
@@ -145,6 +148,7 @@ export function ClaudeAccountsSection({
             key: "computer",
             label: t(`${K}.placeComputer`),
             signedIn: Boolean(config),
+            inUse: usedHere(config),
           },
         ]
       : [];
@@ -210,7 +214,10 @@ export function ClaudeAccountsSection({
       {accounts.map((account) => {
         const config = localFor(account.email);
         const places = account.places ?? [];
-        const inCloud = places.some((place) => place.kind === "cloud");
+        const cloudPlace = places.find((place) => place.kind === "cloud");
+        const inCloud = Boolean(cloudPlace);
+        const cloudInUse = inCloud && (cloudPlace?.active ?? account.active);
+        const active = local.available ? usedHere(config) : cloudInUse;
         const others = places.flatMap((place) =>
           place.kind === "device" && place.deviceId !== deviceId
             ? [
@@ -218,10 +225,31 @@ export function ClaudeAccountsSection({
                   key: `device:${place.deviceId}`,
                   label: place.deviceName ?? t(`${K}.placeOtherComputer`),
                   signedIn: true,
+                  inUse: place.active === true,
                 },
               ]
             : [],
         );
+        const pick = local.available
+          ? config && deviceId
+            ? () =>
+                void run(() =>
+                  cloudEnginesApi.setActiveAccount(
+                    "anthropic",
+                    account.accountId,
+                    deviceId,
+                  ),
+                )
+            : undefined
+          : inCloud
+            ? () =>
+                void run(() =>
+                  cloudEnginesApi.setActiveAccount(
+                    "anthropic",
+                    account.accountId,
+                  ),
+                )
+            : undefined;
         const items: EngineAccountMenuItem[] = [];
         if (canSignInHere && !config) {
           items.push({
@@ -243,6 +271,19 @@ export function ClaudeAccountsSection({
                 place: "cloud",
                 ...(account.email ? { email: account.email } : {}),
               }),
+          });
+        }
+        if (local.available && inCloud && !cloudInUse) {
+          items.push({
+            key: "use-cloud",
+            label: t(`${K}.useInCloud`),
+            onSelect: () =>
+              void run(() =>
+                cloudEnginesApi.setActiveAccount(
+                  "anthropic",
+                  account.accountId,
+                ),
+              ),
           });
         }
         const tail: EngineAccountMenuItem[] = [...signOutHereItem(config)];
@@ -286,24 +327,15 @@ export function ClaudeAccountsSection({
                       key: "cloud",
                       label: t(`${K}.placeCloud`),
                       signedIn: inCloud,
+                      inUse: cloudInUse,
                     },
                   ]
                 : []),
               ...others,
             ]}
-            active={account.active}
+            active={active}
             busy={disabled}
-            {...(account.active
-              ? {}
-              : {
-                  onPick: () =>
-                    void run(() =>
-                      cloudEnginesApi.setActiveAccount(
-                        "anthropic",
-                        account.accountId,
-                      ),
-                    ),
-                })}
+            {...(active || !pick ? {} : { onPick: pick })}
             items={items}
             tail={tail}
           />
@@ -322,7 +354,7 @@ export function ClaudeAccountsSection({
             })}
             {...(plan ? { subtitle: plan } : {})}
             places={computerPlace(config)}
-            active={false}
+            active={usedHere(config)}
             busy={disabled}
             items={
               cloudAvailable

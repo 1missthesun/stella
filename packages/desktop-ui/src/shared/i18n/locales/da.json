@@ -1959,6 +1959,7 @@
       "pastePlaceholderUrl": "Indsæt adressen her",
       "placeCloud": "Sky",
       "placeComputer": "Denne computer",
+      "placeInUse": "{place}: i brug",
       "placeOtherComputer": "En anden computer",
       "placeSignedIn": "{place}: logget ind",
       "placeSignedOut": "{place}: ikke logget ind",
@@ -1986,7 +1987,8 @@
       "statusPlanUsageOff": "Brug af ChatGPT-abonnement er ikke slået til",
       "statusReauth": "Log ind igen for at blive ved med at bruge den",
       "statusSignedOut": "Logget ud",
-      "useAccount": "Brug denne konto"
+      "useAccount": "Brug denne konto",
+      "useInCloud": "Brug i skyen"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modeller",

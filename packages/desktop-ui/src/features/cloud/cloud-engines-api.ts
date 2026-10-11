@@ -26,8 +26,12 @@ export const cloudEnginesApi = {
       ...(accountId ? { accountId } : {}),
       ...(options?.forget ? { forget: true } : {}),
     }),
-  setActiveAccount: (provider: EngineProvider, accountId: string) =>
-    backendClient.call("engines.setActiveAccount", { provider, accountId }),
+  setActiveAccount: (provider: EngineProvider, accountId: string, deviceId?: string) =>
+    backendClient.call("engines.setActiveAccount", {
+      provider,
+      accountId,
+      ...(deviceId ? { deviceId } : {}),
+    }),
   /** Start Claude Code's own sign-in in the owner's cloud container. */
   startClaudeCloudLogin: (email?: string) =>
     backendClient.call("engines.startClaudeCloudLogin", email ? { email } : {}),

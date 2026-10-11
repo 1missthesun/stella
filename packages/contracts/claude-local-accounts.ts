@@ -25,12 +25,10 @@ export type ClaudeLocalAccountsState = {
   configs: ClaudeLocalConfig[];
   /**
    * The config the next local Claude turn runs on: the one signed in to the
-   * owner's active Claude account, else the default config. Null while the
-   * active account has no login on this computer.
+   * account chosen for this computer, else the default config, else the
+   * first signed-in one. Null while no config here is signed in.
    */
   activeConfigId: string | null;
-  /** The owner's active Claude account, when one is chosen. */
-  activeEmail?: string;
 };
 
 /**

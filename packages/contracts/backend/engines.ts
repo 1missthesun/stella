@@ -9,8 +9,10 @@
  * the CLI's own `claude auth login`, against Anthropic's own page; the code
  * Anthropic shows is pasted back into that CLI. This list keeps only
  * identities (email, plan) and, per account, the places where a Claude Code
- * login for it exists (`places`). The active account is the one every place
- * uses when it has a login for it; nothing ever switches accounts on its own.
+ * login for it exists (`places`). Each place (the cloud, each computer) uses
+ * its own account (`places[].active`): the one chosen for that place while
+ * it holds a login for it, else its Claude Code default login, else its
+ * oldest. One place's logins never change which account another uses.
  *
  * - A computer reports the logins its Claude Code configs hold
  *   (`engines.reportClaudeLogins`), which adds their identities here.
@@ -44,8 +46,15 @@ export type EngineProvider = (typeof ENGINE_PROVIDERS)[number];
 
 /** Where a Claude Code login for an account exists. */
 export type ClaudeLoginPlace =
-  | { kind: "cloud"; updatedAt: number }
-  | { kind: "device"; deviceId: string; deviceName?: string; updatedAt: number };
+  | { kind: "cloud"; active?: boolean; updatedAt: number }
+  | {
+      kind: "device";
+      deviceId: string;
+      deviceName?: string;
+      isDefault?: boolean;
+      active?: boolean;
+      updatedAt: number;
+    };
 
 /** One connected account of a provider. */
 export type EngineConnection = {
@@ -70,7 +79,10 @@ export type EngineConnection = {
   planUsage?: boolean;
   /** ChatGPT only: the registration's issued client id (an identifier, not a credential). */
   clientId?: string;
-  /** The account every place uses for this provider when it has a login for it. */
+  /**
+   * The account the owner's cloud uses for this provider. Claude: each
+   * computer's own is on its place (`places[].active`).
+   */
   active: boolean;
   /** Claude only: the places that hold a Claude Code login for this account. */
   places?: ClaudeLoginPlace[];
@@ -118,7 +130,7 @@ export const isEngineConnectionUsable = (connection: EngineConnection): boolean 
     : !connection.status && connection.planUsage !== false;
 
 /** One login a computer's Claude Code configs hold (identity only). */
-export type ClaudeLocalLogin = { email: string; plan?: string };
+export type ClaudeLocalLogin = { email: string; plan?: string; isDefault?: boolean };
 
 export type EngineCalls = {
   "engines.cancelConnect": {
@@ -204,9 +216,12 @@ export type EngineCalls = {
     args: { provider: EngineProvider; accountId?: string; forget?: boolean };
     result: { revoked: boolean } | null;
   };
-  /** Make one account the one every place uses. */
+  /**
+   * Make one account the one the cloud uses, or with `deviceId` (Claude
+   * only) the one that computer uses. The place must hold a login for it.
+   */
   "engines.setActiveAccount": {
-    args: { provider: EngineProvider; accountId: string };
+    args: { provider: EngineProvider; accountId: string; deviceId?: string };
     result: null;
   };
   /**

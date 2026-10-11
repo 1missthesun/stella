@@ -4,7 +4,6 @@ import {
 } from "@stella/contracts/backend/client";
 import type {
   ClaudeLocalLogin,
-  EngineConnection,
   EngineSettings,
 } from "@stella/contracts/backend/engines";
 import { listenForChatGptCallback } from "@stella/runtime/kernel/integrations/chatgpt-sign-in";
@@ -16,7 +15,7 @@ import { listenForChatGptCallback } from "@stella/runtime/kernel/integrations/ch
  *
  * - Claude: this computer reports which Claude Code logins it holds
  *   (identities only, `reportClaudeLogins`); `ClaudeLocalAccounts` picks the
- *   login for the active account from `settings()`.
+ *   login this computer uses from `settings()`.
  * - ChatGPT: this computer's own accounts live in `chatgpt-profiles.ts`;
  *   here it publishes the issued client ids it registered
  *   (`shareChatGptRegistration`) and signs the owner's cloud in
@@ -75,15 +74,6 @@ export class EngineAccountAccess {
   settings(): EngineSettings | null {
     if (this.subject) this.ensureWatch();
     return this.current;
-  }
-
-  /** The owner's active Claude account, if one is chosen. */
-  activeClaudeAccount(): EngineConnection | null {
-    return (
-      this.settings()?.connections.find(
-        (connection) => connection.provider === "anthropic" && connection.active,
-      ) ?? null
-    );
   }
 
   /** Called when the settings change (including to null); returns an unsubscribe. */

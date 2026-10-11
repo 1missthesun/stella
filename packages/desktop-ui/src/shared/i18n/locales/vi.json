@@ -1950,6 +1950,7 @@
       "pastePlaceholderUrl": "Dán địa chỉ vào đây",
       "placeCloud": "Đám mây",
       "placeComputer": "Máy tính này",
+      "placeInUse": "{place}: đang dùng",
       "placeOtherComputer": "Máy tính khác",
       "placeSignedIn": "{place}: đã đăng nhập",
       "placeSignedOut": "{place}: chưa đăng nhập",
@@ -1977,7 +1978,8 @@
       "statusPlanUsageOff": "Chưa bật sử dụng gói ChatGPT",
       "statusReauth": "Đăng nhập lại để tiếp tục sử dụng",
       "statusSignedOut": "Đã đăng xuất",
-      "useAccount": "Dùng tài khoản này"
+      "useAccount": "Dùng tài khoản này",
+      "useInCloud": "Dùng trên đám mây"
     },
     "engineModels": {
       "ariaLabel": "Mô hình {engine}",

@@ -1995,6 +1995,7 @@
       "pastePlaceholderUrl": "الصق العنوان هنا",
       "placeCloud": "السحابة",
       "placeComputer": "هذا الكمبيوتر",
+      "placeInUse": "{place}: مستخدَم الآن",
       "placeOtherComputer": "كمبيوتر آخر",
       "placeSignedIn": "{place}: تم تسجيل الدخول",
       "placeSignedOut": "{place}: لم يتم تسجيل الدخول",
@@ -2022,7 +2023,8 @@
       "statusPlanUsageOff": "استخدام خطة ChatGPT غير مفعّل",
       "statusReauth": "سجّل الدخول مرة أخرى لمواصلة استخدامه",
       "statusSignedOut": "تم تسجيل الخروج",
-      "useAccount": "استخدام هذا الحساب"
+      "useAccount": "استخدام هذا الحساب",
+      "useInCloud": "استخدامه في السحابة"
     },
     "engineModels": {
       "ariaLabel": "نماذج {engine}",

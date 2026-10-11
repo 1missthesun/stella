@@ -1959,6 +1959,7 @@
       "pastePlaceholderUrl": "Klistra in adressen här",
       "placeCloud": "Moln",
       "placeComputer": "Den här datorn",
+      "placeInUse": "{place}: används",
       "placeOtherComputer": "En annan dator",
       "placeSignedIn": "{place}: inloggad",
       "placeSignedOut": "{place}: inte inloggad",
@@ -1986,7 +1987,8 @@
       "statusPlanUsageOff": "Användning av ChatGPT-abonnemang är inte aktiverad",
       "statusReauth": "Logga in igen för att fortsätta använda det",
       "statusSignedOut": "Utloggad",
-      "useAccount": "Använd det här kontot"
+      "useAccount": "Använd det här kontot",
+      "useInCloud": "Använd i molnet"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modeller",

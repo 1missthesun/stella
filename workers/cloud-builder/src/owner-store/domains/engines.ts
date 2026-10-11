@@ -7,10 +7,10 @@
 //
 // Claude (user-approved 2026-10-06): Stella never collects, stores or relays
 // a Claude credential. Every place runs the real Claude Code CLI on its own
-// login; this module keeps only identities (email, plan), which account is
-// active, and where a login exists. The cloud's login is made by
-// `claude auth login` inside the owner's container (`claude-cloud-login.ts`)
-// and stays in that container's own disk state.
+// login; this module keeps only identities (email, plan), where a login
+// exists, and which account each place (the cloud, each computer) uses. The
+// cloud's login is made by `claude auth login` inside the owner's container
+// (`claude-cloud-login.ts`) and stays in that container's own disk state.
 //
 // ChatGPT (user-approved 2026-10-04): Sign in with ChatGPT for open-source
 // apps. The owner's cloud is its own agent host, with its own host id kept
@@ -256,6 +256,31 @@ export const ENGINE_CLI_LOGINS_MIGRATION = {
 export const ENGINE_PROVIDER_SELECTION_MIGRATION = {
   id: "engines.6-provider-selection",
   statements: [`ALTER TABLE engine_settings ADD COLUMN legacy_execution TEXT`],
+};
+
+/**
+ * Each place (the cloud, each computer) uses its own Claude account, so one
+ * computer's login never takes over another's. A place runs the account
+ * chosen for it while it holds a login for it, else its Claude Code default
+ * login, else its oldest. The account-wide choice becomes the choice of
+ * every place that holds a login for it.
+ */
+export const ENGINE_CLAUDE_PER_PLACE_MIGRATION = {
+  id: "engines.7-claude-per-place",
+  statements: [
+    `CREATE TABLE engine_claude_choices (
+       place TEXT PRIMARY KEY,
+       account_id TEXT NOT NULL,
+       updated_at INTEGER NOT NULL
+     )`,
+    `ALTER TABLE engine_claude_places ADD COLUMN is_default INTEGER NOT NULL DEFAULT 0`,
+    `INSERT INTO engine_claude_choices (place, account_id, updated_at)
+       SELECT p.place, s.active_account_id, s.updated_at
+       FROM engine_provider_settings s
+       JOIN engine_claude_places p ON p.account_id = s.active_account_id
+       WHERE s.provider = 'anthropic'`,
+    `DELETE FROM engine_provider_settings WHERE provider = 'anthropic'`,
+  ],
 };
 
 const CONNECT_TTL_MS = 15 * 60_000;
@@ -541,10 +566,14 @@ const activeAccountOf = (
   return servable.find((row) => row.account_id === settings?.active_account_id) ?? servable[0];
 };
 
-const readConnections = (db: OwnerDbReader): EngineConnection[] =>
-  ENGINE_PROVIDERS.flatMap((provider) => {
+const readConnections = (db: OwnerDbReader): EngineConnection[] => {
+  const claudeActive = claudeActiveByPlace(db);
+  return ENGINE_PROVIDERS.flatMap((provider) => {
     const accounts = accountsOf(db, provider);
-    const active = activeAccountOf(accounts, providerSettings(db, provider));
+    const activeId =
+      provider === "anthropic"
+        ? claudeActive.get(CLOUD_PLACE)
+        : activeAccountOf(accounts, providerSettings(db, provider))?.account_id;
     return accounts.map((row): EngineConnection => ({
       provider,
       accountId: row.account_id,
@@ -560,11 +589,12 @@ const readConnections = (db: OwnerDbReader): EngineConnection[] =>
             planUsage: row.plan_usage !== 0,
             ...(row.identity ? { clientId: row.identity } : {}),
           }
-        : { places: placesOf(db, row.account_id) }),
-      active: row.account_id === active?.account_id,
+        : { places: placesOf(db, row.account_id, claudeActive) }),
+      active: row.account_id === activeId,
       updatedAt: row.updated_at,
     }));
   });
+};
 
 const readSettings = (db: OwnerDbReader): EngineSettings => ({
   ...readSelection(db),
@@ -575,20 +605,14 @@ const readSettings = (db: OwnerDbReader): EngineSettings => ({
 /**
  * The owner gate's engine fields: the engines the cloud can run, and the
  * default execution, which falls back to the managed engine when the
- * selected engine can't run in the cloud. Claude runs when the active
- * account has a Claude Code login in the owner's container.
+ * selected engine can't run in the cloud. Claude runs when the owner's
+ * container holds a Claude Code login.
  */
 const connectedEnginesOf = (db: OwnerDbReader): NonNullable<OwnerSnapshot["connectedEngines"]> => {
-  const claude = activeAccountOf(accountsOf(db, "anthropic"), providerSettings(db, "anthropic"));
+  const claudeInCloud = claudeActiveByPlace(db).has(CLOUD_PLACE);
   return ENGINE_PROVIDERS.filter((provider) =>
     provider === "anthropic"
-      ? Boolean(
-          claude &&
-            db.one(
-              "SELECT 1 AS present FROM engine_claude_places WHERE account_id = ? AND place = 'cloud'",
-              claude.account_id,
-            ),
-        )
+      ? claudeInCloud
       : Boolean(
           db.one(
             `SELECT 1 AS present FROM engine_accounts
@@ -742,7 +766,7 @@ const claudeIdentity = (email: string): string => email.trim().toLowerCase();
 
 /**
  * The Claude account for this email, added when it isn't known yet. Never
- * changes which account is active unless none is (the first one becomes it).
+ * changes which account any place uses.
  */
 const ensureClaudeAccount = (
   ctx: OwnerContext,
@@ -782,27 +806,62 @@ const ensureClaudeAccount = (
     now,
     now,
   );
-  if (!providerSettings(ctx.db, "anthropic")?.active_account_id) {
-    writeActiveAccount(ctx, "anthropic", accountId);
-  }
   return accountId;
 };
 
-type PlaceRow = { account_id: string; place: string; device_name: string | null; updated_at: number };
+type PlaceRow = {
+  account_id: string;
+  place: string;
+  device_name: string | null;
+  is_default: number;
+  updated_at: number;
+};
 
-const placesOf = (db: OwnerDbReader, accountId: string): ClaudeLoginPlace[] =>
+const PLACE_COLUMNS = "account_id, place, device_name, is_default, updated_at";
+
+const claudeActiveByPlace = (db: OwnerDbReader): Map<string, string> => {
+  const held = db.all<{ account_id: string; place: string; is_default: number }>(
+    `SELECT p.account_id AS account_id, p.place AS place, p.is_default AS is_default
+     FROM engine_claude_places p JOIN engine_accounts a ON a.account_id = p.account_id
+     WHERE a.provider = 'anthropic' ORDER BY a.created_at, a.rowid`,
+  );
+  const chosen = new Map(
+    db
+      .all<{ place: string; account_id: string }>("SELECT place, account_id FROM engine_claude_choices")
+      .map((row) => [row.place, row.account_id] as const),
+  );
+  const byPlace = new Map<string, typeof held>();
+  for (const row of held) byPlace.set(row.place, [...(byPlace.get(row.place) ?? []), row]);
+  const active = new Map<string, string>();
+  for (const [place, rows] of byPlace) {
+    const pick =
+      rows.find((row) => row.account_id === chosen.get(place)) ??
+      rows.find((row) => row.is_default === 1) ??
+      rows[0];
+    if (pick) active.set(place, pick.account_id);
+  }
+  return active;
+};
+
+const placesOf = (
+  db: OwnerDbReader,
+  accountId: string,
+  active: ReadonlyMap<string, string>,
+): ClaudeLoginPlace[] =>
   db
     .all<PlaceRow>(
-      "SELECT account_id, place, device_name, updated_at FROM engine_claude_places WHERE account_id = ? ORDER BY place",
+      `SELECT ${PLACE_COLUMNS} FROM engine_claude_places WHERE account_id = ? ORDER BY place`,
       accountId,
     )
     .map((row): ClaudeLoginPlace =>
       row.place === CLOUD_PLACE
-        ? { kind: "cloud", updatedAt: row.updated_at }
+        ? { kind: "cloud", active: active.get(row.place) === accountId, updatedAt: row.updated_at }
         : {
             kind: "device",
             deviceId: row.place.slice("device:".length),
             ...(row.device_name ? { deviceName: row.device_name } : {}),
+            ...(row.is_default ? { isDefault: true } : {}),
+            active: active.get(row.place) === accountId,
             updatedAt: row.updated_at,
           },
     );
@@ -829,19 +888,22 @@ const reportClaudeLogins = (
       email,
       ...(text(login.plan, 40) ? { plan: text(login.plan, 40)! } : {}),
     });
+    const isDefault = login.isDefault === true ? 1 : 0;
     const current = ctx.db.one<PlaceRow>(
-      "SELECT account_id, place, device_name, updated_at FROM engine_claude_places WHERE account_id = ? AND place = ?",
+      `SELECT ${PLACE_COLUMNS} FROM engine_claude_places WHERE account_id = ? AND place = ?`,
       accountId,
       place,
     );
-    if (!current || current.device_name !== deviceName) {
+    if (!current || current.device_name !== deviceName || current.is_default !== isDefault) {
       ctx.db.run(
-        `INSERT INTO engine_claude_places (account_id, place, device_name, updated_at) VALUES (?, ?, ?, ?)
+        `INSERT INTO engine_claude_places (account_id, place, device_name, is_default, updated_at)
+         VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (account_id, place) DO UPDATE SET device_name = excluded.device_name,
-           updated_at = excluded.updated_at`,
+           is_default = excluded.is_default, updated_at = excluded.updated_at`,
         accountId,
         place,
         deviceName,
+        isDefault,
         ctx.now,
       );
     }
@@ -965,18 +1027,15 @@ const signOutClaudeCloud = async (
 
 /**
  * `engines.claudeCloudAccount`: which config directory in the owner's
- * container a Claude cloud turn runs on — the active account's, when the
- * cloud holds a login for it. Never a credential; the CLI reads its own.
+ * container a Claude cloud turn runs on — the account the cloud uses, among
+ * the logins it holds. Never a credential; the CLI reads its own.
  */
 const claudeCloudAccount = async (
   ctx: OwnerContext,
 ): Promise<{ key: string; email: string } | { missing: true; email?: string }> => {
-  const accounts = accountsOf(ctx.db, "anthropic");
-  const active = activeAccountOf(accounts, providerSettings(ctx.db, "anthropic"));
+  const accountId = claudeActiveByPlace(ctx.db).get(CLOUD_PLACE);
+  const active = accountId ? claudeAccount(ctx.db, accountId) : null;
   if (!active?.email) return { missing: true };
-  if (!placesOf(ctx.db, active.account_id).some((place) => place.kind === "cloud")) {
-    return { missing: true, email: active.email };
-  }
   return { key: await claudeCloudAccountKey(active.email), email: active.email };
 };
 
@@ -1359,15 +1418,18 @@ const disconnect = async (
         row.account_id,
       );
       if (inCloud) await signOutClaudeCloudRow(ctx, row).catch(() => undefined);
+      ctx.db.run("DELETE FROM engine_claude_choices WHERE account_id = ?", row.account_id);
       ctx.db.run("DELETE FROM engine_claude_places WHERE account_id = ?", row.account_id);
       ctx.db.run("DELETE FROM engine_accounts WHERE account_id = ?", row.account_id);
     }
   }
   const remaining = accountsOf(ctx.db, args.provider);
-  const settings = providerSettings(ctx.db, args.provider);
   const servable = remaining.filter(isServable);
-  if (!servable.some((row) => row.account_id === settings?.active_account_id)) {
-    writeActiveAccount(ctx, args.provider, servable[0]?.account_id ?? null);
+  if (args.provider === "chatgpt") {
+    const settings = providerSettings(ctx.db, args.provider);
+    if (!servable.some((row) => row.account_id === settings?.active_account_id)) {
+      writeActiveAccount(ctx, args.provider, servable[0]?.account_id ?? null);
+    }
   }
   // Fall back to the managed engine if the provider's last usable account went.
   if (servable.length === 0 && readSelection(ctx.db).selection.engine === args.provider) {
@@ -1386,7 +1448,30 @@ const setActiveAccount = (
     args.accountId,
   );
   if (!account) throw new RpcError("NOT_FOUND", "That account isn't connected anymore.");
-  writeActiveAccount(ctx, args.provider, account.account_id);
+  if (args.provider === "chatgpt") {
+    writeActiveAccount(ctx, args.provider, account.account_id);
+    return null;
+  }
+  const place = args.deviceId ? devicePlace(args.deviceId) : CLOUD_PLACE;
+  const held = ctx.db.one(
+    "SELECT 1 AS present FROM engine_claude_places WHERE account_id = ? AND place = ?",
+    account.account_id,
+    place,
+  );
+  if (!held) {
+    throw badRequest(
+      args.deviceId
+        ? "That computer isn't signed in to this Claude account."
+        : "Sign in to this Claude account in the cloud first.",
+    );
+  }
+  ctx.db.run(
+    `INSERT INTO engine_claude_choices (place, account_id, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT (place) DO UPDATE SET account_id = excluded.account_id, updated_at = excluded.updated_at`,
+    place,
+    account.account_id,
+    ctx.now,
+  );
   return null;
 };
 
@@ -1549,6 +1634,7 @@ export const enginesDomain = {
     ENGINE_CHATGPT_SIWC_MIGRATION,
     ENGINE_CLI_LOGINS_MIGRATION,
     ENGINE_PROVIDER_SELECTION_MIGRATION,
+    ENGINE_CLAUDE_PER_PLACE_MIGRATION,
   ],
   views: {
     "engines.get": {
@@ -1602,6 +1688,7 @@ export const enginesDomain = {
           object({
             email: string({ min: 3, max: 320 }),
             plan: optional(string({ max: 64 })),
+            isDefault: optional(boolean()),
           }),
           { max: 20 },
         ),
@@ -1645,6 +1732,7 @@ export const enginesDomain = {
       parse: object({
         provider: literal(...ENGINE_PROVIDERS),
         accountId: string({ min: 1, max: 64 }),
+        deviceId: optional(string({ min: 1, max: 128 })),
       }),
       handler: setActiveAccount,
     },
@@ -1667,6 +1755,7 @@ export const enginesDomain = {
     await deleteClaudeCloudLoginBackup(ctx.env, ctx.ownerId);
     ctx.db.run("DELETE FROM engine_accounts");
     ctx.db.run("DELETE FROM engine_claude_places");
+    ctx.db.run("DELETE FROM engine_claude_choices");
     ctx.db.run("DELETE FROM engine_claude_logins");
     ctx.db.run("DELETE FROM engine_chatgpt_registrations");
     ctx.db.run("DELETE FROM engine_provider_settings");

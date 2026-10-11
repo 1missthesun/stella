@@ -99,6 +99,7 @@ import {
 import { useRestrictedStellaModelReset } from "@/global/settings/hooks/use-restricted-stella-model-reset";
 import { MobileActivityNotificationsBridge } from "@/global/mobile/MobileActivityNotificationsBridge";
 import { ReminderNoticeLayer } from "@/features/reminders/ReminderNoticeLayer";
+import { ScheduleZoneNoticeLayer } from "@/features/schedule/ScheduleZoneNoticeLayer";
 import { useDictationToggleBridge } from "@/shell/root-chrome/use-dictation-toggle-bridge";
 import { CompanionBridge } from "@/shell/companion/use-companion-bridge";
 import { useDisplayPayloadRouting } from "@/shell/root-chrome/use-display-payload-routing";
@@ -859,6 +860,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
       {/* A leaf, so its timeline subscription never re-renders this chrome. */}
       <CompanionBridge conversationId={conversationId} />
       <ReminderNoticeLayer />
+      <ScheduleZoneNoticeLayer />
       {platformCapabilities.phoneAccess ? (
         <MobileActivityNotificationsBridge />
       ) : null}

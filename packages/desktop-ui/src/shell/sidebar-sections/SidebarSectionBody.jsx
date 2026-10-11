@@ -24,6 +24,7 @@ import { HomeLauncherSection } from "./HomeLauncherSection";
 import { CloudBrowserTakeoverSection } from "./CloudBrowserTakeoverSection";
 import { UpdatesSection } from "./UpdatesSection";
 import { EmailDigestSection } from "./EmailDigestSection";
+import { ScheduleSection } from "./ScheduleSection";
 import "./sidebar-sections.css";
 
 const PER_ITEM_BODIES = {
@@ -55,13 +56,14 @@ export function SidebarSectionBody() {
   const browserActive = activeSection === "browser";
   const updatesActive = activeSection === "updates";
   const emailActive = activeSection === "email";
+  const scheduleActive = activeSection === "schedule";
 
   return (
     <>
       <FileSidebarTabExistenceReconciler />
       {tabs.map((tab) => {
         const Body = PER_ITEM_BODIES[tab.kind];
-        if (!Body) return null; // apps / browser / updates / email handled by shared instances
+        if (!Body) return null; // apps / browser / updates / email / schedule handled by shared instances
         return (
           <SectionHost
             key={tab.id}
@@ -90,6 +92,9 @@ export function SidebarSectionBody() {
       </SectionHost>
       <SectionHost section="email" active={emailActive}>
         <EmailDigestSection active={emailActive} />
+      </SectionHost>
+      <SectionHost section="schedule" active={scheduleActive}>
+        <ScheduleSection active={scheduleActive} />
       </SectionHost>
     </>
   );

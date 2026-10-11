@@ -5,7 +5,7 @@
  * option list so both stay in sync. `home` is the launcher itself and never
  * appears as one of the launcher's own options.
  */
-import { AppWindowMac, Download, Folder, Globe, House, Lock, Mail } from "@/ui/icons";
+import { AppWindowMac, Clock, Download, Folder, Globe, House, Lock, Mail } from "@/ui/icons";
 import type { IconComponent } from "@/ui/icons";
 import type { SidebarSection } from "@/features/workspace-display/sidebar-sections";
 
@@ -20,6 +20,7 @@ export const SIDEBAR_SECTION_META: Record<SidebarSection, SidebarSectionMeta> =
     files: { label: "Files", Icon: Folder },
     apps: { label: "Apps", Icon: AppWindowMac },
     browser: { label: "Browser", Icon: Globe },
+    schedule: { label: "Schedule", Icon: Clock },
     updates: { label: "Updates", Icon: Download },
     email: { label: "Email", Icon: Mail },
     takeover: { label: "Sign in", Icon: Lock },
@@ -32,4 +33,4 @@ export const SIDEBAR_SECTION_META: Record<SidebarSection, SidebarSectionMeta> =
  */
 export const HOME_LAUNCHER_SECTIONS: ReadonlyArray<
   Exclude<SidebarSection, "home" | "takeover">
-> = ["files", "apps", "browser", "email", "updates"];
+> = ["files", "apps", "browser", "schedule", "email", "updates"];

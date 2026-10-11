@@ -2748,6 +2748,20 @@
       "title": "Previzualizare imagine"
     }
   },
+  "reminders": {
+    "title": "Memento",
+    "done": "Gata",
+    "doneState": "Finalizat",
+    "snooze": "Amână",
+    "snoozeFor": "Amână 10 minute",
+    "snooze10": "10 minute",
+    "snooze60": "1 oră",
+    "snoozeTomorrow": "Mâine dimineață",
+    "snoozedUntil": "Amânat până la {time}",
+    "snoozed": "Amânat",
+    "due": "Scadent: {time}",
+    "failed": "Mementoul nu a putut fi actualizat. Încearcă din nou."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2783,6 +2797,68 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Urmează",
+    "pausedHeading": "Puse pe pauză",
+    "kind": {
+      "reminder": "Memento",
+      "task": "Sarcină",
+      "watch": "Urmărire"
+    },
+    "next": "Următoarea: {when}",
+    "paused": "Pe pauză",
+    "runsInCloud": "Rulează în cloud",
+    "runsOnComputer": "Rulează pe acest computer",
+    "toAgent": "Merge la un agent",
+    "toStella": "Merge la Stella",
+    "once": "Se oprește când găsește",
+    "lastFailed": "Ultima rulare a eșuat: {error}",
+    "pause": "Pauză",
+    "resume": "Reia",
+    "delete": "Șterge",
+    "deleteConfirm": "Ștergi?",
+    "emptyTitle": "Nimic programat",
+    "emptyBody": "Cere-i Stellei să-ți amintească ceva, să urmărească ceva sau să facă ceva regulat.",
+    "signedOutTitle": "Conectează-te ca să-ți vezi programul",
+    "signedOutBody": "Mementourile, urmăririle și sarcinile tale sunt în contul tău Stella.",
+    "edit": {
+      "title": "Editează",
+      "name": "Nume",
+      "message": "Mesaj",
+      "onFound": "Când găsește ceva",
+      "task": "Ce să facă",
+      "when": "Când",
+      "every": "La fiecare",
+      "unit": "Unitate",
+      "minutes": "minute",
+      "hours": "ore",
+      "days": "zile",
+      "time": "Ora",
+      "zone": "Ora din {zone}",
+      "cron": "Expresie cron",
+      "cancel": "Anulează",
+      "save": "Salvează",
+      "errors": {
+        "pickWhen": "Alege data și ora.",
+        "pickFuture": "Alege o oră din viitor.",
+        "pickEvery": "Introdu frecvența.",
+        "pickTime": "Alege o oră.",
+        "pickDays": "Alege cel puțin o zi.",
+        "pickCron": "Introdu o expresie cron."
+      }
+    },
+    "zone": {
+      "title": "Acum ești în {place}",
+      "body": {
+        "few": "{count} programări rulează încă după ora din {place}.",
+        "one": "{count} programare rulează încă după ora din {place}.",
+        "other": "{count} de programări rulează încă după ora din {place}."
+      },
+      "move": "Mută-mi programările",
+      "keep": "Păstrează orele",
+      "failed": "Nu a funcționat. Încearcă din nou."
     }
   }
 }

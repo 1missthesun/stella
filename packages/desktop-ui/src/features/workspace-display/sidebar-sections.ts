@@ -25,6 +25,7 @@ export const SIDEBAR_SECTIONS = [
   "files",
   "apps",
   "browser",
+  "schedule",
   "updates",
   "email",
   "takeover",
@@ -37,6 +38,7 @@ export const PANEL_SIDEBAR_SECTIONS = [
   "files",
   "apps",
   "browser",
+  "schedule",
   "updates",
   "email",
   "takeover",
@@ -93,7 +95,7 @@ const restoreTabKind = (
  * Surfaces that only ever have one tab: opening one again focuses the tab
  * already open instead of adding another.
  */
-const SINGLE_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set(["updates", "email"]);
+const SINGLE_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set(["updates", "email", "schedule"]);
 
 /** Drop repeats of a single-tab surface (layouts saved before the rule). */
 const withoutRepeats = (tabs: SidebarTab[]): SidebarTab[] => {

@@ -2732,6 +2732,20 @@
       "title": "Képelőnézet"
     }
   },
+  "reminders": {
+    "title": "Emlékeztető",
+    "done": "Kész",
+    "doneState": "Kész",
+    "snooze": "Szundi",
+    "snoozeFor": "Szundi 10 percre",
+    "snooze10": "10 perc",
+    "snooze60": "1 óra",
+    "snoozeTomorrow": "Holnap reggel",
+    "snoozedUntil": "Elhalasztva eddig: {time}",
+    "snoozed": "Elhalasztva",
+    "due": "Esedékes: {time}",
+    "failed": "Nem sikerült frissíteni az emlékeztetőt. Próbáld újra."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2767,6 +2781,67 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Közelgő",
+    "pausedHeading": "Szüneteltetett",
+    "kind": {
+      "reminder": "Emlékeztető",
+      "task": "Feladat",
+      "watch": "Figyelés"
+    },
+    "next": "Következő: {when}",
+    "paused": "Szüneteltetve",
+    "runsInCloud": "A felhőben fut",
+    "runsOnComputer": "Ezen a számítógépen fut",
+    "toAgent": "Egy ügynökhöz kerül",
+    "toStella": "Stellához kerül",
+    "once": "Leáll, ha megtalálja",
+    "lastFailed": "Az utolsó futás sikertelen: {error}",
+    "pause": "Szüneteltetés",
+    "resume": "Folytatás",
+    "delete": "Törlés",
+    "deleteConfirm": "Törlöd?",
+    "emptyTitle": "Nincs semmi ütemezve",
+    "emptyBody": "Kérd meg Stellát, hogy emlékeztessen, figyeljen valamit, vagy rendszeresen elvégezzen valamit.",
+    "signedOutTitle": "Jelentkezz be az ütemezéseid megtekintéséhez",
+    "signedOutBody": "Az emlékeztetőid, figyeléseid és feladataid a Stella-fiókodban vannak.",
+    "edit": {
+      "title": "Szerkesztés",
+      "name": "Név",
+      "message": "Üzenet",
+      "onFound": "Ha talál valamit",
+      "task": "Mit tegyen",
+      "when": "Mikor",
+      "every": "Minden",
+      "unit": "Egység",
+      "minutes": "perc",
+      "hours": "óra",
+      "days": "nap",
+      "time": "Időpont",
+      "zone": "{zone} idő",
+      "cron": "Cron-kifejezés",
+      "cancel": "Mégse",
+      "save": "Mentés",
+      "errors": {
+        "pickWhen": "Válassz dátumot és időpontot.",
+        "pickFuture": "Válassz jövőbeli időpontot.",
+        "pickEvery": "Add meg, milyen gyakran.",
+        "pickTime": "Válassz időpontot.",
+        "pickDays": "Válassz legalább egy napot.",
+        "pickCron": "Adj meg egy cron-kifejezést."
+      }
+    },
+    "zone": {
+      "title": "Most itt vagy: {place}",
+      "body": {
+        "one": "{count} ütemezés még mindig a(z) {place} szerinti időt használja.",
+        "other": "{count} ütemezés még mindig a(z) {place} szerinti időt használja."
+      },
+      "move": "Ütemezéseim áthelyezése",
+      "keep": "Időpontok megtartása",
+      "failed": "Ez nem sikerült. Próbáld újra."
     }
   }
 }

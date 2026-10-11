@@ -1,0 +1,202 @@
+.schedule-section__item {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 6px 8px 10px;
+  border-radius: 12px;
+  transition: background 0.12s ease;
+}
+
+.schedule-section__item:hover {
+  background: color-mix(in oklch, var(--foreground) 4%, transparent);
+}
+
+.schedule-section__item[data-paused] .updates-section__title {
+  color: var(--text-base);
+}
+
+.schedule-section__item[data-busy] {
+  opacity: 0.7;
+}
+
+.schedule-section__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.schedule-section__glyph {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: color-mix(in oklch, var(--foreground) 5%, transparent);
+  color: var(--text-base);
+}
+
+.schedule-section__actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.schedule-section__item:hover .schedule-section__actions,
+.schedule-section__item:focus-within .schedule-section__actions,
+.schedule-section__actions:has([data-confirm]) {
+  opacity: 1;
+}
+
+.schedule-section__icon-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  min-width: 26px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-weak);
+  font-family: inherit;
+  font-size: var(--font-size-xs, 12px);
+  cursor: default;
+  justify-content: center;
+}
+
+.schedule-section__icon-button:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  color: var(--text-strong);
+}
+
+.schedule-section__icon-button[data-confirm] {
+  color: var(--destructive, var(--text-strong));
+}
+
+.schedule-section__icon-button:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.schedule-section__error {
+  margin-top: 2px;
+  color: var(--destructive, var(--text-weak));
+  font-size: var(--font-size-xs, 12px);
+  overflow-wrap: anywhere;
+}
+
+.schedule-zone {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.schedule-zone__body {
+  margin-top: 2px;
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+}
+
+.schedule-zone__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.schedule-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 10px 0 4px 40px;
+}
+
+.schedule-edit__field,
+.schedule-edit__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.schedule-edit__label,
+.schedule-edit__hint {
+  color: var(--text-weak);
+  font-size: var(--font-size-xs, 12px);
+}
+
+.schedule-edit__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.schedule-edit__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-strong);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  color-scheme: light dark;
+}
+
+.schedule-edit__input:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.schedule-edit__input--short {
+  width: auto;
+  min-width: 72px;
+}
+
+.schedule-edit__textarea {
+  resize: vertical;
+}
+
+.schedule-edit__days {
+  display: flex;
+  gap: 4px;
+}
+
+.schedule-edit__day {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-base);
+  font-family: inherit;
+  font-size: var(--font-size-xs, 12px);
+  cursor: default;
+}
+
+.schedule-edit__day[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.schedule-edit__error {
+  margin: 0;
+  color: var(--destructive, var(--text-weak));
+  font-size: var(--font-size-xs, 12px);
+}
+
+.schedule-edit__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}

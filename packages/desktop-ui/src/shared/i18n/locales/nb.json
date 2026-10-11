@@ -2732,6 +2732,20 @@
       "title": "Forhåndsvisning av bilde"
     }
   },
+  "reminders": {
+    "title": "Påminnelse",
+    "done": "Ferdig",
+    "doneState": "Ferdig",
+    "snooze": "Utsett",
+    "snoozeFor": "Utsett 10 minutter",
+    "snooze10": "10 minutter",
+    "snooze60": "1 time",
+    "snoozeTomorrow": "I morgen tidlig",
+    "snoozedUntil": "Utsatt til {time}",
+    "snoozed": "Utsatt",
+    "due": "Forfaller: {time}",
+    "failed": "Kunne ikke oppdatere påminnelsen. Prøv igjen."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2767,6 +2781,67 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Kommende",
+    "pausedHeading": "Satt på pause",
+    "kind": {
+      "reminder": "Påminnelse",
+      "task": "Oppgave",
+      "watch": "Overvåking"
+    },
+    "next": "Neste: {when}",
+    "paused": "Satt på pause",
+    "runsInCloud": "Kjører i skyen",
+    "runsOnComputer": "Kjører på denne datamaskinen",
+    "toAgent": "Går til en agent",
+    "toStella": "Går til Stella",
+    "once": "Stopper når det er funnet",
+    "lastFailed": "Siste kjøring mislyktes: {error}",
+    "pause": "Sett på pause",
+    "resume": "Fortsett",
+    "delete": "Slett",
+    "deleteConfirm": "Slette?",
+    "emptyTitle": "Ingenting planlagt",
+    "emptyBody": "Be Stella om å minne deg på noe, følge med på noe eller gjøre noe regelmessig.",
+    "signedOutTitle": "Logg på for å se tidsplanen din",
+    "signedOutBody": "Påminnelsene, overvåkingene og oppgavene dine ligger i Stella-kontoen din.",
+    "edit": {
+      "title": "Rediger",
+      "name": "Navn",
+      "message": "Melding",
+      "onFound": "Når den finner noe",
+      "task": "Hva som skal gjøres",
+      "when": "Når",
+      "every": "Hver",
+      "unit": "Enhet",
+      "minutes": "minutter",
+      "hours": "timer",
+      "days": "dager",
+      "time": "Tidspunkt",
+      "zone": "Tid i {zone}",
+      "cron": "Cron-uttrykk",
+      "cancel": "Avbryt",
+      "save": "Lagre",
+      "errors": {
+        "pickWhen": "Velg dato og tidspunkt.",
+        "pickFuture": "Velg et tidspunkt i fremtiden.",
+        "pickEvery": "Angi hvor ofte.",
+        "pickTime": "Velg et tidspunkt.",
+        "pickDays": "Velg minst én dag.",
+        "pickCron": "Skriv inn et cron-uttrykk."
+      }
+    },
+    "zone": {
+      "title": "Du er nå i {place}",
+      "body": {
+        "one": "{count} tidsplan følger fortsatt tiden i {place}.",
+        "other": "{count} tidsplaner følger fortsatt tiden i {place}."
+      },
+      "move": "Flytt tidsplanene mine",
+      "keep": "Behold tidspunktene",
+      "failed": "Det gikk ikke. Prøv igjen."
     }
   }
 }

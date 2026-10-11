@@ -2714,6 +2714,20 @@
       "title": "画像のプレビュー"
     }
   },
+  "reminders": {
+    "title": "リマインダー",
+    "done": "完了",
+    "doneState": "完了",
+    "snooze": "スヌーズ",
+    "snoozeFor": "10分スヌーズ",
+    "snooze10": "10分",
+    "snooze60": "1時間",
+    "snoozeTomorrow": "明日の朝",
+    "snoozedUntil": "{time}までスヌーズ中",
+    "snoozed": "スヌーズ中",
+    "due": "期限: {time}",
+    "failed": "リマインダーを更新できませんでした。もう一度お試しください。"
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2749,6 +2763,66 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "今後の予定",
+    "pausedHeading": "一時停止中",
+    "kind": {
+      "reminder": "リマインダー",
+      "task": "タスク",
+      "watch": "ウォッチ"
+    },
+    "next": "次回: {when}",
+    "paused": "一時停止中",
+    "runsInCloud": "クラウドで実行",
+    "runsOnComputer": "このコンピューターで実行",
+    "toAgent": "エージェントに送信",
+    "toStella": "Stellaに送信",
+    "once": "見つかったら停止",
+    "lastFailed": "前回の実行に失敗しました: {error}",
+    "pause": "一時停止",
+    "resume": "再開",
+    "delete": "削除",
+    "deleteConfirm": "削除しますか？",
+    "emptyTitle": "予定はありません",
+    "emptyBody": "リマインド、何かの見守り、定期的な作業をStellaに頼んでみましょう。",
+    "signedOutTitle": "サインインしてスケジュールを表示",
+    "signedOutBody": "リマインダー、ウォッチ、タスクはStellaアカウントに保存されます。",
+    "edit": {
+      "title": "編集",
+      "name": "名前",
+      "message": "メッセージ",
+      "onFound": "何か見つかったとき",
+      "task": "やること",
+      "when": "日時",
+      "every": "間隔",
+      "unit": "単位",
+      "minutes": "分",
+      "hours": "時間",
+      "days": "日",
+      "time": "時刻",
+      "zone": "{zone}時間",
+      "cron": "cron式",
+      "cancel": "キャンセル",
+      "save": "保存",
+      "errors": {
+        "pickWhen": "日付と時刻を選んでください。",
+        "pickFuture": "未来の時刻を選んでください。",
+        "pickEvery": "頻度を入力してください。",
+        "pickTime": "時刻を選んでください。",
+        "pickDays": "1日以上選んでください。",
+        "pickCron": "cron式を入力してください。"
+      }
+    },
+    "zone": {
+      "title": "現在地は{place}です",
+      "body": {
+        "other": "{count}件のスケジュールがまだ{place}の時間で動いています。"
+      },
+      "move": "スケジュールを移動",
+      "keep": "時刻を維持",
+      "failed": "うまくいきませんでした。もう一度お試しください。"
     }
   }
 }

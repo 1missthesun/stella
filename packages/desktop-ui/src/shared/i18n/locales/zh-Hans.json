@@ -2714,6 +2714,20 @@
       "title": "图像预览"
     }
   },
+  "reminders": {
+    "title": "提醒",
+    "done": "完成",
+    "doneState": "已完成",
+    "snooze": "稍后提醒",
+    "snoozeFor": "10 分钟后提醒",
+    "snooze10": "10 分钟",
+    "snooze60": "1 小时",
+    "snoozeTomorrow": "明天早上",
+    "snoozedUntil": "已推迟到 {time}",
+    "snoozed": "已推迟",
+    "due": "到期：{time}",
+    "failed": "无法更新提醒。请重试。"
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2749,6 +2763,66 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "即将进行",
+    "pausedHeading": "已暂停",
+    "kind": {
+      "reminder": "提醒",
+      "task": "任务",
+      "watch": "监视"
+    },
+    "next": "下次：{when}",
+    "paused": "已暂停",
+    "runsInCloud": "在云端运行",
+    "runsOnComputer": "在这台电脑上运行",
+    "toAgent": "交给智能体",
+    "toStella": "交给 Stella",
+    "once": "找到后停止",
+    "lastFailed": "上次运行失败：{error}",
+    "pause": "暂停",
+    "resume": "恢复",
+    "delete": "删除",
+    "deleteConfirm": "删除？",
+    "emptyTitle": "暂无日程",
+    "emptyBody": "让 Stella 提醒你、帮你留意某件事，或定期做某件事。",
+    "signedOutTitle": "登录以查看你的日程",
+    "signedOutBody": "你的提醒、监视和任务都保存在你的 Stella 账户中。",
+    "edit": {
+      "title": "编辑",
+      "name": "名称",
+      "message": "消息",
+      "onFound": "找到内容时",
+      "task": "要做什么",
+      "when": "时间",
+      "every": "每",
+      "unit": "单位",
+      "minutes": "分钟",
+      "hours": "小时",
+      "days": "天",
+      "time": "时间",
+      "zone": "{zone} 时间",
+      "cron": "Cron 表达式",
+      "cancel": "取消",
+      "save": "保存",
+      "errors": {
+        "pickWhen": "请选择日期和时间。",
+        "pickFuture": "请选择将来的时间。",
+        "pickEvery": "请输入频率。",
+        "pickTime": "请选择时间。",
+        "pickDays": "请至少选择一天。",
+        "pickCron": "请输入 Cron 表达式。"
+      }
+    },
+    "zone": {
+      "title": "你现在在{place}",
+      "body": {
+        "other": "{count} 个日程仍按{place}时间运行。"
+      },
+      "move": "移动我的日程",
+      "keep": "保持时间",
+      "failed": "操作未成功。请重试。"
     }
   }
 }

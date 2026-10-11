@@ -4,8 +4,8 @@ import { useT } from "@/shared/i18n";
 import { dismissToast, showToast } from "@/ui/toast";
 import { markReminderDone, snoozeReminder, useReminderFireList } from "./use-reminder-fires";
 
-/** How long after it fired a reminder still pops up when the app opens. */
-const NOTICE_WINDOW_MS = 30 * 60_000;
+/** How long after it fired a reminder this computer missed still pops up, once, when the app opens. */
+const NOTICE_WINDOW_MS = 24 * 60 * 60_000;
 const SEEN_KEY = "stella.reminders.noticed";
 const SEEN_LIMIT = 200;
 

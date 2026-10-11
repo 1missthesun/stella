@@ -3,7 +3,7 @@
  *
  * It keeps the shared search field at the top (owned here; results render in
  * place) and, when nothing is being searched, offers a vertically-centered
- * list of destinations: Files, Apps, Browser, Email, and Updates when Stella runs
+ * list of destinations: Files, Apps, Browser, Schedule, Email, and Updates when Stella runs
  * from its own source. Picking one swaps the panel to
  * that section, mirroring opening a new browser tab.
  */

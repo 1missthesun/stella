@@ -2748,6 +2748,20 @@
       "title": "Prévia da imagem"
     }
   },
+  "reminders": {
+    "title": "Lembrete",
+    "done": "Concluído",
+    "doneState": "Concluído",
+    "snooze": "Adiar",
+    "snoozeFor": "Adiar 10 minutos",
+    "snooze10": "10 minutos",
+    "snooze60": "1 hora",
+    "snoozeTomorrow": "Amanhã de manhã",
+    "snoozedUntil": "Adiado até {time}",
+    "snoozed": "Adiado",
+    "due": "Vence: {time}",
+    "failed": "Não foi possível atualizar o lembrete. Tente novamente."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {
@@ -2783,6 +2797,68 @@
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
       "submitting": "Sending…"
+    }
+  },
+  "schedule": {
+    "upcoming": "Próximos",
+    "pausedHeading": "Pausados",
+    "kind": {
+      "reminder": "Lembrete",
+      "task": "Tarefa",
+      "watch": "Monitoramento"
+    },
+    "next": "Próxima: {when}",
+    "paused": "Pausado",
+    "runsInCloud": "Executado na nuvem",
+    "runsOnComputer": "Executado neste computador",
+    "toAgent": "Vai para um agente",
+    "toStella": "Vai para a Stella",
+    "once": "Para quando encontrar",
+    "lastFailed": "A última execução falhou: {error}",
+    "pause": "Pausar",
+    "resume": "Retomar",
+    "delete": "Excluir",
+    "deleteConfirm": "Excluir?",
+    "emptyTitle": "Nada agendado",
+    "emptyBody": "Peça à Stella para lembrar você, acompanhar algo ou fazer algo regularmente.",
+    "signedOutTitle": "Entre para ver seus agendamentos",
+    "signedOutBody": "Seus lembretes, monitoramentos e tarefas ficam na sua conta Stella.",
+    "edit": {
+      "title": "Editar",
+      "name": "Nome",
+      "message": "Mensagem",
+      "onFound": "Quando encontrar algo",
+      "task": "O que fazer",
+      "when": "Quando",
+      "every": "A cada",
+      "unit": "Unidade",
+      "minutes": "minutos",
+      "hours": "horas",
+      "days": "dias",
+      "time": "Horário",
+      "zone": "Horário de {zone}",
+      "cron": "Expressão cron",
+      "cancel": "Cancelar",
+      "save": "Salvar",
+      "errors": {
+        "pickWhen": "Escolha uma data e um horário.",
+        "pickFuture": "Escolha um horário no futuro.",
+        "pickEvery": "Informe a frequência.",
+        "pickTime": "Escolha um horário.",
+        "pickDays": "Escolha pelo menos um dia.",
+        "pickCron": "Digite uma expressão cron."
+      }
+    },
+    "zone": {
+      "title": "Agora você está em {place}",
+      "body": {
+        "many": "{count} agendamentos ainda usam o horário de {place}.",
+        "one": "{count} agendamento ainda usa o horário de {place}.",
+        "other": "{count} agendamentos ainda usam o horário de {place}."
+      },
+      "move": "Mover meus agendamentos",
+      "keep": "Manter horários",
+      "failed": "Não deu certo. Tente novamente."
     }
   }
 }

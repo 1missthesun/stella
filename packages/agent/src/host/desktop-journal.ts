@@ -11,17 +11,39 @@
  * another computer's) is imported into the transcript before this computer
  * answers, and while the conversation is open, so its orchestrator and its
  * timeline have the whole conversation.
+ *
+ * A turn runs here only while the cloud has it as this computer's. A turn a
+ * previous process left running waits until the cloud confirms that this
+ * computer still holds the brain and that turn (`standing`); one the cloud
+ * settled without it (another host took the brain over, its lease lapsed)
+ * stops here instead of running on unseen, and so does a turn whose lease
+ * this process learns it lost (a computer back from a pause).
  */
 import { parseClaudeUsageLimitCard, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import { randomUUID } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
 import type { Message } from "@earendil-works/pi-ai";
-import { LiveDoc, watchEvents, type AgentEventStream, type Conversation, type EntryId, type EntryRecord, type Harness } from "@earendil-works/pi-durable";
+import {
+  defineExtension,
+  GenerationTask,
+  hook,
+  LiveDoc,
+  ROOT_CONVERSATION_ID,
+  ToolTask,
+  watchEvents,
+  type AgentEventStream,
+  type Conversation,
+  type EntryId,
+  type EntryRecord,
+  type Extension,
+  type Harness,
+  type HookApi,
+} from "@earendil-works/pi-durable";
 import { piJournalUserMessage, piTerminalNotice, type PiRemoteTurn, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
 import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
 import { isAgentAttemptOutcome } from "@stella/contracts/agent-status";
-import { PI_BRAIN_ELSEWHERE_CODE } from "@stella/contracts/turn-plane/pi-brain";
+import { PI_BRAIN_ELSEWHERE_CODE, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import {
   checkpointToPublish,
   importJournal,
@@ -80,6 +102,8 @@ export type DesktopJournal = {
     /** Reacquire the lease of a turn a previous process opened, under its owner epoch. */
     adopt?: boolean;
     ownerGeneration?: string;
+    /** The turn's lease is gone: the cloud refused its renewal (`reason`), or it went unrenewed too long. */
+    onLeaseLost?: (reason: string) => void;
   }): Promise<{
     leaseToken: string;
     ownerGeneration: string;
@@ -105,6 +129,13 @@ export type JournalMirror = {
   remoteTurns(): PiRemoteTurn[];
   /** Whether a turn of this computer's is open in the journal (a Stop from another device ends it). */
   turnOpen(): boolean;
+  /**
+   * Whether Stella's turn may run on here: true at once, unless a previous
+   * process left a turn running; then once the cloud confirms this computer
+   * still holds the brain and that turn, and false (the turn is being
+   * stopped here) when it does not.
+   */
+  standing: Promise<boolean>;
   /** Mirror what the transcript has added since the last sync. */
   sync(): void;
   stop(): Promise<void>;
@@ -115,6 +146,44 @@ const PAGE = 100;
 const REMOTE_TURN_STALE_MS = 30 * 60_000;
 /** Events after which the transcript may have something to mirror. */
 const MIRRORED_EVENTS = new Set(["entry_appended", "message_end", "tool_execution_end", "run_end"]);
+/** The writer's reason for a lease it stopped hearing renewed, which says nothing of whether the cloud moved on. */
+const LEASE_SILENCE = "lease_renewal_silence";
+/** How often the brain record is read again while the cloud can't be reached to confirm a turn left running. */
+const CONFIRM_RETRY_MS = 10_000;
+
+/** How long a turn the cloud refused waits for the stop that ends it before it gives up on its own. */
+const REFUSED_STOP_WAIT_MS = 30_000;
+
+const abortOf = (signal: AbortSignal | undefined): Promise<void> =>
+  new Promise((resolve) => {
+    if (!signal) return;
+    if (signal.aborted) resolve();
+    else signal.addEventListener("abort", () => resolve(), { once: true });
+  });
+
+/**
+ * Stella's turn takes each model request and tool call only once the
+ * cloud's word is in (`JournalMirror.standing`): at once in a turn this
+ * process began, after the cloud confirms a turn a previous process left
+ * running. One it refused never reaches the model or a tool again; it ends
+ * with the stop the mirror makes.
+ */
+export const journalTurnGate = (standing: Promise<boolean>): Extension => {
+  const proceed = async (api: HookApi, context: Context): Promise<undefined> => {
+    if (api.conversationId !== ROOT_CONVERSATION_ID) return undefined;
+    const aborted = abortOf(context.abortSignal);
+    if (await Promise.race([standing, aborted.then(() => false)])) return undefined;
+    await Promise.race([aborted, new Promise((resolve) => setTimeout(resolve, REFUSED_STOP_WAIT_MS))]);
+    throw new Error("This turn was settled without this computer, so it does not run on here.");
+  };
+  return defineExtension({
+    name: "stella-journal-turn-gate",
+    hooks: [
+      hook(GenerationTask, { beforeRequest: (_request, api, context) => proceed(api, context) }),
+      hook(ToolTask, { beforeTool: (_call, api, context) => proceed(api, context) }),
+    ],
+  });
+};
 
 /** A report of this computer's cloud agent, or that one of its messages settled without one. */
 const reportFor = (record: JournalReadRecord, deviceId: string): JournalAgentReport | undefined => {
@@ -171,6 +240,10 @@ export async function journalMirror(args: {
   onRemoteTurns?: (turns: PiRemoteTurn[]) => void;
   /** The cloud held Claude Code work here until the usage limit resets, or resumed it. */
   onUsageLimit?: (card: ClaudeUsageLimitCard, createdAtMs: number) => void;
+  /** The conversation's brain record, as the cloud has it now. */
+  readBrain?: () => Promise<PiBrainRecord | null>;
+  /** A previous process left Stella's turn running: it waits for the cloud's word (`standing`). */
+  resumed: boolean;
   context: Context;
 }): Promise<JournalMirror> {
   const { harness, root, journal, report, context } = args;
@@ -189,6 +262,10 @@ export async function journalMirror(args: {
   /** Turns whose lease this process holds (or re-adopted after a restart). */
   const held = new Set<string>();
   const ending = new Set<string>();
+  /** Turns the cloud no longer has as this computer's: stopped here, and never finished from here. */
+  const lost = new Set<string>();
+  /** Turns a previous process opened, by their adoption: the lease token taken back, or undefined when refused. */
+  const adoptions = new Map<string, Promise<string | undefined>>();
   let running = false;
   let again = false;
   let stopped = false;
@@ -260,6 +337,11 @@ export async function journalMirror(args: {
             (localTurnId) => !ending.has(localTurnId) && record.turnId.endsWith(`:${localTurnId}`),
           );
           if (open && record.kind === "turn" && record.phase === "canceled") stoppedElsewhere = true;
+          // Ended by the cloud without this computer (a takeover, a lapsed lease): it stops here too.
+          else if (open && record.kind === "turn" && record.phase && record.phase !== "started") {
+            const localTurnId = [...held].find((id) => !ending.has(id) && record.turnId.endsWith(`:${id}`));
+            if (localTurnId) loseTurn(localTurnId);
+          }
           continue;
         }
         if (record.kind === "turn") {
@@ -301,6 +383,7 @@ export async function journalMirror(args: {
     });
 
   const finishWith = async (open: Readonly<JournalOpenTurn>) => {
+    if (lost.has(open.localTurnId)) return;
     const entries: EntryRecord[] = [];
     for (const id of open.entries) {
       const entry = await harness.commit(async (tx) => tx.entry(id as EntryId), context);
@@ -324,39 +407,116 @@ export async function journalMirror(args: {
     ending.delete(open.localTurnId);
   };
 
+  /**
+   * The cloud no longer has this turn as this computer's: what runs here
+   * would go nowhere, so Stella stops, as a Stop would end it.
+   */
+  const loseTurn = (localTurnId: string | undefined) => {
+    if (localTurnId) {
+      if (lost.has(localTurnId)) return;
+      lost.add(localTurnId);
+      held.delete(localTurnId);
+    }
+    void stopStella(harness, root, context).catch(report);
+  };
+
+  const brainHere = (record: PiBrainRecord | null) =>
+    !record || (record.host === "device" && record.deviceId === journal.deviceId);
+
+  /**
+   * A refusal of the turn's lease is final: it stops here. A lease that only
+   * went unrenewed (this process paused, or offline) is weighed by the brain
+   * record and the journal, which says whether the cloud ended the turn.
+   */
+  const leaseLost = (localTurnId: string) => (reason: string) => {
+    if (stopped || ending.has(localTurnId)) return;
+    if (reason !== LEASE_SILENCE) {
+      loseTurn(localTurnId);
+      return;
+    }
+    void (async () => {
+      const record = await args.readBrain?.();
+      if (record !== undefined && !brainHere(record)) {
+        loseTurn(localTurnId);
+        return;
+      }
+      await importNow();
+    })().catch(report);
+  };
+
+  /** Take back the lease of a turn a previous process opened, once; its token, or undefined when the cloud refused it. */
+  const adopt = (turn: Readonly<JournalOpenTurn>): Promise<string | undefined> => {
+    const known = adoptions.get(turn.localTurnId);
+    if (known) return known;
+    const adoption = (async () => {
+      const userEntry = await harness.commit(async (tx) => tx.entry(Number(turn.localTurnId.split(":").at(-1)) as EntryId), context);
+      const user = userEntry?.model?.[0];
+      if (user?.role !== "user") return undefined;
+      const journaled = piJournalUserMessage(user as PiUserMessage);
+      const ack = await journal
+        .begin({
+          localTurnId: turn.localTurnId,
+          clientMsgId: turn.localTurnId,
+          userMessageJson: JSON.stringify(journaled.message),
+          hidden: journaled.hidden,
+          adopt: true,
+          ownerGeneration: turn.ownerGeneration,
+          onLeaseLost: leaseLost(turn.localTurnId),
+        })
+        .catch((error: unknown) => {
+          report(error);
+          return undefined;
+        });
+      if (!ack) return undefined;
+      held.add(turn.localTurnId);
+      return ack.leaseToken;
+    })();
+    adoptions.set(turn.localTurnId, adoption);
+    return adoption;
+  };
+
+  /**
+   * Before a turn a previous process left running goes on: the cloud must
+   * still have the brain here and the turn as this computer's. Until it can
+   * be asked, the turn waits.
+   */
+  const confirmResumed = async (): Promise<boolean> => {
+    let record: PiBrainRecord | null = null;
+    if (args.readBrain) {
+      for (;;) {
+        if (stopped) return false;
+        try {
+          record = await args.readBrain();
+          break;
+        } catch (error) {
+          report(error);
+          await new Promise((resolve) => setTimeout(resolve, CONFIRM_RETRY_MS));
+        }
+      }
+    }
+    const open = (await doc()).open;
+    if (!brainHere(record)) {
+      loseTurn(open?.localTurnId);
+      return false;
+    }
+    if (open && !(await adopt(open))) {
+      loseTurn(open.localTurnId);
+      return false;
+    }
+    return !(open && lost.has(open.localTurnId));
+  };
+
   const mirror = async () => {
     const state = await doc();
     const syncId = state.syncId ?? randomUUID();
     let mirrored = state.mirrored ?? 0;
     let open: JournalOpenTurn | undefined = state.open && { ...state.open, entries: [...state.open.entries] };
     // A turn a previous process opened: take its lease back, or let it go
-    // when the journal no longer has it.
-    if (open && !held.has(open.localTurnId)) {
-      const turn = open;
-      const userEntry = await harness.commit(async (tx) => tx.entry(Number(turn.localTurnId.split(":").at(-1)) as EntryId), context);
-      const user = userEntry?.model?.[0];
-      const ack =
-        user?.role === "user"
-          ? await journal
-              .begin({
-                localTurnId: turn.localTurnId,
-                clientMsgId: turn.localTurnId,
-                userMessageJson: JSON.stringify(piJournalUserMessage(user as PiUserMessage).message),
-                hidden: piJournalUserMessage(user as PiUserMessage).hidden,
-                adopt: true,
-                ownerGeneration: turn.ownerGeneration,
-              })
-              .catch((error: unknown) => {
-                report(error);
-                return undefined;
-              })
-          : undefined;
-      if (ack) {
-        open = { ...turn, leaseToken: ack.leaseToken };
-        held.add(turn.localTurnId);
-      } else {
-        open = undefined;
-      }
+    // when the journal no longer has it. One the cloud settled without this
+    // computer is let go as well.
+    if (open && (lost.has(open.localTurnId) || adoptions.has(open.localTurnId) || !held.has(open.localTurnId))) {
+      const leaseToken = lost.has(open.localTurnId) ? undefined : await adopt(open);
+      open = leaseToken && !lost.has(open.localTurnId) ? { ...open, leaseToken } : undefined;
     }
     // A turn ends when the orchestrator goes idle. Idleness is read before
     // the scan that follows it, so every entry of a run that had ended by
@@ -404,6 +564,7 @@ export async function journalMirror(args: {
                       : localTurnId,
                   userMessageJson: JSON.stringify(journaled.message),
                   hidden: journaled.hidden,
+                  onLeaseLost: leaseLost(localTurnId),
                 })
                 .catch(async (error: unknown) => {
                   report(error);
@@ -482,6 +643,14 @@ export async function journalMirror(args: {
     })();
   };
 
+  const standing = args.resumed
+    ? confirmResumed().catch((error: unknown) => {
+        report(error);
+        loseTurn(undefined);
+        return false;
+      })
+    : Promise.resolve(true);
+
   const stream: AgentEventStream = await watchEvents(harness, root.id, context);
   stream.start(async (events) => {
     if ((events as Array<{ type: string }>).some((event) => MIRRORED_EVENTS.has(event.type))) sync();
@@ -492,6 +661,7 @@ export async function journalMirror(args: {
     importNow,
     remoteTurns,
     turnOpen: () => held.size > 0,
+    standing,
     sync,
     async stop() {
       stopped = true;

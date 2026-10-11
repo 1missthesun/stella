@@ -126,6 +126,7 @@ export const cloudJournalFor = (
         userMessageJson: turn.userMessageJson,
         ...(turn.hidden ? { hidden: true } : {}),
         ...(turn.adopt ? { adoptExisting: true } : {}),
+        ...(turn.onLeaseLost ? { onLeaseLost: turn.onLeaseLost } : {}),
       });
       const promptSeq = turn.hidden ? undefined : await runner().cloudJournal.promptSeq(conversationId, ack);
       if (promptSeq !== undefined) promptSeqs.set(conversationId, Math.max(promptSeqs.get(conversationId) ?? 0, promptSeq));

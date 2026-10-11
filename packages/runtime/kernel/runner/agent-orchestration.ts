@@ -1218,12 +1218,16 @@ export const createAgentOrchestration = (
     if (record.ownerGeneration && record.ownerGeneration !== ownerGeneration) {
       return "refused";
     }
+    // The cloud frames another agent's note before it gets here; the
+    // instruction of whoever started the agent arrives bare.
     const delivery = await manager.sendAgentMessage(
       exactThreadId,
       text,
       "orchestrator",
       {
-        deliveryKind: "agent-message",
+        deliveryKind: text.trimStart().startsWith("<agent-message ")
+          ? "agent-message"
+          : "external-input",
         ...(messageId.trim() ? { deliveryEventId: messageId.trim() } : {}),
       },
     );

@@ -1414,11 +1414,12 @@ type MessageArgs = AgentThreadCalls["agentThreads.message"]["args"];
 type MessageDelivery = AgentThreadCalls["agentThreads.message"]["result"];
 
 /**
- * `send_message` to a thread the caller does not own. A cloud conversation
- * id queues a hidden wake turn on that conversation's Stella; a running agent
- * reads the message before its next model call; an idle one resumes with it
- * as its next attempt, under the same parent, so its report still goes where
- * it always did. Idempotent per `messageId`.
+ * `send_message` through the owner's agent threads, from any host. A cloud
+ * conversation id queues a hidden wake turn on that conversation's Stella; a
+ * running agent reads the message before its next model call; an idle one
+ * resumes with it as its next attempt, under the same parent, so its report
+ * still goes where it always did. From whoever started the agent it arrives
+ * as an instruction, from anyone else as a note. Idempotent per `messageId`.
  */
 const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<MessageDelivery> => {
   if (!CONTROL_REQUEST_ID_PATTERN.test(args.messageId)) {
@@ -1463,7 +1464,8 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
     ownerGeneration: args.ownerGeneration,
     messageId: args.messageId,
     to,
-    framed: formatAgentMessage(args.from, text),
+    text,
+    from: args.from,
   });
   ctx.db.run(
     "DELETE FROM agent_message_receipts WHERE created_at < ?",
@@ -1480,9 +1482,19 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
   return delivery;
 };
 
+/**
+ * Whether the sender is the one that started the thread: its conversation's
+ * Stella, or the agent that spawned it. Their message is an instruction to
+ * it, wherever the conversation runs now; anyone else's is a note.
+ */
+const sentByStarter = (thread: ThreadRow, from: MessageArgs["from"]): boolean =>
+  thread.parent_thread_id !== null
+    ? from.threadId === thread.parent_thread_id
+    : from.threadId === thread.conversation_id || from.threadId === thread.origin_conversation_id;
+
 const deliverAgentMessage = async (
   ctx: OwnerContext,
-  args: { ownerGeneration: string; messageId: string; to: string; framed: string },
+  args: { ownerGeneration: string; messageId: string; to: string; text: string; from: MessageArgs["from"] },
 ): Promise<MessageDelivery> => {
   const to = isPlacementThreadId(args.to) ? (placementAliasThreadId(ctx.db, args.to) ?? args.to) : args.to;
   const conversation = ctx.db.one<{ conversation_id: string }>(
@@ -1494,7 +1506,7 @@ const deliverAgentMessage = async (
       ownerGeneration: args.ownerGeneration,
       conversationId: to,
       clientMsgId: `msg:${(await sha256Hex(args.messageId)).slice(0, 48)}`,
-      prompt: args.framed,
+      prompt: formatAgentMessage(args.from, args.text),
     });
     return { delivered: "queued", threadId: to };
   }
@@ -1509,13 +1521,14 @@ const deliverAgentMessage = async (
       { reason: "message_target_not_found" },
     );
   }
+  const message = sentByStarter(thread, args.from) ? args.text : formatAgentMessage(args.from, args.text);
   const executor = threadExecutor(thread);
   if (executor.kind === "local") {
-    return await messageLocalThread(ctx, thread, executor.deviceId, args);
+    return await messageLocalThread(ctx, thread, executor.deviceId, { ...args, framed: message });
   }
   if (ACTIVE_STATUSES.has(thread.status)) {
     if (executor.kind === "dispatch") {
-      await steerDeviceThread(ctx, thread, args.messageId, args.framed);
+      await steerDeviceThread(ctx, thread, args.messageId, message);
       return { delivered: "steered", threadId: to };
     }
     const steered = await ctx.host.steerAgentTurn({
@@ -1523,7 +1536,7 @@ const deliverAgentMessage = async (
       conversationId: thread.conversation_id,
       ownerGeneration: args.ownerGeneration,
       messageId: args.messageId,
-      text: args.framed,
+      text: message,
     });
     if (steered) return { delivered: "steered", threadId: to };
     // Not running yet is not finished: superseding a queued first attempt
@@ -1561,7 +1574,7 @@ const deliverAgentMessage = async (
     turnId: crypto.randomUUID(),
     clientMsgId: args.messageId,
     fingerprint: "agent-message",
-    prompt: args.framed,
+    prompt: message,
   });
   return { delivered: "resumed", threadId: to };
 };

@@ -507,8 +507,9 @@ export function desktopChats(options: DesktopChatsOptions) {
    * Claude Code turns held until the Claude usage limit resets, by
    * conversation and session (Stella's turn or one of its agents): the chat
    * shows one waiting card while any is held, and one line when the last
-   * resumes. A restart drops this; the held turns re-run, meet the limit
-   * again and hold again, so it fills back up.
+   * resumes. A restart drops this and it fills back up: this computer's
+   * held turns re-run, meet the limit and hold again, and the cloud's holds
+   * are read back from its journal when the conversation opens.
    */
   const usageLimitHolds = new Map<string, Map<string, number | undefined>>();
   const usageLimitEvent = (conversationId: string): PiChatEvent | undefined => {

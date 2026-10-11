@@ -8,6 +8,10 @@ import {
   type PiBrainRecord,
   type PiBrainResponse,
 } from "@stella/contracts/turn-plane/pi-brain";
+import {
+  parseClaudeUsageLimitCard,
+  type ClaudeUsageLimitCard,
+} from "@stella/contracts/claude-usage-limit";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { OwnerGateSnapshotError } from "../owner-gate.js";
 import { CLOUD_HISTORY_TOKEN_BUDGET } from "@stella/executor-cloud/prune-history";
@@ -74,6 +78,9 @@ import { OrchestratorJournalWrites } from "./journal-writes.js";
  * Desktop-local turns (begin, renew, finish), history reads, and the pi
  * workspace and brain routes.
  */
+/** Newest usage-limit cards read to rebuild the holds. */
+const USAGE_LIMIT_HOLD_SCAN = 200;
+
 export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
   /**
    * The local half of localTurnOwner for a new admission: who is calling and
@@ -316,6 +323,43 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     }
   }
 
+  /**
+   * The Claude Code work this conversation's journal shows held on the Claude
+   * usage limit now: the newest `usage-limit` card of Stella's turn and of
+   * each agent, where that card is a hold rather than its resume. A client
+   * that starts reading after the cards were written rebuilds its waiting
+   * card from this.
+   */
+  protected usageLimitHolds(): Array<{ threadId?: string; until?: number; createdAtMs: number }> {
+    const rows = this.ctx.storage.sql
+      .exec<{ seq: number; created_at: number; payload_json: string }>(
+        `SELECT seq, created_at, payload_json FROM journal
+          WHERE kind = 'card' AND payload_json LIKE '%"type":"usage-limit"%'
+          ORDER BY seq DESC LIMIT ?`,
+        USAGE_LIMIT_HOLD_SCAN,
+      )
+      .toArray();
+    const latest = new Map<string, { card: ClaudeUsageLimitCard; createdAtMs: number }>();
+    for (const row of rows) {
+      let card: ClaudeUsageLimitCard | null = null;
+      try {
+        card = parseClaudeUsageLimitCard(JSON.parse(row.payload_json));
+      } catch {
+        card = null;
+      }
+      if (!card) continue;
+      const key = card.threadId ?? "";
+      if (!latest.has(key)) latest.set(key, { card, createdAtMs: row.created_at });
+    }
+    return [...latest.values()]
+      .filter(({ card }) => card.state === "held")
+      .map(({ card, createdAtMs }) => ({
+        ...(card.threadId ? { threadId: card.threadId } : {}),
+        ...(card.until !== undefined ? { until: card.until } : {}),
+        createdAtMs,
+      }));
+  }
+
   protected async runHistoryOp(request: unknown): Promise<unknown> {
     const body = (request ?? null) as {
       op?: unknown;
@@ -349,7 +393,8 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         BACKFILL_BATCH_RECORDS,
       );
     }
-    throw new Error('history query op must be "sql" or "read".');
+    if (body?.op === "usageLimitHolds") return { holds: this.usageLimitHolds() };
+    throw new Error('history query op must be "sql", "read" or "usageLimitHolds".');
   }
 
   /**

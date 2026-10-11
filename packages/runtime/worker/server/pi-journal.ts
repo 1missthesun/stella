@@ -88,6 +88,30 @@ export const cloudJournalFor = (
       }
       return { records: body.records ?? [], complete: body.complete !== false };
     },
+    usageLimitHolds: async () => {
+      const auth = runner().getStellaSiteAuth();
+      if (!auth) throw new Error("Sign in to sync this conversation.");
+      const response = await fetch(
+        `${auth.baseUrl.replace(/\/+$/, "")}/conversations/${encodeURIComponent(conversationId)}/history/query`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${auth.authToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({ op: "usageLimitHolds" }),
+          signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as {
+        holds?: Array<{ threadId?: string; until?: number; createdAtMs: number }>;
+        error?: string;
+      } | null;
+      if (!response.ok || !body) {
+        throw new Error(body?.error ?? `The conversation's held work did not load (${response.status}).`);
+      }
+      return body.holds ?? [];
+    },
     ownTurn: (turnId) =>
       turnId.startsWith(`desktop:${deviceId}:pi:`) ||
       turnId.startsWith(`voice:${deviceId}:pi:`),

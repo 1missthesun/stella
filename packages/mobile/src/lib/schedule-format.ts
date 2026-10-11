@@ -1,4 +1,13 @@
+import { Platform, Settings } from "react-native";
+import { setDeviceHourCycle } from "@stella/contracts/schedule-format";
 import type { LocalCronSchedule } from "@stella/contracts/scheduling";
+
+setDeviceHourCycle(() => {
+  if (Platform.OS !== "ios") return null;
+  if (Settings.get("AppleICUForce24HourTime")) return "h23";
+  if (Settings.get("AppleICUForce12HourTime")) return "h12";
+  return null;
+});
 
 export {
   formatNextRun,

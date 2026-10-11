@@ -68,6 +68,8 @@ const CLAUDE_CODE_MAX_TOKENS = 128_000;
 const SEEN_LIMIT = 400;
 const REBUILD_MAX_CHARS = 48_000;
 const UPDATE_MAX_MESSAGE_CHARS = 12_000;
+/** How long a new turn waits for the stopped one it replaces to end. */
+const SUPERSEDED_SETTLE_MS = 10_000;
 
 export type ClaudeCodeRole = "orchestrator" | "worker";
 
@@ -110,7 +112,8 @@ export type ClaudeCodeTurnSpec = {
   onStatus(status: ClaudeCodeStatus): void;
   onSessionId(sessionId: string): void;
   control(turn: {
-    inject(input: { text: string; images: ImageContent[] }): boolean;
+    /** Steer the running CLI; `onConsumed` once it took the input in, `onDropped` if the step ended before it did. */
+    inject(input: { text: string; images: ImageContent[]; onConsumed?: () => void; onDropped?: () => void }): boolean;
     /** End the CLI's step at this tool boundary, unanswered; `toolSetAfterStep` then carries the turn on. */
     endStep(): boolean;
   }): void;
@@ -128,7 +131,12 @@ export type ClaudeCodeTransport = {
   close?(session: ClaudeCodeSessionRef): void;
 };
 
-export type ClaudeCodeSessionRecord = { cliSessionId?: string; seen: string[] };
+/**
+ * `seen`: messages the CLI has, by key. `undelivered`: messages that reached
+ * Stella's transcript but never the CLI (a stop or pause ended its step
+ * before it took them in); the next turn carries them.
+ */
+export type ClaudeCodeSessionRecord = { cliSessionId?: string; seen: string[]; undelivered?: string[] };
 export type ClaudeCodeSessionStore = {
   read(piSessionId: string): Promise<ClaudeCodeSessionRecord | undefined>;
   write(piSessionId: string, record: ClaudeCodeSessionRecord): Promise<void>;
@@ -156,6 +164,9 @@ type Turn = {
   session: Session;
   abort: AbortController;
   done: boolean;
+  /** Resolves once `done`: its CLI step ended and said what it never took in. */
+  settled: Promise<void>;
+  settle: () => void;
   outcome?: { ok: true; text: string } | { ok: false; error: unknown };
   queue: QueueItem[];
   wake?: () => void;
@@ -164,7 +175,7 @@ type Turn = {
   unsent: Message[];
   waiting: Map<string, (outcome: ClaudeCodeToolOutcome) => void>;
   early: Map<string, ClaudeCodeToolOutcome>;
-  inject?: (input: { text: string; images: ImageContent[] }) => boolean;
+  inject?: (input: { text: string; images: ImageContent[]; onConsumed?: () => void; onDropped?: () => void }) => boolean;
   endStep?: () => boolean;
   toolSet: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
   nextToolSet?: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
@@ -180,6 +191,8 @@ type TurnRequest = {
   nativeTools: readonly string[];
   thinkingLevel: ModelThinkingLevel;
   prompt?: { text: string; images: ImageContent[] };
+  /** The messages `prompt` carries. */
+  steered?: Message[];
 };
 
 type Session = {
@@ -440,13 +453,31 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     for (const message of messages) {
       const key = messageKey(message);
       if (key && !record.seen.includes(key)) record.seen.push(key);
+      const undelivered = key ? (record.undelivered?.indexOf(key) ?? -1) : -1;
+      if (undelivered >= 0) record.undelivered!.splice(undelivered, 1);
     }
+    if (record.undelivered?.length === 0) delete record.undelivered;
+  };
+
+  /** Messages the CLI never took in: the next turn carries them. */
+  const holdUndelivered = (session: Session, messages: readonly Message[]) => {
+    if (messages.length === 0) return;
+    const record = (session.record ??= { seen: [] });
+    for (const message of messages) {
+      const key = messageKey(message);
+      if (!key) continue;
+      const seenAt = record.seen.indexOf(key);
+      if (seenAt >= 0) record.seen.splice(seenAt, 1);
+      if (!record.undelivered?.includes(key)) (record.undelivered ??= []).push(key);
+    }
+    void saveRecord(session);
   };
 
   const finish = (turn: Turn, outcome: Turn["outcome"]) => {
     if (turn.done) return;
     turn.done = true;
     turn.outcome = outcome;
+    turn.settle();
     for (const [id, record] of calls) {
       if (record.turn !== turn) continue;
       if (record.native) {
@@ -527,18 +558,33 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       !request.prompt && arrived.length > 0 && arrived.every((message) => wakes?.has(textOf(message.content).trim()) === true);
     if (backgroundWake) for (const message of arrived) wakes?.delete(textOf(message.content).trim());
     const rebuild = rebuildPrompt(conversation);
+    const steering = request.prompt && resumeSessionId;
+    const delta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
+    const given = steering ? (request.steered ?? []) : (delta ?? trailingUsers(conversation).users);
+    const givenKeys = new Set(given.map(messageKey));
+    const undelivered = new Set(record.undelivered ?? []);
+    const carried = conversation.filter((message) => {
+      const key = messageKey(message);
+      return message.role === "user" && key !== undefined && undelivered.has(key) && !givenKeys.has(key);
+    });
+    const asked = steering ? request.prompt! : delta ? deltaPrompt(delta) : rebuild;
+    const before = userPrompt(carried);
     const prompt =
-      request.prompt && resumeSessionId
-        ? request.prompt
-        : resumeSessionId && seenAt >= 0
-          ? deltaPrompt(conversation.slice(seenAt + 1))
-          : rebuild;
+      carried.length > 0
+        ? { text: [before.text, asked.text].filter(Boolean).join("\n\n"), images: [...before.images, ...asked.images] }
+        : asked;
     const abort = new AbortController();
+    let settle = () => {};
+    const settled = new Promise<void>((resolve) => {
+      settle = resolve;
+    });
     const turn: Turn = {
       id: crypto.randomUUID(),
       session,
       abort,
       done: false,
+      settled,
+      settle,
       queue: [],
       callIds: new Set(),
       prompted: conversation,
@@ -739,7 +785,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           if (turn.unsent.length > 0 && request) {
             const steer = userPrompt(turn.unsent);
             try {
-              turn = await startTurn(turn.session, { ...request, prompt: steer });
+              turn = await startTurn(turn.session, { ...request, prompt: steer, steered: turn.unsent });
             } catch (error) {
               fail("error", markedError(error));
               return;
@@ -893,6 +939,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const toolSet = toolSetFor(session.binding, getCurrentTools(messages));
     const conversation = messages.filter((message) => message.role !== "system");
     let turn = session.turn;
+    let superseded: Turn | undefined;
     if (turn) {
       const lastAssistant = conversation.findLastIndex((message) => message.role === "assistant");
       const tail = conversation.slice(lastAssistant + 1);
@@ -901,7 +948,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const ours = results.length > 0 && results.every((message) => message.role === "toolResult" && current.callIds.has(message.toolCallId));
       const stopped = turn.abort.signal.aborted;
       if (!ours || stopped || (turn.done && turn.queue.length === 0)) {
+        holdUndelivered(session, turn.unsent);
+        turn.unsent = [];
         abortTurn(turn, "Superseded.");
+        superseded = turn;
         turn = undefined;
       } else {
         const { users } = trailingUsers(tail);
@@ -924,8 +974,28 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         if (!restarted) turn.carried = undefined;
         if (waiting.length > 0) {
           const prompt = userPrompt(waiting);
-          if (!restarted && !turn.done && prompt.text && turn.inject?.({ text: prompt.text, images: prompt.images })) {
-            noteSeen(session, waiting);
+          const steered = turn;
+          const injected =
+            !restarted &&
+            !turn.done &&
+            prompt.text &&
+            turn.inject?.({
+              text: prompt.text,
+              images: prompt.images,
+              onConsumed: () => {
+                noteSeen(session, waiting);
+                void saveRecord(session);
+              },
+              onDropped: () => {
+                if (steered.done || steered.abort.signal.aborted) {
+                  holdUndelivered(session, waiting);
+                  return;
+                }
+                const queued = new Set(steered.unsent.map(messageKey));
+                steered.unsent = [...waiting.filter((message) => !queued.has(messageKey(message))), ...steered.unsent];
+              },
+            });
+          if (injected) {
             turn.unsent = [];
           } else {
             turn.unsent = waiting;
@@ -964,6 +1034,18 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     };
     session.request = request;
     if (!turn) {
+      // What the replaced turn's CLI never took in is known once its step
+      // ended; the new turn carries it. It waits for that CLI anyway.
+      if (superseded && !superseded.done) {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        await Promise.race([
+          superseded.settled,
+          new Promise<void>((resolve) => {
+            timer = setTimeout(resolve, SUPERSEDED_SETTLE_MS);
+          }),
+        ]);
+        clearTimeout(timer);
+      }
       try {
         turn = await startTurn(session, request);
       } catch (error) {

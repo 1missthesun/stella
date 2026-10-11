@@ -98,9 +98,13 @@ const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
     read: async (piSessionId) => {
       try {
         const parsed = JSON.parse(await readFile(file(piSessionId), "utf8")) as Partial<ClaudeCodeSessionRecord>;
+        const undelivered = Array.isArray(parsed.undelivered)
+          ? parsed.undelivered.filter((entry): entry is string => typeof entry === "string")
+          : [];
         return {
           ...(typeof parsed.cliSessionId === "string" ? { cliSessionId: parsed.cliSessionId } : {}),
           seen: Array.isArray(parsed.seen) ? parsed.seen.filter((entry): entry is string => typeof entry === "string") : [],
+          ...(undelivered.length > 0 ? { undelivered } : {}),
         };
       } catch {
         return undefined;
@@ -244,7 +248,16 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         onStatusChange: (status) => spec.onStatus(status),
         onSessionId: (sessionId) => spec.onSessionId(sessionId),
         onTurnControl: ({ inject, endStep }) => {
-          spec.control({ inject: (input) => inject({ text: input.text, images: input.images }), endStep });
+          spec.control({
+            inject: (input) =>
+              inject({
+                text: input.text,
+                images: input.images,
+                ...(input.onConsumed ? { onConsumed: input.onConsumed } : {}),
+                ...(input.onDropped ? { onDropped: input.onDropped } : {}),
+              }),
+            endStep,
+          });
           return undefined;
         },
         toolSetAfterStep: () => spec.toolSetAfterStep(),

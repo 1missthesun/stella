@@ -2732,6 +2732,19 @@
       "title": "Image preview"
     }
   },
+  "reminders": {
+    "title": "Reminder",
+    "done": "Done",
+    "doneState": "Done",
+    "snooze": "Snooze",
+    "snoozeFor": "Snooze 10 minutes",
+    "snooze10": "10 minutes",
+    "snooze60": "1 hour",
+    "snoozeTomorrow": "Tomorrow morning",
+    "snoozedUntil": "Snoozed until {time}",
+    "snoozed": "Snoozed",
+    "failed": "Couldn't update the reminder. Try again."
+  },
   "userAsk": {
     "blocking": "Waiting on you",
     "deadline": {

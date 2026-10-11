@@ -29,27 +29,17 @@ export const isCloudSchedulePayload = (
   payload: LocalCronJobCreateInput["payload"],
 ): boolean => payload.kind === "notify" || payload.kind === "task";
 
-const REMINDER_PROMPT_PREFIX = "Reminder for the user";
 const LIST_TIMEOUT_MS = 15_000;
 
-/** Same wording as the cloud orchestrator's schedule tool. */
-const reminderPrompt = (message: string): string =>
-  `${REMINDER_PROMPT_PREFIX} (deliver this exact message to them now, and nothing else): ${message}`;
-
-const reminderMessageOf = (prompt: string): string | null => {
-  if (!prompt.startsWith(REMINDER_PROMPT_PREFIX)) return null;
-  const separator = prompt.indexOf("): ");
-  return separator >= 0 ? prompt.slice(separator + 3) : null;
-};
-
+/** A reminder is stored as its text; a task as its prompt. */
 const promptFor = (payload: LocalCronJobCreateInput["payload"]): string => {
-  if (payload.kind === "notify") return reminderPrompt(payload.text);
+  if (payload.kind === "notify") return payload.text;
   if (payload.kind === "task") return payload.prompt;
   throw new Error("Only reminders and tasks can be stored in the cloud.");
 };
 
 const toCronJob = (row: ScheduleRow): LocalCronJobRecord => {
-  const reminder = reminderMessageOf(row.prompt);
+  const reminder = row.kind === "reminder" ? row.prompt : null;
   return {
     id: row.scheduleId,
     conversationId: row.conversationId ?? "",
@@ -133,6 +123,7 @@ export const createCloudSchedules = (options: {
     const row = await client().call("schedules.create", {
       // A fresh id per call: two identical schedules are two schedules.
       requestId: `desk-${randomUUID()}`,
+      kind: input.payload.kind === "notify" ? "reminder" : "task",
       prompt,
       schedule: input.schedule,
       ...(description ? { description } : {}),

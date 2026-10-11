@@ -14,6 +14,7 @@ import type { ConversationFileEntry } from "@/features/workspace-display/derive-
 import type { AgentCompletionSection } from "@/features/chat/lib/agent-completion";
 import type { OfficePreviewRef } from "@stella/contracts/office-preview";
 import type { VoiceSessionSummaryMetadata } from "@stella/contracts/local-chat";
+import type { ReminderMark } from "@stella/contracts/reminders";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { UserAskRecord } from "@stella/contracts/user-ask-deck";
 
@@ -156,6 +157,8 @@ export type AssistantRowViewModel = {
    * card in place of the message text body.
    */
   voiceSession?: VoiceSessionSummaryMetadata;
+  /** A reminder Stella delivered: the row carries its Done and Snooze. */
+  reminder?: ReminderMark;
   /**
    * Collapsed, expandable trace of the tool calls this row's turn ran after
    * its text (one summary line, Claude-Code-style: "Read 3 files and

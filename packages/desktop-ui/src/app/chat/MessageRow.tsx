@@ -63,6 +63,7 @@ import {
 import { AppPreviewCard } from "@/features/cloud/AppPreviewCard";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import { VoiceSessionCard } from "@/app/chat/VoiceSessionCard";
+import { ReminderActions } from "@/features/reminders/ReminderActions";
 import { ReplyPreview } from "@/app/chat/ReplyPreview";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import { ReplyReportLinks } from "@/app/chat/ReplyReportLinks";
@@ -844,6 +845,7 @@ export const AssistantMessageRow = memo(
               )}
             </div>
           )}
+          {row.reminder ? <ReminderActions mark={row.reminder} /> : null}
           {hasBody && (inlineImageStrip || hasMedia) ? (
             <div className="assistant-media">
               {inlineImageStrip}

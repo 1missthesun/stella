@@ -18,6 +18,7 @@ import {
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { isOrchestratorReservedBuiltinAgentId } from "@stella/contracts/agent-runtime";
 import { isOfficePreviewRef } from "@stella/contracts/office-preview";
+import { parseReminderMark } from "@stella/contracts/reminders";
 import {
   collectTurnSourceDiffPayloads,
   deriveTurnInlineImagePayloads,
@@ -373,6 +374,7 @@ export const assistantRowHasNonBackgroundContent = (
   (row.mapArtifacts?.length ?? 0) > 0 ||
   (row.sourceDiffPayloads?.length ?? 0) > 0 ||
   Boolean(row.voiceSession) ||
+  Boolean(row.reminder) ||
   (row.agentCompletion?.sections.length ?? 0) > 0 ||
   Boolean(row.customSlot);
 
@@ -898,6 +900,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         });
         const officePreviewRef = getOfficePreviewRef(ownToolEvents);
         const voiceSession = payload?.metadata?.voiceSession;
+        const reminder = parseReminderMark(payload?.metadata?.reminder);
         const backgroundWorks = buildBackgroundWorks(toolEvents);
         const backgroundWork = backgroundWorks[0];
         const spawnedThreadIds = getSpawnedThreadIds(toolEvents);
@@ -937,6 +940,7 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           ...(askRecords.length > 0 ? { askRecords } : {}),
           ...(sourceDiffPayloads.length > 0 ? { sourceDiffPayloads } : {}),
           ...(voiceSession ? { voiceSession } : {}),
+          ...(reminder ? { reminder } : {}),
           ...(backgroundWork ? { backgroundWork } : {}),
           ...(spawnedThreadIds.length > 0 ? { spawnedThreadIds } : {}),
           ...(spawnedDescriptions.length > 0 ? { spawnedDescriptions } : {}),

@@ -20,6 +20,7 @@
  * this process learns it lost (a computer back from a pause).
  */
 import { parseClaudeUsageLimitCard, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
+import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import { randomUUID } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
 import type { Message } from "@earendil-works/pi-ai";
@@ -325,6 +326,18 @@ export async function journalMirror(args: {
         const usageLimit = record.kind === "card" ? parseClaudeUsageLimitCard(record.card) : null;
         if (usageLimit) {
           args.onUsageLimit?.(usageLimit, record.createdAtMs ?? Date.now());
+          continue;
+        }
+        // A reminder the cloud delivered: Stella's line, in the transcript and the timeline.
+        const reminder = record.kind === "card" ? parseReminderCard(record.card) : null;
+        if (reminder) {
+          messages.push({
+            seq: record.seq,
+            turnId: record.turnId,
+            role: "assistant",
+            hidden: false,
+            message: reminderAssistantMessage(reminder, record.createdAtMs ?? Date.now()) as JournalMessage["message"],
+          });
           continue;
         }
         if (journal.ownTurn(record.turnId)) {

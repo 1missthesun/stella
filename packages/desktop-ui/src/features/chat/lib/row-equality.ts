@@ -441,6 +441,7 @@ const assistantRowEqual = (
   agentCompletionEqual(a.agentCompletion, b.agentCompletion) &&
   (a.voiceSession?.durationMs ?? null) ===
     (b.voiceSession?.durationMs ?? null) &&
+  (a.reminder?.fireId ?? null) === (b.reminder?.fireId ?? null) &&
   // Compare a stable key for the custom slot (the ReactNode itself
   // changes identity on each render of the Store thread). Surfaces
   // that mount a custom slot must supply a key derived from the

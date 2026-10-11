@@ -5,6 +5,7 @@ import type {
   MessageRecord,
 } from "@stella/contracts/local-chat";
 import { isPiAgentText } from "@stella/contracts/pi-chat";
+import { parseReminderCard } from "@stella/contracts/reminders";
 import { journalAgentTitles } from "@stella/contracts/agent-titles";
 import { groupEventsIntoMessages } from "@/features/chat/lib/group-events-into-messages";
 import { withAttachmentPreamble } from "./cloud-composer-store";
@@ -302,12 +303,14 @@ const textPayload = (
   replyRefs?: ReplyRef[],
 ): Record<string, unknown> => {
   const voiceSession = asRecord(record.payload.voiceSession);
+  const reminder = asRecord(record.payload.reminder);
   const displayContext =
     record.role === "user" ? userDisplayContext(record.payload) : undefined;
   const metadata = {
     ...(record.hidden ? { ui: { visibility: "hidden" as const } } : {}),
     ...(displayContext ? { context: displayContext } : {}),
     ...(voiceSession ? { voiceSession } : {}),
+    ...(reminder ? { reminder } : {}),
     ...(replyRefs && replyRefs.length > 0
       ? { runtime: { replyRefs } }
       : {}),
@@ -419,6 +422,20 @@ export const journalRecordsToMessageRecords = (
       if (lifecycle) {
         if (promptAhead && !turnUserRecord) beforePrompt.push(lifecycle);
         else events.push(lifecycle);
+        continue;
+      }
+      // A reminder Stella delivered: her line, on its own, with Done and Snooze.
+      const reminder = record.kind === "card" ? parseReminderCard(record.card) : null;
+      if (reminder) {
+        events.push({
+          _id: `cloud:${turnId}:reminder:${record.seq}`,
+          timestamp: record.createdAtMs,
+          type: "assistant_message",
+          payload: {
+            text: reminder.text,
+            metadata: { reminder: { fireId: reminder.fireId, scheduleId: reminder.scheduleId } },
+          },
+        });
         continue;
       }
       if (record.kind !== "message") continue;

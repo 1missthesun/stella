@@ -3,12 +3,15 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import {
   Animated,
   Easing,
   StyleSheet,
+  View,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -43,7 +46,7 @@ const ARRIVING_BUBBLE_POP: Pop = {
  * `animate` is read once, at mount: callers flip it off on the next render
  * (the row is "seen" by then), and that must not cut the pop short.
  */
-export function useBubblePop(animate: boolean, pop: Pop) {
+export function useBubblePop(animate: boolean, pop: Pop, ready = true) {
   const reducedMotion = useReducedMotion();
   const play = useRef(animate).current && !reducedMotion;
   const progress = useRef(new Animated.Value(play ? 0 : 1)).current;
@@ -57,6 +60,7 @@ export function useBubblePop(animate: boolean, pop: Pop) {
       opacity.setValue(1);
       return;
     }
+    if (!ready) return;
     const animation = Animated.parallel([
       Animated.spring(progress, {
         toValue: 1,
@@ -74,7 +78,7 @@ export function useBubblePop(animate: boolean, pop: Pop) {
     ]);
     animation.start();
     return () => animation.stop();
-  }, [play, progress, opacity, pop.side]);
+  }, [play, ready, progress, opacity, pop.side]);
 
   return useMemo(
     () => ({
@@ -111,19 +115,55 @@ export function AssistantBubble({
 }) {
   const colors = useColors();
   const handoff = useReplyHandoffController();
-  const arrivedRef = useRef(animate);
+  const reducedMotion = useReducedMotion();
+  const [staged, setStaged] = useState(
+    () => animate && !reducedMotion && Boolean(handoff?.canStage()),
+  );
+  const arrivedUnstagedRef = useRef(animate && !staged);
+  const landingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
   useLayoutEffect(() => {
-    if (arrivedRef.current) handoff?.replyArrived();
+    if (arrivedUnstagedRef.current) handoff?.replyArrived();
   }, [handoff]);
-  const pop = useBubblePop(animate, ARRIVING_BUBBLE_POP);
+  const onStagedLayout = (event: LayoutChangeEvent) => {
+    if (landingRef.current || !handoff) return;
+    landingRef.current = true;
+    handoff.land(event.nativeEvent.layout.height, () => {
+      if (!mountedRef.current) return false;
+      setStaged(false);
+      return true;
+    });
+  };
+  const pop = useBubblePop(animate, ARRIVING_BUBBLE_POP, !staged);
   return (
-    <Animated.View style={[style, pop]}>
-      <LinearGradient
-        pointerEvents="none"
-        colors={[colors.assistantBubbleFillTop, colors.assistantBubbleFillBottom]}
-        style={StyleSheet.absoluteFill}
-      />
-      {children}
-    </Animated.View>
+    <View
+      style={staged ? stagedStyles.hidden : undefined}
+      pointerEvents={staged ? "none" : "auto"}
+    >
+      <Animated.View
+        style={[style, pop]}
+        onLayout={staged ? onStagedLayout : undefined}
+      >
+        <LinearGradient
+          pointerEvents="none"
+          colors={[
+            colors.assistantBubbleFillTop,
+            colors.assistantBubbleFillBottom,
+          ]}
+          style={StyleSheet.absoluteFill}
+        />
+        {children}
+      </Animated.View>
+    </View>
   );
 }
+
+const stagedStyles = StyleSheet.create({
+  hidden: { height: 0, opacity: 0 },
+});

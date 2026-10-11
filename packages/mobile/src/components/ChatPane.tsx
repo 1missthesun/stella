@@ -798,11 +798,24 @@ export function ChatPane({
     topInset,
   );
 
-  const { snapFollowBriefly } = scroll;
-  useEffect(() => {
-    replyHandoffController.setArrivalListener(snapFollowBriefly);
-    return () => replyHandoffController.setArrivalListener(null);
-  }, [replyHandoffController, snapFollowBriefly]);
+  const [landingSpacerPx, setLandingSpacerPx] = useState(0);
+  const { makeRoomForReply, settleReplyLanding } = scroll;
+  useEffect(
+    () =>
+      replyHandoffController.attachRoom({
+        make: (heightPx) => {
+          setLandingSpacerPx(heightPx);
+          return makeRoomForReply(heightPx);
+        },
+        revealed: () =>
+          setLandingSpacerPx((px) => px + WORKING_INDICATOR_SLOT_HEIGHT),
+        settle: async (heightPx) => {
+          await settleReplyLanding(heightPx);
+          setLandingSpacerPx(0);
+        },
+      }),
+    [makeRoomForReply, replyHandoffController, settleReplyLanding],
+  );
   const [unread, setUnread] = useState(false);
   const prevLenRef = useRef(0);
   const sawTurnRef = useRef(false);
@@ -1791,9 +1804,10 @@ export function ChatPane({
           toolName={workingIndicator?.toolName}
           toolCallId={workingIndicator?.toolCallId}
         />
+        {landingSpacerPx > 0 ? <View style={{ height: landingSpacerPx }} /> : null}
       </View>
     ),
-    [streaming, workingIndicator, styles.chatTail],
+    [streaming, workingIndicator, styles.chatTail, landingSpacerPx],
   );
 
   // Search shows a separate results menu that overlays the chat (the chat

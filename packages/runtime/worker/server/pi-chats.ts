@@ -1,3 +1,4 @@
+import { isAgentPauseReason } from "@stella/contracts/agent-status";
 import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -603,7 +604,7 @@ export const cancelPiPlacedAgent = async (
 ): Promise<boolean> => {
   persistPiCancel(session, "agent", cancel.runKey, cancel.reason);
   const chats = await chatsBySession.get(session)?.catch(() => undefined);
-  return chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey) === true;
+  return chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey, isAgentPauseReason(cancel.reason)) === true;
 };
 
 /**

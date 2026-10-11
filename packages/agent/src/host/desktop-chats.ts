@@ -32,6 +32,7 @@ import {
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
 import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
+import { PLACED_AGENT_PAUSED } from "../stella/agents.ts";
 import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
 import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
@@ -1345,10 +1346,11 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
 
   /** Stop a run of an agent placed here, for the host that placed it; false when that run is not going here. */
-  const cancelPlacedAgent = (agentKey: string, runKey: string): boolean => {
+  /** Stop an agent another host placed here; `paused` when that host paused it. */
+  const cancelPlacedAgent = (agentKey: string, runKey: string, paused?: boolean): boolean => {
     const placed = placedRuns.get(agentKey);
     if (placed?.runKey !== runKey) return false;
-    placed.cancel.abort();
+    placed.cancel.abort(paused ? PLACED_AGENT_PAUSED : undefined);
     return true;
   };
 

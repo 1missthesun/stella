@@ -3,6 +3,7 @@ import { existsSync, promises as fs, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { hostname } from "node:os";
+import { AGENT_PAUSED_REASON } from "@stella/contracts/agent-status";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -1276,21 +1277,25 @@ export class StellaRuntimeHost {
         kind,
         conversationId,
         payload,
+        paused,
       }) => {
         if (kind === "agent") {
           const remoteThreadId =
             typeof payload?.threadId === "string" && payload.threadId.trim()
               ? payload.threadId.trim()
               : null;
+          const reason = paused
+            ? AGENT_PAUSED_REASON
+            : "Canceled by execution placement.";
           const result = remoteThreadId
             ? await this.cancelBlockingLocalAgent(
                 remoteThreadId,
-                "Canceled by execution placement.",
+                reason,
                 placementLocalAgentThreadId(dispatchId),
               )
             : await this.cancelBlockingLocalAgent(
                 placementLocalAgentThreadId(dispatchId),
-                "Canceled by execution placement.",
+                reason,
               );
           if (result?.canceled !== true) {
             throw new Error(

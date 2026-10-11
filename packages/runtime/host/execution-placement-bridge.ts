@@ -1,6 +1,8 @@
 import {
   AGENT_PAUSED_ERROR_CODE,
-} from "@stella/contracts/backend/agent-threads";
+  AGENT_PAUSED_REASON,
+  isAgentPauseReason,
+} from "@stella/contracts/agent-status";
 import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
 import { createHash } from "node:crypto";
 import type { BackendClient } from "@stella/contracts/backend/client";
@@ -87,6 +89,17 @@ export type ExecutionPlacementDesktopSubmit = {
 
 export type ExecutionPlacementAvailability = DeviceAvailability;
 
+/**
+ * How a gate-side cancel is recorded: a pause (the gate's cancel reason is the
+ * pause reason) keeps its AGENT_PAUSED code, so the local run stops paused.
+ */
+const remoteCancellation = (
+  remote: Pick<DispatchSummary, "cancelReason"> | null | undefined,
+): { errorCode?: string; errorMessage: string } =>
+  isAgentPauseReason(remote?.cancelReason)
+    ? { errorCode: AGENT_PAUSED_ERROR_CODE, errorMessage: AGENT_PAUSED_REASON }
+    : { errorMessage: "Canceled by the user." };
+
 export type ExecutionPlacementRunResult = {
   /** `paused`: someone paused it before it answered; it resumes with a message. */
   status: "ok" | "error" | "canceled" | "paused";
@@ -155,6 +168,8 @@ type PlacementBridgeOptions = {
     conversationId: string;
     /** The accepted payload, for an agent thread's own local id. */
     payload?: Record<string, unknown>;
+    /** The gate withdrew it for a pause: the run stops paused, not canceled. */
+    paused?: boolean;
   }) => Promise<void>;
   /**
    * New input for an accepted agent run. Resolves whether the running agent
@@ -957,7 +972,7 @@ export class ExecutionPlacementBridge {
     },
     cancel: async (frame) => {
       const local = this.inbox.get(frame.dispatchId);
-      if (local) await this.cancelAccepted(local);
+      if (local) await this.cancelAccepted(local, { cancelReason: frame.reason });
     },
     steer: async (frame) => {
       await this.steerAccepted(frame.dispatchId, frame.messageId, frame.text);
@@ -1155,7 +1170,7 @@ export class ExecutionPlacementBridge {
     const local = this.inbox.get(dispatch.dispatchId);
     if (!local) return;
     if (dispatch.state === "cancel_pending") {
-      await this.cancelAccepted(local);
+      await this.cancelAccepted(local, dispatch);
       return;
     }
     if (isTerminalState(dispatch.state)) {
@@ -1400,8 +1415,9 @@ export class ExecutionPlacementBridge {
         continue;
       }
       let remoteCanceled = false;
+      let remote: DispatchSummary | null = null;
       try {
-        const remote = await this.getDispatchStatus(row.dispatchId);
+        remote = await this.getDispatchStatus(row.dispatchId);
         remoteCanceled =
           remote?.state === "cancel_pending" || remote?.state === "canceled";
       } catch (error) {
@@ -1416,7 +1432,7 @@ export class ExecutionPlacementBridge {
       this.inbox.stageCancellation(row.dispatchId, {
         outcome: remoteCanceled ? "canceled" : "failed",
         ...(remoteCanceled
-          ? { errorMessage: "Canceled by the user." }
+          ? remoteCancellation(remote)
           : {
               errorCode: "LOCAL_EXECUTION_INTERRUPTED",
               errorMessage:
@@ -1619,6 +1635,7 @@ export class ExecutionPlacementBridge {
           kind: row.kind,
           conversationId: row.conversationId,
           ...(payload ? { payload } : {}),
+          ...(row.errorCode === AGENT_PAUSED_ERROR_CODE ? { paused: true } : {}),
         });
       } catch (error) {
         this.log(
@@ -1966,7 +1983,7 @@ export class ExecutionPlacementBridge {
         return;
       }
       if (remote.state === "cancel_pending") {
-        await this.cancelAccepted(row);
+        await this.cancelAccepted(row, remote);
         return;
       }
       if (row.state === "claimed") {
@@ -2131,11 +2148,14 @@ export class ExecutionPlacementBridge {
     }
   }
 
-  private async cancelAccepted(row: ExecutionPlacementInboxRow) {
+  private async cancelAccepted(
+    row: ExecutionPlacementInboxRow,
+    remote?: Pick<DispatchSummary, "cancelReason"> | null,
+  ) {
     if (row.state === "terminal" || row.state === "orphaned") return;
     this.inbox.stageCancellation(row.dispatchId, {
       outcome: "canceled",
-      errorMessage: "Canceled by the user.",
+      ...remoteCancellation(remote),
       now: this.now(),
     });
     await this.retryCancellation(row.dispatchId);

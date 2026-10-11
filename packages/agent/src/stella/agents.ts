@@ -245,6 +245,15 @@ export const noteRemoteReport = async (
 /** How a remote agent's latest reported run ended, from its record. */
 const remoteOutcome = (agent: AgentRecord): AgentAttemptOutcome => agent.outcome ?? (agent.failed ? "failed" : "completed");
 
+/** The abort reason of a placed run its host paused rather than canceled. */
+export const PLACED_AGENT_PAUSED = "placed-agent-paused";
+
+/** How a placed run its host stopped ended: paused, or canceled. */
+const stoppedPlacedRun = (threadId: string, signal: AbortSignal): PlacedAgentResult =>
+  signal.reason === PLACED_AGENT_PAUSED
+    ? { threadId, status: "paused", error: AGENT_PAUSED_REASON }
+    : { threadId, status: "canceled", error: "Canceled." };
+
 /** An agent another host placed here, and one run of it (`runPlacedAgent`). */
 export type PlacedAgentRun = {
   /** The agent's identity at the host that placed it, the same for each of its runs. */
@@ -1614,7 +1623,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     const record = (await harness.snapshot(StellaAgentsDoc, root.id, context))?.agents[threadId];
     const agent = record ? await harness.conversation(record.conversationId as ConversationId, context) : undefined;
     if (!agent) return { threadId, status: "error", error: "The agent could not start here." };
-    if (args.signal?.aborted) return { threadId, status: "canceled", error: "Canceled." };
+    if (args.signal?.aborted) return stoppedPlacedRun(threadId, args.signal);
     const submission = await agent.submit(
       { type: "input", content: args.prompt, whenBusy: "steer", requestId: `placed:${args.runKey}` },
       context,
@@ -1626,7 +1635,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     args.signal?.addEventListener("abort", () => void stop().catch(() => undefined), { once: true });
     if (args.signal?.aborted) await stop();
     const settled = await submission.wait(context);
-    if (args.signal?.aborted) return { threadId, status: "canceled", error: "Canceled." };
+    if (args.signal?.aborted) return stoppedPlacedRun(threadId, args.signal);
     // Paused here (its conversation aborted) before it answered.
     if (settled.status === "unanswered" && settled.reason === "aborted") {
       return { threadId, status: "paused", error: AGENT_PAUSED_REASON };

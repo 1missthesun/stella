@@ -55,7 +55,16 @@ export type LocalCronPayload =
     }
   | {
       kind: 'watch'
-      scriptPath: string
+      /** A watch on this computer: its Bun check script (stdout contract). */
+      scriptPath?: string
+      /** A watch in the cloud: its module check script (`WatchCheckResult`). */
+      script?: string
+      /** What to do with a finding, as the user put it when it was set up. */
+      instructions?: string
+      /** Who handles a finding: the orchestrator (default) or an agent, already approved. */
+      route?: 'orchestrator' | 'agent'
+      /** Stop once a finding has been handed over. */
+      once?: boolean
     }
   | {
       kind: 'script'

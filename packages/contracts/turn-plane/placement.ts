@@ -263,6 +263,12 @@ export type DispatchPayload = {
    * message the user typed. It is journaled hidden.
    */
   handoff?: true;
+  /**
+   * Chat dispatches from a schedule only: start the prompt as an agent of
+   * the conversation's orchestrator, without an orchestrator turn. Its
+   * report comes back to the orchestrator like any finished job.
+   */
+  scheduledAgent?: { description: string };
 };
 
 export type DispatchSubmitRequest = {

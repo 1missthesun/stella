@@ -1,6 +1,6 @@
 /**
- * Scheduled turns: prompts the owner's object starts from its alarm, in a
- * cloud chat or on a named desktop.
+ * The owner's schedules, fired from the owner object's alarm: reminders,
+ * tasks and cloud watches.
  */
 
 import type { LocalCronSchedule } from "../scheduling.js";
@@ -11,12 +11,42 @@ export type ScheduleStatus = "active" | "paused" | "done";
 /**
  * `reminder`: the prompt is the text itself, delivered with no model.
  * `task`: the prompt starts a run at fire time.
+ * `watch`: an AI-free check script runs at each fire; only what it finds
+ * (or its failure) wakes AI, and the prompt is what to do with a finding.
  */
-export type ScheduleKind = "reminder" | "task";
+export type ScheduleKind = "reminder" | "task" | "watch";
+
+/**
+ * Who handles a fire that needs AI: the orchestrator (to tell, ask or act,
+ * as it judges), or an agent of its, straight away, for work already
+ * approved when the schedule was set.
+ */
+export type ScheduleRoute = "orchestrator" | "agent";
+
+/**
+ * A cloud watch's script: an ES module whose default export is
+ * `async ({ state }) => ({ found?: string, state?: unknown })`. It may
+ * `fetch`; `state` is what it returned last time (null at first). A
+ * non-empty `found` is a finding; a throw is the watch failing.
+ */
+export const WATCH_SCRIPT_MAX_CHARS = 64_000;
+export const WATCH_STATE_MAX_BYTES = 64_000;
+export const WATCH_MIN_INTERVAL_MS = 5 * 60_000;
+
+export type WatchCheckResult =
+  | { ok: true; found: string; durationMs: number }
+  | { ok: false; error: string; durationMs: number };
 
 export type ScheduleRow = {
   scheduleId: string;
   kind: ScheduleKind;
+  /** Tasks and watches: who handles a fire that needs AI. */
+  route: ScheduleRoute;
+  /** Watches: stop once a finding has been handed over. */
+  once?: boolean;
+  /** Watches: when the script last ran, and how. */
+  lastCheckAt?: number;
+  lastFinding?: string;
   /** Absent until the first fire picks the conversation it reports into. */
   conversationId?: string;
   /** The desktop a fire is offered to first; absent runs in the cloud. */
@@ -46,6 +76,9 @@ export type ScheduleToolRequest =
       schedule: LocalCronSchedule;
       description?: string;
       conversationId?: string;
+      route?: ScheduleRoute;
+      script?: string;
+      once?: boolean;
     }
   | {
       action: "update";
@@ -55,6 +88,9 @@ export type ScheduleToolRequest =
       schedule?: LocalCronSchedule;
       description?: string;
       status?: "active" | "paused";
+      route?: ScheduleRoute;
+      script?: string;
+      once?: boolean;
     }
   | { action: "remove"; requestId: string; scheduleId: string };
 
@@ -63,6 +99,8 @@ export type ScheduleToolResult = {
   ok: boolean;
   replayed: boolean;
   schedule?: ScheduleRow;
+  /** A watch's first check, run when it was set or its script changed. */
+  check?: WatchCheckResult;
   removed?: boolean;
   schedules: ScheduleRow[];
 };
@@ -79,8 +117,12 @@ export type ScheduleCalls = {
       description?: string;
       conversationId?: string;
       targetDeviceId?: string;
+      route?: ScheduleRoute;
+      /** Watches: the check script, run once now to prove it works. */
+      script?: string;
+      once?: boolean;
     };
-    result: ScheduleRow;
+    result: ScheduleRow & { check?: WatchCheckResult };
   };
   "schedules.update": {
     args: {
@@ -90,8 +132,11 @@ export type ScheduleCalls = {
       schedule?: LocalCronSchedule;
       description?: string;
       status?: "active" | "paused";
+      route?: ScheduleRoute;
+      script?: string;
+      once?: boolean;
     };
-    result: ScheduleRow;
+    result: ScheduleRow & { check?: WatchCheckResult };
   };
   "schedules.remove": {
     args: { requestId: string; scheduleId: string };

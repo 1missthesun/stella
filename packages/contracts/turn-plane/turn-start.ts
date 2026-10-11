@@ -83,8 +83,12 @@ export type CloudPiAgentRequest = {
   threadId: string;
   /** For `start`: the agent's name. */
   description?: string;
-  /** The computer whose orchestrator gets the agent's reports. */
-  originDeviceId: string;
+  /**
+   * The computer whose orchestrator gets the agent's reports. Absent only on
+   * a schedule's service turn: the agent reports to this conversation's own
+   * orchestrator.
+   */
+  originDeviceId?: string;
 };
 
 export const PI_AGENT_THREAD_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;

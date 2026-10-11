@@ -47,6 +47,7 @@ import {
   type ComposerMessageStore,
 } from "@/features/chat/hooks/use-composer-message-state";
 import { useOptimisticStop } from "@/features/chat/hooks/use-optimistic-stop";
+import { useEscapeToStop } from "@/features/chat/hooks/use-escape-to-stop";
 import { handleComposerPaste } from "@/features/chat/lib/paste-context";
 import { useReadAloud } from "@/features/voice/services/read-aloud/use-read-aloud";
 import {
@@ -210,6 +211,7 @@ function AccountScopedChatPanelTab({
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const { showStop, requestStop } = useOptimisticStop(isStreaming, onStop);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  useEscapeToStop({ active: showStop, stop: requestStop, inputRef });
   const restoredConversationScrollRef = useRef<string | null>(null);
 
   // Perf: the auto-context suggestion strip polls native window/AX

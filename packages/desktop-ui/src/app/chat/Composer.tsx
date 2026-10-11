@@ -20,6 +20,7 @@ import {
 } from "@/features/chat/ComposerPrimitives";
 import { useComposerModelPinned } from "@/features/chat/composer-model-pin-store";
 import { useOptimisticStop } from "@/features/chat/hooks/use-optimistic-stop";
+import { useEscapeToStop } from "@/features/chat/hooks/use-escape-to-stop";
 import {
   deriveComposerState,
   hasAttachedComposerChips,
@@ -168,6 +169,12 @@ function ComposerImpl({
   // the transcription finishes but the message is never sent/queued.
   const dictationInFlight = dictation.isRecording || dictation.isTranscribing;
   const canSubmitWithDictation = canSubmit || dictationInFlight;
+  useEscapeToStop({
+    active: showStop && !modelMentionTrigger && !dictationInFlight,
+    stop: requestStop,
+    inputRef: textareaRef,
+    whenUnfocused: true,
+  });
   useDictationPaste({
     active: dictationInFlight,
     setMessage,

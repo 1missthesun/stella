@@ -81,8 +81,7 @@ const POST_SEND_REANCHOR_WINDOW_MS = 1500;
 // near the bottom.
 // ---------------------------------------------------------------------------
 
-const LANDING_LAYOUT_TIMEOUT_MS = 400;
-const LANDING_GLIDE_MS = 240;
+const LANDING_GLIDE_TIMEOUT_MS = 700;
 const LANDING_SETTLE_MS = 250;
 
 export function useChatScroll(
@@ -439,10 +438,6 @@ export function useChatScroll(
   }, [commitOffset, updateAwayFromBottom]);
 
   const followSuspendedUntilMsRef = useRef(0);
-  const landingRef = useRef<{
-    minHeight: number;
-    onGrown: (height: number) => void;
-  } | null>(null);
 
   const setFollowTarget = useCallback(
     (target: number, gentle = false) => {
@@ -453,12 +448,7 @@ export function useChatScroll(
       const maxOffset = Math.max(0, contentHeight - layoutHeight);
       const clamped = Math.max(0, Math.min(maxOffset, target));
 
-      if (
-        landingRef.current ||
-        Date.now() < followSuspendedUntilMsRef.current
-      ) {
-        return;
-      }
+      if (Date.now() < followSuspendedUntilMsRef.current) return;
 
       // Seed the spring's current offset from the real position when starting
       // cold, so the first frame integrates from where the list actually sits.
@@ -489,71 +479,25 @@ export function useChatScroll(
     [stepFollow],
   );
 
-  const waitForGrowth = useCallback(
-    (minHeight: number): Promise<number | null> =>
-      new Promise((resolve) => {
-        const timer = setTimeout(() => {
-          if (landingRef.current?.onGrown === onGrown) landingRef.current = null;
-          resolve(null);
-        }, LANDING_LAYOUT_TIMEOUT_MS);
-        const onGrown = (height: number) => {
-          clearTimeout(timer);
-          landingRef.current = null;
-          resolve(height);
-        };
-        landingRef.current = { minHeight, onGrown };
-      }),
-    [],
-  );
+  const beginReplyLanding = useCallback(() => {
+    stopFollowLoop();
+    followSuspendedUntilMsRef.current = Number.POSITIVE_INFINITY;
+  }, [stopFollowLoop]);
 
-  const glideTo = useCallback(
-    (target: number): Promise<void> =>
-      new Promise((resolve) => {
-        const from = metricsRef.current.offsetY;
-        const distance = target - from;
-        if (Math.abs(distance) < 1) {
-          resolve();
-          return;
-        }
-        const startedAt = Date.now();
-        const step = () => {
-          const t = Math.min(1, (Date.now() - startedAt) / LANDING_GLIDE_MS);
-          const eased = 1 - Math.pow(1 - t, 3);
-          commitOffset(from + distance * eased);
-          if (t < 1) {
-            requestAnimationFrame(step);
-          } else {
-            updateAwayFromBottom(target);
-            resolve();
-          }
-        };
-        requestAnimationFrame(step);
-      }),
-    [commitOffset, updateAwayFromBottom],
-  );
+  const glideToEndForReply = useCallback(async (): Promise<void> => {
+    if (!followArmedRef.current) return;
+    const scrolled = listRef.current?.scrollToEnd({ animated: true });
+    await Promise.race([
+      scrolled ?? Promise.resolve(),
+      new Promise<void>((resolve) =>
+        setTimeout(resolve, LANDING_GLIDE_TIMEOUT_MS),
+      ),
+    ]);
+  }, []);
 
-  const makeRoomForReply = useCallback(
-    async (extraPx: number): Promise<void> => {
-      stopFollowLoop();
-      followSuspendedUntilMsRef.current = Number.POSITIVE_INFINITY;
-      const following = followArmedRef.current;
-      const height = await waitForGrowth(
-        contentHeightRef.current + extraPx - 1,
-      );
-      if (!following || height === null) return;
-      const target = Math.max(0, height - metricsRef.current.layoutHeight);
-      if (target > metricsRef.current.offsetY + 1) await glideTo(target);
-    },
-    [glideTo, stopFollowLoop, waitForGrowth],
-  );
-
-  const settleReplyLanding = useCallback(
-    async (rowPx: number): Promise<void> => {
-      await waitForGrowth(contentHeightRef.current + rowPx - 1);
-      followSuspendedUntilMsRef.current = Date.now() + LANDING_SETTLE_MS;
-    },
-    [waitForGrowth],
-  );
+  const endReplyLanding = useCallback(() => {
+    followSuspendedUntilMsRef.current = Date.now() + LANDING_SETTLE_MS;
+  }, []);
 
   const followActiveAssistantRow = useCallback(() => {
     const assistantHeight = activeAssistantHeightRef.current;
@@ -675,12 +619,6 @@ export function useChatScroll(
       contentHeightRef.current = height;
       metricsRef.current.contentHeight = height;
 
-      const landing = landingRef.current;
-      if (landing) {
-        if (height >= landing.minHeight) landing.onGrown(height);
-        return;
-      }
-
       // Composer collapse and footer changes can settle after the user
       // row measures. Re-anchor from this committed geometry as well.
       const pending = pendingSendAnchorRef.current;
@@ -773,8 +711,9 @@ export function useChatScroll(
     getShouldPlaceLatestTurn,
     releaseFollow,
     nudgeAfterSend,
-    makeRoomForReply,
-    settleReplyLanding,
+    beginReplyLanding,
+    glideToEndForReply,
+    endReplyLanding,
     awayFromBottom,
     isFollowingLatest,
   };

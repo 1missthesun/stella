@@ -528,6 +528,15 @@ const withInlineAskRecords = (
   return out;
 };
 
+const nextFrames = (count: number): Promise<void> =>
+  new Promise((resolve) => {
+    const step = (left: number) => {
+      if (left <= 0) resolve();
+      else requestAnimationFrame(() => step(left - 1));
+    };
+    step(count);
+  });
+
 export function ChatPane({
   messages: projectedMessages,
   streaming,
@@ -799,22 +808,31 @@ export function ChatPane({
   );
 
   const [landingSpacerPx, setLandingSpacerPx] = useState(0);
-  const { makeRoomForReply, settleReplyLanding } = scroll;
+  const { beginReplyLanding, glideToEndForReply, endReplyLanding } = scroll;
   useEffect(
     () =>
       replyHandoffController.attachRoom({
-        make: (heightPx) => {
+        make: async (heightPx) => {
+          beginReplyLanding();
           setLandingSpacerPx(heightPx);
-          return makeRoomForReply(heightPx);
+          await nextFrames(2);
+          await glideToEndForReply();
         },
         revealed: () =>
           setLandingSpacerPx((px) => px + WORKING_INDICATOR_SLOT_HEIGHT),
-        settle: async (heightPx) => {
-          await settleReplyLanding(heightPx);
-          setLandingSpacerPx(0);
+        settle: () => {
+          requestAnimationFrame(() => {
+            setLandingSpacerPx(0);
+            endReplyLanding();
+          });
         },
       }),
-    [makeRoomForReply, replyHandoffController, settleReplyLanding],
+    [
+      beginReplyLanding,
+      endReplyLanding,
+      glideToEndForReply,
+      replyHandoffController,
+    ],
   );
   const [unread, setUnread] = useState(false);
   const prevLenRef = useRef(0);

@@ -264,13 +264,28 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderShellRef = useRef(renderShell);
   renderShellRef.current = renderShell;
+  const [held, setHeld] = useState(false);
   const handoffController = useReplyHandoffController();
 
   useEffect(() => {
     if (!handoffController) return;
     return handoffController.attachIndicator({
       shown: () => renderShellRef.current,
+      hold: () => {
+        if (holdTimerRef.current !== null) {
+          clearTimeout(holdTimerRef.current);
+          holdTimerRef.current = null;
+        }
+        if (leaveTimerRef.current !== null) {
+          clearTimeout(leaveTimerRef.current);
+          leaveTimerRef.current = null;
+        }
+        shellProgress.stopAnimation();
+        shellProgress.setValue(1);
+        setHeld(true);
+      },
       vacate: () => {
+        setHeld(false);
         if (holdTimerRef.current !== null) {
           clearTimeout(holdTimerRef.current);
           holdTimerRef.current = null;
@@ -321,7 +336,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     }
 
     wasActiveRef.current = false;
-    if (!renderShell) return clearTimers;
+    if (!renderShell || held) return clearTimers;
 
     const exitMs = exitImmediately ? EXIT_HANDOFF_MS : EXIT_ANIMATION_MS;
     const startExit = () => {
@@ -348,14 +363,14 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     }
 
     return clearTimers;
-  }, [active, exitImmediately, renderShell, shellProgress]);
+  }, [active, exitImmediately, held, renderShell, shellProgress]);
 
   const shellStyle = useMemo(
     () => ({ opacity: shellProgress }),
     [shellProgress],
   );
 
-  const showShell = renderShell && (active || !exitImmediately);
+  const showShell = renderShell && (held || active || !exitImmediately);
 
   return (
     <View

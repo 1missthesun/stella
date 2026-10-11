@@ -119,22 +119,28 @@ export function AssistantBubble({
   const [staged, setStaged] = useState(
     () => animate && !reducedMotion && Boolean(handoff?.canStage()),
   );
+  const stagedOnMountRef = useRef(staged);
   const arrivedUnstagedRef = useRef(animate && !staged);
   const landingRef = useRef(false);
+  const settleRef = useRef<(() => void) | null>(null);
   const mountedRef = useRef(true);
   useEffect(
     () => () => {
       mountedRef.current = false;
+      if (stagedOnMountRef.current && !landingRef.current) {
+        handoff?.replyArrived();
+      }
     },
-    [],
+    [handoff],
   );
   useLayoutEffect(() => {
-    if (arrivedUnstagedRef.current) handoff?.replyArrived();
+    if (stagedOnMountRef.current) handoff?.holdIndicator();
+    else if (arrivedUnstagedRef.current) handoff?.replyArrived();
   }, [handoff]);
   const onStagedLayout = (event: LayoutChangeEvent) => {
     if (landingRef.current || !handoff) return;
     landingRef.current = true;
-    handoff.land(event.nativeEvent.layout.height, () => {
+    settleRef.current = handoff.land(event.nativeEvent.layout.height, () => {
       if (!mountedRef.current) return false;
       setStaged(false);
       return true;
@@ -145,6 +151,15 @@ export function AssistantBubble({
     <View
       style={staged ? stagedStyles.hidden : undefined}
       pointerEvents={staged ? "none" : "auto"}
+      onLayout={
+        staged
+          ? undefined
+          : (event) => {
+              if (event.nativeEvent.layout.height <= 0) return;
+              settleRef.current?.();
+              settleRef.current = null;
+            }
+      }
     >
       <Animated.View
         style={[style, pop]}

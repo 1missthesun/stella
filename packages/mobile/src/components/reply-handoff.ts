@@ -2,14 +2,17 @@ import { createContext, useContext } from "react";
 
 export type ReplyHandoffIndicatorHandle = {
   shown: () => boolean;
+  hold: () => void;
   vacate: () => void;
 };
 
 export type ReplyHandoffRoom = {
   make: (heightPx: number) => Promise<void>;
   revealed: () => void;
-  settle: (heightPx: number) => Promise<void>;
+  settle: () => void;
 };
+
+const ROW_LAYOUT_TIMEOUT_MS = 300;
 
 export function createReplyHandoffController() {
   let indicator: ReplyHandoffIndicatorHandle | null = null;
@@ -30,13 +33,24 @@ export function createReplyHandoffController() {
     canStage(): boolean {
       return Boolean(room && indicator?.shown());
     },
-    land(heightPx: number, reveal: () => boolean) {
+    holdIndicator() {
+      indicator?.hold();
+    },
+    land(heightPx: number, reveal: () => boolean): () => void {
       const target = room;
       if (!target) {
         reveal();
         indicator?.vacate();
-        return;
+        return () => undefined;
       }
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const settle = () => {
+        if (settled) return;
+        settled = true;
+        if (timer !== null) clearTimeout(timer);
+        target.settle();
+      };
       void target
         .make(heightPx)
         .catch(() => undefined)
@@ -44,9 +58,13 @@ export function createReplyHandoffController() {
           if (reveal()) {
             target.revealed();
             indicator?.vacate();
+            timer = setTimeout(settle, ROW_LAYOUT_TIMEOUT_MS);
+          } else {
+            indicator?.vacate();
+            settle();
           }
-          return target.settle(heightPx);
         });
+      return settle;
     },
     replyArrived() {
       if (indicator?.shown()) indicator.vacate();

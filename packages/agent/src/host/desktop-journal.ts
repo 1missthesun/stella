@@ -68,6 +68,8 @@ export type DesktopJournal = {
   publishCheckpoint(checkpoint: { summary: string; firstKept: JournalCheckpointFirstKept }): Promise<void>;
   /** Records after `afterSeq`, ascending, a batch at a time. */
   read(afterSeq: number): Promise<{ records: JournalReadRecord[]; complete: boolean }>;
+  /** The Claude Code work the cloud holds on the usage limit now, by its journal's newest cards. */
+  usageLimitHolds?(): Promise<Array<{ threadId?: string; until?: number; createdAtMs: number }>>;
   /** This computer's own mirrored turns and voice lines, which are not imported back. */
   ownTurn(turnId: string): boolean;
   begin(turn: {
@@ -198,7 +200,34 @@ export async function journalMirror(args: {
       return undefined;
     }, context);
 
+  /**
+   * Once per process, before the first import: the holds the cloud has now,
+   * which an import that resumes past their cards would never see again.
+   */
+  let holdsRebuilt = false;
+  const rebuildHolds = async () => {
+    if (holdsRebuilt || !journal.usageLimitHolds || !args.onUsageLimit) return;
+    holdsRebuilt = true;
+    try {
+      for (const hold of await journal.usageLimitHolds()) {
+        args.onUsageLimit(
+          {
+            type: "usage-limit",
+            state: "held",
+            ...(hold.threadId ? { threadId: hold.threadId } : {}),
+            ...(hold.until !== undefined ? { until: hold.until } : {}),
+          },
+          hold.createdAtMs,
+        );
+      }
+    } catch (error) {
+      holdsRebuilt = false;
+      report(error);
+    }
+  };
+
   const importNow = async () => {
+    await rebuildHolds();
     const start = await journalImportAfter(await doc(), journal.start);
     let after: number = start.after;
     // A first import from the journal's window starts at a prompt: it may

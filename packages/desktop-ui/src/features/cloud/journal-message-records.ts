@@ -402,11 +402,18 @@ export const journalRecordsToMessageRecords = (
     let userMessageId: string | undefined;
     let turnUserRecord: JournalMessageRecord | undefined;
     const mirrored = mirroredLifecycleEvents(turnId, turnRecords);
+    // A wake turn can record its lifecycle card ahead of its own prompt. The
+    // reply that relays it follows the prompt, so the card waits for it.
+    const promptAhead = turnRecords.some(
+      (record) => record.kind === "message" && record.role === "user",
+    );
+    const beforePrompt: EventRecord[] = [];
 
     for (const record of turnRecords) {
       const lifecycle = journalLifecycleEvent(record);
       if (lifecycle) {
-        events.push(lifecycle);
+        if (promptAhead && !turnUserRecord) beforePrompt.push(lifecycle);
+        else events.push(lifecycle);
         continue;
       }
       if (record.kind !== "message") continue;
@@ -446,6 +453,7 @@ export const journalRecordsToMessageRecords = (
         // The wake's completion precedes the reply that relays it, so the
         // grouping hands it to that reply.
         if (mirrored.wake) events.push(mirrored.wake);
+        events.push(...beforePrompt.splice(0));
         continue;
       }
 

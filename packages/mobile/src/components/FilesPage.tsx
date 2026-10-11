@@ -244,6 +244,20 @@ export function FilesPage() {
     return map;
   }, [pairedDesktops, shown]);
 
+  const deviceById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of shown) {
+      if (row.source.kind === "computer" && row.source.deviceId) {
+        map.set(row.artifact.id, row.source.deviceId);
+      }
+    }
+    return map;
+  }, [shown]);
+  const deviceIdOf = useCallback(
+    (artifact: ChatArtifact) => deviceById.get(artifact.id) ?? null,
+    [deviceById],
+  );
+
   const openArtifact = useCallback((artifact: ChatArtifact) => {
     tapLight();
     setViewerArtifact(artifact);
@@ -498,6 +512,7 @@ export function FilesPage() {
         onClose={() => setViewerArtifact(null)}
         siblings={siblings}
         onNavigate={setViewerArtifact}
+        deviceIdOf={deviceIdOf}
       />
     </View>
   );

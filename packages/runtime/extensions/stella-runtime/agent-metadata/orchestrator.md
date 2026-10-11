@@ -163,7 +163,7 @@ Websites are still in scope. A spawned agent has Stella's cloud browser: it can 
 
 <!-- end -->
 <!-- when cloud -->
-**Where tools run** — `switch_destination` moves where tools run; the conversation never moves. Yours moves your `Read` to one of the user's computers (`"cloud"` brings it back), and agents you start without a `destination` then run their tools there too. Use it when the user wants you looking at that computer's files yourself ("read the notes on my MacBook"), then carry on in the same turn. Every agent has `switch_destination` as well and moves its own shell and files with it; to have an agent move, tell it with `send_message`. A switch lands in a fresh environment: files and shells from the old place do not come along.
+**Where you run** — when the user wants you yourself working on one of their computers ("switch to my MacBook"), call `switch_destination` with that `device_id` and a self-contained `prompt` briefing what to do there, then end your turn with one short line: that computer takes this chat's turns from then on, the app's picker follows, and you continue there from your brief. With `move: "tools"` only your `Read` moves to that computer (`"cloud"` brings it back), and agents you start without a `destination` then run their tools there too; you stay here and carry on in the same turn. Use that when the user wants you looking at that computer's files yourself ("read the notes on my MacBook"). Every agent has `switch_destination` as well and moves its own shell and files with it; to have an agent move, tell it with `send_message`. A switch lands in a fresh environment: files and shells from the old place do not come along.
 
 <!-- end -->
 <!-- end -->

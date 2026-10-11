@@ -179,7 +179,7 @@ export const switchDestinationTool = (
   defineTool({
     name: SWITCH_DESTINATION_TOOL_NAME,
     description:
-      'Move where your tools run: "cloud", or one of the user\'s computers by device_id. Only the tools move, unless Stella passes move: "brain". Your conversation, what you know of this work and the agents you started stay with you, so you carry on in this same turn; the switch takes effect from your next tool call. The new place is a fresh environment: files and shells from where you were do not come along. Use it when the work needs that computer\'s files, programs or hardware, or to come back to where they started. For Stella it moves her Read and where her new agents run by default.',
+      'Move where you or your tools run: "cloud", or one of the user\'s computers by device_id. For Stella in a chat stored in the cloud it moves Stella herself by default (move: "brain"): that host takes this conversation\'s turns from now on, the app\'s destination picker follows, and she carries on there with the whole conversation from her brief (prompt) once this turn ends. Naming where she already runs brings her tools back instead. With move: "tools", and always for an agent, only the tools move: your conversation, what you know of this work and the agents you started stay with you, so you carry on in this same turn, and the switch takes effect from your next tool call. The new place is a fresh environment: files and shells from where you were do not come along. Move tools when the work needs that computer\'s files, programs or hardware, or to come back to where they started; for Stella they are her Read and where her new agents run.',
     parameters: Type.Object({
       destination: Type.String({
         description:
@@ -188,13 +188,13 @@ export const switchDestinationTool = (
       prompt: Type.Optional(
         Type.String({
           description:
-            'Optional: a line on what you will do there, shown with the switch. With move: "brain", required: your brief to yourself, which you read there to carry on.',
+            'When Stella moves herself, required: her brief to herself, which she reads there to carry on, self-contained. When only tools move, optional: a line on what you will do there, shown with the switch.',
         }),
       ),
       move: Type.Optional(
         Type.Union([Type.Literal("tools"), Type.Literal("brain")], {
           description:
-            'Stella only, in a chat stored in the cloud: "brain" moves Stella herself there, so that host takes this conversation\'s turns from now on and carries on from the shared conversation with your brief once this turn ends. Use it when the user asks you to keep going in the cloud (or on that computer) or when the work needs you there. Default "tools".',
+            'Stella only, in a chat stored in the cloud: "brain" (her default there) moves Stella herself; "tools" moves only her Read and where her new agents run, and she stays where she is. An agent always moves only its tools.',
         }),
       ),
     }),
@@ -208,38 +208,42 @@ export const switchDestinationTool = (
       if (local && rootPlacement.kind !== "local") throw new Error('You run in the cloud: pass "cloud" or a device_id.');
       const self = (await api.snapshot(StellaAgentDoc, api.conversationId, context)) ?? { agentType: "orchestrator" };
       const orchestrator = self.agentType === "orchestrator";
-      if (args.move === "brain") {
-        if (!orchestrator) throw new Error('Only Stella moves her brain. Leave out move: your tools move instead.');
-        if (!host.moveBrain) throw new Error("Your brain can't move from here; move your tools instead.");
-        const brief = args.prompt?.trim();
-        if (!brief) throw new Error("Pass your brief as prompt: what you will do there, as you will read it there.");
-        const target: StellaPlacement = local
-          ? { kind: "local" }
-          : destination.kind === "cloud"
-            ? { kind: "cloud" }
-            : { kind: "device", deviceId: destination.deviceId };
-        const moved = await host.moveBrain(target, brief, context);
-        if ("error" in moved) throw new Error(moved.error);
-        return {
-          content: [
-            {
-              type: "text",
-              text: `You are moving to ${describePlacement(moved.moved)}: from now on it takes this conversation's turns, and you carry on there with your brief once this turn ends, with the whole conversation. End this turn now with at most one short line to the user; start no more work here.`,
-            },
-          ],
-          details: {
-            move: "brain",
-            destination: moved.moved.kind === "device" ? moved.moved.deviceId : moved.moved.kind,
-            brief,
-          } satisfies Record<string, string> as Record<string, string>,
-        };
-      }
-      const current = placementOf(await api.snapshot(StellaPlacementDoc, api.conversationId, context)) ?? rootPlacement;
-      const target: StellaPlacement = local
+      if (args.move === "brain" && !orchestrator) throw new Error("Only Stella moves her brain. Leave out move: your tools move instead.");
+      if (args.move === "brain" && !host.moveBrain) throw new Error("Your brain can't move from here; move your tools instead.");
+      const requested: StellaPlacement = local
         ? { kind: "local" }
         : destination.kind === "cloud"
           ? { kind: "cloud" }
           : { kind: "device", deviceId: destination.deviceId };
+      if (orchestrator && host.moveBrain && args.move !== "tools") {
+        const prepared = await host.prepare(requested, context);
+        if ("error" in prepared) throw new Error(prepared.error);
+        if (samePlacement(prepared.placement, rootPlacement)) {
+          if (args.move === "brain") {
+            return { content: [{ type: "text", text: `You already run on ${describePlacement(rootPlacement)}. Carry on here.` }] };
+          }
+        } else {
+          const brief = args.prompt?.trim();
+          if (!brief) throw new Error("Pass your brief as prompt: what you will do there, as you will read it there.");
+          const moved = await host.moveBrain(requested, brief, context);
+          if ("error" in moved) throw new Error(moved.error);
+          return {
+            content: [
+              {
+                type: "text",
+                text: `You are moving to ${describePlacement(moved.moved)}: from now on it takes this conversation's turns, and you carry on there with your brief once this turn ends, with the whole conversation. End this turn now with at most one short line to the user; start no more work here.`,
+              },
+            ],
+            details: {
+              move: "brain",
+              destination: moved.moved.kind === "device" ? moved.moved.deviceId : moved.moved.kind,
+              brief,
+            } satisfies Record<string, string> as Record<string, string>,
+          };
+        }
+      }
+      const current = placementOf(await api.snapshot(StellaPlacementDoc, api.conversationId, context)) ?? rootPlacement;
+      const target = requested;
       if (samePlacement(current, target)) {
         return { content: [{ type: "text", text: `Your tools already run on ${describePlacement(current)}. Carry on.` }] };
       }

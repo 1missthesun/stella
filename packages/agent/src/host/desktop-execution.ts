@@ -179,6 +179,34 @@ export function desktopExecution(options: {
     return result(await environment.run(placement, { ...rest, owner: String(piConversationId) }, context.abortSignal));
   };
 
+  const isHere = (target: StellaPlacement): boolean =>
+    target.kind === "local" || (target.kind === "device" && target.deviceId === options.deviceId);
+
+  /** The brain record names `next` from now on: that host takes the conversation's turns. */
+  const setBrain = async (brain: DesktopBrain, next: PiBrainHost): Promise<PiBrainRecord> => {
+    const record = await brain.set(next);
+    options.brainMoved?.(record);
+    return record;
+  };
+
+  /** The cloud or another computer, which must be able to take work now, as for its tools. */
+  const brainHostAt = async (
+    target: StellaPlacement,
+    context: Context,
+  ): Promise<{ placement: StellaPlacement; next: PiBrainHost } | { error: string }> => {
+    const prepared = await host.prepare(target, context);
+    if ("error" in prepared) return prepared;
+    const placement = prepared.placement;
+    if (placement.kind === "local") return { error: "You already run on this computer." };
+    return {
+      placement,
+      next:
+        placement.kind === "device"
+          ? { host: "device", deviceId: placement.deviceId, ...(placement.label ? { label: placement.label } : {}) }
+          : { host: "cloud" },
+    };
+  };
+
   const host: StellaExecutionHost = {
     localOnly: options.localOnly,
     prepare: async (target) => await environment.prepare(target),
@@ -187,33 +215,45 @@ export function desktopExecution(options: {
     ...(options.brain && !options.localOnly
       ? {
           moveBrain: async (target, brief, context) => {
+            if (isHere(target)) return { error: "You already run on this computer." };
+            const at = await brainHostAt(target, context);
+            if ("error" in at) return at;
             const brain = options.brain!;
-            if (target.kind === "local" || (target.kind === "device" && target.deviceId === options.deviceId)) {
-              return { error: "You already run on this computer." };
-            }
-            // A computer must be able to take work now, as for its tools.
-            const prepared = await host.prepare(target, context);
-            if ("error" in prepared) return prepared;
-            const placement = prepared.placement;
-            const next: PiBrainHost =
-              placement.kind === "device"
-                ? { host: "device", deviceId: placement.deviceId, ...(placement.label ? { label: placement.label } : {}) }
-                : { host: "cloud" };
-            const record = await brain.set(next);
-            options.brainMoved?.(record);
+            await setBrain(brain, at.next);
             void (async () => {
               await options.turnEnded?.();
-              await brain.handOff(next, brief);
+              await brain.handOff(at.next, brief);
             })().catch((error: unknown) => options.report(error));
-            return { moved: placement };
+            return { moved: at.placement };
           },
         }
       : {}),
   };
 
+  /**
+   * The user moving Stella from the app's picker: the same move as her own,
+   * with no brief to hand on, since the user's next message continues
+   * there. This computer is a host like any other: picking it keeps her here
+   * for every device's messages.
+   */
+  const pinBrain = async (target: StellaPlacement, context: Context): Promise<PiBrainRecord | { error: string }> => {
+    const brain = options.brain;
+    if (!brain || options.localOnly) return { error: "This chat is stored only on this computer, so it can only run here." };
+    if (!isHere(target)) {
+      const at = await brainHostAt(target, context);
+      if ("error" in at) return at;
+      return await setBrain(brain, at.next);
+    }
+    if (!options.deviceId) return { error: "This computer has no device id yet. Try again in a moment." };
+    const listed = await environment.remote?.devices().catch(() => undefined);
+    const label = listed?.find((entry) => entry.deviceId === options.deviceId)?.label?.trim();
+    return await setBrain(brain, { host: "device", deviceId: options.deviceId, ...(label ? { label } : {}) });
+  };
+
   return {
     host,
     run,
+    pinBrain,
     /** Let every container this conversation holds go. */
     close: environment.close,
   };

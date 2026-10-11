@@ -2,10 +2,31 @@ import type { ChatMessage } from "../types";
 
 const SETTLE_MS = 700;
 const REPEAT_WINDOW_MS = 15_000;
+const FIRST_PART_MIN = 12;
+const FIRST_PART_MAX = 220;
 
-export type QueuedReply = { id: string; text: string };
+/** One clip to speak. `source` is the whole reply it came from, normalized. */
+export type QueuedReply = { id: string; text: string; source: string };
 
 const normalize = (text: string) => text.replace(/\s+/g, " ").trim();
+
+/**
+ * Splits a reply after its first sentence. Speech for a short clip starts
+ * sooner, and the remainder is synthesized while the first part plays.
+ */
+export function splitForSpeech(id: string, text: string): QueuedReply[] {
+  const source = normalize(text);
+  const match = /^[\s\S]+?[.!?…](?=\s)/u.exec(text);
+  const head = match?.[0].trim() ?? "";
+  const tail = match ? text.slice(match[0].length).trim() : "";
+  if (head.length < FIRST_PART_MIN || head.length > FIRST_PART_MAX || !tail) {
+    return [{ id, text, source }];
+  }
+  return [
+    { id: `${id}#1`, text: head, source },
+    { id: `${id}#2`, text: tail, source },
+  ];
+}
 
 /**
  * Decides which assistant messages the car speaks. Every message that arrives
@@ -73,22 +94,26 @@ export class ReplyQueue {
         }
       }
       this.markKnown(message);
-      const key = normalize(text);
-      const spokenAt = this.spoken.get(key);
+      const source = normalize(text);
+      const spokenAt = this.spoken.get(source);
       if (spokenAt !== undefined && now - spokenAt < REPEAT_WINDOW_MS) continue;
-      if (this.queue.some((queued) => normalize(queued.text) === key)) continue;
-      this.queue.push({ id: message.id, text });
+      if (this.queue.some((queued) => queued.source === source)) continue;
+      this.queue.push(...splitForSpeech(message.id, text));
     }
     return waiting ? SETTLE_MS : null;
   }
 
-  push(reply: QueuedReply) {
-    this.queue.push(reply);
+  push(id: string, text: string) {
+    this.queue.push(...splitForSpeech(id, text));
   }
 
   next(): QueuedReply | null {
     const reply = this.queue.shift() ?? null;
-    if (reply) this.spoken.set(normalize(reply.text), Date.now());
+    if (reply) this.spoken.set(reply.source, Date.now());
     return reply;
+  }
+
+  peek(): QueuedReply | null {
+    return this.queue[0] ?? null;
   }
 }

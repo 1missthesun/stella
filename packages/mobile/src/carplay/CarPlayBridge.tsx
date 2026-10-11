@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { AppState, Platform } from "react-native";
 import { authClient } from "../lib/auth-client";
-import { loadAiConsent } from "../lib/ai-consent";
+import { AudioModule } from "expo-audio";
+import { hasAiConsent, loadAiConsent } from "../lib/ai-consent";
 import { hasMobileConfig } from "../config/env";
 import {
   useCloudCanonicalChatThread,
@@ -12,7 +13,9 @@ import { useDictation } from "../lib/dictation";
 import { useChatDraft } from "../lib/chat-draft-store";
 import {
   getReadAloudPlaybackState,
+  prepareSpeech,
   speakReply,
+  type PreparedSpeech,
   stopReadAloud,
   useReadAloudState,
 } from "../lib/read-aloud";
@@ -125,6 +128,7 @@ function CarPlayVoiceLoop({
   const [live, setLive] = useState(false);
   const baselineRef = useRef(false);
   const currentRef = useRef<string | null>(null);
+  const preparedRef = useRef(new Map<string, PreparedSpeech>());
   const startingRef = useRef(false);
   const awaitingReplyRef = useRef(false);
   const pendingSendRef = useRef<string | null>(null);
@@ -148,6 +152,19 @@ function CarPlayVoiceLoop({
     noticeTimerRef.current = setTimeout(() => setNotice(null), NOTICE_MS);
   }, []);
 
+  const prefetchNext = useCallback(() => {
+    const upcoming = replies.peek();
+    if (!upcoming || preparedRef.current.has(upcoming.id)) return;
+    const prepared = prepareSpeech(upcoming.text);
+    if (prepared) preparedRef.current.set(upcoming.id, prepared);
+  }, [replies]);
+
+  const clearQueue = useCallback(() => {
+    replies.clear();
+    for (const prepared of preparedRef.current.values()) prepared.cancel();
+    preparedRef.current.clear();
+  }, [replies]);
+
   const pump = useCallback(() => {
     if (
       currentRef.current ||
@@ -165,7 +182,9 @@ function CarPlayVoiceLoop({
     }
     currentRef.current = next.id;
     refreshPhase();
-    void speakReply(next.text, next.id, { background: true, quiet: true }).finally(() => {
+    const prepared = preparedRef.current.get(next.id);
+    preparedRef.current.delete(next.id);
+    void speakReply(next.text, next.id, { background: true, quiet: true, prepared }).finally(() => {
       if (
         currentRef.current === next.id &&
         getReadAloudPlaybackState()?.messageId !== next.id
@@ -174,7 +193,8 @@ function CarPlayVoiceLoop({
         pump();
       }
     });
-  }, [refreshPhase, replies]);
+    prefetchNext();
+  }, [prefetchNext, refreshPhase, replies]);
 
   const scan = useCallback(() => {
     if (settleTimerRef.current) {
@@ -184,7 +204,8 @@ function CarPlayVoiceLoop({
     const retryIn = replies.scan(messagesRef.current, sendingRef.current);
     if (retryIn !== null) settleTimerRef.current = setTimeout(scan, retryIn);
     pump();
-  }, [pump, replies]);
+    if (currentRef.current) prefetchNext();
+  }, [prefetchNext, pump, replies]);
 
   useEffect(() => {
     if (!ready) return;
@@ -252,7 +273,7 @@ function CarPlayVoiceLoop({
     if (!pending || !storageLoaded || draft.trim() !== pending || sending) return;
     pendingSendRef.current = null;
     replies.markAllKnown(messagesRef.current);
-    replies.clear();
+    clearQueue();
     replies.accepting = true;
     awaitingReplyRef.current = true;
     send();
@@ -264,7 +285,7 @@ function CarPlayVoiceLoop({
       refreshPhase();
     }, SEND_START_TIMEOUT_MS);
     refreshPhase();
-  }, [draft, storageLoaded, sending, send, refreshPhase, replies]);
+  }, [draft, storageLoaded, sending, send, refreshPhase, replies, clearQueue]);
 
   const sendRecording = useCallback(() => {
     if (dictationStatusRef.current !== "recording") return;
@@ -277,9 +298,18 @@ function CarPlayVoiceLoop({
     if (dictationStatusRef.current === "recording") void dictation.cancel();
   }, [dictation]);
 
-  const startListening = useCallback(() => {
+  const startListening = useCallback(async () => {
+    if (!hasAiConsent()) {
+      showNotice("Allow voice input in Stella when you're parked");
+      return;
+    }
+    const permission = await AudioModule.getRecordingPermissionsAsync().catch(() => null);
+    if (!permission?.granted) {
+      showNotice("Allow microphone access for Stella when you're parked");
+      return;
+    }
     replies.accepting = false;
-    replies.clear();
+    clearQueue();
     currentRef.current = null;
     startingRef.current = true;
     stopReadAloud();
@@ -289,7 +319,7 @@ function CarPlayVoiceLoop({
     void dictation.start().then((started) => {
       startingRef.current = false;
       if (started) {
-        refreshPhase();
+        setPhase("listening");
         return;
       }
       carPlayNative?.setVoiceControl(null);
@@ -297,7 +327,7 @@ function CarPlayVoiceLoop({
       showNotice("Couldn't start listening. Try again.");
       refreshPhase();
     });
-  }, [dictation, refreshPhase, replies, showNotice]);
+  }, [dictation, refreshPhase, replies, showNotice, clearQueue]);
 
   const onTalk = useCallback(() => {
     const status = dictationStatusRef.current;
@@ -306,7 +336,7 @@ function CarPlayVoiceLoop({
       return;
     }
     if (status === "transcribing" || pendingSendRef.current || startingRef.current) return;
-    startListening();
+    void startListening();
   }, [sendRecording, startListening]);
 
   const onReplay = useCallback(() => {
@@ -317,13 +347,13 @@ function CarPlayVoiceLoop({
       .reverse()
       .find((message) => message.role === "assistant" && message.text.trim().length > 0);
     if (!latest) return;
-    replies.clear();
+    clearQueue();
     stopReadAloud();
     currentRef.current = null;
     replies.accepting = true;
-    replies.push({ id: latest.id, text: latest.text.trim() });
+    replies.push(latest.id, latest.text.trim());
     pump();
-  }, [pump, replies]);
+  }, [pump, replies, clearQueue]);
 
   useCarPlayEvents({
     onRowSelect: (id) => {
@@ -354,6 +384,7 @@ function CarPlayVoiceLoop({
   useEffect(
     () => () => {
       if (currentRef.current) stopReadAloud();
+      for (const prepared of preparedRef.current.values()) prepared.cancel();
       carPlayNative?.setVoiceControl(null);
       carPlayNative?.setBackgroundActivity(false);
       for (const timer of [settleTimerRef, sendStartTimerRef, noticeTimerRef]) {

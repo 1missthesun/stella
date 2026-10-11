@@ -307,11 +307,51 @@ export function resumeReadAloud() {
   setPlaybackState({ messageId: playbackState.messageId, status: "playing" });
 }
 
+export type PreparedSpeech = {
+  stream: Promise<{ ticket: string; uri: string }>;
+  cancel: () => void;
+  claim: () => void;
+};
+
+/**
+ * Starts synthesis ahead of playback, so the next clip is ready by the time
+ * the current one ends. `cancel` ends the synthesis unless a speakReply call
+ * has claimed the stream.
+ */
+export function prepareSpeech(text: string): PreparedSpeech | null {
+  const spoken = stripForSpeech(text);
+  if (!spoken) return null;
+  const controller = new AbortController();
+  let ticket: string | null = null;
+  let claimed = false;
+  let canceled = false;
+  const stream = prepareReadAloudStream(spoken, controller.signal).then((prepared) => {
+    ticket = prepared.ticket;
+    if (canceled) cancelStreamSession(prepared.ticket);
+    return prepared;
+  });
+  stream.catch(() => undefined);
+  return {
+    stream,
+    claim: () => {
+      claimed = true;
+    },
+    cancel: () => {
+      if (claimed || canceled) return;
+      canceled = true;
+      controller.abort();
+      if (ticket) cancelStreamSession(ticket);
+    },
+  };
+}
+
 export type SpeakReplyOptions = {
   /** Keep playing when the app leaves the foreground, ducking other audio. */
   background?: boolean;
   /** Never raise a phone alert; a failed clip just ends. */
   quiet?: boolean;
+  /** Synthesis already started with prepareSpeech for this same text. */
+  prepared?: PreparedSpeech;
 };
 
 export async function speakReply(
@@ -354,7 +394,10 @@ async function tryStreamReply(
   signal: AbortSignal,
   options: SpeakReplyOptions,
 ): Promise<boolean> {
-  const { ticket, uri } = await prepareReadAloudStream(text, signal);
+  options.prepared?.claim();
+  const { ticket, uri } = options.prepared
+    ? await options.prepared.stream
+    : await prepareReadAloudStream(text, signal);
   if (generation !== playbackGeneration || signal.aborted) {
     // Superseded before playback began — end the background synthesis so it
     // does not run to completion unheard.
@@ -366,13 +409,16 @@ async function tryStreamReply(
   // `uri` is a live HLS playlist that grows as Gemini generates, so playback
   // begins on the first segment instead of waiting for the whole clip.
 
-  await waitForPlaylistReady(uri, signal);
+  const [, sessionReady] = await Promise.all([
+    waitForPlaylistReady(uri, signal),
+    configurePlaybackAudioSession({ background: options.background }),
+  ]);
   if (generation !== playbackGeneration || signal.aborted) {
     cancelStreamSession(ticket);
     return true;
   }
 
-  if (!(await configurePlaybackAudioSession({ background: options.background }))) {
+  if (!sessionReady) {
     if (generation === playbackGeneration) stopReadAloud();
     else cancelStreamSession(ticket);
     return true;
@@ -532,7 +578,7 @@ async function playHlsResilient(
       // Also covers native failures that never emit a playback error event.
       startTimer = setTimeout(retry, STREAM_START_TIMEOUT_MS);
       try {
-        const p = createAudioPlayer({ uri });
+        const p = createAudioPlayer({ uri }, { preferredForwardBufferDuration: 1 });
         player = p;
         currentPlayer = p;
         let seeked = at <= 0.25;

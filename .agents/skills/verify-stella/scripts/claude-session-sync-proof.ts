@@ -112,8 +112,8 @@ const main = async () => {
   const logAhead = flag("--log-ahead");
   const threadHistory = logAhead
     ? [
-        { role: "user", content: [{ type: "text", text: "earlier request" }], timestamp: Date.now() - 2_000 },
-        { role: "assistant", content: [{ type: "text", text: logAhead }], timestamp: Date.now() - 1_000 },
+        { role: "user", content: "earlier request", timestamp: Date.now() - 2_000 },
+        { role: "assistant", content: logAhead, timestamp: Date.now() - 1_000 },
       ]
     : undefined;
   const workingFolder = await resolveClaudeWorkingFolder(cwd);

@@ -140,6 +140,7 @@ const RESUME_GRACE_MS = 1_500;
 const MAX_NO_PROGRESS_BACKFILLS = 3;
 /** How long a liveness probe waits for the auto-response before giving up. */
 const PROBE_TIMEOUT_MS = 5_000;
+const OPEN_TIMEOUT_MS = 20_000;
 /**
  * Keepalive cadence. Under `SOCKET_STALE_MS` (90 s) with room for a missed
  * beat, and answered by the DO's hibernation auto-response — so it stamps the
@@ -212,6 +213,7 @@ export class ConversationSocket {
   private probeTimer: ReturnType<typeof setTimeout> | null = null;
   private keepaliveTimer: ReturnType<typeof setInterval> | null = null;
   private reauthTimer: ReturnType<typeof setTimeout> | null = null;
+  private openTimer: ReturnType<typeof setTimeout> | null = null;
   /** Observed token window minus the lead, learned from `ready`. */
   private reauthPeriodMs = 0;
   private liveSinceMs = 0;
@@ -434,6 +436,8 @@ export class ConversationSocket {
     if (this.probeTimer) clearTimeout(this.probeTimer);
     if (this.keepaliveTimer) clearInterval(this.keepaliveTimer);
     if (this.reauthTimer) clearTimeout(this.reauthTimer);
+    if (this.openTimer) clearTimeout(this.openTimer);
+    this.openTimer = null;
     this.reconnectTimer = null;
     this.resumeTimer = null;
     this.probeTimer = null;
@@ -566,6 +570,18 @@ export class ConversationSocket {
     this.socket = socket;
     this.options.onReadiness?.("socket-created");
     this.lastFrameAtMs = Date.now();
+    if (this.openTimer) clearTimeout(this.openTimer);
+    this.openTimer = setTimeout(() => {
+      this.openTimer = null;
+      if (this.socket !== socket) return;
+      this.socket = null;
+      socket.onopen = null;
+      socket.onmessage = null;
+      socket.onerror = null;
+      socket.onclose = null;
+      socket.close(1000, "open timeout");
+      this.handleClose(1006);
+    }, OPEN_TIMEOUT_MS);
 
     socket.onopen = () => {
       if (this.socket !== socket) return;
@@ -720,6 +736,8 @@ export class ConversationSocket {
 
   private handleReady(ready: ReadyFrame): void {
     this.options.onReadiness?.("socket-ready");
+    if (this.openTimer) clearTimeout(this.openTimer);
+    this.openTimer = null;
     this.liveSinceMs = Date.now();
     this.authRetryUsed = false;
     this.reauthInFlight = false;

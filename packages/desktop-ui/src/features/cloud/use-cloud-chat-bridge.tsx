@@ -53,6 +53,8 @@ import {
 } from "./use-conversation";
 import "./cloud-chat-status.css";
 import { browserAttachmentUploads } from "./browser-chat-attachments";
+import { isPendingCloudConversation } from "./cloud-conversation-selection";
+import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 
 const EMPTY_EVENTS: EventRecord[] = [];
 const EMPTY_MESSAGES: MessageRecord[] = [];
@@ -326,6 +328,15 @@ export function useCloudChatBridge({
   const cloudActivity = useCloudConversationActivity(
     enabled ? conversationId : null,
   );
+  const { accountScope } = useCloudConversationSession();
+  const isAwaitingFirstHistory = Boolean(
+    enabled &&
+      conversationId &&
+      (conversation.state.recordsSource ?? "none") === "none" &&
+      conversation.state.epoch === null &&
+      conversation.state.status !== "blocked" &&
+      !isPendingCloudConversation(conversationId, accountScope),
+  );
   const webShell = isWebShell();
   const completeRecords = useMemo(
     () =>
@@ -555,10 +566,7 @@ export function useCloudChatBridge({
     activeToolCallId: activity.toolCallId ?? null,
     answerLanded: activity.answerLanded,
     pendingUserMessageId,
-    // The local replica (including an explicit known-empty snapshot) paints
-    // immediately. Cloud reconciliation is connection status, not a reason to
-    // replace the entire chat surface with a blocking history spinner.
-    isInitialLoading: false,
+    isInitialLoading: isAwaitingFirstHistory,
     sendMessage,
     cancelCurrentStream,
     extraTail,

@@ -345,6 +345,9 @@ function RootLayout() {
     [clearCloudCreateRetryTimer],
   );
 
+  const settledAccountScope = cloudSession.sessionGate.sessionIsLoading
+    ? null
+    : accountScope;
   // Clear the previous owner synchronously, before any child can paint or an
   // Electron UiState hydration can reintroduce an unvalidated UUID. Tabs are
   // loaded from the same immutable account scope as one atomic snapshot.
@@ -352,8 +355,10 @@ function RootLayout() {
     clearCloudCreateRetryTimer();
     cloudCreateRequestRef.current = null;
     setCloudCreateFailure(null);
-    retireCloudConversationClientAuthority(accountScope);
-    retireCloudExecutionClientAuthority(accountScope);
+    if (settledAccountScope !== null) {
+      retireCloudConversationClientAuthority(settledAccountScope);
+      retireCloudExecutionClientAuthority(settledAccountScope);
+    }
     cloudAttachmentsStore.clear();
     conversationTabs.setAccountScope(
       isPrivate ? "local" : isCloudConversationReady ? accountScope : null,
@@ -361,6 +366,7 @@ function RootLayout() {
     setConversationId(null);
   }, [
     accountScope,
+    settledAccountScope,
     isPrivate,
     clearCloudCreateRetryTimer,
     isCloudConversationReady,

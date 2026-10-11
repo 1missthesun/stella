@@ -126,6 +126,7 @@ const main = async () => {
     agentType: "general",
     userPrompt: prompt,
     agentContext: {
+      systemPrompt: "You are a Stella general agent running a session continuity proof.",
       agentEngine: "claude_code_local",
       activeThreadId: threadId,
       ...(threadHistory ? { threadHistory } : {}),
@@ -141,6 +142,7 @@ const main = async () => {
       getApiKey: () => undefined,
     } as never,
     store,
+    compactionScheduler: { schedule: async () => {} },
   } as never);
   const sessionId = store.getThreadExternalSessionId(threadId)?.split(":").pop() ?? null;
   report.turn = result;

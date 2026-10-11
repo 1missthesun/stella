@@ -248,6 +248,8 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
           return undefined;
         },
         toolSetAfterStep: () => spec.toolSetAfterStep(),
+        onBackgroundWake: (wake) => spec.onBackgroundWake(wake),
+        ...(spec.backgroundWake ? { backgroundWake: true } : {}),
         ...(syncs(ref)
           ? {
               onSessionCheckpoint: (checkpoint: { sessionId: string; configDir: string | null; cwd: string; final: boolean }) => {

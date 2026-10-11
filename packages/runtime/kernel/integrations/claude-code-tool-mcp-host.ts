@@ -118,9 +118,13 @@ export type CreateClaudeCodeToolMcpHostOptions = {
   allowLegacyImagePathReopen?: boolean;
   /**
    * Resolved for every native MCP call. The host is session-scoped while the
-   * execution callback and cancellation boundary are turn-scoped.
+   * execution callback and cancellation boundary are turn-scoped. A promise
+   * when the turn the call belongs to is still on its way.
    */
-  getActiveTurn: () => ClaudeCodeToolMcpActiveTurn | undefined;
+  getActiveTurn: () =>
+    | ClaudeCodeToolMcpActiveTurn
+    | undefined
+    | Promise<ClaudeCodeToolMcpActiveTurn | undefined>;
 };
 
 const stableJson = (value: unknown): string => {
@@ -379,7 +383,10 @@ export const createClaudeCodeToolMcpHost = async (
             `Tool is not available in this Stella session: ${request.params.name}`,
           );
         }
-        const turn = options.getActiveTurn();
+        const turn = await awaitWithAbort(
+          Promise.resolve(options.getActiveTurn()),
+          extra.signal,
+        );
         // A safety refusal or an exhausted output budget cuts the model's
         // stream mid-argument, and the CLI repairs the partial JSON and
         // dispatches the call anyway — a half-written `prompt` or `message`

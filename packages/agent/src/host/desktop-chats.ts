@@ -602,6 +602,19 @@ export function desktopChats(options: DesktopChatsOptions) {
         })
         .catch(() => undefined);
     });
+    // An agent's Claude Code CLI took up a background command that finished:
+    // the agent is woken for it, as for one of Stella's own shells, unless
+    // the user paused or stopped it.
+    claudeCodeEngine.onBackgroundWake((session, wake) => {
+      const threadId = session.threadId;
+      if (!threadId) return;
+      void (async () => {
+        const chat = await ready(session.conversationId);
+        const record = await chat.agentStanding(threadId, context);
+        if (!record || record.agentStatus === "paused" || record.agentStatus === "canceled") return;
+        await chat.messageAgent({ key: `claude-code-wake:${wake.key}`, threadId, message: wake.text, fromOrchestrator: true }, context);
+      })().catch((error: unknown) => options.report(error));
+    });
   }
   let gateway: Promise<{ access: StellaGatewayAccess; gatewayOrigin: string }> | undefined;
   /** Each Stella model alias in use, resolved for the orchestrator and agents. */

@@ -170,6 +170,18 @@ export type ClaudeCodeTurnRequest = {
    * step's own answer reaches the host as an intermediate reply.
    */
   toolSetAfterStep?(): ClaudeCodeToolSetChange | undefined;
+  /**
+   * The session's CLI started a query of its own because a background
+   * command it ran finished. Kept for the session past this turn: the host
+   * wakes the agent, whose next turn takes that query over.
+   */
+  onBackgroundWake?(wake: ClaudeCodeBackgroundWake): void;
+  /**
+   * This turn exists to take over the CLI's own query about a finished
+   * background command: when that query is held, the prompt is not sent,
+   * since the CLI was told about the command itself.
+   */
+  backgroundWake?: boolean;
   onSessionId?(sessionId: string): void;
   onSessionCheckpoint?(checkpoint: {
     sessionId: string;
@@ -185,6 +197,14 @@ export type ClaudeCodeTurnRequest = {
     tools: string[];
     mcpServers: { name?: string; status?: string }[];
   }): void;
+};
+/**
+ * Background commands the CLI ran that finished while no step waited on it:
+ * the CLI started a query about them on its own (`holdAdrift`).
+ */
+export type ClaudeCodeBackgroundWake = {
+  id: string;
+  tasks: { summary: string; status?: string; outputFile?: string }[];
 };
 export type ClaudeCodeToolSetChange = {
   tools: readonly ToolMetadata[];
@@ -237,6 +257,39 @@ type ClaudeCodeProcessState = {
   compactionCount: number;
   launchConfig: string;
   claudeConfigDir: string | null;
+  /** Handles one stdout line as if it arrived now (`replayAdrift`). */
+  handleLine?: (line: ClaudeStreamEvent) => "stop" | undefined;
+  /** A query the CLI started on its own with no step waiting, held whole. */
+  adrift?: {
+    lines: ClaudeStreamEvent[];
+    woke: boolean;
+    tasks: BackgroundTask[];
+  };
+  /** Background commands that finished while a step ran. */
+  finished?: BackgroundTask[];
+};
+type BackgroundTask = ClaudeCodeBackgroundWake["tasks"][number] & {
+  id?: string;
+};
+/** A finished background command, from the CLI's `task_notification`. */
+const backgroundTaskOf = (
+  line: ClaudeStreamEvent,
+): BackgroundTask | undefined => {
+  if (line.type !== "system" || line.subtype !== "task_notification") {
+    return undefined;
+  }
+  const text = (value: unknown) =>
+    typeof value === "string" && value.trim() ? value.trim() : undefined;
+  const id = text(line.uuid);
+  const status = text(line.status);
+  const outputFile = text(line.output_file);
+  return {
+    summary:
+      text(line.summary) ?? "A command you ran in the background finished.",
+    ...(id ? { id } : {}),
+    ...(status ? { status } : {}),
+    ...(outputFile ? { outputFile } : {}),
+  };
 };
 type ClaudeCodeSession = {
   sessionId: string;
@@ -264,6 +317,11 @@ type ClaudeCodeSession = {
   consumedSteeringTexts?: string[];
   /** Tool-set changes the running turn took (`MAX_TOOL_SET_CHANGES_PER_TURN`). */
   toolSetChanges?: number;
+  /** Background commands the CLI says are still running. */
+  backgroundTasks?: number;
+  onBackgroundWake?: (wake: ClaudeCodeBackgroundWake) => void;
+  /** Stella tool calls from a held query, waiting for the turn that takes it over. */
+  mcpTurnWaiters?: Set<(turn: ClaudeCodeToolMcpActiveTurn) => void>;
   modelFallbackNotified?: boolean;
   claudeLoginEmail?: string;
   thinkingStripped?: boolean;
@@ -361,6 +419,42 @@ const DEFAULT_STEP_TOOL_IDLE_TIMEOUT_MS = 20 * 60 * 1000;
  * Stella's tools.
  */
 const DEFAULT_TOOL_CATALOG_TIMEOUT_MS = 40 * 1000;
+/**
+ * Lines of a CLI query nobody claimed yet kept at most. Past this the CLI
+ * is stopped: an unattended query that long is better resumed than held.
+ */
+const MAX_ADRIFT_LINES = 50_000;
+/**
+ * How long a Stella tool call from a held query waits for the agent's turn
+ * that takes the query over; past it the call fails as one with no turn.
+ */
+const ADRIFT_TOOL_TURN_WAIT_MS = 2 * 60 * 1000;
+/**
+ * The turn a Stella tool call runs in. A query the CLI started on its own
+ * has none until the agent's woken turn takes it over, so its calls wait for
+ * that turn rather than fail.
+ */
+const activeMcpTurnFor = (
+  session: ClaudeCodeSession,
+):
+  | ClaudeCodeToolMcpActiveTurn
+  | undefined
+  | Promise<ClaudeCodeToolMcpActiveTurn | undefined> => {
+  if (session.activeMcpTurn || !session.process?.adrift) {
+    return session.activeMcpTurn;
+  }
+  return new Promise((resolve) => {
+    const waiters = (session.mcpTurnWaiters ??= new Set());
+    const settle = (turn: ClaudeCodeToolMcpActiveTurn | undefined) => {
+      clearTimeout(timer);
+      waiters.delete(settle);
+      resolve(turn);
+    };
+    const timer = setTimeout(() => settle(undefined), ADRIFT_TOOL_TURN_WAIT_MS);
+    timer.unref?.();
+    waiters.add(settle);
+  });
+};
 const CLAUDE_CODE_COMPACTING_TEXT = "Compacting context";
 const CLAUDE_CODE_RUNNING_TEXT = "Working";
 /**
@@ -1868,6 +1962,11 @@ class ClaudeCodeSessionRuntime {
     const now = Date.now();
     for (const [sessionKey, session] of this.sessions.entries()) {
       if (session.running || session.queue.length > 0) continue;
+      // The CLI's background commands and its own query about them live
+      // in its process.
+      if ((session.backgroundTasks ?? 0) > 0 || session.process?.adrift) {
+        continue;
+      }
       if (now - session.lastUsedAt > SESSION_IDLE_TTL_MS) {
         cleanupSessionProcess(session);
         cleanupSessionMcpHost(session);
@@ -1925,6 +2024,7 @@ class ClaudeCodeSessionRuntime {
       session.process.compactionCount = 0;
     }
     if (!request.vanilla) {
+      session.onBackgroundWake = request.onBackgroundWake;
       const nativeToolUseCorrelator = createClaudeNativeToolUseCorrelator();
       session.activeNativeToolUseCorrelator = nativeToolUseCorrelator;
       session.activeMcpTurn = {
@@ -1997,6 +2097,10 @@ class ClaudeCodeSessionRuntime {
         },
         onToolResponseWritten: request.onToolResponseWritten,
       };
+      const activeMcpTurn = session.activeMcpTurn;
+      for (const waiter of [...(session.mcpTurnWaiters ?? [])]) {
+        waiter(activeMcpTurn);
+      }
     }
     try {
       let response = await this.executeStepWithRecovery(
@@ -2501,7 +2605,7 @@ class ClaudeCodeSessionRuntime {
     session.mcpHost = await createClaudeCodeToolMcpHost({
       tools: request.tools,
       identityScope: request.sessionKey,
-      getActiveTurn: () => session.activeMcpTurn,
+      getActiveTurn: () => activeMcpTurnFor(session),
     });
     session.mcpToolCatalogKey = catalogKey;
     session.mcpConfigPath = path.join(
@@ -2650,6 +2754,203 @@ class ClaudeCodeSessionRuntime {
         this.refreshPendingIdleTimer(processState, pending);
       }
     };
+    const handleLine = (parsedLine: ClaudeStreamEvent): "stop" | undefined => {
+      if (
+        typeof parsedLine.session_id === "string" &&
+        parsedLine.session_id.trim()
+      ) {
+        processState.finalSessionId = parsedLine.session_id.trim();
+        session.sessionId = processState.finalSessionId;
+        session.resumeReady = true;
+        request.onSessionId?.(session.sessionId);
+      }
+      if (parsedLine.type === "user" && parsedLine.isReplay === true) {
+        this.noteInjectionConsumed(session, processState, parsedLine.uuid);
+        return undefined;
+      }
+      if (
+        parsedLine.type === "assistant" ||
+        parsedLine.type === "user" ||
+        parsedLine.type === "result"
+      ) {
+        const checkpointRequest = processState.pending[0]?.request ?? request;
+        try {
+          checkpointRequest.onSessionCheckpoint?.({
+            sessionId: session.sessionId,
+            configDir: processState.claudeConfigDir,
+            cwd: checkpointRequest.cwd ?? process.cwd(),
+            final: parsedLine.type === "result",
+          });
+        } catch {}
+      }
+      // The init event names the model the CLI actually resolved the
+      // requested alias to (e.g. default -> claude-opus-4-8[1m]).
+      if (
+        parsedLine.type === "system" &&
+        parsedLine.subtype === "init" &&
+        request.onProtocolInit
+      ) {
+        request.onProtocolInit({
+          tools: Array.isArray(parsedLine.tools)
+            ? parsedLine.tools.filter(
+                (entry: unknown): entry is string => typeof entry === "string",
+              )
+            : [],
+          mcpServers: Array.isArray(parsedLine.mcp_servers)
+            ? parsedLine.mcp_servers.map((entry: unknown) => {
+                const value = asObject(entry);
+                return {
+                  ...(typeof value?.name === "string"
+                    ? { name: value.name }
+                    : {}),
+                  ...(typeof value?.status === "string"
+                    ? { status: value.status }
+                    : {}),
+                };
+              })
+            : [],
+        });
+      }
+      if (
+        parsedLine.type === "system" &&
+        parsedLine.subtype === "init" &&
+        typeof parsedLine.model === "string" &&
+        request.stellaAppDir
+      ) {
+        void recordClaudeCodeResolvedModel(
+          request.stellaAppDir,
+          parseClaudeCodeModel(request.modelId) ?? "default",
+          parsedLine.model,
+        );
+      }
+      const status = getClaudeCodeStatusChangeFromStreamEvent(parsedLine);
+      if (status) {
+        // Count discrete compactions (compacting -> running transitions),
+        // not every compaction-related stream event.
+        if (status.state === "compacting" && !processState.compacting) {
+          processState.compacting = true;
+          processState.compactionCount += 1;
+          if (processState.compactionCount > MAX_COMPACTIONS_PER_TURN) {
+            this.failCompactionLoop(request.sessionKey, session, processState);
+            return "stop";
+          }
+        } else if (status.state === "running") {
+          processState.compacting = false;
+        }
+      }
+      // The CLI switched the session to the --fallback-model (configured
+      // model overloaded). The switch is sticky for the session, so
+      // surface it once as a heads-up toast (latch on the session so we
+      // don't spam).
+      const modelFallback =
+        getClaudeCodeModelFallbackFromStreamEvent(parsedLine);
+      const current = processState.pending[0];
+      if (current) {
+        const modelRound = getClaudeCodeModelRoundFromStreamEvent(parsedLine);
+        if (modelRound) {
+          try {
+            current.request.onModelRound?.(modelRound);
+          } catch {
+            // Diagnostic observers must never disrupt the engine stream.
+          }
+        }
+        // Feed the native tool_use correlator. The MCP host consults it for
+        // every inbound call (integrity gate, 750ms fail-open settle) and
+        // for image_gen's durable identity (5s claim), so an unfed
+        // correlator taxes every call and refuses every image_gen.
+        const correlator = session.activeNativeToolUseCorrelator;
+        if (correlator) {
+          observeFinalizedClaudeToolUses(parsedLine, correlator.observe);
+          // Record the stop_reason verdict BEFORE the MCP gate can consult
+          // it, and shout when a tool call's arguments were cut mid-value.
+          // The gate rejects the call when it wins the race with the CLI's
+          // HTTP dispatch; this notice makes the loss visible otherwise.
+          const truncatedToolUse =
+            correlator.observeAssistantMessage(parsedLine);
+          if (truncatedToolUse) {
+            current.request.onStatusChange?.({
+              state: "running",
+              text: `⚠ Truncated tool call — ${describeClaudeToolUseTruncation(truncatedToolUse)} Stella blocked or flagged it; the instruction was NOT delivered in full.`,
+            });
+          }
+          correlator.observeStreamEvent(parsedLine);
+        }
+        if (
+          updateClaudeCodeNativeToolActivity(
+            parsedLine,
+            current.activeNativeToolUseIds,
+          )
+        ) {
+          this.refreshPendingIdleTimer(processState, current);
+        }
+        if (!current.request.vanilla) {
+          observeNativeToolCalls(parsedLine, current);
+        }
+        if (status) {
+          current.request.onStatusChange?.(status);
+        }
+        try {
+          current.request.onStreamEvent?.(parsedLine);
+        } catch {}
+        if (modelFallback && !session.modelFallbackNotified) {
+          session.modelFallbackNotified = true;
+          current.request.onStatusChange?.({
+            state: "model-fallback",
+            text: modelFallback.text,
+          });
+        }
+        current.emitStreamDelta(parsedLine);
+      }
+      if (parsedLine.type === "result") {
+        const current = processState.pending[0];
+        if (
+          current &&
+          parsedLine.is_error !== true &&
+          hasUnconsumedInjection(current)
+        ) {
+          this.reportIntermediateResult(
+            session,
+            processState,
+            current,
+            parsedLine,
+          );
+          return undefined;
+        }
+        const completed = processState.pending.shift();
+        if (!completed) {
+          return undefined;
+        }
+        if (hasUnconsumedInjection(completed)) {
+          // An error result with steering still waiting on this CLI's stdin.
+          // Stop the process before that steering goes back to the host
+          // queue, so it can't also run here against the next prompt.
+          processState.closed = true;
+          if (session.process === processState) {
+            this.resetStreamingProcess(request.sessionKey, session);
+          }
+        }
+        this.detachAbortListener(completed);
+        try {
+          const stepResult = this.parseResultPayload(
+            session,
+            parsedLine,
+            processState.stderrText,
+            Boolean(
+              completed.request.allowEmptyFinal ||
+                (!completed.request.vanilla && session.allowEmptyNativeFinal),
+            ),
+          );
+          completed.resolve(stepResult);
+        } catch (error) {
+          if (error instanceof ClaudeCodeMalformedResultError) {
+            mergeMcpCalls(error.mcpCalls, completed.mcpCalls);
+          }
+          completed.reject(error);
+        }
+      }
+      return undefined;
+    };
+    processState.handleLine = handleLine;
     const consumeStdout = (flush = false) => {
       const segments = flush
         ? [processState.stdoutBuffer]
@@ -2668,203 +2969,11 @@ class ClaudeCodeSessionRuntime {
           continue;
         }
         if (
-          typeof parsedLine.session_id === "string" &&
-          parsedLine.session_id.trim()
+          this.holdAdrift(request.sessionKey, session, processState, parsedLine)
         ) {
-          processState.finalSessionId = parsedLine.session_id.trim();
-          session.sessionId = processState.finalSessionId;
-          session.resumeReady = true;
-          request.onSessionId?.(session.sessionId);
-        }
-        if (parsedLine.type === "user" && parsedLine.isReplay === true) {
-          this.noteInjectionConsumed(session, processState, parsedLine.uuid);
           continue;
         }
-        if (
-          parsedLine.type === "assistant" ||
-          parsedLine.type === "user" ||
-          parsedLine.type === "result"
-        ) {
-          const checkpointRequest = processState.pending[0]?.request ?? request;
-          try {
-            checkpointRequest.onSessionCheckpoint?.({
-              sessionId: session.sessionId,
-              configDir: processState.claudeConfigDir,
-              cwd: checkpointRequest.cwd ?? process.cwd(),
-              final: parsedLine.type === "result",
-            });
-          } catch {}
-        }
-        // The init event names the model the CLI actually resolved the
-        // requested alias to (e.g. default -> claude-opus-4-8[1m]).
-        if (
-          parsedLine.type === "system" &&
-          parsedLine.subtype === "init" &&
-          request.onProtocolInit
-        ) {
-          request.onProtocolInit({
-            tools: Array.isArray(parsedLine.tools)
-              ? parsedLine.tools.filter(
-                  (entry: unknown): entry is string =>
-                    typeof entry === "string",
-                )
-              : [],
-            mcpServers: Array.isArray(parsedLine.mcp_servers)
-              ? parsedLine.mcp_servers.map((entry: unknown) => {
-                  const value = asObject(entry);
-                  return {
-                    ...(typeof value?.name === "string"
-                      ? { name: value.name }
-                      : {}),
-                    ...(typeof value?.status === "string"
-                      ? { status: value.status }
-                      : {}),
-                  };
-                })
-              : [],
-          });
-        }
-        if (
-          parsedLine.type === "system" &&
-          parsedLine.subtype === "init" &&
-          typeof parsedLine.model === "string" &&
-          request.stellaAppDir
-        ) {
-          void recordClaudeCodeResolvedModel(
-            request.stellaAppDir,
-            parseClaudeCodeModel(request.modelId) ?? "default",
-            parsedLine.model,
-          );
-        }
-        const status = getClaudeCodeStatusChangeFromStreamEvent(parsedLine);
-        if (status) {
-          // Count discrete compactions (compacting -> running transitions),
-          // not every compaction-related stream event.
-          if (status.state === "compacting" && !processState.compacting) {
-            processState.compacting = true;
-            processState.compactionCount += 1;
-            if (processState.compactionCount > MAX_COMPACTIONS_PER_TURN) {
-              this.failCompactionLoop(
-                request.sessionKey,
-                session,
-                processState,
-              );
-              return;
-            }
-          } else if (status.state === "running") {
-            processState.compacting = false;
-          }
-        }
-        // The CLI switched the session to the --fallback-model (configured
-        // model overloaded). The switch is sticky for the session, so
-        // surface it once as a heads-up toast (latch on the session so we
-        // don't spam).
-        const modelFallback =
-          getClaudeCodeModelFallbackFromStreamEvent(parsedLine);
-        const current = processState.pending[0];
-        if (current) {
-          const modelRound = getClaudeCodeModelRoundFromStreamEvent(parsedLine);
-          if (modelRound) {
-            try {
-              current.request.onModelRound?.(modelRound);
-            } catch {
-              // Diagnostic observers must never disrupt the engine stream.
-            }
-          }
-          // Feed the native tool_use correlator. The MCP host consults it for
-          // every inbound call (integrity gate, 750ms fail-open settle) and
-          // for image_gen's durable identity (5s claim), so an unfed
-          // correlator taxes every call and refuses every image_gen.
-          const correlator = session.activeNativeToolUseCorrelator;
-          if (correlator) {
-            observeFinalizedClaudeToolUses(parsedLine, correlator.observe);
-            // Record the stop_reason verdict BEFORE the MCP gate can consult
-            // it, and shout when a tool call's arguments were cut mid-value.
-            // The gate rejects the call when it wins the race with the CLI's
-            // HTTP dispatch; this notice makes the loss visible otherwise.
-            const truncatedToolUse =
-              correlator.observeAssistantMessage(parsedLine);
-            if (truncatedToolUse) {
-              current.request.onStatusChange?.({
-                state: "running",
-                text: `⚠ Truncated tool call — ${describeClaudeToolUseTruncation(truncatedToolUse)} Stella blocked or flagged it; the instruction was NOT delivered in full.`,
-              });
-            }
-            correlator.observeStreamEvent(parsedLine);
-          }
-          if (
-            updateClaudeCodeNativeToolActivity(
-              parsedLine,
-              current.activeNativeToolUseIds,
-            )
-          ) {
-            this.refreshPendingIdleTimer(processState, current);
-          }
-          if (!current.request.vanilla) {
-            observeNativeToolCalls(parsedLine, current);
-          }
-          if (status) {
-            current.request.onStatusChange?.(status);
-          }
-          try {
-            current.request.onStreamEvent?.(parsedLine);
-          } catch {}
-          if (modelFallback && !session.modelFallbackNotified) {
-            session.modelFallbackNotified = true;
-            current.request.onStatusChange?.({
-              state: "model-fallback",
-              text: modelFallback.text,
-            });
-          }
-          current.emitStreamDelta(parsedLine);
-        }
-        if (parsedLine.type === "result") {
-          const current = processState.pending[0];
-          if (
-            current &&
-            parsedLine.is_error !== true &&
-            hasUnconsumedInjection(current)
-          ) {
-            this.reportIntermediateResult(
-              session,
-              processState,
-              current,
-              parsedLine,
-            );
-            continue;
-          }
-          const completed = processState.pending.shift();
-          if (!completed) {
-            continue;
-          }
-          if (hasUnconsumedInjection(completed)) {
-            // An error result with steering still waiting on this CLI's stdin.
-            // Stop the process before that steering goes back to the host
-            // queue, so it can't also run here against the next prompt.
-            processState.closed = true;
-            if (session.process === processState) {
-              this.resetStreamingProcess(request.sessionKey, session);
-            }
-          }
-          this.detachAbortListener(completed);
-          try {
-            const stepResult = this.parseResultPayload(
-              session,
-              parsedLine,
-              processState.stderrText,
-              Boolean(
-                completed.request.allowEmptyFinal ||
-                  (!completed.request.vanilla && session.allowEmptyNativeFinal),
-              ),
-            );
-            completed.resolve(stepResult);
-          } catch (error) {
-            if (error instanceof ClaudeCodeMalformedResultError) {
-              mergeMcpCalls(error.mcpCalls, completed.mcpCalls);
-            }
-            completed.reject(error);
-          }
-        }
+        if (handleLine(parsedLine) === "stop") return;
       }
     };
     child.stdout.on("data", (chunk) => {
@@ -2929,6 +3038,7 @@ class ClaudeCodeSessionRuntime {
           new Error("Claude Code process exited."),
         );
         session.process = undefined;
+        session.backgroundTasks = 0;
       }
       // A restart may already have registered a replacement child under this
       // session key; only remove OUR child from tracking.
@@ -3092,30 +3202,49 @@ class ClaudeCodeSessionRuntime {
         }
       }
       processState.pending.push(pending);
-      const payload = buildStreamJsonUserMessage(
-        session.sessionId,
-        prompt,
-        promptImages,
-      );
-      processState.child.stdin.write(`${payload}\n`, (error) => {
-        if (!error) {
-          return;
-        }
-        const index = processState.pending.indexOf(pending);
-        if (index >= 0) {
-          processState.pending.splice(index, 1);
-        }
-        this.detachAbortListener(pending);
-        // A failed stdin write means the process died under us (EPIPE);
-        // classify it as process-ended so the step recovery can respawn.
-        reject(
-          new ClaudeCodeProcessEndedError(
-            `Failed to write Claude Code prompt: ${normalizeErrorMessage(error)}`,
-            null,
-            pending.mcpCalls,
-          ),
+      // A query the CLI started on its own is this step's first: its prompt
+      // follows it as steering, or, for a turn that exists to take it over,
+      // is not sent at all.
+      const held = processState.adrift;
+      processState.adrift = undefined;
+      const adrift = held?.woke ? held : undefined;
+      // Until the CLI is seen starting it, a query of its own may still run
+      // before this prompt; as steering, the prompt keeps the step open
+      // past that query's result.
+      const ownQueryFirst = Boolean(held || processState.finished);
+      const sendsPrompt = !adrift || !request.backgroundWake;
+      const steeringId =
+        sendsPrompt && ownQueryFirst ? crypto.randomUUID() : undefined;
+      if (steeringId) {
+        pending.injections.set(steeringId, { consumed: false, text: "" });
+      }
+      if (sendsPrompt) {
+        const payload = buildStreamJsonUserMessage(
+          session.sessionId,
+          prompt,
+          promptImages,
+          steeringId,
         );
-      });
+        processState.child.stdin.write(`${payload}\n`, (error) => {
+          if (!error) {
+            return;
+          }
+          const index = processState.pending.indexOf(pending);
+          if (index >= 0) {
+            processState.pending.splice(index, 1);
+          }
+          this.detachAbortListener(pending);
+          // A failed stdin write means the process died under us (EPIPE);
+          // classify it as process-ended so the step recovery can respawn.
+          reject(
+            new ClaudeCodeProcessEndedError(
+              `Failed to write Claude Code prompt: ${normalizeErrorMessage(error)}`,
+              null,
+              pending.mcpCalls,
+            ),
+          );
+        });
+      }
       if (request.onTurnControl) {
         try {
           pending.detachTurnControl = request.onTurnControl({
@@ -3127,7 +3256,102 @@ class ClaudeCodeSessionRuntime {
           // A host-side steering observer must not break the engine turn.
         }
       }
+      if (adrift) {
+        pending.hasOutput = true;
+        this.refreshPendingIdleTimer(processState, pending);
+        this.replayAdrift(
+          request.sessionKey,
+          session,
+          processState,
+          adrift.lines,
+        );
+      }
     });
+  }
+  /**
+   * The CLI runs background commands itself and, when one finishes, starts
+   * a query of its own about it: at once when no step waits on the CLI, or
+   * after the step's result when one finished while the step ran (unless
+   * the step took the news in). With no step waiting, that query is held
+   * here, whole, for the next step to take over, and the host is asked once
+   * to wake the agent for it. True for a line held.
+   */
+  holdAdrift(
+    sessionKey: string,
+    session: ClaudeCodeSession,
+    processState: ClaudeCodeProcessState,
+    line: ClaudeStreamEvent,
+  ) {
+    if (line.type === "system" && line.subtype === "background_tasks_changed") {
+      session.backgroundTasks = Array.isArray(line.tasks)
+        ? line.tasks.length
+        : 0;
+    }
+    const finished = backgroundTaskOf(line);
+    if (processState.closed) return false;
+    if (processState.pending.length > 0) {
+      if (finished) (processState.finished ??= []).push(finished);
+      return false;
+    }
+    if (!processState.adrift) {
+      if (!finished && !processState.finished) return false;
+      processState.adrift = {
+        lines: [],
+        woke: false,
+        tasks: processState.finished ?? [],
+      };
+      processState.finished = undefined;
+    }
+    const adrift = processState.adrift;
+    if (finished) adrift.tasks.push(finished);
+    adrift.lines.push(line);
+    if (adrift.lines.length > MAX_ADRIFT_LINES) {
+      processState.adrift = undefined;
+      if (session.process === processState) {
+        this.resetStreamingProcess(sessionKey, session);
+      } else {
+        killProcess(processState.child);
+      }
+      return true;
+    }
+    const startsQuery =
+      Boolean(finished) ||
+      line.type === "stream_event" ||
+      line.type === "assistant" ||
+      (line.type === "system" && line.subtype === "init");
+    if (startsQuery && !adrift.woke) {
+      adrift.woke = true;
+      try {
+        session.onBackgroundWake?.({
+          id: adrift.tasks[0]?.id ?? crypto.randomUUID(),
+          tasks: adrift.tasks.map(({ id: _id, ...task }) => task),
+        });
+      } catch {
+        // A host-side observer must not break the CLI's stream.
+      }
+    }
+    return true;
+  }
+  /**
+   * Hand a held query to the step that took it over, line by line as if it
+   * arrived now. Once that step has its answer, whatever the CLI did next
+   * is held again for the step after.
+   */
+  replayAdrift(
+    sessionKey: string,
+    session: ClaudeCodeSession,
+    processState: ClaudeCodeProcessState,
+    lines: ClaudeStreamEvent[],
+  ) {
+    for (let index = 0; index < lines.length; index += 1) {
+      if (processState.pending.length === 0) {
+        for (const rest of lines.slice(index)) {
+          this.holdAdrift(sessionKey, session, processState, rest);
+        }
+        return;
+      }
+      if (processState.handleLine?.(lines[index]!) === "stop") return;
+    }
   }
   detachAbortListener(pending: PendingStep) {
     if (pending.idleTimer) {

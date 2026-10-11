@@ -86,6 +86,12 @@ export type ClaudeCodeStatus =
   | { state: "usage-limit"; text: string; until?: number }
   | { state: "usage-limit-end"; text: string; resumed: boolean };
 
+/** Background commands the CLI ran that finished while it waited for no one; it started a query about them itself. */
+export type ClaudeCodeBackgroundWake = {
+  id: string;
+  tasks: { summary: string; status?: string; outputFile?: string }[];
+};
+
 export type ClaudeCodeTurnSpec = {
   session: ClaudeCodeSessionRef;
   resumeSessionId?: string;
@@ -109,6 +115,10 @@ export type ClaudeCodeTurnSpec = {
     endStep(): boolean;
   }): void;
   toolSetAfterStep(): { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[]; prompt: string } | undefined;
+  /** The session's CLI started a query of its own about finished background commands: the agent is woken for it. */
+  onBackgroundWake(wake: ClaudeCodeBackgroundWake): void;
+  /** This turn was woken for that query and takes it over; its prompt need not reach a CLI that already knows. */
+  backgroundWake: boolean;
 };
 
 export type ClaudeCodeTransport = {
@@ -179,6 +189,8 @@ type Session = {
   record?: ClaudeCodeSessionRecord;
   turn?: Turn;
   cliSessionId?: string;
+  /** Wake messages sent to the agent for its CLI's own queries, not yet taken in. */
+  wakes?: Set<string>;
 };
 
 const ZERO_USAGE = (): Usage => ({
@@ -236,6 +248,17 @@ const messageKey = (message: Message): string | undefined => {
 };
 
 const clip = (text: string, max: number): string => (text.length > max ? `${text.slice(0, max)}\n[...truncated]` : text);
+
+const backgroundWakeText = (wake: ClaudeCodeBackgroundWake): string =>
+  [
+    wake.tasks.length === 1
+      ? "[wake: a command you left running in the background has finished.]"
+      : `[wake: ${wake.tasks.length} commands you left running in the background have finished.]`,
+    "",
+    ...wake.tasks.map((task) => `- ${task.summary}${task.outputFile ? `\n  Output: ${task.outputFile}` : ""}`),
+    "",
+    "You were resumed for this. Continue the work that was waiting on it, or say what you found.",
+  ].join("\n");
 
 const toolSetKey = (set: { tools: readonly ClaudeCodeToolSpec[]; nativeTools: readonly string[] }): string =>
   JSON.stringify([set.nativeTools, set.tools.map((tool) => tool.name)]);
@@ -370,6 +393,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const nativeResults = new Map<string, NativeResult>();
   const nativeWaiters = new Map<string, Set<(result: NativeResult) => void>>();
   const statusListeners = new Set<(session: ClaudeCodeSessionRef, status: ClaudeCodeStatus) => void>();
+  const wakeListeners = new Set<(session: ClaudeCodeSessionRef, wake: { key: string; text: string }) => void>();
   const modelIds = new Set<string>(CLAUDE_CODE_MODEL_ALIASES);
   let providerListener: ((provider: Provider) => void) | undefined;
 
@@ -497,6 +521,11 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         }
       }
     }
+    const { users: arrived } = trailingUsers(conversation);
+    const wakes = session.wakes;
+    const backgroundWake =
+      !request.prompt && arrived.length > 0 && arrived.every((message) => wakes?.has(textOf(message.content).trim()) === true);
+    if (backgroundWake) for (const message of arrived) wakes?.delete(textOf(message.content).trim());
     const rebuild = rebuildPrompt(conversation);
     const prompt =
       request.prompt && resumeSessionId
@@ -538,6 +567,19 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         tools: request.tools,
         nativeTools: request.nativeTools,
         signal: abort.signal,
+        backgroundWake,
+        onBackgroundWake: (wake) => {
+          const text = backgroundWakeText(wake);
+          (session.wakes ??= new Set()).add(text.trim());
+          const ref = session.binding.session;
+          for (const listener of wakeListeners) {
+            try {
+              listener(ref, { key: `${ref.sessionKey}:${wake.id}`, text });
+            } catch (error) {
+              report(error);
+            }
+          }
+        },
         executeTool: (toolUseId, _name, _args, signal) =>
           new Promise<ClaudeCodeToolOutcome>((resolve) => {
             const early = turn.early.get(toolUseId);
@@ -863,10 +905,14 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         turn = undefined;
       } else {
         const { users } = trailingUsers(tail);
-        const fresh = users.filter((message) => {
+        const unseen = users.filter((message) => {
           const key = messageKey(message);
           return key !== undefined && !session.record?.seen.includes(key);
         });
+        // A wake for the CLI's own query is news only to Stella: the running CLI told itself.
+        const told = unseen.filter((message) => session.wakes?.delete(textOf(message.content).trim()) === true);
+        if (told.length > 0) noteSeen(session, told);
+        const fresh = unseen.filter((message) => !told.includes(message));
         const held = new Set(turn.unsent.map(messageKey));
         const waiting = [...turn.unsent, ...fresh.filter((message) => !held.has(messageKey(message)))];
         const moved = !turn.done && toolSetKey(turn.toolSet) !== toolSetKey(toolSet);
@@ -1087,6 +1133,15 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           }),
         ],
       });
+    },
+    /**
+     * An agent's CLI started a query of its own because a background command
+     * it ran finished: deliver `text` to the agent as a message (once per
+     * `key`), and its next turn takes that query over.
+     */
+    onBackgroundWake(listener: (session: ClaudeCodeSessionRef, wake: { key: string; text: string }) => void): () => void {
+      wakeListeners.add(listener);
+      return () => wakeListeners.delete(listener);
     },
     onStatus(listener: (session: ClaudeCodeSessionRef, status: ClaudeCodeStatus) => void): () => void {
       statusListeners.add(listener);

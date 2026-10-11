@@ -63,7 +63,15 @@ import {
   STELLA_DEFAULT_ALIAS,
   stellaModelRef,
 } from "../harness.ts";
-import { agentRunOutcome, StellaAgentsDoc, type AgentDirectoryHost, type RemoteAgentHost } from "../stella/agents.ts";
+import {
+  agentRunOutcome,
+  noteRemoteReport,
+  StellaAgentsDoc,
+  type AgentDirectoryHost,
+  type AgentModelChoice,
+  type RemoteAgentHost,
+  type RunsOn,
+} from "../stella/agents.ts";
 import type { StellaToolHost } from "../stella/host-tools.ts";
 import {
   parseStellaModelId,
@@ -78,6 +86,7 @@ import {
   stellaCredentialStore,
   storeOnlyAuthContext,
   type DirectModelResolver,
+  type ModelPick,
   type StellaCredentialAccess,
 } from "../provider/byok.ts";
 import {
@@ -165,6 +174,12 @@ export type DesktopChatsOptions = {
   /** For a conversation stored in the cloud: its cloud agents, run in its object. */
   cloudAgents?(conversationId: string): RemoteAgentHost | undefined;
   /**
+   * Claude Code agents on this computer for a conversation, started with a
+   * `claude-code[/<model>]` model: they run on Claude Code as a whole, and
+   * their reports come back as `deliverReport`s.
+   */
+  claudeCode?(conversationId: string): DesktopEngineAgents | undefined;
+  /**
    * For a conversation stored in the cloud: how its tools reach the owner's
    * other computers and a cloud container, once they are moved there.
    */
@@ -242,6 +257,16 @@ export type DesktopChatsOptions = {
   report(error: unknown): void;
 };
 
+/** Agents another engine on this computer runs as a whole (`DesktopChatsOptions.claudeCode`). */
+export type DesktopEngineAgents = {
+  /** Start one, once per `key`, on `model` (`claude-code` or `claude-code/<model>`). */
+  start(args: { key: string; description: string; prompt: string; model: string }): Promise<{ threadId: string }>;
+  /** Another message for it: steers it while it runs, or starts its next run. */
+  message(args: { key: string; threadId: string; message: string }): Promise<"steered" | "resumed">;
+  status(threadId: string): Promise<string>;
+  pause(threadId: string): Promise<void>;
+};
+
 type Chat = {
   harness: Harness;
   root: Conversation;
@@ -268,6 +293,9 @@ type Chat = {
 };
 
 const context = BACKGROUND_CONTEXT;
+
+/** The engine id, and model head, of agents that run on Claude Code here. */
+const CLAUDE_CODE_ENGINE = "claude-code";
 
 /** The response language a conversation's latest message asked for, so it holds across restarts. */
 const LocaleDoc = defineDoc<{ locale?: string }>({
@@ -545,13 +573,12 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { provider: accountRegistryId(provider), modelId: model.id };
   };
 
-  /** The orchestrator's model for the user's pick: a Stella alias, or a model on the user's own key (or the account's). */
-  const pickedModel = async (): Promise<ModelRef> => {
-    const pick = parseModelPick(options.stellaModel?.());
+  /** The model a pick runs on, for the orchestrator or an agent: a Stella alias, or a model on the user's own key (or the account's). */
+  const modelOfPick = async (pick: ModelPick | undefined, agentType: "orchestrator" | "general"): Promise<ModelRef> => {
     if (!pick || pick.kind === "stella") {
       const alias = pick?.alias ?? STELLA_DEFAULT_ALIAS;
       await ensureProvider(alias);
-      return stellaModelRef("orchestrator", alias);
+      return stellaModelRef(agentType, alias);
     }
     if (pick.kind === "direct" && isAccountProviderId(pick.provider) && !(await hasOwnKey(pick.provider, pick.modelId))) {
       return await ensureAccountModel(pick.provider, pick.modelId);
@@ -559,6 +586,76 @@ export function desktopChats(options: DesktopChatsOptions) {
     const ref = byok.ensure(pick);
     if ("error" in ref) throw new Error(ref.error);
     return ref;
+  };
+
+  /** The orchestrator's model for the user's pick. */
+  const pickedModel = (): Promise<ModelRef> => modelOfPick(parseModelPick(options.stellaModel?.()), "orchestrator");
+
+  /**
+   * What an agent its caller named `requested` for runs on here: Claude Code
+   * as a whole, or a model pi runs (a Stella alias, a model on the user's own
+   * key or plan), with an optional `:<effort>`. Anything else fails; it never
+   * runs on another model.
+   */
+  const agentModel = async (conversationId: string, requested: string): Promise<AgentModelChoice> => {
+    const effort = /^(.+):(minimal|low|medium|high|xhigh)$/.exec(requested.trim());
+    const reference = (effort?.[1] ?? requested).trim();
+    if (reference.split("/")[0]!.toLowerCase() === CLAUDE_CODE_ENGINE) {
+      if (!options.claudeCode?.(conversationId)) throw new Error("Claude Code agents can't start from this conversation here.");
+      return { engine: CLAUDE_CODE_ENGINE };
+    }
+    const stellaDefault = reference.toLowerCase() === "stella";
+    const pick = stellaDefault ? undefined : parseModelPick(reference);
+    if (!pick && !stellaDefault) {
+      throw new Error(
+        `"${requested}" isn't a model agents run on here. Name a Stella model ("stella/<model>"), a model on your own key or plan ("<provider>/<model>", such as "codex/<model>"), or Claude Code ("claude-code" or "claude-code/<model>").`,
+      );
+    }
+    const model = await modelOfPick(pick, "general");
+    return { runsOn: { model, ...(effort ? { thinkingLevel: effort[2] as ModelThinkingLevel } : {}) } };
+  };
+
+  /**
+   * A conversation's Claude Code agents as its Stella reaches them: a message
+   * one takes mid-run, and a pause, settle what Stella waits for, as its
+   * reports do (`noteEngineReport`).
+   */
+  const claudeCodeHost = (conversationId: string, chat: () => Chat | undefined): RemoteAgentHost | undefined => {
+    const engine = options.claudeCode?.(conversationId);
+    if (!engine) return undefined;
+    const settle = async (threadId: string, requestId: string, status?: "paused") => {
+      const opened = chat();
+      if (!opened) return;
+      await opened.harness.commit(
+        (tx) => noteRemoteReport(tx, opened.root.id, { threadId, requestId, ...(status ? { status } : {}) }),
+        context,
+      );
+    };
+    return {
+      start: async ({ key, description, prompt, model }) =>
+        await engine.start({ key, description, prompt, model: model ?? CLAUDE_CODE_ENGINE }),
+      message: async ({ key, threadId, message }) => {
+        if ((await engine.message({ key, threadId, message })) === "steered") await settle(threadId, `steered:${key}`);
+      },
+      status: async (threadId) => await engine.status(threadId),
+      pause: async (threadId) => {
+        await engine.pause(threadId);
+        await settle(threadId, `paused:${threadId}:${Date.now()}`, "paused");
+      },
+    };
+  };
+
+  /** A report for one of the conversation's Claude Code agents counts as that agent's answer. */
+  const noteEngineReport = async (conversationId: string, report: { requestId: string; text: string }) => {
+    const threadId = /\nthread_id: (\S+)/.exec(report.text)?.[1];
+    if (!threadId) return;
+    const chat = await ready(conversationId);
+    const agent = (await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context))?.agents[threadId];
+    if (!agent?.engine) return;
+    await chat.harness.commit(
+      (tx) => noteRemoteReport(tx, chat.root.id, { threadId, requestId: report.requestId, text: report.text }),
+      context,
+    );
   };
 
   /** A model a conversation or one of its agents is on, ready to run (after a restart too). */
@@ -768,9 +865,12 @@ export function desktopChats(options: DesktopChatsOptions) {
                 const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
                 return Math.max(1, Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId).length);
               };
+              const claudeCode = claudeCodeHost(conversationId, () => opened);
               return desktopAgentsHost({
                 ...(options.deviceId ? { deviceId: options.deviceId } : {}),
                 ...(cloud ? { cloud } : {}),
+                agentModel: (requested) => agentModel(conversationId, requested),
+                ...(claudeCode ? { engine: (id) => (id === CLAUDE_CODE_ENGINE ? claudeCode : undefined) } : {}),
                 directory: directoryFor(conversationId),
                 dataDir: options.dataDir,
                 execution: execution.host,
@@ -1382,16 +1482,30 @@ export function desktopChats(options: DesktopChatsOptions) {
    */
   const runPlacedAgent = async (
     conversationId: string,
-    run: Parameters<OpenStellaHarness["runPlacedAgent"]>[0],
+    run: Omit<Parameters<OpenStellaHarness["runPlacedAgent"]>[0], "runsOn"> & {
+      /** The model it runs on (`agentModel`), when its host named one. */
+      model?: string;
+    },
   ): ReturnType<OpenStellaHarness["runPlacedAgent"]> => {
     placedIn.set(run.agentKey, conversationId);
     // Before anything awaits, so a cancel that lands while the conversation opens still holds.
     const placed = { runKey: run.runKey, cancel: new AbortController() };
     placedRuns.set(run.agentKey, placed);
+    const { model, signal, ...placedRun } = run;
+    const stop = () => placed.cancel.abort(signal?.reason);
+    if (signal?.aborted) stop();
+    else signal?.addEventListener("abort", stop, { once: true });
     try {
+      let runsOn: RunsOn | undefined;
+      if (model) {
+        const choice = await agentModel(conversationId, model);
+        if (!("runsOn" in choice)) throw new Error(`"${model}" runs on Claude Code, not on Stella's own agents.`);
+        runsOn = choice.runsOn;
+      }
       const chat = await ready(conversationId);
-      return await chat.runPlacedAgent({ ...run, signal: placed.cancel.signal }, context);
+      return await chat.runPlacedAgent({ ...placedRun, ...(runsOn ? { runsOn } : {}), signal: placed.cancel.signal }, context);
     } finally {
+      signal?.removeEventListener("abort", stop);
       if (placedRuns.get(run.agentKey) === placed) placedRuns.delete(run.agentKey);
     }
   };
@@ -1461,6 +1575,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     /** A pause for one of Stella's agents here from another host (the cloud, another computer). */
     pauseAgent: pauseLocalAgent,
     async deliverReport(conversationId: string, report: { requestId: string; text: string }): Promise<void> {
+      await noteEngineReport(conversationId, report);
       if (await noteOnBrain(conversationId, report.requestId, report.text)) return;
       const chat = await ready(conversationId);
       await caughtUp(chat);

@@ -266,8 +266,14 @@ export const runsHandlers: WorkerRpcHandlers = {
         }),
       );
       // On pi-durable an agent another device placed here runs in the
-      // conversation's harness; its answer goes back through the placement.
-      if (piChatRouted(session)) {
+      // conversation's harness, on the model its requester named; its answer
+      // goes back through the placement. One on Claude Code runs on the
+      // runner's agent manager, as every agent does where Claude Code is the
+      // engine (whose non-Claude Code agents run on pi in turn).
+      const requestedModel = payload.requestedModel?.trim();
+      const pickedModel = requestedModel && requestedModel !== "default" ? requestedModel : undefined;
+      const onClaudeCode = pickedModel !== undefined && /^claude-code(?:[/:]|$)/i.test(pickedModel);
+      if (piChatRouted(session) && !onClaudeCode) {
         const hostBus = yield* HostBus.Service;
         const agentKey = payload.remoteThreadId
           ? piPlacedAgentKey(payload.remoteThreadId)
@@ -283,6 +289,14 @@ export const runsHandlers: WorkerRpcHandlers = {
             ...(payload.remoteThreadId ? { threadId: payload.remoteThreadId } : {}),
             description: payload.description,
             prompt: withAttachedFiles(payload.prompt, attachments),
+            ...(pickedModel ? { model: pickedModel } : {}),
+          }).catch((error: unknown) => {
+            if (!pickedModel) throw error;
+            return {
+              threadId: agentKey,
+              status: "error" as const,
+              error: `This device couldn't run the agent on "${pickedModel}": ${error instanceof Error ? error.message : String(error)}`,
+            };
           });
           // The report goes back to a chat on another device; the files it
           // links are here, so this computer shares them.

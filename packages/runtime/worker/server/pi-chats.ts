@@ -208,6 +208,70 @@ const piLocalLog = (
   };
 };
 
+/**
+ * A conversation's Claude Code agents for pi's Stella (`claudeCode`): the
+ * runner's agent manager runs them on Claude Code, and their reports reach
+ * pi as every runner agent's do (`setPiReportDelivery`).
+ */
+const claudeCodeAgentsFor = (
+  session: OpenSession,
+  conversationId: string,
+): import("@stella/agent/host/desktop-chats").DesktopEngineAgents => {
+  const runner = () => {
+    const current = session.runnerCell.get();
+    if (!current) throw new Error("Stella's runtime is restarting; try again.");
+    return current;
+  };
+  return {
+    start: async ({ description, prompt, model }) => {
+      const { parseSpawnAgentModel } = await import("../../kernel/tools/state.js");
+      const selection = parseSpawnAgentModel(model);
+      if (selection.kind !== "engine" || selection.engine.engine !== "claude_code_local") {
+        throw new Error(`"${model}" isn't a Claude Code model. Use "claude-code" or "claude-code/<model>".`);
+      }
+      return await runner().createBackgroundAgent({
+        conversationId,
+        description,
+        prompt,
+        agentType: "general",
+        spawnEngine: selection.engine,
+        ...(selection.reasoningEffort ? { spawnReasoningEffort: selection.reasoningEffort } : {}),
+      });
+    },
+    message: async ({ key, threadId, message }) => {
+      const outcome = await runner().deliverLocalAgentMessage(threadId, message, `pi:${key}`, "");
+      if (outcome === "steered") return "steered";
+      if (outcome === "resumed" || outcome === "queued") return "resumed";
+      throw new Error(`No Claude Code agent ${threadId} on this computer takes messages now.`);
+    },
+    status: async (threadId) => {
+      const snapshot = await runner().getLocalAgentSnapshot(threadId);
+      return snapshot ? `${snapshot.status} on Claude Code on this computer` : "not found on this computer";
+    },
+    pause: async (threadId) => {
+      await runner().pauseLocalAgent(threadId, "");
+    },
+  };
+};
+
+/**
+ * pi as the runner's agent engine: a runner agent whose model is not Claude
+ * Code runs here, in its conversation's harness, while the runner's agent
+ * manager keeps the agent (`PiAgentEngine`).
+ */
+export const piAgentEngineFor = (
+  session: OpenSession,
+  hostBus: HostBus.Interface,
+): import("../../kernel/runner/types.js").PiAgentEngine => ({
+  run: async ({ conversationId, ...run }) => {
+    const result = await (await piChatsFor(session, hostBus)).runPlacedAgent(conversationId, run);
+    return result.status === "ok"
+      ? { status: "ok", finalText: result.finalText }
+      : { status: result.status, error: result.error };
+  },
+  steer: async (message) => await (await piChatsFor(session, hostBus)).steerPlacedAgent(message),
+});
+
 const chatsBySession = new WeakMap<OpenSession, Promise<DesktopChats>>();
 /** The same chats once loaded, for synchronous checks. */
 const loadedBySession = new WeakMap<OpenSession, DesktopChats>();
@@ -323,6 +387,7 @@ export const piChatsFor = (
       },
       journal: (conversationId) => cloudJournalFor(session, conversationId),
       cloudAgents: (conversationId) => cloudAgentsFor(session, conversationId),
+      claudeCode: (conversationId) => claudeCodeAgentsFor(session, conversationId),
       execution: (conversationId) => executionRemoteFor(session, conversationId),
       brain: (conversationId) => brainFor(session, hostBus, conversationId),
       // A conversation stored in the cloud lists this computer's agents in

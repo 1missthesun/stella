@@ -79,6 +79,8 @@ type AgentRecord = {
   reported: number[];
   /** It runs on another host as a whole (`StellaAgentsHost.remote`). */
   remote?: true;
+  /** It runs as a whole on another engine on this host (`StellaAgentsHost.engine`), by that engine's id. */
+  engine?: string;
   /** When a remote agent was started; a local one dates from its first entry. */
   startedAt?: number;
   /**
@@ -183,7 +185,10 @@ const attemptOf = (
   );
 
 /** The model an agent runs on, and at what thinking level. */
-type RunsOn = { model?: ModelRef; thinkingLevel?: ModelThinkingLevel };
+export type RunsOn = { model?: ModelRef; thinkingLevel?: ModelThinkingLevel };
+
+/** What an agent its caller named a model for runs on: a model this host runs, or another engine here. */
+export type AgentModelChoice = { runsOn: RunsOn } | { engine: string };
 
 /** An agent's report, arriving at the orchestrator. */
 export type AgentReport = {
@@ -264,6 +269,8 @@ export type PlacedAgentRun = {
   threadId?: string;
   description: string;
   prompt: string;
+  /** The model it runs on, when the host that placed it named one; otherwise the orchestrator's. */
+  runsOn?: RunsOn;
   /** The host that placed it canceled it: it stops, or never starts. */
   signal?: AbortSignal;
 };
@@ -299,6 +306,16 @@ export type StellaAgentsHost = {
   place(destination: SpawnDestination, caller: StellaPlacement): StellaPlacement | { error: string };
   /** The host that runs agents placed there, when they run somewhere else as a whole. */
   remote?(placement: StellaPlacement): RemoteAgentHost | undefined;
+  /**
+   * What an agent whose caller named `requested` runs on here: a model this
+   * host runs (a Stella alias, a model on the user's own key or plan), or the
+   * id of another engine here that runs it as a whole (`engine`). Throws when
+   * nothing here runs it, so it never runs on something else. Absent, only
+   * Stella's aliases run, for a caller on Stella's models.
+   */
+  agentModel?(requested: string, caller: RunsOn, context: Context): Promise<AgentModelChoice>;
+  /** Another engine on this host that runs whole agents (Claude Code on a computer), by its id. */
+  engine?(id: string): RemoteAgentHost | undefined;
   /** Where the orchestrator itself runs. */
   rootPlacement: StellaPlacement;
   /**
@@ -717,6 +734,24 @@ export function stellaAgents(host: StellaAgentsHost) {
     return { model: parsed ? { provider: STELLA_PROVIDER_ID, modelId: stellaModelId("general", parsed.alias) } : parent };
   };
 
+  /**
+   * What an agent its caller named `requested` for runs on, checked by the
+   * host. Without a host check, another Stella alias runs for a caller on
+   * Stella's models (a turn on the user's own model or plan is admitted for
+   * that model alone); anything else fails rather than running on another model.
+   */
+  const chooseAgentModel = async (requested: string, caller: RunsOn, context: Context): Promise<AgentModelChoice> => {
+    if (host.agentModel) return await host.agentModel(requested, caller, context);
+    if (requested.startsWith("stella/") && caller.model?.provider === STELLA_PROVIDER_ID) {
+      return { runsOn: { model: { provider: STELLA_PROVIDER_ID, modelId: stellaModelId("general", requested) } } };
+    }
+    throw new Error(
+      caller.model?.provider === STELLA_PROVIDER_ID
+        ? `Agents here run on Stella's models, so "${requested}" can't run here. Pick a "stella/..." model, or omit model to use the configured one.`
+        : `Agents here run on this conversation's own model, so "${requested}" can't run here. Omit model to use it.`,
+    );
+  };
+
   const callerPlacement = async (api: ToolExecutionApi, context: Context): Promise<StellaPlacement> =>
     placementOf(await api.snapshot(StellaPlacementDoc, api.conversationId, context)) ?? host.rootPlacement;
 
@@ -811,7 +846,10 @@ export function stellaAgents(host: StellaAgentsHost) {
           "The request and any necessary context the agent does not have. Keep simple requests short; preserve explicit constraints and leave the approach to the agent.",
       }),
       model: Type.Optional(
-        Type.String({ description: "Optional model override, such as `stella/default`. Omit to use the configured model." }),
+        Type.String({
+          description:
+            "Optional model for the agent: a Stella model such as `stella/default`, a model on the user's own key or plan as `<provider>/<model>` (such as `codex/gpt-6.1-sol`), or Claude Code as `claude-code` or `claude-code/<model>`. Add `:low`, `:medium`, `:high` or `:xhigh` to set its reasoning. Omit to use the configured model.",
+        }),
       ),
       destination: Type.Optional(
         Type.String({
@@ -854,25 +892,31 @@ export function stellaAgents(host: StellaAgentsHost) {
       }
       const callerAgent = await api.agent(context);
       const requested = args.model?.trim();
-      // Another Stella alias only for a caller on Stella's models: a turn on
-      // the user's own model or plan is admitted for that model alone.
-      const runsOn =
-        requested?.startsWith("stella/") && callerAgent.model?.provider === STELLA_PROVIDER_ID
-          ? { model: { provider: STELLA_PROVIDER_ID, modelId: stellaModelId("general", requested) } }
-          : childRun(callerAgent);
-      // An alias other than the caller's is registered before the agent runs on it.
-      if (requested && runsOn.model) await host.ensureModel?.(runsOn.model, context);
       const description = args.description.trim() || "agent";
       // An agent's agent stays with it, its tools where it asked or where its
       // caller's run (the cloud, a computer), so its report climbs the chain
       // like any other. Only a whole agent leaves, and only Stella starts one.
       const whole = caller.agentType === "orchestrator" || (destination.kind === "device" && destination.whole === true);
-      const remote = whole ? host.remote?.(placement) : undefined;
+      const placedRemote = whole ? host.remote?.(placement) : undefined;
+      // A whole agent elsewhere is checked against that host's models there.
+      const choice =
+        !placedRemote && requested && requested !== "default"
+          ? await chooseAgentModel(requested, callerAgent, context)
+          : undefined;
+      const runsOn = choice && "runsOn" in choice ? choice.runsOn : childRun(callerAgent);
+      // A model other than the caller's is registered before the agent runs on it.
+      if (choice && runsOn.model) await host.ensureModel?.(runsOn.model, context);
+      const engine = choice && "engine" in choice ? choice.engine : undefined;
+      const engineHost = engine ? host.engine?.(engine) : undefined;
+      if (engine && !engineHost) throw new Error(`"${requested}" runs on ${engine}, which this host cannot start agents on.`);
+      const remote = placedRemote ?? engineHost;
       if (remote) {
         // Its report comes back to the orchestrator only.
         if (caller.agentType !== "orchestrator") {
           throw new Error(
-            "Only Stella can start a whole agent somewhere else. Leave out whole_agent: the agent then stays with you and runs its tools there.",
+            engine
+              ? `Only Stella can start an agent on ${engine}. Pick another model, or omit model to use yours.`
+              : "Only Stella can start a whole agent somewhere else. Leave out whole_agent: the agent then stays with you and runs its tools there.",
           );
         }
         const callKey = String(api.taskId);
@@ -899,6 +943,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             placement: { kind: placement.kind, ...(placement.kind === "device" ? { deviceId: placement.deviceId } : {}) },
             reported: [],
             remote: true,
+            ...(engine && !placedRemote ? { engine } : {}),
             startedAt: Date.now(),
           };
           state.calls[callKey] = { threadId, reporter: -1 };
@@ -1081,6 +1126,7 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   /** The host a remote agent runs on as a whole: on a device, that device's own Stella. */
   const remoteHostOf = (agent: AgentRecord): RemoteAgentHost | undefined => {
+    if (agent.engine) return host.engine?.(agent.engine);
     const placement = placementOf(agent.placement);
     if (!placement) return undefined;
     return host.remote?.(placement.kind === "device" ? { ...placement, whole: true } : placement);
@@ -1631,7 +1677,8 @@ export function stellaAgents(host: StellaAgentsHost) {
    */
   const runPlacedAgent = async (harness: Harness, args: PlacedAgentRun, context: Context): Promise<PlacedAgentResult> => {
     const root = await harness.root(context);
-    const runsOn = childRun(await root.agent(context));
+    const runsOn = args.runsOn?.model ? args.runsOn : childRun(await root.agent(context));
+    if (args.runsOn?.model) await host.ensureModel?.(args.runsOn.model, context);
     const { threadId } = await harness.commit(
       (tx) =>
         createAgent(tx, {

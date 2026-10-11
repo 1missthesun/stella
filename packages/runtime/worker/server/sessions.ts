@@ -28,6 +28,7 @@ import {
   closePiChats,
   terminatePiChatCommands,
   piChatsBusy,
+  piAgentEngineFor,
   piDeliverReport,
   reconcileComputerAgents,
   resumePiChats,
@@ -560,6 +561,9 @@ export const layer = Layer.effect(
                     if (!builtRunner) runnerOutcome = "failure";
                     builtRunner?.setPiReportDelivery((report) =>
                       piDeliverReport(session, hostBus, report),
+                    );
+                    builtRunner?.setPiAgentEngine(
+                      piAgentEngineFor(session, hostBus),
                     );
                     // The initialize-time warm below no-ops while the runner
                     // is still building; warm once it exists, as before.

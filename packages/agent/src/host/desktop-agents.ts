@@ -24,6 +24,9 @@ export function desktopAgentsHost(
     beginAgentRun?: StellaAgentsHost["beginAgentRun"];
     endAgentRun?: StellaAgentsHost["endAgentRun"];
     ensureModel?: StellaAgentsHost["ensureModel"];
+    /** What an agent named with a model runs on here, and the other engines here that run agents. */
+    agentModel?: StellaAgentsHost["agentModel"];
+    engine?: StellaAgentsHost["engine"];
     /** Reports and notes for Stella, which go where she runs. */
     deliverReport?: StellaAgentsHost["deliverReport"];
     deliverNote?: StellaAgentsHost["deliverNote"];
@@ -40,6 +43,8 @@ export function desktopAgentsHost(
     ...(options.beginAgentRun ? { beginAgentRun: options.beginAgentRun } : {}),
     ...(options.endAgentRun ? { endAgentRun: options.endAgentRun } : {}),
     ...(options.ensureModel ? { ensureModel: options.ensureModel } : {}),
+    ...(options.agentModel ? { agentModel: options.agentModel } : {}),
+    ...(options.engine ? { engine: options.engine } : {}),
     ...(options.deliverReport ? { deliverReport: options.deliverReport } : {}),
     ...(options.deliverNote ? { deliverNote: options.deliverNote } : {}),
     ...(options.directory ? { directory: options.directory } : {}),

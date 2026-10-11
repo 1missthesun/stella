@@ -15,6 +15,8 @@ import { runSubagentTask, shutdownSubagentRuntimes } from "../agent-runtime.js";
 import { createAgentLifecycleResponseTarget } from "../agent-runtime/response-target.js";
 import { persistThreadCustomMessage } from "../agent-runtime/thread-memory.js";
 import { resolvePlacedAgentModel } from "./placed-agent-model.js";
+import { runSubagentOnPi } from "./pi-agent-run.js";
+import { shouldUseClaudeCodeAgentRuntime } from "../integrations/claude-code-agent-runtime.js";
 import { resolveOrchestratorThreadKey } from "../thread-runtime.js";
 import {
   AGENT_PAUSE_CANCEL_REASON,
@@ -710,6 +712,26 @@ export const createAgentOrchestration = (
       toolExecutor,
     }: Record<string, any>) => {
       const runId = `local:sub:${crypto.randomUUID()}`;
+      if (
+        !shouldUseClaudeCodeAgentRuntime({
+          stellaAppDir: context.stellaAppDir,
+          agentEngine: agentContext.agentEngine,
+          modelId: agentContext.model ?? agentContext.resolvedLlm?.model?.id,
+        })
+      ) {
+        return await runSubagentOnPi(context.state.piAgentEngine, {
+          conversationId,
+          agentId,
+          runId,
+          description: taskDescription,
+          prompt: taskPrompt,
+          ...(Array.isArray(attachments) ? { attachments } : {}),
+          agentContext,
+          abortSignal,
+          ...(steering ? { steering } : {}),
+          store: context.runtimeStore,
+        });
+      }
       const site = createRunnerSiteConfig(context);
       const resolvedLlm =
         agentContext.resolvedLlm ??

@@ -294,6 +294,7 @@ export type RunnerState = {
    */
   sendRuntimeMessage?: (input: RuntimeSendMessageInput) => Promise<void>;
   piReportDelivery?: PiReportDelivery;
+  piAgentEngine?: PiAgentEngine;
   /**
    * The thread each cloud conversation's last turn here ran, hidden prompt
    * rows included, keyed by `conversationId`. The next cloud turn extends it
@@ -461,10 +462,35 @@ export type PiReportDelivery = (report: {
   text: string;
 }) => Promise<void>;
 
+/**
+ * Runs a LocalAgentManager agent whose model is not Claude Code on pi, the
+ * desktop's own agent engine: the manager keeps the agent, and pi runs it.
+ */
+export type PiAgentEngine = {
+  run: (run: {
+    conversationId: string;
+    /** The agent, the same for each of its runs. */
+    agentKey: string;
+    runKey: string;
+    threadId: string;
+    description: string;
+    prompt: string;
+    /** The pick it runs on (`stella/...`, `<provider>/<model>[:effort]`); absent, Stella's default. */
+    model?: string;
+    signal: AbortSignal;
+  }) => Promise<
+    | { status: "ok"; finalText: string }
+    | { status: "error" | "paused" | "canceled"; error: string }
+  >;
+  /** A message for its run; false when it is not running. */
+  steer: (message: { key: string; agentKey: string; message: string }) => Promise<boolean>;
+};
+
 export type RunnerPublicApi = {
   deviceId: string;
   hookEmitter: HookEmitter;
   setPiReportDelivery: (delivery: PiReportDelivery | null) => void;
+  setPiAgentEngine: (engine: PiAgentEngine | null) => void;
   deliverOrchestratorNote: PiReportDelivery;
   setBackendUrl: (value: string | null) => void;
   setAuthToken: (value: string | null) => void;

@@ -343,6 +343,7 @@ type UseEventRowsOptions = {
   maxItems?: number;
   /** Task titles by thread id (runtime Activity list), for reply context. */
   agentTitles?: ReadonlyMap<string, string>;
+  agentParents?: ReadonlyMap<string, string>;
 };
 
 type UseEventRowsResult = {
@@ -578,7 +579,7 @@ const coalesceVoiceSessionRows = (
 export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
   const developerResourcePreviewsEnabled =
     useDeveloperResourcePreviewsEnabled();
-  const { messages, maxItems, agentTitles } = opts;
+  const { messages, maxItems, agentTitles, agentParents } = opts;
 
   const displayMessages = useMemo(
     () => filterMessagesForUiDisplay(messages),
@@ -1159,9 +1160,9 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
 
     return withReplyContext(
       coalesceVoiceSessionRows(coalesceInlineImageRows(deduped)),
-      { agentTitles },
+      { agentTitles, agentParents },
     );
-  }, [agentTitles, developerResourcePreviewsEnabled, displayMessages, lifecycleIndex]);
+  }, [agentParents, agentTitles, developerResourcePreviewsEnabled, displayMessages, lifecycleIndex]);
 
   const rowsStableRef = useRef<StableTurnRowsState<EventRowViewModel> | null>(
     null,

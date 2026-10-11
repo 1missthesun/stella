@@ -653,9 +653,13 @@ export const AssistantMessageRow = memo(
     const hasMapArtifacts = (row.mapArtifacts?.length ?? 0) > 0;
     const hasVoiceSession = Boolean(row.voiceSession);
     const labelIds = row.agentLabelIds ?? [];
-    const pillCompletions = (row.agentCompletion?.sections ?? []).filter((section) =>
-      labelIds.includes(section.agentId),
-    );
+    const pillCompletions = [
+      ...new Map(
+        (row.agentCompletion?.sections ?? [])
+          .filter((section) => labelIds.includes(section.agentId))
+          .map((section) => [section.agentId, section] as const),
+      ).values(),
+    ];
     const pillRefs: ReplyRef[] = [
       ...(row.replyRefs ?? []).filter((ref) => ref.kind === "message"),
       ...labelIds

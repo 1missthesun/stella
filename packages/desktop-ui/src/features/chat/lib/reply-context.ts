@@ -19,6 +19,7 @@ export type ReplyContextOptions = {
    * spawn (a locally executed turn mirrored into the cloud journal).
    */
   agentTitles?: ReadonlyMap<string, string>;
+  agentParents?: ReadonlyMap<string, string>;
 };
 
 /**
@@ -108,6 +109,17 @@ export function withReplyContext(
     };
   });
   const { contexts } = projectReplyContexts(input);
+  const parents = options.agentParents;
+  const topLevel = (threadId: string): string => {
+    if (!parents?.size) return threadId;
+    let current = threadId;
+    const seen = new Set([current]);
+    for (let parent = parents.get(current); parent && !seen.has(parent); parent = parents.get(current)) {
+      seen.add(parent);
+      current = parent;
+    }
+    return current;
+  };
   const labelRows: AgentLabelRow[] = rows.map((row) => {
     if (row.kind === "user") {
       return { id: row.id, role: "user", ...(row.hidden || rendersNothing(row) ? { hidden: true } : {}) };
@@ -117,7 +129,7 @@ export function withReplyContext(
       ...(row.spawnedThreadIds ?? []),
       ...(row.agentCompletion?.sections.map((section) => section.agentId) ?? []),
       ...(row.replyRefs ?? []).flatMap((ref) => (ref.kind === "agent" ? [ref.threadId] : [])),
-    ];
+    ].map(topLevel);
     const paints =
       assistantRowHasOwnContent(row) || Boolean(row.backgroundWork) || Boolean(row.agentCompletion);
     return {

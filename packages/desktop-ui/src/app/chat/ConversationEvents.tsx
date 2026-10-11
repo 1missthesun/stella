@@ -17,6 +17,7 @@ import type { LegendListRef } from "@legendapp/list/react";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { useEventRows } from "@/features/chat/hooks/use-event-rows";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
+import { useAgentParents } from "@/features/chat/hooks/use-agent-parents";
 import { useDriveAttachmentPreviews } from "@/features/cloud/drive-attachment-previews";
 import { ChatTimeline } from "./ChatTimeline";
 import type { InlineWorkingIndicatorMountProps } from "./InlineWorkingIndicator";
@@ -189,11 +190,13 @@ export const ConversationEvents = memo(function ConversationEvents({
     }
     return titles;
   }, [agentTitlesKey]);
+  const agentParents = useAgentParents(conversationId, activity.records);
   const presentedMessages = useDriveAttachmentPreviews(messages);
   const { rows: projectedRows } = useEventRows({
     messages: presentedMessages,
     maxItems,
     agentTitles,
+    agentParents,
   });
 
   const justSentCandidates = useMemo(

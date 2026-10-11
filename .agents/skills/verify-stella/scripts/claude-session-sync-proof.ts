@@ -129,6 +129,14 @@ const main = async () => {
   const workingFolder = await resolveClaudeWorkingFolder(cwd);
   const projectDir = claudeSessionProjectDir(process.env.CLAUDE_CONFIG_DIR ?? null, workingFolder);
   const orchestrator = flag("--role") === "orchestrator";
+  const resumePosition = flag("--resume-position");
+  if (argv.includes("--cloud-turn")) {
+    store.setThreadExternalSessionId(threadId, null);
+    store.setThreadExternalDeliveredEntryId(threadId, null);
+  }
+  const abortAfter = flag("--abort-after-ms");
+  const abort = new AbortController();
+  if (abortAfter) setTimeout(() => abort.abort("Simulated restart"), Number(abortAfter));
   const orchestratorTools = orchestrator
     ? {
         catalog: createToolHost({
@@ -165,6 +173,10 @@ const main = async () => {
     agentType: orchestrator ? "orchestrator" : "general",
     userPrompt: prompt,
     ...(journalSeq ? { cloudJournalSeq: Number(journalSeq) } : {}),
+    ...(resumePosition
+      ? { resolveClaudeResumeJournalSeq: async () => Number(resumePosition) }
+      : {}),
+    ...(abortAfter ? { abortSignal: abort.signal } : {}),
     ...(orchestratorTools
       ? {
           toolCatalog: orchestratorTools.catalog,
@@ -191,7 +203,16 @@ const main = async () => {
     store,
     compactionScheduler: { schedule: async () => {} },
   } as never);
-  const sessionId = store.getThreadExternalSessionId(threadId)?.split(":").pop() ?? null;
+  const sessionId =
+    store.getThreadExternalSessionId(threadId)?.split(":").pop() ??
+    (
+      db
+        .prepare(
+          "SELECT session_id AS sessionId FROM claude_session_sync_sessions WHERE thread_id = ? ORDER BY updated_at DESC LIMIT 1",
+        )
+        .get(threadId) as { sessionId?: string } | null
+    )?.sessionId ??
+    null;
   report.turn = result;
   report.sessionId = sessionId;
   report.sessionFile = sessionId ? path.join(projectDir, `${sessionId}.jsonl`) : null;

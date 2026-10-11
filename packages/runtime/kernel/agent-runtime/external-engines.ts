@@ -825,12 +825,17 @@ const prepareClaudeSessionResume = async (args: {
   if (pending) return;
   const configDir = (await getClaudeCodeConfig()).configDir ?? null;
   if (!args.orchestrator) {
-    await sink.prepareLocalResume({
+    const prepared = await sink.prepareLocalResume({
       threadId: args.threadKey,
       engine: args.engine,
       configDir,
       cwd: args.cwd,
     });
+    if (prepared) {
+      historyDeliveryLogger.info("claude-session-restore.local-resume", {
+        threadKey: args.threadKey,
+      });
+    }
     return;
   }
   const atJournalSeq = await args.opts

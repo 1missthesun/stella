@@ -290,6 +290,7 @@ export const artifactTitle = (payload: MobileDisplayPayload): string => {
     case "pdf":
       return payload.title ?? basenameOf(payload.filePath);
     case "media":
+      if (payload.title?.trim()) return payload.title.trim();
       if (payload.prompt?.trim()) return payload.prompt.trim();
       switch (payload.asset.kind) {
         case "image":

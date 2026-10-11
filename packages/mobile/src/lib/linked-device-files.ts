@@ -24,7 +24,11 @@ import {
   type DeviceRequestOptions,
 } from "./device-requests";
 import { listExecutionDevices } from "./execution-placement";
-import { getStoredPhoneAccess, type StoredPhoneAccess } from "./phone-access";
+import {
+  getStoredPhoneAccess,
+  reachPhoneAccess,
+  type StoredPhoneAccess,
+} from "./phone-access";
 
 const COMPUTERS_CACHE_MS = 10_000;
 const RESOLUTION_CACHE_MS = 15_000;
@@ -91,40 +95,64 @@ export const locateDeviceFile = async (
   }
 };
 
+type ListedComputer = OnlineComputer & { online: boolean };
+
 let computersCache: {
   at: number;
-  value: Promise<OnlineComputer[] | null>;
+  value: Promise<ListedComputer[] | null>;
 } | null = null;
 
-export const onlineComputers = (): Promise<OnlineComputer[] | null> => {
+const listedComputers = (): Promise<ListedComputer[] | null> => {
   const now = Date.now();
   if (computersCache && now - computersCache.at < COMPUTERS_CACHE_MS) {
     return computersCache.value;
   }
   const value = listExecutionDevices()
     .then((devices) =>
-      devices
-        .filter((device) => device.online)
-        .map((device) => ({
-          deviceId: device.deviceId,
-          label: friendlyDeviceName(device.label),
-        })),
+      devices.map((device) => ({
+        deviceId: device.deviceId,
+        label: friendlyDeviceName(device.label),
+        online: device.online,
+      })),
     )
     .catch(() => null);
   computersCache = { at: now, value };
   return value;
 };
 
+export const onlineComputers = async (): Promise<OnlineComputer[] | null> => {
+  const listed = await listedComputers();
+  return listed
+    ? listed
+        .filter((computer) => computer.online)
+        .map(({ deviceId, label }) => ({ deviceId, label }))
+    : null;
+};
+
 const targetFor = async (
-  access: StoredPhoneAccess,
+  access: StoredPhoneAccess | null,
   deviceId: string,
   deviceName: string,
 ): Promise<DeviceFileTarget> => {
-  if (deviceId === access.desktopDeviceId) {
+  if (access && deviceId === access.desktopDeviceId) {
     return { deviceId, deviceName, access };
   }
   const own = await getStoredPhoneAccess(deviceId).catch(() => null);
-  return { deviceId, deviceName, access: own ?? access };
+  const existing = own ?? access;
+  if (existing) return { deviceId, deviceName, access: existing };
+  return { deviceId, deviceName, access: await reachPhoneAccess(deviceId) };
+};
+
+/**
+ * This phone's credential for the one computer that is online, for reads
+ * that do not name the computer they belong to.
+ */
+export const soleOnlineComputerAccess = async (): Promise<StoredPhoneAccess | null> => {
+  const computers = await onlineComputers();
+  const only = computers?.length === 1 ? computers[0] : null;
+  if (!only) return null;
+  const target = await targetFor(null, only.deviceId, only.label).catch(() => null);
+  return target?.access ?? null;
 };
 
 const requestOptions = (
@@ -184,12 +212,13 @@ const resolveUncached = async (
   filePath: string,
   preferDeviceId: string | null,
 ): Promise<LinkedFileSource> => {
-  const [location, computers] = await Promise.all([
+  const [location, listed] = await Promise.all([
     locateDeviceFile(filePath),
-    access ? onlineComputers() : Promise.resolve([] as OnlineComputer[]),
+    listedComputers(),
   ]);
+  const computers = listed?.filter((computer) => computer.online) ?? null;
   const labelOf = (deviceId: string): string =>
-    computers?.find((computer) => computer.deviceId === deviceId)?.label ??
+    listed?.find((computer) => computer.deviceId === deviceId)?.label ??
     (location?.deviceId === deviceId
       ? friendlyDeviceName(location.deviceName)
       : "your computer");
@@ -198,40 +227,40 @@ const resolveUncached = async (
       ? deviceId === access?.desktopDeviceId
       : computers.some((computer) => computer.deviceId === deviceId);
 
-  let pairedError: unknown = null;
-  if (access) {
-    const candidates = [
-      ...new Set(
-        [
-          preferDeviceId,
-          location?.deviceId ?? null,
-          ...(computers ?? []).map((computer) => computer.deviceId),
-          computers === null ? access.desktopDeviceId : null,
-        ].filter((id): id is string => Boolean(id) && isOnline(id as string)),
-      ),
-    ];
-    const first = candidates.filter(
-      (id) => id === preferDeviceId || id === location?.deviceId,
-    );
-    const rest = candidates.filter((id) => !first.includes(id));
-    const probe = async (deviceId: string) => {
+  const candidates = [
+    ...new Set(
+      [
+        preferDeviceId,
+        location?.deviceId ?? null,
+        ...(computers ?? []).map((computer) => computer.deviceId),
+        computers === null ? (access?.desktopDeviceId ?? null) : null,
+      ].filter((id): id is string => Boolean(id) && isOnline(id as string)),
+    ),
+  ];
+  const first = candidates.filter(
+    (id) => id === preferDeviceId || id === location?.deviceId,
+  );
+  const rest = candidates.filter((id) => !first.includes(id));
+  const targets = new Map<string, DeviceFileTarget>();
+  const failures = new Map<string, unknown>();
+  const probe = async (deviceId: string) => {
+    try {
       const target = await targetFor(access, deviceId, labelOf(deviceId));
-      try {
-        const stat = await statOn(target, conversationId, filePath);
-        return { kind: "device" as const, target, stat };
-      } catch (error) {
-        if (deviceId === access.desktopDeviceId) pairedError = error;
-        throw error;
-      }
-    };
-    for (const deviceId of first) {
-      const found = await probe(deviceId).catch(() => null);
-      if (found) return found;
+      targets.set(deviceId, target);
+      const stat = await statOn(target, conversationId, filePath);
+      return { kind: "device" as const, target, stat };
+    } catch (error) {
+      failures.set(deviceId, error);
+      throw error;
     }
-    if (rest.length > 0) {
-      const found = await firstFound(rest.map(probe));
-      if (found) return found;
-    }
+  };
+  for (const deviceId of first) {
+    const found = await probe(deviceId).catch(() => null);
+    if (found) return found;
+  }
+  if (rest.length > 0) {
+    const found = await firstFound(rest.map(probe));
+    if (found) return found;
   }
 
   if (location?.drivePath) {
@@ -243,21 +272,18 @@ const resolveUncached = async (
       deviceName: friendlyDeviceName(location.deviceName),
     };
   }
-  if (
-    access &&
-    isOnline(access.desktopDeviceId) &&
-    pairedError &&
-    errorCode(pairedError) !== "not_found"
-  ) {
-    return {
-      kind: "device",
-      target: await targetFor(
-        access,
-        access.desktopDeviceId,
-        labelOf(access.desktopDeviceId),
-      ),
-      stat: null,
-    };
+
+  const primary =
+    first[0] ??
+    (access && candidates.includes(access.desktopDeviceId)
+      ? access.desktopDeviceId
+      : candidates.length === 1
+        ? candidates[0]
+        : null);
+  const primaryError = primary ? failures.get(primary) : undefined;
+  const primaryTarget = primary ? targets.get(primary) : undefined;
+  if (primaryTarget && primaryError && errorCode(primaryError) !== "not_found") {
+    return { kind: "device", target: primaryTarget, stat: null };
   }
 
   if (location && !isOnline(location.deviceId)) {
@@ -267,11 +293,20 @@ const resolveUncached = async (
       }),
     );
   }
-  if (!access) {
-    throw new Error("Pair this phone with your computer to open its files here.");
+  if (preferDeviceId && computers !== null && !isOnline(preferDeviceId)) {
+    throw new Error(deviceFileElsewhereMessage(labelOf(preferDeviceId)));
   }
-  if (pairedError && errorCode(pairedError) === "forbidden" && pairedError instanceof Error) {
-    throw pairedError;
+  if (primary && primaryError && !primaryTarget) {
+    throw new Error(
+      `Stella couldn't connect this phone to ${labelOf(primary)}. Try again in a moment.`,
+    );
+  }
+  if (candidates.length === 0) {
+    throw new Error(
+      computers === null
+        ? "Couldn't check which of your computers are online. Try again in a moment."
+        : `${fileNameOf(filePath)} is on a computer that isn't online. Open Stella on it, then try again.`,
+    );
   }
   throw new LinkedFileMissingError(filePath);
 };

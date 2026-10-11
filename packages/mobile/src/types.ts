@@ -125,6 +125,8 @@ export type MobileDisplayPayload =
       asset: MobileMediaAsset;
       createdAt: number;
       prompt?: string;
+      /** The name the file goes by, when it is not its path's last segment. */
+      title?: string;
       madeBy?: string;
       presentation?: "inline-image";
       aspectRatio?: string;

@@ -50,6 +50,7 @@ import {
   locateDeviceFile,
   renderLinkedOfficePreview,
   resolveLinkedFile,
+  soleOnlineComputerAccess,
   subscribeLinkedFileProgress,
   type LinkedFileSource,
 } from "../lib/linked-device-files";
@@ -89,7 +90,13 @@ type ArtifactViewerProps = {
   access: StoredPhoneAccess | null;
   visible: boolean;
   onClose: () => void;
-} & ArtifactSwipeProps;
+} & ArtifactSwipeProps &
+  ArtifactDeviceProps;
+
+type ArtifactDeviceProps = {
+  /** The computer an artifact's file is known to be on, when the opener knows. */
+  deviceIdOf?: (artifact: ChatArtifact) => string | null;
+};
 
 type ArtifactSwipeProps = {
   /**
@@ -114,7 +121,8 @@ type ArtifactViewerContentProps = {
   onClose?: () => void;
   /** The copy, share and link controls this artifact offers, as they change. */
   onActionsChange?: (actions: PopoverAction[]) => void;
-} & ArtifactSwipeProps;
+} & ArtifactSwipeProps &
+  ArtifactDeviceProps;
 
 const isImageArtifact = (artifact: ChatArtifact): boolean =>
   artifact.payload.kind === "media" && artifact.payload.asset.kind === "image";
@@ -340,6 +348,7 @@ export function ArtifactViewerContent({
   siblings: openedSiblings,
   onNavigate,
   onActionsChange,
+  deviceIdOf,
 }: ArtifactViewerContentProps) {
   const t = useT();
   const [trailState, setTrailState] = useState<{
@@ -351,7 +360,9 @@ export function ArtifactViewerContent({
     [openedArtifact, trailState],
   );
   const top = trail[trail.length - 1] ?? null;
-  const preferDeviceId = top?.preferDeviceId ?? null;
+  const preferDeviceId =
+    top?.preferDeviceId ??
+    (openedArtifact && deviceIdOf ? deviceIdOf(openedArtifact) : null);
   const shownArtifact = top?.artifact ?? openedArtifact;
   const artifact = useMemo(
     () => (shownArtifact ? viewedArtifact(shownArtifact) : null),
@@ -766,14 +777,17 @@ export function ArtifactViewerContent({
         return { kind: "url" as const, uri };
       }
       if (payload.kind === "office") {
-        if (!access) {
-          throw new Error("Pair this phone with your desktop again.");
+        const officeAccess = access ?? (await soleOnlineComputerAccess());
+        if (!officeAccess) {
+          throw new Error(
+            "The computer that made this document isn't online. Open Stella on it, then try again.",
+          );
         }
         return {
           kind: "html-document" as const,
           html: prepareDocumentHtml(
             await loadExistingOfficePreviewHtml(
-              access,
+              officeAccess,
               artifact.conversationId,
               payload.previewRef.sessionId,
               controller.signal,
@@ -1172,6 +1186,7 @@ export function ArtifactViewer({
   onClose,
   siblings,
   onNavigate,
+  deviceIdOf,
 }: ArtifactViewerProps) {
   const { height: screenHeight } = useWindowDimensions();
   const [actions, setActions] = useState<PopoverAction[]>([]);
@@ -1191,6 +1206,7 @@ export function ArtifactViewer({
           onActionsChange={setActions}
           {...(siblings ? { siblings } : {})}
           {...(onNavigate ? { onNavigate } : {})}
+          {...(deviceIdOf ? { deviceIdOf } : {})}
         />
       )}
     </FloatingPopover>

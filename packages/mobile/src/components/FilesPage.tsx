@@ -2,6 +2,7 @@ import {
   LegendList,
   type LegendListRenderItemProps,
 } from "@legendapp/list/react-native";
+import { isCloudWorldAppPath } from "@stella/contracts/cloud-world-paths";
 import { generatedImageFileName } from "@stella/contracts/generated-image-name";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -84,6 +85,13 @@ const fileName = (file: ConversationFile): string => {
   return name || artifactTitle(payload);
 };
 
+const titledArtifact = (artifact: ChatArtifact, title: string): ChatArtifact => {
+  const payload = artifact.payload;
+  if (payload.kind === "agent-work" || payload.kind === "map-route") return artifact;
+  if (artifactTitle(payload) === title) return artifact;
+  return { ...artifact, payload: { ...payload, title } };
+};
+
 /**
  * The Files page: every file Stella produced or shared in the conversation,
  * wherever it lives (the cloud drive, one of the owner's computers, or an
@@ -143,7 +151,8 @@ export function FilesPage() {
       merged.push(file);
     }
     for (const artifact of hubArtifacts) {
-      if (!artifactPrimaryFilePath(artifact.payload)) continue;
+      const filePath = artifactPrimaryFilePath(artifact.payload);
+      if (!filePath || isCloudWorldAppPath(filePath)) continue;
       const key = artifactFileKey(artifact);
       const known = byKey.get(key);
       if (known) {
@@ -172,7 +181,13 @@ export function FilesPage() {
             ? `computer:${deviceId}`
             : UNKNOWN_COMPUTER
           : file.source.kind;
-      return { ...file, title: fileName(file), bucket };
+      const title = fileName(file);
+      return {
+        ...file,
+        artifact: titledArtifact(file.artifact, title),
+        title,
+        bucket,
+      };
     });
   }, [driveRows, hubArtifacts, journal.files, preferredAccess?.desktopDeviceId]);
 
@@ -243,6 +258,20 @@ export function FilesPage() {
     }
     return map;
   }, [pairedDesktops, shown]);
+
+  const deviceById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const row of shown) {
+      if (row.source.kind === "computer" && row.source.deviceId) {
+        map.set(row.artifact.id, row.source.deviceId);
+      }
+    }
+    return map;
+  }, [shown]);
+  const deviceIdOf = useCallback(
+    (artifact: ChatArtifact) => deviceById.get(artifact.id) ?? null,
+    [deviceById],
+  );
 
   const openArtifact = useCallback((artifact: ChatArtifact) => {
     tapLight();
@@ -498,6 +527,7 @@ export function FilesPage() {
         onClose={() => setViewerArtifact(null)}
         siblings={siblings}
         onNavigate={setViewerArtifact}
+        deviceIdOf={deviceIdOf}
       />
     </View>
   );

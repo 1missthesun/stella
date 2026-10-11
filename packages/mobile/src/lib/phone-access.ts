@@ -220,14 +220,17 @@ export async function clearStoredPhoneAccess(desktopDeviceId: string) {
  * Both ways in (a redeemed pairing code and a codeless attach) end here, so
  * the two cannot drift in what they store: the access record under the
  * desktop's id, the id in the paired-ids index, and this desktop as the
- * preferred one.
+ * preferred one unless the caller keeps the one already preferred.
  */
-const storeGrantedPhoneAccess = async (args: {
-  desktopDeviceId: string;
-  mobileDeviceId: string;
-  pairSecret: string;
-  approvedAt: number;
-}): Promise<StoredPhoneAccess> => {
+const storeGrantedPhoneAccess = async (
+  args: {
+    desktopDeviceId: string;
+    mobileDeviceId: string;
+    pairSecret: string;
+    approvedAt: number;
+  },
+  options?: { keepPreferred?: boolean },
+): Promise<StoredPhoneAccess> => {
   const access: StoredPhoneAccess = {
     desktopDeviceId: args.desktopDeviceId,
     mobileDeviceId: args.mobileDeviceId,
@@ -244,10 +247,15 @@ const storeGrantedPhoneAccess = async (args: {
     ids.push(access.desktopDeviceId);
   }
   await writePairedDesktopIds(ids);
-  await SecureStore.setItemAsync(
-    PREFERRED_DESKTOP_DEVICE_ID_KEY,
-    access.desktopDeviceId,
-  );
+  const preferred = options?.keepPreferred
+    ? await SecureStore.getItemAsync(PREFERRED_DESKTOP_DEVICE_ID_KEY)
+    : null;
+  if (!preferred?.trim()) {
+    await SecureStore.setItemAsync(
+      PREFERRED_DESKTOP_DEVICE_ID_KEY,
+      access.desktopDeviceId,
+    );
+  }
 
   return access;
 };
@@ -276,7 +284,7 @@ export async function getStoredPhoneAccess(
  */
 export async function attachPhoneAccess(
   desktopDeviceId: string,
-  options?: { displayName?: string },
+  options?: { displayName?: string; keepPreferred?: boolean },
 ): Promise<StoredPhoneAccess> {
   const id = desktopDeviceId.trim();
   assert(Boolean(id), "A computer is required to connect this phone.");
@@ -296,7 +304,23 @@ export async function attachPhoneAccess(
     ),
   );
 
-  return await storeGrantedPhoneAccess({ ...result, mobileDeviceId });
+  return await storeGrantedPhoneAccess(
+    { ...result, mobileDeviceId },
+    { keepPreferred: options?.keepPreferred === true },
+  );
+}
+
+/**
+ * The credential for reaching one of the account's computers to read a file
+ * it made, attaching on demand without making it the computer new chats go
+ * to.
+ */
+export async function reachPhoneAccess(
+  desktopDeviceId: string,
+): Promise<StoredPhoneAccess> {
+  const existing = await getStoredPhoneAccess(desktopDeviceId);
+  if (existing) return existing;
+  return await attachPhoneAccess(desktopDeviceId, { keepPreferred: true });
 }
 
 /**

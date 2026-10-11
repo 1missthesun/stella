@@ -49,8 +49,10 @@ const DELIMITED_TABLE_EXTS = new Set(["csv", "tsv"]);
 export const displayPayloadForStellaFile = (
   filePath: string,
   createdAt: number,
+  name?: string,
 ): MobileDisplayPayload => {
-  const title = basenameOf(filePath);
+  const named = name?.trim() ? { title: name.trim() } : {};
+  const title = name?.trim() || basenameOf(filePath);
   const ext = extensionOf(filePath);
   if (ext === "html" || ext === "htm") {
     return { kind: "canvas-html", filePath, title, createdAt };
@@ -63,16 +65,17 @@ export const displayPayloadForStellaFile = (
       kind: "media",
       asset: { kind: "image", filePaths: [filePath] },
       createdAt,
+      ...named,
     };
   }
   if (ext && VIDEO_EXTS.has(ext)) {
-    return { kind: "media", asset: { kind: "video", filePath }, createdAt };
+    return { kind: "media", asset: { kind: "video", filePath }, createdAt, ...named };
   }
   if (ext && AUDIO_EXTS.has(ext)) {
-    return { kind: "media", asset: { kind: "audio", filePath }, createdAt };
+    return { kind: "media", asset: { kind: "audio", filePath }, createdAt, ...named };
   }
   if (ext && MODEL3D_EXTS.has(ext)) {
-    return { kind: "media", asset: { kind: "model3d", filePath }, createdAt };
+    return { kind: "media", asset: { kind: "model3d", filePath }, createdAt, ...named };
   }
   if (ext && OFFICE_DOC_EXTS.has(ext)) {
     return {
@@ -131,6 +134,7 @@ export const driveFileChatArtifact = (
           kind: "media",
           asset: { kind: "image", filePaths: [drivePath] },
           createdAt,
+          title: name,
           driveBacked: true,
         }
       : ext && VIDEO_EXTS.has(ext)
@@ -138,6 +142,7 @@ export const driveFileChatArtifact = (
             kind: "media",
             asset: { kind: "video", filePath: drivePath },
             createdAt,
+            title: name,
             driveBacked: true,
           }
         : ext && AUDIO_EXTS.has(ext)
@@ -145,6 +150,7 @@ export const driveFileChatArtifact = (
               kind: "media",
               asset: { kind: "audio", filePath: drivePath },
               createdAt,
+              title: name,
               driveBacked: true,
             }
           : null;

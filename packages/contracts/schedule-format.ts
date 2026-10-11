@@ -1,8 +1,9 @@
 /**
  * Schedule rows as people read them, shared by the desktop and the phone: a
- * cadence line (`Daily 09:00`, `Every 30 min`, `Once at Apr 14, 09:00`) in
- * the reader's time zone, and a short next-run badge (`in 2h`,
- * `tomorrow 9:00 AM`, `due`).
+ * cadence line (`Daily 9:00 AM`, `Every 30 min`, `Once at Apr 14, 9:00 AM`)
+ * in the reader's time zone, and a short next-run badge (`in 2h`,
+ * `tomorrow 9:00 AM`, `due`). Every clock time follows the device's 12- or
+ * 24-hour setting, so the two never disagree.
  */
 
 import type { LocalCronSchedule } from "./scheduling.js";
@@ -38,12 +39,30 @@ const SHORT_MONTHS = [
 const padTime = (h: number, m: number): string =>
   `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
-/** 12-hour clock with `AM`/`PM` — matches the desktop badge style. */
 const formatClock12 = (h: number, m: number): string => {
   const period = h >= 12 ? "PM" : "AM";
   const displayHour = h % 12 === 0 ? 12 : h % 12;
   return `${displayHour}:${String(m).padStart(2, "0")} ${period}`;
 };
+
+/** Whether this device shows times on a 12-hour clock, from its own setting. */
+const uses12HourClock = (): boolean => {
+  try {
+    const options = new Intl.DateTimeFormat(undefined, {
+      hour: "numeric",
+    }).resolvedOptions();
+    if (options.hourCycle) {
+      return options.hourCycle === "h11" || options.hourCycle === "h12";
+    }
+    return options.hour12 !== false;
+  } catch {
+    return true;
+  }
+};
+
+/** A clock time as this device writes one: `9:05 AM` or `09:05`. */
+const formatClock = (h: number, m: number): string =>
+  uses12HourClock() ? formatClock12(h, m) : padTime(h, m);
 
 const isSameCalendarDay = (a: Date, b: Date): boolean =>
   a.getFullYear() === b.getFullYear() &&
@@ -69,15 +88,15 @@ export const formatNextRun = (nextRunAtMs: number, nowMs: number): string => {
   const next = new Date(nextRunAtMs);
   const now = new Date(nowMs);
   if (isSameCalendarDay(next, now)) {
-    return formatClock12(next.getHours(), next.getMinutes());
+    return formatClock(next.getHours(), next.getMinutes());
   }
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (isSameCalendarDay(next, tomorrow)) {
-    return `tomorrow ${formatClock12(next.getHours(), next.getMinutes())}`;
+    return `tomorrow ${formatClock(next.getHours(), next.getMinutes())}`;
   }
   if (delta < 7 * DAY_MS) {
-    return `${SHORT_WEEKDAYS[next.getDay()]} ${formatClock12(next.getHours(), next.getMinutes())}`;
+    return `${SHORT_WEEKDAYS[next.getDay()]} ${formatClock(next.getHours(), next.getMinutes())}`;
   }
   return `${SHORT_MONTHS[next.getMonth()]} ${next.getDate()}`;
 };
@@ -233,7 +252,7 @@ const summarizeCron = (
   const days = parseWeekdays(dow);
   if (!days) return expr;
   const local = toLocalClock(time, tz, nextRunAtMs);
-  const clock = padTime(local.h, local.m);
+  const clock = formatClock(local.h, local.m);
   return `${describeWeekdays(shiftWeekdays(days, local.dayDelta))} ${clock}`;
 };
 
@@ -256,7 +275,7 @@ export const summarizeSchedule = (
   if (schedule.kind === "every") return formatIntervalEvery(schedule.everyMs);
   if (schedule.kind === "at") {
     const date = new Date(schedule.atMs);
-    return `Once at ${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}, ${padTime(date.getHours(), date.getMinutes())}`;
+    return `Once at ${SHORT_MONTHS[date.getMonth()]} ${date.getDate()}, ${formatClock(date.getHours(), date.getMinutes())}`;
   }
   return summarizeCron(schedule.expr, schedule.tz, nextRunAtMs);
 };

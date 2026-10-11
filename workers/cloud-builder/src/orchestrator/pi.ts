@@ -1355,20 +1355,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   }
 
   /**
-   * The agents still working whose reports would wake Stella here, by
-   * description: the owner's agent threads running in this conversation,
-   * and pi's own where pi ran here.
-   */
-  protected async workingAgentDescriptions(): Promise<string[]> {
-    const owner = await this.ownerRunningAgents();
-    const pi = this.agentsView?.pi ?? [];
-    const listed = new Set(pi.map((agent) => agent.agentId));
-    return [...pi, ...owner.filter((agent) => !listed.has(agent.agentId))].map(
-      (agent) => agent.title,
-    );
-  }
-
-  /**
    * The latest checkpoint of this journal epoch, if a host published one.
    * One whose messages after it already rolled out of the hot journal is
    * stale (no host compacted for that long), and a new transcript starts

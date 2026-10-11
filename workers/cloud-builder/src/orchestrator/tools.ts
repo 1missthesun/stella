@@ -955,7 +955,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
             createCloudSwitchDestinationTool({
               devices: async () =>
                 (await this.ownerGate(turn.ownerId).devices()).devices,
-              workingAgents: () => this.workingAgentDescriptions(),
               move: async (host, brief, toolCallId) => {
                 await this.putTurnState({
                   [BRAIN_HANDOFF_KEY]: {

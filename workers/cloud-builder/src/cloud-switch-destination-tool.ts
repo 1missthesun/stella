@@ -34,8 +34,6 @@ const deviceRefusal = async (
 export type CloudSwitchDestinationToolOptions = Readonly<{
   /** The owner's connected devices, read fresh. */
   devices: () => Promise<readonly DeviceDestination[]>;
-  /** The agents still working whose reports would wake Stella here: their descriptions. */
-  workingAgents: () => Promise<string[]>;
   /** Stella moves to that computer; `brief` continues there once this turn ends. */
   move: (
     host: { deviceId: string; label?: string },
@@ -98,13 +96,6 @@ export const createCloudSwitchDestinationTool = (
     if (!brief) {
       throw new Error(
         "Pass your brief as prompt: what you will do there, as you will read it there.",
-      );
-    }
-    // Their reports would wake her here.
-    const working = await options.workingAgents();
-    if (working.length > 0) {
-      throw new Error(
-        `Your agents here are still working (${working.join("; ")}), and their reports come to you here. Move once they finish, or pause them first.`,
       );
     }
     const listed = await options.devices().catch(() => undefined);

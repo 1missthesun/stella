@@ -39,8 +39,9 @@
  * the move is refused while that host can't take work, and a brief that
  * finds it gone is answered where the owner gate falls back to.
  *
- * A move is refused while the host that has the brain still runs agents,
- * whose reports would wake Stella there.
+ * Agents' reports and notes go through the owner's agent ledger
+ * (`@stella/contracts/backend/agent-reports`), which hands them to whichever
+ * host holds the lease when they arrive, so the brain moves while they run.
  */
 
 export type PiBrainHost =

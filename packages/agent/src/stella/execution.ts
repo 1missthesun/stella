@@ -175,8 +175,6 @@ export const toolsMovedNotice = (from: StellaPlacement, to: StellaPlacement, orc
 export const switchDestinationTool = (
   host: StellaExecutionHost,
   rootPlacement: StellaPlacement,
-  /** The agents still working whose reports would wake Stella on this host: their descriptions. */
-  workingAgents: (api: ToolExecutionApi, context: Context) => Promise<string[]>,
 ) =>
   defineTool({
     name: SWITCH_DESTINATION_TOOL_NAME,
@@ -215,13 +213,6 @@ export const switchDestinationTool = (
         if (!host.moveBrain) throw new Error("Your brain can't move from here; move your tools instead.");
         const brief = args.prompt?.trim();
         if (!brief) throw new Error("Pass your brief as prompt: what you will do there, as you will read it there.");
-        // Their reports would wake her here.
-        const working = await workingAgents(api, context);
-        if (working.length > 0) {
-          throw new Error(
-            `Your agents here are still working (${working.join("; ")}), and their reports come to you here. Move once they finish, or pause them first.`,
-          );
-        }
         const target: StellaPlacement = local
           ? { kind: "local" }
           : destination.kind === "cloud"

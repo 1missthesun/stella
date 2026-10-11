@@ -31,9 +31,8 @@ const SHORT_LIST = 5;
 /**
  * Whether a brain can run now without setting anything up: Stella always;
  * Claude Code and ChatGPT once an account is signed in for the cloud; an
- * account provider once its key or sign-in works. The one in use counts too,
- * so it is never missing from the menu that shows it checked. The Model menu
- * and the Providers page both sort by this.
+ * account provider once its key or sign-in works. The one in use counts too.
+ * The Providers page sorts by this.
  */
 export const brainReady = (brain: Brain, settings: ModelSettings) => {
   if (brain.id === settings.brainId) return true;
@@ -45,10 +44,9 @@ export const brainReady = (brain: Brain, settings: ModelSettings) => {
 
 /**
  * Which brain runs the chat, shown as the one in use with its models under
- * it. The switcher's system menu holds every brain that is ready to run
- * (Stella, Claude Code, ChatGPT, and each provider connected to the account)
- * and, last, the way to every other provider, so the page stays this size
- * however many providers there are.
+ * it. The switcher's system menu always holds the same four entries: Stella,
+ * Claude Code, ChatGPT, and Other, which opens the page of every provider, so
+ * the page stays this size however many providers there are.
  */
 export function BrainSection({
   settings,
@@ -106,21 +104,19 @@ export function BrainSection({
     });
   };
 
-  const readyBrains = settings.brains.filter((brain) =>
-    brainReady(brain, settings),
-  );
   const items: NativeMenuItem[] = [
-    ...readyBrains.map((brain): NativeMenuItem => ({
-      id: brain.id,
-      title: brain.label,
-      selected: brain.id === settings.brainId,
-      onPress: () => switchTo(brain),
-    })),
+    ...settings.brains
+      .filter((brain) => brain.kind === "engine")
+      .map((brain): NativeMenuItem => ({
+        id: brain.id,
+        title: brain.label,
+        selected: brain.id === settings.brainId,
+        onPress: () => switchTo(brain),
+      })),
     {
-      id: "all-providers",
-      title: "All providers…",
-      systemImage: "square.grid.2x2",
-      separatorBefore: true,
+      id: "other",
+      title: "Other",
+      selected: current?.kind === "provider",
       onPress: onOpenProviders,
     },
   ];

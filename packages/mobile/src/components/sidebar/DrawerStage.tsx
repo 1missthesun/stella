@@ -141,10 +141,6 @@ export function DrawerStage({
   const fade = useAnimatedStyle(() => ({
     opacity: drawerVeil(p.value) * STRIP_VEIL,
   }));
-  const edge = useAnimatedStyle(() => ({
-    borderRadius: interpolate(p.value, [0, 0.12], [0, radius], CLAMP),
-    opacity: interpolate(p.value, [0.3, 0.9], [0, 1], CLAMP),
-  }));
   const pageBlur = useAnimatedProps(() => ({
     intensity: reduce ? 0 : drawerBlur(p.value) * PAGE_BLUR,
   }));
@@ -202,17 +198,6 @@ export function DrawerStage({
               </>
             ) : null}
           </Animated.View>
-          {live ? (
-            <Animated.View
-              pointerEvents="none"
-              style={[
-                StyleSheet.absoluteFill,
-                styles.edge,
-                { borderColor: colors.border },
-                edge,
-              ]}
-            />
-          ) : null}
           {open ? (
             <GestureDetector gesture={catcher}>
               <View
@@ -472,9 +457,6 @@ const styles = StyleSheet.create({
   stage: { flex: 1 },
   clip: { flex: 1, overflow: "hidden" },
   chevron: { position: "absolute" },
-  edge: {
-    borderWidth: 1,
-  },
   restIcon: {
     alignItems: "center",
     height: DRAWER_CHEVRON_SIZE,

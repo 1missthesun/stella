@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ImageContent, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { AgentModelReasoningEffort } from "@stella/contracts/agent-engine";
@@ -81,6 +82,18 @@ const toToolResult = (outcome: ClaudeCodeToolOutcome): ToolResult => {
 const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
   const directory = path.join(dataDir, "agent", "claude-code");
   const file = (piSessionId: string) => path.join(directory, `${piSessionId.replace(/[^A-Za-z0-9_-]/g, "_")}.json`);
+  const writes = new Map<string, Promise<void>>();
+  const save = async (target: string, contents: string) => {
+    await mkdir(directory, { recursive: true });
+    const temporary = `${target}.${process.pid}.${randomUUID()}.tmp`;
+    try {
+      await writeFile(temporary, contents);
+      await rename(temporary, target);
+    } catch (error) {
+      await rm(temporary, { force: true }).catch(() => undefined);
+      throw error;
+    }
+  };
   return {
     read: async (piSessionId) => {
       try {
@@ -93,11 +106,17 @@ const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
         return undefined;
       }
     },
-    write: async (piSessionId, record) => {
-      await mkdir(directory, { recursive: true });
+    write: (piSessionId, record) => {
       const target = file(piSessionId);
-      await writeFile(`${target}.tmp`, JSON.stringify(record));
-      await rename(`${target}.tmp`, target);
+      const contents = JSON.stringify(record);
+      const next = (writes.get(target) ?? Promise.resolve()).catch(() => undefined).then(() => save(target, contents));
+      writes.set(target, next);
+      void next
+        .catch(() => undefined)
+        .finally(() => {
+          if (writes.get(target) === next) writes.delete(target);
+        });
+      return next;
     },
   };
 };

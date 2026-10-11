@@ -501,3 +501,44 @@ export const buildDemotedCodeSuffix = (
   demotedTools.length > 0
     ? `\n\n${DEMOTED_WORKFLOW_TEXT}\n\n${buildCatalogSection(demotedTools)}`
     : "";
+
+/** Claude Code cuts an MCP tool description off at 2048 characters. */
+const CLAUDE_CODE_DESCRIPTION_LIMIT = 2000;
+const CODE_PROMPT_HEADING = "# The `code` tool";
+const CODE_PROMPT_POINTER =
+  "More of this tool's documentation, including every tool callable only inside it, is in your system prompt under \"The `code` tool\".";
+
+/**
+ * Claude Code shows the model only the first 2048 characters of a tool's
+ * description. When `code`'s description (its contract plus the demoted
+ * catalog) is longer, the overflow moves into the system prompt: the demoted
+ * catalog first, and the whole description when even its contract is too
+ * long. The tool keeps a pointer to that section.
+ */
+export const fitCodeDescriptionForClaudeCode = <
+  T extends { name: string; description: string },
+>(
+  tools: readonly T[],
+  systemPrompt: string,
+): { tools: T[]; systemPrompt: string } => {
+  const code = tools.find((tool) => tool.name === "code");
+  if (!code || code.description.length <= CLAUDE_CODE_DESCRIPTION_LIMIT) {
+    return { tools: [...tools], systemPrompt };
+  }
+  const full = code.description;
+  const catalogAt = full.indexOf(`\n\n${DEMOTED_WORKFLOW_TEXT}`);
+  const contract = catalogAt >= 0 ? full.slice(0, catalogAt) : full;
+  const contractFits =
+    contract.length + CODE_PROMPT_POINTER.length + 2 <=
+    CLAUDE_CODE_DESCRIPTION_LIMIT;
+  const moved = contractFits ? full.slice(catalogAt + 2) : full;
+  const kept = contractFits
+    ? `${contract}\n\n${CODE_PROMPT_POINTER}`
+    : `${firstDescriptionLine(contract, 600) || "Run JavaScript."}\n\n${CODE_PROMPT_POINTER}`;
+  return {
+    tools: tools.map((tool) =>
+      tool === code ? { ...tool, description: kept } : tool,
+    ),
+    systemPrompt: `${systemPrompt.trimEnd()}\n\n${CODE_PROMPT_HEADING}\n\n${moved}`,
+  };
+};

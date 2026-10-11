@@ -45,6 +45,7 @@ import {
   type ClaudeCodeServedSearchToolName,
 } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
+import { fitCodeDescriptionForClaudeCode } from "@stella/runtime/kernel/tools/code-catalog";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import { describePlacement, placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella/placement.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
@@ -673,17 +674,18 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       turn.prompted = undefined;
       void saveRecord(session);
     };
+    const fitted = fitCodeDescriptionForClaudeCode(request.tools, request.systemPrompt);
     void options.transport
       .runTurn({
         session: binding.session,
         ...(resumeSessionId ? { resumeSessionId } : {}),
         model: request.model.id,
         thinkingLevel: request.thinkingLevel,
-        systemPrompt: request.systemPrompt,
+        systemPrompt: fitted.systemPrompt,
         prompt: prompt.text,
         images: prompt.images,
         resumeFallbackPrompt: rebuild.text,
-        tools: request.tools,
+        tools: fitted.tools,
         nativeTools: request.nativeTools,
         signal: abort.signal,
         backgroundWake,

@@ -64,6 +64,17 @@ import { OrchestratorCliTurn } from "./cli-turn.js";
 import type { OrchestratorOwner } from "./owner.js";
 
 /** One admitted chat turn, start to terminal, on Stella's loop or on pi. */
+/** pi's error reply for a Claude Code turn the usage limit stopped. */
+const isUsageLimitReply = (message: unknown): boolean => {
+  const reply = message as { role?: unknown; stopReason?: unknown; errorMessage?: unknown };
+  return (
+    reply.role === "assistant" &&
+    reply.stopReason === "error" &&
+    typeof reply.errorMessage === "string" &&
+    claudeUsageLimitOf(reply.errorMessage) !== null
+  );
+};
+
 export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
   /**
    * A stopped turn keeps what the user sent: its prompt is journaled now if
@@ -1009,7 +1020,10 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
             (entry.kind === "pi.assistant" ||
               entry.kind === "pi.tool-result") &&
             // Written from the journal: another writer's, already there.
-            pi.journalSeqOf(entry) === undefined
+            pi.journalSeqOf(entry) === undefined &&
+            // A reply the Claude usage limit cut off is not the turn's
+            // outcome: the turn is held, and the held card says so.
+            !isUsageLimitReply(message)
           ) {
             try {
               const appended = this.appendProduced(

@@ -225,14 +225,6 @@ const sha256 = (value: string) =>
 export const placementLocalAgentThreadId = (dispatchId: string) =>
   `placement-agent:${sha256(dispatchId).slice(0, 32)}`;
 
-/**
- * The local thread for a remote agent thread placed on this device. Every
- * attempt of that thread continues the same local thread, so a follow-up
- * keeps its history; the dispatch-scoped id above stays the attempt's fence.
- */
-export const placementRemoteThreadAgentId = (threadId: string) =>
-  `placement-agent:thread:${sha256(threadId).slice(0, 32)}`;
-
 /** Stable, dispatch-scoped ID for the exact local automation/chat run. */
 export const placementLocalChatRunId = (dispatchId: string) =>
   `placement-chat:${sha256(dispatchId).slice(0, 32)}`;

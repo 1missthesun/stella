@@ -48,8 +48,34 @@ import {
   isPlacementLocalAgentId,
   persistPlacementCancellation,
 } from "./execution-placement-local-ownership.js";
+import {
+  isPlacementThreadId,
+  placementRemoteThreadAgentId,
+} from "@stella/contracts/placement-thread-id";
 
 const TASK_LIFECYCLE_CUSTOM_TYPE = "runtime.task_lifecycle";
+
+const isPlacedHere = (context: RunnerContext, agentId: string): boolean =>
+  isPlacementLocalAgentId(agentId) ||
+  Boolean(context.runtimeStore.getAgentRecord?.(agentId)?.remoteThreadId);
+
+const placedLocalThreadId = (
+  context: RunnerContext,
+  threadId: string,
+): string => {
+  if (
+    !threadId ||
+    isPlacementLocalAgentId(threadId) ||
+    context.runtimeStore.getAgentRecord?.(threadId)
+  ) {
+    return threadId;
+  }
+  const earlier = placementRemoteThreadAgentId(threadId);
+  return !isPlacementThreadId(threadId) &&
+    context.runtimeStore.getAgentRecord?.(earlier)
+    ? earlier
+    : threadId;
+};
 
 const hasPersistedThreadCustomEvent = (
   context: RunnerContext,
@@ -466,7 +492,7 @@ export const createAgentOrchestration = (
       }
       return;
     }
-    if (!isParentOwned && isPlacementLocalAgentId(event.agentId)) {
+    if (!isParentOwned && isPlacedHere(context, event.agentId)) {
       persistSuppressedLifecycleMarker(context, event);
       return;
     }
@@ -1003,7 +1029,9 @@ export const createAgentOrchestration = (
       requestedModel,
       ...agentRequest
     } = request;
-    const requestedThreadId = agentRequest.threadId?.trim();
+    const requestedThreadId = agentRequest.remoteThreadId?.trim()
+      ? placedLocalThreadId(context, agentRequest.threadId?.trim() ?? "")
+      : agentRequest.threadId?.trim();
     const fenceId = requestedExecutionId?.trim() || requestedThreadId;
     const cancellationReason = fenceId
       ? getPlacementCancellation({
@@ -1140,17 +1168,18 @@ export const createAgentOrchestration = (
     reason?: string,
     executionId?: string,
   ): Promise<{ canceled: boolean }> => {
-    const exactAgentId = agentId.trim();
-    if (!exactAgentId) return { canceled: false };
+    const requestedAgentId = agentId.trim();
+    if (!requestedAgentId) return { canceled: false };
     // This SQLite write is deliberately synchronous and precedes every
     // lookup/await. The ACK therefore survives a worker restart in the gap
     // before a delayed runBlockingLocalAgent RPC is delivered.
     persistPlacementCancellation({
       store: context.runtimeStore.chat,
       kind: "agent",
-      executionId: executionId?.trim() || exactAgentId,
+      executionId: executionId?.trim() || requestedAgentId,
       reason,
     });
+    const exactAgentId = placedLocalThreadId(context, requestedAgentId);
 
     const manager = context.state.localAgentManager;
     if (!manager) {
@@ -1184,7 +1213,7 @@ export const createAgentOrchestration = (
     messageId: string,
   ): Promise<{ delivered: boolean }> => {
     const manager = context.state.localAgentManager;
-    const exactAgentId = agentId.trim();
+    const exactAgentId = placedLocalThreadId(context, agentId.trim());
     if (!manager || !exactAgentId || !text.trim()) return { delivered: false };
     // Only a run that is going now: a message for a finished thread would
     // resume it outside the placement that owns its attempts.

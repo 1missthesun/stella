@@ -346,7 +346,8 @@ export const handleSendMessage = async (
   const isLocalOnlyChat = context.conversationId.startsWith("local_");
 
   const target = api.readLocalAgentThread?.(threadId) ?? null;
-  if (target) {
+  const placedHere = Boolean(target?.remoteThreadId);
+  if (target && !placedHere) {
     const owns =
       context.fromUser === true ||
       (isOrchestrator &&
@@ -406,7 +407,11 @@ export const handleSendMessage = async (
     }
   }
 
-  if (!isLocalOnlyChat && !context.fromUser && api.messageCloudThread) {
+  if (
+    !isLocalOnlyChat &&
+    (!context.fromUser || placedHere) &&
+    api.messageCloudThread
+  ) {
     try {
       const outcome = await api.messageCloudThread({
         messageId: agentMessageId(context.requestId),
@@ -697,10 +702,15 @@ export const handleSpawnAgent = async (
     // because it produced an empty assistant message that overwrote the
     // orchestrator's actual response to the pause request.
     if (ctx.agentApi) {
-      const canceled = await ctx.agentApi.cancelAgent(
-        explicitThreadId,
-        AGENT_PAUSE_CANCEL_REASON,
+      const placedHere = Boolean(
+        ctx.agentApi.readLocalAgentThread?.(explicitThreadId)?.remoteThreadId,
       );
+      const canceled = placedHere
+        ? { canceled: false }
+        : await ctx.agentApi.cancelAgent(
+            explicitThreadId,
+            AGENT_PAUSE_CANCEL_REASON,
+          );
       if (canceled.canceled) {
         return {
           result: {

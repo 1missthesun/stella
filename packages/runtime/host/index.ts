@@ -29,7 +29,6 @@ import {
   PlacementRouteError,
   placementLocalAgentThreadId,
   placementLocalChatRunId,
-  placementRemoteThreadAgentId,
 } from "./execution-placement-bridge.js";
 import { isExecutionPlacementEligible } from "./execution-placement-eligibility.js";
 import {
@@ -1116,7 +1115,7 @@ export class StellaRuntimeHost {
               ...(requestedModel ? { requestedModel } : {}),
               ...(remoteThreadId
                 ? {
-                    threadId: placementRemoteThreadAgentId(remoteThreadId),
+                    threadId: remoteThreadId,
                     executionId: placementLocalAgentThreadId(
                       dispatch.dispatchId,
                     ),
@@ -1227,9 +1226,7 @@ export class StellaRuntimeHost {
         } | null>(
           METHOD_NAMES.INTERNAL_WORKER_STEER_BLOCKING_AGENT,
           {
-            agentId: remoteThreadId
-              ? placementRemoteThreadAgentId(remoteThreadId)
-              : placementLocalAgentThreadId(dispatchId),
+            agentId: remoteThreadId ?? placementLocalAgentThreadId(dispatchId),
             text,
             messageId,
           },
@@ -1287,7 +1284,7 @@ export class StellaRuntimeHost {
               : null;
           const result = remoteThreadId
             ? await this.cancelBlockingLocalAgent(
-                placementRemoteThreadAgentId(remoteThreadId),
+                remoteThreadId,
                 "Canceled by execution placement.",
                 placementLocalAgentThreadId(dispatchId),
               )

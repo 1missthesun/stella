@@ -29,6 +29,16 @@ import {
 import * as WorkerSessions from "../sessions.js";
 import { fromPromise, type WorkerRpcHandlers } from "../rpc.js";
 import type { AgentEventPayload } from "../types.js";
+import {
+  isPlacementThreadId,
+  placementRemoteThreadAgentId,
+} from "@stella/contracts/placement-thread-id";
+import { isPlacementLocalAgentId } from "../../../kernel/runner/execution-placement-local-ownership.js";
+
+const piPlacedAgentKey = (agentId: string): string =>
+  isPlacementLocalAgentId(agentId) || isPlacementThreadId(agentId)
+    ? agentId
+    : placementRemoteThreadAgentId(agentId);
 
 /** A placed agent's brief, with where the files the user attached are on this computer. */
 const withAttachedFiles = (
@@ -259,7 +269,9 @@ export const runsHandlers: WorkerRpcHandlers = {
       // conversation's harness; its answer goes back through the placement.
       if (piChatRouted(session)) {
         const hostBus = yield* HostBus.Service;
-        const agentKey = payload.threadId || payload.executionId || crypto.randomUUID();
+        const agentKey = payload.remoteThreadId
+          ? piPlacedAgentKey(payload.remoteThreadId)
+          : payload.threadId || payload.executionId || crypto.randomUUID();
         const runKey = payload.executionId || agentKey;
         return yield* fromPromise(async () => {
           const chats = await piChatsFor(session, hostBus);
@@ -314,7 +326,7 @@ export const runsHandlers: WorkerRpcHandlers = {
       const delivered = yield* fromPromise(async () =>
         (await piChatsFor(session, hostBus)).steerPlacedAgent({
           key: String(payload.messageId || crypto.randomUUID()),
-          agentKey: String(payload.agentId ?? ""),
+          agentKey: piPlacedAgentKey(String(payload.agentId ?? "")),
           message: String(payload.text ?? ""),
         }),
       );
@@ -399,7 +411,7 @@ export const runsHandlers: WorkerRpcHandlers = {
       const reason = typeof payload.reason === "string" ? payload.reason : undefined;
       const executionId = typeof payload.executionId === "string" ? payload.executionId.trim() : "";
       const runKey = executionId || agentId;
-      if (yield* fromPromise(() => cancelPiPlacedAgent(session, { agentKey: agentId, runKey, ...(reason ? { reason } : {}) }))) {
+      if (yield* fromPromise(() => cancelPiPlacedAgent(session, { agentKey: piPlacedAgentKey(agentId), runKey, ...(reason ? { reason } : {}) }))) {
         return { canceled: true };
       }
       const runner = yield* fromPromise(() =>

@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { createAudioPlayer, setIsAudioActiveAsync, type AudioPlayer } from "expo-audio";
+import { createAudioPlayer, type AudioPlayer } from "expo-audio";
 import { Alert } from "react-native";
 import { VOICE_TTS_STREAM_CANCEL_PATH } from "@stella/contracts/backend/voice";
 import { getAuthToken } from "./auth-token";
 import { getBackendClient } from "./backend";
 import { backendOrigin } from "./http";
-import { configurePlaybackAudioSession } from "./mobile-audio-session";
+import {
+  configurePlaybackAudioSession,
+  releasePlaybackAudioSession,
+} from "./mobile-audio-session";
 
 const READ_ALOUD_KEY = "stella-mobile.read-aloud-enabled";
 // The mobile player streams a live HLS playlist so audio starts while Gemini
@@ -83,24 +86,13 @@ export type ReadAloudState = {
 
 let playbackState: ReadAloudState | null = null;
 
-// Starting the microphone while a just-stopped speech clip still holds the
-// playback session makes the recorder read a 0 Hz input format or time out,
-// and it aborts the app. Dictation that follows speech this closely first
-// deactivates the session and lets it settle, matching a start from idle.
-const RECENT_SPEECH_MS = 2000;
-const SESSION_RELEASE_MS = 400;
-let lastPlayerReleasedAt = 0;
+let playbackSessionHeld = false;
 
-/** Resolves once a just-stopped clip has released the audio session. */
-export async function waitForReadAloudRelease() {
-  if (Date.now() - lastPlayerReleasedAt > RECENT_SPEECH_MS) return;
-  try {
-    await setIsAudioActiveAsync(false);
-  } catch {
-    /* the session may already be inactive */
-  }
-  await new Promise((resolve) => setTimeout(resolve, SESSION_RELEASE_MS));
-}
+const releasePlaybackSession = () => {
+  if (!playbackSessionHeld) return;
+  playbackSessionHeld = false;
+  void releasePlaybackAudioSession().catch(() => undefined);
+};
 let playbackAbort: AbortController | null = null;
 
 const abortPlaybackWork = () => {
@@ -244,7 +236,6 @@ export function stopReadAloud() {
   const player = currentPlayer;
   currentPlayer = null;
   if (player) {
-    lastPlayerReleasedAt = Date.now();
     try {
       player.pause();
       player.remove();
@@ -257,6 +248,7 @@ export function stopReadAloud() {
       /* already released */
     }
   }
+  releasePlaybackSession();
 }
 
 /** Terminal stop used when dictation begins. Never a pause; nothing resumes. */
@@ -280,6 +272,7 @@ export function pauseReadAloud() {
   } catch {
     /* ignore */
   }
+  releasePlaybackSession();
   setPlaybackState({ messageId: playbackState.messageId, status: "paused" });
 }
 
@@ -299,6 +292,7 @@ export function resumeReadAloud() {
     return;
   }
   if (!currentPlayer) return;
+  playbackSessionHeld = true;
   try {
     currentPlayer.play();
   } catch {
@@ -480,7 +474,6 @@ async function playHlsResilient(
       player = null;
       if (currentPlayer === p) currentPlayer = null;
       if (!p) return;
-      lastPlayerReleasedAt = Date.now();
       try {
         p.pause();
       } catch {
@@ -509,7 +502,10 @@ async function playHlsResilient(
       if (retryTimer !== null) clearTimeout(retryTimer);
       clearHlsWatchdog();
       dropPlayer();
-      if (disposeHlsPlayback === dispose) disposeHlsPlayback = null;
+      if (disposeHlsPlayback === dispose) {
+        disposeHlsPlayback = null;
+        releasePlaybackSession();
+      }
       resolve(true);
     };
     disposeHlsPlayback = dispose;
@@ -578,7 +574,11 @@ async function playHlsResilient(
       // Also covers native failures that never emit a playback error event.
       startTimer = setTimeout(retry, STREAM_START_TIMEOUT_MS);
       try {
-        const p = createAudioPlayer({ uri }, { preferredForwardBufferDuration: 1 });
+        playbackSessionHeld = true;
+        const p = createAudioPlayer(
+          { uri },
+          { preferredForwardBufferDuration: 1, keepAudioSessionActive: true },
+        );
         player = p;
         currentPlayer = p;
         let seeked = at <= 0.25;

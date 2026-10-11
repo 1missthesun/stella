@@ -9,7 +9,8 @@
  * the user is looking at. So chat surfaces render the current notice as
  * a card pinned directly above the composer (the same slot the
  * agent-initiated connector connect card uses), where it stays until the
- * user acts on it, dismisses it, or sends again.
+ * user acts on it, dismisses it, sends again, or a reply in that chat
+ * finishes without the failure.
  *
  * Transient failures (network blips, timeouts, a blocked prompt) are not
  * notices and keep using the toast.
@@ -93,17 +94,20 @@ export const dismissComposerNotice = (id: string): void => {
 };
 
 /**
- * Drop every notice a new send in `conversationId` makes stale: the one
- * scoped to that chat plus any unscoped one. If the problem persists the
- * failed run raises a fresh notice.
+ * Drop every notice a new send or a finished reply in `conversationId`
+ * makes stale: the one scoped to that chat plus any unscoped one, except
+ * those `keep` holds on to. If the problem persists the failed run raises
+ * a fresh notice.
  */
 export const clearComposerNotices = (
   conversationId: string | null | undefined,
+  keep?: (notice: ComposerNotice) => boolean,
 ): void => {
   const remaining = notices.filter(
     (entry) =>
-      entry.conversationId !== null &&
-      entry.conversationId !== (conversationId ?? null),
+      keep?.(entry) ||
+      (entry.conversationId !== null &&
+        entry.conversationId !== (conversationId ?? null)),
   );
   if (remaining.length === notices.length) return;
   notices = remaining;

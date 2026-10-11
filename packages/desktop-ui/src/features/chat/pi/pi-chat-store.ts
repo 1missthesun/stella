@@ -11,6 +11,7 @@ import type { DesktopThreadActivityRecord } from "@/features/chat/thread-activit
 import { presentStellaProviderError } from "@/features/chat/streaming/stella-provider-error-toast";
 import { showToast } from "@/ui/toast";
 import {
+  clearComposerNotices,
   dismissComposerNotice,
   presentComposerNotice,
 } from "@/features/chat/composer-notice-store";
@@ -80,6 +81,11 @@ const attach = (conversationId: string, entry: Watched) => {
 
 const usageLimitNoticeId = (conversationId: string) => `claude-usage-limit:${conversationId}`;
 
+const clearStaleNotices = (conversationId: string) => {
+  const usageLimit = usageLimitNoticeId(conversationId);
+  clearComposerNotices(conversationId, (notice) => notice.id === usageLimit);
+};
+
 /** "11:30 PM" today, or "Sun 11:30 PM" on another day. */
 const resetTime = (until: number) => {
   const at = new Date(until);
@@ -130,8 +136,11 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
     }
     if (event.type !== "message_end" || event.entry.kind !== "pi.assistant") continue;
     const message = event.entry.model?.[0];
-    if (message?.role === "assistant" && message.stopReason === "error") {
+    if (message?.role !== "assistant") continue;
+    if (message.stopReason === "error") {
       presentStellaProviderError(message.errorMessage ?? null, { conversationId });
+    } else if (message.stopReason !== "aborted") {
+      clearStaleNotices(conversationId);
     }
   }
 };
@@ -202,6 +211,7 @@ export const submitPiChat = async (
 ): Promise<PiChatPlacedResult["placed"] | undefined> => {
   const chat = api();
   if (!chat) throw new Error("Stella's runtime is not available.");
+  clearStaleNotices(conversationId);
   const result = await chat.request({ op: "submit", conversationId, requestId, text, ...(send ? { send } : {}) });
   return (result as Partial<PiChatPlacedResult> | undefined)?.placed;
 };

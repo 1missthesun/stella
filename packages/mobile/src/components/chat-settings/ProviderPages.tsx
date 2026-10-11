@@ -38,8 +38,9 @@ const authHint = (provider: AccountProvider) => {
 function brainDetail(brain: Brain, settings: ModelSettings): string {
   if (brain.kind === "engine") {
     if (brain.engine === "stella") return "Included";
-    return settings.connectedProviders?.includes(brain.engine)
-      ? "Signed in"
+    if (settings.connectedProviders?.includes(brain.engine)) return "Signed in";
+    return brain.id === settings.brainId
+      ? "In use · Sign in for Cloud"
       : "Sign in";
   }
   const connection = brain.provider.connection;

@@ -148,7 +148,9 @@ function ApiKeyForm({
           setKey(text);
           setError(null);
         }}
-        placeholder={method.placeholder || "API key"}
+        placeholder={
+          /[a-z0-9]/i.test(method.placeholder) ? method.placeholder : "API key"
+        }
         secureTextEntry
         autoCapitalize="none"
         autoCorrect={false}

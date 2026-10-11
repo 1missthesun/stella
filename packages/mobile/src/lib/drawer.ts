@@ -201,16 +201,27 @@ const dismissKeyboard = () => Keyboard.dismiss();
 const dragOwner = makeMutable(0);
 const dragOrigin = makeMutable(0);
 const dragTravel = makeMutable(1);
+const dragX = makeMutable(0);
+const dragY = makeMutable(0);
+const dragAt = makeMutable(0);
+
+/**
+ * A move that arrives after the touch has been still this long and lands
+ * this far away is not a finger: a real finger starting again from rest moves
+ * a few points per sample. It means the drag's end was lost and the next
+ * touch was delivered as the same one (the Simulator's injected mouse-up can
+ * go missing this way).
+ */
+const RESUMED_GAP_MS = 150;
+const RESUMED_JUMP_PT = 60;
 
 let nextOwner = 1;
 
-function grab(
-  owner: number,
-  sign: number,
-  translationX: number,
-  travel: number,
-) {
+type PanPoint = { translationX: number; absoluteX: number; absoluteY: number };
+
+function grab(owner: number, sign: number, e: PanPoint, travel: number) {
   "worklet";
+  const translationX = e.translationX;
   cancelAnimation(drawerProgress);
   if (drawerSign.value !== sign) {
     drawerSign.value = sign;
@@ -219,15 +230,42 @@ function grab(
   dragTravel.value = travel;
   dragOrigin.value = drawerProgress.value - (sign * translationX) / travel;
   dragOwner.value = owner;
+  dragX.value = e.absoluteX;
+  dragY.value = e.absoluteY;
+  dragAt.value = Date.now();
   runOnJS(begin)(sign === 1 ? "start" : "end");
 }
 
-function track(owner: number, translationX: number) {
+function track(owner: number, e: PanPoint) {
   "worklet";
   if (dragOwner.value !== owner) return;
+  const now = Date.now();
+  const jump = Math.hypot(e.absoluteX - dragX.value, e.absoluteY - dragY.value);
+  const resumed = now - dragAt.value > RESUMED_GAP_MS && jump > RESUMED_JUMP_PT;
+  dragX.value = e.absoluteX;
+  dragY.value = e.absoluteY;
+  dragAt.value = now;
+  if (resumed) {
+    abandon(owner);
+    return;
+  }
   const raw =
-    dragOrigin.value + (drawerSign.value * translationX) / dragTravel.value;
+    dragOrigin.value + (drawerSign.value * e.translationX) / dragTravel.value;
   drawerProgress.value = raw < 0 ? 0 : raw > 1 ? 1 + rubber(raw - 1) : raw;
+}
+
+/**
+ * The drag's own touch is gone and a new tap has arrived in its place. The
+ * drag is over and the rest of that touch is ignored; the tap, landing on the
+ * page, the strip or the chevron, asks for what a tap there does while a
+ * sidebar is out: close it.
+ */
+function abandon(owner: number) {
+  "worklet";
+  if (dragOwner.value !== owner) return;
+  dragOwner.value = 0;
+  runOnJS(setOpen)(false);
+  settleDrawer(false);
 }
 
 function release(owner: number, velocityX: number) {
@@ -275,10 +313,10 @@ export function useDrawerOpenPan({
           sign = e.translationX > 0 ? 1 : -1;
           if (sign === 1 ? !start : !end) return;
         }
-        grab(owner, sign, e.translationX, sign === 1 ? travel : endTravel);
+        grab(owner, sign, e, sign === 1 ? travel : endTravel);
         runOnJS(dismissKeyboard)();
       })
-      .onUpdate((e) => track(owner, e.translationX))
+      .onUpdate((e) => track(owner, e))
       .onFinalize((e) => release(owner, e.velocityX));
   }, [start, end, open, travel, endTravel]);
 }
@@ -302,8 +340,8 @@ export function useDrawerClosePan(
       .onTouchesDown((_e, manager) => {
         if (dragOwner.value === owner) manager.end();
       })
-      .onStart((e) => grab(owner, sign, e.translationX, travel))
-      .onUpdate((e) => track(owner, e.translationX))
+      .onStart((e) => grab(owner, sign, e, travel))
+      .onUpdate((e) => track(owner, e))
       .onFinalize((e) => release(owner, e.velocityX));
     return scroll ? pan.simultaneousWithExternalGesture(scroll) : pan;
   }, [sign, travel, scroll]);

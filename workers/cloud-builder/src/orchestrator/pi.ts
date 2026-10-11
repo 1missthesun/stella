@@ -13,6 +13,7 @@ import {
   decidePiBrainClaim,
   movePiBrain,
   piBrainHandoffPrompt,
+  piBrainHostName,
   renewPiBrainLease,
   takeOverPiBrain,
   type PiBrainClaimDecision,
@@ -91,6 +92,7 @@ import type {
   PiThreadRecord,
   BrainHandoff,
   AgentsView,
+  LocalTurnLease,
 } from "./types.js";
 import {
   BROWSER_HANDOFF_POLL_MS,
@@ -100,6 +102,7 @@ import {
   piThreadKey,
   PI_LIVE_KEY,
   PI_BRAIN_KEY,
+  LOCAL_TURN_LEASE_KEY,
   JOURNAL_CHECKPOINT_KEY,
   BRAIN_HANDOFF_KEY,
   AGENT_RECONCILE_INTERVAL_MS,
@@ -1442,23 +1445,25 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   /**
    * Whether the computer holding this conversation's brain can take a turn
    * now, as pi's `switch_destination` would refuse a move there (`refusal`
-   * undefined when it can), and when the owner gate last heard its presence
-   * heartbeat, which renews its lease.
+   * undefined when it can), when the owner gate last heard its presence
+   * heartbeat, which renews its lease, and whether it is gone: offline, or
+   * not among the owner's computers at all.
    */
   protected async piBrainHolderState(
     ownerId: string,
     deviceId: string,
-  ): Promise<{ refusal?: string; seenAt?: number }> {
+  ): Promise<{ refusal?: string; seenAt?: number; gone?: true }> {
     const listed = await this.ownerGate(ownerId)
       .devices()
       .catch(() => undefined);
     if (!listed) return { refusal: "the devices list could not be read" };
     const device = listed.devices.find((entry) => entry.deviceId === deviceId);
-    if (!device) return { refusal: "not connected" };
+    if (!device) return { refusal: "not connected", gone: true };
     const { deviceRefusal } = await import("@stella/agent/stella/execution");
     const refusal = deviceRefusal(device, device.label?.trim() || deviceId);
-    if (refusal) return { refusal };
-    return { seenAt: Math.max(device.lastSeenAt ?? 0, Date.now()) };
+    if (!device.online) return { refusal: refusal ?? "offline", gone: true };
+    const seenAt = Math.max(device.lastSeenAt ?? 0, Date.now());
+    return refusal ? { refusal, seenAt } : { seenAt };
   }
 
   /**
@@ -1473,7 +1478,12 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   protected async claimPiBrain(args: {
     claimant: PiBrainHost;
     claimEpoch: number | null;
-    holder?: { forEpoch: number; refusal?: string; seenAt?: number };
+    holder?: {
+      forEpoch: number;
+      refusal?: string;
+      seenAt?: number;
+      gone?: true;
+    };
     turnId?: string;
   }): Promise<{
     decision: PiBrainClaimDecision;
@@ -1521,6 +1531,9 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ...(holder?.refusal ? { holderRefusal: holder.refusal } : {}),
         ...(args.turnId ? { turnId: args.turnId } : {}),
       });
+      if (decision.reason === "expired" || holder?.gone) {
+        await this.settleTakenOverTurn(prior);
+      }
       return { decision, record, takenOver: true };
     }
     // The object's own claim on a live holder is routine: it places there.
@@ -1537,6 +1550,34 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       });
     }
     return { decision, record, takenOver: false };
+  }
+
+  protected async settleTakenOverTurn(prior: PiBrainRecord): Promise<void> {
+    if (prior.host !== "device") return;
+    const lease =
+      await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
+    if (!lease || lease.deviceId !== prior.deviceId) return;
+    log("info", "pi_brain_takeover_settles_turn", {
+      conversationId: this.conversationId(),
+      deviceId: lease.deviceId,
+      turnId: lease.turnId,
+      previousEpoch: prior.epoch,
+    });
+    try {
+      if (lease.cancelRequested) await this.cancelLocalTurn(lease, true);
+      else
+        await this.expireLocalLease(
+          lease,
+          true,
+          `Stella lost touch with ${piBrainHostName(prior)} before this was answered.`,
+        );
+    } catch (error) {
+      log("error", "pi_brain_takeover_settle_failed", {
+        conversationId: this.conversationId(),
+        turnId: lease.turnId,
+        message: errorMessage(error),
+      });
+    }
   }
 
   /** The holding computer journaled or renewed a turn: it is up, so its lease runs on. */

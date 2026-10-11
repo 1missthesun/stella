@@ -545,6 +545,8 @@ type ReporterInput = {
   fromUser?: true;
   /** The report of an agent it started, which waits while it is paused. */
   report?: true;
+  /** A note from an agent that did not start it, which waits while it is paused like a report. */
+  note?: true;
 };
 type ReporterState =
   | {
@@ -628,7 +630,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (carried === undefined) {
           await runtime.commit(async (tx) => {
             const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
-            if (agent?.paused && reporter.input.report) {
+            if (agent?.paused && (reporter.input.report || reporter.input.note)) {
               agent.held = [...(agent.held ?? []), message];
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }
@@ -640,6 +642,17 @@ export function stellaAgents(host: StellaAgentsHost) {
             return { status: "running", checkpoint: { phase: "deliver", carried: held } };
           }, context);
           return;
+        }
+        if (reporter.input.report || reporter.input.note) {
+          let heldNow = false;
+          await runtime.commit(async (tx) => {
+            const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
+            if (!agent?.paused) return undefined;
+            agent.held = [...carried, message, ...(agent.held ?? [])];
+            heldNow = true;
+            return { status: "terminal", outcome: { status: "completed", result: null } };
+          }, context);
+          if (heldNow) return;
         }
         const self = await roleOf(runtime, runtime.conversationId, context);
         const siblings = await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context);
@@ -1493,7 +1506,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (state.calls[key]) return;
         const reporter = await tx.createTask(
           Reporter,
-          { threadId, conversationId: agentConversationId, message: text },
+          { threadId, conversationId: agentConversationId, message: text, note: true },
           { ownership: { kind: "conversation" }, background: true, conversationId: target.parentConversationId },
         );
         state.calls[key] = { threadId, reporter };

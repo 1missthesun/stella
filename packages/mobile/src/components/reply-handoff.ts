@@ -7,7 +7,11 @@ export type ReplyHandoffIndicatorHandle = {
 
 export function createReplyHandoffController() {
   let indicator: ReplyHandoffIndicatorHandle | null = null;
+  let onArrival: (() => void) | null = null;
   return {
+    setArrivalListener(listener: (() => void) | null) {
+      onArrival = listener;
+    },
     attachIndicator(handle: ReplyHandoffIndicatorHandle): () => void {
       indicator = handle;
       return () => {
@@ -15,6 +19,7 @@ export function createReplyHandoffController() {
       };
     },
     replyArrived() {
+      onArrival?.();
       if (indicator?.shown()) indicator.vacate();
     },
   };

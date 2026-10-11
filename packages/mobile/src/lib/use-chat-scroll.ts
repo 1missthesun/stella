@@ -81,6 +81,8 @@ const POST_SEND_REANCHOR_WINDOW_MS = 1500;
 // near the bottom.
 // ---------------------------------------------------------------------------
 
+const REPLY_ARRIVAL_SNAP_MS = 300;
+
 export function useChatScroll(
   listTrailingSlackPx: number,
   trailingMessageId: string | null,
@@ -434,6 +436,8 @@ export function useChatScroll(
     followRafRef.current = requestAnimationFrame(stepFollow);
   }, [commitOffset, updateAwayFromBottom]);
 
+  const snapFollowUntilMsRef = useRef(0);
+
   const setFollowTarget = useCallback(
     (target: number, gentle = false) => {
       if (!followArmedRef.current) return;
@@ -442,6 +446,13 @@ export function useChatScroll(
       const contentHeight = contentHeightRef.current;
       const maxOffset = Math.max(0, contentHeight - layoutHeight);
       const clamped = Math.max(0, Math.min(maxOffset, target));
+
+      if (Date.now() < snapFollowUntilMsRef.current) {
+        stopFollowLoop();
+        commitOffset(clamped);
+        updateAwayFromBottom(clamped);
+        return;
+      }
 
       // Seed the spring's current offset from the real position when starting
       // cold, so the first frame integrates from where the list actually sits.
@@ -469,8 +480,12 @@ export function useChatScroll(
         followRafRef.current = requestAnimationFrame(stepFollow);
       }
     },
-    [stepFollow],
+    [commitOffset, stepFollow, stopFollowLoop, updateAwayFromBottom],
   );
+
+  const snapFollowBriefly = useCallback(() => {
+    snapFollowUntilMsRef.current = Date.now() + REPLY_ARRIVAL_SNAP_MS;
+  }, []);
 
   const followActiveAssistantRow = useCallback(() => {
     const assistantHeight = activeAssistantHeightRef.current;
@@ -684,6 +699,7 @@ export function useChatScroll(
     getShouldPlaceLatestTurn,
     releaseFollow,
     nudgeAfterSend,
+    snapFollowBriefly,
     awayFromBottom,
     isFollowingLatest,
   };

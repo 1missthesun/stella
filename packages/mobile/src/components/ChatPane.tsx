@@ -798,6 +798,11 @@ export function ChatPane({
     topInset,
   );
 
+  const { snapFollowBriefly } = scroll;
+  useEffect(() => {
+    replyHandoffController.setArrivalListener(snapFollowBriefly);
+    return () => replyHandoffController.setArrivalListener(null);
+  }, [replyHandoffController, snapFollowBriefly]);
   const [unread, setUnread] = useState(false);
   const prevLenRef = useRef(0);
   const sawTurnRef = useRef(false);

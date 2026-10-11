@@ -10,6 +10,8 @@ const DEV_BACKEND_HOSTS = new Set([
   "127.0.0.1",
 ]);
 
+const PREVIEW_BACKEND_SUFFIX = "-stella-v2-cloud-builder-preview.fromyou.workers.dev";
+
 const backendHost = (url: string): string => {
   try {
     return new URL(url).hostname.toLowerCase();
@@ -23,8 +25,9 @@ export const devTestSessionBlocker = (
   backendUrl: string,
 ): string | null => {
   if (!isDevBuild) return "Test-account sign-in exists only in development builds.";
-  if (!DEV_BACKEND_HOSTS.has(backendHost(backendUrl))) {
-    return `Test-account sign-in is refused for backend ${backendHost(backendUrl) || "(unset)"}; it works only against the dev backend.`;
+  const host = backendHost(backendUrl);
+  if (!DEV_BACKEND_HOSTS.has(host) && !host.endsWith(PREVIEW_BACKEND_SUFFIX)) {
+    return `Test-account sign-in is refused for backend ${backendHost(backendUrl) || "(unset)"}; it works only against the dev backend or a Preview.`;
   }
   return null;
 };

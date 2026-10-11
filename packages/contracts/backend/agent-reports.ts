@@ -7,13 +7,19 @@ export const agentReportId = (
 
 export const AGENT_REPORT_RECEIPT_MAX_CHARS = 64;
 
+const TWO_32 = 0x1_0000_0000;
+
 const fnv1a64 = (text: string): string => {
-  let hash = 0xcbf29ce484222325n;
+  let hi = 0xcbf29ce4;
+  let lo = 0x84222325;
   for (let index = 0; index < text.length; index += 1) {
-    hash ^= BigInt(text.charCodeAt(index));
-    hash = (hash * 0x100000001b3n) & 0xffffffffffffffffn;
+    lo = (lo ^ text.charCodeAt(index)) >>> 0;
+    const low = lo * 0x1b3;
+    const high = hi * 0x1b3 + Math.floor(low / TWO_32) + ((lo * 0x100) % TWO_32);
+    lo = low % TWO_32;
+    hi = high % TWO_32;
   }
-  return hash.toString(16).padStart(16, "0");
+  return hi.toString(16).padStart(8, "0") + lo.toString(16).padStart(8, "0");
 };
 
 export const agentReportReceipt = (reportId: string): string =>

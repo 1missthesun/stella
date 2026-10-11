@@ -1,3 +1,5 @@
+import type { ReasoningEffortLevel } from "./reasoning-effort.js";
+
 export type AgentRuntimeEngine = "default" | "claude_code_local" | "codex_cli";
 
 export const DEFAULT_AGENT_RUNTIME_ENGINE: AgentRuntimeEngine = "default";
@@ -8,14 +10,13 @@ export type CodexServiceTier = "standard" | "fast";
 export const DEFAULT_CODEX_SERVICE_TIER: CodexServiceTier = "standard";
 
 /** Reasoning levels accepted by spawn_agent's optional model suffix. */
-export type SpawnReasoningEffort = "low" | "medium" | "high" | "xhigh";
+export type SpawnReasoningEffort = ReasoningEffortLevel;
 
-/** Effective reasoning setting captured from a running agent turn. */
-export type AgentModelReasoningEffort =
-  | "default"
-  | "none"
-  | "minimal"
-  | SpawnReasoningEffort;
+/**
+ * Effective reasoning setting captured from a running agent turn. `none`
+ * marks a model with no reasoning dial.
+ */
+export type AgentModelReasoningEffort = "none" | ReasoningEffortLevel;
 
 /**
  * Serializable snapshot of the effective model configuration for a turn.

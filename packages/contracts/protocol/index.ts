@@ -9,6 +9,7 @@ import type {
   TaskLifecycleStatus,
 } from "@stella/contracts/agent-runtime";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
+import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import type {
   RuntimeListModelsRequest,
   RuntimeModelCatalogModel,
@@ -529,7 +530,7 @@ export type RuntimeOneShotCompletionRequest = {
    */
   model?: string;
   /** Internal-only effort pin for bounded utility passes. */
-  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high" | "xhigh";
+  reasoningEffort?: "none" | ReasoningEffortLevel;
   /** Marks a non-user-facing automatic utility pass for engine policy. */
   utility?: boolean;
   /** Stable key for a short-lived reusable utility session. */

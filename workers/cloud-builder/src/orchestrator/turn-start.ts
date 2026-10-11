@@ -3,6 +3,7 @@ import {
   chatTurnFingerprintSource,
   type CloudChatPreparation,
 } from "../cloud-chat-admission.js";
+import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import type {
   ConversationCreatedEvent,
@@ -48,6 +49,7 @@ import {
   PI_BRAIN_KEY,
   LOCAL_TURN_LEASE_KEY,
   chatTurnAdmissionKey,
+  CONVERSATION_EXECUTION_KEY,
   CONVERSATION_PROJECTED_KEY,
   ownerPurgeImportedLeaseKey,
   orchestratorFenceLeaseReceiptKey,
@@ -464,7 +466,21 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         await this.releaseOwnerGate({ ownerId, turnId });
         return turnStartErrorResponse(code, message, retryable);
       };
-      const execution = start.execution ?? snapshot.execution;
+      const allowed = (candidate: CloudExecutionSelection): boolean =>
+        (candidate.engine !== "anthropic" ||
+          snapshotAllowsCloudSandbox(snapshot)) &&
+        snapshotAllowsExecution(snapshot, candidate);
+      const conversationExecution =
+        lane === "wake" && !start.execution
+          ? await this.ctx.storage.get<CloudExecutionSelection>(
+              CONVERSATION_EXECUTION_KEY,
+            )
+          : undefined;
+      const execution =
+        start.execution ??
+        (conversationExecution && allowed(conversationExecution)
+          ? conversationExecution
+          : snapshot.execution);
       if (
         execution.engine === "anthropic" &&
         !snapshotAllowsCloudSandbox(snapshot)
@@ -728,6 +744,9 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           } satisfies ChatTurnAdmissionReceipt,
           ownerDataGeneration: turn.ownerGeneration,
           [CONVERSATION_PROJECTED_KEY]: true,
+          ...(lane === "chat" && !turn.piAgent
+            ? { [CONVERSATION_EXECUTION_KEY]: execution }
+            : {}),
         });
         const localLease =
           await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);

@@ -460,9 +460,11 @@ export const projectCloudConversationMessages = (args: {
       });
     }
 
-    // Only what this turn's own `html` and `image_gen` calls made rides its
-    // last reply, as on desktop. Any other file a files card names (an
-    // agent's output, a report's links) is never attached to a reply.
+    // Only what this turn's own `html` calls made rides its last reply, as
+    // on desktop. An `image_gen` image already shows as its call's inline
+    // card (`generatedImageArtifacts`), so the files card naming the same
+    // drive path never repeats it on the reply. Any other file a files card
+    // names (an agent's output, a report's links) is never attached either.
     const ownOutputPaths = new Set<string>();
     for (const { payload } of toolResults.values()) {
       const toolName =
@@ -472,9 +474,6 @@ export const projectCloudConversationMessages = (args: {
       const details = asRecord(payload.details);
       if (toolName === "html" && typeof details?.filePath === "string") {
         ownOutputPaths.add(details.filePath);
-      }
-      if (toolName === "image_gen") {
-        for (const path of stringList(details?.drivePaths)) ownOutputPaths.add(path);
       }
     }
     const files = turn.flatMap((record) =>

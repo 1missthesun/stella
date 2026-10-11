@@ -29,24 +29,3 @@ export const replyAttachmentTarget = (
     driveLinkPath(trimmed) ?? (options.driveRelative ? trimmed : null);
   return drivePath ? driveLinkTarget(drivePath) : trimmed;
 };
-
-export const placeReplyAttachments = <T>(
-  files: Iterable<T>,
-  targetOf: (file: T) => string | null,
-): { media: T[]; pills: T[] } => {
-  const seen = new Set<string>();
-  const media: T[] = [];
-  const pills: T[] = [];
-  for (const file of files) {
-    const target = targetOf(file)?.trim();
-    if (!target) {
-      pills.push(file);
-      continue;
-    }
-    if (seen.has(target)) continue;
-    seen.add(target);
-    if (replyAttachmentPlacement(target) === "media") media.push(file);
-    else pills.push(file);
-  }
-  return { media, pills };
-};

@@ -1,13 +1,13 @@
 /**
  * Web search, metered in the owner's object: the plan admits the request,
- * and a request that reached the provider is charged once.
+ * and a search the provider served is charged once, at its list price.
  *
  * The desktop runtime calls `search.web`; the orchestrator, cloud agents and
  * the turn broker reach the same operation as an internal call.
  */
 
 import type { SearchCalls } from "@stella/contracts/backend/search";
-import { WEB_SEARCH_COST_MICRO_CENTS, searchWeb } from "../../web-search.js";
+import { searchWeb } from "../../web-search.js";
 import { object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -24,7 +24,10 @@ const parseSearch = object({
   category: optional(string({ max: 200 })),
 });
 
-const webSearch = async (ctx: OwnerContext, args: SearchArgs): Promise<SearchResult> => {
+const webSearch = async (
+  ctx: OwnerContext,
+  args: SearchArgs,
+): Promise<SearchResult> => {
   enforceOwnerRateLimit(
     ctx.db,
     ctx.now,
@@ -44,9 +47,12 @@ const webSearch = async (ctx: OwnerContext, args: SearchArgs): Promise<SearchRes
     ...(args.category ? { category: args.category } : {}),
     signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
   });
-  if (outcome.dispatched) {
+  if (outcome.costMicroCents > 0) {
     recordUsage({ ...ctx, now: Date.now() }, [
-      { id: `search:${crypto.randomUUID()}`, costMicroCents: WEB_SEARCH_COST_MICRO_CENTS },
+      {
+        id: `search:${crypto.randomUUID()}`,
+        costMicroCents: outcome.costMicroCents,
+      },
     ]);
   }
   return outcome.result;

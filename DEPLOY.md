@@ -51,9 +51,15 @@ How it is isolated:
   values, and `STELLA_ADMIN_API_SECRET` and `BUILDER_SERVICE_SECRET` equal
   dev's, so existing tooling works unchanged. `CAPABILITY_SIGNING_KEY` is the
   `builder-preview-1` key, which the dev model gateway trusts (its
-  `CAPABILITY_JWKS`). To give one Preview a third-party key (Exa, fal,
+  `CAPABILITY_JWKS`). To give one Preview a third-party key (fal,
   Stripe test, …):
   `... | bunx wrangler preview secret put NAME --worker-name stella-v2-cloud-builder-preview --name <name>`.
+- **Web search** needs no secret anywhere: every environment and Preview
+  reaches Cloudflare's Web Search API through its `AI` binding and the
+  account's `default` AI Gateway, billed to the account's AI Gateway credits
+  (provider: var `WEB_SEARCH_PROVIDER`, Exa by default). If searches
+  answer 402, the credit balance is empty: top it up under AI → AI Gateway →
+  Credits.
 - Configuration is the `previews` block of `wrangler.jsonc`. The Preview's own
   URL is passed as `CLOUD_BUILDER_PUBLIC_URL` (JWT issuer, turn broker), and
   `STELLA_AUTH_URL` is unset, so auth callbacks use that URL too.

@@ -1,22 +1,59 @@
 /**
- * Web search through Parallel's fast search API. The `search` owner domain
- * meters it; this module only talks to the provider.
+ * Web search through Cloudflare's Web Search API, reached with the Worker's
+ * AI binding through an AI Gateway on the same account, so it needs no
+ * provider key. The provider is Exa unless `WEB_SEARCH_PROVIDER` names
+ * another. The `search` owner domain meters it; this module only talks to the
+ * provider.
  */
 
-import type { WebSearchHit, WebSearchResult } from "@stella/contracts/backend/search";
+import type {
+  WebSearchHit,
+  WebSearchResult,
+} from "@stella/contracts/backend/search";
 
-const PARALLEL_SEARCH_URL = "https://api.parallel.ai/v1/search";
+type Provider = "ceramic" | "exa" | "linkup";
+
+/** List price per request in micro-cents: $0.25, $7 and $5 per 1,000. */
+const PROVIDER_COST_MICRO_CENTS: Record<Provider, number> = {
+  ceramic: 25_000,
+  exa: 700_000,
+  linkup: 500_000,
+};
+
+const DEFAULT_PROVIDER: Provider = "exa";
+const DEFAULT_GATEWAY_ID = "default";
 const MAX_RESULTS = 6;
+const MAX_QUERY_CHARS = 1_024;
 const MAX_SNIPPET_CHARS = 300;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 
-/** Parallel Fast is $1 per 1,000 requests: $0.001 in micro-cents. */
-export const WEB_SEARCH_COST_MICRO_CENTS = 100_000;
-
 export type WebSearchOutcome = {
   result: WebSearchResult;
-  /** A request reached the provider, so it may bill us. */
-  dispatched: boolean;
+  /** What the provider billed us; zero when it did not serve the search. */
+  costMicroCents: number;
+};
+
+const providerOf = (env: Cloudflare.Env): Provider => {
+  const named = (
+    env as { WEB_SEARCH_PROVIDER?: string }
+  ).WEB_SEARCH_PROVIDER?.trim().toLowerCase();
+  return named && named in PROVIDER_COST_MICRO_CENTS
+    ? (named as Provider)
+    : DEFAULT_PROVIDER;
+};
+
+type WebSearchItem = {
+  url?: string;
+  title?: string;
+  description?: string;
+  imageUrl?: string;
+  faviconUrl?: string;
+};
+
+type WebSearchBody = {
+  items?: WebSearchItem[];
+  error?: { message?: string; code?: string } | string;
+  errors?: Array<{ message?: string }>;
 };
 
 const formatText = (query: string, results: WebSearchHit[]): string => {
@@ -31,9 +68,9 @@ const formatText = (query: string, results: WebSearchHit[]): string => {
   return `[External Content - Untrusted Source: web search: ${query}]\nWeb search results for "${query}":\n\n${formatted}\n[End External Content]`;
 };
 
-const failed = (text: string, dispatched: boolean): WebSearchOutcome => ({
+const failed = (text: string): WebSearchOutcome => ({
   result: { text, results: [] },
-  dispatched,
+  costMicroCents: 0,
 });
 
 const readBody = async (response: Response): Promise<string> => {
@@ -43,46 +80,151 @@ const readBody = async (response: Response): Promise<string> => {
     throw new Error("Search response is too large.");
   }
   const bytes = await response.arrayBuffer();
-  if (bytes.byteLength > MAX_RESPONSE_BYTES) throw new Error("Search response is too large.");
+  if (bytes.byteLength > MAX_RESPONSE_BYTES)
+    throw new Error("Search response is too large.");
   return new TextDecoder().decode(bytes);
 };
+
+const parseBody = (body: string): WebSearchBody => {
+  try {
+    return JSON.parse(body) as WebSearchBody;
+  } catch {
+    return {};
+  }
+};
+
+const errorMessage = (data: WebSearchBody, body: string): string => {
+  if (typeof data.error === "string") return data.error;
+  return data.error?.message ?? data.errors?.[0]?.message ?? body.slice(0, 500);
+};
+
+const collapse = (text: string): string => text.replace(/\s+/g, " ").trim();
+
+const queryTerms = (query: string): string[] => [
+  ...new Set(
+    query
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((term) => term.length > 2),
+  ),
+];
+
+const clip = (text: string): string =>
+  text.length <= MAX_SNIPPET_CHARS
+    ? text
+    : `${text.slice(0, MAX_SNIPPET_CHARS - 1).trimEnd()}…`;
+
+const snippetOf = (
+  description: string | undefined,
+  title: string,
+  terms: string[],
+): string => {
+  const paragraphs = (description ?? "")
+    .split(/\n\s*\n/)
+    .map(collapse)
+    .filter(Boolean);
+  if (paragraphs[0] && paragraphs[0].toLowerCase() === title.toLowerCase())
+    paragraphs.shift();
+  if (paragraphs.length === 0) return "";
+  let best = 0;
+  let bestScore = 0;
+  paragraphs.forEach((paragraph, index) => {
+    const lower = paragraph.toLowerCase();
+    const score = terms.filter((term) => lower.includes(term)).length;
+    if (score > bestScore) {
+      best = index;
+      bestScore = score;
+    }
+  });
+  let text = paragraphs[best]!;
+  for (
+    let next = best + 1;
+    next < paragraphs.length && text.length < MAX_SNIPPET_CHARS;
+    next++
+  ) {
+    text = `${text} ${paragraphs[next]}`;
+  }
+  return clip(text);
+};
+
+const toHit = (item: WebSearchItem, terms: string[]): WebSearchHit => {
+  const image = item.imageUrl?.trim();
+  const favicon = item.faviconUrl?.trim();
+  const title = collapse(item.title ?? "") || "(no title)";
+  return {
+    title,
+    url: (item.url ?? "").trim(),
+    snippet: snippetOf(item.description, title, terms),
+    ...(image ? { image } : {}),
+    ...(favicon ? { favicon } : {}),
+  };
+};
+
+const withTimeout = <T>(promise: Promise<T>, signal: AbortSignal): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    if (signal.aborted) return reject(signal.reason);
+    const onAbort = () => reject(signal.reason);
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+    );
+  });
 
 export const searchWeb = async (
   env: Cloudflare.Env,
   input: { query: string; category?: string; signal: AbortSignal },
 ): Promise<WebSearchOutcome> => {
   const query = input.query.trim();
-  if (!query) return failed("WebSearch failed: query is required.", false);
-  const apiKey = (env as { PARALLEL_API_KEY?: string }).PARALLEL_API_KEY?.trim();
-  if (!apiKey) return failed("WebSearch is not configured (missing PARALLEL_API_KEY).", false);
+  if (!query) return failed("WebSearch failed: query is required.");
+  const ai = (env as { AI?: Ai }).AI;
+  if (!ai)
+    return failed("WebSearch is not configured (missing the AI binding).");
+  const gatewayId =
+    (env as { AI_GATEWAY_ID?: string }).AI_GATEWAY_ID?.trim() ||
+    DEFAULT_GATEWAY_ID;
+  const provider = providerOf(env);
   const category = input.category?.trim();
+  const providerQuery = (category ? `${query} ${category}` : query).slice(
+    0,
+    MAX_QUERY_CHARS,
+  );
   try {
-    const response = await fetch(PARALLEL_SEARCH_URL, {
-      method: "POST",
-      headers: { "x-api-key": apiKey, "content-type": "application/json" },
-      body: JSON.stringify({
-        search_queries: [query],
-        objective: category
-          ? `Find information relevant to: ${query}. Focus on ${category}.`
-          : query,
-        mode: "fast",
-        advanced_settings: { max_results: MAX_RESULTS },
+    const response = await withTimeout(
+      ai.websearch({
+        gatewayId,
+        query: providerQuery,
+        provider,
+        limit: MAX_RESULTS,
       }),
-      signal: input.signal,
-    });
+      input.signal,
+    );
     const body = await readBody(response);
-    if (!response.ok) return failed(`WebSearch failed (${response.status}): ${body}`, true);
-    const data = JSON.parse(body) as {
-      results?: Array<{ title?: string; url?: string; excerpts?: string[] }>;
+    const data = parseBody(body);
+    if (!response.ok) {
+      return failed(
+        `WebSearch failed (${response.status}): ${errorMessage(data, body)}`,
+      );
+    }
+    const terms = queryTerms(query);
+    const results = (data.items ?? [])
+      .map((item) => toHit(item, terms))
+      .filter((hit) => hit.url)
+      .slice(0, MAX_RESULTS);
+    return {
+      result: { text: formatText(query, results), results },
+      costMicroCents: PROVIDER_COST_MICRO_CENTS[provider],
     };
-    const results: WebSearchHit[] = (data.results ?? []).map((result) => ({
-      title: (result.title ?? "(no title)").trim(),
-      url: (result.url ?? "").trim(),
-      snippet: (result.excerpts?.join(" ... ") ?? "").trim().slice(0, MAX_SNIPPET_CHARS),
-    }));
-    return { result: { text: formatText(query, results), results }, dispatched: true };
   } catch (error) {
-    if (input.signal.aborted) return failed("WebSearch timed out.", true);
-    return failed(`WebSearch failed: ${error instanceof Error ? error.message : String(error)}`, true);
+    if (input.signal.aborted) return failed("WebSearch timed out.");
+    return failed(
+      `WebSearch failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 };

@@ -21,8 +21,8 @@ and nothing else breaks.
   Durable Objects (SQLite), D1, R2, KV, Queues, Cron Triggers, rate-limit
   bindings, **Containers** (cloud agent sandboxes), **Dynamic Workers** (the
   `worker_loaders` binding, for code mode), **Artifacts** (open beta; holds the
-  app's source), **Browser Run** (the cloud browser) and **Pipelines** (one
-  stream, for telemetry).
+  app's source), **Browser Run** (the cloud browser), **Pipelines** (one
+  stream, for telemetry) and **AI Gateway** (the web search tool, see 1.3).
 - **An OpenRouter API key.** The default models for every agent run on
   OpenRouter. It is the only third-party key Stella needs.
 - **Tools:** git, [Bun](https://bun.sh) 1.4.0, Docker (cloud-builder builds its
@@ -170,6 +170,21 @@ bunx wrangler pipelines streams create stella_telemetry_dev \
 
 The stream alone is enough to deploy. Storing events (sink, R2 Data Catalog,
 SQL pipeline) is optional and described in `infra/telemetry/README.md`.
+
+**Web search** runs on the same account, with no provider key and no API
+token: cloud-builder's `AI` binding calls the Web Search API through the AI
+Gateway named `default`, which every account has. Two dashboard steps:
+
+1. AI → AI Gateway: open the `default` gateway once so it exists (or create
+   one and set the var `AI_GATEWAY_ID` on cloud-builder to its id). The
+   binding needs no token, so authenticated gateway can stay off.
+2. AI → AI Gateway → Credits: load credits (Unified Billing, min $10 plus a
+   5% card fee). Searches are billed at the provider's list price with no
+   markup. With a zero balance every search answers 402 "credit balance is
+   zero".
+
+To pay a provider directly instead, store its key on that gateway (Provider
+Keys, alias `default`); the gateway then uses it instead of credits.
 
 Drive and media files are uploaded and read with presigned URLs, so the drive
 and media buckets need CORS. Save this as `r2-cors.json` and apply it:
@@ -484,7 +499,7 @@ Secrets go on **cloud-builder** unless noted.
 | Email sign-in (magic links) | var `STELLA_EMAIL_FROM` on a domain enabled for Email Sending (see 1.6); or, instead or as a fallback, `RESEND_API_KEY`, `RESEND_FROM`; optional `STELLA_EMAIL_LOGO_URL` | Cloudflare Email Service (Resend fallback) | Magic links answer 503 "Email sign-in isn't set up" |
 | Google / Apple sign-in | see 1.6 | Google, Apple | The provider isn't offered |
 | Opening private canvas links in a browser | `CANVAS_SHARE_VIEW_SECRET` (`openssl rand -hex 32`): the same value on **cloud-builder** (every env that writes to the share bucket) and on **canvas-share** | none | Canvases still get private links and show in the app, but a private link opens nowhere else (the share domain shows its "private" page) until it is made public |
-| Web search tool | `PARALLEL_API_KEY` | Parallel | The tool reports it isn't configured |
+| Web search tool | No key: cloud-builder's `AI` binding (already in `wrangler.jsonc`) calls [Cloudflare's Web Search API](https://developers.cloudflare.com/web-search/) through your account's `default` AI Gateway, paid from AI Gateway credits (1.3). Optional vars: `AI_GATEWAY_ID` (another gateway), `WEB_SEARCH_PROVIDER` (`exa` default, `ceramic`, `linkup`) | Cloudflare Web Search API: Exa ($7 per 1,000 searches; Ceramic $0.25, Linkup $5) | Searches answer "WebSearch failed (402)" with Cloudflare's reason (no credits) |
 | Image, video, music, speech, transcription and 3D generation (`stella-media`, `image_gen`) | `FAL_KEY` | fal.ai: the models in `packages/contracts/media-models.ts` (GPT Image 2.5 Flare, Seedance 2.5, Lyria 3.5, Gemini 3.8 Flash Lite TTS, ElevenLabs Scribe v2, Tripo P2) | 503 "Media generation is not configured yet" |
 | Read-aloud (TTS) | `OPENROUTER_API_KEY` or `FAL_KEY`; OpenRouter with both (cheaper, one hop), unless `STELLA_MEDIA_PROVIDER` = `fal`.; the OpenAI read-aloud voice uses `OPENAI_API_KEY` | Gemini 3.8 Flash Lite TTS on OpenRouter or fal; OpenAI | 503 "read-aloud is not configured yet" |
 | Realtime voice | `OPENAI_API_KEY` | OpenAI Realtime | Unavailable (users can still bring their own xAI / Inworld keys on desktop) |

@@ -138,6 +138,7 @@
   // Cloudflare Email Service: magic-link mail. The sender is STELLA_EMAIL_FROM
   // (or RESEND_FROM) and its domain must be enabled for Email Sending.
   "send_email": [{ "name": "EMAIL" }],
+  "ai": { "binding": "AI" },
   "worker_loaders": [
     {
       "binding": "LOADER",
@@ -379,6 +380,7 @@
       },
     ],
     "send_email": [{ "name": "EMAIL" }],
+    "ai": { "binding": "AI" },
     "worker_loaders": [
       {
         "binding": "LOADER",
@@ -528,6 +530,7 @@
         },
       ],
       "send_email": [{ "name": "EMAIL" }],
+      "ai": { "binding": "AI" },
       "worker_loaders": [
         {
           "binding": "LOADER",
@@ -724,6 +727,7 @@
         },
       ],
       "send_email": [{ "name": "EMAIL" }],
+      "ai": { "binding": "AI" },
       "worker_loaders": [
         {
           "binding": "LOADER",

@@ -50,7 +50,7 @@ const MODELS_DEV_ALIASES: Record<string, string[]> = {
 // Slugs that name the vendor, not the serving provider: prefer the serving
 // provider's row so billing matches what Stella pays.
 const MODELS_DEV_PREFERRED_ALIASES: Record<string, string[]> = {
-  "google/gemini-3.7-flash": ["openrouter/google/gemini-3.7-flash"],
+  "google/gemini-3.8-flash": ["openrouter/google/gemini-3.8-flash"],
   "meta/muse-spark-1.3-contributor": ["openrouter/meta/muse-spark-1.3-contributor"],
 };
 

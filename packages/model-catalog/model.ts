@@ -195,12 +195,12 @@ const GEMINI_3_1_FLASH_LITE_IMAGE_DESCRIPTION_CONFIG: ModelConfig = {
   providerOptions: gatewayOptions("google"),
 };
 
-/** OpenRouter-hosted Gemini 3.7 Flash for mobile cloud chat. */
-export const GEMINI_3_7_FLASH_OFFLINE_RESPONDER_MODEL =
-  "google/gemini-3.7-flash";
+/** OpenRouter-hosted Gemini 3.8 Flash for mobile cloud chat. */
+export const GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL =
+  "google/gemini-3.8-flash";
 
-const GEMINI_3_7_FLASH_OFFLINE_RESPONDER_CONFIG: ModelConfig = {
-  model: GEMINI_3_7_FLASH_OFFLINE_RESPONDER_MODEL,
+const GEMINI_3_8_FLASH_OFFLINE_RESPONDER_CONFIG: ModelConfig = {
+  model: GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL,
   managedGatewayProvider: "openrouter",
   maxOutputTokens: 65536,
   providerOptions: {
@@ -211,21 +211,30 @@ const GEMINI_3_7_FLASH_OFFLINE_RESPONDER_CONFIG: ModelConfig = {
 };
 
 /**
- * Input context window of each managed upstream, as its route serves it.
- * DeepSeek is pinned to OpenRouter's inference-net endpoint, which serves
- * 1,040,000 of the model's 1,048,576. Verified 2026-10-11 against OpenAI,
- * Google and OpenRouter.
+ * Prompts above this many input tokens bill GPT-6 Luna at 2x input and 1.5x
+ * output for the whole request.
+ */
+export const GPT_6_LUNA_PRICE_TIER_INPUT_TOKENS = 272_000;
+
+/**
+ * Input context window each managed upstream is compacted against, as its
+ * route serves it. DeepSeek is pinned to OpenRouter's inference-net endpoint,
+ * which serves 1,040,000 of the model's 1,048,576. GPT-6 Luna serves
+ * 1,050,000 but is held to its price tier: pi compacts before any request
+ * whose estimated input passes the window less its 16,384-token reserve, so
+ * requests stay near 255k, under the tier. Verified 2026-10-11 against
+ * OpenAI, Google and OpenRouter.
  */
 export const MANAGED_MODEL_CONTEXT_WINDOWS: Readonly<Record<string, number>> = {
-  [GPT_6_LUNA_MODEL]: 1_050_000,
+  [GPT_6_LUNA_MODEL]: GPT_6_LUNA_PRICE_TIER_INPUT_TOKENS,
   [DEEPSEEK_V4_1_FLASH_MODEL]: 1_040_000,
-  [GEMINI_3_7_FLASH_OFFLINE_RESPONDER_MODEL]: 1_048_576,
+  [GEMINI_3_8_FLASH_OFFLINE_RESPONDER_MODEL]: 1_048_576,
   [GEMINI_3_1_FLASH_LITE_MODEL]: 1_048_576,
 };
 
 const INTERNAL_MODEL_CONFIGS = {
   image_description: GEMINI_3_1_FLASH_LITE_IMAGE_DESCRIPTION_CONFIG,
-  offline_responder: GEMINI_3_7_FLASH_OFFLINE_RESPONDER_CONFIG,
+  offline_responder: GEMINI_3_8_FLASH_OFFLINE_RESPONDER_CONFIG,
 } as const satisfies Record<string, ModelConfig>;
 
 type InternalModelConfigKey = keyof typeof INTERNAL_MODEL_CONFIGS;

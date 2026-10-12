@@ -270,17 +270,17 @@ export const STATIC_MANAGED_MODEL_PRICE_OVERRIDES: Record<
     modalitiesInput: ["text"],
     modalitiesOutput: ["text"],
   },
-  // OpenRouter's Gemini 3.7 Flash rates. The preferred models.dev alias above
-  // normally supplies these; this keeps reservations and billing correct if
-  // the remote catalog is unavailable.
-  "google/gemini-3.7-flash": {
+  // OpenRouter's Gemini 3.8 Flash rates, verified 2026-10-11. The preferred
+  // models.dev alias normally supplies these; this keeps reservations and
+  // billing correct if the remote catalog is unavailable.
+  "google/gemini-3.8-flash": {
     sourceProvider: "openrouter",
-    sourceModelId: "google/gemini-3.7-flash",
-    inputPerMillionUsd: 0.375,
-    outputPerMillionUsd: 1.875,
-    cacheReadPerMillionUsd: 0.0375,
-    cacheWritePerMillionUsd: 0.020833,
-    reasoningPerMillionUsd: 1.875,
+    sourceModelId: "google/gemini-3.8-flash",
+    inputPerMillionUsd: 0.75,
+    outputPerMillionUsd: 3.75,
+    cacheReadPerMillionUsd: 0.075,
+    cacheWritePerMillionUsd: 0.041667,
+    reasoningPerMillionUsd: 3.75,
     modalitiesInput: ["text", "image", "audio", "video", "pdf"],
     modalitiesOutput: ["text"],
   },

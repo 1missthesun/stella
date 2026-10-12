@@ -220,10 +220,11 @@ export type ClaudeCodeToolSetChange = {
 const MAX_TOOL_SET_CHANGES_PER_TURN = 4;
 
 /**
- * Agents (not the orchestrator) on a model whose window is larger compact
- * against 400k tokens; the CLI keeps the smaller window of the two.
+ * Agents (not the orchestrator) compact at about 400k tokens: the CLI fires
+ * 33k below this window, keeping that much for the summary, and keeps the
+ * model's own window when it is smaller.
  */
-export const CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW = 400_000;
+export const CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW = 433_000;
 type ClaudeCodeInjection = {
   consumed: boolean;
   answered?: boolean;

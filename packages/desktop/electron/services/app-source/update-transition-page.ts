@@ -17,6 +17,7 @@
  *   after picture's crop of it); `whole` when it is the whole window.
  * - `frost(motion)`: frost the covered window for a restart and return the
  *   frosted picture (for the launcher and the next process).
+ * - `frosted()`: resolves once the frost reads as done.
  * - `renderMark(svg, dark, size)`: the mark as a PNG, for the launcher.
  * - `hold(frosted, options)`: show a frosted picture with the Stella mark and
  *   the "Updating Stella" label.
@@ -43,6 +44,8 @@ type Motion = { keyframes: Keyframe[]; timing: KeyframeAnimationOptions };
 export type FocusPullMotion = { out: Motion; in: Motion };
 export type FrostMotion = {
   frost: Motion;
+  /** When the frost reads as done: the spring's tail after it is not seen. */
+  shownMs: number;
   /** Frosting tint over light and dark windows. */
   tintLight: string;
   tintDark: string;
@@ -80,6 +83,8 @@ function transitionPage() {
   /** CSS px rects that stay live: out of the cover and the comparison. */
   let live: Array<[number, number, number, number]> = [];
   let holdLayer: Element | null = null;
+  /** The frost's animation on screen, which the hold waits for. */
+  let frosting: Promise<unknown> = Promise.resolve();
 
   const frame = () => new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -244,12 +249,16 @@ function transitionPage() {
     const tint = document.createElement("div");
     Object.assign(tint.style, { position: "absolute", inset: "0", background: tintColor, opacity: "0" });
     root.replaceChildren(layer, tint);
-    await finished([
-      layer.animate(motion.frost.keyframes, motion.frost.timing),
-      tint.animate([{ opacity: 0 }, { opacity: 1 }], motion.frost.timing),
+    frosting = Promise.race([
+      finished([
+        layer.animate(motion.frost.keyframes, motion.frost.timing),
+        tint.animate([{ opacity: 0 }, { opacity: 1 }], motion.frost.timing),
+      ]),
+      sleep(motion.shownMs),
     ]);
     // The same frosted frame at half resolution (it is all blur) for whoever
-    // holds it next: the launcher, then the next process.
+    // holds it next: the launcher, then the next process. Made while the
+    // frost plays, from the picture rather than the screen.
     const scale = 0.5;
     const out = new OffscreenCanvas(Math.round(picture.width * scale), Math.round(picture.height * scale));
     const g = out.getContext("2d")!;
@@ -288,8 +297,12 @@ function transitionPage() {
     return toBase64(await canvas.convertToBlob({ type: "image/png" }));
   }
 
+  async function frosted() {
+    await frosting;
+  }
+
   async function hold(url: string, options: HoldOptions) {
-    const frosted = await decode(url);
+    const [frosted] = await Promise.all([decode(url), frosting]);
     const layer = document.createElement("div");
     layer.className = "hold";
     layer.dataset.dark = String(options.dark);
@@ -349,6 +362,7 @@ function transitionPage() {
     fillLive,
     reveal,
     frost,
+    frosted,
     renderMark,
     hold,
     focusIn,

@@ -40,8 +40,9 @@ export type CoveredWindow = {
 
 /** A window frosted for a relaunch that has not been committed to yet. */
 export type RelaunchHold = {
-  /** The relaunch is certain: hand the frame to the launcher. */
-  commit(): void;
+  /** The relaunch is certain: hand the frame to the launcher once the
+   * window shows it too. */
+  commit(): Promise<void>;
   /** The relaunch is off: uncover the window and drop the frame. */
   release(): Promise<void>;
 };
@@ -163,14 +164,19 @@ const focusPull = (): FocusPullMotion => ({
 
 const FROST_BLUR = 26;
 const FROST_SATURATE = 1.6;
+const FROST_SPRING = 0.55;
+/** When a critically damped spring of `duration` s is within 2% of rest:
+ * (1 + x)e^-x = 0.02 at x = 5.83, x being ω0·t. */
+const nearlySettledMs = (duration: number) => Math.round((5.83 * duration * 1000) / (2 * Math.PI));
 const frost = (): FrostMotion => ({
   frost: {
     keyframes: [
       { filter: "blur(0px) saturate(1)" },
       { filter: `blur(${FROST_BLUR}px) saturate(${FROST_SATURATE})` },
     ],
-    timing: spring(0.55, 0, { fill: "forwards" }),
+    timing: spring(FROST_SPRING, 0, { fill: "forwards" }),
   },
+  shownMs: nearlySettledMs(FROST_SPRING),
   tintLight: "rgba(255, 255, 255, 0.46)",
   tintDark: "rgba(28, 28, 30, 0.40)",
   blur: FROST_BLUR,
@@ -277,16 +283,21 @@ export class UpdateTransition {
     let view: WebContentsView;
     let before: NativeImage;
     let live: LiveRect[];
+    let coverSplit = "";
     try {
       const frozen = await this.freeze(win);
       if (!frozen) {
         await win.webContents.executeJavaScript(THAW_SCRIPT).catch(() => {});
         return null;
       }
+      const frozenAt = performance.now();
       live = frozen;
       view = await this.attach(win);
+      const attachedAt = performance.now();
       before = await this.capture(win);
+      const capturedAt = performance.now();
       await this.call(view, "cover", jpegUrl(before), live);
+      coverSplit = `freeze ${Math.round(frozenAt - started)} attach ${Math.round(attachedAt - frozenAt)} capture ${Math.round(capturedAt - attachedAt)} show ${Math.round(performance.now() - capturedAt)}`;
     } catch (error) {
       this.fail("cover", error);
       await this.uncover(win);
@@ -351,6 +362,7 @@ export class UpdateTransition {
             : null;
           this.options.log("app-source.transition", {
             coverMs,
+            coverSplit,
             swapMs: Math.round(swapped - swapStarted),
             paintMs: Math.round(shown - swapped),
             compareMs: Math.round(compared - shown),
@@ -381,18 +393,30 @@ export class UpdateTransition {
     const win = this.visibleWindow();
     if (!win) return null;
     const since = Date.now();
+    const split: string[] = [];
+    let lap = since;
+    const step = (name: string) => {
+      const now = Date.now();
+      split.push(`${name} ${now - lap}`);
+      lap = now;
+    };
     try {
       if (!(await this.freeze(win))) {
         await win.webContents.executeJavaScript(THAW_SCRIPT).catch(() => {});
         return null;
       }
+      step("freeze");
       const view = await this.attach(win);
+      step("attach");
       const before = await this.capture(win);
+      step("capture");
       await this.call(view, "cover", jpegUrl(before), []);
+      step("show");
       const { frosted, dark } = (await this.call(view, "frost", frost())) as {
         frosted: string;
         dark: boolean;
       };
+      step("frost");
       const mark = (await this.call(view, "renderMark", MARK_SVG, dark, HOLD_MARK_PX)) as string;
       const hold: UpdateHold = {
         image: path.join(this.options.holdDir, HOLD_IMAGE),
@@ -403,13 +427,25 @@ export class UpdateTransition {
         frame: win.getContentBounds(),
       };
       await fs.mkdir(this.options.holdDir, { recursive: true });
-      await fs.writeFile(hold.image, Buffer.from(frosted, "base64"));
-      await fs.writeFile(hold.mark, Buffer.from(mark, "base64"));
-      await fs.writeFile(path.join(this.options.holdDir, HOLD_RECORD), JSON.stringify(hold));
+      await Promise.all([
+        fs.writeFile(hold.image, Buffer.from(frosted, "base64")),
+        fs.writeFile(hold.mark, Buffer.from(mark, "base64")),
+        fs.writeFile(path.join(this.options.holdDir, HOLD_RECORD), JSON.stringify(hold)),
+      ]);
       // The old window keeps holding until the process exits.
       void this.call(view, "hold", `data:image/jpeg;base64,${frosted}`, this.holdOptions(hold)).catch(() => {});
+      step("files");
+      const played = this.call(view, "frosted")
+        .catch(() => {})
+        .then(() => {
+          step("played");
+          this.options.log("app-source.hold", { ms: Date.now() - since, split: split.join(" | ") });
+        });
       return {
-        commit: () => this.options.onHold?.(hold),
+        commit: async () => {
+          await played;
+          this.options.onHold?.(hold);
+        },
         release: async () => {
           await this.uncover(win);
           await Promise.all(

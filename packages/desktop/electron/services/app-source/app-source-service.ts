@@ -886,7 +886,7 @@ export class AppSourceService {
       ]);
       this.mark("prebuild");
       await settling;
-      (await holding)?.commit();
+      await (await holding)?.commit();
       this.mark("hold");
       this.logTimeline("relaunch");
       this.options.relaunch();

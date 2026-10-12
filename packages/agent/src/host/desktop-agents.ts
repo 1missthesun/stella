@@ -38,6 +38,8 @@ export function desktopAgentsHost(
     dataDir?: string;
     /** Where Stella can move herself, and how the owner's computers stand. */
     execution?: StellaAgentsHost["execution"];
+    /** Every agent's conversation in the cloud. */
+    agentLog?: StellaAgentsHost["agentLog"];
   } = {},
 ): StellaAgentsHost {
   return {
@@ -54,6 +56,7 @@ export function desktopAgentsHost(
     ...(options.directory ? { directory: options.directory } : {}),
     ...(options.dataDir ? { agentDirectory: (threadId: string) => defaultAgentDirectory(options.dataDir!, threadId) } : {}),
     ...(options.execution ? { execution: options.execution } : {}),
+    ...(options.agentLog ? { agentLog: options.agentLog } : {}),
     directoryProblem: async (directory) => {
       const found = await stat(directory).catch(() => undefined);
       if (found?.isDirectory()) return undefined;

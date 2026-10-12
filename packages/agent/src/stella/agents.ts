@@ -30,6 +30,7 @@ import {
   defineTask,
   defineTool,
   LiveDoc,
+  type Conversation,
   type ConversationId,
   type EntryId,
   type Harness,
@@ -62,7 +63,7 @@ import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contr
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
-import { switchDestinationTool, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
+import { switchDestinationTool, type AgentSwitch, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
 import {
   describePlacement,
@@ -107,6 +108,16 @@ type AgentRecord = {
   paused?: true;
   steers?: Array<{ key: string; message: string }>;
   carried?: { runKey: string; messages: string[]; settled?: true };
+  /**
+   * It moved itself to another host (`switch_destination`): it is reached
+   * through the owner's agent threads from then on, wherever it runs, while
+   * its conversation here stays for when it comes back.
+   */
+  moved?: true;
+  /** It moved away and does not run here now. */
+  away?: true;
+  /** It came back here as an agent another host placed, under this key (`runPlacedAgent`). */
+  placedAs?: string;
 };
 
 /**
@@ -300,6 +311,8 @@ export type PlacedAgentRun = {
 
 export type PlacedAgentResult = { threadId: string } & (
   | { status: "ok"; finalText: string }
+  /** It moved itself to another host, which runs it from now on. */
+  | { status: "moved"; where: string }
   | { status: "error"; error: string }
   /** Paused here before it answered, or stopped because the host that placed it canceled it. */
   | { status: "paused" | "canceled"; error: string }
@@ -411,6 +424,16 @@ export type StellaAgentsHost = {
    * owner's computers stand, for agents that run on one of them.
    */
   execution?: StellaExecutionHost;
+  /**
+   * Every agent's conversation in the cloud (`agent-log-sync`): a sync after
+   * the agent's run here, and the import that brings an agent's transcript
+   * here up to its log before it runs here. Answers the folder it worked in
+   * where it ran last.
+   */
+  agentLog?: {
+    kick(conversationId: ConversationId): void;
+    importInto(harness: Harness, conversation: Conversation, threadId: string, context: Context): Promise<{ cwd?: string }>;
+  };
 };
 
 /**
@@ -684,10 +707,12 @@ const relationOf = (row: { threadId: string; parentThreadId?: string }, self: { 
       : "teammate";
 
 export function stellaAgents(host: StellaAgentsHost) {
-  const moveBrain = host.execution?.moveBrain;
-  const switchDestination = moveBrain
-    ? switchDestinationTool({ ...host.execution, moveBrain }, host.rootPlacement)
-    : undefined;
+  const execution = host.execution;
+  const agentsMove = execution?.moveAgent !== undefined && execution.agentTarget !== undefined;
+  const switchDestination =
+    execution && (execution.moveBrain || agentsMove)
+      ? switchDestinationTool(execution, host.rootPlacement, agentsMove ? (args, api, context) => agentSwitch(args, api, context) : undefined)
+      : undefined;
   const Reporter = defineTask<ReporterInput, ReporterState, null>({
     name: "stella.agent-reporter",
     version: 1,
@@ -723,6 +748,16 @@ export function stellaAgents(host: StellaAgentsHost) {
             return { status: "terminal", outcome: { status: "completed", result: null } };
           }, context);
           if (heldNow) return;
+        }
+        // It moved itself away: the message goes where it runs now.
+        const current = (await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context))?.agents[threadId];
+        if (current?.moved) {
+          const remote = remoteHostOf(current);
+          const text = [...carried, message].join("\n\n");
+          if (remote) await remote.message({ key: `moved:${reporter.id}`, threadId, message: text }, context);
+          else await host.directory?.message({ key: `moved:${reporter.id}`, to: threadId, text, from: { threadId: STELLA_MESSAGE_TARGET, label: "Stella" } }, context);
+          await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), context);
+          return;
         }
         const self = await roleOf(runtime, runtime.conversationId, context);
         const siblings = await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context);
@@ -807,6 +842,37 @@ export function stellaAgents(host: StellaAgentsHost) {
               return false;
             })().catch(() => false);
           }
+          if (settled?.status === "unanswered" && settled.reason === "aborted") await dropMove(runtime, agentConversationId, context);
+          // It asked to move: now that this run ended it goes, and reports from there.
+          const move =
+            settled?.status === "done" && settled.type === "input" ? await takeMove(runtime, agentConversationId, context) : undefined;
+          if (move && settled?.status === "done" && settled.type === "input") {
+            const answered = settled.answer;
+            await runtime.commit(async (tx) => {
+              const state = await tx.doc(StellaAgentsDoc, runtime.conversationId);
+              const agent = state.agents[threadId];
+              if (agent && !agent.reported.includes(answered)) agent.reported.push(answered);
+              if (agent && "moved" in move) {
+                // What it was given so far is settled here; what it is given from now on is answered there.
+                const given = Object.entries(state.calls).filter(([, call]) => call.threadId === threadId).map(([key]) => `moved:${key}`);
+                agent.remote = true;
+                agent.moved = true;
+                agent.away = true;
+                agent.placement = { kind: "device", deviceId: move.deviceId };
+                agent.startedAt ??= Date.now();
+                agent.answered = [...new Set([...(agent.answered ?? []), ...given.slice(0, -1)])];
+              }
+              if ("failed" in move) {
+                await tx.createTask(
+                  Reporter,
+                  { threadId, conversationId: reporter.input.conversationId, message: moveFailedText(move.failed) },
+                  { ownership: { kind: "conversation" }, background: true, conversationId: runtime.conversationId },
+                );
+              }
+              return { status: "terminal", outcome: { status: "completed", result: null } };
+            }, context);
+            return;
+          }
           await runtime.commit(async (tx) => {
             const next = (report?: string, status?: AgentAttemptOutcome): { status: "running"; checkpoint: ReporterState } => ({
               status: "running",
@@ -851,6 +917,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             );
           }, context);
         } finally {
+          host.agentLog?.kick(agentConversationId);
           await host.endAgentRun?.(run, context, end);
         }
       },
@@ -1024,12 +1091,23 @@ export function stellaAgents(host: StellaAgentsHost) {
       cwd?: string;
       /** The agent or Stella that started it. */
       startedBy?: AgentMessageSender;
+      /**
+       * Placed here under `threadId`, which may be an agent this harness
+       * already has a conversation for (one that moved away and back): that
+       * conversation is the agent's, under the placing host's key.
+       */
+      adoptAs?: string;
     },
   ): Promise<{ threadId: string; existing: boolean }> => {
     const { parentConversationId, depth, description, runsOn, placement } = args;
     const state = await tx.doc(StellaAgentsDoc, parentConversationId);
     const prior = state.calls[args.callKey];
     if (prior) return { threadId: prior.threadId, existing: true };
+    const known = args.adoptAs && args.threadId ? state.agents[args.threadId] : undefined;
+    if (known && known.conversationId >= 0 && args.adoptAs) {
+      known.placedAs = args.adoptAs;
+      return { threadId: args.threadId!, existing: true };
+    }
     const anchor = await tx.createTask(Anchor, null, {
       ownership: { kind: "conversation" },
       background: true,
@@ -1048,7 +1126,11 @@ export function stellaAgents(host: StellaAgentsHost) {
       // start agents.
       extensions: { ...agentToolSelection, ...engineExtensionChange(runsOn.model) },
       tools: {
-        remove: [...(depth >= MAX_AGENT_DEPTH ? [spawnAgent, pauseAgent] : []), ...(switchDestination ? [switchDestination] : [])],
+        // Only Stella's own agents move themselves; theirs run where they run.
+        remove: [
+          ...(depth >= MAX_AGENT_DEPTH ? [spawnAgent, pauseAgent] : []),
+          ...(switchDestination && (depth > 1 || !agentsMove) ? [switchDestination] : []),
+        ],
       },
     });
     const role = await tx.doc(StellaAgentDoc, child.id);
@@ -2016,7 +2098,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           runsOn,
           placement: host.rootPlacement,
           detached: true,
-          ...(args.threadId ? { threadId: args.threadId } : {}),
+          ...(args.threadId ? { threadId: args.threadId, adoptAs: args.agentKey } : {}),
         }),
       context,
     );
@@ -2024,44 +2106,97 @@ export function stellaAgents(host: StellaAgentsHost) {
     const agent = record ? await harness.conversation(record.conversationId as ConversationId, context) : undefined;
     if (!agent) return { threadId, status: "error", error: "The agent could not start here." };
     if (args.signal?.aborted) return stoppedPlacedRun(threadId, args.signal);
+    // Whatever it did elsewhere since it last ran here (all of it, for an
+    // agent that moved here) comes first, from its log.
+    if (host.agentLog) {
+      let imported: { cwd?: string } | undefined;
+      let failure: unknown;
+      for (let attempt = 0; attempt < 3 && !imported; attempt += 1) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt));
+        imported = await host.agentLog.importInto(harness, agent, threadId, context).catch((error: unknown) => {
+          failure = error;
+          return undefined;
+        });
+      }
+      if (!imported) {
+        return {
+          threadId,
+          status: "error",
+          error: `This computer couldn't read the agent's conversation from Stella's cloud (${failure instanceof Error ? failure.message : String(failure)}), so it did not run it without its memory. Message it again to retry.`,
+        };
+      }
+      const cwd = imported.cwd;
+      const own = await harness.snapshot(AgentDoc, agent.id, context);
+      if (cwd && cwd !== own?.cwd && !(await host.directoryProblem?.(cwd).catch(() => "unreadable"))) {
+        await harness.commit(async (tx) => {
+          await configure(tx, agent.id, { cwd });
+          return undefined;
+        }, context);
+      }
+    }
     const carried = await harness.commit(async (tx) => {
       const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
       if (!current) return [];
+      delete current.away;
       if (current.carried?.runKey === args.runKey) return current.carried.messages;
       const messages = current.held ?? [];
       delete current.held;
       current.carried = { runKey: args.runKey, messages };
       return messages;
     }, context);
-    const submission = await agent.submit(
-      {
-        type: "input",
-        content: [...carried, args.prompt].join("\n\n"),
-        whenBusy: "steer",
-        requestId: `placed:${args.runKey}`,
-      },
-      context,
-    );
-    const stop = async () => {
-      const withdrawn = await harness.abortSubmission(submission.id, context, agent.id);
-      if (withdrawn === "already_placed") await agent.abort(context);
-    };
-    args.signal?.addEventListener("abort", () => void stop().catch(() => undefined), { once: true });
-    if (args.signal?.aborted) await stop();
-    const settled = await submission.wait(context);
-    await keepWithdrawn(harness, root.id, threadId, args.runKey, settled, [...carried, args.prompt], context);
-    if (args.signal?.aborted) return stoppedPlacedRun(threadId, args.signal);
-    // Paused here (its conversation aborted) before it answered.
-    if (settled.status === "unanswered" && settled.reason === "aborted") {
-      return { threadId, status: "paused", error: AGENT_PAUSED_REASON };
+    let content = [...carried, args.prompt].join("\n\n");
+    let requestId = `placed:${args.runKey}`;
+    for (let retry = 1; ; retry += 1) {
+      const submission = await agent.submit({ type: "input", content, whenBusy: "steer", requestId }, context);
+      const stop = async () => {
+        const withdrawn = await harness.abortSubmission(submission.id, context, agent.id);
+        if (withdrawn === "already_placed") await agent.abort(context);
+      };
+      const onAbort = () => void stop().catch(() => undefined);
+      args.signal?.addEventListener("abort", onAbort, { once: true });
+      if (args.signal?.aborted) await stop();
+      let settled: Awaited<ReturnType<typeof submission.wait>>;
+      try {
+        settled = await submission.wait(context);
+      } finally {
+        args.signal?.removeEventListener("abort", onAbort);
+        host.agentLog?.kick(agent.id);
+      }
+      if (retry === 1) await keepWithdrawn(harness, root.id, threadId, args.runKey, settled, [...carried, args.prompt], context);
+      if (args.signal?.aborted) {
+        await dropMove(harness, agent.id, context);
+        return stoppedPlacedRun(threadId, args.signal);
+      }
+      // Paused here (its conversation aborted) before it answered.
+      if (settled.status === "unanswered" && settled.reason === "aborted") {
+        await dropMove(harness, agent.id, context);
+        return { threadId, status: "paused", error: AGENT_PAUSED_REASON };
+      }
+      if (settled.status !== "done" || settled.type !== "input") {
+        return { threadId, status: "error", error: settled.status === "unanswered" ? settled.reason : "The agent did not answer." };
+      }
+      const move = await takeMove(harness, agent.id, context);
+      if (move && "moved" in move) {
+        await harness.commit(async (tx) => {
+          const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
+          if (current) {
+            current.moved = true;
+            current.away = true;
+          }
+          return undefined;
+        }, context);
+        return { threadId, status: "moved", where: move.moved };
+      }
+      if (move && "failed" in move) {
+        content = moveFailedText(move.failed);
+        requestId = `placed:${args.runKey}:stayed:${retry}`;
+        continue;
+      }
+      const answer = await harness.commit(async (tx) => tx.entry(AssistantEntry, settled.answer), context);
+      const message = answer?.model?.[0] as AssistantMessage | undefined;
+      if (message?.stopReason === "error") return { threadId, status: "error", error: message.errorMessage ?? "The agent failed." };
+      return { threadId, status: "ok", finalText: textOf(message) };
     }
-    if (settled.status !== "done" || settled.type !== "input") {
-      return { threadId, status: "error", error: settled.status === "unanswered" ? settled.reason : "The agent did not answer." };
-    }
-    const answer = await harness.commit(async (tx) => tx.entry(AssistantEntry, settled.answer), context);
-    const message = answer?.model?.[0] as AssistantMessage | undefined;
-    if (message?.stopReason === "error") return { threadId, status: "error", error: message.errorMessage ?? "The agent failed." };
-    return { threadId, status: "ok", finalText: textOf(message) };
   };
 
   const keepWithdrawn = async (
@@ -2101,9 +2236,14 @@ export function stellaAgents(host: StellaAgentsHost) {
   ): Promise<boolean> => {
     const root = await harness.root(context);
     const state = await harness.snapshot(StellaAgentsDoc, root.id, context);
-    const threadId = state?.calls[`placed:${args.agentKey}`]?.threadId;
+    const threadId =
+      state?.calls[`placed:${args.agentKey}`]?.threadId ??
+      Object.entries(state?.agents ?? {}).find(([, known]) => known.placedAs === args.agentKey)?.[0];
     const record = threadId ? state?.agents[threadId] : undefined;
-    const agent = record && !record.remote ? await harness.conversation(record.conversationId as ConversationId, context) : undefined;
+    const agent =
+      record && record.conversationId >= 0 && !record.away
+        ? await harness.conversation(record.conversationId as ConversationId, context)
+        : undefined;
     if (!agent || !threadId) return false;
     await harness.commit(async (tx) => {
       const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
@@ -2113,6 +2253,119 @@ export function stellaAgents(host: StellaAgentsHost) {
     await agent.submit({ type: "input", content: args.message, whenBusy: "steer", requestId: `steer:${args.key}` }, context);
     return true;
   };
+
+  /**
+   * An agent's `switch_destination`: checked now (where to, its own agents,
+   * what its folder would leave behind), done once this run of it ends,
+   * when nothing is in flight (`takeMove`).
+   */
+  const agentSwitch: AgentSwitch = async (args, api, context) => {
+    const self = await roleOf(api, api.conversationId, context);
+    if (!self.threadId || self.depth > 1) {
+      throw new Error(
+        "Another agent started you, so you run where it runs. If the work needs another computer, tell the agent that started you with send_message.",
+      );
+    }
+    const moveAgent = execution?.moveAgent;
+    const agentTarget = execution?.agentTarget;
+    if (!moveAgent || !agentTarget) throw new Error("This chat is stored only on this computer, so you can only run here.");
+    const destination = parseSpawnDestination(args.destination);
+    if (destination.kind === "here") throw new Error('destination is required: "cloud" or a device_id.');
+    if (destination.kind === "cloud") {
+      throw new Error(
+        'Agents can\'t move themselves to the cloud yet. If the work needs the cloud, ask Stella with send_message to "stella" to start a cloud agent for it.',
+      );
+    }
+    const brief = args.prompt?.trim();
+    if (!brief) throw new Error("Pass your brief as prompt: what you will do there next, as you will read it there.");
+    const agent = await api.snapshot(AgentDoc, api.conversationId, context);
+    const target = await agentTarget(destination.deviceId, { claudeCode: onClaudeCode(agent?.model) }, context);
+    if ("error" in target) throw new Error(target.error);
+    if (target.here) return { content: [{ type: "text", text: `You already run on ${target.name}. Carry on here.` }] };
+    if (await agentsBusy(busyReader(api, context), api.conversationId).catch(() => false)) {
+      throw new Error(
+        "Agents you started are still at work here, and they stay here. Wait for their reports (or pause them), then move.",
+      );
+    }
+    const left = agent?.cwd ? await execution?.leftBehind?.(agent.cwd).catch(() => undefined) : undefined;
+    if (left && args.leave_files !== true) {
+      throw new Error(
+        `${left} Files in your folder stay on this computer when you move. Commit and push that work first (a WIP branch is fine), then call switch_destination again; or pass leave_files: true to move without it.`,
+      );
+    }
+    await api.commit(async (tx) => {
+      const role = await tx.doc(StellaAgentDoc, api.conversationId);
+      role.moving = { deviceId: target.deviceId, name: target.name, brief, key: String(api.taskId) };
+    }, context);
+    return {
+      content: [
+        {
+          type: "text",
+          text: `You move to ${target.name} as soon as this turn ends: its own Stella continues you there with this whole conversation and your brief, under the same thread id, and your reports, messages and pauses follow you.${
+            left ? ` What stays behind on this computer: ${left}` : ""
+          } End this turn now with one short line saying you are moving to ${target.name}; do no more work here.`,
+        },
+      ],
+      details: { move: "agent", destination: target.deviceId },
+    };
+  };
+
+  /**
+   * After an agent's run here ended: the move it asked for, if any. Its
+   * transcript is in its log by then, and the host hands it over; `moved`
+   * says where it runs now, `failed` why it stays.
+   */
+  const takeMove = async (
+    store: Pick<ToolExecutionApi, "snapshot"> & { commit(change: (tx: Tx) => Promise<undefined>, context: Context): Promise<unknown> },
+    agentConversationId: ConversationId,
+    context: Context,
+  ): Promise<{ moved: string; deviceId: string } | { failed: string } | undefined> => {
+    const role = await store.snapshot(StellaAgentDoc, agentConversationId, context);
+    const move = role?.moving;
+    if (!move || !role.threadId || !execution?.moveAgent) return undefined;
+    const agent = await store.snapshot(AgentDoc, agentConversationId, context);
+    let outcome: { moved: string; deviceId: string } | { failed: string };
+    try {
+      const done = await execution.moveAgent(
+        {
+          threadId: role.threadId,
+          agentConversationId,
+          deviceId: move.deviceId,
+          name: move.name,
+          brief: move.brief,
+          key: move.key,
+          ...(agent?.model ? { model: agent.model } : {}),
+          ...(agent?.thinkingLevel ? { thinkingLevel: agent.thinkingLevel } : {}),
+          ...(agent?.cwd ? { cwd: agent.cwd } : {}),
+        },
+        context,
+      );
+      outcome = "error" in done ? { failed: done.error } : { moved: done.where, deviceId: move.deviceId };
+    } catch (error) {
+      outcome = { failed: error instanceof Error ? error.message : String(error) };
+    }
+    await store.commit(async (tx) => {
+      delete (await tx.doc(StellaAgentDoc, agentConversationId)).moving;
+      return undefined;
+    }, context);
+    return outcome;
+  };
+
+  /** A move asked for in a run that was paused instead of ending: it does not happen. */
+  const dropMove = async (
+    store: { commit(change: (tx: Tx) => Promise<undefined>, context: Context): Promise<unknown> },
+    agentConversationId: ConversationId,
+    context: Context,
+  ) =>
+    store.commit(async (tx) => {
+      const role = await tx.doc(StellaAgentDoc, agentConversationId);
+      if (role.moving) delete role.moving;
+      return undefined;
+    }, context);
+
+  /** What an agent whose move failed reads, to carry on where it is. */
+  const moveFailedText = (error: string) =>
+    `[switch_destination: your move did not happen: ${error} You still run on ${describePlacement(host.rootPlacement)}, with everything as you left it; carry on with your work here.]`;
 
   const extension = defineExtension({
     name: STELLA_AGENTS_EXTENSION,

@@ -6,6 +6,7 @@
  * the app (`@stella/contracts/pi-chat`).
  */
 import { CLAUDE_USAGE_LIMIT_RESUMED_TEXT, type ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
+import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -119,6 +120,10 @@ import { ownHistoryQuery } from "../stella/own-history.ts";
 import { ownHistorySql } from "@stella/runtime/kernel/storage/own-history-sql";
 import type { ClaudeCodeEngine, ClaudeCodeStatus } from "../engine/claude-code.ts";
 import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
+import { agentLogDeviceHolder, type AgentLogCalls } from "@stella/contracts/backend/agent-logs";
+import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
+import { agentLogSync, importAgentLog, type AgentLogTransport } from "../stella/agent-log-sync.ts";
+import { movedAgentBrief, type AgentMove } from "../stella/execution.ts";
 
 /** The newest entries a client gets when it attaches, and per older page. */
 const HISTORY_PAGE = 200;
@@ -209,6 +214,20 @@ export type DesktopChatsOptions = {
   deviceAgents?(conversationId: string): DesktopDeviceAgents | undefined;
   /** For a conversation stored in the cloud: the owner's computers, as the owner gate lists them. */
   devices?(conversationId: string): DesktopDevices | undefined;
+  /**
+   * Every agent's conversation in the owner's cloud: what agents here say
+   * and do, written as they go, and what one that moves here did before.
+   */
+  agentLogs?: {
+    append(args: AgentLogCalls["agentLogs.append"]["args"]): Promise<AgentLogCalls["agentLogs.append"]["result"]>;
+    read(args: AgentLogCalls["agentLogs.read"]["args"]): Promise<AgentLogCalls["agentLogs.read"]["result"]>;
+  };
+  /** One of this computer's agents moving itself to another computer (`switch_destination`). */
+  agentHandoff?(
+    args: Omit<AgentThreadCalls["agentThreads.handoff"]["args"], "ownerGeneration" | "fromDeviceId">,
+  ): Promise<{ where: string }>;
+  /** Everything the Claude Code sessions here wrote, in the cloud, before an agent on one moves. */
+  flushClaudeSessions?(): Promise<void>;
   /**
    * For a conversation stored in the cloud: where its brain runs, as its
    * object records it. Once that names another host, this computer takes
@@ -357,6 +376,51 @@ const fileName = (conversationId: string): string => {
   const safe = conversationId.replace(/[^A-Za-z0-9_.-]/g, "_");
   if (!safe || safe.startsWith(".")) throw new Error(`Invalid conversation id: ${conversationId}`);
   return `${safe}.sqlite`;
+};
+
+const REASONING_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
+
+/** What an agent runs on, as `spawn_agent` names a model, for the computer it moves to. */
+const agentModelSpec = (model: AgentMove["model"], thinkingLevel?: string): string | undefined => {
+  if (!model) return undefined;
+  const effort = thinkingLevel && REASONING_EFFORTS.has(thinkingLevel) ? `:${thinkingLevel}` : "";
+  if (model.provider === STELLA_PROVIDER_ID) {
+    const alias = parseStellaModelId(model.modelId)?.alias;
+    return alias ? `${alias.startsWith("stella/") ? alias : `stella/${alias}`}${effort}` : undefined;
+  }
+  if (onClaudeCode(model)) {
+    return `${CLAUDE_CODE_PROVIDER_ID}${model.modelId && model.modelId !== "default" ? `/${model.modelId}` : ""}${effort}`;
+  }
+  return `${accountProviderOfRegistryId(model.provider) ?? model.provider}/${model.modelId}${effort}`;
+};
+
+const git = (cwd: string, args: string[]): Promise<string> =>
+  new Promise((resolve, reject) => {
+    execFile("git", ["-C", cwd, ...args], { timeout: 10_000, maxBuffer: 1024 * 1024 }, (error, stdout) =>
+      error ? reject(error) : resolve(stdout),
+    );
+  });
+
+/** The work in a git folder that is only on this computer: uncommitted changes and unpushed commits. */
+const workLeftBehind = async (cwd: string): Promise<string | undefined> => {
+  const inside = await git(cwd, ["rev-parse", "--is-inside-work-tree"]).catch(() => "");
+  if (inside.trim() !== "true") return undefined;
+  const changed = (await git(cwd, ["status", "--porcelain"]).catch(() => "")).split("\n").filter((line) => line.trim()).length;
+  const branch = (await git(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]).catch(() => "")).trim();
+  const upstream = await git(cwd, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"]).catch(() => "");
+  const ahead = upstream.trim()
+    ? Number((await git(cwd, ["rev-list", "--count", "@{u}..HEAD"]).catch(() => "0")).trim()) || 0
+    : 0;
+  // No upstream: its commits are pushed when a remote has them.
+  const remotes = upstream.trim() ? "" : (await git(cwd, ["remote"]).catch(() => "")).trim();
+  const unpushed =
+    remotes && !(await git(cwd, ["branch", "-r", "--contains", "HEAD"]).catch(() => "")).trim();
+  const parts = [
+    ...(changed > 0 ? [`${changed} uncommitted change${changed === 1 ? "" : "s"}`] : []),
+    ...(ahead > 0 ? [`${ahead} commit${ahead === 1 ? "" : "s"} on ${branch} not pushed`] : []),
+    ...(unpushed ? [`commits on ${branch || "HEAD"} that no remote has`] : []),
+  ];
+  return parts.length > 0 ? `${cwd} has ${parts.join(" and ")}.` : undefined;
 };
 
 export function desktopChats(options: DesktopChatsOptions) {
@@ -1088,7 +1152,60 @@ export function desktopChats(options: DesktopChatsOptions) {
         const storage = await openBunSqliteStorage(file);
         const devices = options.devices?.(conversationId);
         const brain = options.brain?.(conversationId);
+        let harnessRef: Harness | undefined;
+        const agentLogs = options.agentLogs;
+        const agentLogTransport: AgentLogTransport | undefined =
+          !conversationId.startsWith("local_") && agentLogs && options.deviceId
+            ? (() => {
+                const holder = agentLogDeviceHolder(options.deviceId);
+                return {
+                  holder,
+                  conversationId,
+                  append: ({ threadId, records }) => agentLogs.append({ threadId, conversationId, holder, records }),
+                  read: (args) => agentLogs.read(args),
+                };
+              })()
+            : undefined;
+        const agentLog = agentLogTransport
+          ? agentLogSync({
+              harness: () => harnessRef,
+              transport: () => agentLogTransport,
+              report: options.report,
+              onAppend: (stat) => console.info(`[agent-log] append ${JSON.stringify(stat)}`),
+              context,
+            })
+          : undefined;
+        const handoff = options.agentHandoff;
+        /** One of this chat's agents moving itself, once its run here ended: its log first, then the cloud's hand-off. */
+        const moveAgent =
+          agentLog && handoff
+            ? async (move: AgentMove): Promise<{ where: string } | { error: string }> => {
+                try {
+                  await agentLog.flush(move.agentConversationId);
+                } catch (error) {
+                  return {
+                    error: `your conversation couldn't be saved to Stella's cloud (${error instanceof Error ? error.message : String(error)}).`,
+                  };
+                }
+                await options.flushClaudeSessions?.().catch((error: unknown) => options.report(error));
+                const listed = await devices?.devices().catch(() => undefined);
+                const from = listed?.find((entry) => entry.deviceId === options.deviceId)?.label?.trim() || "the computer you ran on";
+                const brief = move.brief.length > 6_000 ? `${move.brief.slice(0, 6_000)}\n[brief cut]` : move.brief;
+                const model = agentModelSpec(move.model, move.thinkingLevel);
+                const moved = await handoff({
+                  handoffId: `move:${createHash("sha256").update(`${conversationId}\0${move.threadId}\0${move.key}`).digest("hex").slice(0, 40)}`,
+                  threadId: move.threadId,
+                  conversationId,
+                  targetDeviceId: move.deviceId,
+                  prompt: movedAgentBrief(from, brief),
+                  ...(model ? { model } : {}),
+                  ...(move.cwd ? { cwd: move.cwd } : {}),
+                });
+                return { where: moved.where };
+              }
+            : undefined;
         const execution = desktopExecution({
+          ...(moveAgent ? { moveAgent, leftBehind: workLeftBehind } : {}),
           ...(options.deviceId ? { deviceId: options.deviceId } : {}),
           localOnly: conversationId.startsWith("local_"),
           ...(devices ? { devices } : {}),
@@ -1159,6 +1276,15 @@ export function desktopChats(options: DesktopChatsOptions) {
                 directory: directoryFor(conversationId),
                 dataDir: options.dataDir,
                 execution: execution.host,
+                ...(agentLog && agentLogTransport
+                  ? {
+                      agentLog: {
+                        kick: agentLog.kick,
+                        importInto: (into, conversation, threadId, runContext) =>
+                          importAgentLog(into, conversation, agentLogTransport, threadId, runContext),
+                      },
+                    }
+                  : {}),
                 ensureModel: (model) => ensureModel(model),
                 beginAgentRun: async (run) => {
                   if (!opened) return;
@@ -1256,12 +1382,17 @@ export function desktopChats(options: DesktopChatsOptions) {
               });
             })(),
             ...(options.tools ? { tools: options.tools(conversationId) } : {}),
-            extensions: [journalTurnGate(standing), ...(claudeCodeEngine ? [claudeCodeEngine.extension(conversationId)] : [])],
+            extensions: [
+              journalTurnGate(standing),
+              ...(agentLog ? [agentLog.extension()] : []),
+              ...(claudeCodeEngine ? [claudeCodeEngine.extension(conversationId)] : []),
+            ],
             env: environments.env,
             onReport: options.report,
           },
           context,
         );
+        harnessRef = harness;
         const orchestrator = orchestratorAgent(stellaModelRef("orchestrator"));
         const root = await harness.root(context, { agent: orchestrator });
         // A conversation from an older build keeps up with what the orchestrator is offered.

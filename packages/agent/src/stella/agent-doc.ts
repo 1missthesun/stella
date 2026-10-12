@@ -19,6 +19,11 @@ export type StellaAgentRole = {
   parentConversationId?: number;
   /** Who started it, by the thread id its messages and send_message use. */
   startedBy?: { threadId: string; label: string };
+  /**
+   * It called `switch_destination`: once its run here ends, it moves to this
+   * computer, with this brief (`StellaExecutionHost.moveAgent`).
+   */
+  moving?: { deviceId: string; name: string; brief: string; key: string };
 };
 
 export const StellaAgentDoc = defineDoc<StellaAgentRole>({

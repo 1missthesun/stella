@@ -73,6 +73,10 @@ export function desktopExecution(options: {
   turnEnded?(): Promise<void>;
   /** The record the conversation's object took for a move. */
   brainMoved?(record: PiBrainRecord): void;
+  /** One of the conversation's agents here moving itself to another computer, once its run ended. */
+  moveAgent?: StellaExecutionHost["moveAgent"];
+  /** What a folder holds that an agent moving away would leave behind. */
+  leftBehind?: StellaExecutionHost["leftBehind"];
   report(error: unknown): void;
 }) {
   const isHere = (target: StellaPlacement): boolean =>
@@ -107,12 +111,39 @@ export function desktopExecution(options: {
     };
   };
 
+  /** A computer an agent here can move to now, or why it can't. */
+  const agentTarget: NonNullable<StellaExecutionHost["agentTarget"]> = async (deviceId, needs) => {
+    if (!options.devices) return { error: "Sign in to Stella to move to another computer." };
+    const listed = await options.devices.devices().catch(() => undefined);
+    if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
+    const device = findDeviceDestination(listed, deviceId);
+    if (!device) {
+      return { error: `No connected device has the device_id or name ${deviceId}. Use a device_id from the connected devices list.` };
+    }
+    const name = device.label?.trim() || device.deviceId;
+    if (device.deviceId === options.deviceId) return { deviceId: device.deviceId, name, here: true };
+    if (!device.online) {
+      return { error: `${name} is offline, so you can't move there now. Carry on here, or tell Stella with send_message to "stella" if the work needs that computer.` };
+    }
+    const refusal = deviceRefusal(device, name);
+    if (refusal) return { error: refusal };
+    if (needs.claudeCode && device.availability && !device.availability.capabilities.includes("claude-code")) {
+      return {
+        error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › Account there) and try again.`,
+      };
+    }
+    return { deviceId: device.deviceId, name };
+  };
+
   const host: StellaExecutionHost = {
     standing: async (deviceId) => {
       const listed = await options.devices?.devices().catch(() => undefined);
       const device = listed?.find((entry) => entry.deviceId === deviceId);
       return device ? deviceStanding(device) : undefined;
     },
+    ...(options.moveAgent && options.devices && !options.localOnly
+      ? { agentTarget, moveAgent: options.moveAgent, ...(options.leftBehind ? { leftBehind: options.leftBehind } : {}) }
+      : {}),
     ...(options.brain && !options.localOnly
       ? {
           moveBrain: async (target, brief) => {

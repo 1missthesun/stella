@@ -1,8 +1,8 @@
 /**
  * Agents on the desktop: they run on this computer, their tools in a
  * NodeExecutionEnv per working directory. In a conversation stored in the
- * cloud, Stella's agent placed in the cloud runs there as a whole, in the
- * conversation's object, so it keeps working while this computer sleeps
+ * cloud, Stella's agent placed in the cloud runs there as a whole, as one of
+ * the owner's agent threads, so it keeps working while this computer sleeps
  * (`cloud`), and one placed on another of the owner's computers runs there
  * as a whole, on that computer's own Stella (`devices`).
  */

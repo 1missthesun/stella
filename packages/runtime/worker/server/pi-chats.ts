@@ -27,7 +27,6 @@ import {
 import { prepareStoredLocalChatPayload } from "../../kernel/storage/local-chat-payload.js";
 import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";
-import { cloudAgentsFor } from "./pi-cloud-agents.js";
 import { brainFor } from "./pi-brain.js";
 import { cloudJournalFor } from "./pi-journal.js";
 import { claudeCodeEngineFor } from "./claude-code-engine.js";
@@ -184,8 +183,8 @@ const piLocalLog = (
 };
 
 /**
- * Cloud agents pi's Stella starts on a model it names, for a conversation
- * stored in the cloud: the runner dispatches them through the owner's agent
+ * Cloud agents pi's Stella starts, on the model it names or the configured
+ * one, for a conversation stored in the cloud: the runner dispatches them through the owner's agent
  * threads as its own cloud placements, and their reports come back the same way.
  */
 const cloudAgentThreadsFor = (
@@ -385,7 +384,6 @@ export const piChatsFor = (
         },
       },
       journal: (conversationId) => cloudJournalFor(session, conversationId),
-      cloudAgents: (conversationId) => cloudAgentsFor(session, conversationId),
       cloudThreads: (conversationId) => cloudAgentThreadsFor(session, conversationId),
       deviceAgents: (conversationId) => deviceAgentThreadsFor(session, conversationId),
       devices: (conversationId) => httpDevices(conversationId, () => session.runnerCell.get()?.getStellaSiteAuth()),

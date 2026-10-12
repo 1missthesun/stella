@@ -282,50 +282,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           log: (event, fields) => log("info", event, fields),
           deliverNote: (note, authority) =>
             this.deliverPiAgentNote(note, authority),
-          // A computer's cloud agent reports to that computer: its journal
-          // import takes the card and gives it to its orchestrator.
-          deliverOriginReport: async (report, turnId, agent) => {
-            // The computer reads the report from its card; the journal's
-            // count of what runs learns it ended now, whether or not the
-            // computer is awake to read it.
-            if (!report.settled && !agent.running) {
-              this.publishPiAgentTerminal(
-                report.threadId,
-                agent,
-                piReportOutcome(report),
-              );
-            }
-            const appended = this.journal.appendCard({
-              turnId,
-              createdAt: Date.now(),
-              card: {
-                type: "agent-report",
-                reportFor: report.origin.deviceId,
-                threadId: report.threadId,
-                requestId: report.requestId,
-                text: report.text,
-                ...(report.status ? { status: report.status } : {}),
-                ...(report.settled ? { settled: true as const } : {}),
-              },
-              writer: "orchestrator",
-              writerKey: `pi-report:${report.requestId}`,
-            });
-            if (appended.inserted) this.publish(appended.record);
-            // What the agent saved to the drive and linked, as the conversation's files card.
-            if (agent.files?.length) {
-              this.publishTurnFilesCard(
-                turnId,
-                `pi-files:${report.requestId}`,
-                agent.files,
-              );
-            }
-            log("info", "pi_origin_report_journaled", {
-              threadId: report.threadId,
-              settled: report.settled === true,
-              reportFor: report.origin.deviceId,
-              seq: appended.seq,
-            });
-          },
           deliverThreadReport: (report) => this.deliverPiThreadReport(report),
           noteLedgerReport: (report, turnId, agent) => {
             if (!agent.running) {

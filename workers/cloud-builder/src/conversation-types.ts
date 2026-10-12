@@ -200,22 +200,6 @@ export type ConversationCard =
   | CloudAgentLifecycleCard
   | import("@stella/contracts/claude-usage-limit").ClaudeUsageLimitCard
   | import("@stella/contracts/reminders").ReminderCard
-  /**
-   * A report of a cloud agent a computer's orchestrator started, for that
-   * computer, which gives it to its orchestrator. Clients do not show it;
-   * the computer's own turn that answers it does.
-   */
-  | {
-      type: "agent-report";
-      reportFor: string;
-      threadId: string;
-      requestId: string;
-      text: string;
-      /** How the run it reports ended; readers use this, not the text's heading. */
-      status?: import("@stella/contracts/agent-status").AgentAttemptOutcome;
-      /** One of the agent's messages settled without a report of its own (answered within another, or paused). */
-      settled?: true;
-    }
   | { type: "build"; buildId: string; appId?: string }
   | { type: "operation"; operation: string; args?: unknown; result?: unknown }
   | {

@@ -181,8 +181,6 @@ export type DesktopChatsOptions = {
   tools?(conversationId: string): StellaToolHost;
   /** The cloud journal of a conversation stored in the cloud, which its turns are mirrored into. */
   journal?(conversationId: string): DesktopJournal | undefined;
-  /** For a conversation stored in the cloud: its cloud agents, run in its object. */
-  cloudAgents?(conversationId: string): RemoteAgentHost | undefined;
   claudeCodeEngine?: ClaudeCodeEngine;
   /** Why Claude Code can't run on this computer now (not signed in); undefined when it can. */
   claudeCodeProblem?(): Promise<string | undefined>;
@@ -194,10 +192,10 @@ export type DesktopChatsOptions = {
     timezone?: string;
   }): Promise<string[]>;
   /**
-   * For a conversation stored in the cloud: cloud agents started with a
-   * model, run as the owner's agent threads on that model (a Stella model,
-   * Codex, Claude Code, a model on a key saved to the account); their
-   * reports come back as `deliverReport`s.
+   * For a conversation stored in the cloud: its cloud agents, run as the
+   * owner's agent threads on their model (the configured one, a Stella
+   * model, Codex, Claude Code, a model on a key saved to the account);
+   * their reports come back as `deliverReport`s.
    */
   cloudThreads?(conversationId: string): DesktopEngineAgents | undefined;
   /**
@@ -332,7 +330,7 @@ type Chat = {
 
 const context = BACKGROUND_CONTEXT;
 
-/** The engine id of cloud agents started with a model (`cloudThreads`). */
+/** The engine id older records give a cloud agent started with a model (`cloudThreads`). */
 const CLOUD_THREAD_ENGINE = "cloud-thread";
 
 /** The response language a conversation's latest message asked for, so it holds across restarts. */
@@ -793,10 +791,6 @@ export function desktopChats(options: DesktopChatsOptions) {
     requested: string,
     placement?: StellaPlacement,
   ): Promise<AgentModelChoice> => {
-    if (placement?.kind === "cloud") {
-      if (!options.cloudThreads?.(conversationId)) throw new Error("This conversation can't start cloud agents on a chosen model.");
-      return { engine: CLOUD_THREAD_ENGINE };
-    }
     if (placement) return { there: true };
     const effort = /^(.+):(low|medium|high|xhigh|max)$/.exec(requested.trim());
     const reference = (effort?.[1] ?? requested).trim();
@@ -924,7 +918,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (!threadId) return;
     const chat = await ready(conversationId);
     const agent = (await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context))?.agents[threadId];
-    if (!agent?.engine && !(agent?.remote && agent.placement.kind === "device")) return;
+    if (!agent?.remote) return;
     await chat.harness.commit(
       (tx) => noteRemoteReport(tx, chat.root.id, { threadId, requestId: report.requestId, text: report.text }),
       context,
@@ -1143,7 +1137,6 @@ export function desktopChats(options: DesktopChatsOptions) {
               cloudStored: !conversationId.startsWith("local_"),
             }),
             agents: (() => {
-              const cloud = options.cloudAgents?.(conversationId);
               const { agentStarted, agentReported, agentPaused, subagentEnded, agentRunEnded } = options;
               /** How many runs Stella has given one of its agents: the attempt a run is. */
               const attempts = async (threadId: string) => {
@@ -1151,9 +1144,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
                 return Math.max(1, Object.values(state?.calls ?? {}).filter((call) => call.threadId === threadId).length);
               };
-              const engines = new Map<string, RemoteAgentHost>();
-              const cloudThreads = engineHost(options.cloudThreads?.(conversationId), "default", () => opened);
-              if (cloudThreads) engines.set(CLOUD_THREAD_ENGINE, cloudThreads);
+              const cloud = engineHost(options.cloudThreads?.(conversationId), "default", () => opened);
               return desktopAgentsHost({
                 ...(options.deviceId ? { deviceId: options.deviceId } : {}),
                 ...(cloud ? { cloud } : {}),
@@ -1161,7 +1152,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                   ? { devices: (deviceId: string) => deviceHost(conversationId, deviceId, () => opened) }
                   : {}),
                 agentModel: (requested, _caller, placement) => agentModel(conversationId, requested, placement),
-                engine: (id) => engines.get(id),
+                engine: (id) => (id === CLOUD_THREAD_ENGINE ? cloud : undefined),
                 directory: directoryFor(conversationId),
                 dataDir: options.dataDir,
                 execution: execution.host,

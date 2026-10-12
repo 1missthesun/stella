@@ -44,7 +44,6 @@ import {
 import { piJournalUserMessage, piTerminalNotice, type PiRemoteTurn, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
 import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
-import { isAgentAttemptOutcome } from "@stella/contracts/agent-status";
 import { PI_BRAIN_ELSEWHERE_CODE, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import {
   checkpointToPublish,
@@ -53,7 +52,6 @@ import {
   noteCheckpointPublished,
   journalSeqOf,
   JournalSyncDoc,
-  type JournalAgentReport,
   type JournalMessage,
   type JournalOpenTurn,
   type JournalStart,
@@ -195,34 +193,6 @@ export const journalTurnGate = (standing: Promise<boolean>): Extension => {
       hook(ToolTask, { beforeTool: (_call, api, context) => proceed(api, context) }),
     ],
   });
-};
-
-/** A report of this computer's cloud agent, or that one of its messages settled without one. */
-const reportFor = (record: JournalReadRecord, deviceId: string): JournalAgentReport | undefined => {
-  const card = record.card as
-    | {
-        type?: unknown;
-        reportFor?: unknown;
-        threadId?: unknown;
-        requestId?: unknown;
-        text?: unknown;
-        settled?: unknown;
-        status?: unknown;
-      }
-    | undefined;
-  if (record.kind !== "card" || card?.type !== "agent-report" || card.reportFor !== deviceId) return undefined;
-  if (typeof card.threadId !== "string" || typeof card.requestId !== "string") return undefined;
-  const text = card.settled === true ? undefined : typeof card.text === "string" && card.text ? card.text : undefined;
-  if (text === undefined && card.settled !== true) return undefined;
-  return {
-    seq: record.seq,
-    report: {
-      threadId: card.threadId,
-      requestId: card.requestId,
-      ...(text === undefined ? {} : { text }),
-      ...(isAgentAttemptOutcome(card.status) ? { status: card.status } : {}),
-    },
-  };
 };
 
 const asJournalMessage = (record: JournalReadRecord): JournalMessage | undefined => {
@@ -374,13 +344,8 @@ export async function journalMirror(args: {
     let stoppedElsewhere = false;
     for (;;) {
       const page = await journal.read(after);
-      const messages: (JournalMessage | JournalAgentReport)[] = [];
+      const messages: JournalMessage[] = [];
       for (const record of page.records) {
-        const report = reportFor(record, journal.deviceId);
-        if (report) {
-          messages.push(report);
-          continue;
-        }
         const usageLimit = record.kind === "card" ? parseClaudeUsageLimitCard(record.card) : null;
         if (usageLimit) {
           args.onUsageLimit?.(usageLimit, record.createdAtMs ?? Date.now());

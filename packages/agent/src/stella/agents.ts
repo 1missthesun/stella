@@ -110,10 +110,10 @@ type AgentRecord = {
 
 /**
  * Who gets the reports of an agent started here for another host rather
- * than for this orchestrator: a computer's orchestrator, or the owner's
- * agent threads (one attempt of a thread they track, which they hand on).
+ * than for this orchestrator: the owner's agent threads (one attempt of a
+ * thread they track, which they hand on).
  */
-export type AgentOrigin = { deviceId: string } | { agentThread: true };
+export type AgentOrigin = { agentThread: true };
 
 /** One of the orchestrator's agents as the app lists it. */
 export type StellaAgentRecord = {

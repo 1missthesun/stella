@@ -398,7 +398,6 @@ export type PiRuntimeOptions = {
    * back to that computer (an `agent-report` card in the journal), not to
    * this conversation's orchestrator. `turnId` is the latest turn.
    */
-  deliverOriginReport?(report: AgentReport & { origin: { deviceId: string } }, turnId: string, agent: PiAgentInfo): Promise<void>;
   noteLedgerReport(report: AgentReport, turnId: string, agent: PiAgentInfo): void;
   /**
    * A report of an agent thread's agent: it settles the thread's attempt in
@@ -1238,7 +1237,7 @@ export class PiConversationRuntime {
       reportsFromLedger: () => true,
       deliverReport: async (report, context) => {
         const { authority } = await this.#agentState();
-        if (report.origin && "agentThread" in report.origin) {
+        if (report.origin) {
           // What the run delivered goes with the report that settles its attempt.
           const filesKey = deliveredFilesKey(report.threadId);
           const files = report.settled ? undefined : await this.#options.storage.get<PiDeliveredFile[]>(filesKey);
@@ -1252,19 +1251,6 @@ export class PiConversationRuntime {
             ...(attemptGeneration !== undefined ? { attemptGeneration } : {}),
             ...(files?.length ? { files } : {}),
           });
-          if (files) await this.#options.storage.delete(filesKey);
-          return;
-        }
-        if (report.origin && this.#options.deliverOriginReport) {
-          // What the run delivered goes with its report, once, as for the other hosts.
-          const filesKey = deliveredFilesKey(report.threadId);
-          const files = report.settled ? undefined : await this.#options.storage.get<PiDeliveredFile[]>(filesKey);
-          const info = await this.#agentInfo(report.threadId, context);
-          await this.#options.deliverOriginReport(
-            { ...report, origin: report.origin },
-            this.#binding?.turnId ?? this.#state?.lastTurnId ?? `pi:${authority.conversationId}`,
-            files?.length ? { ...info, files } : info,
-          );
           if (files) await this.#options.storage.delete(filesKey);
           return;
         }
@@ -1397,8 +1383,7 @@ export class PiConversationRuntime {
   ): Promise<void> {
     if (!this.#options.agentLedger) return;
     if (run.parentConversationId === (await this.open()).root.id) {
-      const { origin } = await this.#agentInfo(run.threadId, context);
-      if (origin && "agentThread" in origin) return;
+      if ((await this.#agentInfo(run.threadId, context)).origin) return;
     }
     this.#options.agentLedger({
       threadId: run.threadId,
@@ -1434,8 +1419,7 @@ export class PiConversationRuntime {
    * listed in the owner's agent threads, not in this conversation.
    */
   #cardTurnId(threadId: string, info: PiAgentInfo): string | undefined {
-    if (info.origin && "agentThread" in info.origin) return undefined;
-    if (info.origin) return `pi-agent:${threadId}`;
+    if (info.origin) return undefined;
     return this.#binding?.turnId ?? this.#state?.lastTurnId;
   }
 
@@ -1875,13 +1859,12 @@ export class PiConversationRuntime {
   }
 
   /**
-   * A computer's orchestrator controlling its cloud agent here (a `piAgent`
-   * turn): start it under its own thread id, message it, or pause it. The
-   * turn is marked this conversation's own, so its prompt is not imported
-   * as someone else's.
+   * A schedule's agent started here (a `piAgent` turn), under its own thread
+   * id, for this conversation's own orchestrator. The turn is marked this
+   * conversation's own, so its prompt is not imported as someone else's.
    */
-  async originAgent(
-    request: { op: "start" | "message" | "pause"; threadId: string; description?: string; originDeviceId?: string },
+  async scheduledAgent(
+    request: { threadId: string; description?: string },
     prompt: string,
     turnId: string,
     context: Context,
@@ -1891,34 +1874,19 @@ export class PiConversationRuntime {
       {
         type: "write",
         requestId: `turn:${turnId}`,
-        entry: { kind: "stella.agent-op", data: { op: request.op, threadId: request.threadId } },
+        entry: { kind: "stella.agent-op", data: { op: "start", threadId: request.threadId } },
       },
       context,
     );
-    if (request.op === "start") {
-      // Without an origin, a schedule started it for this conversation's own orchestrator.
-      await agents.startAgent(
-        {
-          key: request.originDeviceId
-            ? `origin:${request.originDeviceId}:${request.threadId}`
-            : `schedule:${request.threadId}`,
-          description: request.description ?? request.threadId,
-          prompt,
-          threadId: request.threadId,
-          ...(request.originDeviceId ? { origin: { deviceId: request.originDeviceId } } : {}),
-        },
-        context,
-      );
-    } else if (request.op === "message") {
-      await agents.messageAgent(
-        { key: `origin:${turnId}`, threadId: request.threadId, message: prompt, fromOrchestrator: true },
-        context,
-      );
-    } else {
-      const paused = agents.pauseAgent(request.threadId, context);
-      paused.catch((error: unknown) => this.#options.report(error));
-      await Promise.race([paused, waitFor(ORIGIN_PAUSE_HOLD_MS)]);
-    }
+    await agents.startAgent(
+      {
+        key: `schedule:${request.threadId}`,
+        description: request.description ?? request.threadId,
+        prompt,
+        threadId: request.threadId,
+      },
+      context,
+    );
   }
 
   /**
@@ -2055,7 +2023,7 @@ export class PiConversationRuntime {
     }
     const running: AgentActivityEntry[] = [];
     for (const [threadId, agent] of Object.entries(state?.agents ?? {})) {
-      if (agent.remote || (agent.origin && "agentThread" in agent.origin)) continue;
+      if (agent.remote || agent.origin) continue;
       const conversationId = agent.conversationId as ConversationId;
       const active = admitted.get(conversationId);
       if (!active && (await harness.snapshot(LiveDoc, conversationId, context))?.run === undefined) continue;

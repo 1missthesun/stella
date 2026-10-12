@@ -434,11 +434,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       // (`claude-code-transport.ts`); it holds no model capability.
       const harnessExecution =
         turn.execution.engine === "anthropic" ? undefined : turn.execution;
-      if (turn.piAgent?.originDeviceId && turn.execution.engine !== "stella") {
-        throw new Error(
-          "A computer's cloud agents run on Stella's models; this conversation's cloud turns use another engine.",
-        );
-      }
       // Admission already bound the owner; this only re-asserts it and sets
       // the title on a turn that carried one.
       this.bindConversation(turn);
@@ -1054,16 +1049,15 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       );
       await assertExactTurnActive();
       if (turn.piAgent) {
-        await runtime.originAgent(
+        await runtime.scheduledAgent(
           turn.piAgent,
           turn.prompt,
           turn.turnId,
           context,
         );
-        log("info", "pi_origin_agent_op", {
+        log("info", "pi_scheduled_agent_started", {
           turnId: turn.turnId,
           conversationId: turn.conversationId,
-          op: turn.piAgent.op,
           threadId: turn.piAgent.threadId,
         });
         return await this.completeChatTurn(turn, "", args.started);

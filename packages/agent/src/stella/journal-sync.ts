@@ -20,8 +20,6 @@ import {
   type Harness,
 } from "@earendil-works/pi-durable";
 import type { JournalCheckpoint, JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
-import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
-import { noteRemoteReport } from "./agents.ts";
 
 /** One journaled message, as a reader of the journal gets it. */
 export type JournalMessage = {
@@ -34,15 +32,6 @@ export type JournalMessage = {
   message: Message;
   /** A prompt's client id, which the sending client's pending message binds to. */
   clientMsgId?: string;
-};
-
-/**
- * A report of this host's cloud agent, for its orchestrator to answer; with
- * no text, one of the agent's messages settled without one of its own.
- */
-export type JournalAgentReport = {
-  seq: number;
-  report: { threadId: string; requestId: string; text?: string; status?: AgentAttemptOutcome };
 };
 
 /** The journal turn a transcript is mirroring now. */
@@ -342,7 +331,7 @@ const asWritten = ({ message, hidden, clientMsgId, seq }: JournalMessage): Messa
 export async function importJournal(
   harness: Harness,
   root: Conversation,
-  messages: readonly (JournalMessage | JournalAgentReport)[],
+  messages: readonly JournalMessage[],
   throughSeq: number,
   context: Context,
   /** How a first import seeds the transcript (`journalImportAfter`). */
@@ -373,10 +362,6 @@ export async function importJournal(
   let written = 0;
   for (const record of messages) {
     if (record.seq <= imported) continue;
-    if ("report" in record) {
-      await harness.commit((tx) => noteRemoteReport(tx, root.id, record.report), context);
-      continue;
-    }
     await root.submit(
       {
         type: "write",

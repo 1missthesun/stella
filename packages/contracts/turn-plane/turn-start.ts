@@ -70,25 +70,16 @@ export type CloudAgentThreadControl = {
 export type CloudAgentRuntime = "pi";
 
 /**
- * A cloud agent a computer's pi-durable orchestrator runs in this
- * conversation, so it keeps working while the computer sleeps. The turn
- * starts it, messages it or pauses it instead of answering; the agent runs
- * on pi-durable in the conversation's object, and its report goes back to
- * that computer's orchestrator through the journal (an `agent-report`
- * card addressed to it).
+ * A schedule's agent, started in this conversation by a service turn instead
+ * of an answer; it runs on pi-durable in the conversation's object and
+ * reports to this conversation's own orchestrator.
  */
 export type CloudPiAgentRequest = {
-  op: "start" | "message" | "pause";
-  /** The agent's thread id, chosen by the computer that started it. */
+  op: "start";
+  /** The agent's thread id, chosen by the schedule that started it. */
   threadId: string;
-  /** For `start`: the agent's name. */
+  /** The agent's name. */
   description?: string;
-  /**
-   * The computer whose orchestrator gets the agent's reports. Absent only on
-   * a schedule's service turn: the agent reports to this conversation's own
-   * orchestrator.
-   */
-  originDeviceId?: string;
 };
 
 export const PI_AGENT_THREAD_ID_PATTERN = /^[A-Za-z0-9._-]{1,128}$/;
@@ -114,7 +105,7 @@ export type CloudTurnStartRequest = {
   agentThreadControl?: CloudAgentThreadControl;
   /** Honored only on the turn that creates the conversation. */
   agentRuntime?: CloudAgentRuntime;
-  /** The turn controls a computer's cloud agent instead of asking Stella (prompt: its brief or message). */
+  /** Service-only: the turn starts a schedule's agent instead of asking Stella (prompt: its brief). */
   piAgent?: CloudPiAgentRequest;
 };
 

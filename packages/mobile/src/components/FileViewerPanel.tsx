@@ -70,6 +70,8 @@ export function FileViewerPanel({
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const keyboardHeight = useKeyboardHeight();
+  const rootRef = useRef<View>(null);
+  const [origin, setOrigin] = useState({ x: 0, y: 0 });
 
   useEffect(() => {
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -89,16 +91,43 @@ export function FileViewerPanel({
   const width = Math.min(screenWidth - SIDE_MARGIN * 2, MAX_WIDTH);
 
   return (
-    <View pointerEvents="box-none" style={styles.root}>
+    <View
+      ref={rootRef}
+      pointerEvents="box-none"
+      style={styles.root}
+      onLayout={() =>
+        rootRef.current?.measureInWindow((x, y) =>
+          setOrigin((current) =>
+            current.x === x && current.y === y ? current : { x, y },
+          ),
+        )
+      }
+    >
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={closeLabel}
         onPress={onClose}
-        style={[styles.backdrop, { bottom: bottomReserve > 0 ? obstruction : 0 }]}
+        style={[
+          styles.backdrop,
+          {
+            top: -origin.y,
+            left: -origin.x,
+            width: screenWidth,
+            bottom: bottomReserve > 0 ? obstruction : 0,
+          },
+        ]}
       />
       <View
         pointerEvents="box-none"
-        style={[styles.panel, { top, left: (screenWidth - width) / 2, width, height }]}
+        style={[
+          styles.panel,
+          {
+            top: top - origin.y,
+            left: (screenWidth - width) / 2 - origin.x,
+            width,
+            height,
+          },
+        ]}
       >
         <PopoverSurface width={width} height={height} style={styles.shadow}>
           {children}
@@ -227,9 +256,6 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     position: "absolute",
-    top: 0,
-    right: 0,
-    left: 0,
     backgroundColor: "rgba(0,0,0,0.2)",
   },
   panel: { position: "absolute" },

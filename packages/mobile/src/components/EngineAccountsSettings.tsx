@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
@@ -24,7 +23,10 @@ import {
   type EngineSettings,
 } from "@stella/contracts/backend/engines";
 import { CHATGPT_SIWC } from "@stella/contracts/chatgpt-siwc";
+import { GlassIconButton } from "./GlassIconButton";
 import { Icon } from "./Icon";
+import { LineField, PrimaryButton, TextAction } from "./chat-settings/kit";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import { NativeMenu } from "./NativeMenu";
 import type { NativeMenuItem } from "./NativeMenu.types";
 import { makeSettingsStyles } from "./settings/settings-styles";
@@ -949,21 +951,36 @@ function ProviderSection({
             onPress={() => startConnect()}
             disabled={busy || connectId !== null}
             accessibilityRole="button"
-            hitSlop={{ top: 6, bottom: 6 }}
+            accessibilityLabel={t(section.connectKey)}
             style={({ pressed }) => [
-              styles.panelAdd,
+              settingsStyles.row,
+              styles.panelRow,
               (pressed || busy || connectId !== null) && styles.pressed,
             ]}
           >
-            <Icon
-              name="plus"
-              size={14}
-              color={colors.textInteractive}
-              weight="semibold"
-            />
-            <Text style={styles.panelAddLabel} numberOfLines={1}>
+            <Text
+              style={[
+                settingsStyles.rowLabel,
+                styles.flexLabel,
+                styles.panelLabel,
+                styles.panelAddLabel,
+              ]}
+              numberOfLines={2}
+              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+            >
               {t(section.connectKey)}
             </Text>
+            <View style={styles.panelAddButton}>
+              <GlassIconButton
+                icon="plus"
+                size={36}
+                iconSize={16}
+                onPress={() => startConnect()}
+                disabled={busy || connectId !== null}
+                accessibilityLabel={t(section.connectKey)}
+                accessibilityHidden
+              />
+            </View>
           </Pressable>
         ) : (
           <Pressable
@@ -994,76 +1011,69 @@ function ProviderSection({
       {connectId ? (
         <View
           style={[
-            settingsStyles.group,
-            settingsStyles.groupGap,
-            styles.pasteCard,
-            embedded && styles.embeddedPasteCard,
-            panel && styles.panelPasteCard,
+            styles.pasteStep,
+            panel
+              ? styles.panelPasteStep
+              : [settingsStyles.group, settingsStyles.groupGap, styles.pasteCard],
+            embedded === true && styles.embeddedPasteCard,
           ]}
         >
           {/* The provider's own page already said to copy the code, so the
-              card doesn't repeat it. When the pasteboard already holds
+              step doesn't repeat it. When the pasteboard already holds
               something there is nothing to fill in either: Connect reads it
               on the way through, and the field only appears if that comes up
               empty or the user asks to type it. */}
           {showField ? (
-            <View style={styles.pasteRow}>
-              <TextInput
-                value={pasted}
-                onChangeText={setPasted}
-                placeholder={
-                  chatgpt
-                    ? t("mobile.engineAccounts.pastePlaceholderUrl")
-                    : t("mobile.engineAccounts.pastePlaceholder")
-                }
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="none"
-                autoCorrect={false}
-                spellCheck={false}
-                autoFocus={manualEntry}
-                style={styles.pasteInput}
-              />
-            </View>
+            <LineField
+              value={pasted}
+              onChangeText={setPasted}
+              placeholder={
+                chatgpt
+                  ? t("mobile.engineAccounts.pastePlaceholderUrl")
+                  : t("mobile.engineAccounts.pastePlaceholder")
+              }
+              accessibilityLabel={
+                chatgpt
+                  ? t("mobile.engineAccounts.pastePlaceholderUrl")
+                  : t("mobile.engineAccounts.pastePlaceholder")
+              }
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              autoFocus={manualEntry}
+              multiline
+              submitBehavior="blurAndSubmit"
+              returnKeyType="done"
+              onSubmitEditing={() => {
+                if (pasted.trim()) finishConnect();
+              }}
+              style={styles.pasteInput}
+            />
           ) : null}
-          <View style={styles.pasteActions}>
-            <Pressable
-              onPress={cancelConnect}
-              disabled={busy}
-              hitSlop={8}
-              accessibilityRole="button"
-            >
-              <Text style={settingsStyles.rowSub}>
-                {t("mobile.common.cancel")}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={connect.reopenAuthorizePage}
-              disabled={busy}
-              hitSlop={8}
-              accessibilityRole="button"
-            >
-              <Text style={settingsStyles.rowSub}>
-                {chatgpt
+          <PrimaryButton
+            label={t("mobile.engineAccounts.finish")}
+            busy={busy}
+            disabled={showField && !pasted.trim()}
+            onPress={showField ? finishConnect : connect.connectFromClipboard}
+          />
+          <View style={styles.pasteLinks}>
+            <TextAction
+              label={
+                chatgpt
                   ? t("mobile.engineAccounts.openChatgptAgain")
-                  : t("mobile.engineAccounts.openClaudeAgain")}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={showField ? finishConnect : connect.connectFromClipboard}
-              disabled={busy || (showField && !pasted.trim())}
-              hitSlop={8}
-              accessibilityRole="button"
-              style={({ pressed }) => [
-                (pressed || busy || (showField && !pasted.trim())) &&
-                  styles.pressed,
-              ]}
-            >
-              <Text style={settingsStyles.rowAction}>
-                {busy
-                  ? t("mobile.engineAccounts.connecting")
-                  : t("mobile.engineAccounts.finish")}
-              </Text>
-            </Pressable>
+                  : t("mobile.engineAccounts.openClaudeAgain")
+              }
+              icon="external-link"
+              tone="muted"
+              disabled={busy}
+              onPress={connect.reopenAuthorizePage}
+            />
+            <TextAction
+              label={t("mobile.common.cancel")}
+              tone="muted"
+              disabled={busy}
+              onPress={cancelConnect}
+            />
           </View>
         </View>
       ) : null}
@@ -1146,23 +1156,15 @@ const makeStyles = (colors: Colors) =>
       fontSize: 14,
     },
     warn: { color: colors.danger },
-    pasteCard: { gap: 10, padding: 16 },
-    pasteRow: { alignItems: "center", flexDirection: "row", gap: 12 },
-    pasteInput: {
-      borderColor: colors.border,
-      borderRadius: 10,
-      borderWidth: StyleSheet.hairlineWidth,
-      color: colors.text,
-      flex: 1,
-      fontFamily: fonts.sans.regular,
-      fontSize: 15,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-    },
-    pasteActions: {
+    pasteStep: { gap: 14 },
+    pasteCard: { padding: 16 },
+    panelPasteStep: { paddingBottom: 8, paddingTop: 4 },
+    pasteInput: { maxHeight: 120, paddingTop: 12 },
+    pasteLinks: {
+      columnGap: 20,
       flexDirection: "row",
-      gap: 20,
-      justifyContent: "flex-end",
+      flexWrap: "wrap",
+      rowGap: 2,
     },
     sectionNote: { marginTop: 8, paddingHorizontal: 16 },
     embeddedGroup: {
@@ -1178,23 +1180,12 @@ const makeStyles = (colors: Colors) =>
       height: 6,
       width: 6,
     },
-    panelAdd: {
-      alignItems: "center",
-      alignSelf: "flex-start",
-      flexDirection: "row",
-      gap: 5,
-      minHeight: 32,
-    },
-    panelAddLabel: {
-      color: colors.textInteractive,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 16,
-    },
+    panelAddLabel: { color: colors.textMuted },
+    panelAddButton: { alignItems: "center", width: 40 },
     panelLabel: {
       fontFamily: fonts.sans.semiBold,
       fontSize: 17,
       letterSpacing: -0.3,
     },
-    panelPasteCard: { marginHorizontal: 0 },
     flexLabel: { flex: 1 },
   });

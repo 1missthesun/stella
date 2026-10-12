@@ -158,9 +158,9 @@ import {
   forgetPiCompute,
   openPiComputeLease,
   piBrokerSessionId,
+  piComputeKey,
   releasePiCompute,
   type PiComputeHost,
-  type PiComputeKey,
   type PiComputeLease,
   type PiComputeOwner,
   type PiComputeRecord,
@@ -1589,7 +1589,7 @@ export class PiConversationRuntime {
    * back, the files the answer links delivered), then release it. A stopped
    * run's lease, or one never used, is only released.
    */
-  async #releaseLease(agentConversationId: PiComputeKey, held: AgentLease, end: AgentRunEnd): Promise<void> {
+  async #releaseLease(agentConversationId: number, held: AgentLease, end: AgentRunEnd): Promise<void> {
     const { lease } = held;
     const { record } = lease;
     // A stopped run aborts a container still coming up now, not after it is up.
@@ -1615,7 +1615,7 @@ export class PiConversationRuntime {
     await Promise.race([lease.ready.catch(() => undefined), scheduler.wait(LEASE_STOP_WAIT_MS)]);
     await lease.release({ warm: !end.aborted }).catch((error: unknown) => this.#options.report(error));
     this.#live.delete(`${record.turnId}:${record.attemptGeneration}`);
-    await forgetPiCompute(this.#computeHost(), agentConversationId, record).catch((error: unknown) =>
+    await forgetPiCompute(this.#computeHost(), piComputeKey(agentConversationId), record).catch((error: unknown) =>
       this.#options.report(error),
     );
   }
@@ -1624,13 +1624,10 @@ export class PiConversationRuntime {
   async #sweepLeases(): Promise<void> {
     const left = await this.#options.storage.list<PiComputeRecord>({ prefix: "piCompute:" });
     for (const [key, record] of left) {
-      const id = key.slice("piCompute:".length);
-      const agentConversationId: PiComputeKey = id.startsWith("ws:") ? (id as `ws:${string}`) : Number(id);
-      const holding = typeof agentConversationId === "number" && this.#leases.has(agentConversationId);
-      if (holding || record?.version !== 1) continue;
+      if (this.#leases.has(Number(key.slice("piCompute:".length))) || record?.version !== 1) continue;
       const released = releasePiCompute(this.#computeHost(), record).catch((error: unknown) => this.#options.report(error));
       await Promise.race([released, scheduler.wait(20_000)]);
-      await forgetPiCompute(this.#computeHost(), agentConversationId, record).catch(() => undefined);
+      await forgetPiCompute(this.#computeHost(), key, record).catch(() => undefined);
       this.#options.log("pi_agent_lease_swept", { turnId: record.turnId, attemptGeneration: record.attemptGeneration });
     }
   }

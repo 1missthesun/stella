@@ -90,16 +90,10 @@ export type PiComputeLease = {
 /** The broker session every lease of a conversation presents: `pi:<conversation>`. */
 export const piBrokerSessionId = (conversationId: string): string => `pi:${conversationId}`;
 
-const generationKey = (agentConversationId: PiComputeKey) => `piComputeGen:${agentConversationId}`;
-/**
- * Whose lease a record is: an agent conversation's, by its id, or a
- * workspace one of the owner's computers holds for its own conversation's
- * tools (`ws:<scope>`).
- */
-export type PiComputeKey = number | `ws:${string}`;
+const generationKey = (agentConversationId: number) => `piComputeGen:${agentConversationId}`;
 
 /** The lease of one agent conversation, while it holds resources. */
-export const piComputeKey = (agentConversationId: PiComputeKey) => `piCompute:${agentConversationId}`;
+export const piComputeKey = (agentConversationId: number) => `piCompute:${agentConversationId}`;
 /** Every agent's container is the small instance. */
 const INSTANCE_SIZE = "small";
 
@@ -186,7 +180,7 @@ export const releasePiCompute = async (
  */
 export const openPiComputeLease = async (
   host: PiComputeHost,
-  args: { owner: PiComputeOwner; agentConversationId: PiComputeKey; threadId: string; turnId: string },
+  args: { owner: PiComputeOwner; agentConversationId: number; threadId: string; turnId: string },
 ): Promise<PiComputeLease> => {
   const { owner, agentConversationId, threadId, turnId } = args;
   const attemptGeneration = ((await host.storage.get<number>(generationKey(agentConversationId))) ?? 0) + 1;
@@ -417,7 +411,7 @@ export const openPiComputeLease = async (
   };
 };
 
-/** Forget a released lease's records. */
-export const forgetPiCompute = async (host: PiComputeHost, agentConversationId: PiComputeKey, record: PiComputeRecord) => {
-  await host.storage.delete([piComputeKey(agentConversationId), turnBrokerStorageKey(record)]);
+/** Forget a released lease's records, its own stored under `recordKey`. */
+export const forgetPiCompute = async (host: PiComputeHost, recordKey: string, record: PiComputeRecord) => {
+  await host.storage.delete([recordKey, turnBrokerStorageKey(record)]);
 };

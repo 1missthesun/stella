@@ -886,7 +886,17 @@
         "sortNewest": "最新优先",
         "sortOldest": "最早优先",
         "sourceCloud": "云端",
-        "sourceUpload": "你发送的"
+        "sourceUpload": "你发送的",
+        "types": {
+          "all": "全部",
+          "images": "图片",
+          "videos": "视频",
+          "audio": "音频",
+          "documents": "文档",
+          "code": "代码",
+          "pages": "网页",
+          "other": "其他"
+        }
       },
       "schedule": {
         "actionFailed": "操作未成功。",
@@ -902,7 +912,8 @@
         "next": "下次运行 {when}",
         "pauseSchedule": "暂停日程",
         "paused": "已暂停",
-        "resumeSchedule": "恢复日程"
+        "resumeSchedule": "恢复日程",
+        "editPrompt": "修改我的“{title}”日程："
       },
       "search": {
         "clear": "清除搜索",
@@ -920,6 +931,12 @@
         "finished": "已完成",
         "stopped": "已停止",
         "working": "正在后台工作"
+      },
+      "time": {
+        "today": "今天",
+        "yesterday": "昨天",
+        "tomorrow": "明天",
+        "earlierThisMonth": "本月早些时候"
       }
     },
     "apps": {

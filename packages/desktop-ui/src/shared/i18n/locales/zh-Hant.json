@@ -886,7 +886,17 @@
         "sortNewest": "最新優先",
         "sortOldest": "最舊優先",
         "sourceCloud": "雲端",
-        "sourceUpload": "你傳送的"
+        "sourceUpload": "你傳送的",
+        "types": {
+          "all": "全部",
+          "images": "圖片",
+          "videos": "影片",
+          "audio": "音訊",
+          "documents": "文件",
+          "code": "程式碼",
+          "pages": "網頁",
+          "other": "其他"
+        }
       },
       "schedule": {
         "actionFailed": "操作未成功。",
@@ -902,7 +912,8 @@
         "next": "下次執行 {when}",
         "pauseSchedule": "暫停排程",
         "paused": "已暫停",
-        "resumeSchedule": "恢復排程"
+        "resumeSchedule": "恢復排程",
+        "editPrompt": "修改我的「{title}」排程："
       },
       "search": {
         "clear": "清除搜尋",
@@ -920,6 +931,12 @@
         "finished": "已完成",
         "stopped": "已停止",
         "working": "正在背景工作"
+      },
+      "time": {
+        "today": "今天",
+        "yesterday": "昨天",
+        "tomorrow": "明天",
+        "earlierThisMonth": "本月稍早"
       }
     },
     "apps": {

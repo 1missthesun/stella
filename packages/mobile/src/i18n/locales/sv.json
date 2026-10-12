@@ -894,7 +894,17 @@
         "sortNewest": "Nyast först",
         "sortOldest": "Äldst först",
         "sourceCloud": "Moln",
-        "sourceUpload": "Skickade av dig"
+        "sourceUpload": "Skickade av dig",
+        "types": {
+          "all": "Alla",
+          "images": "Bilder",
+          "videos": "Videor",
+          "audio": "Ljud",
+          "documents": "Dokument",
+          "code": "Kod",
+          "pages": "Sidor",
+          "other": "Övrigt"
+        }
       },
       "schedule": {
         "actionFailed": "Det gick inte.",
@@ -910,7 +920,8 @@
         "next": "Nästa {when}",
         "pauseSchedule": "Pausa schemat",
         "paused": "Pausad",
-        "resumeSchedule": "Återuppta schemat"
+        "resumeSchedule": "Återuppta schemat",
+        "editPrompt": "Ändra mitt schema ”{title}”: "
       },
       "search": {
         "clear": "Rensa sökningen",
@@ -928,6 +939,12 @@
         "finished": "Klart",
         "stopped": "Stoppad",
         "working": "Arbetar i bakgrunden"
+      },
+      "time": {
+        "today": "I dag",
+        "yesterday": "I går",
+        "tomorrow": "I morgon",
+        "earlierThisMonth": "Tidigare denna månad"
       }
     },
     "apps": {

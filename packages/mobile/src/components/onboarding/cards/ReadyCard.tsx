@@ -15,7 +15,7 @@ import { OnboardingCard, PrimaryAction, useCardStyles } from "../OnboardingCard"
 
 const STARTERS: { key: string; icon: IconName }[] = [
   { key: "plan", icon: "clock" },
-  { key: "gift", icon: "sparkles" },
+  { key: "gift", icon: "gift" },
   { key: "remind", icon: "message-square" },
   { key: "explain", icon: "search" },
 ];

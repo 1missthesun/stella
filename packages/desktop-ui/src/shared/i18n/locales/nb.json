@@ -894,7 +894,17 @@
         "sortNewest": "Nyeste først",
         "sortOldest": "Eldste først",
         "sourceCloud": "Sky",
-        "sourceUpload": "Sendt av deg"
+        "sourceUpload": "Sendt av deg",
+        "types": {
+          "all": "Alle",
+          "images": "Bilder",
+          "videos": "Videoer",
+          "audio": "Lyd",
+          "documents": "Dokumenter",
+          "code": "Kode",
+          "pages": "Sider",
+          "other": "Annet"
+        }
       },
       "schedule": {
         "actionFailed": "Det gikk ikke.",
@@ -910,7 +920,8 @@
         "next": "Neste {when}",
         "pauseSchedule": "Sett tidsplan på pause",
         "paused": "Satt på pause",
-        "resumeSchedule": "Gjenoppta tidsplan"
+        "resumeSchedule": "Gjenoppta tidsplan",
+        "editPrompt": "Endre planen min «{title}»: "
       },
       "search": {
         "clear": "Tøm søket",
@@ -928,6 +939,12 @@
         "finished": "Fullført",
         "stopped": "Stoppet",
         "working": "Jobber i bakgrunnen"
+      },
+      "time": {
+        "today": "I dag",
+        "yesterday": "I går",
+        "tomorrow": "I morgen",
+        "earlierThisMonth": "Tidligere denne måneden"
       }
     },
     "apps": {

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,7 +31,7 @@ import {
   useActivityHub,
   useComputerControl,
 } from "../lib/main-shell-store";
-import { formatTimestampHeader } from "../lib/message-time-labels";
+import { pastSection } from "../lib/list-sections";
 import {
   artifactIconName,
   artifactPrimaryFilePath,
@@ -62,7 +63,77 @@ type SourceFilter = "all" | "cloud" | "upload" | `computer:${string}`;
 
 const UNKNOWN_COMPUTER = "computer:unknown";
 
-type FileRow = ConversationFile & { title: string; bucket: SourceFilter };
+type FileType =
+  | "images"
+  | "videos"
+  | "audio"
+  | "documents"
+  | "pages"
+  | "code"
+  | "other";
+type TypeFilter = "all" | FileType;
+
+const FILE_TYPES: FileType[] = [
+  "images",
+  "videos",
+  "audio",
+  "documents",
+  "pages",
+  "code",
+  "other",
+];
+
+const EXTENSION_TYPES: Record<string, FileType> = {};
+const extensions = (type: FileType, list: string) => {
+  for (const ext of list.split(" ")) EXTENSION_TYPES[ext] = type;
+};
+extensions("images", "png jpg jpeg gif webp heic heif svg bmp tif tiff avif ico");
+extensions("videos", "mp4 mov m4v webm mkv avi");
+extensions("audio", "mp3 wav m4a aac flac ogg opus aiff");
+extensions(
+  "documents",
+  "pdf doc docx xls xlsx ppt pptx md markdown txt rtf csv tsv pages key numbers odt ods odp epub",
+);
+extensions("pages", "html htm");
+extensions(
+  "code",
+  "js mjs cjs ts tsx jsx py rb go rs java kt swift c h cc cpp hpp cs php sh zsh bash json yaml yml toml xml css scss sql lua dart",
+);
+
+type FileRow = ConversationFile & {
+  title: string;
+  bucket: SourceFilter;
+  type: FileType;
+};
+
+type ListItem =
+  | { kind: "section"; key: string; label: string }
+  | { kind: "file"; key: string; row: FileRow };
+
+const fileType = (title: string, artifact: ChatArtifact): FileType => {
+  const ext = /\.([A-Za-z0-9]{1,8})$/.exec(title)?.[1]?.toLowerCase();
+  const byExtension = ext ? EXTENSION_TYPES[ext] : undefined;
+  if (byExtension) return byExtension;
+  const payload = artifact.payload;
+  switch (payload.kind) {
+    case "media":
+      if (payload.asset.kind === "image") return "images";
+      if (payload.asset.kind === "video") return "videos";
+      if (payload.asset.kind === "audio") return "audio";
+      return "other";
+    case "markdown":
+    case "office":
+    case "pdf":
+      return "documents";
+    case "canvas-html":
+    case "url":
+      return "pages";
+    case "source-diff":
+      return "code";
+    default:
+      return "other";
+  }
+};
 
 const fileName = (file: ConversationFile): string => {
   if (file.name?.trim()) return file.name.trim();
@@ -131,6 +202,7 @@ export function FilesPage() {
   );
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [sortOrder, setSortOrder] = useState<SortOrder>("newest");
   const [viewerArtifact, setViewerArtifact] = useState<ChatArtifact | null>(
     null,
@@ -187,6 +259,7 @@ export function FilesPage() {
         artifact: titledArtifact(file.artifact, title),
         title,
         bucket,
+        type: fileType(title, file.artifact),
       };
     });
   }, [driveRows, hubArtifacts, journal.files, preferredAccess?.desktopDeviceId]);
@@ -226,11 +299,22 @@ export function FilesPage() {
     ];
   }, [pairedDesktops, rows]);
 
+  const presentTypes = useMemo(() => {
+    const present = new Set<FileType>();
+    for (const row of rows) present.add(row.type);
+    return FILE_TYPES.filter((type) => present.has(type));
+  }, [rows]);
+  const activeType: TypeFilter =
+    typeFilter !== "all" && presentTypes.includes(typeFilter)
+      ? typeFilter
+      : "all";
+
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const filtered = rows.filter(
       (row) =>
         (sourceFilter === "all" || row.bucket === sourceFilter) &&
+        (activeType === "all" || row.type === activeType) &&
         (!needle ||
           `${row.title} ${row.folder ?? ""}`.toLowerCase().includes(needle)),
     );
@@ -243,7 +327,29 @@ export function FilesPage() {
       );
     }
     return [...filtered].sort((a, b) => b.createdAt - a.createdAt);
-  }, [query, rows, sortOrder, sourceFilter]);
+  }, [activeType, query, rows, sortOrder, sourceFilter]);
+
+  const items = useMemo<ListItem[]>(() => {
+    if (sortOrder === "name") {
+      return shown.map((row) => ({ kind: "file", key: row.key, row }));
+    }
+    const now = Date.now();
+    const out: ListItem[] = [];
+    let previous: string | null = null;
+    for (const row of shown) {
+      const section = pastSection(row.createdAt, now, t);
+      if (section.key !== previous) {
+        out.push({
+          kind: "section",
+          key: `section:${section.key}`,
+          label: section.label,
+        });
+        previous = section.key;
+      }
+      out.push({ kind: "file", key: row.key, row });
+    }
+    return out;
+  }, [shown, sortOrder, t]);
 
   const siblings = useMemo(() => shown.map((row) => row.artifact), [shown]);
   const accessById = useMemo(() => {
@@ -279,7 +385,7 @@ export function FilesPage() {
   }, []);
 
   const filtering =
-    query.trim().length > 0 || sourceFilter !== "all";
+    query.trim().length > 0 || sourceFilter !== "all" || activeType !== "all";
   const hasAnything = rows.length > 0;
   // Older files are paged in by the list's onEndReached, which never mounts
   // while nothing is resident; keep reaching back until a file turns up or
@@ -369,53 +475,50 @@ export function FilesPage() {
   useEffect(() => () => publishTopBarAccessory(null), []);
 
   const renderRow = useCallback(
-    ({ item, index }: LegendListRenderItemProps<FileRow>) => (
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={item.title}
-        onPress={() => openArtifact(item.artifact)}
-        style={({ pressed }) => [
-          styles.row,
-          index === 0 && styles.rowFirst,
-          index === shown.length - 1 && styles.rowLast,
-          index > 0 && styles.rowDivider,
-          pressed && styles.rowPressed,
-        ]}
-      >
-        <View style={styles.rowIcon}>
+    ({ item }: LegendListRenderItemProps<ListItem>) =>
+      item.kind === "section" ? (
+        <Text
+          style={styles.section}
+          numberOfLines={1}
+          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+          accessibilityRole="header"
+        >
+          {item.label}
+        </Text>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={item.row.title}
+          onPress={() => openArtifact(item.row.artifact)}
+          style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+        >
           <Icon
-            name={artifactIconName(item.artifact.payload) as IconName}
-            size={17}
-            color={colors.text}
+            name={artifactIconName(item.row.artifact.payload) as IconName}
+            size={20}
+            color={colors.textMuted}
+            style={styles.rowIcon}
           />
-        </View>
-        <View style={styles.rowText}>
           <Text
             style={styles.rowTitle}
             numberOfLines={1}
             maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
           >
-            {item.title}
+            {item.row.title}
           </Text>
-          <Text
-            style={styles.rowMeta}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          >
-            {[
-              bucketLabel(item.bucket),
-              item.folder ? item.folder.split("/").pop() : null,
-              item.createdAt > 0 ? formatTimestampHeader(item.createdAt) : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
-        </View>
-        <Icon name="chevron-right" size={14} color={colors.textMuted} />
-      </Pressable>
-    ),
-    [bucketLabel, colors.text, colors.textMuted, openArtifact, shown.length, styles],
+        </Pressable>
+      ),
+    [colors.textMuted, openArtifact, styles],
   );
+
+  const pills = useMemo(() => {
+    const list: { id: TypeFilter; label: string }[] = [];
+    if (presentTypes.length < 2) return list;
+    list.push({ id: "all", label: t("mobile.activityHub.files.types.all") });
+    for (const type of presentTypes) {
+      list.push({ id: type, label: t(`mobile.activityHub.files.types.${type}`) });
+    }
+    return list;
+  }, [presentTypes, t]);
 
   if (!signedIn && !hasAnything) {
     return (
@@ -469,28 +572,68 @@ export function FilesPage() {
         ) : null}
       </View>
 
-      {sourceFilter !== "all" ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("mobile.activityHub.files.filterAll")}
-          onPress={() => setSourceFilter("all")}
-          style={styles.activeFilter}
-          hitSlop={6}
+      {pills.length > 0 || sourceFilter !== "all" ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          style={styles.pillScroll}
+          contentContainerStyle={styles.pills}
         >
-          <Text style={styles.activeFilterText} numberOfLines={1}>
-            {bucketLabel(sourceFilter)}
-          </Text>
-          <Icon name="x" size={11} color={colors.textMuted} />
-        </Pressable>
+          {sourceFilter !== "all" ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("mobile.activityHub.files.filterAll")}
+              onPress={() => setSourceFilter("all")}
+              style={[styles.pill, styles.pillSelected]}
+            >
+              <Text
+                style={[styles.pillText, styles.pillTextSelected]}
+                numberOfLines={1}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              >
+                {bucketLabel(sourceFilter)}
+              </Text>
+              <Icon name="x" size={10} color={colors.background} />
+            </Pressable>
+          ) : null}
+          {pills.map((pill) => {
+            const selected = activeType === pill.id;
+            return (
+              <Pressable
+                key={pill.id}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                onPress={() => {
+                  tapLight();
+                  setTypeFilter(pill.id);
+                }}
+                style={({ pressed }) => [
+                  styles.pill,
+                  selected && styles.pillSelected,
+                  pressed && !selected && styles.pillPressed,
+                ]}
+              >
+                <Text
+                  style={[styles.pillText, selected && styles.pillTextSelected]}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                >
+                  {pill.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       ) : null}
 
-      <LegendList<FileRow>
+      <LegendList<ListItem>
         style={styles.list}
         contentContainerStyle={{ paddingBottom: bottomInset + 24 }}
-        data={shown}
-        keyExtractor={(row) => row.key}
+        data={items}
+        keyExtractor={(item) => item.key}
+        getItemType={(item) => item.kind}
         renderItem={renderRow}
-        extraData={bucketLabel}
         onEndReached={journal.hasMore ? journal.loadMore : undefined}
         onEndReachedThreshold={0.6}
         ListFooterComponent={
@@ -513,7 +656,7 @@ export function FilesPage() {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
-        estimatedItemSize={60}
+        estimatedItemSize={48}
         recycleItems
       />
 
@@ -564,82 +707,77 @@ const makeStyles = (colors: Colors) =>
       letterSpacing: -0.2,
       padding: 0,
     },
-    activeFilter: {
+    pillScroll: {
+      flexGrow: 0,
+      marginBottom: 6,
+      marginHorizontal: -20,
+    },
+    pills: {
+      gap: 8,
+      paddingHorizontal: 20,
+    },
+    pill: {
       alignItems: "center",
-      alignSelf: "flex-start",
-      backgroundColor: colors.accentSoft,
-      borderColor: colors.selectBorder,
-      borderRadius: 13,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 16,
       borderWidth: StyleSheet.hairlineWidth,
       flexDirection: "row",
       gap: 6,
-      height: 26,
-      marginBottom: 12,
-      maxWidth: "80%",
-      paddingHorizontal: 11,
+      height: 32,
+      paddingHorizontal: 14,
     },
-    activeFilterText: {
+    pillSelected: {
+      backgroundColor: colors.text,
+      borderColor: colors.text,
+    },
+    pillPressed: {
+      backgroundColor: colors.surfaceInset,
+    },
+    pillText: {
       color: colors.text,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 13,
-      letterSpacing: -0.1,
+      fontFamily: fonts.sans.medium,
+      fontSize: 14,
+      letterSpacing: -0.15,
+    },
+    pillTextSelected: {
+      color: colors.background,
     },
     list: {
       flex: 1,
     },
+    section: {
+      alignSelf: "center",
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 12,
+      letterSpacing: -0.1,
+      paddingBottom: 6,
+      paddingTop: 16,
+    },
     row: {
       alignItems: "center",
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderLeftWidth: StyleSheet.hairlineWidth,
-      borderRightWidth: StyleSheet.hairlineWidth,
+      borderRadius: 12,
       flexDirection: "row",
-      gap: 12,
-      minHeight: 60,
-      paddingHorizontal: 12,
+      gap: 14,
+      marginHorizontal: -8,
+      minHeight: 48,
+      paddingHorizontal: 8,
       paddingVertical: 10,
-    },
-    rowFirst: {
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-      borderTopWidth: StyleSheet.hairlineWidth,
-    },
-    rowLast: {
-      borderBottomLeftRadius: 16,
-      borderBottomRightRadius: 16,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-    },
-    rowDivider: {
-      borderTopColor: fadeHex(colors.border, 0.8),
-      borderTopWidth: StyleSheet.hairlineWidth,
     },
     rowPressed: {
       backgroundColor: colors.surfaceInset,
     },
     rowIcon: {
-      alignItems: "center",
-      backgroundColor: colors.surfaceInset,
-      borderRadius: 10,
-      height: 36,
-      justifyContent: "center",
-      width: 36,
-    },
-    rowText: {
-      flex: 1,
-      gap: 2,
-      minWidth: 0,
+      width: 24,
     },
     rowTitle: {
       color: colors.text,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 15,
-      letterSpacing: -0.2,
-    },
-    rowMeta: {
-      color: colors.textMuted,
+      flex: 1,
       fontFamily: fonts.sans.regular,
-      fontSize: 12.5,
-      letterSpacing: -0.05,
+      fontSize: 17,
+      letterSpacing: -0.3,
+      minWidth: 0,
     },
     footer: {
       paddingVertical: 18,

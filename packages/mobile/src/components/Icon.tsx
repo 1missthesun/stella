@@ -56,7 +56,14 @@ export type IconName =
   | "edit-3"
   | "globe"
   | "terminal"
-  | "sparkles"
+  | "brain"
+  | "arrow-up-circle"
+  | "asterisk"
+  | "hand-wave"
+  | "gift"
+  | "credit-card"
+  | "checklist"
+  | "bell"
   | "clock"
   | "refresh-cw"
   | "rotate-ccw"
@@ -132,7 +139,14 @@ const FEATHER_NAMES: Record<
   "edit-3": "edit-3",
   globe: "globe",
   terminal: "terminal",
-  sparkles: "zap",
+  brain: "cpu",
+  "arrow-up-circle": "arrow-up-circle",
+  asterisk: "star",
+  "hand-wave": "smile",
+  gift: "gift",
+  "credit-card": "credit-card",
+  checklist: "check-square",
+  bell: "bell",
   clock: "clock",
   "refresh-cw": "refresh-cw",
   "rotate-ccw": "rotate-ccw",
@@ -208,7 +222,14 @@ const SYMBOL_NAMES: Record<IconName, SymbolViewProps["name"]> = {
   "edit-3": "pencil",
   globe: "globe",
   terminal: "terminal",
-  sparkles: "sparkles",
+  brain: "brain",
+  "arrow-up-circle": "arrow.up.circle",
+  asterisk: "asterisk",
+  "hand-wave": "hand.wave",
+  gift: "gift",
+  "credit-card": "creditcard",
+  checklist: "checklist",
+  bell: "bell",
   clock: "clock",
   "refresh-cw": "arrow.clockwise",
   "rotate-ccw": "arrow.counterclockwise",

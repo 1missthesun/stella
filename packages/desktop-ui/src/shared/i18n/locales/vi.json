@@ -886,7 +886,17 @@
         "sortNewest": "Mới nhất trước",
         "sortOldest": "Cũ nhất trước",
         "sourceCloud": "Đám mây",
-        "sourceUpload": "Do bạn gửi"
+        "sourceUpload": "Do bạn gửi",
+        "types": {
+          "all": "Tất cả",
+          "images": "Hình ảnh",
+          "videos": "Video",
+          "audio": "Âm thanh",
+          "documents": "Tài liệu",
+          "code": "Mã",
+          "pages": "Trang",
+          "other": "Khác"
+        }
       },
       "schedule": {
         "actionFailed": "Không thực hiện được.",
@@ -902,7 +912,8 @@
         "next": "Lần chạy tiếp theo {when}",
         "pauseSchedule": "Tạm dừng lịch trình",
         "paused": "Đã tạm dừng",
-        "resumeSchedule": "Tiếp tục lịch trình"
+        "resumeSchedule": "Tiếp tục lịch trình",
+        "editPrompt": "Đổi lịch “{title}” của tôi: "
       },
       "search": {
         "clear": "Xóa tìm kiếm",
@@ -920,6 +931,12 @@
         "finished": "Đã xong",
         "stopped": "Đã dừng",
         "working": "Đang làm việc trong nền"
+      },
+      "time": {
+        "today": "Hôm nay",
+        "yesterday": "Hôm qua",
+        "tomorrow": "Ngày mai",
+        "earlierThisMonth": "Đầu tháng này"
       }
     },
     "apps": {

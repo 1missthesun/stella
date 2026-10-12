@@ -894,7 +894,17 @@
         "sortNewest": "Uusin ensin",
         "sortOldest": "Vanhin ensin",
         "sourceCloud": "Pilvi",
-        "sourceUpload": "Sinun lähettämäsi"
+        "sourceUpload": "Sinun lähettämäsi",
+        "types": {
+          "all": "Kaikki",
+          "images": "Kuvat",
+          "videos": "Videot",
+          "audio": "Ääni",
+          "documents": "Asiakirjat",
+          "code": "Koodi",
+          "pages": "Sivut",
+          "other": "Muut"
+        }
       },
       "schedule": {
         "actionFailed": "Se ei onnistunut.",
@@ -910,7 +920,8 @@
         "next": "Seuraava {when}",
         "pauseSchedule": "Keskeytä aikataulu",
         "paused": "Keskeytetty",
-        "resumeSchedule": "Jatka aikataulua"
+        "resumeSchedule": "Jatka aikataulua",
+        "editPrompt": "Muuta ajastustani ”{title}”: "
       },
       "search": {
         "clear": "Tyhjennä haku",
@@ -928,6 +939,12 @@
         "finished": "Valmis",
         "stopped": "Pysäytetty",
         "working": "Työskentelee taustalla"
+      },
+      "time": {
+        "today": "Tänään",
+        "yesterday": "Eilen",
+        "tomorrow": "Huomenna",
+        "earlierThisMonth": "Aiemmin tässä kuussa"
       }
     },
     "apps": {

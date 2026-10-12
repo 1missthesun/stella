@@ -886,7 +886,17 @@
         "sortNewest": "Terbaru dulu",
         "sortOldest": "Terlama dulu",
         "sourceCloud": "Cloud",
-        "sourceUpload": "Dikirim olehmu"
+        "sourceUpload": "Dikirim olehmu",
+        "types": {
+          "all": "Semua",
+          "images": "Gambar",
+          "videos": "Video",
+          "audio": "Audio",
+          "documents": "Dokumen",
+          "code": "Kode",
+          "pages": "Halaman",
+          "other": "Lainnya"
+        }
       },
       "schedule": {
         "actionFailed": "Tidak berhasil.",
@@ -902,7 +912,8 @@
         "next": "Berikutnya {when}",
         "pauseSchedule": "Jeda jadwal",
         "paused": "Dijeda",
-        "resumeSchedule": "Lanjutkan jadwal"
+        "resumeSchedule": "Lanjutkan jadwal",
+        "editPrompt": "Ubah jadwal “{title}” saya: "
       },
       "search": {
         "clear": "Bersihkan pencarian",
@@ -920,6 +931,12 @@
         "finished": "Selesai",
         "stopped": "Dihentikan",
         "working": "Bekerja di latar belakang"
+      },
+      "time": {
+        "today": "Hari ini",
+        "yesterday": "Kemarin",
+        "tomorrow": "Besok",
+        "earlierThisMonth": "Sebelumnya bulan ini"
       }
     },
     "apps": {

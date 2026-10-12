@@ -886,7 +886,17 @@
         "sortNewest": "ใหม่สุดก่อน",
         "sortOldest": "เก่าสุดก่อน",
         "sourceCloud": "คลาวด์",
-        "sourceUpload": "ส่งโดยคุณ"
+        "sourceUpload": "ส่งโดยคุณ",
+        "types": {
+          "all": "ทั้งหมด",
+          "images": "รูปภาพ",
+          "videos": "วิดีโอ",
+          "audio": "เสียง",
+          "documents": "เอกสาร",
+          "code": "โค้ด",
+          "pages": "หน้าเว็บ",
+          "other": "อื่นๆ"
+        }
       },
       "schedule": {
         "actionFailed": "ดำเนินการไม่สำเร็จ",
@@ -902,7 +912,8 @@
         "next": "ครั้งถัดไป {when}",
         "pauseSchedule": "หยุดกำหนดการชั่วคราว",
         "paused": "หยุดชั่วคราว",
-        "resumeSchedule": "ทำกำหนดการต่อ"
+        "resumeSchedule": "ทำกำหนดการต่อ",
+        "editPrompt": "เปลี่ยนกำหนดการ “{title}” ของฉัน: "
       },
       "search": {
         "clear": "ล้างการค้นหา",
@@ -920,6 +931,12 @@
         "finished": "เสร็จแล้ว",
         "stopped": "หยุดแล้ว",
         "working": "กำลังทำงานอยู่เบื้องหลัง"
+      },
+      "time": {
+        "today": "วันนี้",
+        "yesterday": "เมื่อวาน",
+        "tomorrow": "พรุ่งนี้",
+        "earlierThisMonth": "ก่อนหน้านี้ในเดือนนี้"
       }
     },
     "apps": {

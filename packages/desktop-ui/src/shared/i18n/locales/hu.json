@@ -894,7 +894,17 @@
         "sortNewest": "Legújabb elöl",
         "sortOldest": "Legrégebbi elöl",
         "sourceCloud": "Felhő",
-        "sourceUpload": "Általad küldött"
+        "sourceUpload": "Általad küldött",
+        "types": {
+          "all": "Összes",
+          "images": "Képek",
+          "videos": "Videók",
+          "audio": "Hang",
+          "documents": "Dokumentumok",
+          "code": "Kód",
+          "pages": "Oldalak",
+          "other": "Egyéb"
+        }
       },
       "schedule": {
         "actionFailed": "Nem sikerült.",
@@ -910,7 +920,8 @@
         "next": "Következő futás {when}",
         "pauseSchedule": "Ütemezés szüneteltetése",
         "paused": "Szüneteltetve",
-        "resumeSchedule": "Ütemezés folytatása"
+        "resumeSchedule": "Ütemezés folytatása",
+        "editPrompt": "Módosítsd a(z) „{title}” ütemezésemet: "
       },
       "search": {
         "clear": "Keresés törlése",
@@ -928,6 +939,12 @@
         "finished": "Kész",
         "stopped": "Leállítva",
         "working": "A háttérben dolgozik"
+      },
+      "time": {
+        "today": "Ma",
+        "yesterday": "Tegnap",
+        "tomorrow": "Holnap",
+        "earlierThisMonth": "Korábban ebben a hónapban"
       }
     },
     "apps": {

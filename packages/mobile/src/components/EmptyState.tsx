@@ -152,7 +152,7 @@ export function EmptyState({
               radius={20}
               style={styles.action}
             >
-              <Icon name="sparkles" size={14} color={colors.accent} />
+              <Icon name="chat" size={14} color={colors.accent} />
               <Text
                 style={styles.actionLabel}
                 maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}

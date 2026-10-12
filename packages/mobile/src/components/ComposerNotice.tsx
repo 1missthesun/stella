@@ -21,7 +21,7 @@ import { Icon, type IconName } from "./Icon";
 
 const KIND_ICON: Record<ComposerNoticeKind, IconName> = {
   "sign-in": "user",
-  upgrade: "sparkles",
+  upgrade: "arrow-up-circle",
   limit: "alert-circle",
   provider: "alert-circle",
 };

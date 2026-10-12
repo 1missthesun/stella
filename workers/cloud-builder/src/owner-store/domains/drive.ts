@@ -874,20 +874,6 @@ const finiteNumber = (value: unknown): number | undefined =>
 
 // ── Turn writes (produced files, html, images) ───────────────────────────
 
-/** One file a turn reports, as its executor or tool sends it. */
-export type DriveFileReport = {
-  path: string;
-  name?: string;
-  sizeBytes?: number;
-  contentType?: string;
-  /** The bytes, for a file below `DRIVE_INLINE_FILE_LIMIT_BYTES`. */
-  contentBase64?: string;
-  /** A `drive.turnStage` upload whose PUT has finished, for anything larger. */
-  uploadId?: string;
-  /** `updatedAt` of the row this turn hydrated: its claim that it read that version. */
-  knownUpdatedAt?: number;
-};
-
 type NormalizedReport = {
   path: string;
   name: string;
@@ -1828,13 +1814,6 @@ export const driveDomain = {
       scope: "owner",
       parse: object({ path: pathArg }),
       handler: fileUrl,
-    },
-    "drive.delete": {
-      scope: "owner",
-      parse: object({ path: pathArg }),
-      handler: (ctx: OwnerContext, args: { path: string }) => ({
-        deleted: deleteFileRow(ctx, normalizeDrivePath(args.path), Date.now()),
-      }),
     },
     // Same reader as the `drive.files` view. A tool call wants one answer, and
     // a device should not open a subscription to get it.

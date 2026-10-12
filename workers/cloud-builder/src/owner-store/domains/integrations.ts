@@ -35,8 +35,6 @@ import { sha256Hex } from "../../hash.js";
 import {
   SAFE_ACTION_NAME,
   SAFE_INTEGRATION_ID,
-  listIntegrationActions,
-  listIntegrationCatalog,
   loadExecutableIntegration,
   loadIntegrationAction,
   type ExecutableIntegration,
@@ -862,27 +860,6 @@ export const integrationsDomain = {
   name: "integrations",
   migrations: [INTEGRATIONS_MIGRATION],
   calls: {
-    "integrations.catalog": {
-      scope: "global",
-      parse: empty(),
-      handler: async (ctx) => ({ integrations: await listIntegrationCatalog(ctx.env) }),
-    },
-    "integrations.actions": {
-      scope: "global",
-      requireAccount: true,
-      parse: object({
-        id: integrationId(),
-        action: optional(string({ min: 2, max: 128, pattern: SAFE_ACTION_NAME })),
-        query: optional(string({ max: 200 })),
-        cursor: optional(string({ max: 128 })),
-        limit: optional(number({ int: true, min: 1, max: 100 })),
-      }),
-      handler: async (ctx, args) => {
-        const page = await listIntegrationActions(ctx.env, args);
-        if (!page) throw new RpcError("NOT_FOUND", "Executable integration actions are unavailable.");
-        return page;
-      },
-    },
     "integrations.connections": {
       scope: "owner",
       requireAccount: true,

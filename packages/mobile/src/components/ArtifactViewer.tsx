@@ -3,16 +3,13 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { Icon } from "./Icon";
 import { AudioPlayerView } from "./AudioPlayerView";
 import { PosterCover, VideoPlayerView } from "./VideoPlayerView";
 import {
@@ -22,16 +19,17 @@ import {
 import * as Sharing from "expo-sharing";
 import { Directory, File, Paths } from "expo-file-system";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
+import { getRandomBytes } from "expo-crypto";
+import { canvasBridgeScript, withCanvasPolicy } from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
-import { FloatingPopover } from "./FloatingPopover";
+import { FileViewerFooter, FileViewerPanel } from "./FileViewerPanel";
 import type { PopoverAction } from "./FloatingPopoverParts";
 import { canvasSlugFor, useCanvasShareToggle } from "../lib/use-canvas-share-toggle";
 import type { ChatArtifact } from "../types";
 import type { StoredPhoneAccess } from "../lib/phone-access";
 import {
   artifactPrimaryFilePath,
-  artifactSubtitle,
-  artifactTitle,
+  artifactFileName,
   viewedArtifact,
 } from "../lib/mobile-artifacts";
 import {
@@ -60,7 +58,6 @@ import type {
 } from "@stella/contracts/device-file-reads";
 import { DeviceFolderView, formatFileSize } from "./DeviceFolderView";
 import { stellaFileChatArtifact } from "../lib/stella-file-links";
-import { useT } from "../i18n";
 import { embedRelativeHtmlAssets } from "@stella/contracts/html-relative-assets";
 import { sharePdf } from "../lib/chat-pdf";
 import {
@@ -72,7 +69,6 @@ import {
   DOCUMENT_PAGE_BACKGROUND,
   prepareDocumentHtml,
 } from "../lib/html-document-preview";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import type { Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
@@ -90,6 +86,7 @@ type ArtifactViewerProps = {
   access: StoredPhoneAccess | null;
   visible: boolean;
   onClose: () => void;
+  bottomReserve?: number;
 } & ArtifactSwipeProps &
   ArtifactDeviceProps;
 
@@ -186,91 +183,78 @@ const escapeHtml = (value: string): string =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-const CANVAS_NAVIGATION_SCRIPT = String.raw`
-(() => {
-  const navigate = (rawHref) => {
-    const href = rawHref.trim();
-    if (href.startsWith("#")) {
-      let fragment;
-      try { fragment = decodeURIComponent(href.slice(1)); } catch { return; }
-      if (!fragment) {
-        window.scrollTo({ top: 0, behavior: "auto" });
-        return;
-      }
-      const target = document.getElementById(fragment) ||
-        document.querySelector('[name="' + CSS.escape(fragment) + '"]');
-      target?.scrollIntoView();
-      return;
-    }
-    window.ReactNativeWebView.postMessage(JSON.stringify({
-      type: "stella:canvas-navigate",
-      href,
-    }));
-  };
-
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const anchor = target && typeof target.closest === "function"
-      ? target.closest("a[href]")
-      : null;
-    if (!anchor) return;
-    event.preventDefault();
-    event.stopPropagation();
-    navigate(anchor.getAttribute("href") || "");
-  }, true);
-
-  document.addEventListener("submit", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const form = event.target;
-    if (form && typeof form.getAttribute === "function") {
-      navigate(form.getAttribute("action") || "");
-    }
-  }, true);
-})();
-true;
-`;
-
 function CanvasDocumentWebView({ html, style }: { html: string; style: object }) {
-  const webViewRef = useRef<WebView>(null);
-  const allowedInitialLoadRef = useRef(false);
+  const { token, source } = useMemo(
+    () => ({
+      token: Array.from(getRandomBytes(24), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join(""),
+      source: { html: withCanvasPolicy(html) },
+    }),
+    [html],
+  );
+  const bridgeScript = useMemo(() => canvasBridgeScript(token), [token]);
+  const loadedTokenRef = useRef<string | null>(null);
 
-  const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data) as {
-        type?: unknown;
-        href?: unknown;
-      };
-      if (
-        message.type !== "stella:canvas-navigate" ||
-        typeof message.href !== "string"
-      ) {
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      try {
+        const message = JSON.parse(event.nativeEvent.data) as {
+          type?: unknown;
+          token?: unknown;
+          href?: unknown;
+        };
+        if (
+          message.type !== "stella:canvas-navigate" ||
+          message.token !== token ||
+          typeof message.href !== "string"
+        ) {
+          return;
+        }
+        const navigation = classifyCanvasNavigation(message.href);
+        if (navigation.kind === "external") {
+          void Linking.openURL(navigation.url).catch(() => undefined);
+        }
+      } catch {
         return;
       }
-      const navigation = classifyCanvasNavigation(message.href);
-      if (navigation.kind === "external") {
-        void Linking.openURL(navigation.url).catch(() => undefined);
-      }
-    } catch {
-      // Ignore malformed messages from untrusted canvas code.
-    }
-  }, []);
+    },
+    [token],
+  );
 
   return (
     <WebView
-      ref={webViewRef}
+      key={token}
       originWhitelist={["*"]}
-      source={{ html }}
+      source={source}
       style={style}
       forceDarkOn={false}
-      injectedJavaScript={CANVAS_NAVIGATION_SCRIPT}
+      incognito
+      cacheEnabled={false}
+      allowFileAccess={false}
+      allowFileAccessFromFileURLs={false}
+      allowUniversalAccessFromFileURLs={false}
+      allowsLinkPreview={false}
+      javaScriptCanOpenWindowsAutomatically={false}
+      setSupportMultipleWindows={false}
+      sharedCookiesEnabled={false}
+      thirdPartyCookiesEnabled={false}
+      geolocationEnabled={false}
+      mixedContentMode="never"
+      dataDetectorTypes="none"
+      injectedJavaScriptBeforeContentLoaded={bridgeScript}
+      injectedJavaScript={bridgeScript}
       onMessage={handleMessage}
       onShouldStartLoadWithRequest={(request) => {
         const isCanvasDocument =
           request.url === "about:blank" ||
           request.url.startsWith("data:text/html");
-        if (!allowedInitialLoadRef.current && isCanvasDocument) {
-          allowedInitialLoadRef.current = true;
+        if (
+          loadedTokenRef.current !== token &&
+          isCanvasDocument &&
+          request.isTopFrame !== false
+        ) {
+          loadedTokenRef.current = token;
           return true;
         }
         return false;
@@ -350,7 +334,6 @@ export function ArtifactViewerContent({
   onActionsChange,
   deviceIdOf,
 }: ArtifactViewerContentProps) {
-  const t = useT();
   const [trailState, setTrailState] = useState<{
     root: ChatArtifact | null;
     entries: FolderTrailEntry[];
@@ -418,13 +401,8 @@ export function ArtifactViewerContent({
   const title = shownFolder
     ? folderName(shownFolder.listing.path)
     : artifact
-      ? artifactTitle(artifact.payload)
+      ? artifactFileName(artifact.payload)
       : "Artifact";
-  const subtitle = shownFolder
-    ? t("shell.display.folder.onDevice", { device: shownFolder.deviceName })
-    : artifact
-      ? artifactSubtitle(artifact.payload)
-      : "";
 
   const neighbours = useMemo(
     () => imageNeighbours(artifact, siblings),
@@ -1024,38 +1002,6 @@ export function ArtifactViewerContent({
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        {onBack ? (
-          <Pressable
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backButtonPressed,
-            ]}
-          >
-            <Icon name="chevron-left" size={20} color={colors.text} />
-          </Pressable>
-        ) : null}
-        <View style={styles.headerText}>
-          <Text
-            style={styles.title}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          >
-            {title}
-          </Text>
-          <Text
-            style={styles.subtitle}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          >
-            {subtitle}
-          </Text>
-        </View>
-      </View>
         <View style={styles.body}>
           {(loading || error) && swipeable ? (
             <SwipeArea onSwipe={onSwipe}>
@@ -1169,11 +1115,16 @@ export function ArtifactViewerContent({
             </ScrollView>
           ) : null}
       </View>
+      <FileViewerFooter
+        name={title}
+        actions={actions}
+        onBack={onBack}
+        onClose={onClose}
+        closeLabel="Close"
+      />
     </View>
   );
 }
-
-const VIEWER_HEIGHT_RATIO = 0.6;
 
 /**
  * The artifact viewer opened from chat cards, links and Files: a floating
@@ -1187,29 +1138,24 @@ export function ArtifactViewer({
   siblings,
   onNavigate,
   deviceIdOf,
+  bottomReserve,
 }: ArtifactViewerProps) {
-  const { height: screenHeight } = useWindowDimensions();
-  const [actions, setActions] = useState<PopoverAction[]>([]);
   if (!visible || !artifact) return null;
   return (
-    <FloatingPopover
+    <FileViewerPanel
       onClose={onClose}
       closeLabel="Close"
-      height={Math.round(screenHeight * VIEWER_HEIGHT_RATIO)}
-      actions={actions}
+      {...(bottomReserve !== undefined ? { bottomReserve } : {})}
     >
-      {(close) => (
-        <ArtifactViewerContent
-          artifact={artifact}
-          access={access}
-          onClose={close}
-          onActionsChange={setActions}
-          {...(siblings ? { siblings } : {})}
-          {...(onNavigate ? { onNavigate } : {})}
-          {...(deviceIdOf ? { deviceIdOf } : {})}
-        />
-      )}
-    </FloatingPopover>
+      <ArtifactViewerContent
+        artifact={artifact}
+        access={access}
+        onClose={onClose}
+        {...(siblings ? { siblings } : {})}
+        {...(onNavigate ? { onNavigate } : {})}
+        {...(deviceIdOf ? { deviceIdOf } : {})}
+      />
+    </FileViewerPanel>
   );
 }
 
@@ -1217,41 +1163,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     root: {
       flex: 1,
-    },
-    header: {
-      alignItems: "center",
-      borderBottomColor: colors.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      flexDirection: "row",
-      gap: 8,
-      paddingBottom: 10,
-      paddingHorizontal: 16,
-      paddingTop: 12,
-    },
-    headerText: {
-      flex: 1,
-      minWidth: 0,
-    },
-    backButton: {
-      alignItems: "center",
-      justifyContent: "center",
-      marginLeft: -6,
-      width: 28,
-    },
-    backButtonPressed: {
-      opacity: 0.6,
-    },
-    title: {
-      color: colors.text,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 15,
-      letterSpacing: -0.2,
-    },
-    subtitle: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12,
-      marginTop: 2,
     },
     body: {
       flex: 1,

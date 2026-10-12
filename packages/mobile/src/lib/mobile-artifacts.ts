@@ -276,6 +276,35 @@ export const artifactAttachmentTarget = (
   });
 };
 
+export const artifactFileName = (payload: MobileDisplayPayload): string => {
+  const path = artifactPrimaryFilePath(payload);
+  const title = artifactTitle(payload);
+  if (!path || /^(?:data|blob):/i.test(path.trim())) return title;
+  const raw = basenameOf(path);
+  if (!raw) return title;
+  let name = raw;
+  try {
+    name = decodeURIComponent(raw);
+  } catch {
+    name = raw;
+  }
+  const dot = name.lastIndexOf(".");
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : "";
+  const machineNamed =
+    /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(stem) ||
+    /^[0-9a-f_-]{16,}$/i.test(stem) ||
+    /^\d{10,}/.test(stem);
+  const readableTitle = title.trim().replace(/[\\/:*?"<>|\r\n]+/g, " ").trim();
+  if (machineNamed && readableTitle && readableTitle !== name) {
+    const titled = readableTitle;
+    return titled.toLowerCase().endsWith(extension.toLowerCase())
+      ? titled
+      : `${titled}${extension}`;
+  }
+  return name;
+};
+
 export const artifactTitle = (payload: MobileDisplayPayload): string => {
   switch (payload.kind) {
     case "canvas-html":

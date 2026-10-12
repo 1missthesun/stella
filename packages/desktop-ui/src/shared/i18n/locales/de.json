@@ -772,6 +772,8 @@
       "finishingSub": "Deine Chats werden in dieses Konto übernommen. Das dauert nur einen Moment.",
       "finishingTitle": "Anmeldung wird abgeschlossen",
       "googleContinue": "Mit Google fortfahren",
+      "passkeyContinue": "Continue with a passkey",
+      "passkeyFailed": "Passkey sign-in could not finish. Please try again.",
       "googleExpired": "Die Google-Anmeldung ist abgelaufen. Bitte versuch es erneut.",
       "googleNoSession": "Die Google-Anmeldung wurde ohne Sitzung abgeschlossen.",
       "googleStartFailed": "Die Google-Anmeldung konnte nicht gestartet werden.",
@@ -1862,6 +1864,45 @@
       "action": "Erweiterung holen",
       "description": "Lass Stella deinen Browser sehen und darin handeln.",
       "title": "Stella für Chrome"
+    },
+    "passkeys": {
+      "add": "Add a passkey",
+      "description": "Sign in to Stella on the web with a passkey instead of an email link. Desktop and mobile sign-in are unchanged.",
+      "loadError": "Couldn't load or change passkeys. Try again.",
+      "remove": "Remove",
+      "title": "Passkeys",
+      "unnamed": "Passkey"
+    },
+    "sessions": {
+      "current": "This device",
+      "description": "Every device signed in to your account. Sign out any you don't recognize.",
+      "loadError": "Couldn't load or change sessions. Try again.",
+      "revoke": "Sign out",
+      "revoking": "Signing out…",
+      "title": "Signed-in devices"
+    },
+    "yourData": {
+      "description": "Encrypted in Stella Cloud, never used to train models, sold, or shown in ads. Stella staff have no view of your message content.",
+      "exportAction": "Download",
+      "exportDone": "Your data export downloaded.",
+      "exportError": "Couldn't export your data. Try again.",
+      "exportLabel": "Download my data",
+      "exporting": "Preparing…",
+      "logAccessed": "Support access used",
+      "logGranted": "Support access granted",
+      "logRevoked": "Support access ended",
+      "supportActive": "On until",
+      "supportError": "Couldn't change support access. Try again.",
+      "supportGrant": "Grant for 24 hours",
+      "supportLabel": "Support access",
+      "supportOff": "Off. Only turn this on if Stella support asks, for a case you're working on together.",
+      "supportRevoke": "End now",
+      "title": "Your data in Stella Cloud"
+    },
+    "telemetry": {
+      "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
+      "error": "Couldn’t change telemetry. Try again.",
+      "title": "Share anonymous usage metrics"
     },
     "chatStorage": {
       "description": "Synchronisiert Chats geräteübergreifend. Aus bleiben sie auf diesem Computer.",

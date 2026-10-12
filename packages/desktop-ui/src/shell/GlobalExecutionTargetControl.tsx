@@ -175,7 +175,7 @@ export function GlobalExecutionTargetControl() {
       return;
     }
     if (!brainConversationId) return;
-    if (JSON.stringify(next) === JSON.stringify(target)) return;
+    // Picking where Stella already runs still makes it the home computer.
     void move(next).catch((error: unknown) => {
       showToast({
         title: "Stella couldn't move",

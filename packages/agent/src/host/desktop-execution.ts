@@ -22,7 +22,7 @@ import type { Context, JsonValue } from "@earendil-works/chord";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { defineExtension, type Extension, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
 import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-durable/tools";
-import type { PiBrainHost, PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
+import { samePiBrainHost, type PiBrainHost, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import type { DeviceToolName, DeviceToolResult } from "@stella/contracts/turn-plane/device-tools";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import { STELLA_CODING_EXTENSION } from "../stella/coding.ts";
@@ -53,6 +53,8 @@ export type DesktopBrain = {
    * (out of reach, not ready), for this computer to take instead.
    */
   note(host: PiBrainHost, note: { id: string; text: string }): Promise<boolean>;
+  /** The account's home computer, where Stella stays while it is up; null clears it. */
+  setHome?(deviceId: string | null): Promise<void>;
 };
 
 export type ToolResultContent = (TextContent | ImageContent)[];
@@ -260,15 +262,26 @@ export function desktopExecution(options: {
   const pinBrain = async (target: StellaPlacement, context: Context): Promise<PiBrainRecord | { error: string }> => {
     const brain = options.brain;
     if (!brain || options.localOnly) return { error: "This chat is stored only on this computer, so it can only run here." };
+    // The computer the user picks is the account's home computer from now
+    // on: Stella comes back to it whenever it is up. Picking the cloud clears it.
+    const home = async (record: PiBrainRecord): Promise<PiBrainRecord> => {
+      await brain.setHome?.(record.host === "device" ? record.deviceId : null);
+      return record;
+    };
+    // Already there: only the home computer changes, and the lease keeps its epoch.
+    const settle = async (next: PiBrainHost): Promise<PiBrainRecord> => {
+      const current = await brain.read().catch(() => null);
+      return await home(current && samePiBrainHost(current, next) ? current : await setBrain(brain, next));
+    };
     if (!isHere(target)) {
       const at = await brainHostAt(target, context);
       if ("error" in at) return at;
-      return await setBrain(brain, at.next);
+      return await settle(at.next);
     }
     if (!options.deviceId) return { error: "This computer has no device id yet. Try again in a moment." };
     const listed = await environment.remote?.devices().catch(() => undefined);
     const label = listed?.find((entry) => entry.deviceId === options.deviceId)?.label?.trim();
-    return await setBrain(brain, { host: "device", deviceId: options.deviceId, ...(label ? { label } : {}) });
+    return await settle({ host: "device", deviceId: options.deviceId, ...(label ? { label } : {}) });
   };
 
   return {

@@ -107,6 +107,9 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       await this.piHeartbeat().catch((error: unknown) => {
         log("error", "pi_heartbeat_failed", { message: errorMessage(error) });
       });
+      await this.checkPlacedChats().catch((error: unknown) => {
+        log("error", "pi_placed_check_failed", { message: errorMessage(error) });
+      });
     }
   }
 
@@ -298,6 +301,8 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (!ownerId || request.headers.get(HEADER_TURN_AUTH_KIND)?.trim() !== "service") {
       return json({ error: "Service callers only." }, 403);
     }
+    const home = await this.piBrainHome(ownerId);
+    if (home) await this.bringPiBrainHome(home);
     const brain = (await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ?? null;
     if (!brain) return json({ kind: "sender" } satisfies AgentReportTarget);
     if (brain.host === "cloud") return json({ kind: "cloud" } satisfies AgentReportTarget);

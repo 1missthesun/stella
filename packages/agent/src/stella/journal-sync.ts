@@ -69,6 +69,8 @@ export type JournalSyncState = {
   publishedCheckpoint?: number;
   /** The newest transcript entry mirrored into the journal. */
   mirrored?: number;
+  /** Messages typed here and sent on to where Stella runs (`relay`): the journal's copy is not imported. */
+  relayed?: string[];
   open?: JournalOpenTurn;
   /**
    * The journal epoch the transcript follows, when it started over on a new

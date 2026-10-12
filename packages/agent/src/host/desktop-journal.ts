@@ -23,8 +23,9 @@ import { parseClaudeUsageLimitCard, type ClaudeUsageLimitCard } from "@stella/co
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import { randomUUID } from "node:crypto";
 import type { Context } from "@earendil-works/chord";
-import type { Message } from "@earendil-works/pi-ai";
+import type { AssistantMessage, Message } from "@earendil-works/pi-ai";
 import {
+  AssistantEntry,
   defineExtension,
   GenerationTask,
   hook,
@@ -121,7 +122,17 @@ export type DesktopJournal = {
   }): Promise<void>;
   /** What a voice call said, outside any turn. */
   appendVoice(append: { appendId: string; role: "user" | "assistant"; payloadJson: string; hidden: boolean }): Promise<void>;
+  /**
+   * A message the user typed here that another host must answer (this
+   * computer's turn was refused: Stella runs elsewhere), sent to the
+   * conversation's object as a message from this computer's user, which
+   * places it where Stella runs or answers it. Resolves once the cloud took it.
+   */
+  relay?(message: { clientMsgId: string; prompt: string }): Promise<void>;
 };
+
+/** How long a refused message keeps being sent on before the user is told it did not go. */
+const RELAY_DELAYS_MS = [0, 2_000, 5_000, 10_000, 20_000, 30_000, 60_000, 60_000, 60_000];
 
 export type JournalMirror = {
   /** Import what other writers journaled since the last import. */
@@ -270,6 +281,51 @@ export async function journalMirror(args: {
   let running = false;
   let again = false;
   let stopped = false;
+  /** Messages typed here and sent on to where Stella runs: their journal prompt is the one already shown here. */
+  const relayed = new Set<string>();
+
+  /**
+   * A message the user typed here is never dropped: refused because Stella
+   * runs elsewhere, it goes to the conversation in the cloud, which hands it
+   * to her. Only when that never succeeds is the user told, in the chat.
+   */
+  const relayTyped = async (clientMsgId: string, prompt: string): Promise<void> => {
+    const relay = journal.relay;
+    if (!relay) return;
+    let failure: unknown;
+    for (const delay of RELAY_DELAYS_MS) {
+      if (stopped) return;
+      if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
+      try {
+        await relay({ clientMsgId, prompt });
+        return;
+      } catch (error) {
+        failure = error;
+      }
+    }
+    report(failure);
+    relayed.delete(clientMsgId);
+    const { model } = await root.agent(context);
+    const notice: AssistantMessage = {
+      role: "assistant",
+      content: [
+        {
+          type: "text",
+          text: "Stella runs on another computer right now, and this message couldn't reach her there. Send it again in a moment.",
+        },
+      ],
+      api: "stella-notice",
+      provider: model?.provider ?? "stella",
+      model: model?.modelId ?? "notice",
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: "stop",
+      timestamp: Date.now(),
+    };
+    await harness.commit(async (tx) => {
+      await tx.appendEntry(root.id, { kind: AssistantEntry.kind, model: [notice] });
+      return undefined;
+    }, context);
+  };
 
   const doc = async (): Promise<Readonly<JournalSyncState>> =>
     (await harness.snapshot(JournalSyncDoc, root.id, context)) ?? {};
@@ -307,7 +363,9 @@ export async function journalMirror(args: {
 
   const importNow = async () => {
     await rebuildHolds();
-    const start = await journalImportAfter(await doc(), journal.start);
+    const synced = await doc();
+    for (const id of synced.relayed ?? []) relayed.add(id);
+    const start = await journalImportAfter(synced, journal.start);
     let after: number = start.after;
     // A first import from the journal's window starts at a prompt: it may
     // open mid-turn, on tool results whose calls it no longer holds. After a
@@ -365,6 +423,12 @@ export async function journalMirror(args: {
         if (record.role === "user" && record.clientMsgId) {
           prompts.set(record.turnId, record.clientMsgId);
           if (prompts.size > PAGE) prompts.delete(prompts.keys().next().value!);
+          // Typed here and sent on: this computer already shows it, now numbered.
+          if (relayed.has(record.clientMsgId)) {
+            if (!record.hidden) await recordMessageId(harness, root.id, record.clientMsgId, record.seq, context);
+            atPrompt = true;
+            continue;
+          }
         }
         if (AGENT_OPERATION.test(record.clientMsgId ?? "")) continue;
         const message = asJournalMessage(record);
@@ -566,7 +630,15 @@ export async function journalMirror(args: {
               // The writer retries what can succeed; a refusal is final, and the
               // turn stays on this computer only. Refused because another host
               // holds the brain, this computer's Stella stops: it does not answer
-              // beside the holder, and what it holds is now only a cache.
+              // beside the holder, and what it holds is now only a cache. A
+              // message its user typed goes on to the holder all the same.
+              const relayId = journaled.clientMsgId && CLIENT_MSG_ID_PATTERN.test(journaled.clientMsgId)
+                ? journaled.clientMsgId
+                : localTurnId;
+              const typed = (journaled.message.content as Array<{ type?: string; text?: string }>)
+                .flatMap((part) => (part.type === "text" && part.text ? [part.text] : []))
+                .join("\n")
+                .trim();
               const ack = await journal
                 .begin({
                   localTurnId,
@@ -582,7 +654,16 @@ export async function journalMirror(args: {
                 .catch(async (error: unknown) => {
                   report(error);
                   if ((error as { code?: unknown } | null)?.code === PI_BRAIN_ELSEWHERE_CODE) {
-                    await stopStella(harness, root, context).catch(report);
+                    if (!journaled.hidden && typed && journal.relay) {
+                      relayed.add(relayId);
+                      await save((current) => {
+                        current.relayed = [...(current.relayed ?? []).filter((id) => id !== relayId), relayId].slice(-50);
+                      });
+                      void relayTyped(relayId, typed).catch(report);
+                      await root.abort(context).catch(report);
+                    } else {
+                      await stopStella(harness, root, context).catch(report);
+                    }
                   }
                   return undefined;
                 });

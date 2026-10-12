@@ -14,6 +14,8 @@ import { PLACEMENT_PROTOCOL } from "@stella/contracts/turn-plane/placement";
 import {
   claimFreePiBrain,
   decidePiBrainClaim,
+  homePiBrain,
+  samePiBrainHost,
   movePiBrain,
   piBrainHandoffPrompt,
   piBrainHostName,
@@ -1514,6 +1516,8 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     turnId?: string;
     /** A device's turn on a message its user typed there: with no lease held, it claims one. */
     claimFree?: boolean;
+    /** The account's home computer, when it is up and ready (`piBrainHome`). */
+    home?: Extract<PiBrainHost, { host: "device" }>;
   }): Promise<{
     decision: PiBrainClaimDecision;
     record: PiBrainRecord | null;
@@ -1527,6 +1531,15 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ? args.holder
         : undefined;
     let record = stored;
+    if (args.home) {
+      const homed = await this.bringPiBrainHome(args.home, args.turnId);
+      if (homed && homed.epoch !== stored?.epoch) {
+        record = homed;
+        if (samePiBrainHost(record, args.claimant)) {
+          return { decision: { kind: "holder" }, record, takenOver: false };
+        }
+      }
+    }
     if (record && holder?.seenAt !== undefined) {
       const renewed = renewPiBrainLease(record, holder.seenAt);
       if (renewed) {
@@ -1615,6 +1628,61 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         message: errorMessage(error),
       });
     }
+  }
+
+  /** The account's home computer while it is up and ready: the lease belongs there. */
+  protected async piBrainHome(
+    ownerId: string,
+  ): Promise<Extract<PiBrainHost, { host: "device" }> | undefined> {
+    const listed = await this.ownerGate(ownerId)
+      .devices()
+      .catch(() => undefined);
+    const home = listed?.devices.find((entry) => entry.brainHome);
+    if (!home?.online || home.availability?.ready !== true) return undefined;
+    return {
+      host: "device",
+      deviceId: home.deviceId,
+      ...(home.label?.trim() ? { label: home.label.trim() } : {}),
+    };
+  }
+
+  /**
+   * The lease back on the account's home computer, which is up: unless the
+   * holder is in the middle of a turn. It only ever moves the lease home; it
+   * never weighs whether the holder lapsed. The record as it stands after.
+   */
+  protected async bringPiBrainHome(
+    home: Extract<PiBrainHost, { host: "device" }>,
+    turnId?: string,
+  ): Promise<PiBrainRecord | null> {
+    const record =
+      (await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ?? null;
+    if (record && samePiBrainHost(record, home)) return record;
+    const busy =
+      record?.host === "cloud"
+        ? this.activeTurnId !== null
+        : record?.host === "device" &&
+          (await this.piBrainHolderBusy(record.deviceId));
+    if (busy) return record;
+    const homed = homePiBrain(record, home, Date.now());
+    await this.ctx.storage.put(PI_BRAIN_KEY, homed);
+    this.notePiBrainLease("moved", homed, {
+      reason: "home",
+      ...(turnId ? { turnId } : {}),
+    });
+    return homed;
+  }
+
+  /** Whether a computer is in the middle of one of this conversation's turns. */
+  protected async piBrainHolderBusy(deviceId: string): Promise<boolean> {
+    const lease =
+      await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
+    return Boolean(
+      lease &&
+        lease.deviceId === deviceId &&
+        !lease.cancelRequested &&
+        lease.expiresAt > Date.now(),
+    );
   }
 
   /** The holding computer journaled or renewed a turn: it is up, so its lease runs on. */

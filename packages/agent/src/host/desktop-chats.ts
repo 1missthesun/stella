@@ -487,10 +487,27 @@ export function desktopChats(options: DesktopChatsOptions) {
       return null;
     }
     let host = otherHost(record);
-    if (host?.host === "device") {
+    // A list that can't be read now says nothing of the holder: the record stands.
+    const listed =
+      host?.host === "device" || options.deviceId
+        ? await options.execution?.(conversationId)?.devices().catch(() => undefined)
+        : undefined;
+    const home = listed?.find((entry) => entry.brainHome && entry.online && entry.availability?.ready === true);
+    if (home && home.deviceId === options.deviceId) {
+      // This is the account's home computer and it is up: it answers, and its
+      // turn takes the lease back once the holder is between turns.
+      host = null;
+    } else if (home && !(host?.host === "device" && host.deviceId === home.deviceId)) {
+      // The home computer is up: Stella goes back there, so a send goes there.
+      host = {
+        host: "device",
+        deviceId: home.deviceId,
+        ...(home.label ? { label: home.label } : {}),
+        epoch: record?.epoch ?? 0,
+        updatedAt: record?.updatedAt ?? 0,
+      };
+    } else if (host?.host === "device") {
       const { deviceId } = host;
-      // A list that can't be read now says nothing of the holder: the record stands.
-      const listed = await options.execution?.(conversationId)?.devices().catch(() => undefined);
       const device = listed?.find((entry) => entry.deviceId === deviceId);
       if (listed && !device?.online) host = null;
       else if (!host.label && device?.label) host = { ...host, label: device.label };

@@ -8,6 +8,7 @@
  * it now: then this computer does.
  */
 import type { DesktopBrain } from "@stella/agent/host/desktop-execution";
+import { BackendClient } from "@stella/contracts/backend/client";
 import { METHOD_NAMES } from "@stella/contracts/protocol";
 import { piBrainPath, type PiBrainRecord, type PiBrainResponse } from "@stella/contracts/turn-plane/pi-brain";
 import type * as HostBus from "./host-bus.js";
@@ -56,6 +57,12 @@ export const brainFor = (
         { retryOnDisconnect: true },
       )) as { ok?: boolean; error?: string } | null;
       if (!result?.ok) throw new Error(result?.error ?? "Stella's brief could not be handed on.");
+    },
+    setHome: async (deviceId) => {
+      const auth = session.runnerCell.get()?.getStellaSiteAuth();
+      if (!auth) throw new Error("Sign in to Stella to choose where Stella runs.");
+      const client = new BackendClient({ baseUrl: auth.baseUrl, getToken: async () => auth.authToken });
+      await client.call("devices.setBrainHome", { deviceId });
     },
     note: async (host, note) => {
       const result = (await hostBus.request(

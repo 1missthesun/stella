@@ -13,7 +13,7 @@ import type {
 import { sha256Hex } from "@stella/contracts/turn-plane/pairing-proof";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import type { DeviceRemoteExecution } from "@stella/contracts/turn-plane/placement";
-import { array, boolean, empty, literal, object, optional, string } from "../args.js";
+import { array, boolean, empty, literal, nullable, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerCaller, OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -189,11 +189,18 @@ export const DEVICES_PUSH_CAPABILITIES_MIGRATION = {
   ],
 };
 
+/** The account's home computer for Stella's brain (`devices.setBrainHome`): at most one row. */
+export const DEVICES_BRAIN_HOME_MIGRATION = {
+  id: "devices.8-brain-home",
+  statements: [`ALTER TABLE devices ADD COLUMN brain_home INTEGER NOT NULL DEFAULT 0`],
+};
+
 type DeviceRow = {
   device_id: string;
   public_key: string | null;
   name: string | null;
   platform: string | null;
+  brain_home?: number;
   remote_execution_enabled: number;
   remote_execution_state: string;
   remote_execution_asked_at: number | null;
@@ -414,6 +421,22 @@ const setRemoteExecution = (
   return { deviceId: row.device_id, remoteExecution: "asking", changed: before !== "asking" };
 };
 
+/** The account's home computer for Stella's brain; null clears it. */
+const setBrainHome = (
+  ctx: OwnerContext,
+  args: DeviceCalls["devices.setBrainHome"]["args"],
+): DeviceCalls["devices.setBrainHome"]["result"] => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "devices.setBrainHome", { count: 60, windowMs: 60_000 }, "Too many changes to where Stella runs. Please wait a minute and try again.");
+  const deviceId = args.deviceId === null ? null : requireDevice(ctx, args.deviceId).device_id;
+  ctx.db.run(
+    "UPDATE devices SET brain_home = CASE WHEN device_id = ? THEN 1 ELSE 0 END, updated_at = ? WHERE brain_home = 1 OR device_id = ?",
+    deviceId,
+    ctx.now,
+    deviceId,
+  );
+  return { deviceId };
+};
+
 /**
  * Something tried to dispatch here and this device has not agreed. Recorded so
  * the device raises its own prompt and the list can say an answer is pending.
@@ -508,6 +531,10 @@ const adoptSuccession = (
   if (migratedRemoteExecution) {
     writeRemoteExecution(ctx, args.deviceId, inherited, retired?.remote_execution_asked_at ?? null);
   }
+  // The home computer is the machine, not its key.
+  if (retired?.brain_home === 1 && successor) {
+    ctx.db.run("UPDATE devices SET brain_home = CASE WHEN device_id = ? THEN 1 ELSE 0 END", args.deviceId);
+  }
   ctx.db.run(
     "INSERT INTO device_successors (previous_device_id, device_id, rotated_at) VALUES (?, ?, ?)",
     args.previousDeviceId,
@@ -540,6 +567,7 @@ export const snapshotDevices = (
         ...(row.remote_execution_asked_at
           ? { remoteExecutionAskedAt: row.remote_execution_asked_at }
           : {}),
+        ...(row.brain_home === 1 ? { brainHome: true as const } : {}),
         ...(row.name?.trim() ? { label: row.name.trim() } : {}),
         ...(capabilities.length > 0 ? { capabilities } : {}),
       };
@@ -1012,6 +1040,7 @@ export const devicesDomain = {
     DEVICES_PUSH_TOKEN_SESSION_MIGRATION,
     DEVICES_DROP_PAIRING_CODES_MIGRATION,
     DEVICES_PUSH_CAPABILITIES_MIGRATION,
+    DEVICES_BRAIN_HOME_MIGRATION,
   ],
   calls: {
     "devices.identity": {
@@ -1043,6 +1072,12 @@ export const devicesDomain = {
       requireAccount: true,
       parse: object({ deviceId: deviceIdArg }),
       handler: (ctx: OwnerContext, args: DeviceCalls["devices.requestRemoteExecution"]["args"]) => requestRemoteExecution(ctx, args),
+    },
+    "devices.setBrainHome": {
+      scope: "owner",
+      requireAccount: true,
+      parse: object({ deviceId: nullable(deviceIdArg) }),
+      handler: (ctx: OwnerContext, args: DeviceCalls["devices.setBrainHome"]["args"]) => setBrainHome(ctx, args),
     },
     "devices.adoptSuccession": {
       scope: "owner",

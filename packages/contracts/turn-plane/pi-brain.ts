@@ -10,11 +10,21 @@
  * the host it names holds the brain under its epoch, and only that host
  * journals the conversation's turns.
  *
+ * - The account's home computer (`brainHome` in the owner's devices list,
+ *   set by the user picking a computer in "Run on"): while it is up and
+ *   ready, the lease is on it. Any host weighing the lease moves it there
+ *   (`homePiBrain`) unless the holder is in the middle of a turn, so it comes
+ *   back to the home computer as soon as that one is online and the holder
+ *   idle. While it is offline the rules below hold.
  * - No record: the first computer to answer a message its user typed there
  *   claims the lease (`claimFreePiBrain`), so Stella has one home from then on.
  *   Until a computer has, the sender's host answers: the object the phone's
  *   messages, a computer the hidden ones (its agents' reports and notes),
  *   which never claim it.
+ * - A message the user typed is never dropped: a computer refused because
+ *   another host holds the lease sends it on to the conversation's object,
+ *   which places it on the holder or, when the holder can't take it,
+ *   answers it.
  * - A record: its holder takes the conversation's turns. A host that would
  *   have answered a message while the holder is gone (a computer offline or
  *   no longer the owner's) or its lease expired takes the lease over under
@@ -66,8 +76,8 @@ export type PiBrainRecord = PiBrainHost & {
   updatedAt: number;
   /** A computer's lease lapses here unless it is renewed; absent for the cloud, whose lease never lapses. */
   leaseExpiresAt?: number;
-  /** How the holder got the brain: claimed with none held, moved there, or taken over from a holder that was unavailable. */
-  acquired?: "claimed" | "moved" | "takeover";
+  /** How the holder got the brain: claimed with none held, moved there, back home, or taken over from a holder that was unavailable. */
+  acquired?: "claimed" | "moved" | "home" | "takeover";
   /** The holder before this epoch. */
   previous?: PiBrainHost & { epoch: number };
 };
@@ -115,7 +125,10 @@ export const parsePiBrainRecord = (value: unknown): PiBrainRecord | null => {
     epoch: record.epoch,
     updatedAt: typeof record.updatedAt === "number" ? record.updatedAt : 0,
     ...(typeof record.leaseExpiresAt === "number" ? { leaseExpiresAt: record.leaseExpiresAt } : {}),
-    ...(record.acquired === "claimed" || record.acquired === "moved" || record.acquired === "takeover"
+    ...(record.acquired === "claimed" ||
+    record.acquired === "moved" ||
+    record.acquired === "home" ||
+    record.acquired === "takeover"
       ? { acquired: record.acquired }
       : {}),
     ...(previous ? { previous } : {}),
@@ -151,6 +164,16 @@ export const claimFreePiBrain = (
 ): PiBrainRecord => ({
   ...movePiBrain(null, claimant, now),
   acquired: "claimed",
+});
+
+/** The lease the account's home computer gets back while it is up (`brainHome`). */
+export const homePiBrain = (
+  prior: PiBrainRecord | null | undefined,
+  home: Extract<PiBrainHost, { host: "device" }>,
+  now: number,
+): PiBrainRecord => ({
+  ...movePiBrain(prior, home, now),
+  acquired: "home",
 });
 
 /** The lease a host takes over from a holder that was unavailable or lapsed. */

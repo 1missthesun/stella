@@ -95,6 +95,8 @@ export type DeviceDestination = {
   remoteExecution: DeviceRemoteExecution;
   /** When the prompt on that device's screen was last raised. */
   remoteExecutionAskedAt?: number;
+  /** The account's home computer: Stella's brain stays on it, or comes back to it, while it is up. */
+  brainHome?: true;
   online: boolean;
   presenceSessionId?: string;
   availability?: DeviceAvailability;

@@ -84,6 +84,15 @@ export type DeviceCalls = {
     args: { deviceId: string };
     result: { deviceId: string; remoteExecution: DeviceRemoteExecution };
   };
+  /**
+   * The account's home computer: while it is up, Stella's brain lease stays
+   * on it or comes back to it (`@stella/contracts/turn-plane/pi-brain`).
+   * Null clears it. Set by the user picking a computer in "Run on".
+   */
+  "devices.setBrainHome": {
+    args: { deviceId: string | null };
+    result: { deviceId: string | null };
+  };
   /** Move a retired desktop id's pairings and consent to its successor. */
   "devices.adoptSuccession": {
     args: { previousDeviceId: string; deviceId: string };

@@ -1832,8 +1832,11 @@ export class StellaRuntimeHost {
         };
       } catch (error) {
         // Where Stella runs is out of reach: this computer answers, and its
-        // turn takes the brain lease over from that host.
-        if (!placementUnavailable(error)) throw error;
+        // turn takes the brain lease over from that host. A computer that
+        // refused it is not the end of the message either: sent here, a turn
+        // the cloud refuses goes on through the conversation in the cloud,
+        // which places it or answers it.
+        if (target.mode !== "device" && !placementUnavailable(error)) throw error;
         console.warn(
           "[pi-chat] Where Stella runs could not take this message; this computer answers it.",
           error,

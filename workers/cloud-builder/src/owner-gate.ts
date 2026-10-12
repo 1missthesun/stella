@@ -1443,6 +1443,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         ...(device.remoteExecutionAskedAt
           ? { remoteExecutionAskedAt: device.remoteExecutionAskedAt }
           : {}),
+        ...(device.brainHome ? { brainHome: true as const } : {}),
         online,
         ...(presence
           ? {

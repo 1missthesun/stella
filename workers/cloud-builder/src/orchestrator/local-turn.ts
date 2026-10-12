@@ -847,12 +847,14 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
                 )),
               }
             : undefined;
+        const home = await this.piBrainHome(caller.ownerId);
         const claim = await this.claimPiBrain({
           claimant: { host: "device", deviceId },
           claimEpoch: brainClaim.epoch,
           ...(holder ? { holder } : {}),
           turnId,
           claimFree: !promptHidden,
+          ...(home ? { home } : {}),
         });
         if (claim.decision.kind === "elsewhere" && claim.record) {
           return this.piBrainElsewhereResponse(claim.record);

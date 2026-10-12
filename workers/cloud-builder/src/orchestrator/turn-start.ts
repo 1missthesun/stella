@@ -5,6 +5,7 @@ import {
 } from "../cloud-chat-admission.js";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
+import { TERMINAL_DISPATCH_STATES } from "@stella/contracts/turn-plane/placement";
 import type {
   ConversationCreatedEvent,
   OwnerEvent,
@@ -67,8 +68,132 @@ import {
 } from "./support.js";
 import { OrchestratorLocalTurn } from "./local-turn.js";
 
+/**
+ * Messages the user typed that this object placed on the computer holding
+ * Stella, until that computer journals them. One that never gets there (the
+ * computer failed it, refused it, or never took it) this object answers itself.
+ */
+const PI_PLACED_KEY = "piPlacedChats";
+const PI_PLACED_CHECK_MS = 15_000;
+const PI_PLACED_GIVE_UP_MS = 3 * 60_000;
+
+type PiPlacedChat = {
+  clientMsgId: string;
+  dispatchId: string;
+  ownerId: string;
+  prompt: string;
+  attachments?: string[];
+  locale?: string;
+  placedAt: number;
+};
+
 /** Turn start: admission, idempotency, ownership, and the owner gate. */
 export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
+  private async followPlacedChat(placed: PiPlacedChat): Promise<void> {
+    const pending =
+      (await this.ctx.storage.get<PiPlacedChat[]>(PI_PLACED_KEY)) ?? [];
+    if (!pending.some((entry) => entry.clientMsgId === placed.clientMsgId)) {
+      await this.ctx.storage.put(PI_PLACED_KEY, [...pending, placed]);
+    }
+    await this.armAlarmNoLaterThan(Date.now() + PI_PLACED_CHECK_MS);
+  }
+
+  /**
+   * Whether each placed message reached the conversation. One the computer
+   * ended without journaling it, or that waited too long, this object
+   * answers itself, as it answers a message the holder could not take.
+   * A Stop (the dispatch canceled on request) is the user's own word.
+   */
+  protected async checkPlacedChats(): Promise<void> {
+    const pending =
+      (await this.ctx.storage.get<PiPlacedChat[]>(PI_PLACED_KEY)) ?? [];
+    if (pending.length === 0) return;
+    const still: PiPlacedChat[] = [];
+    for (const placed of pending) {
+      const journaled = this.ctx.storage.sql
+        .exec<{ found: number }>(
+          "SELECT 1 AS found FROM journal WHERE kind = 'message' AND role = 'user' AND client_msg_id = ? LIMIT 1",
+          placed.clientMsgId,
+        )
+        .toArray()[0];
+      if (journaled) continue;
+      const status = await this.ownerGate(placed.ownerId)
+        .dispatchStatus(placed.dispatchId)
+        .catch(() => undefined);
+      const dispatch = status?.ok ? status.response.dispatch : undefined;
+      const terminal =
+        dispatch !== undefined && TERMINAL_DISPATCH_STATES.includes(dispatch.state);
+      if (dispatch?.state === "canceled" && dispatch.cancelRequestId) continue;
+      if (dispatch?.state === "completed") continue;
+      const stuck =
+        dispatch?.state === "blocked" ||
+        dispatch?.state === "reconciliation_required";
+      const late = Date.now() - placed.placedAt >= PI_PLACED_GIVE_UP_MS;
+      if (!terminal && !stuck && !late) {
+        still.push(placed);
+        continue;
+      }
+      if (!terminal) {
+        await this.ownerGate(placed.ownerId)
+          .cancelDispatch({
+            dispatchId: placed.dispatchId,
+            cancelRequestId: `pi-brain-unplaced:${placed.clientMsgId}`.slice(0, 128),
+            reason: "The computer holding Stella did not take this message.",
+          })
+          .catch(() => undefined);
+      }
+      const answered = await this.answerUnplacedChat(placed).catch(
+        (error: unknown) => {
+          log("error", "pi_brain_unplaced_answer_failed", {
+            dispatchId: placed.dispatchId,
+            message: errorMessage(error),
+          });
+          return false;
+        },
+      );
+      log("info", "pi_brain_unplaced_answered", {
+        dispatchId: placed.dispatchId,
+        state: dispatch?.state ?? "unknown",
+        answered,
+      });
+      if (!answered) still.push(placed);
+    }
+    await this.ctx.storage.put(PI_PLACED_KEY, still);
+    if (still.length > 0) {
+      await this.armAlarmNoLaterThan(Date.now() + PI_PLACED_CHECK_MS);
+    }
+  }
+
+  /** A placed message the holder never journaled, answered here as a turn of this object's own. */
+  private async answerUnplacedChat(placed: PiPlacedChat): Promise<boolean> {
+    const owner = await this.resolveOwnerForCaller({ ownerId: placed.ownerId });
+    if (!owner) return false;
+    const response = await this.handleTurnStart(
+      new Request("https://orchestrator.internal/turns", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [HEADER_OWNER]: placed.ownerId,
+          [HEADER_TURN_AUTH_KIND]: "service",
+          [TURN_OWNER_GENERATION_HEADER]: owner.ownerGeneration,
+        },
+        body: JSON.stringify({
+          protocol: TURN_PLANE_PROTOCOL,
+          clientMsgId: placed.clientMsgId,
+          prompt: placed.prompt,
+          lane: "chat",
+          source: "placement",
+          ...(placed.attachments?.length
+            ? { attachments: placed.attachments }
+            : {}),
+          ...(placed.locale ? { locale: placed.locale } : {}),
+        }),
+      }),
+    );
+    await response.body?.cancel().catch(() => undefined);
+    return response.ok;
+  }
+
   protected async handleTurnStart(
     request: Request,
     handoff?: {
@@ -186,10 +311,15 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       // this object answers the message once without the lease, as the
       // owner gate answers work aimed at a computer that has not said yes.
       const placedHere = authKind === "service" && start.source === "placement";
-      const brain =
-        (authKind === "user" || placedHere) && lane === "chat" && !start.piAgent
-          ? await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)
-          : undefined;
+      const weighsBrain =
+        (authKind === "user" || placedHere) && lane === "chat" && !start.piAgent;
+      // While the account's home computer is up, the lease goes back to it
+      // first (unless its holder is mid-turn), and the message goes there.
+      const home = weighsBrain ? await this.piBrainHome(ownerId) : undefined;
+      if (home) await this.bringPiBrainHome(home);
+      const brain = weighsBrain
+        ? await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)
+        : undefined;
       if (brain?.host === "device" && placedHere) {
         const holder = await this.piBrainHolderState(ownerId, brain.deviceId);
         const claim = await this.claimPiBrain({
@@ -232,6 +362,17 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               deviceId: placeOn.deviceId,
               epoch: placeOn.epoch,
               dispatchId,
+            });
+            await this.followPlacedChat({
+              clientMsgId: start.clientMsgId,
+              dispatchId,
+              ownerId,
+              prompt: start.prompt,
+              ...(start.attachments?.length
+                ? { attachments: start.attachments }
+                : {}),
+              ...(start.locale ? { locale: start.locale } : {}),
+              placedAt: Date.now(),
             });
             return json(
               {

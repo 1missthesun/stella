@@ -77,6 +77,8 @@ export type OwnerSnapshot = {
       | "enabled"
       | "declined";
     remoteExecutionAskedAt?: number;
+    /** The account's home computer, where Stella's brain stays while it is up. */
+    brainHome?: true;
     label?: string;
     capabilities?: Array<
       | "chat"

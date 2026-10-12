@@ -9,6 +9,11 @@
 import type { DesktopJournal, JournalReadRecord } from "@stella/agent/host/desktop-journal";
 import type { OpenSession } from "./sessions.js";
 import { JOURNAL_CHECKPOINT_PATH, type JournalCheckpointPublish } from "@stella/contracts/journal-checkpoint";
+import {
+  TURN_PLANE_PROTOCOL,
+  turnStartPath,
+  type CloudTurnStartRequest,
+} from "@stella/contracts/turn-plane/turn-start";
 
 const READ_TIMEOUT_MS = 30_000;
 
@@ -145,6 +150,28 @@ export const cloudJournalFor = (
       if (!status.queued) {
         throw new Error(`A turn was too large for the cloud journal (${status.reason}).`);
       }
+    },
+    relay: async ({ clientMsgId, prompt }) => {
+      const auth = runner().getStellaSiteAuth();
+      if (!auth) throw new Error("Sign in to send this message on to where Stella runs.");
+      const body: CloudTurnStartRequest = {
+        protocol: TURN_PLANE_PROTOCOL,
+        clientMsgId,
+        prompt,
+        lane: "chat",
+        source: "desktop",
+      };
+      const response = await fetch(`${auth.baseUrl.replace(/\/+$/, "")}${turnStartPath(conversationId)}`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${auth.authToken}`, "content-type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(READ_TIMEOUT_MS),
+      });
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(`Where Stella runs did not take this message (${response.status}): ${detail.slice(0, 300)}`);
+      }
+      await response.body?.cancel().catch(() => undefined);
     },
     appendVoice: async (said) => {
       await runner().cloudJournal.append({

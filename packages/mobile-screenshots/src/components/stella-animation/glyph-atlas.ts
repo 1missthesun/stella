@@ -1,6 +1,5 @@
 export const DOT_COUNT = 10;
 export const BIRTH_DURATION = 12000;
-export const FLASH_DURATION = 1200;
 
 export const parseColor = (value: string): [number, number, number] => {
   const normalized = value.trim();

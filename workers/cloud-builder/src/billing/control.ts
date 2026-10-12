@@ -21,6 +21,7 @@ import { dollarsToMicroCents } from "@stella/model-catalog/pricing";
 import { readManagedModelPrices } from "../catalog/prices.js";
 import { billingConfig } from "./plans.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { reportCharges } from "./charge-telemetry.js";
 
 /** A breaker in USD from the Worker's env, -1 meaning none; else the default. */
 const tierCeilingMicroCents = (env: Env, name: string, defaultUsd: number): number => {
@@ -204,9 +205,14 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
       byOwner.set(event.ownerId, events);
     }
     const results = await Promise.all(
-      [...byOwner].map(([ownerId, events]) =>
-        ownerGateStub(this.env.OWNER_GATES, ownerId).applyGatewayUsage(events),
-      ),
+      [...byOwner].map(async ([ownerId, events]) => {
+        const result = await ownerGateStub(this.env.OWNER_GATES, ownerId).applyGatewayUsage(events);
+        const accepted = new Set(result.accepted);
+        this.ctx.waitUntil(
+          reportCharges(this.env, ownerId, events.filter((event) => accepted.has(event.requestId))),
+        );
+        return result;
+      }),
     );
     return {
       accepted: results.flatMap((result) => result.accepted),

@@ -19,6 +19,8 @@ export type RunOptions = {
   background?: boolean;
   /** Stops the command; the run then rejects. */
   signal?: AbortSignal;
+  /** Written to the command's stdin, which is then closed. */
+  input?: string;
 };
 
 const IONICE = "/usr/bin/ionice";
@@ -70,6 +72,7 @@ export const run = (
         resolve({ code, stdout: String(stdout), stderr: String(stderr) });
       },
     );
+    if (options.input !== undefined) child.stdin?.end(options.input);
     if (options.background && child.pid) {
       try {
         setPriority(child.pid, constants.priority.PRIORITY_LOW);
@@ -84,6 +87,7 @@ type GitOptions = {
   timeoutMs?: number;
   background?: boolean;
   signal?: AbortSignal;
+  input?: string;
 };
 
 export const gitRaw = (cwd: string, args: string[], options: GitOptions = {}) =>
@@ -94,6 +98,7 @@ export const gitRaw = (cwd: string, args: string[], options: GitOptions = {}) =>
     timeoutMs: options.timeoutMs,
     background: options.background,
     signal: options.signal,
+    input: options.input,
   });
 
 /** Run git and return trimmed stdout; throws with git's message on failure. */

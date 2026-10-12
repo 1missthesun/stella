@@ -76,18 +76,28 @@ try {
 `;
 
 /**
- * Parts of the repository main and preload never read, left out of the
- * scratch copy (the published app has none of them anyway). A build that
- * fails without them is tried again on the whole tree.
+ * What main and preload are built from: the build's source roots, the
+ * directories of every file the checkout's last build read, and the files
+ * that steer resolution (the top of the repo, package manifests, tsconfigs).
+ * About a quarter of the tree. A build that fails on just these is tried
+ * again on the whole tree, so leaving something out only costs time.
  */
-const SCRATCH_EXCLUDED = [
-  "docs",
-  "launcher",
-  "packages/mobile",
-  "packages/mobile-screenshots",
-  "packages/website",
-  "workers",
+const BUILD_ROOTS = [
+  "packages/contracts/",
+  "packages/desktop/",
+  "packages/runtime/",
+  "packages/desktop-ui/src/shared/i18n/",
 ];
+const RESOLUTION_FILE = /(^|\/)(package\.json|tsconfig[^/]*\.json)$/;
+
+const buildReads = (inputs: Set<string>) => {
+  const dirs = [...new Set([...inputs].map((input) => `${path.posix.dirname(input)}/`))];
+  return (file: string) =>
+    !file.includes("/") ||
+    RESOLUTION_FILE.test(file) ||
+    BUILD_ROOTS.some((root) => file.startsWith(root)) ||
+    dirs.some((dir) => file.startsWith(dir));
+};
 
 const DESKTOP_DIR = path.join("packages", "desktop");
 const BUNDLE_OUTDIR = path.join(DESKTOP_DIR, "dist-electron");
@@ -110,18 +120,19 @@ const writeTree = async (
   const gitOptions = { env, ...options };
   try {
     await git(cwd, ["read-tree", commit], gitOptions);
-    if (!whole) {
-      await git(
-        cwd,
-        ["rm", "--cached", "-r", "-q", "--ignore-unmatch", "--", ...SCRATCH_EXCLUDED],
-        gitOptions,
-      );
+    const prefix = `--prefix=${scratch}${path.sep}`;
+    if (whole) {
+      await git(cwd, ["checkout-index", "-a", "-f", prefix], gitOptions);
+    } else {
+      const reads = buildReads(await recordedBundleInputs(cwd));
+      const files = (await git(cwd, ["ls-files", "-z"], gitOptions))
+        .split("\0")
+        .filter((file) => file && reads(file));
+      await git(cwd, ["checkout-index", "-f", "-z", "--stdin", prefix], {
+        ...gitOptions,
+        input: `${files.join("\0")}\0`,
+      });
     }
-    await git(
-      cwd,
-      ["checkout-index", "-a", "-f", `--prefix=${scratch}${path.sep}`],
-      gitOptions,
-    );
   } finally {
     await fs.rm(index, { force: true });
   }

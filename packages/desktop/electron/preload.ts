@@ -47,7 +47,6 @@ const ipc: TypedIpcRenderer = {
 
 const api = createElectronApi(ipc, {
   platform: process.platform,
-  arch: process.arch,
   getPathForFile: (file) => {
     try {
       return webUtils.getPathForFile(file) || "";
@@ -56,8 +55,6 @@ const api = createElectronApi(ipc, {
     }
   },
 });
-
-export type ElectronAPI = typeof api;
 
 // Shared UI state (~/.stella/ui-state.json) snapshot, read synchronously so
 // the boot script and module-load preference reads see it before first paint.

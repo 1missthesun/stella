@@ -311,7 +311,6 @@ import {
 /** What the preload knows about its own process, outside of IPC. */
 export type ElectronApiHost = {
   platform: string;
-  arch: string;
   /**
    * Absolute on-disk path for a picker/drag-drop `File`, or "" for
    * synthetic files (e.g. clipboard images).
@@ -353,7 +352,6 @@ export const createElectronApi = (
 
   return {
     platform: host.platform,
-    arch: host.arch,
 
     files: {
       /**

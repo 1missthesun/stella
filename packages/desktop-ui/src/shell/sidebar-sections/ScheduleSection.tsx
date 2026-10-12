@@ -18,7 +18,7 @@ import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state"
 import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { Clock, Eye, Pause, Pencil, Play, Trash2, Wand2 } from "@/ui/icons";
 import type { IconComponent } from "@/ui/icons";
-import { draftOf, scheduleOf, type EveryUnit, type TimingDraft } from "./schedule-editing";
+import { draftOf, sameTiming, scheduleOf, type EveryUnit, type TimingDraft } from "./schedule-editing";
 import "./updates-section.css";
 import "./schedule-section.css";
 
@@ -121,13 +121,13 @@ function TimingFields({ draft, onChange }: { draft: TimingDraft; onChange: (draf
           min={1}
           value={draft.amount}
           aria-label={t("schedule.edit.every")}
-          onChange={(event) => onChange({ ...draft, amount: event.target.value })}
+          onChange={(event) => onChange({ kind: "every", unit: draft.unit, amount: event.target.value })}
         />
         <select
           className="schedule-edit__input schedule-edit__input--short"
           value={draft.unit}
           aria-label={t("schedule.edit.unit")}
-          onChange={(event) => onChange({ ...draft, unit: event.target.value as EveryUnit })}
+          onChange={(event) => onChange({ kind: "every", amount: draft.amount, unit: event.target.value as EveryUnit })}
         >
           <option value="minutes">{t("schedule.edit.minutes")}</option>
           <option value="hours">{t("schedule.edit.hours")}</option>
@@ -191,16 +191,15 @@ function ScheduleEditor({ job, onDone }: { job: LocalCronJobRecord; onDone: () =
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    const timing = scheduleOf(draft);
-    if ("error" in timing) {
+    const timing = sameTiming(draft, job.schedule) ? null : scheduleOf(draft);
+    if (timing && "error" in timing) {
       setError(t(`schedule.edit.errors.${timing.error}`));
       return;
     }
     const payload = text.trim() ? withText(job.payload, text.trim()) : null;
-    const scheduleChanged = JSON.stringify(timing.schedule) !== JSON.stringify(job.schedule);
     const patch: LocalCronJobUpdatePatch = {
       ...(name.trim() && name.trim() !== job.name ? { name: name.trim() } : {}),
-      ...(scheduleChanged ? { schedule: timing.schedule } : {}),
+      ...(timing ? { schedule: timing.schedule } : {}),
       ...(payload ? { payload } : {}),
     };
     if (Object.keys(patch).length === 0) {

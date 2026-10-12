@@ -294,6 +294,11 @@ REMOTE
     boot_udid="${boot_result%%|*}"
     boot_started="${boot_result##*|}"
     validate_udid "$boot_udid"
+    if [[ "$boot_started" == "0" && -f "$sim_state" ]] \
+      && [[ "$(read_state_value "$sim_state" UDID)" == "$boot_udid" ]] \
+      && [[ "$(read_state_value "$sim_state" STARTED)" == "1" ]]; then
+      boot_started=1
+    fi
     printf 'UDID=%s\nSTARTED=%s\n' "$boot_udid" "$boot_started" >"$sim_state"
     printf 'udid=%s\nstarted_by_helper=%s\n' "$boot_udid" "$boot_started"
     ;;

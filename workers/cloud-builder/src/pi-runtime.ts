@@ -1628,7 +1628,7 @@ export class PiConversationRuntime {
     // A container still coming up stops first, so nothing it creates outlives the release.
     lease.abort();
     await Promise.race([lease.ready.catch(() => undefined), scheduler.wait(LEASE_STOP_WAIT_MS)]);
-    await lease.release().catch((error: unknown) => this.#options.report(error));
+    await lease.release({ warm: !end.aborted }).catch((error: unknown) => this.#options.report(error));
     this.#live.delete(`${record.turnId}:${record.attemptGeneration}`);
     await forgetPiCompute(this.#computeHost(), agentConversationId, record).catch((error: unknown) =>
       this.#options.report(error),

@@ -452,8 +452,41 @@ export const runContainerAgentTurn = async (
     // The first 16 characters name this agent's own container in the tail.
     sandbox: sandboxId.slice(0, 16),
   });
+  let prewarmed: Promise<void> | undefined;
   try {
     await host.assertAgentExecutionActive(turn, execution);
+    // The thread's container comes up while its context is prepared: the
+    // slot first, then the start, which a warm container answers at once.
+    // The attempt's own first call waits for a start still under way.
+    const proposedSize: InstanceSize = initialInstanceSize({
+      prompt: turn.prompt,
+    });
+    let size = await agentContainerSize(host.ctx.storage, proposedSize);
+    await host.ctx.storage.put("sandboxSize", size);
+    execution.assertActive();
+    const contextStarted = performance.now();
+    const slot = acquireAgentContainerSlot(host, turn, sandboxId, execution);
+    slot.catch(() => undefined);
+    let prewarmMs: number | undefined;
+    prewarmed = slot.then(async () => {
+      const started = performance.now();
+      try {
+        await withInfrastructureDeadline(
+          host
+            .sandbox(sandboxId, size, "world", ownerWorld)
+            .exec("true", { origin: "internal" }),
+          120_000,
+          "Agent container prewarm did not settle.",
+        );
+        prewarmMs = Math.round(performance.now() - started);
+      } catch (error) {
+        log("error", "agent_container_prewarm_failed", {
+          turnId: turn.turnId,
+          threadId: turn.threadId,
+          message: errorMessage(error),
+        });
+      }
+    }, () => undefined);
     await host.event(
       turn,
       "auto",
@@ -538,13 +571,17 @@ export const runContainerAgentTurn = async (
       : undefined;
     execution.assertActive();
 
-    const proposedSize: InstanceSize = initialInstanceSize({
-      prompt: turn.prompt,
-    });
-    let size = await agentContainerSize(host.ctx.storage, proposedSize);
-    await host.ctx.storage.put("sandboxSize", size);
+    const contextMs = Math.round(performance.now() - contextStarted);
+    await slot;
     execution.assertActive();
-    await acquireAgentContainerSlot(host, turn, sandboxId, execution);
+    const slotWaitMs = Math.round(performance.now() - contextStarted);
+    log("info", "agent_container_prewarm", {
+      turnId: turn.turnId,
+      threadId: turn.threadId,
+      contextMs,
+      slotWaitMs,
+      ...(prewarmMs === undefined ? {} : { prewarmMs }),
+    });
     sandbox = host.sandbox(sandboxId, size, "world", ownerWorld);
     let escalated = false;
     let attempt = await host.runAgentAttempt({
@@ -928,6 +965,9 @@ export const runContainerAgentTurn = async (
       instanceType: INSTANCE_TIERS[size].instanceType,
     });
   } catch (error) {
+    // A container still coming up for this turn is up before any teardown
+    // looks for it, so none of it outlives the turn.
+    await prewarmed;
     const message = errorMessage(error);
     if (host.builderFallbackRecoveries.has(turn.turnId)) {
       // Alarm recovery owns the exact kill/join/archive sequence. Destroying
@@ -1326,7 +1366,15 @@ export const runAgentAttempt = async (
   restoreMs: number;
 }> => {
   const { turn, execution: turnExecution, sandbox } = args;
+  const setupMs: Record<string, number> = {};
+  let setupMark = performance.now();
+  const setupStep = (name: string) => {
+    const now = performance.now();
+    setupMs[name] = Math.round(now - setupMark);
+    setupMark = now;
+  };
   const world = await host.attachAgentWorld(args);
+  setupStep("attachWorld");
   const { session, coldContainerStartMs, restoreMs, adoptedSession } = world;
   await host.event(
     turn,
@@ -1353,6 +1401,7 @@ export const runAgentAttempt = async (
       assertActive: () => turnExecution.assertActive(),
     });
     turnExecution.assertActive();
+    setupStep("skillsMaterialize");
     // The pinned roots above stay authoritative; HOME's copy is for an agent
     // that looks where a device keeps them.
     await mirrorCloudSkillsIntoHome({ session, catalog: cloudSkills }).catch(
@@ -1364,6 +1413,7 @@ export const runAgentAttempt = async (
       },
     );
     turnExecution.assertActive();
+    setupStep("skillsHomeMirror");
   }
 
   // The native CLI's resumable session lives in the root-only backup mount.
@@ -1394,6 +1444,7 @@ export const runAgentAttempt = async (
   const brokerRecordKey = turnBrokerStorageKey(brokerIdentity);
   await host.ctx.storage.put(brokerRecordKey, issuedBroker.record);
   turnExecution.assertActive();
+  setupStep("brokerIssue");
   // Every handoff file of this attempt lives in its own root-only
   // directory: the container runs other threads' attempts beside this one.
   const attemptPaths = cloudTurnAttemptPaths(
@@ -1419,10 +1470,12 @@ export const runAgentAttempt = async (
       throw new Error("Turn attempt directory could not be created.");
     }
     turnExecution.assertActive();
+    setupStep("mkdirAttempt");
     await session.writeFile(
       brokerCredentialsPath,
       JSON.stringify(issuedBroker.handoff),
     );
+    setupStep("writeCredentials");
     const protectedBrokerHandoff = await session.exec(
       `chmod 600 ${brokerCredentialsPath}`,
     );
@@ -1430,6 +1483,7 @@ export const runAgentAttempt = async (
       throw new Error("Turn broker handoff could not be protected.");
     }
     turnExecution.assertActive();
+    setupStep("chmodCredentials");
 
     // Only Claude turns run here (agents on Stella's models or a ChatGPT
     // plan run on pi in their conversation), and a Claude turn holds no
@@ -1454,6 +1508,7 @@ export const runAgentAttempt = async (
       }
     }
     turnExecution.assertActive();
+    setupStep("claudeLogins");
 
     // The turn input sits in the root-only attempt directory, above the
     // world root on purpose: the checkpoint only covers the root, so
@@ -1525,6 +1580,7 @@ export const runAgentAttempt = async (
       }),
     );
     turnExecution.assertActive();
+    setupStep("writeInput");
     const markerKey = agentExecutionMarkerKey(
       turn.turnId,
       turn.attemptGeneration!,
@@ -1534,6 +1590,9 @@ export const runAgentAttempt = async (
       turnId: turn.turnId,
       threadId: turn.threadId,
       attemptGeneration: turn.attemptGeneration,
+      coldContainerStartMs,
+      restoreMs,
+      setupMs,
     });
     const executorProcessId = sessionName(
       `agent-executor-${turn.turnId}-${turn.attemptGeneration}`,

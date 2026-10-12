@@ -70,7 +70,10 @@ import type {
 } from "@stella/contracts/device-file-reads";
 import { DeviceFolderView, formatFileSize } from "./DeviceFolderView";
 import { stellaFileChatArtifact } from "../lib/stella-file-links";
-import { embedRelativeHtmlAssets } from "@stella/contracts/html-relative-assets";
+import {
+  embedRelativeHtmlAssets,
+  rewriteRelativeMarkdownImages,
+} from "@stella/contracts/html-relative-assets";
 import { sharePdf } from "../lib/chat-pdf";
 import {
   createArtifactMediaFile,
@@ -1081,9 +1084,11 @@ export function ArtifactViewerContent({
               return null;
             }
             if (kind === "text") return bytesToText(asset.bytes);
-            return asset.mimeType.startsWith("image/")
-              ? bytesToDataUri(asset.bytes, asset.mimeType)
-              : null;
+            const embeddable =
+              kind === "image"
+                ? asset.mimeType.startsWith("image/")
+                : /^(?:video|audio)\//.test(asset.mimeType);
+            return embeddable ? bytesToDataUri(asset.bytes, asset.mimeType) : null;
           },
           controller.signal,
         );
@@ -1093,7 +1098,29 @@ export function ArtifactViewerContent({
         };
       }
       if (payload.kind === "markdown") {
-        return { kind: "markdown" as const, text: bytesToText(result.bytes) };
+        const text = await rewriteRelativeMarkdownImages(
+          bytesToText(result.bytes),
+          filePath,
+          async (imagePath) => {
+            const image = await readLinkedArtifactFile(
+              access,
+              artifact.conversationId,
+              imagePath,
+              controller.signal,
+              { preferDeviceId: holderId, maxBytes: CANVAS_ASSET_MAX_BYTES },
+            );
+            if (
+              image.missing ||
+              image.sizeBytes > CANVAS_ASSET_MAX_BYTES ||
+              !image.mimeType.startsWith("image/")
+            ) {
+              return null;
+            }
+            return bytesToDataUri(image.bytes, image.mimeType);
+          },
+          controller.signal,
+        );
+        return { kind: "markdown" as const, text };
       }
       if (payload.kind === "source-diff") {
         return {

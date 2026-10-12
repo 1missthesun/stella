@@ -266,6 +266,7 @@ const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve,
 export class UpdateTransition {
   private readonly options: UpdateTransitionOptions;
   private view: WebContentsView | null = null;
+  private host: BrowserWindow | null = null;
   private viewLoad: Promise<void> | null = null;
 
   constructor(options: UpdateTransitionOptions) {
@@ -544,6 +545,10 @@ export class UpdateTransition {
 
   /** The overlay, on top of `win`'s views, sized to it, loaded and visible. */
   private createView() {
+    if (this.view && this.host && !this.host.isDestroyed()) {
+      this.host.contentView.removeChildView(this.view);
+    }
+    this.host = null;
     const view = new WebContentsView({
       webPreferences: {
         partition: this.options.partition,
@@ -564,6 +569,11 @@ export class UpdateTransition {
     const view =
       this.view && !this.view.webContents.isDestroyed() ? this.view : this.createView();
     await timeout(this.viewLoad!, STEP_TIMEOUT_MS, "Loading the transition page");
+    // It stays in its window, hidden, between updates; a new window takes it.
+    if (this.host && this.host !== win && !this.host.isDestroyed()) {
+      this.host.contentView.removeChildView(view);
+    }
+    this.host = win;
     // Adding a child that is already there moves it to the top.
     win.contentView.addChildView(view);
     const { width, height } = win.getContentBounds();
@@ -578,7 +588,6 @@ export class UpdateTransition {
     await view.webContents.executeJavaScript("window.__updateTransition?.clear()").catch(() => {});
     view.setVisible(false);
     if (!win.isDestroyed()) {
-      win.contentView.removeChildView(view);
       await win.webContents.executeJavaScript(THAW_SCRIPT).catch(() => {});
     }
   }

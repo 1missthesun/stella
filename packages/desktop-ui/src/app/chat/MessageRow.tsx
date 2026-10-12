@@ -32,6 +32,7 @@ import {
   pastedTextPreview,
   type PastedTextDescriptor,
 } from "@/features/chat/lib/paste-context";
+import { ClipboardPaste } from "@/ui/icons";
 import { ChipPreviewPortal } from "@/app/chat/ChipPreviewPortal";
 import { useHoverPreview } from "@/app/chat/use-hover-preview";
 import type {
@@ -235,13 +236,21 @@ function UserPastedTextChip({
   const preview = pastedTextPreview(descriptor);
   return (
     <span className="event-window-badge-hovercard">
-      <ContextPill
-        kind="pasted-text"
-        pillRef={triggerRef}
-        label={t("app.chat.messageRow.pastedTextLabel")}
+      <span
+        ref={triggerRef}
+        className="chat-composer-file-chip event-pasted-text-chip"
         data-has-preview={preview ? "true" : undefined}
         tabIndex={preview ? 0 : undefined}
-      />
+      >
+        <span className="chat-composer-file-icon">
+          <ClipboardPaste size={16} strokeWidth={1.75} aria-hidden="true" />
+        </span>
+        <span className="chat-composer-file-info">
+          <span className="chat-composer-file-name">
+            {t("app.chat.messageRow.pastedTextLabel")}
+          </span>
+        </span>
+      </span>
       {preview && (
         <ChipPreviewPortal
           triggerRef={triggerRef}
@@ -481,6 +490,35 @@ export const UserMessageRow = memo(
       : null;
 
     const chips: ContextChip[] = [];
+    const fileChips: ContextChip[] = [];
+    attachments.forEach((attachment, index) => {
+      const safeUrl = sanitizeAttachmentImageUrl(attachment.url);
+      const key = attachment.id ?? `attachment-${index}`;
+      if (safeUrl && isImageAttachment(attachment, safeUrl)) {
+        chips.push({
+          key,
+          node: (
+            <AttachmentImage
+              attachment={attachment}
+              index={index}
+              safeUrl={safeUrl}
+            />
+          ),
+        });
+        return;
+      }
+      fileChips.push({
+        key,
+        node: (
+          <FileAttachmentChip
+            name={getFileAttachmentName(attachment, t)}
+            size={attachment.size}
+            mimeType={attachment.mimeType}
+            path={attachment.path}
+          />
+        ),
+      });
+    });
     if (windowLabel) {
       chips.push({
         key: "window",
@@ -540,35 +578,11 @@ export const UserMessageRow = memo(
         ),
       });
     }
-    attachments.forEach((attachment, index) => {
-      const safeUrl = sanitizeAttachmentImageUrl(attachment.url);
-      const key = attachment.id ?? `attachment-${index}`;
-      if (safeUrl && isImageAttachment(attachment, safeUrl)) {
-        chips.push({
-          key,
-          node: (
-            <AttachmentImage
-              attachment={attachment}
-              index={index}
-              safeUrl={safeUrl}
-            />
-          ),
-        });
-        return;
-      }
-      // Non-image attachments (pdf, docs, audio, …) reuse the composer's
-      // document chip: file-type glyph + real filename, opening the
-      // original on disk when a source path was captured at attach time.
+    chips.push(...fileChips);
+    pastedTexts.forEach((descriptor, index) => {
       chips.push({
-        key,
-        node: (
-          <FileAttachmentChip
-            name={getFileAttachmentName(attachment, t)}
-            size={attachment.size}
-            mimeType={attachment.mimeType}
-            path={attachment.path}
-          />
-        ),
+        key: `pasted-text-${index}`,
+        node: <UserPastedTextChip descriptor={descriptor} />,
       });
     });
 
@@ -584,7 +598,7 @@ export const UserMessageRow = memo(
             text OR attachment/context chips — so attachment-only messages keep
             the same actions. Copy falls back to the attachment when there is
             no text to copy. */}
-        {(text.trim() || chips.length > 0 || pastedTexts.length > 0) && (
+        {(text.trim() || chips.length > 0) && (
           <div className="message-line message-line--user">
             <MessageActions
               text={text}
@@ -594,9 +608,9 @@ export const UserMessageRow = memo(
               copyAttachment={copyAttachment ?? undefined}
               onReply={reply ?? undefined}
             />
-            {text.trim() || pastedTexts.length > 0 ? (
+            {text.trim() ? (
               <div
-                className={`event-item user chat-bubble-text${pastedTexts.length > 0 ? " event-item--with-pastes" : ""}${row.reaction ? " event-item--reacted" : ""}`}
+                className={`event-item user chat-bubble-text${row.reaction ? " event-item--reacted" : ""}`}
               >
                 {row.reaction ? (
                   <span
@@ -613,17 +627,7 @@ export const UserMessageRow = memo(
                     {row.reaction}
                   </span>
                 ) : null}
-                {text.trim() ? <UserMessageBody text={text} /> : null}
-                {pastedTexts.length > 0 ? (
-                  <div className="event-item__pastes">
-                    {pastedTexts.map((descriptor, index) => (
-                      <UserPastedTextChip
-                        key={`pasted-text-${index}`}
-                        descriptor={descriptor}
-                      />
-                    ))}
-                  </div>
-                ) : null}
+                <UserMessageBody text={text} />
               </div>
             ) : null}
           </div>

@@ -17,6 +17,8 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  type ImageStyle,
+  type StyleProp,
   type TextLayoutEventData,
   useWindowDimensions,
   View,
@@ -132,6 +134,35 @@ export function MessageEntry({
 }
 
 const REACTION_POP = { side: "left", rise: 4, scale: 0.4 } as const;
+
+const USER_THUMB_HEIGHT = 84;
+
+function UserThumb({
+  uri,
+  name,
+  style,
+}: {
+  uri: string;
+  name?: string;
+  style: StyleProp<ImageStyle>;
+}) {
+  const [aspect, setAspect] = useState(1);
+  const width = Math.round(
+    Math.min(Math.max(USER_THUMB_HEIGHT * aspect, 48), 200),
+  );
+  return (
+    <Image
+      source={{ uri }}
+      style={[style, { width }]}
+      contentFit="contain"
+      accessibilityLabel={name}
+      onLoad={(event) => {
+        const { width: w, height: h } = event.source;
+        if (w > 0 && h > 0) setAspect(w / h);
+      }}
+    />
+  );
+}
 
 function ReactionBadge({
   emoji,
@@ -779,104 +810,43 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     const showText = item.text.trim().length > 0;
     const quotedText = item.quotedText?.trim();
     const pastedTexts = item.pastedTexts ?? [];
-    const hasBubbleBody =
-      showText ||
-      pastedTexts.length > 0 ||
-      showThumbs ||
-      attachmentPreviews.length > 0 ||
-      documentNames.length > 0;
-    const userBubbleBody = (
-      <>
-        {attachmentPreviews.length > 0 ? (
-          <View
-            style={[styles.userThumbStrip, showText && styles.userThumbsAbove]}
-          >
-            {attachmentPreviews.slice(0, 3).map((preview) => (
-              <View key={preview.path} style={styles.userThumbImage}>
-                {preview.imageUri ? (
-                  <Image
-                    source={{ uri: preview.imageUri }}
-                    style={styles.userThumbImage}
-                    contentFit="cover"
-                    accessibilityLabel={preview.name}
-                  />
-                ) : (
-                  <View style={styles.userAttachmentPlaceholder}>
-                    <Icon name="file-text" size={20} color={colors.textMuted} />
-                    <Text style={styles.userDocumentName} numberOfLines={2}>
-                      {preview.name}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            ))}
-          </View>
-        ) : showThumbs ? (
-          <View
-            style={[styles.userThumbStrip, showText && styles.userThumbsAbove]}
-          >
-            {thumbs.slice(0, 3).map((uri) => (
-              <Image
-                key={uri}
-                source={{ uri }}
-                style={styles.userThumbImage}
-                contentFit="cover"
-              />
-            ))}
-          </View>
-        ) : null}
-        {attachmentPreviews.length === 0 && documentNames.length > 0 ? (
-          <View
-            style={[
-              styles.userDocumentStrip,
-              showText && styles.userThumbsAbove,
-            ]}
-          >
-            {documentNames.map((name) => (
-              <View key={name} style={styles.userDocumentChip}>
-                <Icon
-                  name="file-text"
-                  size={14}
-                  color={fadeHex(colors.userBubbleText, 0.8)}
-                />
-                <Text
-                  style={styles.userDocumentChipName}
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                >
-                  {fileDisplayName(name)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-        {showText ? <UserMessageText text={item.text} styles={styles} /> : null}
-        {pastedTexts.length > 0 ? (
-          <View style={[styles.userPasteStrip, showText && styles.userPastesBelow]}>
-            {pastedTexts.map((pasted, index) => (
-              <View
-                key={`pasted-${index}`}
-                style={styles.userPasteChip}
-                accessibilityLabel="Pasted text"
-              >
-                <Icon
-                  name="file-text"
-                  size={14}
-                  color={fadeHex(colors.userBubbleText, 0.8)}
-                />
-                <Text
-                  style={styles.userPasteText}
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                >
-                  Pasted text
-                </Text>
-              </View>
-            ))}
-          </View>
-        ) : null}
-      </>
+    const imageUris =
+      attachmentPreviews.length > 0
+        ? attachmentPreviews.flatMap((preview) =>
+            preview.imageUri ? [{ key: preview.path, uri: preview.imageUri, name: preview.name }] : [],
+          )
+        : thumbs.slice(0, 3).map((uri) => ({ key: uri, uri, name: undefined }));
+    const fileNames =
+      attachmentPreviews.length > 0
+        ? attachmentPreviews.filter((preview) => !preview.imageUri).map((preview) => preview.name)
+        : documentNames;
+    const hasAttachmentRow =
+      imageUris.length > 0 || fileNames.length > 0 || pastedTexts.length > 0;
+    const hasBubbleBody = showText;
+    const attachmentChip = (key: string, label: string) => (
+      <View key={key} style={styles.userAttachmentChip} accessibilityLabel={label}>
+        <Icon name="file-text" size={14} color={colors.textMuted} />
+        <Text
+          style={styles.userAttachmentChipName}
+          numberOfLines={1}
+          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+        >
+          {label}
+        </Text>
+      </View>
     );
+    const attachmentRow = hasAttachmentRow ? (
+      <View style={[styles.userAttachmentRow, showText && styles.userAttachmentRowAbove]}>
+        {imageUris.map((image) => (
+          <UserThumb key={image.key} uri={image.uri} name={image.name} style={styles.userThumbImage} />
+        ))}
+        {fileNames.map((name, index) => attachmentChip(`file-${index}-${name}`, fileDisplayName(name)))}
+        {pastedTexts.map((_, index) => attachmentChip(`pasted-${index}`, "Pasted text"))}
+      </View>
+    ) : null;
+    const userBubbleBody = showText ? (
+      <UserMessageText text={item.text} styles={styles} />
+    ) : null;
     if (menuClone) {
       return <View style={styles.userBubble}>{userBubbleBody}</View>;
     }
@@ -903,6 +873,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
               </Text>
             </View>
           ) : null}
+          {attachmentRow}
           {!hasBubbleBody ? null : isSelecting && showText ? (
             // "Select" mode: the bubble body becomes a native selection
             // surface (with a Copy pill), so a substring can be lifted out.
@@ -1285,39 +1256,29 @@ export const makeMessageRowStyles = (colors: Colors) =>
     userTogglePressed: {
       color: colors.text,
     },
-    userThumbStrip: {
-      alignSelf: "flex-start",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 6,
-    },
-    userThumbsAbove: { marginBottom: 8 },
-    userPastesBelow: { marginTop: 6 },
-    userPasteStrip: {
+    userAttachmentRow: {
+      alignItems: "center",
       alignSelf: "flex-end",
       flexDirection: "row",
       flexWrap: "wrap",
       gap: 6,
       justifyContent: "flex-end",
     },
-    userPasteChip: {
+    userAttachmentRowAbove: { marginBottom: 6 },
+    userAttachmentChip: {
       alignItems: "center",
-      backgroundColor: fadeHex(colors.userBubbleText, 0.12),
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
       borderRadius: 999,
+      borderWidth: StyleSheet.hairlineWidth,
       flexDirection: "row",
       gap: 5,
       maxWidth: 240,
       paddingHorizontal: 11,
       paddingVertical: 6,
     },
-    userPasteText: {
-      color: colors.userBubbleText,
-      flexShrink: 1,
-      fontFamily: fonts.sans.medium,
-      fontSize: 14,
-    },
-    userDocumentChipName: {
-      color: colors.userBubbleText,
+    userAttachmentChipName: {
+      color: colors.text,
       flexShrink: 1,
       fontFamily: fonts.sans.medium,
       fontSize: 14,
@@ -1326,37 +1287,6 @@ export const makeMessageRowStyles = (colors: Colors) =>
       backgroundColor: colors.muted,
       borderRadius: 8,
       height: 84,
-      width: 84,
-    },
-    userDocumentStrip: {
-      alignSelf: "flex-start",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 6,
-    },
-    userAttachmentPlaceholder: {
-      flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      padding: 6,
-      gap: 5,
-    },
-    userDocumentChip: {
-      alignItems: "center",
-      backgroundColor: fadeHex(colors.userBubbleText, 0.12),
-      borderRadius: 999,
-      flexDirection: "row",
-      gap: 5,
-      maxWidth: 240,
-      paddingHorizontal: 11,
-      paddingVertical: 6,
-    },
-    userDocumentName: {
-      color: colors.textMuted,
-      flexShrink: 1,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12,
-      letterSpacing: -0.1,
     },
     assistantRow: { paddingVertical: ASSISTANT_ROW_PAD_VERTICAL },
     /**

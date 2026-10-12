@@ -118,6 +118,7 @@ const sections = [
   { label: "Privacy", href: "#privacy" },
   { label: "Models", href: "#models" },
   { label: "What's new", href: "/learn-more/whats-new" },
+  { label: "What Stella can fix", href: "/fix" },
 ];
 
 const MODEL_LOGOS = [

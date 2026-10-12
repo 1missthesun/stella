@@ -20,6 +20,7 @@ export const homeFooterGroups: FooterGroup[] = [
     title: "Product",
     items: [
       { label: "Learn More", href: "/learn-more" },
+      { label: "What Stella can fix", href: "/fix" },
       { label: "One chat", href: "/one-chat" },
       { label: "Voice", href: "/voice" },
       { label: "Pricing", href: "/pricing" },

@@ -101,6 +101,10 @@
   padding: clamp(90px, 14svh, 160px) var(--l-margin);
 }
 
+.doesSection {
+  padding-bottom: clamp(160px, 34svh, 340px);
+}
+
 .searches {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

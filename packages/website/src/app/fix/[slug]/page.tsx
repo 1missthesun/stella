@@ -1,18 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowRight, Check } from "lucide-react";
-import { AuroraCanvas } from "@/components/aurora-canvas";
+import { ArrowRight, Check, Search } from "lucide-react";
+import { CopyPromptButton } from "@/components/copy-prompt-button";
 import { DownloadButton } from "@/components/download-button";
-import { FixHowItWorks } from "@/components/fix-how-it-works";
 import { WindowsInstallNote } from "@/components/windows-install-note";
-import { FooterLegalLinks } from "@/components/footer-legal-links";
-import { homeFooterGroups } from "@/components/site-footer-groups";
-import { SiteHeader } from "@/components/site-header";
-import { StellaMark } from "@/components/stella-mark";
+import { Her, Me, MockChat, MockStage } from "@/components/landing/chat-mock";
+import { Finale } from "@/components/landing/closing";
+import { InView } from "@/components/landing/in-view";
+import { PageShell } from "@/components/landing/page-shell";
+import pg from "@/components/landing/page.module.css";
 import { getFixPageDemo } from "@/lib/fix-page-demos";
 import { FIX_PAGES, getFixPage } from "@/lib/fix-pages";
-import "../fix.css";
+import f from "../fix.module.css";
 
 export const dynamicParams = false;
 
@@ -35,6 +35,12 @@ export async function generateMetadata({
   };
 }
 
+const BEATS = [
+  "You describe the problem in your own words.",
+  "Stella uses your apps, browser, and files.",
+  "You watch every step. Destructive work waits.",
+];
+
 export default async function FixPage({
   params,
 }: {
@@ -43,117 +49,112 @@ export default async function FixPage({
   const { slug } = await params;
   const page = getFixPage(slug);
   if (!page) notFound();
+  const exchanges = getFixPageDemo(page.slug);
 
   return (
-    <div className="stella-page fix-page">
-      <SiteHeader />
+    <PageShell
+      closing={
+        <Finale
+          title={page.ctaHeadline}
+          body="Download Stella for Mac or Windows and tell it what's broken."
+          actions={<Link href="/fix">More things Stella fixes</Link>}
+          note="Free. No credit card, no trial."
+          after={<WindowsInstallNote />}
+        />
+      }
+    >
+      <section className={pg.hero} data-tone="light" data-bg="#ffffff">
+        <p className={pg.eyebrow}>{page.eyebrow}</p>
+        <h1 className={`${pg.title} ${f.title}`}>
+          {page.headline} <em>{page.headlineAccent}</em>
+        </h1>
+        <p className={pg.lede}>{page.lede}</p>
+        <div className={pg.cta}>
+          <DownloadButton />
+          <Link className={pg.secondary} href="/pricing">
+            See pricing
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+        <div className={pg.note}>
+          <WindowsInstallNote />
+        </div>
+        <p className={pg.reassure}>Free to use</p>
+      </section>
 
-      <main>
-        <section className="fix-hero section-border">
-          <AuroraCanvas className="fix-aurora" />
-          <div className="fix-hero__copy">
-            <p className="fix-eyebrow">{page.eyebrow}</p>
-            <h1>
-              {page.headline} <span>{page.headlineAccent}</span>
-            </h1>
-            <p className="fix-lede">{page.lede}</p>
-            <div className="fix-actions">
-              <DownloadButton />
-              <Link className="button button--ghost" href="/pricing">
-                See pricing
-                <ArrowRight size={16} />
-              </Link>
-            </div>
-            <WindowsInstallNote />
-            <p className="fix-offer">
-              Free to use
+      <section className={f.symptomsSection} data-tone="light" data-bg="#f1f1f4" aria-labelledby="familiar">
+        <div className={f.sectionHead}>
+          <p className={pg.eyebrow}>Sound familiar?</p>
+          <h2 id="familiar" className={pg.h2}>
+            You&apos;ve probably already searched this.
+          </h2>
+        </div>
+        <InView className={f.searches} threshold={0.1}>
+          {page.symptoms.map((symptom, i) => (
+            <p key={symptom} className={f.search} style={{ ["--i" as string]: i }}>
+              <Search size={18} strokeWidth={2} aria-hidden="true" />
+              <span>{symptom}</span>
             </p>
-          </div>
-        </section>
+          ))}
+        </InView>
+      </section>
 
-        <section
-          className="fix-section section-border"
-          aria-label="Searches this page answers"
-        >
-          <header className="fix-section__header">
-            <p className="fix-eyebrow">Sound familiar?</p>
-            <h2>You&apos;ve probably already searched this.</h2>
-          </header>
-          <ul className="fix-symptoms">
-            {page.symptoms.map((symptom) => (
-              <li key={symptom}>{symptom}</li>
-            ))}
-          </ul>
-        </section>
-
-        <FixHowItWorks prompt={page.prompt} exchanges={getFixPageDemo(page.slug)} />
-
-        <section className="fix-section section-border">
-          <header className="fix-section__header">
-            <p className="fix-eyebrow">On this problem</p>
-            <h2>What Stella actually does.</h2>
-          </header>
-          <ul className="fix-does">
-            {page.steps.map((step) => (
-              <li key={step}>
-                <Check size={16} strokeWidth={2.5} aria-hidden="true" />
-                {step}
+      <section className={pg.split} data-tone="light" data-bg="#ffffff" aria-labelledby="how">
+        <div className={pg.copy}>
+          <p className={pg.eyebrow}>How it works</p>
+          <h2 id="how" className={pg.h2}>
+            Tell Stella. It works your computer. Done.
+          </h2>
+          <ol className={f.beats}>
+            {BEATS.map((beat, i) => (
+              <li key={beat}>
+                <span>{i + 1}</span>
+                {beat}
               </li>
             ))}
-          </ul>
-        </section>
-
-        <section className="fix-cta">
-          <div>
-            <p className="fix-eyebrow">Ready when you are</p>
-            <h2>{page.ctaHeadline}</h2>
-            <p>
-              Download Stella for Mac or Windows and tell it what&apos;s broken.
-            </p>
+          </ol>
+          <div className={f.prompt}>
+            <div className={f.promptTop}>
+              <span className={f.promptLabel}>Try this prompt</span>
+              <CopyPromptButton text={page.prompt} className={f.copy} />
+            </div>
+            <q className={f.promptText}>{page.prompt}</q>
           </div>
-          <div className="fix-actions">
-            <DownloadButton />
-            <Link className="button button--ghost" href="/fix">
-              More things Stella fixes
-              <ArrowRight size={16} />
-            </Link>
-          </div>
-          <WindowsInstallNote />
-          <p className="download-reassurance">
-            Free. No credit card, no trial.
-          </p>
-        </section>
-      </main>
-
-      <footer className="grid-shell site-footer section-border">
-        <div className="footer-brand">
-          <Link className="brand-mark brand-mark--footer" href="/">
-            <StellaMark size={42} />
-            <span className="brand-text">Stella</span>
-          </Link>
-          <FooterLegalLinks />
         </div>
-        <div className="footer-columns">
-          {homeFooterGroups.map((group) => (
-            <div key={group.title} className="footer-column">
-              <h3>{group.title}</h3>
-              <ul>
-                {group.items.map((item) => (
-                  <li key={item.label}>
-                    <a
-                      href={item.href}
-                      target={item.external ? "_blank" : undefined}
-                      rel={item.external ? "noopener noreferrer" : undefined}
-                    >
-                      {item.label}
-                    </a>
-                  </li>
-                ))}
-              </ul>
+        {exchanges.length > 0 ? (
+          <MockStage>
+            <MockChat>
+              {exchanges.flatMap((exchange, i) => [
+                <Me key={`u${i}`} d={i * 1400}>
+                  {exchange.user}
+                </Me>,
+                <Her key={`r${i}`} d={i * 1400 + 600}>
+                  {exchange.reply}
+                </Her>,
+              ])}
+            </MockChat>
+          </MockStage>
+        ) : null}
+      </section>
+
+      <section className={f.doesSection} data-tone="light" data-bg="#f1f1f4" aria-labelledby="does">
+        <div className={f.sectionHead}>
+          <p className={pg.eyebrow}>On this problem</p>
+          <h2 id="does" className={pg.h2}>
+            What Stella actually does.
+          </h2>
+        </div>
+        <InView className={f.does} threshold={0.1}>
+          {page.steps.map((step, i) => (
+            <div key={step} className={f.step} style={{ ["--i" as string]: i }}>
+              <span className={f.stepIcon}>
+                <Check size={18} strokeWidth={2.6} aria-hidden="true" />
+              </span>
+              <p>{step}</p>
             </div>
           ))}
-        </div>
-      </footer>
-    </div>
+        </InView>
+      </section>
+    </PageShell>
   );
 }

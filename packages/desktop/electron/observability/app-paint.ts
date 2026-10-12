@@ -12,3 +12,9 @@ export const noteAppPainted = (contents: WebContents): void => {
 export const onceAppPainted = (contents: WebContents, listener: () => void): void => {
   listeners.set(contents, [...(listeners.get(contents) ?? []), listener]);
 };
+
+let markStartupPainted: () => void = () => undefined;
+export const startupAppPainted = new Promise<void>((resolve) => {
+  markStartupPainted = resolve;
+});
+export const noteStartupAppPainted = (): void => markStartupPainted();

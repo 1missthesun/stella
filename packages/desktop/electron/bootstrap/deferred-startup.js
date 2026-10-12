@@ -1,5 +1,6 @@
 import path from "node:path";
 import { getMainLogger } from "../observability/main-logger.js";
+import { startupAppPainted } from "../observability/app-paint.js";
 import { sweepOrphanedHelpers } from "../services/orphaned-helpers.js";
 import { resolveLegacyStellaBrowserBinaryPath, resolveStellaBrowserBinaryPath, } from "../utils/stella-browser-paths.js";
 import { getTotalSystemMemoryMb, isLowMemoryWindowsDevice, } from "../resource-profile.js";
@@ -71,6 +72,7 @@ const createDeferredStartupTasks = (context) => {
             // quit) left its helpers running; stop them now rather than at the
             // next quit. In the background: nothing here waits on it.
             label: "orphaned-helpers",
+            afterAppPaint: true,
             run: () => {
                 const browserBinaryDirectories = [
                     resolveStellaBrowserBinaryPath(),
@@ -87,12 +89,14 @@ const createDeferredStartupTasks = (context) => {
             // Drafts, undo and fork sync for the app's own checkout (from
             // source only). Every git call is async.
             label: "app-source",
+            afterAppPaint: true,
             run: () => {
                 state.appSourceService?.start();
             },
         },
         {
             label: "overlay-warmup-schedule",
+            afterAppPaint: true,
             run: () => {
                 scheduleOverlayWarmup(context);
             },
@@ -101,6 +105,7 @@ const createDeferredStartupTasks = (context) => {
             // Bring the floating companion back if the user left it on. Runs
             // after first paint so its renderer never contends with the shell's.
             label: "companion-restore",
+            afterAppPaint: true,
             run: () => {
                 const stellaDataDir = state.stellaDataDirPath ?? config.stellaDataDirPath;
                 if (!stellaDataDir || !getCompanionEnabled(stellaDataDir)) {
@@ -122,6 +127,9 @@ export const startDeferredStartup = (context) => {
     }
     state.deferredStartupSequence = (async () => {
         for (const task of createDeferredStartupTasks(context)) {
+            if (task.afterAppPaint) {
+                await startupAppPainted;
+            }
             const completed = await runDeferredStartupTask(context, task);
             if (!completed) {
                 return;

@@ -13,8 +13,9 @@ import { resolveRendererBuildMode, serveRendererSource, } from "../source/render
 import { getAllWindows, } from "./context.js";
 import { startDeferredStartup } from "./deferred-startup.js";
 import { getMainLogger } from "../observability/main-logger.js";
-import { onceAppPainted } from "../observability/app-paint.js";
+import { noteStartupAppPainted, onceAppPainted } from "../observability/app-paint.js";
 import { heldFirstPage, pendingHold } from "../services/app-source/update-transition.js";
+const STARTUP_APP_PAINT_FALLBACK_MS = 4_000;
 const initializeBootstrapLocalState = async (context) => {
     const { config, lifecycle, services, state } = context;
     const stellaDataDir = await resolveStellaDataDir(app, config.stellaAppDir, config.stellaDataDirPath);
@@ -172,8 +173,10 @@ export const createBootstrapInitialWindows = (context) => {
             getMainLogger()?.process("startup.first-app-paint", {
                 elapsedMs: Math.round(process.uptime() * 1000),
             });
+            noteStartupAppPainted();
         });
     }
+    setTimeout(noteStartupAppPainted, STARTUP_APP_PAINT_FALLBACK_MS).unref?.();
     if (hold && fullWindow) {
         let raised = false;
         const raise = (shownWith) => {

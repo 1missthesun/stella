@@ -24,6 +24,7 @@ import { LocalChatHistoryService } from "../services/local-chat-history-service.
 import { SecurityPolicyService } from "../services/security-policy-service.js";
 import { UiStateService } from "../services/ui-state-service.js";
 import { RENDERER_ORIGIN } from "../source/origin.js";
+import { startupAppPainted } from "../observability/app-paint.js";
 import { initMainProcessTelemetry } from "../observability/main-telemetry.js";
 import { getMainLogger } from "../observability/main-logger.js";
 export const createBootstrapServices = (options) => {
@@ -158,8 +159,10 @@ export const createBootstrapServices = (options) => {
         log: (event, data) => getMainLogger()?.process(event, data),
     });
     app.on("browser-window-focus", () => {
-        claudeLocalAccounts.noteWindowFocus();
-        memorySync.noteWindowFocus();
+        void startupAppPainted.then(() => {
+            claudeLocalAccounts.noteWindowFocus();
+            memorySync.noteWindowFocus();
+        });
     });
     const connectorOAuthService = new ConnectorOAuthService();
     connectorCredentialService = new ConnectorCredentialService({

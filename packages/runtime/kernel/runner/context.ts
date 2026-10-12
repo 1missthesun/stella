@@ -239,34 +239,30 @@ export const createRunnerContext = ({
     );
   };
 
-  const piCloudAgentThreads: PiCloudAgentThreads = {
-    start: async ({ conversationId, requestId, description, prompt, model }) => {
-      const validModel = (modelName: string) => {
-        try {
-          resolveRunnerLlmRoute(context, AGENT_IDS.GENERAL, modelName);
-          return true;
-        } catch {
-          return false;
-        }
-      };
-      const selection = parseSpawnAgentModel(model, validModel);
-      if (selection.kind === "model") {
-        await resolveRunnerLlmRouteWithMetadata(
-          context,
-          AGENT_IDS.GENERAL,
-          selection.model,
-          selection.reasoningEffort,
-        );
+  const cloudExecutionFor = async (model: string | undefined) => {
+    const validModel = (modelName: string) => {
+      try {
+        resolveRunnerLlmRoute(context, AGENT_IDS.GENERAL, modelName);
+        return true;
+      } catch {
+        return false;
       }
-      const execution = await resolveCloudExecutionSelection({
-        ...(selection.kind === "model"
-          ? { model: selection.model, spawnEngine: { engine: "default" } as const }
-          : {}),
-        ...(selection.kind === "engine" ? { spawnEngine: selection.engine } : {}),
-        ...(selection.reasoningEffort
-          ? { reasoningEffort: selection.reasoningEffort }
-          : {}),
-      });
+    };
+    const selection = parseSpawnAgentModel(model, validModel);
+    if (selection.kind === "model") {
+      await resolveRunnerLlmRouteWithMetadata(context, AGENT_IDS.GENERAL, selection.model, selection.reasoningEffort);
+    }
+    return await resolveCloudExecutionSelection({
+      ...(selection.kind === "model" ? { model: selection.model, spawnEngine: { engine: "default" } as const } : {}),
+      ...(selection.kind === "engine" ? { spawnEngine: selection.engine } : {}),
+      ...(selection.reasoningEffort ? { reasoningEffort: selection.reasoningEffort } : {}),
+    });
+  };
+
+  const piCloudAgentThreads: PiCloudAgentThreads = {
+    execution: cloudExecutionFor,
+    start: async ({ conversationId, requestId, description, prompt, model }) => {
+      const execution = await cloudExecutionFor(model);
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to run agents in the cloud.");
       }

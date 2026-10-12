@@ -31,9 +31,9 @@ export type StellaExecutionHost = {
   standing?(deviceId: string, context: Context): Promise<DeviceStanding | undefined>;
   /**
    * Whether one of this host's agents can move to `deviceId` now
-   * (`switch_destination`): that computer by its id and name, `here` when it
-   * is this one, or why not (offline, not ready, not taking work, not signed
-   * in to Claude Code for an agent on it).
+   * (`switch_destination`), `AGENT_MOVE_CLOUD` for the cloud: that place by
+   * its id and name, `here` when it is this one, or why not (offline, not
+   * ready, not taking work, not signed in to Claude Code for an agent on it).
    */
   agentTarget?(
     deviceId: string,
@@ -51,6 +51,9 @@ export type StellaExecutionHost = {
 };
 
 /** An agent moving itself, as `StellaExecutionHost.moveAgent` takes it. */
+/** The `deviceId` of a move to the cloud. */
+export const AGENT_MOVE_CLOUD = "cloud";
+
 export type AgentMove = {
   threadId: string;
   agentConversationId: ConversationId;
@@ -123,7 +126,7 @@ export const switchDestinationTool = (
   defineTool({
     name: SWITCH_DESTINATION_TOOL_NAME,
     description:
-      'Move yourself to another place: "cloud", or one of the user\'s computers by device_id, and carry on there with this whole conversation from your brief (prompt). Stella: that host takes this conversation\'s turns from now on and the app\'s destination picker follows, once this turn ends; for separate work there, start an agent with spawn_agent and that destination instead. An agent: you move as a whole when this turn ends, and that computer\'s own Stella runs you natively from then on, with its files, apps, browser and sign-ins (and its Claude Code, for an agent on Claude Code); your thread id, reports, messages and pauses follow you. Files in your working folder do not move: commit and push work in progress (a WIP branch is fine) before you move. End your turn right after calling it.',
+      'Move yourself to another place: "cloud", or one of the user\'s computers by device_id, and carry on there with this whole conversation from your brief (prompt). Stella: that host takes this conversation\'s turns from now on and the app\'s destination picker follows, once this turn ends; for separate work there, start an agent with spawn_agent and that destination instead. An agent: you move as a whole when this turn ends, and that computer\'s own Stella (or the cloud, in a container of its own) runs you from then on, with its files, apps, browser and sign-ins (and its Claude Code, for an agent on Claude Code); your thread id, reports, messages and pauses follow you. Files in your working folder do not move: commit and push work in progress (a WIP branch is fine) before you move. End your turn right after calling it.',
     parameters: Type.Object({
       destination: Type.String({
         description: '"cloud", or a device_id from the connected devices list.',

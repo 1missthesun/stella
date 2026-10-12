@@ -123,6 +123,7 @@ import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
 import { agentLogDeviceHolder, type AgentLogCalls } from "@stella/contracts/backend/agent-logs";
 import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
 import { agentLogSync, importAgentLog, type AgentLogTransport } from "../stella/agent-log-sync.ts";
+import { agentMoveModel } from "../stella/agent-move-model.ts";
 import { movedAgentBrief, type AgentMove } from "../stella/execution.ts";
 
 /** The newest entries a client gets when it attaches, and per older page. */
@@ -376,22 +377,6 @@ const fileName = (conversationId: string): string => {
   const safe = conversationId.replace(/[^A-Za-z0-9_.-]/g, "_");
   if (!safe || safe.startsWith(".")) throw new Error(`Invalid conversation id: ${conversationId}`);
   return `${safe}.sqlite`;
-};
-
-const REASONING_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
-
-/** What an agent runs on, as `spawn_agent` names a model, for the computer it moves to. */
-const agentModelSpec = (model: AgentMove["model"], thinkingLevel?: string): string | undefined => {
-  if (!model) return undefined;
-  const effort = thinkingLevel && REASONING_EFFORTS.has(thinkingLevel) ? `:${thinkingLevel}` : "";
-  if (model.provider === STELLA_PROVIDER_ID) {
-    const alias = parseStellaModelId(model.modelId)?.alias;
-    return alias ? `${alias.startsWith("stella/") ? alias : `stella/${alias}`}${effort}` : undefined;
-  }
-  if (onClaudeCode(model)) {
-    return `${CLAUDE_CODE_PROVIDER_ID}${model.modelId && model.modelId !== "default" ? `/${model.modelId}` : ""}${effort}`;
-  }
-  return `${accountProviderOfRegistryId(model.provider) ?? model.provider}/${model.modelId}${effort}`;
 };
 
 const git = (cwd: string, args: string[]): Promise<string> =>
@@ -1191,7 +1176,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                 const listed = await devices?.devices().catch(() => undefined);
                 const from = listed?.find((entry) => entry.deviceId === options.deviceId)?.label?.trim() || "the computer you ran on";
                 const brief = move.brief.length > 6_000 ? `${move.brief.slice(0, 6_000)}\n[brief cut]` : move.brief;
-                const model = agentModelSpec(move.model, move.thinkingLevel);
+                const model = agentMoveModel(move.model, move.thinkingLevel);
                 const moved = await handoff({
                   handoffId: `move:${createHash("sha256").update(`${conversationId}\0${move.threadId}\0${move.key}`).digest("hex").slice(0, 40)}`,
                   threadId: move.threadId,
@@ -1280,8 +1265,12 @@ export function desktopChats(options: DesktopChatsOptions) {
                   ? {
                       agentLog: {
                         kick: agentLog.kick,
-                        importInto: (into, conversation, threadId, runContext) =>
-                          importAgentLog(into, conversation, agentLogTransport, threadId, runContext),
+                        importInto: async (agentConversationId, threadId, runContext) => {
+                          const into = harnessRef;
+                          const conversation = into ? await into.conversation(agentConversationId, runContext) : undefined;
+                          if (!into || !conversation) throw new Error("this chat isn't open here.");
+                          return await importAgentLog(into, conversation, agentLogTransport, threadId, runContext);
+                        },
                       },
                     }
                   : {}),

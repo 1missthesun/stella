@@ -279,6 +279,8 @@ export type PiReportDelivery = (report: {
  * back to this computer the same way.
  */
 export type PiCloudAgentThreads = {
+  /** What an agent on `model` (as `spawn_agent` names one) runs on in the cloud. */
+  execution: (model: string | undefined) => Promise<import("@stella/contracts/agent-engine").CloudExecutionSelection>;
   start: (request: {
     conversationId: string;
     requestId: string;

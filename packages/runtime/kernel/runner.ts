@@ -464,12 +464,16 @@ export const createStellaHostRunner = (
           ownerGeneration: await context.cloudOwnerGeneration(),
         });
       },
-      handoff: async (args) =>
-        await context.backend.require().call("agentThreads.handoff", {
+      handoff: async (args) => {
+        const execution =
+          args.targetDeviceId === "cloud" ? await context.piCloudAgentThreads.execution(args.model) : undefined;
+        return await context.backend.require().call("agentThreads.handoff", {
           ...args,
+          ...(execution ? { execution } : {}),
           fromDeviceId: context.deviceId,
           ownerGeneration: await context.cloudOwnerGeneration(),
-        }),
+        });
+      },
     },
     agentLogs: {
       append: async (args) => await context.backend.require().call("agentLogs.append", args),

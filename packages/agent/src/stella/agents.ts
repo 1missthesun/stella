@@ -63,7 +63,7 @@ import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contr
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
-import { switchDestinationTool, type AgentSwitch, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
+import { AGENT_MOVE_CLOUD, switchDestinationTool, type AgentSwitch, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
 import {
   describePlacement,
@@ -118,6 +118,8 @@ type AgentRecord = {
   away?: true;
   /** It came back here as an agent another host placed, under this key (`runPlacedAgent`). */
   placedAs?: string;
+  /** It moved here: its next run first takes what it did elsewhere from its log. */
+  catchUp?: true;
 };
 
 /**
@@ -432,7 +434,7 @@ export type StellaAgentsHost = {
    */
   agentLog?: {
     kick(conversationId: ConversationId): void;
-    importInto(harness: Harness, conversation: Conversation, threadId: string, context: Context): Promise<{ cwd?: string }>;
+    importInto(agentConversationId: ConversationId, threadId: string, context: Context): Promise<{ cwd?: string }>;
   };
 };
 
@@ -786,6 +788,14 @@ export function stellaAgents(host: StellaAgentsHost) {
             // Its model may be one nothing registered since a restart (another Stella alias).
             const model = host.ensureModel ? (await runtime.snapshot(AgentDoc, agentConversationId, context))?.model : undefined;
             if (model) await host.ensureModel?.(model, context);
+            if ((await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context))?.agents[threadId]?.catchUp) {
+              await catchUpFromLog(agentConversationId, threadId, context);
+              await runtime.commit(async (tx) => {
+                const current = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
+                if (current) delete current.catchUp;
+                return undefined;
+              }, context);
+            }
             const submission = await agent.submit(
               {
                 type: "input",
@@ -858,7 +868,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 agent.remote = true;
                 agent.moved = true;
                 agent.away = true;
-                agent.placement = { kind: "device", deviceId: move.deviceId };
+                agent.placement = move.deviceId === AGENT_MOVE_CLOUD ? { kind: "cloud" } : { kind: "device", deviceId: move.deviceId };
                 agent.startedAt ??= Date.now();
                 agent.answered = [...new Set([...(agent.answered ?? []), ...given.slice(0, -1)])];
               }
@@ -1840,6 +1850,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       model?: ModelRef;
       /** The thinking level that host admitted it for, with `model`. */
       thinkingLevel?: ModelThinkingLevel;
+      /** It may have run elsewhere before (it moved here): its first run takes its log first. */
+      catchUp?: boolean;
     },
     context: Context,
   ): Promise<{ threadId: string; existing: boolean }> => {
@@ -1848,21 +1860,42 @@ export function stellaAgents(host: StellaAgentsHost) {
       ? { model: args.model, ...(args.thinkingLevel ? { thinkingLevel: args.thinkingLevel } : {}) }
       : childRun(await root.agent(context));
     if (args.model) await host.ensureModel?.(args.model, context);
-    return await harness.commit(
-      (tx) =>
-        createAgent(tx, {
-          parentConversationId: root.id,
-          callKey: `host:${args.key}`,
-          depth: 1,
-          description: args.description.trim() || "agent",
-          prompt: args.prompt,
-          runsOn,
-          placement: host.rootPlacement,
-          ...(args.threadId ? { threadId: args.threadId } : {}),
-          ...(args.origin ? { origin: args.origin } : {}),
-        }),
-      context,
-    );
+    return await harness.commit(async (tx) => {
+      const created = await createAgent(tx, {
+        parentConversationId: root.id,
+        callKey: `host:${args.key}`,
+        depth: 1,
+        description: args.description.trim() || "agent",
+        prompt: args.prompt,
+        runsOn,
+        placement: host.rootPlacement,
+        ...(args.threadId ? { threadId: args.threadId } : {}),
+        ...(args.origin ? { origin: args.origin } : {}),
+      });
+      if (args.catchUp && !created.existing) {
+        const record = (await tx.doc(StellaAgentsDoc, root.id)).agents[created.threadId];
+        if (record) record.catchUp = true;
+      }
+      return created;
+    }, context);
+  };
+
+  /** One of the orchestrator's agents that may have run elsewhere since: its next run takes its log first. */
+  const markCatchUp = async (harness: Harness, threadId: string, context: Context): Promise<void> => {
+    const root = await harness.root(context);
+    await harness.commit(async (tx) => {
+      const record = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
+      if (!record) return undefined;
+      record.catchUp = true;
+      // It moved away and came back: it runs here again.
+      if (record.moved) {
+        delete record.moved;
+        delete record.remote;
+        delete record.away;
+        record.placement = host.rootPlacement;
+      }
+      return undefined;
+    }, context);
   };
 
   /** One of the orchestrator's agents at any depth, with the conversation that started it. */
@@ -2083,6 +2116,28 @@ export function stellaAgents(host: StellaAgentsHost) {
    * to the host that placed it rather than reporting here. Once per `key`;
    * settles with its answer.
    */
+  /**
+   * What an agent did elsewhere since it last ran here, from its log, into
+   * its conversation here; a few tries, and then it does not run without
+   * its memory.
+   */
+  const catchUpFromLog = async (agentConversationId: ConversationId, threadId: string, context: Context): Promise<{ cwd?: string }> => {
+    const agentLog = host.agentLog;
+    if (!agentLog) return {};
+    let failure: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt));
+      try {
+        return await agentLog.importInto(agentConversationId, threadId, context);
+      } catch (error) {
+        failure = error;
+      }
+    }
+    throw new Error(
+      `Its conversation couldn't be read from Stella's cloud (${failure instanceof Error ? failure.message : String(failure)}), so it did not run without its memory. Message it again to retry.`,
+    );
+  };
+
   const runPlacedAgent = async (harness: Harness, args: PlacedAgentRun, context: Context): Promise<PlacedAgentResult> => {
     const root = await harness.root(context);
     const runsOn = args.runsOn?.model ? args.runsOn : childRun(await root.agent(context));
@@ -2109,21 +2164,11 @@ export function stellaAgents(host: StellaAgentsHost) {
     // Whatever it did elsewhere since it last ran here (all of it, for an
     // agent that moved here) comes first, from its log.
     if (host.agentLog) {
-      let imported: { cwd?: string } | undefined;
-      let failure: unknown;
-      for (let attempt = 0; attempt < 3 && !imported; attempt += 1) {
-        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt));
-        imported = await host.agentLog.importInto(harness, agent, threadId, context).catch((error: unknown) => {
-          failure = error;
-          return undefined;
-        });
-      }
-      if (!imported) {
-        return {
-          threadId,
-          status: "error",
-          error: `This computer couldn't read the agent's conversation from Stella's cloud (${failure instanceof Error ? failure.message : String(failure)}), so it did not run it without its memory. Message it again to retry.`,
-        };
+      let imported: { cwd?: string };
+      try {
+        imported = await catchUpFromLog(agent.id, threadId, context);
+      } catch (error) {
+        return { threadId, status: "error", error: error instanceof Error ? error.message : String(error) };
       }
       const cwd = imported.cwd;
       const own = await harness.snapshot(AgentDoc, agent.id, context);
@@ -2271,15 +2316,11 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (!moveAgent || !agentTarget) throw new Error("This chat is stored only on this computer, so you can only run here.");
     const destination = parseSpawnDestination(args.destination);
     if (destination.kind === "here") throw new Error('destination is required: "cloud" or a device_id.');
-    if (destination.kind === "cloud") {
-      throw new Error(
-        'Agents can\'t move themselves to the cloud yet. If the work needs the cloud, ask Stella with send_message to "stella" to start a cloud agent for it.',
-      );
-    }
+    const where = destination.kind === "cloud" ? AGENT_MOVE_CLOUD : destination.deviceId;
     const brief = args.prompt?.trim();
     if (!brief) throw new Error("Pass your brief as prompt: what you will do there next, as you will read it there.");
     const agent = await api.snapshot(AgentDoc, api.conversationId, context);
-    const target = await agentTarget(destination.deviceId, { claudeCode: onClaudeCode(agent?.model) }, context);
+    const target = await agentTarget(where, { claudeCode: onClaudeCode(agent?.model) }, context);
     if ("error" in target) throw new Error(target.error);
     if (target.here) return { content: [{ type: "text", text: `You already run on ${target.name}. Carry on here.` }] };
     if (await agentsBusy(busyReader(api, context), api.conversationId).catch(() => false)) {
@@ -2387,6 +2428,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     agentStanding,
     runPlacedAgent,
     steerPlacedAgent,
+    markCatchUp,
   };
 }
 

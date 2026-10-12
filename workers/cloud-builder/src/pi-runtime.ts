@@ -75,7 +75,20 @@ import {
 } from "@stella/agent/provider/stella";
 import { StellaAgentDoc } from "@stella/agent/stella/agent-doc";
 import { ownHistoryQuery } from "@stella/agent/stella/own-history";
-import { deviceRefusal, deviceStanding, type StellaExecutionHost } from "@stella/agent/stella/execution";
+import {
+  AGENT_MOVE_CLOUD,
+  deviceRefusal,
+  deviceStanding,
+  movedAgentBrief,
+  type AgentMove,
+  type StellaExecutionHost,
+} from "@stella/agent/stella/execution";
+import { agentLogSync, importAgentLog, type AgentLogTransport } from "@stella/agent/stella/agent-log-sync";
+import { agentMoveModel } from "@stella/agent/stella/agent-move-model";
+import { sha256Hex } from "./hash.js";
+import { AGENT_LOG_CLOUD_HOLDER, type AgentLogCalls } from "@stella/contracts/backend/agent-logs";
+import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
+import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import { findDeviceDestination } from "@stella/contracts/turn-plane/placement";
 import type { PiBrainHost } from "@stella/contracts/turn-plane/pi-brain";
 import {
@@ -630,7 +643,7 @@ type Opened = {
   root: Conversation;
   rootSession: string;
   refreshTools(): void;
-  agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "pauseAgent" | "agentStanding">;
+  agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "pauseAgent" | "agentStanding" | "markCatchUp">;
 };
 
 /** A cloud tool as the harness offers it. */
@@ -686,6 +699,16 @@ export class PiConversationRuntime {
   readonly #waiting = new Map<string, Set<() => void>>();
   /** The root conversation's events for clients watching the pi view. */
   #clientStream: AgentEventStream | undefined;
+  /** The harness once open, for the agents' log sync. */
+  #harnessRef: Harness | undefined;
+  /** Every agent's conversation, written to its log in the owner's cloud at each step. */
+  readonly #agentLog = agentLogSync({
+    harness: () => this.#harnessRef,
+    transport: () => this.#agentLogTransport(),
+    report: (error) => this.#options.report(error),
+    onAppend: (stat) => this.#options.log("pi_agent_log_append", stat),
+    context: BACKGROUND_CONTEXT,
+  });
 
   constructor(options: PiRuntimeOptions) {
     this.#options = options;
@@ -1165,6 +1188,16 @@ export class PiConversationRuntime {
       defaultAgentModel: (caller) => (caller.model?.provider === CLAUDE_CODE_PROVIDER_ID ? "default" : undefined),
       engine: (id) => (id === THREAD_AGENT_ENGINE ? this.#threadAgentHost() : undefined),
       execution: this.#execution(),
+      agentLog: {
+        kick: (conversationId) => this.#agentLog.kick(conversationId),
+        importInto: async (agentConversationId, threadId, context) => {
+          const harness = this.#harnessRef;
+          const transport = this.#agentLogTransport();
+          const conversation = harness ? await harness.conversation(agentConversationId, context) : undefined;
+          if (!harness || !transport || !conversation) throw new Error("this conversation isn't open in the cloud yet.");
+          return await importAgentLog(harness, conversation, transport, threadId, context);
+        },
+      },
       beginAgentRun: async (run, context) => {
         const authority = await this.#runAuthority(run, context);
         const turnId = `pi:${authority.conversationId}:${run.runId}`;
@@ -1515,6 +1548,31 @@ export class PiConversationRuntime {
    */
   #execution(): StellaExecutionHost {
     return {
+      agentTarget: async (deviceId, needs) => {
+        if (deviceId.trim().toLowerCase() === AGENT_MOVE_CLOUD) return { deviceId: AGENT_MOVE_CLOUD, name: "Stella's cloud", here: true };
+        const { authority } = await this.#agentState();
+        const listed = await this.#gate(authority)
+          .devices()
+          .catch(() => undefined);
+        if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
+        const device = findDeviceDestination(listed.devices, deviceId);
+        if (!device) {
+          return { error: `No connected device has the device_id or name ${deviceId}. Use a device_id from the connected devices list.` };
+        }
+        const name = device.label?.trim() || device.deviceId;
+        if (!device.online) {
+          return { error: `${name} is offline, so you can't move there now. Carry on here, or tell Stella with send_message to "stella" if the work needs that computer.` };
+        }
+        const refusal = deviceRefusal(device, name);
+        if (refusal) return { error: refusal };
+        if (needs.claudeCode && device.availability && !device.availability.capabilities.includes("claude-code")) {
+          return {
+            error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › Account there) and try again.`,
+          };
+        }
+        return { deviceId: device.deviceId, name };
+      },
+      moveAgent: async (move) => await this.#moveAgent(move),
       standing: async (deviceId) => {
         const { authority } = await this.#agentState();
         const listed = await this.#gate(authority)
@@ -1548,6 +1606,63 @@ export class PiConversationRuntime {
           }
         : {}),
     };
+  }
+
+  /** The owner's object, for one of the agents' internal calls. */
+  async #ownerCall<T>(authority: PiAuthority, name: string, args: unknown): Promise<T> {
+    const response = (await this.#gate(authority).ownerInternal({
+      name,
+      args,
+      ownerGeneration: authority.ownerGeneration,
+    })) as RpcResponse<T>;
+    if (!response.ok) throw Object.assign(new Error(response.error.message), { reason: response.error.reason });
+    return response.value;
+  }
+
+  /** The agents' logs in the owner's cloud, written as the cloud's; none before any authority is known. */
+  #agentLogTransport(): AgentLogTransport | undefined {
+    const authority = this.#state?.authority;
+    if (!authority) return undefined;
+    return {
+      holder: AGENT_LOG_CLOUD_HOLDER,
+      conversationId: authority.conversationId,
+      append: async ({ threadId, records }) =>
+        await this.#ownerCall<AgentLogCalls["agentLogs.append"]["result"]>(authority, "agentLogs.cloudAppend", {
+          threadId,
+          conversationId: authority.conversationId,
+          records,
+        }),
+      read: async (args) => await this.#ownerCall<AgentLogCalls["agentLogs.read"]["result"]>(authority, "agentLogs.cloudRead", args),
+    };
+  }
+
+  /**
+   * One of the agents here moving itself to one of the owner's computers,
+   * once its run here ended: its log first, then the owner's hand-off, after
+   * which that computer runs it and reports for it.
+   */
+  async #moveAgent(move: AgentMove): Promise<{ where: string } | { error: string }> {
+    if (move.deviceId === AGENT_MOVE_CLOUD) return { error: "You already run in the cloud." };
+    try {
+      await this.#agentLog.flush(move.agentConversationId);
+    } catch (error) {
+      return { error: `your conversation couldn't be saved (${error instanceof Error ? error.message : String(error)}).` };
+    }
+    const { authority } = await this.#agentState();
+    const brief = move.brief.length > 6_000 ? `${move.brief.slice(0, 6_000)}\n[brief cut]` : move.brief;
+    const model = agentMoveModel(move.model, move.thinkingLevel);
+    const handoffId = `move:${(await sha256Hex(`${authority.conversationId}\0${move.threadId}\0${move.key}`)).slice(0, 40)}`;
+    const moved = await this.#ownerCall<AgentThreadCalls["agentThreads.handoff"]["result"]>(authority, "agentThreads.cloudHandoff", {
+      ownerGeneration: authority.ownerGeneration,
+      handoffId,
+      threadId: move.threadId,
+      conversationId: authority.conversationId,
+      targetDeviceId: move.deviceId,
+      prompt: movedAgentBrief("Stella's cloud", brief),
+      ...(model ? { model } : {}),
+    });
+    this.#options.log("pi_agent_moved", { threadId: move.threadId, to: move.deviceId });
+    return { where: moved.where };
   }
 
   /**
@@ -1823,7 +1938,7 @@ export class PiConversationRuntime {
       if (kept) this.#state = kept;
       this.#setModels(kept);
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
-      const { harness, refreshTools, startAgent, messageAgent, pauseAgent, agentStanding } = await openStellaHarness(
+      const { harness, refreshTools, startAgent, messageAgent, pauseAgent, agentStanding, markCatchUp } = await openStellaHarness(
         {
           storage,
           models: this.#models,
@@ -1834,11 +1949,13 @@ export class PiConversationRuntime {
           extensions: [
             piAttachedCoding((call, context) => this.#attachedTool(call, context)),
             ...(this.#claudeCode ? [this.#claudeCode.extension(CLAUDE_CODE_SCOPE)] : []),
+            this.#agentLog.extension(),
           ],
           onReport: this.#options.report,
         },
         BACKGROUND_CONTEXT,
       );
+      this.#harnessRef = harness;
       const root = await harness.root(BACKGROUND_CONTEXT);
       // Before recovered work runs: a root seeded with the whole journal is
       // too large to read back into one model request.
@@ -1855,7 +1972,7 @@ export class PiConversationRuntime {
         root,
         rootSession,
         refreshTools,
-        agents: { startAgent, messageAgent, pauseAgent, agentStanding },
+        agents: { startAgent, messageAgent, pauseAgent, agentStanding, markCatchUp },
       };
     })().catch((error: unknown) => {
       this.#opening = undefined;
@@ -2000,6 +2117,7 @@ export class PiConversationRuntime {
     const state = await harness.snapshot(StellaAgentsDoc, root.id, context);
     if (state?.calls[`host:${key}`] || state?.calls[`user:${key}`]) return;
     if (state?.agents[attempt.threadId]) {
+      await agents.markCatchUp(attempt.threadId, context);
       await agents.messageAgent(
         { key, threadId: attempt.threadId, message: prompt, fromOrchestrator: true },
         context,
@@ -2012,6 +2130,7 @@ export class PiConversationRuntime {
         description: attempt.description,
         prompt,
         threadId: attempt.threadId,
+        catchUp: true,
         origin: { agentThread: true },
         model: this.#threadModel(attempt.authority.execution, attempt.model),
         thinkingLevel: thinkingLevelFor(attempt.authority.execution.reasoningEffort),

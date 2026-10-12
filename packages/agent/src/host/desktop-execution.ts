@@ -16,7 +16,7 @@ import {
   type DeviceDestination,
   type DevicesResponse,
 } from "@stella/contracts/turn-plane/placement";
-import { deviceRefusal, deviceStanding, type StellaExecutionHost } from "../stella/execution.ts";
+import { AGENT_MOVE_CLOUD, deviceRefusal, deviceStanding, type StellaExecutionHost } from "../stella/execution.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
 
 const LIST_TIMEOUT_MS = 15_000;
@@ -114,6 +114,7 @@ export function desktopExecution(options: {
   /** A computer an agent here can move to now, or why it can't. */
   const agentTarget: NonNullable<StellaExecutionHost["agentTarget"]> = async (deviceId, needs) => {
     if (!options.devices) return { error: "Sign in to Stella to move to another computer." };
+    if (deviceId.trim().toLowerCase() === AGENT_MOVE_CLOUD) return { deviceId: AGENT_MOVE_CLOUD, name: "Stella's cloud" };
     const listed = await options.devices.devices().catch(() => undefined);
     if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
     const device = findDeviceDestination(listed, deviceId);

@@ -95,9 +95,13 @@ export type OpenStellaHarness = {
       origin?: AgentOrigin;
       model?: ModelRef;
       thinkingLevel?: ModelThinkingLevel;
+      /** It may have run elsewhere before (it moved here): its first run takes its log first. */
+      catchUp?: boolean;
     },
     context: Context,
   ): Promise<{ threadId: string; existing: boolean }>;
+  /** One of the orchestrator's agents that may have run elsewhere since: its next run takes its log first. */
+  markCatchUp(threadId: string, context: Context): Promise<void>;
   /** Pause one of the orchestrator's agents, or one of theirs, by thread id. */
   pauseAgent(threadId: string, context: Context): Promise<void>;
   /** Where one of the orchestrator's agents, or one of theirs, stands; undefined when none here has that id. */
@@ -170,5 +174,6 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
     agentStanding: (threadId, standingContext) => agents.agentStanding(harness, threadId, standingContext),
     runPlacedAgent: (args, runContext) => agents.runPlacedAgent(harness, args, runContext),
     steerPlacedAgent: (args, steerContext) => agents.steerPlacedAgent(harness, args, steerContext),
+    markCatchUp: (threadId, markContext) => agents.markCatchUp(harness, threadId, markContext),
   };
 }

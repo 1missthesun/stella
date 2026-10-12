@@ -347,7 +347,7 @@ export const prebuildElectronBundles = async (
  * returns at once instead of holding the restart. Never throws: the launcher
  * runs it again regardless.
  */
-export const prepareInstallAhead = async (cwd: string, log: Log): Promise<void> => {
+export const prepareInstallAhead = async (cwd: string, log: Log): Promise<boolean> => {
   const startedAt = Date.now();
   const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
   try {
@@ -357,12 +357,14 @@ export const prepareInstallAhead = async (cwd: string, log: Log): Promise<void> 
       { cwd, timeoutMs: 10 * 60_000 },
     );
     log("app-source.prepare-install", { code: result.code, ms: Date.now() - startedAt });
+    return result.code === 0;
   } catch (error) {
     log("app-source.prepare-install", {
       code: -1,
       ms: Date.now() - startedAt,
       message: error instanceof Error ? error.message : String(error),
     });
+    return false;
   }
 };
 

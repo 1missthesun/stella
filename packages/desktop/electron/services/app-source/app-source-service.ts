@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { hostname } from "node:os";
 import path from "node:path";
@@ -104,6 +105,12 @@ type AppSourceServiceOptions = {
    * while the window is held, so its run finds the work done.
    */
   launcherPreparesOnRelaunch?: boolean;
+  /**
+   * Before a relaunch, what was made ready here that the launcher would
+   * otherwise redo: the dependencies for this lockfile, the setup for this
+   * HEAD.
+   */
+  reportPrepared?: (prepared: { lockHash?: string; head?: string }) => void;
   /**
    * Scratch copy for checking a merged update, removed after each check.
    * Versions prepared before they are offered keep their records next to
@@ -913,7 +920,7 @@ export class AppSourceService {
       }
       // A main that does not build is left to the next launch, which fails
       // the same way and shows the launcher's recovery.
-      await Promise.all([
+      const [, setUp] = await Promise.all([
         prebuildElectronBundles(
           cwd,
           `${this.options.updateScratchDir}-prebuild.mjs`,
@@ -922,9 +929,21 @@ export class AppSourceService {
         ),
         this.options.launcherPreparesOnRelaunch
           ? prepareInstallAhead(cwd, this.options.log)
-          : null,
+          : false,
       ]);
       this.mark("prebuild");
+      if (this.options.launcherPreparesOnRelaunch) {
+        this.options.reportPrepared?.({
+          ...(install
+            ? {
+                lockHash: createHash("sha256")
+                  .update(await fs.readFile(path.join(cwd, "bun.lock")))
+                  .digest("hex"),
+              }
+            : {}),
+          ...(setUp ? { head: to } : {}),
+        });
+      }
       await settling;
       await (await holding)?.commit();
       this.mark("hold");

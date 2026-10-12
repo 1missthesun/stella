@@ -148,6 +148,17 @@ export const holdForRelaunch = (hold: {
   send({ op: "hold", ...hold });
 };
 
+/**
+ * Before a relaunch: this process installed the dependencies for the lockfile
+ * hashed `lockHash`, and ran prepare-install.mjs for `head`, so the
+ * launcher's own prepare on the way back up can skip both. The launcher takes
+ * only what still matches the checkout. No-op without a launcher.
+ */
+export const reportPrepared = (prepared: { lockHash?: string; head?: string }) => {
+  if (!prepared.lockHash && !prepared.head) return;
+  send({ op: "prepared", ...prepared });
+};
+
 /** Tell the launcher Stella can't keep running; it shows the recovery screen. */
 export const reportFailed = (reason: string) => {
   send({ op: "failed", reason: reason.slice(0, 4_000) });

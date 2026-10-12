@@ -56,7 +56,7 @@ import { buildAndUploadWebRenderer } from "../services/app-source/web-renderer.j
 import { assertHeadSigned, signHead } from "../launcher-client.js";
 import { getMainLogger } from "../observability/main-logger.js";
 import { openDraftPreview } from "../services/app-source/draft-preview.js";
-import { holdForRelaunch, isLauncherPresent, relaunchApp, } from "../launcher-client.js";
+import { holdForRelaunch, isLauncherPresent, relaunchApp, reportPrepared, } from "../launcher-client.js";
 import {
   handleIpc,
 } from "../ipc/typed-ipc.js";
@@ -455,6 +455,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             coverRenderer: () => updateTransition.cover(),
             beforeRelaunch: () => updateTransition.holdForRelaunch(),
             launcherPreparesOnRelaunch: isLauncherPresent(),
+            reportPrepared,
             relaunch: relaunchApp,
             // Checking a merged update happens on a scratch worktree here,
             // never in the checkout that is running.

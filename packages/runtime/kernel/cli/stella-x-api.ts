@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+import {
+  sendXApiRequest,
+  type XApiHttpResult,
+  type XApiOperation,
+} from "./x-api-request.js";
+import { requestXApiFromBridge } from "../connectors/cli-broker-client.js";
+
 type CliOptions = {
   command: string;
   method?: string;
@@ -117,37 +124,51 @@ const getAuth = (): SiteAuth => {
   return { baseUrl, authToken };
 };
 
-const stellaUrl = (baseUrl: string, pathname: string): string =>
-  new URL(pathname, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
+/** The bridge reads one request line of at most 64 KiB. */
+const MAX_BRIDGE_REQUEST_BYTES = 60 * 1024;
 
-const fetchJson = async <T>(url: string, init: RequestInit): Promise<T> => {
-  const response = await fetch(url, init);
-  const text = await response.text();
-  const payload = text.trim() ? JSON.parse(text) as unknown : null;
-  if (!response.ok) {
-    const message =
-      payload && typeof payload === "object" && "error" in payload
-        ? String((payload as { error?: unknown }).error)
-        : `Request failed with status ${response.status}.`;
-    throw new Error(message);
+/** The bridge never received the call, so sending it directly cannot repeat it. */
+const bridgeNotReached = (error: unknown): boolean =>
+  /ENOENT|ECONNREFUSED|EACCES|unsupported|unknown method/u.test(
+    error instanceof Error ? error.message : String(error),
+  );
+
+/**
+ * Inside Stella the call goes through the runtime, which holds the live
+ * session and refreshes it, so a token that expired in this shell's
+ * environment never matters. Elsewhere it goes straight to the API.
+ */
+const callX = async (operation: XApiOperation): Promise<unknown> => {
+  const socketPath = process.env.STELLA_CLI_BRIDGE_SOCK?.trim();
+  let result: XApiHttpResult | null = null;
+  if (
+    socketPath &&
+    Buffer.byteLength(JSON.stringify(operation)) <= MAX_BRIDGE_REQUEST_BYTES
+  ) {
+    try {
+      result = await requestXApiFromBridge({ socketPath, operation });
+    } catch (error) {
+      if (!bridgeNotReached(error)) throw error;
+    }
   }
-  return payload as T;
+  result ??= await sendXApiRequest(getAuth(), operation);
+  if (result.status < 200 || result.status >= 300) {
+    const body = result.body;
+    throw new Error(
+      body && typeof body === "object" && "error" in body
+        ? String((body as { error?: unknown }).error)
+        : `Request failed with status ${result.status}.`,
+    );
+  }
+  return result.body;
 };
 
-const requestHeaders = (auth: SiteAuth): Record<string, string> => ({
-  Authorization: `Bearer ${auth.authToken}`,
-  "Content-Type": "application/json",
-});
-
-const callStellaX = async (
-  auth: SiteAuth,
-  body: Record<string, unknown>,
-): Promise<unknown> =>
-  await fetchJson(stellaUrl(auth.baseUrl, "/api/x/request"), {
-    method: "POST",
-    headers: requestHeaders(auth),
-    body: JSON.stringify(body),
-  });
+const callStellaX = async (body: {
+  path: string;
+  method?: string;
+  query?: Record<string, unknown>;
+  body?: unknown;
+}): Promise<unknown> => await callX({ op: "request", ...body });
 
 const extractPostId = (value: string): string => {
   const match = value.match(/(?:status|statuses)\/(\d+)/u) ?? value.match(/^(\d+)$/u);
@@ -157,11 +178,10 @@ const extractPostId = (value: string): string => {
 };
 
 const connect = async (options: CliOptions) => {
-  const auth = getAuth();
-  const payload = await fetchJson<{ url: string; expiresAt: number }>(
-    stellaUrl(auth.baseUrl, "/api/x/connect-url"),
-    { method: "GET", headers: requestHeaders(auth) },
-  );
+  const payload = (await callX({ op: "connectUrl" })) as {
+    url: string;
+    expiresAt: number;
+  };
   if (options.json) {
     printJson(payload);
     return;
@@ -170,11 +190,7 @@ const connect = async (options: CliOptions) => {
 };
 
 const status = async (options: CliOptions) => {
-  const auth = getAuth();
-  const payload = await fetchJson(
-    stellaUrl(auth.baseUrl, "/api/x/connections"),
-    { method: "GET", headers: requestHeaders(auth) },
-  );
+  const payload = await callX({ op: "connections" });
   if (options.json) {
     printJson(payload);
     return;
@@ -193,10 +209,9 @@ const status = async (options: CliOptions) => {
 };
 
 const request = async (options: CliOptions) => {
-  if (!options.path) fail("Usage: stella-x-api request <x-api-v2-path>");
-  const auth = getAuth();
-  const payload = await callStellaX(auth, {
-    path: options.path,
+  const path = options.path || fail("Usage: stella-x-api request <x-api-v2-path>");
+  const payload = await callStellaX({
+    path,
     method: options.method ?? "GET",
     query: parseJson(options.query, {}),
     ...(options.body
@@ -207,7 +222,7 @@ const request = async (options: CliOptions) => {
 };
 
 const whoami = async () => {
-  const payload = await callStellaX(getAuth(), {
+  const payload = await callStellaX({
     path: "/2/users/me",
     query: { "user.fields": "id,name,username,description,public_metrics,verified" },
   });
@@ -217,7 +232,7 @@ const whoami = async () => {
 const post = async (options: CliOptions) => {
   const text = options.path;
   if (!text) fail('Usage: stella-x-api post "text"');
-  const payload = await callStellaX(getAuth(), {
+  const payload = await callStellaX({
     path: "/2/tweets",
     method: "POST",
     body: { text },
@@ -231,7 +246,7 @@ const readPost = async (options: CliOptions) => {
     return fail("Usage: stella-x-api read <post-id-or-url>");
   }
   const postId = extractPostId(raw);
-  const payload = await callStellaX(getAuth(), {
+  const payload = await callStellaX({
     path: `/2/tweets/${postId}`,
     query: {
       expansions: "author_id,attachments.media_keys,referenced_tweets.id",
@@ -247,7 +262,7 @@ const readPost = async (options: CliOptions) => {
 const search = async (options: CliOptions) => {
   const query = options.path;
   if (!query) fail('Usage: stella-x-api search "query" [-n 10]');
-  const payload = await callStellaX(getAuth(), {
+  const payload = await callStellaX({
     path: "/2/tweets/search/recent",
     query: {
       query,

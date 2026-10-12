@@ -21,7 +21,10 @@ import {
   createBackendConnectorActionBroker,
   createBackendConnectorActionsBroker,
 } from "../../backend-connector-action-broker.js";
-import { createBackendMediaBroker } from "../../backend-media-broker.js";
+import {
+  createBackendMediaBroker,
+  createBackendXApiBroker,
+} from "../../backend-session-broker.js";
 import { connectorActionBrokerAvailability } from "../../required-cli-bridge.js";
 import * as HostBus from "../host-bus.js";
 import * as SessionConfig from "./config.js";
@@ -139,7 +142,7 @@ export const layer = Layer.effect(
       },
     });
 
-    const requestMedia = createBackendMediaBroker({
+    const liveSession = {
       getSiteAuth: () => {
         const baseUrl = config.get().backendUrl?.trim();
         const authToken = config.get().authToken?.trim();
@@ -152,7 +155,9 @@ export const layer = Layer.effect(
           return null;
         }
       },
-    });
+    };
+    const requestMedia = createBackendMediaBroker(liveSession);
+    const requestXApi = createBackendXApiBroker(liveSession);
 
     const requestHostConnectorTokenStore = async (
       request: ConnectorTokenStoreRequest,
@@ -207,6 +212,7 @@ export const layer = Layer.effect(
             runBackendConnectorAction,
             listBackendConnectorActions,
             requestMedia,
+            requestXApi,
             requestConnectorCredential: async (params) => {
               try {
                 return await hostBus.request<

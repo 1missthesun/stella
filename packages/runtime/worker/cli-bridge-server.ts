@@ -9,8 +9,8 @@
  * of JSON, server closes. Request: `{ id, method, params }`. Response:
  * `{ id, result }` on success or `{ id, error: { message } }` on failure.
  *
- * Surface is intentionally narrow. Connector backend actions and
- * `stella-media` calls are brokered as action-specific requests; the protocol
+ * Surface is intentionally narrow. Connector backend actions,
+ * `stella-media` and `stella-x-api` calls are brokered as action-specific requests; the protocol
  * never exposes Stella site auth or an arbitrary HTTP proxy. New methods get added as separate handler entries —
  * no introspection, no versioning, no streaming. If we ever need more
  * than this we should reconsider rather than grow the protocol here.
@@ -32,6 +32,10 @@ import type {
   MediaHttpResult,
   MediaOperation,
 } from "../kernel/cli/media-request.js";
+import type {
+  XApiHttpResult,
+  XApiOperation,
+} from "../kernel/cli/x-api-request.js";
 
 /**
  * Defensive ceiling kept below the 104-byte BSD `sun_path` limit (UTF-8
@@ -143,6 +147,10 @@ export type CliBridgeHandlers = {
   requestMedia?: (
     params: MediaOperation & { deviceId?: string; signal?: AbortSignal },
   ) => Promise<MediaHttpResult>;
+  /** `stella-x-api` calls made with the worker's live Stella session. */
+  requestXApi?: (
+    params: XApiOperation & { signal?: AbortSignal },
+  ) => Promise<XApiHttpResult>;
 };
 
 export type CliBridgeServer = {
@@ -192,6 +200,18 @@ const mediaRequestParamsSchema = z.discriminatedUnion("op", [
     request: z.string().min(2),
     idempotencyKey: z.string().trim().min(1).max(256).optional(),
     deviceId: z.string().trim().min(1).max(128).optional(),
+  }),
+]);
+
+const xApiRequestParamsSchema = z.discriminatedUnion("op", [
+  z.strictObject({ op: z.literal("connectUrl") }),
+  z.strictObject({ op: z.literal("connections") }),
+  z.strictObject({
+    op: z.literal("request"),
+    path: z.string().trim().min(1).max(2048),
+    method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).optional(),
+    query: z.record(z.string(), z.unknown()).optional(),
+    body: z.unknown().optional(),
   }),
 ]);
 
@@ -402,6 +422,19 @@ const dispatch = async (
       }
       return await handlers.requestMedia({
         ...parsed.data,
+        ...(signal ? { signal } : {}),
+      });
+    }
+    case "x.request": {
+      if (!handlers.requestXApi) {
+        throw new Error("x.request: unsupported");
+      }
+      const parsed = xApiRequestParamsSchema.safeParse(params);
+      if (!parsed.success) {
+        throw new Error("x.request: a valid X operation is required");
+      }
+      return await handlers.requestXApi({
+        ...(parsed.data as XApiOperation),
         ...(signal ? { signal } : {}),
       });
     }

@@ -23,6 +23,10 @@ import type {
   MediaHttpResult,
   MediaOperation,
 } from "../cli/media-request.js";
+import type {
+  XApiHttpResult,
+  XApiOperation,
+} from "../cli/x-api-request.js";
 
 /**
  * Shape of the worker→host connector token-store RPC (owner-only local
@@ -464,6 +468,27 @@ export const requestMediaFromBridge = async ({
       : null;
   if (!record || typeof record.status !== "number") {
     throw new Error("cli-bridge: invalid media response");
+  }
+  return { status: record.status, body: record.body };
+};
+
+/** One `stella-x-api` call made with the worker's live Stella session. */
+export const requestXApiFromBridge = async ({
+  socketPath,
+  operation,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+}: {
+  socketPath: string;
+  operation: XApiOperation;
+  timeoutMs?: number;
+}): Promise<XApiHttpResult> => {
+  const result = await sendRequest(socketPath, "x.request", operation, timeoutMs);
+  const record =
+    result && typeof result === "object"
+      ? (result as Record<string, unknown>)
+      : null;
+  if (!record || typeof record.status !== "number") {
+    throw new Error("cli-bridge: invalid X response");
   }
   return { status: record.status, body: record.body };
 };

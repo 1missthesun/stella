@@ -10,7 +10,7 @@ export const CODE_TOOL_HISTORY_SENTENCE =
   "history: await history.search(text, { kinds, limit, order }) finds messages and agent reports in this conversation's whole history, await history.sql(query, params) runs one read-only SELECT over it, and await history.read(fromSeq, toSeq) returns its full records for a seq range.";
 
 export const CODE_TOOL_DESCRIPTION =
-  "Run JavaScript with top-level await in Stella's persistent code runtime; bindings persist within one generation (use var for reusable names). Globals: codeRuntime, sky, browser, connect, history, and tools; the stella-computer and stella-browser skills document sky and browser, and codeRuntime.help() lists its helpers. End with an expression to return its value, or call codeRuntime.write(...); console.log is not an output channel. A long cell yields a cell_id: call code again with it to read new output or terminate it. tools exposes allowed Stella tools: tools.$list() for exact names (bracket notation for non-identifier names, such as tools[\"mcp.server/tool\"](...)), tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete schema. Use Promise.all for independent calls. Nested calls keep permissions, cancellation, and file tracking; tools requiring explicit approval must be called directly. " +
+  "Run JavaScript with top-level await in Stella's persistent code runtime; bindings persist within one generation (use var for reusable names). Globals: codeRuntime, sky, browser, connect, history, and tools; the stella-computer and stella-browser skills document sky and browser, and codeRuntime.help() lists its helpers. End with an expression to return its value; codeRuntime.write(...) and console.log also print. A long cell yields a cell_id: call code again with it to read new output or terminate it. A failed cell returns the output it printed before the error. tools exposes allowed Stella tools: tools.$list() for exact names (bracket notation for non-identifier names, such as tools[\"mcp.server/tool\"](...)), tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete schema. Use Promise.all for independent calls. Nested calls keep permissions, cancellation, and file tracking; tools requiring explicit approval must be called directly. " +
   CODE_TOOL_HISTORY_SENTENCE;
 
 /**
@@ -19,7 +19,7 @@ export const CODE_TOOL_DESCRIPTION =
  * stated plainly.
  */
 export const CODE_TOOL_ORCHESTRATOR_DESCRIPTION =
-  "Run JavaScript with top-level await in Stella's persistent code runtime on the computer you run on; use var for bindings you reuse. Globals: codeRuntime, connect, history, memory (when on), and tools. node:fs reads, writes and edits files there (absolute paths); codeRuntime.emitImage(path) shows you an image. No process spawning. End with an expression to return it; console.log is not output. A long cell yields a cell_id to call code with again. tools.$list(), tools.$search({ query }) and tools.$describe(name) find tools; call them as tools.<name>(args) (bracket notation for other names). " +
+  "Run JavaScript with top-level await in Stella's persistent code runtime on the computer you run on; use var for bindings you reuse. Globals: codeRuntime, connect, history, memory (when on), and tools. node:fs reads, writes and edits files there (absolute paths); codeRuntime.emitImage(path) shows you an image. No process spawning. End with an expression to return it; console.log and codeRuntime.write print. A long cell yields a cell_id to call code with again. tools.$list(), tools.$search({ query }) and tools.$describe(name) find tools; call them as tools.<name>(args) (bracket notation for other names). " +
   CODE_TOOL_HISTORY_SENTENCE;
 
 export const CODE_TOOL_PROMPT_SNIPPET =
@@ -43,22 +43,17 @@ export const CODE_TOOL_PARAMETERS: Record<string, unknown> = {
     },
     cell_id: {
       type: "string",
-      description: "Generation-tagged ID returned by a running code cell.",
+      description: "ID returned by a running code cell.",
     },
     wait_ms: {
       type: "number",
       description:
         "How long to observe cell_id for terminal output. Defaults to 10000ms.",
     },
-    cursor: {
-      type: "number",
-      description:
-        "Optional prior cursor for cell_id. The response contains only content after this cursor and does not consume content if the wait is aborted.",
-    },
     terminate: {
       type: "boolean",
       description:
-        "Terminate cell_id and reset its persistent REPL generation.",
+        "Stop cell_id. This resets the runtime, so bindings are lost.",
     },
   },
 };

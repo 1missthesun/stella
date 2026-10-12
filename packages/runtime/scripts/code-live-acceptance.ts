@@ -58,7 +58,7 @@ const main = async () => {
       "var livePersistentBinding = 40; 'seeded'",
       context,
     );
-    assert(seed === "'seeded'", `unexpected seed output: ${seed}`);
+    assert(seed === "seeded", `unexpected seed output: ${seed}`);
     const persisted = await registry.evaluate(
       "livePersistentBinding + 2",
       context,
@@ -110,7 +110,7 @@ const main = async () => {
       `unexpected terminal cursor ${terminalChunk.cursor}`,
     );
     assert(
-      terminalChunk.output === "'terminal-value'",
+      terminalChunk.output === "terminal-value",
       `unexpected terminal output: ${terminalChunk.output}`,
     );
 
@@ -137,7 +137,7 @@ const main = async () => {
       waitMs: 0,
     });
     assert(
-      replay.output === "chunk-one\nchunk-two\n'terminal-value'",
+      replay.output === "chunk-one\nchunk-two\nterminal-value",
       `explicit cursor replay was incomplete: ${replay.output}`,
     );
 
@@ -159,7 +159,7 @@ const main = async () => {
     );
     assert(
       image.content[1]?.type === "text" &&
-        image.content[1].text === "'image-complete'",
+        image.content[1].text === "image-complete",
       "terminal text did not follow typed image output",
     );
 
@@ -190,7 +190,7 @@ const main = async () => {
       context,
     );
     assert(
-      discarded === "'undefined'",
+      discarded === "undefined",
       `reset binding remained visible: ${discarded}`,
     );
 
@@ -224,7 +224,7 @@ const main = async () => {
       context,
     );
     assert(
-      resetErrorDiscarded === "'undefined'",
+      resetErrorDiscarded === "undefined",
       `reset-then-error preserved an old binding: ${resetErrorDiscarded}`,
     );
 

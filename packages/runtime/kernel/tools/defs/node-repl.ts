@@ -17,34 +17,25 @@ export type CodeToolOptions = NodeReplKernelManagerOptions & {
   registry?: NodeReplKernelRegistry;
 };
 
+const FAILED_OUTPUT_MAX_CHARS = 1_900;
+
+const cleanCodeError = (raw: string): string => {
+  const lines = raw.split("\n");
+  const position = raw.match(/stella-code:(\d+):(\d+)/);
+  const kept = lines.filter((line) => !/^\s+at\s/.test(line));
+  while (kept.length > 0 && kept[kept.length - 1]!.trim() === "") kept.pop();
+  const message = kept.join("\n").trim() || "Code cell failed.";
+  return position && !message.includes(`stella-code:${position[1]}`)
+    ? `${message} (line ${position[1]}:${position[2]})`
+    : message;
+};
+
 export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
   const registry = options.registry ?? new NodeReplKernelRegistry(options);
-  const observationDetails = (
-    observation: NodeReplCellObservation,
-    forceCell = false,
-  ) => {
+  const observationDetails = (observation: NodeReplCellObservation) => {
     const media = observation.content?.filter((item) => item.type !== "text");
-    const includeCell =
-      forceCell ||
-      observation.status !== "completed" ||
-      observation.reset !== undefined ||
-      Boolean(media && media.length > 0);
     return {
-      ...(includeCell
-        ? {
-            code: {
-              cellId: observation.cellId,
-              generation: observation.generation,
-              status: observation.status,
-              elapsedMs: observation.elapsedMs,
-              fromCursor: observation.fromCursor,
-              cursor: observation.cursor,
-              ...(observation.reset ? { reset: observation.reset } : {}),
-              ...(media && media.length > 0 ? { content: media } : {}),
-            },
-          }
-        : {}),
-      ...(observation.responseMeta ? { _meta: observation.responseMeta } : {}),
+      ...(media && media.length > 0 ? { code: { content: media } } : {}),
       ...(observation.mapArtifacts?.length === 1
         ? { map: observation.mapArtifacts[0] }
         : {}),
@@ -52,6 +43,13 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
         ? { maps: [...observation.mapArtifacts] }
         : {}),
     };
+  };
+  const withDetails = <T extends Record<string, unknown>>(
+    result: T,
+    observation: NodeReplCellObservation,
+  ) => {
+    const details = observationDetails(observation);
+    return Object.keys(details).length > 0 ? { ...result, details } : result;
   };
   const modelText = (observation: NodeReplCellObservation): string =>
     (observation.content ?? [])
@@ -65,34 +63,50 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
         return [];
       })
       .join("\n");
+  const seconds = (elapsedMs: number) =>
+    `${(elapsedMs / 1000).toFixed(elapsedMs < 10_000 ? 1 : 0)}s`;
+  const resetNote = (observation: NodeReplCellObservation) =>
+    observation.reset && observation.reset.reason !== "explicit"
+      ? "[runtime reset]"
+      : "";
+  const join = (...parts: string[]) => parts.filter(Boolean).join("\n");
   const resultForObservation = (
     observation: NodeReplCellObservation,
-    forceCellDetails = false,
+    stopRequested: boolean,
   ) => {
-    if (observation.status === "failed") {
-      return {
-        error: observation.error ?? "Code cell failed.",
-        details: observationDetails(observation, forceCellDetails),
-      };
-    }
+    const text = modelText(observation);
     if (observation.status === "running") {
-      const text = modelText(observation);
-      return {
-        result: `${text}${text ? "\n" : ""}[code running: cellId=${JSON.stringify(observation.cellId)} generation=${observation.generation} cursor=${observation.cursor} elapsedMs=${observation.elapsedMs}]`,
-        details: observationDetails(observation, forceCellDetails),
-      };
+      return withDetails(
+        {
+          result: join(
+            text,
+            `[running · cell_id=${observation.cellId} · ${seconds(observation.elapsedMs)}]`,
+          ),
+        },
+        observation,
+      );
     }
-    const details = observationDetails(observation, forceCellDetails);
-    const hasDetails =
-      forceCellDetails ||
-      observation.reset ||
-      observation.responseMeta ||
-      Boolean(observation.mapArtifacts?.length) ||
-      observation.content?.some((item) => item.type !== "text");
-    return {
-      result: modelText(observation),
-      ...(hasDetails ? { details } : {}),
-    };
+    if (observation.status === "failed") {
+      if (stopRequested && observation.reset?.reason === "terminated") {
+        return withDetails(
+          { result: join(text, "[stopped · runtime reset]") },
+          observation,
+        );
+      }
+      const failure = join(
+        cleanCodeError(observation.error ?? "Code cell failed."),
+        resetNote(observation),
+      );
+      const budget = FAILED_OUTPUT_MAX_CHARS - failure.length;
+      const partial =
+        text.length <= budget
+          ? text
+          : budget > 40
+            ? `[earlier output omitted]\n${text.slice(text.length - budget + 26).replace(/^\n/, "")}`
+            : "";
+      return withDetails({ error: join(partial, failure) }, observation);
+    }
+    return withDetails({ result: text }, observation);
   };
   return {
     name: CODE_TOOL_NAME,
@@ -139,7 +153,6 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
               ...(yieldTimeMs !== undefined ? { yieldTimeMs } : {}),
               ...(extras?.signal ? { signal: extras.signal } : {}),
               ...(extras?.onUpdate ? { onToolUpdate: extras.onUpdate } : {}),
-              onResponseMeta: () => undefined,
             })
           : await registry.waitCell((args.cell_id as string).trim(), context, {
               ...(waitMs !== undefined ? { waitMs } : {}),
@@ -147,7 +160,10 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
               ...(args.terminate === true ? { terminate: true } : {}),
               ...(extras?.signal ? { signal: extras.signal } : {}),
             });
-        return resultForObservation(observation, hasCellId);
+        return resultForObservation(
+          observation,
+          hasCellId && args.terminate === true,
+        );
       } catch (error) {
         return {
           error: error instanceof Error ? error.message : String(error),

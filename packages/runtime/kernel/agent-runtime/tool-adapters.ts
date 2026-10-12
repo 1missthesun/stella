@@ -279,7 +279,7 @@ export const preserveModelVisibleToolText = async (
     runId: context.runId,
     toolCallId: context.toolCallId,
   });
-  const marker = `\n\n[TOOL_OUTPUT_TRUNCATED complete post-sanitization output preserved: artifact=${artifact.path} bytes=${artifact.bytes} sha256=${artifact.sha256} encoding=${artifact.encoding} lines=${artifact.lineCount}. Read more with Read({ file_path: ${JSON.stringify(artifact.path)}, offset: 1, limit: 200 }); offsets are 1-based lines; complete byte range is [0, ${artifact.bytes}).]`;
+  const marker = `\n\n[Output truncated. Full output (${artifact.lineCount} lines, ${artifact.bytes} bytes): ${artifact.path}; Read it with offset/limit.]`;
   const previewBudget = Math.max(
     0,
     Math.min(resolved.previewMaxBytes, resolved.maxBytes) -
@@ -460,7 +460,7 @@ export const neutralizeLegacyAttachImageMarkers = (text: string): string => {
     }
     return value;
   };
-  return JSON.stringify(neutralizeJsonStrings(jsonValue), null, 2);
+  return JSON.stringify(neutralizeJsonStrings(jsonValue));
 };
 
 /**
@@ -696,7 +696,7 @@ export const extractAttachImageBlocks = async (
       }
       return value;
     };
-    stripped = JSON.stringify(replaceJsonStrings(jsonValue), null, 2);
+    stripped = JSON.stringify(replaceJsonStrings(jsonValue));
     return { text: stripped, images };
   }
   for (const { full, replacement } of markerReplacements) {
@@ -1062,7 +1062,7 @@ export const executeModelToolCall = async (
   const attachedImages = [...codeImages, ...legacyImages, ...authorizedImages];
   const screenshotNote =
     attachedImages.length > 0
-      ? "\n\n[Image attached below. Inspect it directly. If it is a UI screenshot and the accessibility tree is sparse or missing a visible control, use screenshot x/y coordinates.]"
+      ? "\n\n[Image attached below.]"
       : "";
   if (truncatedText || attachedImages.length === 0) {
     content.push({
@@ -1078,18 +1078,7 @@ export const executeModelToolCall = async (
   content.push(...attachedImages);
   return {
     content,
-    details: preservedText.artifact
-      ? {
-          ...(formatted.details &&
-          typeof formatted.details === "object" &&
-          !Array.isArray(formatted.details)
-            ? (formatted.details as Record<string, unknown>)
-            : formatted.details === undefined
-              ? {}
-              : { result: formatted.details }),
-          toolOutputArtifact: preservedText.artifact,
-        }
-      : formatted.details,
+    details: formatted.details,
     isError: Boolean(toolResult.error),
     ...(typeof toolResult.modelOutputTokens === "number"
       ? { modelOutputTokens: toolResult.modelOutputTokens }

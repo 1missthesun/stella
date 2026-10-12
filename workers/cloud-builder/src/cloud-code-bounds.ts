@@ -358,7 +358,7 @@ const writePreview = (
       appendText(writer, "[");
       const count = Math.min(value.length, 128);
       for (let index = 0; index < count && !writer.truncated; index += 1) {
-        if (index > 0) appendText(writer, ", ");
+        if (index > 0) appendText(writer, ",");
         const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
         writePreview(
           writer,
@@ -368,7 +368,7 @@ const writePreview = (
         );
       }
       if (value.length > count) {
-        if (count > 0) appendText(writer, ", ");
+        if (count > 0) appendText(writer, ",");
         appendJsonString(writer, `[${value.length - count} more items]`);
       }
       appendText(writer, "]");
@@ -384,15 +384,15 @@ const writePreview = (
     for (const key in value as Record<string, unknown>) {
       if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
       if (count >= 128) {
-        if (count > 0) appendText(writer, ", ");
+        if (count > 0) appendText(writer, ",");
         appendJsonString(writer, "[more properties]");
-        appendText(writer, ": true");
+        appendText(writer, ":true");
         break;
       }
       const descriptor = Object.getOwnPropertyDescriptor(value, key);
-      if (count > 0) appendText(writer, ", ");
+      if (count > 0) appendText(writer, ",");
       appendJsonString(writer, key);
-      appendText(writer, ": ");
+      appendText(writer, ":");
       if (!descriptor || !("value" in descriptor)) {
         appendJsonString(writer, "[Accessor]");
       } else {

@@ -713,6 +713,9 @@ const nodeReplWorkerMain = async (
     const rendered = formatWithOptions({ colors: false, depth: 6 }, ...values);
     appendContent({ type: "text", text: rendered });
   };
+  const consoleWrite = (...values: unknown[]) => {
+    if (content) write(...values);
+  };
   const mediaPath = (value: unknown, helper: "emitImage" | "emitAudio") => {
     if (typeof value !== "string") {
       throw new Error(
@@ -974,6 +977,19 @@ const nodeReplWorkerMain = async (
       writable: false,
       configurable: false,
     },
+    console: {
+      value: Object.freeze({
+        ...console,
+        log: consoleWrite,
+        info: consoleWrite,
+        warn: consoleWrite,
+        error: consoleWrite,
+        debug: consoleWrite,
+      }),
+      enumerable: false,
+      writable: true,
+      configurable: true,
+    },
     process: {
       value: undefined,
       enumerable: false,
@@ -1097,12 +1113,14 @@ const nodeReplWorkerMain = async (
           resolve(
             value === undefined
               ? ""
-              : inspect(value, {
-                  colors: false,
-                  depth: 6,
-                  maxArrayLength: 100,
-                  maxStringLength: 100_000,
-                }),
+              : typeof value === "string"
+                ? value
+                : inspect(value, {
+                    colors: false,
+                    depth: 6,
+                    maxArrayLength: 100,
+                    maxStringLength: 100_000,
+                  }),
           );
         });
       });

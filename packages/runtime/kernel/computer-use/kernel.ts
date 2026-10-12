@@ -564,9 +564,6 @@ const resetReceipt = (
   requestedAt,
 });
 
-const formatResetReceipt = (receipt: NodeReplResetReceipt): string =>
-  `[code reset: reason=${receipt.reason} generation=${receipt.previousGeneration} previousGeneration=${receipt.previousGeneration} nextGeneration=${receipt.nextGeneration} bindingsDiscarded=true requestedAt=${receipt.requestedAt}]`;
-
 export type NodeReplTransport = {
   on(event: "message", listener: (message: unknown) => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
@@ -2544,6 +2541,7 @@ export class NodeReplKernelRegistry {
   private readonly generations = new Map<string, number>();
   private readonly disposedKernels = new WeakSet<NodeReplKernel>();
   private readonly cells = new Map<string, NodeReplCellRecord>();
+  private cellCounter = 0;
   private readonly runningCellByOwner = new Map<string, string>();
   private cancelCellCleanup?: () => void;
   private cellCleanupEpoch = 0;
@@ -2612,7 +2610,7 @@ export class NodeReplKernelRegistry {
         `Code already has a running cell for this session: ${existingCellId}. Wait for or terminate that cell before starting another.`,
       );
     }
-    const cellId = `g${kernel.generation}:${randomUUID()}`;
+    const cellId = `c${++this.cellCounter}${randomUUID().slice(0, 4)}`;
     const cell: NodeReplCellRecord = {
       cellId,
       ownerId: id,
@@ -2807,7 +2805,7 @@ export class NodeReplKernelRegistry {
           error.requestedAt,
         );
         throw new KernelTerminatedError(
-          `${error.message} ${formatResetReceipt(receipt)}`,
+          error.message,
           error.resetReason,
           error.requestedAt,
           receipt,

@@ -223,28 +223,13 @@ try {
     undefined,
     undefined,
   );
-  const resetErrorDetails = resetErrorResult.details as
-    | {
-        code?: {
-          generation?: number;
-          status?: string;
-          reset?: {
-            reason?: string;
-            previousGeneration?: number;
-            nextGeneration?: number;
-            bindingsDiscarded?: boolean;
-          };
-        };
-      }
-    | undefined;
+  const resetErrorText = (
+    resetErrorResult.content as Array<{ text?: string }>
+  )[0]?.text;
   assert(resetErrorResult.isError === true, "Reset-then-error did not fail");
   assert(
-    resetErrorDetails?.code?.status === "failed" &&
-      resetErrorDetails.code.reset?.reason === "explicit" &&
-      resetErrorDetails.code.reset.previousGeneration === 1 &&
-      resetErrorDetails.code.reset.nextGeneration === 2 &&
-      resetErrorDetails.code.reset.bindingsDiscarded === true,
-    `Reset-then-error lost provenance: ${JSON.stringify(resetErrorDetails)}`,
+    resetErrorText?.includes("live adapter reset failure") === true,
+    `Reset-then-error lost its error: ${resetErrorText}`,
   );
   const afterErrorReset = await modelTool.execute(
     `live-browser-after-reset-error-${randomUUID()}`,
@@ -351,12 +336,6 @@ codeRuntime.reset()`;
             mimeType?: string;
             deleteAfterAttach?: boolean;
           }>;
-          reset?: {
-            reason?: string;
-            previousGeneration?: number;
-            nextGeneration?: number;
-            bindingsDiscarded?: boolean;
-          };
         };
       }
     | undefined;
@@ -381,13 +360,6 @@ codeRuntime.reset()`;
   assert(
     screenshotStillExists === false,
     "Adapter did not acknowledge and clean up the transferred screenshot",
-  );
-  assert(
-    details?.code?.reset?.reason === "explicit" &&
-      details.code.reset.previousGeneration === 2 &&
-      details.code.reset.nextGeneration === 3 &&
-      details.code.reset.bindingsDiscarded === true,
-    `Screenshot reset lost provenance: ${JSON.stringify(details)}`,
   );
   const afterScreenshotReset = await modelTool.execute(
     `live-browser-after-screenshot-reset-${randomUUID()}`,
@@ -431,11 +403,10 @@ codeRuntime.reset()`;
         rawBase64InModelText: false,
         legacyMarkerInModelText: false,
         resetThenError: {
-          reset: resetErrorDetails?.code?.reset,
+          error: resetErrorText,
           committedState: afterErrorText,
         },
         screenshotReset: {
-          reset: details?.code?.reset,
           nextState: afterScreenshotText,
           temporaryFileRemoved: true,
         },

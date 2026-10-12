@@ -229,7 +229,11 @@ const modelTextForResult = (result: CloudCodeExecutionResult): string => {
   const sections: string[] = [];
   if (result.ok) {
     sections.push(
-      boundedJsonPreview(result.result, CLOUD_CODE_MODEL_OUTPUT_MAX_BYTES),
+      result.result === undefined
+        ? ""
+        : typeof result.result === "string"
+          ? result.result
+          : boundedJsonPreview(result.result, CLOUD_CODE_MODEL_OUTPUT_MAX_BYTES),
     );
   } else {
     sections.push(`Error (${result.code}): ${result.error}`);
@@ -257,6 +261,16 @@ const textOfContent = (
     : null;
 };
 
+const structuredText = (text: string): unknown => {
+  const trimmed = text.trim();
+  if (!/^[[{]/.test(trimmed)) return text;
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return text;
+  }
+};
+
 /**
  * What `await tools.<name>(args)` resolves to: the tool's model-visible
  * text (the device REPL hands back the tool's result value the same way),
@@ -273,7 +287,7 @@ const nestedValueForCode = (
   }
   const text = textOfContent(result.content);
   const value = cloneBoundedJsonValue(
-    text ?? { content: result.content },
+    text === null ? { content: result.content } : structuredText(text),
     NESTED_RESULT_LIMITS,
   );
   if (!value.ok) {

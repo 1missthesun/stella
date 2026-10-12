@@ -108,7 +108,6 @@ import {
   serviceOnlyTurnFields,
   turnStartErrorResponse,
 } from "../turn-start-request.js";
-import { previewSafeRequestLogPath } from "../vite-preview-access.js";
 import {
   boundedIngressRequest,
   cloudHomeLeaseRunner,
@@ -970,7 +969,7 @@ app.use(async (c, next) => {
     method: c.req.method,
     path: c.req.path.startsWith("/workspace-apps/")
       ? "/workspace-apps/[session]"
-      : previewSafeRequestLogPath(new URL(c.req.url).pathname),
+      : new URL(c.req.url).pathname,
   });
   await next();
 });

@@ -101,6 +101,7 @@ const CAPABILITY_VALUES: readonly ExecutionCapability[] = [
   "local-files",
   "local-apps",
   "attachments",
+  "claude-code",
 ];
 
 export const withReleasedClientSelectability = (

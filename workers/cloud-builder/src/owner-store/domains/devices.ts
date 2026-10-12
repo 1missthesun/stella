@@ -227,6 +227,7 @@ const CAPABILITIES: ExecutionCapability[] = [
   "local-files",
   "local-apps",
   "attachments",
+  "claude-code",
 ];
 
 // ── Small helpers ──────────────────────────────────────────────────────────

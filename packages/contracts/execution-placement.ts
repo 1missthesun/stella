@@ -27,7 +27,9 @@ export type ExecutionCapability =
   | "computer-use"
   | "local-files"
   | "local-apps"
-  | "attachments";
+  | "attachments"
+  /** Claude Code is signed in there, so agents on Claude Code can run there. */
+  | "claude-code";
 
 export type ExecutionDispatchState =
   | "queued"

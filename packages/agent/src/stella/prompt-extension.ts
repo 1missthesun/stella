@@ -29,7 +29,6 @@ import { messageIdsHook } from "./message-ids.ts";
 import { processableImagesHook } from "./processable-images.ts";
 import { residentContextHook } from "./resident-context.ts";
 import type { StellaAgentPromptId, StellaContextSources } from "./context.ts";
-import { renderCloudDestination, renderDeviceDestination, SWITCH_DESTINATION_TOOL_NAME } from "./execution.ts";
 import { placementOf, StellaPlacementDoc } from "./placement.ts";
 
 export const STELLA_PROMPT_EXTENSION = "stella-prompt";
@@ -67,7 +66,7 @@ const workingDirectory: PromptSection["render"] = async (input, context) => {
   const cwd = input.agent.cwd;
   const env = input.env;
   if (!cwd || !env || (await role(input, context)).agentType === "orchestrator") return undefined;
-  // Tools moved elsewhere start in that place's home, not here.
+  // An agent in the cloud starts in its container's home.
   const placement = placementOf(await input.read.snapshot(StellaPlacementDoc, input.conversationId, context));
   if (placement && placement.kind !== "local") return undefined;
   const lines = [
@@ -151,24 +150,14 @@ export function stellaPromptExtension(sources: StellaContextSources) {
         { tag: false },
       ),
       section("skills", async (_input, context) => sources.skillsCatalog(context), { tag: false }),
-      // Stella's, and an agent's that can move its own tools to one of them.
+      // Stella's: where she can start agents.
       section("execution-devices", async (input, context) => {
-        const switchable = input.agent.tools.some((tool) => tool.name === SWITCH_DESTINATION_TOOL_NAME);
-        if ((await role(input, context)).agentType !== "orchestrator" && !switchable) return undefined;
+        if ((await role(input, context)).agentType !== "orchestrator") return undefined;
         const snapshot = await sources.executionContext(input.conversationId, context);
-        return snapshot && renderExecutionDevices(snapshot, { switchable });
+        return snapshot && renderExecutionDevices(snapshot);
       }),
       section("execution-destination", async (input, context) => {
-        // A conversation whose tools run on one of the user's computers says which.
-        const placement = placementOf(await input.read.snapshot(StellaPlacementDoc, input.conversationId, context));
-        if (placement?.kind === "device") {
-          return renderDeviceDestination(placement, (await role(input, context)).agentType === "orchestrator");
-        }
         const snapshot = await sources.executionContext(input.conversationId, context);
-        // On a computer, a conversation whose tools moved to the cloud says so.
-        if (placement?.kind === "cloud" && snapshot?.destination.kind === "device") {
-          return renderCloudDestination((await role(input, context)).agentType === "orchestrator");
-        }
         return snapshot && renderExecutionDestination(snapshot);
       }),
       section("working-directory", workingDirectory),

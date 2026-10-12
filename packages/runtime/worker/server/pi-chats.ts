@@ -29,7 +29,6 @@ import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";
 import { cloudAgentsFor } from "./pi-cloud-agents.js";
 import { brainFor } from "./pi-brain.js";
-import { executionRemoteFor } from "./pi-execution.js";
 import { cloudJournalFor } from "./pi-journal.js";
 import { claudeCodeEngineFor } from "./claude-code-engine.js";
 import { piUserReminders } from "./pi-reminders.js";
@@ -212,6 +211,41 @@ const cloudAgentThreadsFor = (
   };
 };
 
+/**
+ * Agents pi's Stella starts on another of the owner's computers, for a
+ * conversation stored in the cloud: each runs there as a whole, on that
+ * computer's own Stella, through the owner's agent threads; its reports come
+ * back through the owner's report ledger to wherever Stella runs.
+ */
+const deviceAgentThreadsFor = (
+  session: OpenSession,
+  conversationId: string,
+): import("@stella/agent/host/desktop-chats").DesktopDeviceAgents | undefined => {
+  if (conversationId.startsWith("local_")) return undefined;
+  const threads = () => {
+    const runner = session.runnerCell.get();
+    if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to run agents on your other computers.");
+    return runner.piCloudAgentThreads;
+  };
+  const requestId = (key: string) => `pi:${conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128);
+  return {
+    start: async ({ key, deviceId, description, prompt, model }) =>
+      await threads().startOnDevice({
+        conversationId,
+        requestId: requestId(`device:${key}`),
+        description,
+        prompt,
+        targetDeviceId: deviceId,
+        ...(model ? { model } : {}),
+      }),
+    message: async ({ key, threadId, description, message }) =>
+      await threads().message({ conversationId, threadId, requestId: requestId(`message:${key}`), description, message }),
+    pause: async (threadId) => {
+      await threads().pause({ conversationId, threadId, requestId: requestId(`pause:${threadId}:${Date.now()}`) });
+    },
+  };
+};
+
 const chatsBySession = new WeakMap<OpenSession, Promise<DesktopChats>>();
 /** The same chats once loaded, for synchronous checks. */
 const loadedBySession = new WeakMap<OpenSession, DesktopChats>();
@@ -245,7 +279,8 @@ export const piChatsFor = (
     import("../../kernel/model-routing.js"),
     import("../../kernel/integrations/claude-code-agent-runtime.js"),
     claudeCodeEngineFor(session),
-  ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine]) =>
+    import("@stella/agent/host/desktop-execution"),
+  ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine, { httpDevices }]) =>
     desktopChats({
       dataDir: session.config.get().stellaDataDirPath,
       deviceId: session.config.deviceId,
@@ -260,6 +295,11 @@ export const piChatsFor = (
           : getModelOverride(dataDir, "orchestrator");
       },
       claudeCodeEngine,
+      claudeCodeProblem: async () => {
+        const { checkClaudeCodeAuth } = await import("../../kernel/integrations/claude-code-session-runtime.js");
+        const auth = await checkClaudeCodeAuth();
+        return auth.status === "ok" ? undefined : auth.message;
+      },
       shellEnv: ({ conversationId, cwd }) =>
         session.runnerCell.get()?.piTools.shellEnvironment({ conversationId, cwd }),
       userReminders: ({ text, sentAt, previousUserAt, timezone }) =>
@@ -347,7 +387,8 @@ export const piChatsFor = (
       journal: (conversationId) => cloudJournalFor(session, conversationId),
       cloudAgents: (conversationId) => cloudAgentsFor(session, conversationId),
       cloudThreads: (conversationId) => cloudAgentThreadsFor(session, conversationId),
-      execution: (conversationId) => executionRemoteFor(session, conversationId),
+      deviceAgents: (conversationId) => deviceAgentThreadsFor(session, conversationId),
+      devices: (conversationId) => httpDevices(conversationId, () => session.runnerCell.get()?.getStellaSiteAuth()),
       brain: (conversationId) => brainFor(session, hostBus, conversationId),
       // A conversation stored in the cloud lists this computer's agents in
       // the owner's agent threads, where a paired phone shows and messages

@@ -1,45 +1,48 @@
 /**
- * Where a desktop conversation's tools run, apart from the conversation: the
- * brain (Stella's or an agent's conversation, its state and history) stays
- * in this computer's harness, and its file and shell tools run on this
- * computer, on another of the owner's computers, or in a cloud container.
+ * Where a desktop conversation's Stella runs. Everything the conversation
+ * does here runs on this computer; an agent meant for another computer or
+ * the cloud runs there as a whole (`desktop-agents`).
  *
- *   another computer: this computer --HTTP--> owner gate --presence socket--> computer
- *   cloud:            this computer --HTTP--> conversation object --> its container
- *
- * Both ends serve the same file and shell tools a cloud agent's container
- * does (`@stella/contracts/turn-plane/device-tools`), so a call leaves here
- * in their shape: pi's own tools translate their arguments, and Stella's
- * Read goes as it is. Only a conversation stored in the cloud can move its
- * tools; one kept on this computer refuses every switch.
- *
- * In a conversation stored in the cloud Stella can move her brain as well
- * (`switch_destination` with `move: "brain"`): the conversation's object
- * records the new host (`@stella/contracts/turn-plane/pi-brain`), and once
- * her turn here ends her brief continues there as a placed chat.
+ * In a conversation stored in the cloud Stella can move herself
+ * (`switch_destination`): the conversation's object records the new host
+ * (`@stella/contracts/turn-plane/pi-brain`), and once her turn here ends
+ * her brief continues there as a placed chat.
  */
-import type { Context, JsonValue } from "@earendil-works/chord";
-import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
-import { defineExtension, type Extension, type ToolExecutionApi, type ToolRegistration } from "@earendil-works/pi-durable";
-import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-durable/tools";
+import type { Context } from "@earendil-works/chord";
 import { samePiBrainHost, type PiBrainHost, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
-import type { DeviceToolName, DeviceToolResult } from "@stella/contracts/turn-plane/device-tools";
-import { StellaAgentDoc } from "../stella/agent-doc.ts";
-import { STELLA_CODING_EXTENSION } from "../stella/coding.ts";
-import type { StellaExecutionHost } from "../stella/execution.ts";
-import { placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella/placement.ts";
-import { remoteToolEnvironment, type DesktopExecutionRemote, type RemoteToolCall as EnvironmentToolCall } from "./remote-tools.ts";
+import {
+  DEVICES_PATH,
+  findDeviceDestination,
+  type DeviceDestination,
+  type DevicesResponse,
+} from "@stella/contracts/turn-plane/placement";
+import { deviceRefusal, deviceStanding, type StellaExecutionHost } from "../stella/execution.ts";
+import type { StellaPlacement } from "../stella/placement.ts";
 
-export type { DesktopExecutionRemote } from "./remote-tools.ts";
+const LIST_TIMEOUT_MS = 15_000;
 
-/** One file or shell call for a pi conversation's tools elsewhere. */
-export type RemoteToolCall = Omit<EnvironmentToolCall, "owner"> & {
-  /** The pi conversation whose tools these are, in this computer's harness. */
-  piConversationId: number;
+/** The owner's computers, as the owner gate lists them, for one conversation stored in the cloud. */
+export type DesktopDevices = { devices(): Promise<DeviceDestination[]> };
+
+/** The owner's computers over HTTP with the user's sign-in; undefined for a conversation kept on this computer. */
+export const httpDevices = (
+  conversationId: string,
+  auth: () => { baseUrl: string; authToken: string } | null | undefined,
+): DesktopDevices | undefined => {
+  if (conversationId.startsWith("local_")) return undefined;
+  return {
+    devices: async () => {
+      const current = auth();
+      if (!current) throw new Error("Sign in to Stella to reach your other computers.");
+      const response = await fetch(`${current.baseUrl.replace(/\/+$/, "")}${DEVICES_PATH}`, {
+        headers: { authorization: `Bearer ${current.authToken}` },
+        signal: AbortSignal.timeout(LIST_TIMEOUT_MS),
+      });
+      if (!response.ok) throw new Error(`Listing your computers failed (${response.status}).`);
+      return ((await response.json()) as DevicesResponse).devices ?? [];
+    },
+  };
 };
-
-/** The longest a shell command waits for its end on the other side before handing back a session. */
-const SHELL_WAIT_MS = 600_000;
 
 /** Where a conversation stored in the cloud has its brain, as its object records it. */
 export type DesktopBrain = {
@@ -57,125 +60,13 @@ export type DesktopBrain = {
   setHome?(deviceId: string | null): Promise<void>;
 };
 
-export type ToolResultContent = (TextContent | ImageContent)[];
-
-const result = (outcome: DeviceToolResult): { content: ToolResultContent; isError?: true } => ({
-  content: [
-    { type: "text", text: outcome.text || "(no output)" },
-    ...(outcome.images ?? []).map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
-  ],
-  ...(outcome.isError ? { isError: true as const } : {}),
-});
-
-/**
- * pi's file and shell tools, as the other side's tools take them: the
- * same work under the container's argument names. A shell command waits as
- * long as the other side lets one wait.
- */
-const remoteCall = (toolName: string, args: Record<string, unknown>): { toolName: DeviceToolName; params: Record<string, unknown> } => {
-  switch (toolName) {
-    case "Bash": {
-      const seconds = typeof args.timeout === "number" && args.timeout > 0 ? args.timeout : undefined;
-      return {
-        toolName: "Bash",
-        params: { cmd: args.command, timeout_ms: Math.min(SHELL_WAIT_MS, seconds ? seconds * 1000 : SHELL_WAIT_MS) },
-      };
-    }
-    case "Read":
-      return {
-        toolName: "Read",
-        params: {
-          file_path: args.path,
-          ...(typeof args.offset === "number" ? { offset: args.offset } : {}),
-          ...(typeof args.limit === "number" ? { limit: args.limit } : {}),
-        },
-      };
-    case "Write":
-      return { toolName: "Write", params: { file_path: args.path, content: args.content } };
-    case "Edit": {
-      const edits = Array.isArray(args.edits) ? (args.edits as Array<{ oldText?: unknown; newText?: unknown }>) : [];
-      return {
-        toolName: "Edit",
-        params: { file_path: args.path, edits: edits.map((edit) => ({ old_string: edit.oldText, new_string: edit.newText })) },
-      };
-    }
-    default:
-      throw new Error(`${toolName} does not run away from this computer.`);
-  }
-};
-
-type PlacedRun = (
-  placement: Exclude<StellaPlacement, { kind: "local" }>,
-  call: RemoteToolCall,
-  context: Context,
-) => Promise<{ content: ToolResultContent; isError?: true }>;
-
-/**
- * One device-shaped call where the conversation's tools run now, through
- * `run`; undefined while they run on this computer.
- */
-export const runWherePlaced =
-  (run: PlacedRun) =>
-  async (
-    call: { toolName: DeviceToolName; params: Record<string, unknown> },
-    api: ToolExecutionApi<JsonValue>,
-    context: Context,
-  ): Promise<{ content: ToolResultContent; isError?: true } | undefined> => {
-    const placement = placementOf(await api.snapshot(StellaPlacementDoc, api.conversationId, context));
-    if (!placement || placement.kind === "local") return undefined;
-    const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
-    return await run(
-      placement,
-      {
-        piConversationId: api.conversationId,
-        ...(role?.threadId ? { threadId: role.threadId } : {}),
-        callId: api.callId,
-        toolName: call.toolName,
-        params: call.params,
-      },
-      context,
-    );
-  };
-
-/**
- * The agents' `stella-coding` on this computer: pi's own tools, which run
- * here through the ExecutionEnv, and wherever else the conversation's tools
- * were moved through `run`.
- */
-export const desktopCoding = (run: PlacedRun): Extension => {
-  const elsewhere = runWherePlaced(run);
-  return defineExtension({
-    name: STELLA_CODING_EXTENSION,
-    tools: [
-      { ...createBashTool(), name: "Bash" },
-      { ...createReadTool(), name: "Read" },
-      { ...createWriteTool(), name: "Write" },
-      { ...createEditTool(), name: "Edit" },
-    ].map(
-      (tool): ToolRegistration => ({
-        ...tool,
-        async execute(args: unknown, api: ToolExecutionApi<JsonValue>, context: Context) {
-          const ran = await elsewhere(remoteCall(tool.name, (args ?? {}) as Record<string, unknown>), api, context);
-          return ran ?? (await tool.execute(args as never, api as never, context));
-        },
-      }),
-    ),
-  });
-};
-
-/**
- * One conversation's execution host on this computer: where its tools can
- * move (`switch_destination`, `spawn_agent` with a device), and how a call
- * reaches them there.
- */
+/** One conversation's execution host on this computer: where Stella can move herself. */
 export function desktopExecution(options: {
-  /** The Stella conversation. */
-  conversationId: string;
-  /** This computer: naming it moves tools back here. */
+  /** This computer: naming it keeps Stella here. */
   deviceId?: string;
-  /** Kept on this computer only: every switch is refused. */
+  /** Kept on this computer only: Stella never moves. */
   localOnly: boolean;
-  remote?: DesktopExecutionRemote;
+  devices?: DesktopDevices;
   /** Where the conversation's brain runs, for a conversation stored in the cloud. */
   brain?: DesktopBrain;
   /** Settles once Stella's turn here has ended, so her brief continues after it. */
@@ -184,23 +75,6 @@ export function desktopExecution(options: {
   brainMoved?(record: PiBrainRecord): void;
   report(error: unknown): void;
 }) {
-  const environment = remoteToolEnvironment({
-    conversationId: options.conversationId,
-    ...(options.deviceId ? { deviceId: options.deviceId } : {}),
-    ...(options.remote ? { remote: options.remote } : {}),
-    report: options.report,
-  });
-
-  /** One call where the conversation's tools run now. */
-  const run = async (
-    placement: Exclude<StellaPlacement, { kind: "local" }>,
-    call: RemoteToolCall,
-    context: Context,
-  ): Promise<{ content: ToolResultContent; isError?: true }> => {
-    const { piConversationId, ...rest } = call;
-    return result(await environment.run(placement, { ...rest, owner: String(piConversationId) }, context.abortSignal));
-  };
-
   const isHere = (target: StellaPlacement): boolean =>
     target.kind === "local" || (target.kind === "device" && target.deviceId === options.deviceId);
 
@@ -211,35 +85,38 @@ export function desktopExecution(options: {
     return record;
   };
 
-  /** The cloud or another computer, which must be able to take work now, as for its tools. */
-  const brainHostAt = async (
-    target: StellaPlacement,
-    context: Context,
-  ): Promise<{ placement: StellaPlacement; next: PiBrainHost } | { error: string }> => {
-    const prepared = await host.prepare(target, context);
-    if ("error" in prepared) return prepared;
-    const placement = prepared.placement;
-    if (placement.kind === "local") return { error: "You already run on this computer." };
+  /** The cloud, or another computer that can take work now. */
+  const brainHostAt = async (target: StellaPlacement): Promise<{ placement: StellaPlacement; next: PiBrainHost } | { error: string }> => {
+    if (isHere(target)) return { error: "You already run on this computer." };
+    if (!options.devices) return { error: "Sign in to Stella to move away from this computer." };
+    if (target.kind === "cloud") return { placement: target, next: { host: "cloud" } };
+    if (target.kind !== "device") return { error: "You already run on this computer." };
+    const listed = await options.devices.devices().catch(() => undefined);
+    if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
+    const device = findDeviceDestination(listed, target.deviceId);
+    if (!device) {
+      return { error: `No connected device has the device_id or name ${target.deviceId}. Use a device_id from the connected devices list, or "cloud".` };
+    }
+    if (device.deviceId === options.deviceId) return { error: "You already run on this computer." };
+    const name = device.label?.trim() || device.deviceId;
+    const refusal = deviceRefusal(device, name);
+    if (refusal) return { error: refusal };
     return {
-      placement,
-      next:
-        placement.kind === "device"
-          ? { host: "device", deviceId: placement.deviceId, ...(placement.label ? { label: placement.label } : {}) }
-          : { host: "cloud" },
+      placement: { kind: "device", deviceId: device.deviceId, label: name },
+      next: { host: "device", deviceId: device.deviceId, label: name },
     };
   };
 
   const host: StellaExecutionHost = {
-    localOnly: options.localOnly,
-    prepare: async (target) => await environment.prepare(target),
-    standing: async (deviceId) => await environment.standing(deviceId),
-    // Leaving the cloud saves the container's work into the world, then lets it go.
-    moved: async (piConversationId, from) => await environment.moved(String(piConversationId), from),
+    standing: async (deviceId) => {
+      const listed = await options.devices?.devices().catch(() => undefined);
+      const device = listed?.find((entry) => entry.deviceId === deviceId);
+      return device ? deviceStanding(device) : undefined;
+    },
     ...(options.brain && !options.localOnly
       ? {
-          moveBrain: async (target, brief, context) => {
-            if (isHere(target)) return { error: "You already run on this computer." };
-            const at = await brainHostAt(target, context);
+          moveBrain: async (target, brief) => {
+            const at = await brainHostAt(target);
             if ("error" in at) return at;
             const brain = options.brain!;
             await setBrain(brain, at.next);
@@ -259,7 +136,7 @@ export function desktopExecution(options: {
    * there. This computer is a host like any other: picking it keeps her here
    * for every device's messages.
    */
-  const pinBrain = async (target: StellaPlacement, context: Context): Promise<PiBrainRecord | { error: string }> => {
+  const pinBrain = async (target: StellaPlacement, _context: Context): Promise<PiBrainRecord | { error: string }> => {
     const brain = options.brain;
     if (!brain || options.localOnly) return { error: "This chat is stored only on this computer, so it can only run here." };
     // The computer the user picks is the account's home computer from now
@@ -274,23 +151,17 @@ export function desktopExecution(options: {
       return await home(current && samePiBrainHost(current, next) ? current : await setBrain(brain, next));
     };
     if (!isHere(target)) {
-      const at = await brainHostAt(target, context);
+      const at = await brainHostAt(target);
       if ("error" in at) return at;
       return await settle(at.next);
     }
     if (!options.deviceId) return { error: "This computer has no device id yet. Try again in a moment." };
-    const listed = await environment.remote?.devices().catch(() => undefined);
+    const listed = await options.devices?.devices().catch(() => undefined);
     const label = listed?.find((entry) => entry.deviceId === options.deviceId)?.label?.trim();
     return await settle({ host: "device", deviceId: options.deviceId, ...(label ? { label } : {}) });
   };
 
-  return {
-    host,
-    run,
-    pinBrain,
-    /** Let every container this conversation holds go. */
-    close: environment.close,
-  };
+  return { host, pinBrain };
 }
 
 export type DesktopExecution = ReturnType<typeof desktopExecution>;

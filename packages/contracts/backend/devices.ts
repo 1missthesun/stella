@@ -18,7 +18,8 @@ export type ExecutionCapability =
   | "computer-use"
   | "local-files"
   | "local-apps"
-  | "attachments";
+  | "attachments"
+  | "claude-code";
 
 export type ActivityNotificationKind = "started" | "completed" | "failed";
 

@@ -287,6 +287,14 @@ export type PiCloudAgentThreads = {
     prompt: string;
     model: string;
   }) => Promise<{ threadId: string }>;
+  startOnDevice: (request: {
+    conversationId: string;
+    requestId: string;
+    description: string;
+    prompt: string;
+    targetDeviceId: string;
+    model?: string;
+  }) => Promise<{ threadId: string; waitingForDevice: boolean }>;
   message: (request: {
     conversationId: string;
     threadId: string;

@@ -103,17 +103,9 @@ import {
   isAccountProviderId,
 } from "../provider/account-byok.ts";
 import { openBunSqliteStorage } from "../storage/bun-sqlite.ts";
-import { isDeviceToolName } from "@stella/contracts/turn-plane/device-tools";
-import { placementOf, StellaPlacementDoc, type StellaPlacement } from "../stella/placement.ts";
+import type { StellaPlacement } from "../stella/placement.ts";
 import { desktopAgentsHost, desktopEnvironments } from "./desktop-agents.ts";
-import {
-  desktopCoding,
-  runWherePlaced,
-  desktopExecution,
-  type DesktopBrain,
-  type DesktopExecution,
-  type DesktopExecutionRemote,
-} from "./desktop-execution.ts";
+import { desktopExecution, type DesktopBrain, type DesktopDevices, type DesktopExecution } from "./desktop-execution.ts";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import { journalMirror, journalTurnGate, type DesktopJournal, type JournalMirror } from "./desktop-journal.ts";
 import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror } from "./desktop-local-log.ts";
@@ -192,6 +184,8 @@ export type DesktopChatsOptions = {
   /** For a conversation stored in the cloud: its cloud agents, run in its object. */
   cloudAgents?(conversationId: string): RemoteAgentHost | undefined;
   claudeCodeEngine?: ClaudeCodeEngine;
+  /** Why Claude Code can't run on this computer now (not signed in); undefined when it can. */
+  claudeCodeProblem?(): Promise<string | undefined>;
   userReminders?(input: {
     conversationId: string;
     text: string;
@@ -207,10 +201,13 @@ export type DesktopChatsOptions = {
    */
   cloudThreads?(conversationId: string): DesktopEngineAgents | undefined;
   /**
-   * For a conversation stored in the cloud: how its tools reach the owner's
-   * other computers and a cloud container, once they are moved there.
+   * For a conversation stored in the cloud: Stella's agents on the owner's
+   * other computers, each run there as a whole on that computer's own
+   * Stella; their reports come back through the owner's report ledger.
    */
-  execution?(conversationId: string): DesktopExecutionRemote | undefined;
+  deviceAgents?(conversationId: string): DesktopDeviceAgents | undefined;
+  /** For a conversation stored in the cloud: the owner's computers, as the owner gate lists them. */
+  devices?(conversationId: string): DesktopDevices | undefined;
   /**
    * For a conversation stored in the cloud: where its brain runs, as its
    * object records it. Once that names another host, this computer takes
@@ -286,6 +283,18 @@ export type DesktopChatsOptions = {
   report(error: unknown): void;
 };
 
+/** Stella's agents on the owner's other computers (`DesktopChatsOptions.deviceAgents`). */
+export type DesktopDeviceAgents = {
+  /** Start one there, once per `key`; `model` is what that computer runs it on, absent its own default. */
+  start(args: { key: string; deviceId: string; description: string; prompt: string; model?: string }): Promise<{
+    threadId: string;
+    waitingForDevice: boolean;
+  }>;
+  /** Another message for it: steers it while it runs, or starts its next run. */
+  message(args: { key: string; threadId: string; description: string; message: string }): Promise<"steered" | "resumed">;
+  pause(threadId: string): Promise<void>;
+};
+
 /** Agents another runtime runs as a whole (`DesktopChatsOptions.cloudThreads`). */
 export type DesktopEngineAgents = {
   /** Start one, once per `key`, on `model`. */
@@ -311,7 +320,7 @@ type Chat = {
   mirror?: JournalMirror;
   /** For a conversation kept on this computer: its chat log mirror. */
   localLog?: LocalLogMirror;
-  /** Where its tools run when they are not on this computer. */
+  /** Where Stella can move herself. */
   execution: DesktopExecution;
   stream?: AgentEventStream;
   watchers: number;
@@ -334,28 +343,6 @@ const LocaleDoc = defineDoc<{ locale?: string }>({
   history: "latest",
   fork: "current",
   initial: () => ({}),
-});
-
-/**
- * Stella's own tools for one conversation: her Read reads where her tools
- * run, this computer or wherever `switch_destination` moved them.
- */
-const placedTools = (tools: StellaToolHost, execution: DesktopExecution, chat: () => Chat | undefined): StellaToolHost => ({
-  specs: (role) => tools.specs(role),
-  run: async (call, context) => {
-    const opened = chat();
-    if (call.role === "orchestrator" && isDeviceToolName(call.name) && opened) {
-      const placement = placementOf(await opened.harness.snapshot(StellaPlacementDoc, opened.root.id, context));
-      if (placement && placement.kind !== "local") {
-        return await execution.run(
-          placement,
-          { piConversationId: opened.root.id, callId: call.callId, toolName: call.name, params: call.args },
-          context,
-        );
-      }
-    }
-    return await tools.run(call, context);
-  },
 });
 
 /** A conversation id as a file name. */
@@ -490,7 +477,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     // A list that can't be read now says nothing of the holder: the record stands.
     const listed =
       host?.host === "device" || options.deviceId
-        ? await options.execution?.(conversationId)?.devices().catch(() => undefined)
+        ? await options.devices?.(conversationId)?.devices().catch(() => undefined)
         : undefined;
     const home = listed?.find((entry) => entry.brainHome && entry.online && entry.availability?.ready === true);
     if (home && home.deviceId === options.deviceId) {
@@ -871,13 +858,73 @@ export function desktopChats(options: DesktopChatsOptions) {
     };
   };
 
+  /**
+   * Stella's agent on another of the owner's computers, which runs there as
+   * a whole: a message it takes mid-run, and a pause, settle what Stella
+   * waits for, as its reports do (`noteEngineReport`). One on Claude Code
+   * needs that computer signed in to it.
+   */
+  const deviceHost = (
+    conversationId: string,
+    deviceId: string,
+    chat: () => Chat | undefined,
+  ): RemoteAgentHost | undefined => {
+    const agents = options.deviceAgents?.(conversationId);
+    if (!agents) return undefined;
+    const device = async () =>
+      (await options.devices?.(conversationId)?.devices().catch(() => undefined))?.find((entry) => entry.deviceId === deviceId);
+    const settle = async (threadId: string, requestId: string, status?: "paused") => {
+      const opened = chat();
+      if (!opened) return;
+      await opened.harness.commit(
+        (tx) => noteRemoteReport(tx, opened.root.id, { threadId, requestId, ...(status ? { status } : {}) }),
+        context,
+      );
+    };
+    const descriptionOf = async (threadId: string) => {
+      const opened = chat();
+      const known = opened ? (await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context))?.agents : undefined;
+      return known?.[threadId]?.description ?? threadId;
+    };
+    return {
+      start: async ({ key, description, prompt, model }) => {
+        if (model && /^claude-code(?:[/:]|$)/u.test(model)) {
+          const there = await device();
+          const name = there?.label?.trim() || deviceId;
+          if (there?.online && there.availability && !there.availability.capabilities.includes("claude-code")) {
+            throw new Error(
+              `${name} isn't signed in to Claude Code, so a Claude Code agent can't run there. Ask the user to sign in to Claude on ${name} (Settings › Account there) and try again, or start the agent in the cloud with destination "cloud".`,
+            );
+          }
+        }
+        const started = await agents.start({ key, deviceId, description, prompt, ...(model ? { model } : {}) });
+        return { threadId: started.threadId, ...(started.waitingForDevice ? { waiting: true } : {}) };
+      },
+      message: async ({ key, threadId, message }) => {
+        const description = await descriptionOf(threadId);
+        if ((await agents.message({ key, threadId, description, message })) === "steered") {
+          await settle(threadId, `steered:${key}`);
+        }
+      },
+      status: async () => {
+        const there = await device();
+        const name = there?.label?.trim() || deviceId;
+        return there && !there.online ? `runs on ${name}, which is offline now` : `runs on ${name}`;
+      },
+      pause: async (threadId) => {
+        await agents.pause(threadId);
+        await settle(threadId, `paused:${threadId}:${Date.now()}`, "paused");
+      },
+    };
+  };
+
   /** A report for one of the conversation's Claude Code agents counts as that agent's answer. */
   const noteEngineReport = async (conversationId: string, report: { requestId: string; text: string }) => {
     const threadId = /\nthread_id: (\S+)/.exec(report.text)?.[1];
     if (!threadId) return;
     const chat = await ready(conversationId);
     const agent = (await chat.harness.snapshot(StellaAgentsDoc, chat.root.id, context))?.agents[threadId];
-    if (!agent?.engine) return;
+    if (!agent?.engine && !(agent?.remote && agent.placement.kind === "device")) return;
     await chat.harness.commit(
       (tx) => noteRemoteReport(tx, chat.root.id, { threadId, requestId: report.requestId, text: report.text }),
       context,
@@ -1042,13 +1089,12 @@ export function desktopChats(options: DesktopChatsOptions) {
         await mkdir(directory, { recursive: true });
         const file = path.join(directory, fileName(conversationId));
         const storage = await openBunSqliteStorage(file);
-        const remote = options.execution?.(conversationId);
+        const devices = options.devices?.(conversationId);
         const brain = options.brain?.(conversationId);
         const execution = desktopExecution({
-          conversationId,
           ...(options.deviceId ? { deviceId: options.deviceId } : {}),
           localOnly: conversationId.startsWith("local_"),
-          ...(remote ? { remote } : {}),
+          ...(devices ? { devices } : {}),
           ...(brain ? { brain } : {}),
           // Stella's brief continues elsewhere once her turn here has ended.
           turnEnded: async () => {
@@ -1111,6 +1157,9 @@ export function desktopChats(options: DesktopChatsOptions) {
               return desktopAgentsHost({
                 ...(options.deviceId ? { deviceId: options.deviceId } : {}),
                 ...(cloud ? { cloud } : {}),
+                ...(options.deviceAgents?.(conversationId)
+                  ? { devices: (deviceId: string) => deviceHost(conversationId, deviceId, () => opened) }
+                  : {}),
                 agentModel: (requested, _caller, placement) => agentModel(conversationId, requested, placement),
                 engine: (id) => engines.get(id),
                 directory: directoryFor(conversationId),
@@ -1212,15 +1261,8 @@ export function desktopChats(options: DesktopChatsOptions) {
                   : {}),
               });
             })(),
-            ...(options.tools ? { tools: placedTools(options.tools(conversationId), execution, () => opened) } : {}),
-            // An agent's file and shell tools run here, or wherever its tools were moved.
-            extensions: [
-              journalTurnGate(standing),
-              desktopCoding(execution.run),
-              ...(claudeCodeEngine
-                ? [claudeCodeEngine.extension(conversationId, { searchElsewhere: runWherePlaced(execution.run) })]
-                : []),
-            ],
+            ...(options.tools ? { tools: options.tools(conversationId) } : {}),
+            extensions: [journalTurnGate(standing), ...(claudeCodeEngine ? [claudeCodeEngine.extension(conversationId)] : [])],
             env: environments.env,
             onReport: options.report,
           },
@@ -1849,6 +1891,18 @@ export function desktopChats(options: DesktopChatsOptions) {
         runsOn = choice.runsOn;
       }
       const chat = await ready(conversationId);
+      // One on Claude Code runs on this computer's own Claude login, or not at all.
+      const engineModel = runsOn?.model ?? (await chat.root.agent(context)).model;
+      if (onClaudeCode(engineModel)) {
+        const problem = await options.claudeCodeProblem?.().catch(() => undefined);
+        if (problem) {
+          return {
+            threadId: run.threadId ?? run.agentKey,
+            status: "error",
+            error: `${problem} This agent was started from another device to run on Claude Code here; once Claude is signed in on this computer, message it to try again, or start it in the cloud.`,
+          };
+        }
+      }
       return await chat.runPlacedAgent({ ...placedRun, ...(runsOn ? { runsOn } : {}), signal: placed.cancel.signal }, context);
     } finally {
       signal?.removeEventListener("abort", stop);
@@ -2039,7 +2093,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         clearInterval(chat.followCheck);
         await chat.mirror?.stop();
         await chat.localLog?.stop();
-        await chat.execution.close();
         await chat.stream?.stop().catch(() => undefined);
         await chat.harness.close(context).catch(() => undefined);
       }

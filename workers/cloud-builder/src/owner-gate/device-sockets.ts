@@ -3,7 +3,6 @@ import {
   deviceRequestErrorResponse,
   DeviceRequestRelay,
 } from "../device-request-relay.js";
-import type { DeviceToolDeviceFrame } from "@stella/contracts/turn-plane/device-tools";
 import {
   DEVICE_REQUEST_LIMITS,
   type DeviceRequestDeviceFrame,
@@ -204,7 +203,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       for (const other of this.sockets(attachment.deviceId)) {
         if (other === socket) continue;
         this.deviceRequestRelay().onDeviceGone(attachment.deviceId, other);
-        this.deviceToolRelayState?.onDeviceGone(attachment.deviceId, other);
         this.closeSocket(other, DEVICE_PRESENCE_CLOSE.replaced, "replaced");
       }
       attachment.phase = "connected";
@@ -222,7 +220,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
           requestedAt: device!.remoteExecutionAskedAt ?? now,
         });
       }
-      this.deviceToolRelayState?.onDeviceConnected(attachment.deviceId, socket);
       const flushed = await this.ownerStore().internalCall(
         "agentThreads.flushDeviceMessages",
         { deviceId: attachment.deviceId },
@@ -302,17 +299,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         socket,
         attachment.deviceId,
         frame as DeviceRequestDeviceFrame,
-      );
-      return;
-    }
-    if (
-      frame.type === "tool.accepted" ||
-      frame.type === "tool.result" ||
-      frame.type === "tool.error"
-    ) {
-      this.deviceToolRelayState?.onFrame(
-        attachment.deviceId,
-        frame as DeviceToolDeviceFrame,
       );
       return;
     }
@@ -412,7 +398,6 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       this.markDisconnected(attachment, now);
     }
     this.deviceRequestRelay().onDeviceGone(attachment.deviceId, socket);
-    this.deviceToolRelayState?.onDeviceGone(attachment.deviceId, socket);
     this.closeSocket(socket, code, reason);
     await this.scheduleAlarm(now);
   }

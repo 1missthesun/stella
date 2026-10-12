@@ -206,7 +206,6 @@ const remoteExecutionNote = (device: ExecutionContextDevice): string => {
 
 export const renderExecutionDevices = (
   snapshot: ExecutionContextSnapshot,
-  options: { switchable?: boolean } = {},
 ): string =>
   [
     "# Connected devices and execution destinations",
@@ -218,9 +217,7 @@ export const renderExecutionDevices = (
     ...(!snapshot.devicesKnown
       ? ["The connected device list is currently unavailable."]
       : []),
-    options.switchable
-      ? 'To run a new agent\'s tools on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination; to move your own tools there, pass it to switch_destination.'
-      : 'To run an agent on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination. Your own tools still run where you are, and running agents stay where they started.',
+    'To run an agent on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination: it runs entirely there. Running agents stay where they started.',
   ].join("\n");
 
 export const renderExecutionDestination = (

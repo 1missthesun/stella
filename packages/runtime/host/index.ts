@@ -288,6 +288,8 @@ export class StellaRuntimeHost {
   placedDispatchByRunId = new Map<string, PlacedDispatch>();
   /** What each conversation runs elsewhere, for Stop (`ConversationPlacements`). */
   placements = new ConversationPlacements();
+  /** Whether Claude Code is signed in on this computer, as last read, for what this computer advertises. */
+  claudeCodeLogin: { signedIn: boolean; at: number; pending?: Promise<void> } = { signedIn: false, at: 0 };
   pendingDestinationHandoffs = new Map<string, { canceled: boolean }>();
   /** The desktop database the execution placement bridge keeps its proofs in. */
   hostDatabase: SqliteDatabase | null = null;
@@ -904,39 +906,12 @@ export class StellaRuntimeHost {
         }
         return await serve(request);
       },
-      // A cloud agent's tool call runs in the worker, on this computer's
-      // tool host; a stop from the cloud stops it there.
-      runDeviceTool: async (call, signal) => {
-        const requestId = crypto.randomUUID();
-        const stop = () => {
-          void this.requestWorker(
-            METHOD_NAMES.INTERNAL_WORKER_CANCEL_DEVICE_TOOL,
-            { requestId },
-            {
-              ensureWorker: false,
-              recordActivity: false,
-            },
-          ).catch(() => undefined);
-        };
-        signal.addEventListener("abort", stop, { once: true });
-        try {
-          return await this.requestWorker(
-            METHOD_NAMES.INTERNAL_WORKER_RUN_DEVICE_TOOL,
-            { requestId, call },
-            {
-              ensureWorker: true,
-              recordActivity: true,
-            },
-          );
-        } finally {
-          signal.removeEventListener("abort", stop);
-        }
-      },
       getAvailability: async () => {
         const platformCapabilities: ExecutionPlacementAvailability["capabilities"] =
           process.platform === "darwin" || process.platform === "win32"
             ? ["computer-use"]
             : [];
+        const claudeCode = await this.claudeCodeSignedIn();
         return {
           ready: Boolean(
             this.started &&
@@ -950,6 +925,7 @@ export class StellaRuntimeHost {
             "local-files",
             "attachments",
             ...platformCapabilities,
+            ...(claudeCode ? (["claude-code"] as const) : []),
           ],
         };
       },
@@ -1451,6 +1427,24 @@ export class StellaRuntimeHost {
       this.placements.submitted(submitting);
     }
   }
+  /**
+   * Whether Claude Code is signed in here, read again at most once a minute:
+   * agents on Claude Code that another computer places here need it.
+   */
+  private async claudeCodeSignedIn(): Promise<boolean> {
+    const known = this.claudeCodeLogin;
+    if (Date.now() - known.at >= 60_000 && !known.pending) {
+      known.pending = (async () => {
+        const answer = (await this.options.hostHandlers
+          .requestLlmCredentials?.({ operation: "claude-config" })
+          .catch(() => undefined)) as { ok?: boolean; signedIn?: boolean } | undefined;
+        this.claudeCodeLogin = { signedIn: answer?.ok === true && answer.signedIn === true, at: Date.now() };
+      })();
+      if (known.at === 0) await known.pending;
+    }
+    return this.claudeCodeLogin.signedIn;
+  }
+
   private async submitPlacedChat(
     payload: PlacedChatPayload,
     target: PlacedChatTarget,

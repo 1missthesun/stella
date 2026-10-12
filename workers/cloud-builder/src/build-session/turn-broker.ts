@@ -81,6 +81,7 @@ import type {
   TurnBrokerTurnStateCheckpointReceipt,
   TurnBrokerTurnStateCheckpointRequest,
 } from "@stella/contracts/turn-credential-broker";
+import { ownerGateStub } from "../rpc-release.js";
 
 export type TurnBrokerHost = Pick<
   BuildSessionInternals,
@@ -660,7 +661,7 @@ export const serveTurnDriveRequest = async (
               }
             : null;
   if (!call) return brokerFailure(403);
-  const response = (await env.OWNER_GATES.getByName(turn.ownerId).ownerInternal({
+  const response = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
     ...call,
     ownerGeneration: turn.ownerGeneration,
   })) as RpcResponse;
@@ -696,7 +697,7 @@ export const serveTurnSearchRequest = async (
   turn: Pick<TurnRequest, "ownerId" | "ownerGeneration">,
   body: Record<string, unknown>,
 ): Promise<Response> => {
-  const response = (await env.OWNER_GATES.getByName(turn.ownerId).ownerInternal({
+  const response = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
     name: "search.web",
     args: {
       query: body.query,
@@ -763,7 +764,7 @@ export const serveTurnUserAskRequest = async (
           detail: body.detail,
         }
       : { askId: body.askId };
-  const response = (await env.OWNER_GATES.getByName(turn.ownerId).ownerInternal({
+  const response = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
     name,
     args,
     ownerGeneration: turn.ownerGeneration,

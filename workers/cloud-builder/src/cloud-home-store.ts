@@ -5,6 +5,7 @@ import {
 } from "./builtin-cloud-app-skill.js";
 import type { BackendError, RpcResponse } from "@stella/contracts/backend/protocol";
 import { sha256BytesHex, sha256Hex } from "./hash.js";
+import { ownerGateStub } from "./rpc-release.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder("utf-8", {
@@ -34,7 +35,7 @@ export type HomeControl = (
 export const gateHomeControl =
   (gates: Cloudflare.Env["OWNER_GATES"], ownerId: string): HomeControl =>
   async (op, body) =>
-    await gates.getByName(ownerId).homeControl({ op, body });
+    await ownerGateStub(gates, ownerId).homeControl({ op, body });
 
 export type CloudHomeEndpoint = {
   control: HomeControl;

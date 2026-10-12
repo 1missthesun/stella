@@ -5,6 +5,7 @@
  */
 
 import { StripeError, stripeRequest, verifyStripeWebhook, type StripeEvent } from "./stripe.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -63,7 +64,7 @@ const stripeWebhook = async (request: Request, env: Cloudflare.Env): Promise<Res
     console.log(JSON.stringify({ event: "stripe_webhook_unowned", type: event.type, id: event.id }));
     return json({ received: true });
   }
-  await env.OWNER_GATES.getByName(ownerId).applyStripeEvent(event);
+  await ownerGateStub(env.OWNER_GATES, ownerId).applyStripeEvent(event);
   return json({ received: true });
 };
 

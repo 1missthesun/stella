@@ -25,6 +25,7 @@ import { CLOUD_ADOPTED_SESSION_DIR } from "@stella/contracts/cloud-native-state"
 import type { ExecutionSession } from "../sandbox-client.js";
 import { sha256Hex } from "../hash.js";
 import { log } from "./shared/keys.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 /** The most of a session the container takes; a larger one rebuilds. */
 const MAX_ADOPTED_BYTES = 64 * 1024 * 1024;
@@ -45,7 +46,7 @@ export const writeAdoptedClaudeSession = async (args: {
   adopt: CloudOrchestratorCliAdoptedSession;
 }): Promise<{ sessionId: string; cliVersion: string } | undefined> => {
   const call = async (name: string, callArgs: unknown): Promise<unknown> => {
-    const response = (await args.gates.getByName(args.ownerId).ownerInternal({
+    const response = (await ownerGateStub(args.gates, args.ownerId).ownerInternal({
       name,
       args: callArgs,
       ownerGeneration: args.ownerGeneration,

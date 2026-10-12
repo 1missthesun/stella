@@ -41,6 +41,7 @@ import {
   requireCloudContext,
 } from "./support.js";
 import { OrchestratorSessionCore } from "./session-core.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 /**
  * Owner fence leases, the owner gate, owner events, and the owner's home
@@ -52,7 +53,7 @@ export abstract class OrchestratorOwner extends OrchestratorSessionCore {
     path: string,
     body: Record<string, unknown>,
   ): Promise<Response> {
-    return this.env.OWNER_GATES.getByName(ownerId).fetch(
+    return ownerGateStub(this.env.OWNER_GATES, ownerId).fetch(
       `https://owner-gate/owner-fence/${path}`,
       {
         method: "POST",

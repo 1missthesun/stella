@@ -6,6 +6,7 @@ import {
   type CloudSkillUploadFile,
 } from "./cloud-home-store.js";
 import { json } from "./http/response.js";
+import { ownerGateStub } from "./rpc-release.js";
 
 type CloudHomeRouteEnv = Pick<Cloudflare.Env, "AGENT_HOME" | "OWNER_GATES">;
 
@@ -45,7 +46,7 @@ export const ownerAccess = async (
   ownerId: string,
 ): Promise<string> => {
   try {
-    return (await env.OWNER_GATES.getByName(ownerId).snapshot()).ownerGeneration;
+    return (await ownerGateStub(env.OWNER_GATES, ownerId).snapshot()).ownerGeneration;
   } catch {
     throw new CloudHomeProtocolError("Account state is unavailable. Try again.", 503);
   }

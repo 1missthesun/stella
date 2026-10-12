@@ -757,8 +757,11 @@ class ConversationHubImpl implements ConversationHub {
    * revoke a send that was about to happen, never grant one, and a socket that
    * is sending nothing needs no supervision.
    */
-  private sendSerialized(ws: WebSocket, payload: string): void {
-    const attachment = readAttachment(ws);
+  private sendSerialized(
+    ws: WebSocket,
+    payload: string,
+    attachment: SocketAttachment | null = readAttachment(ws),
+  ): void {
     if (!attachment) {
       try {
         ws.close(CLOSE_INTERNAL, closeReason(CLOSE_INTERNAL));
@@ -833,10 +836,13 @@ class ConversationHubImpl implements ConversationHub {
 
   broadcastPi(events: readonly unknown[]): void {
     try {
-      const sockets = this.piSockets();
-      if (sockets.length === 0) return;
-      const payload = JSON.stringify({ type: "pi.events", events } satisfies PiEventsFrame);
-      for (const ws of sockets) this.sendSerialized(ws, payload);
+      let payload: string | undefined;
+      for (const ws of this.deps.ctx.getWebSockets()) {
+        const attachment = readAttachment(ws);
+        if (attachment?.pi !== true) continue;
+        payload ??= JSON.stringify({ type: "pi.events", events } satisfies PiEventsFrame);
+        this.sendSerialized(ws, payload, attachment);
+      }
     } catch (error) {
       this.deps.log("error", "conversation_pi_broadcast_failed", {
         conversationId: this.deps.conversationId(),

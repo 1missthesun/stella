@@ -24,6 +24,10 @@ markTurnStep("modulesLoaded");
 await loadModelRegistry();
 markTurnStep("modelRegistryLoaded");
 
+// A container that just started runs this once in the background so the
+// turn's own executor finds its modules already read.
+if (process.argv.includes("--warm")) process.exit(0);
+
 // The daemon and the one-call client never produce a turn result, so they exit
 // before the turn-result plumbing below.
 if (process.argv.includes("--attached-tool-host")) {

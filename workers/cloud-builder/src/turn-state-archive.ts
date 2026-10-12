@@ -469,6 +469,35 @@ const buildArchiveCommand = (
   ].join("\n");
 };
 
+/**
+ * The archive the target's tree on disk would pack to now, built exactly as
+ * the checkpoint built it (the build is reproducible), or a line saying there
+ * is no complete tree to pack. A tree left mid-swap counts as absent.
+ */
+const currentTargetDigestCommand = (
+  target: TurnStateArchiveTarget,
+  scratchId: string,
+): string => {
+  const source = targetSource(target);
+  const { archivePath, priorPath, failedPath } = scratchPaths(
+    target,
+    scratchId,
+  );
+  return [
+    "set -eu",
+    "umask 077",
+    `if [ -d ${source} ] && [ ! -L ${source} ] && [ "$(/usr/bin/readlink -f -- ${source})" = ${source} ] && [ "$(/usr/bin/stat -c '%u:%g:%a' -- ${source})" = ${targetOwnerMode(target)} ] && [ ! -e ${priorPath} ] && [ ! -L ${priorPath} ] && [ ! -e ${failedPath} ] && [ ! -L ${failedPath} ]; then`,
+    `  /usr/bin/mksquashfs ${source} ${archivePath} -noappend -comp zstd -no-progress -no-xattrs -reproducible -mkfs-time 0 >/dev/null`,
+    `  archive_size="$(/usr/bin/stat -c '%s' -- ${archivePath})"`,
+    `  archive_digest="$(/usr/bin/sha256sum -- ${archivePath} | /usr/bin/cut -d ' ' -f 1)"`,
+    `  /usr/bin/rm -f -- ${archivePath}`,
+    `  printf 'STELLA_ARCHIVE_SIZE=%s\nSTELLA_ARCHIVE_SHA256=%s\n' "$archive_size" "$archive_digest"`,
+    "else",
+    "  printf 'STELLA_ARCHIVE_ABSENT=1\n'",
+    "fi",
+  ].join("\n");
+};
+
 const verifyDownloadedArchiveCommand = (
   target: TurnStateArchiveTarget,
   scratchId: string,
@@ -907,20 +936,25 @@ const cancelObjectBody = async (
   await cancelReadableStream((stored as Partial<R2ObjectBody>).body);
 };
 
-/** Restore one exact registered native object. */
+/**
+ * Restore one exact registered native object. A container that still holds
+ * the very tree the archive was packed from (the thread's last turn ran
+ * here) keeps it: the tree is packed again, and only identical bytes count.
+ * Resolves `current` then, `restored` after a download.
+ */
 export const restoreTurnStateArchive = async (args: {
   session: TurnStateArchiveSession;
   bucket: Pick<R2Bucket, "head" | "get">;
   archive: TurnStateArchive;
   target: TurnStateArchiveTarget;
-}): Promise<void> => {
+}): Promise<"current" | "restored"> => {
   assertArchiveDescriptor(args.archive);
   if (args.archive.kind !== args.target.kind) {
     throw new Error("Turn state archive target kind does not match.");
   }
   const scratchId = newScratchId();
   const { archivePath } = scratchPaths(args.target, scratchId);
-  await withScratchCleanup(args.session, args.target, scratchId, async () => {
+  return await withScratchCleanup(args.session, args.target, scratchId, async () => {
     await runLockedCommand(
       args.session,
       args.target,
@@ -930,6 +964,28 @@ export const restoreTurnStateArchive = async (args: {
       ].join("\n"),
       "Turn state archive scratch preparation",
     );
+    const onDisk = await runOwnedLockedCommand(
+      args.session,
+      args.target,
+      [
+        heartbeatTargetScratchCommand(args.target, scratchId),
+        currentTargetDigestCommand(args.target, scratchId),
+      ].join("\n"),
+      "Turn state archive current tree digest",
+    )
+      .then((stdout) =>
+        /STELLA_ARCHIVE_ABSENT=1/u.test(stdout)
+          ? null
+          : parseArchiveDigest(stdout),
+      )
+      .catch(() => null);
+    if (
+      onDisk &&
+      onDisk.sizeBytes === args.archive.sizeBytes &&
+      onDisk.sha256 === args.archive.sha256
+    ) {
+      return "current" as const;
+    }
     const expected: ArchiveExpectation = {
       ...args.archive,
       target: args.target,
@@ -1012,5 +1068,6 @@ export const restoreTurnStateArchive = async (args: {
       ].join("\n"),
       "Turn state archive target swap",
     );
+    return "restored" as const;
   });
 };

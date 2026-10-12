@@ -153,12 +153,22 @@ backup)
 restore)
   # The stored backup is the owner's logins; whatever this container's disk
   # or snapshot carried may be older, so it is replaced. Without a backup
-  # the container keeps what it has.
+  # the container keeps what it has. A container that already holds the
+  # backup it would fetch (ETAG, the one it last restored) keeps its copy.
   parent=$(dirname "$accounts")
   archive=$parent/.claude-accounts-restore.tgz
   stage=$parent/.claude-accounts-restore
+  marker=$parent/.claude-accounts-etag
+  headers=$parent/.claude-accounts-restore.headers
+  if [ -n "${"$"}{ETAG:-}" ] && [ -d "$accounts" ] && [ ! -L "$accounts" ] && [ -f "$marker" ] && [ ! -L "$marker" ] && [ "$(cat "$marker")" = "$ETAG" ]; then
+    json '{ok:true,restored:false,current:true}'
+    exit 0
+  fi
+  rm -f -- "$marker" "$headers"
   rm -rf -- "$archive" "$stage"
-  code=$(curl -s -o "$archive" -w '%{http_code}' --max-time 60 "$URL")
+  code=$(curl -s -D "$headers" -o "$archive" -w '%{http_code}' --max-time 60 "$URL")
+  fetched=$(tr -d '\r"' <"$headers" 2>/dev/null | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p' | tail -n 1)
+  rm -f -- "$headers"
   if [ "$code" = 404 ]; then
     rm -f -- "$archive"
     mkdir -p "$accounts" && chmod 700 "$accounts"
@@ -175,6 +185,7 @@ restore)
   [ -e "$accounts" ] && mv -- "$accounts" "$accounts.old"
   mv -- "$stage/$name" "$accounts" && chown root:root "$accounts" && chmod 700 "$accounts"
   rm -rf -- "$stage" "$accounts.old"
+  if [ -n "$fetched" ]; then printf '%s\n' "$fetched" >"$marker"; fi
   json '{ok:true,restored:true}'
   ;;
 probe-plant)
@@ -339,9 +350,13 @@ export const restoreClaudeCloudLogins = async (
 ): Promise<boolean> => {
   const url = await loginBackupUrl(env, ownerId, "GET");
   if (!url) return false;
+  const stored = await (env as unknown as { BACKUP_BUCKET?: R2Bucket }).BACKUP_BUCKET?.head(
+    await loginBackupKey(ownerId),
+  ).catch(() => null);
   const result = await runScript(env, ownerId, ["restore"], {
     url,
     timeoutMs: 120_000,
+    ...(stored?.etag ? { extraEnv: { ETAG: stored.etag.replace(/"/gu, "") } } : {}),
     ...(container ? { container } : {}),
   });
   if (!result.ok) {

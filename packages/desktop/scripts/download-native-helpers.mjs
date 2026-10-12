@@ -7,8 +7,9 @@
 // Usage:
 //   bun run native:download [--manifest-url <url>] [--platform <key>] [--force]
 //
-// Defaults to the canonical R2 manifest URL and the host platform. Pass --force
-// to re-download even when binaries already look present.
+// Defaults to the canonical R2 manifest URL and the host platform. Installed
+// helpers are compared with the manifest on every run, so a new build replaces
+// them; pass --force to reinstall even when they already match.
 
 import { createHash } from "node:crypto";
 import {
@@ -98,12 +99,13 @@ const sentinel = path.join(
   outDir,
   platformDir === "win32" ? "window_info.exe" : "window_info",
 );
-if (!force && existsSync(sentinel)) {
-  process.stdout.write(
-    `Native helpers for ${platformKey} already look present at ${outDir} (pass --force to refresh).\n`,
+const exitKeepingInstalledHelpers = (reason) => {
+  if (!existsSync(sentinel)) return;
+  process.stderr.write(
+    `${reason}; keeping the installed native helpers at ${outDir}.\n`,
   );
   process.exit(0);
-}
+};
 
 const tarPath = (filePath) => {
   if (process.platform !== "win32") return filePath;
@@ -364,6 +366,9 @@ if (manifestFile) {
   try {
     manifest = JSON.parse(readFileSync(path.resolve(manifestFile), "utf8"));
   } catch (error) {
+    exitKeepingInstalledHelpers(
+      `Manifest file read failed: ${errorMessageWithCause(error)}`,
+    );
     process.stderr.write(
       `Manifest file read failed: ${errorMessageWithCause(error)}\n`,
     );
@@ -390,12 +395,18 @@ if (manifestFile) {
       },
     );
   } catch (error) {
+    exitKeepingInstalledHelpers(
+      `Manifest request failed: ${errorMessageWithCause(error)}`,
+    );
     process.stderr.write(
       `Manifest request failed: ${errorMessageWithCause(error)}\n`,
     );
     process.exit(1);
   }
   if (!manifestResp.ok) {
+    exitKeepingInstalledHelpers(
+      `Manifest request failed: HTTP ${manifestResp.status}`,
+    );
     process.stderr.write(
       `Manifest request failed: HTTP ${manifestResp.status}\n`,
     );
@@ -447,7 +458,7 @@ if (!asset) {
   process.exit(1);
 }
 
-if (existingHelpersMatch(manifest, asset)) {
+if (!force && existingHelpersMatch(manifest, asset)) {
   process.stdout.write(
     `Native helpers for ${platformKey} already match the current manifest at ${outDir}.\n`,
   );

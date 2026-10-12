@@ -827,9 +827,11 @@ function installAgentCursor(host, assetUrl, glowColor) {
           waiter(false);
         }, 4_000);
       });
+      const pageHidden = document.visibilityState === "hidden";
       const shouldAnimate = next.cursor.animateMovement !== false;
       const remainingDistance = distance(state.point, target);
       if (
+        pageHidden ||
         !shouldAnimate ||
         state.visibilitySpring.value <= 0.001 ||
         remainingDistance < 0.5

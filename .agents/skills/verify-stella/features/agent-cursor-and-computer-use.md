@@ -12,7 +12,7 @@ The agent cursor makes browser and native computer-use actions visible before St
 
 ## Expected behavior
 
-- The cursor uses the 23 by 24 pixel black pointer with white dotted edge and blue glow.
+- The cursor is Stella's pink-to-cyan gradient pointer (one 46x48 PNG drawn at 23x24 with a blue glow), the same bytes in the browser script, the macOS helper and the Windows helper. A white vector arrow means a stale native helper build.
 - Short moves scoot; longer moves follow a bounded curved path.
 - Arrival produces one brief wobble, not a perpetual loop.
 - Clicking has no synthetic ring, badge, or pulse. The target control's response is the click feedback.
@@ -32,4 +32,7 @@ The agent cursor makes browser and native computer-use actions visible before St
 - Browser cursor failure must fail open so protected pages do not block the real action indefinitely.
 - macOS helpers launched from a new path may lack Accessibility permission even when the developer's installed Stella helper is trusted.
 - Linux has browser control but no native desktop computer-use backend.
+- A hidden page (an external agent tab Chrome keeps in the background, or an in-app tab not on screen) runs no animation frames, so the cursor jumps to its target there instead of animating; waiting for arrival there stalled every click by about 4.5s.
+- External agent tabs open in the background by design, and the in-app panel does not switch to agent tabs on its own, so the cursor is only seen when the user is looking at that tab.
+- Installs fetch native helpers from R2 in the launcher's prepare step whenever HEAD changes; check `packages/native/out/<platform>/.stella-native-helpers.json` for the installed build.
 - The Windows overlay is excluded from OS capture to keep it out of Stella's own screenshots; verify its visible composition with an external camera or a capture path that intentionally disables that exclusion in a disposable build.

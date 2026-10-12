@@ -5,6 +5,7 @@ import {
   magicLinkClient,
   oneTimeTokenClient,
 } from "better-auth/client/plugins";
+import { passkeyClient } from "@better-auth/passkey/client";
 import { backendUrl } from "@/platform/backend/backend-url";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
 import {
@@ -23,6 +24,7 @@ const createPlugins = () => [
   anonymousClient(),
   magicLinkClient(),
   oneTimeTokenClient(),
+  passkeyClient(),
 ];
 
 // Capture the full plugin-aware return type so signIn.anonymous(), etc. are typed.

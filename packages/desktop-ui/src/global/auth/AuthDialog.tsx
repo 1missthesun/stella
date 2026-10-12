@@ -15,6 +15,7 @@ import {
   applyAndVerifyAccountSessionToken,
   startBrowserGoogleSignIn,
 } from "./services/account-connection";
+import { refreshAuthSession } from "./services/auth-session";
 import {
   claimSessionToken,
   generateClaimSecret,
@@ -150,6 +151,7 @@ export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
               <p className="auth-dialog-sub">{t("global.auth.welcomeSub")}</p>
             </div>
             <GoogleAuthButton />
+            <PasskeyAuthButton />
             <div className="auth-dialog-method-divider">
               <span>{t("global.auth.orUseEmail")}</span>
             </div>
@@ -252,6 +254,46 @@ function GoogleAuthButton() {
         {isSigningIn
           ? t("global.auth.googleWaiting")
           : t("global.auth.googleContinue")}
+      </button>
+      {error ? <div className="auth-dialog-error">{error}</div> : null}
+    </div>
+  );
+}
+
+/** Passkeys bind to the auth domain, so this only offers itself in the web shell. */
+function PasskeyAuthButton() {
+  const t = useT();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSignIn = useCallback(async () => {
+    setError(null);
+    setIsSigningIn(true);
+    try {
+      const result = await authClient.signIn.passkey();
+      if (result.error) {
+        setError(result.error.message || t("global.auth.passkeyFailed"));
+        return;
+      }
+      await refreshAuthSession();
+    } catch {
+      setError(t("global.auth.passkeyFailed"));
+    } finally {
+      setIsSigningIn(false);
+    }
+  }, [t]);
+
+  if (window.electronAPI) return null;
+
+  return (
+    <div className="auth-dialog-google-wrap">
+      <button
+        type="button"
+        className="auth-dialog-google"
+        onClick={handleSignIn}
+        disabled={isSigningIn}
+      >
+        {t("global.auth.passkeyContinue")}
       </button>
       {error ? <div className="auth-dialog-error">{error}</div> : null}
     </div>

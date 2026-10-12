@@ -1,5 +1,20 @@
 export type AuthIdentityIntent = "anonymous" | "connected";
 
+/**
+ * One signed-in session as the account settings list shows it. Deliberately
+ * carries no session token: revocation is by id, resolved by whoever owns
+ * the credential (Electron main, or the browser shell's auth client).
+ */
+export type AccountSessionSummary = {
+  id: string;
+  createdAt: number;
+  updatedAt: number;
+  expiresAt: number;
+  ipAddress: string | null;
+  userAgent: string | null;
+  current: boolean;
+};
+
 export type AuthSessionError = {
   kind: "network" | "http" | "malformed" | "ipc";
   message: string;

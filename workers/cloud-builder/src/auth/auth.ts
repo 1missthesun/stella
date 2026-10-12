@@ -17,15 +17,28 @@
  * One instance per isolate.
  */
 
+// The passkey stack's tsyringe needs this evaluating ahead of it in this chunk.
+import "reflect-metadata";
 import { APP_INTEGRITY_HEADER } from "@stella/contracts/app-integrity";
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { anonymous, bearer, captcha, jwt, magicLink, oneTimeToken } from "better-auth/plugins";
 import { expo } from "@better-auth/expo";
+
+// Loaded after this module's static imports (reflect-metadata first): the
+// SimpleWebAuthn stack's tsyringe container throws at evaluation time when
+// the Reflect polyfill has not run yet, and bundler chunk order does not
+// otherwise guarantee it.
+const { passkey } = await import("@better-auth/passkey");
 import { importPKCS8, SignJWT } from "jose";
 import { bearerCredential } from "../../../shared/bearer.js";
 import { isDisposableEmail } from "./disposable-email-domains.js";
-import { buildMagicLinkEmail, getMagicLinkSubject } from "./email-templates.js";
+import {
+  buildMagicLinkEmail,
+  buildNewSignInAlertEmail,
+  getMagicLinkSubject,
+  NEW_SIGN_IN_SUBJECT,
+} from "./email-templates.js";
 import { stellaHandoff, type HandoffApi } from "./handoff.js";
 import {
   integrityErrorMessage,
@@ -167,6 +180,52 @@ const sendMagicLinkEmail = async (env: AuthEnv, email: string, url: string): Pro
   });
   if (!response.ok) throw new Error(`Resend refused the magic link (${response.status}).`);
   console.log(JSON.stringify({ event: "auth_magic_link_sent", provider: "resend" }));
+};
+
+/**
+ * Best-effort new-device sign-in alert, over the same transports as magic
+ * links. Never throws: an alert must not fail the sign-in it reports.
+ */
+const sendNewSignInAlertEmail = async (
+  env: AuthEnv,
+  email: string,
+  userAgent: string | null,
+  ipAddress: string | null,
+): Promise<void> => {
+  try {
+    const binding = (env as { EMAIL?: SendEmail }).EMAIL;
+    const cloudflareFrom = binding ? configured(env, "STELLA_EMAIL_FROM") : undefined;
+    const resendKey = configured(env, "RESEND_API_KEY");
+    const resendFrom = resendKey ? configured(env, "RESEND_FROM") ?? configured(env, "STELLA_EMAIL_FROM") : undefined;
+    if (!cloudflareFrom && !resendFrom) return;
+    const logo = configured(env, "STELLA_EMAIL_LOGO_URL") ?? `${websiteUrl(env)}/stella-logo.png`;
+    const device = [userAgent, ipAddress].filter(Boolean).join(" · ") || "Unknown device";
+    const message = {
+      subject: NEW_SIGN_IN_SUBJECT,
+      html: buildNewSignInAlertEmail(
+        escapeHtmlAttribute(logo),
+        escapeHtmlAttribute(device),
+        escapeHtmlAttribute(new Date().toUTCString()),
+      ),
+    };
+    if (binding && cloudflareFrom) {
+      await binding.send({ from: parseMailbox(cloudflareFrom), to: email, ...message });
+    } else if (resendKey && resendFrom) {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { authorization: `Bearer ${resendKey}`, "content-type": "application/json" },
+        body: JSON.stringify({ from: resendFrom, to: email, ...message }),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!response.ok) throw new Error(`Resend refused the alert (${response.status}).`);
+    }
+    console.log(JSON.stringify({ event: "auth_new_sign_in_alert_sent" }));
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "auth_new_sign_in_alert_failed",
+      detail: error instanceof Error ? error.message.slice(0, 300) : null,
+    }));
+  }
 };
 
 const parseMailbox = (value: string): string | { email: string; name: string } => {
@@ -472,6 +531,40 @@ const buildOptions = (env: AuthEnv) => {
           },
         },
       },
+      session: {
+        create: {
+          // A device this account has never signed in from (no prior
+          // session shares its user agent) earns the owner an email.
+          // Same device on a new network keeps its user agent, so
+          // roaming does not alert. Best-effort throughout.
+          after: async (session, ctx) => {
+            try {
+              const adapter = ctx?.context.internalAdapter as
+                | {
+                    listSessions(userId: string): Promise<Array<{ id: string; userAgent?: string | null }>>;
+                    findUserById(userId: string): Promise<{ email?: string; isAnonymous?: boolean } | null>;
+                  }
+                | undefined;
+              if (!adapter) return;
+              const user = await adapter.findUserById(session.userId).catch(() => null);
+              const email = typeof user?.email === "string" ? user.email : "";
+              if (!email || user?.isAnonymous || email.endsWith("@anon.stella.local")) return;
+              if (testAccountsEnabled(env) && email.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX)) return;
+              const sessions = await adapter.listSessions(session.userId).catch(() => []);
+              const prior = sessions.filter((candidate) => candidate.id !== session.id);
+              if (prior.length === 0) return;
+              const userAgent =
+                typeof session.userAgent === "string" ? session.userAgent : null;
+              if (userAgent && prior.some((candidate) => candidate.userAgent === userAgent)) return;
+              const ipAddress =
+                typeof session.ipAddress === "string" ? session.ipAddress : null;
+              await sendNewSignInAlertEmail(env, email, userAgent, ipAddress);
+            } catch {
+              // Alerts never fail a sign-in.
+            }
+          },
+        },
+      },
     },
     socialProviders: {
       google: {
@@ -504,6 +597,22 @@ const buildOptions = (env: AuthEnv) => {
             ...(testAccountsEnabled(env) && user.email?.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX) ? { tst: true } : {}),
           }),
         },
+      }),
+      // Passkeys bind to the auth domain: enroll and sign in from the web
+      // shell served on that origin. Desktop and mobile native sign-in are
+      // unchanged; a passkey is an additional method, never the only one.
+      passkey({
+        rpID: (() => {
+          try {
+            return new URL(authUrl(env)).hostname;
+          } catch {
+            return "localhost";
+          }
+        })(),
+        rpName: "Stella",
+        origin: Array.from(
+          new Set([authUrl(env), backend, websiteUrl(env)]),
+        ),
       }),
       stellaHandoff({ env, backendUrl: authUrl(env), websiteUrl: websiteUrl(env), secret, api }),
     ],

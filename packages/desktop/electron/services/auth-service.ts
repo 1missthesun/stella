@@ -374,6 +374,17 @@ export class AuthService {
     if (!headers.has("origin")) {
       headers.set("origin", DESKTOP_AUTH_ORIGIN);
     }
+    if (!headers.has("user-agent")) {
+      // So the account's session list can name this device; Better Auth
+      // records it when the session is created.
+      const platform =
+        process.platform === "darwin"
+          ? "Macintosh"
+          : process.platform === "win32"
+            ? "Windows"
+            : "Linux";
+      headers.set("user-agent", `Stella Desktop (${platform})`);
+    }
     const token = this.getBearerToken();
     if (token) {
       headers.set("authorization", `Bearer ${token}`);
@@ -841,6 +852,94 @@ export class AuthService {
         "content-type": "application/json",
       },
       body: JSON.stringify({}),
+    });
+    if (!response.ok) {
+      throw new Error(`Session revocation failed with HTTP ${response.status}.`);
+    }
+    return { ok: true };
+  }
+
+  /**
+   * Every live session on the account, newest activity first, tokens never
+   * leaving main: the renderer gets ids and device metadata only.
+   */
+  async listSessions() {
+    const [list, current] = await Promise.all([
+      this.authFetch("/list-sessions", {
+        method: "GET",
+        headers: { accept: "application/json" },
+      }),
+      this.authFetch("/get-session", {
+        method: "GET",
+        headers: { accept: "application/json" },
+      }).catch(() => null),
+    ]);
+    if (!list.ok) {
+      throw new Error(`Session list failed with HTTP ${list.status}.`);
+    }
+    const rows = (await list.json().catch(() => [])) as Array<{
+      id?: unknown;
+      createdAt?: unknown;
+      updatedAt?: unknown;
+      expiresAt?: unknown;
+      ipAddress?: unknown;
+      userAgent?: unknown;
+    }>;
+    let currentId: string | null = null;
+    if (current?.ok) {
+      const body = (await current.json().catch(() => null)) as {
+        session?: { id?: unknown };
+      } | null;
+      currentId =
+        typeof body?.session?.id === "string" ? body.session.id : null;
+    }
+    const time = (value: unknown): number => {
+      const parsed =
+        typeof value === "number"
+          ? value
+          : typeof value === "string"
+            ? Date.parse(value)
+            : Number.NaN;
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    return rows
+      .filter((row) => typeof row.id === "string" && row.id.length > 0)
+      .map((row) => ({
+        id: row.id as string,
+        createdAt: time(row.createdAt),
+        updatedAt: time(row.updatedAt),
+        expiresAt: time(row.expiresAt),
+        ipAddress: typeof row.ipAddress === "string" ? row.ipAddress : null,
+        userAgent: typeof row.userAgent === "string" ? row.userAgent : null,
+        current: row.id === currentId,
+      }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  /** Revoke one other session by id; main resolves its token server-side. */
+  async revokeSessionById(sessionId: string) {
+    const list = await this.authFetch("/list-sessions", {
+      method: "GET",
+      headers: { accept: "application/json" },
+    });
+    if (!list.ok) {
+      throw new Error(`Session list failed with HTTP ${list.status}.`);
+    }
+    const rows = (await list.json().catch(() => [])) as Array<{
+      id?: unknown;
+      token?: unknown;
+    }>;
+    const target = rows.find((row) => row.id === sessionId);
+    if (!target || typeof target.token !== "string" || !target.token) {
+      throw new Error("That session is no longer active.");
+    }
+    const response = await this.authFetch("/revoke-session", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ token: target.token }),
     });
     if (!response.ok) {
       throw new Error(`Session revocation failed with HTTP ${response.status}.`);

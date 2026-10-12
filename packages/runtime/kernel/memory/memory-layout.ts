@@ -10,9 +10,9 @@
  * (the desktop's memory sync in Electron main, over cloud-builder's
  * `memory.files.*`).
  *
- *   - `memories/main.md`  the one resident document: who the user is, how
- *     they want Stella to work, global rules, and an "Areas" section with one
- *     line per area file. Onboarding writes it first.
+ *   - `memories/main.md`  the one resident document: an "Areas" section
+ *     first, with one line per area file, then who the user is, how they
+ *     want Stella to work, and global rules. Onboarding writes it first.
  *   - `memories/areas/<area>.md`  one file per area of the user's life and
  *     work, matching the named-area agents. Read on demand, never injected.
  *
@@ -41,10 +41,29 @@ export const PERSONALITY_FILE = "PERSONALITY.md";
 export const MAIN_MEMORY_DISPLAY_PATH = "~/.stella/memories/main.md";
 
 /**
- * Injection budget, in unicode code points. Hitting it means the document
- * needs editing down, not that memory should be thrown away.
+ * Injection budget, in unicode code points. Writes past it still succeed;
+ * the injected copy keeps the top (Areas first) and is cut at the cap.
  */
 export const MAIN_MEMORY_INJECTED_MAX_CHARS = 23_000;
+/** From this share of the cap, a write to main.md reports how full it is. */
+export const MAIN_MEMORY_NEAR_CAP_RATIO = 0.9;
+
+const formatChars = (chars: number): string => chars.toLocaleString("en-US");
+
+/**
+ * The one-line size reminder for main.md at `chars` characters, or undefined
+ * while it is comfortably under the cap.
+ */
+export const mainMemoryCapNote = (chars: number): string | undefined => {
+  const size = `main.md is ${formatChars(chars)}/${formatChars(MAIN_MEMORY_INJECTED_MAX_CHARS)} characters`;
+  if (chars > MAIN_MEMORY_INJECTED_MAX_CHARS) {
+    return `${size}; anything past the cap is cut from your context. Move area detail into area files or tighten lines.`;
+  }
+  if (chars >= MAIN_MEMORY_INJECTED_MAX_CHARS * MAIN_MEMORY_NEAR_CAP_RATIO) {
+    return `${size}; near the cap, past which the rest is cut from your context. Move area detail into area files or tighten lines.`;
+  }
+  return undefined;
+};
 
 export const memoriesDirPath = (stellaDataDir: string): string =>
   path.join(stellaDataDir, MEMORIES_DIR);

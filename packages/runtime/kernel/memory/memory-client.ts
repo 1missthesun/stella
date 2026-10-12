@@ -20,10 +20,12 @@
  */
 
 import { redactMemoryText } from "./redaction.js";
+import { residentMemoryChars } from "./resident-doc-shape.js";
 import {
   MAIN_MEMORY_INJECTED_MAX_CHARS,
   MAIN_MEMORY_RELATIVE_PATH,
   MEMORIES_DIR,
+  mainMemoryCapNote,
   PERSONALITY_FILE,
 } from "./memory-layout.js";
 
@@ -47,7 +49,7 @@ export type MemoryFileInfo = {
   updatedAt: number;
 };
 
-export type MemoryWriteResult = { sha: string; bytes: number };
+export type MemoryWriteResult = { sha: string; bytes: number; note?: string };
 
 /**
  * One host's raw memory files. Paths are already validated memory paths.
@@ -189,7 +191,8 @@ const shortSha = (sha: string | null): string =>
 
 /**
  * The bytes a write of `content` to `path` stores: redacted, and refused over
- * the file's cap. The model's `memory.write` and the desktop/cloud memory
+ * the file's cap (main.md has none: past its injection budget it is cut from
+ * context instead). The model's `memory.write` and the desktop/cloud memory
  * sync both write through this.
  */
 export const prepareMemoryWrite = async (
@@ -199,7 +202,7 @@ export const prepareMemoryWrite = async (
   const text = redactMemoryText(content);
   const chars = codePoints(text);
   const maxChars = memoryFileMaxChars(path);
-  if (chars > maxChars) {
+  if (path !== MAIN_MEMORY_RELATIVE_PATH && chars > maxChars) {
     throw new Error(
       `memory.write: ${path} would be ${chars.toLocaleString("en-US")} characters; its limit is ${maxChars.toLocaleString("en-US")}. Nothing was written. Curate it down (rewrite stale lines, or move area detail into its area file under memories/areas/) and write again.`,
     );
@@ -228,7 +231,11 @@ export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
         `memory.write: ${path} changed since that sha was taken (expected ${shortSha(expectSha ?? null)}, found ${shortSha(outcome.actualSha)}). Nothing was written; read it again, reapply the edit, and write with the new sha.`,
       );
     }
-    return { sha, bytes: bytes.byteLength };
+    const note =
+      path === MAIN_MEMORY_RELATIVE_PATH
+        ? mainMemoryCapNote(residentMemoryChars(decoder.decode(bytes)))
+        : undefined;
+    return { sha, bytes: bytes.byteLength, ...(note ? { note } : {}) };
   },
   list: async () =>
     (await store.list())

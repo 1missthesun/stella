@@ -6,6 +6,7 @@
  * into the same bytes.
  */
 
+import { mainMemoryCapNote } from "./memory-layout.js";
 import { redactMemoryText } from "./redaction.js";
 
 const unicodeCodePointLength = (text: string): number => Array.from(text).length;
@@ -17,15 +18,17 @@ const stripInjectedHtmlComments = (text: string): string =>
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
 
-const TRUNCATION_MARKER =
-  "\n...[truncated for context budget — the file on disk is complete; edit it down]";
+const truncationMarker = (chars: number): string =>
+  `\n[Truncated here. ${mainMemoryCapNote(chars) ?? ""}]`;
 
 const truncateUnicodeAtLineBoundary = (
   text: string,
   maxChars: number,
 ): string => {
-  if (unicodeCodePointLength(text) <= maxChars) return text;
-  const markerChars = unicodeCodePointLength(TRUNCATION_MARKER);
+  const chars = unicodeCodePointLength(text);
+  if (chars <= maxChars) return text;
+  const marker = truncationMarker(chars);
+  const markerChars = unicodeCodePointLength(marker);
   if (maxChars < markerChars) return "";
   const prefixBudget = maxChars - markerChars;
   let prefix = "";
@@ -37,8 +40,12 @@ const truncateUnicodeAtLineBoundary = (
   if (!prefix) {
     prefix = [...text].slice(0, prefixBudget).join("");
   }
-  return `${prefix}${TRUNCATION_MARKER}`;
+  return `${prefix.trimEnd()}${marker}`;
 };
+
+/** Characters of a memory file's text as the model is shown it, before any cut. */
+export const residentMemoryChars = (raw: string): number =>
+  unicodeCodePointLength(redactMemoryText(stripInjectedHtmlComments(raw)));
 
 /** The injected body for a memory file's text, or undefined when empty. */
 export const shapeResidentMemoryDoc = (

@@ -1607,6 +1607,8 @@ const MAIN_MEMORY_TEMPLATE = (who: string) =>
   [
     "# Memory",
     "",
+    "## Areas",
+    "",
     WHO_HEADING,
     who,
     "",
@@ -1614,14 +1616,12 @@ const MAIN_MEMORY_TEMPLATE = (who: string) =>
     "",
     "## Global rules",
     "",
-    "## Areas",
-    "",
   ].join("\n");
 
 const withWhoSection = (existing: string | null, who: string): string => {
   if (!existing?.trim()) return MAIN_MEMORY_TEMPLATE(who);
   const start = existing.indexOf(WHO_HEADING);
-  if (start === -1) return `${WHO_HEADING}\n${who}\n\n${existing}`;
+  if (start === -1) return `${existing.trimEnd()}\n\n${WHO_HEADING}\n${who}\n`;
   const bodyStart = start + WHO_HEADING.length;
   const next = existing.indexOf("\n## ", bodyStart);
   return `${existing.slice(0, bodyStart)}\n${who}\n${next === -1 ? "" : existing.slice(next)}`;

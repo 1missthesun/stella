@@ -162,9 +162,7 @@ export const checkBoundaries = async (repoRoot) => {
       }
       if (
         specifier === "node:sqlite" &&
-        !file.startsWith("packages/runtime/scripts/") &&
-        !file.startsWith("packages/runtime/tests/") &&
-        !/\.test\.tsx?$/.test(file)
+        !file.startsWith("packages/runtime/scripts/")
       ) {
         // The detached worker runs under Bun, which has no node:sqlite; a
         // static import crashes the runner chunk at load (desktop-v0.0.409,

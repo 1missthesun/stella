@@ -16,9 +16,8 @@
  * elements runs per mount, so handlers and context are resolved fresh.
  *
  * The cached tree is shared between mounts and must be treated as immutable;
- * Streamdown's hast → JSX step only reads it. The ratchet in
- * `tests/app/chat/markdown-render-cache.test.tsx` fails if a Streamdown
- * upgrade changes the call shape this relies on.
+ * Streamdown's hast → JSX step only reads it. Recheck the call shape this
+ * relies on when upgrading Streamdown.
  */
 
 type UnifiedLike = {

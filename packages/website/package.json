@@ -16,7 +16,6 @@
     "deploy:dev": "bash scripts/deploy-stella.sh dev",
     "deploy:production": "bash scripts/deploy-stella.sh production",
     "lint": "eslint",
-    "test": "bun test tests",
     "typecheck": "node ../../node_modules/typescript-7/bin/tsc --noEmit",
     "optimize-canvas-demos": "bun scripts/optimize-canvas-screenshots.mjs"
   },

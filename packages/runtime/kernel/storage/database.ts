@@ -15,7 +15,7 @@ let cachedSqliteCtor: SqliteDatabaseCtor | null = null;
 
 /**
  * Resolve the sqlite driver lazily so importing this module never fails on
- * runtimes without `bun:sqlite` (e.g. vitest under Node). Under Bun this
+ * runtimes without `bun:sqlite` (e.g. Node). Under Bun this
  * resolves `bun:sqlite` exactly as the previous static import did; under
  * Node >= 22.5 it falls back to `node:sqlite`.
  */

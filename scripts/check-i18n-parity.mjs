@@ -5,11 +5,9 @@
  *   node scripts/check-i18n-parity.mjs            # report and exit non-zero on drift
  *   node scripts/check-i18n-parity.mjs --json     # machine-readable report
  *
- * CI enforcement lives in
- * `packages/desktop-ui/tests/runtime/i18n/catalog-parity.test.ts`, which also
- * checks placeholders, plural categories and leaf kinds. This script exists for
- * the human loop: it prints the exact missing/extra paths per locale so a
- * backfill can be written straight from its output.
+ * CI runs it through `bun run check:generated`. It prints the exact
+ * missing/extra paths per locale so a backfill can be written straight from
+ * its output.
  *
  * The mobile catalogs under `packages/mobile/src/i18n/locales` are generated
  * copies of the desktop ones (see packages/mobile/scripts/sync-i18n-catalogs.mjs),

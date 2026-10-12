@@ -11,8 +11,7 @@
     "release:target": "bun scripts/resolve-public-mobile-builds.ts",
     "eas:check-bun": "scripts/check-bun-pin.sh",
     "lint": "expo lint",
-    "typecheck": "bun run i18n:sync && tsc --noEmit",
-    "test": "bun test src"
+    "typecheck": "bun run i18n:sync && tsc --noEmit"
   },
   "dependencies": {
     "@better-auth/expo": "^1.7.7",

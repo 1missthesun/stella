@@ -36,13 +36,6 @@ reports retirement instead of claiming acceptance for the replacement.
 
 ## Verification
 
-- `workers/cloud-builder/tests/workspace-apps-workerd.test.ts`: real Workerd
-  publication, owner isolation, state persistence, successful updates, and
-  preservation of the last good revision after a failed update.
-- `workspace-app-access.test.ts` and the apps-host proxy test: signed access,
-  credential stripping, enforced browser isolation, and account reset fencing.
-- Desktop discovery/navigation tests cover colliding local and cloud names.
-
 Development acceptance created Daily Counter through a real cloud agent and
 verified its sidebar interaction on Electron and the browser website build,
 including shared persisted count. A local app was also opened alongside it.

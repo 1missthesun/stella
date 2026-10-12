@@ -28,11 +28,10 @@ import {
 
 // Chain-step vocabulary offered to agents: a deliberate subset of the
 // session's BROWSER_CHAIN_ACTIONS, which the `satisfies` below enforces at
-// compile time. Contract-checked against
-// packages/stella-browser/protocol/actions.json by
-// tests/runtime/kernel/browser-use/action-contract.test.ts: every action
-// here must be a manifest action with "chain": true, and every key must be
-// a manifest param (or the global tabId). finalize_tabs is deliberately
+// compile time. Keep it in step with
+// packages/stella-browser/protocol/actions.json: every action here must be a
+// manifest action with "chain": true, and every key must be a manifest param
+// (or the global tabId). finalize_tabs is deliberately
 // absent: it is top-level-only on the daemon and exposed as
 // browser.tabs.finalize() instead.
 export const SAFE_ACTION_KEYS: Readonly<Record<string, readonly string[]>> =

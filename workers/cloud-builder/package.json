@@ -6,7 +6,6 @@
   "scripts": {
     "image:prepare": "node scripts/prepare-image.mjs",
     "image:lock:refresh": "node scripts/prepare-image.mjs --refresh-lock",
-    "test:image:reproducibility": "bun test tests/image-preparation.test.ts",
     "containers:check": "node scripts/check-container-metadata.mjs",
     "containers:check:production": "node scripts/check-container-metadata.mjs --env production",
     "deploy:dev": "node ../../scripts/check-dev-deploy.mjs && node scripts/check-container-metadata.mjs --config && bun run image:prepare && wrangler deploy --env=\"\" && node scripts/check-container-metadata.mjs --deployed",
@@ -16,11 +15,7 @@
     "types:generate": "node scripts/generate-worker-types.mjs",
     "types:check": "node scripts/generate-worker-types.mjs --check",
     "typecheck": "bun run types:check && tsc --noEmit",
-    "test:unit": "bun test tests --path-ignore-patterns 'tests/*-workerd.test.ts'",
-    "test:workerd": "bun test tests/*-workerd.test.ts",
-    "test": "bun run test:unit && bun run test:workerd && bun run test:code-workerd",
-    "build:dry-run": "node scripts/check-production-bundle.mjs",
-    "test:code-workerd": "bun tests/cloud-code-workerd-acceptance.mjs"
+    "build:dry-run": "node scripts/check-production-bundle.mjs"
   },
   "dependencies": {
     "@better-auth/expo": "1.7.7",

@@ -24,7 +24,6 @@ DEV-CONTEXT.md
 /workers/*/node_modules/
 /workers/*/.wrangler/
 /workers/cloud-builder/wrangler.preview-*.jsonc
-/workers/*/tests/fixtures/.wrangler/
 /workers/cloud-builder/.image/
 /packages/executor-cloud/node_modules/
 /packages/runtime/node_modules/

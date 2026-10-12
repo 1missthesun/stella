@@ -52,8 +52,8 @@ const CATALOG_JSON_BASENAME = "oauth-provider-catalog.json";
  * (the keyword reminder, discovery, the Store list) reads only this; the full
  * catalog is parsed only when a provider's actions are requested. Regenerate
  * with `bun packages/runtime/kernel/connectors/generate-oauth-provider-catalog-index.ts`
- * after editing the catalog; `--check` (and the bun test beside it) fails on
- * drift.
+ * after editing the catalog; `--check` (run by `bun run check:generated`)
+ * fails on drift.
  */
 export const OAUTH_PROVIDER_CATALOG_INDEX_BASENAME =
   "oauth-provider-catalog.index.json";

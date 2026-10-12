@@ -17,10 +17,9 @@ export const DEFAULT_BROWSER_CHAIN_DELAY_MAX_MS = 1_200;
 /** Backend a worker-issued command is bound to; stripped before the daemon. */
 export const WORKER_BOUND_BACKEND_PARAM = "__stellaBrowserBackend";
 
-// Contract-checked against packages/stella-browser/protocol/actions.json
-// ("chain": true) by tests/runtime/kernel/browser-use/action-contract.test.ts:
-// adding, removing, or renaming an entry fails that test until the manifest
-// and the Rust daemon (is_chain_allowed_action) agree.
+// Mirrors packages/stella-browser/protocol/actions.json ("chain": true):
+// adding, removing, or renaming an entry needs the manifest and the Rust
+// daemon (is_chain_allowed_action) to agree.
 export const BROWSER_CHAIN_ACTIONS = [
   "healthcheck",
   "navigate",

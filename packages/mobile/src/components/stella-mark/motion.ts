@@ -1,7 +1,5 @@
 /**
- * Pure motion math for the character mark, kept out of the component so it can
- * be unit-tested (the repo's `bun test` runner has no React Native renderer,
- * so only logic is testable).
+ * Pure motion math for the character mark, kept out of the component.
  *
  * Every function here is a Reanimated worklet: the mark evaluates them on the
  * UI thread from one shared clock, so no per-frame work ever crosses to JS.

@@ -8,8 +8,7 @@
     "./*": "./*.ts"
   },
   "scripts": {
-    "typecheck": "node ../../node_modules/typescript-7/bin/tsc --noEmit",
-    "test": "bun test tests"
+    "typecheck": "node ../../node_modules/typescript-7/bin/tsc --noEmit"
   },
   "dependencies": {
     "@stella/contracts": "workspace:*"

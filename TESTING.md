@@ -3,8 +3,8 @@
 **Agents:** verify through `.agents/skills/verify-stella/SKILL.md`, never a
 plain `bun run electron:dev`. The harness owns an isolated instance (its own
 data, display, browser bridge, ports and Claude config); `electron:dev` runs
-on the user's real `~/.stella`, account and conversation. Unit tests are
-banned: don't write, update or run them. Backend changes are tested on your
+on the user's real `~/.stella`, account and conversation. The repo has no
+unit tests; don't add any. Backend changes are tested on your
 own Preview ("Test accounts" below, and DEPLOY.md, "Previews"). The desktop
 fetches its prompts from the backend, so prompt changes need one too.
 

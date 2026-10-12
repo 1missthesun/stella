@@ -8,7 +8,7 @@ import path from "node:path";
  * modules it imports are bundled into one self-contained expression when this
  * module loads: one Bun.build from the source tree per process, about 10ms,
  * with no build step and no generated file. The runtime always runs from
- * source on Bun; only Node-hosted tooling (vitest) takes the esbuild fallback
+ * source on Bun; only Node-hosted tooling takes the esbuild fallback
  * below. A failed build surfaces when a kernel starts, not when this module
  * is imported.
  */
@@ -59,7 +59,7 @@ const bundleWithBun = async (bun: typeof Bun): Promise<string> => {
 // (workers/cloud-builder/scripts/prepare-image.mjs); the image runs on Bun.
 const ESBUILD = "esbuild";
 
-/** Same bundle under Node, where Bun.build does not exist (vitest). */
+/** Same bundle under Node, where Bun.build does not exist. */
 const bundleWithEsbuild = async (): Promise<string> => {
   const esbuild: typeof import("esbuild") = await import(
     /* @vite-ignore */ ESBUILD

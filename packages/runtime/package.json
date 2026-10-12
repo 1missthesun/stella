@@ -3,12 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "test:bun": "bun scripts/run-bun-tests.mjs",
-    "test:vitest": "node ../../node_modules/vitest/vitest.mjs run --environment node --testTimeout 30000 tests",
-    "test:harness": "node --test scripts/*.test.mjs",
-    "test": "bun run test:bun && bun run test:vitest && bun run test:harness"
-  },
+  "scripts": {},
   "exports": {
     ".": "./index.ts",
     "./host": "./host/index.ts",

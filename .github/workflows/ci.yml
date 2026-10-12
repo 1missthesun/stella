@@ -54,20 +54,8 @@ jobs:
       - name: Typecheck Electron and preload
         run: bun run electron:typecheck
 
-      - name: Hydrate pinned OfficeCLI binary for integration tests
-        run: bun run stella-office:download
-
-      - name: Test desktop UI
-        run: bun run test:run
-
-      - name: Test shared theme package
-        run: bun run theme:test
-
-      - name: Test Electron services
-        run: bun run test:electron
-
-      - name: Test verification scripts
-        run: bun run test:verification
+      - name: Lint renderer
+        run: bun run lint
 
   prompts:
     name: Prompt contracts
@@ -130,12 +118,6 @@ jobs:
       - name: Typecheck agent harness
         run: bun run agent:typecheck
 
-      - name: Hydrate pinned OfficeCLI binary for integration tests
-        run: bun run stella-office:download
-
-      - name: Test runtime
-        run: bun run runtime:test
-
       # Runtime worker perf lab (packages/runtime/scripts/perf/README.md).
       # Source entry only, 1k history template; the worker runs with a
       # scratch HOME/data dir, the scripted fake model provider and the
@@ -183,46 +165,6 @@ jobs:
       - name: Typecheck executor
         run: bun run executor:typecheck
 
-      - name: Test executor
-        run: bun run executor:test
-
-  stella_browser:
-    name: Stella Browser contracts
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.2
-
-      - name: Restore Bun package cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.BUN_INSTALL_CACHE_DIR }}
-          key: bun-install-v1-1.4.0-${{ runner.os }}-${{ hashFiles('bun.lock') }}
-
-      - name: Restore Cargo cache
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/git
-            ~/.cargo/registry
-            packages/stella-browser/cli/target
-          key: ${{ runner.os }}-cargo-stella-browser-${{ hashFiles('packages/stella-browser/cli/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-stella-browser-
-
-      - name: Install dependencies
-        env:
-          STELLA_SKIP_BROWSER_HYDRATE: "1"
-          STELLA_SKIP_OFFICE_HYDRATE: "1"
-        run: bun install --frozen-lockfile
-
-      - name: Test Rust CLI, extension, and browser action contracts
-        run: bun run test:stella-browser
-
   cloud_workers:
     name: ${{ matrix.name }}
     runs-on: ubuntu-latest
@@ -233,19 +175,14 @@ jobs:
         include:
           - name: Cloud Builder worker
             script: cloud-builder
-            test_name: Test worker including Workerd acceptance
           - name: Apps Host worker
             script: apps-host
-            test_name: Test worker
           - name: Browser Gateway worker
             script: browser-gateway
-            test_name: Test worker including Workerd acceptance
           - name: Device Code fixture worker
             script: device-code-fixture
-            test_name: Test worker including Workerd acceptance
           - name: Canvas Share worker
             script: canvas-share
-            test_name: Test worker including Workerd acceptance
     steps:
       - uses: actions/checkout@v4
 
@@ -270,13 +207,6 @@ jobs:
 
       - name: Check Worker promises are handled
         run: bun run ${{ matrix.script }}:lint:promises
-
-      - name: Install Apps Host browser
-        if: matrix.script == 'apps-host'
-        run: cd workers/apps-host && bunx playwright install --with-deps chromium
-
-      - name: ${{ matrix.test_name }}
-        run: bun run ${{ matrix.script }}:test
 
       - name: Verify worker bundle
         run: bun run ${{ matrix.script }}:build:dry-run
@@ -309,9 +239,6 @@ jobs:
 
       - name: Lint mobile
         run: bun run mobile:lint
-
-      - name: Test mobile
-        run: bun run mobile:test
 
       - name: Check generated mobile catalogs
         run: git diff --exit-code -- packages/mobile/src/i18n/locales

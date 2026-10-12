@@ -11,8 +11,7 @@
     "./attached-tool-protocol": "./src/attached-tool-protocol.ts"
   },
   "scripts": {
-    "typecheck": "node ../../node_modules/typescript-7/bin/tsc --noEmit",
-    "test": "bun test src"
+    "typecheck": "node ../../node_modules/typescript-7/bin/tsc --noEmit"
   },
   "dependencies": {
     "@sinclair/typebox": "0.34.52",

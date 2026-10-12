@@ -9,13 +9,10 @@
     "deploy:production": "wrangler deploy --config wrangler.jsonc --env production --strict",
     "typecheck": "tsc --noEmit && bun run types:check",
     "types:check": "wrangler types worker-configuration.d.ts --config wrangler.jsonc --env-interface AppsHostBindings --check",
-    "test:browser:install": "playwright install chromium",
-    "test": "bun test --preload ./tests/cloudflare-workers-shim.ts tests",
     "build:dry-run": "wrangler deploy --dry-run --env=\"\""
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261004.1",
-    "playwright": "1.63.0",
     "typescript": "npm:typescript@^7.0.2",
     "wrangler": "4.147.0"
   }

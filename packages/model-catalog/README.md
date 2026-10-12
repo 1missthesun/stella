@@ -9,4 +9,4 @@ Cloudflare Workers, Bun, and the desktop runtime.
 - `usage` / `pricing`: per-provider usage normalization and micro-cent cost math.
 - `cloud-binding` / `native-relay`: turn-binding validators and the connected-credential (Claude Code / Codex) helpers.
 
-Import subpaths directly (`@stella/model-catalog/model`); `index.ts` re-exports everything. Tests: `bun test tests`.
+Import subpaths directly (`@stella/model-catalog/model`); `index.ts` re-exports everything.

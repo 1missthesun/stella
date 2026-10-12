@@ -4,8 +4,8 @@
 //
 //   bun packages/runtime/kernel/connectors/generate-oauth-provider-catalog-index.ts [--check]
 //
-// `--check` exits 1 when the committed sidecar has drifted. The bun test
-// beside this file runs the same comparison.
+// `--check` exits 1 when the committed sidecar has drifted; CI runs it through
+// `bun run check:generated`.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";

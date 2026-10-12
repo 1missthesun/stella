@@ -52,15 +52,13 @@ read cookies/localStorage or touch each other. Do not add `allow-same-origin`.
 
 This Worker is part of the repository's root Bun workspace. A root
 `bun install --frozen-lockfile` installs its pinned toolchain, and the
-`cloud_workers` CI matrix runs its type-generation check, typecheck, unit test,
-real-Workerd test, and production bundle dry-run.
+`cloud_workers` CI matrix runs its type-generation check, typecheck, and
+production bundle dry-run.
 
 ```sh
 bun install
 bun run types
 bun run typecheck
-bun run test
-bun run test:workerd
 bun run build:dry-run
 bun run dev -- --local # requires Wrangler login for non-local resources
 ```

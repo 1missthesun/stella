@@ -28,8 +28,8 @@ teardown) is faster to drive headless:
 - Reproduce executor bugs before deploying: the built sandbox image can run
   the attached tool host locally (`docker run --rm --entrypoint sh
   stella-v2-cloud-builder-dev-sandboxsmall:<version>`), where stderr is on the
-  terminal instead of in a diagnostic event three minutes later. Don't run or
-  extend the worker test suites; unit tests are banned in this repo.
+  terminal instead of in a diagnostic event three minutes later. The repo has no
+  worker test suites; don't add unit tests.
 - Test an unmerged backend change on your own Preview: `env -u
   CLOUDFLARE_API_TOKEN bun run preview -- up --name <name>` in
   `workers/cloud-builder`, then `STELLA_BACKEND_URL=<printed url> node

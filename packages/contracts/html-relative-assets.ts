@@ -1,6 +1,6 @@
 /**
- * A local HTML document's relative assets (`<img src="img/x.png">`, a
- * stylesheet, a script), for viewers that hold the document's text rather
+ * A local HTML document's relative assets (`<img src="img/x.png">`, a video
+ * or audio source, a stylesheet, a script), for viewers that hold the document's text rather
  * than serving its folder: the website and the phone. They read each asset
  * through their own file lane and embed it, so the document renders as it
  * does on the desktop.
@@ -9,7 +9,7 @@
  * folder, absolute paths, URLs and hidden files or folders are left alone.
  */
 
-export type HtmlAssetKind = "image" | "text";
+export type HtmlAssetKind = "image" | "media" | "text";
 
 export type HtmlAssetLoader = (asset: {
   path: string;
@@ -20,7 +20,7 @@ const MAX_ASSETS = 64;
 const MAX_EMBEDDED_CHARS = 48 * 1024 * 1024;
 const CONCURRENCY = 4;
 
-const TAG_RE = /<(img|video|link|script)\b[^>]*>/gi;
+const TAG_RE = /<(img|video|audio|source|link|script)\b[^>]*>/gi;
 const ATTRIBUTE_RE = /(\s)(src|href|poster|rel)(\s*=\s*)("([^"]*)"|'([^']*)'|([^\s"'=<>`]+))/gi;
 const SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -118,7 +118,10 @@ const findAssetSlots = (html: string): AssetSlot[] => {
       });
     };
     if (name === "img") push("src", "image", "attribute");
-    else if (name === "video") push("poster", "image", "attribute");
+    else if (name === "video") {
+      push("poster", "image", "attribute");
+      push("src", "media", "attribute");
+    } else if (name === "audio" || name === "source") push("src", "media", "attribute");
     else if (name === "script") push("src", "text", "script");
     else if (
       name === "link" &&
@@ -161,8 +164,8 @@ const withAttribute = (tag: string, attribute: string, value: string) => {
 
 /**
  * `html` with each relative image, stylesheet and script inside the
- * document's folder embedded: images as the data URIs `load` returns for
- * them, stylesheets and scripts inline as the text it returns. An asset
+ * document's folder embedded: images, video and audio as the URIs `load`
+ * returns for them, stylesheets and scripts inline as the text it returns. An asset
  * `load` cannot supply keeps its original reference.
  */
 export const embedRelativeHtmlAssets = async (
@@ -203,17 +206,27 @@ export const embedRelativeHtmlAssets = async (
 
   let output = "";
   let cursor = 0;
+  const contentOf = (slot: AssetSlot) =>
+    loaded.get(`${slot.kind}\0${resolveRelativeHtmlAsset(documentPath, slot.ref)}`);
   for (const slot of slots) {
     if (slot.start < cursor) continue;
-    const content = loaded.get(
-      `${slot.kind}\0${resolveRelativeHtmlAsset(documentPath, slot.ref)}`,
-    );
+    if (slot.mode === "attribute") {
+      let tag = slot.tag;
+      for (const sibling of slots) {
+        if (sibling.start !== slot.start || sibling.mode !== "attribute") continue;
+        const content = contentOf(sibling);
+        if (content !== undefined) tag = withAttribute(tag, sibling.attribute, content);
+      }
+      if (tag === slot.tag) continue;
+      output += html.slice(cursor, slot.start) + tag;
+      cursor = slot.end;
+      continue;
+    }
+    const content = contentOf(slot);
     if (content === undefined) continue;
     output += html.slice(cursor, slot.start);
     cursor = slot.end;
-    if (slot.mode === "attribute") {
-      output += withAttribute(slot.tag, slot.attribute, content);
-    } else if (slot.mode === "style") {
+    if (slot.mode === "style") {
       output += `<style>${content.replace(/<\/style/giu, "<\\/style")}</style>`;
     } else {
       const closingRe = /\s*<\/script\s*>/iuy;
@@ -233,4 +246,134 @@ export const embedRelativeHtmlAssets = async (
     }
   }
   return output + html.slice(cursor);
+};
+
+const DOCUMENT_ASSET_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "avif",
+  "svg",
+  "ico",
+  "bmp",
+  "mp4",
+  "m4v",
+  "webm",
+  "mov",
+  "mp3",
+  "wav",
+  "ogg",
+  "m4a",
+  "flac",
+  "css",
+  "js",
+  "mjs",
+  "woff",
+  "woff2",
+  "ttf",
+  "otf",
+]);
+
+const extensionOf = (filePath: string) =>
+  /\.([a-z0-9]+)$/iu.exec(filePath)?.[1]?.toLowerCase() ?? "";
+
+/** An HTML or markdown document, whose folder its relative assets load from. */
+export const isAssetDocumentPath = (filePath: string): boolean =>
+  /\.(?:html?|mdx?)$/iu.test(filePath);
+
+/**
+ * A file type a document loads as an asset (an image, video, audio, a
+ * stylesheet, script or font): what sharing a document also shares from its
+ * folder. Documents, data and code files are not.
+ */
+export const isDocumentAssetPath = (filePath: string): boolean =>
+  DOCUMENT_ASSET_EXTENSIONS.has(extensionOf(filePath));
+
+/**
+ * `assetPath` sits inside `documentPath`'s folder tree (at any depth, no
+ * hidden file or folder on the way) and is an asset type. Both are absolute
+ * paths in the same style; separators may be `/` or `\`.
+ */
+export const isDocumentFolderAsset = (
+  documentPath: string,
+  assetPath: string,
+): boolean => {
+  if (!isAssetDocumentPath(documentPath) || !isDocumentAssetPath(assetPath)) {
+    return false;
+  }
+  const slash = Math.max(documentPath.lastIndexOf("/"), documentPath.lastIndexOf("\\"));
+  if (slash < 0) return false;
+  const folder = documentPath.slice(0, slash + 1);
+  if (!assetPath.startsWith(folder)) return false;
+  const rest = assetPath.slice(folder.length).split(/[\\/]/u);
+  return rest.every(
+    (segment) => segment !== "" && segment !== ".." && !segment.startsWith("."),
+  );
+};
+
+const MARKDOWN_IMAGE_RE =
+  /(!\[[^\]\n]*\]\(\s*)(<[^>\n]*>|[^\s)<>]+)((?:\s+(?:"[^"\n]*"|'[^'\n]*'|\([^)\n]*\)))?\s*\))/gu;
+
+const markdownImageRef = (destination: string) =>
+  destination.startsWith("<") ? destination.slice(1, -1) : destination;
+
+/** The absolute paths of a markdown document's relative images inside its folder. */
+export const relativeMarkdownImagePaths = (
+  markdown: string,
+  documentPath: string,
+): string[] => {
+  const paths = new Set<string>();
+  for (const match of markdown.matchAll(MARKDOWN_IMAGE_RE)) {
+    const resolved = resolveRelativeHtmlAsset(documentPath, markdownImageRef(match[2]!));
+    if (resolved) paths.add(resolved);
+    if (paths.size >= MAX_ASSETS) break;
+  }
+  for (const resolved of relativeHtmlAssetPaths(markdown, documentPath)) {
+    if (paths.size >= MAX_ASSETS) break;
+    paths.add(resolved);
+  }
+  return [...paths];
+};
+
+/**
+ * `markdown` with each relative image (`![alt](img/a.png)`) inside the
+ * document's folder pointed at the URI `load` returns for it. An image
+ * `load` cannot supply keeps its original reference.
+ */
+export const rewriteRelativeMarkdownImages = async (
+  markdown: string,
+  documentPath: string,
+  load: (path: string) => Promise<string | null>,
+  signal?: AbortSignal,
+): Promise<string> => {
+  const paths = [
+    ...new Set(
+      [...markdown.matchAll(MARKDOWN_IMAGE_RE)].flatMap((match) => {
+        const resolved = resolveRelativeHtmlAsset(documentPath, markdownImageRef(match[2]!));
+        return resolved ? [resolved] : [];
+      }),
+    ),
+  ].slice(0, MAX_ASSETS);
+  if (paths.length === 0) return markdown;
+  const loaded = new Map<string, string>();
+  let next = 0;
+  const worker = async () => {
+    while (next < paths.length && !signal?.aborted) {
+      const assetPath = paths[next++]!;
+      const uri = await load(assetPath).catch(() => null);
+      if (uri) loaded.set(assetPath, uri);
+    }
+  };
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  if (signal?.aborted || loaded.size === 0) return markdown;
+  return markdown.replace(
+    MARKDOWN_IMAGE_RE,
+    (whole, open: string, destination: string, close: string) => {
+      const resolved = resolveRelativeHtmlAsset(documentPath, markdownImageRef(destination));
+      const uri = resolved ? loaded.get(resolved) : undefined;
+      return uri ? `${open}<${uri.replace(/[<>\n]/gu, encodeURIComponent)}>${close}` : whole;
+    },
+  );
 };

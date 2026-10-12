@@ -8,7 +8,12 @@ import {
   DEVICE_FILE_COPY_LIMITS,
   deviceFileCopyDrivePath,
 } from "@stella/contracts/device-files";
-import { relativeHtmlAssetPaths } from "@stella/contracts/html-relative-assets";
+import {
+  isAssetDocumentPath,
+  isDocumentAssetPath,
+  relativeHtmlAssetPaths,
+  relativeMarkdownImagePaths,
+} from "@stella/contracts/html-relative-assets";
 import {
   DEVICE_FILE_READ_LIMITS,
   DEVICE_FOLDER_CONTENT_TYPE,
@@ -110,9 +115,12 @@ const readBounded = async (
 };
 
 /**
- * The images, stylesheets and scripts a linked HTML document loads from its
- * own folder, so the website and the phone can render it whole from Drive.
- * Each must really live inside that folder (symlinks resolved).
+ * The images, video, audio, stylesheets and scripts a linked HTML document
+ * (or the images a markdown one) loads from its own folder, so every viewer
+ * can render it whole from Drive while its computer is offline. Only what the
+ * document references is copied, never the rest of its folder; each must
+ * really live inside that folder (symlinks resolved), be an asset type, and
+ * stay under the Drive copy limit like any other linked file.
  */
 const htmlDocumentAssets = async (documentPath: string): Promise<string[]> => {
   const bytes = await readBounded(
@@ -123,10 +131,12 @@ const htmlDocumentAssets = async (documentPath: string): Promise<string[]> => {
   const root = await fs.realpath(path.dirname(documentPath)).catch(() => null);
   if (!root) return [];
   const assets: string[] = [];
-  for (const candidate of relativeHtmlAssetPaths(
-    bytes.toString("utf8"),
-    documentPath,
-  )) {
+  const text = bytes.toString("utf8");
+  const candidates = /\.html?$/iu.test(documentPath)
+    ? relativeHtmlAssetPaths(text, documentPath)
+    : relativeMarkdownImagePaths(text, documentPath);
+  for (const candidate of candidates) {
+    if (!isDocumentAssetPath(candidate)) continue;
     const real = await fs.realpath(candidate).catch(() => null);
     if (
       real &&
@@ -198,7 +208,7 @@ const folderContents = async (
 const withHtmlDocumentAssets = async (paths: string[]): Promise<string[]> => {
   const expanded = new Set(paths);
   for (const sourcePath of paths) {
-    if (!/\.html?$/iu.test(sourcePath)) continue;
+    if (!isAssetDocumentPath(sourcePath)) continue;
     for (const asset of await htmlDocumentAssets(sourcePath)) {
       expanded.add(asset);
     }

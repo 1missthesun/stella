@@ -84,6 +84,7 @@ import {
   signOutClaudeCloudAccount,
   startClaudeCloudLogin,
 } from "../../claude-cloud-login.js";
+import { TEST_CLAUDE_EMAIL } from "../../test-claude.js";
 import { array, boolean, empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -981,6 +982,28 @@ const finishClaudeCloud = async (
     Date.now(),
   );
   return { accountId, email: finished.email };
+};
+
+/**
+ * Dev test accounts only (`test-claude.ts`): the shared test Claude login as
+ * a cloud account, once. Signing it out in the cloud keeps the account, so
+ * it stays signed out.
+ */
+export const ensureTestClaudeCloudAccount = (ctx: OwnerContext): void => {
+  const known = ctx.db.one<{ account_id: string }>(
+    "SELECT account_id FROM engine_accounts WHERE provider = 'anthropic' AND identity = ?",
+    claudeIdentity(TEST_CLAUDE_EMAIL),
+  );
+  if (known) return;
+  if (accountsOf(ctx.db, "anthropic").length >= MAX_ACCOUNTS_PER_PROVIDER) return;
+  const accountId = ensureClaudeAccount(ctx, { email: TEST_CLAUDE_EMAIL, plan: "test" });
+  ctx.db.run(
+    `INSERT INTO engine_claude_places (account_id, place, device_name, updated_at) VALUES (?, ?, NULL, ?)
+     ON CONFLICT (account_id, place) DO UPDATE SET updated_at = excluded.updated_at`,
+    accountId,
+    CLOUD_PLACE,
+    ctx.now,
+  );
 };
 
 const cancelClaudeCloud = async (

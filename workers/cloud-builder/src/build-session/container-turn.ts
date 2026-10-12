@@ -61,7 +61,9 @@ import type { Env } from "./shared/env.js";
 import {
   backupClaudeCloudLogins,
   restoreClaudeCloudLogins,
+  seedTestClaudeLogin,
 } from "../claude-cloud-login.js";
+import { TEST_CLAUDE_EMAIL, testClaudeConfigured } from "../test-claude.js";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
   parseAgentExecutorResult,
@@ -1444,6 +1446,12 @@ export const runAgentAttempt = async (
     // before the CLI looks for them; its own copy may be older.
     if (claudeAccount) {
       await restoreClaudeCloudLogins(host.env, turn.ownerId, sandbox);
+      if (
+        claudeAccount.email === TEST_CLAUDE_EMAIL &&
+        testClaudeConfigured(host.env)
+      ) {
+        await seedTestClaudeLogin(host.env, turn.ownerId, sandbox);
+      }
     }
     turnExecution.assertActive();
 

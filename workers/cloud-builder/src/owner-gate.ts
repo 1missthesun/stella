@@ -84,7 +84,11 @@ import type {
   DeviceToolCall,
   DeviceToolOutcome,
 } from "@stella/contracts/turn-plane/device-tools";
-import { snapshotEngines } from "./owner-store/domains/engines.js";
+import {
+  ensureTestClaudeCloudAccount,
+  snapshotEngines,
+} from "./owner-store/domains/engines.js";
+import { isTestAccountOwner, testClaudeConfigured } from "./test-claude.js";
 import { snapshotTimeZone } from "./owner-store/domains/schedules.js";
 import type { StripeEvent } from "./billing/stripe.js";
 import { BillingConfigError } from "./billing/plans.js";
@@ -224,6 +228,36 @@ export {
 } from "./owner-gate/support.js";
 
 export class OwnerGate extends OwnerGateCloudDispatch {
+  private testClaudeChecked = false;
+
+  /**
+   * Dev test accounts only (`test-claude.ts`): a test owner's cloud gets the
+   * shared test Claude login the first time this object reads its state.
+   */
+  private async ensureTestClaude(): Promise<void> {
+    if (this.testClaudeChecked) return;
+    if (!testClaudeConfigured(this.env)) {
+      this.testClaudeChecked = true;
+      return;
+    }
+    try {
+      const ownerId = this.ownerId();
+      if (await isTestAccountOwner(this.env, ownerId)) {
+        const store = this.ownerStore();
+        try {
+          ensureTestClaudeCloudAccount(store.context(null));
+        } finally {
+          store.flush();
+        }
+      }
+      this.testClaudeChecked = true;
+    } catch (error) {
+      log("error", "test_claude_account_failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   private ownerHost(): OwnerHost {
     return (this.ownerHostState ??= createGateHost({
       ownerId: () => this.ownerId(),
@@ -321,6 +355,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     args: unknown;
     caller: OwnerCaller;
   }): Promise<RpcResponse> {
+    await this.ensureTestClaude();
     const store = this.ownerStore();
     const { db } = store.context(input.caller);
     if (callerSessionRevoked(db, input.caller)) {
@@ -737,6 +772,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   async snapshot(
     options: { refresh?: boolean; now?: number } = {},
   ): Promise<OwnerSnapshot> {
+    await this.ensureTestClaude();
     const now = options.now ?? Date.now();
     const store = this.ownerStore();
     const ctx = store.context(null, now);

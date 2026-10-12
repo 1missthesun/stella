@@ -41,18 +41,20 @@ teardown) is faster to drive headless:
   origin/master; `deploy:dev` refuses anything else). `wrangler tail` does
   not attach to Previews; read the Preview's logs in the dashboard
   (Observability, persisted at full sampling).
-- Cloud Claude Code on a test account needs that account's container signed
-  in to Claude, which only a person can do, once. Use one stable account so
-  the login is reused (`STELLA_VERIFY_ACCOUNT_EMAIL=agent-claude-cloud@test.stella.local`,
-  and `--email` with `cloud-turn.mjs`), on dev:
-  `node .agents/skills/verify-stella/scripts/backend-call.mjs call engines.startClaudeCloudLogin '{}'`
-  prints `loginId` and Anthropic's `authorizeUrl`. Ask the user with
-  `request_secure_input`: the link in `detail`, one `code` field marked
-  sensitive. Then `use_secure_value` with the command
-  `node .agents/skills/verify-stella/scripts/backend-call.mjs call engines.finishClaudeCloudLogin '{"loginId":"<id>","code":"{{secret}}"}'`,
-  so the code never enters chat. A code pasted into an ordinary ask card or
-  message leaks; don't ask that way. It spends the user's Claude quota, so
-  only for claims that need a real cloud Claude Code turn.
+- Cloud Claude Code works on every test account on dev with no sign-in:
+  a test owner's cloud lists the shared Claude login
+  `claude@test.stella.local` (plan "test"), and each Claude turn writes the
+  `STELLA_TEST_CLAUDE_OAUTH_TOKEN` setup token into that account's root-only
+  directory in the container, where `claude auth login` would leave it
+  (`workers/cloud-builder/src/test-claude.ts`). Prove a turn with
+  `node .agents/skills/verify-stella/cloud-turn.mjs --engine anthropic --model claude-sonnet-4-6 --prompt "Reply with exactly: ok"`;
+  a background Claude agent with a Stella-model turn that spawns one
+  (`model: "claude"`) and `--wait-report`. It spends the user's Claude quota,
+  so only for claims that need a real cloud Claude Code turn. Previews have
+  no containers, so no cloud Claude there. To test a real sign-in instead,
+  `engines.startClaudeCloudLogin` / `engines.finishClaudeCloudLogin` through
+  `scripts/backend-call.mjs`, with the code collected by
+  `request_secure_input` and passed with `use_secure_value`, never in chat.
 - A test account's API JWT lasts 15 minutes. `cloud-turn.mjs` renews it from
   the session before then and on a 401, and `backend-call.mjs` mints one per
   call. A hand-rolled `curl` loop that starts failing with 401 "Your sign-in

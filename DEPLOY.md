@@ -316,6 +316,25 @@ worker's `wrangler.jsonc` too (bindings and vars don't inherit), regenerate
 types (`node scripts/generate-worker-types.mjs` in cloud-builder), and set prod
 secrets before the prod deploy: `... | bunx wrangler secret put NAME --env production`.
 
+### Test accounts' cloud Claude login (dev only)
+
+`STELLA_TEST_CLAUDE_OAUTH_TOKEN` on `stella-v2-cloud-builder-dev` is a
+`claude setup-token` token (one year, `user:inference`). On a deployment with
+`STELLA_TEST_ACCOUNTS=1`, every `@test.stella.local` owner's cloud lists the
+Claude account `claude@test.stella.local`, and its Claude turns run on this
+token, written into the root-only account directory in the container
+(`workers/cloud-builder/src/test-claude.ts`). Never set it on prod (prod has
+no `STELLA_TEST_ACCOUNTS`, so it would do nothing there anyway) or in any
+committed config. Previews have no containers, so they need no copy.
+
+To rotate it: the user runs `claude setup-token` on their own computer and
+the agent collects the token with `request_secure_input` (sensitive), then
+`use_secure_value` into
+`cd workers/cloud-builder && printf %s '{{secret}}' | env -u CLOUDFLARE_API_TOKEN bunx wrangler secret put STELLA_TEST_CLAUDE_OAUTH_TOKEN --env=""`,
+and `env -u CLOUDFLARE_API_TOKEN bun run containers:check` after, since a
+secret change makes a new Worker version. The next Claude turn of each test
+owner writes the new token.
+
 ### Prompts
 
 Edit `packages/runtime/extensions/stella-runtime/{agent-metadata,prompts}/*.md`,

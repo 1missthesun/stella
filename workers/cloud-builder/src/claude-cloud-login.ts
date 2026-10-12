@@ -16,6 +16,11 @@ import {
 } from "@stella/contracts/cloud-native-state";
 import { presignR2Url, r2Signer } from "./r2-presign.js";
 import { sandboxClient, type SandboxHandle } from "./sandbox-client.js";
+import {
+  isTestAccountOwner,
+  TEST_CLAUDE_EMAIL,
+  testClaudeCredentials,
+} from "./test-claude.js";
 import { worldSandboxId } from "./workspace.js";
 
 
@@ -179,6 +184,16 @@ probe-plant)
   mkdir -p "$dir" && chmod 700 "$dir"
   printf '%s' "$PROBE_CREDENTIALS" >"$dir/.credentials.json" && chmod 600 "$dir/.credentials.json"
   printf '%s' "$PROBE_CONFIG" >"$dir/.claude.json" && chmod 600 "$dir/.claude.json"
+  json '{ok:true}'
+  ;;
+test-seed)
+  # Dev test accounts only: the shared test login (test-claude.ts), written
+  # where a sign-in would leave it.
+  dir="$accounts/$2"
+  mkdir -p "$dir" && chmod 700 "$dir"
+  printf '%s' "$TEST_CREDENTIALS" >"$dir/.credentials.json.tmp" && chmod 600 "$dir/.credentials.json.tmp" \
+    && mv -f -- "$dir/.credentials.json.tmp" "$dir/.credentials.json" \
+    || { rm -f -- "$dir/.credentials.json.tmp"; fail "Couldn't set up the test Claude login."; }
   json '{ok:true}'
   ;;
 probe-inspect)
@@ -390,6 +405,32 @@ export const claudeLoginProbe = async (
     });
   }
   return await runScript(env, ownerId, ["probe-inspect", key], { timeoutMs: 120_000 });
+};
+
+/**
+ * Dev test accounts only: put the shared test Claude login into an agent's
+ * container, after its restore, for a test owner's turn on that account.
+ */
+export const seedTestClaudeLogin = async (
+  env: Cloudflare.Env,
+  ownerId: string,
+  container: SandboxHandle,
+): Promise<boolean> => {
+  if (!(await isTestAccountOwner(env, ownerId))) return false;
+  const credentials = testClaudeCredentials(env);
+  if (!credentials) return false;
+  const result = await runScript(
+    env,
+    ownerId,
+    ["test-seed", await claudeCloudAccountKey(TEST_CLAUDE_EMAIL)],
+    { timeoutMs: 60_000, container, extraEnv: { TEST_CREDENTIALS: credentials } },
+  );
+  if (!result.ok) {
+    console.error(
+      JSON.stringify({ level: "error", event: "test_claude_seed_failed", message: result.error }),
+    );
+  }
+  return result.ok;
 };
 
 /** Forget the owner's backup object (owner purge). */

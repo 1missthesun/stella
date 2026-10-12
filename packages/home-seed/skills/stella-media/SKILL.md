@@ -31,5 +31,5 @@ stella-media generate --wait --request '{"model":"<id>","input":{ ...the model's
 - If your context's `# Media generation` says off, don't try; tell the user what it says turns it on.
 - Use Stella's models for generated media unless the task needs something they can't do. Calling providers directly bypasses the user's plan and Stella's copy of the files.
 - Set the length and quality the user asked for; don't pick the most expensive options on your own (video bills per second, so set `duration` instead of leaving it to the model).
-- **Signed out:** the error says to sign in. Stop, tell the Orchestrator to ask the user to sign in, and retry once they confirm. Don't loop.
+- **Signed out:** `stella-media` renews Stella's session itself, so an error saying to sign in means the user really is signed out. Stop, tell the Orchestrator to ask the user to sign in, and retry once they confirm. Don't loop.
 - Still images in the chat are the Orchestrator's `image_gen`; use this skill for everything else, and for images when you need the files.

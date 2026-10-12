@@ -71,45 +71,7 @@ export const RPC_ERROR_CODES = {
 
 export const METHOD_NAMES = {
   INITIALIZE: "initialize",
-  INITIALIZED: "initialized",
-  RUNTIME_CONFIGURE: "runtime.configure",
   RUNTIME_HEALTH: "runtime.health",
-  RUNTIME_LIST_MODELS: "runtime.listModels",
-  RUNTIME_RESTART_WORKER: "runtime.restartWorker",
-  RUN_HEALTH_CHECK: "run.healthCheck",
-  RUN_GET_ACTIVE: "run.getActive",
-  RUN_START_CHAT: "run.startChat",
-  RUN_CANCEL: "run.cancel",
-  RUN_ACK_EVENTS: "run.ackEvents",
-  RUN_AUTOMATION: "run.automation",
-  AGENT_RUN_BLOCKING: "agent.runBlocking",
-  AGENT_CREATE_BACKGROUND: "agent.createBackground",
-  AGENT_GET_SNAPSHOT: "agent.getSnapshot",
-  SEARCH_WEB: "search.web",
-  VOICE_PERSIST_TRANSCRIPT: "voice.persistTranscript",
-  VOICE_ORCHESTRATOR_CHAT: "voice.orchestratorChat",
-  VOICE_ORCHESTRATOR_CONFIG: "voice.orchestratorConfig",
-  VOICE_EXECUTE_TOOL: "voice.executeTool",
-  VOICE_WEB_SEARCH: "voice.webSearch",
-  THREAD_APPEND_MESSAGE: "thread.appendMessage",
-  LOCAL_CHAT_GET_OR_CREATE_DEFAULT:
-    "localChat.getOrCreateDefaultConversationId",
-  LOCAL_CHAT_LIST_EVENTS: "localChat.listEvents",
-  LOCAL_CHAT_GET_EVENT_COUNT: "localChat.getEventCount",
-  LOCAL_CHAT_PERSIST_DISCOVERY_WELCOME: "localChat.persistDiscoveryWelcome",
-  LOCAL_CHAT_LIST_SYNC_MESSAGES: "localChat.listSyncMessages",
-  SCHEDULE_LIST_CRON_JOBS: "schedule.listCronJobs",
-  SCHEDULE_LIST_HEARTBEATS: "schedule.listHeartbeats",
-  SCHEDULE_LIST_EVENTS: "schedule.listConversationEvents",
-  SCHEDULE_GET_EVENT_COUNT: "schedule.getConversationEventCount",
-  SHELL_KILL_ALL: "shell.killAll",
-  SHELL_KILL_BY_PORT: "shell.killByPort",
-  DISCOVERY_COLLECT_BROWSER_DATA: "discovery.collectBrowserData",
-  DISCOVERY_COLLECT_ALL_SIGNALS: "discovery.collectAllSignals",
-  DISCOVERY_CORE_MEMORY_EXISTS: "discovery.coreMemoryExists",
-  DISCOVERY_WRITE_CORE_MEMORY: "discovery.writeCoreMemory",
-  DISCOVERY_DETECT_PREFERRED_BROWSER: "discovery.detectPreferredBrowser",
-  DISCOVERY_LIST_BROWSER_PROFILES: "discovery.listBrowserProfiles",
   HOST_DEVICE_IDENTITY_GET: "host.deviceIdentity.get",
   HOST_ASK_USER_REQUEST: "host.askUser.request",
   HOST_ASK_USER_CANCEL: "host.askUser.cancel",
@@ -150,15 +112,6 @@ export const METHOD_NAMES = {
   INTERNAL_WORKER_CONFIGURE: "internal.worker.configure",
   INTERNAL_WORKER_HEALTH: "internal.worker.health",
   INTERNAL_WORKER_LIST_MODELS: "internal.worker.listModels",
-  INTERNAL_WORKER_GET_ACTIVE: "internal.worker.getActive",
-  INTERNAL_WORKER_START_CHAT: "internal.worker.startChat",
-  INTERNAL_WORKER_CANCEL: "internal.worker.cancel",
-  /** Cancel the active orchestrator automation/chat run for a local conversation. */
-  INTERNAL_WORKER_CANCEL_BY_CONVERSATION:
-    "internal.worker.cancelByConversation",
-  INTERNAL_WORKER_RESUME_EVENTS: "internal.worker.resumeEvents",
-  INTERNAL_WORKER_ACK_EVENTS: "internal.worker.ackEvents",
-  INTERNAL_WORKER_LIST_ACTIVE_RUNS: "internal.worker.listActiveRuns",
   INTERNAL_WORKER_RUN_AUTOMATION: "internal.worker.runAutomation",
   INTERNAL_WORKER_CANCEL_PLACEMENT_AUTOMATION:
     "internal.worker.cancelPlacementAutomation",
@@ -171,12 +124,9 @@ export const METHOD_NAMES = {
   INTERNAL_WORKER_PAUSE_LOCAL_AGENT: "internal.worker.pauseLocalAgent",
   INTERNAL_WORKER_CREATE_BACKGROUND_AGENT:
     "internal.worker.createBackgroundAgent",
-  INTERNAL_WORKER_GET_AGENT_SNAPSHOT: "internal.worker.getAgentSnapshot",
-  INTERNAL_WORKER_APPEND_THREAD_MESSAGE: "internal.worker.appendThreadMessage",
   INTERNAL_WORKER_SEND_AGENT_INPUT: "internal.worker.sendAgentInput",
   /** The pi-durable chat (`@stella/contracts/pi-chat`): submit, abort, watch. */
   INTERNAL_WORKER_PI_CHAT: "internal.worker.piChat",
-  /** A cloud agent's tool call the owner gate relayed to this computer (`@stella/contracts/turn-plane/device-tools`). */
   INTERNAL_WORKER_WEB_SEARCH: "internal.worker.webSearch",
   INTERNAL_WORKER_VOICE_PERSIST_TRANSCRIPT:
     "internal.worker.voice.persistTranscript",
@@ -204,24 +154,7 @@ export const METHOD_NAMES = {
     "internal.worker.discovery.collectBrowserData",
   INTERNAL_WORKER_DISCOVERY_COLLECT_ALL_SIGNALS:
     "internal.worker.discovery.collectAllSignals",
-  INTERNAL_WORKER_SCHEDULE_LIST_CRON_JOBS:
-    "internal.worker.schedule.listCronJobs",
-  INTERNAL_WORKER_SCHEDULE_LIST_HEARTBEATS:
-    "internal.worker.schedule.listHeartbeats",
-  INTERNAL_WORKER_SCHEDULE_LIST_EVENTS:
-    "internal.worker.schedule.listConversationEvents",
-  INTERNAL_WORKER_SCHEDULE_GET_EVENT_COUNT:
-    "internal.worker.schedule.getConversationEventCount",
   INTERNAL_WORKER_ONE_SHOT_COMPLETION: "internal.worker.oneShotCompletion",
-  INTERNAL_STORE_LOAD_THREAD_MESSAGES: "internal.store.loadThreadMessages",
-  INTERNAL_STORE_RESOLVE_OR_CREATE_ACTIVE_THREAD:
-    "internal.store.resolveOrCreateActiveThread",
-  INTERNAL_STORE_APPEND_THREAD_MESSAGE: "internal.store.appendThreadMessage",
-  INTERNAL_STORE_ARCHIVE_THREAD: "internal.store.archiveThread",
-  INTERNAL_STORE_REPLACE_THREAD_MESSAGES:
-    "internal.store.replaceThreadMessages",
-  INTERNAL_STORE_UPDATE_THREAD_SUMMARY: "internal.store.updateThreadSummary",
-  INTERNAL_STORE_LIST_LOCAL_CHAT_EVENTS: "internal.store.listLocalChatEvents",
   INTERNAL_SCHEDULE_LIST_CRON_JOBS: "internal.schedule.listCronJobs",
   INTERNAL_SCHEDULE_LIST_HEARTBEATS: "internal.schedule.listHeartbeats",
   INTERNAL_SCHEDULE_ADD_CRON_JOB: "internal.schedule.addCronJob",
@@ -232,10 +165,6 @@ export const METHOD_NAMES = {
     "internal.schedule.getHeartbeatConfig",
   INTERNAL_SCHEDULE_UPSERT_HEARTBEAT: "internal.schedule.upsertHeartbeat",
   INTERNAL_SCHEDULE_RUN_HEARTBEAT: "internal.schedule.runHeartbeat",
-  INTERNAL_CAPABILITY_STATE_GET: "internal.capabilityState.get",
-  INTERNAL_CAPABILITY_STATE_SET: "internal.capabilityState.set",
-  INTERNAL_CAPABILITY_STATE_APPEND_EVENT:
-    "internal.capabilityState.appendEvent",
   INTERNAL_WORKER_GOOGLE_WORKSPACE_AUTH_STATUS:
     "internal.worker.googleWorkspace.authStatus",
   INTERNAL_WORKER_GOOGLE_WORKSPACE_CONNECT:
@@ -248,7 +177,6 @@ export const NOTIFICATION_NAMES = {
   RUNTIME_READY: "runtime.ready",
   RUNTIME_RELOADING: "runtime.reloading",
   RUNTIME_LAGGED: "runtime.lagged",
-  RUN_EVENT: "run.event",
   VOICE_AGENT_EVENT: "voice.agentEvent",
   LOCAL_CHAT_UPDATED: "localChat.updated",
   /** A watched pi-durable conversation's events (`PiChatEventsPayload`). */
@@ -256,7 +184,6 @@ export const NOTIFICATION_NAMES = {
   THREAD_TRANSCRIPT_UPDATED: "localChat.threadTranscriptUpdated",
   SCHEDULE_UPDATED: "schedule.updated",
   MODEL_CATALOG_UPDATED: "modelCatalog.updated",
-  APPROVAL_REQUESTED: "approval.requested",
 } as const;
 
 export type RuntimeInitializeParams = {

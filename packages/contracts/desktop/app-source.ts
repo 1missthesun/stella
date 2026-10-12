@@ -6,6 +6,13 @@
  * (upstream). Git is the only bookkeeping.
  */
 
+/**
+ * Dispatched on the window when Stella is about to restart to apply an
+ * update. The window is then torn down without `pagehide`, so anything it
+ * hands to the next window is written on this.
+ */
+export const APP_RELAUNCHING_EVENT = "stella:relaunching";
+
 export type AppSourceDraft = {
   name: string;
   /** Subject of the draft's tip commit. */

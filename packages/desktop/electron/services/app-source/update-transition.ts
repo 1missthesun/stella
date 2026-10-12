@@ -1,6 +1,7 @@
 import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
 import { type BrowserWindow, type NativeImage, WebContentsView } from "electron";
+import { APP_RELAUNCHING_EVENT } from "@stella/contracts/desktop/app-source";
 import { springEasing } from "@stella/contracts/desktop/spring";
 import { diffRegions, type LiveRect, type Rect } from "./picture-diff.js";
 import {
@@ -249,9 +250,16 @@ const THAW_SCRIPT = "window.__stellaUpdateThaw?.()";
 const PAINTED_SCRIPT =
   "new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))))";
 
-/** Live: the page finished loading and its launch splash is gone. */
-const LIVE_SCRIPT =
-  'document.readyState === "complete" && !document.getElementById("stella-launch")';
+/**
+ * Live: the page finished loading and its launch splash is gone. A splash
+ * already fading out is removed here: the window is under the cover, so
+ * nobody would see the fade.
+ */
+const LIVE_SCRIPT = `(() => {
+  const splash = document.getElementById("stella-launch");
+  if (splash?.dataset.exiting === "true") splash.remove();
+  return document.readyState === "complete" && !document.getElementById("stella-launch");
+})()`;
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -443,7 +451,16 @@ export class UpdateTransition {
         });
       return {
         commit: async () => {
-          await played;
+          await Promise.all([
+            played,
+            timeout(
+              win.webContents.executeJavaScript(
+                `window.dispatchEvent(new Event(${JSON.stringify(APP_RELAUNCHING_EVENT)}))`,
+              ),
+              1_000,
+              "Telling the window",
+            ).catch(() => {}),
+          ]);
           this.options.onHold?.(hold);
         },
         release: async () => {

@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { ConversationSummary } from "@stella/contracts/backend/conversations";
 import { useBackendView } from "@/platform/backend/use-backend-view";
+import { recallHandoff, rememberForHandoff } from "@/platform/backend/window-handoff";
 import {
   cloudConversationsForOwnerSubject,
   isOwnedCloudConversation,
@@ -32,7 +33,23 @@ export function useShellConversationSource({
     "conversations.recent",
     isCloudConversationReady ? {} : "skip",
   );
-  const cloudConversations: ConversationSummary[] | undefined = recent.value;
+  // A reloaded or restarted window starts from the last window's list
+  // (`window-handoff.ts`) until the view answers.
+  const handoffKey =
+    isCloudConversationReady && ownerSubject
+      ? `conversations.recent:${accountScope}:${ownerSubject}`
+      : null;
+  useEffect(() => {
+    if (handoffKey && recent.status === "ready") {
+      rememberForHandoff(handoffKey, recent.value);
+    }
+  }, [handoffKey, recent.status, recent.value]);
+  const handedOver = useMemo(
+    () => (handoffKey ? recallHandoff<ConversationSummary[]>(handoffKey) : undefined),
+    [handoffKey],
+  );
+  const cloudConversations: ConversationSummary[] | undefined =
+    recent.value ?? (recent.status === "loading" ? handedOver : undefined);
   const ownerGeneration = isCloudConversationReady ? session.ownerGeneration : null;
 
   const scopedCloudConversations = useMemo(

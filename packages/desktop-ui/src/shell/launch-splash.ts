@@ -14,6 +14,8 @@
  * the shell shows in whatever state it is in.
  */
 
+import { reportCloudReadiness } from "@/features/cloud/cloud-readiness-timing";
+
 const LAUNCH_SPLASH_ID = "stella-launch";
 
 /** Matches the `opacity` transition on `.stella-launch` in `index.html`. */
@@ -45,6 +47,7 @@ export function dismissLaunchSplash(): void {
   clearHoldTimer();
   if (dismissed) return;
   dismissed = true;
+  reportCloudReadiness("cloud.shell-live");
   const launch = document.getElementById(LAUNCH_SPLASH_ID);
   if (!launch) return;
   launch.dataset.exiting = "true";

@@ -161,6 +161,91 @@ const launch = async () => {
   await waitForLive(run, Date.now() + 60_000);
 };
 
+/* -------------------------------------------------------------- resources */
+
+const TICK_MS = 1000 / 100;
+
+/** `/proc/<pid>/stat` fields after the command name. */
+const procStat = (pid) => {
+  try {
+    const text = readFileSync(`/proc/${pid}/stat`, "utf8");
+    return text.slice(text.lastIndexOf(")") + 2).split(" ");
+  } catch {
+    return null;
+  }
+};
+
+const rssKb = (pid) => {
+  try {
+    return Number(/VmRSS:\s+(\d+)/.exec(readFileSync(`/proc/${pid}/status`, "utf8"))?.[1] ?? 0);
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * What the update work costs, sampled from /proc every 20ms (Linux only):
+ * the peak memory of the processes the app started during the window (git,
+ * builds, installs) on top of what was running when it began, and the CPU
+ * time the main process and everything it reaped used meanwhile.
+ */
+class ResourceSampler {
+  constructor(mainPid) {
+    this.mainPid = mainPid;
+    this.enabled = process.platform === "linux" && Boolean(mainPid);
+    if (!this.enabled) return;
+    this.baseline = new Set(this.descendants());
+    this.startCpu = this.cpuTicks();
+    this.lastCpu = this.startCpu;
+    this.mainRssStart = rssKb(mainPid);
+    this.peakKb = 0;
+    this.peakMainKb = this.mainRssStart;
+    this.timer = setInterval(() => this.sample(), 20);
+  }
+  descendants() {
+    const children = new Map();
+    for (const entry of readdirSync("/proc")) {
+      if (!/^\d+$/.test(entry)) continue;
+      const stat = procStat(entry);
+      if (!stat) continue;
+      const ppid = Number(stat[1]);
+      if (!children.has(ppid)) children.set(ppid, []);
+      children.get(ppid).push(Number(entry));
+    }
+    const found = [];
+    const pending = [...(children.get(this.mainPid) ?? [])];
+    while (pending.length > 0) {
+      const pid = pending.pop();
+      found.push(pid);
+      pending.push(...(children.get(pid) ?? []));
+    }
+    return found;
+  }
+  cpuTicks() {
+    const stat = procStat(this.mainPid);
+    if (!stat) return null;
+    return Number(stat[11]) + Number(stat[12]) + Number(stat[13]) + Number(stat[14]);
+  }
+  sample() {
+    const cpu = this.cpuTicks();
+    if (cpu !== null) this.lastCpu = cpu;
+    let kb = 0;
+    for (const pid of this.descendants()) if (!this.baseline.has(pid)) kb += rssKb(pid);
+    this.peakKb = Math.max(this.peakKb, kb);
+    this.peakMainKb = Math.max(this.peakMainKb, rssKb(this.mainPid));
+  }
+  stop() {
+    if (!this.enabled) return undefined;
+    clearInterval(this.timer);
+    this.sample();
+    return {
+      peakWorkMb: Math.round(this.peakKb / 1024),
+      mainGrowthMb: Math.round((this.peakMainKb - this.mainRssStart) / 1024),
+      cpuMs: Math.round((this.lastCpu - this.startCpu) * TICK_MS),
+    };
+  }
+}
+
 /* -------------------------------------------------------------------- CDP */
 
 const fullPage = async (port) => {
@@ -397,6 +482,8 @@ const steps = (line) =>
       }),
   );
 
+let pendingPrepare = null;
+
 const iterate = async (variation) => {
   let run = readRun();
   const nonce = `b${Date.now().toString(36)}`;
@@ -412,18 +499,35 @@ const iterate = async (variation) => {
     const change = prepareChange(variation, nonce);
     const name = `bench-${variation}-${nonce}`;
     const commit = commitOnto(change.base, change.files, `Update bench: ${variation} ${nonce}${change.note ? ` (${change.note})` : ""}`);
+    const prepareTail = new LogTail(run);
+    const prepareResources = new ResourceSampler(runElectronPids(run)[0]);
+    const createdAt = Date.now();
     git(appDir, ["branch", "--force", `draft/${name}`, commit]);
     // As the user sees it: the draft offered in Updates (which also loads the
-    // transition overlay ahead of the press) before Update is pressed.
-    const offeredBy = Date.now() + 20_000;
+    // transition overlay ahead of the press) before Update is pressed. A
+    // version is offered once it is prepared.
+    const offeredBy = Date.now() + 180_000;
+    let offeredAt = null;
     while (Date.now() < offeredBy) {
       const ready = await tryEvaluate(
         run.cdpPort,
         `window.electronAPI.appSource.getState().then((state) => [...(state?.ready ?? []), ...(state?.stale ?? [])].some((draft) => draft.name === ${JSON.stringify(name)}))`,
       );
-      if (ready) break;
-      await sleep(200);
+      if (ready) {
+        offeredAt = Date.now();
+        break;
+      }
+      await sleep(100);
     }
+    prepareTail.poll();
+    const prepared = prepareTail.find("app-source.prepared");
+    pendingPrepare = {
+      offerMs: offeredAt ? offeredAt - createdAt : undefined,
+      prepareMs: prepared?.fields.ms,
+      gate: prepared?.fields.gate,
+      bundles: prepared?.fields.bundles,
+      resources: prepareResources.stop(),
+    };
     await sleep(1000);
     action = `window.electronAPI.appSource.apply(${JSON.stringify(name)})`;
     if (variation === "renderer") markerSelector = `[data-update-bench="${nonce}"]`;
@@ -432,10 +536,17 @@ const iterate = async (variation) => {
   const kind = KIND[variation];
   const tail = new LogTail(run);
   const oldPids = new Set(runElectronPids(run));
+  const clickResources = new ResourceSampler([...oldPids][0]);
   const t0 = Date.now();
   await evaluate(run.cdpPort, `(${action}.then((result) => { window.__benchResult = result; }), true)`);
   const deadline = t0 + 120_000;
   const record = { at: new Date(t0).toISOString(), variation, mode: run.benchMode ?? "development", nonce };
+  if (pendingPrepare) record.prepare = pendingPrepare;
+  pendingPrepare = null;
+  // The click's own work ends where the action logs its timing.
+  const clickDone = tail.waitFor("app-source.timing", deadline).then(() => {
+    record.clickResources = clickResources.stop();
+  });
 
   if (kind === "renderer") {
     let visibleAt = null;
@@ -525,6 +636,7 @@ const iterate = async (variation) => {
   if (readiness.length > 0) {
     record.readiness = Object.fromEntries(readiness.map((entry) => [entry.fields.phase, entry.fields.elapsedMs]));
   }
+  await clickDone;
   return record;
 };
 

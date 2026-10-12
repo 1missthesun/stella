@@ -17,8 +17,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  type ImageStyle,
-  type StyleProp,
   type TextLayoutEventData,
   useWindowDimensions,
   View,
@@ -51,6 +49,13 @@ import type { AnchorRect } from "./PlusMenu";
 import { assistantBubbleNeedsBoundedWidth } from "../../lib/assistant-bubble-layout";
 import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import { artifactAttachmentTarget } from "../../lib/mobile-artifacts";
+import {
+  AttachmentTileRow,
+  FileTile,
+  ImageTile,
+  PastedTextTile,
+  type AttachmentTileItem,
+} from "./AttachmentTiles";
 import {
   resolveCloudDriveFileUri,
   useCloudDriveFileUri,
@@ -134,35 +139,6 @@ export function MessageEntry({
 }
 
 const REACTION_POP = { side: "left", rise: 4, scale: 0.4 } as const;
-
-const USER_THUMB_HEIGHT = 84;
-
-function UserThumb({
-  uri,
-  name,
-  style,
-}: {
-  uri: string;
-  name?: string;
-  style: StyleProp<ImageStyle>;
-}) {
-  const [aspect, setAspect] = useState(1);
-  const width = Math.round(
-    Math.min(Math.max(USER_THUMB_HEIGHT * aspect, 48), 200),
-  );
-  return (
-    <Image
-      source={{ uri }}
-      style={[style, { width }]}
-      contentFit="contain"
-      accessibilityLabel={name}
-      onLoad={(event) => {
-        const { width: w, height: h } = event.source;
-        if (w > 0 && h > 0) setAspect(w / h);
-      }}
-    />
-  );
-}
 
 function ReactionBadge({
   emoji,
@@ -815,7 +791,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         ? attachmentPreviews.flatMap((preview) =>
             preview.imageUri ? [{ key: preview.path, uri: preview.imageUri, name: preview.name }] : [],
           )
-        : thumbs.slice(0, 3).map((uri) => ({ key: uri, uri, name: undefined }));
+        : thumbs.map((uri) => ({ key: uri, uri, name: undefined }));
     const fileNames =
       attachmentPreviews.length > 0
         ? attachmentPreviews.filter((preview) => !preview.imageUri).map((preview) => preview.name)
@@ -823,26 +799,30 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     const hasAttachmentRow =
       imageUris.length > 0 || fileNames.length > 0 || pastedTexts.length > 0;
     const hasBubbleBody = showText;
-    const attachmentChip = (key: string, label: string) => (
-      <View key={key} style={styles.userAttachmentChip} accessibilityLabel={label}>
-        <Icon name="file-text" size={14} color={colors.textMuted} />
-        <Text
-          style={styles.userAttachmentChipName}
-          numberOfLines={1}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        >
-          {label}
-        </Text>
-      </View>
-    );
+    const attachmentTiles: AttachmentTileItem[] = [
+      ...imageUris.map((image) => ({
+        key: `image-${image.key}`,
+        node: <ImageTile uri={image.uri} name={image.name} colors={colors} />,
+      })),
+      ...fileNames.map((name, index) => ({
+        key: `file-${index}-${name}`,
+        node: <FileTile name={fileDisplayName(name)} colors={colors} />,
+      })),
+      ...pastedTexts.map((pasted, index) => ({
+        key: `pasted-${index}`,
+        node: <PastedTextTile text={pasted.text ?? ""} colors={colors} />,
+      })),
+    ];
     const attachmentRow = hasAttachmentRow ? (
-      <View style={[styles.userAttachmentRow, showText && styles.userAttachmentRowAbove]}>
-        {imageUris.map((image) => (
-          <UserThumb key={image.key} uri={image.uri} name={image.name} style={styles.userThumbImage} />
-        ))}
-        {fileNames.map((name, index) => attachmentChip(`file-${index}-${name}`, fileDisplayName(name)))}
-        {pastedTexts.map((_, index) => attachmentChip(`pasted-${index}`, "Pasted text"))}
-      </View>
+      <AttachmentTileRow
+        items={attachmentTiles}
+        align="end"
+        colors={colors}
+        style={[
+          styles.userAttachmentRow,
+          showText || quotedText ? styles.userAttachmentRowAbove : null,
+        ]}
+      />
     ) : null;
     const userBubbleBody = showText ? (
       <UserMessageText text={item.text} styles={styles} />
@@ -851,92 +831,94 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       return <View style={styles.userBubble}>{userBubbleBody}</View>;
     }
     return (
-      <View style={styles.userRow}>
-        <View style={styles.userColumn}>
-          {quotedText ? (
-            // Quoted / "Ask Stella" context rides to the model as a separate
-            // field and shows here as a chip — never folded into the bubble
-            // body — so internal framing/decoration can't leak into the text.
-            <View style={[styles.quoteChip, styles.userQuoteChip]}>
-              <Icon
-                name="quote"
-                size={13}
-                color={colors.textMuted}
-                style={styles.quoteChipIcon}
-              />
+      <View>
+        {attachmentRow}
+        <View style={styles.userRow}>
+          <View style={styles.userColumn}>
+            {quotedText ? (
+              // Quoted / "Ask Stella" context rides to the model as a separate
+              // field and shows here as a chip — never folded into the bubble
+              // body — so internal framing/decoration can't leak into the text.
+              <View style={[styles.quoteChip, styles.userQuoteChip]}>
+                <Icon
+                  name="quote"
+                  size={13}
+                  color={colors.textMuted}
+                  style={styles.quoteChipIcon}
+                />
+                <Text
+                  style={styles.quoteChipText}
+                  numberOfLines={1}
+                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                >
+                  {quotedText}
+                </Text>
+              </View>
+            ) : null}
+            {!hasBubbleBody ? null : isSelecting && showText ? (
+              // "Select" mode: the bubble body becomes a native selection
+              // surface (with a Copy pill), so a substring can be lifted out.
+              <View style={styles.userBubble}>
+                <AssistantTextSelection
+                  text={item.text}
+                  colors={{ ...colors, text: colors.userBubbleText }}
+                  onDismiss={onEndSelecting}
+                />
+              </View>
+            ) : (
+              <View
+                ref={bubbleRef}
+                collapsable={false}
+                style={[
+                  item.reaction ? styles.userBubbleReacted : null,
+                  menuActive ? styles.bubbleHidden : null,
+                ]}
+              >
+                <Animated.View style={pressStyle}>
+                  <Pressable
+                    onLongPress={openMenu}
+                    onPressIn={pressIn}
+                    onPressOut={pressOut}
+                    // While another message is selecting, a tap here exits
+                    // selection, so tapping away always dismisses.
+                    onPress={anySelecting ? onEndSelecting : undefined}
+                    delayLongPress={MESSAGE_LONG_PRESS_MS}
+                    accessibilityHint="Long press for message actions"
+                    style={styles.userBubble}
+                  >
+                    {userBubbleBody}
+                  </Pressable>
+                </Animated.View>
+                {item.reaction ? (
+                  <ReactionBadge
+                    key={item.reaction}
+                    emoji={item.reaction}
+                    fresh={
+                      item.reactionAt !== undefined &&
+                      Date.now() - item.reactionAt < 10_000
+                    }
+                    styles={styles}
+                  />
+                ) : null}
+              </View>
+            )}
+            {receiptLabel ? (
               <Text
-                style={styles.quoteChipText}
-                numberOfLines={1}
+                style={styles.receipt}
                 maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
               >
-                {quotedText}
+                {receiptLabel}
               </Text>
-            </View>
-          ) : null}
-          {attachmentRow}
-          {!hasBubbleBody ? null : isSelecting && showText ? (
-            // "Select" mode: the bubble body becomes a native selection
-            // surface (with a Copy pill), so a substring can be lifted out.
-            <View style={styles.userBubble}>
-              <AssistantTextSelection
-                text={item.text}
-                colors={{ ...colors, text: colors.userBubbleText }}
-                onDismiss={onEndSelecting}
-              />
-            </View>
-          ) : (
-            <View
-              ref={bubbleRef}
-              collapsable={false}
-              style={[
-                item.reaction ? styles.userBubbleReacted : null,
-                menuActive ? styles.bubbleHidden : null,
-              ]}
-            >
-              <Animated.View style={pressStyle}>
-                <Pressable
-                  onLongPress={openMenu}
-                  onPressIn={pressIn}
-                  onPressOut={pressOut}
-                  // While another message is selecting, a tap here exits
-                  // selection, so tapping away always dismisses.
-                  onPress={anySelecting ? onEndSelecting : undefined}
-                  delayLongPress={MESSAGE_LONG_PRESS_MS}
-                  accessibilityHint="Long press for message actions"
-                  style={styles.userBubble}
-                >
-                  {userBubbleBody}
-                </Pressable>
-              </Animated.View>
-              {item.reaction ? (
-                <ReactionBadge
-                  key={item.reaction}
-                  emoji={item.reaction}
-                  fresh={
-                    item.reactionAt !== undefined &&
-                    Date.now() - item.reactionAt < 10_000
-                  }
-                  styles={styles}
-                />
-              ) : null}
-            </View>
-          )}
-          {receiptLabel ? (
-            <Text
-              style={styles.receipt}
-              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-            >
-              {receiptLabel}
-            </Text>
-          ) : null}
-          {item.stopped ? (
-            <Text
-              style={styles.stoppedTag}
-              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-            >
-              Stopped
-            </Text>
-          ) : null}
+            ) : null}
+            {item.stopped ? (
+              <Text
+                style={styles.stoppedTag}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+              >
+                Stopped
+              </Text>
+            ) : null}
+          </View>
         </View>
       </View>
     );
@@ -1256,38 +1238,8 @@ export const makeMessageRowStyles = (colors: Colors) =>
     userTogglePressed: {
       color: colors.text,
     },
-    userAttachmentRow: {
-      alignItems: "center",
-      alignSelf: "flex-end",
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: 6,
-      justifyContent: "flex-end",
-    },
+    userAttachmentRow: { alignSelf: "flex-end", maxWidth: "92%" },
     userAttachmentRowAbove: { marginBottom: 6 },
-    userAttachmentChip: {
-      alignItems: "center",
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderRadius: 999,
-      borderWidth: StyleSheet.hairlineWidth,
-      flexDirection: "row",
-      gap: 5,
-      maxWidth: 240,
-      paddingHorizontal: 11,
-      paddingVertical: 6,
-    },
-    userAttachmentChipName: {
-      color: colors.text,
-      flexShrink: 1,
-      fontFamily: fonts.sans.medium,
-      fontSize: 14,
-    },
-    userThumbImage: {
-      backgroundColor: colors.muted,
-      borderRadius: 8,
-      height: 84,
-    },
     assistantRow: { paddingVertical: ASSISTANT_ROW_PAD_VERTICAL },
     /**
      * Mirror of `userBubble`, flipped: same radius family with the tightened

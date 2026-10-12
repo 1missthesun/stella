@@ -832,44 +832,8 @@ button.event-context-chip--overflow:focus-visible {
   background: color-mix(in srgb, var(--foreground) 35%, transparent);
 }
 
-.event-pasted-text-chip[data-has-preview] {
-  cursor: default;
+.event-attachment-tiles {
+  align-self: flex-end;
+  max-width: 85%;
 }
 
-.event-pasted-text-chip:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.event-window-badge-hovercard:hover .event-pasted-text-chip,
-.event-window-badge-hovercard:focus-within .event-pasted-text-chip {
-  background: color-mix(in srgb, var(--chat-text-color, var(--text-strong)) 18%, transparent);
-}
-
-/* A file you sent: the same chip as every other file in the chat. */
-.event-row .chat-composer-file-chip {
-  gap: 6px;
-  padding: 4px 12px 4px 8px;
-  border-color: transparent;
-  background: color-mix(in srgb, var(--chat-text-color, var(--text-strong)) 12%, transparent);
-  color: var(--chat-text-color, var(--text-strong));
-}
-
-.event-row button.chat-composer-file-chip:hover {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--chat-text-color, var(--text-strong)) 18%, transparent);
-}
-
-.event-row .chat-composer-file-icon {
-  width: auto;
-  height: auto;
-  background: none;
-  color: inherit;
-  opacity: 0.8;
-}
-
-.event-row .chat-composer-file-name {
-  color: inherit;
-  font-size: var(--font-size-base);
-  font-weight: var(--weight-medium);
-}

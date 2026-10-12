@@ -32,8 +32,12 @@ import {
   pastedTextPreview,
   type PastedTextDescriptor,
 } from "@/features/chat/lib/paste-context";
-import { ClipboardPaste } from "@/ui/icons";
 import { ChipPreviewPortal } from "@/app/chat/ChipPreviewPortal";
+import {
+  AttachmentTileRow,
+  PastedTextTile,
+  type AttachmentTileItem,
+} from "@/app/chat/AttachmentTiles";
 import { useHoverPreview } from "@/app/chat/use-hover-preview";
 import type {
   Attachment,
@@ -232,37 +236,12 @@ function UserPastedTextChip({
   descriptor: PastedTextDescriptor;
 }) {
   const t = useT();
-  const { triggerRef, open, previewProps } = useHoverPreview<HTMLSpanElement>();
-  const preview = pastedTextPreview(descriptor);
   return (
-    <span className="event-window-badge-hovercard">
-      <span
-        ref={triggerRef}
-        className="chat-composer-file-chip event-pasted-text-chip"
-        data-has-preview={preview ? "true" : undefined}
-        tabIndex={preview ? 0 : undefined}
-      >
-        <span className="chat-composer-file-icon">
-          <ClipboardPaste size={16} strokeWidth={1.75} aria-hidden="true" />
-        </span>
-        <span className="chat-composer-file-info">
-          <span className="chat-composer-file-name">
-            {t("app.chat.messageRow.pastedTextLabel")}
-          </span>
-        </span>
-      </span>
-      {preview && (
-        <ChipPreviewPortal
-          triggerRef={triggerRef}
-          open={open}
-          preferredPlacement="top"
-          className="event-pasted-text-preview-card"
-          {...previewProps}
-        >
-          <div className="event-pasted-text-preview-body">{preview}</div>
-        </ChipPreviewPortal>
-      )}
-    </span>
+    <PastedTextTile
+      text={descriptor.text ?? ""}
+      preview={pastedTextPreview(descriptor)}
+      label={t("app.chat.messageRow.pastedTextLabel")}
+    />
   );
 }
 
@@ -490,12 +469,13 @@ export const UserMessageRow = memo(
       : null;
 
     const chips: ContextChip[] = [];
-    const fileChips: ContextChip[] = [];
+    const imageTiles: AttachmentTileItem[] = [];
+    const fileTiles: AttachmentTileItem[] = [];
     attachments.forEach((attachment, index) => {
       const safeUrl = sanitizeAttachmentImageUrl(attachment.url);
       const key = attachment.id ?? `attachment-${index}`;
       if (safeUrl && isImageAttachment(attachment, safeUrl)) {
-        chips.push({
+        imageTiles.push({
           key,
           node: (
             <AttachmentImage
@@ -507,7 +487,7 @@ export const UserMessageRow = memo(
         });
         return;
       }
-      fileChips.push({
+      fileTiles.push({
         key,
         node: (
           <FileAttachmentChip
@@ -578,9 +558,9 @@ export const UserMessageRow = memo(
         ),
       });
     }
-    chips.push(...fileChips);
+    const tiles: AttachmentTileItem[] = [...imageTiles, ...fileTiles];
     pastedTexts.forEach((descriptor, index) => {
-      chips.push({
+      tiles.push({
         key: `pasted-text-${index}`,
         node: <UserPastedTextChip descriptor={descriptor} />,
       });
@@ -592,13 +572,18 @@ export const UserMessageRow = memo(
         data-chat-row-id={row.id}
       >
         {chips.length > 0 && <UserContextChips chips={chips} />}
+        <AttachmentTileRow
+          items={tiles}
+          align="end"
+          className="event-attachment-tiles"
+        />
         {/* Bubble + its hover controls share one horizontal line: Reply and
             Copy sit to the LEFT of the right-aligned bubble and costs no vertical
             space. It mounts for any user message that has visible content —
             text OR attachment/context chips — so attachment-only messages keep
             the same actions. Copy falls back to the attachment when there is
             no text to copy. */}
-        {(text.trim() || chips.length > 0) && (
+        {(text.trim() || chips.length > 0 || tiles.length > 0) && (
           <div className="message-line message-line--user">
             <MessageActions
               text={text}

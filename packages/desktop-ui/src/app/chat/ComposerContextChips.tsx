@@ -26,6 +26,7 @@ import {
   X,
 } from "@/ui/icons";
 import { ChipPreviewPortal } from "./ChipPreviewPortal";
+import { PastedTextTile } from "./AttachmentTiles";
 import { useHoverPreview } from "./use-hover-preview";
 import { ImageLightbox } from "@/ui/image-lightbox";
 import { getElectronApi } from "@/platform/electron/electron";
@@ -428,17 +429,6 @@ export function PendingCaptureChip({
   );
 }
 
-type ScreenshotContextChipsProps = {
-  screenshots: NonNullable<ChatContext["regionScreenshots"]>;
-  setChatContext: SetChatContext;
-  // Legacy overlay hook — the chip now opens the shared ImageLightbox
-  // itself, but the param is retained so callers can still pass it
-  // without a type error.
-  onPreviewScreenshot?: (index: number) => void;
-  chipClassName?: string;
-  imageClassName?: string;
-};
-
 type ImageAttachmentChipProps = {
   thumbnailUrl: string;
   fullImageUrl: string;
@@ -470,25 +460,16 @@ export function ImageAttachmentChip({
 }: ImageAttachmentChipProps) {
   const [previewOpen, setPreviewOpen] = useState(false);
   return (
-    <span className="composer-chip-shell">
+    <span className="attachment-tile-shell composer-chip-shell">
       <button
         type="button"
-        className={cn(
-          "chat-composer-context-chip chat-composer-context-chip--screenshot composer-context-chip composer-context-chip--screenshot",
-          "chat-composer-context-window-card chat-composer-context-region-card composer-chip-previewable",
-          chipClassName,
-        )}
-        data-with-thumb="true"
-        data-region-card="true"
+        className={cn("attachment-tile attachment-tile--image", chipClassName)}
         title={title}
         onClick={() => setPreviewOpen(true)}
       >
         <img
           src={thumbnailUrl}
-          className={cn(
-            "chat-composer-context-thumb composer-context-thumb chat-composer-context-window-thumb chat-composer-context-region-thumb",
-            imageClassName,
-          )}
+          className={cn("attachment-tile__image", imageClassName)}
           alt={alt}
         />
       </button>
@@ -505,33 +486,27 @@ export function ImageAttachmentChip({
   );
 }
 
-export function ScreenshotContextChips({
-  screenshots,
+export function ScreenshotContextChip({
+  screenshot,
+  index,
   setChatContext,
-  chipClassName,
-  imageClassName,
-}: ScreenshotContextChipsProps) {
+}: {
+  screenshot: NonNullable<ChatContext["regionScreenshots"]>[number];
+  index: number;
+  setChatContext: SetChatContext;
+}) {
   const t = useT();
   return (
-    <>
-      {screenshots.map((screenshot, index) => (
-        <ImageAttachmentChip
-          key={index}
-          thumbnailUrl={screenshot.previewUrl ?? screenshot.dataUrl}
-          fullImageUrl={screenshot.dataUrl}
-          alt={t("app.chat.contextChips.screenshotAlt", { index: index + 1 })}
-          title={t("app.chat.contextChips.screenshotEnlargeTitle")}
-          chipClassName={chipClassName}
-          imageClassName={imageClassName}
-          removeLabel={t("app.chat.contextChips.removeScreenshot", {
-            index: index + 1,
-          })}
-          onRemove={() =>
-            removeComposerScreenshotContext(index, setChatContext)
-          }
-        />
-      ))}
-    </>
+    <ImageAttachmentChip
+      thumbnailUrl={screenshot.previewUrl ?? screenshot.dataUrl}
+      fullImageUrl={screenshot.dataUrl}
+      alt={t("app.chat.contextChips.screenshotAlt", { index: index + 1 })}
+      title={t("app.chat.contextChips.screenshotEnlargeTitle")}
+      removeLabel={t("app.chat.contextChips.removeScreenshot", {
+        index: index + 1,
+      })}
+      onRemove={() => removeComposerScreenshotContext(index, setChatContext)}
+    />
   );
 }
 
@@ -592,23 +567,6 @@ function FileIcon({ category }: { category: ReturnType<typeof resolveFileCategor
   }
 }
 
-const FILE_NAME_MAX_CHARS = 12;
-
-// Truncate to FILE_NAME_MAX_CHARS but keep the extension visible when it
-// fits — losing the extension drops a lot of context for short caps.
-function truncateFileName(name: string, max: number = FILE_NAME_MAX_CHARS): string {
-  if (name.length <= max) return name;
-  const dotIdx = name.lastIndexOf(".");
-  if (dotIdx > 0 && dotIdx >= name.length - 6) {
-    const ext = name.slice(dotIdx);
-    const stemBudget = max - ext.length - 1;
-    if (stemBudget >= 1) {
-      return `${name.slice(0, stemBudget)}…${ext}`;
-    }
-  }
-  return `${name.slice(0, max)}…`;
-}
-
 const FILE_CATEGORY_LABEL_KEYS: Record<
   ReturnType<typeof resolveFileCategory>,
   string
@@ -666,15 +624,13 @@ export function FileAttachmentChip({
   // Disk-backed attachments open in their default app for preview;
   // synthetic files (no on-disk path) have no preview target.
   const canOpen = Boolean(path);
+  const displayName = fileDisplayName(name);
   return (
-    <span className="composer-chip-shell">
+    <span className="attachment-tile-shell composer-chip-shell">
       <button
         type="button"
-        className={cn(
-          "chat-composer-file-chip",
-          chipClassName,
-          canOpen && "composer-chip-previewable",
-        )}
+        className={cn("attachment-tile attachment-tile--file", chipClassName)}
+        data-openable={canOpen ? "true" : undefined}
         title={
           canOpen ? t("app.chat.contextChips.fileClickToOpen", { name }) : name
         }
@@ -686,14 +642,10 @@ export function FileAttachmentChip({
             : undefined
         }
       >
-        <div className="chat-composer-file-icon">
+        <span className="attachment-tile__file-icon">
           <FileIcon category={category} />
-        </div>
-        <div className="chat-composer-file-info">
-          <span className="chat-composer-file-name">
-            {truncateFileName(fileDisplayName(name))}
-          </span>
-        </div>
+        </span>
+        <span className="attachment-tile__name">{displayName}</span>
       </button>
       {onRemove && removeLabel ? (
         <ChipRemoveButton label={removeLabel} onRemove={onRemove} />
@@ -702,7 +654,7 @@ export function FileAttachmentChip({
   );
 }
 
-function FileContextChip({
+export function FileContextChip({
   file,
   index,
   setChatContext,
@@ -727,41 +679,14 @@ function FileContextChip({
   );
 }
 
-type FileContextChipsProps = {
-  files: ChatContextFile[];
-  setChatContext: SetChatContext;
-  chipClassName?: string;
-};
-
-export function FileContextChips({
-  files,
-  setChatContext,
-  chipClassName,
-}: FileContextChipsProps) {
-  return (
-    <>
-      {files.map((file, index) => (
-        <FileContextChip
-          key={index}
-          file={file}
-          index={index}
-          setChatContext={setChatContext}
-          chipClassName={chipClassName}
-        />
-      ))}
-    </>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /*  Pasted-text chips                                                 */
 /* ------------------------------------------------------------------ */
 
-function PastedTextChip({
+export function PastedTextChip({
   text,
   index,
   setChatContext,
-  className,
 }: {
   text: string;
   index: number;
@@ -769,60 +694,22 @@ function PastedTextChip({
   className?: string;
 }) {
   const t = useT();
-  const { triggerRef, open, previewProps } = useHoverPreview<HTMLButtonElement>();
   const stats = describePastedText(toPastedTextDescriptor(text));
   const preview =
     text.length > PASTED_TEXT_PREVIEW_MAX_CHARS
       ? `${text.slice(0, PASTED_TEXT_PREVIEW_MAX_CHARS)}…`
       : text;
   return (
-    <span className="composer-chip-shell">
-      <ContextPill
-        as="button"
-        kind="pasted-text"
-        pillRef={triggerRef}
-        label={t("app.chat.contextChips.pastedTextLabel", { stats })}
-        title={t("app.chat.contextChips.pastedTextTitle", { stats })}
-        className={className}
-      />
-      <ChipRemoveButton
-        label={t("app.chat.contextChips.removePastedText")}
-        onRemove={() => removeComposerPastedTextContext(index, setChatContext)}
-      />
-      <ChipPreviewPortal
-        triggerRef={triggerRef}
-        open={open}
-        className="composer-context-preview composer-context-preview--portal"
-        {...previewProps}
-      >
-        <div className="composer-context-preview-text">{preview}</div>
-      </ChipPreviewPortal>
-    </span>
-  );
-}
-
-type PastedTextChipsProps = {
-  pastedTexts: string[];
-  setChatContext: SetChatContext;
-  className?: string;
-};
-
-export function PastedTextChips({
-  pastedTexts,
-  setChatContext,
-  className,
-}: PastedTextChipsProps) {
-  return (
-    <>
-      {pastedTexts.map((text, index) => (
-        <PastedTextChip
-          key={index}
-          text={text}
-          index={index}
-          setChatContext={setChatContext}
-          className={className}
+    <PastedTextTile
+      text={text}
+      preview={preview}
+      label={t("app.chat.contextChips.pastedTextTitle", { stats })}
+      remove={
+        <ChipRemoveButton
+          label={t("app.chat.contextChips.removePastedText")}
+          onRemove={() => removeComposerPastedTextContext(index, setChatContext)}
         />
-      ))}
-    </>
+      }
+    />
   );
 }

@@ -5,9 +5,7 @@ import { getElectronApi } from "@/platform/electron/electron";
 import {
   ComposerActivityContextSection,
   ComposerAppSelectionContextSection,
-  ComposerCaptureContextSection,
-  ComposerFileContextSection,
-  ComposerPastedTextContextSection,
+  ComposerAttachmentTilesSection,
   ComposerSelectedTextContextSection,
   ComposerWindowContextSection,
 } from "./ComposerContextSections";
@@ -38,22 +36,10 @@ export function ComposerContextRow({
   selectedText,
   setChatContext,
   setSelectedText,
-  onPreviewScreenshot,
 }: ComposerContextRowProps) {
   return (
     <div className="composer-context-actions">
-      <ComposerCaptureContextSection
-        variant={variant}
-        chatContext={chatContext}
-        setChatContext={setChatContext}
-        onPreviewScreenshot={onPreviewScreenshot}
-      />
-      <ComposerFileContextSection
-        variant={variant}
-        chatContext={chatContext}
-        setChatContext={setChatContext}
-      />
-      <ComposerPastedTextContextSection
+      <ComposerAttachmentTilesSection
         variant={variant}
         chatContext={chatContext}
         setChatContext={setChatContext}

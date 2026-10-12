@@ -3,14 +3,15 @@ import type { ChatContext } from "@/shared/types/electron";
 import {
   ActivityContextChip,
   AppSelectionChips,
-  FileContextChips,
-  PastedTextChips,
+  FileContextChip,
+  PastedTextChip,
   PendingCaptureChip,
-  ScreenshotContextChips,
+  ScreenshotContextChip,
   SelectedTextChip,
   WindowContextChip,
 } from "./ComposerContextChips";
 import { getComposerAppSelections } from "@/features/chat/composer-context";
+import { AttachmentTileRow, type AttachmentTileItem } from "./AttachmentTiles";
 import "./composer-context.css";
 
 type ComposerContextVariant = "full" | "compact";
@@ -22,10 +23,6 @@ type SharedContextProps = {
   variant: ComposerContextVariant;
   chatContext: ChatContext | null;
   setChatContext: SetChatContext;
-};
-
-type CaptureContextSectionProps = SharedContextProps & {
-  onPreviewScreenshot?: (index: number) => void;
 };
 
 type SelectedTextContextSectionProps = {
@@ -40,23 +37,6 @@ type SelectedTextContextSectionProps = {
  * composer and the sent message row cannot drift apart. The variant maps
  * below only add layout constraints (the compact composer's tighter width
  * cap) plus the pending-capture shimmer's size classes. */
-const captureVariantClassNames = {
-  full: {
-    containerClassName: null,
-    pendingClassName:
-      "chat-composer-context-chip chat-composer-context-chip--pending composer-context-chip composer-context-chip--pending",
-    pendingInnerClassName:
-      "chat-composer-context-pending-inner composer-context-pending-inner",
-  },
-  compact: {
-    containerClassName: null,
-    pendingClassName:
-      "chat-composer-context-chip chat-composer-context-chip--pending compact-context-chip compact-context-chip--pending",
-    pendingInnerClassName:
-      "chat-composer-context-pending-inner compact-context-pending-inner",
-  },
-} as const;
-
 const pillVariantClassNames = {
   full: {
     containerClassName: null,
@@ -99,80 +79,59 @@ export function ComposerWindowContextSection({
   return <WindowContextChip {...sharedProps} />;
 }
 
-export function ComposerCaptureContextSection({
-  variant,
+export function ComposerAttachmentTilesSection({
   chatContext,
   setChatContext,
-  onPreviewScreenshot,
-}: CaptureContextSectionProps) {
-  const screenshots = chatContext?.regionScreenshots ?? [];
-  const hasScreenshots = screenshots.length > 0;
-  // Only render the standalone pending-capture shimmer when there's no
-  // window chip in flight — the window chip renders its own pending
-  // treatment so users see one loading indicator, not two.
-  const hasWindow = Boolean(chatContext?.window);
-  const isCapturePending =
-    Boolean(chatContext?.capturePending) && !hasWindow;
-
-  if (!hasScreenshots && !isCapturePending) {
-    return null;
-  }
-
-  const classes = captureVariantClassNames[variant];
-  const content = (
-    <>
-      {hasScreenshots ? (
-        <ScreenshotContextChips
-          screenshots={screenshots}
+}: SharedContextProps) {
+  const items: AttachmentTileItem[] = [];
+  (chatContext?.regionScreenshots ?? []).forEach((screenshot, index) => {
+    items.push({
+      key: `screenshot-${index}`,
+      node: (
+        <ScreenshotContextChip
+          screenshot={screenshot}
+          index={index}
           setChatContext={setChatContext}
-          onPreviewScreenshot={onPreviewScreenshot}
         />
-      ) : null}
-      {isCapturePending ? (
+      ),
+    });
+  });
+  if (chatContext?.capturePending && !chatContext.window) {
+    items.push({
+      key: "capture-pending",
+      node: (
         <PendingCaptureChip
-          className={classes.pendingClassName}
-          innerClassName={classes.pendingInnerClassName}
+          className="attachment-tile attachment-tile--pending"
+          innerClassName="chat-composer-context-pending-inner attachment-tile__pending-inner"
         />
-      ) : null}
-    </>
-  );
-
-  if (!classes.containerClassName) {
-    return content;
+      ),
+    });
   }
-
-  return <div className={classes.containerClassName}>{content}</div>;
-}
-
-export function ComposerFileContextSection({
-  chatContext,
-  setChatContext,
-}: SharedContextProps) {
-  const files = chatContext?.files ?? [];
-  if (files.length === 0) return null;
-
-  return <FileContextChips files={files} setChatContext={setChatContext} />;
-}
-
-export function ComposerPastedTextContextSection({
-  variant,
-  chatContext,
-  setChatContext,
-}: SharedContextProps) {
-  const pastedTexts = chatContext?.pastedTexts ?? [];
-  if (pastedTexts.length === 0) return null;
-
-  const classes = pillVariantClassNames[variant];
-  const content = (
-    <PastedTextChips
-      pastedTexts={pastedTexts}
-      setChatContext={setChatContext}
-      className={classes.chipClassName}
-    />
-  );
-
-  if (!classes.containerClassName) return content;
-  return <div className={classes.containerClassName}>{content}</div>;
+  (chatContext?.files ?? []).forEach((file, index) => {
+    items.push({
+      key: `file-${index}-${file.name}`,
+      node: (
+        <FileContextChip
+          file={file}
+          index={index}
+          setChatContext={setChatContext}
+        />
+      ),
+    });
+  });
+  (chatContext?.pastedTexts ?? []).forEach((text, index) => {
+    items.push({
+      key: `pasted-${index}`,
+      node: (
+        <PastedTextChip
+          text={text}
+          index={index}
+          setChatContext={setChatContext}
+        />
+      ),
+    });
+  });
+  return <AttachmentTileRow items={items} align="start" />;
 }
 
 export function ComposerAppSelectionContextSection({

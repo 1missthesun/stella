@@ -16,14 +16,12 @@ import {
   type LayoutChangeEvent,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   type TextInputProps,
   View,
 } from "react-native";
-import { Image } from "expo-image";
 import { useT } from "../../i18n";
 import { type ComposerAttachment } from "../../lib/chat-attachments";
 import { useChatDraft, type ChatDraftStore } from "../../lib/chat-draft-store";
@@ -39,6 +37,8 @@ import { DictationRecordingBar } from "../DictationRecordingBar";
 import { GlassSurface } from "../glass";
 import { Icon } from "../Icon";
 import { AskSlotContext, type AskSlot } from "./ask-slot";
+import { AttachmentTileRow, FileTile, ImageTile } from "./AttachmentTiles";
+import { fileDisplayName } from "@stella/contracts/file-display-name";
 
 // ---------------------------------------------------------------------------
 // Constants — mapped from desktop full-shell.composer.css
@@ -554,34 +554,18 @@ export const Composer = memo(function Composer({
             </View>
           ) : null}
           {showAttachmentStrip ? (
-            // Pending attachments sit inside the composer, above the text,
-            // in a horizontal rail so any number of them stays one row.
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
+            <AttachmentTileRow
+              align="start"
+              colors={colors}
               style={styles.attachmentStrip}
-              contentContainerStyle={styles.attachmentStripContent}
-            >
-              {(attachments ?? []).map((attachment) => (
+              items={(attachments ?? []).map((attachment) => ({
+                key: attachment.id,
+                node: (
                 <View key={attachment.id} style={styles.attachmentThumb}>
                   {attachment.kind === "image" ? (
-                    <Image
-                      source={{ uri: attachment.uri }}
-                      style={styles.attachmentImage}
-                      contentFit="contain"
-                    />
+                    <ImageTile uri={attachment.uri} name={attachment.name} colors={colors} />
                   ) : (
-                    <View style={styles.attachmentFile}>
-                      <Icon
-                        name="file-text"
-                        size={18}
-                        color={colors.textMuted}
-                      />
-                      <Text style={styles.attachmentFileName} numberOfLines={2}>
-                        {attachment.name}
-                      </Text>
-                    </View>
+                    <FileTile name={fileDisplayName(attachment.name)} colors={colors} />
                   )}
                   {attachment.status !== "ready" && (
                     <Pressable
@@ -625,8 +609,9 @@ export const Composer = memo(function Composer({
                     />
                   </Pressable>
                 </View>
-              ))}
-            </ScrollView>
+                ),
+              }))}
+            />
           ) : null}
           {dictationCompact ? (
             <View style={styles.dictationCompact}>
@@ -811,12 +796,6 @@ const makeComposerStyles = (colors: Colors) =>
     // Attachment rail inside the shell: sized by its content so the input
     // below keeps its own height, scrolling sideways once thumbs overflow.
     attachmentStrip: {
-      flexGrow: 0,
-      flexShrink: 0,
-    },
-    attachmentStripContent: {
-      flexDirection: "row",
-      gap: 8,
       paddingBottom: 2,
       paddingHorizontal: 12,
       paddingTop: 12,
@@ -857,42 +836,19 @@ const makeComposerStyles = (colors: Colors) =>
       backgroundColor: fadeHex(colors.textMuted, 0.28),
     },
     attachmentThumb: {
-      borderRadius: 10,
+      borderCurve: "continuous",
+      borderRadius: 12,
       height: 64,
       overflow: "hidden",
       position: "relative",
       width: 64,
-    },
-    attachmentImage: {
-      backgroundColor: fadeHex(colors.textMuted, 0.12),
-      borderRadius: 10,
-      height: 64,
-      width: 64,
-    },
-    // A document has no preview to show, so the tile becomes its name.
-    attachmentFile: {
-      alignItems: "center",
-      backgroundColor: fadeHex(colors.textMuted, 0.12),
-      borderRadius: 10,
-      gap: 2,
-      height: 64,
-      justifyContent: "center",
-      paddingHorizontal: 4,
-      width: 64,
-    },
-    attachmentFileName: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 9,
-      letterSpacing: -0.1,
-      textAlign: "center",
     },
     // Covers the whole tile while an upload is in flight or broken, so a chip
     // never reads as ready when it is not.
     attachmentStatusScrim: {
       alignItems: "center",
       backgroundColor: "rgba(0,0,0,0.45)",
-      borderRadius: 10,
+      borderRadius: 12,
       bottom: 0,
       justifyContent: "center",
       left: 0,

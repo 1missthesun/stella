@@ -2183,7 +2183,7 @@ const routeCommand = async (
           });
           return { outcome: "steered" };
         }
-        if (steered.reason === "unreachable") return { hold: "unreachable" };
+        if (steered.reason === "unreachable" || steered.reason === "timeout") return { hold: steered.reason };
         throw new RpcError(
           "CONFLICT",
           `${thread.thread_id} is between runs on its device (starting up or just finishing). Check agent_status, then send_message again.`,

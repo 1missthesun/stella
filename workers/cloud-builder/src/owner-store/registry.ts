@@ -91,7 +91,7 @@ export type OwnerHost = {
     dispatchId: string;
     messageId: string;
     text: string;
-  }): Promise<{ delivered: boolean; reason?: "not_running" | "unreachable" }>;
+  }): Promise<{ delivered: boolean; reason?: "not_running" | "unreachable" | "timeout" }>;
   /**
    * A framed message for an agent a device runs locally (started by its own
    * Stella, so there is no dispatch). `unreachable` means no live socket;

@@ -1854,13 +1854,14 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   /**
    * Hand new input to an agent a device accepted and is running, and wait
    * for the device to say whether the agent took it. `unreachable` means no
-   * live socket for that device; `not_running` that the run already ended.
+   * live socket for that device; `timeout` that it did not answer in time,
+   * so it may still have landed; `not_running` that the run already ended.
    */
   async steerDispatch(input: {
     dispatchId: string;
     messageId: string;
     text: string;
-  }): Promise<{ delivered: boolean; reason?: "not_running" | "unreachable" }> {
+  }): Promise<{ delivered: boolean; reason?: "not_running" | "unreachable" | "timeout" }> {
     this.ensureSchema();
     const row = this.dispatchRow(input.dispatchId.trim());
     if (
@@ -1871,11 +1872,11 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     ) {
       return { delivered: false, reason: "not_running" };
     }
-    const socket = this.connectedSocket(row.executor_device_id);
+    const socket = this.liveSocket(row.executor_device_id);
     if (!socket) return { delivered: false, reason: "unreachable" };
     const key = `${row.dispatch_id}:${input.messageId}`;
     const acknowledged = withTimeout(
-      new Promise<boolean>((resolve) => {
+      new Promise<boolean | "timeout">((resolve) => {
         this.steerAcks.set(key, (delivered) => {
           this.steerAcks.delete(key);
           resolve(delivered);
@@ -1885,7 +1886,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       "steer acknowledgement timed out",
     ).catch(() => {
       this.steerAcks.delete(key);
-      return false;
+      return "timeout" as const;
     });
     this.send(socket, {
       type: "steer",
@@ -1893,9 +1894,9 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       messageId: input.messageId,
       text: input.text,
     });
-    return (await acknowledged)
-      ? { delivered: true }
-      : { delivered: false, reason: "not_running" };
+    const answer = await acknowledged;
+    if (answer === "timeout") return { delivered: false, reason: "timeout" };
+    return answer ? { delivered: true } : { delivered: false, reason: "not_running" };
   }
 
   /**

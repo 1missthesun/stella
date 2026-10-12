@@ -4,7 +4,6 @@ import { app, protocol, session, webContents } from "electron";
 import { RENDERER_ORIGIN, RENDERER_SCHEME } from "./origin.js";
 import { MEDIA_SCHEME_PRIVILEGES, serveMediaProtocol } from "./media-protocol.js";
 import { CANVAS_SCHEME_PRIVILEGES, serveCanvasProtocol } from "./canvas-protocol.js";
-import type { RendererSource } from "./renderer-source.js";
 
 /** Must run before `ready`: the scheme behaves like https (ESM, fetch, CSP 'self'). */
 export const registerRendererScheme = () => {
@@ -65,7 +64,6 @@ export const resolveRendererBuildMode = (options: {
 };
 
 export type RendererSourceHandle = {
-  ready: Promise<RendererSource>;
   /**
    * Swap in files that changed in this source root (repo-relative posix
    * paths). Hot-updates every renderer webContents on this partition
@@ -77,6 +75,9 @@ export type RendererSourceHandle = {
   /** Stop serving: unhandle the protocol on the partition, dispose the source. */
   dispose(): void;
 };
+
+type Answer = { status: number; contentType: string; body: Uint8Array };
+const NO_CACHE = { "cache-control": "no-cache" };
 
 /**
  * Serve the renderer from a source root on a session partition and start
@@ -112,40 +113,48 @@ export const serveRendererSource = (options: {
   const reloadPages = () => {
     for (const contents of pages()) contents.reload();
   };
-  const ready = Promise.all([import("./renderer-source.js"), import("./tools.js")]).then(
-    async ([{ createRendererSource }, { loadOxcTools }]) =>
-      createRendererSource({
-        tools: await loadOxcTools(),
-        uiRoot: path.join(options.sourceRoot, "packages", "desktop-ui"),
-        repoRoot: options.sourceRoot,
-        envDir: path.join(options.envRoot ?? options.sourceRoot, "packages", "desktop-ui"),
-        cacheDir: path.join(app.getPath("userData"), "Renderer Source Cache"),
-        mode: options.mode,
-        log: options.log,
-        onReloadNeeded: reloadPages,
-      }),
-  );
-  let firstPage = options.firstPage ?? null;
   const uiRoot = path.join(options.sourceRoot, "packages", "desktop-ui");
-  let sourceReady = false;
-  void ready.then(
-    () => {
-      sourceReady = true;
-    },
-    () => undefined,
+  const ready = import("./renderer-source.js").then(({ createRendererSource }) =>
+    createRendererSource({
+      uiRoot,
+      repoRoot: options.sourceRoot,
+      envDir: path.join(options.envRoot ?? options.sourceRoot, "packages", "desktop-ui"),
+      cacheDir: path.join(app.getPath("userData"), "Renderer Source Cache"),
+      mode: options.mode,
+      log: options.log,
+      onReloadNeeded: reloadPages,
+    }),
   );
-  partitionSession.protocol.handle(RENDERER_SCHEME, async (request) => {
-    const url = new URL(request.url);
+  void ready
+    .then((source) => source.prepare())
+    .catch((error: unknown) => {
+      options.log(`[source] prepare failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+  const source = {
+    request: async (requestUrl: string): Promise<Answer> => {
+      const response = await (await ready).handle(requestUrl);
+      return { status: response.status, contentType: response.type, body: response.body };
+    },
+    apply: async (paths: string[]) => (await ready).applyChanges(paths),
+    dispose: () => {
+      void ready.then((current) => current.dispose(), () => undefined);
+    },
+  };
+  let firstPage = options.firstPage ?? null;
+  const html = (body: string): Answer => ({
+    status: 200,
+    contentType: "text/html; charset=utf-8",
+    body: Buffer.from(body),
+  });
+
+  const answer = async (requestUrl: string): Promise<Answer> => {
+    const url = new URL(requestUrl);
     // The first page's own scripts are plain files in public/: served from
     // disk while the source server is still loading, so the page can paint.
-    const early = !sourceReady && options.mode === "production" ? earlyPublicFile(uiRoot, url) : null;
+    const early = options.mode === "production" ? earlyPublicFile(uiRoot, url) : null;
     if (early) {
       const body = await fs.promises.readFile(early).catch(() => null);
-      if (body) {
-        return new Response(body, {
-          headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" },
-        });
-      }
+      if (body) return { status: 200, contentType: "text/javascript; charset=utf-8", body };
     }
     if (
       firstPage &&
@@ -154,26 +163,32 @@ export const serveRendererSource = (options: {
     ) {
       const rewrite = firstPage;
       firstPage = null;
-      const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" };
       if (options.mode === "production") {
-        const source = await fs.promises.readFile(path.join(uiRoot, "index.html"), "utf8").catch(() => null);
-        if (source !== null) return new Response(rewrite(source), { headers });
+        const page = await fs.promises.readFile(path.join(uiRoot, "index.html"), "utf8").catch(() => null);
+        if (page !== null) return html(rewrite(page));
       }
-      const response = await (await ready).handle(request);
-      if (!response.ok) return response;
-      return new Response(rewrite(await response.text()), { status: response.status, headers });
+      const response = await source.request(requestUrl);
+      if (response.status !== 200) return response;
+      return html(rewrite(Buffer.from(response.body).toString("utf8")));
     }
-    return (await ready).handle(request);
+    return source.request(requestUrl);
+  };
+  const failure = (error: unknown): Answer => ({
+    status: 500,
+    contentType: "text/plain; charset=utf-8",
+    body: Buffer.from(error instanceof Error ? error.message : String(error)),
   });
-  void ready
-    .then((source) => source.prepare())
-    .catch((error) => {
-      options.log(`[source] prepare failed: ${error instanceof Error ? error.message : String(error)}`);
+
+  partitionSession.protocol.handle(RENDERER_SCHEME, async (request) => {
+    const response = await answer(request.url).catch(failure);
+    return new Response(response.body as Uint8Array<ArrayBuffer>, {
+      status: response.status,
+      headers: { "content-type": response.contentType, ...NO_CACHE },
     });
+  });
   return {
-    ready,
     applyChanges: async (paths) => {
-      const result = await (await ready).applyChanges(paths);
+      const result = await source.apply(paths);
       if (result.mode === "reload") reloadPages();
       if (result.mode === "hot") {
         const script = `globalThis.__stellaHot?.update(${JSON.stringify(result.payload)})`;
@@ -190,7 +205,7 @@ export const serveRendererSource = (options: {
     },
     dispose: () => {
       partitionSession.protocol.unhandle(RENDERER_SCHEME);
-      void ready.then((source) => source.dispose(), () => undefined);
+      source.dispose();
     },
   };
 };

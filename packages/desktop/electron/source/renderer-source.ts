@@ -1,13 +1,20 @@
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { absolutizeCssUrls, createTailwindBuild, cssModule, isTailwindStylesheet, type TailwindBuild } from "./css.js";
-import { bundleDependencies, type DepBundle } from "./deps.js";
+import { bundleDependencies, fileDigest, type DepBundle } from "./deps.js";
 import { envDefines, loadRendererEnv } from "./env.js";
-import { createModuleGraph, isInNodeModules, isInside, SOURCE_EXTENSIONS } from "./modules.js";
+import {
+  createModuleGraph,
+  isInNodeModules,
+  isInside,
+  isSideEffectImport,
+  SOURCE_EXTENSIONS,
+} from "./modules.js";
 import { RENDERER_ORIGIN } from "./origin.js";
 import type { RendererBuildMode } from "./renderer-protocol.js";
 import { createRouteTreeGenerator } from "./routes.js";
-import { loadDepTools, loadRouteTools, loadTailwindTools, type OxcTools } from "./tools.js";
+import { loadDepTools, loadOxcTools, loadRouteTools, loadTailwindTools } from "./tools.js";
 
 /**
  * Serves the renderer straight from its source tree, with no dev server and
@@ -30,6 +37,8 @@ const HTML_ENTRIES = ["index.html", "overlay.html", "companion.html"];
 const HOT_CLIENT_URL = "/src/platform/hot/hot-client.ts";
 /** Where PdfViewerCard loads pdf.js's worker from. */
 const PDF_WORKER_URL = "/vendor/pdfjs/pdf.worker.min.mjs";
+const PACK_PREFIX = "/@pack/";
+const GRAPH_FORMAT_VERSION = "1";
 /**
  * Prefixed to every module but the hot client, on its first line. A Web
  * Worker has no hot client, so its modules get no `import.meta.hot` (as in
@@ -66,12 +75,16 @@ const CONTENT_TYPES: Record<string, string> = {
   ".md": "text/markdown; charset=utf-8",
 };
 
-const respond = (body: string | Uint8Array, contentType: string, status = 200) =>
-  new Response(body, {
-    status,
-    headers: { "content-type": contentType, "cache-control": "no-cache" },
-  });
-const javascript = (code: string) => respond(code, CONTENT_TYPES[".js"]!);
+export type SourceResponse = { status: number; type: string; body: Uint8Array };
+
+const encoder = new TextEncoder();
+const bytes = (body: string | Uint8Array) => (typeof body === "string" ? encoder.encode(body) : body);
+const respond = (body: string | Uint8Array, type: string, status = 200): SourceResponse => ({
+  status,
+  type,
+  body: bytes(body),
+});
+const javascript = (code: string | Uint8Array) => respond(code, CONTENT_TYPES[".js"]!);
 
 /** A module that fails the way a broken import should: loudly, with the cause. */
 const errorModule = (message: string) =>
@@ -101,7 +114,6 @@ export type ApplyResult =
   | { mode: "hot"; payload: { updates: HotUpdate[]; stale: string[] } };
 
 export type RendererSourceOptions = {
-  tools: OxcTools;
   uiRoot: string;
   repoRoot: string;
   /** The desktop-ui directory whose `.env` files supply `import.meta.env`. */
@@ -111,10 +123,21 @@ export type RendererSourceOptions = {
   log: (message: string) => void;
   /** Dependencies were rebundled: reload the windows. */
   onReloadNeeded: () => void;
+  tailwind?: (file: string, source: string) => Promise<string>;
 };
 
-export const createRendererSource = (options: RendererSourceOptions) => {
-  const { tools, uiRoot, repoRoot, log } = options;
+type Edge = { file: string; kind: "source" | "dep" | "asset"; dynamic: boolean; bare: boolean };
+type GraphNode = { stamp: { mtimeMs: number; size: number; key: string | null }; edges: Edge[] };
+type StoredGraph = {
+  version: string;
+  tag: string;
+  lock: string;
+  modules: Record<string, GraphNode>;
+  dirs: Record<string, number>;
+};
+
+export const createRendererSource = async (options: RendererSourceOptions) => {
+  const { uiRoot, repoRoot, log } = options;
   const mode = options.mode;
   // Hot module replacement belongs to the authoring mode: React Fast Refresh
   // registrations are emitted by the development transform, so a production
@@ -123,7 +146,7 @@ export const createRendererSource = (options: RendererSourceOptions) => {
   const hot = mode === "development";
   const env = loadRendererEnv(options.envDir, mode);
   const graph = createModuleGraph({
-    tools,
+    tools: await loadOxcTools(),
     uiRoot,
     repoRoot,
     cacheDir: options.cacheDir,
@@ -134,6 +157,11 @@ export const createRendererSource = (options: RendererSourceOptions) => {
   const publicDir = path.join(uiRoot, "public");
   const lockfile = path.join(repoRoot, "bun.lock");
   const hotClientFile = path.join(uiRoot, HOT_CLIENT_URL);
+  const graphFile = path.join(
+    options.cacheDir,
+    "graphs",
+    `${createHash("sha256").update(`${repoRoot}\0${mode}`).digest("hex").slice(0, 16)}.json`,
+  );
 
   const depFiles = new Set<string>();
   let deps: DepBundle | null = null;
@@ -157,6 +185,16 @@ export const createRendererSource = (options: RendererSourceOptions) => {
   const tailwind = new Map<string, Promise<string>>();
   /** Incremental Tailwind builds by stylesheet: they outlive `tailwind`'s cached output. */
   const tailwindBuilds = new Map<string, TailwindBuild>();
+  const compileTailwind =
+    options.tailwind ??
+    ((file: string, source: string) => {
+      let build = tailwindBuilds.get(file);
+      if (!build) {
+        build = createTailwindBuild({ loadTools: loadTailwindTools, file, root: uiRoot, cacheDir: options.cacheDir });
+        tailwindBuilds.set(file, build);
+      }
+      return build.build(source);
+    });
   // What the windows were served, for hot updates: each module's resolved
   // source and stylesheet imports, the stylesheets loaded as modules, and
   // the version each updated file is now imported at (`?t=<version>`).
@@ -171,78 +209,354 @@ export const createRendererSource = (options: RendererSourceOptions) => {
     return version ? `${url}${url.includes("?") ? "&" : "?"}t=${version}` : url;
   };
 
-  const htmlEntryModules = (): string[] => {
-    const modules: string[] = hot ? [hotClientFile] : [];
-    for (const name of HTML_ENTRIES) {
-      let html: string;
-      try {
-        html = fs.readFileSync(path.join(uiRoot, name), "utf8");
-      } catch {
-        continue;
-      }
-      for (const match of html.matchAll(/<script\s+type="module"\s+src="([^"]+)"/g)) {
-        const file = graph.fileForUrlPath(match[1]!);
-        if (file) modules.push(file);
-      }
+  const htmlEntryModules = (name: string): string[] => {
+    let html: string;
+    try {
+      html = fs.readFileSync(path.join(uiRoot, name), "utf8");
+    } catch {
+      return [];
+    }
+    const modules: string[] = [];
+    for (const match of html.matchAll(/<script\s+type="module"\s+src="([^"]+)"/g)) {
+      const file = graph.fileForUrlPath(match[1]!);
+      if (file) modules.push(file);
     }
     return modules;
   };
 
-  /** Transform everything reachable from the HTML entries and note its dependencies. */
-  const crawl = async () => {
+
+  let nodes = new Map<string, GraphNode>();
+  let packs = new Map<string, { entry: string; stylesheets: string[] }>();
+  let packed = new Map<string, Set<string>>();
+
+  const readGraph = async (lock: string): Promise<StoredGraph | null> => {
+    try {
+      const stored = JSON.parse(await fs.promises.readFile(graphFile, "utf8")) as StoredGraph;
+      return stored.version === GRAPH_FORMAT_VERSION && stored.tag === graph.cacheTag && stored.lock === lock
+        ? stored
+        : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const writeGraph = async (stored: StoredGraph) => {
+    await fs.promises.mkdir(path.dirname(graphFile), { recursive: true });
+    const temporary = `${graphFile}.${process.pid}.${Math.random().toString(36).slice(2)}`;
+    await fs.promises.writeFile(temporary, JSON.stringify(stored));
+    await fs.promises.rename(temporary, graphFile);
+  };
+
+  const edgesOf = async (file: string): Promise<Edge[]> => {
+    const module = await graph.load(file);
+    const edges: Edge[] = [];
+    for (const ref of module.imports) {
+      let resolved;
+      try {
+        resolved = graph.resolveImport(ref.specifier, file);
+      } catch {
+        continue;
+      }
+      if (!resolved) continue;
+      edges.push({
+        file: resolved.file,
+        kind: resolved.kind,
+        dynamic: ref.dynamic,
+        bare: isSideEffectImport(module.code, ref),
+      });
+    }
+    return edges;
+  };
+
+  const validate = async (): Promise<{ changed: Set<string>; moved: boolean; count: number; loaded: number }> => {
+    const lock = fileDigest(lockfile);
+    const stored = await readGraph(lock);
+    const changed = new Set<string>();
+    const changedDirs = new Set<string>();
+    if (stored) {
+      await Promise.all([
+        ...Object.entries(stored.modules).map(async ([file, node]) => {
+          const stats = await fs.promises.stat(file).catch(() => null);
+          if (!stats || stats.mtimeMs !== node.stamp.mtimeMs || stats.size !== node.stamp.size) changed.add(file);
+        }),
+        ...Object.entries(stored.dirs).map(async ([dir, mtimeMs]) => {
+          const stats = await fs.promises.stat(dir).catch(() => null);
+          if (!stats || stats.mtimeMs !== mtimeMs) changedDirs.add(dir);
+        }),
+      ]);
+    }
+    const reusable = (file: string, node: GraphNode | undefined): node is GraphNode =>
+      Boolean(
+        node &&
+          !changed.has(file) &&
+          !changedDirs.has(path.dirname(file)) &&
+          node.edges.every((edge) => edge.kind === "dep" || !changedDirs.has(path.dirname(edge.file))),
+      );
+
+    const next = new Map<string, GraphNode>();
     const seen = new Set<string>();
-    let frontier = htmlEntryModules();
+    let loaded = 0;
+    let frontier = [...new Set([...(hot ? [hotClientFile] : []), ...HTML_ENTRIES.flatMap(htmlEntryModules)])];
     while (frontier.length > 0) {
-      const next: string[] = [];
+      const following: string[] = [];
       await Promise.all(
         frontier.map(async (file) => {
           if (seen.has(file)) return;
           seen.add(file);
-          let module;
-          try {
-            module = await graph.load(file);
-          } catch (error) {
-            log(`[source] ${path.relative(repoRoot, file)}: ${error instanceof Error ? error.message : String(error)}`);
-            return;
-          }
-          for (const ref of module.imports) {
-            let resolved;
+          const previous = stored?.modules[file];
+          let node: GraphNode;
+          if (reusable(file, previous)) {
+            node = previous;
+            if (node.stamp.key) graph.remember(file, { ...node.stamp, key: node.stamp.key });
+          } else {
+            loaded += 1;
             try {
-              resolved = graph.resolveImport(ref.specifier, file);
-            } catch {
-              continue;
+              const edges = await edgesOf(file);
+              node = { stamp: graph.stamp(file) ?? { mtimeMs: 0, size: 0, key: null }, edges };
+            } catch (error) {
+              log(`[source] ${path.relative(repoRoot, file)}: ${error instanceof Error ? error.message : String(error)}`);
+              return;
             }
-            if (resolved?.kind === "dep") depFiles.add(resolved.file);
-            else if (resolved?.kind === "source" && !seen.has(resolved.file)) next.push(resolved.file);
+          }
+          next.set(file, node);
+          for (const edge of node.edges) {
+            if (edge.kind === "source" && !seen.has(edge.file)) following.push(edge.file);
           }
         }),
       );
-      frontier = next;
+      frontier = following;
     }
-    return seen.size;
+
+    const previousNodes = nodes;
+    const sameEdges = (a: Edge[], b: Edge[]) =>
+      a.length === b.length &&
+      a.every((edge, index) => {
+        const other = b[index]!;
+        return edge.file === other.file && edge.kind === other.kind && edge.dynamic === other.dynamic && edge.bare === other.bare;
+      });
+    const moved =
+      previousNodes.size !== next.size ||
+      [...next].some(([file, node]) => {
+        const before = previousNodes.get(file);
+        return !before || !sameEdges(before.edges, node.edges);
+      });
+    const touched = new Set(
+      [...next].filter(([file, node]) => previousNodes.get(file)?.stamp.mtimeMs !== node.stamp.mtimeMs).map(([file]) => file),
+    );
+    nodes = next;
+    depFiles.clear();
+    for (const node of nodes.values()) {
+      for (const edge of node.edges) if (edge.kind === "dep") depFiles.add(edge.file);
+    }
+
+    if (!stored || loaded > 0 || changedDirs.size > 0 || Object.keys(stored.modules).length !== nodes.size) {
+      const dirs = new Set<string>();
+      for (const [file, node] of nodes) {
+        dirs.add(path.dirname(file));
+        for (const edge of node.edges) if (edge.kind !== "dep") dirs.add(path.dirname(edge.file));
+      }
+      const dirStamps: Record<string, number> = {};
+      await Promise.all(
+        [...dirs].map(async (dir) => {
+          const stats = await fs.promises.stat(dir).catch(() => null);
+          if (stats) dirStamps[dir] = stats.mtimeMs;
+        }),
+      );
+      void writeGraph({
+        version: GRAPH_FORMAT_VERSION,
+        tag: graph.cacheTag,
+        lock,
+        modules: Object.fromEntries(nodes),
+        dirs: dirStamps,
+      }).catch((error) => log(`[source] graph not saved: ${String(error)}`));
+    }
+    return { changed: touched, moved, count: nodes.size, loaded };
+  };
+
+  const planPacks = async () => {
+    packs = new Map();
+    packed = new Map();
+    if (hot) return;
+    const importedWithBindings = new Set<string>();
+    for (const node of nodes.values()) {
+      for (const edge of node.edges) {
+        if (edge.kind === "asset" && path.extname(edge.file) === ".css" && (!edge.bare || edge.dynamic)) {
+          importedWithBindings.add(edge.file);
+        }
+      }
+    }
+    const packable = new Map<string, boolean>();
+    const isPackable = async (file: string) => {
+      let result = packable.get(file);
+      if (result === undefined) {
+        const source = await fs.promises.readFile(file, "utf8").catch(() => null);
+        result =
+          source !== null &&
+          !importedWithBindings.has(file) &&
+          (isTailwindStylesheet(source) || !/@import\b|@charset\b|@namespace\b/.test(source));
+        packable.set(file, result);
+      }
+      return result;
+    };
+    const entryOf = new Map<string, string[]>();
+    const entries = HTML_ENTRIES.map((name) => ({ name, modules: htmlEntryModules(name) }));
+    for (const { name, modules } of entries) {
+      for (const file of modules) entryOf.set(file, [...(entryOf.get(file) ?? []), name]);
+    }
+    const imported = new Set<string>();
+    for (const node of nodes.values()) {
+      for (const edge of node.edges) if (edge.kind === "source") imported.add(edge.file);
+    }
+    const reachable = new Map<string, Set<string>>();
+    for (const { name, modules } of entries) {
+      const first = modules[0];
+      const reach = new Set<string>();
+      const pending = [...modules];
+      while (pending.length > 0) {
+        const file = pending.pop()!;
+        if (reach.has(file)) continue;
+        reach.add(file);
+        for (const edge of nodes.get(file)?.edges ?? []) if (edge.kind === "source") pending.push(edge.file);
+      }
+      reachable.set(name, reach);
+      if (!first || imported.has(first) || (entryOf.get(first)?.length ?? 0) > 1) continue;
+      const order: string[] = [];
+      const visited = new Set<string>();
+      const later: string[] = [];
+      const visit = (file: string) => {
+        if (visited.has(file)) return;
+        visited.add(file);
+        for (const edge of nodes.get(file)?.edges ?? []) {
+          if (edge.dynamic) {
+            if (edge.kind === "source") later.push(edge.file);
+          } else if (edge.kind === "source") {
+            visit(edge.file);
+          } else if (edge.kind === "asset" && path.extname(edge.file) === ".css" && !order.includes(edge.file)) {
+            order.push(edge.file);
+          }
+        }
+      };
+      for (const file of modules) visit(file);
+      for (let index = 0; index < later.length; index += 1) visit(later[index]!);
+      const stylesheets: string[] = [];
+      for (const file of order) if (await isPackable(file)) stylesheets.push(file);
+      packs.set(name, { entry: first, stylesheets });
+    }
+    for (const [file, node] of nodes) {
+      const pages = [...reachable].filter(([, reach]) => reach.has(file)).map(([name]) => name);
+      if (pages.length === 0 || pages.some((name) => !packs.has(name))) continue;
+      const skipped = new Set<string>();
+      for (const edge of node.edges) {
+        if (edge.kind !== "asset" || !edge.bare || edge.dynamic) continue;
+        if (pages.every((name) => packs.get(name)!.stylesheets.includes(edge.file))) skipped.add(edge.file);
+      }
+      if (skipped.size > 0) packed.set(file, skipped);
+    }
+  };
+
+  const rendered = new Map<string, Promise<Uint8Array>>();
+  let generation = 0;
+
+  let chain: Promise<void> = Promise.resolve();
+  const sync = (reason: "start" | "page") => {
+    const run = chain.then(async () => {
+      const startedAt = Date.now();
+      await routes.run().catch((error) => log(`[source] route tree: ${String(error)}`));
+      const result = await validate();
+      if (result.moved) {
+        graph.invalidate();
+        rendered.clear();
+      } else {
+        for (const file of result.changed) rendered.delete(file);
+      }
+      const bundle = deps;
+      if (!bundle || [...depFiles].some((file) => !bundle.entries.has(file))) {
+        rendered.clear();
+        await buildDeps();
+      }
+      if (result.moved || packs.size === 0) await planPacks();
+      generation += 1;
+      log(`[source] ${result.count} modules ready in ${Date.now() - startedAt}ms (${reason}, ${result.loaded} read)`);
+      prewarm();
+    });
+    chain = run.catch(() => undefined);
+    return run;
   };
 
   let prepared: Promise<void> | null = null;
-  const prepare = () =>
-    (prepared ??= (async () => {
-      const startedAt = Date.now();
-      await routes.run().catch((error) => log(`[source] route tree: ${String(error)}`));
-      const moduleCount = await crawl();
-      await buildDeps();
-      log(`[source] ${moduleCount} modules ready in ${Date.now() - startedAt}ms`);
-    })());
-
-  /** Before a page loads: forget resolutions and compiled CSS, and regenerate the route tree. */
-  const refresh = async () => {
-    graph.invalidate();
-    tailwind.clear();
-    await routes.run().catch((error) => log(`[source] route tree: ${String(error)}`));
+  const prepare = () => (prepared ??= sync("start"));
+  const ready = async () => {
+    await prepare();
+    await chain;
   };
 
-  const renderModule = async (file: string): Promise<string> => {
+  let firstPage = true;
+  /** Before a page loads: forget resolutions and compiled CSS, and regenerate the route tree. */
+  const refresh = async () => {
+    if (firstPage) {
+      firstPage = false;
+      return prepare();
+    }
+    await prepare();
+    tailwind.clear();
+    packCss.clear();
+    await sync("page");
+  };
+
+  const prewarm = () => {
+    if (hot) return;
+    const mine = generation;
+    const page = packs.get("index.html");
+    if (page) void packModule("index.html").catch(() => undefined);
+    void (async () => {
+      const order: string[] = [];
+      const seen = new Set<string>();
+      const deferred: string[] = [];
+      let frontier = htmlEntryModules("index.html");
+      while (frontier.length > 0) {
+        const following: string[] = [];
+        for (const file of frontier) {
+          if (seen.has(file)) continue;
+          seen.add(file);
+          order.push(file);
+          for (const edge of nodes.get(file)?.edges ?? []) {
+            if (edge.kind !== "source" || seen.has(edge.file)) continue;
+            (edge.dynamic ? deferred : following).push(edge.file);
+          }
+        }
+        frontier = following.length > 0 ? following : deferred.splice(0);
+      }
+      for (const file of order) {
+        if (generation !== mine) return;
+        await renderModule(file).catch(() => undefined);
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    })();
+  };
+
+
+  const renderModule = (file: string): Promise<Uint8Array> => {
+    let render = rendered.get(file);
+    if (!render) {
+      render = renderModuleNow(file).then(bytes);
+      rendered.set(file, render);
+      render.catch(() => {
+        if (rendered.get(file) === render) rendered.delete(file);
+      });
+    }
+    return render;
+  };
+
+  const renderModuleNow = async (file: string): Promise<string> => {
     const module = await graph.load(file);
     const missing: string[] = [];
     const imported = new Set<string>();
+    const skipped = packed.get(file);
+    const page = [...packs].find(([, pack]) => pack.entry === file)?.[0];
+    const prefix = [
+      hot && file !== hotClientFile ? HOT_HEADER : "",
+      page ? `import ${JSON.stringify(`${PACK_PREFIX}${page}`)};` : "",
+    ].join("");
     const code = graph.render(
       module,
       file,
@@ -250,6 +564,7 @@ export const createRendererSource = (options: RendererSourceOptions) => {
         const resolved = graph.resolveImport(ref.specifier, file);
         if (!resolved) return null;
         if (resolved.kind !== "dep") {
+          if (skipped?.has(resolved.file) && isSideEffectImport(module.code, ref)) return false;
           if (resolved.kind === "source" || path.extname(resolved.file) === ".css") {
             imported.add(resolved.file);
           }
@@ -262,7 +577,7 @@ export const createRendererSource = (options: RendererSourceOptions) => {
         }
         return `/@deps/${entry}`;
       },
-      hot && file !== hotClientFile ? HOT_HEADER : "",
+      prefix,
     );
     if (missing.length === 0) {
       servedImports.set(file, imported);
@@ -272,9 +587,10 @@ export const createRendererSource = (options: RendererSourceOptions) => {
     // windows so no page mixes two bundles' copies of shared code.
     for (const file of missing) depFiles.add(file);
     log(`[source] new dependencies: ${missing.map((file) => path.relative(repoRoot, file)).join(", ")}`);
+    rendered.clear();
     await buildDeps();
     options.onReloadNeeded();
-    return await renderModule(file);
+    return await renderModuleNow(file);
   };
 
   const stylesheet = async (file: string): Promise<string> => {
@@ -284,18 +600,30 @@ export const createRendererSource = (options: RendererSourceOptions) => {
       tailwindStylesheets.add(file);
       let compiled = tailwind.get(file);
       if (!compiled) {
-        let build = tailwindBuilds.get(file);
-        if (!build) {
-          build = createTailwindBuild({ loadTools: loadTailwindTools, file, root: uiRoot, cacheDir: options.cacheDir });
-          tailwindBuilds.set(file, build);
-        }
-        compiled = build.build(source);
+        compiled = compileTailwind(file, source);
         tailwind.set(file, compiled);
         compiled.catch(() => tailwind.delete(file));
       }
       css = await compiled;
     }
     return absolutizeCssUrls(css, `${RENDERER_ORIGIN}${graph.urlForFile(file)}`);
+  };
+
+  const packCss = new Map<string, Promise<Uint8Array>>();
+  const packModule = (name: string): Promise<Uint8Array> => {
+    let built = packCss.get(name);
+    if (!built) {
+      const pack = packs.get(name);
+      built = (async () => {
+        const sheets = await Promise.all((pack?.stylesheets ?? []).map(stylesheet));
+        return bytes(cssModule(sheets.join("\n"), `${PACK_PREFIX}${name}`));
+      })();
+      packCss.set(name, built);
+      built.catch(() => {
+        if (packCss.get(name) === built) packCss.delete(name);
+      });
+    }
+    return built;
   };
 
   /** Serve an HTML entry from disk, with the hot client as its first module. */
@@ -308,17 +636,20 @@ export const createRendererSource = (options: RendererSourceOptions) => {
     return index < 0 ? source.replace("</head>", `${tag}</head>`) : `${source.slice(0, index)}${tag}${source.slice(index)}`;
   };
 
-  const handle = async (request: Request): Promise<Response> => {
-    const url = new URL(request.url);
+  const handle = async (requestUrl: string): Promise<SourceResponse> => {
+    const url = new URL(requestUrl);
     const pathname = url.pathname === "/" ? "/index.html" : url.pathname;
     try {
-      await prepare();
+      if (path.extname(pathname) !== ".html") await ready();
       if (pathname.startsWith("/@deps/")) {
         const bundle = deps ?? (await depsBuild);
         const file = bundle ? path.join(bundle.dir, path.basename(pathname)) : null;
         return file && exists(file)
-          ? javascript(await fs.promises.readFile(file, "utf8"))
+          ? javascript(await fs.promises.readFile(file))
           : respond("Not found", "text/plain", 404);
+      }
+      if (pathname.startsWith(PACK_PREFIX)) {
+        return javascript(await packModule(pathname.slice(PACK_PREFIX.length)));
       }
       if (pathname === PDF_WORKER_URL) {
         // pdf.js's worker, from the copy react-pdf imports, so it always
@@ -326,7 +657,7 @@ export const createRendererSource = (options: RendererSourceOptions) => {
         const reactPdf = graph.resolveImport("react-pdf", path.join(uiRoot, "src", "main.tsx"));
         const worker = reactPdf && graph.resolveImport("pdfjs-dist/build/pdf.worker.min.mjs", reactPdf.file);
         return worker && exists(worker.file)
-          ? javascript(await fs.promises.readFile(worker.file, "utf8"))
+          ? javascript(await fs.promises.readFile(worker.file))
           : respond("Not found", "text/plain", 404);
       }
       let file = graph.fileForUrlPath(pathname);
@@ -397,6 +728,8 @@ export const createRendererSource = (options: RendererSourceOptions) => {
       repoPaths.map((repoPath) => path.resolve(repoRoot, repoPath)).filter(isRendererInput),
     );
     if (changed.size === 0) return { mode: "none" };
+    rendered.clear();
+    packCss.clear();
     for (const file of changed) graph.invalidate(file);
     // Tailwind reads every source file's class names and its own stylesheets'
     // imports; a change to any other stylesheet can't change what it builds.
@@ -535,4 +868,4 @@ export const createRendererSource = (options: RendererSourceOptions) => {
   };
 };
 
-export type RendererSource = ReturnType<typeof createRendererSource>;
+export type RendererSource = Awaited<ReturnType<typeof createRendererSource>>;

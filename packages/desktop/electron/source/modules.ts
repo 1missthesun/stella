@@ -36,6 +36,11 @@ export type ResolvedImport =
 
 /** Part of every cache key: bump it whenever transform output changes. */
 const TRANSFORM_VERSION = "4";
+const SIDE_EFFECT_IMPORT = /(?<=^|[;\s])import\s*$/;
+
+export const isSideEffectImport = (code: string, ref: ImportRef): boolean =>
+  !ref.dynamic && SIDE_EFFECT_IMPORT.test(code.slice(Math.max(0, ref.start - 16), ref.start));
+
 export const SOURCE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".js", ".jsx", ".mjs"]);
 
 const toPosix = (value: string) => value.replace(/\\/g, "/");
@@ -105,7 +110,8 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
   const definesDigest = createHash("sha256").update(JSON.stringify(options.defines)).digest("hex");
   const moduleCacheDir = path.join(options.cacheDir, "modules");
   fs.mkdirSync(moduleCacheDir, { recursive: true });
-  const memory = new Map<string, { mtimeMs: number; size: number; module: TransformedModule }>();
+  const memory = new Map<string, { mtimeMs: number; size: number; key: string | null; module: TransformedModule }>();
+  const known = new Map<string, { mtimeMs: number; size: number; key: string }>();
   const resolutions = new Map<string, ResolvedImport>();
 
   /** A file's path from the repository root, which the cache and the output name it by. */
@@ -277,6 +283,18 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     const stat = await fs.promises.stat(file);
     const hit = memory.get(file);
     if (hit && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) return hit.module;
+    const remembered = known.get(file);
+    if (remembered && remembered.mtimeMs === stat.mtimeMs && remembered.size === stat.size) {
+      try {
+        const module = JSON.parse(
+          await fs.promises.readFile(path.join(moduleCacheDir, `${remembered.key}.json`), "utf8"),
+        ) as TransformedModule;
+        memory.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, key: remembered.key, module });
+        return module;
+      } catch {
+        known.delete(file);
+      }
+    }
     const source = await fs.promises.readFile(file, "utf8");
     // Globs read the directory, so their output is never cached by content.
     const cacheable = !source.includes("import.meta.glob");
@@ -298,7 +316,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         await fs.promises.writeFile(diskPath, JSON.stringify(module)).catch(() => undefined);
       }
     }
-    memory.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, module });
+    memory.set(file, { mtimeMs: stat.mtimeMs, size: stat.size, key: cacheable ? key : null, module });
     return module;
   };
 
@@ -309,7 +327,7 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
   const render = (
     module: TransformedModule,
     file: string,
-    urlFor: (ref: ImportRef) => string | null,
+    urlFor: (ref: ImportRef) => string | null | false,
     prefix = "",
   ): string => {
     let code = module.code;
@@ -317,6 +335,14 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
       const ref = module.imports[index]!;
       const url = urlFor(ref);
       if (url === null) continue;
+      if (url === false) {
+        const statement = SIDE_EFFECT_IMPORT.exec(code.slice(Math.max(0, ref.start - 16), ref.start));
+        if (statement) {
+          const end = code[ref.end] === ";" ? ref.end + 1 : ref.end;
+          code = `${code.slice(0, ref.start - statement[0].length)}${code.slice(end)}`;
+        }
+        continue;
+      }
       code = `${code.slice(0, ref.start)}${JSON.stringify(url)}${code.slice(ref.end)}`;
     }
     if (module.map) {
@@ -336,7 +362,15 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     render,
     urlForFile,
     fileForUrlPath,
+    cacheTag: `${TRANSFORM_VERSION}:${definesDigest}`,
     isJsxLang: (file: string) => langFor(file) !== "ts",
+    stamp: (file: string) => {
+      const hit = memory.get(file);
+      return hit ? { mtimeMs: hit.mtimeMs, size: hit.size, key: hit.key } : null;
+    },
+    remember: (file: string, stamp: { mtimeMs: number; size: number; key: string }) => {
+      known.set(file, stamp);
+    },
     /** Forget a changed file and every cached resolution (files may have moved). */
     invalidate: (file?: string) => {
       if (file) memory.delete(file);

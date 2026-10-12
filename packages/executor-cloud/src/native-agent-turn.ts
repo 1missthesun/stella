@@ -1,10 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import {
-  markTurnStep,
-  markTurnStepAt,
-  noteTurnValue,
-} from "./turn-timing.js";
+import { markTurnStep } from "./turn-timing.js";
 import * as Effect from "effect/Effect";
 import {
   chmod,
@@ -673,81 +669,6 @@ const stellaToolsUnavailable = (
  * observe the raw stream through `onStreamEvent`; this owns the session
  * marker, final text, usage, the compaction-loop breaker, and cancellation.
  */
-/**
- * Phases of Claude Code's own startup, found in its debug log by fixed
- * phrases. Only which phrase and when leave the container, never a line.
- */
-const CLAUDE_STARTUP_PHASES: ReadonlyArray<readonly [string, RegExp]> = [
-  ["StartupMcpConfigs", /\[STARTUP\] Loading MCP configs/u],
-  ["StartupSetupDone", /\[STARTUP\] setup\(\) completed/u],
-  ["StartupCommandsLoaded", /\[STARTUP\] Commands and agents loaded/u],
-  ["Prefetches", /Starting background startup prefetches/u],
-  ["BootstrapFetch", /\[Bootstrap\] Fetching/u],
-  ["BootstrapDone", /\[Bootstrap\] (?:Fetch ok|Cache|Fetch failed)/u],
-  ["McpResolved", /MCP configs resolved/u],
-  ["ClaudeaiMcpFetch", /\[claudeai-mcp\] Fetching/u],
-  ["ClaudeaiMcpDone", /\[claudeai-mcp\] (?!Fetching)/u],
-  ["StellaMcpConnecting", /MCP server "stella".*(?:Starting|connect)/iu],
-  ["StellaMcpConnected", /MCP server "stella".*(?:Successfully connected|connected in|Connection established)/iu],
-  ["StellaMcpTools", /MCP server "stella".*tools/iu],
-  ["OrgFastMode", /Org fast mode/u],
-  ["Grove", /Grove:/u],
-  ["Growthbook", /growthbook|GrowthBook/u],
-  ["OauthProfile", /oauth.*profile|profile.*oauth/iu],
-  ["TokenRefresh", /refresh/iu],
-  ["SessionResume", /resum/iu],
-  ["EngineTurnStart", /\[engine\] turn 1 start/u],
-  ["Attribution", /attribution header/u],
-  ["ApiRequest", /API request|Stream started|\[API:request\]|messages\.create|Sending request/iu],
-];
-
-const CLAUDE_DEBUG_TAGS = [
-  "STARTUP",
-  "MCP",
-  "Bootstrap",
-  "claudeai-mcp",
-  "engine",
-  "LSP MANAGER",
-  "init",
-  "servedCatalog",
-  "auto-mode",
-  "API",
-];
-
-const noteClaudeStartupProfile = async (file: string): Promise<void> => {
-  const text = await readFile(file, "utf8").catch(() => "");
-  let previous: number | undefined;
-  const gaps: Array<{ at: number; ms: number; tag: number }> = [];
-  let lines = 0;
-  for (const line of text.split("\n")) {
-    const match = /^(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z) \[[A-Z]+\] (.*)$/u.exec(line);
-    if (!match) continue;
-    const at = Date.parse(match[1]!);
-    if (!Number.isFinite(at)) continue;
-    lines += 1;
-    if (lines === 1) markTurnStepAt("claudeDbgFirstLine", at);
-    const message = match[2]!;
-    for (const [name, pattern] of CLAUDE_STARTUP_PHASES) {
-      if (pattern.test(message)) markTurnStepAt(`claudeDbg${name}`, at);
-    }
-    if (previous !== undefined && at - previous >= 60) {
-      const tag = /^\[([^\]]{1,30})\]/u.exec(message)?.[1];
-      gaps.push({ at, ms: at - previous, tag: tag ? CLAUDE_DEBUG_TAGS.indexOf(tag) + 1 : 0 });
-    }
-    previous = at;
-  }
-  noteTurnValue("claudeDbgLines", lines);
-  gaps
-    .sort((a, b) => b.ms - a.ms)
-    .slice(0, 6)
-    .forEach((gap, index) => {
-      const n = "ABCDEF"[index];
-      noteTurnValue(`claudeDbgGap${n}At`, gap.at);
-      noteTurnValue(`claudeDbgGap${n}Ms`, gap.ms);
-      noteTurnValue(`claudeDbgGap${n}Tag`, gap.tag);
-    });
-};
-
 export const runCloudClaude = async (options: {
   profile: CloudClaudeRoleProfile;
   inputPrompt: string;
@@ -799,16 +720,12 @@ export const runCloudClaude = async (options: {
       : deterministicUuid(profile.sessionKey);
   markTurnStep("claudeStateChecked");
   const mcpConfig = await createCloudClaudeMcpConfig(options.mcpServerConfig);
-  // Dev test accounts only: Claude Code's startup phases, for the timing log.
-  const debugFile = options.claudeAccount.email.endsWith("@test.stella.local")
-    ? path.join(path.dirname(mcpConfig.path), "claude-debug.log")
-    : undefined;
   // One latch, two sources: the caller's cancellation and our own
   // compaction-loop verdict both have to reach one child process. A turn
   // without a caller latch still owns one for the verdict.
   const cancellation = options.cancellation ?? createNativeTurnCancellation();
   try {
-    const takeoverArgs = buildCloudClaudeTakeoverArgs({
+    const args = buildCloudClaudeTakeoverArgs({
       model: options.execution.model,
       reasoningEffort: options.execution.reasoningEffort,
       systemPrompt: options.systemPrompt,
@@ -818,9 +735,6 @@ export const runCloudClaude = async (options: {
       includePartialMessages: profile.includePartialMessages,
       streamInput: Boolean(inbox),
     });
-    const args = debugFile
-      ? ["--debug-file", debugFile, ...takeoverArgs]
-      : takeoverArgs;
     // With an inbox, the prompt is the first stream-json message and stdin
     // stays open while Claude works: a message that arrives is written after
     // it, Claude folds it in at its next tool boundary (or answers it as one
@@ -1000,7 +914,6 @@ export const runCloudClaude = async (options: {
         }
       },
     }).finally(endInput);
-    if (debugFile) await noteClaudeStartupProfile(debugFile);
     if (initialized) {
       await writeFile(markerPath, `${sessionId}\n`, { mode: 0o600 });
     }

@@ -1,43 +1,13 @@
 import {
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type RefObject,
-} from "react";
-import { voiceSessionErrorStore } from "@/features/voice/runtime/voice-session-error-state";
-import {
   RealtimeVoiceSession,
   type VoiceSessionEvent,
   type VoiceSessionState,
 } from "@/features/voice/services/realtime-voice";
-import type { VoiceRuntimeSnapshot } from "@/shared/types/electron";
-
-interface UseRealtimeVoiceResult {
-  isConnected: boolean;
-  isSpeaking: boolean;
-  isUserSpeaking: boolean;
-  sessionState: VoiceSessionState;
-  /** Why the call failed, in the backend's own words. "" when healthy. */
-  errorMessage: string;
-  micLevel: number;
-  outputLevel: number;
-  micLevelRef: RefObject<number>;
-  outputLevelRef: RefObject<number>;
-}
 
 const SESSION_ROTATE_MS = 55 * 60 * 1000;
 const SESSION_ROTATE_IDLE_WAIT_MS = 30_000;
 const RETRY_BASE_MS = 5_000;
 const RETRY_MAX_MS = 60_000;
-const DEFAULT_RUNTIME_STATE: VoiceRuntimeSnapshot = {
-  sessionState: "idle",
-  isConnected: false,
-  isSpeaking: false,
-  isUserSpeaking: false,
-  micLevel: 0,
-  outputLevel: 0,
-};
 
 export const shouldPersistVoiceTranscriptToHistory = (
   event: VoiceSessionEvent,
@@ -485,75 +455,3 @@ export class VoiceSessionManager {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
-export function useRealtimeVoice(): UseRealtimeVoiceResult {
-  const [runtimeState, setRuntimeState] = useState<VoiceRuntimeSnapshot>(
-    DEFAULT_RUNTIME_STATE,
-  );
-  const micLevelRef = useRef(DEFAULT_RUNTIME_STATE.micLevel);
-  const outputLevelRef = useRef(DEFAULT_RUNTIME_STATE.outputLevel);
-  const errorMessage = useSyncExternalStore(
-    voiceSessionErrorStore.subscribe,
-    voiceSessionErrorStore.getSnapshot,
-    voiceSessionErrorStore.getServerSnapshot,
-  );
-
-  useEffect(() => {
-    const api = window.electronAPI;
-    if (!api?.voice) {
-      return;
-    }
-
-    let receivedLiveSnapshot = false;
-    const unsubscribe = api.voice.onRuntimeState((snapshot) => {
-      receivedLiveSnapshot = true;
-      micLevelRef.current = snapshot.micLevel;
-      outputLevelRef.current = snapshot.outputLevel;
-      setRuntimeState((previous) => {
-        if (
-          previous.sessionState === snapshot.sessionState &&
-          previous.isConnected === snapshot.isConnected &&
-          previous.isSpeaking === snapshot.isSpeaking &&
-          previous.isUserSpeaking === snapshot.isUserSpeaking
-        ) {
-          return previous;
-        }
-        return snapshot;
-      });
-    });
-
-    void api.voice
-      .getRuntimeState()
-      .then((snapshot) => {
-        if (receivedLiveSnapshot) return;
-        micLevelRef.current = snapshot.micLevel;
-        outputLevelRef.current = snapshot.outputLevel;
-        setRuntimeState(snapshot);
-      })
-      .catch(() => {
-        if (receivedLiveSnapshot) return;
-        micLevelRef.current = DEFAULT_RUNTIME_STATE.micLevel;
-        outputLevelRef.current = DEFAULT_RUNTIME_STATE.outputLevel;
-        setRuntimeState(DEFAULT_RUNTIME_STATE);
-      });
-
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  return {
-    isConnected: runtimeState.isConnected,
-    isSpeaking: runtimeState.isSpeaking,
-    isUserSpeaking: runtimeState.isUserSpeaking,
-    sessionState: runtimeState.sessionState,
-    errorMessage,
-    micLevel: runtimeState.micLevel,
-    outputLevel: runtimeState.outputLevel,
-    micLevelRef,
-    outputLevelRef,
-  };
-}

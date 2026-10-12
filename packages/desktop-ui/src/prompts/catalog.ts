@@ -4,17 +4,6 @@ import type {
   PromptId,
 } from "./types";
 
-const renderStatic = (template: string): string => template;
-
-const interpolateTemplate = (
-  template: string,
-  replacements: Record<string, string>,
-): string =>
-  template.replace(
-    /\{\{(\w+)\}\}/g,
-    (_match, key: string) => replacements[key] ?? "",
-  );
-
 const PROMPT_CATALOG = {
   "voice_orchestrator.base": {
     id: "voice_orchestrator.base",
@@ -84,7 +73,6 @@ How to delegate:
 # Ending the call
 
 When the user clearly ends it — "bye", "goodbye", "see you later", "goodnight" — give one short, warm goodbye. The call may close itself afterwards.`,
-    render: renderStatic,
   },
   "voice_orchestrator.function_call_handoff": {
     id: "voice_orchestrator.function_call_handoff",
@@ -100,7 +88,6 @@ You have exactly one tool: \`ask_stella\`. It is how you reach Stella's backend,
 - It returns the answer. Tell the user that answer in your own words, briefly. Do not claim anything is done before it comes back.
 - Do not call it for greetings, small talk, acknowledgments, a clarifying question, or stable general knowledge.
 - One call per request. If the user changes their mind mid-task, call it again with the new request and ignore the earlier answer.`,
-    render: renderStatic,
   },
   "synthesis.category_analysis.browsing_bookmarks.system": {
     id: "synthesis.category_analysis.browsing_bookmarks.system",
@@ -124,7 +111,6 @@ You have exactly one tool: \`ask_stella\`. It is how you reach Stella's backend,
 
 ## Output
 Preserve visit counts, URLs, content details, and bookmark structure. Keep the data structured (lists, counts). Add 1-2 observations about patterns only if they connect signals that aren't obvious (e.g., "frequent Convex dashboard + docs visits alongside Vercel suggests active full-stack deployment workflow").`,
-    render: renderStatic,
   },
   "synthesis.category_analysis.dev_environment.system": {
     id: "synthesis.category_analysis.dev_environment.system",
@@ -149,7 +135,6 @@ Preserve visit counts, URLs, content details, and bookmark structure. Keep the d
 
 ## Output
 Preserve the full structured data: project lists with paths, command frequency tables, working directories, git config, runtimes, package managers. The core memory generator needs exact paths to let the AI act on "open my project" requests — dropping any path is a failure.`,
-    render: renderStatic,
   },
   "synthesis.category_analysis.apps_system.system": {
     id: "synthesis.category_analysis.apps_system.system",
@@ -170,7 +155,6 @@ Preserve the full structured data: project lists with paths, command frequency t
 
 ## Output
 Preserve the device summary, app names with exact casing, and game titles with playtime.`,
-    render: renderStatic,
   },
   "synthesis.category_analysis.messages_notes.system": {
     id: "synthesis.category_analysis.messages_notes.system",
@@ -193,7 +177,6 @@ Preserve the device summary, app names with exact casing, and game titles with p
 
 ## Output
 Preserve contact names with frequency, group chat names, note folder structure, and calendar patterns. Focus on what reveals the user's social world, organizational habits, and routines.`,
-    render: renderStatic,
   },
   "synthesis.category_analysis.user": {
     id: "synthesis.category_analysis.user",
@@ -204,7 +187,6 @@ Preserve contact names with frequency, group chat names, note folder structure, 
 {{data}}
 
 Output the filtered data (300-500 tokens). Preserve paths, names, and structure. No preamble.`,
-    render: (template, values) => interpolateTemplate(template, values),
   },
   "synthesis.core_memory.system": {
     id: "synthesis.core_memory.system",
@@ -273,7 +255,6 @@ Format: "- area: specific details"
 - invented descriptions for projects or apps whose purpose is not evident in the data
 
 Output only the structured profile.`,
-    render: renderStatic,
   },
   "synthesis.core_memory.user": {
     id: "synthesis.core_memory.user",
@@ -286,7 +267,6 @@ Use 1000-1500 tokens. Preserve specific names, projects, services, and interests
 {{rawOutputs}}
 
 Output ONLY the structured profile. No preamble.`,
-    render: (template, values) => interpolateTemplate(template, values),
   },
   "synthesis.welcome_message.user": {
     id: "synthesis.welcome_message.user",
@@ -299,12 +279,8 @@ Output ONLY the structured profile. No preamble.`,
 Say a brief greeting. Use the person's name only if you are confident you know it from the context above; if you are not sure what their name is, do not mention a name.
 
 Write ONLY the greeting.`,
-    render: (template, values) => interpolateTemplate(template, values),
   },
 } satisfies PromptCatalog;
-
-export const isPromptId = (value: string): value is PromptId =>
-  value in PROMPT_CATALOG;
 
 export const getPromptDefinition = <TId extends PromptId>(
   promptId: TId,

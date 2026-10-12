@@ -40,8 +40,6 @@ type CacheEntry = { tree: object; chars: number };
 // Insertion-ordered: the first key is the least recently used.
 const entries = new Map<string, CacheEntry>();
 let cachedChars = 0;
-let hits = 0;
-let misses = 0;
 
 /** Placeholder trees handed from `parse` to `runSync` on a cache hit. */
 const pendingHits = new WeakMap<object, object>();
@@ -89,7 +87,6 @@ export function remarkMarkdownRenderCache(this: unknown, scope = ""): void {
     if (typeof file === "string") {
       const tree = readEntry(cacheKey(scope, file));
       if (tree) {
-        hits += 1;
         const placeholder = { type: "root", children: [] };
         pendingHits.set(placeholder, tree);
         return placeholder;
@@ -112,23 +109,9 @@ export function remarkMarkdownRenderCache(this: unknown, scope = ""): void {
     }
     const result = baseRunSync.call(this, tree, file);
     if (typeof file === "string" && result && typeof result === "object") {
-      misses += 1;
       writeEntry(cacheKey(scope, file), result, file.length);
     }
     return result;
   };
 }
 
-export const getMarkdownRenderCacheStats = () => ({
-  hits,
-  misses,
-  entries: entries.size,
-  chars: cachedChars,
-});
-
-export const clearMarkdownRenderCache = () => {
-  entries.clear();
-  cachedChars = 0;
-  hits = 0;
-  misses = 0;
-};

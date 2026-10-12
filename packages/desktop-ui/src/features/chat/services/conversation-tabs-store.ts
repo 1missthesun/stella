@@ -1,4 +1,3 @@
-import { useSyncExternalStore } from "react";
 import type { ConversationSummary } from "@stella/contracts/local-chat";
 import { uiState } from "@/platform/ui-state";
 
@@ -388,9 +387,3 @@ export const conversationTabs = {
   },
 };
 
-export const useConversationTabs = (): ConversationTabsSnapshot =>
-  useSyncExternalStore(
-    conversationTabs.subscribe,
-    conversationTabs.getSnapshot,
-    conversationTabs.getSnapshot,
-  );

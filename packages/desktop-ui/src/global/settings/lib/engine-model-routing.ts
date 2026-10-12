@@ -35,43 +35,6 @@ export function listChatGptCatalogModels(
   return models.filter((model) => model.provider === CHATGPT_PROVIDER);
 }
 
-export type LiveCodexModel = {
-  id: string;
-  displayName?: string;
-  description?: string;
-  hidden?: boolean;
-  additionalSpeedTiers?: string[];
-  serviceTiers?: Array<{
-    id: string;
-    name?: string;
-    description?: string;
-  }>;
-  defaultServiceTier?: string | null;
-};
-
-export function codexModelSupportsFast(
-  model: LiveCodexModel | null | undefined,
-): boolean {
-  if (!model) return false;
-  return (
-    model.serviceTiers?.some((tier) => tier.id === "priority") === true ||
-    model.additionalSpeedTiers?.includes("fast") === true
-  );
-}
-
-/** Only models accepted by both the OAuth orchestrator and Codex runtime. */
-export function intersectChatGptModels(
-  catalog: readonly CatalogModel[],
-  liveModels: readonly LiveCodexModel[],
-): CatalogModel[] {
-  const liveIds = new Set(
-    liveModels.filter((model) => !model.hidden).map((model) => model.id),
-  );
-  return listChatGptCatalogModels(catalog).filter((model) =>
-    liveIds.has(model.modelId),
-  );
-}
-
 /**
  * ChatGPT is directly selectable: the only real gate is OpenAI auth, never a
  * forced model pick. When the requested/saved model isn't in the live catalog

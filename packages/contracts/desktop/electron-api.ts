@@ -14,7 +14,6 @@
  */
 import type { DriveEvidenceSource } from "../chat-evidence.js";
 import type { ChatContext } from "../index.js";
-import type { BrowserFetchInit } from "./ipc-contract.js";
 import type {
   IpcEventChannel,
   IpcEventPayload,
@@ -26,16 +25,13 @@ import type {
   TypedIpcRenderer,
 } from "./ipc-contract.js";
 import {
-  IPC_AGENT_EVENT,
   IPC_PI_CHAT_EVENTS,
   IPC_PI_CHAT_REQUEST,
-  IPC_AGENT_ONE_SHOT_COMPLETION,
   IPC_AGENT_SEND_INPUT,
   IPC_APP_HARD_RESET,
   IPC_APP_QUIT_FOR_RESTART,
   IPC_APP_RELAUNCH,
   IPC_APP_RELOAD,
-  IPC_APP_RESET_MESSAGES,
   IPC_APP_SET_READY,
   IPC_APP_SOURCE_APPLY,
   IPC_APP_SOURCE_APPLY_REMOTE,
@@ -51,12 +47,9 @@ import {
   IPC_AUTH_GET_TOKEN,
   IPC_AUTH_REVOKE_SESSIONS,
   IPC_AUTH_SESSION_INVALIDATED,
-  IPC_AUTH_SIGN_DEVICE,
   IPC_AUTH_SIGN_IN_ANONYMOUS,
   IPC_AUTH_SIGN_OUT,
   IPC_BROWSER_BRIDGE_STATUS,
-  IPC_BROWSER_FETCH_JSON,
-  IPC_BROWSER_FETCH_TEXT,
   IPC_BROWSER_VIEW_CLOSE_TAB,
   IPC_BROWSER_VIEW_CONNECT,
   IPC_BROWSER_VIEW_CREATE_TAB,
@@ -70,12 +63,9 @@ import {
   IPC_BROWSER_VIEW_SELECT_TAB,
   IPC_BROWSER_VIEW_SET_LAYOUT,
   IPC_BROWSER_VIEW_SET_OWNER_SCOPE,
-  IPC_BROWSER_VIEW_SET_VISIBLE_OWNER,
   IPC_BROWSER_VIEW_SHOW,
   IPC_BROWSER_VIEW_STATE,
   IPC_CAPTURE_BEGIN_REGION_CAPTURE,
-  IPC_CAPTURE_CURSOR_DISPLAY_INFO,
-  IPC_CAPTURE_PAGE_DATA_URL,
   IPC_CAPTURE_REGION_FAILED,
   IPC_CHAT_CONTEXT_GET,
   IPC_CHAT_CONTEXT_REMOVE_SCREENSHOT,
@@ -83,7 +73,6 @@ import {
   IPC_CHAT_CONTEXT_UPDATED,
   IPC_CHAT_EVIDENCE_CARDS,
   IPC_CHAT_EVIDENCE_DRIVE_CARDS,
-  IPC_CHAT_OPEN_SIDEBAR,
   IPC_CHATGPT_CANCEL_SIGN_IN,
   IPC_CHATGPT_LIST_MODELS,
   IPC_CHATGPT_LIST_PROFILES,
@@ -139,8 +128,6 @@ import {
   IPC_CONNECTOR_CREDENTIAL_SUBMIT,
   IPC_CUSTOMIZATIONS_RESET,
   IPC_DEVICE_GET_ID,
-  IPC_DEVTEST_FIX_VITE_ERROR,
-  IPC_DEVTEST_TRIGGER_VITE_ERROR,
   IPC_DIAGNOSTICS_EXPORT_LOGS,
   IPC_DIAGNOSTICS_OPEN_LOGS,
   IPC_DIAGNOSTICS_RECORD_HEAP_TRACE,
@@ -157,10 +144,7 @@ import {
   IPC_DICTATION_TOGGLE,
   IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER,
   IPC_DISCOVERY_COLLECT_ALL_SIGNALS,
-  IPC_DISCOVERY_COLLECT_BROWSER_DATA,
-  IPC_DISCOVERY_CORE_MEMORY_EXISTS,
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
-  IPC_DISCOVERY_KNOWLEDGE_EXISTS,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
   IPC_DISCOVERY_WRITE_CORE_MEMORY,
   IPC_DISCOVERY_WRITE_KNOWLEDGE,
@@ -181,7 +165,6 @@ import {
   IPC_EXECUTION_ANSWER_REMOTE_REQUEST,
   IPC_EXECUTION_REMOTE_REQUEST,
   IPC_EXECUTION_TARGET_SET,
-  IPC_GLOBAL_SHORTCUTS_GET_SUSPENDED,
   IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED,
   IPC_HOME_CAPTURE_APP_WINDOW,
   IPC_HOME_GET_ACTIVE_BROWSER_TAB,
@@ -197,26 +180,18 @@ import {
   IPC_LLM_CREDENTIALS_LOGIN_OAUTH,
   IPC_LLM_CREDENTIALS_SAVE,
   IPC_LLM_CREDENTIALS_VALIDATE_OAUTH,
-  IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID,
-  IPC_LOCAL_CHAT_DELETE_CONVERSATION,
   IPC_LOCAL_CHAT_GET_OR_CREATE_ID,
   IPC_LOCAL_CHAT_LIST_ACTIVITY,
-  IPC_LOCAL_CHAT_LIST_CONVERSATIONS,
-  IPC_LOCAL_CHAT_LIST_EVENTS,
   IPC_LOCAL_CHAT_LIST_FILES,
   IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES,
-  IPC_LOCAL_CHAT_LIST_MESSAGE_TOOL_EVENTS,
   IPC_LOCAL_CHAT_LIST_MESSAGES,
   IPC_LOCAL_CHAT_LIST_MESSAGES_AFTER,
   IPC_LOCAL_CHAT_LIST_MESSAGES_BEFORE,
   IPC_LOCAL_CHAT_LIST_MODEL_USAGE,
-  IPC_LOCAL_CHAT_LIST_REPLY_COUNTS,
-  IPC_LOCAL_CHAT_PERSIST_WELCOME,
   IPC_LOCAL_CHAT_SET_ACTIVE_ID,
   IPC_LOCAL_CHAT_UPDATED,
   IPC_MEDIA_COPY_ATTACHMENT,
   IPC_MEDIA_COPY_IMAGE,
-  IPC_MEDIA_GET_DIR,
   IPC_MEDIA_SAVE_OUTPUT,
   IPC_MEETINGS_OPEN_FOLDER,
   IPC_MEETINGS_PAUSE,
@@ -235,17 +210,10 @@ import {
   IPC_OFFICE_PREVIEW_START,
   IPC_OFFICE_PREVIEW_UPDATE,
   IPC_ONBOARDING_SYNTHESIZE,
-  IPC_OVERLAY_DISPLAY_CHANGE,
   IPC_OVERLAY_END_REGION_CAPTURE,
-  IPC_OVERLAY_HIDE_SCREEN_GUIDE,
-  IPC_OVERLAY_HIDE_SELECTION_CHIP,
   IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT,
-  IPC_OVERLAY_SELECTION_CHIP_CLICKED,
   IPC_OVERLAY_SET_INTERACTIVE,
-  IPC_OVERLAY_SHOW_SCREEN_GUIDE,
-  IPC_OVERLAY_SHOW_SELECTION_CHIP,
-  IPC_OVERLAY_SHOW_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_START_REGION_CAPTURE,
   IPC_OVERLAY_WINDOW_HIGHLIGHT,
   IPC_PERMISSIONS_GET_STATUS,
@@ -283,7 +251,6 @@ import {
   IPC_REGION_PREPARE_SELECTION,
   IPC_REGION_SELECT,
   IPC_RUNTIME_AVAILABILITY,
-  IPC_SCHEDULE_GET_EVENT_COUNT,
   IPC_SCHEDULE_LIST_CONVERSATION_EVENTS,
   IPC_SCHEDULE_LIST_CRON_JOBS,
   IPC_SCHEDULE_LIST_HEARTBEATS,
@@ -293,19 +260,13 @@ import {
   IPC_SCHEDULE_UPDATE_CRON_JOB,
   IPC_SCHEDULE_UPDATED,
   IPC_SCHEDULE_UPSERT_HEARTBEAT,
-  IPC_SCREEN_GUIDE_HIDE,
-  IPC_SCREEN_GUIDE_SHOW,
   IPC_SCREENSHOT_CAPTURE,
-  IPC_SCREENSHOT_CAPTURE_VISION,
-  IPC_SHELL_KILL_BY_PORT,
   IPC_SHELL_LIST_OPENERS,
   IPC_SHELL_OPEN_EXTERNAL,
   IPC_SHELL_OPEN_PATH,
   IPC_SHELL_OPEN_WITH,
   IPC_SHELL_SAVE_FILE_AS,
   IPC_SHELL_SHOW_IN_FOLDER,
-  IPC_SYSTEM_DETECT_TECHNICAL_USER_SIGNALS,
-  IPC_SYSTEM_OPEN_FDA,
   IPC_THEME_LIST_INSTALLED,
   IPC_UI_GET_STATE,
   IPC_UI_SET_STATE,
@@ -338,7 +299,6 @@ import {
   IPC_VOICE_RUNTIME_STATE,
   IPC_VOICE_SESSION_ERROR,
   IPC_VOICE_SESSION_ERROR_STATE,
-  IPC_VOICE_WEB_SEARCH,
   IPC_WEBSITE_GET_BASE_URL,
   IPC_WINDOW_CLOSE,
   IPC_WINDOW_IS_MAXIMIZED,
@@ -351,7 +311,6 @@ import {
 /** What the preload knows about its own process, outside of IPC. */
 export type ElectronApiHost = {
   platform: string;
-  arch: string;
   /**
    * Absolute on-disk path for a picker/drag-drop `File`, or "" for
    * synthetic files (e.g. clipboard images).
@@ -393,7 +352,6 @@ export const createElectronApi = (
 
   return {
     platform: host.platform,
-    arch: host.arch,
 
     files: {
       /**
@@ -536,7 +494,6 @@ export const createElectronApi = (
       getState: invoker(IPC_UI_GET_STATE),
       setState: invoker(IPC_UI_SET_STATE),
       onState: on(IPC_UI_STATE),
-      onOpenChatSidebar: onSignal(IPC_CHAT_OPEN_SIDEBAR),
       setAppReady: sender(IPC_APP_SET_READY),
       reload: sender(IPC_APP_RELOAD),
       relaunch: sender(IPC_APP_RELAUNCH),
@@ -578,7 +535,6 @@ export const createElectronApi = (
       onContext: on(IPC_CHAT_CONTEXT_UPDATED),
       onRegionCaptureFailed: onSignal(IPC_CAPTURE_REGION_FAILED),
       screenshot: invoker(IPC_SCREENSHOT_CAPTURE),
-      visionScreenshots: invoker(IPC_SCREENSHOT_CAPTURE_VISION),
       removeScreenshot: sender(IPC_CHAT_CONTEXT_REMOVE_SCREENSHOT),
       submitRegionSelection: sender(IPC_REGION_SELECT),
       prepareRegionSelection: invoker(IPC_REGION_PREPARE_SELECTION),
@@ -586,8 +542,6 @@ export const createElectronApi = (
       submitRegionClick: sender(IPC_REGION_CLICK),
       getWindowCapture: invoker(IPC_REGION_GET_WINDOW_CAPTURE),
       cancelRegion: sender(IPC_REGION_CANCEL),
-      cursorDisplayInfo: invoker(IPC_CAPTURE_CURSOR_DISPLAY_INFO),
-      pageDataUrl: invoker(IPC_CAPTURE_PAGE_DATA_URL),
       /**
        * Composer "+ menu" capture entry point. Minimizes the active Stella
        * window, opens the region overlay (click=window, drag=region), merges
@@ -599,7 +553,6 @@ export const createElectronApi = (
 
     overlay: {
       setInteractive: sender(IPC_OVERLAY_SET_INTERACTIVE),
-      showWindowHighlight: sender(IPC_OVERLAY_SHOW_WINDOW_HIGHLIGHT),
       hideWindowHighlight: sender(IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT),
       previewWindowHighlightAtPoint: sender(
         IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT,
@@ -607,13 +560,6 @@ export const createElectronApi = (
       onStartRegionCapture: on(IPC_OVERLAY_START_REGION_CAPTURE),
       onEndRegionCapture: onSignal(IPC_OVERLAY_END_REGION_CAPTURE),
       onWindowHighlight: on(IPC_OVERLAY_WINDOW_HIGHLIGHT),
-      onShowScreenGuide: on(IPC_OVERLAY_SHOW_SCREEN_GUIDE),
-      onHideScreenGuide: onSignal(IPC_OVERLAY_HIDE_SCREEN_GUIDE),
-      onShowSelectionChip: on(IPC_OVERLAY_SHOW_SELECTION_CHIP),
-      onHideSelectionChip: on(IPC_OVERLAY_HIDE_SELECTION_CHIP),
-      selectionChipClicked: (requestId: number) =>
-        ipc.send(IPC_OVERLAY_SELECTION_CHIP_CLICKED, { requestId }),
-      onDisplayChange: on(IPC_OVERLAY_DISPLAY_CHANGE),
     },
 
     theme: {
@@ -636,13 +582,6 @@ export const createElectronApi = (
       onChanged: on(IPC_UI_STATE_KV_CHANGED),
     },
 
-    screenGuide: {
-      show: (
-        annotations: Array<{ id: string; label: string; x: number; y: number }>,
-      ) => ipc.send(IPC_SCREEN_GUIDE_SHOW, { annotations }),
-      hide: sender(IPC_SCREEN_GUIDE_HIDE),
-    },
-
     voice: {
       /** Toggle the desktop realtime voice session. */
       toggleRtc: sender(IPC_VOICE_RTC_TOGGLE),
@@ -655,7 +594,6 @@ export const createElectronApi = (
        * `agent:event` stream the full window gets.
        */
       onOrchestratorActivity: on(IPC_VOICE_ORCHESTRATOR_ACTIVITY),
-      webSearch: invoker(IPC_VOICE_WEB_SEARCH),
       createOpenAISession: invoker(IPC_VOICE_CREATE_OPENAI_SESSION),
       createXaiSession: invoker(IPC_VOICE_CREATE_XAI_SESSION),
       getRuntimeState: invoker(IPC_VOICE_GET_RUNTIME_STATE),
@@ -750,9 +688,7 @@ export const createElectronApi = (
     },
 
     agent: {
-      oneShotCompletion: invoker(IPC_AGENT_ONE_SHOT_COMPLETION),
       sendInput: invoker(IPC_AGENT_SEND_INPUT),
-      onStream: on(IPC_AGENT_EVENT),
       /**
        * Runtime client availability transitions. The host adapter fires this
        * whenever the worker connection drops or reattaches, most notably
@@ -760,8 +696,6 @@ export const createElectronApi = (
        * worker, so renderer hooks can re-trigger chat-resume right away.
        */
       onAvailability: on(IPC_RUNTIME_AVAILABILITY),
-      triggerViteError: invoker(IPC_DEVTEST_TRIGGER_VITE_ERROR),
-      fixViteError: invoker(IPC_DEVTEST_FIX_VITE_ERROR),
     },
 
     // The renderer reads asks as electronAPI.userAsk (user-ask-store).
@@ -778,7 +712,6 @@ export const createElectronApi = (
 
     system: {
       getDeviceId: invoker(IPC_DEVICE_GET_ID),
-      signDevice: invoker(IPC_AUTH_SIGN_DEVICE),
       configurePiRuntime: invoker(IPC_HOST_CONFIGURE_RUNTIME),
       getAuthSession: invoker(IPC_AUTH_GET_SESSION),
       signInAnonymous: invoker(IPC_AUTH_SIGN_IN_ANONYMOUS),
@@ -792,7 +725,6 @@ export const createElectronApi = (
       setCloudSyncEnabled: invoker(IPC_HOST_SET_CLOUD_SYNC),
       onAuthSessionInvalidated: onSignal(IPC_AUTH_SESSION_INVALIDATED),
       quitForRestart: invoker(IPC_APP_QUIT_FOR_RESTART),
-      openFullDiskAccess: sender(IPC_SYSTEM_OPEN_FDA),
       getPermissionStatus: invoker(IPC_PERMISSIONS_GET_STATUS),
       openPermissionSettings: (kind: string) =>
         ipc.invoke(IPC_PERMISSIONS_OPEN_SETTINGS, { kind }),
@@ -811,8 +743,6 @@ export const createElectronApi = (
         ipc.invoke(IPC_SHELL_OPEN_WITH, { filePath, openerId }),
       openPath: (filePath: string) =>
         ipc.invoke(IPC_SHELL_OPEN_PATH, { filePath }),
-      shellKillByPort: (port: number) =>
-        ipc.invoke(IPC_SHELL_KILL_BY_PORT, { port }),
       getPreventComputerSleep: invoker(IPC_PREFERENCES_GET_PREVENT_SLEEP),
       setPreventComputerSleep: invoker(IPC_PREFERENCES_SET_PREVENT_SLEEP),
       getLockedComputerUseStatus: invoker(
@@ -833,7 +763,6 @@ export const createElectronApi = (
       getOnboardingCompleted: invoker(IPC_PREFERENCES_GET_ONBOARDING_COMPLETED),
       setOnboardingCompleted: invoker(IPC_PREFERENCES_SET_ONBOARDING_COMPLETED),
       setGlobalShortcutsSuspended: invoker(IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED),
-      getGlobalShortcutsSuspended: invoker(IPC_GLOBAL_SHORTCUTS_GET_SUSPENDED),
       recordHeapTrace: (durationMs?: number) =>
         ipc.invoke(IPC_DIAGNOSTICS_RECORD_HEAP_TRACE, { durationMs }),
       reportError: sender(IPC_DIAGNOSTICS_REPORT_ERROR),
@@ -934,10 +863,6 @@ export const createElectronApi = (
       saveLlmCredential: invoker(IPC_LLM_CREDENTIALS_SAVE),
       deleteLlmCredential: (provider: string) =>
         ipc.invoke(IPC_LLM_CREDENTIALS_DELETE, { provider }),
-      detectTechnicalUserSignals: invoker(
-        IPC_SYSTEM_DETECT_TECHNICAL_USER_SIGNALS,
-      ),
-      resetMessages: invoker(IPC_APP_RESET_MESSAGES),
       onConnectorCredentialRequest: onWithEvent(
         IPC_CONNECTOR_CREDENTIAL_REQUEST,
       ),
@@ -956,9 +881,6 @@ export const createElectronApi = (
     },
 
     discovery: {
-      checkCoreMemoryExists: invoker(IPC_DISCOVERY_CORE_MEMORY_EXISTS),
-      checkKnowledgeExists: invoker(IPC_DISCOVERY_KNOWLEDGE_EXISTS),
-      collectData: invoker(IPC_DISCOVERY_COLLECT_BROWSER_DATA),
       detectPreferred: invoker(IPC_DISCOVERY_DETECT_PREFERRED_BROWSER),
       listProfiles: invoker(IPC_DISCOVERY_LIST_BROWSER_PROFILES),
       writeCoreMemory: (
@@ -974,10 +896,6 @@ export const createElectronApi = (
     },
 
     browser: {
-      fetchJson: (url: string, init?: BrowserFetchInit) =>
-        ipc.invoke(IPC_BROWSER_FETCH_JSON, { url, init }),
-      fetchText: (url: string, init?: BrowserFetchInit) =>
-        ipc.invoke(IPC_BROWSER_FETCH_TEXT, { url, init }),
       onBridgeStatus: on(IPC_BROWSER_BRIDGE_STATUS),
     },
 
@@ -985,7 +903,6 @@ export const createElectronApi = (
       getState: invoker(IPC_BROWSER_VIEW_GET_STATE),
       connect: invoker(IPC_BROWSER_VIEW_CONNECT),
       show: invoker(IPC_BROWSER_VIEW_SHOW),
-      setVisibleOwner: invoker(IPC_BROWSER_VIEW_SET_VISIBLE_OWNER),
       setOwnerScope: (payload: { ownerId?: string } = {}) =>
         ipc.invoke(IPC_BROWSER_VIEW_SET_OWNER_SCOPE, payload),
       setLayout: invoker(IPC_BROWSER_VIEW_SET_LAYOUT),
@@ -1039,7 +956,6 @@ export const createElectronApi = (
     media: {
       saveOutput: (url: string, fileName: string) =>
         ipc.invoke(IPC_MEDIA_SAVE_OUTPUT, { url, fileName }),
-      getStellaMediaDir: invoker(IPC_MEDIA_GET_DIR),
       copyImage: (pngBase64: string) =>
         ipc.invoke(IPC_MEDIA_COPY_IMAGE, { pngBase64 }),
       /**
@@ -1065,7 +981,6 @@ export const createElectronApi = (
       listCronJobs: invoker(IPC_SCHEDULE_LIST_CRON_JOBS),
       listHeartbeats: invoker(IPC_SCHEDULE_LIST_HEARTBEATS),
       listConversationEvents: invoker(IPC_SCHEDULE_LIST_CONVERSATION_EVENTS),
-      getConversationEventCount: invoker(IPC_SCHEDULE_GET_EVENT_COUNT),
       runCronJob: invoker(IPC_SCHEDULE_RUN_CRON_JOB),
       removeCronJob: invoker(IPC_SCHEDULE_REMOVE_CRON_JOB),
       updateCronJob: invoker(IPC_SCHEDULE_UPDATE_CRON_JOB),
@@ -1078,22 +993,11 @@ export const createElectronApi = (
       getOrCreateDefaultConversationId: invoker(
         IPC_LOCAL_CHAT_GET_OR_CREATE_ID,
       ),
-      createNewDefaultConversationId: invoker(
-        IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID,
-      ),
       /**
        * Record the conversation the user is viewing as the durable "active
        * conversation" pointer restored on boot. Does not mint a new id.
        */
       setActiveConversationId: invoker(IPC_LOCAL_CHAT_SET_ACTIVE_ID),
-      listConversations: invoker(IPC_LOCAL_CHAT_LIST_CONVERSATIONS),
-      deleteConversation: invoker(IPC_LOCAL_CHAT_DELETE_CONVERSATION),
-      /**
-       * Raw event-stream read for the few non-timeline consumers that look
-       * for specific auxiliary event types, and for the mobile bridge. Chat
-       * surfaces use `listMessages` / `listActivity` / `listFiles` instead.
-       */
-      listEvents: invoker(IPC_LOCAL_CHAT_LIST_EVENTS),
       listMessages: invoker(IPC_LOCAL_CHAT_LIST_MESSAGES),
       listMessagesBefore: invoker(IPC_LOCAL_CHAT_LIST_MESSAGES_BEFORE),
       /**
@@ -1101,13 +1005,10 @@ export const createElectronApi = (
        * driving the chat's tail-only refresh on `localChat:updated`.
        */
       listMessagesAfter: invoker(IPC_LOCAL_CHAT_LIST_MESSAGES_AFTER),
-      listMessageToolEvents: invoker(IPC_LOCAL_CHAT_LIST_MESSAGE_TOOL_EVENTS),
       listActivity: invoker(IPC_LOCAL_CHAT_LIST_ACTIVITY),
       listLineageMessages: invoker(IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES),
-      listReplyCounts: invoker(IPC_LOCAL_CHAT_LIST_REPLY_COUNTS),
       listModelUsage: invoker(IPC_LOCAL_CHAT_LIST_MODEL_USAGE),
       listFiles: invoker(IPC_LOCAL_CHAT_LIST_FILES),
-      persistDiscoveryWelcome: invoker(IPC_LOCAL_CHAT_PERSIST_WELCOME),
       onUpdated: on(IPC_LOCAL_CHAT_UPDATED),
     },
 

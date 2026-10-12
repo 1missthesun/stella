@@ -208,16 +208,6 @@ export const clearComposerWindowContext = (setChatContext: SetChatContext) => {
   ));
 };
 
-/**
- * Removes leftover selected-area chips from persisted or in-flight
- * composer context. There is no longer a picker that creates new ones.
- */
-export const clearComposerAppSelectionContext = (setChatContext: SetChatContext) => {
-  setChatContext((prev) => (
-    prev ? { ...prev, appSelection: null, appSelections: [] } : prev
-  ));
-};
-
 /** Removes one leftover selected-area chip; the mirror slot tracks the newest left. */
 export const removeComposerAppSelectionContext = (
   index: number,

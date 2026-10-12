@@ -32,14 +32,6 @@ export type {
   MessagePayload,
 }
 
-interface StepItem {
-  id: string
-  tool: string
-  title?: string
-  subtitle?: string
-  status: 'pending' | 'running' | 'completed' | 'error'
-}
-
 /**
  * Extract the human-readable text from an event payload.
  *
@@ -136,8 +128,6 @@ export type TaskItem = {
   assistantMessagesUpdatedSequence?: number
 }
 
-export const TASK_COMPLETION_INDICATOR_MS = 3000
-
 /**
  * Ephemeral stream-fed extras for a running thread, keyed by thread id.
  * Structurally matches the streaming store's `TaskDecoration` (defined
@@ -161,26 +151,6 @@ export type TaskLiveDecoration = {
   statusText?: string
   toolActivity?: TaskToolActivity
   reasoningText?: string
-}
-
-/**
- * Tasks that should drive "is Stella working right now" surfaces: running
- * rows plus terminals fresh enough to still deserve a completion beat.
- * The full task list is durable history (rows persist forever), so
- * presence-driven consumers such as transient chips select from this
- * instead — an hour-old error row must not read as "Stella just failed".
- */
-export function selectFreshActivityTasks(
-  tasks: readonly TaskItem[],
-  nowMs = Date.now(),
-): TaskItem[] {
-  return tasks.filter(
-    (task) =>
-      isManagedActivityTask(task) &&
-      (task.status === 'running' ||
-        (typeof task.completedAtMs === 'number' &&
-          nowMs - task.completedAtMs <= TASK_COMPLETION_INDICATOR_MS)),
-  )
 }
 
 /**
@@ -352,36 +322,6 @@ export function isStandaloneTaskStatusText(
   return Boolean(normalized && STANDALONE_STATUS_TEXT.has(normalized))
 }
 
-export function getTaskDisplayText(task: TaskItem): string {
-  const description = isGenericTaskDescription(task.description)
-    ? ''
-    : task.description
-
-  if (task.status === 'running') {
-    const statusText = normalizeDisplayStatusText(task.statusText)
-    if (statusText && !isStandaloneTaskStatusText(statusText)) {
-      return statusText
-    }
-    return description
-  }
-  return description
-}
-
-export function getTaskWorkingIndicatorText(task: TaskItem): string {
-  const statusText = normalizeDisplayStatusText(task.statusText)
-  if (
-    task.status === 'running' &&
-    statusText &&
-    isStandaloneTaskStatusText(statusText)
-  ) {
-    const description = isGenericTaskDescription(task.description)
-      ? ''
-      : task.description
-    return description ? `${statusText} · ${description}` : statusText
-  }
-  return getTaskDisplayText(task)
-}
-
 // Generic type guard factory — reduces per-event-type boilerplate.
 function createEventGuard<T extends Record<string, unknown>>(
   type: string,
@@ -432,135 +372,6 @@ export const isAgentProgressEvent = createEventGuard<AgentProgressEventPayload>(
   'agent-progress',
   ['agentId', 'statusText'],
 )
-
-export function extractToolTitle(event: EventRecord): string {
-  if (!isToolRequest(event)) return ''
-
-  const { toolName, args } = event.payload
-
-  const str = (v: unknown) => v as string
-
-  switch (toolName.toLowerCase()) {
-    case 'read':
-      return args?.path ? str(args.path).split('/').pop()! : 'Reading file'
-    case 'write':
-      return args?.path ? str(args.path).split('/').pop()! : 'Writing file'
-    case 'edit':
-      return args?.path ? str(args.path).split('/').pop()! : 'Editing file'
-    case 'grep':
-      return args?.pattern ? `"${str(args.pattern).slice(0, 30)}"` : 'Searching'
-    case 'executetypescript':
-      return args?.summary
-        ? str(args.summary).slice(0, 40)
-        : 'Running code mode'
-    case 'glob':
-      return args?.pattern ? str(args.pattern) : 'Finding files'
-    case 'bash':
-      return args?.command
-        ? str(args.command).slice(0, 40) +
-            (str(args.command).length > 40 ? '...' : '')
-        : 'Running command'
-    case 'webfetch':
-      return args?.url ? new URL(str(args.url)).hostname : 'Fetching'
-    case 'web':
-      if (args?.url) {
-        try {
-          return new URL(str(args.url)).hostname
-        } catch {
-          return 'Fetching'
-        }
-      }
-      return args?.query
-        ? `"${str(args.query).slice(0, 40)}${str(args.query).length > 40 ? '…' : ''}"`
-        : 'Searching the web'
-    case 'task':
-      return args?.description
-        ? str(args.description).slice(0, 40)
-        : 'Delegating'
-    default:
-      return toolName
-  }
-}
-
-// Helper to get requestId from event (can be at top level or in payload)
-function getRequestId(event: EventRecord): string | undefined {
-  // Check top level first
-  if (event.requestId) return event.requestId
-  // Then check payload
-  if (event.payload && typeof event.payload === 'object') {
-    const payload = event.payload as { requestId?: string }
-    if (payload.requestId) return payload.requestId
-  }
-  return undefined
-}
-
-export function extractStepsFromEvents(events: EventRecord[]): StepItem[] {
-  const steps: StepItem[] = []
-  const stepIndexByRequestId = new Map<string, number>()
-
-  for (const event of events) {
-    if (isToolRequest(event)) {
-      const requestId = getRequestId(event) ?? event._id
-      const toolName = event.payload.toolName
-      const stepIndex = steps.length
-      steps.push({
-        id: requestId,
-        tool: toolName,
-        title: extractToolTitle(event),
-        status: 'running',
-      })
-      stepIndexByRequestId.set(requestId, stepIndex)
-      continue
-    }
-
-    if (!isToolResult(event)) {
-      continue
-    }
-
-    const status: StepItem['status'] = event.payload.error
-      ? 'error'
-      : 'completed'
-    const requestId = getRequestId(event)
-
-    if (requestId) {
-      const directIndex = stepIndexByRequestId.get(requestId)
-      if (
-        directIndex !== undefined &&
-        steps[directIndex]?.status === 'running'
-      ) {
-        steps[directIndex] = { ...steps[directIndex], status }
-        continue
-      }
-    }
-  }
-
-  return steps
-}
-
-/**
- * Returns the currently-running tool call (name + stable request id),
- * if any.
- *
- * Walks each message's turn-scoped `toolEvents` and pairs requests with
- * results by requestId. Returns the unmatched (still running) one.
- *
- * The `id` doubles as a stable seed for the working-indicator's
- * variation picker — it stays constant for the duration of one tool
- * call so the friendly label doesn't flicker on each re-render.
- */
-export function getCurrentRunningTool(
-  messages: { toolEvents: EventRecord[] }[],
-): { tool: string; id: string } | undefined {
-  const events: EventRecord[] = []
-  for (const message of messages) {
-    if (message.toolEvents.length === 0) continue
-    for (const toolEvent of message.toolEvents) events.push(toolEvent)
-  }
-  const running = extractStepsFromEvents(events).find(
-    (s) => s.status === 'running',
-  )
-  return running ? { tool: running.tool, id: running.id } : undefined
-}
 
 /**
  * One persisted ownership tree rooted at a Manager (or any future nested
@@ -905,13 +716,6 @@ const countActivityTasks = (rows: readonly ActivityRow[]): number =>
     if (row.kind === 'task') return total + 1
     return total + 1 + row.hierarchy.descendantCount
   }, 0)
-
-/** Descendant count as the meta line for a collapsed hierarchy row. */
-export function getTaskHierarchyStatusText(hierarchy: TaskHierarchy): string {
-  return hierarchy.descendantCount === 1
-    ? '1 agent'
-    : `${hierarchy.descendantCount} agents`
-}
 
 /** Agent-authored prose for Activity rows, active or completed. */
 export function getTaskAgentUpdates(

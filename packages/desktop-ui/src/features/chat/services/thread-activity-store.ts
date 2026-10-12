@@ -611,18 +611,3 @@ export const subscribeToThreadActivityRecord = (
   };
 };
 
-export const __privateThreadActivityStore = {
-  handleThreadActivityUpdated,
-  resetForTests() {
-    for (const entry of entries.values()) {
-      entry.disposed = true;
-      entry.requestGeneration += 1;
-      if (entry.refreshTimer !== null) window.clearTimeout(entry.refreshTimer);
-      if (entry.retryTimer !== null) window.clearTimeout(entry.retryTimer);
-    }
-    unsubscribeUpdates?.();
-    unsubscribeUpdates = null;
-    entries.clear();
-    retainedRecordsByConversation.clear();
-  },
-};

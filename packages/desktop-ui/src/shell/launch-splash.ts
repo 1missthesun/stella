@@ -66,8 +66,3 @@ export function holdLaunchSplashUntilLive(): void {
   }, LAUNCH_SPLASH_MAX_HOLD_MS);
 }
 
-/** Test-only: reset module state between cases. */
-export function resetLaunchSplashForTests(): void {
-  clearHoldTimer();
-  dismissed = false;
-}

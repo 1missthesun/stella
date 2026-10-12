@@ -36,12 +36,6 @@ const fetchAgentReport = (
   return request;
 };
 
-export const __testing = {
-  clearReportCache(): void {
-    reportCache.clear();
-  },
-};
-
 export function TaskReportButton({
   reference,
   conversationId,

@@ -21,11 +21,3 @@ export const openCloudAppPanel = (
   sidebarSections.openLocation("apps", cloudAppLocation(app.appId));
 };
 
-export const closeCloudAppPanel = (appId: string): void => {
-  const location = cloudAppLocation(appId);
-  const matchingTabs = sidebarSections
-    .getSnapshot()
-    .tabs.filter((tab) => tab.kind === "apps" && tab.location === location);
-  for (const tab of matchingTabs) sidebarSections.closeTab(tab.id);
-};
-

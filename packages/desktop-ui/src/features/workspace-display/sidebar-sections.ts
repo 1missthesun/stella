@@ -30,22 +30,8 @@ export const SIDEBAR_SECTIONS = [
   "email",
   "takeover",
 ] as const;
-// Kept for the sections that render inside the panel body. Home is a real
-// in-panel surface (the launcher) rather than an outside-the-panel activity
-// view.
-export const PANEL_SIDEBAR_SECTIONS = [
-  "home",
-  "files",
-  "apps",
-  "browser",
-  "schedule",
-  "updates",
-  "email",
-  "takeover",
-] as const;
 
 export type SidebarSection = (typeof SIDEBAR_SECTIONS)[number];
-export type PanelSidebarSection = (typeof PANEL_SIDEBAR_SECTIONS)[number];
 
 export const isSidebarSection = (value: unknown): value is SidebarSection =>
   typeof value === "string" &&
@@ -64,10 +50,6 @@ const LEGACY_SECTION_ALIASES: Readonly<Record<string, SidebarSection>> = {
   settings: "home",
   quickchat: "home",
 };
-
-export const LEGACY_SIDEBAR_SECTION_IDS = Object.keys(
-  LEGACY_SECTION_ALIASES,
-) as readonly string[];
 
 /** Every id the sidebar can be pointed at, resolved to one that exists. */
 export const resolveSidebarSection = (value: unknown): SidebarSection => {
@@ -614,13 +596,6 @@ export const useSidebarTab = (tabId: string | undefined): SidebarTab | null =>
         : (sidebarSections.getSnapshot().tabs.find((tab) => tab.id === tabId) ??
           null),
     () => null,
-  );
-
-export const useSidebarSections = (): SidebarSectionsSnapshot =>
-  useSyncExternalStore(
-    sidebarSections.subscribe,
-    sidebarSections.getSnapshot,
-    sidebarSections.getSnapshot,
   );
 
 /** The active tab's kind (or `home` when there is somehow no active tab). */

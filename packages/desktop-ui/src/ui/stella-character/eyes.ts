@@ -75,8 +75,6 @@ export const EYE_POSES = {
 
 export type EyePoseName = keyof typeof EYE_POSES;
 
-export const POSE_NAMES = Object.keys(EYE_POSES) as EyePoseName[];
-
 export const lerpPose = (
   a: readonly Point[],
   b: readonly Point[],

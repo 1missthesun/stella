@@ -34,15 +34,3 @@ export function listReasoningEffortOptions(): readonly ReasoningEffortOption[] {
   return REASONING_EFFORT_OPTIONS;
 }
 
-/**
- * Whether the user may choose a reasoning effort for the current selection:
- * any selected model, Stella's own included, plus the Codex / Claude Code
- * engines.
- */
-export function supportsReasoningEffortSelection(
-  engine: string,
-  selectedModelId: string | null | undefined,
-): boolean {
-  if (engine === "codex_cli" || engine === "claude_code_local") return true;
-  return (selectedModelId?.trim() ?? "").length > 0;
-}

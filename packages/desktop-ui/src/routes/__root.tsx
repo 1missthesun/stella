@@ -93,7 +93,6 @@ import { SettingsDialogHost } from "@/shell/SettingsDialogHost";
 import { FeedbackDialogHost } from "@/shell/FeedbackDialogHost";
 import {
   STELLA_COMPOSE_TEXT_EVENT,
-  type StellaOpenPanelChatDetail,
   type StellaComposeTextDetail,
 } from "@/shared/lib/stella-orb-chat";
 import { useRestrictedStellaModelReset } from "@/global/settings/hooks/use-restricted-stella-model-reset";
@@ -105,7 +104,6 @@ import { CompanionBridge } from "@/shell/companion/use-companion-bridge";
 import { useDisplayPayloadRouting } from "@/shell/root-chrome/use-display-payload-routing";
 import { useLastLocationRestore } from "@/shell/root-chrome/use-last-location-restore";
 import { usePersistLastLocation } from "@/shell/root-chrome/use-persist-last-location";
-import { useWorkspacePanelEvents } from "@/shell/root-chrome/use-workspace-panel-events";
 import {
   shellBreakpointStore,
   useShellBreakpointState,
@@ -607,35 +605,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
     [closeDialog],
   );
 
-  const openChatPanel = useCallback(
-    (detail: StellaOpenPanelChatDetail = {}) => {
-      openChatDisplayTab({ id: Date.now(), ...detail });
-    },
-    [],
-  );
-
-  // Route-aware default surface for a manual panel open (keyboard /
-  // toggle). Home never opens to a duplicate chat — it shows the Home
-  // launcher; every other route opens the chat viewer. An already-active
-  // artifact viewer (media / canvas / pdf / …) reopens as-is regardless of
-  // route so summoning doesn't lose what the user was looking at.
-  const openDefaultPanelSurface = useCallback(() => {
-    const { activeTabId } = displayTabs.getTabListSnapshot();
-    const isArtifactViewer =
-      activeTabId !== null &&
-      activeTabId !== CHAT_DISPLAY_TAB_ID &&
-      activeTabId !== HOME_DISPLAY_TAB_ID;
-    if (isArtifactViewer) {
-      displayTabs.setPanelOpen(true);
-      return;
-    }
-    if (isOnChatRoute) {
-      openHomeDisplayTab();
-      return;
-    }
-    openChatPanel();
-  }, [isOnChatRoute, openChatPanel]);
-
   useEffect(() => {
     const handleComposeText = (event: Event) => {
       const detail = (event as CustomEvent<StellaComposeTextDetail>).detail;
@@ -699,18 +668,11 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
     ensureChatDisplayTab();
   }, []);
 
-  const { latestDisplayPayloadRef } = useDisplayPayloadRouting({
+  useDisplayPayloadRouting({
     rightSidebarRef,
   });
 
   useDictationToggleBridge();
-
-  useWorkspacePanelEvents({
-    rightSidebarRef,
-    latestDisplayPayloadRef,
-    openChatPanel,
-    openDefaultPanelSurface,
-  });
 
   // Auto-follow the route with the panel's default surface: navigating to
   // home flips an open Chat panel to the Home launcher, and navigating away

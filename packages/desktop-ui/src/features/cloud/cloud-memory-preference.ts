@@ -66,20 +66,6 @@ export const beginCloudMemoryPreferenceWrite = (args: {
   });
 };
 
-export const isCloudMemoryPreferenceRequestCurrent = (
-  originating: CloudMemoryPreferenceRequestFence,
-  current: {
-    accountScope: string | null | undefined;
-    identityRevision: number | null | undefined;
-    expectedSubject: string | null | undefined;
-    requestId: string | null | undefined;
-  },
-): boolean =>
-  originating.accountScope === current.accountScope &&
-  originating.identityRevision === current.identityRevision &&
-  originating.expectedSubject === current.expectedSubject &&
-  originating.requestId === current.requestId;
-
 export type CloudMemoryPreferencePort = {
   write: (input: SetCloudMemoryEnabledArgs) => Promise<unknown>;
 };

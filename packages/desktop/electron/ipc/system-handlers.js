@@ -1,6 +1,6 @@
 import { app, BrowserWindow, contentTracing, dialog, powerSaveBlocker, shell } from "electron";
 import { spawn } from "node:child_process";
-import { access, copyFile, readdir, readFile, stat } from "node:fs/promises";
+import { copyFile, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -23,7 +23,6 @@ import { cleanupRetiredLocalLlmOAuthCredentials, deleteLocalLlmOAuthCredential, 
 import { getLlmOAuthProvider, getLlmOAuthProviders, loginLlmOAuth, } from "@stella/runtime/kernel/storage/llm-oauth-providers";
 import { loginChatGpt } from "@stella/runtime/kernel/integrations/chatgpt-sign-in";
 import { beginChatGptRegistration, chatGptProfileIdForClient, getChatGptAccessToken, getChatGptHostId, hasUsableChatGptProfile, listChatGptProfiles, removeChatGptProfile, saveChatGptRegistration, savedChatGptRegistration, setActiveChatGptProfile, signOutChatGptProfile, } from "@stella/runtime/kernel/storage/chatgpt-profiles";
-import { isRuntimeUnavailableError } from "@stella/contracts/protocol/rpc-peer";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
 import {
   IPC_APP_QUIT_FOR_RESTART,
@@ -40,9 +39,7 @@ import {
   IPC_DIAGNOSTICS_REPORT_ERROR,
   IPC_DIAGNOSTICS_REPORT_TIMING,
   IPC_DIAGNOSTICS_OPEN_LOGS,
-  IPC_GLOBAL_SHORTCUTS_GET_SUSPENDED,
   IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED,
-  IPC_SYSTEM_OPEN_FDA,
   IPC_PERMISSIONS_GET_STATUS,
   IPC_PERMISSIONS_OPEN_SETTINGS,
   IPC_PERMISSIONS_REQUEST,
@@ -78,17 +75,14 @@ import {
   IPC_USER_ASK_POLICY_GET,
   IPC_USER_ASK_POLICY_SET,
   IPC_DEVICE_GET_ID,
-  IPC_AUTH_SIGN_DEVICE,
   IPC_HOST_CONFIGURE_RUNTIME,
   IPC_HOST_SET_CLOUD_SYNC,
   IPC_APP_HARD_RESET,
-  IPC_APP_RESET_MESSAGES,
   IPC_CONNECTOR_CREDENTIAL_SUBMIT,
   IPC_CONNECTOR_CREDENTIAL_CANCEL,
   IPC_CONNECTOR_CONNECT_RESPOND,
   IPC_SHELL_OPEN_EXTERNAL,
   IPC_SHELL_SHOW_IN_FOLDER,
-  IPC_SHELL_KILL_BY_PORT,
   IPC_LLM_CREDENTIALS_LIST,
   IPC_LLM_CREDENTIALS_LIST_OAUTH_PROVIDERS,
   IPC_LLM_CREDENTIALS_LIST_OAUTH,
@@ -113,15 +107,13 @@ import {
   IPC_LLM_CREDENTIALS_DELETE_OAUTH,
   IPC_LLM_CREDENTIALS_SAVE,
   IPC_LLM_CREDENTIALS_DELETE,
-  IPC_SYSTEM_DETECT_TECHNICAL_USER_SIGNALS,
 } from "@stella/contracts/desktop/ipc-channels";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
 import { hasMacPermission, clearPermissionCache, getMicrophonePermissionStatus, requestMacPermission, resetMacMicrophonePermissions, resetMacPermission, } from "../utils/macos-permissions.js";
 import { waitForConnectedRunner } from "./runtime-availability.js";
-import { getGlobalShortcutsSuspended, setGlobalShortcutsSuspended, } from "./global-shortcuts.js";
+import { setGlobalShortcutsSuspended, } from "./global-shortcuts.js";
 import { createRequire } from "node:module";
 import { t } from "../services/i18n-service.js";
-import { isDelegatedDeviceSigningInput } from "@stella/contracts/gateway/dpop";
 import {
   handleIpc,
   onIpc,
@@ -197,146 +189,11 @@ const openMacPermissionSettings = async (kind) => {
     await shell.openExternal(url);
     return { opened: true, url };
 };
-/**
- * Touch a few TCC-protected paths from the main process so macOS records the
- * Stella.app bundle as a Full Disk Access client. Until an app actually
- * *attempts* to read protected data, it never appears in
- * System Settings → Privacy & Security → Full Disk Access — so the user opens
- * the pane and Stella isn't in the list, forcing them to add it by hand. The
- * reads are expected to fail with EPERM when access hasn't been granted yet;
- * the TCC registration side-effect is what we're after, so all errors are
- * swallowed. Mirrors `registerStellaForScreenRecording` in macos-permissions.
- */
-const registerStellaForFullDiskAccess = async () => {
-    if (process.platform !== "darwin")
-        return;
-    const home = os.homedir();
-    await Promise.allSettled([
-        readFile(path.join(home, "Library", "Application Support", "com.apple.TCC", "TCC.db")),
-        readdir(path.join(home, "Library", "Safari")),
-        readdir(path.join(home, "Library", "Containers", "com.apple.stocks")),
-    ]);
-};
 const clampHeapTraceDurationMs = (value) => {
     const parsed = Number(value);
     if (!Number.isFinite(parsed))
         return 5_000;
     return Math.min(30_000, Math.max(1_000, Math.floor(parsed)));
-};
-const macAppPaths = (appName) => {
-    const home = os.homedir();
-    return [
-        `/Applications/${appName}.app`,
-        path.join(home, "Applications", `${appName}.app`),
-    ];
-};
-const winAppPaths = (relPath) => {
-    const localAppData = process.env.LOCALAPPDATA ?? path.join(os.homedir(), "AppData", "Local");
-    const programFiles = process.env["ProgramFiles"] ?? "C:\\Program Files";
-    const programFilesX86 = process.env["ProgramFiles(x86)"] ?? "C:\\Program Files (x86)";
-    return [
-        path.join(localAppData, relPath),
-        path.join(programFiles, relPath),
-        path.join(programFilesX86, relPath),
-    ];
-};
-const pathExists = async (candidate) => {
-    try {
-        await access(candidate);
-        return true;
-    }
-    catch {
-        return false;
-    }
-};
-const anyExistsAsync = async (paths) => {
-    if (paths.length === 0)
-        return false;
-    const results = await Promise.all(paths.map(pathExists));
-    return results.some(Boolean);
-};
-/**
- * On Windows the simplistic `for (dir in PATH) for (ext in PATHEXT) existsSync(...)`
- * loop is the recurring source of slow onboarding. PATH typically has 30-50
- * entries and PATHEXT defaults to `.EXE;.CMD;.BAT`, so each binary lookup is
- * ~150-300 filesystem hits — and `existsSync` blocks the entire main process.
- *
- * We resolve each binary by running every candidate path through `fs.promises.access`
- * in parallel. NTFS is case-insensitive so the lowercase-vs-uppercase double
- * check the legacy code did is unnecessary; we use PATHEXT as-is.
- */
-const findCliOnPathAsync = async (binName) => {
-    const home = os.homedir();
-    const wellKnown = binName === "claude"
-        ? [
-            path.join(home, ".claude", "local", "claude"),
-            path.join(home, ".claude", "bin", "claude"),
-        ]
-        : binName === "codex"
-            ? [
-                path.join(home, ".codex", "bin", "codex"),
-                path.join(home, ".cargo", "bin", "codex"),
-            ]
-            : binName === "opencode"
-                ? [
-                    path.join(home, ".opencode", "bin", "opencode"),
-                    path.join(home, ".bun", "bin", "opencode"),
-                ]
-                : [];
-    if (await anyExistsAsync(wellKnown))
-        return true;
-    const pathEnv = process.env.PATH ?? "";
-    const sep = process.platform === "win32" ? ";" : ":";
-    const exts = process.platform === "win32"
-        ? (process.env.PATHEXT ?? ".EXE;.CMD;.BAT").split(";")
-        : [""];
-    const candidates = [];
-    for (const dir of pathEnv.split(sep)) {
-        if (!dir)
-            continue;
-        for (const ext of exts) {
-            candidates.push(path.join(dir, `${binName}${ext}`));
-        }
-    }
-    return await anyExistsAsync(candidates);
-};
-const detectTechnicalUserSignalsAsync = async () => {
-    const home = os.homedir();
-    const probes = [];
-    if (process.platform === "darwin") {
-        probes.push(anyExistsAsync(macAppPaths("Claude")).then((v) => v ? "claude-app" : null), anyExistsAsync(macAppPaths("ChatGPT")).then((v) => v ? "chatgpt-app" : null), anyExistsAsync(macAppPaths("Cursor")).then((v) => v ? "cursor-app" : null));
-    }
-    else if (process.platform === "win32") {
-        probes.push(Promise.all([
-            anyExistsAsync(winAppPaths("AnthropicClaude\\Claude.exe")),
-            anyExistsAsync(winAppPaths("Programs\\Claude\\Claude.exe")),
-        ]).then(([a, b]) => (a || b ? "claude-app" : null)), anyExistsAsync(winAppPaths("Programs\\OpenAI ChatGPT\\ChatGPT.exe")).then((v) => (v ? "chatgpt-app" : null)), anyExistsAsync(winAppPaths("Programs\\Cursor\\Cursor.exe")).then((v) => v ? "cursor-app" : null));
-    }
-    probes.push(findCliOnPathAsync("claude").then((v) => (v ? "claude-cli" : null)), findCliOnPathAsync("opencode").then((v) => (v ? "opencode-cli" : null)), Promise.all([
-        pathExists(path.join(home, ".pi", "agent")),
-        findCliOnPathAsync("pi"),
-    ]).then(([a, b]) => (a || b ? "pi-cli" : null)));
-    const results = await Promise.all(probes);
-    const seen = new Set();
-    for (const value of results) {
-        if (value)
-            seen.add(value);
-    }
-    return Array.from(seen);
-};
-let technicalUserSignalsPromise = null;
-const detectTechnicalUserSignalsMemoized = () => {
-    // Memoize for the lifetime of the Electron main process. The probe scans
-    // ~hundreds of filesystem entries on Windows and the answer can't change
-    // mid-session in any way the user cares about.
-    if (!technicalUserSignalsPromise) {
-        technicalUserSignalsPromise = detectTechnicalUserSignalsAsync().catch((error) => {
-            // Reset the cache on failure so a later probe can retry.
-            technicalUserSignalsPromise = null;
-            throw error;
-        });
-    }
-    return technicalUserSignalsPromise;
 };
 const asTrimmedString = (value) => typeof value === "string" ? value.trim() : "";
 const sanitizeStringRecord = (value) => {
@@ -562,25 +419,6 @@ export const registerSystemHandlers = (options) => {
         }
         return options.getDeviceId() ?? await options.loadDeviceId();
     });
-    handleIpc(IPC_AUTH_SIGN_DEVICE, async (event, input) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_SIGN_DEVICE)) {
-            throw new Error("Blocked untrusted device-signing request.");
-        }
-        if (typeof input !== "string" || input.length === 0 || input.length > 64 * 1024) {
-            throw new Error("Invalid device-signing input.");
-        }
-        // The device key also signs presence-socket proofs; a renderer may
-        // only obtain DPoP-shaped signatures through this channel.
-        if (!isDelegatedDeviceSigningInput(input)) {
-            throw new Error("Blocked device-signing input outside the DPoP contract.");
-        }
-        const signer = await options.loadDeviceSigner();
-        return {
-            alg: signer.alg,
-            rawPublicKey: Array.from(signer.rawPublicKey),
-            signature: await signer.sign(input),
-        };
-    });
     handleIpc(IPC_APP_QUIT_FOR_RESTART, (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_APP_QUIT_FOR_RESTART)) {
             throw new Error("Blocked untrusted app:quitForRestart request.");
@@ -665,12 +503,6 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted app:hardResetLocalState request.");
         }
         return options.hardResetLocalState();
-    });
-    handleIpc(IPC_APP_RESET_MESSAGES, async (event) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_APP_RESET_MESSAGES)) {
-            throw new Error("Blocked untrusted app:resetLocalMessages request.");
-        }
-        return options.resetLocalMessages();
     });
     handleIpc(IPC_USER_ASK_LIST, (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_LIST)) {
@@ -857,31 +689,6 @@ export const registerSystemHandlers = (options) => {
             };
         }
     });
-    onIpc(IPC_SYSTEM_OPEN_FDA, async (event) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_SYSTEM_OPEN_FDA)) {
-            return;
-        }
-        const approved = await options.ensurePrivilegedActionApproval("system.open_full_disk_access", "Allow Stella to open Full Disk Access settings?", "This opens macOS System Settings so Stella can be granted disk access for user-requested tasks.", event);
-        if (!approved) {
-            return;
-        }
-        if (process.platform === "darwin") {
-            // Register the Stella.app bundle with TCC first so it shows up in the
-            // Full Disk Access list, then open the pane for the user to toggle on.
-            await registerStellaForFullDiskAccess();
-            await openMacPermissionSettings("full-disk-access");
-        }
-    });
-    handleIpc(IPC_SHELL_KILL_BY_PORT, async (event, payload) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_SHELL_KILL_BY_PORT)) {
-            throw new Error("Blocked untrusted shell kill request.");
-        }
-        const port = Number(payload?.port);
-        if (!Number.isInteger(port) || port < 1 || port > 65535) {
-            throw new Error("Invalid port.");
-        }
-        options.getStellaHostRunner()?.killShellsByPort(port);
-    });
     handleIpc(IPC_PREFERENCES_GET_PREVENT_SLEEP, (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_GET_PREVENT_SLEEP)) {
             throw new Error("Blocked untrusted preferences:getPreventSleep request.");
@@ -1025,12 +832,6 @@ export const registerSystemHandlers = (options) => {
             }
         }
         return { enabled: nextEnabled };
-    });
-    handleIpc(IPC_GLOBAL_SHORTCUTS_GET_SUSPENDED, (event) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_GLOBAL_SHORTCUTS_GET_SUSPENDED)) {
-            throw new Error("Blocked untrusted globalShortcuts:getSuspended request.");
-        }
-        return getGlobalShortcutsSuspended();
     });
     handleIpc(IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED, (event, suspended) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED)) {
@@ -1798,11 +1599,5 @@ export const registerSystemHandlers = (options) => {
             options.onPermissionGranted?.(macKind);
         }
         return { ...result, openedSettings };
-    });
-    handleIpc(IPC_SYSTEM_DETECT_TECHNICAL_USER_SIGNALS, async (event) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_SYSTEM_DETECT_TECHNICAL_USER_SIGNALS)) {
-            throw new Error("Blocked untrusted system:detectTechnicalUserSignals request.");
-        }
-        return { signals: await detectTechnicalUserSignalsMemoized() };
     });
 };

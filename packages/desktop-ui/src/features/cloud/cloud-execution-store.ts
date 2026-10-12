@@ -79,8 +79,3 @@ export const retireCloudExecutionClientAuthority = (
   emit();
 };
 
-export const resetCloudExecutionSelectionForTests = (): void => {
-  authorityAccountScope = null;
-  localSelection = null;
-  emit();
-};

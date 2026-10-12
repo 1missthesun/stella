@@ -122,7 +122,6 @@ let layoutSnapshot: LayoutSnapshot = {
   panelWidth: state.panelWidth,
 };
 let nextOrd = 1;
-const listeners = new Set<Listener>();
 const tabListListeners = new Set<Listener>();
 const layoutListeners = new Set<Listener>();
 // ── Navigation history ──────────────────────────────────────────────
@@ -181,24 +180,15 @@ const emit = (
     };
     for (const listener of layoutListeners) listener();
   }
-  // Legacy `useDisplayTabs()` consumers fire on any change so we don't
-  // silently break callers that still want the union snapshot.
-  for (const listener of listeners) listener();
 };
 const findIndex = (snap: DisplayTabsState, tabId: string) =>
   snap.tabs.findIndex((tab) => tab.id === tabId);
 /**
- * Public store surface. Always read through `displayTabs.subscribe` /
- * `useDisplayTabs` so callers stay reactive; never reach into the captured
+ * Public store surface. Always read through the subscribe methods or the
+ * React hooks below so callers stay reactive; never reach into the captured
  * `state` directly.
  */
 export const displayTabs = {
-  subscribe(listener: Listener) {
-    listeners.add(listener);
-    return () => {
-      listeners.delete(listener);
-    };
-  },
   /**
    * Tab-list–only subscription. Fires when the tab list or active tab
    * changes; ignores panel layout updates (open/expanded/width).
@@ -442,17 +432,6 @@ export const displayTabs = {
   },
 };
 /**
- * React binding. Returns the current snapshot and re-renders on any change
- * to the store. Prefer `useDisplayTabList` or one of the per-field panel hooks below
- * for new consumers.
- */
-export const useDisplayTabs = () =>
-  useSyncExternalStore(
-    displayTabs.subscribe,
-    displayTabs.getSnapshot,
-    displayTabs.getSnapshot,
-  );
-/**
  * Subscribe to just the tab list slice (tabs + activeTabId). Use this
  * for the tab strip, the +-menu, and active-tab consumers so panel
  * resize/animation updates don't trigger their re-renders.
@@ -478,19 +457,3 @@ const useLayoutSlice = <T>(pick: (snapshot: LayoutSnapshot) => T) =>
 export const useDisplayPanelOpen = () => useLayoutSlice((s) => s.panelOpen);
 export const useDisplayPanelExpanded = () =>
   useLayoutSlice((s) => s.panelExpanded);
-export const useActiveDisplayTab = () => {
-  const { tabs, activeTabId } = useDisplayTabList();
-  if (activeTabId == null) return null;
-  return tabs.find((tab) => tab.id === activeTabId) ?? null;
-};
-/**
- * Subscribe to the panel navigation history (current entry +
- * back/forward availability). Drives the top-bar back/forward controls
- * and the panel's overview-vs-viewer rendering.
- */
-export const useDisplayNav = () =>
-  useSyncExternalStore(
-    displayTabs.subscribeNav,
-    displayTabs.getNavSnapshot,
-    displayTabs.getNavSnapshot,
-  );

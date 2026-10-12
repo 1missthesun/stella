@@ -25,7 +25,6 @@ import type { EventRecord } from "./event-transforms";
 import {
   fallbackTaskDescription,
   isAgentCompletedEvent,
-  isAgentStartedEvent,
 } from "./event-transforms";
 import { deriveAgentFilesMap } from "@/features/workspace-display/agent-files";
 import type { ConversationFileEntry } from "@/features/workspace-display/derive-conversation-files";
@@ -88,33 +87,6 @@ const rankDeliverablesFirst = (
   ...entries.filter((entry) => isDeclaredOutputPath(entry.path)),
   ...entries.filter((entry) => !isDeclaredOutputPath(entry.path)),
 ];
-
-/**
- * Fold every `agent-started` event across the loaded window into a per-agent
- * metadata map. The first non-empty value for each field wins so a later
- * `send_message` re-activation (which reuses the original description) doesn't
- * clobber a richer earlier label.
- */
-export function buildAgentMetaMap(
-  events: ReadonlyArray<EventRecord>,
-): Map<string, AgentMeta> {
-  const byId = new Map<string, AgentMeta>();
-  for (const event of events) {
-    if (!isAgentStartedEvent(event)) continue;
-    const agentId = asNonEmptyString(event.payload.agentId);
-    if (!agentId) continue;
-    const existing = byId.get(agentId) ?? {};
-    const next: AgentMeta = { ...existing };
-    if (!next.description) {
-      next.description = asNonEmptyString(event.payload.description);
-    }
-    if (!next.agentType) {
-      next.agentType = asNonEmptyString(event.payload.agentType);
-    }
-    byId.set(agentId, next);
-  }
-  return byId;
-}
 
 /**
  * Group a single row's `agent-completed` events by `agentId` and derive each

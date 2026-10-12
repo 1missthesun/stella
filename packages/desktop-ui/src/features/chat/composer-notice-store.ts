@@ -68,9 +68,6 @@ const subscribe = (listener: () => void) => {
 
 const getSnapshot = () => notices;
 
-/** Current notices, newest last. */
-export const getComposerNotices = (): readonly ComposerNotice[] => notices;
-
 /**
  * Show (or replace) the notice for a conversation scope. One notice per
  * scope: a fresh limit/auth failure supersedes the previous one rather
@@ -111,12 +108,6 @@ export const clearComposerNotices = (
   );
   if (remaining.length === notices.length) return;
   notices = remaining;
-  emitChange();
-};
-
-/** Test/reset hook. */
-export const resetComposerNotices = (): void => {
-  notices = [];
   emitChange();
 };
 

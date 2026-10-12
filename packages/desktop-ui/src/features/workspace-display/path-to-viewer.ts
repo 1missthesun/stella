@@ -203,30 +203,3 @@ export const pickPrimaryEditedPath = (
   return null;
 };
 
-export const tabIdForPath = (filePath: string): string => {
-  const kind = kindForPath(filePath);
-  if (kind === "pdf") return `pdf:${filePath}`;
-  if (kind === "markdown") return `markdown:${filePath}`;
-  if (
-    kind === "office-document" ||
-    kind === "office-spreadsheet" ||
-    kind === "office-slides"
-  ) {
-    return `office:${filePath}`;
-  }
-  if (kind === "image") return `media:image:${filePath}`;
-  if (kind === "video") return `media:video:${filePath}`;
-  if (kind === "audio") return `media:audio:${filePath}`;
-  if (kind === "model3d") return `media:model3d:${filePath}`;
-  if (isDeveloperResourceExtension(extensionOf(filePath))) {
-    return "source-diff";
-  }
-  return `file:${filePath}`;
-};
-
-export const isPreviewableExtension = (
-  extension: string | null | undefined,
-): boolean => extension != null && PREFERRED_RESOURCE_EXTS.has(extension);
-export const isFallbackPreviewableExtension = (
-  extension: string | null | undefined,
-): boolean => extension != null && FALLBACK_RESOURCE_EXTS.has(extension);

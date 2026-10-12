@@ -305,11 +305,3 @@ export function Roll({ value, className }: { value: string; className?: string }
   );
 }
 
-/** A caption that sits over the frame's lower edge, like a keynote super. */
-export function Super({ visible, children }: { visible: boolean; children: ReactNode }) {
-  return (
-    <div className="ofilm-super" data-visible={visible || undefined}>
-      {children}
-    </div>
-  );
-}

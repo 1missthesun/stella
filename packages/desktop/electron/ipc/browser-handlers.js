@@ -1,9 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { clipboard, ClipboardItem, nativeImage } from "electron";
-import { getBrowserCookieHeader } from "./browser-fetch-session.js";
 import { normalizeUrlForPrivilegedRendererFetch, PRIVILEGED_RENDERER_FETCH_TIMEOUT_MS, } from "./renderer-safe-url.js";
-import { IPC_BROWSER_FETCH_JSON, IPC_BROWSER_FETCH_TEXT, IPC_MEDIA_COPY_ATTACHMENT, IPC_MEDIA_COPY_IMAGE, IPC_MEDIA_GET_DIR, IPC_MEDIA_SAVE_OUTPUT, } from "@stella/contracts/desktop/ipc-channels";
+import { IPC_MEDIA_COPY_ATTACHMENT, IPC_MEDIA_COPY_IMAGE, IPC_MEDIA_SAVE_OUTPUT, } from "@stella/contracts/desktop/ipc-channels";
 import { decodeAndValidateImage, decodeBase64ImageBounded, readResponseBodyBounded, validateDecodedImageFile, } from "@stella/runtime/kernel/tools/image-decode-validation";
 import { materializeMediaArtifact } from "@stella/runtime/kernel/tools/media-artifact-store";
 import {
@@ -15,47 +14,6 @@ const writeImageToClipboard = (image) => clipboard.write([
         "image/png": new Blob([image.toPNG()], { type: "image/png" }),
     }),
 ]);
-const fetchWithBrowserSession = async (payload) => {
-    const url = await normalizeUrlForPrivilegedRendererFetch(payload.url);
-    const cookieHeader = await getBrowserCookieHeader(url);
-    const method = payload.init?.method ?? "GET";
-    const headers = new Headers(payload.init?.headers);
-    if (!headers.has("User-Agent")) {
-        headers.set("User-Agent", "StellaDesktop/1.0");
-    }
-    if (cookieHeader) {
-        headers.set("Cookie", cookieHeader);
-    }
-    const response = await globalThis.fetch(url, {
-        method,
-        headers,
-        body: payload.init?.body,
-        redirect: "follow",
-        signal: AbortSignal.timeout(PRIVILEGED_RENDERER_FETCH_TIMEOUT_MS),
-    });
-    if (!response.ok) {
-        throw new Error(`Request failed with status ${response.status}.`);
-    }
-    if (payload.responseType === "json") {
-        const text = await response.text();
-        try {
-            return JSON.parse(text);
-        }
-        catch {
-            throw new Error(`Response was not valid JSON (status ${response.status}, ${text.length} bytes).`);
-        }
-    }
-    return response.text();
-};
-const assertStellaInitialized = (options) => {
-    // The browser bridge is gated on the app being far enough along that a
-    // stellaAppDir has been resolved; the value itself isn't needed here because
-    // the browser service lives inside the desktop tree.
-    const stellaAppDir = options.getStellaAppDir();
-    if (!stellaAppDir?.trim()) {
-        throw new Error("Stella root not available; restart the app.");
-    }
-};
 const resolveMediaOutputPath = (dir, fileName) => {
     if (!fileName ||
         fileName === "." ||
@@ -89,30 +47,6 @@ const normalizedImageOutputPath = (requestedPath, mimeType) => {
     return path.join(parsed.dir, `${parsed.name}${extension}`);
 };
 export const registerBrowserHandlers = (options) => {
-    handleIpc(IPC_BROWSER_FETCH_JSON, async (event, payload) => {
-        if (!options.assertPrivilegedSender(event, IPC_BROWSER_FETCH_JSON)) {
-            throw new Error("Blocked untrusted request.");
-        }
-        assertStellaInitialized(options);
-        options.ensureBrowserBridgeStarted?.();
-        return fetchWithBrowserSession({
-            url: payload.url,
-            responseType: "json",
-            init: payload.init,
-        });
-    });
-    handleIpc(IPC_BROWSER_FETCH_TEXT, async (event, payload) => {
-        if (!options.assertPrivilegedSender(event, IPC_BROWSER_FETCH_TEXT)) {
-            throw new Error("Blocked untrusted request.");
-        }
-        assertStellaInitialized(options);
-        options.ensureBrowserBridgeStarted?.();
-        return fetchWithBrowserSession({
-            url: payload.url,
-            responseType: "text",
-            init: payload.init,
-        });
-    });
     // ── Media file operations ──
     handleIpc(IPC_MEDIA_SAVE_OUTPUT, async (event, payload) => {
         if (!options.assertPrivilegedSender(event, IPC_MEDIA_SAVE_OUTPUT)) {
@@ -232,15 +166,6 @@ export const registerBrowserHandlers = (options) => {
         catch (error) {
             return { ok: false, error: error.message };
         }
-    });
-    handleIpc(IPC_MEDIA_GET_DIR, async (event) => {
-        if (!options.assertPrivilegedSender(event, IPC_MEDIA_GET_DIR)) {
-            return null;
-        }
-        const stellaDataDir = options.getStellaDataDir();
-        if (!stellaDataDir)
-            return null;
-        return path.join(stellaDataDir, "media");
     });
     handleIpc(IPC_MEDIA_COPY_IMAGE, async (event, payload) => {
         if (!options.assertPrivilegedSender(event, IPC_MEDIA_COPY_IMAGE)) {

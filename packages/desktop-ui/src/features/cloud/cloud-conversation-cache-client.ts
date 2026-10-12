@@ -36,11 +36,9 @@ export type CloudConversationCacheRendererApi = {
   ) => Promise<CloudConversationCachePurgeResult>;
 };
 
-let testApi: CloudConversationCacheRendererApi | undefined;
 let operationTail: Promise<void> = Promise.resolve();
 
 const api = (): CloudConversationCacheRendererApi | null => {
-  if (testApi) return testApi;
   if (typeof window === "undefined") return null;
   return window.electronAPI?.cloudConversationCache ?? null;
 };
@@ -165,9 +163,3 @@ export const cloudConversationCacheClient = {
   },
 };
 
-export const setCloudConversationCacheApiForTests = (
-  next: CloudConversationCacheRendererApi | undefined,
-): void => {
-  testApi = next;
-  operationTail = Promise.resolve();
-};

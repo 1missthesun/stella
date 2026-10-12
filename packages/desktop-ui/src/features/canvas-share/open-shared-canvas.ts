@@ -86,15 +86,6 @@ const renderShared = async (
 };
 
 /**
- * Fetch + render a shared canvas natively. Returns `true` when the URL was a
- * recognized canvas-share link that was handled (so the caller should NOT
- * fall back to opening it in the system browser), `false` otherwise.
- */
-export const renderSharedCanvasFromUrl = async (
-  url: string,
-): Promise<boolean> => (await renderShared(url)).handled;
-
-/**
  * Fire-and-forget guard for synchronous callers (e.g. the external-link
  * helper). Returns `true` immediately when the URL is a canvas-share link
  * (kicking off the async native render), so the caller can skip the browser.

@@ -1,5 +1,5 @@
 import { waitForConnectedRunner } from "./runtime-availability.js";
-import { IPC_DISCOVERY_COLLECT_ALL_SIGNALS, IPC_DISCOVERY_COLLECT_BROWSER_DATA, IPC_DISCOVERY_CORE_MEMORY_EXISTS, IPC_DISCOVERY_DETECT_PREFERRED_BROWSER, IPC_DISCOVERY_KNOWLEDGE_EXISTS, IPC_DISCOVERY_LIST_BROWSER_PROFILES, IPC_DISCOVERY_WRITE_CORE_MEMORY, IPC_DISCOVERY_WRITE_KNOWLEDGE, } from "@stella/contracts/desktop/ipc-channels";
+import { IPC_DISCOVERY_COLLECT_ALL_SIGNALS, IPC_DISCOVERY_DETECT_PREFERRED_BROWSER, IPC_DISCOVERY_LIST_BROWSER_PROFILES, IPC_DISCOVERY_WRITE_CORE_MEMORY, IPC_DISCOVERY_WRITE_KNOWLEDGE, } from "@stella/contracts/desktop/ipc-channels";
 import {
   handleIpc,
 } from "./typed-ipc.js";
@@ -26,35 +26,6 @@ const collectWithRunnerEnvelope = async (options, event, channel, action) => {
     }
 };
 export const registerDiscoveryHandlers = (options) => {
-    handleIpc(IPC_DISCOVERY_CORE_MEMORY_EXISTS, async () => {
-        const runner = options.getStellaHostRunner();
-        if (!runner)
-            return false;
-        try {
-            return await runner.coreMemoryExists();
-        }
-        catch {
-            return false;
-        }
-    });
-    handleIpc(IPC_DISCOVERY_KNOWLEDGE_EXISTS, async () => {
-        const runner = options.getStellaHostRunner();
-        if (!runner)
-            return false;
-        try {
-            return await runner.discoveryKnowledgeExists();
-        }
-        catch {
-            return false;
-        }
-    });
-    handleIpc(IPC_DISCOVERY_COLLECT_BROWSER_DATA, async (event, collectOptions) => await collectWithRunnerEnvelope(options, event, IPC_DISCOVERY_COLLECT_BROWSER_DATA, async (runner) => {
-        const result = await runner.collectBrowserData(collectOptions);
-        return {
-            data: result.data,
-            formatted: result.formatted,
-        };
-    }));
     handleIpc(IPC_DISCOVERY_WRITE_CORE_MEMORY, async (event, payload) => {
         if (!options.assertPrivilegedSender(event, IPC_DISCOVERY_WRITE_CORE_MEMORY)) {
             throw new Error("Blocked untrusted request.");

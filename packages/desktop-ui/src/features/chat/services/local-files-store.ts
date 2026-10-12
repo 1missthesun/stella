@@ -234,11 +234,3 @@ export const subscribeToLocalFilesWindow = (
   };
 };
 
-export const __privateLocalFilesStore = {
-  handleLocalChatUpdated,
-  resetForTests() {
-    unsubscribeLocalChatUpdates?.();
-    unsubscribeLocalChatUpdates = null;
-    localFilesWindows.clear();
-  },
-};

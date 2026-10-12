@@ -272,7 +272,6 @@ export const buildPayloadFromBarePath = (
       return null;
   }
 };
-export const extractMarkdownLinkPaths = extractLocalFileLinkPaths;
 
 export const collectTurnSourceDiffPayloads = (
   toolEvents: readonly EventRecord[],

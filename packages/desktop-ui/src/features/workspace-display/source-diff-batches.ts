@@ -74,13 +74,6 @@ const getSnapshot = (): Snapshot => state;
 export const useSourceDiffBatches = (): Snapshot =>
   useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 
-/**
- * Read the current store snapshot. Exported for tests and for any
- * non-React caller that needs a one-shot view of the ring (e.g.
- * tooling that wants to introspect last-batch state).
- */
-export const peekSourceDiffBatches = (): Snapshot => state;
-
 export const sourceDiffBatches = {
   /**
    * Push a batch into the ring. Replaces an existing batch with the

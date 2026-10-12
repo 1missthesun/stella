@@ -4,7 +4,6 @@ import {
   IPC_SCHEDULE_LIST_CRON_JOBS,
   IPC_SCHEDULE_LIST_HEARTBEATS,
   IPC_SCHEDULE_LIST_CONVERSATION_EVENTS,
-  IPC_SCHEDULE_GET_EVENT_COUNT,
   IPC_SCHEDULE_RUN_CRON_JOB,
   IPC_SCHEDULE_REMOVE_CRON_JOB,
   IPC_SCHEDULE_UPDATE_CRON_JOB,
@@ -35,15 +34,6 @@ export const registerScheduleHandlers = (options) => {
             conversationId,
             maxItems: Number.isFinite(maxItems) ? maxItems : undefined,
         });
-    });
-    registerPrivilegedHandle(options, IPC_SCHEDULE_GET_EVENT_COUNT, async (_event, payload) => {
-        const conversationId = typeof payload?.conversationId === "string"
-            ? payload.conversationId.trim()
-            : "";
-        if (!conversationId) {
-            return 0;
-        }
-        return await (await waitForRunner()).getConversationEventCount({ conversationId });
     });
     registerPrivilegedHandle(options, IPC_SCHEDULE_RUN_CRON_JOB, async (_event, payload) => {
         const jobId = typeof payload?.jobId === "string" ? payload.jobId.trim() : "";

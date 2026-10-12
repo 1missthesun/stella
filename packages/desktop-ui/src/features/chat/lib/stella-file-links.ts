@@ -4,7 +4,6 @@ import type { Image, Link, Parent, Root, RootContent, Text } from "mdast";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
 import {
   parseFileLinkTarget,
-  parseLocalFileLinkTarget,
 } from "@stella/contracts/local-file-links";
 import { parseStellaAppUrl } from "@stella/contracts/workspace-apps";
 import {
@@ -18,8 +17,6 @@ export const STELLA_FILE_TAG_ATTRIBUTES = ["path", "label"] as const;
 /** `stella://app/<slug>` links become `<stella-app slug label>` the same way. */
 export const STELLA_APP_TAG = "stella-app";
 export const STELLA_APP_TAG_ATTRIBUTES = ["slug", "label"] as const;
-
-export const parseStellaFileUrl = parseLocalFileLinkTarget;
 
 export const displayPayloadForStellaFile = (
   filePath: string,

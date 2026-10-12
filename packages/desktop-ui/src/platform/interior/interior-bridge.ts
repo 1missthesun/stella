@@ -66,5 +66,3 @@ export const getStellaInteriorBridge = (): StellaInteriorBridge | null => {
     : null;
 };
 
-export const isStellaInteriorRuntime = (): boolean =>
-  getStellaInteriorBridge() !== null;

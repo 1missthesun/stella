@@ -1,10 +1,5 @@
 export type LegalDocument = "terms" | "privacy";
 
-export const LEGAL_TITLES: Record<LegalDocument, string> = {
-  terms: "Terms of Service",
-  privacy: "Privacy Policy",
-};
-
 const LEGAL_LAST_UPDATED = "August 26, 2026";
 
 export const TERMS_OF_SERVICE = `Stella — FromYou LLC

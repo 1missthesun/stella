@@ -295,5 +295,3 @@ export const useBrowserAttachmentUploads = () =>
     () => EMPTY,
   );
 
-export const hasPendingCloudAttachmentUploads = (): boolean =>
-  uploads.some((entry) => IN_FLIGHT.has(entry.status));

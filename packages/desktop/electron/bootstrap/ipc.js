@@ -281,7 +281,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     registerSystemHandlers({
         getDeviceId: () => state.deviceId,
         loadDeviceId: () => loadStellaDeviceId(context),
-        loadDeviceSigner: () => loadStellaDeviceSigner(context),
         authService: services.authService,
         engineAccountAccess: services.engineAccountAccess,
         claudeLocalAccounts: services.claudeLocalAccounts,
@@ -292,7 +291,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         externalLinkService: services.externalLinkService,
         ensurePrivilegedActionApproval: (action, message, detail, event) => services.securityPolicyService.ensureApproval(action, message, detail, event),
         hardResetLocalState: resetFlows.hardResetLocalState,
-        resetLocalMessages: resetFlows.resetLocalMessages,
         listUserAsks: () => services.userAskService.listOpenAsks(),
         answerUserAsk: (payload) => services.userAskService.answer(payload),
         cancelUserAsk: (payload) => services.userAskService.cancel(payload),
@@ -321,14 +319,8 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     registerBrowserHandlers({
-        getStellaAppDir: lifecycle.getStellaAppDir,
         getStellaDataDir: lifecycle.getStellaDataDir,
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
-        // On-demand fallback to the eager startup gate: if the extension wasn't
-        // detected at launch (installed mid-session, or in a custom user-data-dir),
-        // the first browser-session fetch still starts the bridge. Idempotent —
-        // reuses the existing resource if already running.
-        ensureBrowserBridgeStarted: () => startStellaBrowserBridge(context),
     });
     registerDiscoveryHandlers({
         getStellaHostRunner: lifecycle.getRunner,
@@ -404,7 +396,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     registerAgentHandlers({
         getStellaHostRunner: lifecycle.getRunner,
         uiState: services.uiStateService.state,
-        stellaAppDir: config.stellaAppDir,
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     registerRuntimeAvailabilityBridge({

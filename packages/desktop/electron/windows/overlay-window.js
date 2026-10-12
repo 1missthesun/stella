@@ -3,16 +3,12 @@ import { loadWindow } from './window-load.js';
 import { createSharedWebPreferences } from './shared-window-preferences.js';
 import { STELLA_CAPTURE_EXCLUDED_TITLE_PREFIXES, getWindowInfoAtPoint, } from '../window-capture.js';
 import {
-  IPC_OVERLAY_DISPLAY_CHANGE,
   IPC_OVERLAY_SET_INTERACTIVE,
-  IPC_OVERLAY_SHOW_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT,
   IPC_OVERLAY_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_START_REGION_CAPTURE,
   IPC_OVERLAY_END_REGION_CAPTURE,
-  IPC_OVERLAY_SHOW_SCREEN_GUIDE,
-  IPC_OVERLAY_HIDE_SCREEN_GUIDE,
 } from "@stella/contracts/desktop/ipc-channels";
 import {
   onIpc,
@@ -224,10 +220,6 @@ class OverlayWindow {
         const bounds = getAllDisplaysBounds();
         this.overlayOrigin = { x: bounds.x, y: bounds.y };
         this.window.setBounds(bounds);
-        this.window.webContents.send(IPC_OVERLAY_DISPLAY_CHANGE, {
-            origin: this.overlayOrigin,
-            bounds,
-        });
     }
     show(options) {
         if (!this.window || !this.ready)
@@ -399,7 +391,6 @@ export class OverlayWindowController {
     destroyed = false;
     // Active component tracking — overlay stays visible when any component is active.
     activeRegionCapture = false;
-    activeScreenGuide = false;
     activeWindowHighlight = false;
     windowHighlightRequestId = 0;
     // Perf: idle-reclaim timer for the overlay renderer (see
@@ -411,18 +402,6 @@ export class OverlayWindowController {
             return;
         }
         this.overlayWindow.setIgnoreMouseEvents(!interactive);
-    };
-    handleOverlayShowWindowHighlight = (_event, payload) => {
-        this.windowHighlightRequestId += 1;
-        if (!payload) {
-            void this.setWindowHighlight(null);
-            return;
-        }
-        if ('bounds' in payload) {
-            void this.setWindowHighlight(payload.bounds, payload.tone ?? 'default');
-            return;
-        }
-        void this.setWindowHighlight(payload, 'default');
     };
     handleOverlayHideWindowHighlight = () => {
         this.windowHighlightRequestId += 1;
@@ -453,7 +432,6 @@ export class OverlayWindowController {
     constructor(options) {
         this.overlayWindow = new OverlayWindow(options);
         onIpc(IPC_OVERLAY_SET_INTERACTIVE, this.handleOverlaySetInteractive);
-        onIpc(IPC_OVERLAY_SHOW_WINDOW_HIGHLIGHT, this.handleOverlayShowWindowHighlight);
         onIpc(IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT, this.handleOverlayHideWindowHighlight);
         onIpc(IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT, this.handleOverlayPreviewWindowHighlightAtPoint);
     }
@@ -510,7 +488,6 @@ export class OverlayWindowController {
     }
     get isAnyActive() {
         return (this.activeRegionCapture ||
-            this.activeScreenGuide ||
             this.activeWindowHighlight);
     }
     async setWindowHighlight(bounds, tone = 'default') {
@@ -637,29 +614,6 @@ export class OverlayWindowController {
     send(channel, ...args) {
         this.overlayWindow.send(channel, ...args);
     }
-    // ─── Screen Guide ────────────────────────────────────────────────────
-    async showScreenGuide(annotations) {
-        this.activeScreenGuide = true;
-        // Perf: self-create on demand so the screen guide still appears after an
-        // idle reclaim (or before the overlay's first build).
-        if (!(await this.ensureReady()))
-            return;
-        this.overlayWindow.show({ inactive: true });
-        const origin = this.overlayWindow.getOverlayOrigin();
-        const adjusted = annotations.map((a) => ({
-            ...a,
-            x: a.x - origin.x,
-            y: a.y - origin.y,
-        }));
-        this.overlayWindow.send(IPC_OVERLAY_SHOW_SCREEN_GUIDE, {
-            annotations: adjusted,
-        });
-    }
-    hideScreenGuide() {
-        this.activeScreenGuide = false;
-        this.overlayWindow.send(IPC_OVERLAY_HIDE_SCREEN_GUIDE);
-        this.hideOverlayIfIdle();
-    }
     // ─── Cleanup ──────────────────────────────────────────────────────────
     /** Idempotent — calling more than once is a no-op after the first.
      *  Detaches every IPC listener this controller registered in its
@@ -670,7 +624,6 @@ export class OverlayWindowController {
             return;
         this.destroyed = true;
         offIpc(IPC_OVERLAY_SET_INTERACTIVE, this.handleOverlaySetInteractive);
-        offIpc(IPC_OVERLAY_SHOW_WINDOW_HIGHLIGHT, this.handleOverlayShowWindowHighlight);
         offIpc(IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT, this.handleOverlayHideWindowHighlight);
         offIpc(IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT, this.handleOverlayPreviewWindowHighlightAtPoint);
         // Clear the idle-reclaim timer so it can't fire after teardown.

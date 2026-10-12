@@ -1,10 +1,8 @@
 import type { IpcMainEvent, IpcMainInvokeEvent } from "electron";
 import type {
-  ConversationSummaryCursor,
   EventRecord,
   LocalChatLineageWindow,
   LocalChatMessageWindow,
-  LocalChatToolEventPage,
   LocalModelUsagePage,
 } from "@stella/contracts/local-chat";
 import type { ConversationFocusRoot } from "@stella/contracts/reply-refs";
@@ -14,23 +12,15 @@ import {
   IPC_CLOUD_CONVERSATION_CACHE_READ,
   IPC_CLOUD_CONVERSATION_CACHE_REPLACE,
   IPC_CLOUD_CONVERSATION_CACHE_RETAIN_ACCOUNT,
-  IPC_LOCAL_CHAT_DELETE_CONVERSATION,
   IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES,
-  IPC_LOCAL_CHAT_LIST_REPLY_COUNTS,
-  IPC_LOCAL_CHAT_LIST_CONVERSATIONS,
   IPC_LOCAL_CHAT_LIST_MESSAGES_AFTER,
-  IPC_LOCAL_CHAT_LIST_MESSAGE_TOOL_EVENTS,
   IPC_LOCAL_CHAT_LIST_MODEL_USAGE,
   IPC_LOCAL_CHAT_GET_OR_CREATE_ID,
-  IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID,
   IPC_LOCAL_CHAT_SET_ACTIVE_ID,
-  IPC_LOCAL_CHAT_LIST_EVENTS,
   IPC_LOCAL_CHAT_LIST_MESSAGES,
   IPC_LOCAL_CHAT_LIST_MESSAGES_BEFORE,
   IPC_LOCAL_CHAT_LIST_ACTIVITY,
   IPC_LOCAL_CHAT_LIST_FILES,
-  IPC_LOCAL_CHAT_GET_EVENT_COUNT,
-  IPC_LOCAL_CHAT_PERSIST_WELCOME,
 } from "@stella/contracts/desktop/ipc-channels";
 import type { LocalChatHistoryService } from "../services/local-chat-history-service.js";
 import { assertPrivilegedRequest } from "./privileged-ipc.js";
@@ -150,15 +140,6 @@ export const registerLocalChatHandlers = (
     );
   });
 
-  handleIpc(IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID, async (event) => {
-    return await withLocalChatClient(
-      options,
-      event,
-      IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID,
-      (client) => client.createNewDefaultConversationId(),
-    );
-  });
-
   handleIpc(
     IPC_LOCAL_CHAT_SET_ACTIVE_ID,
     async (event, payload: { conversationId?: string }) =>
@@ -169,59 +150,6 @@ export const registerLocalChatHandlers = (
         (client) =>
           client.setActiveConversationId(payload?.conversationId ?? ""),
       ),
-  );
-
-  handleIpc(
-    IPC_LOCAL_CHAT_LIST_CONVERSATIONS,
-    async (
-      event,
-      payload: {
-        limit?: number;
-        cursor?: ConversationSummaryCursor | null;
-      },
-    ) =>
-      await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_LIST_CONVERSATIONS,
-        (client) =>
-          client.listConversations({
-            limit: payload?.limit,
-            cursor: payload?.cursor,
-          }),
-      ),
-  );
-
-  handleIpc(
-    IPC_LOCAL_CHAT_DELETE_CONVERSATION,
-    async (event, payload: { conversationId?: string }) =>
-      await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_DELETE_CONVERSATION,
-        (client) => client.deleteConversation(payload?.conversationId ?? ""),
-      ),
-  );
-
-  handleIpc(
-    IPC_LOCAL_CHAT_LIST_EVENTS,
-    async (
-      event,
-      payload: {
-        conversationId?: string;
-        maxItems?: number;
-      },
-    ) =>
-      (await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_LIST_EVENTS,
-        (client) =>
-          client.listEvents({
-            conversationId: payload?.conversationId ?? "",
-            maxItems: payload?.maxItems,
-          }),
-      )) as EventRecord[],
   );
 
   handleIpc(
@@ -304,39 +232,6 @@ export const registerLocalChatHandlers = (
   );
 
   handleIpc(
-    IPC_LOCAL_CHAT_LIST_MESSAGE_TOOL_EVENTS,
-    async (
-      event,
-      payload: {
-        conversationId?: string;
-        messageTimestampMs?: number;
-        messageId?: string;
-        messageSequence?: number;
-        afterTimestampMs?: number;
-        afterId?: string;
-        afterSequence?: number;
-        limit?: number;
-      },
-    ) =>
-      (await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_LIST_MESSAGE_TOOL_EVENTS,
-        (client) =>
-          client.listMessageToolEvents({
-            conversationId: payload?.conversationId ?? "",
-            messageTimestampMs: payload?.messageTimestampMs ?? 0,
-            messageId: payload?.messageId ?? "",
-            messageSequence: payload?.messageSequence,
-            afterTimestampMs: payload?.afterTimestampMs,
-            afterId: payload?.afterId,
-            afterSequence: payload?.afterSequence,
-            limit: payload?.limit,
-          }),
-      )) as LocalChatToolEventPage,
-  );
-
-  handleIpc(
     IPC_LOCAL_CHAT_LIST_ACTIVITY,
     async (
       event,
@@ -396,20 +291,6 @@ export const registerLocalChatHandlers = (
           });
         },
       )) as LocalChatLineageWindow,
-  );
-
-  handleIpc(
-    IPC_LOCAL_CHAT_LIST_REPLY_COUNTS,
-    async (event, payload: { conversationId?: string }) =>
-      await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_LIST_REPLY_COUNTS,
-        (client) =>
-          client.listReplyCounts({
-            conversationId: payload?.conversationId ?? "",
-          }),
-      ),
   );
 
   handleIpc(
@@ -474,43 +355,4 @@ export const registerLocalChatHandlers = (
       )) as { files: EventRecord[] },
   );
 
-  handleIpc(
-    IPC_LOCAL_CHAT_GET_EVENT_COUNT,
-    async (
-      event,
-      payload: {
-        conversationId?: string;
-      },
-    ) =>
-      await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_GET_EVENT_COUNT,
-        (client) =>
-          client.getEventCount({
-            conversationId: payload?.conversationId ?? "",
-          }),
-      ),
-  );
-
-  handleIpc(
-    IPC_LOCAL_CHAT_PERSIST_WELCOME,
-    async (
-      event,
-      payload: {
-        conversationId?: string;
-        message?: string;
-      },
-    ) =>
-      await withLocalChatClient(
-        options,
-        event,
-        IPC_LOCAL_CHAT_PERSIST_WELCOME,
-        (client) =>
-          client.persistDiscoveryWelcome({
-            conversationId: payload?.conversationId ?? "",
-            message: payload?.message ?? "",
-          }),
-      ),
-  );
 };

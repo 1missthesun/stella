@@ -123,6 +123,7 @@ import {
 } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { Effect } from "effect";
 import { ownerGateStub } from "../rpc-release.js";
+import { importAgentLogIntoThread } from "./agent-log-bridge.js";
 
 export type ContainerTurnHost = Pick<
   BuildSessionInternals,
@@ -508,6 +509,8 @@ export const runContainerAgentTurn = async (
     // (service secret) and hands it to the executor, which holds only the
     // turn token. Fetched once, before any sandbox exists, so an escalation
     // retry does not pay for it twice.
+    await importAgentLogIntoThread(host, turn, execution.signal);
+    execution.assertActive();
     const history = host.fetchCanonicalAgentHistory(turn, {
       excludeCurrentTurn: true,
       signal: execution.signal,

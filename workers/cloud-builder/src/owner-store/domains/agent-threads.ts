@@ -79,7 +79,7 @@ import { endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { queueStellaNote } from "./agent-reports.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
-import { agentLogDeviceHolder } from "@stella/contracts/backend/agent-logs";
+import { AGENT_LOG_CLOUD_HOLDER, agentLogDeviceHolder } from "@stella/contracts/backend/agent-logs";
 import { array, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { executionUnavailableMessage, snapshotAllowsExecution } from "../../owner-gate/support.js";
@@ -1380,29 +1380,45 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
 // ── Agents moving themselves ──────────────────────────────────────────────
 
 type HandoffArgs = AgentThreadCalls["agentThreads.handoff"]["args"];
+type HandoffResult = AgentThreadCalls["agentThreads.handoff"]["result"];
+
+/** Who asks to move an agent: the computer that holds it, or the cloud that runs it. */
+type MoveFrom = { kind: "device"; deviceId: string } | { kind: "cloud" };
+
+type MoveInput = Omit<HandoffArgs, "fromDeviceId"> & { from: MoveFrom };
+
+const CLOUD_DESTINATION = "cloud";
 
 /**
- * An agent's `switch_destination`, from the computer that holds it once its
- * run there ended: the target holds its log from now on, and the thread's
- * next attempt runs there with the agent's brief, the same thread with the
- * same reports, messages and pauses, now routed to the target. Idempotent per
- * `handoffId`.
+ * An agent's `switch_destination`, from the host that holds it once its run
+ * there ended: the target (one of the owner's computers, or the cloud) holds
+ * its log from now on, and the thread's next attempt runs there with the
+ * agent's brief, the same thread with the same reports, messages and pauses,
+ * now routed to the target. Idempotent per `handoffId`.
  */
-const handoffThread = async (
-  ctx: OwnerContext,
-  args: HandoffArgs,
-): Promise<AgentThreadCalls["agentThreads.handoff"]["result"]> => {
+const moveThread = async (ctx: OwnerContext, args: MoveInput): Promise<HandoffResult> => {
   if (!CONTROL_REQUEST_ID_PATTERN.test(args.handoffId)) {
     throw new RpcError("BAD_REQUEST", "That move could not be sent. Try again.");
   }
   assertPrompt(args.prompt, "move");
+  const toCloud = args.targetDeviceId.trim().toLowerCase() === CLOUD_DESTINATION;
+  const fromKey = args.from.kind === "device" ? args.from.deviceId : CLOUD_DESTINATION;
   const fingerprint = await sha256Hex(
-    JSON.stringify(["agent-handoff/v1", args.threadId, args.fromDeviceId, args.targetDeviceId, args.prompt, args.model ?? null]),
+    JSON.stringify([
+      "agent-handoff/v2",
+      args.threadId,
+      fromKey,
+      toCloud ? CLOUD_DESTINATION : args.targetDeviceId,
+      args.prompt,
+      args.model ?? null,
+      args.execution ?? null,
+    ]),
   );
   const labels = await deviceLabels(ctx);
-  const whereOf = (deviceId: string) => `on ${labels.get(deviceId) ?? "another computer"}`;
+  const whereOf = (deviceId: string) =>
+    deviceId === CLOUD_DESTINATION ? "in Stella's cloud" : `on ${labels.get(deviceId) ?? "another computer"}`;
   const replay = replayAttempt(ctx.db, args.handoffId, fingerprint, args.ownerGeneration);
-  if (replay) return { ...replay, where: whereOf(args.targetDeviceId) };
+  if (replay) return { ...replay, where: whereOf(toCloud ? CLOUD_DESTINATION : args.targetDeviceId) };
   await assertGeneration(ctx, args.ownerGeneration);
   const thread = readThread(ctx.db, args.threadId);
   if (
@@ -1415,64 +1431,100 @@ const handoffThread = async (
     });
   }
   const executor = threadExecutor(thread);
-  const holder = executor.kind === "dispatch" || executor.kind === "local" ? executor.deviceId : null;
-  if (holder !== args.fromDeviceId) {
-    throw new RpcError("CONFLICT", "This agent doesn't run on the computer that asked to move it.", {
-      reason: "not_holder",
-    });
+  const holds =
+    args.from.kind === "device"
+      ? (executor.kind === "dispatch" || executor.kind === "local") && executor.deviceId === args.from.deviceId
+      : executor.kind === "cloud" || executor.kind === "harness";
+  if (!holds) {
+    throw new RpcError("CONFLICT", "This agent doesn't run where the move was asked from.", { reason: "not_holder" });
   }
   if (!ACTIVE_STATUSES.has(thread.status)) {
     throw new RpcError("CONFLICT", `This agent is ${thread.status}, so it doesn't move.`, { reason: "thread_not_running" });
   }
-  if (args.targetDeviceId === args.fromDeviceId) {
-    throw new RpcError("BAD_REQUEST", "The agent already runs on that computer.", { reason: "device_is_holder" });
-  }
-  const device = findDeviceDestination(await ctx.host.deviceDestinations(), args.targetDeviceId);
-  if (!device) {
-    throw new RpcError("NOT_FOUND", `No connected device has the id or name ${args.targetDeviceId}.`, {
-      reason: "device_not_found",
-    });
-  }
-  const name = device.label?.trim() || device.deviceId;
-  if (!device.online) {
-    throw new RpcError("CONFLICT", `${name} is offline, so the agent can't move there now.`, { reason: "device_offline" });
-  }
-  if (device.remoteExecution === "declined" || !device.remoteExecutionEnabled) {
-    throw new RpcError("CONFLICT", `${name} doesn't take work from other devices.`, {
-      reason: "device_remote_execution_declined",
-    });
-  }
-  if (device.availability && !device.availability.ready) {
-    throw new RpcError("CONFLICT", `${name} isn't ready to take work yet.`, { reason: "device_not_ready" });
+  const fromLabel = args.from.kind === "device" ? (labels.get(args.from.deviceId) ?? args.from.deviceId) : "Stella's cloud";
+  let target: { holder: string; where: string; name: string; sql: () => void };
+  if (toCloud) {
+    if (args.from.kind === "cloud") {
+      throw new RpcError("BAD_REQUEST", "The agent already runs in the cloud.", { reason: "device_is_holder" });
+    }
+    const execution = args.execution;
+    if (!execution) throw new RpcError("BAD_REQUEST", "A move to the cloud needs what the agent runs on there.");
+    target = {
+      holder: AGENT_LOG_CLOUD_HOLDER,
+      where: "in Stella's cloud",
+      name: "Stella's cloud",
+      sql: () =>
+        ctx.db.run(
+          `UPDATE agent_threads SET executor_device_id = NULL, harness = NULL, placement = 'cloud',
+             execution_json = ?, requested_model = ? WHERE thread_id = ?`,
+          JSON.stringify(execution),
+          args.model?.trim() || thread.requested_model,
+          thread.thread_id,
+        ),
+    };
+  } else {
+    if (args.from.kind === "device" && args.targetDeviceId === args.from.deviceId) {
+      throw new RpcError("BAD_REQUEST", "The agent already runs on that computer.", { reason: "device_is_holder" });
+    }
+    const device = findDeviceDestination(await ctx.host.deviceDestinations(), args.targetDeviceId);
+    if (!device) {
+      throw new RpcError("NOT_FOUND", `No connected device has the id or name ${args.targetDeviceId}.`, {
+        reason: "device_not_found",
+      });
+    }
+    const name = device.label?.trim() || device.deviceId;
+    if (!device.online) {
+      throw new RpcError("CONFLICT", `${name} is offline, so the agent can't move there now.`, { reason: "device_offline" });
+    }
+    if (device.remoteExecution === "declined" || !device.remoteExecutionEnabled) {
+      throw new RpcError("CONFLICT", `${name} doesn't take work from other devices.`, {
+        reason: "device_remote_execution_declined",
+      });
+    }
+    if (device.availability && !device.availability.ready) {
+      throw new RpcError("CONFLICT", `${name} isn't ready to take work yet.`, { reason: "device_not_ready" });
+    }
+    target = {
+      holder: agentLogDeviceHolder(device.deviceId),
+      where: `on ${name}`,
+      name,
+      sql: () =>
+        ctx.db.run(
+          "UPDATE agent_threads SET executor_device_id = ?, harness = NULL, requested_model = ?, placement = 'computer' WHERE thread_id = ?",
+          device.deviceId,
+          args.model?.trim() || thread.requested_model,
+          thread.thread_id,
+        ),
+    };
   }
   const raced = replayAttempt(ctx.db, args.handoffId, fingerprint, args.ownerGeneration);
-  if (raced) return { ...raced, where: whereOf(device.deviceId) };
-  const from = labels.get(args.fromDeviceId) ?? args.fromDeviceId;
+  if (raced) return { ...raced, where: target.where };
   setAgentLogHolder(ctx.db, {
     threadId: thread.thread_id,
     conversationId: thread.conversation_id,
-    holder: agentLogDeviceHolder(device.deviceId),
+    holder: target.holder,
     ...(args.cwd ? { cwd: args.cwd } : {}),
     now: ctx.now,
   });
-  ctx.db.run(
-    "UPDATE agent_threads SET executor_device_id = ?, requested_model = ?, placement = 'computer' WHERE thread_id = ?",
-    device.deviceId,
-    args.model?.trim() || thread.requested_model,
-    thread.thread_id,
-  );
+  target.sql();
   const continued = beginNextAttempt(ctx, readThread(ctx.db, thread.thread_id)!, {
     clientMsgId: args.handoffId,
     fingerprint,
     prompt: args.prompt,
-    source: `device:${args.fromDeviceId}`,
-    detail: { executor: "device", moved: { from: args.fromDeviceId, to: device.deviceId } },
+    source: args.from.kind === "device" ? `device:${args.from.deviceId}` : "cloud:agent",
+    detail: { executor: toCloud ? "cloud" : "device", moved: { from: fromKey, to: toCloud ? CLOUD_DESTINATION : args.targetDeviceId } },
     sql: `UPDATE agent_threads SET attempt_generation = ?, status = 'running', result_json = NULL, error_message = NULL,
             origin_delivery_ack_at = NULL, updated_at = ? WHERE thread_id = ?`,
   });
-  console.log(JSON.stringify({ event: "agent_thread_moved", threadId: thread.thread_id, from, to: name }));
-  return { ...control(continued), where: `on ${name}` };
+  console.log(JSON.stringify({ event: "agent_thread_moved", threadId: thread.thread_id, from: fromLabel, to: target.name }));
+  return { ...control(continued), where: target.where };
 };
+
+const handoffThread = async (ctx: OwnerContext, args: HandoffArgs): Promise<HandoffResult> => {
+  const { fromDeviceId, ...rest } = args;
+  return await moveThread(ctx, { ...rest, from: { kind: "device", deviceId: fromDeviceId } });
+};
+
 
 // ── Agent directory and messages ──────────────────────────────────────────
 
@@ -3465,6 +3517,17 @@ const deviceThreads = (
 
 const id = (max = 128) => string({ min: 1, max });
 const generation = id(512);
+
+const cloudHandoffParser = object({
+  ownerGeneration: generation,
+  handoffId: id(),
+  threadId: id(),
+  conversationId: id(),
+  targetDeviceId: id(256),
+  prompt: string({ max: AGENT_PROMPT_MAX_CHARS }),
+  model: optional(string({ max: 256 })),
+  cwd: optional(string({ max: 4_096 })),
+});
 const origin = { originDeviceId: id(256), originConversationId: id(256) };
 const senderParser = object({ threadId: id(256), label: string({ max: 2_000 }) });
 const messageParser = object({
@@ -3641,6 +3704,7 @@ export const agentThreadsDomain = {
         prompt: string({ max: AGENT_PROMPT_MAX_CHARS }),
         model: optional(string({ max: 256 })),
         cwd: optional(string({ max: 4_096 })),
+        execution: optional(executionParser),
       }),
       handler: handoffThread,
     },
@@ -3783,6 +3847,8 @@ export const agentThreadsDomain = {
     "agentThreads.continueOnDevice": continueDeviceForCloud,
     "agentThreads.cancelOnDevice": cancelDeviceForCloud,
     "agentThreads.deviceSettled": deviceSettled,
+    "agentThreads.cloudHandoff": async (ctx, raw) =>
+      await moveThread(ctx, { ...cloudHandoffParser(raw), from: { kind: "cloud" } }),
     "agentThreads.directory": async (ctx, raw) =>
       await agentDirectory(ctx, object({ ownerGeneration: generation, conversationId: id(256) })(raw)),
     "agentThreads.message": async (ctx, raw) => await messageAgent(ctx, messageParser(raw)),

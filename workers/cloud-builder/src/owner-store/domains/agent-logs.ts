@@ -10,6 +10,7 @@
 
 import {
   AGENT_LOG_APPEND_MAX_BODY_BYTES,
+  AGENT_LOG_CLOUD_HOLDER,
   AGENT_LOG_MOVED_REASON,
   AGENT_LOG_READ_MAX_RECORDS,
   AGENT_LOG_RECORD_MAX_BYTES,
@@ -228,6 +229,37 @@ export const deleteConversationAgentLogs = (db: OwnerDb, conversationId: string)
 
 const threadIdArg = string({ min: 1, max: 256 });
 
+const recordsArg = array(
+  object({
+    key: string({ min: 1, max: 512 }),
+    role: literal("user", "assistant", "toolResult", "checkpoint"),
+    payloadJson: string({ min: 2, max: AGENT_LOG_RECORD_MAX_BYTES }),
+  }),
+  { max: 200 },
+);
+
+const cloudAppendParser = object({
+  threadId: threadIdArg,
+  conversationId: string({ min: 1, max: 512 }),
+  records: recordsArg,
+});
+
+const readParser = object({
+  threadId: threadIdArg,
+  afterSeq: number({ int: true, min: -1 }),
+  limit: optional(number({ int: true, min: 1, max: AGENT_LOG_READ_MAX_RECORDS })),
+});
+
+/**
+ * The cloud's own writes, for the agents it runs: refused like any other
+ * holder's once the agent moved away, so a late write from a cloud turn
+ * never lands in a log another host holds now.
+ */
+const cloudAppend = (ctx: OwnerContext, raw: unknown) => {
+  const args = cloudAppendParser(raw);
+  return append(ctx, { ...args, holder: AGENT_LOG_CLOUD_HOLDER });
+};
+
 export const agentLogsDomain = {
   name: "agent-logs",
   migrations: [AGENT_LOGS_MIGRATION],
@@ -240,27 +272,23 @@ export const agentLogsDomain = {
         threadId: threadIdArg,
         conversationId: string({ min: 1, max: 512 }),
         holder: string({ min: 1, max: 600 }),
-        records: array(
-          object({
-            key: string({ min: 1, max: 512 }),
-            role: literal("user", "assistant", "toolResult", "checkpoint"),
-            payloadJson: string({ min: 2, max: AGENT_LOG_RECORD_MAX_BYTES }),
-          }),
-          { max: 200 },
-        ),
+        records: recordsArg,
       }),
-      handler: append,
+      handler: (ctx, args) => {
+        if (!args.holder.startsWith("device:")) throw new RpcError("BAD_REQUEST", "Only a computer writes an agent's log here.");
+        return append(ctx, args);
+      },
     },
     "agentLogs.read": {
       scope: "owner",
       requireAccount: true,
-      parse: object({
-        threadId: threadIdArg,
-        afterSeq: number({ int: true, min: -1 }),
-        limit: optional(number({ int: true, min: 1, max: AGENT_LOG_READ_MAX_RECORDS })),
-      }),
+      parse: readParser,
       handler: read,
     },
+  },
+  internal: {
+    "agentLogs.cloudAppend": cloudAppend,
+    "agentLogs.cloudRead": (ctx, raw) => read(ctx, readParser(raw)),
   },
   purge: (ctx) => {
     ctx.db.run("DELETE FROM agent_log_records");

@@ -233,10 +233,10 @@ export type AgentThreadCalls = {
   };
   /**
    * An agent moves itself (`switch_destination`) at the end of a run on
-   * `fromDeviceId`, which holds it: `targetDeviceId` holds it from now on,
-   * takes its log after the newest seq it has, and continues the same
-   * thread with `prompt`. Its later reports, messages and pauses go there.
-   * Idempotent per `handoffId`.
+   * `fromDeviceId`, which holds it: `targetDeviceId` (a device, or "cloud")
+   * holds it from now on, takes its log after the newest seq it has, and
+   * continues the same thread with `prompt`. Its later reports, messages and
+   * pauses go there. Idempotent per `handoffId`.
    */
   "agentThreads.handoff": {
     args: {
@@ -251,6 +251,8 @@ export type AgentThreadCalls = {
       model?: string;
       /** The folder it worked in, which the new holder uses when it has one at that path. */
       cwd?: string;
+      /** A move to the cloud: what it runs on there. */
+      execution?: CloudExecutionSelection;
     };
     result: AgentThreadControl & { where: string };
   };

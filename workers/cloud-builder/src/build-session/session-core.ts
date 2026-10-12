@@ -66,6 +66,7 @@ import {
 } from "@stella/contracts/turn-plane/owner-events";
 import type { AgentHistoryRow } from "@stella/executor-cloud/agent-history";
 import { ownerGateStub } from "../rpc-release.js";
+import { writeThreadToAgentLog } from "./agent-log-bridge.js";
 
 export type SessionCoreHost = Pick<
   BuildSessionInternals,
@@ -347,6 +348,7 @@ export const appendThreadTranscript = async (
     messages,
     now: Date.now(),
   });
+  await writeThreadToAgentLog(host, turn, messages);
 };
 
 export const trackTurn = <T>(

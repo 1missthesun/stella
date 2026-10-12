@@ -381,6 +381,26 @@ export const piChatsFor = (
           await runner.agentThreads.note(args);
         },
       },
+      agentLogs: {
+        append: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) throw new Error("Not signed in to Stella.");
+          return await runner.agentLogs.append(args);
+        },
+        read: async (args) => {
+          const runner = session.runnerCell.get();
+          if (!runner?.getStellaSiteAuth()) throw new Error("Not signed in to Stella.");
+          return await runner.agentLogs.read(args);
+        },
+      },
+      agentHandoff: async (args) => {
+        const runner = session.runnerCell.get();
+        if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to move agents to your other computers.");
+        return await runner.agentThreads.handoff(args);
+      },
+      flushClaudeSessions: async () => {
+        await session.runnerCell.get()?.flushClaudeSessionSync(15_000);
+      },
       journal: (conversationId) => cloudJournalFor(session, conversationId),
       cloudThreads: (conversationId) => cloudAgentThreadsFor(session, conversationId),
       deviceAgents: (conversationId) => deviceAgentThreadsFor(session, conversationId),

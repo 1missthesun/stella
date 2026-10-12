@@ -165,6 +165,8 @@ export const runsHandlers: WorkerRpcHandlers = {
             .then((runner) => runner.publishLinkedFiles(result.finalText))
             .catch(() => undefined);
         }
+        // It moved itself on: the attempt here ended, and the next one runs where it went.
+        if (result.status === "moved") return { status: "ok" as const, finalText: "", threadId: result.threadId };
         return result.status === "ok"
           ? { status: "ok" as const, finalText: result.finalText, threadId: result.threadId }
           : { status: result.status, finalText: "" as const, error: result.error, threadId: result.threadId };

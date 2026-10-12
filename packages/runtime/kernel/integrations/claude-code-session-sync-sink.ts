@@ -33,7 +33,8 @@ export type ClaudeSessionSyncSink = {
     threadId: string;
     configDir: string | null;
     cwd: string;
-    atJournalSeq: number;
+    /** The log position the session must cover; absent, the newest synced session is taken. */
+    atJournalSeq?: number;
   }): Promise<"native" | "rebuild" | "none">;
   prepareLocalResume(args: {
     threadId: string;

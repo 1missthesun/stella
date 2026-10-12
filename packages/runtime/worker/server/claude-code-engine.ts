@@ -150,8 +150,9 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
       stellaDataDir: dataDir(),
       ...(ref.threadId ? { agentId: ref.threadId } : {}),
     });
+  // Stella's session is fenced by her brain lease; an agent's has its own holder (its log's).
   const leaseEpoch = (ref: ClaudeCodeSessionRef): number | null =>
-    runner()?.brainLeases.claim(ref.conversationId).epoch ?? null;
+    ref.role === "orchestrator" ? (runner()?.brainLeases.claim(ref.conversationId).epoch ?? null) : null;
 
   const adopt = async (ref: ClaudeCodeSessionRef, cwd: string | undefined, lastReply: string | undefined) => {
     const sink = claudeSessionSyncSink();
@@ -174,7 +175,10 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
     if (!sink || !cwd) return "none";
     if (sink.takeRestored({ threadId: ref.sessionKey, engine: SESSION_ENGINE })) return "native";
     const configDir = (await getClaudeCodeConfig()).configDir ?? null;
+    // An agent resumes the newest session it synced, wherever it ran it:
+    // files here that already cover the cloud's are kept, others come down.
     if (ref.role !== "orchestrator") {
+      if ((await sink.restoreForResume({ threadId: ref.sessionKey, configDir, cwd })) === "native") return "native";
       const prepared = await sink.prepareLocalResume({ threadId: ref.sessionKey, engine: SESSION_ENGINE, configDir, cwd });
       return prepared ? "native" : "none";
     }

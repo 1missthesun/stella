@@ -464,6 +464,16 @@ export const createStellaHostRunner = (
           ownerGeneration: await context.cloudOwnerGeneration(),
         });
       },
+      handoff: async (args) =>
+        await context.backend.require().call("agentThreads.handoff", {
+          ...args,
+          fromDeviceId: context.deviceId,
+          ownerGeneration: await context.cloudOwnerGeneration(),
+        }),
+    },
+    agentLogs: {
+      append: async (args) => await context.backend.require().call("agentLogs.append", args),
+      read: async (args) => await context.backend.require().call("agentLogs.read", args),
     },
     googleWorkspaceGetAuthStatus: async () => {
       return {

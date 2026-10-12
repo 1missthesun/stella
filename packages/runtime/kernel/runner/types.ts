@@ -431,6 +431,19 @@ export type RunnerPublicApi = {
       fromThreadId: string;
       text: string;
     }) => Promise<void>;
+    /** One of this computer's agents moving itself to another computer (`switch_destination`). */
+    handoff: (
+      args: Omit<AgentThreadCalls["agentThreads.handoff"]["args"], "ownerGeneration" | "fromDeviceId">,
+    ) => Promise<AgentThreadCalls["agentThreads.handoff"]["result"]>;
+  };
+  /** Every agent's conversation in the owner's cloud (`@stella/contracts/backend/agent-logs`). */
+  agentLogs: {
+    append: (
+      args: import("@stella/contracts/backend/agent-logs").AgentLogCalls["agentLogs.append"]["args"],
+    ) => Promise<import("@stella/contracts/backend/agent-logs").AgentLogCalls["agentLogs.append"]["result"]>;
+    read: (
+      args: import("@stella/contracts/backend/agent-logs").AgentLogCalls["agentLogs.read"]["args"],
+    ) => Promise<import("@stella/contracts/backend/agent-logs").AgentLogCalls["agentLogs.read"]["result"]>;
   };
   googleWorkspaceGetAuthStatus: () => Promise<{
     connected: boolean;

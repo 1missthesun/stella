@@ -78,6 +78,8 @@ import { normalizeDrivePath } from "./drive.js";
 import { endedKind, recordAgentChange, startedKind } from "./agent-events.js";
 import { queueStellaNote } from "./agent-reports.js";
 import { resolveCurrentDeviceId } from "./devices.js";
+import { setAgentLogHolder } from "./agent-logs.js";
+import { agentLogDeviceHolder } from "@stella/contracts/backend/agent-logs";
 import { array, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { executionUnavailableMessage, snapshotAllowsExecution } from "../../owner-gate/support.js";
@@ -1373,6 +1375,103 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
     },
   );
   return { ...control(thread), ...(destination?.waiting ? { waitingForDevice: true } : {}) };
+};
+
+// ── Agents moving themselves ──────────────────────────────────────────────
+
+type HandoffArgs = AgentThreadCalls["agentThreads.handoff"]["args"];
+
+/**
+ * An agent's `switch_destination`, from the computer that holds it once its
+ * run there ended: the target holds its log from now on, and the thread's
+ * next attempt runs there with the agent's brief, the same thread with the
+ * same reports, messages and pauses, now routed to the target. Idempotent per
+ * `handoffId`.
+ */
+const handoffThread = async (
+  ctx: OwnerContext,
+  args: HandoffArgs,
+): Promise<AgentThreadCalls["agentThreads.handoff"]["result"]> => {
+  if (!CONTROL_REQUEST_ID_PATTERN.test(args.handoffId)) {
+    throw new RpcError("BAD_REQUEST", "That move could not be sent. Try again.");
+  }
+  assertPrompt(args.prompt, "move");
+  const fingerprint = await sha256Hex(
+    JSON.stringify(["agent-handoff/v1", args.threadId, args.fromDeviceId, args.targetDeviceId, args.prompt, args.model ?? null]),
+  );
+  const labels = await deviceLabels(ctx);
+  const whereOf = (deviceId: string) => `on ${labels.get(deviceId) ?? "another computer"}`;
+  const replay = replayAttempt(ctx.db, args.handoffId, fingerprint, args.ownerGeneration);
+  if (replay) return { ...replay, where: whereOf(args.targetDeviceId) };
+  await assertGeneration(ctx, args.ownerGeneration);
+  const thread = readThread(ctx.db, args.threadId);
+  if (
+    !thread ||
+    thread.owner_generation !== args.ownerGeneration ||
+    (thread.conversation_id !== args.conversationId && thread.origin_conversation_id !== args.conversationId)
+  ) {
+    throw new RpcError("NOT_FOUND", "Stella's cloud has no record of this agent, so it can't move.", {
+      reason: "thread_not_found",
+    });
+  }
+  const executor = threadExecutor(thread);
+  const holder = executor.kind === "dispatch" || executor.kind === "local" ? executor.deviceId : null;
+  if (holder !== args.fromDeviceId) {
+    throw new RpcError("CONFLICT", "This agent doesn't run on the computer that asked to move it.", {
+      reason: "not_holder",
+    });
+  }
+  if (!ACTIVE_STATUSES.has(thread.status)) {
+    throw new RpcError("CONFLICT", `This agent is ${thread.status}, so it doesn't move.`, { reason: "thread_not_running" });
+  }
+  if (args.targetDeviceId === args.fromDeviceId) {
+    throw new RpcError("BAD_REQUEST", "The agent already runs on that computer.", { reason: "device_is_holder" });
+  }
+  const device = findDeviceDestination(await ctx.host.deviceDestinations(), args.targetDeviceId);
+  if (!device) {
+    throw new RpcError("NOT_FOUND", `No connected device has the id or name ${args.targetDeviceId}.`, {
+      reason: "device_not_found",
+    });
+  }
+  const name = device.label?.trim() || device.deviceId;
+  if (!device.online) {
+    throw new RpcError("CONFLICT", `${name} is offline, so the agent can't move there now.`, { reason: "device_offline" });
+  }
+  if (device.remoteExecution === "declined" || !device.remoteExecutionEnabled) {
+    throw new RpcError("CONFLICT", `${name} doesn't take work from other devices.`, {
+      reason: "device_remote_execution_declined",
+    });
+  }
+  if (device.availability && !device.availability.ready) {
+    throw new RpcError("CONFLICT", `${name} isn't ready to take work yet.`, { reason: "device_not_ready" });
+  }
+  const raced = replayAttempt(ctx.db, args.handoffId, fingerprint, args.ownerGeneration);
+  if (raced) return { ...raced, where: whereOf(device.deviceId) };
+  const from = labels.get(args.fromDeviceId) ?? args.fromDeviceId;
+  setAgentLogHolder(ctx.db, {
+    threadId: thread.thread_id,
+    conversationId: thread.conversation_id,
+    holder: agentLogDeviceHolder(device.deviceId),
+    ...(args.cwd ? { cwd: args.cwd } : {}),
+    now: ctx.now,
+  });
+  ctx.db.run(
+    "UPDATE agent_threads SET executor_device_id = ?, requested_model = ?, placement = 'computer' WHERE thread_id = ?",
+    device.deviceId,
+    args.model?.trim() || thread.requested_model,
+    thread.thread_id,
+  );
+  const continued = beginNextAttempt(ctx, readThread(ctx.db, thread.thread_id)!, {
+    clientMsgId: args.handoffId,
+    fingerprint,
+    prompt: args.prompt,
+    source: `device:${args.fromDeviceId}`,
+    detail: { executor: "device", moved: { from: args.fromDeviceId, to: device.deviceId } },
+    sql: `UPDATE agent_threads SET attempt_generation = ?, status = 'running', result_json = NULL, error_message = NULL,
+            origin_delivery_ack_at = NULL, updated_at = ? WHERE thread_id = ?`,
+  });
+  console.log(JSON.stringify({ event: "agent_thread_moved", threadId: thread.thread_id, from, to: name }));
+  return { ...control(continued), where: `on ${name}` };
 };
 
 // ── Agent directory and messages ──────────────────────────────────────────
@@ -3528,6 +3627,22 @@ export const agentThreadsDomain = {
         parentThreadId: optional(id()),
       }),
       handler: spawnFromDesktop,
+    },
+    "agentThreads.handoff": {
+      scope: "owner",
+      requireAccount: true,
+      parse: object({
+        ownerGeneration: generation,
+        handoffId: id(),
+        threadId: id(),
+        conversationId: id(),
+        fromDeviceId: id(256),
+        targetDeviceId: id(256),
+        prompt: string({ max: AGENT_PROMPT_MAX_CHARS }),
+        model: optional(string({ max: 256 })),
+        cwd: optional(string({ max: 4_096 })),
+      }),
+      handler: handoffThread,
     },
     "agentThreads.cancel": {
       scope: "owner",

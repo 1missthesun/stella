@@ -232,6 +232,29 @@ export type AgentThreadCalls = {
     result: AgentControlResult;
   };
   /**
+   * An agent moves itself (`switch_destination`) at the end of a run on
+   * `fromDeviceId`, which holds it: `targetDeviceId` holds it from now on,
+   * takes its log after the newest seq it has, and continues the same
+   * thread with `prompt`. Its later reports, messages and pauses go there.
+   * Idempotent per `handoffId`.
+   */
+  "agentThreads.handoff": {
+    args: {
+      ownerGeneration: string;
+      handoffId: string;
+      threadId: string;
+      conversationId: string;
+      fromDeviceId: string;
+      targetDeviceId: string;
+      prompt: string;
+      /** The model it runs on, as `spawn_agent` names one, which the new holder runs it on. */
+      model?: string;
+      /** The folder it worked in, which the new holder uses when it has one at that path. */
+      cwd?: string;
+    };
+    result: AgentThreadControl & { where: string };
+  };
+  /**
    * Stop a running remote thread from any desktop of the owner, for a
    * thread its conversation started; it is recorded paused. Idempotent per
    * request id.

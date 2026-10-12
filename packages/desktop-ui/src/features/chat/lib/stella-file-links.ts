@@ -110,16 +110,12 @@ const transformChildren = (parent: Parent, hiddenPaths: ReadonlySet<string>): vo
       }
       const path = parseFileLinkTarget((child as Link).url ?? "");
       if (path) {
-        const identity = fileIdentity(path);
-        const label = textOfChildren(child as Parent);
-        if (hiddenPaths.has(identity)) {
-          parent.children.splice(index, 1, {
-            type: "text",
-            value: label.trim() && label.trim() !== path ? label : fileLabel(path),
-          } as Text);
-          continue;
-        }
-        parent.children.splice(index, 1, buildStellaFileNode(path, label));
+        const label = textOfChildren(child as Parent).trim();
+        parent.children.splice(
+          index,
+          1,
+          buildStellaFileNode(path, label && label !== path ? label : ""),
+        );
         continue;
       }
     }

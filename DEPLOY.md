@@ -16,12 +16,12 @@ them, and say in your report that you deployed dev. `STELLA_DEV_DEPLOY_FORCE=1`
 skips the check; use it only to restore dev deliberately.
 
 **Pushes that publish to every install, prod included**, with no further step:
-`packages/stella-browser/{cli,scripts,package.json}` or its workflow file
-(stella-browser) and `packages/native/` or its workflow file (native helpers).
-Installs pick them up at their next launcher prepare. Treat a master push
-touching them as a prod release and get the go-ahead first. To validate native helpers without publishing, run
-`build-native-helpers.yml` by hand with `publish=false`; stella-browser has no
-such switch yet, so build it locally (`node packages/desktop/scripts/ensure-stella-browser.mjs --build-from-source`).
+`packages/native/` or its workflow file (native helpers); installs pick them up
+at their next launcher prepare. Treat a master push touching them as a prod
+release and get the go-ahead first; to validate a build without publishing, run
+`build-native-helpers.yml` by hand with `publish=false`. stella-browser is
+different: a push publishes it to the dev channel only (see Desktop, step 4),
+and prod moves when someone runs `promote-stella-browser.yml`.
 
 **Logins differ per machine and change; check instead of assuming.**
 `env -u CLOUDFLARE_API_TOKEN bunx wrangler whoami` lists the scopes
@@ -141,7 +141,8 @@ secrets only reach Previews created afterwards.
 | Mobile JS/TS | OTA (`publish-ota.sh`) | Downloaded on launch, applied on the next cold start |
 | Mobile native (`app.json`, native modules, plugins, `patches/`) | EAS store build + submit | Store update |
 | `launcher/` | `build-launchers.yml` with `publish=true` | Installed launchers self-update; new downloads |
-| `packages/native/`, `packages/stella-browser/cli` | Push to master (workflow publishes to R2) | Next launcher prepare (see below) |
+| `packages/native/` | Push to master (workflow publishes to R2) | Next launcher prepare (see below) |
+| `packages/stella-browser/cli` | Push to master (dev channel), then `promote-stella-browser.yml` | Next launcher prepare after promotion |
 | Electron version (`package.json`) | Push (signed identity) + app-source publish | Update installs it and relaunches (see below) |
 | Website / web chat (`packages/website`) | `deploy-stella.sh` to the website Worker | Immediately |
 
@@ -344,12 +345,18 @@ applies until the user clicks Update.
    `Stella.app` for that Electron version. Let it finish before publishing app
    source, or macOS launchers fall back to an ad-hoc copy and prompt for the
    Keychain.
-4. **Native helpers** (`packages/native/`) and **stella-browser**
-   (`packages/stella-browser/cli`): the push runs `build-native-helpers.yml` /
-   `build-stella-browser.yml`, which upload to R2 and move `current.json` only
-   when the commit is still master's head. What is live now:
+4. **Native helpers** (`packages/native/`): the push runs
+   `build-native-helpers.yml`, which uploads to R2 and moves `current.json`
+   only when the commit is still master's head. **stella-browser**
+   (`packages/stella-browser/{cli,scripts,package.json}`): the push runs
+   `build-stella-browser.yml`, which uploads immutable builds and moves only
+   `stella-browser/dev/current.json`. Installs read `stella-browser/current.json`;
+   promote at release with `gh workflow run promote-stella-browser.yml --ref master`
+   (the dev channel's build) or `-f source_sha=<full sha>`. A dev machine can
+   take the dev channel with `STELLA_BROWSER_MANIFEST_URL=…/stella-browser/dev/current.json`
+   for `packages/desktop/scripts/download-stella-browser.mjs`. What is live now:
    `curl -s https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/native-helpers/current.json`
-   (`stella-browser/current.json` likewise). Installs fetch them in the
+   (`stella-browser/current.json` and `stella-browser/dev/current.json` likewise). Installs fetch them in the
    launcher's prepare step (`packages/desktop/scripts/prepare-install.mjs`),
    which runs on install, relaunch and rollback.
 

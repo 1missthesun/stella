@@ -1,0 +1,54 @@
+name: Promote Stella Browser
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Commit whose published build becomes current for every install. Empty: whatever the dev channel serves now."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: stella-browser-current-publish
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Point stella-browser/current.json at a published build
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export AWS_ACCESS_KEY_ID="$R2_ACCESS_KEY_ID"
+          export AWS_SECRET_ACCESS_KEY="$R2_SECRET_ACCESS_KEY"
+          export AWS_DEFAULT_REGION=auto
+          if [ -n "$SOURCE_SHA" ]; then
+            [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "source_sha must be a full 40-character commit sha." >&2; exit 1; }
+            source_key="stella-browser/${SOURCE_SHA}/manifest.json"
+          else
+            source_key="stella-browser/dev/current.json"
+          fi
+          aws s3 cp "s3://${R2_BUCKET}/${source_key}" manifest.json --endpoint-url "$R2_ENDPOINT"
+          node -e '
+            const m = JSON.parse(require("fs").readFileSync("manifest.json", "utf8"));
+            const platforms = ["darwin-arm64", "darwin-x64", "win-x64", "linux-x64"];
+            if (m.schemaVersion !== 1 || !/^[0-9a-f]{40}$/.test(m.sourceSha) || !platforms.every((p) => m.assets?.[p]?.sha256)) {
+              throw new Error("Not a complete stella-browser manifest.");
+            }
+            console.log(`Promoting ${m.sourceSha} (built ${m.builtAt}).`);
+          '
+          aws s3 cp manifest.json "s3://${R2_BUCKET}/stella-browser/current.json" \
+            --content-type application/json \
+            --cache-control no-cache \
+            --endpoint-url "$R2_ENDPOINT"

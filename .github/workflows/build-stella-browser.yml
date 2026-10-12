@@ -1,7 +1,7 @@
 name: Build Stella Browser
 
-# Run/publish this workflow before the first desktop release that removes the
-# legacy tracked bin/ executables. Existing installs retain the bin/ fallback.
+# A push publishes to the dev channel only (stella-browser/dev/current.json).
+# Installs read stella-browser/current.json, which only promote-stella-browser.yml moves.
 
 on:
   push:
@@ -169,10 +169,11 @@ jobs:
           fi
           if [ "$SOURCE_SHA" = "$master_sha" ]; then
             aws s3 cp "$manifest_path" \
-              "s3://${R2_BUCKET}/stella-browser/current.json" \
+              "s3://${R2_BUCKET}/stella-browser/dev/current.json" \
               --content-type application/json \
               --cache-control no-cache \
               --endpoint-url "$R2_ENDPOINT"
+            echo "Published $SOURCE_SHA to the dev channel (stella-browser/dev/current.json). Installs keep stella-browser/current.json until promote-stella-browser.yml moves it."
           else
-            echo "Published immutable artifacts for $SOURCE_SHA; current master is $master_sha, so current.json was left unchanged."
+            echo "Published immutable artifacts for $SOURCE_SHA; current master is $master_sha, so dev/current.json was left unchanged."
           fi

@@ -27,6 +27,8 @@ const MIN_HEIGHT = 140;
 const CONFIRM_MS = 1400;
 const BUTTON_SIZE = 36;
 const SURFACE_RIM = 1;
+const TOP_GAP = 12;
+const COMPOSER_TOP_SLACK = 12;
 
 function useKeyboardHeight(): number {
   const [height, setHeight] = useState(0);
@@ -88,9 +90,9 @@ export function FileViewerPanel({
   const keyboardLift = Math.max(0, keyboardHeight - insets.bottom);
   const obstruction =
     bottomReserve > 0
-      ? bottomReserve + keyboardLift
+      ? Math.max(0, bottomReserve - COMPOSER_TOP_SLACK) + keyboardLift
       : Math.max(insets.bottom, keyboardHeight);
-  const bandTop = insets.top + TOP_BAR_BAR_HEIGHT + EDGE_GAP;
+  const bandTop = insets.top + TOP_BAR_BAR_HEIGHT + TOP_GAP;
   const maxHeight = Math.max(MIN_HEIGHT, screenHeight - bandTop - obstruction - EDGE_GAP);
   const height =
     preferredHeight === null

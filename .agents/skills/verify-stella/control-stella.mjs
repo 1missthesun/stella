@@ -5,7 +5,7 @@
  * script did not start.
  */
 import { createRequire } from "node:module";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
   closeSync,
@@ -14,6 +14,7 @@ import {
   openSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createServer } from "node:net";
@@ -428,6 +429,43 @@ const runtimeEvaluate = async (ws, expression) => {
   return result.result?.value;
 };
 
+const realHome = os.homedir();
+
+const ensureRunHome = (run) => {
+  const homeDir = path.join(run.runDir, "home");
+  mkdirSync(homeDir, { recursive: true, mode: 0o700 });
+  const stellaLink = path.join(homeDir, ".stella");
+  if (!existsSync(stellaLink)) symlinkSync(run.dataDir, stellaLink, "dir");
+  const gitconfig = path.join(homeDir, ".gitconfig");
+  if (!existsSync(gitconfig)) {
+    const read = (key) => {
+      const result = spawnSync("git", ["config", "--global", key], { encoding: "utf8" });
+      return result.status === 0 ? result.stdout.trim() : "";
+    };
+    const name = read("user.name") || "Stella Verify";
+    const email = read("user.email") || "verify@test.stella.local";
+    writeFileSync(gitconfig, `[user]\n\tname = ${name}\n\temail = ${email}\n`);
+  }
+  return homeDir;
+};
+
+const runHomeEnvironment = (run) => {
+  if (!run.homeDir) return {};
+  const shared = (relative) => {
+    const target = path.join(realHome, relative);
+    return existsSync(target) ? target : null;
+  };
+  const bunCache = shared(".bun/install/cache");
+  const miseData = shared(".local/share/mise");
+  const miseConfig = shared(".config/mise/config.toml");
+  return {
+    HOME: run.homeDir,
+    ...(bunCache ? { BUN_INSTALL_CACHE_DIR: bunCache } : {}),
+    ...(miseData ? { MISE_DATA_DIR: miseData } : {}),
+    ...(miseConfig ? { MISE_GLOBAL_CONFIG_FILE: miseConfig } : {}),
+  };
+};
+
 const seedDataDir = (dataDir) => {
   mkdirSync(dataDir, { recursive: true });
   writeJson(path.join(dataDir, "ui-state.json"), {
@@ -792,6 +830,7 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
           }
         : {}),
       ...providerHomes,
+      ...runHomeEnvironment(run),
       // The app talks to the backend the harness signs in against.
       ...(process.env.STELLA_BACKEND_URL?.trim()
         ? { VITE_STELLA_BACKEND_URL: resolveSiteUrl() }
@@ -955,6 +994,7 @@ const cmdLaunch = async (options) => {
   const run = {
     runId,
     runName: RUN_NAME,
+    homeDir: null,
     runDir,
     dataDir,
     userDataDir,
@@ -977,6 +1017,7 @@ const cmdLaunch = async (options) => {
   writeJson(path.join(runDir, "run.json"), run);
 
   try {
+    run.homeDir = ensureRunHome(run);
     run.display = await ensureDisplay(run, run.displayMode);
     if (displayMode === "xvfb" && run.display.mode !== "xvfb")
       throw new Error(`--display xvfb was requested but no private display started: ${run.display.reason}`);
@@ -1065,6 +1106,7 @@ const cmdRelaunch = async () => {
   run.cdpPort = await allocatePort();
   run.electronPid = null;
   run.relaunchedAt = new Date().toISOString();
+  if (!run.homeDir) run.homeDir = ensureRunHome(run);
   run.display = await ensureDisplay(run, run.displayMode ?? "host");
   writeJson(POINTER_PATH, run);
   writeJson(path.join(run.runDir, "run.json"), run);

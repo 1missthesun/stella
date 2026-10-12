@@ -543,6 +543,46 @@ const pickVariation = (
   return options[hashSeed(seed) % options.length]!;
 };
 
+const STILL_STATUS_BY_NAME: Record<string, string> = {
+  web: "Still searching",
+  grep: "Still searching",
+  glob: "Still looking for files",
+  image_gen: "Still drawing",
+  bash: "Still running it",
+  exec_command: "Still running it",
+  code: "Still running code",
+  node_repl: "Still running code",
+  read: "Still reading",
+  write: "Still writing",
+  edit: "Still making changes",
+  str_replace: "Still making changes",
+  apply_patch: "Still making changes",
+  view_image: "Still looking",
+  browser: "Still browsing",
+  computer_use: "Still using the computer",
+  html: "Still building it",
+  context: "Still looking back",
+  remember: "Still making a note",
+  schedule: "Still scheduling",
+  schedule_add: "Still scheduling",
+  ask_user: "Still waiting on you",
+  request_secure_input: "Still waiting on you",
+  request_credential: "Still asking for access",
+  spawn_agent: "Still on it",
+  send_message: "Still on it",
+  task: "Still on it",
+};
+
+/**
+ * The label a single tool call switches to, once, after it has run for a
+ * while: the tool's own "still" phrase, or a generic one.
+ */
+export function computeStillStatus(toolName: string): string {
+  return (
+    STILL_STATUS_BY_NAME[toToolStatusKey(toolName)] ?? "Still working on it"
+  );
+}
+
 export function computeStatus({
   toolName,
   seed,

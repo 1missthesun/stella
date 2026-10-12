@@ -3,9 +3,11 @@ import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { ShimmerText } from "./ShimmerText";
 import { StellaMarkIndicator } from "./stella-mark/StellaMarkIndicator";
 import {
+  computeStillStatus,
   computeWorkingIndicatorStatus,
   getWorkingIndicatorThinkingText,
   WORKING_INDICATOR_LONG_THINKING_MS,
+  WORKING_INDICATOR_LONG_TOOL_MS,
   WORKING_INDICATOR_THINKING_LABEL_MS,
 } from "./working-indicator-status";
 import {
@@ -185,23 +187,37 @@ function SwapText({
   );
 }
 
-function useThinkingText(thinking: boolean): string {
-  const [startedAt, setStartedAt] = useState<number | null>(null);
+const STRETCH_MARKS_MS = [
+  WORKING_INDICATOR_THINKING_LABEL_MS,
+  WORKING_INDICATOR_LONG_THINKING_MS,
+  WORKING_INDICATOR_LONG_TOOL_MS,
+];
+
+/**
+ * How long the current stretch (a spell of thinking, or one tool call) has
+ * run, re-rendering as it crosses each label threshold. A new stretch reads
+ * zero from its first render, so a fresh tool never inherits the last one's
+ * age.
+ */
+function useStretchElapsedMs(stretch: string | null): number {
+  const [started, setStarted] = useState<{
+    stretch: string;
+    at: number;
+  } | null>(null);
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (!thinking) {
-      setStartedAt(null);
+    if (stretch === null) {
+      setStarted(null);
       return;
     }
-    setStartedAt(Date.now());
-    const timers = [
-      WORKING_INDICATOR_THINKING_LABEL_MS,
-      WORKING_INDICATOR_LONG_THINKING_MS,
-    ].map((ms) => setTimeout(() => setTick((tick) => tick + 1), ms));
+    setStarted({ stretch, at: Date.now() });
+    const timers = STRETCH_MARKS_MS.map((ms) =>
+      setTimeout(() => setTick((tick) => tick + 1), ms),
+    );
     return () => timers.forEach((timer) => clearTimeout(timer));
-  }, [thinking]);
-  if (!thinking || startedAt === null) return "";
-  return getWorkingIndicatorThinkingText(Date.now() - startedAt);
+  }, [stretch]);
+  if (stretch === null || started?.stretch !== stretch) return 0;
+  return Date.now() - started.at;
 }
 
 /**
@@ -245,10 +261,25 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     toolName,
     seed: toolCallId ?? reasoningSeed,
   });
-  const thinkingText = useThinkingText(active && !toolStatus);
+  const stretchMs = useStretchElapsedMs(
+    !active
+      ? null
+      : toolName
+        ? `tool:${toolCallId ?? toolName}`
+        : toolStatus
+          ? null
+          : "thinking",
+  );
+  const thinkingText = toolStatus
+    ? ""
+    : getWorkingIndicatorThinkingText(stretchMs);
+  const shownToolStatus =
+    toolName && stretchMs >= WORKING_INDICATOR_LONG_TOOL_MS
+      ? computeStillStatus(toolName)
+      : toolStatus;
   const liveDisplay = useMemo(
     () => ({
-      status: toolStatus || thinkingText,
+      status: shownToolStatus || thinkingText,
       thinking: !toolStatus,
       characterState: getWorkingIndicatorCharacterState(
         toolName,
@@ -256,7 +287,15 @@ export const WorkingIndicator = memo(function WorkingIndicator({
         previousPoseRef.current,
       ),
     }),
-    [poseEpoch, reasoningSeed, thinkingText, toolCallId, toolName, toolStatus],
+    [
+      poseEpoch,
+      reasoningSeed,
+      shownToolStatus,
+      thinkingText,
+      toolCallId,
+      toolName,
+      toolStatus,
+    ],
   );
   previousPoseRef.current = liveDisplay.characterState;
   const labelledDisplay = liveDisplay;

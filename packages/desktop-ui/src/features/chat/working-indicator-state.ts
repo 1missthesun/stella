@@ -21,6 +21,8 @@ export const WORKING_INDICATOR_COMPACTING_TEXT = "Compacting";
  */
 export const WORKING_INDICATOR_THINKING_LABEL_MS = 3500;
 export const WORKING_INDICATOR_LONG_THINKING_MS = 15000;
+/** One tool call this long switches its label once to the "still" form. */
+export const WORKING_INDICATOR_LONG_TOOL_MS = 15000;
 export const WORKING_INDICATOR_THINKING_TEXT = "Thinking";
 export const WORKING_INDICATOR_LONG_THINKING_TEXT = "Thinking it through";
 

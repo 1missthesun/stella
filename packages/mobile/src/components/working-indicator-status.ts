@@ -541,6 +541,46 @@ export function normalizeDisplayStatusText(
   return trimmed;
 }
 
+const STILL_STATUS_BY_NAME: Record<string, string> = {
+  web: "Still searching",
+  grep: "Still searching",
+  glob: "Still looking for files",
+  image_gen: "Still drawing",
+  bash: "Still running it",
+  exec_command: "Still running it",
+  code: "Still running code",
+  node_repl: "Still running code",
+  read: "Still reading",
+  write: "Still writing",
+  edit: "Still making changes",
+  str_replace: "Still making changes",
+  apply_patch: "Still making changes",
+  view_image: "Still looking",
+  browser: "Still browsing",
+  computer_use: "Still using the computer",
+  html: "Still building it",
+  context: "Still looking back",
+  remember: "Still making a note",
+  schedule: "Still scheduling",
+  schedule_add: "Still scheduling",
+  ask_user: "Still waiting on you",
+  request_secure_input: "Still waiting on you",
+  request_credential: "Still asking for access",
+  spawn_agent: "Still on it",
+  send_message: "Still on it",
+  task: "Still on it",
+};
+
+/**
+ * The label a single tool call switches to, once, after it has run for a
+ * while: the tool's own "still" phrase, or a generic one.
+ */
+export function computeStillStatus(toolName: string): string {
+  return (
+    STILL_STATUS_BY_NAME[toToolStatusKey(toolName)] ?? "Still working on it"
+  );
+}
+
 /**
  * Thinking stays bare dots while it is short. A stretch of thinking that
  * lasts gets one calm label, and a long one switches once to a second; the
@@ -548,6 +588,8 @@ export function normalizeDisplayStatusText(
  */
 export const WORKING_INDICATOR_THINKING_LABEL_MS = 3500;
 export const WORKING_INDICATOR_LONG_THINKING_MS = 15000;
+/** One tool call this long switches its label once to the "still" form. */
+export const WORKING_INDICATOR_LONG_TOOL_MS = 15000;
 
 export function getWorkingIndicatorThinkingText(elapsedMs: number): string {
   if (elapsedMs >= WORKING_INDICATOR_LONG_THINKING_MS) {

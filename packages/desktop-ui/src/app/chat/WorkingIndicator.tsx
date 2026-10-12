@@ -5,6 +5,7 @@ import { cn } from "@/shared/lib/utils";
 import { StellaCharacter } from "@/ui/stella-character/StellaCharacter";
 import { SwapText } from "./SwapText";
 import { CHAT_ACTIVITY_SHIMMER_GROUP } from "./TextShimmer";
+import { computeStillStatus } from "@/features/chat/status-utils";
 import {
   getWorkingIndicatorCharacterState,
   getWorkingIndicatorDisplayStatus,
@@ -12,6 +13,7 @@ import {
   INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS,
   WORKING_INDICATOR_COMPACTING_TEXT,
   WORKING_INDICATOR_LONG_THINKING_MS,
+  WORKING_INDICATOR_LONG_TOOL_MS,
   WORKING_INDICATOR_POSE_ROTATE_MS,
   WORKING_INDICATOR_THINKING_LABEL_MS,
   type WorkingIndicatorCharacterState,
@@ -41,24 +43,37 @@ interface WorkingIndicatorProps {
   minimumVisibleMs?: number;
 }
 
-function useThinkingText(thinking: boolean): string {
-  const [startedAt, setStartedAt] = useState<number | null>(null);
+const STRETCH_MARKS_MS = [
+  WORKING_INDICATOR_THINKING_LABEL_MS,
+  WORKING_INDICATOR_LONG_THINKING_MS,
+  WORKING_INDICATOR_LONG_TOOL_MS,
+];
+
+/**
+ * How long the current stretch (a spell of thinking, or one tool call) has
+ * run, re-rendering as it crosses each label threshold. A new stretch reads
+ * zero from its first render, so a fresh tool never inherits the last one's
+ * age.
+ */
+function useStretchElapsedMs(stretch: string | null): number {
+  const [started, setStarted] = useState<{
+    stretch: string;
+    at: number;
+  } | null>(null);
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (!thinking) {
-      setStartedAt(null);
+    if (stretch === null) {
+      setStarted(null);
       return;
     }
-    const began = Date.now();
-    setStartedAt(began);
-    const timers = [
-      WORKING_INDICATOR_THINKING_LABEL_MS,
-      WORKING_INDICATOR_LONG_THINKING_MS,
-    ].map((ms) => window.setTimeout(() => setTick((tick) => tick + 1), ms));
+    setStarted({ stretch, at: Date.now() });
+    const timers = STRETCH_MARKS_MS.map((ms) =>
+      window.setTimeout(() => setTick((tick) => tick + 1), ms),
+    );
     return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, [thinking]);
-  if (!thinking || startedAt === null) return "";
-  return getWorkingIndicatorThinkingText(Date.now() - startedAt);
+  }, [stretch]);
+  if (stretch === null || started?.stretch !== stretch) return 0;
+  return Date.now() - started.at;
 }
 
 export function WorkingIndicator({
@@ -91,9 +106,15 @@ export function WorkingIndicator({
     undefined,
   );
 
-  const thinkingText = useThinkingText(
-    !toolName && Boolean(isReasoning) && !compacting,
+  const thinking = !toolName && Boolean(isReasoning) && !compacting;
+  const stretchMs = useStretchElapsedMs(
+    toolName ? `tool:${toolCallId ?? toolName}` : thinking ? "thinking" : null,
   );
+  const thinkingText = thinking
+    ? getWorkingIndicatorThinkingText(stretchMs)
+    : "";
+  const longTool =
+    Boolean(toolName) && stretchMs >= WORKING_INDICATOR_LONG_TOOL_MS;
 
   // Pose and label are held as one tuple so they can never disagree: holding
   // them separately would let a stale label sit under the next activity's
@@ -109,7 +130,13 @@ export function WorkingIndicator({
       status:
         characterState === "thinking"
           ? thinkingText
-          : getWorkingIndicatorDisplayStatus({ status, toolName, toolCallId }),
+          : longTool && toolName
+            ? computeStillStatus(toolName)
+            : getWorkingIndicatorDisplayStatus({
+                status,
+                toolName,
+                toolCallId,
+              }),
       characterState,
     };
   }, [
@@ -120,6 +147,7 @@ export function WorkingIndicator({
     reasoningSeed,
     poseEpoch,
     thinkingText,
+    longTool,
   ]);
   previousPoseRef.current = liveDisplay.characterState;
   // Dots have no text to read: a tool can replace them immediately.

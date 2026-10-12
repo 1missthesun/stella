@@ -373,55 +373,6 @@ export const isAgentProgressEvent = createEventGuard<AgentProgressEventPayload>(
   ['agentId', 'statusText'],
 )
 
-export function extractToolTitle(event: EventRecord): string {
-  if (!isToolRequest(event)) return ''
-
-  const { toolName, args } = event.payload
-
-  const str = (v: unknown) => v as string
-
-  switch (toolName.toLowerCase()) {
-    case 'read':
-      return args?.path ? str(args.path).split('/').pop()! : 'Reading file'
-    case 'write':
-      return args?.path ? str(args.path).split('/').pop()! : 'Writing file'
-    case 'edit':
-      return args?.path ? str(args.path).split('/').pop()! : 'Editing file'
-    case 'grep':
-      return args?.pattern ? `"${str(args.pattern).slice(0, 30)}"` : 'Searching'
-    case 'executetypescript':
-      return args?.summary
-        ? str(args.summary).slice(0, 40)
-        : 'Running code mode'
-    case 'glob':
-      return args?.pattern ? str(args.pattern) : 'Finding files'
-    case 'bash':
-      return args?.command
-        ? str(args.command).slice(0, 40) +
-            (str(args.command).length > 40 ? '...' : '')
-        : 'Running command'
-    case 'webfetch':
-      return args?.url ? new URL(str(args.url)).hostname : 'Fetching'
-    case 'web':
-      if (args?.url) {
-        try {
-          return new URL(str(args.url)).hostname
-        } catch {
-          return 'Fetching'
-        }
-      }
-      return args?.query
-        ? `"${str(args.query).slice(0, 40)}${str(args.query).length > 40 ? '…' : ''}"`
-        : 'Searching the web'
-    case 'task':
-      return args?.description
-        ? str(args.description).slice(0, 40)
-        : 'Delegating'
-    default:
-      return toolName
-  }
-}
-
 /**
  * One persisted ownership tree rooted at a Manager (or any future nested
  * owner). `parentAgentId` is the only edge source; labels/group names never

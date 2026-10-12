@@ -133,10 +133,34 @@ const runElectronPids = (run) => {
   return pids;
 };
 
+/**
+ * The run's Electron main process. Matched by binary rather than by the
+ * run's environment: the runtime shares that environment, and a relaunched
+ * main process no longer has it.
+ */
+const runMainPid = (run) => {
+  if (process.platform !== "linux") return run.electronPid;
+  const electron = path.join(appDir, "node_modules");
+  for (const entry of readdirSync("/proc")) {
+    if (!/^\d+$/.test(entry)) continue;
+    try {
+      // Chromium rewrites its command line, NULs to spaces, in some processes.
+      const cmdline = readFileSync(`/proc/${entry}/cmdline`, "utf8");
+      const binary = cmdline.split(/[\0 ]/)[0];
+      if (binary.startsWith(electron) && /\/electron$/.test(binary) && !cmdline.includes("--type=")) {
+        return Number(entry);
+      }
+    } catch {
+      // Gone, or not ours.
+    }
+  }
+  return undefined;
+};
+
 const stop = () => {
   if (!existsSync(pointerFile)) return;
   const run = readRun();
-  for (const pid of runElectronPids(run)) {
+  for (const pid of new Set([...runElectronPids(run), runMainPid(run)].filter(Boolean))) {
     try {
       process.kill(pid, "SIGTERM");
     } catch {
@@ -500,7 +524,7 @@ const iterate = async (variation) => {
     const name = `bench-${variation}-${nonce}`;
     const commit = commitOnto(change.base, change.files, `Update bench: ${variation} ${nonce}${change.note ? ` (${change.note})` : ""}`);
     const prepareTail = new LogTail(run);
-    const prepareResources = new ResourceSampler(runElectronPids(run)[0]);
+    const prepareResources = new ResourceSampler(runMainPid(run));
     const createdAt = Date.now();
     git(appDir, ["branch", "--force", `draft/${name}`, commit]);
     // As the user sees it: the draft offered in Updates (which also loads the
@@ -536,7 +560,7 @@ const iterate = async (variation) => {
   const kind = KIND[variation];
   const tail = new LogTail(run);
   const oldPids = new Set(runElectronPids(run));
-  const clickResources = new ResourceSampler([...oldPids][0]);
+  const clickResources = new ResourceSampler(runMainPid(run));
   const t0 = Date.now();
   await evaluate(run.cdpPort, `(${action}.then((result) => { window.__benchResult = result; }), true)`);
   const deadline = t0 + 120_000;

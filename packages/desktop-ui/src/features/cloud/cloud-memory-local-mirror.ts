@@ -20,6 +20,3 @@ export const mirrorCloudMemoryPreferenceLocally = (
   return mirrorQueue;
 };
 
-export const resetCloudMemoryLocalMirrorForTests = (): void => {
-  mirrorQueue = Promise.resolve(true);
-};

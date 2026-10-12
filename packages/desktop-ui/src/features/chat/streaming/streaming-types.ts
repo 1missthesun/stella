@@ -51,52 +51,6 @@ export type StreamingAssistantOverlay = {
   locked?: boolean;
 };
 
-/** Adopt the provider's finalized text and persisted id for a slot. */
-export const reconcileStreamingAssistantCanonicalMessage = (
-  overlays: StreamingAssistantOverlay[],
-  args: {
-    userMessageId: string;
-    indexInTurn: number;
-    canonicalMessageId?: string;
-    canonicalText: string;
-    replyRefs?: ReplyRef[];
-  },
-): StreamingAssistantOverlay[] => {
-  const index = overlays.findIndex(
-    (overlay) =>
-      overlay.userMessageId === args.userMessageId &&
-      overlay.indexInTurn === args.indexInTurn,
-  );
-  if (index < 0) return overlays;
-  const current = overlays[index]!;
-  const canonicalMessageId =
-    args.canonicalMessageId ?? current.canonicalMessageId;
-  const replyRefs = args.replyRefs ?? current.replyRefs;
-  if (
-    current.text === args.canonicalText &&
-    current.locked &&
-    current.canonicalMessageId === canonicalMessageId &&
-    replyRefs === current.replyRefs
-  ) {
-    return overlays;
-  }
-  const next = overlays.slice();
-  next[index] = {
-    ...current,
-    text: args.canonicalText,
-    locked: true,
-    ...(canonicalMessageId ? { canonicalMessageId } : {}),
-    ...(replyRefs && replyRefs.length > 0 ? { replyRefs } : {}),
-  };
-  return next;
-};
-
-/** Stable synthetic id used for both the overlay row and its React key. */
-export const streamingAssistantOverlayId = (
-  userMessageId: string,
-  indexInTurn: number,
-): string => `stream-overlay:${userMessageId}:${indexInTurn}`;
-
 /** Stable scroll-follow / React row key for an assistant slot in a turn. */
 export const assistantScrollFollowKey = (
   userMessageId: string,

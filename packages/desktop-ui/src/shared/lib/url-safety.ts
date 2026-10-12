@@ -29,7 +29,6 @@ const sanitizeUrl = (
   }
 };
 
-const EXTERNAL_LINK_PROTOCOLS = new Set(["http:", "https:"]);
 const ATTACHMENT_IMAGE_PROTOCOLS = new Set([
   "http:",
   "https:",
@@ -37,9 +36,6 @@ const ATTACHMENT_IMAGE_PROTOCOLS = new Set([
   "blob:",
   "file:",
 ]);
-
-export const sanitizeExternalLinkUrl = (value: unknown): string | null =>
-  sanitizeUrl(value, EXTERNAL_LINK_PROTOCOLS);
 
 export const sanitizeAttachmentImageUrl = (value: unknown): string | null =>
   sanitizeUrl(value, ATTACHMENT_IMAGE_PROTOCOLS);

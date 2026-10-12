@@ -2,7 +2,6 @@ import { type ReactNode } from "react";
 import { useFullShellChat } from "@/shell/use-full-shell-chat";
 import { ChatRuntimeContext } from "@/context/chat-runtime-context";
 import { ChatMessagesContext } from "@/context/chat-messages-context";
-import { isTraceDiagnosticsEnabled } from "@/platform/diagnostics/trace-store";
 
 /**
  * Hoists `useFullShellChat`'s output into a single Context so the chat
@@ -31,9 +30,6 @@ export function ChatRuntimeProvider({
   const { runtime, messages } = useFullShellChat({
     activeConversationId,
     isOnChatRoute,
-    // Trace diagnostics are an explicit opt-in that defaults OFF, not a
-    // build-mode consequence: see isTraceDiagnosticsEnabled.
-    traceEnabled: isTraceDiagnosticsEnabled(),
   });
 
   return (

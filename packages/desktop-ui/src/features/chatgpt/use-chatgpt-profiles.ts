@@ -107,4 +107,3 @@ export function useChatGptProfiles() {
   };
 }
 
-export type ChatGptProfiles = ReturnType<typeof useChatGptProfiles>;

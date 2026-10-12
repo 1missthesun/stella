@@ -25,7 +25,6 @@ import { canvasShareBaseUrl } from "@/shared/lib/canvas-share";
 
 export type PublishedCanvasShare = PublishedShare;
 export type SharedCanvasLink = ShareLink;
-export type SavedCanvasLink = SavedCanvasShare;
 export type CanvasLinkVisibility = ShareVisibility;
 
 export type CanvasShareContextValue = {

@@ -457,14 +457,3 @@ export const useLineageMessages = (
   return useMemo(() => ({ ...snapshot, loadOlder }), [snapshot, loadOlder]);
 };
 
-export const __testing = {
-  reset(): void {
-    for (const entry of entries.values()) {
-      if (entry.refreshTimer !== null) window.clearTimeout(entry.refreshTimer);
-    }
-    entries.clear();
-    providedSources.clear();
-    updateUnsubscribe?.();
-    updateUnsubscribe = null;
-  },
-};

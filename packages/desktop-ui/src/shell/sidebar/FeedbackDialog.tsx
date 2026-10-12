@@ -106,20 +106,6 @@ const FeedbackForm = ({ onCancel, onSubmitted }: FeedbackFormProps) => {
   );
 };
 
-interface FeedbackPanelProps {
-  onDone: () => void;
-  onSubmitted?: () => void;
-}
-
-export const FeedbackPanel = ({
-  onDone,
-  onSubmitted,
-}: FeedbackPanelProps) => (
-  <div className="sidebar-feedback-panel">
-    <FeedbackForm onCancel={onDone} onSubmitted={onSubmitted} />
-  </div>
-);
-
 export const FeedbackDialog = ({
   open,
   onOpenChange,

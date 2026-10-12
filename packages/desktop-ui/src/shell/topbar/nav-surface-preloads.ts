@@ -21,9 +21,6 @@ export const preloadAuthDialog = () =>
 export const preloadBillingScreen = () =>
   runOnce("billing", () => import("@/global/billing/BillingScreen"));
 
-export const preloadConnectDialog = () =>
-  runOnce("connect", () => import("@/global/integrations/ConnectDialog"));
-
 export const preloadModelsPicker = () =>
   runOnce("models-picker", async () => {
     const mod = await import("@/global/settings/AgentModelPicker");

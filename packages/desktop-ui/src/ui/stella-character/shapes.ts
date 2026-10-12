@@ -69,8 +69,6 @@ const PEAKS = (() => {
   return found;
 })();
 
-export const RAY_COUNT = PEAKS.length;
-
 const EVEN_ANGLES = PEAKS.map(
   (_, k) => -Math.PI / 2 + (k * TAU) / PEAKS.length,
 );
@@ -176,7 +174,6 @@ export const SHAPES = {
 };
 
 export const ORB_RING = SHAPES.orb.ring;
-export const ORB_PATH = SHAPES.orb.path;
 
 export const SPARKLE_PATH = (() => {
   const pts: string[] = [];

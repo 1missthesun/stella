@@ -123,7 +123,3 @@ export const getEmojiSheets = (): readonly (readonly string[])[] =>
 
 export const getEmojiSheetGridSize = (): number => EMOJI_SHEET_GRID_SIZE;
 
-export const getEmojiSheetCellCount = (): number => {
-  const size = getEmojiSheetGridSize();
-  return size * size;
-};

@@ -26,8 +26,6 @@ const emit = () => {
   for (const listener of listeners) listener(current);
 };
 
-export const getConversationFocus = (): ConversationFocus | null => current;
-
 export const openConversationFocus = (focus: ConversationFocus): void => {
   if (
     current &&
@@ -75,9 +73,3 @@ export const useConversationFocus = (
   return focus;
 };
 
-export const __testing = {
-  reset(): void {
-    current = null;
-    listeners.clear();
-  },
-};

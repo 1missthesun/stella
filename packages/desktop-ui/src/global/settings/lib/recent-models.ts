@@ -47,20 +47,6 @@ export const recordRecentModel = (modelId: string): string[] => {
 };
 
 /**
- * Drop persisted recents that no longer resolve to a selectable model
- * (provider disconnected, catalog entry removed, local model deleted).
- * Returns the surviving list; persists only when something was pruned.
- */
-export const pruneRecentModels = (
-  isKnownModelId: (modelId: string) => boolean,
-): string[] => {
-  const current = readRecentModels();
-  const next = current.filter(isKnownModelId);
-  if (next.length !== current.length) writeRecentModels(next);
-  return next;
-};
-
-/**
  * Namespaces whose model-id space is open-ended, so a typed custom id is
  * valid WITHOUT appearing in the merged catalog. Pass-through gateways
  * (OpenRouter, Vercel AI Gateway) accept arbitrary `<vendor>/<model>` slugs

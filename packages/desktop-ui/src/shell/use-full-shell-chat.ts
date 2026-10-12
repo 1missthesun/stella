@@ -19,7 +19,6 @@ import {
 import { takePendingComposerDraft } from "@/global/onboarding/chat/pending-handoff";
 import { useStreamingChat } from "@/features/chat/hooks/use-streaming-chat";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
-import { useTraceEventMonitor } from "@/platform/diagnostics/use-trace-listener";
 import { buildActivityTasks } from "@/features/chat/lib/event-transforms";
 import { useCapturedChatContext } from "./use-captured-chat-context";
 import { useChatScrollManagement } from "./use-chat-scroll-management";
@@ -140,11 +139,9 @@ export const createConversationScrollMemoryCleanup = ({
 export function useFullShellChat({
   activeConversationId,
   isOnChatRoute,
-  traceEnabled,
 }: {
   activeConversationId: string | null;
   isOnChatRoute: boolean;
-  traceEnabled: boolean;
 }) {
   const { cloudFeaturesEnabled, storageMode } = useChatStore();
   const { accountScope } = useCloudConversationSession();
@@ -503,23 +500,6 @@ export function useFullShellChat({
     optimisticEvents,
     streamingAssistants: NO_STREAMING_ASSISTANTS,
   });
-  // Opt-in event trace consumes the union of activity + message + the
-  // per-turn tool events. The hook's internal `seenIds` set keeps it
-  // idempotent across re-runs, so we can rebuild the list cheaply on
-  // every tick without double-firing trace entries. Gated on `traceEnabled`
-  // (explicit opt-in) rather than a build-mode flag, so the array stays empty
-  // unless someone asked for tracing.
-  const traceEvents = useMemo(() => {
-    if (!traceEnabled) return [];
-    const out = [];
-    for (const event of activities) out.push(event);
-    for (const message of persistedMessages) {
-      out.push(message);
-      for (const toolEvent of message.toolEvents) out.push(toolEvent);
-    }
-    return out;
-  }, [activities, traceEnabled, persistedMessages]);
-  useTraceEventMonitor(traceEnabled, traceEvents);
   const hasMessages = displayMessages.length > 0;
   const conversationAsks = useConversationUserAsks(activeConversationId);
   const hasOpenQuestion = conversationAsks.some(

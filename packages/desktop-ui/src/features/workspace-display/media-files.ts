@@ -11,7 +11,6 @@ export const SUPPORTED_MEDIA_MIME_PREFIXES = [
   "video/",
   "audio/",
 ] as const;
-export const SUPPORTED_MEDIA_ACCEPT = "image/*,video/*,audio/*";
 
 export const isSupportedMediaMime = (type: string): boolean =>
   SUPPORTED_MEDIA_MIME_PREFIXES.some((prefix) => type.startsWith(prefix));

@@ -293,36 +293,6 @@ export const getBackgroundWorks = (
   return cards;
 };
 
-/**
- * Run-scoped "paused" subset for a background-work card: threads whose
- * latest `agent-canceled` (a) postdates this card's spawn and (b) is not
- * outdated by a completion. The orchestrator's pause_agent lands as an
- * agent-canceled lifecycle event and the runtime's thread live-state
- * (`deriveRuntimeThreadLiveState`) reads any non-running thread as
- * paused/resumable, so this is the reload-safe mirror of that signal for
- * the inline card. A resume emits a fresh `agent-started` whose newer card
- * supersedes the paused one.
- */
-export const derivePausedThreadIds = (
-  threadIds: readonly string[],
-  spawnedAtMs: Record<string, number>,
-  completedAtMsById: ReadonlyMap<string, number>,
-  canceledAtMsById: ReadonlyMap<string, number>,
-): string[] =>
-  threadIds.filter((id) => {
-    const canceledAt = canceledAtMsById.get(id);
-    const spawnedAt = spawnedAtMs[id];
-    if (
-      canceledAt === undefined ||
-      spawnedAt === undefined ||
-      canceledAt < spawnedAt
-    ) {
-      return false;
-    }
-    const completedAt = completedAtMsById.get(id);
-    return completedAt === undefined || canceledAt > completedAt;
-  });
-
 const getCwd = (events: readonly EventRecord[]): string | undefined => {
   for (let index = events.length - 1; index >= 0; index -= 1) {
     const event = events[index];

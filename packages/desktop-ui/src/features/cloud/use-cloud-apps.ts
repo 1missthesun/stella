@@ -11,7 +11,6 @@ export type CloudAppsState = {
   error: string | null;
   httpOrigin: string | null;
 };
-export const isDeployedCloudApp = (app: CloudApp) => app.status === "ready";
 // Every poll is a backend round trip against the owner's objects, so this
 // refreshes slowly and only while the window is actually being looked at; a
 // window that comes back to the foreground refreshes immediately.

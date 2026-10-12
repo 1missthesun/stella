@@ -108,38 +108,6 @@ const DropdownMenuRadioItem = React.forwardRef<
 ));
 DropdownMenuRadioItem.displayName = "DropdownMenuRadioItem";
 
-const DropdownMenuSub = DropdownMenuPrimitive.Sub;
-
-const DropdownMenuSubTrigger = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.SubTrigger>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubTrigger>
->(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.SubTrigger
-    ref={ref}
-    data-slot="dropdown-menu-sub-trigger"
-    className={cn(className)}
-    {...props}
-  />
-));
-DropdownMenuSubTrigger.displayName = "DropdownMenuSubTrigger";
-
-const DropdownMenuSubContent = React.forwardRef<
-  React.ElementRef<typeof DropdownMenuPrimitive.SubContent>,
-  React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.SubContent>
->(({ className, collisionPadding = 8, ...props }, ref) => (
-  <DropdownMenuPrimitive.Portal>
-    <DropdownMenuPrimitive.SubContent
-      ref={ref}
-      collisionPadding={collisionPadding}
-      data-component="dropdown-menu-content"
-      data-slot="dropdown-menu-sub-content"
-      className={cn(className)}
-      {...props}
-    />
-  </DropdownMenuPrimitive.Portal>
-));
-DropdownMenuSubContent.displayName = "DropdownMenuSubContent";
-
 export {
   DropdownMenuRoot as DropdownMenu,
   DropdownMenuTrigger,
@@ -149,7 +117,4 @@ export {
   DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 };

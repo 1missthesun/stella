@@ -200,11 +200,3 @@ export const subscribeToLocalActivityWindow = (
   };
 };
 
-export const __privateLocalActivityStore = {
-  handleLocalChatUpdated,
-  resetForTests() {
-    unsubscribeLocalChatUpdates?.();
-    unsubscribeLocalChatUpdates = null;
-    localActivityWindows.clear();
-  },
-};

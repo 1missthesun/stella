@@ -1,14 +1,8 @@
-import type { OpenTabOptions } from "./types";
-
 export const CHAT_DISPLAY_TAB_ID = "chat";
 export const HOME_DISPLAY_TAB_ID = "home";
 export const TRASH_DISPLAY_TAB_ID = "trash:deferred-delete";
 
 type WorkspaceDefaultTabsAdapter = {
-  openChatDisplayTab: (openRequest?: unknown, opts?: OpenTabOptions) => void;
-  openHomeDisplayTab: () => void;
-  ensureChatDisplayTab: () => void;
-  openTrashDisplayTab: () => void;
   openModelPicker: () => void;
 };
 
@@ -26,25 +20,6 @@ const getAdapter = (): WorkspaceDefaultTabsAdapter => {
   }
   return adapter;
 };
-
-export function openChatDisplayTab(
-  openRequest: unknown = null,
-  opts?: OpenTabOptions,
-): void {
-  getAdapter().openChatDisplayTab(openRequest, opts);
-}
-
-export function openHomeDisplayTab(): void {
-  getAdapter().openHomeDisplayTab();
-}
-
-export function ensureChatDisplayTab(): void {
-  getAdapter().ensureChatDisplayTab();
-}
-
-export function openTrashDisplayTab(): void {
-  getAdapter().openTrashDisplayTab();
-}
 
 export function openModelPicker(): void {
   getAdapter().openModelPicker();

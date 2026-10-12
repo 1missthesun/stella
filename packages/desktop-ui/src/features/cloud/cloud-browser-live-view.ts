@@ -16,7 +16,3 @@ export const parseCloudBrowserLiveViewUrl = (value: string): URL | null => {
   }
 };
 
-export const isCloudBrowserLiveViewNavigationAllowed = (
-  value: string,
-): boolean =>
-  value === "about:blank" || parseCloudBrowserLiveViewUrl(value) !== null;

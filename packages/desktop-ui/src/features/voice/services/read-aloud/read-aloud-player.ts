@@ -341,14 +341,6 @@ export function stopReadAloud(): void {
   stopCurrent();
 }
 
-export function disposeReadAloud(): void {
-  stopCurrent();
-  if (context) {
-    context.close().catch(() => undefined);
-    context = null;
-  }
-}
-
 export function isReadAloudPlaying(): boolean {
   return currentSource !== null || currentStream !== null;
 }

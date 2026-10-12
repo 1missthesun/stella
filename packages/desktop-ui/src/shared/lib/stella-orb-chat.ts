@@ -17,28 +17,12 @@ export type StellaComposeTextDetail = {
   selectedText?: string | null;
 };
 
-export function dispatchOpenPanelChat(detail: StellaOpenPanelChatDetail = {}) {
-  window.dispatchEvent(
-    new CustomEvent<StellaOpenPanelChatDetail>(STELLA_OPEN_PANEL_CHAT_EVENT, {
-      detail,
-    }),
-  );
-}
-
 export function dispatchComposeText(detail: StellaComposeTextDetail) {
   window.dispatchEvent(
     new CustomEvent<StellaComposeTextDetail>(STELLA_COMPOSE_TEXT_EVENT, {
       detail,
     }),
   );
-}
-
-export function dispatchClosePanel() {
-  window.dispatchEvent(new CustomEvent(STELLA_CLOSE_PANEL_EVENT));
-}
-
-export function dispatchOpenWorkspacePanel() {
-  window.dispatchEvent(new CustomEvent(STELLA_OPEN_WORKSPACE_PANEL_EVENT));
 }
 
 export const STELLA_SHOW_HOME_EVENT = "stella:show-home";
@@ -48,6 +32,3 @@ export function dispatchShowHome() {
   window.dispatchEvent(new CustomEvent(STELLA_SHOW_HOME_EVENT));
 }
 
-export function dispatchEnterChat() {
-  window.dispatchEvent(new CustomEvent(STELLA_ENTER_CHAT_EVENT));
-}

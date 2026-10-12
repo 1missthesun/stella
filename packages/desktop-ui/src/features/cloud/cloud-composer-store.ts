@@ -1,14 +1,3 @@
-/**
- * What is attached to the next turn.
- *
- * There is no destination setting: a turn runs where its subject lives. The
- * web/mobile interior has no local runtime, so its turns run in the cloud;
- * desktop chats with its local runtime and reaches the owner's cloud world
- * through a spawn placed there. Routing is a property of the request, never a
- * mode the user holds.
- */
-import { useSyncExternalStore } from "react";
-
 export const isWebShell = (): boolean =>
   typeof window !== "undefined" &&
   !(window as { electronAPI?: unknown }).electronAPI;
@@ -73,15 +62,6 @@ export const cloudAttachmentsStore = {
     return true;
   },
 };
-
-const EMPTY_ATTACHMENTS: readonly CloudAttachment[] = [];
-
-export const useCloudAttachments = (): readonly CloudAttachment[] =>
-  useSyncExternalStore(
-    cloudAttachmentsStore.subscribe,
-    cloudAttachmentsStore.getSnapshot,
-    () => EMPTY_ATTACHMENTS,
-  );
 
 /**
  * Attached drive files ride along as an addressable list in the prompt: the

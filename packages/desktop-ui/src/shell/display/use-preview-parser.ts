@@ -125,14 +125,3 @@ export function usePreviewParser(request: PreviewRequest | null) {
   return state?.request === request ? state : null;
 }
 
-export const __testing = {
-  reset() {
-    pending.clear();
-    terminateWorker();
-    nextRequestId = 1;
-  },
-  get worker() {
-    return worker;
-  },
-  requestPreview,
-};

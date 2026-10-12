@@ -314,10 +314,6 @@ const storageKeys = (storage: CloudConversationOutboxStorage): string[] => {
   return keys;
 };
 
-export type CloudConversationOutbox = ReturnType<
-  typeof createCloudConversationOutbox
->;
-
 export const createCloudConversationOutbox = (
   getStorage: () => CloudConversationOutboxStorage | null,
 ) => {
@@ -463,20 +459,8 @@ export const createCloudConversationOutbox = (
   };
 };
 
-let testStorage: CloudConversationOutboxStorage | null | undefined;
-
-const selectedStorage = (): CloudConversationOutboxStorage | null =>
-  testStorage === undefined ? browserStorage() : testStorage;
-
 export const cloudConversationOutbox =
-  createCloudConversationOutbox(selectedStorage);
-
-/** Unit tests install a real synchronous Storage-shaped adapter explicitly. */
-export const setCloudConversationOutboxStorageForTests = (
-  storage: CloudConversationOutboxStorage | null | undefined,
-): void => {
-  testStorage = storage;
-};
+  createCloudConversationOutbox(browserStorage);
 
 // ---------------------------------------------------------------- pending
 

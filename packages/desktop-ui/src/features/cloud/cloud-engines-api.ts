@@ -7,8 +7,6 @@ import type { ProviderSettings } from "@stella/contracts/backend/providers";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 
-export type CloudEngineSettings = EngineSettings;
-
 /** The account's live engine settings; undefined while loading or skipped. */
 export const useCloudEngines = (enabled: boolean): EngineSettings | undefined =>
   useBackendValue("engines.get", enabled ? {} : "skip");

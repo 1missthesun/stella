@@ -129,10 +129,5 @@ export function openModelPicker(): void {
 }
 
 registerWorkspaceDefaultTabs({
-  openChatDisplayTab: (openRequest, opts) =>
-    openChatDisplayTab(openRequest as ChatPanelOpenRequest | null, opts),
-  openHomeDisplayTab,
-  ensureChatDisplayTab,
-  openTrashDisplayTab,
   openModelPicker,
 });

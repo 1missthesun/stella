@@ -33,7 +33,6 @@ import {
 } from "./audience";
 import { i18nFallback } from "@/shared/i18n/I18nProvider";
 import type { ToastOptions } from "@/ui/toast";
-import { showToast } from "@/ui/toast";
 
 // Re-exported so UI code has one import for everything capability-shaped
 // and never has to reach past this module into the contract.
@@ -187,17 +186,6 @@ export const getCapabilityRestrictionDescription = (
     : t("billing.capabilityRestriction.upgrade", { capability, plan });
 };
 
-/** Short lock annotation for a pre-emptively disabled affordance. */
-export const getCapabilityLockLabel = (
-  restriction: CapabilityRestriction,
-  t: Translate = defaultTranslate,
-): string =>
-  restriction.minimumPlan
-    ? t("billing.capabilityRestriction.lockedBadge", {
-        plan: getPlanLabel(restriction.minimumPlan),
-      })
-    : t("billing.capabilityRestriction.lockedBadgeGeneric");
-
 /* ── Toast ── */
 
 const openBilling = () => {
@@ -233,22 +221,3 @@ export const buildCapabilityRestrictionToast = (
   },
 });
 
-/**
- * Fire the restriction toast for `capability` and report whether the
- * user is blocked. Callers use the boolean to bail out of the action
- * they were about to take.
- */
-export const notifyCapabilityRestriction = (
-  capability: Capability,
-  options: {
-    audience?: ManagedModelAudience | null;
-    t?: Translate;
-  } = {},
-): boolean => {
-  const audience =
-    options.audience === undefined ? readBillingAudience() : options.audience;
-  const restriction = resolveCapabilityRestriction(audience, capability);
-  if (!restriction) return false;
-  showToast(buildCapabilityRestrictionToast(restriction, options.t));
-  return true;
-};

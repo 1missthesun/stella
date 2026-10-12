@@ -59,4 +59,3 @@ export function useClaudeLocalAccounts() {
   };
 }
 
-export type ClaudeLocalAccounts = ReturnType<typeof useClaudeLocalAccounts>;

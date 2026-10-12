@@ -11,7 +11,6 @@ export const stellaHostKind = (): StellaHostKind => {
 };
 
 export const isWebsiteHost = (): boolean => stellaHostKind() === "website";
-export const isDesktopHost = (): boolean => stellaHostKind() === "desktop";
 
 const browserCanSelectSpeaker = (): boolean =>
   typeof HTMLMediaElement !== "undefined" &&

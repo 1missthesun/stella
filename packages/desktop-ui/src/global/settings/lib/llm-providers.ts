@@ -76,11 +76,5 @@ export const LOCAL_MODEL_PROVIDER_KEYS = new Set(
   LLM_PROVIDERS.map((entry) => entry.key),
 );
 
-const byKey = new Map(LLM_PROVIDERS.map((entry) => [entry.key, entry]));
-
-export const getLlmProviderEntry = (
-  key: string,
-): LlmProviderEntry | undefined => byKey.get(key);
-
 export const isApiKeyOnlyPlaceholder = (placeholder: string) =>
   placeholder.trim().toLowerCase() === "oauth only";

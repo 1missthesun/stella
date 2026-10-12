@@ -84,9 +84,6 @@ const EMPTY_ACTIVITY: CloudActivity = {
   hasRunning: false,
 };
 
-/** The deepest the sidebar ever renders (`SEARCH_CAPS.activity`). */
-const ACTIVITY_THREAD_LIMIT = 40;
-
 const projectCloudActivity = (
   threads: readonly CloudAgentThread[] | undefined,
 ): CloudActivity => {
@@ -106,31 +103,6 @@ const projectCloudActivity = (
     threadsById,
     hasRunning: tasks.some((task) => task.status === "running"),
   };
-};
-
-/**
- * Every cloud thread the owner has, regardless of which cloud conversation it
- * hangs off. Desktop-dispatched agents, scheduled runs, and threads spawned
- * from the phone each land in a different conversation, and a thread that is
- * still running must stay in the sidebar no matter which of them the owner
- * touched last.
- */
-export const useCloudActivity = (): CloudActivity => {
-  const { isCloudConversationReady, ownerSubject } = useCloudConversationSession();
-  // Errors arrive as state, never as a throw: this runs in the left sidebar,
-  // which an unavailable backend must not take down.
-  const recent = useBackendView(
-    "agentThreads.recent",
-    isCloudConversationReady ? { limit: ACTIVITY_THREAD_LIMIT } : "skip",
-  );
-  const threads = useMemo(
-    () =>
-      recent.value
-        ? cloudThreadsForOwnerSubject(recent.value, ownerSubject)
-        : undefined,
-    [ownerSubject, recent.value],
-  );
-  return useMemo(() => projectCloudActivity(threads), [threads]);
 };
 
 export type CloudConversationActivity = CloudActivity & {

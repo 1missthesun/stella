@@ -48,20 +48,6 @@ type TimelineEntry = {
   stability: StableMessageListState | null;
 };
 
-export type MessageTimelineDebugStats = {
-  initialReads: number;
-  olderReads: number;
-  newerReads: number;
-  latestReads: number;
-  tailReads: number;
-  mergedRows: number;
-  maxResidentMessages: number;
-  activeEntries: number;
-  pendingReads: number;
-  retainedEntries: number;
-  residentMessages: number;
-};
-
 const EMPTY_SNAPSHOT: MessageTimelineSnapshot = {
   messages: [],
   hasLoaded: false,
@@ -75,24 +61,6 @@ const EMPTY_SNAPSHOT: MessageTimelineSnapshot = {
 const entries = new Map<string, TimelineEntry>();
 let updateUnsubscribe: (() => void) | null = null;
 let useCounter = 0;
-let debugStats: MessageTimelineDebugStats = createDebugStats();
-
-function createDebugStats(): MessageTimelineDebugStats {
-  return {
-    initialReads: 0,
-    olderReads: 0,
-    newerReads: 0,
-    latestReads: 0,
-    tailReads: 0,
-    mergedRows: 0,
-    maxResidentMessages: 0,
-    activeEntries: 0,
-    pendingReads: 0,
-    retainedEntries: 0,
-    residentMessages: 0,
-  };
-}
-
 function getApi() {
   if (typeof window === "undefined") return undefined;
   return window.electronAPI?.localChat;
@@ -125,7 +93,6 @@ function mergeOrderedMessages(
   current: MessageRecord[],
   incoming: MessageRecord[],
 ): MessageRecord[] {
-  debugStats.mergedRows += current.length + incoming.length;
   const byId = new Map<string, MessageRecord>();
   for (const message of current) byId.set(message._id, message);
   for (const message of incoming) byId.set(message._id, message);
@@ -299,16 +266,6 @@ function publish(entry: TimelineEntry, snapshot: MessageTimelineSnapshot) {
     }
   }
   touch(entry);
-  debugStats.maxResidentMessages = Math.max(
-    debugStats.maxResidentMessages,
-    entry.snapshot.messages.length,
-  );
-  debugStats.activeEntries = Array.from(entries.values()).filter(
-    (candidate) => candidate.listeners.size > 0,
-  ).length;
-  debugStats.pendingReads = Array.from(entries.values()).filter(
-    (candidate) => candidate.inFlight !== null,
-  ).length;
   for (const listener of entry.listeners) listener(entry.snapshot);
 }
 
@@ -366,7 +323,6 @@ function evictUnusedEntries() {
 function finishRead(entry: TimelineEntry, requestId: number) {
   if (entry.requestId !== requestId) return false;
   entry.inFlight = null;
-  debugStats.pendingReads = Math.max(0, debugStats.pendingReads - 1);
   const shouldRefreshTail = entry.queuedTailRefresh;
   const shouldRefreshLatest = entry.queuedLatestRefresh;
   entry.queuedTailRefresh = false;
@@ -391,8 +347,6 @@ async function readInitial(entry: TimelineEntry, kind: "initial" | "latest") {
 
   entry.inFlight = kind;
   const requestId = ++entry.requestId;
-  if (kind === "initial") debugStats.initialReads += 1;
-  else debugStats.latestReads += 1;
   setLoading(entry, kind, true);
 
   try {
@@ -452,7 +406,6 @@ async function readOlder(entry: TimelineEntry) {
 
   entry.inFlight = "older";
   const requestId = ++entry.requestId;
-  debugStats.olderReads += 1;
   setLoading(entry, "older", true);
 
   try {
@@ -525,7 +478,6 @@ async function readNewer(entry: TimelineEntry) {
   entry.inFlight = "newer";
   const requestId = ++entry.requestId;
   const mutationRevision = entry.mutationRevision;
-  debugStats.newerReads += 1;
   setLoading(entry, "newer", true);
 
   try {
@@ -614,8 +566,6 @@ async function readTail(entry: TimelineEntry) {
   entry.inFlight = "tail";
   const requestId = ++entry.requestId;
   const mutationRevision = entry.mutationRevision;
-  debugStats.tailReads += 1;
-  debugStats.pendingReads += 1;
   try {
     const result = await api.listMessagesAfter({
       conversationId: entry.conversationId,
@@ -995,131 +945,6 @@ function syncUpdateSubscription() {
 
 const detailReads = new Set<string>();
 
-/** Load at most one bounded page of complete turn events on explicit demand. */
-export async function loadLocalMessageToolEventPage(
-  conversationId: string,
-  messageId: string,
-): Promise<boolean> {
-  const api = getApi();
-  const entry = entries.get(conversationId);
-  const message = entry?.snapshot.messages.find(
-    (candidate) => candidate._id === messageId,
-  );
-  const readKey = `${conversationId}\n${messageId}`;
-  if (
-    !api?.listMessageToolEvents ||
-    !entry ||
-    !message ||
-    detailReads.has(readKey)
-  ) {
-    return false;
-  }
-  if (!message.toolEventSummary?.truncated) return false;
-  detailReads.add(readKey);
-  const restartFromBeginning = entry.detailResetRequired.delete(messageId);
-  const pinsAtReadStart = new Map(entry.liveToolEventPins.get(messageId) ?? []);
-  try {
-    const detailLoaded = message.toolEventSummary.detailLoaded === true;
-    const last =
-      !restartFromBeginning && detailLoaded
-        ? message.toolEventSummary?.detailCursor
-        : undefined;
-    const page = await api.listMessageToolEvents({
-      conversationId,
-      messageTimestampMs: message.timestamp,
-      messageId: message._id,
-      messageSequence: message.sequence,
-      ...(last
-        ? {
-            afterTimestampMs: last.timestamp,
-            afterId: last.id,
-            afterSequence: last.sequence,
-          }
-        : {}),
-      limit: 100,
-    });
-    const current = entry.snapshot.messages.find(
-      (candidate) => candidate._id === messageId,
-    );
-    if (!current) return false;
-    const pins = entry.liveToolEventPins.get(messageId) ?? new Map();
-    for (const event of page.events) {
-      const currentPin = pins.get(event._id);
-      if (
-        currentPin !== undefined &&
-        pinsAtReadStart.get(event._id) === currentPin
-      ) {
-        pins.delete(event._id);
-      }
-    }
-    if (pins.size === 0) entry.liveToolEventPins.delete(messageId);
-    else entry.liveToolEventPins.set(messageId, pins);
-
-    const uncoveredInsidePage =
-      page.nextCursor !== undefined &&
-      [...pins.values()].some(
-        (event) => compareToolEventToCursor(event, page.nextCursor!) <= 0,
-      );
-    const nextDetailCursor = uncoveredInsidePage
-      ? last
-      : (page.nextCursor ?? last);
-    const historicalDetailHasMore =
-      page.hasMore ||
-      uncoveredInsidePage ||
-      entry.detailResetRequired.has(messageId);
-    const livePinsPending = pins.size > 0;
-    const hasUnreadDurableEvents = historicalDetailHasMore || livePinsPending;
-    const mergedEvents = [
-      ...new Map(
-        [...current.toolEvents, ...page.events, ...pins.values()].map(
-          (event) => [event._id, event],
-        ),
-      ).values(),
-    ].sort(compareEventOrder);
-    const events = retainBoundedToolEvents(mergedEvents);
-    const priorLoadedCount = current.toolEventSummary?.loadedCount ?? 0;
-    const loadedCount =
-      restartFromBeginning || !detailLoaded
-        ? page.events.length
-        : priorLoadedCount + page.events.length;
-    entry.mutationRevision += 1;
-    publish(entry, {
-      ...entry.snapshot,
-      messages: entry.snapshot.messages.map((candidate) =>
-        candidate._id === messageId
-          ? {
-              ...candidate,
-              toolEvents: events,
-              toolEventSummary: {
-                totalCount: hasUnreadDurableEvents
-                  ? Math.max(
-                      candidate.toolEventSummary?.totalCount ?? 0,
-                      loadedCount + 1,
-                    )
-                  : loadedCount,
-                loadedCount,
-                truncated: hasUnreadDurableEvents,
-                ...(hasUnreadDurableEvents
-                  ? { totalCountIsLowerBound: true }
-                  : {}),
-                detailLoaded: true,
-                detailHasMore: historicalDetailHasMore,
-                livePinsPending,
-                ...(nextDetailCursor ? { detailCursor: nextDetailCursor } : {}),
-              },
-            }
-          : candidate,
-      ),
-    });
-    return true;
-  } catch (error) {
-    if (restartFromBeginning) entry.detailResetRequired.add(messageId);
-    throw error;
-  } finally {
-    detailReads.delete(readKey);
-  }
-}
-
 export function subscribeToLocalMessageTimeline(
   conversationId: string,
   listener: Listener,
@@ -1209,38 +1034,3 @@ export function retryLocalMessageTimeline(
   }
 }
 
-export const __testing = {
-  getLiveToolEventPinIds(conversationId: string, messageId: string): string[] {
-    return [
-      ...(entries
-        .get(conversationId)
-        ?.liveToolEventPins.get(messageId)
-        ?.keys() ?? []),
-    ];
-  },
-  getDebugStats(): MessageTimelineDebugStats {
-    const retained = Array.from(entries.values());
-    return {
-      ...debugStats,
-      activeEntries: retained.filter((entry) => entry.listeners.size > 0)
-        .length,
-      pendingReads: retained.filter((entry) => entry.inFlight !== null).length,
-      retainedEntries: retained.length,
-      residentMessages: retained.reduce(
-        (total, entry) => total + entry.snapshot.messages.length,
-        0,
-      ),
-    };
-  },
-  resetDebugStats() {
-    debugStats = createDebugStats();
-  },
-  reset() {
-    updateUnsubscribe?.();
-    updateUnsubscribe = null;
-    entries.clear();
-    detailReads.clear();
-    useCounter = 0;
-    debugStats = createDebugStats();
-  },
-};

@@ -761,7 +761,7 @@ export class SlackRelay {
     }
     if (tooLarge.length) {
       await this.postText(
-        `Couldn't attach ${tooLarge.join(", ")} here. Open it in Stella.`,
+        `Couldn't attach ${tooLarge.join(", ")} here. Ask me to share it another way, such as a shorter summary in the thread.`,
       );
     }
   }

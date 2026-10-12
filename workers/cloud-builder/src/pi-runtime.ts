@@ -557,6 +557,8 @@ type AgentLease = {
   inFlight: number;
   /** Whether any call reached it, so its work is saved when the run ends. */
   used: boolean;
+  /** What the answers of runs that ended before its last one link, delivered with the last one's. */
+  linked: Set<string>;
 };
 
 /** How long saving a run's browser profile may take when the run ends. */
@@ -568,6 +570,16 @@ const LEASE_RENEW_MS = 3 * 60_000;
 const LEASE_STOP_WAIT_MS = 30_000;
 /** The files an agent's latest run delivered, until its report carries them. */
 const deliveredFilesKey = (threadId: string) => `piAgentFiles:${threadId}`;
+/** The most a report waits for its agent's other runs to end and deliver their files. */
+const REPORT_FILES_WAIT_MS = 15 * 60_000;
+
+/** The files an answer links, as paths in the agent's container (its home is the world). */
+const answerLinkedPaths = (answer: string): string[] => [
+  ...extractLocalFileLinkPaths(answer).map((linkedPath) =>
+    linkedPath === "~" || linkedPath.startsWith("~/") ? `${WORLD_ROOT}${linkedPath.slice(1)}` : linkedPath,
+  ),
+  ...extractDriveLinkPaths(answer).map((drivePath) => `${WORLD_ROOT}/drive/${drivePath}`),
+];
 /** The key an agent thread's attempt is given to its agent under. */
 const threadCallKey = (threadId: string, attemptGeneration: number) => `thread:${threadId}:${attemptGeneration}`;
 /** Storage key prefix: an agent thread's own authority and model, by thread id. */
@@ -658,6 +670,11 @@ export class PiConversationRuntime {
   readonly #runs = new Map<string, ActiveRun[]>();
   /** Agents' containers by their conversation. */
   readonly #leases = new Map<number, Promise<AgentLease>>();
+  /**
+   * Agents with runs here that have not finished ending (their lease's files
+   * not yet delivered), by thread id: a report waits for them.
+   */
+  readonly #ending = new Map<string, { runs: number; ended: Promise<void>; resolve: () => void }>();
   /** Leases whose daemon may call the broker, by `turnId:attemptGeneration` (until released). */
   readonly #live = new Map<string, AgentLease>();
   /** Broker claims, one at a time. */
@@ -1171,6 +1188,7 @@ export class PiConversationRuntime {
         const runs = this.#runs.get(active.sessionId) ?? [];
         runs.push(active);
         this.#runs.set(active.sessionId, runs);
+        this.#runStarted(run.threadId);
         this.#notify(active.sessionId);
         this.#options.heartbeat();
         this.#options.log("pi_agent_run_started", { threadId: run.threadId, turnId });
@@ -1210,11 +1228,19 @@ export class PiConversationRuntime {
         }
         // The agent's last run: its container's work is saved and delivered
         // while the run still holds its admission, then the container goes.
-        const busy = [...this.#runs.values()].some((runs) =>
-          runs.some((active) => active.run.agentConversationId === run.agentConversationId),
-        );
-        if (!busy) {
-          await this.#endLease(run.agentConversationId, end ?? {}).catch((error: unknown) => this.#options.report(error));
+        // An earlier one's answer is kept for it, so what it links is delivered too.
+        try {
+          const busy = [...this.#runs.values()].some((runs) =>
+            runs.some((active) => active.run.agentConversationId === run.agentConversationId),
+          );
+          if (!busy) {
+            await this.#endLease(run.agentConversationId, end ?? {}).catch((error: unknown) => this.#options.report(error));
+          } else if (end?.answer) {
+            const held = await this.#leases.get(run.agentConversationId)?.catch(() => undefined);
+            for (const linkedPath of answerLinkedPaths(end.answer)) held?.linked.add(linkedPath);
+          }
+        } finally {
+          if (ended) this.#runEnded(ended.run.threadId);
         }
         await ended?.guard?.release().catch((error: unknown) => this.#options.report(error));
         const authority = ended?.authority ?? this.#state?.authority;
@@ -1233,6 +1259,7 @@ export class PiConversationRuntime {
       },
       reportsFromLedger: () => true,
       deliverReport: async (report, context) => {
+        await this.#agentRunsEnded(report.threadId);
         const { authority } = await this.#agentState();
         if (report.origin) {
           // What the run delivered goes with the report that settles its attempt.
@@ -1262,6 +1289,7 @@ export class PiConversationRuntime {
           this.#binding?.turnId ?? this.#state?.lastTurnId ?? `pi:${authority.conversationId}`,
           files?.length ? { ...info, files } : info,
         );
+        this.#options.log("pi_agent_report_delivered", { threadId: report.threadId, files: files?.length ?? 0 });
         if (files) await this.#options.storage.delete(filesKey);
       },
       deliverNote: async (note) => {
@@ -1544,7 +1572,7 @@ export class PiConversationRuntime {
         threadId,
         turnId: active.turnId,
       });
-      const held: AgentLease = { lease, threadId, inFlight: 0, used: false };
+      const held: AgentLease = { lease, threadId, inFlight: 0, used: false, linked: new Set() };
       this.#live.set(`${lease.record.turnId}:${lease.record.attemptGeneration}`, held);
       return held;
     })();
@@ -1553,6 +1581,45 @@ export class PiConversationRuntime {
       if (this.#leases.get(agentConversationId) === opening) this.#leases.delete(agentConversationId);
     });
     return await opening;
+  }
+
+  /** A run of the agent began here: its report waits until it has ended. */
+  #runStarted(threadId: string): void {
+    const current = this.#ending.get(threadId);
+    if (current) {
+      current.runs += 1;
+      return;
+    }
+    let resolve!: () => void;
+    const ended = new Promise<void>((done) => (resolve = done));
+    this.#ending.set(threadId, { runs: 1, ended, resolve });
+  }
+
+  /** A run of the agent finished ending: with its lease's files delivered when it was the last. */
+  #runEnded(threadId: string): void {
+    const current = this.#ending.get(threadId);
+    if (!current) return;
+    current.runs -= 1;
+    if (current.runs > 0) return;
+    this.#ending.delete(threadId);
+    current.resolve();
+  }
+
+  /**
+   * Until every run of the agent here has ended, its lease's files
+   * delivered: a run a message steered into the same answer ends after the
+   * one that reports it, and its files go with that report.
+   */
+  async #agentRunsEnded(threadId: string): Promise<void> {
+    const deadline = Date.now() + REPORT_FILES_WAIT_MS;
+    for (let current = this.#ending.get(threadId); current; current = this.#ending.get(threadId)) {
+      const left = deadline - Date.now();
+      if (left <= 0) {
+        this.#options.log("pi_agent_report_unwaited", { threadId });
+        return;
+      }
+      await Promise.race([current.ended, scheduler.wait(left)]);
+    }
   }
 
   /** The agent's last run ended: its lease is quiesced (unless it was stopped) and released. */
@@ -1586,13 +1653,7 @@ export class PiConversationRuntime {
     const up = !end.aborted && held.used && (await lease.ready.then(() => true, () => false));
     if (up) {
       try {
-        // The agent's home is the world: a link to `~/drive/...` names the drive copy there.
-        const linked = [
-          ...extractLocalFileLinkPaths(end.answer ?? "").map((linkedPath) =>
-            linkedPath === "~" || linkedPath.startsWith("~/") ? `${WORLD_ROOT}${linkedPath.slice(1)}` : linkedPath,
-          ),
-          ...extractDriveLinkPaths(end.answer ?? "").map((drivePath) => `${WORLD_ROOT}/drive/${drivePath}`),
-        ];
+        const linked = [...new Set([...held.linked, ...answerLinkedPaths(end.answer ?? "")])];
         const { deliveredFiles } = await lease.quiesce(linked);
         this.#options.log("pi_agent_quiesced", { threadId: held.threadId, delivered: deliveredFiles.length });
       } catch (error) {
@@ -2311,6 +2372,8 @@ export class PiConversationRuntime {
   async discard(): Promise<number> {
     const runs = [...this.#runs.values()].flat();
     this.#runs.clear();
+    for (const ending of this.#ending.values()) ending.resolve();
+    this.#ending.clear();
     const leases = [...this.#leases.keys()];
     await this.close();
     const authority = this.#state?.authority;

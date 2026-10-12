@@ -14,9 +14,7 @@
     "typecheck": "node ../../node_modules/typescript-7/bin/tsc --noEmit"
   },
   "dependencies": {
-    "@sinclair/typebox": "0.34.52",
     "@stella/contracts": "workspace:*",
-    "@stella/model-catalog": "workspace:*",
     "@stella/runtime": "workspace:*",
     "effect": "4.0.0"
   },

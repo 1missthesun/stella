@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 export default function SlackPage() {
   return (
     <div className={`${l.root} ${landingFontVars} ${s.root}`} data-landing-root="" data-native-scroll="">
-      <LandingHeader />
+      <LandingHeader getHref="/#get" />
       <main className={s.main}>
         <SlackClient />
       </main>

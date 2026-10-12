@@ -126,12 +126,6 @@ export type AgentThreadSummary = {
   updatedAt: number;
 };
 
-export type AgentThreadLookup = AgentThreadSummary & {
-  originDeviceId?: string;
-  originDeviceLabel?: string;
-  executorDeviceLabel?: string;
-};
-
 /** A thread the originating desktop has yet to persist locally. */
 export type DeviceAgentThread = AgentThreadSummary & {
   originDeviceId: string;
@@ -349,7 +343,6 @@ export type AgentThreadViews = {
 };
 
 export const RUNNING_AGENT_THREADS_LIMIT = 64;
-export const AGENT_THREAD_PAGE_MAX = 50;
 export const CONVERSATION_AGENT_THREADS_MAX = 500;
 export const AGENT_PROMPT_MAX_CHARS = 8_000;
 

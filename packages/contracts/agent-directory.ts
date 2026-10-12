@@ -12,9 +12,6 @@ export const STELLA_MESSAGE_TARGET = "stella";
 
 export const AGENT_MESSAGE_MAX_CHARS = 8_000;
 
-/** Where the orchestrator's resident agent list renders. */
-export const AGENT_ROSTER_DOC_PATH = "stella://context/agents";
-
 /** Active agents listed at most; past this the rest are counted, not shown. */
 export const AGENT_ROSTER_ACTIVE_LIMIT = 200;
 /** Slots inactive agents fill once the active ones are listed. */

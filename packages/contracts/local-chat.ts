@@ -137,13 +137,6 @@ export type ThreadActivityUpdatedPayload = {
   transcriptUpdate?: ThreadTranscriptUpdate;
 };
 
-export type ToolRequestPayload = {
-  toolName: string;
-  args?: Record<string, unknown>;
-  targetDeviceId?: string;
-  agentType?: string;
-};
-
 /**
  * One web search hit as surfaced to the chat UI. Mirrors the backend
  * `SearchHit` shape; `image`/`favicon` are only present when the

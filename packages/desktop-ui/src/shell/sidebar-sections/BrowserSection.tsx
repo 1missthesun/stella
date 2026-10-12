@@ -670,9 +670,12 @@ export function BrowserSection() {
                       )}
                       <span>{tab.title || "New tab"}</span>
                       {tab.agentActive ? (
-                        <i
-                          className="browser-section__agent-dot"
-                          aria-label="Agent working"
+                        <img
+                          className="browser-section__agent-mark"
+                          src="stella-agent-cursor.png"
+                          alt="Agent working"
+                          title="Agent working"
+                          draggable={false}
                         />
                       ) : null}
                     </button>

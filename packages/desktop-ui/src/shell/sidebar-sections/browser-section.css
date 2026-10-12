@@ -140,14 +140,13 @@
   white-space: nowrap;
 }
 
-.browser-section__agent-dot {
+.browser-section__agent-mark {
   flex: 0 0 auto;
-  width: 6px;
-  height: 6px;
+  width: 12px;
+  height: 12.5px;
   margin-left: auto;
-  border-radius: 50%;
-  background: var(--primary);
-  animation: browser-agent-dot 1.4s ease-in-out infinite;
+  object-fit: contain;
+  pointer-events: none;
 }
 
 .browser-section__favicon {
@@ -361,16 +360,6 @@
   }
 }
 
-@keyframes browser-agent-dot {
-  0%,
-  100% {
-    opacity: 0.35;
-  }
-  50% {
-    opacity: 1;
-  }
-}
-
 @keyframes browser-loading-track {
   from {
     transform: translateX(-110%);
@@ -382,7 +371,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .browser-section__tab-shell,
-  .browser-section__agent-dot,
   .browser-section__loading-track span {
     animation: none;
   }

@@ -100,7 +100,8 @@ export const downloadArtifact = async (args: {
   noun: string;
   signal?: AbortSignal;
 }): Promise<Uint8Array> => {
-  const response = await args.fetchImpl(args.url, {
+  const { fetchImpl } = args;
+  const response = await fetchImpl(args.url, {
     signal: withTimeout(args.timeoutMs, args.signal),
     redirect: "follow",
   });
@@ -223,6 +224,8 @@ export const runCloudMediaJob = async (args: {
   statusText: (status: MediaJob["status"]) => string;
   hasOutputs: (output: unknown) => boolean;
   materialize: (job: MediaJob, reattached: boolean) => Promise<CloudMediaToolResult>;
+  existingJobId?: string | null;
+  stillRunning?: (jobId: string) => string;
 }): Promise<CloudMediaToolResult> => {
   const { context, noun, prompt, signal } = args;
   const now = context.now ?? Date.now;
@@ -256,6 +259,12 @@ export const runCloudMediaJob = async (args: {
     (await context.ownerInternal("media.lookup", lookupArgs)) as MediaJob | null;
 
   let jobId: string | null = null;
+  if (args.existingJobId) {
+    const existing = await lookup({ jobId: args.existingJobId });
+    if (!existing) return failure("failed", "job_lookup_not_found", `No ${noun.toLowerCase()} job ${args.existingJobId} exists.`);
+    jobId = existing.jobId;
+    reattached = true;
+  }
   try {
     for (let attempt = 0; !jobId && attempt < SUBMIT_ATTEMPTS; attempt += 1) {
       throwIfAborted(signal, noun);
@@ -348,6 +357,12 @@ export const runCloudMediaJob = async (args: {
       }
       await sleep(Math.min(pollMs, Math.max(1, deadline - now())), signal);
       pollMs = Math.min(MAX_POLL_MS, Math.max(INITIAL_POLL_MS, pollMs * 1.5));
+    }
+    if (args.stillRunning && lastJob && (lastJob.status === "queued" || lastJob.status === "running")) {
+      return {
+        content: [{ type: "text", text: args.stillRunning(jobId) }],
+        details: { status: "running", jobId, prompt, reattached },
+      };
     }
     const timeoutMinutes = Math.max(1, Math.ceil(timeoutMs / 60_000));
     return failure(

@@ -21,6 +21,7 @@ const MAX_VIDEO_BYTES = 80 * 1024 * 1024;
 const INLINE_LIMIT_BYTES = 8 * 1024 * 1024;
 const DOWNLOAD_TIMEOUT_MS = 120_000;
 const JOB_TIMEOUT_MS = 12 * 60_000;
+const ORCHESTRATOR_WAIT_MS = 3.5 * 60_000;
 const DRIVE_OUTPUT_PREFIX = "videos";
 const REFERENCE_SIGNING_BUCKET_MS = 60 * 60_000;
 const DEFAULT_SECONDS = 5;
@@ -93,6 +94,11 @@ const PARAMETERS = {
       type: "string",
       description: "Optional drive path of an image for the last frame; needs a start image.",
     },
+    resumeJobId: {
+      type: "string",
+      description:
+        "Only when a brief gives you one: the id of a video job that is already rendering. Waits for that job and delivers it instead of starting a new one; the other fields are ignored except prompt.",
+    },
   },
   required: ["prompt"],
 } as const;
@@ -108,6 +114,7 @@ type Args = {
   startImageDrivePath?: unknown;
   startImageUrl?: unknown;
   endImageDrivePath?: unknown;
+  resumeJobId?: unknown;
 };
 
 const oneOf = <T extends string>(value: string | null, allowed: readonly T[], name: string): T | null => {
@@ -210,8 +217,17 @@ export const createCloudVideoGenTool = (context: CloudMediaToolContext): Replaya
     });
     const fetchImpl = context.fetchImpl ?? fetch;
 
+    const agent = Boolean(context.downloadLinks);
+    const resumeJobId = agent ? asNonEmptyString(args.resumeJobId) : null;
     return await runCloudMediaJob({
-      context: { ...context, timeoutMs: context.timeoutMs ?? JOB_TIMEOUT_MS },
+      context: { ...context, timeoutMs: context.timeoutMs ?? (agent ? JOB_TIMEOUT_MS : ORCHESTRATOR_WAIT_MS) },
+      existingJobId: resumeJobId,
+      ...(agent
+        ? {}
+        : {
+            stillRunning: (jobId: string) =>
+              `The video is still rendering (job ${jobId}) and this turn can't wait longer. Don't call video_gen again for it. Start one agent with spawn_agent whose brief says: "Call video_gen with resumeJobId \"${jobId}\" and prompt \"${prompt.replace(/"/g, "'").slice(0, 200)}\", wait for it, and report back in one line; the video is attached to your report automatically." Then tell the user in one line that the video is still rendering and will arrive shortly.`,
+          }),
       noun: NOUN,
       keyPrefix: "stella-video-gen-v1-",
       keyNamespace: "stella-cloud-video-gen-v1",

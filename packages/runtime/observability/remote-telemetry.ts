@@ -96,6 +96,12 @@ export type RemoteTelemetryClientOptions = {
   eventId?: () => string;
   /** Pseudonymous identity lane bound to this durable spool. */
   principalScope?: string;
+  /**
+   * The user's telemetry opt-out, consulted on every record and flush so a
+   * settings change takes effect without a restart. When it reports off,
+   * nothing is queued, spooled, or sent. Absent means enabled.
+   */
+  isEnabled?: () => boolean;
 };
 
 export type RemoteTelemetryStats = {
@@ -173,7 +179,7 @@ export class RemoteTelemetryClient {
   > &
     Pick<
       RemoteTelemetryClientOptions,
-      "spoolPath" | "getContext" | "getTransportConfig"
+      "spoolPath" | "getContext" | "getTransportConfig" | "isEnabled"
     > & { fetch: typeof globalThis.fetch };
 
   private queue: TelemetryEventV1[] = [];
@@ -232,6 +238,7 @@ export class RemoteTelemetryClient {
       random: options.random ?? Math.random,
       now: options.now ?? Date.now,
       eventId: options.eventId ?? randomUUID,
+      ...(options.isEnabled ? { isEnabled: options.isEnabled } : {}),
     };
     this.ready = this.initialize().catch(() => {
       this.stats.spoolErrors += 1;
@@ -243,6 +250,10 @@ export class RemoteTelemetryClient {
    * Resolves to the idempotency key only after the spool append/compaction.
    */
   async record(event: TelemetryEventBody): Promise<string | null> {
+    if (this.options.isEnabled && !this.options.isEnabled()) {
+      this.stats.rejected += 1;
+      return null;
+    }
     if (this.closing || this.closed || !isTelemetryEventBody(event)) {
       this.stats.rejected += 1;
       return null;
@@ -310,8 +321,26 @@ export class RemoteTelemetryClient {
     }
   }
 
+  /**
+   * Drop every queued event and empty the spool without sending. The
+   * opt-out path: what was collected while telemetry was on is discarded,
+   * never delivered after the user turns it off.
+   */
+  async discardQueued(): Promise<void> {
+    await this.serializeSpool(async () => {
+      await this.ready;
+      this.stats.dropped += this.queue.length;
+      this.queue = [];
+      await this.rewriteSpool().catch(() => undefined);
+    });
+  }
+
   /** Flush one bounded batch. Concurrent callers share the same attempt. */
   async flush(): Promise<boolean> {
+    if (this.options.isEnabled && !this.options.isEnabled()) {
+      await this.discardQueued().catch(() => undefined);
+      return false;
+    }
     if (this.closed) return false;
     if (this.flushPromise) return await this.flushPromise;
     this.clearScheduledFlush();

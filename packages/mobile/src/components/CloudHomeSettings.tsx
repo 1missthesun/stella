@@ -12,6 +12,7 @@ import { GlassToggle } from "./glass";
 import { PrimaryButton } from "./PrimaryButton";
 import type { CloudConversationIdentity } from "../lib/cloud-conversation-auth";
 import { useCloudMemoryPreference } from "../lib/use-cloud-memory-preference";
+import { useTelemetryPreference } from "../lib/use-telemetry-preference";
 import { type Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
 import { useColors } from "../theme/theme-context";
@@ -35,6 +36,7 @@ export function CloudHomeSettings({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const memoryPreference = useCloudMemoryPreference(identity);
+  const telemetry = useTelemetryPreference(identity);
 
   const header = (
     <View style={styles.header}>
@@ -101,6 +103,27 @@ export function CloudHomeSettings({
             disabled={memoryPreference.disabled}
             onValueChange={memoryPreference.setMemoryEnabled}
             accessibilityLabel={t("settings.memory.title")}
+          />
+        </View>
+      </View>
+      <View style={styles.memoryPreferenceCard}>
+        <View style={styles.memoryPreferenceCopy}>
+          <Text style={styles.memoryPreferenceTitle}>
+            {t("settings.telemetry.title")}
+          </Text>
+          <Text style={styles.memoryPreferenceBody}>
+            {t("settings.telemetry.description")}
+          </Text>
+        </View>
+        <View style={styles.memoryPreferenceControl}>
+          {telemetry.loading || telemetry.saving ? (
+            <ActivityIndicator color={colors.accent} size="small" />
+          ) : null}
+          <GlassToggle
+            value={telemetry.enabled}
+            disabled={telemetry.loading || telemetry.saving}
+            onValueChange={telemetry.setTelemetryEnabled}
+            accessibilityLabel={t("settings.telemetry.title")}
           />
         </View>
       </View>

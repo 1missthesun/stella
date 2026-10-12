@@ -1,6 +1,6 @@
 import { app, BrowserWindow, contentTracing, dialog, powerSaveBlocker, shell } from "electron";
 import { spawn } from "node:child_process";
-import { copyFile, stat } from "node:fs/promises";
+import { copyFile, readdir, stat, unlink } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,7 +8,7 @@ import { getMainLogger } from "../observability/main-logger.js";
 import { noteAppPainted } from "../observability/app-paint.js";
 import { exportDesktopDebugLogs, getDesktopDebugPaths } from "../observability/desktop-debug-logging.js";
 import { resolveLogPaths } from "@stella/runtime/observability/log-paths";
-import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, saveLocalPreferences, setOnboardingCompleted, updateLocalModelPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, getTelemetryEnabled, setTelemetryEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, saveLocalPreferences, setOnboardingCompleted, updateLocalModelPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { coerceAgentRuntimeEngine } from "@stella/contracts/agent-engine";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
@@ -33,6 +33,8 @@ import {
   IPC_AUTH_GET_SESSION,
   IPC_AUTH_GET_TOKEN,
   IPC_AUTH_REVOKE_SESSIONS,
+  IPC_AUTH_LIST_SESSIONS,
+  IPC_AUTH_REVOKE_SESSION,
   IPC_AUTH_SIGN_IN_ANONYMOUS,
   IPC_AUTH_SIGN_OUT,
   IPC_DIAGNOSTICS_EXPORT_LOGS,
@@ -61,11 +63,13 @@ import {
   IPC_PREFERENCES_GET_PREVENT_SLEEP,
   IPC_PREFERENCES_GET_LOCKED_COMPUTER_USE,
   IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS,
+  IPC_PREFERENCES_GET_TELEMETRY,
   IPC_PREFERENCES_SET_MODELS,
   IPC_PREFERENCES_SET_ONBOARDING_COMPLETED,
   IPC_PREFERENCES_SET_PREVENT_SLEEP,
   IPC_PREFERENCES_SET_LOCKED_COMPUTER_USE,
   IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS,
+  IPC_PREFERENCES_SET_TELEMETRY,
   IPC_PREFERENCES_GET_READ_ALOUD,
   IPC_PREFERENCES_READ_ALOUD_CHANGED,
   IPC_PREFERENCES_SET_READ_ALOUD,
@@ -488,6 +492,21 @@ export const registerSystemHandlers = (options) => {
         }
         return await options.authService.revokeSessions();
     });
+    handleIpc(IPC_AUTH_LIST_SESSIONS, async (event) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_LIST_SESSIONS)) {
+            throw new Error("Blocked untrusted session list request.");
+        }
+        return await options.authService.listSessions();
+    });
+    handleIpc(IPC_AUTH_REVOKE_SESSION, async (event, payload) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_REVOKE_SESSION)) {
+            throw new Error("Blocked untrusted session revocation request.");
+        }
+        const sessionId = typeof payload?.sessionId === "string" ? payload.sessionId : "";
+        if (!sessionId)
+            throw new Error("A session id is required.");
+        return await options.authService.revokeSessionById(sessionId);
+    });
     handleIpc(IPC_HOST_SET_CLOUD_SYNC, (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_HOST_SET_CLOUD_SYNC)) {
             throw new Error("Blocked untrusted host:setCloudSyncEnabled request.");
@@ -783,6 +802,35 @@ export const registerSystemHandlers = (options) => {
             const prefs = loadLocalPreferences(stellaAppDir);
             prefs.soundNotificationsEnabled = nextEnabled;
             saveLocalPreferences(stellaAppDir, prefs);
+        }
+        return { enabled: nextEnabled };
+    });
+    handleIpc(IPC_PREFERENCES_GET_TELEMETRY, (event) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_GET_TELEMETRY)) {
+            throw new Error("Blocked untrusted preferences:getTelemetry request.");
+        }
+        const stellaAppDir = options.getStellaAppDir();
+        if (!stellaAppDir)
+            return true;
+        return getTelemetryEnabled(stellaAppDir);
+    });
+    handleIpc(IPC_PREFERENCES_SET_TELEMETRY, async (event, enabled) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_SET_TELEMETRY)) {
+            throw new Error("Blocked untrusted preferences:setTelemetry request.");
+        }
+        const nextEnabled = enabled === true;
+        const stellaAppDir = options.getStellaAppDir();
+        if (stellaAppDir) {
+            setTelemetryEnabled(stellaAppDir, nextEnabled);
+            if (!nextEnabled) {
+                // Opting out discards what is still queued on this device;
+                // producers also re-check the preference before every send.
+                const telemetryDir = path.join(stellaAppDir, "telemetry");
+                const spoolNames = await readdir(telemetryDir).catch(() => []);
+                await Promise.all(spoolNames
+                    .filter((name) => name.endsWith(".jsonl"))
+                    .map((name) => unlink(path.join(telemetryDir, name)).catch(() => undefined)));
+            }
         }
         return { enabled: nextEnabled };
     });

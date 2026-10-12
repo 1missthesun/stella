@@ -10,6 +10,7 @@ import {
   telemetryHttpEndpoint,
   telemetryHttpEnvironment,
 } from "./telemetry-endpoints.js";
+import { getTelemetryEnabled } from "../kernel/preferences/local-preferences.js";
 
 export type RuntimeTelemetryConfig = {
   stellaDataDirPath: string;
@@ -109,6 +110,7 @@ const createClient = (next: RuntimeTelemetryBinding): RemoteTelemetryClient =>
       authToken: next.authToken,
       principalScope: next.principalScope,
     }),
+    isEnabled: () => getTelemetryEnabled(next.root),
   });
 
 /**

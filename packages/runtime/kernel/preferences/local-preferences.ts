@@ -133,6 +133,12 @@ export type LocalPreferences = {
   /** Allows start/stop sound effects for dictation. */
   dictationSoundEffectsEnabled: boolean;
   /**
+   * Metadata-only product telemetry (never message content). The account-wide
+   * backend preference mirrors this; the local bit is what the desktop and
+   * runtime producers check before recording or sending anything.
+   */
+  telemetryEnabled: boolean;
+  /**
    * Reads finalized assistant messages aloud via one-shot TTS. Off by
    * default — the user opts in from a speaker toggle in the chat UI. The
    * provider is `realtimeVoice.readAloudProvider` (defaults to Gemini),
@@ -228,6 +234,7 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   lockedComputerUseEnabled: false,
   soundNotificationsEnabled: true,
   dictationSoundEffectsEnabled: true,
+  telemetryEnabled: true,
   wakeWordEnabled: false,
   onboardingCompleted: false,
   wakeWordThreshold: 0.6,
@@ -335,6 +342,7 @@ const normalizeStoredPreferences = (
   lockedComputerUseEnabled: parsed.lockedComputerUseEnabled === true,
   soundNotificationsEnabled: parsed.soundNotificationsEnabled !== false,
   dictationSoundEffectsEnabled: parsed.dictationSoundEffectsEnabled !== false,
+  telemetryEnabled: parsed.telemetryEnabled !== false,
   wakeWordEnabled:
     typeof parsed.wakeWordEnabled === "boolean"
       ? parsed.wakeWordEnabled
@@ -711,6 +719,22 @@ export const getSoundNotificationsEnabled = (
   stellaDataDir: string,
 ): boolean => {
   return loadLocalPreferences(stellaDataDir).soundNotificationsEnabled;
+};
+
+export const getTelemetryEnabled = (stellaDataDir: string): boolean => {
+  try {
+    return loadLocalPreferences(stellaDataDir).telemetryEnabled;
+  } catch {
+    return true;
+  }
+};
+
+export const setTelemetryEnabled = (
+  stellaDataDir: string,
+  enabled: boolean,
+): void => {
+  const prefs = loadLocalPreferences(stellaDataDir);
+  saveLocalPreferences(stellaDataDir, { ...prefs, telemetryEnabled: enabled });
 };
 
 export const getDictationSoundEffectsEnabled = (

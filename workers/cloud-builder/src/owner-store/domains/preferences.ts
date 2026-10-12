@@ -13,14 +13,20 @@ import {
   type PreferenceLocale,
   type Preferences,
   type PreferredBrowser,
+  type SupportAccessEntry,
 } from "@stella/contracts/backend/preferences";
-import { empty, literal, object, optional, string } from "../args.js";
+import { boolean, empty, literal, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
 const LOCALE_KEY = "locale";
 const PREFERRED_BROWSER_KEY = "preferred_browser";
+const TELEMETRY_ENABLED_KEY = "telemetry_enabled";
+const SUPPORT_UNTIL_KEY = "support_access_until";
+const SUPPORT_LOG_KEY = "support_access_log";
+const SUPPORT_GRANT_MS = 24 * 60 * 60 * 1000;
+const SUPPORT_LOG_MAX = 50;
 const FEEDBACK_META_MAX_CHARS = 64;
 
 export const PREFERENCES_MIGRATION = {
@@ -48,10 +54,73 @@ const readPreferences = (db: OwnerDbReader): Preferences => {
   );
   const locale = values.get(LOCALE_KEY);
   const browser = values.get(PREFERRED_BROWSER_KEY);
+  const untilRaw = Number(values.get(SUPPORT_UNTIL_KEY) ?? "");
+  let supportAccessLog: SupportAccessEntry[] = [];
+  try {
+    const parsed = JSON.parse(values.get(SUPPORT_LOG_KEY) ?? "[]") as unknown;
+    if (Array.isArray(parsed)) {
+      supportAccessLog = parsed.filter(
+        (entry): entry is SupportAccessEntry =>
+          typeof entry === "object" &&
+          entry !== null &&
+          typeof (entry as { at?: unknown }).at === "number" &&
+          ["granted", "revoked", "accessed"].includes(
+            String((entry as { action?: unknown }).action),
+          ),
+      );
+    }
+  } catch {
+    supportAccessLog = [];
+  }
   return {
     locale: isLocale(locale) ? locale : null,
     preferredBrowser: isBrowser(browser) ? browser : null,
+    telemetryEnabled: values.get(TELEMETRY_ENABLED_KEY) !== "0",
+    supportAccessUntil:
+      Number.isSafeInteger(untilRaw) && untilRaw > Date.now() ? untilRaw : null,
+    supportAccessLog,
   };
+};
+
+const writePreference = (
+  ctx: OwnerContext,
+  key: string,
+  value: string,
+): void => {
+  ctx.db.run(
+    `INSERT INTO preferences (key, value, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    key,
+    value,
+    ctx.now,
+  );
+};
+
+const appendSupportLog = (ctx: OwnerContext, entry: SupportAccessEntry): void => {
+  const log = [...readPreferences(ctx.db).supportAccessLog, entry].slice(
+    -SUPPORT_LOG_MAX,
+  );
+  writePreference(ctx, SUPPORT_LOG_KEY, JSON.stringify(log));
+};
+
+const setSupportAccess = (ctx: OwnerContext, grant: boolean): Preferences => {
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    grant ? "support.grant" : "support.revoke",
+    { count: 10, windowMs: 60_000 },
+    "Too many support access changes. Please wait a moment.",
+  );
+  writePreference(
+    ctx,
+    SUPPORT_UNTIL_KEY,
+    grant ? String(ctx.now + SUPPORT_GRANT_MS) : "0",
+  );
+  appendSupportLog(ctx, {
+    at: ctx.now,
+    action: grant ? "granted" : "revoked",
+  });
+  return readPreferences(ctx.db);
 };
 
 const setPreferences = (
@@ -75,6 +144,8 @@ const setPreferences = (
     );
   if (args.locale !== undefined) write(LOCALE_KEY, args.locale);
   if (args.preferredBrowser !== undefined) write(PREFERRED_BROWSER_KEY, args.preferredBrowser);
+  if (args.telemetryEnabled !== undefined)
+    write(TELEMETRY_ENABLED_KEY, args.telemetryEnabled ? "1" : "0");
   return readPreferences(ctx.db);
 };
 
@@ -122,9 +193,20 @@ export const preferencesDomain = {
       parse: object({
         locale: optional(literal(...PREFERENCE_LOCALES)),
         preferredBrowser: optional(literal(...PREFERRED_BROWSERS)),
+        telemetryEnabled: optional(boolean()),
       }),
       handler: (ctx: OwnerContext, args: PreferenceCalls["preferences.set"]["args"]) =>
         setPreferences(ctx, args),
+    },
+    "support.grant": {
+      scope: "owner",
+      parse: empty(),
+      handler: (ctx: OwnerContext) => setSupportAccess(ctx, true),
+    },
+    "support.revoke": {
+      scope: "owner",
+      parse: empty(),
+      handler: (ctx: OwnerContext) => setSupportAccess(ctx, false),
     },
     "feedback.submit": {
       scope: "owner",
@@ -135,6 +217,32 @@ export const preferencesDomain = {
       }),
       handler: (ctx: OwnerContext, args: PreferenceCalls["feedback.submit"]["args"]) =>
         submitFeedback(ctx, args),
+    },
+  },
+  internal: {
+    /** Cloud telemetry producers ask before reporting anything for an owner. */
+    "preferences.telemetryEnabled": (ctx) =>
+      readPreferences(ctx.db).telemetryEnabled,
+    /**
+     * The only way any support tooling may touch an owner's content: the
+     * owner granted access, and the use is written to their visible log
+     * first. No grant, no access — there is no other staff path to content.
+     */
+    "support.recordAccess": (ctx, args) => {
+      const tool =
+        typeof (args as { tool?: unknown } | null)?.tool === "string"
+          ? ((args as { tool: string }).tool.slice(0, 64) || "unknown")
+          : "unknown";
+      const preferences = readPreferences(ctx.db);
+      if (!preferences.supportAccessUntil) {
+        throw new RpcError(
+          "FORBIDDEN",
+          "The owner has not granted support access.",
+          { reason: "support_access_not_granted", retryable: false },
+        );
+      }
+      appendSupportLog(ctx, { at: ctx.now, action: "accessed", tool });
+      return { until: preferences.supportAccessUntil };
     },
   },
   purge: (ctx) => {

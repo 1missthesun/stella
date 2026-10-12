@@ -33,7 +33,10 @@ import type {
   VoiceRuntimeSnapshot,
 } from "../index.js";
 import type { ReasoningEffortLevel } from "../reasoning-effort.js";
-import type { AuthSessionSnapshot } from "../auth-session.js";
+import type {
+  AccountSessionSummary,
+  AuthSessionSnapshot,
+} from "../auth-session.js";
 import type { StellaBrowserBridgeStatus } from "../browser-bridge-status.js";
 import type {
   DriveEvidenceSource,
@@ -132,6 +135,8 @@ import {
   IPC_AUTH_GET_CHALLENGE_TOKEN,
   IPC_AUTH_GET_SESSION,
   IPC_AUTH_GET_TOKEN,
+  IPC_AUTH_LIST_SESSIONS,
+  IPC_AUTH_REVOKE_SESSION,
   IPC_AUTH_REVOKE_SESSIONS,
   IPC_AUTH_SESSION_INVALIDATED,
   IPC_AUTH_SIGN_IN_ANONYMOUS,
@@ -310,6 +315,7 @@ import {
   IPC_PREFERENCES_GET_PREVENT_SLEEP,
   IPC_PREFERENCES_GET_READ_ALOUD,
   IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS,
+  IPC_PREFERENCES_GET_TELEMETRY,
   IPC_PREFERENCES_GET_WAKE_WORD,
   IPC_PREFERENCES_LIST_CLAUDE_CODE_MODELS,
   IPC_PREFERENCES_LIST_MODELS,
@@ -321,6 +327,7 @@ import {
   IPC_PREFERENCES_SET_PREVENT_SLEEP,
   IPC_PREFERENCES_SET_READ_ALOUD,
   IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS,
+  IPC_PREFERENCES_SET_TELEMETRY,
   IPC_PREFERENCES_SET_WAKE_WORD,
   IPC_PROMPT_PRESETS_DELETE,
   IPC_PROMPT_PRESETS_LIST,
@@ -933,6 +940,11 @@ export type IpcInvokeContract = {
   >;
   [IPC_AUTH_GET_TOKEN]: Invoke<[], string | null>;
   [IPC_AUTH_REVOKE_SESSIONS]: Invoke<[], OkResult>;
+  [IPC_AUTH_LIST_SESSIONS]: Invoke<[], AccountSessionSummary[]>;
+  [IPC_AUTH_REVOKE_SESSION]: Invoke<
+    [payload: { sessionId: string }],
+    OkResult
+  >;
   [IPC_HOST_SET_CLOUD_SYNC]: Invoke<[payload: { enabled: boolean }], OkResult>;
   [IPC_APP_QUIT_FOR_RESTART]: Invoke<[], OkResult>;
   [IPC_PERMISSIONS_GET_STATUS]: Invoke<[], PermissionStatus>;
@@ -976,6 +988,11 @@ export type IpcInvokeContract = {
   >;
   [IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS]: Invoke<[], boolean>;
   [IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS]: Invoke<
+    [enabled: boolean],
+    { enabled: boolean }
+  >;
+  [IPC_PREFERENCES_GET_TELEMETRY]: Invoke<[], boolean>;
+  [IPC_PREFERENCES_SET_TELEMETRY]: Invoke<
     [enabled: boolean],
     { enabled: boolean }
   >;

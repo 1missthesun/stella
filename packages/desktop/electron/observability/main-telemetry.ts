@@ -3,6 +3,7 @@ import { app } from "electron";
 import type { TelemetryEnvironment } from "@stella/contracts/telemetry";
 import { RemoteTelemetryClient } from "@stella/runtime/observability/remote-telemetry";
 import { telemetryHttpEndpoint } from "@stella/runtime/observability/telemetry-endpoints";
+import { getTelemetryEnabled } from "@stella/runtime/kernel/preferences/local-preferences";
 
 type MainTelemetryOptions = {
   stellaDataDirPath: string;
@@ -37,6 +38,7 @@ export const initMainProcessTelemetry = (options: MainTelemetryOptions) => {
       const endpoint = authToken ? telemetryHttpEndpoint(environment, authToken) : null;
       return authToken && endpoint ? { endpoint, authToken } : null;
     },
+    isEnabled: () => getTelemetryEnabled(options.stellaDataDirPath),
   });
 
   void client.record({

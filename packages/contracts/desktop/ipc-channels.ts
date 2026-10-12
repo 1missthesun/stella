@@ -204,6 +204,8 @@ export const IPC_AUTH_DELETE_USER = "auth:deleteUser" as const;
 export const IPC_AUTH_APPLY_SESSION_TOKEN = "auth:applySessionToken" as const;
 export const IPC_AUTH_GET_TOKEN = "auth:getToken" as const;
 export const IPC_AUTH_REVOKE_SESSIONS = "auth:revokeSessions" as const;
+export const IPC_AUTH_LIST_SESSIONS = "auth:listSessions" as const;
+export const IPC_AUTH_REVOKE_SESSION = "auth:revokeSession" as const;
 export const IPC_HOST_SET_CLOUD_SYNC = "host:setCloudSyncEnabled" as const;
 
 // Main revoked this device's session on its own (the stored bearer was
@@ -243,6 +245,10 @@ export const IPC_PREFERENCES_GET_SOUND_NOTIFICATIONS =
   "preferences:getSoundNotifications" as const;
 export const IPC_PREFERENCES_SET_SOUND_NOTIFICATIONS =
   "preferences:setSoundNotifications" as const;
+export const IPC_PREFERENCES_GET_TELEMETRY =
+  "preferences:getTelemetry" as const;
+export const IPC_PREFERENCES_SET_TELEMETRY =
+  "preferences:setTelemetry" as const;
 export const IPC_PREFERENCES_GET_READ_ALOUD =
   "preferences:getReadAloud" as const;
 export const IPC_PREFERENCES_SET_READ_ALOUD =

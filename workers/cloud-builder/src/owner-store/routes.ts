@@ -36,6 +36,7 @@ import { requireCaller, verifyCaller } from "../http/caller.js";
 import { ownerRegistry } from "./domains.js";
 import { RpcError, toBackendError } from "./errors.js";
 import type { OwnerRegistry } from "./registry.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 const MAX_RPC_BODY_BYTES = 1024 * 1024;
 
@@ -86,7 +87,7 @@ export const handleRpc = async (
     return rpcJson({ ok: false, error: toBackendError(error) });
   }
   if (def.scope === "owner") {
-    const response = await env.OWNER_GATES.getByName(caller.ownerId).ownerRpc({ name, args, caller });
+    const response = await ownerGateStub(env.OWNER_GATES, caller.ownerId).ownerRpc({ name, args, caller });
     return rpcJson(response);
   }
   try {
@@ -200,7 +201,7 @@ export const handleLive = async (request: Request, env: RouteEnv): Promise<Respo
   } catch {
     // Some runtimes guard Sec-* headers; the object is inside the same trust boundary.
   }
-  return await env.OWNER_GATES.getByName(caller.ownerId).fetch(forwarded);
+  return await ownerGateStub(env.OWNER_GATES, caller.ownerId).fetch(forwarded);
 };
 
 /** The backend client routes, or null when the path is someone else's. */

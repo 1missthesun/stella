@@ -49,6 +49,7 @@ import {
 import type { Env } from "../build-session/shared/env.js";
 import { log } from "../build-session/shared/keys.js";
 import type { ConversationCaller } from "../build-session/shared/types.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 export const handleDeviceRequestRoute = async (
   request: Request,
@@ -88,7 +89,7 @@ export const handleDeviceRequestRoute = async (
     return deviceRequestErrorResponse("bad_request", "Request params are too large.");
   }
 
-  const gate = env.OWNER_GATES.getByName(caller.ownerId);
+  const gate = ownerGateStub(env.OWNER_GATES, caller.ownerId);
   let snapshot: OwnerSnapshot;
   try {
     snapshot = await gate.snapshot();

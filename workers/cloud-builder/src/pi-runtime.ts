@@ -177,6 +177,7 @@ import {
   turnBrokerTargetMatchesEngine,
   type TurnBrokerRecord,
 } from "./turn-credential-broker.js";
+import { ownerGateStub } from "./rpc-release.js";
 
 /** How long recovered work waits for its turn or agent run to bind a transport. */
 const BINDING_WAIT_MS = 120_000;
@@ -1109,7 +1110,7 @@ export class PiConversationRuntime {
   }
 
   #gate(authority: PiAuthority) {
-    return this.#options.env.OWNER_GATES.getByName(authority.ownerId);
+    return ownerGateStub(this.#options.env.OWNER_GATES, authority.ownerId);
   }
 
   #agents(): StellaAgentsHost {
@@ -1453,7 +1454,7 @@ export class PiConversationRuntime {
       storage: this.#options.storage,
       takeSlot: (owner, sandboxId, signal) => this.#takeSlot(owner, sandboxId, signal),
       releaseSlot: async (owner, sandboxId) => {
-        await this.#options.env.OWNER_GATES.getByName(owner.ownerId).releaseAgentContainer({ sandboxId });
+        await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).releaseAgentContainer({ sandboxId });
       },
       log: this.#options.log,
     };
@@ -1463,7 +1464,7 @@ export class PiConversationRuntime {
   async #takeSlot(owner: PiComputeOwner, sandboxId: string, signal: AbortSignal): Promise<void> {
     const deadline = Date.now() + CONTAINER_SLOT_WAIT_MS;
     for (;;) {
-      const slot = await this.#options.env.OWNER_GATES.getByName(owner.ownerId).acquireAgentContainer({ sandboxId });
+      const slot = await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).acquireAgentContainer({ sandboxId });
       if (slot.ok) return;
       if (Date.now() >= deadline) {
         throw new Error(

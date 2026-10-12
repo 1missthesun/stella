@@ -8,6 +8,8 @@
  *   goes, taking its sessions and accounts with it.
  */
 
+import { ownerGateStub } from "../rpc-release.js";
+
 const DAY_MS = 24 * 60 * 60_000;
 const ANONYMOUS_STALE_MS = 30 * DAY_MS;
 /** Upper bound on anonymous users one run closes; the next run takes the rest. */
@@ -46,7 +48,7 @@ export const sweepAnonymousUsers = async (env: SweepEnv, now = Date.now()): Prom
   let closed = 0;
   for (const { id } of results) {
     try {
-      await env.OWNER_GATES.getByName(id).closeOwner();
+      await ownerGateStub(env.OWNER_GATES, id).closeOwner();
       await db(env).prepare('DELETE FROM "user" WHERE "id" = ?').bind(id).run();
       closed += 1;
     } catch (error) {

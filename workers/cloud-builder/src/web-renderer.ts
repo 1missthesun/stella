@@ -17,6 +17,7 @@ import { readBodyBytes } from "./http/body.js";
 import { requireCaller } from "./http/caller.js";
 import { fail, failRpcError } from "./http/response.js";
 import { TREE_SHA_PATTERN, webRendererPrefix } from "./owner-store/domains/app-source.js";
+import { ownerGateStub } from "./rpc-release.js";
 
 export const WEB_RENDERER_PUBLIC_PREFIX = "/web-renderer/";
 
@@ -110,7 +111,7 @@ const ownerInternal = async (
   name: string,
   args: unknown,
 ): Promise<unknown> => {
-  const response = (await env.OWNER_GATES.getByName(ownerId).ownerInternal({
+  const response = (await ownerGateStub(env.OWNER_GATES, ownerId).ownerInternal({
     name,
     args,
     ownerGeneration,
@@ -142,7 +143,7 @@ const upload = async (
   if (files.length > MAX_FILES) return fail(413, "The renderer has too many files.");
 
   try {
-    const ownerGeneration = (await env.OWNER_GATES.getByName(caller.ownerId).snapshot()).ownerGeneration;
+    const ownerGeneration = (await ownerGateStub(env.OWNER_GATES, caller.ownerId).snapshot()).ownerGeneration;
     const { forkName } = (await ownerInternal(env, caller.ownerId, ownerGeneration, "appSource.webRendererFork", {})) as {
       forkName: string | null;
     };

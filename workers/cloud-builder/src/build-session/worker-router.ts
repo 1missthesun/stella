@@ -133,6 +133,7 @@ import {
   issueSocketTicket,
   verifySocketTicket,
 } from "../socket-ticket.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 // ---------------------------------------------------------------------------
 // The user-authenticated conversation surfaces
@@ -495,7 +496,7 @@ const forwardToDevicePresence = async (
   } catch {
     // Some runtimes guard Sec-* headers. The DO is in the same trust boundary.
   }
-  return await env.OWNER_GATES.getByName(caller.ownerId).fetch(forwarded);
+  return await ownerGateStub(env.OWNER_GATES, caller.ownerId).fetch(forwarded);
 };
 
 const handleDispatchSubmitRoute = async (
@@ -590,7 +591,7 @@ const handleDispatchSubmitRoute = async (
     return dispatchErrorResponse("bad_request", parsed.message, false);
   }
   let submitted: DispatchSubmitRequest = parsed.request;
-  const gate = env.OWNER_GATES.getByName(caller.ownerId);
+  const gate = ownerGateStub(env.OWNER_GATES, caller.ownerId);
 
   if (caller.kind === "user" && hasMobilePairingProofHeaders(request.headers)) {
     // A phone has no device key the cloud can verify; the pairing key in the
@@ -777,7 +778,7 @@ const handleDispatchControlRoute = async (
     }
     ownerId = auth.caller.ownerId;
   }
-  const gate = env.OWNER_GATES.getByName(ownerId);
+  const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   try {
     if (action === "status") {
       const status = await gate.dispatchStatus(dispatchId);
@@ -1113,7 +1114,7 @@ app.post(
 app.get(DEVICES_PATH, userAuth(), async (c) => {
   try {
     return Response.json(
-      await c.env.OWNER_GATES.getByName(c.var.caller.ownerId).devices(),
+      await ownerGateStub(c.env.OWNER_GATES, c.var.caller.ownerId).devices(),
       { headers: { "cache-control": "no-store" } },
     );
   } catch (error) {

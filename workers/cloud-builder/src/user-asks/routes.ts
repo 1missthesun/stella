@@ -3,6 +3,7 @@ import { readJsonObject } from "../http/body.js";
 import { requireCaller } from "../http/caller.js";
 import { fail, failRpcError } from "../http/response.js";
 import { verifyUserAskReplyRoute } from "./reply-route-signature.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 const PREFIX = "/api/user-asks";
 const MAX_BODY_BYTES = 192 * 1024;
@@ -26,7 +27,7 @@ const replyRoute = async (
   ) {
     return fail(403, "That reply is not valid for this question.");
   }
-  const result = await env.OWNER_GATES.getByName(token.ownerId).userAskReply({
+  const result = await ownerGateStub(env.OWNER_GATES, token.ownerId).userAskReply({
     askId,
     body: body.value,
   });
@@ -96,7 +97,7 @@ const userAskRoute = async (
       : await readJsonObject(request, MAX_BODY_BYTES, { allowEmpty: true });
   if (!body.ok) return fail(body.status, body.error);
   const deviceIdHeader = request.headers.get("x-stella-device-id")?.trim() ?? "";
-  const result = await env.OWNER_GATES.getByName(
+  const result = await ownerGateStub(env.OWNER_GATES, 
     verified.caller.ownerId,
   ).userAskRoute({
     route: resolved.route,

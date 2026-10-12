@@ -46,6 +46,7 @@ import {
   withInfrastructureDeadline,
 } from "./shared/keys.js";
 import type { AgentExecutionMarker, TurnRequest } from "./shared/types.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 export type SessionSandboxHost = Pick<
   BuildSessionInternals,
@@ -223,7 +224,7 @@ export const prewarmOrchestratorContainer = async (
   ) {
     return json({ prewarmed: false, reason: "owner_mismatch" }, 409);
   }
-  const snapshot = await host.env.OWNER_GATES.getByName(ownerId)
+  const snapshot = await ownerGateStub(host.env.OWNER_GATES, ownerId)
     .snapshot()
     .catch(() => null);
   if (!snapshot || !snapshotAllowsCloudSandbox(snapshot)) {
@@ -285,7 +286,7 @@ export const acquireAgentContainerSlot = async (
   execution: TurnExecutionContext,
 ): Promise<void> => {
   if (turn.agentRole === "orchestrator") return;
-  const gate = host.env.OWNER_GATES.getByName(turn.ownerId);
+  const gate = ownerGateStub(host.env.OWNER_GATES, turn.ownerId);
   const deadline = Date.now() + AGENT_CONTAINER_WAIT_MS;
   const queuedAt = Date.now();
   let queued = false;
@@ -555,7 +556,7 @@ export const releaseAgentSessionResources = async (
   // The slot goes back whether or not the container is still up: a stopped
   // or lost container holds no capacity.
   if (turn?.ownerId) {
-    await host.env.OWNER_GATES.getByName(turn.ownerId)
+    await ownerGateStub(host.env.OWNER_GATES, turn.ownerId)
       .releaseAgentContainer({ sandboxId: target.sandboxId })
       .catch(() => undefined);
   }

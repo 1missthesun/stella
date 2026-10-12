@@ -33,6 +33,7 @@ import {
   turnstileSecret,
   verifyAuthRequestProof,
 } from "./integrity.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 type AuthEnv = Cloudflare.Env;
 
@@ -260,7 +261,7 @@ const ownerInternalCall = async (
   name: string,
   args: Record<string, unknown>,
 ): Promise<void> => {
-  const gate = env.OWNER_GATES.getByName(userId);
+  const gate = ownerGateStub(env.OWNER_GATES, userId);
   const { ownerGeneration } = await gate.snapshot();
   await gate.ownerInternal({ name, args, ownerGeneration });
 };
@@ -414,7 +415,7 @@ const buildOptions = (env: AuthEnv) => {
       deleteUser: {
         enabled: true,
         beforeDelete: async (user) => {
-          const closed = await env.OWNER_GATES.getByName(user.id).closeOwner();
+          const closed = await ownerGateStub(env.OWNER_GATES, user.id).closeOwner();
           console.log(JSON.stringify({ event: "auth_user_owner_closed", pending: closed.pending }));
         },
       },

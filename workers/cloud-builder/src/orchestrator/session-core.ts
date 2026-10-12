@@ -42,6 +42,7 @@ import {
 import { listedAgents, errorMessage, log } from "./support.js";
 import type { OrchestratorOwner } from "./owner.js";
 import { SlackRelay } from "../slack/relay.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 /**
  * The conversation Durable Object (`OrchestratorSessionObject`, see
@@ -360,7 +361,7 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   protected ownerGate(ownerId: string) {
     const gates = this.env.OWNER_GATES;
     if (!gates) throw new Error("Owner gate namespace is not bound.");
-    return gates.getByName(ownerId);
+    return ownerGateStub(gates, ownerId);
   }
 
   protected reader(): JournalReader {

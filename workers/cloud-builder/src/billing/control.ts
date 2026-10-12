@@ -20,6 +20,7 @@ import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import { dollarsToMicroCents } from "@stella/model-catalog/pricing";
 import { readManagedModelPrices } from "../catalog/prices.js";
 import { billingConfig } from "./plans.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 /** A breaker in USD from the Worker's env, -1 meaning none; else the default. */
 const tierCeilingMicroCents = (env: Env, name: string, defaultUsd: number): number => {
@@ -45,7 +46,7 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
       return { ok: false, status: 400, code: "bad_request", retryable: false };
     }
     try {
-      return await this.env.OWNER_GATES.getByName(request.ownerId).issueSessionCapability(request);
+      return await ownerGateStub(this.env.OWNER_GATES, request.ownerId).issueSessionCapability(request);
     } catch (error) {
       console.error(
         JSON.stringify({
@@ -92,7 +93,7 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
     if (typeof ownerId !== "string" || !ownerId || ownerId.length > 512) {
       throw new Error("The owner id is invalid.");
     }
-    return await this.env.OWNER_GATES.getByName(ownerId).ownerEnforcement();
+    return await ownerGateStub(this.env.OWNER_GATES, ownerId).ownerEnforcement();
   }
 
   /**
@@ -115,7 +116,7 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
       return { ok: false, status: 400, code: "bad_request", retryable: false };
     }
     try {
-      const response = (await this.env.OWNER_GATES.getByName(request.ownerId).ownerInternal({
+      const response = (await ownerGateStub(this.env.OWNER_GATES, request.ownerId).ownerInternal({
         name: "engines.access",
         args: { provider: request.provider },
         ownerGeneration: request.ownerGeneration,
@@ -165,7 +166,7 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
       return { ok: false, status: 400, code: "bad_request", retryable: false };
     }
     try {
-      const response = (await this.env.OWNER_GATES.getByName(request.ownerId).ownerInternal({
+      const response = (await ownerGateStub(this.env.OWNER_GATES, request.ownerId).ownerInternal({
         name: "providers.access",
         args: { provider: request.provider },
         ownerGeneration: request.ownerGeneration,
@@ -204,7 +205,7 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
     }
     const results = await Promise.all(
       [...byOwner].map(([ownerId, events]) =>
-        this.env.OWNER_GATES.getByName(ownerId).applyGatewayUsage(events),
+        ownerGateStub(this.env.OWNER_GATES, ownerId).applyGatewayUsage(events),
       ),
     );
     return {

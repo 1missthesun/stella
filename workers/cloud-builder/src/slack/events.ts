@@ -52,6 +52,7 @@ import {
   type SlackUserProfile,
 } from "./store.js";
 import { publishHome, sendConnectPrompt } from "./ui.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 type SlackFile = {
   id: string;
@@ -259,7 +260,7 @@ const ownerInternal = async (
   args: unknown,
 ): Promise<unknown> =>
   unwrapRpc(
-    await env.OWNER_GATES.getByName(ownerId).ownerInternal({
+    await ownerGateStub(env.OWNER_GATES, ownerId).ownerInternal({
       name,
       args,
       ownerGeneration,
@@ -400,7 +401,7 @@ const handleMessage = async (
     name: "eyes",
   });
 
-  const gate = env.OWNER_GATES.getByName(ownerId);
+  const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   const { ownerGeneration } = await gate.snapshot();
   const conversationId =
     binding?.conversationId ??

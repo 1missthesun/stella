@@ -10,6 +10,7 @@ import { bearerCredential } from "../../../shared/bearer.js";
 import { sha256Hex } from "../hash.js";
 import { verifyCaller } from "../http/caller.js";
 import { readManagedModelPrices } from "./prices.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 /**
  * `GET /api/stella/models`: the public model catalog for Stella runtimes.
@@ -50,7 +51,7 @@ const audienceFor = async (
     return { ok: false, response: reply(rpcErrorStatus(verified.error.code), { error: verified.error.message }) };
   }
   if (verified.caller.isAnonymous) return { ok: true, audience: "anonymous" };
-  const access = await env.OWNER_GATES.getByName(verified.caller.ownerId).billingAccess({ isAnonymous: false });
+  const access = await ownerGateStub(env.OWNER_GATES, verified.caller.ownerId).billingAccess({ isAnonymous: false });
   return { ok: true, audience: access.audience };
 };
 

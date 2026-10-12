@@ -122,6 +122,7 @@ import {
   sleepWithAbort,
 } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { Effect } from "effect";
+import { ownerGateStub } from "../rpc-release.js";
 
 export type ContainerTurnHost = Pick<
   BuildSessionInternals,
@@ -1927,7 +1928,7 @@ const claudeCloudAccountFor = async (
   env: Env,
   turn: TurnRequest,
 ): Promise<{ key: string; email: string }> => {
-  const response = (await env.OWNER_GATES.getByName(turn.ownerId).ownerInternal({
+  const response = (await ownerGateStub(env.OWNER_GATES, turn.ownerId).ownerInternal({
     name: "engines.claudeCloudAccount",
     args: {},
     ownerGeneration: turn.ownerGeneration,

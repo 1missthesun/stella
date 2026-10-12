@@ -127,9 +127,14 @@ const finalizeWindowLaunch = (context) => {
         // than after first paint, so Stella is back to usable sooner.
         triggerDeferredStartup("update-relaunch");
         void Promise.race([
-            transition.resumeAfterRelaunch(fullWindow),
-            new Promise((resolve) => setTimeout(resolve, 800)),
-        ]).finally(() => state.windowManager.showWindow());
+            transition.resumeAfterRelaunch(fullWindow).then(() => "hold"),
+            new Promise((resolve) => setTimeout(() => resolve("timeout"), 800)),
+        ]).then((shownWith) => {
+            getMainLogger()?.process("startup.window-shown", {
+                shownWith,
+                elapsedMs: Math.round(process.uptime() * 1000),
+            });
+        }).finally(() => state.windowManager.showWindow());
     }
     else {
         state.windowManager.showWindow();

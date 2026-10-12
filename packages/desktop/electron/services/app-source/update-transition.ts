@@ -1,6 +1,11 @@
 import { existsSync, promises as fs } from "node:fs";
 import path from "node:path";
-import { type BrowserWindow, type NativeImage, WebContentsView } from "electron";
+import {
+  type BrowserWindow,
+  type MouseInputEvent,
+  type NativeImage,
+  WebContentsView,
+} from "electron";
 import { APP_RELAUNCHING_EVENT } from "@stella/contracts/desktop/app-source";
 import { springEasing } from "@stella/contracts/desktop/spring";
 import { diffRegions, type LiveRect, type Rect } from "./picture-diff.js";
@@ -140,8 +145,14 @@ const edges = (rect: Rect, feather: number, vw: number, vh: number): RevealItem[
   rect.y + rect.h >= vh ? 0 : feather,
 ];
 
+/**
+ * Blur, opacity and a scale of a percent or two read as still once a spring
+ * is within 1% of rest; the 0.2% tail after that only holds the cover longer.
+ */
+const VISIBLE_REST = 0.01;
+
 const spring = (duration: number, bounce: number, extra: KeyframeTiming = {}) => {
-  const { easing, ms } = springEasing(duration, bounce);
+  const { easing, ms } = springEasing(duration, bounce, VISIBLE_REST);
   return { duration: ms, easing, ...extra };
 };
 type KeyframeTiming = { delay?: number; fill?: string };
@@ -155,17 +166,17 @@ const focusPull = (): FocusPullMotion => ({
       { opacity: 1, filter: "blur(12px)", offset: 0.55, easing: "linear" },
       { opacity: 0, filter: "blur(14px)" },
     ],
-    timing: { duration: 250, fill: "forwards" },
+    timing: { duration: 180, fill: "forwards" },
   },
   in: {
     keyframes: [{ filter: "blur(12px)" }, { filter: "blur(0px)" }],
-    timing: spring(0.48, 0, { delay: 150, fill: "both" }),
+    timing: spring(0.34, 0, { delay: 90, fill: "both" }),
   },
 });
 
 const FROST_BLUR = 26;
 const FROST_SATURATE = 1.6;
-const FROST_SPRING = 0.55;
+const FROST_SPRING = 0.34;
 /** When a critically damped spring of `duration` s is within 2% of rest:
  * (1 + x)e^-x = 0.02 at x = 5.83, x being ω0·t. */
 const nearlySettledMs = (duration: number) => Math.round((5.83 * duration * 1000) / (2 * Math.PI));
@@ -189,7 +200,7 @@ const appear = () => ({
     { opacity: 0, filter: "blur(6px)", transform: "scale(0.96)" },
     { opacity: 1, filter: "blur(0px)", transform: "scale(1)" },
   ],
-  timing: spring(0.5, 0),
+  timing: spring(0.4, 0),
 });
 
 const focusIn = (): FocusInMotion => ({
@@ -198,18 +209,18 @@ const focusIn = (): FocusInMotion => ({
       { filter: "blur(18px)", transform: "scale(1.014)" },
       { filter: "blur(0px)", transform: "scale(1)" },
     ],
-    timing: spring(0.6, 0, { delay: 90, fill: "both" }),
+    timing: spring(0.4, 0, { delay: 40, fill: "both" }),
   },
   fade: {
     keyframes: [{ opacity: 1 }, { opacity: 0 }],
-    timing: { duration: 440, delay: 90, easing: "cubic-bezier(.2,.6,.3,1)", fill: "forwards" },
+    timing: { duration: 300, delay: 40, easing: "cubic-bezier(.2,.6,.3,1)", fill: "forwards" },
   },
   leave: {
     keyframes: [
       { opacity: 1, filter: "blur(0px)", transform: "scale(1)" },
       { opacity: 0, filter: "blur(6px)", transform: "scale(0.97)" },
     ],
-    timing: { duration: 200, easing: "ease-in", fill: "forwards" },
+    timing: { duration: 160, easing: "ease-in", fill: "forwards" },
   },
 });
 
@@ -366,9 +377,13 @@ export class UpdateTransition {
             return { rect, feather: whole ? [0, 0, 0, 0] : edges(rect, FEATHER, vw, vh), after: jpegUrl(crop) };
           });
           const compared = performance.now();
+          // The live window under the reveal already shows the change: the
+          // pointer and the keyboard go to it while the reveal plays.
+          const letThrough = this.letInputThrough(view, win);
           const report = items.length
-            ? ((await this.call(view, "reveal", items, whole, focusPull())) as RevealReport)
+            ? ((await this.call(view, "reveal", items, whole, focusPull()).finally(letThrough)) as RevealReport)
             : null;
+          if (!items.length) letThrough();
           this.options.log("app-source.transition", {
             coverMs,
             coverSplit,
@@ -501,9 +516,15 @@ export class UpdateTransition {
     if (!hold || Date.now() - hold.since > HOLD_MAX_AGE_MS) return;
     let view: WebContentsView;
     try {
+      const started = Date.now();
       const image = await fs.readFile(hold.image);
       view = await this.attach(win);
+      const attached = Date.now();
       await this.call(view, "hold", `data:image/jpeg;base64,${image.toString("base64")}`, this.holdOptions(hold));
+      this.options.log("app-source.resume-hold", {
+        attachMs: attached - started,
+        holdMs: Date.now() - attached,
+      });
     } catch (error) {
       this.fail("resume-hold", error);
       await this.uncover(win);
@@ -580,6 +601,28 @@ export class UpdateTransition {
     view.setBounds({ x: 0, y: 0, width, height });
     view.setVisible(true);
     return view;
+  }
+
+  /**
+   * Hand the overlay's mouse input to the window under it, and keep keyboard
+   * focus there, until the returned function is called.
+   */
+  private letInputThrough(view: WebContentsView, win: BrowserWindow) {
+    const contents = view.webContents;
+    const forward = (event: Electron.Event, mouse: MouseInputEvent) => {
+      event.preventDefault();
+      if (!win.isDestroyed()) win.webContents.sendInputEvent(mouse);
+    };
+    const refocus = () => {
+      if (!win.isDestroyed()) win.webContents.focus();
+    };
+    contents.on("before-mouse-event", forward);
+    contents.on("focus", refocus);
+    if (contents.isFocused()) refocus();
+    return () => {
+      contents.removeListener("before-mouse-event", forward);
+      contents.removeListener("focus", refocus);
+    };
   }
 
   private async uncover(win: BrowserWindow) {

@@ -65,12 +65,6 @@ type JwksCacheEntry = {
 const jwksCache = new Map<string, JwksCacheEntry>();
 const jwksInflight = new Map<string, Promise<JwksCacheEntry>>();
 
-/** Test hook: drop the isolate cache. */
-export const resetJwksCacheForTests = (): void => {
-  jwksCache.clear();
-  jwksInflight.clear();
-};
-
 const fetchJwks = async (
   url: string,
   fetchImpl: typeof fetch,

@@ -139,9 +139,3 @@ export const verifyUserToken = async (token: string, configuredIssuer: string): 
     return fail("bad_signature");
   }
 };
-
-/** Test-only cache reset; harmless in production and avoids exporting cache state. */
-export const resetJwksCacheForTest = (): void => {
-  cache.clear();
-  inflight.clear();
-};

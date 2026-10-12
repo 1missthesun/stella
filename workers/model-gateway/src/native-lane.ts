@@ -63,10 +63,6 @@ type EngineAccessEntry = {
 };
 const engineAccessCache = new Map<string, EngineAccessEntry>();
 
-export const resetEngineAccessCacheForTests = (): void => {
-  engineAccessCache.clear();
-};
-
 const engineAccessKey = (
   claims: GatewayCapabilityClaims,
   provider: GatewayNativeCredentialProvider,

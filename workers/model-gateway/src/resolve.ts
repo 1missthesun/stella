@@ -1,7 +1,6 @@
 import type { GatewayProtocol } from "@stella/contracts/gateway/api";
 import type { GatewayCapabilityClaims } from "@stella/contracts/gateway/capability";
 import {
-  getManagedGatewayConfig,
   resolveManagedGatewayProvider,
   type ManagedGatewayProvider,
   type ManagedProtocol,
@@ -125,6 +124,3 @@ export const resolveManagedRoute = (args: {
     config: selection.config,
   };
 };
-
-export const upstreamBaseUrl = (provider: ManagedGatewayProvider): string =>
-  getManagedGatewayConfig(provider).baseURL;

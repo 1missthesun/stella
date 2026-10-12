@@ -14,6 +14,7 @@ import { resolveToolFallbackCwd } from "../cwd.js";
 import { getStellaComputerSessionId } from "../stella-computer-session.js";
 import { stellaAgentShellEnvironment } from "../stella-agent-env.js";
 import type { ShellState } from "./sessions.js";
+import { isStellaShellShim, isStellaShellShimDir } from "./shims.js";
 
 const DEFERRED_DELETE_SWEEP_INTERVAL_MS = 60 * 60 * 1000;
 
@@ -140,18 +141,37 @@ export const buildShellEnv = (
     const pathKey =
       Object.keys(mergedEnv).find((key) => key.toLowerCase() === "path") ??
       "PATH";
-    const existingPath =
-      typeof mergedEnv[pathKey] === "string" ? mergedEnv[pathKey] : "";
+    // Another Stella's shims (one whose shell launched this Stella) read
+    // that Stella's variables: off this PATH, and never taken for git.
+    const existingPath = (
+      typeof mergedEnv[pathKey] === "string" ? mergedEnv[pathKey] : ""
+    )
+      .split(path.delimiter)
+      .filter(
+        (entry) =>
+          entry &&
+          !shellShimDirs.includes(entry) &&
+          !isStellaShellShimDir(entry),
+      )
+      .join(path.delimiter);
     if (process.platform !== "win32" && options?.nodeShimDir) {
+      const isGit = (candidate: string) =>
+        existsSync(candidate) && !isStellaShellShim(candidate);
       const configuredGit = mergedEnv.STELLA_GIT_BIN?.trim();
       const validConfiguredGit =
-        configuredGit && existsSync(configuredGit) ? configuredGit : undefined;
+        configuredGit && isGit(configuredGit) ? configuredGit : undefined;
       const realGit =
         validConfiguredGit ??
-        findOnPath("git", process.platform, mergedEnv, existsSync) ??
+        findOnPath(
+          "git",
+          process.platform,
+          { [pathKey]: existingPath },
+          isGit,
+        ) ??
         "";
       if (!validConfiguredGit) delete mergedEnv.STELLA_GIT_BIN;
       if (realGit) mergedEnv.STELLA_REAL_GIT_BIN = realGit;
+      else delete mergedEnv.STELLA_REAL_GIT_BIN;
     }
     mergedEnv[pathKey] = [...shellShimDirs, existingPath]
       .filter(Boolean)

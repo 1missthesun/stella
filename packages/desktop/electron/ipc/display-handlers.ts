@@ -42,7 +42,6 @@ import {
   MAX_CANVAS_HTML_BYTES,
   registerCanvasHtml,
 } from "../source/canvas-protocol.js";
-import { resolveJwtOwnerScope } from "@stella/runtime/kernel/runner/computer-agent-cloud-records";
 import {
   linkedPathsGrant,
   localChatLinkedPaths,

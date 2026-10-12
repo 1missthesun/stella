@@ -29,9 +29,7 @@ import type { StellaBrowserBridgeStatus } from "../process-resources/browser-bri
 import type {
   BrowserViewConnection,
   BrowserViewLayout,
-  BrowserViewOwnerState,
   BrowserViewState,
-  BrowserViewTabState,
   BrowserViewUnavailableReason,
   StellaBrowserExportedCookie,
 } from "@stella/contracts/desktop/browser-view";

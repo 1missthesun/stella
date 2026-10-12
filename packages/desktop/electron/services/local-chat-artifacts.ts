@@ -102,13 +102,6 @@ export type LocalChatMobileSyncResult = {
   hasMore?: boolean;
 };
 
-export type LocalChatMobileHistoryPage = {
-  messages: LocalChatSyncMessageWithArtifacts[];
-  hasOlder: boolean;
-  /** Oldest durable source consumed, including when every projection is hidden. */
-  oldestSourceCursor: { timestamp: number; id: string } | null;
-};
-
 type MobileArtifactOptions = {
   includeDeveloperArtifacts?: boolean;
 };
@@ -136,13 +129,6 @@ type ArtifactMessageRecord = {
   toolEvents: readonly ArtifactEventRecord[];
 };
 
-type ArtifactSourceRecord = {
-  _id: string;
-  timestamp: number;
-  sequence?: number;
-  toolEvents?: readonly ArtifactEventRecord[];
-};
-
 export const encodeMobileSyncCursor = (
   cursor: LocalChatMobileSyncCursor,
 ): string => {
@@ -152,84 +138,6 @@ export const encodeMobileSyncCursor = (
   return Number.isFinite(sequence) && sequence >= 0
     ? `${SYNC_CURSOR_VERSION}:${sequence}:${timestamp}:${encodeURIComponent(cursor.id)}`
     : `${LEGACY_SYNC_CURSOR_VERSION}:${timestamp}:${encodeURIComponent(cursor.id)}`;
-};
-
-export const decodeMobileSyncCursor = (
-  cursor: string | null | undefined,
-): LocalChatMobileSyncCursor | null => {
-  const raw = typeof cursor === "string" ? cursor.trim() : "";
-  if (!raw) return null;
-  const isV2 = raw.startsWith(`${SYNC_CURSOR_VERSION}:`);
-  const prefix = isV2
-    ? `${SYNC_CURSOR_VERSION}:`
-    : `${LEGACY_SYNC_CURSOR_VERSION}:`;
-  if (!raw.startsWith(prefix)) return null;
-  let rest = raw.slice(prefix.length);
-  let sequence: number | undefined;
-  if (isV2) {
-    const sequenceSeparator = rest.indexOf(":");
-    if (sequenceSeparator <= 0) return null;
-    sequence = Number.parseInt(rest.slice(0, sequenceSeparator), 10);
-    if (!Number.isFinite(sequence) || sequence < 0) return null;
-    rest = rest.slice(sequenceSeparator + 1);
-  }
-  const separator = rest.indexOf(":");
-  if (separator <= 0 || separator === rest.length - 1) return null;
-  const timestamp = Number.parseInt(rest.slice(0, separator), 10);
-  if (!Number.isFinite(timestamp)) return null;
-  try {
-    const id = decodeURIComponent(rest.slice(separator + 1)).trim();
-    return id
-      ? { timestamp, id, ...(sequence === undefined ? {} : { sequence }) }
-      : null;
-  } catch {
-    return null;
-  }
-};
-
-const considerNewestSource = (
-  current: LocalChatMobileSyncCursor | null,
-  candidate: LocalChatMobileSyncCursor,
-): LocalChatMobileSyncCursor => {
-  const currentSequence = current?.sequence;
-  const candidateSequence = candidate.sequence;
-  const useSequence =
-    typeof currentSequence === "number" &&
-    typeof candidateSequence === "number";
-  return !current ||
-    (useSequence
-      ? candidateSequence > currentSequence
-      : candidate.timestamp > current.timestamp ||
-        (candidate.timestamp === current.timestamp &&
-          candidate.id > current.id))
-    ? candidate
-    : current;
-};
-
-const cursorForNewestSourceRecord = (
-  records: readonly ArtifactSourceRecord[],
-): string | null => {
-  let newest: LocalChatMobileSyncCursor | null = null;
-  for (const record of records) {
-    newest = considerNewestSource(newest, {
-      timestamp: record.timestamp,
-      id: record._id,
-      ...(typeof record.sequence === "number"
-        ? { sequence: record.sequence }
-        : {}),
-    });
-    for (const event of record.toolEvents ?? []) {
-      if (!event._id) continue;
-      newest = considerNewestSource(newest, {
-        timestamp: event.timestamp,
-        id: event._id,
-        ...(typeof event.sequence === "number"
-          ? { sequence: event.sequence }
-          : {}),
-      });
-    }
-  }
-  return newest ? encodeMobileSyncCursor(newest) : null;
 };
 
 const IMAGE_EXTS = new Set([
@@ -887,54 +795,6 @@ const deriveMobileTasksForMessage = (
   return out;
 };
 
-const taskIdsTouchedByMessages = (
-  messages: readonly ArtifactMessageRecord[],
-): Set<string> => {
-  const touched = new Set<string>();
-  for (const message of messages) {
-    for (const event of message.toolEvents) {
-      if (!isMobileTaskLifecycleEvent(event.type)) continue;
-      const agentId = trimmedString(event.payload?.agentId);
-      if (agentId) touched.add(agentId);
-    }
-  }
-  return touched;
-};
-
-const messageStartsTouchedTask = (
-  message: ArtifactMessageRecord,
-  touchedTaskIds: ReadonlySet<string>,
-): boolean => {
-  for (const event of message.toolEvents) {
-    if (event.type !== "agent-started") continue;
-    const agentId = trimmedString(event.payload?.agentId);
-    if (agentId && touchedTaskIds.has(agentId)) return true;
-  }
-  return false;
-};
-
-const withTaskAnchorMessages = (
-  messages: readonly ArtifactMessageRecord[],
-  taskContextMessages: readonly ArtifactMessageRecord[],
-): ArtifactMessageRecord[] => {
-  if (taskContextMessages === messages || messages.length === 0) {
-    return [...messages];
-  }
-  const touchedTaskIds = taskIdsTouchedByMessages(messages);
-  if (touchedTaskIds.size === 0) return [...messages];
-
-  const seenMessageIds = new Set(messages.map((message) => message._id));
-  const anchors = taskContextMessages.filter(
-    (message) =>
-      !seenMessageIds.has(message._id) &&
-      messageStartsTouchedTask(message, touchedTaskIds),
-  );
-  if (anchors.length === 0) return [...messages];
-  return [...anchors, ...messages].sort(
-    (a, b) => a.timestamp - b.timestamp || a._id.localeCompare(b._id),
-  );
-};
-
 const TITLE_ARG_KEYS = [
   "path",
   "file_path",
@@ -1340,32 +1200,3 @@ export const buildMobileSyncMessages = (
   return rows.slice(Math.max(0, rows.length - maxMessages));
 };
 
-export const buildMobileSyncMessagesPage = (
-  messages: readonly ArtifactMessageRecord[],
-  maxMessages: number,
-  cursorSource: readonly ArtifactSourceRecord[] = messages,
-  options?: MobileArtifactOptions,
-  assistantMessagesByAgentId?: ReadonlyMap<string, readonly string[]>,
-  taskContextMessages: readonly ArtifactMessageRecord[] = messages,
-  statusTextByAgentId?: ReadonlyMap<string, string>,
-): LocalChatMobileSyncResult => {
-  const messagesWithTaskAnchors = withTaskAnchorMessages(
-    messages,
-    taskContextMessages,
-  );
-  const extraAnchorBudget = Math.max(
-    0,
-    messagesWithTaskAnchors.length - messages.length,
-  );
-  return {
-    messages: buildMobileSyncMessages(
-      messagesWithTaskAnchors,
-      maxMessages + extraAnchorBudget,
-      options,
-      assistantMessagesByAgentId,
-      taskContextMessages,
-      statusTextByAgentId,
-    ),
-    cursor: cursorForNewestSourceRecord(cursorSource),
-  };
-};

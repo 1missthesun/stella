@@ -63,15 +63,6 @@ export const resolveAppInstall = (
 export const isInstalledProduct = (options: AppIdentityOptions = {}): boolean =>
   resolveAppInstall(options) === "product";
 
-/**
- * A human is running this tree themselves: a developer checkout or the
- * harness. The condition for developer conveniences — devtools, verbose
- * diagnostics, relaxed checks, development telemetry and data.
- */
-export const isDeveloperInstance = (
-  options: AppIdentityOptions = {},
-): boolean => !isInstalledProduct(options);
-
 /** The isolated verification harness. */
 export const isDevHarness = (options: AppIdentityOptions = {}): boolean =>
   resolveAppInstall(options) === "harness";

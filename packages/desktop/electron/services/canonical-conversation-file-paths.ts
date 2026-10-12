@@ -1,5 +1,3 @@
-import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
-import type { SqliteDatabase } from "@stella/runtime/kernel/storage/shared";
 import fs from "node:fs/promises";
 import path from "node:path";
 

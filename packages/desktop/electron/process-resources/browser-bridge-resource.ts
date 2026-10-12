@@ -13,7 +13,7 @@ import {
   type StellaBrowserBridgeStatus,
 } from "@stella/contracts/browser-bridge-status";
 
-export type { StellaBrowserBridgeFailureReason, StellaBrowserBridgeStatus };
+export type { StellaBrowserBridgeStatus };
 
 export type StellaBrowserBridgeResource = {
   start: () => void;

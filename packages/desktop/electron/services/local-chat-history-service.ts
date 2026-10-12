@@ -26,10 +26,7 @@ import type {
 import type {
   ConversationSummaryCursor,
   ConversationSummaryPage,
-  LocalChatAgentReport,
-  LocalModelUsagePage,
   LocalChatUpdatedPayload,
-  ThreadActivityRecord,
 } from "@stella/contracts/local-chat";
 import type {
   ConversationFocusRoot,

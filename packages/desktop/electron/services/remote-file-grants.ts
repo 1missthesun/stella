@@ -77,11 +77,3 @@ export const linkedPathsGrant = async (
   return false;
 };
 
-/** True when `resolved`, or a folder above it, appears among `linkedPaths` at all. */
-export const isLinkedOrInsideLinked = (
-  resolved: string,
-  linkedPaths: readonly string[],
-): boolean => {
-  const linked = new Set(linkedPaths.map((entry) => path.resolve(entry)));
-  return pathAndAncestors(resolved).some((candidate) => linked.has(candidate));
-};

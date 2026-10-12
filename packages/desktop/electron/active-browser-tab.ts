@@ -221,11 +221,3 @@ export const getActiveBrowserTabForBundleId = async (
   }
 }
 
-/**
- * True when the bundle id belongs to a browser we can query for the active
- * tab. Renderer uses this to decide whether the recent-apps chip for that
- * app should also try to fetch a URL.
- */
-export const isKnownBrowserBundleId = (
-  bundleId: string | null | undefined,
-): boolean => Boolean(bundleId && BUNDLE_ID_TO_BROWSER.has(bundleId))

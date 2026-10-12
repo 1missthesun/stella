@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { arch, platform } from "node:os";
 import { spawn } from "node:child_process";
-import { app, type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
+import { type IpcMainEvent, type IpcMainInvokeEvent } from "electron";
 import {
   IPC_OFFICE_PREVIEW_LIST,
   IPC_OFFICE_PREVIEW_START,
@@ -18,7 +18,6 @@ import { listOfficePreviewSnapshots } from "../bootstrap/office-preview-bridge.j
 import type { LocalChatHistoryService } from "../services/local-chat-history-service.js";
 import { isDisplayReadPathInLocalChatFiles } from "./display-handlers.js";
 import type { LocalChatEventRecord } from "@stella/runtime/kernel/storage/shared";
-import { resolveJwtOwnerScope } from "@stella/runtime/kernel/runner/computer-agent-cloud-records";
 import { resolveCanonicalConversationFilePaths } from "../services/canonical-conversation-file-paths.js";
 import type { CloudConversationFileGrants } from "../services/cloud-conversation-file-grants.js";
 import { handleIpc } from "./typed-ipc.js";

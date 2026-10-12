@@ -26,14 +26,6 @@ const resolvedHelperPaths = new Map<string, string>()
 const NEGATIVE_CACHE_TTL_MS = 30_000
 const missingHelperUntil = new Map<string, number>()
 
-/**
- * Forget all cached "helper absent" results so a freshly-downloaded helper is
- * re-statted immediately. Call this after a `native:download` completes.
- */
-export const invalidateNativeHelperPathCache = (): void => {
-  missingHelperUntil.clear()
-}
-
 /** Every directory native helpers may run from, whether or not it exists. */
 export const nativeHelperDirectories = (): string[] => [
   path.join(process.resourcesPath, 'native', 'out', platformDir),

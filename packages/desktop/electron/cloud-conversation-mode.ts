@@ -1,7 +1,3 @@
-type StorageModeCarrier = {
-  storageMode?: "cloud" | "local";
-};
-
 /**
  * Main-process UI state mirrors the selected conversation in the current
  * storage mode. Empty state means selection is still booting; callers must
@@ -60,11 +56,3 @@ export const requireRequestedCloudConversationId = (
   return requestedId;
 };
 
-/** Preserve explicit local ownership; omission continues to mean cloud. */
-export const withConversationStorage = <T extends StorageModeCarrier>(
-  payload: T,
-) => ({
-  ...payload,
-  storageMode:
-    payload.storageMode === "local" ? ("local" as const) : ("cloud" as const),
-});

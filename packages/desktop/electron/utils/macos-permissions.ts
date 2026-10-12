@@ -22,10 +22,6 @@ const getScreenCapturePermissions = (): ScreenCapturePermissionsModule | null =>
 }
 
 export type MacPermissionKind = 'accessibility' | 'screen'
-export type MacPermissionSettingsKind =
-  | MacPermissionKind
-  | 'full-disk-access'
-  | 'microphone'
 export type MicrophonePermissionStatus =
   | 'not-determined'
   | 'granted'

@@ -104,9 +104,6 @@ let activeLocale: Locale = DEFAULT_LOCALE;
 
 const localeListeners = new Set<(locale: Locale) => void>();
 
-/** The locale main-process surfaces are currently rendering in. */
-export const getMainLocale = (): Locale => activeLocale;
-
 /**
  * Resolve `key` against `locale`, then English, then the key itself.
  * Interpolates `{name}` placeholders with `params`.

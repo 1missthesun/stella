@@ -346,4 +346,3 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
   };
 };
 
-export type ModuleGraph = ReturnType<typeof createModuleGraph>;

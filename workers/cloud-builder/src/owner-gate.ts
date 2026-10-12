@@ -526,7 +526,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         message: error instanceof Error ? error.message : String(error),
       });
     });
-    await this.reportCharges(accepted);
+    this.ctx.waitUntil(this.reportCharges(accepted));
     return result;
   }
 

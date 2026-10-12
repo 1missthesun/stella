@@ -60,7 +60,7 @@ import {
   R2_SWEEP_MAX_PAGES,
   sweepR2Prefix,
 } from "./shared/keys.js";
-import { ownerGateStub } from "../rpc-release.js";
+import { ownerGateStub, released } from "../rpc-release.js";
 
 const ownerFenceStub = (env: Env, ownerId: string) =>
   ownerGateStub(env.OWNER_GATES, ownerId);
@@ -568,7 +568,7 @@ export const handleWorldRoute = async (
     if (!Number.isSafeInteger(since) || since < 0) {
       return json({ error: "Malformed world revision." }, 400);
     }
-    return json(await stub.changesSince(since));
+    return json(released(await stub.changesSince(since)));
   }
   if (action.kind === "blob") {
     if (request.method !== "GET")

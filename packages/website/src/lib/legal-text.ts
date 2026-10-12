@@ -6,7 +6,7 @@ export const LEGAL_TITLES: Record<LegalDocument, string> = {
 };
 
 export const LEGAL_LAST_UPDATED = "September 10, 2026";
-export const PRIVACY_LAST_UPDATED = "September 10, 2026";
+export const PRIVACY_LAST_UPDATED = "October 12, 2026";
 
 export const TERMS_OF_SERVICE = `Stella — FromYou LLC
 Last updated: ${LEGAL_LAST_UPDATED}
@@ -205,6 +205,8 @@ Media, Search, and Connected Services — Media prompts, uploaded files, generat
 
 Other Hosted Content — Publishing, social or collaboration features, and other hosted features store the content and metadata needed to provide them.
 
+Telemetry — Stella collects metadata-only telemetry: event types, timing, token and cost counts, model and agent type, and error codes, pseudonymized under a hash of your account or installation identifier. It never includes messages, prompts, files, tool arguments, or outputs. You can turn it off in Settings, Privacy: that deletes telemetry still queued on your device and stops cloud-side reporting for your account. Usage and billing records needed to operate paid plans are not telemetry and are described separately in this policy.
+
 
 5. Computer Use and Agent Activity Data
 
@@ -253,7 +255,7 @@ If you use Stella's social features (friend system, chat rooms, collaborative se
 
 Stella uses third-party services including AI gateways and model providers (which may include OpenAI, Anthropic, Google, xAI, OpenRouter, and Fireworks), fal.ai and other media providers, Exa and other search providers, Cloudflare for backend infrastructure, Stripe for billing, authentication and connected-service vendors, and Google Ads for advertising-referred download measurement.
 
-These providers process data under their own terms, privacy policies, and account configurations. Depending on the provider and feature, they may retain prompts, outputs, uploaded files, generated media, search requests, or metadata for safety, abuse prevention, service operation, or other stated purposes. Some providers offer optional or account-specific zero-data-retention controls, but availability and coverage vary. FromYou does not make a blanket zero-data-retention promise for third-party processing. When using BYOK, a model request may go directly from your device to the provider, but that does not change the provider's own practices.
+These providers process data under their own terms, privacy policies, and account configurations. Depending on the provider and feature, they may retain prompts, outputs, uploaded files, generated media, search requests, or metadata for safety, abuse prevention, service operation, or other stated purposes. Some providers offer optional or account-specific zero-data-retention controls, but availability and coverage vary. FromYou does not make a blanket zero-data-retention promise for third-party processing. We do not sell your personal information, use your conversations to serve advertising, or use your conversation content to train models. When using BYOK, a model request may go directly from your device to the provider, but that does not change the provider's own practices.
 
 
 13. Google Workspace Connector and Google API Services User Data
@@ -298,13 +300,15 @@ Limited Use — Stella's use and transfer to any other app of information receiv
 • Mobile and connector delivery records — retained according to operational delivery, deduplication, and cleanup periods that vary by record type
 • Media inputs, outputs, and job records — retained as needed to submit, deliver, manage, and clean up media jobs; third-party copies follow provider policies
 • Anonymous device usage — retained for rate-limiting purposes; periodically pruned
+• Telemetry — metadata only, as described above; collection stops entirely when you turn it off
+• Support access log — grants, revocations, and uses of support access, kept with your account preferences until account deletion
 • Google Ads attribution flag — stored in your browser for up to 30 days
 • Social data — until you delete your account or the relevant content
 
 
 15. Data Security
 
-We implement reasonable security measures to protect data in our infrastructure: encryption in transit (all communication uses TLS/HTTPS), secret encryption (user-provided secrets stored on our backend are encrypted using AES-256-GCM with a versioned master key system), local encryption (API keys stored on your device are encrypted locally), device identity (devices authenticate using Ed25519 cryptographic keypairs), rate limiting (multi-layer rate limiting protects against abuse), and provider redaction (AI responses are scrubbed of upstream provider details before being returned to you).
+We implement reasonable security measures to protect data in our infrastructure: encryption in transit (all communication uses TLS/HTTPS), conversation encryption (each conversation's messages, tool results, and search index are encrypted at rest with a unique key wrapped under our master key system, so a copy of the database alone cannot be read, and deleting a conversation destroys its key; secrets a tool output happens to contain are scrubbed from the stored copy), secret encryption (user-provided secrets stored on our backend are encrypted using AES-256-GCM with a versioned master key system), local encryption (API keys stored on your device are encrypted locally), device identity (devices authenticate using Ed25519 cryptographic keypairs), rate limiting (multi-layer rate limiting protects against abuse), provider redaction (AI responses are scrubbed of upstream provider details before being returned to you), and staff access limits (our admin and support tools cannot display conversation, memory, or file content — they expose account, billing, and enforcement metadata only; any future support access to content requires a grant you turn on in Settings, expires after 24 hours, and is recorded in a log you can see there).
 
 
 16. Your Rights and Choices
@@ -312,6 +316,12 @@ We implement reasonable security measures to protect data in our infrastructure:
 Access and Control — You can use available in-app controls to manage your information, revoke connected integrations, and contact us to request access to, export of, or deletion of your conversation history and eligible account data. Some records may be retained where required for legal, security, fraud-prevention, billing, or dispute-resolution purposes. Deleting data from Stella does not necessarily delete copies retained by third-party providers under their policies.
 
 Discovery Opt-Out — During onboarding, each discovery category is individually selectable. The most sensitive category (Messages & Notes) is disabled by default and requires explicit opt-in. You can skip discovery entirely.
+
+Telemetry Opt-Out — Settings, Privacy turns telemetry off for your device and your account at any time.
+
+Data Export — Settings, Privacy downloads your conversations, memory files, and account preferences as JSON.
+
+Sessions — Settings, Account lists every device signed in to your account and can sign any of them out. We email you when a new device signs in.
 
 Anonymous Use — You can use Stella's core features without creating an account or providing any personal information.
 

@@ -13,6 +13,8 @@ import { useT } from "@/shared/i18n";
 import { platformCapabilities } from "@/platform/capabilities";
 import { SettingsToggleCard } from "./settings-toggle-card";
 import { CloudSyncCard } from "./CloudSyncCard";
+import { TelemetrySettingsCard } from "./TelemetrySettingsCard";
+import { YourDataCard } from "./YourDataCard";
 
 const NativePermissionSettings = lazy(() =>
   import("./NativePermissionSettings").then((module) => ({
@@ -95,6 +97,8 @@ export function PrivacyTab() {
           key={`memory-wipe:${accountScope}:${identityRevision}`}
         />
       ) : null}
+      <YourDataCard />
+      {platformCapabilities.nativeSettings ? <TelemetrySettingsCard /> : null}
       <CloudAccountCards />
       {platformCapabilities.nativeSettings ? (
         <Suspense fallback={null}>

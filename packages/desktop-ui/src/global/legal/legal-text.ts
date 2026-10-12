@@ -1,6 +1,6 @@
 export type LegalDocument = "terms" | "privacy";
 
-const LEGAL_LAST_UPDATED = "August 26, 2026";
+const LEGAL_LAST_UPDATED = "October 12, 2026";
 
 export const TERMS_OF_SERVICE = `Stella — FromYou LLC
 Last updated: ${LEGAL_LAST_UPDATED}
@@ -231,6 +231,8 @@ Cloud Agent and Mobile Processing — Messages submitted from supported clients 
 
 Device Routing — When Stella dispatches or synchronizes work with a desktop, we process device identifiers, conversation mappings, connectivity state, and delivery metadata needed to route that work.
 
+Telemetry — Stella collects metadata-only telemetry: event types, timing, token and cost counts, model and agent type, and error codes, pseudonymized under a hash of your account or installation identifier. It never includes messages, prompts, files, tool arguments, or outputs. You can turn it off in Settings, Privacy: that deletes telemetry still queued on your device and stops cloud-side reporting for your account. Usage and billing records needed to operate paid plans are not telemetry and are described separately in this policy.
+
 Connected Integrations — When you connect or direct Stella to use another service, the task inputs, selected content, credentials or authorization tokens, and results needed for that action may be processed by Stella's integration infrastructure and the connected service. The connected service's own terms and privacy policy apply.
 
 
@@ -287,11 +289,13 @@ Retention depends on the data category, the feature used, legal requirements, av
 • Responses API request and response records — retained by the selected AI provider under its retention and deletion policies
 • Connector and integration data — retention depends on Stella's service operation and the connected provider's policies
 • Anonymous device usage — retained for service operation, security, and rate limiting
+• Telemetry — metadata only, as described above; collection stops entirely when you turn it off
+• Support access log — grants, revocations, and uses of support access, kept with your account preferences until account deletion
 
 
 12. Data Security
 
-We implement reasonable security measures to protect data processed by Stella: cloud-authoritative conversation and memory data is encrypted in transit and at rest; user-provided secrets stored on our backend are encrypted using AES-256-GCM with a versioned master key system; API keys stored on your device are encrypted locally; devices authenticate using Ed25519 cryptographic keypairs; and multi-layer rate limiting protects against abuse. No security measure eliminates all risk, and third-party providers and integrations apply their own security practices.
+We implement reasonable security measures to protect data processed by Stella: cloud-authoritative conversation and memory data is encrypted in transit and at rest, each conversation's messages, tool results, and search index under a unique key wrapped under our master key system, so a copy of the database alone cannot be read and deleting a conversation destroys its key (secrets a tool output happens to contain are scrubbed from the stored copy); user-provided secrets stored on our backend are encrypted using AES-256-GCM with a versioned master key system; API keys stored on your device are encrypted locally; devices authenticate using Ed25519 cryptographic keypairs; multi-layer rate limiting protects against abuse; and our admin and support tools cannot display conversation, memory, or file content (any future support access to content requires a grant you turn on in Settings, expires after 24 hours, and is recorded in a log you can see there). No security measure eliminates all risk, and third-party providers and integrations apply their own security practices.
 
 
 13. Your Rights and Choices
@@ -299,6 +303,14 @@ We implement reasonable security measures to protect data processed by Stella: c
 Access and Control — You can manage device-local data through Stella's data directory and applicable in-app controls. Cloud conversation, memory, account, and other hosted data must be managed through the Service's data, reset, integration-revocation, or account-deletion controls where available. Clearing a local cache alone does not delete the cloud-authoritative copy.
 
 Discovery Opt-Out — During onboarding, each discovery category is individually selectable. The most sensitive category (Messages & Notes) is disabled by default and requires explicit opt-in. You can skip discovery entirely.
+
+Telemetry Opt-Out — Settings, Privacy turns telemetry off for your device and your account at any time.
+
+Data Export — Settings, Privacy downloads your conversations, memory files, and account preferences as JSON.
+
+Sessions — Settings, Account lists every device signed in to your account and can sign any of them out. We email you when a new device signs in.
+
+No Sale, Advertising, or Training — We do not sell your personal information, use your conversations to serve advertising, or use your conversation content to train models.
 
 Anonymous Use — You can use Stella's core features without creating an account or providing any personal information.
 

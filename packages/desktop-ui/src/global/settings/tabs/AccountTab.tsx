@@ -18,6 +18,8 @@ import { useT } from "@/shared/i18n";
 import { getSettingsErrorMessage } from "./shared";
 import { CloudBoundary } from "@/features/cloud/CloudBoundary";
 import { ProviderAccountsCard } from "@/features/cloud/ProviderAccountsCard";
+import { SessionsCard } from "./SessionsCard";
+import { PasskeysCard } from "./PasskeysCard";
 
 type AccountDeleteAction = "data" | "account";
 
@@ -162,6 +164,12 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
       <CloudBoundary>
         <ProviderAccountsCard />
       </CloudBoundary>
+      {hasConnectedAccount ? (
+        <CloudBoundary>
+          <SessionsCard />
+        </CloudBoundary>
+      ) : null}
+      {hasConnectedAccount ? <PasskeysCard /> : null}
       <div className="settings-card">
         <h3 className="settings-card-title">{t("settings.account.title")}</h3>
         <div className="settings-row">

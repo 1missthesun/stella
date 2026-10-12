@@ -75,6 +75,31 @@ export const SETTINGS_SEARCH_ENTRY_DEFS: SettingsSearchEntryDef[] = [
     keywords: ["privacy", "local", "cloud", "history", "storage", "sync", "messages"],
   },
   {
+    tab: "privacy",
+    availability: "native",
+    titleKey: "settings.telemetry.title",
+    descriptionKey: "settings.telemetry.description",
+    keywords: ["privacy", "telemetry", "analytics", "tracking", "metrics", "anonymous"],
+  },
+  {
+    tab: "privacy",
+    titleKey: "settings.yourData.title",
+    descriptionKey: "settings.yourData.description",
+    keywords: ["privacy", "export", "download", "data", "support", "access", "encryption"],
+  },
+  {
+    tab: "account",
+    titleKey: "settings.sessions.title",
+    descriptionKey: "settings.sessions.description",
+    keywords: ["security", "devices", "sessions", "sign out", "revoke"],
+  },
+  {
+    tab: "account",
+    titleKey: "settings.passkeys.title",
+    descriptionKey: "settings.passkeys.description",
+    keywords: ["security", "passkey", "webauthn", "fido", "sign in"],
+  },
+  {
     tab: "general",
     titleKey: "settings.language.title",
     descriptionKey: "settings.language.description",

@@ -454,6 +454,22 @@ export class OwnerStore {
     });
   }
 
+  /** Whether an open live socket is subscribed to `view`. */
+  watching(view: string): boolean {
+    const sockets = this.liveSockets();
+    if (sockets.length === 0) return false;
+    this.ensureSchema();
+    const open = new Set<string>();
+    for (const socket of sockets) {
+      const attachment = this.liveAttachment(socket);
+      if (attachment) open.add(attachment.connId);
+    }
+    return this.sql
+      .exec<{ conn_id: string }>("SELECT conn_id FROM owner_live_subs WHERE view = ?", view)
+      .toArray()
+      .some((row) => open.has(row.conn_id));
+  }
+
   // ── Live views ──────────────────────────────────────────────────────────
 
   liveSockets(): WebSocket[] {

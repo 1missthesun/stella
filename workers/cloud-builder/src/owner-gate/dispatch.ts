@@ -852,18 +852,26 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     )
       next = Math.min(next, now + 5_000);
     next = Math.min(next, this.ownerStore().nextDeadline());
+    // A proven device going quiet needs no wake while nobody watches the
+    // device list: request-time readers check staleness against
+    // `presenceRow`, in-flight device calls have their own deadlines, and
+    // waking to re-check would undo hibernation. While `devices.list` is
+    // watched, a connection left half-open (a laptop asleep, its network
+    // gone) is reaped when it goes stale, so the pushed list shows it offline.
+    const watched = this.ownerStore().watching("devices.list");
     for (const socket of this.sockets()) {
       const attachment = this.attachment(socket);
       if (!attachment) continue;
       next = Math.min(next, attachment.authExpiresAtMs);
-      // A proven device going quiet needs no wake of its own: every reader
-      // checks staleness against `presenceRow`, in-flight device calls have
-      // their own deadlines, and waking to re-check would undo hibernation.
-      // Only a handshake that never finishes is reaped on a timer.
       if (attachment.phase !== "connected") {
         next = Math.min(
           next,
           attachment.lastSeenAtMs + DEVICE_PRESENCE_STALE_AFTER_MS,
+        );
+      } else if (watched) {
+        next = Math.min(
+          next,
+          this.lastSeenAt(socket, attachment) + DEVICE_PRESENCE_STALE_AFTER_MS,
         );
       }
     }

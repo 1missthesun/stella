@@ -12,6 +12,11 @@ import {
 } from "@stella/contracts/user-ask-notification";
 import { USER_ASK_PUSH_KIND } from "@stella/contracts/user-ask";
 import { i18nFallback } from "../i18n";
+import {
+  claimNotificationAction,
+  releaseNotificationAction,
+} from "./notification-action-claims";
+import { handleReminderActionResponse } from "./reminder-notification-actions";
 
 export const USER_ASK_NOTIFICATION_TASK = "stella-user-ask-notification";
 const REPLY_TIMEOUT_MS = 20_000;
@@ -236,19 +241,16 @@ export const setAskReplyDeviceIdReader = (reader: () => Promise<string | null>):
   deviceIdReader = reader;
 };
 
-const handledReplies = new Set<string>();
-
 export const handleAskReplyResponse = async (
   response: Notifications.NotificationResponse,
 ): Promise<AskReplyOutcome | null> => {
   if (!isAskReplyResponse(response)) return null;
   if (nativeAskRepliesAvailable()) return null;
   const request = response.notification.request;
-  const key = `${request.identifier}:${response.actionIdentifier}`;
-  if (handledReplies.has(key)) return null;
-  handledReplies.add(key);
   const data = readActionableAskData(request.content.data);
   if (!data) return null;
+  const claimKey = `ask:${data.askId}:${response.actionIdentifier}`;
+  if (!claimNotificationAction(claimKey)) return null;
   const deviceId = deviceIdReader ? await deviceIdReader().catch(() => null) : null;
   const outcome = await sendAskReply({
     data,
@@ -256,6 +258,7 @@ export const handleAskReplyResponse = async (
     ...(response.userText ? { text: response.userText } : {}),
     deviceId,
   });
+  if (!outcome.ok && !outcome.closed) releaseNotificationAction(claimKey);
   await Notifications.dismissNotificationAsync(request.identifier).catch(() => undefined);
   if (!outcome.ok) await presentReplyFailure(data, outcome.closed === true);
   else if (!outcome.accepted) await presentReplyFailure(data, true);
@@ -276,13 +279,22 @@ const actionablePushFromTaskPayload = (payload: unknown): UserAskActionablePushD
 const responseFromTaskPayload = (payload: unknown): Notifications.NotificationResponse | null => {
   const source = record(payload);
   if (!source || typeof source.actionIdentifier !== "string") return null;
-  return source as unknown as Notifications.NotificationResponse;
+  const notification = record(source.notification);
+  const request = record(notification?.request);
+  const content = record(request?.content);
+  if (!notification || !request || !content) return null;
+  const data = record(content.data) ?? parseJsonRecord(content.dataString) ?? {};
+  return {
+    ...source,
+    notification: { ...notification, request: { ...request, content: { ...content, data } } },
+  } as unknown as Notifications.NotificationResponse;
 };
 
 if (Platform.OS === "android") {
   TaskManager.defineTask(USER_ASK_NOTIFICATION_TASK, async ({ data }) => {
     const response = responseFromTaskPayload(data);
     if (response) {
+      if (await handleReminderActionResponse(response)) return;
       await handleAskReplyResponse(response);
       return;
     }

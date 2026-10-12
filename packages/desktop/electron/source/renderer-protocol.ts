@@ -1,9 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
+import { Worker } from "node:worker_threads";
 import { app, protocol, session, webContents } from "electron";
 import { RENDERER_ORIGIN, RENDERER_SCHEME } from "./origin.js";
 import { MEDIA_SCHEME_PRIVILEGES, serveMediaProtocol } from "./media-protocol.js";
 import { CANVAS_SCHEME_PRIVILEGES, serveCanvasProtocol } from "./canvas-protocol.js";
+import type { SourceWorkerData, SourceWorkerMessage, SourceWorkerRequest } from "./source-worker.js";
 
 /** Must run before `ready`: the scheme behaves like https (ESM, fetch, CSP 'self'). */
 export const registerRendererScheme = () => {
@@ -77,6 +79,72 @@ export type RendererSourceHandle = {
 };
 
 type Answer = { status: number; contentType: string; body: Uint8Array };
+type ApplyAnswer = Extract<SourceWorkerMessage, { type: "applied" }>["result"];
+
+const startSourceWorker = (options: {
+  workerData: SourceWorkerData;
+  log: (message: string) => void;
+  onReloadNeeded: () => void;
+}) => {
+  let worker: Worker | null = null;
+  let disposed = false;
+  let restarts = 0;
+  let nextId = 0;
+  const pending = new Map<number, { resolve: (value: never) => void; reject: (error: Error) => void }>();
+  const start = () => {
+    const current = new Worker(new URL("./source-worker.js", import.meta.url), {
+      workerData: options.workerData,
+    });
+    current.on("message", (message: SourceWorkerMessage) => {
+      if (message.type === "log") {
+        options.log(message.message);
+      } else if (message.type === "reload") {
+        options.onReloadNeeded();
+      } else {
+        const request = pending.get(message.id);
+        if (!request) return;
+        pending.delete(message.id);
+        if (message.type === "applied" && message.error !== undefined) request.reject(new Error(message.error));
+        else request.resolve(message as never);
+      }
+    });
+    current.on("error", (error) => {
+      options.log(`[source] worker failed: ${error instanceof Error ? error.message : String(error)}`);
+    });
+    current.on("exit", (code) => {
+      if (worker !== current) return;
+      worker = null;
+      for (const request of pending.values()) request.reject(new Error(`The source worker exited (${code}).`));
+      pending.clear();
+      if (!disposed && restarts < 3) {
+        restarts += 1;
+        start();
+      }
+    });
+    worker = current;
+  };
+  start();
+  const call = <T>(message: SourceWorkerRequest extends infer R ? (R extends unknown ? Omit<R, "id"> : never) : never): Promise<T> =>
+    new Promise<T>((resolve, reject) => {
+      if (!worker) {
+        reject(new Error("The source worker is not running."));
+        return;
+      }
+      nextId += 1;
+      pending.set(nextId, { resolve: resolve as (value: never) => void, reject });
+      worker.postMessage({ ...message, id: nextId });
+    });
+  return {
+    request: (url: string) => call<Answer>({ type: "request", url }),
+    apply: (paths: string[]) =>
+      call<{ result?: ApplyAnswer }>({ type: "apply", paths }).then((answer) => answer.result ?? { mode: "none" as const }),
+    dispose: () => {
+      disposed = true;
+      void worker?.terminate();
+    },
+  };
+};
+
 const NO_CACHE = { "cache-control": "no-cache" };
 
 /**
@@ -114,32 +182,17 @@ export const serveRendererSource = (options: {
     for (const contents of pages()) contents.reload();
   };
   const uiRoot = path.join(options.sourceRoot, "packages", "desktop-ui");
-  const ready = import("./renderer-source.js").then(({ createRendererSource }) =>
-    createRendererSource({
+  const source = startSourceWorker({
+    workerData: {
       uiRoot,
       repoRoot: options.sourceRoot,
       envDir: path.join(options.envRoot ?? options.sourceRoot, "packages", "desktop-ui"),
       cacheDir: path.join(app.getPath("userData"), "Renderer Source Cache"),
       mode: options.mode,
-      log: options.log,
-      onReloadNeeded: reloadPages,
-    }),
-  );
-  void ready
-    .then((source) => source.prepare())
-    .catch((error: unknown) => {
-      options.log(`[source] prepare failed: ${error instanceof Error ? error.message : String(error)}`);
-    });
-  const source = {
-    request: async (requestUrl: string): Promise<Answer> => {
-      const response = await (await ready).handle(requestUrl);
-      return { status: response.status, contentType: response.type, body: response.body };
     },
-    apply: async (paths: string[]) => (await ready).applyChanges(paths),
-    dispose: () => {
-      void ready.then((current) => current.dispose(), () => undefined);
-    },
-  };
+    log: options.log,
+    onReloadNeeded: reloadPages,
+  });
   let firstPage = options.firstPage ?? null;
   const html = (body: string): Answer => ({
     status: 200,

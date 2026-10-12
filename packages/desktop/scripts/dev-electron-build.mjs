@@ -43,6 +43,8 @@ const electronMainEntryPoints = {
   "electron/launch": "packages/desktop/electron/launch.ts",
   "electron/main": "packages/desktop/electron/main.ts",
   "electron/cloud-conversation-cache-worker": "packages/desktop/electron/services/cloud-conversation-cache-worker.ts",
+  "electron/source-worker": "packages/desktop/electron/source/source-worker.ts",
+  "electron/tailwind-worker": "packages/desktop/electron/source/tailwind-worker.ts",
 };
 const preloadEntryPoints = {
   "electron/preload": "packages/desktop/electron/preload.ts",

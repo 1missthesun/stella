@@ -95,6 +95,9 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
         ? { originUserMessageId: turn.originUserMessageId }
         : {}),
       ...(turn.source ? { source: turn.source } : {}),
+      ...(turn.context?.display
+        ? { metadata: { context: turn.context.display } }
+        : {}),
     } as AgentMessage;
     const promptPayload = await this.spillOversizePrompt(
       turn.turnId,
@@ -1085,6 +1088,9 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
               ...hidden,
             },
             { type: "text", text, ...(turn.hiddenMessage ? hidden : {}) },
+            ...(turn.context?.text
+              ? [{ type: "text" as const, text: turn.context.text, ...hidden }]
+              : []),
             ...(turn.attachments?.length
               ? [
                   {

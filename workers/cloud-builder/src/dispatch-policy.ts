@@ -26,6 +26,7 @@ import {
   type ExecutionTargetMode,
   PLACEMENT_PROTOCOL,
 } from "@stella/contracts/turn-plane/placement";
+import { parseCloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import { parseCloudExecutionSelection } from "./turn-start-request.js";
 
 /**
@@ -271,6 +272,11 @@ export const parseDispatchPayload = (
       attachments.push(path);
     }
     if (attachments.length > 0) payload.attachments = attachments;
+  }
+  if (value.context !== undefined && value.context !== null) {
+    const context = parseCloudTurnContext(value.context);
+    if (!context || kind !== "chat") return fail("payload.context is malformed.");
+    if (context.text || context.display) payload.context = context;
   }
   if (value.execution !== undefined && value.execution !== null) {
     const execution = parseCloudExecutionSelection(value.execution);

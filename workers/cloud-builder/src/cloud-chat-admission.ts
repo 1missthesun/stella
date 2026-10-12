@@ -65,6 +65,7 @@ export const chatTurnFingerprintSource = (
     hiddenMessage: request.hiddenMessage,
     locale: request.locale,
     attachments: request.attachments,
+    context: request.context,
     agentThreadControl: request.agentThreadControl
       ? {
           threadId: request.agentThreadControl.threadId,

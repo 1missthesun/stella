@@ -20,6 +20,7 @@ import {
   TURN_PLANE_PROTOCOL,
   TURN_PROMPT_MAX_CHARS,
   TURN_TITLE_MAX_CHARS,
+  parseCloudTurnContext,
   type CloudAgentThreadControl,
   type CloudAgentTurnSource,
   type CloudAgentTurnStartRequest,
@@ -197,6 +198,11 @@ export const parseCloudTurnStartRequest = (
       attachments.push(path);
     }
     request.attachments = attachments;
+  }
+  if (value.context !== undefined) {
+    const context = parseCloudTurnContext(value.context);
+    if (!context) return fail("context is malformed.");
+    if (context.text || context.display) request.context = context;
   }
   if (value.lane !== undefined) {
     if (!LANES.includes(value.lane as CloudTurnLane)) {

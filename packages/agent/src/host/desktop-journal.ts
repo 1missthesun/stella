@@ -41,7 +41,13 @@ import {
   type Harness,
   type HookApi,
 } from "@earendil-works/pi-durable";
-import { piJournalUserMessage, piTerminalNotice, type PiRemoteTurn, type PiUserMessage } from "@stella/contracts/pi-chat";
+import {
+  piJournalUserMessage,
+  piTerminalNotice,
+  piUserView,
+  type PiRemoteTurn,
+  type PiUserMessage,
+} from "@stella/contracts/pi-chat";
 import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
 import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
 import { PI_BRAIN_ELSEWHERE_CODE, type PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
@@ -126,7 +132,60 @@ export type DesktopJournal = {
    * conversation's object as a message from this computer's user, which
    * places it where Stella runs or answers it. Resolves once the cloud took it.
    */
-  relay?(message: { clientMsgId: string; prompt: string }): Promise<void>;
+  relay?(message: RelayedMessage): Promise<void>;
+};
+
+export type RelayedMessage = {
+  clientMsgId: string;
+  prompt: string;
+  images?: Array<{ mimeType: string; data: string }>;
+  files?: Array<{ name?: string; mimeType?: string; path?: string; url?: string }>;
+  context?: { text?: string; display?: Record<string, unknown> };
+};
+
+const LOCAL_ATTACHMENT_NOTICE = /^The user attached (a file|an image): /;
+
+const relayedMessage = (clientMsgId: string, message: PiUserMessage): RelayedMessage | undefined => {
+  const { text, display } = piUserView(message);
+  const parts = typeof message.content === "string" ? [] : message.content;
+  const images = parts.flatMap((part) =>
+    part.type === "image" && part.data ? [{ mimeType: part.mimeType, data: part.data }] : [],
+  );
+  const files = (display?.attachments ?? []).flatMap((attachment) =>
+    attachment.kind === "file" && (attachment.path || attachment.url)
+      ? [
+          {
+            ...(attachment.name ? { name: attachment.name } : {}),
+            ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+            ...(attachment.path ? { path: attachment.path } : {}),
+            ...(attachment.url ? { url: attachment.url } : {}),
+          },
+        ]
+      : [],
+  );
+  const contextText = parts
+    .flatMap((part) =>
+      part.type === "text" && part.stella?.hidden && part.text.trim() && !LOCAL_ATTACHMENT_NOTICE.test(part.text)
+        ? [part.text]
+        : [],
+    )
+    .join("\n\n");
+  const prompt = text.trim();
+  if (!prompt && images.length === 0 && files.length === 0) return undefined;
+  return {
+    clientMsgId,
+    prompt,
+    ...(images.length > 0 ? { images } : {}),
+    ...(files.length > 0 ? { files } : {}),
+    ...(contextText || display?.context
+      ? {
+          context: {
+            ...(contextText ? { text: contextText } : {}),
+            ...(display?.context ? { display: display.context } : {}),
+          },
+        }
+      : {}),
+  };
 };
 
 /** How long a refused message keeps being sent on before the user is told it did not go. */
@@ -259,15 +318,16 @@ export async function journalMirror(args: {
    * runs elsewhere, it goes to the conversation in the cloud, which hands it
    * to her. Only when that never succeeds is the user told, in the chat.
    */
-  const relayTyped = async (clientMsgId: string, prompt: string): Promise<void> => {
+  const relayTyped = async (outgoing: RelayedMessage): Promise<void> => {
     const relay = journal.relay;
     if (!relay) return;
+    const clientMsgId = outgoing.clientMsgId;
     let failure: unknown;
     for (const delay of RELAY_DELAYS_MS) {
       if (stopped) return;
       if (delay) await new Promise((resolve) => setTimeout(resolve, delay));
       try {
-        await relay({ clientMsgId, prompt });
+        await relay(outgoing);
         return;
       } catch (error) {
         failure = error;
@@ -600,10 +660,7 @@ export async function journalMirror(args: {
               const relayId = journaled.clientMsgId && CLIENT_MSG_ID_PATTERN.test(journaled.clientMsgId)
                 ? journaled.clientMsgId
                 : localTurnId;
-              const typed = (journaled.message.content as Array<{ type?: string; text?: string }>)
-                .flatMap((part) => (part.type === "text" && part.text ? [part.text] : []))
-                .join("\n")
-                .trim();
+              const typed = journaled.hidden ? undefined : relayedMessage(relayId, message as PiUserMessage);
               const ack = await journal
                 .begin({
                   localTurnId,
@@ -619,12 +676,12 @@ export async function journalMirror(args: {
                 .catch(async (error: unknown) => {
                   report(error);
                   if ((error as { code?: unknown } | null)?.code === PI_BRAIN_ELSEWHERE_CODE) {
-                    if (!journaled.hidden && typed && journal.relay) {
+                    if (typed && journal.relay) {
                       relayed.add(relayId);
                       await save((current) => {
                         current.relayed = [...(current.relayed ?? []).filter((id) => id !== relayId), relayId].slice(-50);
                       });
-                      void relayTyped(relayId, typed).catch(report);
+                      void relayTyped(typed).catch(report);
                       await root.abort(context).catch(report);
                     } else {
                       await stopStella(harness, root, context).catch(report);

@@ -1066,6 +1066,9 @@ export class StellaRuntimeHost {
             ),
             ownerGeneration,
             ...(attachments.length > 0 ? { attachments } : {}),
+            ...(userAuthored && payload.context !== undefined
+              ? { context: payload.context }
+              : {}),
           },
           {
             ensureWorker: true,

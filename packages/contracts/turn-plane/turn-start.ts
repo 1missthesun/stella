@@ -46,6 +46,31 @@ export const CONVERSATION_ID_PATTERN = /^[A-Za-z0-9._-]{8,128}$/;
 export const TURN_PROMPT_MAX_CHARS = 8_000;
 export const TURN_ATTACHMENTS_MAX = 4;
 export const TURN_TITLE_MAX_CHARS = 120;
+export const TURN_CONTEXT_TEXT_MAX_CHARS = 32_000;
+export const TURN_CONTEXT_DISPLAY_MAX_CHARS = 16_000;
+
+export type CloudTurnContext = {
+  text?: string;
+  display?: Record<string, unknown>;
+};
+
+const isPlainRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+export const parseCloudTurnContext = (value: unknown): CloudTurnContext | null => {
+  if (!isPlainRecord(value)) return null;
+  const context: CloudTurnContext = {};
+  if (value.text !== undefined) {
+    if (typeof value.text !== "string" || value.text.length > TURN_CONTEXT_TEXT_MAX_CHARS) return null;
+    if (value.text.trim()) context.text = value.text;
+  }
+  if (value.display !== undefined) {
+    if (!isPlainRecord(value.display)) return null;
+    if (JSON.stringify(value.display).length > TURN_CONTEXT_DISPLAY_MAX_CHARS) return null;
+    if (Object.keys(value.display).length > 0) context.display = value.display;
+  }
+  return context;
+};
 
 export type CloudAgentThreadControl = {
   /** Report fixed with the terminal decision, never parsed from the wake prompt. */
@@ -95,6 +120,7 @@ export type CloudTurnStartRequest = {
   locale?: string;
   /** Drive paths, at most TURN_ATTACHMENTS_MAX. */
   attachments?: string[];
+  context?: CloudTurnContext;
   lane?: CloudTurnLane;
   source?: CloudTurnSource;
   /** Title hint used only when the conversation is created by this turn. */

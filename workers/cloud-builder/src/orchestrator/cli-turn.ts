@@ -190,6 +190,9 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
           : {}),
       },
       ...(turn.source ? { source: turn.source } : {}),
+      ...(turn.context?.display
+        ? { metadata: { context: turn.context.display } }
+        : {}),
     } as AgentMessage;
     const promptPayload = await this.spillOversizePrompt(
       turn.turnId,

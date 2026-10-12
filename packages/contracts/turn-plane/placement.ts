@@ -1,4 +1,5 @@
 import type { CloudExecutionSelection } from "../agent-engine.js";
+import type { CloudTurnContext } from "./turn-start.js";
 import type {
   DeviceRequestDeviceFrame,
   DeviceRequestServerFrame,
@@ -250,6 +251,7 @@ export type DispatchPayload = {
   userMessageEventId?: string;
   locale?: string;
   attachments?: string[];
+  context?: CloudTurnContext;
   execution?: CloudExecutionSelection | null;
   /** Agent dispatches only. */
   description?: string;

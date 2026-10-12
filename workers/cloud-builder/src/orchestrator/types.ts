@@ -2,6 +2,7 @@ import type { AgentActivityEntry } from "@stella/contracts/conversation-agent-ac
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import type {
+  CloudTurnContext,
   CloudTurnLane,
   CloudTurnSource,
 } from "@stella/contracts/turn-plane/turn-start";
@@ -83,6 +84,7 @@ export type ChatTurnRequest = {
   // so every client supplies exact references, including on history replay.
   // Images also hydrate through the capability-scoped attachment route.
   attachments?: string[];
+  context?: CloudTurnContext;
   /**
    * Exact control receipt for a cloud-agent lifecycle wake. Kept structured
    * (and out of the model's tool arguments) so a thread id can never be

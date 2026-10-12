@@ -8,7 +8,7 @@ import {
   NOTIFICATION_NAMES,
   type RuntimeChatPayload,
 } from "@stella/contracts/protocol";
-import { CLIENT_MSG_ID_PATTERN } from "@stella/contracts/turn-plane/turn-start";
+import { CLIENT_MSG_ID_PATTERN, parseCloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import {
   getAgentRuntimeEngine,
   getModelOverride,
@@ -585,6 +585,7 @@ export const piPlacedChat = async (
     placementRunId: string;
     userMessageEventId?: string;
     attachments?: RuntimeChatPayload["attachments"];
+    context?: unknown;
     /** A schedule's prompt: read by Stella, never shown; its answer shows. */
     scheduled?: boolean;
     /**
@@ -609,6 +610,16 @@ export const piPlacedChat = async (
     resolveImageTarget: async () => (await session.runnerCell.get()?.resolveImageTarget(undefined)) ?? undefined,
   });
   const content = piUserContent(payload, prepared);
+  const context = run.context === undefined ? null : parseCloudTurnContext(run.context);
+  if (context?.text) content.push({ type: "text", text: context.text, stella: { hidden: true } });
+  if (context?.display) {
+    const first = content[0]!;
+    const display = first.stella?.display;
+    content[0] = {
+      ...first,
+      stella: { ...first.stella, display: { ...display, context: { ...display?.context, ...context.display } } },
+    } as typeof first;
+  }
   // The sender binds its pending message to this id: the journal row keeps it.
   content[0] = { ...content[0]!, stella: { ...content[0]!.stella, clientMsgId: requestId } } as typeof content[number];
   if (run.scheduled || run.handoff) {

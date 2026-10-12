@@ -12,6 +12,7 @@ import type {
   TurnStartedEvent,
 } from "@stella/contracts/turn-plane/owner-events";
 import {
+  type CloudTurnContext,
   type CloudTurnLane,
   type CloudTurnStartResponse,
   TURN_OWNER_GENERATION_HEADER,
@@ -83,6 +84,7 @@ type PiPlacedChat = {
   ownerId: string;
   prompt: string;
   attachments?: string[];
+  context?: CloudTurnContext;
   locale?: string;
   placedAt: number;
 };
@@ -197,6 +199,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           ...(placed.attachments?.length
             ? { attachments: placed.attachments }
             : {}),
+          ...(placed.context ? { context: placed.context } : {}),
           ...(placed.locale ? { locale: placed.locale } : {}),
         }),
       }),
@@ -367,6 +370,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               ...(start.attachments?.length
                 ? { attachments: start.attachments }
                 : {}),
+              ...(start.context ? { context: start.context } : {}),
               ...(start.locale ? { locale: start.locale } : {}),
             });
             log("info", "pi_brain_turn_placed", {
@@ -382,6 +386,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               ...(start.attachments?.length
                 ? { attachments: start.attachments }
                 : {}),
+              ...(start.context ? { context: start.context } : {}),
               ...(start.locale ? { locale: start.locale } : {}),
               placedAt: Date.now(),
             });
@@ -717,6 +722,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         ...(start.locale ? { locale: start.locale } : {}),
         ...(snapshot.timeZone ? { timeZone: snapshot.timeZone } : {}),
         ...(start.attachments ? { attachments: start.attachments } : {}),
+        ...(start.context ? { context: start.context } : {}),
         ...(start.agentThreadControl
           ? {
               agentThreadControl: wakeReportSpillKey

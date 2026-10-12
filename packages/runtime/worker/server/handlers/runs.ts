@@ -67,6 +67,7 @@ export const runsHandlers: WorkerRpcHandlers = {
         scheduled?: boolean;
         handoff?: boolean;
         attachments?: RuntimeAttachmentRef[];
+        context?: unknown;
       };
       // The host's own turns (schedule fires, watch escalations, heartbeats)
       // and the chats other devices place here run in the conversation's harness.
@@ -80,6 +81,7 @@ export const runsHandlers: WorkerRpcHandlers = {
             placementRunId,
             ...(automation.userMessageEventId ? { userMessageEventId: automation.userMessageEventId } : {}),
             ...(automation.attachments?.length ? { attachments: automation.attachments } : {}),
+            ...(automation.context !== undefined ? { context: automation.context } : {}),
             ...(automation.scheduled ? { scheduled: true } : {}),
             ...(automation.handoff ? { handoff: true } : {}),
           }),

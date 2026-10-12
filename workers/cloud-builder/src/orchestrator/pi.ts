@@ -10,6 +10,7 @@ import type {
   CloudChatPreparation,
 } from "../cloud-chat-admission.js";
 import { PLACEMENT_PROTOCOL } from "@stella/contracts/turn-plane/placement";
+import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import {
   claimFreePiBrain,
   decidePiBrainClaim,
@@ -1727,6 +1728,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     clientMsgId: string;
     prompt: string;
     attachments?: string[];
+    context?: CloudTurnContext;
     locale?: string;
     handoff?: true;
   }): Promise<string> {
@@ -1755,6 +1757,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           ...(args.attachments?.length
             ? { attachments: args.attachments }
             : {}),
+          ...(args.context ? { context: args.context } : {}),
           ...(args.handoff ? { handoff: true as const } : {}),
         },
       },

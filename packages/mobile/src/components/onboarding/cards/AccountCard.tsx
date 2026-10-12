@@ -51,7 +51,7 @@ type EngineSpec = {
 const ENGINES: EngineSpec[] = [
   {
     provider: "anthropic",
-    icon: "sparkles",
+    icon: "asterisk",
     name: "Claude",
     descKey: "mobile.onboarding.account.claudeDesc",
     pasteHintKey: "mobile.engineAccounts.pasteHintClaude",

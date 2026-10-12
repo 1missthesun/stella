@@ -894,7 +894,17 @@
         "sortNewest": "Nyeste først",
         "sortOldest": "Ældste først",
         "sourceCloud": "Cloud",
-        "sourceUpload": "Sendt af dig"
+        "sourceUpload": "Sendt af dig",
+        "types": {
+          "all": "Alle",
+          "images": "Billeder",
+          "videos": "Videoer",
+          "audio": "Lyd",
+          "documents": "Dokumenter",
+          "code": "Kode",
+          "pages": "Sider",
+          "other": "Andet"
+        }
       },
       "schedule": {
         "actionFailed": "Det lykkedes ikke.",
@@ -910,7 +920,8 @@
         "next": "Næste {when}",
         "pauseSchedule": "Sæt tidsplan på pause",
         "paused": "Sat på pause",
-        "resumeSchedule": "Genoptag tidsplan"
+        "resumeSchedule": "Genoptag tidsplan",
+        "editPrompt": "Ændr min plan “{title}”: "
       },
       "search": {
         "clear": "Ryd søgning",
@@ -928,6 +939,12 @@
         "finished": "Færdig",
         "stopped": "Stoppet",
         "working": "Arbejder i baggrunden"
+      },
+      "time": {
+        "today": "I dag",
+        "yesterday": "I går",
+        "tomorrow": "I morgen",
+        "earlierThisMonth": "Tidligere denne måned"
       }
     },
     "apps": {

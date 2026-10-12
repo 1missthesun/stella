@@ -894,7 +894,17 @@
         "sortNewest": "Newest first",
         "sortOldest": "Oldest first",
         "sourceCloud": "Cloud",
-        "sourceUpload": "Sent by you"
+        "sourceUpload": "Sent by you",
+        "types": {
+          "all": "All",
+          "images": "Images",
+          "videos": "Videos",
+          "audio": "Audio",
+          "documents": "Documents",
+          "code": "Code",
+          "pages": "Pages",
+          "other": "Other"
+        }
       },
       "schedule": {
         "actionFailed": "That didn’t go through.",
@@ -910,7 +920,8 @@
         "next": "Next {when}",
         "pauseSchedule": "Pause schedule",
         "paused": "Paused",
-        "resumeSchedule": "Resume schedule"
+        "resumeSchedule": "Resume schedule",
+        "editPrompt": "Change my “{title}” schedule: "
       },
       "search": {
         "clear": "Clear search",
@@ -928,6 +939,12 @@
         "finished": "Finished",
         "stopped": "Stopped",
         "working": "Working in background"
+      },
+      "time": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "tomorrow": "Tomorrow",
+        "earlierThisMonth": "Earlier this month"
       }
     },
     "apps": {

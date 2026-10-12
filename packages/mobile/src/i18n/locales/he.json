@@ -902,7 +902,17 @@
         "sortNewest": "החדשים ביותר קודם",
         "sortOldest": "הישנים ביותר קודם",
         "sourceCloud": "ענן",
-        "sourceUpload": "נשלחו על ידך"
+        "sourceUpload": "נשלחו על ידך",
+        "types": {
+          "all": "הכול",
+          "images": "תמונות",
+          "videos": "סרטונים",
+          "audio": "שמע",
+          "documents": "מסמכים",
+          "code": "קוד",
+          "pages": "דפים",
+          "other": "אחר"
+        }
       },
       "schedule": {
         "actionFailed": "זה לא הצליח.",
@@ -918,7 +928,8 @@
         "next": "ההרצה הבאה {when}",
         "pauseSchedule": "השהיית התזמון",
         "paused": "מושהה",
-        "resumeSchedule": "חידוש התזמון"
+        "resumeSchedule": "חידוש התזמון",
+        "editPrompt": "שנה את התזמון „{title}”: "
       },
       "search": {
         "clear": "ניקוי החיפוש",
@@ -936,6 +947,12 @@
         "finished": "הושלם",
         "stopped": "הופסק",
         "working": "עובד ברקע"
+      },
+      "time": {
+        "today": "היום",
+        "yesterday": "אתמול",
+        "tomorrow": "מחר",
+        "earlierThisMonth": "מוקדם יותר החודש"
       }
     },
     "apps": {

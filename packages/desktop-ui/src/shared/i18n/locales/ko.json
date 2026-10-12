@@ -886,7 +886,17 @@
         "sortNewest": "최신순",
         "sortOldest": "오래된 순",
         "sourceCloud": "클라우드",
-        "sourceUpload": "내가 보낸 파일"
+        "sourceUpload": "내가 보낸 파일",
+        "types": {
+          "all": "전체",
+          "images": "이미지",
+          "videos": "동영상",
+          "audio": "오디오",
+          "documents": "문서",
+          "code": "코드",
+          "pages": "페이지",
+          "other": "기타"
+        }
       },
       "schedule": {
         "actionFailed": "처리하지 못했습니다.",
@@ -902,7 +912,8 @@
         "next": "다음 실행 {when}",
         "pauseSchedule": "일정 일시정지",
         "paused": "일시정지됨",
-        "resumeSchedule": "일정 재개"
+        "resumeSchedule": "일정 재개",
+        "editPrompt": "“{title}” 일정을 바꿔줘: "
       },
       "search": {
         "clear": "검색 지우기",
@@ -920,6 +931,12 @@
         "finished": "완료됨",
         "stopped": "중지됨",
         "working": "백그라운드에서 작업 중"
+      },
+      "time": {
+        "today": "오늘",
+        "yesterday": "어제",
+        "tomorrow": "내일",
+        "earlierThisMonth": "이번 달 초"
       }
     },
     "apps": {

@@ -886,7 +886,17 @@
         "sortNewest": "新しい順",
         "sortOldest": "古い順",
         "sourceCloud": "クラウド",
-        "sourceUpload": "あなたが送信"
+        "sourceUpload": "あなたが送信",
+        "types": {
+          "all": "すべて",
+          "images": "画像",
+          "videos": "動画",
+          "audio": "オーディオ",
+          "documents": "書類",
+          "code": "コード",
+          "pages": "ページ",
+          "other": "その他"
+        }
       },
       "schedule": {
         "actionFailed": "実行できませんでした。",
@@ -902,7 +912,8 @@
         "next": "次回 {when}",
         "pauseSchedule": "スケジュールを一時停止",
         "paused": "一時停止中",
-        "resumeSchedule": "スケジュールを再開"
+        "resumeSchedule": "スケジュールを再開",
+        "editPrompt": "「{title}」のスケジュールを変更して："
       },
       "search": {
         "clear": "検索をクリア",
@@ -920,6 +931,12 @@
         "finished": "完了",
         "stopped": "停止",
         "working": "バックグラウンドで作業中"
+      },
+      "time": {
+        "today": "今日",
+        "yesterday": "昨日",
+        "tomorrow": "明日",
+        "earlierThisMonth": "今月のはじめ"
       }
     },
     "apps": {

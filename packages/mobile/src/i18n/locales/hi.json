@@ -894,7 +894,17 @@
         "sortNewest": "नई पहले",
         "sortOldest": "पुरानी पहले",
         "sourceCloud": "क्लाउड",
-        "sourceUpload": "आपके द्वारा भेजी गई"
+        "sourceUpload": "आपके द्वारा भेजी गई",
+        "types": {
+          "all": "सभी",
+          "images": "चित्र",
+          "videos": "वीडियो",
+          "audio": "ऑडियो",
+          "documents": "दस्तावेज़",
+          "code": "कोड",
+          "pages": "पेज",
+          "other": "अन्य"
+        }
       },
       "schedule": {
         "actionFailed": "यह पूरा नहीं हो सका।",
@@ -910,7 +920,8 @@
         "next": "अगली बार {when}",
         "pauseSchedule": "शेड्यूल रोकें",
         "paused": "रुका हुआ",
-        "resumeSchedule": "शेड्यूल फिर शुरू करें"
+        "resumeSchedule": "शेड्यूल फिर शुरू करें",
+        "editPrompt": "मेरा “{title}” शेड्यूल बदलो: "
       },
       "search": {
         "clear": "खोज साफ़ करें",
@@ -928,6 +939,12 @@
         "finished": "पूरा हुआ",
         "stopped": "रोका गया",
         "working": "बैकग्राउंड में काम कर रहा है"
+      },
+      "time": {
+        "today": "आज",
+        "yesterday": "कल",
+        "tomorrow": "कल",
+        "earlierThisMonth": "इस महीने पहले"
       }
     },
     "apps": {

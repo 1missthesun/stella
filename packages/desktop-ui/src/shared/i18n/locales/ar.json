@@ -926,7 +926,17 @@
         "sortNewest": "الأحدث أولًا",
         "sortOldest": "الأقدم أولًا",
         "sourceCloud": "السحابة",
-        "sourceUpload": "أرسلتها أنت"
+        "sourceUpload": "أرسلتها أنت",
+        "types": {
+          "all": "الكل",
+          "images": "الصور",
+          "videos": "الفيديوهات",
+          "audio": "الصوت",
+          "documents": "المستندات",
+          "code": "الكود",
+          "pages": "الصفحات",
+          "other": "أخرى"
+        }
       },
       "schedule": {
         "actionFailed": "لم تنجح العملية.",
@@ -942,7 +952,8 @@
         "next": "التشغيل التالي {when}",
         "pauseSchedule": "إيقاف الجدولة مؤقتًا",
         "paused": "متوقفة مؤقتًا",
-        "resumeSchedule": "استئناف الجدولة"
+        "resumeSchedule": "استئناف الجدولة",
+        "editPrompt": "غيّر جدول «{title}»: "
       },
       "search": {
         "clear": "مسح البحث",
@@ -960,6 +971,12 @@
         "finished": "اكتمل",
         "stopped": "أُوقف",
         "working": "يعمل في الخلفية"
+      },
+      "time": {
+        "today": "اليوم",
+        "yesterday": "أمس",
+        "tomorrow": "غدًا",
+        "earlierThisMonth": "في وقت سابق هذا الشهر"
       }
     },
     "apps": {

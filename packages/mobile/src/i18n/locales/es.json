@@ -902,7 +902,17 @@
         "sortNewest": "Más recientes primero",
         "sortOldest": "Más antiguos primero",
         "sourceCloud": "Nube",
-        "sourceUpload": "Enviados por ti"
+        "sourceUpload": "Enviados por ti",
+        "types": {
+          "all": "Todo",
+          "images": "Imágenes",
+          "videos": "Vídeos",
+          "audio": "Audio",
+          "documents": "Documentos",
+          "code": "Código",
+          "pages": "Páginas",
+          "other": "Otros"
+        }
       },
       "schedule": {
         "actionFailed": "No se pudo completar.",
@@ -918,7 +928,8 @@
         "next": "Próxima ejecución {when}",
         "pauseSchedule": "Pausar programación",
         "paused": "En pausa",
-        "resumeSchedule": "Reanudar programación"
+        "resumeSchedule": "Reanudar programación",
+        "editPrompt": "Cambia mi programación «{title}»: "
       },
       "search": {
         "clear": "Borrar búsqueda",
@@ -936,6 +947,12 @@
         "finished": "Terminado",
         "stopped": "Detenido",
         "working": "Trabajando en segundo plano"
+      },
+      "time": {
+        "today": "Hoy",
+        "yesterday": "Ayer",
+        "tomorrow": "Mañana",
+        "earlierThisMonth": "Antes este mes"
       }
     },
     "apps": {

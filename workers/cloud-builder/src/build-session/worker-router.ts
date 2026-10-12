@@ -132,7 +132,7 @@ import {
   issueSocketTicket,
   verifySocketTicket,
 } from "../socket-ticket.js";
-import { ownerGateStub } from "../rpc-release.js";
+import { ownerGateStub, released } from "../rpc-release.js";
 
 // ---------------------------------------------------------------------------
 // The user-authenticated conversation surfaces
@@ -1021,7 +1021,7 @@ app.all("/workspace-apps/:rest{.*}", (c) => serveWorkspaceApp(c.req.raw, c.env))
 const listOwnerApps = async (env: Env, ownerId: string) => {
   const world = env.WORLDS.getByName(await worldName(ownerId));
   await ownerAccess(env, ownerId);
-  const apps = await world.listWorkspaceApps();
+  const apps = released(await world.listWorkspaceApps());
   return { world, apps };
 };
 app.get("/owners/me/apps", userAuth(), async (c) => {

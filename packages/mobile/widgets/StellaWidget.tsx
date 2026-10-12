@@ -49,14 +49,14 @@ const StellaWidget = (
           </Text>
         </VStack>
         <Spacer />
-        <Image systemName="sparkles" color={accent} size={28} />
+        <Image systemName="bubble.left.fill" color={accent} size={28} />
       </HStack>
     );
   }
 
   return (
     <VStack alignment="leading" modifiers={[padding({ all: 14 })]}>
-      <Image systemName="sparkles" color={accent} size={22} />
+      <Image systemName="bubble.left.fill" color={accent} size={22} />
       <Spacer />
       <Text modifiers={[font({ weight: "semibold", size: 15 })]}>
         Ask Stella

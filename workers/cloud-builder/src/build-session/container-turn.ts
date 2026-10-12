@@ -1389,6 +1389,23 @@ export const runAgentAttempt = async (
     false,
     turnExecution.signal,
   );
+  // This agent's container gets the owner's current Claude Code logins
+  // before the CLI looks for them; its own copy may be older. Nothing below
+  // reads them before the turn input is written, so they come down while
+  // the skills and the attempt directory are set up.
+  let claudeLoginsMs: number | undefined;
+  const claudeLogins = (async () => {
+    if (turn.execution?.engine !== "anthropic") return null;
+    const started = performance.now();
+    const account = await claudeCloudAccountFor(host.env, turn);
+    await restoreClaudeCloudLogins(host.env, turn.ownerId, sandbox);
+    if (account.email === TEST_CLAUDE_EMAIL && testClaudeConfigured(host.env)) {
+      await seedTestClaudeLogin(host.env, turn.ownerId, sandbox);
+    }
+    claudeLoginsMs = Math.round(performance.now() - started);
+    return account;
+  })();
+  claudeLogins.catch(() => undefined);
   let cloudSkills:
     | Awaited<ReturnType<typeof materializeCloudSkillSnapshot>>
     | undefined = undefined;
@@ -1491,24 +1508,9 @@ export const runAgentAttempt = async (
     // container uses, and talks to Anthropic itself.
     if (!turn.execution) throw new AgentTurnAuthorityLostError();
     const orchestrator = turn.agentRole === "orchestrator";
-    const admitted = turn.execution;
-    const claudeAccount =
-      admitted.engine === "anthropic"
-        ? await claudeCloudAccountFor(host.env, turn)
-        : null;
-    // This agent's container gets the owner's current Claude Code logins
-    // before the CLI looks for them; its own copy may be older.
-    if (claudeAccount) {
-      await restoreClaudeCloudLogins(host.env, turn.ownerId, sandbox);
-      if (
-        claudeAccount.email === TEST_CLAUDE_EMAIL &&
-        testClaudeConfigured(host.env)
-      ) {
-        await seedTestClaudeLogin(host.env, turn.ownerId, sandbox);
-      }
-    }
+    const claudeAccount = await claudeLogins;
     turnExecution.assertActive();
-    setupStep("claudeLogins");
+    setupStep("claudeLoginsWait");
 
     // The turn input sits in the root-only attempt directory, above the
     // world root on purpose: the checkpoint only covers the root, so
@@ -1593,6 +1595,7 @@ export const runAgentAttempt = async (
       coldContainerStartMs,
       restoreMs,
       setupMs,
+      ...(claudeLoginsMs === undefined ? {} : { claudeLoginsMs }),
     });
     const executorProcessId = sessionName(
       `agent-executor-${turn.turnId}-${turn.attemptGeneration}`,

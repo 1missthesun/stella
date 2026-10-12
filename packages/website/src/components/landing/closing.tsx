@@ -68,15 +68,18 @@ export function OpenSourceAct() {
           </pre>
         ))}
       </div>
-      <h2 id="source-title" className={o.repo}>
-        <a href="https://github.com/1missthesun/stella-v2" target="_blank" rel="noopener noreferrer">
-          github.com/
-          <wbr />
-          1missthesun/
-          <wbr />
-          stella-v2
-        </a>
+      <h2 id="source-title" className={o.sourceTitle}>
+        Open <span>source.</span>
       </h2>
+      <a
+        className={o.hot}
+        href="https://github.com/1missthesun/stella-v2"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        github.com/1missthesun/stella-v2
+      </a>
+      <span className={o.license}>Apache-2.0</span>
     </section>
   );
 }

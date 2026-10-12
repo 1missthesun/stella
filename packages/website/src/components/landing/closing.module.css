@@ -52,14 +52,26 @@
   margin-top: 220px;
 }
 
-.repo {
+.hot {
   position: relative;
-  max-width: calc(100% - 2 * var(--l-margin));
+  margin-top: clamp(28px, 5svh, 56px);
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: linear-gradient(90deg, #00b8ff, #5243ff 50%, #ff4ac0);
+  color: #fff;
+  font-family: var(--l-mono);
+  font-size: clamp(11px, 1.1vw, 16px);
+  white-space: nowrap;
+  box-shadow: 0 24px 50px -16px rgba(82, 67, 255, 0.7);
+}
+
+.sourceTitle {
+  position: relative;
   margin: 0;
-  font-size: clamp(38px, 6.4vw, 124px);
+  font-size: clamp(60px, 15vw, 290px);
   font-weight: 820;
-  line-height: 1.06;
-  letter-spacing: -0.055em;
+  line-height: 0.84;
+  letter-spacing: -0.065em;
   text-align: center;
   color: #0a0a0d;
   opacity: 0;
@@ -69,9 +81,20 @@
     transform 1200ms cubic-bezier(0.2, 1, 0.3, 1);
 }
 
-.source[data-in="1"] .repo {
+.source[data-in="1"] .sourceTitle {
   opacity: 1;
   transform: none;
+}
+
+.hot,
+.license {
+  opacity: 0;
+  transition: opacity 800ms ease 500ms;
+}
+
+.source[data-in="1"] .hot,
+.source[data-in="1"] .license {
+  opacity: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -79,11 +102,26 @@
     animation: none;
   }
 
-  .repo {
+  .sourceTitle,
+  .hot,
+  .license {
     opacity: 1;
     transform: none;
     transition: none;
   }
+}
+
+.sourceTitle span {
+  font-stretch: 125%;
+}
+
+.license {
+  position: relative;
+  margin-top: 16px;
+  font-family: var(--l-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: rgba(10, 10, 13, 0.5);
 }
 
 .finale {
@@ -327,20 +365,19 @@
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.repo a {
-  text-decoration: underline;
-  text-decoration-color: #703cff;
-  text-decoration-thickness: 0.06em;
-  text-underline-offset: 0.14em;
-  text-shadow: 0 0 24px #fff, 0 0 12px #fff;
-  transition: color 200ms ease;
+.source .hot {
+  transition:
+    opacity 800ms ease 500ms,
+    transform 220ms ease,
+    box-shadow 220ms ease;
 }
 
-.repo a:hover {
-  color: #703cff;
+.source .hot:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 30px 60px -16px rgba(82, 67, 255, 0.85);
 }
 
-.repo a:focus-visible {
+.source .hot:focus-visible {
   outline: 3px solid #703cff;
-  outline-offset: 6px;
+  outline-offset: 4px;
 }

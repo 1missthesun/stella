@@ -122,6 +122,10 @@ const finalizeWindowLaunch = (context) => {
     // frame the last process left (bounded, so a stuck hold never hides it).
     const transition = state.updateTransition;
     if (fullWindow && transition?.hasPendingHold()) {
+        // Nobody sees this window paint: it is under the held frame until it
+        // is live. The runtime starts now, alongside the renderer, rather
+        // than after first paint, so Stella is back to usable sooner.
+        triggerDeferredStartup("update-relaunch");
         void Promise.race([
             transition.resumeAfterRelaunch(fullWindow),
             new Promise((resolve) => setTimeout(resolve, 800)),

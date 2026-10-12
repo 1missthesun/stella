@@ -115,6 +115,7 @@ const copyCallableMetadata = (
   ...(tool.annotations ? { annotations: tool.annotations } : {}),
   ...(tool.demoted ? { demoted: tool.demoted } : {}),
   ...(tool.agentTypes ? { agentTypes: tool.agentTypes } : {}),
+  ...("awaitsUser" in tool && tool.awaitsUser ? { awaitsUser: true } : {}),
 });
 
 /**
@@ -332,6 +333,7 @@ export const createToolHost = ({
       }
     },
     executeTool: executeNestedToolCall,
+    toolAwaitsUser: (toolName) => toolCatalog.get(toolName)?.awaitsUser === true,
     // In-REPL `tools.$search` — runs host-side over the LIVE catalog so
     // connector/extension changes are visible immediately. Scope: exactly
     // the tools the calling context can invoke as `tools.<name>` in the

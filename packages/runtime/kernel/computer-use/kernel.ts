@@ -198,6 +198,7 @@ export type NodeReplKernelManagerOptions = {
     signal?: AbortSignal,
     onUpdate?: ToolUpdateCallback,
   ) => Promise<ToolResult>;
+  toolAwaitsUser?: (toolName: string) => boolean;
   /**
    * Host-side implementation of the in-REPL frozen `connect` client
    * (third-party app integrations: discover/connectors/actions/schema/
@@ -390,6 +391,10 @@ type ActiveEvaluation = {
   controller: AbortController;
   /** Interrupts the evaluation's timeout fiber (the clearTimeout analogue). */
   cancelTimeout: () => void;
+  timeoutMs: number;
+  remainingMs: number;
+  clockStartedAt: number;
+  awaitingUser: number;
   signal?: AbortSignal;
   onAbort?: () => void;
   resolve: (result: NodeReplEvaluationResult) => void;
@@ -778,6 +783,8 @@ class NodeReplKernel {
   private browserBackend: BrowserBackend = "in-app";
   private readonly requestBrowserExtensionConnect?: BrowserExtensionConnectRequester;
   private readonly executeTool?: NodeReplKernelManagerOptions["executeTool"];
+  private readonly toolAwaitsUser?: NodeReplKernelManagerOptions["toolAwaitsUser"];
+  private readonly awaitingUserListeners = new Set<() => void>();
   private readonly searchTools?: NodeReplKernelManagerOptions["searchTools"];
   private readonly describeTool?: NodeReplKernelManagerOptions["describeTool"];
   private readonly queryHistory?: NodeReplKernelManagerOptions["queryHistory"];
@@ -820,6 +827,7 @@ class NodeReplKernel {
       ) => BrowserSessionClient;
       requestBrowserExtensionConnect?: BrowserExtensionConnectRequester;
       executeTool?: NodeReplKernelManagerOptions["executeTool"];
+      toolAwaitsUser?: NodeReplKernelManagerOptions["toolAwaitsUser"];
       searchTools?: NodeReplKernelManagerOptions["searchTools"];
       describeTool?: NodeReplKernelManagerOptions["describeTool"];
       queryHistory?: NodeReplKernelManagerOptions["queryHistory"];
@@ -844,6 +852,7 @@ class NodeReplKernel {
     this.requestBrowserExtensionConnect =
       options.requestBrowserExtensionConnect;
     this.executeTool = options.executeTool;
+    this.toolAwaitsUser = options.toolAwaitsUser;
     this.searchTools = options.searchTools;
     this.describeTool = options.describeTool;
     this.queryHistory = options.queryHistory;
@@ -1046,21 +1055,14 @@ class NodeReplKernel {
       // session daemon, the browser client (CDP transport), and nested tool
       // execution — non-Effect consumers that need a genuine AbortSignal.
       const controller = new AbortController();
-      // The evaluation timeout is a forked fiber interrupted by
-      // `settleActive` (the clearTimeout analogue); the duration and the
-      // terminate path are unchanged.
-      const cancelTimeout = forkCancelableTimeout(timeoutMs, () => {
-        this.terminateActive(
-          new KernelTerminatedError(
-            `Code evaluation timed out after ${timeoutMs}ms.`,
-            "timeout",
-          ),
-        );
-      });
       const active: ActiveEvaluation = {
         id,
         controller,
-        cancelTimeout,
+        cancelTimeout: () => {},
+        timeoutMs,
+        remainingMs: timeoutMs,
+        clockStartedAt: Date.now(),
+        awaitingUser: 0,
         signal,
         resolve,
         reject,
@@ -1080,6 +1082,7 @@ class NodeReplKernel {
         },
       };
       this.active = active;
+      this.startClock(active);
       if (signal) {
         active.onAbort = () => {
           this.terminateActive(
@@ -1115,6 +1118,53 @@ class NodeReplKernel {
 
   private post(message: ParentToNodeReplWorkerMessage) {
     this.worker.postMessage(message);
+  }
+
+  private startClock(active: ActiveEvaluation) {
+    active.clockStartedAt = Date.now();
+    active.cancelTimeout = forkCancelableTimeout(active.remainingMs, () => {
+      if (this.active !== active) return;
+      this.terminateActive(
+        new KernelTerminatedError(
+          `Code evaluation timed out after ${active.timeoutMs}ms.`,
+          "timeout",
+        ),
+      );
+    });
+  }
+
+  get awaitingUser(): boolean {
+    return (this.active?.awaitingUser ?? 0) > 0;
+  }
+
+  onAwaitingUserChange(listener: () => void): () => void {
+    this.awaitingUserListeners.add(listener);
+    return () => this.awaitingUserListeners.delete(listener);
+  }
+
+  private async whileAwaitingUser<T>(
+    active: ActiveEvaluation,
+    task: () => Promise<T>,
+  ): Promise<T> {
+    active.awaitingUser += 1;
+    if (active.awaitingUser === 1) {
+      active.cancelTimeout();
+      active.cancelTimeout = () => {};
+      active.remainingMs = Math.max(
+        1,
+        active.remainingMs - (Date.now() - active.clockStartedAt),
+      );
+      for (const listener of [...this.awaitingUserListeners]) listener();
+    }
+    try {
+      return await task();
+    } finally {
+      active.awaitingUser -= 1;
+      if (active.awaitingUser === 0) {
+        if (this.active === active) this.startClock(active);
+        for (const listener of [...this.awaitingUserListeners]) listener();
+      }
+    }
   }
 
   private handleMessage(message: unknown) {
@@ -1466,14 +1516,16 @@ class NodeReplKernel {
       try {
         value = await this.executeBrowserMessage(active, message);
       } catch (error) {
-        const outcome = await maybeRequestBrowserExtensionConnect({
-          output: error instanceof Error ? error.message : String(error),
-          command: "stella-browser node_repl",
-          requestConnect: this.requestBrowserExtensionConnect,
-          conversationId: active.context.conversationId,
-          agentId: active.context.agentId,
-          signal: active.controller.signal,
-        });
+        const outcome = await this.whileAwaitingUser(active, () =>
+          maybeRequestBrowserExtensionConnect({
+            output: error instanceof Error ? error.message : String(error),
+            command: "stella-browser node_repl",
+            requestConnect: this.requestBrowserExtensionConnect,
+            conversationId: active.context.conversationId,
+            agentId: active.context.agentId,
+            signal: active.controller.signal,
+          }),
+        );
         if (!outcome?.ok) throw error;
         value = await this.executeBrowserMessage(active, message);
       }
@@ -1908,17 +1960,21 @@ class NodeReplKernel {
     }
 
     try {
-      const result = await this.executeTool(
-        message.toolName,
-        message.args,
-        active.context,
-        active.controller.signal,
-        (update) => {
-          if (!this.closed && this.active === active) {
-            active.onToolUpdate?.(update);
-          }
-        },
-      );
+      const execute = () =>
+        this.executeTool!(
+          message.toolName,
+          message.args,
+          active.context,
+          active.controller.signal,
+          (update) => {
+            if (!this.closed && this.active === active) {
+              active.onToolUpdate?.(update);
+            }
+          },
+        );
+      const result = this.toolAwaitsUser?.(message.toolName)
+        ? await this.whileAwaitingUser(active, execute)
+        : await execute();
       if (!this.closed && this.active === active) {
         const details =
           result.details &&
@@ -2438,11 +2494,13 @@ const waitForCellChange = async (
   waitMs: number,
   signal?: AbortSignal,
   wakeOnContent = true,
+  until?: () => boolean,
 ): Promise<void> => {
   if (
     cell.outcome ||
     (wakeOnContent && cell.cursor > afterCursor) ||
-    waitMs <= 0
+    waitMs <= 0 ||
+    until?.()
   ) {
     return;
   }
@@ -2453,7 +2511,7 @@ const waitForCellChange = async (
         const terminal = yield* Deferred.make<void>();
         const contentReady = yield* Deferred.make<void>();
         const onChange = () => {
-          if (cell.outcome) {
+          if (cell.outcome || until?.()) {
             Deferred.doneUnsafe(terminal, Effect.void);
           } else if (wakeOnContent && cell.cursor > afterCursor) {
             Deferred.doneUnsafe(contentReady, Effect.void);
@@ -2486,7 +2544,9 @@ const waitForCellChange = async (
           ),
         );
         yield* Effect.raceFirst(
-          Effect.raceFirst(changed, Effect.sleep(waitMs)),
+          Number.isFinite(waitMs)
+            ? Effect.raceFirst(changed, Effect.sleep(waitMs))
+            : changed,
           aborted,
         );
       }),
@@ -2617,7 +2677,11 @@ export class NodeReplKernelRegistry {
     );
     this.cells.set(cellId, cell);
     this.runningCellByOwner.set(id, cellId);
+    const stopWatchingUser = kernel.onAwaitingUserChange(() =>
+      notifyCellObservers(cell),
+    );
     void cell.settled.finally(() => {
+      stopWatchingUser();
       if (this.runningCellByOwner.get(id) === cellId) {
         this.runningCellByOwner.delete(id);
       }
@@ -2705,6 +2769,7 @@ export class NodeReplKernelRegistry {
         requestBrowserExtensionConnect:
           this.options.requestBrowserExtensionConnect,
         executeTool: this.options.executeTool,
+        toolAwaitsUser: this.options.toolAwaitsUser,
         searchTools: this.options.searchTools,
         describeTool: this.options.describeTool,
         queryHistory: this.options.queryHistory,
@@ -2797,6 +2862,28 @@ export class NodeReplKernelRegistry {
       signal,
       wakeOnContent,
     );
+    while (
+      !cell.outcome &&
+      cell.kernel.awaitingUser &&
+      !(wakeOnContent && cell.cursor > fromCursor)
+    ) {
+      await waitForCellChange(
+        cell,
+        fromCursor,
+        Number.POSITIVE_INFINITY,
+        signal,
+        wakeOnContent,
+        () => !cell.kernel.awaitingUser,
+      );
+      if (cell.outcome || cell.kernel.awaitingUser) continue;
+      await waitForCellChange(
+        cell,
+        fromCursor,
+        boundedWaitMs,
+        signal,
+        wakeOnContent,
+      );
+    }
     if (signal?.aborted) throw abortError(signal);
     const cursor = cell.cursor;
     const content = cell.content.slice(fromCursor, cursor);

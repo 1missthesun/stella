@@ -43,6 +43,8 @@ import type {
   ToolUpdateCallback,
 } from "../tools/types.js";
 
+const CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS = 30 * 60_000;
+
 /** One parsed stream-json line from the CLI: untrusted JSON, read defensively. */
 export type ClaudeStreamEvent = Record<string, any>;
 type ClaudeToolArgs = Record<string, any>;
@@ -2706,6 +2708,9 @@ class ClaudeCodeSessionRuntime {
       childEnv.CLAUDE_CODE_EFFORT_LEVEL = effortLevel;
     }
     session.claudeLoginEmail = claudeConfig.email;
+    childEnv.CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT = String(
+      CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT_MS,
+    );
     delete childEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW;
     delete childEnv.CLAUDE_AUTOCOMPACT_PCT_OVERRIDE;
     if (

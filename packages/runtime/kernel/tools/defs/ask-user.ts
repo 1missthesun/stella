@@ -18,6 +18,7 @@ export const createAskUserTool = (options: AskUserOptions): ToolDefinition => ({
   label: ASK_USER_TOOL_LABEL,
   workingText: ASK_USER_TOOL_WORKING_TEXT,
   replay: "unsafe",
+  awaitsUser: true,
   description: ASK_USER_TOOL_DESCRIPTION,
   promptSnippet: ASK_USER_TOOL_PROMPT_SNIPPET,
   parameters: ASK_USER_TOOL_PARAMETERS,

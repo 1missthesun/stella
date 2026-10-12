@@ -22,6 +22,7 @@ export const createRequestSecureInputTool = (
   label: "Ask for information securely",
   workingText: "Asking for details",
   replay: "unsafe",
+  awaitsUser: true,
   description:
     "Ask the user for information through a secure card, describing exactly the fields you need this time. Non-sensitive fields (an address, a one-time code) come back as values you can read. Sensitive fields (passwords, card numbers) never reach you: you get a handle instead, which `use_secure_value` can type into a browser field, pass to a command, or store in the keychain. Mark each field sensitive yourself; the user can override it. The user may answer on another device and the value travels end-to-end encrypted to this one.",
   promptSnippet:

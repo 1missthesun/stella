@@ -968,9 +968,10 @@ export function stellaAgents(host: StellaAgentsHost) {
   };
 
   /**
-   * The model an agent on another computer runs on when its caller names
-   * none: Claude Code, with the caller's model and effort, when the caller
-   * runs on it; otherwise that computer's own configured model.
+   * The model an agent placed elsewhere (another computer, or the cloud from
+   * a computer) runs on when its caller names none: Claude Code, with the
+   * caller's model and effort, when the caller runs on it; otherwise the
+   * default there.
    */
   const sameEngine = (caller: RunsOn): string | undefined => {
     if (!onClaudeCode(caller.model)) return undefined;
@@ -1151,9 +1152,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (!here && !placedRemote) throw new Error(`Agents can't start on ${describePlacement(placement)} from here.`);
       const named = args.model?.trim();
       const explicit = named && named !== "default" ? named : undefined;
-      // On another computer it runs on Stella's engine, as it would here: Claude Code when she runs on it.
-      const requested =
-        explicit ?? (placedRemote && placement.kind === "device" ? sameEngine(callerAgent) : host.defaultAgentModel?.(callerAgent));
+      // Elsewhere it runs on Stella's engine, as it would here: Claude Code when she runs on it.
+      const requested = explicit ?? (placedRemote ? sameEngine(callerAgent) : undefined) ?? host.defaultAgentModel?.(callerAgent);
       const description = args.description.trim() || "agent";
       const choice = requested
         ? await chooseAgentModel(requested, callerAgent, placedRemote ? placement : undefined, context)

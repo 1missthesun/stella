@@ -34,12 +34,33 @@ import {
 } from "./cli/registry.mjs";
 
 import { DOM_TOOLS_JS, compareObservations } from "./cli/dom.mjs";
+import { ADMIN_SECRET_HELP, adminApiSecret, readDevVar } from "./cli/dev-vars.mjs";
+import {
+  borrowClaudeLogin,
+  ensureDisplay,
+  killGroup,
+  prepareTestExtension,
+  removeBorrowedClaudeLogin,
+  runOwnedProcesses,
+  startTestBrowser,
+  stopRunOwnedProcesses,
+} from "./cli/isolation.mjs";
 
 const scriptPath = fileURLToPath(import.meta.url);
 const skillRoot = path.dirname(scriptPath);
 const repoRoot = path.resolve(skillRoot, "../../..");
-const POINTER_PATH = path.join(skillRoot, ".run", "current.json");
-const DEFAULT_EVIDENCE_DIR = path.join(skillRoot, "artifacts");
+const RUN_NAME = process.env.STELLA_VERIFY_RUN?.trim() || null;
+if (RUN_NAME && !/^[a-z0-9][a-z0-9-]{0,31}$/.test(RUN_NAME)) {
+  process.stderr.write(`${JSON.stringify({ ok: false, error: { code: "USAGE", message: "STELLA_VERIFY_RUN must be 1-32 characters of a-z, 0-9 and -." } })}\n`);
+  process.exit(1);
+}
+const POINTER_PATH = path.join(skillRoot, ".run", RUN_NAME ? `current-${RUN_NAME}.json` : "current.json");
+const evidenceRoot = () => {
+  const explicit = process.env.STELLA_VERIFY_EVIDENCE_DIR?.trim();
+  if (explicit) return path.resolve(explicit);
+  const outputs = path.join(os.homedir(), ".stella", "outputs");
+  return existsSync(outputs) ? path.join(outputs, "verify-stella") : path.join(skillRoot, "artifacts");
+};
 const READY_SELECTOR = ".shell-topbar-full";
 const SETTLE_IGNORED_SELECTOR = 'svg[aria-hidden="true"]';
 const HOST_HEALTH_EXPRESSION = String.raw`
@@ -422,21 +443,7 @@ const TEST_ACCOUNT_EMAIL_DOMAIN = "test.stella.local";
 
 const DEV_BACKEND_URL = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
 
-/** A value from the gitignored workers/cloud-builder/.dev.vars, if present. */
-const readDevVar = (name) => {
-  const envPath = path.join(repoRoot, "workers/cloud-builder/.dev.vars");
-  if (!existsSync(envPath)) return "";
-  const line = readFileSync(envPath, "utf8")
-    .split("\n")
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith(`${name}=`));
-  return line
-    ? line.slice(name.length + 1).split(" #")[0].trim().replace(/^"(.*)"$/, "$1")
-    : "";
-};
-
-const resolveAdminApiSecret = () =>
-  process.env.STELLA_ADMIN_API_SECRET?.trim() || readDevVar("STELLA_ADMIN_API_SECRET");
+const resolveAdminApiSecret = adminApiSecret;
 
 /** The backend (cloud-builder) origin: auth, test accounts and the API. */
 const resolveSiteUrl = () =>
@@ -560,7 +567,7 @@ const mintTestAccount = async (runId, mode) => {
     fail("STELLA_ADMIN_API_SECRET is unavailable.", 2, {
       errorCode: "TEST_ACCOUNT_SECRET_MISSING",
       recovery:
-        "Export STELLA_ADMIN_API_SECRET, or set it in the gitignored workers/cloud-builder/.dev.vars.",
+        ADMIN_SECRET_HELP,
     });
   // STELLA_VERIFY_ACCOUNT_EMAIL reuses one test account across runs, e.g.
   // two checkouts acting as the same owner's two computers.
@@ -739,7 +746,7 @@ const runStorageKey = (runDir) => {
 const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge }) => {
   const { runDir, dataDir, userDataDir, cdpPort, providerHomes } = run;
   process.stderr.write("Starting Electron...\n");
-  const softwareGl = linuxSoftwareGl();
+  const softwareGl = linuxSoftwareGl() || run.display?.mode === "xvfb";
   const electronArgs = [];
   if (process.platform === "linux") {
     electronArgs.push("--no-sandbox", "--disable-dev-shm-usage");
@@ -777,6 +784,13 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
       ...isolatedElectronEnvironment(),
       ...(modelGateway ? { STELLA_MODEL_GATEWAY_URL: modelGateway } : {}),
       ...(browserBridge ? { STELLA_BROWSER_BRIDGE: browserBridge } : {}),
+      ...(run.display?.display ? { DISPLAY: run.display.display } : {}),
+      ...(run.browserExtension
+        ? {
+            STELLA_BROWSER_SOCKET_DIR: run.browserExtension.socketDir,
+            STELLA_BROWSER_ISOLATED_EXT_PORT: String(run.browserExtension.extPort),
+          }
+        : {}),
       ...providerHomes,
       // The app talks to the backend the harness signs in against.
       ...(process.env.STELLA_BACKEND_URL?.trim()
@@ -865,7 +879,7 @@ const cmdLaunch = async (options) => {
       fail(
         `A verification instance is already running (runId ${existing.runId}). Pass --replace to stop it first, or drive that instance.`,
         1,
-        { errorCode: "ALREADY_RUNNING", recovery: "Run `cleanup plan`, then `session launch --replace`, or keep driving the recorded run." },
+        { errorCode: "ALREADY_RUNNING", recovery: "Keep driving the recorded run, or run `cleanup plan` then `session launch --replace` if it is yours. Another agent working in this checkout? Set STELLA_VERIFY_RUN=<name> to keep a separate run." },
       );
     }
     await cmdStop({ silent: true });
@@ -884,6 +898,23 @@ const cmdLaunch = async (options) => {
   const browserBridge = options["browser-bridge"] ?? null;
   if (browserBridge && !["shared", "isolated"].includes(browserBridge))
     fail("--browser-bridge must be shared or isolated.");
+  const wantsTestExtension = Boolean(options["browser-extension"]);
+  if (wantsTestExtension && browserBridge === "shared")
+    fail("--browser-extension pairs a private extension with the isolated bridge; drop --browser-bridge shared.");
+  if (wantsTestExtension && process.platform === "win32")
+    fail("--browser-extension is not supported on Windows, where every bridge shares one namespace.");
+  const displayMode = options.display ?? "auto";
+  if (!["auto", "xvfb", "host"].includes(displayMode)) fail("--display must be auto, xvfb or host.");
+  const claudeLogin = options["claude-login"] ?? null;
+  if (claudeLogin && !["host", "token"].includes(claudeLogin)) fail("--claude-login must be host or token.");
+  const claudeToken = claudeLogin === "token"
+    ? process.env.STELLA_VERIFY_CLAUDE_OAUTH_TOKEN?.trim() || readDevVar("STELLA_VERIFY_CLAUDE_OAUTH_TOKEN")
+    : null;
+  if (claudeLogin === "token" && !claudeToken)
+    fail("--claude-login token needs STELLA_VERIFY_CLAUDE_OAUTH_TOKEN (a `claude setup-token` token) in the environment or workers/cloud-builder/.dev.vars.", 2, {
+      errorCode: "CLAUDE_TOKEN_MISSING",
+      recovery: "Use --claude-login host to borrow this computer's Claude access token for the run, or have the user create a dedicated token with `claude setup-token`.",
+    });
 
   const runId = randomUUID().slice(0, 8);
   const runDir = path.join(skillRoot, ".run", runId);
@@ -919,37 +950,104 @@ const cmdLaunch = async (options) => {
     STELLA_V2_DEV_DATA_DIR: dataDir,
   };
 
+  const evidenceDir = path.join(evidenceRoot(), runId);
+  mkdirSync(evidenceDir, { recursive: true });
   const run = {
     runId,
+    runName: RUN_NAME,
     runDir,
     dataDir,
     userDataDir,
     cdpPort,
     electronPid: null,
     startedAt: new Date().toISOString(),
-    evidenceDir: DEFAULT_EVIDENCE_DIR,
+    backendUrl: resolveSiteUrl(),
+    evidenceDir,
     account,
     browserBridge: browserBridge ?? "isolated",
     providerHomes,
     modelGateway,
     fakeMic,
+    displayMode: displayMode === "host" ? "host" : "xvfb",
+    display: null,
+    browserExtension: null,
+    claudeLogin: null,
   };
   writeJson(POINTER_PATH, run);
   writeJson(path.join(runDir, "run.json"), run);
 
   try {
+    run.display = await ensureDisplay(run, run.displayMode);
+    if (displayMode === "xvfb" && run.display.mode !== "xvfb")
+      throw new Error(`--display xvfb was requested but no private display started: ${run.display.reason}`);
+    if (wantsTestExtension) {
+      run.browserExtension = prepareTestExtension({
+        runDir,
+        socketDir: path.join(path.dirname(userDataDir), "browser"),
+        extPort: await allocatePort(),
+      });
+    }
+    if (claudeLogin) {
+      run.claudeLogin = borrowClaudeLogin({ claudeConfigDir: providerHomes.CLAUDE_CONFIG_DIR, oauthToken: claudeToken });
+    }
+    writeJson(POINTER_PATH, run);
     await startElectron(run, { minted, modelGateway, fakeMic, browserBridge });
+    if (run.browserExtension) await startRunTestBrowser(run);
+    run.warnings = launchWarnings(run);
+    writeJson(POINTER_PATH, run);
   } catch (error) {
-    // STELLA_VERIFY_KEEP_ON_FAILURE=1 leaves a failed launch up to inspect.
     if (process.env.STELLA_VERIFY_KEEP_ON_FAILURE !== "1") {
-      await stopPid(run.electronPid);
-      removeTemporaryUserData(run);
-      rmSync(POINTER_PATH, { force: true });
+      await teardownRun(run);
     }
     throw error;
   }
 
   respond(run, run);
+};
+
+const launchWarnings = (run) => {
+  const warnings = [];
+  if (/-preview\.[^/]*workers\.dev/.test(run.backendUrl ?? "") && !run.claudeLogin) {
+    warnings.push(
+      "Backend is a Worker Preview: the desktop's own Stella-model turns get HTTP 401 from the dev model gateway and the chat shows no reply (electron.log: \"refused the session capability exchange\"). Prove desktop turns with --claude-login host, or against dev; cloud turns work on the Preview.",
+    );
+  }
+  if (process.platform === "linux" && run.display?.mode === "host") {
+    warnings.push(`The window is on the real display ${run.display.display ?? ""}${run.display.reason ? `: ${run.display.reason}` : ""}`);
+  }
+  return warnings;
+};
+
+const startRunTestBrowser = async (run) => {
+  const browser = await startTestBrowser({
+    runDir: run.runDir,
+    extension: run.browserExtension,
+    display: run.display?.display ?? null,
+    softwareGl: run.display?.mode === "xvfb" || linuxSoftwareGl(),
+  });
+  run.browserExtension = { ...run.browserExtension, chromiumPid: browser.pid, chromium: browser.chromium };
+  writeJson(POINTER_PATH, run);
+  writeJson(path.join(run.runDir, "run.json"), run);
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${run.browserExtension.extPort}/healthz`, { signal: AbortSignal.timeout(1_000) });
+      if (response.ok) break;
+    } catch {}
+    await delay(500);
+  }
+};
+
+const teardownRun = async (run) => {
+  const stopped = { electronPid: run.electronPid, chromiumPid: run.browserExtension?.chromiumPid ?? null, xvfbPid: run.display?.pid ?? null };
+  await killGroup(run.browserExtension?.chromiumPid);
+  await stopPid(run.electronPid);
+  const strays = await stopRunOwnedProcesses(run.runId);
+  if (run.display?.mode === "xvfb") await killGroup(run.display.pid);
+  const claudeLoginRemoved = removeBorrowedClaudeLogin(run.claudeLogin ? run.providerHomes?.CLAUDE_CONFIG_DIR : null);
+  removeTemporaryUserData(run);
+  rmSync(POINTER_PATH, { force: true });
+  return { ...stopped, runtimeAndHelpers: strays, claudeLoginRemoved };
 };
 
 const cmdRelaunch = async () => {
@@ -959,7 +1057,9 @@ const cmdRelaunch = async () => {
       errorCode: "NOT_RUNNING",
       recovery: "Run `session launch` first.",
     });
+  await killGroup(run.browserExtension?.chromiumPid);
   await stopPid(run.electronPid);
+  const stoppedRuntime = await stopRunOwnedProcesses(run.runId);
   let minted = null;
   if (run.account?.mode && run.account.mode !== "anonymous") {
     minted = await mintTestAccount(run.runId, run.account.mode);
@@ -970,6 +1070,7 @@ const cmdRelaunch = async () => {
   run.cdpPort = await allocatePort();
   run.electronPid = null;
   run.relaunchedAt = new Date().toISOString();
+  run.display = await ensureDisplay(run, run.displayMode ?? "host");
   writeJson(POINTER_PATH, run);
   writeJson(path.join(run.runDir, "run.json"), run);
   await startElectron(run, {
@@ -978,7 +1079,8 @@ const cmdRelaunch = async () => {
     fakeMic: run.fakeMic ?? null,
     browserBridge: run.browserBridge === "shared" ? "shared" : null,
   });
-  respond(run, run);
+  if (run.browserExtension) await startRunTestBrowser(run);
+  respond({ ...run, stoppedRuntime }, run);
 };
 
 const cmdStop = async ({ silent = false, "dry-run": dryRun = false } = {}) => {
@@ -988,28 +1090,16 @@ const cmdStop = async ({ silent = false, "dry-run": dryRun = false } = {}) => {
     return;
   }
   if (dryRun) {
-    respond(
-      {
-        dryRun: true,
-        runId: run.runId,
-        wouldStop: {
-          electronPid: run.electronPid,
-        },
-        wouldRemove: [run.userDataDir, POINTER_PATH],
-        wouldKeep: [run.dataDir, run.evidenceDir],
-      },
-      run,
-    );
+    respond({ dryRun: true, runId: run.runId, ...cleanupTargets(run) }, run);
     return;
   }
-  await stopPid(run.electronPid);
-  removeTemporaryUserData(run);
-  rmSync(POINTER_PATH, { force: true });
+  const stopped = await teardownRun(run);
   if (!silent) {
     respond(
       {
         stopped: true,
         runId: run.runId,
+        ...stopped,
         evidenceDir: run.evidenceDir,
         dataDirKept: run.dataDir,
       },
@@ -1463,8 +1553,11 @@ const openLauncherDestination = async (run, name) => {
     await clickQuery(run, { role: "button", name: "Open panel" });
     await waitForState(run, (state) => state.panelOpen);
   }
-  await clickQuery(run, { role: "button", name: "New tab" });
-  await waitQuery(run, { role: "button", name });
+  const launcherShowing = await waitQuery(run, { role: "button", name }, 1_500).then(() => true, () => false);
+  if (!launcherShowing) {
+    await clickQuery(run, { role: "button", name: "New tab" });
+    await waitQuery(run, { role: "button", name });
+  }
   await clickQuery(run, { role: "button", name });
   return waitForState(run, (state) => state.selectedTabs.includes(name));
 };
@@ -2102,21 +2195,21 @@ const cmdLogs = (options) => {
   );
 };
 
+const cleanupTargets = (run) => ({
+  wouldStop: {
+    electronPid: run.electronPid,
+    testChromiumPid: run.browserExtension?.chromiumPid ?? null,
+    xvfbPid: run.display?.mode === "xvfb" ? run.display.pid : null,
+    runtimeAndHelpers: runOwnedProcesses(run.runId).map(({ pid, command }) => ({ pid, command: command.slice(0, 160) })),
+  },
+  wouldRemove: [run.userDataDir, POINTER_PATH, ...(run.claudeLogin ? [run.claudeLogin.file] : [])],
+  wouldKeep: [run.dataDir, run.evidenceDir],
+});
+
 const cmdCleanupPlan = () => {
   const startedAt = Date.now();
   const run = requireRun();
-  emitSuccess(
-    "cleanup.plan",
-    {
-      wouldStop: {
-        electronPid: run.electronPid,
-      },
-      wouldRemove: [run.userDataDir, POINTER_PATH],
-      wouldKeep: [run.dataDir, run.evidenceDir],
-    },
-    run,
-    startedAt,
-  );
+  emitSuccess("cleanup.plan", cleanupTargets(run), run, startedAt);
 };
 
 const options = parseArgs(process.argv.slice(2));

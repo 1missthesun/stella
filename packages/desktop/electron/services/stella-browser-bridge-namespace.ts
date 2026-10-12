@@ -73,11 +73,21 @@ export type BrowserBridgeNamespace = Readonly<{
 
 /** `shared` | `isolated`; unset isolates everything but the user's Stella. */
 export const STELLA_BROWSER_BRIDGE_MODE_ENV = "STELLA_BROWSER_BRIDGE";
+export const STELLA_BROWSER_ISOLATED_EXT_PORT_ENV =
+  "STELLA_BROWSER_ISOLATED_EXT_PORT";
 /** Lets an opted-in claim replace a newer bridge binary. */
 export const STELLA_BROWSER_BRIDGE_ALLOW_DOWNGRADE_ENV =
   "STELLA_BROWSER_BRIDGE_ALLOW_DOWNGRADE";
 
 const SHARED_EXTENSION_PORT = 39040;
+
+const isolatedExtensionPort = (env: NodeJS.ProcessEnv): number | null => {
+  const port = Number(env[STELLA_BROWSER_ISOLATED_EXT_PORT_ENV]?.trim());
+  return Number.isInteger(port) && port > 1024 && port < 65536 &&
+    port !== SHARED_EXTENSION_PORT
+    ? port
+    : null;
+};
 
 /** Mirror of `getStellaBrowserSocketDir`, ignoring the explicit override. */
 const defaultSocketDir = (env: NodeJS.ProcessEnv): string => {
@@ -130,7 +140,8 @@ export const resolveBrowserBridgeNamespace = (options: {
     socketDir,
     claim: !product && requested === "shared",
     packaged: product,
-    extPort: mode === "isolated" ? null : SHARED_EXTENSION_PORT,
+    extPort:
+      mode === "isolated" ? isolatedExtensionPort(env) : SHARED_EXTENSION_PORT,
     ownsExtensionChannel: mode === "shared",
     dataDir,
   });

@@ -25,22 +25,37 @@ teardown) is faster to drive headless:
   `pi_thread_attempt_settled`).
   The tail samples under load and dies with the shell that started it, so
   scope it to the tested owner, conversation and turn.
-- Reproduce executor bugs before deploying. The worker tests already run the
-  real BuildSession and real Sandbox containers in workerd
-  (`workers/cloud-builder/tests/*-workerd.test.ts`, for example
-  `sandbox-lifecycle-workerd.test.ts` and
-  `guarded-model-fetch-workerd.test.ts`), and the built sandbox image can run
+- Reproduce executor bugs before deploying: the built sandbox image can run
   the attached tool host locally (`docker run --rm --entrypoint sh
   stella-v2-cloud-builder-dev-sandboxsmall:<version>`), where stderr is on the
-  terminal instead of in a diagnostic event three minutes later.
-- Test an unmerged backend change on your own Preview: `bun run preview -- up
-  --name <name>` in `workers/cloud-builder`, then
-  `STELLA_BACKEND_URL=<printed url> node .agents/skills/verify-stella/cloud-turn.mjs ...`.
-  It has its own Durable Objects and D1, so its owners, conversations and
-  history never mix with dev's. It has no agent containers, so verify
-  sandbox and background-agent behavior on dev. `wrangler tail` does not
-  attach to Previews; read the Preview's logs in the dashboard
+  terminal instead of in a diagnostic event three minutes later. Don't run or
+  extend the worker test suites; unit tests are banned in this repo.
+- Test an unmerged backend change on your own Preview: `env -u
+  CLOUDFLARE_API_TOKEN bun run preview -- up --name <name>` in
+  `workers/cloud-builder`, then `STELLA_BACKEND_URL=<printed url> node
+  .agents/skills/verify-stella/cloud-turn.mjs ...`. It has its own Durable
+  Objects and D1, so its owners, conversations and history never mix with
+  dev's, and cloud orchestrator turns on Stella models work there. It has no
+  agent containers, so verify sandbox, background-agent, cloud shell and
+  cloud Claude Code behavior on dev (deploy dev from a tree that contains
+  origin/master; `deploy:dev` refuses anything else). `wrangler tail` does
+  not attach to Previews; read the Preview's logs in the dashboard
   (Observability, persisted at full sampling).
+- Cloud Claude Code on a test account needs that account's container signed
+  in to Claude, which only a person can do, once. Use one stable account so
+  the login is reused (`STELLA_VERIFY_ACCOUNT_EMAIL=agent-claude-cloud@test.stella.local`,
+  and `--email` with `cloud-turn.mjs`), on dev:
+  `node .agents/skills/verify-stella/scripts/backend-call.mjs call engines.startClaudeCloudLogin '{}'`
+  prints `loginId` and Anthropic's `authorizeUrl`. Ask the user with
+  `request_secure_input`: the link in `detail`, one `code` field marked
+  sensitive. Then `use_secure_value` with the command
+  `node .agents/skills/verify-stella/scripts/backend-call.mjs call engines.finishClaudeCloudLogin '{"loginId":"<id>","code":"{{secret}}"}'`,
+  so the code never enters chat. A code pasted into an ordinary ask card or
+  message leaks; don't ask that way. It spends the user's Claude quota, so
+  only for claims that need a real cloud Claude Code turn.
+- `cloud-turn.mjs` creates a new conversation per run unless you pass
+  `--conversation`. The phone shows only the account's main conversation, so
+  a headless turn's agents never appear on iOS.
 - Call an owner RPC or read a live view as a test account without printing
   tokens: `node .agents/skills/verify-stella/scripts/backend-call.mjs call
   <name> '<argsJson>'`, `... view <name>`, or `... history <conversationId>`.

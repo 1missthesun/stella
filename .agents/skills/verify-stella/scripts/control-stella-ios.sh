@@ -38,7 +38,7 @@ Commands:
   type <text>
   key <key-name>
   open-url <url>
-  launch [bundle-id]
+  launch [bundle-id] [--metro-port <port>]
   logs
   shutdown
 EOF
@@ -268,16 +268,21 @@ REMOTE
       validate_udid "$requested_udid"
     fi
     mkdir -p "$run_dir"
-    boot_result="$(run_zsh "$requested_udid" <<'REMOTE'
+    boot_result="$(run_zsh "$requested_udid" "${STELLA_IOS_ALLOW_SECOND_SIM:-0}" <<'REMOTE'
 set -eu
 udid="$1"
 if test -z "$udid"; then
-  udid="$(/usr/bin/xcrun simctl list devices available | /usr/bin/awk -F '[()]' '/iPhone/ { print $2; exit }')"
+  udid="$(/usr/bin/xcrun simctl list devices available | /usr/bin/awk -F '[()]' '/iPhone/ && !/iPhone Air/ { print $2; exit }')"
 fi
 test -n "$udid"
 if /usr/bin/xcrun simctl list devices booted | /usr/bin/grep -Fq "$udid"; then
   started=0
 else
+  others="$(/usr/bin/xcrun simctl list devices booted | /usr/bin/grep -E '\(Booted\)' | /usr/bin/sed -E 's/^ *//' || true)"
+  if test -n "$others" && test "$2" != "1"; then
+    printf 'Refusing to boot a second simulator; this Mac runs one at a time. Booted now:\n%s\nUse that device if it is yours (boot <udid>), wait for its owner, or ask. STELLA_IOS_ALLOW_SECOND_SIM=1 overrides.\n' "$others" >&2
+    exit 3
+  fi
   /usr/bin/xcrun simctl boot "$udid"
   started=1
 fi
@@ -596,14 +601,30 @@ REMOTE
     open_url "$url"
     ;;
   launch)
-    bundle_id="${1:-com.stella.mobile}"
+    bundle_id="com.stella.mobile"
+    metro_port=""
+    while [[ $# -gt 0 ]]; do
+      case "$1" in
+        --metro-port) metro_port="${2:-}"; shift 2 ;;
+        *) bundle_id="$1"; shift ;;
+      esac
+    done
     [[ "$bundle_id" =~ ^[A-Za-z0-9.-]+$ ]] || {
       printf 'Invalid bundle identifier\n' >&2
       exit 2
     }
-    run_zsh "$bundle_id" "$(target_udid)" <<'REMOTE'
+    if [[ -n "$metro_port" && ! "$metro_port" =~ ^[0-9]{2,5}$ ]]; then
+      printf 'Invalid --metro-port\n' >&2
+      exit 2
+    fi
+    run_zsh "$bundle_id" "$(target_udid)" "$metro_port" <<'REMOTE'
 set -eu
-/usr/bin/xcrun simctl launch "$2" "$1"
+if test -n "$3"; then
+  /usr/bin/xcrun simctl terminate "$2" "$1" >/dev/null 2>&1 || true
+  /usr/bin/xcrun simctl launch "$2" "$1" -RCT_jsLocation "localhost:$3"
+else
+  /usr/bin/xcrun simctl launch "$2" "$1"
+fi
 REMOTE
     ;;
   logs)

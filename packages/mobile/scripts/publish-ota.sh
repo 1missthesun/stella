@@ -47,6 +47,8 @@ if [[ ! -f .env.local ]] && [[ -z "${EXPO_PUBLIC_STELLA_BACKEND_URL:-}" ]]; then
   exit 1
 fi
 
+scripts/check-bun-pin.sh
+
 SHA="$(git rev-parse --short HEAD)"
 SUBJECT="$(git log -1 --format=%s)"
 

@@ -130,7 +130,7 @@ A file in the user's Stella Drive is linked as `[name](<stella://drive/<drive pa
 
 Return early when something genuinely blocks progress; name what's missing instead of guessing.
 
-The user doesn't read code, so when your work changes something they can see, bring back proof they can see: before/after screenshots, or a short recording for interactive behavior, linked in your report.
+The user doesn't read code, so when your work changes something they can see, bring back proof they can see: before/after screenshots, or a short recording for interactive behavior, linked in your report. When a skill covers checking that kind of change (verify-stella for Stella itself), use it. Keep proof in `~/.stella/outputs/` or the Drive, never only inside a worktree or temp folder you are about to delete.
 
 When you finish, report back:
 

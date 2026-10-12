@@ -41,7 +41,8 @@
 // signed-in client sends it. Nothing here prints a secret; evidence is the
 // JSON the worker returns.
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { ADMIN_SECRET_HELP, adminApiSecret } from "./cli/dev-vars.mjs";
 
 const args = process.argv.slice(2);
 const flag = (name, fallback) => {
@@ -70,18 +71,9 @@ const engine = flag("--engine");
 const execution = engine
   ? { engine, provider: flag("--provider", engine), model: flag("--model", ""), reasoningEffort: flag("--effort", "default") }
   : undefined;
-const devVarsPath = new URL("../../../workers/cloud-builder/.dev.vars", import.meta.url).pathname;
-const devVar = (name) => {
-  if (!existsSync(devVarsPath)) return "";
-  const line = readFileSync(devVarsPath, "utf8")
-    .split("\n")
-    .map((entry) => entry.trim())
-    .find((entry) => entry.startsWith(`${name}=`));
-  return line ? line.slice(name.length + 1).trim().replace(/^"(.*)"$/, "$1") : "";
-};
-const adminSecret = process.env.STELLA_ADMIN_API_SECRET?.trim() || devVar("STELLA_ADMIN_API_SECRET");
+const adminSecret = adminApiSecret();
 if (!adminSecret) {
-  console.error("STELLA_ADMIN_API_SECRET is unavailable: export it or set it in workers/cloud-builder/.dev.vars.");
+  console.error(`STELLA_ADMIN_API_SECRET is unavailable. ${ADMIN_SECRET_HELP}`);
   process.exit(2);
 }
 

@@ -69,10 +69,20 @@ const buildWindowsPythonShimScript = (): string =>
 const buildWindowsPipShimScript = (): string =>
   ["@echo off", '"%STELLA_PYTHON_BIN%" -m pip %*', ""].join("\r\n");
 
-const buildUnixNodeShimScript = (): string =>
-  ["#!/bin/sh", 'ELECTRON_RUN_AS_NODE=1 exec "$STELLA_NODE_BIN" "$@"', ""].join(
-    "\n",
-  );
+const ELECTRON_NODE_ARGV_FIX = "electron-node-argv.cjs";
+
+const ELECTRON_NODE_ARGV_FIX_SOURCE =
+  'Object.defineProperty(process, "defaultApp", { value: true, configurable: true });\n';
+
+const quoteForShDoubleQuotes = (value: string): string =>
+  value.replace(/[\\"$`]/g, (char) => `\\${char}`);
+
+const buildUnixNodeShimScript = (argvFixPath: string): string =>
+  [
+    "#!/bin/sh",
+    `NODE_OPTIONS="--require \\"${quoteForShDoubleQuotes(argvFixPath)}\\" \${NODE_OPTIONS:-}" ELECTRON_RUN_AS_NODE=1 exec "$STELLA_NODE_BIN" "$@"`,
+    "",
+  ].join("\n");
 
 const buildUnixCliShimScript = (envVar: string): string =>
   [
@@ -132,9 +142,16 @@ export const ensureNodeShim = (
       shimPath,
       process.platform === "win32"
         ? buildWindowsNodeShimScript()
-        : buildUnixNodeShimScript(),
+        : buildUnixNodeShimScript(path.join(shimDir, ELECTRON_NODE_ARGV_FIX)),
       "utf-8",
     );
+    if (process.platform !== "win32") {
+      writeFileSync(
+        path.join(shimDir, ELECTRON_NODE_ARGV_FIX),
+        ELECTRON_NODE_ARGV_FIX_SOURCE,
+        "utf-8",
+      );
+    }
     if (process.platform === "win32" && process.env.STELLA_PYTHON_BIN?.trim()) {
       for (const command of ["python", "python3", "py"]) {
         writeFileSync(

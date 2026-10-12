@@ -6,8 +6,33 @@ Nothing user-facing deploys on push except the R2 asset workflows noted below.
 
 **To test a backend change, don't deploy dev: start your own Preview**
 (next section). Dev is one shared deployment, and every agent's test deploy
-replaces the one before it. Deploy dev only to ship a change that is already
-on `master`.
+replaces the one before it. Deploy dev to ship what is on `master`, or when a
+claim needs what a Preview lacks (containers, the desktop's own model calls).
+That needs no go-ahead, but `deploy:dev` (cloud-builder, model-gateway) runs
+`scripts/check-dev-deploy.mjs` first and refuses a dirty tree or a HEAD missing
+commits from origin/master, which is how agents kept rolling back each other's
+work. Push your commits right after, or the next deploy from master removes
+them, and say in your report that you deployed dev. `STELLA_DEV_DEPLOY_FORCE=1`
+skips the check; use it only to restore dev deliberately.
+
+**Pushes that publish to every install, prod included**, with no further step:
+`packages/stella-browser/{cli,scripts,package.json}` or its workflow file
+(stella-browser) and `packages/native/` or its workflow file (native helpers).
+Installs pick them up at their next launcher prepare. Treat a master push
+touching them as a prod release and get the go-ahead first. To validate native helpers without publishing, run
+`build-native-helpers.yml` by hand with `publish=false`; stella-browser has no
+such switch yet, so build it locally (`node packages/desktop/scripts/ensure-stella-browser.mjs --build-from-source`).
+
+**Logins differ per machine and change; check instead of assuming.**
+`env -u CLOUDFLARE_API_TOKEN bunx wrangler whoami` lists the scopes
+(`artifacts (write)` for app-source publish; stored Workers Logs need
+Workers Observability read, which the OAuth login lacks, so read them in the
+dashboard), and `bunx eas-cli whoami` shows the EAS account. When a login is
+missing, hand the step to the computer that has it or ask the user to sign in
+there; never copy credentials between machines. A secret only the user has
+(a provider key such as dev's `COMPOSIO_API_KEY`) is collected with
+`request_secure_input` (sensitive field) and written with `use_secure_value`
+into `bunx wrangler secret put NAME`, never pasted into chat.
 
 ## Previews: your own backend for testing
 
@@ -81,8 +106,13 @@ What a Preview cannot do yet (Cloudflare limits, 2026-10):
   owner ids dev has never issued. No dev user is affected.
 - **The desktop's own model calls fail with HTTP 401.** The desktop exchanges
   its sign-in token for a capability directly at the dev gateway, which only
-  trusts dev-issued JWTs. Cloud turns (`cloud-turn.mjs`, the desktop's cloud
-  lane) work, and so does sign-in. Local agents on Stella models do not.
+  trusts dev-issued JWTs. The chat shows no reply and no error;
+  `electron.log` says "refused the session capability exchange (HTTP 401
+  unauthorized: The bearer token is not a valid Stella sign-in.)", and the
+  verify harness warns at launch. Cloud turns (`cloud-turn.mjs`, the
+  desktop's cloud lane) work, and so does sign-in. Local agents on Stella
+  models do not: prove desktop turns on Claude Code
+  (`session launch --claude-login host`) or against dev.
 - Cron Triggers, queue consumers and the `auth-dev.stella.sh` route don't run
   on Previews. `wrangler tail` doesn't support Previews either. Logs and
   traces are persisted at full sampling under the Preview's Observability tab
@@ -141,12 +171,19 @@ cloud-builder's `wrangler.jsonc`).
 
 Run from each worker's directory. Use the Wrangler login, not the `.dev.vars`
 token (it can't push containers): prefix with `env -u CLOUDFLARE_API_TOKEN`.
+If wrangler fails with `Unknown argument: …/wrangler-dist/cli.js`, the `node`
+on PATH is Stella's Electron shim from before the fix in
+`packages/runtime/kernel/tools/shell/shims.ts`; drop `~/.stella/shell-shims`
+from PATH for the command until that Stella updates.
 cloud-builder builds its container image, so Docker must respond (`docker info`;
 if it hangs, force-quit and reopen Docker Desktop).
 
 Order: **D1 migrations → cloud-builder → model-gateway → the rest.** The gateway
-prices models from cloud-builder's catalog, so a new model must reach
-cloud-builder first. A deploy kills in-flight container agent turns.
+refuses any model it has no price for, and it prices models from
+cloud-builder's catalog. When a release adds or changes a model, deploy
+cloud-builder, wait a couple of minutes for the gateway to refresh its price
+list, then deploy the gateway; skipping the wait failed dev turns for 2–4
+minutes. A deploy kills in-flight container agent turns.
 
 ```bash
 # dev
@@ -455,7 +492,10 @@ in review already has its update waiting the moment it is approved.
 **`eas.json` pins bun** (`"bun"` in each build profile). The fingerprint hashes bun's
 store paths, so if the builders' bun differs from the one that resolved `bun.lock`,
 every build dies in `CONFIGURE_EXPO_UPDATES` with a local-vs-EAS runtime mismatch. Keep
-the pin equal to the bun that owns the lockfile.
+the pin equal to the bun that owns the lockfile, and install and build with exactly
+that bun: `bun run eas:check-bun` in `packages/mobile` checks it (`publish-ota.sh`
+runs it) and prints the fix. Shells on omarchy default to mise's bun 1.3.14; Stella's
+own 1.4.0 is at `~/.local/share/stella/runtimes/bun-1.4.0/bun`.
 
 `publish-ota.sh` invokes `bunx`, which Stella's bundled bun does not ship; put a shim
 on `PATH` rather than editing the script.

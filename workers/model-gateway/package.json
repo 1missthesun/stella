@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --env=\"\"",
-    "deploy:dev": "wrangler deploy --env=\"\"",
+    "deploy:dev": "node ../../scripts/check-dev-deploy.mjs && wrangler deploy --env=\"\"",
     "deploy:production": "wrangler deploy --env production --strict",
     "build:dry-run": "wrangler deploy --dry-run --env= --outdir .wrangler/dry-run",
     "types:generate": "wrangler types worker-configuration.d.ts --include-runtime false --env=",

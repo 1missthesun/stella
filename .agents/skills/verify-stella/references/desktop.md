@@ -31,7 +31,7 @@ Numeric ranges: `chat send --timeout` 500-120000 ms (default 10000); `drive sett
 
 ## Desktop launch and doctor
 
-From the repository root, with Bun 1.4.x and dependencies installed, and an X display (`DISPLAY`; on Linux a real Hyprland/Wayland session works through XWayland, otherwise run under Xvfb). The window opens on the visible desktop and the compositor may tile or resize it; read geometry from a fresh observation rather than assuming a size:
+From the repository root, with dependencies installed (`bun install --frozen-lockfile`; a worktree has none until you run it). On Linux, launch starts a private Xvfb for the run on the first free display from `:90` (system `Xvfb`, `STELLA_VERIFY_XVFB`, or one `scripts/fetch-xvfb.sh` unpacks into `~/.cache/stella-verify/xvfb` from the pacman mirror without root) and runs Electron with software GL there, so no window reaches the user's screen and nothing competes with other runs. The run record's `display` says which; `--display host` puts the window on the real `DISPLAY`, and `--display xvfb` fails instead of falling back. Never start an Xvfb by hand with `-displayfd` or on a low display number: on Hyprland it can take over `:0`, the display the user's own X11 apps use. On macOS the window opens on the visible desktop. Read geometry from a fresh observation rather than assuming a size:
 
 ```bash
 node .agents/skills/verify-stella/control-stella.mjs session launch
@@ -40,7 +40,9 @@ node .agents/skills/verify-stella/control-stella.mjs session doctor
 
 Pass `--replace` only after inspecting `cleanup plan` when a stale verifier run is recorded.
 
-`session relaunch` quits the recorded Electron and starts it again on the same data directory, Chromium profile and account (a test account is re-minted for the same email; a `--reuse` anonymous session is reused), so claims about state surviving a restart can be checked. Fixture state that must be on disk before the app reads it (for example entries in the run's `data/ui-state.json`) can be written after stopping the recorded `electronPid` and before relaunching; the main process rewrites that file while it runs.
+`session relaunch` quits the recorded Electron, stops the run's detached runtime worker (otherwise the new window attaches to the old worker and runtime or engine edits never load) and the test browser, and starts them again on the same data directory, Chromium profile and account (a test account is re-minted for the same email; a `--reuse` anonymous session is reused), so claims about state surviving a restart can be checked. Fixture state that must be on disk before the app reads it (for example entries in the run's `data/ui-state.json`) can be written after stopping the recorded `electronPid` and before relaunching; the main process rewrites that file while it runs.
+
+One run per checkout is recorded in `.run/current.json`. Agents sharing a checkout keep separate runs with `STELLA_VERIFY_RUN=<name>` (1-32 of `a-z0-9-`) on every command, including `backend-call.mjs`; each gets `.run/current-<name>.json`, its own display, ports and data. `ALREADY_RUNNING` without it means a run is already recorded: drive it only if it is yours.
 
 Launch is anonymous by default. Pass `--account signed-in`, `--account go`, or `--account pro` to boot with a signed-in test account on that plan (minted per run at `agent-<runId>@test.stella.local` through the dev backend's admin API; targets `STELLA_BACKEND_URL` (default: the dev cloud-builder worker) and needs `STELLA_ADMIN_API_SECRET`, read from the gitignored `workers/cloud-builder/.dev.vars` when not exported). The run record and `session info` report `account.mode`, `account.ownerId`, and `account.email`; the bearer is handed to Electron only through its environment and never written to disk.
 
@@ -56,7 +58,9 @@ Isolated per run: the Stella data directory (`~/.stella` equivalent: conversatio
 
 Shared with the host: the user account and its home directory (`HOME` is not overridden, so agent shell commands and file tools run against the real home, and onboarding discovery would read host browser, shell, and project history if onboarding ran), the CLIs on `PATH` (the `claude`/`codex` binaries, git and its global config), the display and `XDG_RUNTIME_DIR`, and the network. On macOS, a CLI that keys the keychain by config directory stays isolated; anything that reads a fixed keychain item does not. Some copy is hard-coded for macOS ("this Mac" in Cloud Home import and Locked computer use) and appears on Linux too; it is not leaked state. Runs before this change saw the host's default Claude Code login.
 
-The harness runs an isolated browser bridge by default, so the Browser section shows "Extension isn't connected" and the user's Chrome extension cannot reach it. `--browser-bridge shared` sets `STELLA_BROWSER_BRIDGE=shared`, which claims the per-user shared bridge (fixed extension port and native-messaging host) from any running Stella, including the user's installed app. Use it only when an extension-backed browser claim needs proof and taking over the bridge on that machine is acceptable; relaunching the installed app reclaims it.
+The harness runs an isolated browser bridge by default, so the user's Chrome extension cannot reach it and the Browser panel offers "Use my browser's logins". `--browser-extension` pairs the run with a private extension instead: launch copies `packages/stella-browser/extension` into the run with its bridge port patched, writes a native-messaging host into a private Chromium profile pointing at this run's bridge socket directory, sets `STELLA_BROWSER_ISOLATED_EXT_PORT` and `STELLA_BROWSER_SOCKET_DIR` for Electron, and starts Chromium on the run's display with only that extension loaded. The panel then shows the connected state ("Sites open with your browser's logins"), and the extension's cookie import and tab control run against that Chromium profile, so sign in there for logins a claim needs. The record's `browserExtension` has the Chromium pid, profile and port; relaunch and cleanup restart and stop it. It needs Chromium (system, Playwright's, or `STELLA_VERIFY_CHROMIUM`): Google Chrome ignores `--load-extension`. Not on Windows. `--browser-bridge shared` sets `STELLA_BROWSER_BRIDGE=shared`, which claims the per-user shared bridge (fixed extension port and native-messaging host) from any running Stella, including the user's installed app and other agents' runs. Use it only for a claim about the user's own Chrome, after asking; relaunching the installed app reclaims it.
+
+`--claude-login host` writes this computer's newest Claude Code access token (from `$CLAUDE_CONFIG_DIR`, `~/.claude`, or the macOS keychain) into the run's `provider-homes/claude/.credentials.json` with no refresh token, and reports `claudeLogin.status` from `claude auth status` in that directory. It refuses a token with under 30 minutes left (run any `claude` command to refresh it). `--claude-login token` writes `STELLA_VERIFY_CLAUDE_OAUTH_TOKEN` (environment or `.dev.vars`) instead. Cleanup deletes the file. On macOS the CLI may keep reading its keychain item for that config dir; trust `claudeLogin.status.loggedIn`, not the flag.
 
 The optional `--model-gateway <origin>` overrides gateway discovery for a specific
 deployment; omit it to verify discovery from the signed-in catalog.
@@ -99,17 +103,18 @@ Use current observations to choose roles, accessible names, placeholders, or a s
 
 ## Desktop evidence and diagnosis
 
-Store proof under `.agents/skills/verify-stella/artifacts/<feature>/`. Cleanup preserves this directory.
+Store proof in the run's `evidenceDir` (`session info`): `~/.stella/outputs/verify-stella/<runId>/` when `~/.stella/outputs` exists, else `artifacts/` in this folder; `STELLA_VERIFY_EVIDENCE_DIR` overrides the root. Cleanup preserves it. Paths below are examples.
 
 ```bash
-node .agents/skills/verify-stella/control-stella.mjs inspect aria --path .agents/skills/verify-stella/artifacts/settings/open.aria.txt
-node .agents/skills/verify-stella/control-stella.mjs inspect screenshot --path .agents/skills/verify-stella/artifacts/settings/open.png
+E=$(node .agents/skills/verify-stella/control-stella.mjs session info | node -pe 'JSON.parse(require("fs").readFileSync(0)).data.evidenceDir')
+node .agents/skills/verify-stella/control-stella.mjs inspect aria --path "$E"/settings-open.aria.txt
+node .agents/skills/verify-stella/control-stella.mjs inspect screenshot --path "$E"/settings-open.png
 node .agents/skills/verify-stella/control-stella.mjs diagnostics logs --tail 300
 node .agents/skills/verify-stella/control-stella.mjs diagnostics console --duration 2000
 node .agents/skills/verify-stella/control-stella.mjs diagnostics network-summary --duration 2000
 node .agents/skills/verify-stella/control-stella.mjs performance metrics
-node .agents/skills/verify-stella/control-stella.mjs performance trace --duration 3000 --path .agents/skills/verify-stella/artifacts/perf/trace.json
-node .agents/skills/verify-stella/control-stella.mjs performance profile --duration 3000 --path .agents/skills/verify-stella/artifacts/perf/profile.json
+node .agents/skills/verify-stella/control-stella.mjs performance trace --duration 3000 --path "$E"/perf-trace.json
+node .agents/skills/verify-stella/control-stella.mjs performance profile --duration 3000 --path "$E"/perf-profile.json
 ```
 
 Proof must show the action and resulting state in the Electron window. A screenshot of an idle shell, a successful build, or direct internal state manipulation is not UI proof. For a mutation, read the value back through another visible state or the isolated persisted data. A missing model provider may yield a visible send error; do not hang waiting for output.
@@ -124,7 +129,7 @@ node .agents/skills/verify-stella/control-stella.mjs cleanup apply --dry-run
 node .agents/skills/verify-stella/control-stella.mjs cleanup apply
 ```
 
-Cleanup targets only the recorded Electron PID (its process group), verifier pointer, and temporary Chromium profile. It preserves the isolated durable data and proof artifacts. Do not kill by process name; the developer's own Stella window shares the `stella-v2` window class. The detached Bun runtime worker (`--listen unix:///…/stella-verify-<runId>/…/r.sock`) and Chromium's crashpad handler outlive the Electron PID by up to about a minute and a half, then exit on their own once their parent and socket are gone.
+Cleanup targets only what the run recorded: the Electron PID (its process group), the test Chromium, the run's Xvfb, processes whose command line carries the run's own `stella-verify-<runId>` path (the detached Bun runtime worker, Electron helpers, crashpad), a borrowed Claude login, the verifier pointer, and the temporary Chromium profile. It preserves the isolated durable data and proof artifacts. Do not kill by process name or a broad `pkill -f` pattern; the developer's own Stella shares the `stella-v2` window class, and a pattern that matches your own shell kills it.
 
 
 ## Observation and interaction results

@@ -16,11 +16,11 @@ const QUERY_FLAGS = ["role", "name", "selector", "within"];
 export const COMMANDS = [
   command("session", "launch", "launch", "Launch an isolated Stella instance", {
     aliases: ["launch"],
-    usage: "[--replace] [--account anonymous|signed-in|go|pro] [--reuse] [--fake-mic <wav>] [--browser-bridge shared|isolated] [--model-gateway <origin>]",
-    flags: ["account", "fake-mic", "browser-bridge", "model-gateway"],
-    switches: ["replace", "reuse"],
+    usage: "[--replace] [--account anonymous|signed-in|go|pro] [--reuse] [--display auto|xvfb|host] [--browser-extension] [--claude-login host|token] [--fake-mic <wav>] [--browser-bridge shared|isolated] [--model-gateway <origin>]   (STELLA_VERIFY_RUN=<name> keeps a separate run per name)",
+    flags: ["account", "fake-mic", "browser-bridge", "model-gateway", "display", "claude-login"],
+    switches: ["replace", "reuse", "browser-extension"],
   }),
-  command("session", "relaunch", "relaunch", "Quit and restart the owned instance on the same data, profile and account"),
+  command("session", "relaunch", "relaunch", "Quit and restart the owned instance, its runtime worker and test browser on the same data, profile and account"),
   command("session", "doctor", "doctor", "Check the owned instance end to end; exit 2 when unhealthy", { aliases: ["doctor"] }),
   command("session", "info", "info", "Read the owned session record", { aliases: ["info"] }),
   command("chat", "ready", "chat-ready", "Return semantic chat readiness; exit 2 when not ready"),
@@ -183,7 +183,8 @@ export const helpText = () => {
     lines.push("");
   }
   lines.push("Safety:");
-  lines.push("  Only the run recorded in .agents/skills/verify-stella/.run/current.json is driven.");
+  lines.push("  Only the run recorded in .agents/skills/verify-stella/.run/current.json is driven");
+  lines.push("  (.run/current-<name>.json with STELLA_VERIFY_RUN=<name>, one per agent sharing a checkout).");
   lines.push("  Cleanup targets exact recorded PIDs and paths, preserves durable run data and artifacts,");
   lines.push("  and can be previewed with `cleanup plan` or `cleanup apply --dry-run`.");
   lines.push("");

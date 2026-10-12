@@ -9,21 +9,17 @@
 //   node backend-call.mjs history <conversationId> conversation history
 //
 // The account is STELLA_VERIFY_ACCOUNT_EMAIL, else the current desktop run's
-// account (.run/current.json), so calls act as the signed-in desktop owner.
+// account (.run/current.json, or current-<name>.json with STELLA_VERIFY_RUN), so
+// calls act as the signed-in desktop owner.
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { ADMIN_SECRET_HELP, adminApiSecret } from "../cli/dev-vars.mjs";
 
 const skillRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const repoRoot = path.resolve(skillRoot, "../../..");
 const backend = (process.env.STELLA_BACKEND_URL?.trim() || "https://stella-v2-cloud-builder-dev.fromyou.workers.dev").replace(/\/+$/, "");
 
-const devVar = (name) => {
-  const file = path.join(repoRoot, "workers/cloud-builder/.dev.vars");
-  if (!existsSync(file)) return "";
-  const line = readFileSync(file, "utf8").split("\n").find((l) => l.startsWith(`${name}=`));
-  return line ? line.slice(name.length + 1).trim().replace(/^"(.*)"$/, "$1") : "";
-};
 
 const fail = (message) => {
   console.error(message);
@@ -33,15 +29,16 @@ const fail = (message) => {
 const accountEmail = () => {
   const explicit = process.env.STELLA_VERIFY_ACCOUNT_EMAIL?.trim();
   if (explicit) return explicit;
-  const pointer = path.join(skillRoot, ".run/current.json");
+  const runName = process.env.STELLA_VERIFY_RUN?.trim();
+  const pointer = path.join(skillRoot, ".run", runName ? `current-${runName}.json` : "current.json");
   const email = existsSync(pointer) ? JSON.parse(readFileSync(pointer, "utf8"))?.account?.email : "";
   if (!email) fail("No account: set STELLA_VERIFY_ACCOUNT_EMAIL or launch a desktop run with --account.");
   return email;
 };
 
 const mintJwt = async () => {
-  const secret = process.env.STELLA_ADMIN_API_SECRET?.trim() || devVar("STELLA_ADMIN_API_SECRET");
-  if (!secret) fail("STELLA_ADMIN_API_SECRET is unavailable.");
+  const secret = adminApiSecret();
+  if (!secret) fail(`STELLA_ADMIN_API_SECRET is unavailable. ${ADMIN_SECRET_HELP}`);
   const response = await fetch(`${backend}/api/admin/test-accounts/session`, {
     method: "POST",
     headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },

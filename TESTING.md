@@ -1,5 +1,13 @@
 # Stella v2 local testing
 
+**Agents:** verify through `.agents/skills/verify-stella/SKILL.md`, never a
+plain `bun run electron:dev`. The harness owns an isolated instance (its own
+data, display, browser bridge, ports and Claude config); `electron:dev` runs
+on the user's real `~/.stella`, account and conversation. Unit tests are
+banned: don't write, update or run them. Backend changes are tested on your
+own Preview ("Test accounts" below, and DEPLOY.md, "Previews"). The desktop
+fetches its prompts from the backend, so prompt changes need one too.
+
 This repository is a local v2 test surface. It intentionally shares the
 production `com.stella.app` bundle ID with Stella v1, so keep the two apps
 separate and **never replace `/Applications/Stella.app`**.

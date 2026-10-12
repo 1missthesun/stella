@@ -53,7 +53,10 @@ import {
 } from "../workspace.js";
 import { issueWorldCapability } from "../world-capability.js";
 import { worldMaterializationCommand } from "../world-materialization.js";
-import { SANDBOX_EXECUTOR } from "../sandbox-code.js";
+import {
+  SANDBOX_EXECUTOR,
+  SANDBOX_PAGE_CACHE_WARM_COMMAND,
+} from "../sandbox-code.js";
 import type { BuildSessionInternals } from "./host.js";
 import type { Env } from "./shared/env.js";
 import {
@@ -436,6 +439,7 @@ export const runContainerAgentTurn = async (
 ): Promise<void> => {
   const commandTimeoutMs = Number(host.env.TURN_TIMEOUT_MS);
   const requestStarted = performance.now();
+  const turnStartedAt = Date.now();
   const ownerWorld = await worldName(turn.ownerId);
   let sandbox = host.sandbox(sandboxId, "large", "world", ownerWorld);
   const sessionId = agentTurnSessionId(turn.turnId);
@@ -469,14 +473,19 @@ export const runContainerAgentTurn = async (
     prewarmed = slot.then(async () => {
       const started = performance.now();
       try {
+        const warming = host.sandbox(sandboxId, size, "world", ownerWorld);
+        const wasRunning = await host.sandboxContainerRunning(warming);
         await withInfrastructureDeadline(
-          host
-            .sandbox(sandboxId, size, "world", ownerWorld)
-            .exec("true", { origin: "internal" }),
+          warming.exec("true", { origin: "internal" }),
           120_000,
           "Agent container prewarm did not settle.",
         );
         prewarmMs = Math.round(performance.now() - started);
+        if (!wasRunning) {
+          await warming
+            .exec(SANDBOX_PAGE_CACHE_WARM_COMMAND, { origin: "internal" })
+            .catch(() => undefined);
+        }
       } catch (error) {
         log("error", "agent_container_prewarm_failed", {
           turnId: turn.turnId,
@@ -675,6 +684,14 @@ export const runContainerAgentTurn = async (
       execution.assertActive();
     }
     const { coldContainerStartMs, restoreMs } = attempt;
+    if (attempt.result.timings) {
+      log("info", "agent_turn_timing", {
+        turnId: turn.turnId,
+        threadId: turn.threadId,
+        turnStartedAt,
+        executor: attempt.result.timings,
+      });
+    }
     let result = attempt.result;
     // A stale turn (alarm fired, or a successor continuation took over
     // this thread's DO) must not checkpoint over the successor's restore
@@ -1232,6 +1249,7 @@ export const attachAgentWorld = async (
   restoreMs = phaseMs(restoreStarted);
 
   let nativeRestoreMs = 0;
+  let nativeRestore: "current" | "restored" | undefined;
   let adoptedSession: { sessionId: string; cliVersion: string } | undefined;
   if (
     turn.execution?.engine === "anthropic" &&
@@ -1286,7 +1304,7 @@ export const attachAgentWorld = async (
   if (args.turnStateThreadRestore?.native) {
     const nativeRestoreStarted = performance.now();
     turnExecution.assertActive();
-    await restoreTurnStateArchive({
+    nativeRestore = await restoreTurnStateArchive({
       session,
       bucket: host.env.BACKUP_BUCKET,
       archive: args.turnStateThreadRestore.native,
@@ -1319,6 +1337,7 @@ export const attachAgentWorld = async (
     capabilityMs,
     materializationMs,
     nativeRestoreMs,
+    ...(nativeRestore ? { nativeRestore } : {}),
     restoreConfirmationMs: phaseMs(confirmationStarted),
     totalAttachMs: phaseMs(attachStarted),
     ...(head ? { observedHeadRevision: head.revision } : {}),
@@ -1372,7 +1391,10 @@ export const runAgentAttempt = async (
   const world = await host.attachAgentWorld(args);
   setupStep("attachWorld");
   const { session, coldContainerStartMs, restoreMs, adoptedSession } = world;
-  await host.event(
+  // The ready event, the skills, the Claude logins and the attempt
+  // directory below need nothing from each other; each is awaited before
+  // the turn input is written.
+  const sandboxReadyEvent = host.event(
     turn,
     "auto",
     "sandbox_ready",
@@ -1385,39 +1407,45 @@ export const runAgentAttempt = async (
     false,
     turnExecution.signal,
   );
+  sandboxReadyEvent.catch(() => undefined);
   // This agent's container gets the owner's current Claude Code logins
   // before the CLI looks for them; its own copy may be older. Nothing below
   // reads them before the turn input is written, so they come down while
   // the skills and the attempt directory are set up.
-  let claudeLoginsMs: number | undefined;
+  let claudeLoginsMs: Record<string, number> | undefined;
   const claudeLogins = (async () => {
     if (turn.execution?.engine !== "anthropic") return null;
     const started = performance.now();
     const account = await claudeCloudAccountFor(host.env, turn);
+    const accountAt = performance.now();
     await restoreClaudeCloudLogins(host.env, turn.ownerId, sandbox);
+    const restoredAt = performance.now();
     if (account.email === TEST_CLAUDE_EMAIL && testClaudeConfigured(host.env)) {
       await seedTestClaudeLogin(host.env, turn.ownerId, sandbox);
     }
-    claudeLoginsMs = Math.round(performance.now() - started);
+    claudeLoginsMs = {
+      account: Math.round(accountAt - started),
+      restore: Math.round(restoredAt - accountAt),
+      testSeed: Math.round(performance.now() - restoredAt),
+    };
     return account;
   })();
   claudeLogins.catch(() => undefined);
-  let cloudSkills:
-    | Awaited<ReturnType<typeof materializeCloudSkillSnapshot>>
-    | undefined = undefined;
-  if (args.cloudSkillHome && args.cloudSkillCatalog) {
+  let skillsMs: number | undefined;
+  const skillsReady = (async () => {
+    if (!args.cloudSkillHome || !args.cloudSkillCatalog) return undefined;
+    const started = performance.now();
     turnExecution.assertActive();
-    cloudSkills = await materializeCloudSkillSnapshot({
+    const materialized = await materializeCloudSkillSnapshot({
       home: args.cloudSkillHome,
       snapshot: args.cloudSkillCatalog,
       session,
       assertActive: () => turnExecution.assertActive(),
     });
     turnExecution.assertActive();
-    setupStep("skillsMaterialize");
     // The pinned roots above stay authoritative; HOME's copy is for an agent
     // that looks where a device keeps them.
-    await mirrorCloudSkillsIntoHome({ session, catalog: cloudSkills }).catch(
+    await mirrorCloudSkillsIntoHome({ session, catalog: materialized }).catch(
       (error: unknown) => {
         log("error", "cloud_skills_home_mirror_failed", {
           turnId: turn.turnId,
@@ -1426,8 +1454,10 @@ export const runAgentAttempt = async (
       },
     );
     turnExecution.assertActive();
-    setupStep("skillsHomeMirror");
-  }
+    skillsMs = Math.round(performance.now() - started);
+    return materialized;
+  })();
+  skillsReady.catch(() => undefined);
 
   // The native CLI's resumable session lives in the root-only backup mount.
   // Its full-tree attestation is bound to this builder-derived owner/thread
@@ -1506,6 +1536,10 @@ export const runAgentAttempt = async (
     const claudeAccount = await claudeLogins;
     turnExecution.assertActive();
     setupStep("claudeLoginsWait");
+    const cloudSkills = await skillsReady;
+    await sandboxReadyEvent;
+    turnExecution.assertActive();
+    setupStep("skillsWait");
 
     // The turn input sits in the root-only attempt directory, above the
     // world root on purpose: the checkpoint only covers the root, so
@@ -1591,6 +1625,7 @@ export const runAgentAttempt = async (
       restoreMs,
       setupMs,
       ...(claudeLoginsMs === undefined ? {} : { claudeLoginsMs }),
+      ...(skillsMs === undefined ? {} : { skillsMs }),
     });
     const executorProcessId = sessionName(
       `agent-executor-${turn.turnId}-${turn.attemptGeneration}`,

@@ -23,6 +23,7 @@ import {
   SANDBOX_WORKLOADS,
 } from "../sandbox-lifecycle.js";
 import { sandboxClient } from "../sandbox-client.js";
+import { SANDBOX_PAGE_CACHE_WARM_COMMAND } from "../sandbox-code.js";
 import { snapshotAllowsCloudSandbox } from "../owner-gate.js";
 import { agentSandboxId, agentTurnSessionId, worldName } from "../workspace.js";
 import { initialInstanceSize } from "../instance-size.js";
@@ -261,6 +262,9 @@ export const prewarmOrchestratorContainer = async (
     return json({ prewarmed: false, reason: "start_failed" }, 502);
   }
   const startMs = Math.round(performance.now() - started);
+  await handle
+    .exec(SANDBOX_PAGE_CACHE_WARM_COMMAND, { origin: "internal" })
+    .catch(() => undefined);
   log("info", "orchestrator_container_prewarmed", {
     instanceSize: size,
     startMs,

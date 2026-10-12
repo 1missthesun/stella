@@ -40,6 +40,14 @@ export const sandboxCodeAssetPath = (sha256: string): string =>
 export const SANDBOX_CODE_INSTALL = "/opt/stella/bin/stella-code-install";
 export const SANDBOX_EXECUTOR = "/opt/stella/bin/stella-executor";
 
+/**
+ * Run in the background in a container that just started, while the turn's
+ * context is prepared: reads the executor's modules, which the turn needs
+ * first, then Claude Code's binary into the page cache, which a cold start otherwise pays for on the turn's
+ * own path (about 1.7 s of Claude Code start and 0.7 s of module load).
+ */
+export const SANDBOX_PAGE_CACHE_WARM_COMMAND = `setsid sh -c '${SANDBOX_EXECUTOR} --warm; cat "$(readlink -f "$(command -v claude)")" >/dev/null; claude --version' </dev/null >/dev/null 2>&1 &`;
+
 const SHA256 = /^[0-9a-f]{64}$/u;
 
 /** The bundle this Worker version was built with. */

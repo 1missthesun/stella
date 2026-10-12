@@ -64,6 +64,7 @@ export const parseAgentExecutorResult = (
     "usage",
     "checkpointPolicy",
     "checkpointMs",
+    "timings",
     "turnStateCheckpoint",
     "builderFallback",
   ]);
@@ -88,6 +89,19 @@ export const parseAgentExecutorResult = (
       result.checkpointPolicy !== "builder_fallback")
   ) {
     return null;
+  }
+  if (result.timings !== undefined) {
+    const timings = result.timings;
+    const valid =
+      !!timings &&
+      typeof timings === "object" &&
+      !Array.isArray(timings) &&
+      Object.keys(timings).length <= 64 &&
+      Object.entries(timings).every(
+        ([key, at]) =>
+          /^[A-Za-z]{1,64}$/u.test(key) && Number.isSafeInteger(at),
+      );
+    if (!valid) delete result.timings;
   }
 
   if (result.checkpointPolicy === "builder_fallback") {

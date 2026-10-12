@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
+import { markTurnStep } from "./turn-timing.js";
 import * as Effect from "effect/Effect";
 import {
   chmod,
@@ -276,6 +277,7 @@ const runJsonLines = async (options: {
       commandArgs: options.args,
       identity: options.processIdentity,
     });
+    markTurnStep("claudeSpawned");
     const child = spawn(launch.command, launch.args, {
       cwd: options.cwd,
       env: options.env,
@@ -303,6 +305,7 @@ const runJsonLines = async (options: {
       }
     };
     child.stdout.on("data", (chunk: Buffer) => {
+      markTurnStep("claudeFirstStdout");
       pending += chunk.toString();
       const lines = pending.split(/\r?\n/);
       pending = lines.pop() ?? "";
@@ -499,6 +502,13 @@ export const buildClaudeChildEnv = (options: {
     // as root unless told it is in a sandbox.
     IS_SANDBOX: "1",
     MCP_CONNECTION_NONBLOCKING: "0",
+    // No telemetry, error reporting or update check: nothing the turn needs
+    // goes out before its first model request.
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+    // claude.ai's own connectors are never this turn's tools
+    // (`--strict-mcp-config`), and with blocking MCP connections their fetch
+    // held every start for about half a second.
+    ENABLE_CLAUDEAI_MCP_SERVERS: "false",
   };
   // Nothing may point the CLI at another endpoint or another credential.
   delete childEnv.ANTHROPIC_BASE_URL;
@@ -708,6 +718,7 @@ export const runCloudClaude = async (options: {
     marked && isClaudeSessionId(marked)
       ? marked
       : deterministicUuid(profile.sessionKey);
+  markTurnStep("claudeStateChecked");
   const mcpConfig = await createCloudClaudeMcpConfig(options.mcpServerConfig);
   // One latch, two sources: the caller's cancellation and our own
   // compaction-loop verdict both have to reach one child process. A turn
@@ -820,6 +831,7 @@ export const runCloudClaude = async (options: {
         options.onStreamEvent?.(event);
         const type = event.type;
         if (type === "system" && event.subtype === "init") {
+          markTurnStep("claudeInit");
           initialized = true;
           void writeFile(markerPath, `${sessionId}\n`, { mode: 0o600 });
           const unavailable = stellaToolsUnavailable(event);
@@ -861,6 +873,7 @@ export const runCloudClaude = async (options: {
           return;
         }
         if (type === "assistant") {
+          markTurnStep("claudeFirstAssistant");
           llmCalls += 1;
           const texts = textBlocks(
             (event.message as { content?: unknown } | undefined)?.content,
@@ -869,6 +882,7 @@ export const runCloudClaude = async (options: {
           return;
         }
         if (type === "result") {
+          markTurnStep("claudeResult");
           const resultText =
             typeof event.result === "string" ? event.result.trim() : "";
           // A message Claude answered as one more query adds its answer to
@@ -1081,6 +1095,7 @@ export const runNativeAgentTurn = async (options: {
       integrityKey: options.stateIntegrityKey,
     });
   }
+  markTurnStep("nativeParityChecked");
   const run = () =>
     runCloudClaude({
       profile: options.profile,

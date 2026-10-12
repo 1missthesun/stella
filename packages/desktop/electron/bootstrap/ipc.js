@@ -96,6 +96,22 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                     return false;
                 return await resource.getExtensionStatus();
             },
+            reconnectExtension: async () => {
+                const resource = state.stellaBrowserBridgeService;
+                if (!resource) {
+                    startStellaBrowserBridge(context);
+                    return;
+                }
+                try {
+                    await resource.reconnectExtension();
+                }
+                catch {
+                    // A daemon that predates extension_reconnect: restarting it
+                    // closes the extension's link, which reconnects on its own.
+                    await resource.stop();
+                    resource.start();
+                }
+            },
             exportAllCookies: async () => {
                 const resource = state.stellaBrowserBridgeService;
                 if (!resource?.exportAllCookies) {

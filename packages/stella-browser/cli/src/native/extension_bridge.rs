@@ -8,6 +8,7 @@ use std::fs;
 use std::io::Write as IoWrite;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -35,6 +36,15 @@ const DISCONNECT_SHUTDOWN_MS: u64 = 30_000;
 
 /// Reconnect wait after a dead connection is detected.
 const RECONNECT_WAIT_MS: u64 = 10_000;
+
+/// Consecutive failed health checks before a connection is declared dead.
+/// One slow answer from a busy or waking service worker is not a dead link.
+const DEAD_AFTER_MISSED_HEALTH_CHECKS: u32 = 2;
+
+/// How often a connection checks whether it was retired. A retired connection
+/// closes its socket so the native host exits and the extension, seeing its
+/// port disconnect, reconnects with a fresh hello.
+const RETIRED_CONNECTION_POLL_MS: u64 = 500;
 const EXTENSION_PROTOCOL_VERSION: &str = "2.1";
 const MIN_EXTENSION_VERSION: (u64, u64, u64) = (1, 2, 12);
 
@@ -109,6 +119,9 @@ pub struct ExtensionBridge {
     /// subscribers. Lives outside `inner` so subscribing never contends the
     /// command-path mutex. Cloned into each accepted extension connection.
     events_tx: broadcast::Sender<String>,
+    /// Generation that last failed a status health check, and how many in a
+    /// row it has failed.
+    missed_health_checks: Arc<std::sync::Mutex<(u64, u32)>>,
 }
 
 impl ExtensionBridge {
@@ -145,6 +158,7 @@ impl ExtensionBridge {
             connected_notify: Arc::new(Notify::new()),
             shutdown_tx: None,
             events_tx: broadcast::channel(EVENT_BROADCAST_CAPACITY).0,
+            missed_health_checks: Arc::new(std::sync::Mutex::new((0, 0))),
         }
     }
 
@@ -297,16 +311,58 @@ impl ExtensionBridge {
     /// health exchange. A transport socket alone is not authorization: the
     /// extension service worker may have restarted while native messaging
     /// still appears connected.
+    ///
+    /// A connection is declared dead only after
+    /// `DEAD_AFTER_MISSED_HEALTH_CHECKS` consecutive misses; until then it is
+    /// still reported live. Declaring it dead retires it, which closes its
+    /// socket so the extension reconnects on its own.
     pub async fn verified_connection_generation(&self) -> Option<u64> {
         let (alive, generation) = self.verify_connection().await;
+        let generation = generation?;
         if alive {
-            generation
-        } else {
-            if let Some(stale_generation) = generation {
-                deactivate_connection(&self.inner, stale_generation).await;
-            }
-            None
+            self.reset_missed_health_checks();
+            return Some(generation);
         }
+        if self.record_missed_health_check(generation) < DEAD_AFTER_MISSED_HEALTH_CHECKS {
+            return Some(generation);
+        }
+        self.reset_missed_health_checks();
+        deactivate_connection(&self.inner, generation).await;
+        None
+    }
+
+    /// Retire the live connection so the extension reconnects with a fresh
+    /// hello. Returns whether there was a connection to retire.
+    pub async fn force_reconnect(&self) -> bool {
+        let generation = {
+            let guard = self.inner.lock().await;
+            guard.connection_generation
+        };
+        self.reset_missed_health_checks();
+        match generation {
+            Some(generation) => deactivate_connection(&self.inner, generation).await,
+            None => false,
+        }
+    }
+
+    fn record_missed_health_check(&self, generation: u64) -> u32 {
+        let mut missed = self
+            .missed_health_checks
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if missed.0 != generation {
+            *missed = (generation, 0);
+        }
+        missed.1 += 1;
+        missed.1
+    }
+
+    fn reset_missed_health_checks(&self) {
+        let mut missed = self
+            .missed_health_checks
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        *missed = (0, 0);
     }
 
     /// Send a command to the extension and wait for the response.
@@ -332,7 +388,10 @@ impl ExtensionBridge {
         };
 
         if needs_health_check {
-            let (alive, checked_generation) = self.verify_connection().await;
+            let (mut alive, mut checked_generation) = self.verify_connection().await;
+            if !alive && checked_generation.is_some() {
+                (alive, checked_generation) = self.verify_connection().await;
+            }
             if !alive {
                 // Connection is dead — wait for reconnection
                 if let Some(generation) = checked_generation {
@@ -634,17 +693,44 @@ async fn handle_extension_connection(
 
     let (read_half, mut write_half) = stream.into_split();
     let mut reader = BufReader::new(read_half);
+    let active_generation = Arc::new(AtomicU64::new(0));
 
-    // Spawn writer task — one JSON object per line
+    // Spawn writer task — one JSON object per line. Once this connection is
+    // retired (its generation is no longer the live one: a failed health
+    // check, a forced reconnect, or a newer connection), it shuts the socket.
+    // The native host exits on EOF, the extension's port disconnects, and the
+    // extension reconnects. Without this a retired connection stayed open,
+    // answering pings, so the extension showed "connected" indefinitely while
+    // the daemon reported it disconnected.
+    let writer_inner = inner.clone();
+    let writer_generation = active_generation.clone();
     let write_handle = tokio::spawn(async move {
-        while let Some(msg) = cmd_rx.recv().await {
-            let mut line = msg;
-            line.push('\n');
-            if write_half.write_all(line.as_bytes()).await.is_err() {
-                break;
-            }
-            if write_half.flush().await.is_err() {
-                break;
+        let mut retired_poll =
+            tokio::time::interval(Duration::from_millis(RETIRED_CONNECTION_POLL_MS));
+        retired_poll.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        loop {
+            tokio::select! {
+                msg = cmd_rx.recv() => {
+                    let Some(msg) = msg else { break };
+                    let mut line = msg;
+                    line.push('\n');
+                    if write_half.write_all(line.as_bytes()).await.is_err() {
+                        break;
+                    }
+                    if write_half.flush().await.is_err() {
+                        break;
+                    }
+                }
+                _ = retired_poll.tick() => {
+                    let generation = writer_generation.load(Ordering::Acquire);
+                    if generation == 0 {
+                        continue;
+                    }
+                    let live = writer_inner.lock().await.connection_generation;
+                    if live != Some(generation) {
+                        break;
+                    }
+                }
             }
         }
         let _ = write_half.shutdown().await;
@@ -712,7 +798,9 @@ async fn handle_extension_connection(
                 // Native host injects token from disk; empty expected_token disables auth (dev only).
                 if token_matches || expected_token.is_empty() {
                     authenticated = true;
-                    connection_generation = Some(activate_connection(&inner, cmd_tx.clone()).await);
+                    let generation = activate_connection(&inner, cmd_tx.clone()).await;
+                    connection_generation = Some(generation);
+                    active_generation.store(generation, Ordering::Release);
                     connected_notify.notify_waiters();
 
                     let welcome = json!({

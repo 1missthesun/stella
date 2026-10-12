@@ -73,9 +73,10 @@ export const createCloudWebTool = (context: {
       query,
       ...(category ? { category } : {}),
     })) as WebSearchResult;
+    const { text, ...structured } = payload;
     return {
-      content: [{ type: "text", text: payload.text || "No results found." }],
-      details: { mode: "search", query, ...payload },
+      content: [{ type: "text", text: text || "No results found." }],
+      details: { mode: "search", query, ...structured },
     };
   },
 });

@@ -65,7 +65,7 @@ const formatText = (query: string, results: WebSearchHit[]): string => {
       return parts.join("\n");
     })
     .join("\n\n");
-  return `[External Content - Untrusted Source: web search: ${query}]\nWeb search results for "${query}":\n\n${formatted}\n[End External Content]`;
+  return `[External Content - Untrusted Source: web search: ${query}]\n${formatted}\n[End External Content]`;
 };
 
 const failed = (text: string): WebSearchOutcome => ({

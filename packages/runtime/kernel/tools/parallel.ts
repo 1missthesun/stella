@@ -37,7 +37,7 @@ const stringifyResult = (value: unknown): string => {
   if (typeof value === "string") return value;
   if (value == null) return "";
   try {
-    return JSON.stringify(value, null, 2);
+    return JSON.stringify(value);
   } catch {
     return String(value);
   }

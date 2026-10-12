@@ -8,8 +8,9 @@
  * `memories/areas/finance.md`. Writes are redacted with the memory redaction
  * and capped per file: the main file at its injection budget (so a write can
  * never produce a file the model is shown truncated), any other memory file
- * at `MEMORY_FILE_MAX_CHARS`. A `sha` is the hex SHA-256 of
- * the file's bytes.
+ * at `MEMORY_FILE_MAX_CHARS`. A `sha` the model sees is the first
+ * `MEMORY_SHA_CHARS` hex characters of the SHA-256 of the file's bytes;
+ * `expectSha` takes that prefix or the full hash.
  *
  * This module does no I/O. Each side has one module that owns its files and
  * returns this client — `disk-memory.ts` over `~/.stella` on the desktop,
@@ -37,7 +38,8 @@ export const MEMORY_LIST_MAX_FILES = 500;
 const MAX_PATH_CHARS = 240;
 const MAX_SEGMENT_CHARS = 96;
 const MAX_SEGMENTS = 8;
-const SHA256_HEX = /^[0-9a-f]{64}$/u;
+const SHA_PREFIX_HEX = /^[0-9a-f]{12,64}$/u;
+export const MEMORY_SHA_CHARS = 12;
 
 export type MemoryFileInfo = {
   /** Relative to `~/.stella`, e.g. `memories/main.md`. */
@@ -50,6 +52,16 @@ export type MemoryFileInfo = {
 };
 
 export type MemoryWriteResult = { sha: string; bytes: number; note?: string };
+
+export type MemoryReadResult = { text: string; sha: string };
+
+export type MemoryListEntry = {
+  path: string;
+  size: number;
+  sha: string;
+  /** ISO 8601. */
+  updatedAt: string;
+};
 
 /**
  * One host's raw memory files. Paths are already validated memory paths.
@@ -71,14 +83,16 @@ export type MemoryFileStore = {
 };
 
 export type MemoryClient = {
-  read(path: unknown): Promise<string | null>;
+  read(path: unknown): Promise<MemoryReadResult | null>;
   write(
     path: unknown,
     content: unknown,
     options?: unknown,
   ): Promise<MemoryWriteResult>;
-  list(): Promise<MemoryFileInfo[]>;
+  list(): Promise<MemoryListEntry[]>;
 };
+
+const visibleSha = (sha: string): string => sha.slice(0, MEMORY_SHA_CHARS);
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -178,16 +192,16 @@ const expectShaOption = (options: unknown): string | null | undefined => {
   }
   const expectSha = (options as { expectSha?: unknown }).expectSha;
   if (expectSha === undefined || expectSha === null) return expectSha;
-  if (typeof expectSha !== "string" || !SHA256_HEX.test(expectSha)) {
+  if (typeof expectSha !== "string" || !SHA_PREFIX_HEX.test(expectSha)) {
     throw new Error(
-      "memory.write: expectSha must be a file's sha from memory.list() or an earlier memory.write(), or null for a file that must not exist yet.",
+      "memory.write: expectSha must be a file's sha from memory.read(), memory.list() or an earlier memory.write(), or null for a file that must not exist yet.",
     );
   }
   return expectSha;
 };
 
 const shortSha = (sha: string | null): string =>
-  sha ? `${sha.slice(0, 12)}…` : "no file";
+  sha ? visibleSha(sha) : "no file";
 
 /**
  * The bytes a write of `content` to `path` stores: redacted, and refused over
@@ -216,26 +230,43 @@ export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
   read: async (input) => {
     const path = memoryPath(input, "read");
     const bytes = await store.read(path);
-    return bytes === null ? null : decoder.decode(bytes);
+    if (bytes === null) return null;
+    return {
+      text: decoder.decode(bytes),
+      sha: visibleSha(await memorySha(bytes)),
+    };
   },
   write: async (input, content, options) => {
     const path = memoryPath(input, "write");
     if (typeof content !== "string") {
       throw new Error(`memory.write: content for ${path} must be a string.`);
     }
-    const expectSha = expectShaOption(options);
+    const expected = expectShaOption(options);
+    const changed = (actualSha: string | null) =>
+      new Error(
+        `memory.write: ${path} changed since that sha was taken (expected ${shortSha(expected ?? null)}, found ${shortSha(actualSha)}). Nothing was written; read it again, reapply the edit, and write with the new sha.`,
+      );
+    let expectSha = expected;
+    if (typeof expected === "string" && expected.length < 64) {
+      const current = await store.read(path);
+      const currentSha = current === null ? null : await memorySha(current);
+      if (currentSha === null || !currentSha.startsWith(expected)) {
+        throw changed(currentSha);
+      }
+      expectSha = currentSha;
+    }
     const { bytes, sha } = await prepareMemoryWrite(path, content);
     const outcome = await store.write(path, bytes, sha, expectSha);
-    if (!outcome.ok) {
-      throw new Error(
-        `memory.write: ${path} changed since that sha was taken (expected ${shortSha(expectSha ?? null)}, found ${shortSha(outcome.actualSha)}). Nothing was written; read it again, reapply the edit, and write with the new sha.`,
-      );
-    }
+    if (!outcome.ok) throw changed(outcome.actualSha);
     const note =
       path === MAIN_MEMORY_RELATIVE_PATH
         ? mainMemoryCapNote(residentMemoryChars(decoder.decode(bytes)))
         : undefined;
-    return { sha, bytes: bytes.byteLength, ...(note ? { note } : {}) };
+    return {
+      sha: visibleSha(sha),
+      bytes: bytes.byteLength,
+      ...(note ? { note } : {}),
+    };
   },
   list: async () =>
     (await store.list())
@@ -247,7 +278,13 @@ export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
             ? 1
             : left.path.localeCompare(right.path),
       )
-      .slice(0, MEMORY_LIST_MAX_FILES),
+      .slice(0, MEMORY_LIST_MAX_FILES)
+      .map((file) => ({
+        path: file.path,
+        size: file.size,
+        sha: visibleSha(file.sha),
+        updatedAt: new Date(file.updatedAt).toISOString(),
+      })),
 });
 
 /**

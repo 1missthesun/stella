@@ -10,6 +10,7 @@ import {
   normalizeUserAskQuestions,
   userAskReadableAnswers,
   type UserAskQuestion,
+  type UserAskQuestionResponse,
   type UserAskResolution,
   type UserAskUrgencyLevel,
 } from "@stella/contracts/user-ask";
@@ -151,24 +152,43 @@ export const prepareAskUser = (
   };
 };
 
+const modelAnswers = (
+  questions: readonly UserAskQuestion[],
+  responses: readonly UserAskQuestionResponse[],
+): Record<string, unknown>[] =>
+  questions.map((question) => {
+    const response = responses.find((entry) => entry.questionId === question.id);
+    if (!response || response.kind === "skipped") {
+      return { id: question.id, skipped: true };
+    }
+    if (response.kind === "text") return { id: question.id, text: response.text };
+    return { id: question.id, choice: response.choiceId };
+  });
+
 export const userAskResolutionResult = (
   resolution: UserAskResolution,
   questions: readonly UserAskQuestion[] = [],
-): { result: Record<string, unknown> } => {
+): { result: Record<string, unknown>; details: Record<string, unknown> } => {
   if (resolution.outcome === "answered") {
+    const shared = {
+      ...(resolution.values ? { values: resolution.values } : {}),
+      ...(resolution.handles ? { handles: resolution.handles } : {}),
+      ...(resolution.late ? { late: true } : {}),
+    };
     return {
       result: {
         outcome: "answered",
         ...(resolution.responses
-          ? {
-              answers: userAskReadableAnswers(questions, resolution.responses),
-              shownToUser:
-                "The chat already shows the user these answers. Don't repeat them back; act on them.",
-            }
+          ? { answers: modelAnswers(questions, resolution.responses) }
           : {}),
-        ...(resolution.values ? { values: resolution.values } : {}),
-        ...(resolution.handles ? { handles: resolution.handles } : {}),
-        ...(resolution.late ? { late: true } : {}),
+        ...shared,
+      },
+      details: {
+        outcome: "answered",
+        ...(resolution.responses
+          ? { answers: userAskReadableAnswers(questions, resolution.responses) }
+          : {}),
+        ...shared,
       },
     };
   }
@@ -176,13 +196,16 @@ export const userAskResolutionResult = (
     return {
       result: {
         outcome: "defaulted",
+        answers: modelAnswers(questions, resolution.responses),
+        note: resolution.note,
+      },
+      details: {
+        outcome: "defaulted",
         answers: userAskReadableAnswers(questions, resolution.responses),
         note: resolution.note,
-        tellTheUser: resolution.note,
       },
     };
   }
-  return {
-    result: { outcome: resolution.outcome, note: resolution.note },
-  };
+  const ended = { outcome: resolution.outcome, note: resolution.note };
+  return { result: ended, details: ended };
 };

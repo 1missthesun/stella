@@ -112,7 +112,7 @@ export type CloudImageGenDetails =
     };
 
 export const CLOUD_IMAGE_GEN_TOOL_DESCRIPTION =
-  "Generate a still image with Stella's managed image provider. The call stays pending until the job settles: on success the image is saved into the user's drive and shown in the chat, and the result lists its drive path(s). Never retry or parallel-submit a pending call; Stella reattaches to the same job on a lost response. Do not poll, download, or open the result yourself. Required: prompt.";
+  "Generate a still image with Stella's managed image provider. The call stays pending until the job settles: on success the image is saved into the user's drive and shown in the chat, and the result lists its drive path(s); don't link or describe a path unless asked. Never retry or parallel-submit a pending call; Stella reattaches to the same job on a lost response. Do not poll, download, or open the result yourself. Required: prompt.";
 
 export const CLOUD_IMAGE_GEN_TOOL_PARAMETERS = {
   type: "object",
@@ -539,7 +539,7 @@ export const createCloudImageGenTool = (
                   content: [
                     {
                       type: "text",
-                      text: `Generated ${saved.length} image${saved.length === 1 ? "" : "s"} and saved ${saved.length === 1 ? "it" : "them"} to the user's drive: ${listed}. The image is already shown in the chat; do not link or describe the file path unless asked.`,
+                      text: `Generated ${saved.length} image${saved.length === 1 ? "" : "s"}: ${listed}.`,
                     },
                   ],
                   details,

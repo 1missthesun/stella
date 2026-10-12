@@ -20,6 +20,8 @@ import {
   CONNECTOR_STATUS_TOOL_PARAMETERS,
   CONNECTOR_STATUS_TOOL_REPLAY,
   CONNECTOR_STATUS_TOOL_WORKING_TEXT,
+  connectorConnectedText,
+  connectorNotConnectedText,
 } from "@stella/runtime/kernel/tools/defs/connector-status-def.js";
 import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
 import {
@@ -66,13 +68,8 @@ const diagnosticsFor = (
   connected: boolean,
 ) => ({
   id: entry.id,
-  catalogSource: "live" as const,
-  provider: "backend-composio" as const,
-  enabled: connected,
-  providerStatus: connected ? "connected" : "not_connected",
-  accountVerified: connected,
   toolCount: entry.catalogToolCount,
-  executable: connected,
+  connected,
 });
 
 export const createCloudConnectorStatusTool = (
@@ -119,21 +116,21 @@ export const createCloudConnectorStatusTool = (
     const diagnostics = diagnosticsFor(entry, connected);
     if (connected) {
       return text(
-        `${entry.name} is connected and exposes ${entry.catalogToolCount} executable tool${entry.catalogToolCount === 1 ? "" : "s"} (integration id \`${entry.id}\`, catalog: live, provider: backend-composio). The provider account is connected. Agents use it inside code: \`await connect.actions("${entry.id}")\` to inspect, \`await connect.call("${entry.id}", …)\` to run.`,
+        connectorConnectedText(entry.name, entry.id, entry.catalogToolCount),
         { ...diagnostics, status: "executable" },
       );
     }
 
     if (entry.catalogToolCount === 0) {
       return text(
-        `${entry.name} exists, but its Store catalog entry exposes no executable tools. It is not ready to use.`,
+        connectorNotConnectedText(entry.name, "it has no tools it can run"),
         { ...diagnostics, status: "not_executable" },
       );
     }
 
     if (!options.requestConnection) {
       return text(
-        `${entry.name} exists in the catalog and cannot be connected from here (its connect flow isn't available in this session). It is not ready to use; proceed via the browser/computer fallback or the Store.`,
+        connectorNotConnectedText(entry.name, "it can't be connected from here"),
         { ...diagnostics, status: "not_connected", reason: "flow_unavailable" },
       );
     }
@@ -155,25 +152,28 @@ export const createCloudConnectorStatusTool = (
       // directory's connection snapshot for this turn is now stale.
       await options.directory.connections({ refresh: true }).catch(() => []);
       return text(
-        `${entry.name} is now connected — the user approved the connect card. Continue the original task immediately (do not re-ask what they wanted); agents use it inside code via \`await connect.call("${entry.id}", …)\`.`,
+        `${connectorConnectedText(entry.name, entry.id, entry.catalogToolCount)} The user approved the card.`,
         { id: entry.id, status: "connected" },
       );
     }
     if (outcome.reason === "declined") {
       return text(
-        `The user declined connecting ${entry.name}. Tell them once — concisely — that they can always connect it from the Store later, then proceed with the task by other means (the executing agent can use the browser). Do not offer ${entry.name} again unless the user asks to connect it.`,
+        connectorNotConnectedText(entry.name, "the user declined"),
         { id: entry.id, status: "declined" },
       );
     }
     if (outcome.reason === "cancelled" && signal?.aborted) {
       return text(
-        `The turn was cancelled before the user answered the ${entry.name} connect card.`,
+        connectorNotConnectedText(entry.name, "the turn was canceled"),
         { id: entry.id, status: "not_connected", reason: "turn_cancelled" },
       );
     }
     if (outcome.reason === "cancelled" || outcome.reason === "timeout") {
       return text(
-        `The connect card for ${entry.name} was ${outcome.reason === "timeout" ? "not answered in time" : "dismissed"} — the user neither connected nor declined. Don't re-offer it for now; mention once that ${entry.name} is available in the Store, and proceed via other means (browser fallback).`,
+        connectorNotConnectedText(
+          entry.name,
+          outcome.reason === "timeout" ? "the card went unanswered" : "the user dismissed the card",
+        ),
         {
           id: entry.id,
           status: "not_connected",
@@ -182,7 +182,7 @@ export const createCloudConnectorStatusTool = (
       );
     }
     return text(
-      `Could not run the ${entry.name} connect flow: ${outcome.reason}. It is not connected. Proceed via the browser/computer fallback.`,
+      connectorNotConnectedText(entry.name, `the connect flow failed (${outcome.reason})`),
       { id: entry.id, status: "not_connected", reason: outcome.reason },
       true,
     );

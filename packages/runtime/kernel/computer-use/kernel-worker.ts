@@ -498,8 +498,13 @@ const nodeReplWorkerMain = async (
       callTool("$history", { op: "search", text, options }),
     sql: (query: string, params: unknown[] = []) =>
       callTool("$history", { op: "sql", query, params }),
-    read: (fromSeq: number, toSeq: number) =>
-      callTool("$history", { op: "read", fromSeq, toSeq }),
+    read: (fromSeq: number, toSeq: number, options: { raw?: boolean } = {}) =>
+      callTool("$history", {
+        op: "read",
+        fromSeq,
+        toSeq,
+        ...(options?.raw === true ? { raw: true } : {}),
+      }),
   });
   // `memory.read` / `memory.write` / `memory.list` ride the same path as the
   // `$memory` intrinsic; only the orchestrator's REPL is given the global.

@@ -21,6 +21,8 @@ import {
   SCHEDULE_REMOVE_TOOL_DESCRIPTOR,
   SCHEDULE_SEARCH_TERMS,
   SCHEDULE_UPDATE_TOOL_DESCRIPTOR,
+  formatScheduleList,
+  type ScheduleListRow,
   type ScheduleToolDescriptor,
 } from "@stella/runtime/kernel/tools/defs/schedule-manage-def.js";
 import { WATCH_MIN_INTERVAL_MS } from "@stella/contracts/backend/schedules";
@@ -90,6 +92,26 @@ const describeSchedule = (schedule: Record<string, unknown>): string => {
     return `cron "${schedule.expr}" (${typeof schedule.tz === "string" && schedule.tz ? schedule.tz : "follows the user's time zone"})`;
   }
   return "unknown schedule";
+};
+
+const listRow = (row: ScheduleRow): ScheduleListRow => {
+  const message = row.kind === "reminder" ? row.prompt : undefined;
+  const watch = row.kind === "watch";
+  return {
+    jobId: row.scheduleId,
+    name: row.description || (message ?? row.prompt).slice(0, 60),
+    kind: message !== undefined ? "reminder" : watch ? "watch" : "task",
+    when: describeSchedule(parseStoredSchedule(row.schedule)),
+    enabled: row.status === "active",
+    ...(iso(row.nextRunAt) ? { next: iso(row.nextRunAt) } : {}),
+    ...(message !== undefined ? { message } : { prompt: row.prompt }),
+    ...(row.kind === "task" || watch
+      ? { deliverTo: row.route === "agent" ? "agent" : "orchestrator" }
+      : {}),
+    ...(watch && row.once ? { once: true as const } : {}),
+    ...(watch && row.lastFinding ? { lastFinding: row.lastFinding } : {}),
+    ...(row.lastError ? { lastError: row.lastError } : {}),
+  };
 };
 
 /** The device `summarizeJob` shape so lists read the same on both hosts. */
@@ -334,8 +356,8 @@ export const createCloudScheduleTools = (
     tool(SCHEDULE_LIST_TOOL_DESCRIPTOR, async (toolCallId, _params, signal) => {
       try {
         const payload = await post("list", {}, toolCallId, signal);
-        const rows = rowsOf(payload).map(summarizeRow);
-        return result(JSON.stringify(rows, null, 2), {
+        const rows = rowsOf(payload).map(listRow);
+        return result(formatScheduleList(rows), {
           action: "list",
           count: rows.length,
         });

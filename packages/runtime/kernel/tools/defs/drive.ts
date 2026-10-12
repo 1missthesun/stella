@@ -116,7 +116,6 @@ export const createDriveTool = (
           result: [
             `${files.length} file(s) in the user's drive${prefix ? ` under ${prefix}` : ""}:`,
             ...files.map((file) => `- ${describe(file)}`),
-            "Use drive fetch with one of these paths to bring a file here and get a path to Read.",
           ].join("\n"),
           details: { files },
         };
@@ -163,7 +162,7 @@ export const createDriveTool = (
       const localPath = path.join(directory, `${randomUUID()}-${safeName}`);
       await fs.writeFile(localPath, bytes, { flag: "wx", mode: 0o600 });
       return {
-        result: `Fetched ${file.path} from the user's drive to ${localPath} (${file.contentType}, ${bytes.byteLength} bytes). Use Read with that absolute path, and pass it to any agent that needs this file.`,
+        result: `Fetched ${file.path} from the user's drive to ${localPath} (${file.contentType}, ${bytes.byteLength} bytes).`,
         details: {
           drivePath: file.path,
           path: localPath,

@@ -26,7 +26,7 @@ export const createImageGenTool = (
     // filter and executeTool via this gate.
     agentTypes: [AGENT_IDS.ORCHESTRATOR],
     description:
-      "Generate a still image through the image provider selected in Settings (Stella managed or the user's own OpenAI, OpenRouter, or Fal account). The call stays pending until success, failure, cancellation, or a structured unknown outcome, including durable artifact handoff. Success returns terminal status, artifact metadata, and local path(s) under ~/.stella/media/outputs/. Never retry or parallel-submit a pending call; Stella reattaches when the provider exposes durable identity and never blindly resubmits an ambiguous BYOK request. Do not poll, download, or open the result yourself. Required: prompt.",
+      "Generate a still image through the image provider selected in Settings (Stella managed or the user's own OpenAI, OpenRouter, or Fal account). The call stays pending until success, failure, cancellation, or a structured unknown outcome, including durable artifact handoff. Success returns the local path(s) under ~/.stella/media/outputs/; the image is shown in the chat, so don't link or describe a path unless asked. Never retry or parallel-submit a pending call; Stella reattaches when the provider exposes durable identity and never blindly resubmits an ambiguous BYOK request. Do not poll, download, or open the result yourself. Required: prompt.",
     promptSnippet:
       "Generate a still image and return its terminal artifact result",
     parameters: {

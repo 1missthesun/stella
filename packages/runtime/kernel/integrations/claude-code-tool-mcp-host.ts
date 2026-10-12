@@ -25,6 +25,11 @@ import {
   prepareAuthorizedToolImageBlocks,
 } from "../agent-runtime/tool-adapters.js";
 import { normalizeProviderToolInputSchema } from "../tools/provider-tool-schema.js";
+import {
+  sanitizeToolError,
+  sanitizeToolResult,
+  sanitizeToolVisibleText,
+} from "../tools/safety.js";
 import { forkCancelableTimeout } from "./effect-runtime.js";
 import { claudeCodePostToolUseHookResponse } from "./claude-code-output-redaction.js";
 
@@ -148,10 +153,18 @@ const stringifyUnknown = (value: unknown): string => {
   if (typeof value === "string") return value;
   if (value === undefined) return "";
   try {
-    return JSON.stringify(value, null, 2);
+    return JSON.stringify(value);
   } catch {
     return String(value);
   }
+};
+
+const LEADING_ERROR_PREFIX_RE = /^(?:\s*(?:Error:|\[TOOL_ERROR\]))+\s*/;
+
+const toolErrorText = (error: unknown): string => {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const bare = message.replace(LEADING_ERROR_PREFIX_RE, "");
+  return `Error: ${sanitizeToolError(bare || "The tool failed.")}`;
 };
 
 const summarizeUpdate = (update: ToolResult): string => {
@@ -198,7 +211,11 @@ const toolResultToMcp = async (
   result: ToolResult,
   options: { allowLegacyImagePathReopen: boolean },
 ): Promise<CallToolResult> => {
-  const rawResult = stringifyUnknown(result.result);
+  const rawResult = result.error
+    ? ""
+    : sanitizeToolVisibleText(
+        stringifyUnknown(sanitizeToolResult(result.result)),
+      );
   const { text: resolvedResult, images: legacyImages } =
     options.allowLegacyImagePathReopen
       ? await extractAttachImageBlocks(rawResult, { provider: "anthropic" })
@@ -210,16 +227,8 @@ const toolResultToMcp = async (
     result[TOOL_RESULT_AUTHORIZED_IMAGES],
     { provider: "anthropic" },
   );
-  const hasDetails = result.details !== undefined;
   const text = trimToolResult(
-    result.error
-      ? `Error: ${result.error}`
-      : hasDetails
-        ? stringifyUnknown({
-            result: resolvedResult || result.result,
-            details: result.details,
-          })
-        : resolvedResult,
+    result.error ? toolErrorText(result.error) : resolvedResult,
   );
   const content: CallToolResult["content"] = [];
   if (text || legacyImages.length + authorizedImages.length === 0) {
@@ -562,7 +571,7 @@ export const createClaudeCodeToolMcpHost = async (
               content: [
                 {
                   type: "text",
-                  text: `Error: ${error instanceof Error ? error.message : String(error)}`,
+                  text: toolErrorText(error),
                 },
               ],
               isError: true,

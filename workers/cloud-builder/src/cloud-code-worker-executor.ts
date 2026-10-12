@@ -471,7 +471,7 @@ const buildWorkerModule = (
     "    const history = Object.freeze({",
     '      search: (text, options = {}) => __historyCall("search", [text, options]),',
     '      sql: (query, params = []) => __historyCall("sql", [query, params]),',
-    '      read: (fromSeq, toSeq) => __historyCall("read", [fromSeq, toSeq]),',
+    '      read: (fromSeq, toSeq, options = {}) => __historyCall("read", [fromSeq, toSeq, options]),',
     "    });",
     ...(browser ? BROWSER_GLOBAL_LINES : []),
     ...(memory ? MEMORY_GLOBAL_LINES : []),

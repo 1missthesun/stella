@@ -37,6 +37,8 @@ import {
   CONNECTOR_STATUS_TOOL_PARAMETERS,
   CONNECTOR_STATUS_TOOL_REPLAY,
   CONNECTOR_STATUS_TOOL_WORKING_TEXT,
+  connectorConnectedText,
+  connectorNotConnectedText,
 } from "./connector-status-def.js";
 
 export { CONNECTOR_STATUS_TOOL_NAME };
@@ -215,7 +217,7 @@ export const createConnectorStatusTool = (
     };
     if (executable) {
       return {
-        result: `${entry.name} is enabled and exposes ${toolCount} executable tool${toolCount === 1 ? "" : "s"} (integration id \`${entry.id}\`, catalog: ${diagnostics.catalogSource}, provider: ${entry.provider}).${state.accountVerified ? " The provider account is connected." : " Backend account linkage is managed server-side and was not independently verified by this status check."} Agents use it inside code: \`await connect.actions("${entry.id}")\` to inspect, \`await connect.call("${entry.id}", …)\` to run.`,
+        result: `${connectorConnectedText(entry.name, entry.id, toolCount)}${state.accountVerified ? "" : " Its account link is managed by the backend and was not verified here."}`,
         details: { ...diagnostics, status: "executable" },
       };
     }
@@ -225,16 +227,19 @@ export const createConnectorStatusTool = (
         entry.provider === "oauth-catalog" &&
         entry.localExecution !== "production-ready";
       return {
-        result: incompleteLocal
-          ? `${entry.name} ${state.enabled ? "is locally enabled, but its authoritative Store catalog is unavailable" : "is present only as bundled metadata"}. The bundled OAuth implementation is incomplete/deprecated and is not an execution fallback. It is not ready to use.`
-          : `${entry.name} ${state.enabled ? "is locally enabled, but" : "exists, but"} the resolved ${entry.provider} catalog entry exposes no executable tools. It is not ready to use.`,
+        result: connectorNotConnectedText(
+          entry.name,
+          incompleteLocal
+            ? "its Store catalog is unavailable and the bundled version can't run"
+            : "it has no tools it can run",
+        ),
         details: { ...diagnostics, status: "not_executable" },
       };
     }
 
     if (!entry.connectable || !options.requestConnectorConnection) {
       return {
-        result: `${entry.name} ${state.enabled ? "is locally enabled but does not have a verified provider credential" : "exists in the catalog"} and cannot be connected from here${entry.connectable ? "" : " (its connect flow isn't available in this build)"}. It is not ready to use; proceed via the browser/computer fallback or the Store.`,
+        result: connectorNotConnectedText(entry.name, "it can't be connected from here"),
         details: {
           ...diagnostics,
           status: "not_connected",
@@ -260,13 +265,13 @@ export const createConnectorStatusTool = (
 
     if (outcome.ok) {
       return {
-        result: `${entry.name} is now connected — the user approved the connect card. Continue the original task immediately (do not re-ask what they wanted); agents use it inside code via \`await connect.call("${entry.id}", …)\`.`,
+        result: `${connectorConnectedText(entry.name, entry.id, toolCount)} The user approved the card.`,
         details: { id: entry.id, status: "connected" },
       };
     }
     if (outcome.reason === "declined") {
       return {
-        result: `The user declined connecting ${entry.name}. Tell them once — concisely — that they can always connect it from the Store later, then proceed with the task by other means (the executing agent can use the browser). Do not offer ${entry.name} again unless the user asks to connect it.`,
+        result: connectorNotConnectedText(entry.name, "the user declined"),
         details: { id: entry.id, status: "declined" },
       };
     }
@@ -274,7 +279,7 @@ export const createConnectorStatusTool = (
       // The turn itself was cancelled; the desktop card was settled as
       // cancelled too. Nothing to tell the user.
       return {
-        result: `The turn was cancelled before the user answered the ${entry.name} connect card.`,
+        result: connectorNotConnectedText(entry.name, "the turn was canceled"),
         details: {
           id: entry.id,
           status: "not_connected",
@@ -284,7 +289,10 @@ export const createConnectorStatusTool = (
     }
     if (outcome.reason === "cancelled" || outcome.reason === "timeout") {
       return {
-        result: `The connect card for ${entry.name} was ${outcome.reason === "timeout" ? "not answered in time" : "dismissed"} — the user neither connected nor declined. Don't re-offer it for now; mention once that ${entry.name} is available in the Store, and proceed via other means (browser fallback).`,
+        result: connectorNotConnectedText(
+          entry.name,
+          outcome.reason === "timeout" ? "the card went unanswered" : "the user dismissed the card",
+        ),
         details: {
           id: entry.id,
           status: "not_connected",
@@ -293,7 +301,7 @@ export const createConnectorStatusTool = (
       };
     }
     return {
-      error: `Could not run the ${entry.name} connect flow: ${outcome.reason}. It is not connected. Proceed via the browser/computer fallback.`,
+      error: connectorNotConnectedText(entry.name, `the connect flow failed (${outcome.reason})`),
       details: {
         id: entry.id,
         status: "not_connected",

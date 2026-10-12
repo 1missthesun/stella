@@ -328,3 +328,65 @@ export const answerOwnHistory = (
   }
   throw new Error('history query op must be "search", "read" or "sql".');
 };
+
+export type HistoryReadEntry = {
+  seq: number;
+  role: string;
+  at?: string;
+  text: string;
+};
+
+const historyEntryOf = (input: unknown): HistoryReadEntry | null => {
+  if (!input || typeof input !== "object") return null;
+  const record = input as Record<string, unknown>;
+  if (typeof record.seq !== "number") return null;
+  const at =
+    typeof record.createdAtMs === "number" && record.createdAtMs > 0
+      ? new Date(record.createdAtMs).toISOString()
+      : undefined;
+  const base = { seq: record.seq, ...(at ? { at } : {}) };
+  if (record.kind === "card") {
+    const card = record.card as { type?: unknown } | undefined;
+    return { ...base, role: "card", text: typeof card?.type === "string" ? card.type : "" };
+  }
+  if (record.kind !== undefined && record.kind !== "message") return null;
+  const payload =
+    record.payload && typeof record.payload === "object"
+      ? (record.payload as Record<string, unknown>)
+      : {};
+  const role =
+    typeof record.role === "string"
+      ? record.role
+      : typeof payload.role === "string"
+        ? payload.role
+        : "unknown";
+  const content = Array.isArray(payload.content) ? payload.content : [];
+  const calls = content.flatMap((item) => {
+    const part = item as { type?: unknown; name?: unknown } | null;
+    return part?.type === "toolCall" && typeof part.name === "string" ? [`[tool call: ${part.name}]`] : [];
+  });
+  const name = typeof payload.toolName === "string" ? `[${payload.toolName} result] ` : "";
+  const text = [`${name}${historyMessageText(payload)}`.trim(), ...calls].filter(Boolean).join("\n");
+  return { ...base, role, text };
+};
+
+/**
+ * What `history.read` gives the model: each message as its seq, role, time
+ * and text, without the app's sync fields. `raw` keeps the rows as stored.
+ */
+export const historyReadView = (result: unknown): unknown => {
+  const rows = Array.isArray(result)
+    ? result
+    : result && typeof result === "object" && Array.isArray((result as { records?: unknown }).records)
+      ? ((result as { records: unknown[] }).records)
+      : null;
+  if (!rows) return result;
+  const records = rows.map(historyEntryOf).filter((entry): entry is HistoryReadEntry => entry !== null);
+  if (Array.isArray(result)) return records;
+  const rest = result as { complete?: unknown; missingBelowSeq?: unknown };
+  return {
+    records,
+    ...(rest.complete === false ? { complete: false } : {}),
+    ...(typeof rest.missingBelowSeq === "number" ? { missingBelowSeq: rest.missingBelowSeq } : {}),
+  };
+};

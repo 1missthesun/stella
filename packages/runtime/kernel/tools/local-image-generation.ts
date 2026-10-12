@@ -248,7 +248,10 @@ const terminalToolResult = (
     artifacts: terminal.artifacts,
     reattached: terminal.reattached,
   };
-  return { result: details, details };
+  return {
+    result: `Generated ${terminal.filePaths.length} image${terminal.filePaths.length === 1 ? "" : "s"}: ${terminal.filePaths.join(", ")}.`,
+    details,
+  };
 };
 
 export const runLocalImageGeneration = async (

@@ -199,7 +199,7 @@ const resultText = (result: ToolResult): string => {
       ? result.result
       : result.result === undefined
         ? ""
-        : JSON.stringify(result.result, null, 2);
+        : JSON.stringify(result.result);
   return raw.length > MODEL_VISIBLE_MAX_CHARS
     ? `${raw.slice(0, 15_000)}\n…[truncated]…\n${raw.slice(-15_000)}`
     : raw;

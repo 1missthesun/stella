@@ -604,7 +604,6 @@ export type UserAskReadableAnswer = Readonly<{
   label?: string;
   text?: string;
   skipped?: true;
-  note?: string;
 }>;
 
 export const userAskReadableAnswers = (
@@ -614,7 +613,7 @@ export const userAskReadableAnswers = (
   questions.map((question) => {
     const response = responses.find((entry) => entry.questionId === question.id);
     if (!response || response.kind === "skipped") {
-      return { question: question.question, skipped: true, note: USER_ASK_SKIPPED_NOTE };
+      return { question: question.question, skipped: true };
     }
     if (response.kind === "text") {
       return { question: question.question, text: response.text };

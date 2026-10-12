@@ -280,7 +280,7 @@ const createImageGenHandler =
         : {}),
     };
     return {
-      result: details,
+      result: `Generated ${terminal.filePaths.length} image${terminal.filePaths.length === 1 ? "" : "s"}: ${terminal.filePaths.join(", ")}.`,
       details,
     };
   };

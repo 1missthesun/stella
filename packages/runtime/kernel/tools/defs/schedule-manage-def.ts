@@ -219,3 +219,46 @@ export const SCHEDULE_REMOVE_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
   },
 };
 
+
+export type ScheduleListRow = {
+  jobId: string;
+  name: string;
+  kind: string;
+  when: string;
+  enabled: boolean;
+  next?: string;
+  message?: string;
+  prompt?: string;
+  scriptPath?: string;
+  deliverTo?: string;
+  once?: true;
+  lastFinding?: string;
+  lastError?: string;
+};
+
+const compactScheduleRow = (row: ScheduleListRow): string =>
+  JSON.stringify(
+    Object.fromEntries(
+      Object.entries(row).filter(([, value]) => value !== undefined && value !== ""),
+    ),
+  );
+
+export const formatScheduleList = (
+  entries: readonly ScheduleListRow[],
+  heartbeats: readonly ScheduleListRow[] = [],
+): string => {
+  if (entries.length === 0 && heartbeats.length === 0) {
+    return "No schedule entries.";
+  }
+  const sections = [
+    `entries (${entries.length}):`,
+    ...entries.map(compactScheduleRow),
+  ];
+  if (heartbeats.length > 0) {
+    sections.push(
+      `heartbeats (${heartbeats.length}):`,
+      ...heartbeats.map(compactScheduleRow),
+    );
+  }
+  return sections.join("\n");
+};

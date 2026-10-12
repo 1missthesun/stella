@@ -138,12 +138,8 @@ export const createCloudHtmlTool = (
         {
           type: "text",
           text: link
-            ? `Canvas "${title}" saved to your drive at ${path} and opened in the panel. Its link is ${link.url} (${
-                link.visibility === "public"
-                  ? "public: anyone with it can view"
-                  : "private: only the user can open it until they make it public from the canvas's Share menu"
-              }).`
-            : `Canvas "${title}" saved to your drive at ${path} and opened in the panel.`,
+            ? `Canvas "${title}" opened; link ${link.url} (${link.visibility === "public" ? "public" : "private"}).`
+          : `Canvas "${title}" opened; saved at ${path}.`,
         },
       ],
       details: {

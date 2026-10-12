@@ -87,6 +87,7 @@ import type { ToolDefinition } from "../extensions/types.js";
 import type { HookEmitter } from "../extensions/hook-emitter.js";
 import { runToolCallPipeline } from "./tool-call-pipeline.js";
 import { getToolArgumentPreparer } from "./argument-preparers.js";
+import { historyReadView } from "@stella/contracts/history-search";
 
 export type { ToolContext, ToolHandlerExtras, ToolResult };
 
@@ -301,6 +302,42 @@ export const createToolHost = ({
     }
     return executeToolCall(toolName, toolArgs, context, signal, onUpdate);
   };
+  const queryCodeHistory =
+    codeHistoryQuery ??
+    (async (args: Record<string, unknown>, context: ToolContext): Promise<unknown> => {
+      // An agent reads its own thread, never the conversation it was started from.
+      if (context.agentType && context.agentType !== AGENT_IDS.ORCHESTRATOR) {
+        if (!agentHistoryQuery) throw new Error("Your history is unavailable in this session.");
+        return await agentHistoryQuery(args, context);
+      }
+      const auth = getCloudBackendAuth?.();
+      if (!auth) {
+        throw new Error("history is unavailable in this session.");
+      }
+      const response = await fetch(
+        `${auth.baseUrl.replace(/\/+$/, "")}/conversations/${encodeURIComponent(
+          context.conversationId,
+        )}/history/query`,
+        {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${auth.authToken}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(args),
+          signal: AbortSignal.timeout(30_000),
+        },
+      );
+      const body = (await response.json().catch(() => null)) as unknown;
+      if (!response.ok) {
+        const message =
+          body && typeof body === "object" && "error" in body
+            ? String((body as { error: unknown }).error)
+            : `history request failed (${response.status}).`;
+        throw new Error(message);
+      }
+      return body;
+    });
   const nodeReplRegistry = new NodeReplKernelRegistry({
     browserBinPath: _stellaBrowserBinPath,
     ...(requestBrowserExtensionConnect
@@ -369,40 +406,12 @@ export const createToolHost = ({
       : {}),
     // `history.sql` / `history.read`: the conversation lives in its cloud
     // session DO, which answers both exactly as the cloud code tool does.
-    queryHistory: codeHistoryQuery ?? (async (args, context) => {
-      // An agent reads its own thread, never the conversation it was started from.
-      if (context.agentType && context.agentType !== AGENT_IDS.ORCHESTRATOR) {
-        if (!agentHistoryQuery) throw new Error("Your history is unavailable in this session.");
-        return await agentHistoryQuery(args, context);
-      }
-      const auth = getCloudBackendAuth?.();
-      if (!auth) {
-        throw new Error("history is unavailable in this session.");
-      }
-      const response = await fetch(
-        `${auth.baseUrl.replace(/\/+$/, "")}/conversations/${encodeURIComponent(
-          context.conversationId,
-        )}/history/query`,
-        {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${auth.authToken}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(args),
-          signal: AbortSignal.timeout(30_000),
-        },
-      );
-      const body = (await response.json().catch(() => null)) as unknown;
-      if (!response.ok) {
-        const message =
-          body && typeof body === "object" && "error" in body
-            ? String((body as { error: unknown }).error)
-            : `history request failed (${response.status}).`;
-        throw new Error(message);
-      }
-      return body;
-    }),
+    queryHistory: async (args, context) => {
+      const result = await queryCodeHistory(args, context);
+      return args.op === "read" && args.raw !== true
+        ? historyReadView(result)
+        : result;
+    },
     describeTool: (name, context, cursor) => {
       const tool = collectReplSearchableTools(
         toolCatalog.values(),

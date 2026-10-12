@@ -26,6 +26,10 @@ import {
   type ScheduleToolDetails,
 } from "@stella/contracts/scheduling";
 import type { ScheduleToolApi, ToolContext, ToolResult } from "./types.js";
+import {
+  formatScheduleList,
+  type ScheduleListRow,
+} from "./defs/schedule-manage-def.js";
 
 const requireScheduleApi = (scheduleApi?: ScheduleToolApi): ScheduleToolApi => {
   if (!scheduleApi) {
@@ -115,15 +119,14 @@ const findHeartbeat = async (
 
 const summarizeHeartbeat = (
   record: LocalHeartbeatConfigRecord,
-): Record<string, unknown> => ({
+): ScheduleListRow => ({
   jobId: record.id,
-  triggerKind: "heartbeat",
+  name: "heartbeat",
+  kind: "heartbeat",
+  when: `every ${Math.round(record.intervalMs / 1000)}s`,
   enabled: record.enabled,
-  intervalMs: record.intervalMs,
-  conversationId: record.conversationId,
-  nextRunAt: new Date(record.nextRunAtMs).toISOString(),
+  next: new Date(record.nextRunAtMs).toISOString(),
   ...(record.prompt ? { prompt: record.prompt } : {}),
-  ...(record.lastStatus ? { lastStatus: record.lastStatus } : {}),
   ...(record.lastError ? { lastError: record.lastError } : {}),
 });
 
@@ -137,37 +140,36 @@ const describeSchedule = (schedule: LocalCronSchedule): string => {
   return `cron "${schedule.expr}"${schedule.tz ? ` (${schedule.tz})` : ""}`;
 };
 
-const summarizeJob = (record: LocalCronJobRecord): Record<string, unknown> => ({
-  jobId: record.id,
-  name: record.name,
-  triggerKind: getCronTriggerKind(record.payload),
-  schedule: record.schedule,
-  enabled: record.enabled,
-  conversationId: record.conversationId,
-  nextRunAt: new Date(record.nextRunAtMs).toISOString(),
-  ...(record.description ? { description: record.description } : {}),
-  ...(record.payload.kind === "notify" ? { message: record.payload.text } : {}),
-  ...(record.payload.kind === "task" || record.payload.kind === "agent"
-    ? { prompt: record.payload.prompt }
-    : {}),
-  ...(record.payload.kind === "task" ? { deliverTo: record.payload.route ?? "orchestrator" } : {}),
-  ...(record.payload.kind === "script" ? { scriptPath: record.payload.scriptPath } : {}),
-  ...(record.payload.kind === "watch"
-    ? {
-        runsOn: record.payload.scriptPath ? "computer" : "cloud",
-        ...(record.payload.scriptPath ? { scriptPath: record.payload.scriptPath } : {}),
-        ...(record.payload.instructions ? { prompt: record.payload.instructions } : {}),
-        deliverTo: record.payload.route ?? "orchestrator",
-        ...(record.payload.once ? { once: true } : {}),
-        ...(record.lastOutputPreview ? { lastFinding: record.lastOutputPreview } : {}),
-      }
-    : {}),
-  ...(record.lastStatus ? { lastStatus: record.lastStatus } : {}),
-  ...(record.lastError ? { lastError: record.lastError } : {}),
-  ...(typeof record.lastRunAtMs === "number"
-    ? { lastRunAt: new Date(record.lastRunAtMs).toISOString() }
-    : {}),
-});
+const summarizeJob = (record: LocalCronJobRecord): ScheduleListRow => {
+  const payload = record.payload;
+  return {
+    jobId: record.id,
+    name: record.name,
+    kind: getCronTriggerKind(payload),
+    when: describeSchedule(record.schedule),
+    enabled: record.enabled,
+    next: new Date(record.nextRunAtMs).toISOString(),
+    ...(payload.kind === "notify" ? { message: payload.text } : {}),
+    ...(payload.kind === "task" || payload.kind === "agent"
+      ? { prompt: payload.prompt }
+      : {}),
+    ...(payload.kind === "watch" && payload.instructions
+      ? { prompt: payload.instructions }
+      : {}),
+    ...((payload.kind === "script" || payload.kind === "watch") &&
+    payload.scriptPath
+      ? { scriptPath: payload.scriptPath }
+      : {}),
+    ...(payload.kind === "task" || payload.kind === "watch"
+      ? { deliverTo: payload.route ?? "orchestrator" }
+      : {}),
+    ...(payload.kind === "watch" && payload.once ? { once: true as const } : {}),
+    ...(payload.kind === "watch" && record.lastOutputPreview
+      ? { lastFinding: record.lastOutputPreview }
+      : {}),
+    ...(record.lastError ? { lastError: record.lastError } : {}),
+  };
+};
 
 /**
  * Map schedule_add's trigger-kind args onto the stored payload shape.
@@ -318,13 +320,13 @@ export const handleScheduleList = async (
     api.listCronJobs(),
     api.listHeartbeats().catch(() => []),
   ]);
-  const lines: Record<string, unknown> = {
-    entries: jobs.map(summarizeJob),
-    ...(heartbeats.length > 0
-      ? { heartbeats: heartbeats.map(summarizeHeartbeat) }
-      : {}),
+  return {
+    result: formatScheduleList(
+      jobs.map(summarizeJob),
+      heartbeats.map(summarizeHeartbeat),
+    ),
+    details: { action: "list", count: jobs.length + heartbeats.length },
   };
-  return { result: JSON.stringify(lines, null, 2) };
 };
 
 /**

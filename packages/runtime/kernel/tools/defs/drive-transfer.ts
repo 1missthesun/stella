@@ -108,7 +108,7 @@ export const createDriveTransferTools = (
     agentTypes: DRIVE_TRANSFER_AGENT_TYPES,
     demoted: { searchTerms: DRIVE_TRANSFER_SEARCH_TERMS },
     description:
-      "Upload a file from this computer into the user's own Stella Drive, which every device signed in to their account can read. Use it to move a file to another of the user's devices: upload here, then on the other device call drive_download with the returned drivePath and sha256. Returns drivePath, sizeBytes and sha256. Overwrites a drive file at the same drivePath.",
+      "Upload a file from this computer into the user's own Stella Drive, which every device signed in to their account can read. Use it to move a file to another of the user's devices: upload here, then on the other device call drive_download with the returned drivePath and sha256. Returns drivePath, sizeBytes, sha256 and a drive link to give the user. Overwrites a drive file at the same drivePath.",
     parameters: {
       type: "object",
       properties: {
@@ -181,7 +181,7 @@ export const createDriveTransferTools = (
           contentType: record.contentType,
         };
         return {
-          result: `Uploaded ${localPath} to the user's drive at ${record.path} (${record.sizeBytes} bytes, sha256 ${sha256}). Link it for the user as [${record.name}](<${driveLinkTarget(record.path)}>). On the other device, call drive_download with drivePath "${record.path}" and sha256 "${sha256}".`,
+          result: `Uploaded ${localPath} to drivePath ${record.path} (${record.sizeBytes} bytes, sha256 ${sha256}); link [${record.name}](<${driveLinkTarget(record.path)}>).`,
           details,
         };
       });
@@ -303,10 +303,10 @@ export const createDriveTransferTools = (
           }
           await fs.rename(temporary, destination);
           return {
-            result: `Downloaded ${file.path} from the user's drive to ${destination} (${sizeBytes} bytes, sha256 ${sha256}${expected ? ", matches the expected hash" : ""}).`,
+            result: `Downloaded ${file.path} to ${destination} (${sizeBytes} bytes, ${expected ? "sha256 verified" : `sha256 ${sha256}`}).`,
             details: {
               drivePath: file.path,
-              path: destination,
+              filePath: destination,
               sizeBytes,
               sha256,
               contentType: file.contentType,

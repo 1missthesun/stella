@@ -648,7 +648,7 @@ export const handleShellStatus = async (
           : undefined,
       }));
     if (shells.length === 0) return { result: "No active shells." };
-    return { result: JSON.stringify(shells, null, 2) };
+    return { result: JSON.stringify(shells) };
   }
 
   const record = state.shells.get(shellId);

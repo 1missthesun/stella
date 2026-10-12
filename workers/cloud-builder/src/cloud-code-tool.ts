@@ -59,6 +59,7 @@ import type {
   CloudBrowserScreenshot,
 } from "./cloud-browser.js";
 import type { ToolReplayPolicy } from "./tool-replay.js";
+import { historyReadView } from "@stella/contracts/history-search";
 
 const CLOUD_CODE_MODEL_OUTPUT_MAX_BYTES = 50_000;
 const CLOUD_CODE_NESTED_RESULT_MAX_BYTES = 128 * 1024;
@@ -553,7 +554,10 @@ const historyIntrinsic =
         if (!Number.isSafeInteger(args[0]) || !Number.isSafeInteger(args[1])) {
           throw new Error("history.read requires integer fromSeq and toSeq.");
         }
-        return client.read(args[0] as number, args[1] as number);
+        {
+          const rows = await client.read(args[0] as number, args[1] as number);
+          return asRecord(args[2]).raw === true ? rows : historyReadView(rows);
+        }
       default:
         throw new Error(
           `history.${String(request.method ?? "?")} is not a history method.`,

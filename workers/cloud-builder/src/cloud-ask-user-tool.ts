@@ -164,10 +164,13 @@ export const createCloudAskUserTool = (
     } catch (error) {
       return failure((error as Error).message || "The ask failed.");
     }
-    const { result } = userAskResolutionResult(resolution, prepared.questions);
+    const { result, details } = userAskResolutionResult(
+      resolution,
+      prepared.questions,
+    );
     return {
       content: [{ type: "text" as const, text: JSON.stringify(result) }],
-      details: result,
+      details,
     };
   },
 });

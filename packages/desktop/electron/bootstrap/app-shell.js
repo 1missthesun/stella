@@ -13,6 +13,7 @@ import { resolveRendererBuildMode, serveRendererSource, } from "../source/render
 import { getAllWindows, } from "./context.js";
 import { startDeferredStartup } from "./deferred-startup.js";
 import { getMainLogger } from "../observability/main-logger.js";
+import { onceAppPainted } from "../observability/app-paint.js";
 import { heldFirstPage, pendingHold } from "../services/app-source/update-transition.js";
 const initializeBootstrapLocalState = async (context) => {
     const { config, lifecycle, services, state } = context;
@@ -166,6 +167,13 @@ export const createBootstrapInitialWindows = (context) => {
     const hold = context.state.pendingUpdateHold;
     context.state.windowManager.createInitialWindows(hold ? { backgroundColor: hold.backgroundColor } : undefined);
     const fullWindow = context.state.windowManager.getFullWindow();
+    if (fullWindow) {
+        onceAppPainted(fullWindow.webContents, () => {
+            getMainLogger()?.process("startup.first-app-paint", {
+                elapsedMs: Math.round(process.uptime() * 1000),
+            });
+        });
+    }
     if (hold && fullWindow) {
         let raised = false;
         const raise = (shownWith) => {

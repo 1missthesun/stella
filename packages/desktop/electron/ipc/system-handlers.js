@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { getMainLogger } from "../observability/main-logger.js";
+import { noteAppPainted } from "../observability/app-paint.js";
 import { exportDesktopDebugLogs, getDesktopDebugPaths } from "../observability/desktop-debug-logging.js";
 import { resolveLogPaths } from "@stella/runtime/observability/log-paths";
 import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, saveLocalPreferences, setOnboardingCompleted, updateLocalModelPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
@@ -595,6 +596,17 @@ export const registerSystemHandlers = (options) => {
         }
         const phase = typeof payload?.phase === "string" ? payload.phase : "";
         const elapsedMs = Number(payload?.elapsedMs);
+        if (phase === "app.first-paint") {
+            if (!Number.isFinite(elapsedMs) || elapsedMs < 0 || elapsedMs > 600000) {
+                return;
+            }
+            getMainLogger()?.process("renderer.app-paint", {
+                navMs: Math.round(elapsedMs),
+                url: event.sender.getURL().split("?")[0]?.split("/").pop(),
+            });
+            noteAppPainted(event.sender);
+            return;
+        }
         const durationMs = payload?.durationMs === undefined ? undefined : Number(payload.durationMs);
         const outcome = payload?.outcome;
         if (!/^cloud\.[a-z0-9.-]{1,72}$/.test(phase) ||

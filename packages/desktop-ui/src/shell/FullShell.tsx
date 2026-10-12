@@ -25,6 +25,7 @@ import {
   dismissLaunchSplash,
   holdLaunchSplashUntilLive,
 } from "./launch-splash";
+import { reportFirstAppPaint } from "./app-paint";
 
 /* Onboarding is loaded as a dynamic chunk that contains the whole flow:
  * the conversation surface, every card, the demo scenes, and all
@@ -156,6 +157,10 @@ const DesktopFullShell = () => {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [onboardingDone, onboardingResolved]);
+
+  useEffect(() => {
+    reportFirstAppPaint();
+  }, []);
 
   // The renderer shell does not depend on auth or the local runtime. Those
   // background bootstraps only unlock cloud state, chat history, sends, and

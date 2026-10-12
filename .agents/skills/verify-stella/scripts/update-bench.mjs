@@ -183,6 +183,33 @@ const launch = async () => {
   writeFileSync(pointerFile, JSON.stringify(run, null, 2));
   log(`launched (${mode} renderer) on CDP ${run.cdpPort}`);
   await waitForLive(run, Date.now() + 60_000);
+  const label = option("label");
+  if (!label) return;
+  const tail = new LogTail(run);
+  tail.offset = 0;
+  const startupDeadline = Date.now() + 10_000;
+  await tail.waitFor("startup.first-app-paint", startupDeadline);
+  const starting = tail.find("main.starting");
+  const elapsed = (event) => tail.find(event)?.fields.elapsedMs;
+  const ready = tail.find("renderer.source", (entry) => /modules ready/.test(entry.fields.message ?? ""));
+  const record = {
+    label,
+    sha: run.benchSha,
+    at: new Date().toISOString(),
+    variation: "launch",
+    mode,
+    startup: {
+      mainStartingMs: starting?.fields.startupMs,
+      windowCreatedMs: elapsed("startup.window-created"),
+      sourceReadyMs: ready && starting ? Math.round(ready.at - (starting.at - starting.fields.startupMs)) : undefined,
+      firstPaintMs: elapsed("startup.first-paint"),
+      firstAppPaintMs: elapsed("startup.first-app-paint"),
+      hostReadyMs: elapsed("startup.host-runner.ready"),
+    },
+  };
+  mkdirSync(path.dirname(resultsFile), { recursive: true });
+  appendFileSync(resultsFile, `${JSON.stringify(record)}\n`);
+  console.log(JSON.stringify(record));
 };
 
 /* -------------------------------------------------------------- resources */
@@ -585,6 +612,8 @@ const iterate = async (variation) => {
     const transition = tail.find("app-source.transition");
     const failed = tail.find("app-source.action-failed");
     if (failed) throw new Error(`apply failed: ${failed.fields.message}`);
+    const appPaint = tail.find("renderer.app-paint", (entry) => entry.fields.url === "index.html");
+    if (appPaint) record.appPaint = { clickMs: appPaint.at - t0, navMs: appPaint.fields.navMs };
     record.visibleMs = visibleAt - t0;
     record.doneMs = Math.max(visibleAt, timing.at) - t0;
     record.steps = steps(timing.fields.steps);
@@ -630,6 +659,7 @@ const iterate = async (variation) => {
     tail.poll();
     const processStart = starting.at - starting.fields.startupMs;
     const firstPaint = tail.find("startup.first-paint", (entry) => entry.at > starting.at);
+    const firstAppPaint = await tail.waitFor("startup.first-app-paint", Math.min(deadline, Date.now() + 5_000), (entry) => entry.at > starting.at);
     const hostReady = tail.find("startup.host-runner.ready", (entry) => entry.at > starting.at);
     const shown = tail.find("startup.window-shown", (entry) => entry.at > starting.at);
     const resumeHold = tail.find("app-source.resume-hold", (entry) => entry.at > starting.at);
@@ -645,6 +675,7 @@ const iterate = async (variation) => {
       exitToSpawnMs: Math.round(processStart - quit.at),
       spawnToMainMs: starting.fields.startupMs,
       firstPaintMs: firstPaint ? firstPaint.at - processStart : undefined,
+      firstAppPaintMs: firstAppPaint?.fields.elapsedMs,
       hostReadyMs: hostReady ? hostReady.at - processStart : undefined,
       liveMs: liveAt - processStart,
       transitionDoneMs: transition ? transition.at - processStart : undefined,
@@ -718,6 +749,8 @@ const report = () => {
         Object.entries(row.relaunch ?? {}).filter(([, v]) => typeof v === "number").map(([k, v]) => [`relaunch.${k}`, v]),
       ),
       ...Object.fromEntries(Object.entries(row.runtime ?? {}).map(([k, v]) => [`runtime.${k}`, v])),
+      ...Object.fromEntries(Object.entries(row.appPaint ?? {}).map(([k, v]) => [`appPaint.${k}`, v])),
+      ...Object.fromEntries(Object.entries(row.startup ?? {}).map(([k, v]) => [`startup.${k}`, v])),
       gateMs: row.gateMs,
     });
     const flats = group.map(flat);

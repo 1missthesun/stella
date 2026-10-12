@@ -2,11 +2,8 @@
 
 import Link from "next/link";
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -28,25 +25,15 @@ import { StellaMark } from "@/components/stella-mark";
 
 const AUTH_TOKEN_PATTERN = /^[A-Za-z0-9._~-]{8,2048}$/;
 
-type SignInDialogContextValue = {
-  open: () => void;
-  close: () => void;
-};
-
-const SignInDialogContext = createContext<SignInDialogContextValue | null>(
-  null,
-);
-
 /**
  * Window event used to open the sign-in dialog from non-React contexts (e.g.
- * top-level helpers in `store-client.tsx`). Prefer `useSignInDialog().open()`
- * inside React components.
+ * top-level helpers in `store-client.tsx`).
  */
 export { openSignInDialog } from "./sign-in-dialog-events";
 
 /**
- * Provider that mounts a single global sign-in dialog and exposes `open`/`close`
- * via `useSignInDialog`. Renders the same magic-link flow as `/sign-in` but
+ * Provider that mounts a single global sign-in dialog, opened through
+ * `openSignInDialog`. Renders the same magic-link flow as `/sign-in` but
  * inline, so links and buttons across the marketing site can avoid a full
  * navigation away from the current page.
  */
@@ -105,13 +92,8 @@ export function SignInDialogProvider({
     };
   }, []);
 
-  const value = useMemo<SignInDialogContextValue>(
-    () => ({ open, close }),
-    [open, close],
-  );
-
   return (
-    <SignInDialogContext.Provider value={value}>
+    <>
       {children}
       <dialog
         ref={dialogRef}
@@ -136,7 +118,7 @@ export function SignInDialogProvider({
           {isOpen ? <DialogBody onClose={close} /> : null}
         </div>
       </dialog>
-    </SignInDialogContext.Provider>
+    </>
   );
 }
 
@@ -181,21 +163,6 @@ function useOAuthReturnToken() {
       cancelled = true;
     };
   }, []);
-}
-
-export function useSignInDialog(): SignInDialogContextValue {
-  const ctx = useContext(SignInDialogContext);
-  if (ctx) return ctx;
-  // The root dialog host is deliberately lazy, so callers normally sit outside
-  // the provider. Wake the host via the same event used by non-React callers.
-  return {
-    open: () => {
-      if (typeof window !== "undefined") {
-        openSignInDialog();
-      }
-    },
-    close: () => {},
-  };
 }
 
 function DialogBody({ onClose }: { onClose: () => void }) {

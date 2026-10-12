@@ -42,7 +42,5 @@ export const RELEASE_ASSETS = {
 /** The same Mac app zipped, for `install.sh`, which unpacks it without mounting. */
 export const MAC_APP_ZIP = `${LAUNCHER_STABLE_BASE}/Stella-macos.zip`;
 
-export type ReleaseAssetSlug = keyof typeof RELEASE_ASSETS;
-
 /** The `curl … | sh` one-liner shown to Linux visitors. */
 export const INSTALL_COMMAND = `curl -fsSL ${SITE_ORIGIN}/install.sh | sh`;

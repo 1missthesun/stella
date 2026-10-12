@@ -6,9 +6,8 @@
  * keep up — eliminating scroll jank without a flash of the full-fat animation
  * before React mounts.
  *
- * The heuristic here mirrors `isLowPowerDevice()` in `lib/device-perf.ts`;
- * keep the two in sync. WebGL capability is probed separately inside the aurora
- * component (creating a GL context here would block paint).
+ * WebGL capability is probed separately inside the aurora component
+ * (`lib/device-perf.ts`; creating a GL context here would block paint).
  */
 const PERF_INIT_SCRIPT = /* javascript */ `
 (() => {

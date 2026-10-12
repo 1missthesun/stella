@@ -299,6 +299,17 @@ export const assertMainBundleStartupBoundary = (metafile) => {
   }
 };
 
+const NON_ASCII = /[^\x00-\x7f]/g;
+
+const asciiOnly = (contents) => {
+  const text = Buffer.from(contents.buffer, contents.byteOffset, contents.byteLength).toString("utf8");
+  if (!/[^\x00-\x7f]/.test(text)) return contents;
+  return Buffer.from(
+    text.replace(NON_ASCII, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`),
+    "utf8",
+  );
+};
+
 const writeOutputIfChanged = (absPath, contents) => {
   try {
     const existing = readFileSync(absPath);
@@ -330,7 +341,7 @@ export const buildElectronBundles = async () => {
     const changedOutputs = [];
     for (const result of results) {
       for (const file of result.outputFiles ?? []) {
-        if (writeOutputIfChanged(file.path, file.contents)) {
+        if (writeOutputIfChanged(file.path, asciiOnly(file.contents))) {
           changedOutputs.push(file.path);
         }
       }

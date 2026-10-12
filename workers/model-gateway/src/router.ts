@@ -283,6 +283,9 @@ const handleSessionCapability = async (
   const ownerAdmission = await ownerGate.admitMint({
     audience,
     throttled: enforcement.throttled,
+    ...(env.STELLA_TEST_ACCOUNTS === "1" && verified.token.testAccount
+      ? { testAccount: true }
+      : {}),
   });
   if (!ownerAdmission.ok) {
     throw new GatewayError(

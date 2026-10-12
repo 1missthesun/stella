@@ -43,7 +43,8 @@ export type ResolvedLlmRoute = {
    */
   credentialless?: boolean;
   getApiKey: () => Promise<string | undefined> | string | undefined;
-  refreshApiKey?: () => Promise<string | undefined> | string | undefined;
+  /** A credential in place of `rejected`, the one the provider just refused. */
+  refreshApiKey?: (rejected?: string) => Promise<string | undefined> | string | undefined;
   /**
    * A Stella route's lane to the model gateway and the model it asks for
    * there: the `stella` provider (`@stella/agent`) runs its requests.

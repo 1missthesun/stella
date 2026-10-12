@@ -295,6 +295,14 @@ export const GATEWAY_OWNER_RELAY_LIMITS: Readonly<
   pro: { inFlight: 8, perMinute: 120, mintsPerHour: 24 },
 };
 
+/**
+ * Session capability exchanges per rolling hour for a dev test account
+ * (`@test.stella.local`), on a gateway that serves them
+ * (`STELLA_TEST_ACCOUNTS=1`, dev only): test runs launch and relaunch
+ * several computers on one account, each a fresh exchange. Never production.
+ */
+export const GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR = 240;
+
 /** A throttled owner (enforcement status) gets this share of its tier limits. */
 export const GATEWAY_THROTTLED_LIMIT_SHARE = 0.5;
 

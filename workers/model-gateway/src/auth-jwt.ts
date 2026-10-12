@@ -30,6 +30,12 @@ export type VerifiedToken = {
   expiresAtMs: number;
   /** The `anon` claim: an anonymous Better Auth user. Absent means an account. */
   isAnonymous: boolean;
+  /**
+   * The `tst` claim: a dev test account (`@test.stella.local`), which only a
+   * backend with test accounts on names. Honored only by a gateway with
+   * `STELLA_TEST_ACCOUNTS=1`.
+   */
+  testAccount: boolean;
 };
 
 export type VerifyResult =
@@ -273,6 +279,7 @@ export const verifyUserToken = async (
       sessionId: typeof payload.sid === "string" ? payload.sid : "",
       expiresAtMs: exp * 1000,
       isAnonymous: payload.anon === true,
+      testAccount: payload.tst === true,
     },
   };
 };

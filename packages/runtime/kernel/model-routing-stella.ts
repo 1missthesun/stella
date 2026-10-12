@@ -460,7 +460,7 @@ const sessionCapabilityFetch = (
     if (response.status !== 401 && !(await capabilityExhausted(response))) {
       return response;
     }
-    const capability = (await session.refreshCapability())?.trim();
+    const capability = (await session.refreshCapability(firstCapability))?.trim();
     if (!capability) return response;
     const retryBody =
       retryRequest && method !== "GET" && method !== "HEAD"
@@ -576,7 +576,7 @@ export const createStellaRoute = (args: {
     route: "stella",
     model,
     getApiKey: () => session.getCapability(),
-    refreshApiKey: () => session.refreshCapability(),
+    refreshApiKey: (rejected) => session.refreshCapability(rejected),
     stella: {
       access,
       spec: {

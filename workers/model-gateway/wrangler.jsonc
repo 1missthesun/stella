@@ -33,6 +33,10 @@
     // Preview (`https://<name><suffix>`, DEPLOY.md "Previews") gets its
     // session capability from that Preview, signed with `builder-preview-1`.
     "PREVIEW_BACKEND_HOST_SUFFIX": "-stella-v2-cloud-builder-preview.fromyou.workers.dev",
+    // Dev only, never production: a dev test account (`@test.stella.local`,
+    // the `tst` sign-in claim) gets GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR
+    // session exchanges, since test runs relaunch several computers on one.
+    "STELLA_TEST_ACCOUNTS": "1",
     // JSON `GatewayJwks` holding the PUBLIC ES256 keys of the capability
     // issuer (cloud-builder's `CAPABILITY_SIGNING_KID`s). Ops
     // Keep the public keys in deployment config so future deploys cannot

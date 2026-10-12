@@ -340,8 +340,12 @@ export type GatewaySessionClientArgs = {
 export type GatewaySessionClient = {
   /** Cached capability, exchanged on first use and 60 s before expiry. */
   getCapability(): Promise<string | undefined>;
-  /** Drop the cached capability and exchange a new one immediately. */
-  refreshCapability(): Promise<string | undefined>;
+  /**
+   * A capability in place of `rejected`, the one the gateway just refused:
+   * a fresh exchange, unless another request already replaced it (then that
+   * one). Without `rejected`, always a fresh exchange.
+   */
+  refreshCapability(rejected?: string): Promise<string | undefined>;
   /** Drop the cached capability; the next `getCapability` re-exchanges. */
   invalidate(): Promise<void>;
   /** The same signer bound to the cached capability. */
@@ -446,6 +450,7 @@ export const createGatewaySessionClient = (
 
   const getCapability = async (
     forceRefresh: boolean,
+    rejected?: string,
   ): Promise<string | undefined> => {
     const gatewayOrigin = requireOrigin();
     const authToken = (await args.getAuthToken())?.trim();
@@ -456,6 +461,18 @@ export const createGatewaySessionClient = (
       authToken,
       signer,
     });
+    const replaced = rejected ? capabilityCache.get(key) : undefined;
+    if (
+      replaced &&
+      replaced.capability !== rejected &&
+      replaced.expiresAt - GATEWAY_SESSION_CAPABILITY_REFRESH_SKEW_MS > now()
+    ) {
+      return replaced.capability;
+    }
+    if (rejected) {
+      const inFlight = inFlightExchanges.get(key);
+      if (inFlight) return (await inFlight).capability;
+    }
     if (forceRefresh) {
       capabilityCache.delete(key);
     } else {
@@ -473,7 +490,7 @@ export const createGatewaySessionClient = (
 
   return {
     getCapability: () => getCapability(false),
-    refreshCapability: () => getCapability(true),
+    refreshCapability: (rejected) => getCapability(true, rejected?.trim() || undefined),
     getDeviceSigner,
     invalidate: async () => {
       const gatewayOrigin = args.gatewayOrigin();

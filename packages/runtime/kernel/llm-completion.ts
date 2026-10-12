@@ -127,7 +127,7 @@ export async function completeOnRoute(
   if (message.stopReason !== "error" || !route.refreshApiKey || !UNAUTHORIZED.test(message.errorMessage ?? "")) {
     return message;
   }
-  const refreshed = (await route.refreshApiKey())?.trim();
+  const refreshed = (await route.refreshApiKey(apiKey))?.trim();
   return refreshed ? await send(refreshed) : message;
 }
 

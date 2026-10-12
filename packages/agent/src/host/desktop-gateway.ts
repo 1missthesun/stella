@@ -80,7 +80,7 @@ export function desktopGatewayAccess(options: DesktopGatewayOptions): StellaGate
     if (!capability) throw new Error("Stella is not signed in.");
     const response = await send(request, body, capability);
     if (!(await capabilityExhausted(response)) && response.status !== 401) return response;
-    const fresh = (await session.refreshCapability())?.trim();
+    const fresh = (await session.refreshCapability(capability))?.trim();
     if (!fresh) return response;
     return send(request, body, fresh);
   };

@@ -501,6 +501,7 @@ const buildOptions = (env: AuthEnv) => {
             sid: session.id,
             anon: user.isAnonymous === true,
             idl: typeof user.identityLevel === "number" ? user.identityLevel : 0,
+            ...(testAccountsEnabled(env) && user.email?.endsWith(TEST_ACCOUNT_EMAIL_SUFFIX) ? { tst: true } : {}),
           }),
         },
       }),

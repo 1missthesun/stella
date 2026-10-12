@@ -20,6 +20,7 @@ import {
 } from "../shared-config.js";
 import {
   GATEWAY_OWNER_RELAY_LIMITS,
+  GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR,
   GATEWAY_THROTTLED_LIMIT_SHARE,
   GATEWAY_UPSTREAM_MAX_DURATION_MS,
   limitsAudienceFor,
@@ -606,6 +607,8 @@ export class OwnerRelayGate extends DurableObject<Env> {
   async admitMint(args: {
     audience: ManagedModelAudience;
     throttled: boolean;
+    /** A dev test account on a gateway that serves them (`GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR`). */
+    testAccount?: boolean;
   }): Promise<GateAdmission> {
     const now = Date.now();
     this.ctx.storage.sql.exec(
@@ -613,7 +616,9 @@ export class OwnerRelayGate extends DurableObject<Env> {
       now - HOUR_MS,
     );
     const policy = GATEWAY_OWNER_RELAY_LIMITS[limitsAudienceFor(args.audience)];
-    const limit = scaledLimit(policy.mintsPerHour, args.throttled);
+    const limit = args.testAccount
+      ? GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR
+      : scaledLimit(policy.mintsPerHour, args.throttled);
     const admissions = this.ctx.storage.sql
       .exec<CountRow>("SELECT COUNT(*) AS count FROM mint_admissions")
       .one().count;

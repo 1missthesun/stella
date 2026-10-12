@@ -71,18 +71,36 @@ export const verifyConfirmToken = async (
   return { teamId, slackUserId, ownerId: state.ownerId };
 };
 
-export const signInstallState = async (env: Cloudflare.Env): Promise<string> =>
+export type SlackInstallState = {
+  /** The signed-in Stella account that started the install on stella.sh. */
+  ownerId?: string;
+  /** Where the install returns when it began on stella.sh. */
+  returnTo?: string;
+};
+
+export const signInstallState = async (
+  env: Cloudflare.Env,
+  from: SlackInstallState = {},
+): Promise<string> =>
   await signOAuthState(env, {
-    ownerId: "slack-install",
+    ownerId: from.ownerId ?? "slack-install",
     kind: INSTALL_KIND,
     nonce: crypto.randomUUID(),
     exp: Date.now() + INSTALL_TTL_MS,
+    ...(from.ownerId && from.returnTo
+      ? { extra: { owner: from.ownerId, returnTo: from.returnTo } }
+      : {}),
   });
 
 export const verifyInstallState = async (
   env: Cloudflare.Env,
   token: string,
-): Promise<boolean> => {
+): Promise<SlackInstallState | null> => {
   const state = await verifyOAuthState(env, token);
-  return Boolean(state && state.kind === INSTALL_KIND);
+  if (!state || state.kind !== INSTALL_KIND) return null;
+  const owner = state.extra?.owner;
+  const returnTo = state.extra?.returnTo;
+  return owner && returnTo && owner === state.ownerId
+    ? { ownerId: owner, returnTo }
+    : {};
 };

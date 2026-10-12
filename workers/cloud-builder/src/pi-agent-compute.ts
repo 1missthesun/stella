@@ -30,6 +30,7 @@ import {
   turnBrokerStorageKey,
   type TurnBrokerRecord,
 } from "./turn-credential-broker.js";
+import { prepareSlackRepo } from "./slack/repo-clone.js";
 import { startTurnExecution } from "./turn-cancellation.js";
 import { issueWorldCapability } from "./world-capability.js";
 import { worldMaterializationCommand } from "./world-materialization.js";
@@ -39,7 +40,7 @@ export type PiComputeEnv = Pick<
   Cloudflare.Env,
   "OWNER_GATES" | "WORLDS" | "BUILDER_SERVICE_SECRET"
 > &
-  Partial<Pick<Cloudflare.Env, "Sandbox" | "SANDBOX_IDLE_TIMEOUT_MS" | "CLOUD_BUILDER_PUBLIC_URL">>;
+  Partial<Pick<Cloudflare.Env, "Sandbox" | "SANDBOX_IDLE_TIMEOUT_MS" | "CLOUD_BUILDER_PUBLIC_URL" | "DB" | "BETTER_AUTH_SECRET">>;
 
 /** Whose agent this is. */
 export type PiComputeOwner = { ownerId: string; ownerGeneration: string; conversationId: string };
@@ -258,6 +259,7 @@ export const openPiComputeLease = async (
     if (!materialized.success) throw new Error("Stella could not bring this world into the agent's workspace.");
     // Materialization replaces the world root, including the drive directory the daemon expects.
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
+    await prepareSlackRepo(host.env, session, owner.conversationId, host.log);
     context.assertActive();
     host.log("pi_agent_world_attached", {
       threadId,

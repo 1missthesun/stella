@@ -46,8 +46,23 @@ import {
   saveInstallation,
   setInstallationOwner,
   unlinkIdentity,
+  type SlackInstallation,
 } from "./store.js";
 import { connectBlocks, connectUrl, publishHome } from "./ui.js";
+import { handleSlackWorkspaceApi } from "./workspace-api.js";
+import {
+  ENGINE_LABELS,
+  isEffort,
+  loadWorkspaceSettings,
+  resolveModelChoice,
+  saveWorkspaceSettings,
+  workspaceOptions,
+} from "./settings.js";
+import { ownerGateStub } from "../rpc-release.js";
+import {
+  SLACK_INSTALL_RESULT_PARAM,
+  type SlackInstallResult,
+} from "@stella/contracts/slack-workspace";
 
 const MAX_BODY_BYTES = 1_000_000;
 
@@ -149,15 +164,25 @@ const oauthCallback = async (
   env: Cloudflare.Env,
 ): Promise<Response> => {
   const url = new URL(request.url);
+  const from = await verifyInstallState(env, url.searchParams.get("state") ?? "");
+  const back = (result: SlackInstallResult, teamId?: string): Response | null => {
+    if (!from?.returnTo) return null;
+    const target = new URL(from.returnTo);
+    target.searchParams.set(SLACK_INSTALL_RESULT_PARAM, result);
+    if (teamId) target.searchParams.set("team", teamId);
+    return Response.redirect(target.toString(), 302);
+  };
   if (url.searchParams.get("error")) {
-    return page(
-      "Installation canceled",
-      "<p>Nothing was installed. You can close this tab.</p>",
+    return (
+      back("canceled") ??
+      page(
+        "Installation canceled",
+        "<p>Nothing was installed. You can close this tab.</p>",
+      )
     );
   }
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state") ?? "";
-  if (!code || !(await verifyInstallState(env, state))) {
+  if (!code || !from) {
     return page(
       "Couldn't install Stella",
       "<p>That install link expired. Start the install again.</p>",
@@ -174,6 +199,8 @@ const oauthCallback = async (
     });
   } catch (error) {
     logError("slack_oauth_exchange_failed", error);
+    const failed = back("failed");
+    if (failed) return failed;
     return page(
       "Couldn't install Stella",
       "<p>Slack didn't accept the install. Try again.</p>",
@@ -205,6 +232,11 @@ const oauthCallback = async (
   });
   console.log(JSON.stringify({ event: "slack_installed", teamId }));
   const installer = access.authed_user?.id ?? "";
+  if (from.ownerId) {
+    if (installer) await linkIdentity(env, teamId, installer, from.ownerId);
+    await setInstallationOwner(env, teamId, from.ownerId);
+    return back("installed", teamId)!;
+  }
   const installerOwner = installer
     ? await linkedOwner(env, teamId, installer)
     : null;
@@ -341,12 +373,72 @@ const commands = async (
         : `Stella isn't set up yet: ${setupBy} needs to connect a Stella account.`,
     );
   }
+  const [verb, ...rest] = action.split(/\s+/u);
+  const value = rest.join(" ").trim();
+  if (verb === "engine" || verb === "model" || verb === "effort") {
+    return ephemeral(
+      await settingCommand(env, installation, userId, verb, value),
+    );
+  }
+  const settings = await loadWorkspaceSettings(env, teamId);
   return ephemeral(
-    `Stella is this workspace's shared assistant, set up by ${setupBy}. Mention @Stella in a channel or DM her.` +
+    `Stella is this workspace's shared assistant, set up by ${setupBy}. Mention @Stella in a channel or DM her.\n` +
+      `She runs on *${ENGINE_LABELS[settings.engine]}* · model \`${settings.model}\` · effort \`${settings.effort}\`.` +
+      (settings.slackCommands
+        ? "\nChange it with `/stella engine stella|claude-code`, `/stella model <name>` or `/stella effort <level>`."
+        : "") +
       (installer
-        ? " `/stella connect` switches the Stella account she runs on; `/stella disconnect` turns her off."
+        ? "\n`/stella connect` switches the Stella account she runs on; `/stella disconnect` turns her off. Everything else is on stella.sh/slack."
         : ""),
   );
+};
+
+const settingCommand = async (
+  env: Cloudflare.Env,
+  installation: SlackInstallation,
+  userId: string,
+  verb: "engine" | "model" | "effort",
+  value: string,
+): Promise<string> => {
+  const settings = await loadWorkspaceSettings(env, installation.teamId);
+  if (!settings.slackCommands) {
+    return "Changing Stella's engine, model or effort from Slack is turned off for this workspace. Its owner can turn it on at stella.sh/slack.";
+  }
+  const audience = (
+    await ownerGateStub(env.OWNER_GATES, installation.ownerId!).billingAccess({
+      isAnonymous: false,
+    })
+  ).audience;
+  const options = workspaceOptions(audience);
+  if (verb === "engine") {
+    const engine =
+      value === "stella"
+        ? "stella"
+        : value === "claude-code" || value === "claude code" || value === "claude"
+          ? "claude-code"
+          : null;
+    if (!engine) {
+      return `Engines: ${options.engines.map((option) => `\`${option.id}\``).join(", ")}. Now: \`${settings.engine}\`.`;
+    }
+    const saved = await saveWorkspaceSettings(env, installation.teamId, { engine });
+    console.log(JSON.stringify({ event: "slack_setting_changed", teamId: installation.teamId, setting: "engine", by: userId }));
+    return `Stella now runs on *${ENGINE_LABELS[saved.engine]}* (model \`${saved.model}\`) in this workspace.`;
+  }
+  if (verb === "model") {
+    const model = value ? resolveModelChoice(settings.engine, value, audience) : null;
+    if (!model) {
+      return `Models for ${ENGINE_LABELS[settings.engine]}: ${options.models[settings.engine].map((option) => `\`${option.id}\``).join(", ")}. Now: \`${settings.model}\`.`;
+    }
+    const saved = await saveWorkspaceSettings(env, installation.teamId, { model });
+    console.log(JSON.stringify({ event: "slack_setting_changed", teamId: installation.teamId, setting: "model", by: userId }));
+    return `Stella now uses \`${saved.model}\` in this workspace.`;
+  }
+  if (!isEffort(value)) {
+    return `Efforts: ${options.efforts.map((effort) => `\`${effort}\``).join(", ")}. Now: \`${settings.effort}\`.`;
+  }
+  const saved = await saveWorkspaceSettings(env, installation.teamId, { effort: value });
+  console.log(JSON.stringify({ event: "slack_setting_changed", teamId: installation.teamId, setting: "effort", by: userId }));
+  return `Stella now thinks at \`${saved.effort}\` effort in this workspace.`;
 };
 
 // ── Linking ────────────────────────────────────────────────────────────────
@@ -597,6 +689,8 @@ export const handleSlackRoute = async (
   if (!pathname.startsWith("/api/slack/")) return null;
   const method = request.method;
   try {
+    const api = await handleSlackWorkspaceApi(request, env);
+    if (api) return api;
     if (pathname === SLACK_PATHS.events && method === "POST")
       return await events(request, env, ctx);
     if (pathname === SLACK_PATHS.interactivity && method === "POST")

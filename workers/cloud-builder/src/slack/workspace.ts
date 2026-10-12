@@ -8,6 +8,7 @@
  * The workspace's home is a folder in the installer's Drive
  * (`Slack/<workspace>/`). Its notes live there as Markdown files:
  *
+ *   memories/rules.md                 the owner's rules, set on stella.sh; read-only to Stella
  *   memories/workspace.md             read everywhere, written from public channels
  *   memories/channels/<channelId>.md  one channel or group DM
  *   memories/people/<slackUserId>.md  one person
@@ -31,6 +32,8 @@ export {
   SLACK_CONVERSATION_PREFIX,
 } from "./conversation-id.js";
 export const SLACK_MEMORY_TOOL_NAME = "slack_memory";
+/** Where a workspace's repository is cloned in its agents' containers. */
+export const SLACK_REPO_ROOT = "/workspace/repos";
 /** The reply that posts nothing: a thread reply that wasn't for Stella. */
 export const SLACK_NO_REPLY = "<no-reply/>";
 
@@ -45,6 +48,8 @@ export type SlackWorkspaceContext = {
   requester: SlackPerson;
   /** Other people active in the thread, newest first. */
   participants: SlackPerson[];
+  /** The GitHub repository agents start with, as `owner/name` (and `@branch`). */
+  repo?: string;
 };
 
 const shortText = (value: unknown, max: number): string | null =>
@@ -92,7 +97,16 @@ export const parseSlackWorkspaceContext = (
         .filter((person): person is SlackPerson => person !== null)
         .slice(0, 12)
     : [];
-  return { teamName, homeFolder, channelId, place, requester, participants };
+  const repo = shortText(record.repo, 320);
+  return {
+    teamName,
+    homeFolder,
+    channelId,
+    place,
+    requester,
+    participants,
+    ...(repo ? { repo } : {}),
+  };
 };
 
 const NOTE_MAX_CHARS = 6_000;
@@ -102,13 +116,19 @@ const SLACK_ID = /^[A-Z0-9]{2,32}$/u;
 
 type NoteScope = "workspace" | "channel" | "person" | "dm";
 
+export const rulesPath = (homeFolder: string): string =>
+  `${homeFolder}/memories/rules.md`;
+
+export const workspaceNotesPath = (homeFolder: string): string =>
+  `${homeFolder}/memories/workspace.md`;
+
 const notePath = (
   context: SlackWorkspaceContext,
   scope: NoteScope,
   person?: string,
 ): string => {
   const root = `${context.homeFolder}/memories`;
-  if (scope === "workspace") return `${root}/workspace.md`;
+  if (scope === "workspace") return workspaceNotesPath(context.homeFolder);
   if (scope === "channel") return `${root}/channels/${context.channelId}.md`;
   return `${root}/${scope === "person" ? "people" : "dms"}/${person}.md`;
 };
@@ -187,12 +207,15 @@ export const renderSlackSystemPrompt = async (
       path: notePath(context, "person", person.id),
     });
   }
-  const notes = await Promise.all(
-    loads.map(async (load) => ({
-      ...load,
-      text: await readNote(ownerInternal, load.path).catch(() => ""),
-    })),
-  );
+  const [rules, notes] = await Promise.all([
+    readNote(ownerInternal, rulesPath(context.homeFolder)).catch(() => ""),
+    Promise.all(
+      loads.map(async (load) => ({
+        ...load,
+        text: await readNote(ownerInternal, load.path).catch(() => ""),
+      })),
+    ),
+  ]);
   const noteBlocks = notes
     .filter((note) => note.text)
     .map((note) => `### ${note.label}\n${inert(clipNote(note.text))}`);
@@ -207,10 +230,14 @@ export const renderSlackSystemPrompt = async (
     `Where: ${placeLabel(context.place)} (channel id ${context.channelId})`,
     `Latest request from: @${context.requester.name} (${context.requester.id})`,
     `Others in this thread: ${participants}`,
+    context.repo
+      ? `Repository: github.com/${context.repo} — every agent you start has it cloned at ${SLACK_REPO_ROOT}/${context.repo.split("@")[0]!.split("/")[1]}`
+      : "Repository: none connected",
   ].join("\n");
   return [
     slackPrompt.trim(),
     `<workspace>\n${inert(workspace)}\n</workspace>`,
+    `<workspace-rules>\n${rules ? inert(clipNote(rules)) : "No rules set."}\n</workspace-rules>`,
     `<workspace-notes>\n${noteBlocks.length ? noteBlocks.join("\n\n") : "No notes yet."}\n</workspace-notes>`,
   ].join("\n\n");
 };

@@ -1,4 +1,5 @@
 import { SOCKET_TICKET_PATH } from "@stella/contracts/socket-ticket";
+import { SLACK_INSTALL_START_PATH, SLACK_WORKSPACES_PATH } from "@stella/contracts/slack-workspace";
 // Keep these aligned with the browser origins Better Auth trusts (src/auth).
 const BROWSER_ORIGINS = new Set([
   "https://stella.sh",
@@ -24,7 +25,9 @@ const isBrowserRoute = (path: string): boolean =>
   path.startsWith("/api/rpc/") ||
   path.startsWith("/api/media/v1/") ||
   path.startsWith("/api/voice/") ||
-  path.startsWith("/api/dictation/");
+  path.startsWith("/api/dictation/") ||
+  path.startsWith(SLACK_WORKSPACES_PATH) ||
+  path === SLACK_INSTALL_START_PATH;
 
 /** CORS grants browser access only; the router still authenticates every operation. */
 /** STELLA_WEBSITE_URL's origin, when this deployment's website is not stella.sh. */
@@ -53,7 +56,9 @@ export async function withBrowserCors(
     path.startsWith("/api/rpc/") ||
     path.startsWith("/api/media/v1/") ||
     path.startsWith("/api/voice/") ||
-  path.startsWith("/api/dictation/");
+  path.startsWith("/api/dictation/") ||
+  path.startsWith(SLACK_WORKSPACES_PATH) ||
+  path === SLACK_INSTALL_START_PATH;
   // Packaged Electron has an opaque file origin; isolated dev runs use random
   // loopback ports. These routes require a bearer JWT and never use cookies.
   const allowed =

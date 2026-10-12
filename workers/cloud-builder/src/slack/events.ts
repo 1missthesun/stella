@@ -53,7 +53,7 @@ import {
 } from "./store.js";
 import { publishHome, sendSetupPrompt } from "./ui.js";
 import { ownerGateStub } from "../rpc-release.js";
-import { DEFAULT_REASONING_EFFORT } from "@stella/contracts/reasoning-effort";
+import { loadWorkspaceSettings, workspaceExecution } from "./settings.js";
 import type { SlackPerson, SlackWorkspaceContext } from "./workspace.js";
 
 type SlackFile = {
@@ -471,6 +471,7 @@ const handleMessage = async (
       if (participants.length >= 8) break;
     }
   }
+  const settings = await loadWorkspaceSettings(env, install.teamId);
   const workspace: SlackWorkspaceContext = {
     teamName: install.teamName,
     homeFolder: install.homeFolder,
@@ -478,6 +479,13 @@ const handleMessage = async (
     place,
     requester: { id: userId, name: requester.name },
     participants,
+    ...(settings.repo
+      ? {
+          repo: settings.repo.branch
+            ? `${settings.repo.fullName}@${settings.repo.branch}`
+            : settings.repo.fullName,
+        }
+      : {}),
   };
 
   const clientMsgId = `slack:${channelId}:${ts}`.slice(0, 64);
@@ -513,12 +521,7 @@ const handleMessage = async (
     prompt,
     lane: "chat",
     source: "slack",
-    execution: {
-      engine: "stella",
-      provider: "stella",
-      model: "stella/default",
-      reasoningEffort: DEFAULT_REASONING_EFFORT,
-    },
+    execution: workspaceExecution(settings),
     title:
       place.kind === "channel"
         ? `Slack · #${place.name}`

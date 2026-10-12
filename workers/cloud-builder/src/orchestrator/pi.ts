@@ -349,9 +349,9 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                   signal: AbortSignal | undefined,
                 ) => this.awaitPiBrowserHandoff(handoff, signal),
                 deviceAgents: this.piDeviceAgents(),
-                claudeCode: this.claudeCodeTransport(),
                 threadAgents: this.piThreadAgents(),
               }),
+          claudeCode: this.claudeCodeTransport(),
           agentGuard: (authority, turnId) =>
             this.piAgentGuard(authority, turnId),
           // Her brief continues there once this turn ends (`runPiTurn`).

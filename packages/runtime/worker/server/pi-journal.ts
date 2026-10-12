@@ -268,7 +268,7 @@ export const cloudJournalFor = (
       const attachments = uploaded.slice(0, TURN_ATTACHMENTS_MAX).map((upload) => upload.path);
       const listed = message.prompt ? uploaded.slice(TURN_ATTACHMENTS_MAX) : uploaded;
       const prompt = listed.length
-        ? `${message.prompt}\n\nAttached in my drive:\n${listed.map((upload) => `- ${upload.path}`).join("\n")}`.trim()
+        ? `${message.prompt}\n\nAttached in my drive:\n${listed.map((upload) => `- ${upload.path}`).join("\n")}`
         : message.prompt;
       const context = relayContext(message.context);
       const body: CloudTurnStartRequest = {

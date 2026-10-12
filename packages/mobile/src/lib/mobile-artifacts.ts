@@ -297,9 +297,7 @@ export const artifactFileName = (payload: MobileDisplayPayload): string => {
     /^\d{10,}/.test(stem);
   const readableTitle = title.trim().replace(/[\\/:*?"<>|\r\n]+/g, " ").trim();
   if (machineNamed && readableTitle && readableTitle !== name) {
-    const titled = readableTitle.length > 60
-      ? `${readableTitle.slice(0, 60).trimEnd()}…`
-      : readableTitle;
+    const titled = readableTitle;
     return titled.toLowerCase().endsWith(extension.toLowerCase())
       ? titled
       : `${titled}${extension}`;

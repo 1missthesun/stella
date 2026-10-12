@@ -478,7 +478,7 @@ const MarkdownView = ({
             <PreviewEmpty title={t("shell.display.preview.emptyTitle")} />
           ) : (
             <Suspense fallback={null}>
-              <Markdown text={markdown} />
+              <Markdown text={markdown} documentPath={filePath} />
             </Suspense>
           )}
         </div>

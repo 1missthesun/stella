@@ -27,6 +27,12 @@ import {
 } from "@/features/chat/lib/stella-web-links";
 import { StellaFileLink } from "./StellaFileLink";
 import {
+  MarkdownDocumentImage,
+  remarkDocumentImages,
+  STELLA_DOCUMENT_IMAGE_TAG,
+  STELLA_DOCUMENT_IMAGE_TAG_ATTRIBUTES,
+} from "./MarkdownDocumentImage";
+import {
   hasCompleteEmojiSpritePack,
   useActiveEmojiPack,
 } from "./emoji-sprites/active-emoji-pack";
@@ -48,6 +54,8 @@ interface MarkdownProps {
    *  models often append a trailing rule that reads as a message divider. */
   hideHorizontalRules?: boolean;
   hiddenFilePaths?: readonly string[];
+  /** The markdown file being shown, so its relative images load from its folder. */
+  documentPath?: string;
 }
 
 type MarkdownImageProps = ImgHTMLAttributes<HTMLImageElement> & {
@@ -86,6 +94,7 @@ const DEFAULT_REMARK_PLUGINS = Object.values(defaultRemarkPlugins);
 const ALLOWED_TAGS: Record<string, string[]> = {
   [STELLA_FILE_TAG]: [...STELLA_FILE_TAG_ATTRIBUTES],
   [STELLA_APP_TAG]: [...STELLA_APP_TAG_ATTRIBUTES],
+  [STELLA_DOCUMENT_IMAGE_TAG]: [...STELLA_DOCUMENT_IMAGE_TAG_ATTRIBUTES],
 };
 
 type SanitizeSchema = {
@@ -162,6 +171,7 @@ const areMarkdownPropsEqual = (
   prev.hiddenFilePaths?.join("\0") === next.hiddenFilePaths?.join("\0") &&
   prev.text === next.text &&
   prev.cacheKey === next.cacheKey &&
+  prev.documentPath === next.documentPath &&
   prev.className === next.className &&
   Boolean(prev.hideHorizontalRules) === Boolean(next.hideHorizontalRules);
 
@@ -268,6 +278,7 @@ const COMPONENTS = {
   img: MarkdownImage,
   [STELLA_FILE_TAG]: StellaFileLink,
   [STELLA_APP_TAG]: StellaAppLink,
+  [STELLA_DOCUMENT_IMAGE_TAG]: MarkdownDocumentImage,
 };
 const COMPONENTS_WITHOUT_RULES = { ...COMPONENTS, hr: HiddenHorizontalRule };
 
@@ -279,6 +290,7 @@ export const Markdown = memo(function Markdown({
   className,
   hideHorizontalRules = false,
   hiddenFilePaths,
+  documentPath,
 }: MarkdownProps) {
   /*
    * Stable per-instance fallback when the caller didn't supply one,
@@ -299,7 +311,7 @@ export const Markdown = memo(function Markdown({
   const remarkPlugins = useMemo(() => {
     // The cache scope names every input besides the text that shapes the
     // parsed tree: the emoji pass and the hidden file-link set.
-    const cacheScope = `${emojiSpritesEnabled ? "emoji" : "plain"}\0${hiddenFileKey}`;
+    const cacheScope = `${emojiSpritesEnabled ? "emoji" : "plain"}\0${hiddenFileKey}\0${documentPath ?? ""}`;
     const plugins = [
       [remarkMarkdownRenderCache, cacheScope] as [
         typeof remarkMarkdownRenderCache,
@@ -307,9 +319,12 @@ export const Markdown = memo(function Markdown({
       ],
       ...DEFAULT_REMARK_PLUGINS,
       [remarkStellaFileLinks, hiddenFileKey ? hiddenFileKey.split("\0") : []] as [typeof remarkStellaFileLinks, string[]],
+      ...(documentPath
+        ? [[remarkDocumentImages, documentPath] as [typeof remarkDocumentImages, string]]
+        : []),
     ];
     return emojiSpritesEnabled ? [...plugins, remarkEmojiSprites] : plugins;
-  }, [emojiSpritesEnabled, hiddenFileKey]);
+  }, [documentPath, emojiSpritesEnabled, hiddenFileKey]);
   /*
    * `emojiVars` is memoized so the outer `<div>`'s `style` reference is
    * stable across renders when the active emoji pack hasn't changed.
@@ -327,7 +342,7 @@ export const Markdown = memo(function Markdown({
       ]),
     ) as CSSProperties;
   }, [activeEmojiPack, emojiSpritesEnabled]);
-  const streamdownKey = `${effectiveCacheKey}:${emojiSpritesEnabled ? "emoji" : "plain"}:${hiddenFileKey}`;
+  const streamdownKey = `${effectiveCacheKey}:${emojiSpritesEnabled ? "emoji" : "plain"}:${hiddenFileKey}:${documentPath ?? ""}`;
   // Streamdown parsing is intentionally a hard-bounded main-thread task.
   // Parsing separate fragments changes document-level Markdown semantics
   // (references, lists), while one pathological paragraph or fence defeats

@@ -25,9 +25,9 @@ and prod moves when someone runs `promote-stella-browser.yml`.
 
 **Logins differ per machine and change; check instead of assuming.**
 `env -u CLOUDFLARE_API_TOKEN bunx wrangler whoami` lists the scopes
-(`artifacts (write)` for app-source publish; stored Workers Logs need
-Workers Observability read, which the OAuth login lacks, so read them in the
-dashboard), and `bunx eas-cli whoami` shows the EAS account. When a login is
+(`artifacts (write)` for app-source publish; stored Workers Logs are read
+with a separate token, see "Reading Worker logs"), and `bunx eas-cli whoami`
+shows the EAS account. When a login is
 missing, hand the step to the computer that has it or ask the user to sign in
 there; never copy credentials between machines. A secret only the user has
 (a provider key such as dev's `COMPOSIO_API_KEY`) is collected with
@@ -335,6 +335,20 @@ the agent collects the token with `request_secure_input` (sensitive), then
 and `env -u CLOUDFLARE_API_TOKEN bun run containers:check` after, since a
 secret change makes a new Worker version. The next Claude turn of each test
 owner writes the new token.
+
+### Reading Worker logs
+
+`wrangler tail` samples, needs a live shell, and doesn't show Durable Object
+logs (the owner store, BuildSession), and Wrangler's OAuth login has no scope
+for stored logs. Query the stored ones instead:
+`node scripts/worker-logs.mjs --worker stella-v2-cloud-builder-dev --minutes 30 --search <event or text>`
+(`--json` for raw events; works for any Worker, Previews' logs included). It
+reads an API token with only Account › Workers Observability › Read from
+`CLOUDFLARE_OBSERVABILITY_TOKEN` or `~/.config/stella-dev/cloudflare-observability-token`
+(omarchy has one, `stella-agents-worker-logs-read`, made 2026-10-12). On another
+computer, create one in the dashboard (Profile › API Tokens › Create Token,
+custom, that single permission on Stella's account) and save it to that file
+with mode 600; never paste it into chat.
 
 ### Prompts
 

@@ -79,7 +79,7 @@ export const composioFetch = async (
       accept: "application/json",
       "content-type": "application/json",
       "x-api-key": config.apiKey,
-      "x-consumer-api-key": config.apiKey,
+      ...(config.apiKey.startsWith("ck_") ? { "x-consumer-api-key": config.apiKey } : {}),
     },
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),

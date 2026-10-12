@@ -340,5 +340,12 @@ export async function importAgentLog(
     if (page.complete || through <= after) break;
     after = through;
   }
+  // It came back: this host writes it again.
+  if (state.released && holder === transport.holder) {
+    await harness.commit(async (tx) => {
+      delete (await tx.doc(AgentLogDoc, conversation.id)).released;
+      return undefined;
+    }, context);
+  }
   return { imported, ...(cwd ? { cwd } : {}), ...(holder ? { holder } : {}) };
 }

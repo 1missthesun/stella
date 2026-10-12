@@ -6,7 +6,7 @@ import {
 import type { AgentModelConfigSnapshot } from "@stella/contracts/agent-engine"
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator"
 import { isTopLevelAgent } from "@stella/contracts/agent-ledger"
-import { normalizeDisplayStatusText } from '../status-utils'
+import { normalizeDisplayStatusText } from '@stella/contracts/working-status'
 import type {
   Attachment,
   ChannelEnvelope,

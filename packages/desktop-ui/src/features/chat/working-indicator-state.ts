@@ -1,6 +1,16 @@
 import type { TaskItem } from "@/features/chat/lib/event-transforms";
 import { isStandaloneTaskStatusText } from "@/features/chat/lib/event-transforms";
-import { computeStatus, normalizeDisplayStatusText } from "./status-utils";
+import {
+  computeStatus,
+  normalizeDisplayStatusText,
+} from "@stella/contracts/working-status";
+
+export {
+  getWorkingIndicatorThinkingText,
+  WORKING_INDICATOR_LONG_THINKING_MS,
+  WORKING_INDICATOR_LONG_TOOL_MS,
+  WORKING_INDICATOR_THINKING_LABEL_MS,
+} from "@stella/contracts/working-status";
 
 export const INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS = 2000;
 
@@ -13,28 +23,6 @@ export const INLINE_WORKING_INDICATOR_SHOW_DELAY_MS = 300;
 export const WORKING_INDICATOR_HANDOFF_MS = 240;
 
 export const WORKING_INDICATOR_COMPACTING_TEXT = "Compacting";
-
-/**
- * Thinking stays bare dots while it is short. A stretch of thinking that
- * lasts gets one calm label, and a long one switches once to a second; the
- * clock restarts whenever a tool hands back to thinking.
- */
-export const WORKING_INDICATOR_THINKING_LABEL_MS = 3500;
-export const WORKING_INDICATOR_LONG_THINKING_MS = 15000;
-/** One tool call this long switches its label once to the "still" form. */
-export const WORKING_INDICATOR_LONG_TOOL_MS = 15000;
-export const WORKING_INDICATOR_THINKING_TEXT = "Thinking";
-export const WORKING_INDICATOR_LONG_THINKING_TEXT = "Thinking it through";
-
-export function getWorkingIndicatorThinkingText(elapsedMs: number): string {
-  if (elapsedMs >= WORKING_INDICATOR_LONG_THINKING_MS) {
-    return WORKING_INDICATOR_LONG_THINKING_TEXT;
-  }
-  if (elapsedMs >= WORKING_INDICATOR_THINKING_LABEL_MS) {
-    return WORKING_INDICATOR_THINKING_TEXT;
-  }
-  return "";
-}
 
 export type InlineWorkingIndicatorProps = {
   runningTool?: string;

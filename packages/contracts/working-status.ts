@@ -1,6 +1,7 @@
 /**
- * Compute a user-friendly status message for the working indicator
- * based on which orchestrator tool is currently in flight.
+ * The working indicator's words, shared by desktop and the phone so both show
+ * the same phrase for the same tool call. Computes a user-friendly status
+ * message based on which orchestrator tool is currently in flight.
  *
  * Only the orchestrator's tool surface lives here — anything a general
  * agent runs is rolled up into a "Working on it" task line by the
@@ -330,6 +331,33 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Making it happen",
   ],
 
+  // Direct scheduling tools
+  schedule_add: [
+    "Scheduling it",
+    "Setting it up",
+    "Adding it",
+    "Penciling it in",
+    "Booking it",
+  ],
+  schedule_list: [
+    "Checking the schedule",
+    "Looking at what's planned",
+    "Reviewing the schedule",
+    "Pulling up the schedule",
+  ],
+  schedule_update: [
+    "Updating the schedule",
+    "Adjusting it",
+    "Rescheduling",
+    "Tweaking the timing",
+  ],
+  schedule_remove: [
+    "Clearing it",
+    "Removing it",
+    "Canceling it",
+    "Taking it off the schedule",
+  ],
+
   // Schedule subagent
   cron_add: [
     "Scheduling it",
@@ -601,5 +629,27 @@ export function computeStatus({
     return pickVariation(FALLBACK_VARIATIONS, seed ?? normalizedToolName);
   }
 
+  return "";
+}
+
+/**
+ * Thinking stays bare dots while it is short. A stretch of thinking that
+ * lasts gets one calm label, and a long one switches once to a second; the
+ * clock restarts whenever a tool hands back to thinking. A single tool call
+ * that runs long switches once to its "still" label.
+ */
+export const WORKING_INDICATOR_THINKING_LABEL_MS = 3500;
+export const WORKING_INDICATOR_LONG_THINKING_MS = 15000;
+export const WORKING_INDICATOR_LONG_TOOL_MS = 15000;
+export const WORKING_INDICATOR_THINKING_TEXT = "Thinking";
+export const WORKING_INDICATOR_LONG_THINKING_TEXT = "Thinking it through";
+
+export function getWorkingIndicatorThinkingText(elapsedMs: number): string {
+  if (elapsedMs >= WORKING_INDICATOR_LONG_THINKING_MS) {
+    return WORKING_INDICATOR_LONG_THINKING_TEXT;
+  }
+  if (elapsedMs >= WORKING_INDICATOR_THINKING_LABEL_MS) {
+    return WORKING_INDICATOR_THINKING_TEXT;
+  }
   return "";
 }

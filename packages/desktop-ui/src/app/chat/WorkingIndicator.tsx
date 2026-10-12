@@ -5,7 +5,7 @@ import { cn } from "@/shared/lib/utils";
 import { StellaCharacter } from "@/ui/stella-character/StellaCharacter";
 import { SwapText } from "./SwapText";
 import { CHAT_ACTIVITY_SHIMMER_GROUP } from "./TextShimmer";
-import { computeStillStatus } from "@/features/chat/status-utils";
+import { computeStillStatus } from "@stella/contracts/working-status";
 import {
   getWorkingIndicatorCharacterState,
   getWorkingIndicatorDisplayStatus,

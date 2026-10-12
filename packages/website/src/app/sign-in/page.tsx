@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { landingFontVars } from "@/components/landing/fonts";
 import { SignInView } from "./sign-in-view";
+import styles from "./sign-in.module.css";
 
 export const metadata: Metadata = {
   title: "Sign In",
@@ -14,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function SignInPage() {
   return (
-    <div className="stella-page">
+    <div className={`stella-page ${landingFontVars} ${styles.root}`}>
       <SignInView />
     </div>
   );

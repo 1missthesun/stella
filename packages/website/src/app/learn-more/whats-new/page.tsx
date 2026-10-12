@@ -4,7 +4,10 @@ import {
   type ChangeItem,
   type ChangelogEntry,
 } from "../changelog-entries";
-import { LearnSidebar } from "../learn-sidebar";
+import Link from "next/link";
+import { PageShell } from "@/components/landing/page-shell";
+import pg from "@/components/landing/page.module.css";
+import w from "./whats-new.module.css";
 
 export const metadata: Metadata = {
   title: "What's New",
@@ -27,7 +30,7 @@ function ChangeRow({ item }: { item: ChangeItem }) {
   }
   return (
     <li>
-      <span className="learn-log__product" aria-label={`${item.product} update`}>
+      <span className={w.product} aria-label={`${item.product} update`}>
         {item.product}
       </span>
       {item.text}
@@ -37,86 +40,71 @@ function ChangeRow({ item }: { item: ChangeItem }) {
 
 export default function WhatsNew() {
   return (
-    <main className="learn-shell">
-      <LearnSidebar current="whats-new" />
+    <PageShell>
+      <section className={pg.hero} data-tone="light" data-bg="#ffffff">
+        <p className={pg.eyebrow}>
+          <Link href="/learn-more" className={w.crumb}>
+            Learn more
+          </Link>{" "}
+          / What&apos;s new
+        </p>
+        <h1 className={pg.title}>
+          Every release, <em>in plain English.</em>
+        </h1>
+        <p className={pg.lede}>
+          Stella ships in small, frequent releases. Each entry below headlines the version that shipped, with the
+          highlights up top and the rest tucked just behind &ldquo;More in this release.&rdquo;
+        </p>
+      </section>
 
-      <article className="learn-content">
-        <header className="learn-hero learn-hero--compact">
-          <div className="learn-hero__copy">
-            <span className="learn-eyebrow">What&apos;s new</span>
-            <h1>
-              Every release,{" "}
-              <span className="learn-hero__accent">in plain English</span>.
-            </h1>
-            <p>
-              Stella ships in small, frequent releases. Each entry below
-              headlines the version that shipped, with the highlights up top
-              and the rest tucked just behind &ldquo;More in this release.&rdquo;
-            </p>
-          </div>
-        </header>
-
-        <section className="learn-section learn-section--log">
-          <ol className="learn-log">
-            {changelogEntries.map((entry) => {
-              const highlights = entry.highlights ?? [];
-              const more = entry.more ?? [];
-              const moreCount = more.length;
-              return (
-                <li key={entryKey(entry)} className="learn-log__entry">
-                  <div className="learn-log__meta">
-                    <span className="learn-log__release">
-                      {entryHeadline(entry)}
+      <section className={w.log} data-tone="light" data-bg="#ffffff" aria-label="Releases">
+        <ol>
+          {changelogEntries.map((entry) => {
+            const highlights = entry.highlights ?? [];
+            const more = entry.more ?? [];
+            return (
+              <li key={entryKey(entry)} className={w.entry}>
+                <div className={w.meta}>
+                  <span className={w.release}>{entryHeadline(entry)}</span>
+                  <span className={w.date}>{entry.date}</span>
+                  {entry.tags && entry.tags.length > 0 ? (
+                    <span className={w.tags}>
+                      {entry.tags.map((tag) => (
+                        <span key={tag} className={w.tag} data-tag={tag}>
+                          {tag}
+                        </span>
+                      ))}
                     </span>
-                    {entry.release ? (
-                      <span className="learn-log__date">{entry.date}</span>
-                    ) : (
-                      <span className="learn-log__date learn-log__date--era">
-                        {entry.date}
-                      </span>
-                    )}
-                    {entry.tags && entry.tags.length > 0 ? (
-                      <div className="learn-log__tags">
-                        {entry.tags.map((tag) => (
-                          <span key={tag} className="learn-log__tag">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="learn-log__body">
-                    {highlights.length > 0 ? (
-                      <ul className="learn-log__items">
-                        {highlights.map((item, idx) => (
-                          <ChangeRow key={`h-${idx}`} item={item} />
+                  ) : null}
+                </div>
+                <div className={w.body}>
+                  {highlights.length > 0 ? (
+                    <ul className={w.highlights}>
+                      {highlights.map((item, idx) => (
+                        <ChangeRow key={`h-${idx}`} item={item} />
+                      ))}
+                    </ul>
+                  ) : null}
+                  {more.length > 0 ? (
+                    <details className={w.more}>
+                      <summary>
+                        <span>More in this release</span>
+                        <span className={w.count}>{more.length}</span>
+                        <i className={w.icon} aria-hidden="true" />
+                      </summary>
+                      <ul className={w.moreList}>
+                        {more.map((item, idx) => (
+                          <ChangeRow key={`m-${idx}`} item={item} />
                         ))}
                       </ul>
-                    ) : null}
-                    {moreCount > 0 ? (
-                      <details className="learn-log__more">
-                        <summary>
-                          <span className="learn-log__more-label">
-                            More in this release
-                          </span>
-                          <span className="learn-log__more-count">
-                            {moreCount}
-                          </span>
-                        </summary>
-                        <ul className="learn-log__items learn-log__items--more">
-                          {more.map((item, idx) => (
-                            <ChangeRow key={`m-${idx}`} item={item} />
-                          ))}
-                        </ul>
-                      </details>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ol>
-        </section>
-      </article>
-    </main>
+                    </details>
+                  ) : null}
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </section>
+    </PageShell>
   );
 }

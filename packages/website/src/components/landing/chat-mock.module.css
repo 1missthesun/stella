@@ -1,0 +1,281 @@
+.stage {
+  position: relative;
+  aspect-ratio: 5 / 4;
+  border-radius: 28px;
+  overflow: hidden;
+  container-type: inline-size;
+  background:
+    radial-gradient(60% 70% at 15% 0%, rgba(0, 200, 255, 0.24), transparent 70%),
+    radial-gradient(60% 70% at 100% 100%, rgba(255, 74, 192, 0.22), transparent 70%),
+    radial-gradient(80% 80% at 60% 40%, rgba(112, 60, 255, 0.16), transparent 70%),
+    #eeeef3;
+}
+
+.stage[data-variant="dark"] {
+  background:
+    radial-gradient(60% 70% at 15% 0%, rgba(0, 200, 255, 0.3), transparent 70%),
+    radial-gradient(60% 70% at 100% 100%, rgba(255, 74, 192, 0.26), transparent 70%),
+    radial-gradient(80% 80% at 60% 40%, rgba(112, 60, 255, 0.24), transparent 70%),
+    #0c0c12;
+}
+
+.window {
+  position: absolute;
+  inset: 8% 7%;
+}
+
+.column {
+  flex: 1;
+  min-height: 0;
+  width: min(520px, 88%);
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  padding: 0 0 16px;
+  font-size: clamp(12px, 2.3cqw, 15px);
+  line-height: 1.4;
+}
+
+.thread {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 8px;
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 28px);
+  mask-image: linear-gradient(to bottom, transparent, #000 28px);
+}
+
+.her {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.her img {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+}
+
+.step {
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+}
+
+[data-in="1"] .step {
+  animation: arrive 460ms cubic-bezier(0.2, 0.9, 0.2, 1) var(--d, 0ms) both;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.task {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: var(--w-menu, rgba(255, 255, 255, 0.7));
+  box-shadow: 0 0 0 1px var(--w-line, rgba(0, 0, 0, 0.06));
+  color: var(--w-fg);
+}
+
+.glyph {
+  position: relative;
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.glyph svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.star {
+  padding: 1.5px;
+  fill: var(--w-fg);
+}
+
+.check {
+  fill: none;
+  stroke: var(--w-sub);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+}
+
+.taskLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+
+.taskState {
+  position: relative;
+  font-family: var(--l-mono);
+  font-size: 0.78em;
+}
+
+.taskState em {
+  font-style: normal;
+}
+
+.running {
+  background: linear-gradient(90deg, var(--w-sub) 0%, var(--w-fg) 50%, var(--w-sub) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 1.6s linear infinite;
+}
+
+.done {
+  position: absolute;
+  right: 0;
+  color: var(--w-sub);
+  opacity: 0;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+[data-in="1"] .task[data-done="later"] .star,
+[data-in="1"] .task[data-done="later"] .running {
+  animation: vanish 260ms ease calc(var(--d, 0ms) + var(--done)) both;
+}
+
+[data-in="1"] .task[data-done="later"] .check,
+[data-in="1"] .task[data-done="later"] .done {
+  animation: appear 320ms cubic-bezier(0.3, 1.6, 0.5, 1) calc(var(--d, 0ms) + var(--done)) both;
+}
+
+@keyframes vanish {
+  to {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 82%;
+  padding: 9px 12px;
+  border-radius: 14px;
+  background: var(--w-menu, #fff);
+  box-shadow: 0 0 0 1px var(--w-line, rgba(0, 0, 0, 0.06)), 0 6px 16px -10px rgba(0, 0, 0, 0.25);
+  color: var(--w-fg);
+}
+
+.cardIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--w-plus, #f2f2f5);
+  color: var(--w-fg);
+}
+
+.cardText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.cardText b {
+  font-weight: 600;
+}
+
+.cardText small {
+  font-size: 0.82em;
+  color: var(--w-sub);
+}
+
+.typed {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  color: var(--w-fg);
+  clip-path: inset(0 100% 0 0);
+}
+
+[data-in="1"] .typed {
+  animation: type calc(var(--n) * 45ms) steps(var(--n)) var(--d, 0ms) forwards;
+}
+
+@keyframes type {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@container (max-width: 520px) {
+  .column {
+    width: 92%;
+  }
+}
+
+@media (max-width: 860px) {
+  .stage {
+    aspect-ratio: 1 / 1.05;
+    border-radius: 22px;
+  }
+
+  .window {
+    inset: 6% 5%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .step,
+  [data-in="1"] .step {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+
+  .typed,
+  [data-in="1"] .typed {
+    clip-path: none;
+    animation: none;
+  }
+
+  .running {
+    animation: none;
+  }
+}

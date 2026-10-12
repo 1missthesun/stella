@@ -1,11 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, Check } from "lucide-react";
-import { FooterLegalLinks } from "@/components/footer-legal-links";
-import { homeFooterGroups } from "@/components/site-footer-groups";
-import { SiteHeader } from "@/components/site-header";
-import "./pricing.css";
-import { StellaMark } from "@/components/stella-mark";
+import { Check, FolderOpen, KeyRound, Mic, MonitorSmartphone, Paintbrush, Sparkles } from "lucide-react";
+import { Finale } from "@/components/landing/closing";
+import { InView } from "@/components/landing/in-view";
+import { PageShell } from "@/components/landing/page-shell";
+import pg from "@/components/landing/page.module.css";
+import pr from "./pricing.module.css";
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -61,159 +60,98 @@ const plans: {
 ];
 
 const included = [
-  "Browser, desktop, and mobile access",
-  "Coding, assistant and research in one app",
-  "Dictation and wake word on every tier",
-  "Customizable interface",
-  "Work with files and apps",
-  "Bring your own models and keys",
+  { label: "Browser, desktop, and mobile access", icon: MonitorSmartphone },
+  { label: "Coding, assistant and research in one app", icon: Sparkles },
+  { label: "Dictation and wake word on every tier", icon: Mic },
+  { label: "Customizable interface", icon: Paintbrush },
+  { label: "Work with files and apps", icon: FolderOpen },
+  { label: "Bring your own models and keys", icon: KeyRound },
 ];
 
 export default function Pricing() {
   return (
-    <div className="stella-page">
-      <SiteHeader />
+    <PageShell
+      closing={<Finale title="Choose Stella and get started" note="Free. No credit card, no trial." />}
+    >
+      <section className={`${pg.hero} ${pg.center} ${pr.hero}`} data-tone="light" data-bg="#ffffff">
+        <p className={pg.eyebrow}>Pricing</p>
+        <h1 className={pg.title}>Choose your plan</h1>
+        <p className={pg.lede}>Pick the usage and capabilities you need.</p>
+      </section>
 
-      <main>
-        {/* ── Hero ─────────────────────────────────── */}
-        <section className="grid-shell pr-hero section-border">
-          <div className="pr-article">
-            <h1 className="pr-title reveal">Choose your plan</h1>
-            <p className="pr-subtitle reveal reveal-delay-1">
-              Pick the usage and capabilities you need.
-            </p>
-          </div>
-        </section>
-
-        {/* ── Plan cards ───────────────────────────── */}
-        <section className="grid-shell pr-section section-border">
-          <div className="pr-grid-wrap">
-            <div className="pr-grid">
-              {plans.map((plan, i) => (
-                <div
-                  key={plan.name}
-                  className={`pr-card reveal${plan.featured ? " pr-card--featured" : ""}`}
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
-                  {plan.featured && (
-                    <span className="pr-card__badge">Popular</span>
-                  )}
-
-                  <div className="pr-card__head">
-                    <h3 className="pr-card__name">{plan.name}</h3>
-                    {typeof plan.introFirstMonthPriceUsd === "number" &&
-                    plan.introFirstMonthPriceUsd > 0 &&
-                    plan.introFirstMonthPriceUsd < plan.price ? (
-                      <div className="pr-card__price-bundle">
-                        <div className="pr-card__price pr-card__price--intro-offer">
-                          <span className="pr-card__amount">
-                            ${plan.introFirstMonthPriceUsd}
-                          </span>
-                          <span className="pr-card__period pr-card__period--phrase">
-                            first month
-                          </span>
-                        </div>
-                        <p className="pr-card__price-then">
-                          Then{" "}
-                          <strong>${plan.price}</strong>
-                          <span aria-hidden="true">/mo</span> after that
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="pr-card__price">
-                        <span className="pr-card__amount">
-                          ${plan.price}
-                        </span>
-                        {plan.price > 0 ? (
-                          <span className="pr-card__period">/mo</span>
-                        ) : null}
-                      </div>
-                    )}
-                    <p className="pr-card__tagline">{plan.tagline}</p>
+      <section className={pr.plans} data-tone="light" data-bg="#ffffff" aria-label="Plans">
+        <InView className={pr.grid} threshold={0.15}>
+          {plans.map((plan, i) => {
+            const intro =
+              typeof plan.introFirstMonthPriceUsd === "number" &&
+              plan.introFirstMonthPriceUsd > 0 &&
+              plan.introFirstMonthPriceUsd < plan.price
+                ? plan.introFirstMonthPriceUsd
+                : null;
+            return (
+              <article
+                key={plan.name}
+                className={pr.card}
+                data-featured={plan.featured ? "1" : "0"}
+                style={{ ["--i" as string]: i }}
+              >
+                <header className={pr.cardHead}>
+                  <h2 className={pr.name}>{plan.name}</h2>
+                  {plan.featured ? <span className={pr.badge}>Popular</span> : null}
+                </header>
+                {intro !== null ? (
+                  <div className={pr.priceBlock}>
+                    <p className={pr.price}>
+                      <span className={pr.amount}>${intro}</span>
+                      <span className={pr.period}>first month</span>
+                    </p>
+                    <p className={pr.then}>
+                      Then <strong>${plan.price}</strong>
+                      <span aria-hidden="true">/mo</span> after that
+                    </p>
                   </div>
+                ) : (
+                  <p className={pr.price}>
+                    <span className={pr.amount}>${plan.price}</span>
+                    {plan.price > 0 ? <span className={pr.period}>/mo</span> : null}
+                  </p>
+                )}
+                <p className={pr.tagline}>{plan.tagline}</p>
+                <ul className={pr.features}>
+                  {plan.features.map((f) => (
+                    <li key={f}>
+                      <Check size={16} strokeWidth={2.6} aria-hidden="true" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            );
+          })}
+        </InView>
+      </section>
 
-                  <ul className="pr-card__features">
-                    {plan.features.map((f) => (
-                      <li key={f}>
-                        <Check size={14} strokeWidth={2.5} />
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* ── Every plan includes ──────────────────── */}
-        <section className="grid-shell pr-section section-border">
-          <div className="pr-article">
-            <h2>Every plan includes</h2>
-            <p className="pr-note">
-              Every tier includes browser, desktop, and mobile access, with
-              different usage limits for assistant, research, browser, and file tools.
-            </p>
-            <ul className="pr-included">
-              {included.map((item) => (
-                <li key={item}>
-                  <Check size={15} strokeWidth={2.5} />
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        {/* ── CTA ──────────────────────────────────── */}
-        <section className="grid-shell pr-cta-section">
-          <div className="pr-article pr-cta reveal">
-            <h2>Choose Stella and get started</h2>
-            <p>
-              Free. No credit card, no trial.
-            </p>
-            <Link className="button button--primary" href="/">
-              Get Started
-              <ArrowRight size={16} />
-            </Link>
-          </div>
-        </section>
-      </main>
-
-      {/* ── Footer ─────────────────────────────────── */}
-      <footer className="grid-shell site-footer section-border">
-        <div className="footer-brand">
-          <Link className="brand-mark brand-mark--footer" href="/">
-            <StellaMark size={42} />
-            <span className="brand-text">Stella</span>
-          </Link>
-          <FooterLegalLinks />
+      <section className={pr.included} data-tone="light" data-bg="#f1f1f4" aria-labelledby="included-title">
+        <div className={pr.includedHead}>
+          <h2 id="included-title" className={pg.h2}>
+            Every plan includes
+          </h2>
+          <p className={pr.includedNote}>
+            Every tier includes browser, desktop, and mobile access, with different usage limits for
+            assistant, research, browser, and file tools.
+          </p>
         </div>
-        <div className="footer-columns">
-          {homeFooterGroups.map((group) => (
-            <div key={group.title} className="footer-column">
-              <h3>{group.title}</h3>
-              <ul>
-                {group.items.map((item) => (
-                  <li key={item.label}>
-                    {item.external ? (
-                      <a
-                        href={item.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {item.label}
-                      </a>
-                    ) : (
-                      <a href={item.href}>{item.label}</a>
-                    )}
-                  </li>
-                ))}
-              </ul>
+        <InView className={pr.tiles}>
+          {included.map(({ label, icon: Icon }, i) => (
+            <div key={label} className={pr.tile} style={{ ["--i" as string]: i }}>
+              <span className={pr.tileIcon}>
+                <Icon size={22} strokeWidth={1.8} aria-hidden="true" />
+              </span>
+              <p>{label}</p>
             </div>
           ))}
-        </div>
-      </footer>
-    </div>
+        </InView>
+      </section>
+    </PageShell>
   );
 }

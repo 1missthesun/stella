@@ -1,3 +1,14 @@
+.root {
+  min-height: 100vh;
+  background:
+    radial-gradient(50% 45% at 50% 108%, rgba(112, 60, 255, 0.28), transparent 70%),
+    radial-gradient(35% 35% at 22% 100%, rgba(0, 220, 255, 0.22), transparent 70%),
+    radial-gradient(35% 35% at 80% 100%, rgba(255, 74, 192, 0.2), transparent 70%),
+    #ffffff;
+  color: #0a0a0d;
+  font-family: var(--l-sans), system-ui, sans-serif;
+}
+
 .page {
   min-height: 100vh;
   display: grid;
@@ -9,13 +20,14 @@
   width: min(100%, 30rem);
   display: grid;
   gap: 1.25rem;
-  padding: clamp(1.4rem, 3vw, 2.2rem);
-  border: 1px solid rgba(82, 104, 134, 0.16);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(244, 249, 255, 0.9)),
-    var(--page-panel);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(18px);
+  padding: clamp(1.6rem, 3.4vw, 2.6rem);
+  border-radius: 32px;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow:
+    0 0 0 1px rgba(10, 10, 20, 0.06),
+    0 40px 90px -40px rgba(40, 20, 120, 0.4);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  backdrop-filter: blur(22px) saturate(180%);
 }
 
 .brand {
@@ -35,24 +47,22 @@
 }
 
 .brandText {
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 600;
-  font-size: 1.15rem;
-  letter-spacing: -0.02em;
+  font-weight: 700;
+  font-size: 1.3rem;
+  letter-spacing: -0.045em;
 }
 
 .title {
-  margin: 0;
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-size: clamp(1.7rem, 4.25vw, 2.72rem);
-  font-weight: 600;
-  line-height: 0.98;
-  letter-spacing: -0.05em;
+  margin: 0.4rem 0 0;
+  font-size: clamp(2.3rem, 5vw, 3.3rem);
+  font-weight: 820;
+  line-height: 0.9;
+  letter-spacing: -0.06em;
 }
 
 .subtitle {
   margin: 0;
-  color: var(--page-muted);
+  color: #4a4a55;
   font-size: 1rem;
   line-height: 1.55;
   letter-spacing: -0.01em;
@@ -73,16 +83,17 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--page-muted);
-  font-family: var(--font-mono), monospace;
+  font-family: var(--l-mono), monospace;
 }
 
 .input {
   appearance: none;
   width: 100%;
-  min-height: 3rem;
-  padding: 0.85rem 1rem;
-  border: 1px solid rgba(82, 104, 134, 0.18);
-  background: rgba(255, 255, 255, 0.9);
+  min-height: 3.25rem;
+  padding: 0.85rem 1.2rem;
+  border: 1px solid rgba(10, 10, 13, 0.14);
+  border-radius: 999px;
+  background: #fff;
   color: var(--page-foreground);
   font: inherit;
   letter-spacing: -0.01em;
@@ -98,8 +109,8 @@
 
 .input:focus {
   outline: none;
-  border-color: rgba(79, 118, 255, 0.55);
-  box-shadow: 0 0 0 3px rgba(79, 118, 255, 0.18);
+  border-color: rgba(112, 60, 255, 0.6);
+  box-shadow: 0 0 0 4px rgba(112, 60, 255, 0.16);
 }
 
 .input:disabled {
@@ -112,11 +123,12 @@
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  min-height: 3rem;
-  padding: 0.9rem 1.15rem;
+  min-height: 3.25rem;
+  padding: 0.9rem 1.3rem;
   border: 1px solid transparent;
-  background: var(--page-accent);
-  color: var(--page-accent-foreground);
+  border-radius: 999px;
+  background: #0a0a0d;
+  color: #fff;
   font: inherit;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -130,7 +142,7 @@
 
 .button:hover {
   transform: translateY(-1px);
-  background: var(--page-accent-hover);
+  background: #24242b;
 }
 
 .button:disabled {
@@ -149,12 +161,13 @@
   align-items: center;
   justify-content: center;
   gap: 0.65rem;
-  min-height: 3rem;
+  min-height: 3.25rem;
   width: 100%;
   padding: 0.85rem 1.15rem;
-  border: 1px solid rgba(82, 104, 134, 0.18);
-  background: rgba(255, 255, 255, 0.9);
-  color: var(--page-foreground);
+  border: 1px solid rgba(10, 10, 13, 0.14);
+  border-radius: 999px;
+  background: #fff;
+  color: #0a0a0d;
   font: inherit;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -169,7 +182,7 @@
 .socialButton:hover {
   transform: translateY(-1px);
   background: rgba(255, 255, 255, 1);
-  border-color: rgba(82, 104, 134, 0.28);
+  border-color: rgba(10, 10, 13, 0.3);
 }
 
 .socialButton:disabled {
@@ -199,15 +212,14 @@
 .statusCard {
   display: grid;
   gap: 0.75rem;
-  padding: 1rem 1.05rem;
-  border: 1px solid rgba(82, 104, 134, 0.12);
-  background: rgba(255, 255, 255, 0.72);
+  padding: 1.1rem 1.2rem;
+  border-radius: 20px;
+  background: #f4f4f7;
 }
 
 .statusTitle {
   margin: 0;
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 600;
+  font-weight: 720;
   font-size: 1.19rem;
   letter-spacing: -0.03em;
 }
@@ -227,7 +239,7 @@
 }
 
 .statusEmail {
-  font-family: var(--font-mono), monospace;
+  font-family: var(--l-mono), monospace;
   color: var(--page-foreground);
 }
 
@@ -235,6 +247,7 @@
   margin: 0;
   padding: 0.7rem 0.85rem;
   border: 1px solid rgba(220, 64, 76, 0.28);
+  border-radius: 14px;
   background: rgba(255, 234, 236, 0.85);
   color: rgba(133, 22, 32, 0.95);
   font-size: 0.88rem;
@@ -261,7 +274,7 @@
 }
 
 .linkButton:hover {
-  color: var(--page-accent-hover);
+  color: #703cff;
 }
 
 .spinner {
@@ -295,7 +308,7 @@
 }
 
 .footnote a:hover {
-  color: var(--page-accent-hover);
+  color: #703cff;
 }
 
 .signedInUser {
@@ -305,15 +318,14 @@
 
 .signedInName {
   margin: 0;
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 600;
+  font-weight: 720;
   font-size: 1.27rem;
   letter-spacing: -0.03em;
 }
 
 .signedInEmail {
   margin: 0;
-  font-family: var(--font-mono), monospace;
+  font-family: var(--l-mono), monospace;
   font-size: 0.85rem;
   color: var(--page-muted);
 }
@@ -328,7 +340,7 @@
 }
 
 .homeLink:hover {
-  color: var(--page-accent-hover);
+  color: #703cff;
 }
 
 .divider {
@@ -342,7 +354,7 @@
   align-items: center;
   gap: 0.75rem;
   color: var(--page-muted);
-  font-family: var(--font-mono), monospace;
+  font-family: var(--l-mono), monospace;
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;

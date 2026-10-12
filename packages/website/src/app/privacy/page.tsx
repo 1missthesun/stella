@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LegalDoc } from "@/components/landing/legal-doc";
 import { LEGAL_TITLES, PRIVACY_POLICY } from "@/lib/legal-text";
-import "../legal.css";
 
 export const metadata: Metadata = {
   title: LEGAL_TITLES.privacy,
@@ -13,19 +12,5 @@ export const metadata: Metadata = {
 };
 
 export default function PrivacyPage() {
-  return (
-    <div className="stella-page">
-      <div className="legal-doc-page">
-      <div className="legal-doc-page__bar">
-        <Link className="legal-doc-page__back" href="/">
-          ← Back to Stella
-        </Link>
-      </div>
-      <main className="legal-doc-page__main">
-        <h1 className="legal-doc-page__title">{LEGAL_TITLES.privacy}</h1>
-        <pre className="legal-doc-page__text">{PRIVACY_POLICY}</pre>
-      </main>
-      </div>
-    </div>
-  );
+  return <LegalDoc title={LEGAL_TITLES.privacy} source={PRIVACY_POLICY} />;
 }

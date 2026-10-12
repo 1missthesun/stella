@@ -311,3 +311,56 @@
     font-size: 11px;
   }
 }
+
+.line {
+  position: relative;
+  max-width: 14ch;
+  margin: 0;
+  font-size: clamp(52px, 9vw, 168px);
+  font-weight: 820;
+  line-height: 0.88;
+  letter-spacing: -0.062em;
+  text-align: center;
+  text-wrap: balance;
+}
+
+.body {
+  position: relative;
+  max-width: 46ch;
+  margin: clamp(22px, 4svh, 36px) 0 0;
+  font-size: clamp(17px, 1.3vw, 20px);
+  line-height: 1.5;
+  letter-spacing: -0.012em;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.66);
+}
+
+.body a {
+  color: #fff;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.after {
+  position: relative;
+  width: min(520px, 100%);
+  margin-top: 22px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.getRow > a:not(:global(.button--download)) {
+  display: inline-flex;
+  align-items: center;
+  padding: 17px 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  font-weight: 620;
+  font-size: 17px;
+  letter-spacing: -0.02em;
+  color: #fff;
+  transition: background 200ms ease, border-color 200ms ease;
+}
+
+.getRow > a:not(:global(.button--download)):hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.5);
+}

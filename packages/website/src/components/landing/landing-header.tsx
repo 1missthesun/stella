@@ -6,7 +6,7 @@ import { SiteHeaderAccount } from "@/components/auth/site-header-account";
 import { StellaMark } from "@/components/stella-mark";
 import h from "./landing-header.module.css";
 
-export function LandingHeader() {
+export function LandingHeader({ getHref = "#get" }: { getHref?: string }) {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function LandingHeader() {
         <span className={h.account}>
           <SiteHeaderAccount />
         </span>
-        <a href="#get" className={h.get}>
+        <a href={getHref} className={h.get}>
           Get Stella
         </a>
       </nav>

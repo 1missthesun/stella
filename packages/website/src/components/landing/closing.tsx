@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, type ReactNode } from "react";
 import { DownloadButton } from "@/components/download-button";
 import { FooterLegalLinks } from "@/components/footer-legal-links";
 import { homeFooterGroups } from "@/components/site-footer-groups";
@@ -79,20 +79,41 @@ export function OpenSourceAct() {
   );
 }
 
-export function Finale() {
+export function Finale({
+  title,
+  body,
+  actions,
+  note = "Free.",
+  after,
+}: {
+  title?: ReactNode;
+  body?: ReactNode;
+  actions?: ReactNode;
+  note?: ReactNode;
+  after?: ReactNode;
+}) {
   return (
     <section id="get" className={`${o.finale} ${l.invert}`} data-tone="dark" data-bg="#060609" aria-labelledby="get-title">
       <div className={o.finaleAurora}>
         <AuroraField className={o.finaleCanvas} dark />
       </div>
-      <h2 id="get-title" className={o.word}>
-        <StellaMark className={o.wordMark} />
-        Stella
-      </h2>
+      {title ? (
+        <h2 id="get-title" className={o.line}>
+          {title}
+        </h2>
+      ) : (
+        <h2 id="get-title" className={o.word}>
+          <StellaMark className={o.wordMark} />
+          Stella
+        </h2>
+      )}
+      {body ? <p className={o.body}>{body}</p> : null}
       <div className={o.getRow}>
+        {actions}
         <DownloadButton />
-        <span className={o.free}>Free.</span>
+        <span className={o.free}>{note}</span>
       </div>
+      {after ? <div className={o.after}>{after}</div> : null}
       <div className={o.stores}>
         <a href="https://apps.apple.com/us/app/stella-your-ai/id6761148311" target="_blank" rel="noopener noreferrer">
           iPhone

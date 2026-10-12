@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { randomUUID } from "node:crypto";
 import { createWriteStream } from "node:fs";
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
@@ -7,6 +8,13 @@ import { pipeline } from "node:stream/promises";
 
 import { resolveStatePath } from "./shared.js";
 import { sleepMs } from "./effect-runtime.js";
+import {
+  sendMediaRequest,
+  type MediaAuth,
+  type MediaHttpResult,
+  type MediaOperation,
+} from "./media-request.js";
+import { requestMediaFromBridge } from "../connectors/cli-broker-client.js";
 
 type MediaJobStatus =
   | "queued"
@@ -143,11 +151,7 @@ const parseArgs = (argv: string[]): CliOptions => {
   return options;
 };
 
-const getAuth = (): {
-  baseUrl: string;
-  authToken: string;
-  deviceId?: string;
-} => {
+const getAuth = (): MediaAuth => {
   const baseUrl =
     process.env.STELLA_MEDIA_BASE_URL?.trim() ||
     process.env.STELLA_BACKEND_URL?.trim() ||
@@ -162,77 +166,55 @@ const getAuth = (): {
       "stella-media requires Stella sign-in. Open Stella and finish signing in, then retry.",
     );
   }
-  const deviceId = process.env.STELLA_DEVICE_ID?.trim() || undefined;
+  const deviceId = deviceIdFromEnv();
   return { baseUrl, authToken, ...(deviceId ? { deviceId } : {}) };
 };
 
-const mediaUrl = (baseUrl: string, pathname: string): string =>
-  new URL(pathname, baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`).toString();
+const deviceIdFromEnv = (): string | undefined =>
+  process.env.STELLA_DEVICE_ID?.trim() || undefined;
 
-const requestHeaders = (auth: {
-  authToken: string;
-  deviceId?: string;
-}): Record<string, string> => ({
-  Authorization: `Bearer ${auth.authToken}`,
-  ...(auth.deviceId ? { "X-Device-ID": auth.deviceId } : {}),
-});
+/** The bridge reads one request line of at most 64 KiB. */
+const MAX_BRIDGE_REQUEST_BYTES = 60 * 1024;
 
-const fetchJson = async <T>(url: string, init: RequestInit): Promise<T> => {
-  const response = await fetch(url, init);
-  if (!response.ok) {
-    let message = "";
-    try {
-      const body = (await response.json()) as {
-        error?: string;
-        message?: string;
-      };
-      message = body.error ?? body.message ?? "";
-    } catch {
-      message = await response.text().catch(() => "");
-    }
+/**
+ * Inside Stella the call goes through the runtime, which holds the live
+ * session and refreshes it, so a token that expired in this shell's
+ * environment never matters. Elsewhere it goes straight to the API.
+ */
+const callMedia = async (operation: MediaOperation): Promise<unknown> => {
+  const socketPath = process.env.STELLA_CLI_BRIDGE_SOCK?.trim();
+  const deviceId = deviceIdFromEnv();
+  let result: MediaHttpResult | null = null;
+  if (
+    socketPath &&
+    Buffer.byteLength(JSON.stringify(operation)) <= MAX_BRIDGE_REQUEST_BYTES
+  ) {
+    result = await requestMediaFromBridge({
+      socketPath,
+      operation,
+      ...(deviceId ? { deviceId } : {}),
+    }).catch(() => null);
+  }
+  result ??= await sendMediaRequest(getAuth(), operation);
+  if (result.status < 200 || result.status >= 300) {
+    const body =
+      result.body && typeof result.body === "object"
+        ? (result.body as { error?: unknown; message?: unknown })
+        : {};
+    const message =
+      typeof body.error === "string"
+        ? body.error
+        : typeof body.message === "string"
+          ? body.message
+          : "";
     throw new Error(
-      message || `Stella media request failed with status ${response.status}.`,
+      message || `Stella media request failed with status ${result.status}.`,
     );
   }
-  return (await response.json()) as T;
+  return result.body;
 };
 
-const MIME_TYPES: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-  gif: "image/gif",
-  mp4: "video/mp4",
-  mov: "video/quicktime",
-  webm: "video/webm",
-  mp3: "audio/mpeg",
-  wav: "audio/wav",
-  m4a: "audio/mp4",
-  ogg: "audio/ogg",
-  flac: "audio/flac",
-};
-
-/** Every `file://` URL in the input, read and sent inline as a data URI. */
-const inlineLocalFiles = async (value: unknown): Promise<unknown> => {
-  if (typeof value === "string" && value.startsWith("file://")) {
-    const filePath = new URL(value).pathname;
-    const extension = path.extname(filePath).slice(1).toLowerCase();
-    const mimeType = MIME_TYPES[extension] ?? "application/octet-stream";
-    return `data:${mimeType};base64,${(await readFile(filePath)).toString("base64")}`;
-  }
-  if (Array.isArray(value)) return await Promise.all(value.map(inlineLocalFiles));
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, entry] of Object.entries(value)) {
-      out[key] = await inlineLocalFiles(entry);
-    }
-    return out;
-  }
-  return value;
-};
-
-const readRequestBody = async (options: CliOptions): Promise<unknown> => {
+const readRequestText = async (options: CliOptions): Promise<string> => {
   const raw = options.request
     ? options.request
     : options.requestFile
@@ -241,33 +223,18 @@ const readRequestBody = async (options: CliOptions): Promise<unknown> => {
   if (raw === null) {
     throw new Error("generate requires --request or --request-file.");
   }
-  return await inlineLocalFiles(JSON.parse(raw) as unknown);
+  return JSON.stringify(JSON.parse(raw) as unknown);
 };
 
-const submitJob = async (body: unknown): Promise<AcceptedMediaJob> => {
-  const auth = getAuth();
-  return await fetchJson<AcceptedMediaJob>(
-    mediaUrl(auth.baseUrl, "/api/media/v1/generate"),
-    {
-      method: "POST",
-      headers: {
-        ...requestHeaders(auth),
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    },
-  );
-};
+const submitJob = async (request: string): Promise<AcceptedMediaJob> =>
+  (await callMedia({
+    op: "generate",
+    request,
+    idempotencyKey: randomUUID(),
+  })) as AcceptedMediaJob;
 
-const getJob = async (jobId: string): Promise<MediaJob> => {
-  const auth = getAuth();
-  const url = new URL(mediaUrl(auth.baseUrl, "/api/media/v1/job"));
-  url.searchParams.set("jobId", jobId);
-  return await fetchJson<MediaJob>(url.toString(), {
-    method: "GET",
-    headers: requestHeaders(auth),
-  });
-};
+const getJob = async (jobId: string): Promise<MediaJob> =>
+  (await callMedia({ op: "job", jobId })) as MediaJob;
 
 // Effect-backed sleep (kernel/cli/effect-runtime.ts); poll pacing timing
 // is unchanged.
@@ -443,13 +410,9 @@ const run = async (): Promise<number> => {
   }
 
   if (options.command === "models") {
-    const auth = getAuth();
-    const result = await fetchJson<{
+    const result = (await callMedia({ op: "models" })) as {
       data: Array<{ id: string; kind: string; does: string; docsUrl: string }>;
-    }>(mediaUrl(auth.baseUrl, "/api/media/v1/models"), {
-      method: "GET",
-      headers: requestHeaders(auth),
-    });
+    };
     if (options.json) {
       print(result, true);
     } else {
@@ -461,8 +424,7 @@ const run = async (): Promise<number> => {
   }
 
   if (options.command === "generate") {
-    const body = await readRequestBody(options);
-    const accepted = await submitJob(body);
+    const accepted = await submitJob(await readRequestText(options));
     if (!options.wait) {
       print(accepted, options.json);
       return 0;

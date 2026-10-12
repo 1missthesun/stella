@@ -67,7 +67,7 @@ const isPlainJsonValue = (value: unknown, depth = 0): boolean => {
   );
 };
 
-const jwtStatus = (
+export const jwtStatus = (
   token: string,
   now = Date.now(),
 ): "opaque" | "valid" | "expired" | "malformed" => {

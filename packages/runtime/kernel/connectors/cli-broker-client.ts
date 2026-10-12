@@ -19,6 +19,10 @@ import { z } from "zod";
 
 import { forkTimeoutFiber } from "./effect-runtime.js";
 import type { ConnectorTokenPayload } from "./oauth.js";
+import type {
+  MediaHttpResult,
+  MediaOperation,
+} from "../cli/media-request.js";
 
 /**
  * Shape of the worker→host connector token-store RPC (owner-only local
@@ -434,6 +438,34 @@ export const requestAutomationDaemonSpawnFromBridge = async ({
         ? record.reason
         : "unsupported",
   };
+};
+
+/** One `stella-media` call made with the worker's live Stella session. */
+export const requestMediaFromBridge = async ({
+  socketPath,
+  operation,
+  deviceId,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+}: {
+  socketPath: string;
+  operation: MediaOperation;
+  deviceId?: string;
+  timeoutMs?: number;
+}): Promise<MediaHttpResult> => {
+  const result = await sendRequest(
+    socketPath,
+    "media.request",
+    { ...operation, ...(deviceId ? { deviceId } : {}) },
+    timeoutMs,
+  );
+  const record =
+    result && typeof result === "object"
+      ? (result as Record<string, unknown>)
+      : null;
+  if (!record || typeof record.status !== "number") {
+    throw new Error("cli-bridge: invalid media response");
+  }
+  return { status: record.status, body: record.body };
 };
 
 export const requestDesktopPermissionFromBridge = async ({

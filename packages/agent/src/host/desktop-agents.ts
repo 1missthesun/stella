@@ -93,8 +93,15 @@ const isPidAlive = (pid: number) => {
   }
 };
 
-/** One environment per working directory; agents on this computer share it. */
-export function desktopEnvironments(defaultCwd: string) {
+/**
+ * One environment per conversation and working directory; agents on this
+ * computer share it. `shellEnv` is the environment Stella's shell gives
+ * commands (its CLIs on PATH, their entrypoints and the runtime's bridge).
+ */
+export function desktopEnvironments(
+  defaultCwd: string,
+  shellEnv?: (target: { conversationId: string; cwd: string }) => Record<string, string> | undefined,
+) {
   const envs = new Map<string, NodeExecutionEnv>();
   /**
    * Terminations still running. pi starts one without waiting when a command
@@ -121,16 +128,22 @@ export function desktopEnvironments(defaultCwd: string) {
   return {
     /** End every command the agents have running here, with everything it started. */
     terminateCommands,
-    env: async ({ cwd }: EnvTarget, _context: Context) => {
+    env: async ({ conversationId, cwd }: EnvTarget, _context: Context) => {
       // A conversation whose tools run elsewhere reaches them through its
       // tools (`desktopCoding`); its prompt still reads this one.
       const directory = cwd ?? defaultCwd;
-      let env = envs.get(directory);
+      const key = shellEnv ? `${conversationId}\0${directory}` : directory;
+      let env = envs.get(key);
       if (!env) {
         // An agent's own folder exists once it first works there.
         if (cwd) await mkdir(directory, { recursive: true }).catch(() => undefined);
-        env = new NodeExecutionEnv({ cwd: directory, killProcessTree: killCommandTree });
-        envs.set(directory, env);
+        const commandEnv = shellEnv?.({ conversationId: String(conversationId), cwd: directory });
+        env = new NodeExecutionEnv({
+          cwd: directory,
+          killProcessTree: killCommandTree,
+          ...(commandEnv ? { shellEnv: { ...process.env, ...commandEnv } } : {}),
+        });
+        envs.set(key, env);
       }
       return env;
     },

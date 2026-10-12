@@ -183,6 +183,8 @@ export type DesktopChatsOptions = {
   resolveDirectModel?: DirectModelResolver;
   /** The orchestrator's thinking level, from the user's reasoning effort. */
   thinkingLevel?(): ModelThinkingLevel;
+  /** The environment Stella's shell gives a conversation's commands run here. */
+  shellEnv?(target: { conversationId: string; cwd: string }): Record<string, string> | undefined;
   /** Stella's own tools (web, html, image_gen, ask_user, …) for one conversation. */
   tools?(conversationId: string): StellaToolHost;
   /** The cloud journal of a conversation stored in the cloud, which its turns are mirrored into. */
@@ -439,7 +441,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     }).catch((error: unknown) => options.report(error));
     await saving;
   };
-  const environments = desktopEnvironments(options.workspace);
+  const environments = desktopEnvironments(options.workspace, options.shellEnv);
   /**
    * Where each conversation stored in the cloud has its brain, as last read,
    * and the host that takes this computer's turns for it now (null: here).

@@ -260,6 +260,8 @@ export const piChatsFor = (
           : getModelOverride(dataDir, "orchestrator");
       },
       claudeCodeEngine,
+      shellEnv: ({ conversationId, cwd }) =>
+        session.runnerCell.get()?.piTools.shellEnvironment({ conversationId, cwd }),
       userReminders: ({ text, sentAt, previousUserAt, timezone }) =>
         piUserReminders(session.config.get().stellaDataDirPath, {
           text,

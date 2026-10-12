@@ -365,6 +365,7 @@ export const createRunnerContext = ({
     stellaBrowserBinPath,
     stellaOfficeBinPath,
     stellaComputerCliPath,
+    cliBridgeSocketPath,
     askUser,
     requestSecureInput,
     useSecureValue,

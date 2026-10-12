@@ -21,6 +21,7 @@ import {
   createBackendConnectorActionBroker,
   createBackendConnectorActionsBroker,
 } from "../../backend-connector-action-broker.js";
+import { createBackendMediaBroker } from "../../backend-media-broker.js";
 import { connectorActionBrokerAvailability } from "../../required-cli-bridge.js";
 import * as HostBus from "../host-bus.js";
 import * as SessionConfig from "./config.js";
@@ -138,6 +139,21 @@ export const layer = Layer.effect(
       },
     });
 
+    const requestMedia = createBackendMediaBroker({
+      getSiteAuth: () => {
+        const baseUrl = config.get().backendUrl?.trim();
+        const authToken = config.get().authToken?.trim();
+        return baseUrl && authToken ? { baseUrl, authToken } : null;
+      },
+      refreshSiteAuth: async () => {
+        try {
+          return await refreshSiteAuth();
+        } catch {
+          return null;
+        }
+      },
+    });
+
     const requestHostConnectorTokenStore = async (
       request: ConnectorTokenStoreRequest,
     ): Promise<ConnectorTokenStoreResult> =>
@@ -190,6 +206,7 @@ export const layer = Layer.effect(
           handlers: {
             runBackendConnectorAction,
             listBackendConnectorActions,
+            requestMedia,
             requestConnectorCredential: async (params) => {
               try {
                 return await hostBus.request<

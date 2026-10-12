@@ -9,9 +9,9 @@
  * of JSON, server closes. Request: `{ id, method, params }`. Response:
  * `{ id, result }` on success or `{ id, error: { message } }` on failure.
  *
- * Surface is intentionally narrow. Connector backend actions are brokered as
- * action-specific requests; the protocol never exposes Stella site auth or an
- * arbitrary HTTP proxy. New methods get added as separate handler entries —
+ * Surface is intentionally narrow. Connector backend actions and
+ * `stella-media` calls are brokered as action-specific requests; the protocol
+ * never exposes Stella site auth or an arbitrary HTTP proxy. New methods get added as separate handler entries —
  * no introspection, no versioning, no streaming. If we ever need more
  * than this we should reconsider rather than grow the protocol here.
  */
@@ -28,6 +28,10 @@ import type {
   BackendConnectorActionResult,
   BackendConnectorActionsResult,
 } from "../kernel/connectors/cli-broker-client.js";
+import type {
+  MediaHttpResult,
+  MediaOperation,
+} from "../kernel/cli/media-request.js";
 
 /**
  * Defensive ceiling kept below the 104-byte BSD `sun_path` limit (UTF-8
@@ -132,6 +136,13 @@ export type CliBridgeHandlers = {
   spawnAutomationDaemon?: (
     params: AutomationDaemonSpawnParams,
   ) => Promise<AutomationDaemonSpawnResult>;
+  /**
+   * `stella-media` calls made with the worker's live Stella session, so the
+   * CLI never depends on the token its shell was started with.
+   */
+  requestMedia?: (
+    params: MediaOperation & { deviceId?: string; signal?: AbortSignal },
+  ) => Promise<MediaHttpResult>;
 };
 
 export type CliBridgeServer = {
@@ -165,6 +176,24 @@ const spawnAutomationDaemonParamsSchema = z.object({
   stateDir: z.string().min(1),
   env: z.unknown().optional(),
 });
+
+const mediaRequestParamsSchema = z.discriminatedUnion("op", [
+  z.strictObject({
+    op: z.literal("models"),
+    deviceId: z.string().trim().min(1).max(128).optional(),
+  }),
+  z.strictObject({
+    op: z.literal("job"),
+    jobId: z.string().trim().min(1).max(256),
+    deviceId: z.string().trim().min(1).max(128).optional(),
+  }),
+  z.strictObject({
+    op: z.literal("generate"),
+    request: z.string().min(2),
+    idempotencyKey: z.string().trim().min(1).max(256).optional(),
+    deviceId: z.string().trim().min(1).max(128).optional(),
+  }),
+]);
 
 const REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
 const MAX_REQUEST_BYTES = 64 * 1024;
@@ -361,6 +390,19 @@ const dispatch = async (
         sessionId,
         stateDir,
         ...(env ? { env } : {}),
+      });
+    }
+    case "media.request": {
+      if (!handlers.requestMedia) {
+        throw new Error("media.request: unsupported");
+      }
+      const parsed = mediaRequestParamsSchema.safeParse(params);
+      if (!parsed.success) {
+        throw new Error("media.request: a valid media operation is required");
+      }
+      return await handlers.requestMedia({
+        ...parsed.data,
+        ...(signal ? { signal } : {}),
       });
     }
     case "connector.requestCredential": {

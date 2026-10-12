@@ -72,10 +72,12 @@ const platformKey =
         : "");
 
 if (!platformKey) {
-  process.stderr.write(
-    `Unsupported platform/arch combo: ${process.platform}/${process.arch}. Pass --platform to override.\n`,
+  // Nothing is published for this platform, so there is nothing to fetch:
+  // reporting that as a failure made every launch on it retry setup.
+  process.stdout.write(
+    `No native helpers are published for ${process.platform}/${process.arch}; nothing to download. Pass --platform to fetch another platform's.\n`,
   );
-  process.exit(1);
+  process.exit(0);
 }
 
 const platformDir =

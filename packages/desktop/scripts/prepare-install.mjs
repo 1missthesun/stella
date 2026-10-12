@@ -9,12 +9,39 @@
 // rest still run. Exits 1 when any step failed, so the launcher tries again
 // on the next launch.
 //
-// Usage: bun packages/desktop/scripts/prepare-install.mjs
+// Once every step succeeds for a commit, the commit is noted in the
+// checkout's git dir and later runs for it return at once, so Stella can run this
+// before an update relaunches it and the launcher's run on the way back up
+// costs nothing. `--force` runs the steps regardless.
+//
+// Usage: bun packages/desktop/scripts/prepare-install.mjs [--force]
 
 import { spawnSync } from "node:child_process";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..", "..");
+
+const gitOutput = (args) => {
+  const result = spawnSync("git", args, { cwd: repoRoot, encoding: "utf8" });
+  return result.status === 0 ? result.stdout.trim() : "";
+};
+const head = gitOutput(["rev-parse", "HEAD"]);
+// The checkout's own git dir: the assets are in its working tree, so a
+// worktree sharing the repository is not prepared by this one.
+const gitDir = gitOutput(["rev-parse", "--absolute-git-dir"]);
+const stampPath = gitDir ? path.join(gitDir, "stella-prepared-head") : "";
+const readStamp = () => {
+  try {
+    return readFileSync(stampPath, "utf8").trim();
+  } catch {
+    return "";
+  }
+};
+if (head && stampPath && !process.argv.includes("--force") && readStamp() === head) {
+  console.log(`[prepare-install] already prepared for ${head.slice(0, 12)}`);
+  process.exit(0);
+}
 
 const steps = [
   ["native helpers", "packages/desktop/scripts/download-native-helpers.mjs"],
@@ -58,4 +85,11 @@ for (const [name, script, ...args] of steps) {
 if (failed.length > 0) {
   console.error(`[prepare-install] incomplete: ${failed.join(", ")}`);
   process.exit(1);
+}
+if (head && stampPath) {
+  try {
+    writeFileSync(stampPath, `${head}\n`);
+  } catch {
+    // Unnoted, the next run just checks again.
+  }
 }

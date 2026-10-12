@@ -1,8 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Worker } from "node:worker_threads";
-import { app, protocol, session, webContents } from "electron";
-import { RENDERER_ORIGIN, RENDERER_SCHEME } from "./origin.js";
+import { fileURLToPath } from "node:url";
+import { app, protocol, session, utilityProcess, webContents } from "electron";
+import { RENDERER_ORIGIN, RENDERER_SCHEME, SOURCE_DATA_ARG } from "./origin.js";
 import { MEDIA_SCHEME_PRIVILEGES, serveMediaProtocol } from "./media-protocol.js";
 import { CANVAS_SCHEME_PRIVILEGES, serveCanvasProtocol } from "./canvas-protocol.js";
 import type { SourceWorkerData, SourceWorkerMessage, SourceWorkerRequest } from "./source-worker.js";
@@ -81,45 +82,102 @@ export type RendererSourceHandle = {
 type Answer = { status: number; contentType: string; body: Uint8Array };
 type ApplyAnswer = Extract<SourceWorkerMessage, { type: "applied" }>["result"];
 
+type SourceChannel = {
+  post: (message: SourceWorkerRequest) => void;
+  terminate: () => void;
+};
+
+const SOURCE_WORKER_URL = new URL("./source-worker.js", import.meta.url);
+
+/**
+ * A thread in this process, or a process of its own. The native tools
+ * (rolldown's allocator above all) keep what a thread allocated after it
+ * exits, so a source server that comes and goes runs as a process.
+ */
+const openSourceChannel = (
+  workerData: SourceWorkerData,
+  isolate: "thread" | "process",
+  handlers: {
+    message: (message: SourceWorkerMessage) => void;
+    error: (error: unknown) => void;
+    exit: (code: number) => void;
+  },
+): SourceChannel => {
+  if (isolate === "thread") {
+    const worker = new Worker(SOURCE_WORKER_URL, { workerData });
+    worker.on("message", handlers.message);
+    worker.on("error", handlers.error);
+    worker.on("exit", handlers.exit);
+    return {
+      post: (message) => worker.postMessage(message),
+      terminate: () => void worker.terminate(),
+    };
+  }
+  const child = utilityProcess.fork(fileURLToPath(SOURCE_WORKER_URL), [`${SOURCE_DATA_ARG}${JSON.stringify(workerData)}`], {
+    serviceName: "Stella source server",
+    stdio: "ignore",
+    // On macOS, through the helper that may load node_modules' native tools.
+    allowLoadingUnsignedLibraries: process.platform === "darwin",
+    // rolldown keeps a heap per pool thread (one per core by default) and
+    // returns freed pages lazily: a cold dependency bundle then holds about
+    // twice the memory for no gain in speed.
+    env: { ...process.env, ROLLDOWN_WORKER_THREADS: "4", RAYON_NUM_THREADS: "4", MIMALLOC_PURGE_DELAY: "0" },
+  });
+  child.on("message", handlers.message);
+  child.on("error", (type, location) => handlers.error(new Error(`${type} at ${location}`)));
+  child.on("exit", handlers.exit);
+  return {
+    post: (message) => child.postMessage(message),
+    terminate: () => void child.kill(),
+  };
+};
+
 const startSourceWorker = (options: {
   workerData: SourceWorkerData;
+  isolate: "thread" | "process";
   log: (message: string) => void;
   onReloadNeeded: () => void;
 }) => {
-  let worker: Worker | null = null;
+  let worker: SourceChannel | null = null;
+  let isolate = options.isolate;
+  let heard = false;
   let disposed = false;
   let restarts = 0;
   let nextId = 0;
   const pending = new Map<number, { resolve: (value: never) => void; reject: (error: Error) => void }>();
   const start = () => {
-    const current = new Worker(new URL("./source-worker.js", import.meta.url), {
-      workerData: options.workerData,
-    });
-    current.on("message", (message: SourceWorkerMessage) => {
-      if (message.type === "log") {
-        options.log(message.message);
-      } else if (message.type === "reload") {
-        options.onReloadNeeded();
-      } else {
-        const request = pending.get(message.id);
-        if (!request) return;
-        pending.delete(message.id);
-        if (message.type === "applied" && message.error !== undefined) request.reject(new Error(message.error));
-        else request.resolve(message as never);
-      }
-    });
-    current.on("error", (error) => {
-      options.log(`[source] worker failed: ${error instanceof Error ? error.message : String(error)}`);
-    });
-    current.on("exit", (code) => {
-      if (worker !== current) return;
-      worker = null;
-      for (const request of pending.values()) request.reject(new Error(`The source worker exited (${code}).`));
-      pending.clear();
-      if (!disposed && restarts < 3) {
-        restarts += 1;
-        start();
-      }
+    const current: SourceChannel = openSourceChannel(options.workerData, isolate, {
+      message: (message) => {
+        heard = true;
+        if (message.type === "log") {
+          options.log(message.message);
+        } else if (message.type === "reload") {
+          options.onReloadNeeded();
+        } else {
+          const request = pending.get(message.id);
+          if (!request) return;
+          pending.delete(message.id);
+          if (message.type === "applied" && message.error !== undefined) request.reject(new Error(message.error));
+          else request.resolve(message as never);
+        }
+      },
+      error: (error) => {
+        options.log(`[source] worker failed: ${error instanceof Error ? error.message : String(error)}`);
+      },
+      exit: (code) => {
+        if (worker !== current) return;
+        worker = null;
+        for (const request of pending.values()) request.reject(new Error(`The source worker exited (${code}).`));
+        pending.clear();
+        if (!disposed && restarts < 3) {
+          restarts += 1;
+          if (isolate === "process" && !heard) {
+            options.log(`[source] the source process could not start (${code}); serving from a thread`);
+            isolate = "thread";
+          }
+          start();
+        }
+      },
     });
     worker = current;
   };
@@ -132,7 +190,7 @@ const startSourceWorker = (options: {
       }
       nextId += 1;
       pending.set(nextId, { resolve: resolve as (value: never) => void, reject });
-      worker.postMessage({ ...message, id: nextId });
+      worker.post({ ...message, id: nextId } as SourceWorkerRequest);
     });
   return {
     request: (url: string) => call<Answer>({ type: "request", url }),
@@ -140,7 +198,7 @@ const startSourceWorker = (options: {
       call<{ result?: ApplyAnswer }>({ type: "apply", paths }).then((answer) => answer.result ?? { mode: "none" as const }),
     dispose: () => {
       disposed = true;
-      void worker?.terminate();
+      worker?.terminate();
     },
   };
 };
@@ -158,6 +216,8 @@ export const serveRendererSource = (options: {
   /** Repo root whose packages/desktop-ui .env files supply the defines; defaults to sourceRoot. */
   envRoot?: string;
   mode: RendererBuildMode;
+  /** Where the source server runs; `process` for one that closes while the app runs on. */
+  isolate?: "thread" | "process";
   log: (message: string) => void;
   /**
    * Rewrites the main window's first page, once. In production it is served
@@ -190,6 +250,7 @@ export const serveRendererSource = (options: {
       cacheDir: path.join(app.getPath("userData"), "Renderer Source Cache"),
       mode: options.mode,
     },
+    isolate: options.isolate ?? "thread",
     log: options.log,
     onReloadNeeded: reloadPages,
   });

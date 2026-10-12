@@ -3,6 +3,7 @@ import type { RendererBuildMode } from "./renderer-protocol.js";
 import { createTailwindBuild, type TailwindBuild } from "./css.js";
 import { createRendererSource } from "./renderer-source.js";
 import { loadTailwindTools } from "./tools.js";
+import { SOURCE_DATA_ARG } from "./origin.js";
 
 export type SourceWorkerData = {
   uiRoot: string;
@@ -22,10 +23,36 @@ export type SourceWorkerMessage =
   | { type: "log"; message: string }
   | { type: "reload" };
 
-const port = parentPort;
-if (!port) throw new Error("The renderer source worker needs a parent port.");
-const data = workerData as SourceWorkerData;
-const post = (message: SourceWorkerMessage) => port.postMessage(message);
+type Port = {
+  post: (message: SourceWorkerMessage) => void;
+  listen: (handler: (message: SourceWorkerRequest) => void) => void;
+};
+
+const connectPort = (): { port: Port; data: SourceWorkerData } => {
+  if (parentPort) {
+    const thread = parentPort;
+    return {
+      port: {
+        post: (message) => thread.postMessage(message),
+        listen: (handler) => thread.on("message", handler),
+      },
+      data: workerData as SourceWorkerData,
+    };
+  }
+  const child = (process as { parentPort?: Electron.ParentPort }).parentPort;
+  const arg = process.argv.find((value) => value.startsWith(SOURCE_DATA_ARG));
+  if (!child || !arg) throw new Error("The renderer source worker needs a parent port.");
+  return {
+    port: {
+      post: (message) => child.postMessage(message),
+      listen: (handler) => child.on("message", (event) => handler(event.data as SourceWorkerRequest)),
+    },
+    data: JSON.parse(arg.slice(SOURCE_DATA_ARG.length)) as SourceWorkerData,
+  };
+};
+
+const { port, data } = connectPort();
+const post = (message: SourceWorkerMessage) => port.post(message);
 const log = (message: string) => post({ type: "log", message });
 
 let tailwindWorker: Worker | null = null;
@@ -88,7 +115,7 @@ void source.then((ready) => ready.prepare()).catch((error: unknown) => {
   log(`[source] prepare failed: ${error instanceof Error ? error.message : String(error)}`);
 });
 
-port.on("message", (message: SourceWorkerRequest) => {
+port.listen((message) => {
   if (message.type === "request") {
     void source
       .then((ready) => ready.handle(message.url))

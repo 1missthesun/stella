@@ -74,6 +74,8 @@ export const openDraftPreview = async (options: {
     // A preview is an authoring surface: the agent iterating on the draft wants
     // hot updates and readable errors, whichever mode the app itself serves.
     mode: "development",
+    // Closing the preview then gives back everything its server allocated.
+    isolate: "process",
     log: (message) =>
       getMainLogger()?.process("renderer.preview-source", {
         draft: options.name,

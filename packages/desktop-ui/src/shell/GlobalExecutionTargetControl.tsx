@@ -1,9 +1,8 @@
 import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
 import { useEffect, useMemo, useState } from "react";
 import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
-import { listExecutionDevices } from "@/features/cloud/placement-client";
+import { useExecutionDeviceList } from "@/features/cloud/use-execution-device-list";
 import { backendUrl } from "@/platform/backend/backend-client";
-import { getAuthToken } from "@/global/auth/services/auth-token";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import {
@@ -34,9 +33,6 @@ import {
   conversationBrainAvailable,
   useConversationBrain,
 } from "@/features/execution-placement/conversation-brain";
-
-/** Live presence goes stale quickly; refresh while the picker is open. */
-const DEVICE_POLL_INTERVAL_MS = 15_000;
 
 /**
  * Why a listed computer cannot be picked, said plainly. "Unavailable" used to
@@ -101,35 +97,13 @@ export function GlobalExecutionTargetControl() {
     DeviceDestination[] | undefined
   >(undefined);
 
-  // The owner gate holds presence, so this is a read of live device state
-  // rather than a backend view subscription. Poll only while the picker is open.
-  useEffect(() => {
-    if (
-      !open ||
-      !socketOrigin ||
-      !isCloudConversationReady ||
-      !hasConnectedAccount
-    ) {
-      return;
-    }
-    let active = true;
-    const read = () => {
-      void listExecutionDevices({
-        socketOrigin,
-        getToken: (options) => getAuthToken(options ?? {}),
-      })
-        .then((response) => {
-          if (active) setDestinations(response.devices);
-        })
-        .catch(() => undefined);
-    };
-    read();
-    const timer = window.setInterval(read, DEVICE_POLL_INTERVAL_MS);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
-  }, [hasConnectedAccount, isCloudConversationReady, open, socketOrigin]);
+  useExecutionDeviceList({
+    socketOrigin:
+      open && isCloudConversationReady && hasConnectedAccount
+        ? socketOrigin
+        : null,
+    onDevices: (devices) => setDestinations(devices),
+  });
 
   useEffect(() => {
     void getDeviceIdOrNull().then(setCurrentDeviceId, () =>

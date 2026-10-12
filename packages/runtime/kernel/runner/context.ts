@@ -412,6 +412,7 @@ export const createRunnerContext = ({
         deviceId,
         baseUrl: authToken ? await cloudRealtimeBaseUrl() : null,
         authToken,
+        client: authToken ? context.backend.client() : null,
         loadMedia: () =>
           loadMediaAccess({
             stellaDataDir,

@@ -3,15 +3,11 @@ import type {
   DeviceDestination,
   DeviceRemoteExecution,
 } from "@stella/contracts/turn-plane/placement";
-import { listExecutionDevices } from "@/features/cloud/placement-client";
+import { useExecutionDeviceList } from "@/features/cloud/use-execution-device-list";
 import { backendClient, backendUrl } from "@/platform/backend/backend-client";
-import { getAuthToken } from "@/global/auth/services/auth-token";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { getDeviceIdOrNull } from "@/platform/electron/device";
 import { getElectronApi } from "@/platform/electron/electron";
-
-/** Presence goes stale quickly, so re-read while the list is on screen. */
-const DEVICE_POLL_INTERVAL_MS = 15_000;
 
 export type ExecutionDeviceRow = DeviceDestination & {
   /** The computer the user is looking at right now. */
@@ -26,7 +22,7 @@ export type ExecutionDevicesError = "load" | "update";
  *
  * The read is a presence read and nothing more. `setRemoteExecution` is the
  * only writer and only a user action calls it, which is what keeps "listed"
- * and "willing to run work" apart: polling this hook can never enlist a
+ * and "willing to run work" apart: reading this list can never enlist a
  * machine, and neither can rendering a row for it.
  */
 export function useExecutionDevicesController() {
@@ -38,7 +34,7 @@ export function useExecutionDevicesController() {
   const socketOrigin = hasConnectedAccount && backendUrl ? backendUrl : null;
   // An answer to the user's tap is newer than any read already in flight, so
   // a read that started before it must not scroll the row back.
-  const writeSeq = useRef(0);
+  const lastWriteAt = useRef(0);
 
   useEffect(() => {
     void getDeviceIdOrNull().then(setCurrentDeviceId, () =>
@@ -47,33 +43,18 @@ export function useExecutionDevicesController() {
   }, []);
 
   useEffect(() => {
-    if (!socketOrigin) {
-      setDevices(null);
-      return;
-    }
-    let active = true;
-    const read = () => {
-      const seq = writeSeq.current;
-      void listExecutionDevices({
-        socketOrigin,
-        getToken: (options) => getAuthToken(options ?? {}),
-      })
-        .then((response) => {
-          if (!active || seq !== writeSeq.current) return;
-          setDevices(response.devices);
-          setError((current) => (current === "load" ? null : current));
-        })
-        .catch(() => {
-          if (active) setError("load");
-        });
-    };
-    read();
-    const timer = window.setInterval(read, DEVICE_POLL_INTERVAL_MS);
-    return () => {
-      active = false;
-      window.clearInterval(timer);
-    };
+    if (!socketOrigin) setDevices(null);
   }, [socketOrigin]);
+
+  useExecutionDeviceList({
+    socketOrigin,
+    onDevices: (next, startedAt) => {
+      if (startedAt < lastWriteAt.current) return;
+      setDevices(next);
+      setError((current) => (current === "load" ? null : current));
+    },
+    onError: () => setError("load"),
+  });
 
   const rows = useMemo<ExecutionDeviceRow[]>(() => {
     const listed = (devices ?? []).map((device) => ({
@@ -115,7 +96,7 @@ export function useExecutionDevicesController() {
           );
           remoteExecution = result.remoteExecution;
         }
-        writeSeq.current += 1;
+        lastWriteAt.current = Date.now();
         setDevices((current) =>
           (current ?? []).map((device) =>
             device.deviceId === deviceId

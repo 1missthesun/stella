@@ -11,7 +11,14 @@ import type {
 } from "@stella/contracts/backend/devices";
 import { sha256Hex } from "@stella/contracts/turn-plane/pairing-proof";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
-import { knownExecutionCapabilities, type DeviceRemoteExecution } from "@stella/contracts/turn-plane/placement";
+import {
+  CLOUD_CAPABILITIES,
+  knownExecutionCapabilities,
+  PLACEMENT_PROTOCOL,
+  type DeviceRemoteExecution,
+  type DevicesResponse,
+} from "@stella/contracts/turn-plane/placement";
+import { deviceDestination, presenceState, type PresenceRow } from "../../owner-gate/presence.js";
 import { array, boolean, empty, literal, nullable, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -574,6 +581,37 @@ export const snapshotDevices = (
   ),
 });
 
+/**
+ * `devices.list`: the registry joined with presence rows. An open connection
+ * is online; when it was last heard from is left out while it is, so the value
+ * changes only when presence or the registry does.
+ */
+const devicesList = (db: OwnerDbReader): DevicesResponse => {
+  const presence = new Map(
+    readOrDefault(
+      () =>
+        db.all<PresenceRow>(
+          `SELECT device_id, presence_session_id, connection_id, connected, ready,
+                  chat_slots, agent_slots, capabilities, protocol_version, last_seen_at
+             FROM device_presence`,
+        ),
+      [],
+    ).map((row) => [row.device_id, presenceState(row)] as const),
+  );
+  return {
+    protocol: PLACEMENT_PROTOCOL,
+    devices: (snapshotDevices(db).devices ?? []).map((device) => {
+      const state = presence.get(device.deviceId);
+      const online = Boolean(state?.connected);
+      const destination = deviceDestination(device, state, online);
+      if (!online) return destination;
+      const { lastSeenAt: _lastSeenAt, ...rest } = destination;
+      return rest;
+    }),
+    cloud: { capabilities: [...CLOUD_CAPABILITIES] },
+  };
+};
+
 // ── Phones ─────────────────────────────────────────────────────────────────
 
 /**
@@ -1108,6 +1146,12 @@ export const devicesDomain = {
       empty()(raw);
       forgetAllPushTokens(ctx);
       return null;
+    },
+  },
+  views: {
+    "devices.list": {
+      parse: empty(),
+      read: (ctx) => devicesList(ctx.db),
     },
   },
   jobs: {

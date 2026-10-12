@@ -441,6 +441,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       now,
       now,
     );
+    this.ownerStore().wrote(["device_presence"]);
   }
 
   /**
@@ -459,6 +460,7 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       attachment.deviceId,
       attachment.connectionId,
     );
+    this.ownerStore().wrote(["device_presence"]);
   }
 
   protected presenceRow(deviceId: string): DevicePresenceState | undefined {

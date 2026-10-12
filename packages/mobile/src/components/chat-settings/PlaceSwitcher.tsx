@@ -6,6 +6,7 @@ import {
   type AutomaticExecutionTarget,
   type ExecutionDeviceDestination,
 } from "../../lib/execution-placement";
+import { getBackendClient } from "../../lib/backend";
 import { tapLight } from "../../lib/haptics";
 import type { ComputerControl } from "../../lib/main-shell-store";
 import {
@@ -30,7 +31,7 @@ import {
 } from "../settings/computer-rows";
 import { ChoiceRow, KIT, SwitcherFace } from "./kit";
 
-/** Live presence goes stale quickly; refresh while the panel is open. */
+/** Where the backend does not push presence yet, how often the panel reads it. */
 const EXECUTION_DEVICE_POLL_MS = 15_000;
 
 const STATUS_KEYS: Readonly<Record<ComputerRowStatusKind, string>> = {
@@ -87,13 +88,15 @@ export function PlaceSwitcher({
     void refreshPaired();
   }, [refreshPaired, chatPaired]);
 
-  // Presence is a poll while the panel is open, and only ever a read:
-  // nothing here may move a computer's consent, however often it runs.
+  // Presence is pushed while the panel is open (polled where the backend
+  // does not push it yet), and only ever a read: nothing here may move a
+  // computer's consent, however often it runs.
   const canListDevices = control !== null || signedIn;
   const [refreshToken, setRefreshToken] = useState(0);
   useEffect(() => {
     if (!focused || !open || !canListDevices) return;
     let active = true;
+    let timer: ReturnType<typeof setInterval> | undefined;
     const controller = new AbortController();
     const read = () => {
       void listExecutionDevices({ signal: controller.signal })
@@ -110,12 +113,26 @@ export function PlaceSwitcher({
           );
         });
     };
-    read();
-    const timer = setInterval(read, EXECUTION_DEVICE_POLL_MS);
+    const stop = getBackendClient().watch(
+      "devices.list",
+      {},
+      (value) => {
+        if (!active) return;
+        if (timer !== undefined) clearInterval(timer);
+        timer = undefined;
+        setDestinations(value.devices);
+      },
+      () => {
+        if (!active || timer !== undefined) return;
+        read();
+        timer = setInterval(read, EXECUTION_DEVICE_POLL_MS);
+      },
+    );
     return () => {
       active = false;
+      stop();
       controller.abort();
-      clearInterval(timer);
+      if (timer !== undefined) clearInterval(timer);
     };
   }, [focused, open, canListDevices, refreshToken]);
 

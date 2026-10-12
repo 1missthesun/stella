@@ -142,8 +142,8 @@ const BRAIN_TTL_MS = 5_000;
 const BRAIN_WATCH_MS = 10_000;
 /** How long a moved brain's brief waits for Stella's turn here to end. */
 const BRAIN_HANDOFF_WAIT_MS = 5 * 60_000;
-/** How long the owner's device list and media access are trusted before they are read again. */
-const EXECUTION_CONTEXT_TTL_MS = 30_000;
+/** How long one read of the owner's device list and media access serves the reads around it, such as one request's sections. */
+const EXECUTION_CONTEXT_TTL_MS = 1_000;
 /** Until signed in, recovered work retries the provider this often. */
 const PROVIDER_RETRY_MS = 5_000;
 /** How long the agents' directory waits for the cloud; a message waits out the cloud's own device wait. */
@@ -362,11 +362,11 @@ const fileName = (conversationId: string): string => {
 export function desktopChats(options: DesktopChatsOptions) {
   const chats = new Map<string, Promise<Chat>>();
   /**
-   * The owner's devices and media access for every conversation's prompt,
-   * read at most once per `EXECUTION_CONTEXT_TTL_MS`: a request after that
-   * waits for a fresh read, so a turn that starts after a quiet spell sees the
-   * devices as they are now, and a failed read keeps the last answer, so a
-   * moment offline does not rewrite the prompt.
+   * The owner's devices and media access for every conversation's prompt.
+   * The runtime keeps them as the backend pushes them, so a read is local and
+   * a turn never waits on the network for them once the first push arrived;
+   * a failed read keeps the last answer, so a moment offline does not
+   * rewrite the prompt.
    */
   let executionContextRead: { snapshot?: ExecutionContextSnapshot; at: number; pending?: Promise<void> } = { at: 0 };
   const sharedExecutionContext = async (): Promise<ExecutionContextSnapshot | undefined> => {

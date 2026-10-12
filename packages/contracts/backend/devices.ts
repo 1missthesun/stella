@@ -10,7 +10,7 @@
  * list cannot fill up with browsers.
  */
 
-import type { DeviceRemoteExecution } from "../turn-plane/placement.js";
+import type { DeviceRemoteExecution, DevicesResponse } from "../turn-plane/placement.js";
 
 export type ActivityNotificationKind = "started" | "completed" | "failed";
 
@@ -103,4 +103,12 @@ export type DeviceCalls = {
   };
 };
 
-export type DeviceViews = Record<never, never>;
+export type DeviceViews = {
+  /**
+   * The owner's computers with live presence, pushed when one connects,
+   * drops, changes availability, or changes in the registry. A computer
+   * whose connection is open counts as online; `GET /owners/me/devices`
+   * also ages out one that went quiet without closing.
+   */
+  "devices.list": { args: Record<string, never>; result: DevicesResponse };
+};

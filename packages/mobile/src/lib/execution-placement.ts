@@ -148,9 +148,9 @@ export const readMainConversationId = async (): Promise<string> => {
 export type ExecutionDeviceDestination = DeviceDestination;
 
 /**
- * The owner's execution destinations with live presence, read from the owner
- * gate. Presence is a socket fact there, so this is a poll, not a
- * subscription: callers refresh it while a picker is on screen.
+ * The owner's execution destinations with live presence, read once from the
+ * owner gate. A picker that stays on screen subscribes to `devices.list`
+ * instead, which the backend pushes as presence changes.
  */
 export const listExecutionDevices = async (options?: {
   signal?: AbortSignal;

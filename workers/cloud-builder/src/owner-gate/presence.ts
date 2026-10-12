@@ -1,9 +1,11 @@
 import {
   DEVICE_PRESENCE_PROOF_PREFIX,
   type DeviceAvailability,
+  type DeviceDestination,
   knownExecutionCapabilities,
   type ExecutionCapability,
 } from "@stella/contracts/turn-plane/placement";
+import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import type { DevicePresenceState } from "../dispatch-policy.js";
 import { isRecord } from "./support.js";
 
@@ -136,3 +138,35 @@ export const presenceState = (row: PresenceRow): DevicePresenceState => ({
   protocolVersion: row.protocol_version,
   lastSeenAt: row.last_seen_at,
 });
+
+/** One registered device as an execution destination, given its presence and whether it counts as online. */
+export const deviceDestination = (
+  device: NonNullable<OwnerSnapshot["devices"]>[number],
+  presence: DevicePresenceState | undefined,
+  online: boolean,
+): DeviceDestination => {
+  const remoteExecution =
+    device.remoteExecution ??
+    (device.remoteExecutionEnabled ? "enabled" : "unconfigured");
+  return {
+    deviceId: device.deviceId,
+    ...(device.label ? { label: device.label } : {}),
+    remoteExecutionEnabled: remoteExecution === "enabled",
+    remoteExecution,
+    ...(device.remoteExecutionAskedAt
+      ? { remoteExecutionAskedAt: device.remoteExecutionAskedAt }
+      : {}),
+    ...(device.brainHome ? { brainHome: true as const } : {}),
+    online,
+    ...(presence
+      ? {
+          presenceSessionId: presence.presenceSessionId,
+          availability: withReleasedClientSelectability({
+            ready: online && presence.ready,
+            capabilities: presence.capabilities,
+          }),
+          lastSeenAt: presence.lastSeenAt,
+        }
+      : {}),
+  };
+};

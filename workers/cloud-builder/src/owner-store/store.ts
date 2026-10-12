@@ -436,6 +436,24 @@ export class OwnerStore {
     });
   }
 
+  /** Note a write to named tables made outside `call()`, so only the views that read them rerun. */
+  wrote(tables: readonly string[]): void {
+    this.dirty = true;
+    const known = this.tables();
+    if (tables.some((table) => !known.has(table))) {
+      this.forgetSchema();
+      this.dirtyTables = null;
+    } else if (this.dirtyTables !== null) {
+      for (const table of tables) this.dirtyTables.add(table);
+    }
+    if (this.flushQueued) return;
+    this.flushQueued = true;
+    queueMicrotask(() => {
+      this.flushQueued = false;
+      this.flush();
+    });
+  }
+
   // ── Live views ──────────────────────────────────────────────────────────
 
   liveSockets(): WebSocket[] {

@@ -1,6 +1,7 @@
 import { hostname } from "node:os";
 import { Effect } from "effect";
 import type { BackendClient } from "@stella/contracts/backend/client";
+import type { ViewArgs, ViewName, ViewResult } from "@stella/contracts/backend/api";
 import {
   createExecutionContextSnapshot,
   mediaAccessForAudience,
@@ -13,6 +14,35 @@ import { hasAccessibleLocalLlmApiKey } from "../storage/local-llm-credential-acc
 import { DEVICES_PATH } from "@stella/contracts/turn-plane/placement";
 
 const MAX_CATALOG_BYTES = 128 * 1024;
+const FALLBACK_READ_TIMEOUT_MS = 1_000;
+
+type HeldView<T> = { client: BackendClient; value?: T; failed: boolean; stop(): void };
+const heldViews = new Map<string, HeldView<unknown>>();
+
+/**
+ * A view this process keeps subscribed for as long as the client lives, so a
+ * read is the latest pushed value rather than a request. A new client (another
+ * sign-in) starts over.
+ */
+const holdView = <K extends ViewName>(client: BackendClient, view: K, args: ViewArgs<K>): HeldView<ViewResult<K>> => {
+  const existing = heldViews.get(view) as HeldView<ViewResult<K>> | undefined;
+  if (existing?.client === client) return existing;
+  existing?.stop();
+  const held: HeldView<ViewResult<K>> = { client, failed: false, stop: () => {} };
+  heldViews.set(view, held as HeldView<unknown>);
+  held.stop = client.watch(
+    view,
+    args,
+    (value) => {
+      held.value = value;
+      held.failed = false;
+    },
+    () => {
+      held.failed = true;
+    },
+  );
+  return held;
+};
 
 const readCatalog = async (response: Response): Promise<unknown> => {
   if (Number(response.headers.get("content-length")) > MAX_CATALOG_BYTES) {
@@ -46,6 +76,11 @@ const readMediaPlan = async (
   client: BackendClient | null,
 ): Promise<MediaAccess["stella"] | null> => {
   if (!client) return null;
+  const held = holdView(client, "billing.status", {});
+  if (held.value) {
+    if (!held.value.authenticated) return null;
+    return held.value.isAnonymous ? "sign_in" : mediaAccessForAudience(held.value.plan);
+  }
   // The watch is the callback's canceler: a timeout interrupts the wait and
   // stops the subscription, the same as the old timer settling with null.
   return await Effect.runPromise(
@@ -74,7 +109,7 @@ const readMediaPlan = async (
       });
     }).pipe(
       Effect.timeoutOrElse({
-        duration: 3_000,
+        duration: FALLBACK_READ_TIMEOUT_MS,
         orElse: () => Effect.succeed(null),
       }),
     ),
@@ -108,6 +143,7 @@ export const loadDeviceExecutionContext = async (args: {
   deviceId: string;
   baseUrl: string | null;
   authToken: string | null;
+  client?: BackendClient | null;
   fetchImpl?: typeof fetch;
   loadMedia?: () => Promise<MediaAccess | undefined>;
 }): Promise<ExecutionContextSnapshot> => {
@@ -118,10 +154,42 @@ export const loadDeviceExecutionContext = async (args: {
   return media ? { ...snapshot, media } : snapshot;
 };
 
+const fetchDevices = async (args: {
+  baseUrl: string;
+  authToken: string;
+  fetchImpl?: typeof fetch;
+}): Promise<unknown> => {
+  try {
+    const response = await (args.fetchImpl ?? fetch)(
+      `${args.baseUrl.replace(/\/+$/, "")}${DEVICES_PATH}`,
+      {
+        headers: { Authorization: `Bearer ${args.authToken}` },
+        signal: AbortSignal.timeout(FALLBACK_READ_TIMEOUT_MS),
+      },
+    );
+    if (!response.ok) return undefined;
+    const body = await readCatalog(response);
+    return body && typeof body === "object" && "devices" in body ? body.devices : undefined;
+  } catch {
+    // Offline/signed-out local work must not depend on the device catalog.
+    return undefined;
+  }
+};
+
+type FetchedDevices = { devices?: unknown; pending?: Promise<void> };
+const fetchedDevices = new WeakMap<BackendClient, FetchedDevices>();
+
+/**
+ * The owner's computers as `devices.list` last pushed them. Until the first
+ * push arrives, or on a backend without the view, a read falls back to the
+ * HTTP list: it waits only when nothing was read yet, and otherwise answers
+ * with the last list while a newer one loads.
+ */
 const loadDevices = async (args: {
   deviceId: string;
   baseUrl: string | null;
   authToken: string | null;
+  client?: BackendClient | null;
   fetchImpl?: typeof fetch;
 }): Promise<ExecutionContextSnapshot> => {
   const destination = {
@@ -129,31 +197,31 @@ const loadDevices = async (args: {
     deviceId: args.deviceId,
     label: hostname() || args.deviceId,
   } as const;
+  const known = (devices: unknown) =>
+    devices === undefined
+      ? undefined
+      : readExecutionContextSnapshot({ executionContext: { devices, destination, devicesKnown: true } });
+  const held = args.client ? holdView(args.client, "devices.list", {}) : undefined;
+  const pushed = known(held?.value?.devices);
+  if (pushed) return pushed;
   if (args.baseUrl && args.authToken) {
-    try {
-      const response = await (args.fetchImpl ?? fetch)(
-        `${args.baseUrl.replace(/\/+$/, "")}${DEVICES_PATH}`,
-        {
-          headers: { Authorization: `Bearer ${args.authToken}` },
-          signal: AbortSignal.timeout(3_000),
-        },
-      );
-      if (response.ok) {
-        const body = await readCatalog(response);
-        if (body && typeof body === "object" && "devices" in body) {
-          const snapshot = readExecutionContextSnapshot({
-            executionContext: {
-              devices: body.devices,
-              destination,
-              devicesKnown: true,
-            },
-          });
-          if (snapshot) return snapshot;
-        }
-      }
-    } catch {
-      // Offline/signed-out local work must not depend on the device catalog.
-    }
+    const http = { baseUrl: args.baseUrl, authToken: args.authToken, fetchImpl: args.fetchImpl };
+    if (!args.client) return known(await fetchDevices(http)) ?? createExecutionContextSnapshot({ devices: null, destination });
+    let fallback = fetchedDevices.get(args.client);
+    if (!fallback) fetchedDevices.set(args.client, (fallback = {}));
+    const state = fallback;
+    const refresh = () =>
+      (state.pending ??= fetchDevices(http)
+        .then((devices) => {
+          if (devices !== undefined) state.devices = devices;
+        })
+        .finally(() => {
+          state.pending = undefined;
+        }));
+    if (state.devices === undefined) await refresh();
+    else void refresh();
+    const last = known(state.devices);
+    if (last) return last;
   }
   return createExecutionContextSnapshot({ devices: null, destination });
 };

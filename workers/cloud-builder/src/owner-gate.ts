@@ -150,7 +150,7 @@ import {
 import {
   type PresenceAttachment,
   presenceTag,
-  withReleasedClientSelectability,
+  deviceDestination,
 } from "./owner-gate/presence.js";
 import {
   withTimeout,
@@ -1408,30 +1408,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         presence?.connected &&
           presence.lastSeenAt + DEVICE_PRESENCE_STALE_AFTER_MS > now,
       );
-      const remoteExecution =
-        device.remoteExecution ??
-        (device.remoteExecutionEnabled ? "enabled" : "unconfigured");
-      devices.push({
-        deviceId: device.deviceId,
-        ...(device.label ? { label: device.label } : {}),
-        remoteExecutionEnabled: remoteExecution === "enabled",
-        remoteExecution,
-        ...(device.remoteExecutionAskedAt
-          ? { remoteExecutionAskedAt: device.remoteExecutionAskedAt }
-          : {}),
-        ...(device.brainHome ? { brainHome: true as const } : {}),
-        online,
-        ...(presence
-          ? {
-              presenceSessionId: presence.presenceSessionId,
-              availability: withReleasedClientSelectability({
-                ready: online && presence.ready,
-                capabilities: presence.capabilities,
-              }),
-              lastSeenAt: presence.lastSeenAt,
-            }
-          : {}),
-      });
+      devices.push(deviceDestination(device, presence, online));
     }
     return {
       protocol: PLACEMENT_PROTOCOL,

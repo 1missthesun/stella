@@ -142,12 +142,18 @@ backup)
   # this container straight to the owner's backup object (presigned URL in
   # URL). Nothing reads what is inside.
   [ -d "$accounts" ] || { json '{ok:true,skipped:true}'; exit 0; }
+  # The stored object is then this container's own copy: its ETag is kept
+  # beside the logins, so the next restore here downloads nothing.
   archive=$(dirname "$accounts")/.claude-accounts-backup.tgz
-  rm -f -- "$archive"
+  marker=$(dirname "$accounts")/.claude-accounts-etag
+  headers=$(dirname "$accounts")/.claude-accounts-backup.headers
+  rm -f -- "$archive" "$marker" "$headers"
   tar -C "$(dirname "$accounts")" -czf "$archive" "$(basename "$accounts")" || { rm -f -- "$archive"; fail "Couldn't pack the Claude Code logins."; }
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -T "$archive" "$URL")
-  rm -f -- "$archive"
+  code=$(curl -s -D "$headers" -o /dev/null -w '%{http_code}' --max-time 60 -T "$archive" "$URL")
+  stored=$(tr -d '\r"' <"$headers" 2>/dev/null | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p' | tail -n 1)
+  rm -f -- "$archive" "$headers"
   [ "$code" = 200 ] || fail "Couldn't store the Claude Code login backup ($code)."
+  if [ -n "$stored" ]; then printf '%s\n' "$stored" >"$marker"; fi
   json '{ok:true}'
   ;;
 restore)

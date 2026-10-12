@@ -323,7 +323,7 @@ export const buildElectronBundles = async () => {
   try {
     const results = await Promise.all(
       buildOptions.map((options) =>
-        runEsbuildBuild({ ...options, write: false }),
+        runEsbuildBuild({ ...options, write: false, metafile: true }),
       ),
     );
     assertMainBundleStartupBoundary(results[0].metafile);
@@ -335,13 +335,34 @@ export const buildElectronBundles = async () => {
         }
       }
     }
+    lastBuildInputs = sourceInputsOf(results.map((result) => result.metafile));
     return changedOutputs;
   } finally {
     await stopEsbuildService();
   }
 };
 
-const collectBundleSourceFiles = () => {
+/**
+ * The repo files the last build read, outside node_modules: what a change
+ * must touch to change main or preload. Recorded with the fingerprint, so
+ * the fingerprint covers files outside the source roots that the bundles
+ * import (the browser extension's shared code, for one), and so a merge can
+ * be judged by them without building it.
+ */
+let lastBuildInputs = [];
+const sourceInputsOf = (metafiles) => {
+  const inputs = new Set();
+  for (const metafile of metafiles) {
+    for (const input of Object.keys(metafile?.inputs ?? {})) {
+      const posix = toPosix(input);
+      if (posix.includes("node_modules/") || posix.startsWith("..") || posix.includes(":")) continue;
+      inputs.add(posix);
+    }
+  }
+  return [...inputs].sort();
+};
+
+const collectBundleSourceFiles = (inputs = readBundleInputs()) => {
   const files = [];
 
   const visit = (absolutePath) => {
@@ -378,14 +399,18 @@ const collectBundleSourceFiles = () => {
       files.push(toPosix(configFile));
     }
   }
+  const listed = new Set(files);
+  for (const input of inputs) {
+    if (!listed.has(input)) files.push(input);
+  }
 
   files.sort();
   return files;
 };
 
-export const computeBundleInputsFingerprint = () => {
+export const computeBundleInputsFingerprint = (inputs) => {
   const hash = createHash("sha256");
-  for (const relPath of collectBundleSourceFiles()) {
+  for (const relPath of collectBundleSourceFiles(inputs)) {
     let stat;
     try {
       stat = lstatSync(path.join(repoRootDir, relPath));
@@ -402,21 +427,31 @@ export const computeBundleInputsFingerprint = () => {
   return hash.digest("hex");
 };
 
-const readBundleFingerprint = () => {
+const readFingerprintFile = (file = fingerprintFilePath) => {
   try {
-    const parsed = JSON.parse(readFileSync(fingerprintFilePath, "utf8"));
-    return typeof parsed?.fingerprint === "string" ? parsed.fingerprint : null;
+    return JSON.parse(readFileSync(file, "utf8"));
   } catch {
     return null;
   }
 };
 
-const writeBundleFingerprint = (fingerprint) => {
+const readBundleFingerprint = () => {
+  const parsed = readFingerprintFile();
+  return typeof parsed?.fingerprint === "string" ? parsed.fingerprint : null;
+};
+
+/** The source files the last build read (see `sourceInputsOf`). */
+export const readBundleInputs = (file = fingerprintFilePath) => {
+  const inputs = readFingerprintFile(file)?.inputs;
+  return Array.isArray(inputs) ? inputs.filter((input) => typeof input === "string") : [];
+};
+
+const writeBundleFingerprint = (fingerprint, inputs) => {
   try {
     writeFileSync(
       fingerprintFilePath,
       JSON.stringify(
-        { fingerprint, updatedAt: new Date().toISOString() },
+        { fingerprint, updatedAt: new Date().toISOString(), inputs },
         null,
         2,
       ),
@@ -455,9 +490,31 @@ export const ensureElectronBundlesFresh = async ({ log } = {}) => {
   }
   const startedAt = Date.now();
   await buildElectronBundles();
-  writeBundleFingerprint(fingerprint);
+  writeBundleFingerprint(computeBundleInputsFingerprint(lastBuildInputs), lastBuildInputs);
   log?.(`built main and preload in ${Date.now() - startedAt}ms`);
   return { built: true };
+};
+
+/**
+ * Take main and preload built elsewhere from this same tree (an update
+ * prepared on a scratch worktree before it was applied): its outputs and
+ * the inputs it read, fingerprinted here, so the next launch finds them
+ * fresh. `from` is that tree's `packages/desktop`.
+ */
+export const adoptElectronBundles = (from) => {
+  const fromOut = path.join(from, outdir);
+  const inputs = readBundleInputs(path.join(from, path.basename(fingerprintFilePath)));
+  const outputs = [...Object.keys(electronMainEntryPoints), ...Object.keys(preloadEntryPoints)].map(
+    (entry) => `${entry}.js`,
+  );
+  if (inputs.length === 0 || !outputs.every((name) => existsSync(path.join(fromOut, name)))) {
+    return { adopted: false };
+  }
+  for (const name of outputs) {
+    writeOutputIfChanged(path.join(desktopDir, outdir, name), readFileSync(path.join(fromOut, name)));
+  }
+  writeBundleFingerprint(computeBundleInputsFingerprint(inputs), inputs);
+  return { adopted: true };
 };
 
 if (isEntryPoint(import.meta.url)) {
@@ -466,7 +523,7 @@ if (isEntryPoint(import.meta.url)) {
   try {
     await cleanOutdir();
     await buildElectronBundles();
-    writeBundleFingerprint(computeBundleInputsFingerprint());
+    writeBundleFingerprint(computeBundleInputsFingerprint(lastBuildInputs), lastBuildInputs);
     process.exit(0);
   } catch (error) {
     console.error(

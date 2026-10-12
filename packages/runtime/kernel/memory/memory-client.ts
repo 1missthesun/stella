@@ -167,7 +167,7 @@ export const memoryFileMaxChars = (path: string): number => {
   return MEMORY_FILE_MAX_CHARS;
 };
 
-const expectShaOption = (options: unknown): string | undefined => {
+const expectShaOption = (options: unknown): string | null | undefined => {
   if (options === undefined || options === null) return undefined;
   if (typeof options !== "object" || Array.isArray(options)) {
     throw new Error(
@@ -175,10 +175,10 @@ const expectShaOption = (options: unknown): string | undefined => {
     );
   }
   const expectSha = (options as { expectSha?: unknown }).expectSha;
-  if (expectSha === undefined) return undefined;
+  if (expectSha === undefined || expectSha === null) return expectSha;
   if (typeof expectSha !== "string" || !SHA256_HEX.test(expectSha)) {
     throw new Error(
-      "memory.write: expectSha must be a file's sha from memory.list() or an earlier memory.write().",
+      "memory.write: expectSha must be a file's sha from memory.list() or an earlier memory.write(), or null for a file that must not exist yet.",
     );
   }
   return expectSha;

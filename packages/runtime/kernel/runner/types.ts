@@ -144,6 +144,7 @@ export type RunnerState = {
   /** Who a background exit wakes, and how it stands (`setBackgroundExitTarget`). */
   backgroundExitTarget?: BackgroundExitTarget;
   piReportDelivery?: PiReportDelivery;
+  agentHistoryQuery?: AgentHistoryQuery;
   loadedAgents: ParsedAgentLike[];
   /**
    * Late-bound web search handler. Wired by `createStellaHostRunner` so the
@@ -260,6 +261,13 @@ export type BackgroundExitTarget = {
   }) => Promise<boolean>;
 };
 
+/** An agent's `history.*` call, answered from its own thread (`setAgentHistoryQuery`). */
+export type AgentHistoryQuery = (request: {
+  conversationId: string;
+  threadId: string;
+  args: Record<string, unknown>;
+}) => Promise<unknown>;
+
 export type PiReportDelivery = (report: {
   conversationId: string;
   requestId: string;
@@ -298,6 +306,7 @@ export type RunnerPublicApi = {
   hookEmitter: HookEmitter;
   piCloudAgentThreads: PiCloudAgentThreads;
   setPiReportDelivery: (delivery: PiReportDelivery | null) => void;
+  setAgentHistoryQuery: (query: AgentHistoryQuery | null) => void;
   setBackgroundExitTarget: (target: BackgroundExitTarget | null) => void;
   /**
    * The exit wakes of shells a finished run left running: `arm` watches the

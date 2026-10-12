@@ -57,6 +57,8 @@ const DRIVE_PATHS = new Set<string>(Object.values(TURN_BROKER_DRIVE_PATHS));
 export const TURN_BROKER_EVENTS_PATH = "/api/cloud/events";
 /** The thread transcript. Written to the BuildSession's own table. */
 export const TURN_BROKER_MESSAGES_PATH = "/api/cloud/messages";
+/** The agent's `history.*`, answered from its own thread's transcript. */
+export const TURN_BROKER_HISTORY_PATH = "/api/cloud/history";
 
 export const TURN_BROKER_USER_ASK_PATH = "/api/cloud/user-ask";
 
@@ -92,6 +94,7 @@ export type TurnBrokerTarget = {
     | "search"
     | "turn-event"
     | "thread-messages"
+    | "thread-history"
     | "user-ask"
     | "orchestrator-tool"
     | "orchestrator-events";
@@ -390,6 +393,14 @@ export const validateTurnBrokerTarget = (
       method: "POST",
       path: parsed.pathname,
       maxBodyBytes: MAX_CALLBACK_BODY_BYTES,
+    };
+  }
+  if (parsed.pathname === TURN_BROKER_HISTORY_PATH) {
+    return {
+      kind: "thread-history",
+      method: "POST",
+      path: parsed.pathname,
+      maxBodyBytes: MAX_CONTROL_BODY_BYTES,
     };
   }
   if (parsed.pathname === TURN_BROKER_USER_ASK_PATH) {

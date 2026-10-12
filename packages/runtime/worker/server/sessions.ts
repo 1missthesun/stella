@@ -29,6 +29,7 @@ import {
   piChatsBusy,
   piBackgroundExitTarget,
   piDeliverReport,
+  piAgentHistory,
   reconcileComputerAgents,
   resumePiChats,
 } from "./pi-chats.js";
@@ -540,6 +541,9 @@ export const layer = Layer.effect(
                     if (!builtRunner) runnerOutcome = "failure";
                     builtRunner?.setPiReportDelivery((report) =>
                       piDeliverReport(session, hostBus, report),
+                    );
+                    builtRunner?.setAgentHistoryQuery((request) =>
+                      piAgentHistory(session, hostBus, request),
                     );
                     builtRunner?.setBackgroundExitTarget(
                       piBackgroundExitTarget(session, hostBus),

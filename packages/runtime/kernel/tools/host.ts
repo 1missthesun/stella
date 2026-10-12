@@ -224,6 +224,7 @@ export const createToolHost = ({
   getCloudBackendAuth,
   codeConnectClient,
   codeHistoryQuery,
+  agentHistoryQuery,
 }: ToolHostOptions) => {
   const stateRoot = stellaDataDir ?? stellaAppDir;
   const toolCatalog = new Map<string, ToolMetadata>();
@@ -363,6 +364,11 @@ export const createToolHost = ({
     // `history.sql` / `history.read`: the conversation lives in its cloud
     // session DO, which answers both exactly as the cloud code tool does.
     queryHistory: codeHistoryQuery ?? (async (args, context) => {
+      // An agent reads its own thread, never the conversation it was started from.
+      if (context.agentType && context.agentType !== AGENT_IDS.ORCHESTRATOR) {
+        if (!agentHistoryQuery) throw new Error("Your history is unavailable in this session.");
+        return await agentHistoryQuery(args, context);
+      }
       const auth = getCloudBackendAuth?.();
       if (!auth) {
         throw new Error("history is unavailable in this session.");

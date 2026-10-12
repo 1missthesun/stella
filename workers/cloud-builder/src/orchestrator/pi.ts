@@ -377,8 +377,8 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               });
             });
           },
-          agentTools: (authority, browser) =>
-            this.createPiAgentTools(authority, browser),
+          agentTools: (authority, browser, history) =>
+            this.createPiAgentTools(authority, browser, history),
           browserHandoff: (handoff, signal) =>
             this.awaitPiBrowserHandoff(handoff, signal),
           agentGuard: (authority, turnId) =>
@@ -1966,6 +1966,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       conversationId: string;
     },
     browser: CloudBrowserClient | undefined,
+    history?: import("../cloud-code-tool.js").CloudHistoryClient,
   ): Promise<CloudCodeSourceAgentTool[]> {
     const ownerInternal = async (name: string, args: unknown) =>
       unwrapRpc(
@@ -1994,6 +1995,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       executionScope: `${authority.ownerGeneration}:${authority.conversationId}:pi-agents`,
       connect: createCloudConnectClient(connectors),
       ...(browser ? { browser } : {}),
+      ...(history ? { history } : {}),
     });
     return [code, web];
   }

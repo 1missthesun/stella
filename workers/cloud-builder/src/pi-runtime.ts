@@ -76,6 +76,7 @@ import {
   type StellaRequestRoute,
 } from "@stella/agent/provider/stella";
 import { StellaAgentDoc } from "@stella/agent/stella/agent-doc";
+import { ownHistoryQuery } from "@stella/agent/stella/own-history";
 import { deviceRefusal, deviceStanding, type StellaExecutionHost } from "@stella/agent/stella/execution";
 import { findDeviceDestination } from "@stella/contracts/turn-plane/placement";
 import { placementOf, StellaPlacementDoc, type StellaPlacement } from "@stella/agent/stella/placement";
@@ -147,7 +148,7 @@ import {
   type CloudBrowserAuthority,
   type CloudBrowserClient,
 } from "./cloud-browser.js";
-import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
+import type { CloudCodeSourceAgentTool, CloudHistoryClient } from "./cloud-code-tool.js";
 import {
   fetchWithManagedCancellation,
   type ModelGatewayControl,
@@ -455,9 +456,13 @@ export type PiRuntimeOptions = {
   /**
    * An agent's own tools (web, code with connectors), on the agents'
    * authority; `browser` is the calling run's cloud browser, which its code
-   * drives.
+   * drives; `history` is the calling agent's own thread, which its code reads.
    */
-  agentTools(authority: PiAuthority, browser?: CloudBrowserClient): Promise<readonly CloudCodeSourceAgentTool[]>;
+  agentTools(
+    authority: PiAuthority,
+    browser?: CloudBrowserClient,
+    history?: CloudHistoryClient,
+  ): Promise<readonly CloudCodeSourceAgentTool[]>;
   /**
    * Show a login handoff to the user and wait until it ends: the user
    * finished, canceled, or it expired. An abort of `signal` withdraws it.
@@ -944,8 +949,8 @@ export class PiConversationRuntime {
       executionContext: async () =>
         this.#binding?.sources.executionContext ?? (await this.#agentState()).executionContext,
       locale: async () => (this.#binding ? this.#binding.sources.locale : (await this.#agentState()).locale),
-      // The orchestrator's code reads the journal while memory is on; agents' code has no history.
-      codeHistory: async (agentType) => agentType === "orchestrator" && (await turn()).memory.enabled,
+      // Stella reads the journal while memory is on; an agent reads its own thread.
+      codeHistory: async (agentType) => agentType !== "orchestrator" || (await turn()).memory.enabled,
     };
   }
 
@@ -1001,7 +1006,11 @@ export class PiConversationRuntime {
         const tools =
           call.role === "orchestrator"
             ? await this.#turnToolsFor(await this.#turn(signal))
-            : await this.#options.agentTools((await this.#agentState()).authority, this.#browser(active));
+            : await this.#options.agentTools(
+                (await this.#agentState()).authority,
+                this.#browser(active),
+                call.threadId ? this.#ownHistory(call.threadId) : undefined,
+              );
         const tool = tools.find((candidate) => candidate.name === call.name);
         if (!tool) throw new Error(`${call.name} is not available here.`);
         const started = Date.now();
@@ -1024,6 +1033,21 @@ export class PiConversationRuntime {
           });
           throw error;
         }
+      },
+    };
+  }
+
+  /** An agent's `history.*`, bound to its own thread: never Stella's conversation or another agent's. */
+  #ownHistory(threadId: string): CloudHistoryClient {
+    const query = async (args: Record<string, unknown>) => {
+      const { harness, root } = await this.open();
+      return await ownHistoryQuery(harness, root.id, threadId, args, BACKGROUND_CONTEXT);
+    };
+    return {
+      search: (text, options) => query({ op: "search", text, options }),
+      read: (fromSeq, toSeq) => query({ op: "read", fromSeq, toSeq }),
+      sql: () => {
+        throw new Error("history.sql is not available for your thread here; use history.search and history.read.");
       },
     };
   }

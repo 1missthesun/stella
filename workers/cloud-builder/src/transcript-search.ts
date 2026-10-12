@@ -16,35 +16,14 @@ export const DEFAULT_TRANSCRIPT_SEARCH_TABLE = "journal_fts";
 
 const INDEXED_TEXT_MAX_BYTES = 64 * 1024;
 
-/** What a `journal_fts` row is, in its `role` column. */
-export const HISTORY_SEARCH_KINDS = [
-  "user",
-  "assistant",
-  "agent_report",
-  "agent_message",
-] as const;
-export type HistorySearchKind = (typeof HISTORY_SEARCH_KINDS)[number];
+import { historySearchKind } from "@stella/contracts/history-search";
 
-const AGENT_REPORT_RE =
-  /^\[(?:Agent completed|Agent failed|Agent canceled|Task failed|Task canceled)\]/mu;
-const AGENT_MESSAGE_RE = /<agent-message\b/u;
+export {
+  HISTORY_SEARCH_KINDS,
+  historySearchKind,
+  type HistorySearchKind,
+} from "@stella/contracts/history-search";
 
-/**
- * What a journal message is for search, or null when it is not searched. A
- * hidden user prompt is searched only when it carries another agent's words.
- */
-export const historySearchKind = (
-  role: string,
-  hidden: boolean,
-  text: string,
-): HistorySearchKind | null => {
-  if (role === "assistant") return hidden ? null : "assistant";
-  if (role !== "user") return null;
-  if (!hidden) return "user";
-  if (AGENT_REPORT_RE.test(text)) return "agent_report";
-  if (AGENT_MESSAGE_RE.test(text)) return "agent_message";
-  return null;
-};
 export type TranscriptSearchRow = Readonly<{
   seq: number;
   turnId: string;

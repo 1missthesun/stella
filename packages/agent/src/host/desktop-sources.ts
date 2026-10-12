@@ -96,6 +96,7 @@ export function desktopContextSources(options: DesktopSourcesOptions): StellaCon
       });
     },
     locale: async () => options.locale?.(),
-    codeHistory: async () => options.cloudStored === true,
+    // Stella reads a conversation stored in the cloud; an agent reads its own thread, which is here.
+    codeHistory: async (agentType) => agentType !== "orchestrator" || options.cloudStored === true,
   };
 }

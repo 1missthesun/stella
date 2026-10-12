@@ -338,6 +338,13 @@ export const createRunnerContext = ({
       }
       return await handler(query, searchOptions);
     },
+    agentHistoryQuery: async (args, toolContext) => {
+      const query = context.state?.agentHistoryQuery;
+      if (!query || !toolContext.agentId) {
+        throw new Error("Your history is unavailable in this session.");
+      }
+      return await query({ conversationId: toolContext.conversationId, threadId: toolContext.agentId, args });
+    },
     getCloudBackendAuth: () => {
       const baseUrl = context.state?.backendUrl?.trim();
       const authToken = (context.state?.authToken ?? envAuthToken ?? "").trim();

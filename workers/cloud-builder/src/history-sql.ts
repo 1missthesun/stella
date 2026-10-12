@@ -12,31 +12,23 @@
 
 import { CLOUD_CODE_WORKER_VALUE_MAX_BYTES } from "./cloud-code-worker-executor.js";
 import { utf8Length } from "./conversation-types.js";
+import { DEFAULT_TRANSCRIPT_SEARCH_TABLE } from "./transcript-search.js";
 import {
-  DEFAULT_TRANSCRIPT_SEARCH_TABLE,
-  HISTORY_SEARCH_KINDS,
-  type HistorySearchKind,
-} from "./transcript-search.js";
+  historySearchKinds,
+  historySearchLimit,
+  historySearchMatch,
+  readOnlyHistoryQuery,
+  type HistorySearchHit,
+  type HistorySearchOptions,
+} from "@stella/contracts/history-search";
 
-/** Literals, quoted identifiers and comments, which may contain anything. */
-const OPAQUE_SQL_RE =
-  /'(?:[^']|'')*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\]|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/gu;
-
-/** `replace(` is the string function; bare REPLACE starts a write. */
-const WRITE_KEYWORD_RE =
-  /\b(?:insert|update|delete|replace(?!\s*\()|create|drop|alter|attach|detach|pragma|vacuum|reindex|analyze|begin|commit|rollback|savepoint|release|returning)\b/iu;
-
-export const readOnlyHistoryQuery = (query: string): string => {
-  const statement = query.trim().replace(/;\s*$/u, "");
-  const code = statement.replace(OPAQUE_SQL_RE, " ").trim();
-  if (code.includes(";")) {
-    throw new Error("history.sql runs exactly one statement.");
-  }
-  if (!/^(?:select|with)\b/iu.test(code) || WRITE_KEYWORD_RE.test(code)) {
-    throw new Error("history.sql accepts only a read-only SELECT or WITH query.");
-  }
-  return statement;
-};
+export {
+  historySearchMatch,
+  historySearchOptions,
+  readOnlyHistoryQuery,
+  type HistorySearchHit,
+  type HistorySearchOptions,
+} from "@stella/contracts/history-search";
 
 export const runHistoryQuery = (
   storage: DurableObjectStorage,
@@ -71,54 +63,6 @@ export const runHistoryQuery = (
   });
 };
 
-export type HistorySearchOptions = {
-  limit?: number;
-  kinds?: readonly string[];
-  order?: "relevance" | "newest";
-  beforeSeq?: number;
-};
-
-export type HistorySearchHit = {
-  seq: number;
-  kind: string;
-  at: string;
-  turnId: string;
-  snippet: string;
-  archived: boolean;
-};
-
-/** `history.search`'s options as they arrive from a sandbox or a computer. */
-export const historySearchOptions = (value: unknown): HistorySearchOptions => {
-  const raw = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
-  return {
-    ...(typeof raw.limit === "number" ? { limit: raw.limit } : {}),
-    ...(Array.isArray(raw.kinds)
-      ? { kinds: raw.kinds.filter((kind): kind is string => typeof kind === "string") }
-      : typeof raw.kinds === "string"
-        ? { kinds: [raw.kinds] }
-        : {}),
-    ...(raw.order === "newest" || raw.order === "relevance" ? { order: raw.order } : {}),
-    ...(typeof raw.beforeSeq === "number" ? { beforeSeq: raw.beforeSeq } : {}),
-  };
-};
-
-const SEARCH_LIMIT_DEFAULT = 20;
-const SEARCH_LIMIT_MAX = 100;
-
-/**
- * The FTS5 query for plain text: each word, or each quoted phrase, must
- * appear. Punctuation splits words the way the index's tokenizer does, so a
- * thread id like `deploy-dev-ixov5k` is searched as the phrase it indexes as.
- */
-export const historySearchMatch = (text: string): string => {
-  const terms: string[] = [];
-  for (const [, phrase, word] of text.matchAll(/"([^"]*)"|(\S+)/gu)) {
-    const tokens = (phrase ?? word ?? "").match(/[\p{L}\p{N}]+/gu);
-    if (tokens?.length) terms.push(`"${tokens.join(" ")}"`);
-  }
-  return terms.join(" ");
-};
-
 /**
  * `history.search(text, options)`: matches from `journal_fts`, newest or
  * best first, each with its seq, kind, time and a snippet. The index outlives
@@ -132,16 +76,8 @@ export const searchHistory = (
 ): HistorySearchHit[] => {
   const match = historySearchMatch(text);
   if (!match) throw new Error("history.search needs at least one word to look for.");
-  const kinds = (options.kinds ?? []).filter((kind): kind is HistorySearchKind =>
-    (HISTORY_SEARCH_KINDS as readonly string[]).includes(kind),
-  );
-  if ((options.kinds?.length ?? 0) > 0 && kinds.length === 0) {
-    throw new Error(`history.search kinds are ${HISTORY_SEARCH_KINDS.join(", ")}.`);
-  }
-  const limit = Math.min(
-    Math.max(1, Math.floor(options.limit ?? SEARCH_LIMIT_DEFAULT)),
-    SEARCH_LIMIT_MAX,
-  );
+  const kinds = historySearchKinds(options);
+  const limit = historySearchLimit(options);
   const table = DEFAULT_TRANSCRIPT_SEARCH_TABLE;
   const where = [`${table} MATCH ?`];
   const params: SqlStorageValue[] = [match];

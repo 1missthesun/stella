@@ -347,6 +347,10 @@ export const createStellaHostRunner = (
       if (delivery) context.state.piReportDelivery = delivery;
       else delete context.state.piReportDelivery;
     },
+    setAgentHistoryQuery: (query) => {
+      if (query) context.state.agentHistoryQuery = query;
+      else delete context.state.agentHistoryQuery;
+    },
     setBackgroundExitTarget: (target) => {
       if (target) context.state.backgroundExitTarget = target;
       else delete context.state.backgroundExitTarget;

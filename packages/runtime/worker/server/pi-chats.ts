@@ -607,6 +607,14 @@ export const piDeliverAgentMessage = async (
 export const piPauseAgent = async (session: OpenSession, hostBus: HostBus.Interface, threadId: string) =>
   await (await piChatsFor(session, hostBus)).pauseAgent(threadId);
 
+/** An agent's `history.*` call, from its own thread in the pi conversation that holds it. */
+export const piAgentHistory = async (
+  session: OpenSession,
+  hostBus: HostBus.Interface,
+  request: { conversationId: string; threadId: string; args: Record<string, unknown> },
+): Promise<unknown> =>
+  await (await piChatsFor(session, hostBus)).agentHistory(request.conversationId, request.threadId, request.args);
+
 export const piDeliverReport = async (
   session: OpenSession,
   hostBus: HostBus.Interface,

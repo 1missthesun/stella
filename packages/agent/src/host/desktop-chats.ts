@@ -120,6 +120,8 @@ import { localLogMirror, writtenReply, type DesktopLocalLog, type LocalLogMirror
 import { desktopGatewayAccess, resolveStellaModels } from "./desktop-gateway.ts";
 import { desktopContextSources } from "./desktop-sources.ts";
 import { afterStop, stopStella } from "../stella/stop.ts";
+import { ownHistoryQuery } from "../stella/own-history.ts";
+import { ownHistorySql } from "@stella/runtime/kernel/storage/own-history-sql";
 import type { ClaudeCodeEngine, ClaudeCodeStatus } from "../engine/claude-code.ts";
 import { CLAUDE_CODE_PROVIDER_ID, onClaudeCode } from "../engine/selection.ts";
 
@@ -1835,6 +1837,12 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
   };
 
+  /** An agent's `history.*` call, answered from its own thread in the conversation that holds it. */
+  const agentHistory = async (conversationId: string, threadId: string, args: Record<string, unknown>): Promise<unknown> => {
+    const chat = await ready(conversationId);
+    return await ownHistoryQuery(chat.harness, chat.root.id, threadId, args, context, ownHistorySql);
+  };
+
   /** A message for an agent placed here, from the host that placed it; false when it is not running here. */
   const steerPlacedAgent = async (message: { key: string; agentKey: string; message: string }): Promise<boolean> => {
     const conversationId = placedIn.get(message.agentKey);
@@ -1862,6 +1870,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     messageAgent,
     runPlacedAgent,
     steerPlacedAgent,
+    agentHistory,
     cancelPlacedAgent,
     voiceTranscript,
     voiceHistory,

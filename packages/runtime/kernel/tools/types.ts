@@ -440,6 +440,14 @@ export type ToolHostOptions = {
     args: Record<string, unknown>,
     context: ToolContext,
   ) => Promise<unknown>;
+  /**
+   * An agent's `history.*`: its own thread, never the conversation it was
+   * started from. Absent, an agent's `history` rejects.
+   */
+  agentHistoryQuery?: (
+    args: Record<string, unknown>,
+    context: ToolContext,
+  ) => Promise<unknown>;
   stellaDataDir?: string;
   askUser?: import("./user.js").UserToolsConfig["askUser"];
   requestSecureInput?: import("./user.js").UserToolsConfig["requestSecureInput"];

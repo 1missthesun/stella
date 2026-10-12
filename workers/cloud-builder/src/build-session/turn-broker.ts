@@ -10,7 +10,11 @@ import {
   nativeHistoryCursorFromRows,
   validNativeStateCheckpointMac,
 } from "../native-state-checkpoint.js";
-import { ThreadTranscriptError } from "../thread-transcript.js";
+import { readThreadHistory, ThreadTranscriptError } from "../thread-transcript.js";
+import { answerOwnHistory, withoutThinking, type OwnHistoryRow } from "@stella/contracts/history-search";
+
+/** Every message an agent's `history.*` reads from its thread's transcript. */
+const THREAD_HISTORY_QUERY_ROWS = 100_000;
 import type { ThreadMessageInput } from "../thread-transcript.js";
 import {
   TurnBrokerBodyTooLargeError,
@@ -931,6 +935,41 @@ const forwardOrchestratorBrokerRequest = async (
  * `serveTurnSearchRequest`); the claim's live fence already proved this
  * exact attempt is running.
  */
+/**
+ * An agent's `history.*` from its sandbox: this object holds exactly one
+ * thread, so its transcript is the agent's own history and nothing else's.
+ * A refused query answers 200 with its reason, which the agent reads.
+ */
+const serveThreadHistoryRequest = (sql: SqlStorage, body: Record<string, unknown>): Response => {
+  const headers = { "cache-control": "no-store" };
+  const args = body.args && typeof body.args === "object" && !Array.isArray(body.args) ? (body.args as Record<string, unknown>) : {};
+  try {
+    const rows: OwnHistoryRow[] = readThreadHistory(sql, { limit: THREAD_HISTORY_QUERY_ROWS }).flatMap((row) => {
+      let payload: unknown;
+      try {
+        payload = JSON.parse(row.payloadJson);
+      } catch {
+        return [];
+      }
+      if (!payload || typeof payload !== "object") return [];
+      const timestamp = (payload as { timestamp?: unknown }).timestamp;
+      return [
+        {
+          seq: row.seq,
+          kind: "message" as const,
+          turnId: row.turnId,
+          createdAtMs: typeof timestamp === "number" ? timestamp : 0,
+          role: row.role,
+          payload: withoutThinking(payload),
+        },
+      ];
+    });
+    return Response.json({ ok: true, result: answerOwnHistory(rows, args) }, { headers });
+  } catch (error) {
+    return Response.json({ ok: false, error: error instanceof Error ? error.message : String(error) }, { headers });
+  }
+};
+
 const handleBrokerLocalRequest = async (
   host: TurnBrokerHost,
   turn: TurnRequest,
@@ -965,6 +1004,9 @@ const handleBrokerLocalRequest = async (
     }
     if (target.kind === "user-ask") {
       return await serveTurnUserAskRequest(host.env, turn, body);
+    }
+    if (target.kind === "thread-history") {
+      return serveThreadHistoryRequest(host.ctx.storage.sql, body);
     }
     if (target.kind === "drive") {
       return await serveTurnDriveRequest(host.env, turn, target.path, body);
@@ -1164,6 +1206,7 @@ export const handleTurnBroker = async (
     if (
       claimed.target.kind === "turn-event" ||
       claimed.target.kind === "thread-messages" ||
+      claimed.target.kind === "thread-history" ||
       claimed.target.kind === "drive" ||
       claimed.target.kind === "search" ||
       claimed.target.kind === "user-ask" ||

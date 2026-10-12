@@ -1454,12 +1454,12 @@ export const runAgentAttempt = async (
     turnExecution.assertActive();
     // An agent turn runs `general.md` rendered here, from this deploy's
     // bundle, for exactly the tools the executor will give this engine;
-    // its `code` has no history client. The image never supplies prose.
+    // its `code` reads its own thread's history. The image never supplies prose.
     let roleInput: CloudCliTurnRoleInput = {
       role: "agent",
       systemPrompt: renderCloudAgentPrompt("agents/general.md", {
         names: cloudGeneralToolNames(),
-        history: false,
+        history: true,
       }),
     };
     if (orchestrator) {

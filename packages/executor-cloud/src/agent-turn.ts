@@ -599,6 +599,16 @@ export const runAgentTurn = (
             askUser: userAsks.handlers.askUser,
             requestSecureInput: userAsks.handlers.requestSecureInput,
             useSecureValue: userAsks.handlers.useSecureValue,
+            // The agent's `history.*` reads its own thread, which its
+            // BuildSession holds and nothing else does.
+            agentHistoryQuery: async (args) => {
+              const response = await postJson("/api/cloud/history", { turnId: input.turnId, args });
+              const body = (await response.json().catch(() => null)) as { ok?: boolean; result?: unknown; error?: string } | null;
+              if (!response.ok || !body?.ok) {
+                throw new Error(body?.error ?? `Your history is unavailable right now (${response.status}).`);
+              }
+              return body.result;
+            },
             webSearch: async (query, options) => {
               const response = await postJson("/api/cloud/web-search", {
                 query,

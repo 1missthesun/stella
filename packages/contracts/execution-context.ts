@@ -219,8 +219,8 @@ export const renderExecutionDevices = (
       ? ["The connected device list is currently unavailable."]
       : []),
     reader === "agent"
-      ? "To move yourself to another of these computers, pass its device_id to switch_destination."
-      : 'To run an agent on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination: it runs entirely there. A running agent can move itself to another of these computers with switch_destination, keeping its conversation.',
+      ? 'To move yourself to one of these, pass its device_id (or "cloud") to switch_destination.'
+      : 'To run an agent on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination: it runs entirely there. A running agent can move itself to any of these with switch_destination, keeping its conversation.',
   ].join("\n");
 
 export const renderExecutionDestination = (

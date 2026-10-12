@@ -332,6 +332,9 @@ const commands = async (
   const teamId = form.get("team_id") ?? "";
   const userId = form.get("user_id") ?? "";
   const action = (form.get("text") ?? "").trim().toLowerCase();
+  const slash = /^\/[a-z0-9_-]{1,32}$/u.test(form.get("command") ?? "")
+    ? form.get("command")!
+    : "/stella";
   const installation = await loadInstallation(env, teamId);
   if (!installation)
     return ephemeral("Stella isn't installed in this workspace anymore.");
@@ -369,7 +372,7 @@ const commands = async (
   if (!installation.ownerId) {
     return ephemeral(
       installer
-        ? "Stella isn't set up yet. Run `/stella connect` to connect your Stella account."
+        ? `Stella isn't set up yet. Run \`${slash} connect\` to connect your Stella account.`
         : `Stella isn't set up yet: ${setupBy} needs to connect a Stella account.`,
     );
   }
@@ -385,10 +388,10 @@ const commands = async (
     `Stella is this workspace's shared assistant, set up by ${setupBy}. Mention @Stella in a channel or DM her.\n` +
       `She runs on *${ENGINE_LABELS[settings.engine]}* · model \`${settings.model}\` · effort \`${settings.effort}\`.` +
       (settings.slackCommands
-        ? "\nChange it with `/stella engine stella|claude-code`, `/stella model <name>` or `/stella effort <level>`."
+        ? `\nChange it with \`${slash} engine stella|claude-code\`, \`${slash} model <name>\` or \`${slash} effort <level>\`.`
         : "") +
       (installer
-        ? "\n`/stella connect` switches the Stella account she runs on; `/stella disconnect` turns her off. Everything else is on stella.sh/slack."
+        ? `\n\`${slash} connect\` switches the Stella account she runs on; \`${slash} disconnect\` turns her off. Everything else is on stella.sh/slack.`
         : ""),
   );
 };

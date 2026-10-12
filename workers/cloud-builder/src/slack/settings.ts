@@ -215,6 +215,23 @@ export const repoForConversation = async (
   };
 };
 
+/** The saved read-only token for a workspace's repository, unsealed. */
+export const savedRepoToken = async (
+  env: Cloudflare.Env,
+  teamId: string,
+  fullName: string,
+): Promise<string | null> => {
+  const row = await d1(env)
+    .prepare(
+      "SELECT repo_token_enc FROM slack_workspace_settings WHERE team_id = ? AND repo_full_name = ?",
+    )
+    .bind(teamId, fullName)
+    .first<{ repo_token_enc: string | null }>();
+  return row?.repo_token_enc
+    ? await decryptToken(env, row.repo_token_enc).catch(() => null)
+    : null;
+};
+
 /** The execution a workspace's turns run on. */
 export const workspaceExecution = (
   settings: SlackWorkspaceSettings,

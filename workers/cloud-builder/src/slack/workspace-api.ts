@@ -32,6 +32,7 @@ import {
   parseBranch,
   parseRepoName,
   resolveModelChoice,
+  savedRepoToken,
   saveWorkspaceSettings,
   workspaceOptions,
   type SettingsPatch,
@@ -206,6 +207,12 @@ const update = async (
     if (branch === null) return fail(400, "That branch name isn't valid.");
     const token = input.repo.token === undefined ? undefined : String(input.repo.token).trim();
     if (token && (token.length > 400 || /\s/u.test(token))) return fail(400, "That access token isn't valid.");
+    const reachable = await repoReachable(
+      fullName,
+      branch,
+      token === undefined ? await savedRepoToken(env, teamId, fullName) : token || null,
+    );
+    if (reachable) return fail(400, reachable);
     patch.repo = { fullName, branch, ...(token !== undefined ? { token } : {}) };
   }
   if (input.rules !== undefined && String(input.rules).length > SLACK_RULES_MAX_CHARS) {
@@ -221,6 +228,31 @@ const update = async (
     await writeText(env, caller.ownerId, workspaceNotesPath(install.homeFolder), String(input.memory));
   }
   return ok({ workspace: await describe(env, install, owned.installedAt) });
+};
+
+/** Null when GitHub shows the repository (and branch); otherwise what to tell the owner. */
+const repoReachable = async (fullName: string, branch: string, token: string | null): Promise<string | null> => {
+  const headers: Record<string, string> = {
+    accept: "application/vnd.github+json",
+    "user-agent": "stella-cloud",
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+  };
+  try {
+    const path = branch
+      ? `repos/${fullName}/branches/${encodeURIComponent(branch)}`
+      : `repos/${fullName}`;
+    const response = await fetch(`https://api.github.com/${path}`, { headers, signal: AbortSignal.timeout(8_000) });
+    if (response.ok) return null;
+    if (response.status === 401) return "GitHub didn't accept that access token.";
+    if (response.status === 404) {
+      return branch
+        ? `GitHub can't find the branch ${branch} in ${fullName}. If the repository is private, add a read-only access token.`
+        : `GitHub can't find ${fullName}. If it's private, add a read-only access token.`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
 };
 
 const allowedReturnOrigins = (env: Cloudflare.Env): Set<string> =>

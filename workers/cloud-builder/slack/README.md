@@ -1,13 +1,17 @@
-# Slack Stella
+# Stella for Slack
 
 A Slack app that gives a workspace its own shared Stella, shaped like Claude
 in Slack: people mention `@Stella` in a channel or DM her, and anyone in the
-thread can keep steering her. Code: `src/slack/`.
+thread can keep steering her. Code: `src/slack/`; its settings page is
+`packages/website/src/app/slack/` (stella.sh/slack), on the API in
+`@stella/contracts/slack-workspace`.
 
 ## How it works
 
-- **Install:** any workspace installs through `<auth>/api/slack/install`
-  (OAuth v2). The bot token is stored per workspace in D1
+- **Install:** a signed-in Stella user adds it from stella.sh/slack ("Add to
+  Slack", `POST /api/slack/install/start`), which makes that account the
+  owner at once; any workspace can also install through
+  `<auth>/api/slack/install` (OAuth v2) and connect afterwards. The bot token is stored per workspace in D1
   (`slack_installations`), AES-GCM encrypted under a key derived from
   `BETTER_AUTH_SECRET`. Nothing is hardcoded to one workspace.
 - **Owner:** the person who installed the app connects their Stella account
@@ -29,6 +33,17 @@ thread can keep steering her. Code: `src/slack/`.
   and the workspace's files), drive, her own thread's history, cloud agents,
   and `slack_memory`. Separation is structural plus the prompt, which knows
   she is talking to many people and what not to repeat elsewhere.
+- **Settings** (`settings.ts`, `workspace-api.ts`, D1
+  `slack_workspace_settings`), edited on stella.sh/slack by the owner:
+  engine (Stella's runtime or Claude Code on the owner's Claude login, which
+  needs a plan with cloud access), model, reasoning effort, whether
+  `/stella engine|model|effort` may change those from Slack, and a GitHub
+  repository (optional read-only token, sealed like the bot token) that is
+  cloned into every Slack agent's container under `/workspace/repos/<name>`
+  before it starts (`repo-clone.ts`), outside the owner's world. The page also
+  edits `memories/rules.md`, plain-language rules she follows as
+  `<workspace-rules>` (no permission system beyond that), and
+  `memories/workspace.md`.
 - **Memory:** short notes in the home folder: `memories/workspace.md`
   (written from public channels), `memories/channels/<channel>.md`,
   `memories/people/<user>.md` and `memories/dms/<user>.md`. Each turn loads
@@ -54,10 +69,14 @@ thread can keep steering her. Code: `src/slack/`.
    `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET` (pipe each
    into `bunx wrangler secret put NAME`, `--env production` for prod).
    `OAUTH_STATE_SECRET` must also be set.
-3. Apply the D1 migrations (`migrations/0009_slack.sql`, `0010_slack_workspace.sql`) and deploy
-   cloud-builder.
+3. Apply the D1 migrations (`migrations/0009_slack.sql`, `0010_slack_workspace.sql`,
+   `0011_slack_workspace_settings.sql`) and deploy cloud-builder.
 4. In the app's Event Subscriptions, retry verification of the request URL.
-5. Install into a workspace by opening `<auth>/api/slack/install`.
+5. Install into a workspace from stella.sh/slack, or by opening
+   `<auth>/api/slack/install`.
+
+A workspace that has both the dev and prod apps installed sends `/stella` to
+one of them only; the dev app's command is `/stella-dev` for that reason.
    Don't use "Install to Workspace" in Slack's settings, because that skips
    storing the token.
 

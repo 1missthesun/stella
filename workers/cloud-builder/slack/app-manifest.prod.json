@@ -19,8 +19,8 @@
       {
         "command": "/stella",
         "url": "https://auth.stella.sh/api/slack/commands",
-        "description": "Connect or disconnect your Stella account, or check status",
-        "usage_hint": "connect | disconnect | status",
+        "description": "Stella's status, or change her engine, model or effort",
+        "usage_hint": "engine | model | effort | connect | disconnect",
         "should_escape": false
       }
     ]

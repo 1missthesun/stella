@@ -1,25 +1,60 @@
 import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { constants, setPriority } from "node:os";
 
 export type GitResult = { code: number; stdout: string; stderr: string };
 
 const gitBinary = () => process.env.STELLA_GIT_BIN?.trim() || "git";
 
+export type RunOptions = {
+  cwd: string;
+  env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
+  /**
+   * Work nobody is waiting on (preparing an update before it is offered):
+   * lowest CPU priority, and idle disk priority where the system has a way to
+   * ask for it (`ionice` on Linux, `taskpolicy` on macOS). What it spawns
+   * inherits both.
+   */
+  background?: boolean;
+  /** Stops the command; the run then rejects. */
+  signal?: AbortSignal;
+};
+
+const IONICE = "/usr/bin/ionice";
+const TASKPOLICY = "/usr/sbin/taskpolicy";
+
+/** The command line a background run starts with. */
+const backgroundCommand = (file: string, args: string[]): [string, string[]] => {
+  if (process.platform === "linux" && existsSync(IONICE)) {
+    return [IONICE, ["-c", "3", file, ...args]];
+  }
+  if (process.platform === "darwin" && existsSync(TASKPOLICY)) {
+    return [TASKPOLICY, ["-b", file, ...args]];
+  }
+  return [file, args];
+};
+
 /** Run a command without a shell; resolves with its exit code, never throws on one. */
 export const run = (
   file: string,
   args: string[],
-  options: { cwd: string; env?: NodeJS.ProcessEnv; timeoutMs?: number },
+  options: RunOptions,
 ): Promise<GitResult> =>
   new Promise((resolve, reject) => {
-    execFile(
-      file,
-      args,
+    const [command, commandArgs] = options.background
+      ? backgroundCommand(file, args)
+      : [file, args];
+    const child = execFile(
+      command,
+      commandArgs,
       {
         cwd: options.cwd,
         env: { ...process.env, ...options.env },
         maxBuffer: 16 * 1024 * 1024,
         timeout: options.timeoutMs ?? 60_000,
         windowsHide: true,
+        ...(options.signal ? { signal: options.signal } : {}),
       },
       (error, stdout, stderr) => {
         const code =
@@ -35,26 +70,34 @@ export const run = (
         resolve({ code, stdout: String(stdout), stderr: String(stderr) });
       },
     );
+    if (options.background && child.pid) {
+      try {
+        setPriority(child.pid, constants.priority.PRIORITY_LOW);
+      } catch {
+        // It runs at normal priority.
+      }
+    }
   });
 
-export const gitRaw = (
-  cwd: string,
-  args: string[],
-  options: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
-) =>
+type GitOptions = {
+  env?: NodeJS.ProcessEnv;
+  timeoutMs?: number;
+  background?: boolean;
+  signal?: AbortSignal;
+};
+
+export const gitRaw = (cwd: string, args: string[], options: GitOptions = {}) =>
   run(gitBinary(), args, {
     cwd,
     // Never prompt: a missing credential must fail, not hang main.
     env: { GIT_TERMINAL_PROMPT: "0", ...options.env },
     timeoutMs: options.timeoutMs,
+    background: options.background,
+    signal: options.signal,
   });
 
 /** Run git and return trimmed stdout; throws with git's message on failure. */
-export const git = async (
-  cwd: string,
-  args: string[],
-  options: { env?: NodeJS.ProcessEnv; timeoutMs?: number } = {},
-) => {
+export const git = async (cwd: string, args: string[], options: GitOptions = {}) => {
   const result = await gitRaw(cwd, args, options);
   if (result.code !== 0) {
     throw new Error(

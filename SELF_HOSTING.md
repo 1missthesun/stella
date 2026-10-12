@@ -54,7 +54,7 @@ at Stella's account:
 |---|---|---|
 | all `workers/*/wrangler.jsonc` | every `*.fromyou.workers.dev` URL | your workers.dev subdomain (Dashboard → Workers → Subdomain). `sed -i '' 's/fromyou\.workers\.dev/YOURSUB.workers.dev/g' workers/*/wrangler.jsonc` (drop `''` on Linux) |
 | `workers/cloud-builder/wrangler.jsonc` | `vars.R2_S3_ENDPOINT` | `https://<ACCOUNT_ID>.r2.cloudflarestorage.com` |
-| 〃 | `vars.STELLA_TEST_ACCOUNTS`, `vars.ENABLE_DEV_ACCEPTANCE_PROBES` | delete both unless you want test accounts / acceptance probes on dev |
+| 〃 | `vars.STELLA_TEST_ACCOUNTS` | delete it unless you want test accounts on dev |
 | 〃 | `d1_databases[0].database_id` | from `wrangler d1 create` (1.3) |
 | 〃 | `kv_namespaces` ids (`APP_ROUTES`, `ASN_POLICY`) | from `wrangler kv namespace create` (1.3) |
 | 〃 | `artifacts[0].namespace` | any name; `stella-app-dev` is fine |

@@ -16,12 +16,9 @@ import { constants as fsConstants, existsSync } from "node:fs";
 import {
   chmod,
   chown,
-  lchown,
-  lstat,
   readFile,
   mkdir,
   open,
-  readdir,
   rm,
 } from "node:fs/promises";
 import path from "node:path";
@@ -52,7 +49,6 @@ import {
 import { openAgentInbox } from "./agent-inbox.js";
 import { createCloudUserAskHost } from "./cloud-user-ask.js";
 import {
-  emptyDriveSync,
   materializeDriveFiles,
   type DriveSyncResult,
 } from "./drive-sync.js";
@@ -89,7 +85,6 @@ import {
 } from "./agent-history.js";
 import {
   type TurnBrokerInput,
-  type TurnBrokerTurnStateCheckpointRequest,
   type TurnBrokerTurnStateCheckpointReceipt,
 } from "@stella/contracts/turn-credential-broker";
 import {
@@ -105,8 +100,6 @@ import {
 } from "./cloud-process-isolation.js";
 import { CLOUD_TOOL_HOME } from "@stella/contracts/cloud-tool-home";
 import { cloudAgentToolContext } from "./cloud-tool-context.js";
-
-export { CLOUD_TOOL_PROCESS_IDENTITY } from "./cloud-process-isolation.js";
 
 /**
  * turn-input.json. `role` (from the shared contract) says which loop runs:
@@ -208,38 +201,6 @@ export const createBuilderFallbackAgentTurnResult = (args: {
       : {}),
   },
 });
-
-/**
- * Make the restored workspace writable by the fixed tool account without ever
- * following a workspace symlink. The trusted executor and native Claude
- * process remain root; only model-authored ToolHost child processes use this
- * identity, so `/home/stella-native-state` stays unreadable to them.
- */
-export const chownTreeWithoutFollowingSymlinks = async (
-  root: string,
-  uid: number = CLOUD_TOOL_PROCESS_IDENTITY.uid,
-  gid: number = CLOUD_TOOL_PROCESS_IDENTITY.gid,
-): Promise<void> => {
-  const visit = async (target: string, isRoot: boolean): Promise<void> => {
-    const details = await lstat(target);
-    if (details.isSymbolicLink()) {
-      if (isRoot) {
-        throw new Error("Cloud workspace root must not be a symbolic link.");
-      }
-      await lchown(target, uid, gid);
-      return;
-    }
-    if (details.isFile() && details.nlink !== 1) {
-      throw new Error("Cloud workspace contains a hard-linked file.");
-    }
-    await chown(target, uid, gid);
-    if (!details.isDirectory()) return;
-    for (const entry of await readdir(target)) {
-      await visit(path.join(target, entry), false);
-    }
-  };
-  await visit(root, true);
-};
 
 export const prepareCloudToolFilesystem = async (args: {
   workspaceRoot: string;

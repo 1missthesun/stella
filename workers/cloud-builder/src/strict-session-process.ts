@@ -3,13 +3,8 @@ import type {
   ExecResult,
   ExecutionSession,
   Process,
-  ProcessOptions,
 } from "./sandbox-client.js";
 import { Effect } from "effect";
-import {
-  CLOUD_TOOL_HOME,
-  toolStateEnvironment,
-} from "@stella/contracts/cloud-tool-home";
 import {
   runToolEffect,
   sleepWithAbortEffect,
@@ -17,13 +12,6 @@ import {
 
 export const CLOUD_MODEL_UID = 42_424;
 export const CLOUD_MODEL_GID = 42_424;
-export const APP_BUILD_SESSION_ENV = Object.freeze({
-  STELLA_CLOUD_WORKSPACE_ROOT: "/workspace/app",
-  USER: "stella-tools",
-  LOGNAME: "stella-tools",
-  HOME: CLOUD_TOOL_HOME,
-  ...toolStateEnvironment(CLOUD_TOOL_HOME),
-});
 
 const quoteShellArg = (value: string): string => {
   if (value.includes("\0")) {
@@ -32,15 +20,11 @@ const quoteShellArg = (value: string): string => {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 };
 
-const strictSessionCommandForMode = (
-  argv: readonly string[],
-  replaceSessionShell: boolean,
-): string => {
+const strictSessionCommand = (argv: readonly string[]): string => {
   if (argv.length === 0 || !argv[0]) {
     throw new Error("Strict session execution requires a command.");
   }
   return [
-    ...(replaceSessionShell ? ["exec"] : []),
     "/usr/bin/setpriv",
     `--reuid=${CLOUD_MODEL_UID}`,
     `--regid=${CLOUD_MODEL_GID}`,
@@ -54,21 +38,7 @@ const strictSessionCommandForMode = (
   ].join(" ");
 };
 
-/**
- * Exact command for a tracked process inside an ExecutionSession.
- *
- * The session owns a persistent shell. Replacing that shell with `exec` makes
- * Cloudflare's process registry track a session lifetime instead of the
- * bounded command and can leave `waitForExit()` pending after admission. The
- * fixed root shell is only a non-interactive wrapper; the model-controlled
- * child still crosses the complete setpriv boundary below, and process-tree
- * cancellation joins both wrapper and child.
- */
-export const strictSessionCommand = (argv: readonly string[]): string =>
-  strictSessionCommandForMode(argv, false);
-
 type StrictExecSession = Pick<ExecutionSession, "exec">;
-type StrictProcessSession = Pick<ExecutionSession, "startProcess">;
 type CapturedSession = Pick<ExecutionSession, "startProcess"> &
   Partial<Pick<ExecutionSession, "getProcess">>;
 
@@ -192,14 +162,7 @@ export const strictSessionExec = (
   // ExecutionSession owns a persistent shell. `exec setpriv ...` would replace
   // that shell, so a successful foreground command would terminate the whole
   // session and make every subsequent operation fail.
-  session.exec(strictSessionCommandForMode(argv, false), options);
-
-export const startStrictSessionProcess = (
-  session: StrictProcessSession,
-  argv: readonly string[],
-  options?: ProcessOptions,
-): Promise<Process> =>
-  session.startProcess(strictSessionCommand(argv), options);
+  session.exec(strictSessionCommand(argv), options);
 
 const trustedProcessCommand = (argv: readonly string[]): string => {
   if (argv.length === 0 || !argv[0]) {
@@ -213,7 +176,7 @@ const trustedProcessCommand = (argv: readonly string[]): string => {
  * its authoritative terminal result from Cloudflare's process registry. The
  * executor must remain root so it can validate the root-owned host/native
  * anchors and apply the per-tool setpriv boundary itself. Untrusted app/build
- * commands continue to use `strictSessionExec`/`startStrictSessionProcess`.
+ * commands continue to use `strictSessionExec`.
  *
  * A foreground `ExecutionSession.exec()` RPC can remain pending after its
  * command exits, while an explicit-session background process can be tracked

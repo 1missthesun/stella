@@ -12,11 +12,6 @@ export const ownerGenerationMatches = (
   return Boolean(expected && normalized === expected);
 };
 
-/** A forced admission lookup must never share an older in-flight lookup. */
-export const mayReusePendingOwnerLookup = (
-  forceGenerationRefresh: boolean,
-): boolean => !forceGenerationRefresh;
-
 export type OwnerPurgeBeginDisposition =
   | {
       action: "start";

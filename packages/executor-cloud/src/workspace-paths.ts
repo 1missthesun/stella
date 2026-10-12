@@ -12,15 +12,11 @@ import path from "node:path";
 /** The single checkpointed root, mirrored from the builder worker. */
 export const WORLD_ROOT = "/workspace/world";
 
-/** Stella's own editable renderer source, a plain directory in the world. */
-
 /**
  * Where the user's drive is hydrated and where deliverables are collected
  * from. A file anywhere else in the world is the agent's working material,
  * not something the user receives.
  */
-export const WORLD_DRIVE_ROOT = `${WORLD_ROOT}/drive`;
-
 export const worldDriveRoot = (worldRoot: string): string =>
   path.join(worldRoot, "drive");
 
@@ -35,16 +31,6 @@ export const worldDriveRoot = (worldRoot: string): string =>
  */
 export const toolStateDir = (root: string): string =>
   path.join(root, ".stella");
-
-/**
- * Drive hydration's ledger must be contained by the exact tree whose files it
- * describes. Keeping this distinct from the world-level tool-host state makes
- * that boundary explicit at both cloud execution entry points.
- */
-export const WORLD_DRIVE_WORKSPACE = Object.freeze({
-  root: WORLD_DRIVE_ROOT,
-  stateDir: toolStateDir(WORLD_DRIVE_ROOT),
-});
 
 export const worldDriveWorkspace = (worldRoot: string) => {
   const root = worldDriveRoot(worldRoot);

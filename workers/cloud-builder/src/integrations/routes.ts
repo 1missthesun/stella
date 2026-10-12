@@ -4,7 +4,6 @@
  *
  *   GET  /api/native-integrations/catalog        the executable Store catalog (public)
  *   GET  /api/native-integrations/actions        ?id&action|query&cursor&limit
- *   GET  /api/native-integrations/connections    `integrations.connections`
  *   GET  /api/native-integrations/status         ?id → `integrations.status`
  *   POST /api/native-integrations/connect-link   {id} → `integrations.connectLink`
  *   POST /api/native-integrations/run            {id, action, input}; `x-stella-request-id` or `Idempotency-Key`
@@ -251,8 +250,6 @@ export const handleIntegrationsRoute = async (request: Request, env: RouteEnv): 
       }
     case "/api/native-integrations/actions":
       return method === "GET" ? await actions(request, env) : methodNotAllowed();
-    case "/api/native-integrations/connections":
-      return method === "GET" ? await ownerCall(request, env, "integrations.connections", () => ({})) : methodNotAllowed();
     case "/api/native-integrations/status":
       return method === "GET"
         ? await ownerCall(request, env, "integrations.status", (_body, url) => ({

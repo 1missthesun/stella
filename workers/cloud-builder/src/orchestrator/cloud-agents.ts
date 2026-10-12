@@ -22,7 +22,7 @@ import type { AppendCardInput } from "../journal.js";
 import type { WakeReport, ChatTurnRequest } from "./types.js";
 import { WAKE_REPORT_INLINE_MAX_BYTES } from "./constants.js";
 import { errorMessage, log } from "./support.js";
-import { OrchestratorDevAcceptance } from "./dev-acceptance.js";
+import { OrchestratorJournalProbe } from "./journal-probe.js";
 
 /**
  * Cloud agents: control receipts, wake reports, steering wakes into a running
@@ -33,7 +33,7 @@ type CardPayload = AppendCardInput["card"];
 /** Where a wake turn's staged cards are kept; the length keeps one turn's prefix from matching another's. */
 const wakeCardPrefix = (turnId: string): string => `wakeCard:${turnId.length}:${turnId}:`;
 
-export abstract class OrchestratorCloudAgents extends OrchestratorDevAcceptance {
+export abstract class OrchestratorCloudAgents extends OrchestratorJournalProbe {
   /**
    * Advances the durable control receipt for one reusable cloud-agent thread.
    * Attempt generation is the primary ABA fence; updatedAt orders state within

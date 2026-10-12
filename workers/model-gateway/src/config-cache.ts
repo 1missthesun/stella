@@ -54,12 +54,6 @@ const adopt = (restored: GatewayConfig | null): void => {
   }
 };
 
-export const resetConfigCacheForTests = (): void => {
-  cached = null;
-  inflight = null;
-  sharedInflight = null;
-};
-
 const isSnapshot = (value: unknown): value is GatewayConfigSnapshot =>
   !!value &&
   typeof value === "object" &&

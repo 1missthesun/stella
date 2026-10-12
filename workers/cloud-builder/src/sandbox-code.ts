@@ -40,9 +40,6 @@ export const sandboxCodeAssetPath = (sha256: string): string =>
 export const SANDBOX_CODE_INSTALL = "/opt/stella/bin/stella-code-install";
 export const SANDBOX_EXECUTOR = "/opt/stella/bin/stella-executor";
 
-/** Where installed bundles live in the container. */
-export const SANDBOX_CODE_ROOT = "/run/stella-code";
-
 const SHA256 = /^[0-9a-f]{64}$/u;
 
 /** The bundle this Worker version was built with. */

@@ -27,7 +27,6 @@ import type {
   MediaJob,
   MediaJobError,
   MediaJobStatus,
-  MediaModelListing,
 } from "@stella/contracts/backend/media";
 import { buildCapabilityDenial, hasCapability, toCapabilityAudience } from "@stella/contracts/capabilities";
 import { MEDIA_MODELS, mediaModel, type MediaModel } from "@stella/contracts/media-models";
@@ -42,7 +41,7 @@ import {
   submitFal,
 } from "../../media/fal.js";
 import { presignR2Url, r2Signer, type R2Signer } from "../../r2-presign.js";
-import { empty, json, literal, number, object, optional, string, type Parser } from "../args.js";
+import { json, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -234,14 +233,6 @@ const accepted = (row: JobRow, reattached: boolean): MediaGenerateAccepted => ({
   status: publicStatus(row.status),
   ...(reattached ? { reattached: true } : {}),
   ...(row.status === "succeeded" && row.outputs_json ? { output: parseJson<unknown>(row.outputs_json) } : {}),
-});
-
-const listing = (model: MediaModel): MediaModelListing => ({
-  id: model.id,
-  name: model.name,
-  kind: model.kind,
-  does: model.does,
-  docsUrl: model.docsUrl,
 });
 
 // ── Storage ──────────────────────────────────────────────────────────────
@@ -832,11 +823,6 @@ export const mediaDomain = {
   name: "media",
   migrations: [MEDIA_MIGRATION, MEDIA_CHARGE_MIGRATION, MEDIA_MODEL_MIGRATION, MEDIA_WEBHOOK_TOKEN_MIGRATION],
   calls: {
-    "media.models": {
-      scope: "global",
-      parse: empty(),
-      handler: () => ({ data: MEDIA_MODELS.map(listing), docsUrl: MEDIA_DOCS_URL }),
-    },
     "media.generate": {
       scope: "owner",
       requireAccount: true,

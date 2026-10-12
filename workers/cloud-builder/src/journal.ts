@@ -214,21 +214,6 @@ const DDL = [
      result_json  TEXT NOT NULL,
      created_at   INTEGER NOT NULL
    )`,
-  // A single fixed-shape, dev-acceptance-only context fault. The caller never
-  // supplies SQL or replacement content: the original resident row and the
-  // fixed malformed sentinel move together in one SQLite transaction, and a
-  // bounded observation count restores the exact bytes automatically.
-  `CREATE TABLE IF NOT EXISTS acceptance_context_fault (
-     id                      INTEGER PRIMARY KEY CHECK (id = 0),
-     run_id_sha256           TEXT    NOT NULL,
-     seq                     INTEGER NOT NULL,
-     original_payload_json   TEXT    NOT NULL,
-     original_payload_sha256 TEXT    NOT NULL,
-     corrupt_payload_sha256  TEXT    NOT NULL,
-     observed_failures       INTEGER NOT NULL DEFAULT 0,
-     repair_after_failures   INTEGER NOT NULL,
-     created_at              INTEGER NOT NULL
-   )`,
 ];
 
 /**
@@ -256,7 +241,6 @@ const CURRENT_SCHEMA_OBJECT_NAMES = [
   "retired_writers",
   "retired_turns",
   "conversation_edit_receipts",
-  "acceptance_context_fault",
 ] as const;
 
 /**
@@ -540,21 +524,6 @@ export type WindowSelection = {
     toolCallId: string | null;
   }>;
 };
-
-export type AcceptanceContextFault = {
-  run_id_sha256: string;
-  seq: number;
-  original_payload_json: string;
-  original_payload_sha256: string;
-  corrupt_payload_sha256: string;
-  observed_failures: number;
-  repair_after_failures: number;
-  created_at: number;
-};
-
-/** Fixed invalid JSON. No caller-controlled bytes ever enter the mutation. */
-export const ACCEPTANCE_CONTEXT_CORRUPT_PAYLOAD =
-  '{"stellaAcceptanceContextFault":';
 
 /**
  * A resident canonical row selected for model context could not be decoded.
@@ -1640,210 +1609,6 @@ export class Journal {
       if (Number.isSafeInteger(index) && index > max) max = index;
     }
     return max;
-  }
-
-  // -------------------------------------------------------------------------
-  // Bounded dev-acceptance context fault
-  // -------------------------------------------------------------------------
-
-  /**
-   * Select the newest completed user row, which is guaranteed to participate
-   * in the next normal context window. The acceptance route hashes the payload
-   * before arming; the raw bytes never leave this DO.
-   */
-  acceptanceContextFaultCandidate(): {
-    seq: number;
-    payloadJson: string;
-  } | null {
-    if (this.acceptanceContextFaultRecord()) return null;
-    const candidate = this.sql
-      .exec<{ seq: number; payload_json: string }>(
-        `SELECT seq, payload_json FROM journal
-          WHERE kind = 'message' AND role = 'user' AND model_skip = 0
-          ORDER BY seq DESC LIMIT 1`,
-      )
-      .toArray()[0];
-    if (!candidate) return null;
-    try {
-      JSON.parse(candidate.payload_json);
-    } catch {
-      // A real corruption is never overwritten by a test fault.
-      return null;
-    }
-    return { seq: candidate.seq, payloadJson: candidate.payload_json };
-  }
-
-  acceptanceContextFaultStatus(): Omit<
-    AcceptanceContextFault,
-    "original_payload_json"
-  > | null {
-    const fault = this.acceptanceContextFaultRecord();
-    if (!fault) return null;
-    const { original_payload_json: _original, ...safe } = fault;
-    return safe;
-  }
-
-  /**
-   * Replace exactly one internally selected row with a fixed invalid sentinel.
-   * The original and its repair metadata commit atomically; there is no API
-   * for caller-provided SQL, sequence numbers, or replacement content.
-   */
-  armAcceptanceContextFault(args: {
-    runIdSha256: string;
-    seq: number;
-    expectedPayloadJson: string;
-    originalPayloadSha256: string;
-    corruptPayloadSha256: string;
-    createdAt: number;
-  }): Omit<AcceptanceContextFault, "original_payload_json"> {
-    if (
-      !/^[a-f0-9]{64}$/u.test(args.runIdSha256) ||
-      !/^[a-f0-9]{64}$/u.test(args.originalPayloadSha256) ||
-      !/^[a-f0-9]{64}$/u.test(args.corruptPayloadSha256) ||
-      !Number.isSafeInteger(args.seq) ||
-      args.seq < 0
-    ) {
-      throw new Error("Invalid acceptance context fault metadata.");
-    }
-    return this.transactionSync(() => {
-      if (this.acceptanceContextFaultRecord()) {
-        throw new Error("An acceptance context fault is already armed.");
-      }
-      const row = this.sql
-        .exec<{
-          payload_json: string;
-          model_skip: number;
-          role: string | null;
-        }>(
-          `SELECT payload_json, model_skip, role FROM journal
-            WHERE seq = ? AND kind = 'message'`,
-          args.seq,
-        )
-        .toArray()[0];
-      if (
-        !row ||
-        row.model_skip !== 0 ||
-        row.role !== "user" ||
-        row.payload_json !== args.expectedPayloadJson
-      ) {
-        throw new Error("Acceptance context fault candidate changed.");
-      }
-      try {
-        JSON.parse(row.payload_json);
-      } catch {
-        throw new Error(
-          "Acceptance context fault candidate is already corrupt.",
-        );
-      }
-      this.sql.exec(
-        `INSERT INTO acceptance_context_fault (
-           id, run_id_sha256, seq, original_payload_json,
-           original_payload_sha256, corrupt_payload_sha256,
-           observed_failures, repair_after_failures, created_at
-         ) VALUES (0, ?, ?, ?, ?, ?, 0, 2, ?)`,
-        args.runIdSha256,
-        args.seq,
-        row.payload_json,
-        args.originalPayloadSha256,
-        args.corruptPayloadSha256,
-        args.createdAt,
-      );
-      this.sql.exec(
-        `UPDATE journal SET payload_json = ?
-          WHERE seq = ? AND payload_json = ?`,
-        ACCEPTANCE_CONTEXT_CORRUPT_PAYLOAD,
-        args.seq,
-        row.payload_json,
-      );
-      const armed = this.acceptanceContextFaultRecord();
-      const changed = this.sql
-        .exec<{
-          payload_json: string;
-        }>(`SELECT payload_json FROM journal WHERE seq = ?`, args.seq)
-        .toArray()[0];
-      if (
-        !armed ||
-        changed?.payload_json !== ACCEPTANCE_CONTEXT_CORRUPT_PAYLOAD
-      ) {
-        throw new Error("Acceptance context fault did not commit atomically.");
-      }
-      const { original_payload_json: _original, ...safe } = armed;
-      return safe;
-    });
-  }
-
-  /**
-   * One failed turn before restart and one after restart are required. The
-   * second observation restores the byte-identical original automatically.
-   */
-  observeAcceptanceContextFault(runIdSha256: string): {
-    observedFailures: number;
-    repaired: boolean;
-    seq: number;
-    originalPayloadSha256: string;
-    corruptPayloadSha256: string;
-  } | null {
-    return this.transactionSync(() => {
-      const fault = this.acceptanceContextFaultRecord();
-      if (!fault) return null;
-      if (fault.run_id_sha256 !== runIdSha256) {
-        throw new Error("Acceptance context fault run does not match.");
-      }
-      const observedFailures = fault.observed_failures + 1;
-      if (observedFailures < fault.repair_after_failures) {
-        this.sql.exec(
-          `UPDATE acceptance_context_fault SET observed_failures = ? WHERE id = 0`,
-          observedFailures,
-        );
-        return {
-          observedFailures,
-          repaired: false,
-          seq: fault.seq,
-          originalPayloadSha256: fault.original_payload_sha256,
-          corruptPayloadSha256: fault.corrupt_payload_sha256,
-        };
-      }
-      const row = this.sql
-        .exec<{
-          payload_json: string;
-        }>(`SELECT payload_json FROM journal WHERE seq = ?`, fault.seq)
-        .toArray()[0];
-      if (row?.payload_json !== ACCEPTANCE_CONTEXT_CORRUPT_PAYLOAD) {
-        // Keep the repair copy when the row is missing or unexpectedly changed;
-        // an operator can inspect the DO without this code overwriting evidence.
-        throw new Error(
-          "Acceptance context fault evidence changed before repair.",
-        );
-      }
-      this.sql.exec(
-        `UPDATE journal SET payload_json = ?
-          WHERE seq = ? AND payload_json = ?`,
-        fault.original_payload_json,
-        fault.seq,
-        ACCEPTANCE_CONTEXT_CORRUPT_PAYLOAD,
-      );
-      this.sql.exec(`DELETE FROM acceptance_context_fault WHERE id = 0`);
-      return {
-        observedFailures,
-        repaired: true,
-        seq: fault.seq,
-        originalPayloadSha256: fault.original_payload_sha256,
-        corruptPayloadSha256: fault.corrupt_payload_sha256,
-      };
-    });
-  }
-
-  private acceptanceContextFaultRecord(): AcceptanceContextFault | null {
-    return (
-      this.sql
-        .exec<AcceptanceContextFault>(
-          `SELECT run_id_sha256, seq, original_payload_json,
-                  original_payload_sha256, corrupt_payload_sha256,
-                  observed_failures, repair_after_failures, created_at
-             FROM acceptance_context_fault WHERE id = 0`,
-        )
-        .toArray()[0] ?? null
-    );
   }
 
   // -------------------------------------------------------------------------

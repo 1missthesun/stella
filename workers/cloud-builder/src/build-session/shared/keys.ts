@@ -7,10 +7,8 @@ import {
 } from "@stella/contracts/turn-plane/turn-start";
 import { HEADER_OWNER } from "../../conversation-types.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
-import { classifyAgentFailureDiagnostic } from "../../agent-failure-diagnostic.js";
 import { sha256Hex } from "../../hash.js";
 import { inSubshell } from "../../shell-subshell.js";
-import { sandboxLifecycleId } from "../../sandbox-lifecycle.js";
 import type { InstanceSize } from "../../instance-size.js";
 import { APP_BUILD_ROOT, WORLD_ROOT } from "../../workspace.js";
 import type { OwnerGateRefusalCode } from "../../owner-gate.js";
@@ -184,8 +182,6 @@ export const isBuildOwnerFenceDurabilityKey = (key: string): boolean =>
   key.startsWith(BUILD_OWNER_FENCE_LEASE_RECEIPT_PREFIX) ||
   key.startsWith(BUILD_OWNER_FENCE_LEASE_SLOT_PREFIX);
 
-export const APP_TURN_ADMISSION_CLAIM_KEY = "appTurnAdmissionClaim";
-
 export const json = (body: unknown, status = 200): Response =>
   Response.json(body, {
     status,
@@ -228,63 +224,12 @@ export const log = (
   );
 };
 
-export const executionFailureFields = (
-  stderr: string,
-): { failureCode: string; stderrBytes: number } => ({
-  failureCode: classifyAgentFailureDiagnostic(stderr),
-  stderrBytes: new TextEncoder().encode(stderr).byteLength,
-});
-
-/**
- * The single spelling of a conversation id, used as the Durable Object name.
- *
- * Four callers build these URLs — service callers (raw), the socket client, the runtime
- * journal writer, and the dev probe — and two of them percent-encode. Two
- * spellings of one id would address two DIFFERENT Durable Objects, which is a
- * split-brain no amount of downstream care recovers from. Decoding once here
- * makes every spelling converge; conversation ids are `crypto.randomUUID()`, so
- * decode is the identity for every id that exists today and this only closes
- * the latent case. A segment that is not valid percent-encoding is used as-is
- * rather than throwing — it cannot match a real conversation either way.
- */
-export const conversationName = (segment: string): string => {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-};
-
 export const sessionName = (value: string): string =>
   value
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 56);
-
-export const contentType = (path: string): string => {
-  if (path.endsWith(".html")) return "text/html; charset=utf-8";
-  if (path.endsWith(".js") || path.endsWith(".mjs"))
-    return "text/javascript; charset=utf-8";
-  if (path.endsWith(".css")) return "text/css; charset=utf-8";
-  if (path.endsWith(".json")) return "application/json; charset=utf-8";
-  if (path.endsWith(".map")) return "application/json";
-  if (path.endsWith(".svg")) return "image/svg+xml";
-  if (path.endsWith(".png")) return "image/png";
-  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) return "image/jpeg";
-  if (path.endsWith(".webp")) return "image/webp";
-  if (path.endsWith(".gif")) return "image/gif";
-  if (path.endsWith(".ico")) return "image/x-icon";
-  if (path.endsWith(".woff")) return "font/woff";
-  if (path.endsWith(".woff2")) return "font/woff2";
-  if (path.endsWith(".ttf")) return "font/ttf";
-  if (path.endsWith(".wasm")) return "application/wasm";
-  if (path.endsWith(".webmanifest")) return "application/manifest+json";
-  if (path.endsWith(".txt")) return "text/plain; charset=utf-8";
-  if (path.endsWith(".mp3")) return "audio/mpeg";
-  if (path.endsWith(".wav")) return "audio/wav";
-  return "application/octet-stream";
-};
 
 /** Longer than the 30s callback timeout; covers an evicted isolate's last send. */
 export const OWNER_PURGE_STALE_LEASE_GRACE_MS = 35_000;
@@ -371,23 +316,6 @@ export const HEADER_CONVERSATION_ID = "x-stella-conversation-id";
 /** Headers the outer Worker forwards a dispatched turn's routing on. */
 export const HEADER_BUILD_SESSION_NAME = "x-stella-build-session-name";
 export const HEADER_TURN_BROKER_ENDPOINT = "x-stella-turn-broker-endpoint";
-export const HEADER_PREVIEW_BASE_URL = "x-stella-preview-base-url";
-
-
-/** Header the outer Worker forwards a signed preview capability on. */
-export const HEADER_PREVIEW_CAPABILITY = "x-stella-preview-capability";
-
-export const exactTurnSandboxId = async (
-  prefix: "app",
-  turn: TurnRequest,
-): Promise<string> =>
-  await sandboxLifecycleId(prefix, {
-    ownerId: turn.ownerId,
-    ownerGeneration: turn.ownerGeneration,
-    turnId: turn.turnId,
-    attemptGeneration:
-      turn.kind === "agent" ? (turn.attemptGeneration ?? 0) : 1,
-  });
 
 /**
  * The two directories a model-shaped process may own. `world` is the owner's

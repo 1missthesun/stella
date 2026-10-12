@@ -346,7 +346,6 @@ const controlError = (error: BackendError): CloudHomeProtocolError =>
 
 export class CloudHomeStore {
   private ownerHashPromise?: Promise<string>;
-  private ownerGenerationHashPromise?: Promise<string>;
 
   constructor(
     private readonly bucket: R2Bucket,
@@ -356,17 +355,6 @@ export class CloudHomeStore {
   private ownerHash(): Promise<string> {
     this.ownerHashPromise ??= sha256Hex(this.endpoint.ownerId);
     return this.ownerHashPromise;
-  }
-
-  private ownerGenerationHash(): Promise<string> {
-    this.ownerGenerationHashPromise ??= sha256Hex(
-      this.endpoint.ownerGeneration,
-    );
-    return this.ownerGenerationHashPromise;
-  }
-
-  private async generationPrefix(): Promise<string> {
-    return `agent-home/${await this.ownerHash()}/generations/${await this.ownerGenerationHash()}/`;
   }
 
   private async assertOwnedKey(key: string): Promise<void> {

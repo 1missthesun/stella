@@ -1494,10 +1494,6 @@ export const schedulesDomain = {
       parse: empty(),
       read: (ctx) => listFires(ctx.db, ctx.now),
     },
-    "schedules.zone": {
-      parse: empty(),
-      read: (ctx) => readZone(ctx.db),
-    },
   },
   calls: {
     "schedules.create": {

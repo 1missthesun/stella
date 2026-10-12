@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { lstat, readFile, realpath } from "node:fs/promises";
+import { lstat, realpath } from "node:fs/promises";
 import path from "node:path";
 import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-isolation.js";
 import type { ToolProcessIdentity } from "@stella/runtime/kernel/tools/types.js";
@@ -173,14 +173,6 @@ export const assertStrictLinuxProcessStatus = (
   if (statusValue(status, "NoNewPrivs") !== "1") {
     throw new Error("Cloud child did not enter no_new_privs mode.");
   }
-};
-
-export const assertCurrentCloudProcessIsolation = async (): Promise<void> => {
-  if (process.platform !== "linux") {
-    throw new Error("Cloud model entrypoints require a Linux isolation host.");
-  }
-  const status = await readFile("/proc/self/status", "utf8");
-  assertStrictLinuxProcessStatus(status);
 };
 
 /** Prove the exact trampoline contract before any untrusted child can start. */

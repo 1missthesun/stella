@@ -80,9 +80,6 @@ const TOOLS = [
   [APPLY_PATCH_TOOL_NAME, APPLY_PATCH_TOOL_DESCRIPTION, APPLY_PATCH_TOOL_PARAMETERS, APPLY_PATCH_TOOL_REPLAY],
 ] as const;
 
-/** The names these tools take, which the agents' host tools must not also offer. */
-export const PI_ATTACHED_TOOL_NAMES: ReadonlySet<string> = new Set(TOOLS.map(([name]) => name));
-
 const asResult = (result: SerializedAgentToolResult) => {
   const text = result.outcome.kind === "ok" ? result.outcome.text : result.outcome.message;
   const images = result.authorizedImages.map((image) => ({

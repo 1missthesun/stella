@@ -255,14 +255,6 @@ export class WorldStore extends DurableObject<Env> {
     return this.world.usage();
   }
 
-  statMany(paths: readonly string[]) {
-    return this.world.statMany(paths);
-  }
-
-  children(path: string) {
-    return this.world.children(path);
-  }
-
   async commitShell(input: Parameters<WorldSqlStore["commitShell"]>[0]) {
     const result = await this.ctx.blockConcurrencyWhile(() =>
       this.world.commitShell(input),

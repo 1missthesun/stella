@@ -22,7 +22,6 @@ import {
   sandboxLifecycleFailureFields,
   SANDBOX_WORKLOADS,
 } from "../sandbox-lifecycle.js";
-import { PREVIEW_ACCESS_STORAGE_KEY } from "../vite-preview-access.js";
 import { sandboxClient } from "../sandbox-client.js";
 import { snapshotAllowsCloudSandbox } from "../owner-gate.js";
 import { agentSandboxId, agentTurnSessionId, worldName } from "../workspace.js";
@@ -372,9 +371,6 @@ export const destroySandboxDurably = async (
   target: SandboxTarget,
   event: string,
 ): Promise<void> => {
-  // Revocation precedes every container lifecycle RPC. A failed or delayed
-  // destroy can never leave the signed proxy usable while retirement waits.
-  await host.ctx.storage.delete(PREVIEW_ACCESS_STORAGE_KEY);
   const now = Date.now();
   let debt!: SandboxDestroyDebt;
   await host.ctx.storage.transaction(async (txn) => {

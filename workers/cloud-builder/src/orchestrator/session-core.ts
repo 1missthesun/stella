@@ -49,7 +49,7 @@ import { ownerGateStub } from "../rpc-release.js";
  * `../orchestrator-session-object.ts`) is one class split by concern into a
  * chain of layers, each extending the one below it:
  *
- *   session-core → owner → turn-lifecycle → turn-queue → dev-acceptance →
+ *   session-core → owner → turn-lifecycle → turn-queue → journal-probe →
  *   cloud-agents → pi → tools → cli-turn → run-turn → journal-writes →
  *   local-turn → turn-start → OrchestratorSessionObject
  *
@@ -94,8 +94,6 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   protected readonly index: ConversationIndex;
   protected readonly hub: ConversationHub;
   protected readonly exactTurnCancellations: ExactTurnCancellationLedger;
-  /** Isolate identity only; the raw value is never persisted or returned. */
-  protected readonly devAcceptanceBootId = crypto.randomUUID();
 
   /**
    * Work that must finish before a turn is called terminal but that cannot run

@@ -92,10 +92,6 @@ let keyCache: {
   keys: Promise<CapabilityVerificationKeys>;
 } | null = null;
 
-export const resetCapabilityKeysForTests = (): void => {
-  keyCache = null;
-};
-
 const parseJwks = (raw: string): GatewayJwks => {
   try {
     const parsed = JSON.parse(raw) as unknown;

@@ -100,11 +100,6 @@ export const capabilitySigningKey = (
   return key;
 };
 
-/** Test-only: forget the cached key so a new env is imported fresh. */
-export const resetCapabilitySigningKeyCache = (): void => {
-  cachedKey = undefined;
-};
-
 const nativeCredentialFor = (
   execution: CloudExecutionSelection,
 ): GatewayNativeCredentialProvider | undefined =>

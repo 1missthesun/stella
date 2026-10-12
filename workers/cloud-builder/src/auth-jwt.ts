@@ -144,11 +144,6 @@ const importUserKeys = async (jwks: unknown): Promise<UserKeys> => {
   return { keys, fetchedAtMs: Date.now() };
 };
 
-/** Test seam: verify against these public keys instead of the worker's own. */
-export const setUserJwksForTests = async (jwks: unknown | null): Promise<void> => {
-  userKeys = jwks === null ? null : await importUserKeys(jwks);
-};
-
 const loadUserKeys = async (env: Cloudflare.Env): Promise<UserKeys> => {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const deadline = new Promise<never>((_resolve, reject) => {

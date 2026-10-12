@@ -22,13 +22,7 @@ import {
   type HistorySearchOptions,
 } from "@stella/contracts/history-search";
 
-export {
-  historySearchMatch,
-  historySearchOptions,
-  readOnlyHistoryQuery,
-  type HistorySearchHit,
-  type HistorySearchOptions,
-} from "@stella/contracts/history-search";
+export { historySearchOptions } from "@stella/contracts/history-search";
 
 export const runHistoryQuery = (
   storage: DurableObjectStorage,

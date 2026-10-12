@@ -1,4 +1,3 @@
-import type { AgentToolResult } from "@stella/runtime/kernel/agent-core/types.js";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import {
@@ -190,15 +189,6 @@ export const advanceCloudAgentControlReceipt = (
     ? merged(receipt)
     : existing;
 };
-
-export const sameCloudAgentControlReceipt = (
-  left: CloudAgentControlReceipt,
-  right: CloudAgentControlReceipt,
-): boolean =>
-  left.threadId === right.threadId &&
-  left.attemptGeneration === right.attemptGeneration &&
-  left.threadUpdatedAt === right.threadUpdatedAt &&
-  left.status === right.status;
 
 export const rememberCloudAgentControlReceipt = async (
   storage: CloudAgentControlStorage,
@@ -836,25 +826,3 @@ export const agentCompletionPromptText = (args: {
   return `${label} ${description} (thread ${args.threadId})\n\n${resultText}`;
 };
 
-export const pauseResult = (
-  control: CloudAgentControlReceipt,
-  disposition: "paused" | "pending" | "already_terminal",
-): AgentToolResult<unknown> => ({
-  content: [
-    {
-      type: "text",
-      text:
-        disposition === "pending"
-          ? `Pause requested for ${control.threadId}. It is stopping now and can be resumed later with send_message.`
-          : disposition === "already_terminal"
-            ? `${control.threadId} had already stopped. Resume it later with send_message.`
-            : `Paused ${control.threadId}. Resume it later with send_message.`,
-    },
-  ],
-  details: {
-    thread_id: control.threadId,
-    canceled: true,
-    attempt_generation: control.attemptGeneration,
-    thread_updated_at: control.threadUpdatedAt,
-  },
-});

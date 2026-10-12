@@ -23,9 +23,7 @@ import {
   reserveTurnEventSeq,
   type ThreadMessageInput,
 } from "../thread-transcript.js";
-import { checkpointKey } from "../workspace.js";
 import type { BuildSessionInternals } from "./host.js";
-import type { Env } from "./shared/env.js";
 import {
   AGENT_CONTAINER_LARGE_KEY,
   BACKUP_ID_PATTERN,

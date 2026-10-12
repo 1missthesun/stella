@@ -77,11 +77,6 @@ export type TurnRequest = {
     sessionId: string;
     endpoint: string;
   };
-  /** Trusted outer-router facts for the agent-only signed preview proxy. */
-  previewRoute?: {
-    buildSessionName: string;
-    baseUrl: string;
-  };
   /** Worker-issued lease. Callers cannot choose this value. */
   ownerPurgeGeneration?: string;
   ownerPurgeLeaseId?: string;
@@ -114,14 +109,6 @@ export type BuildOwnerFenceLeaseSlot = {
   turnId: string;
   leaseId: string;
   kind: "run" | "aux";
-};
-
-export type AppTurnAdmissionClaim = {
-  schemaVersion: 1;
-  claimId: string;
-  turnId: string;
-  ownerGeneration: string;
-  createdAt: number;
 };
 
 export type PendingAppBuildPublication = {
@@ -266,18 +253,6 @@ export type PendingTerminal = {
    * would be refused as a different message under the same id.
    */
   completedAt?: number;
-};
-
-export type ExecutorResult = {
-  ok: true;
-  runtimeTools: string[];
-  metrics: {
-    dependencyHydrationMs: number;
-    productionBuildMs: number;
-    activeCpuSeconds: number;
-    peakMemoryBytes: number;
-    workspaceDiskBytes: number;
-  };
 };
 
 export type ConversationCaller = {

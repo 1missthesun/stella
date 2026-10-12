@@ -7,7 +7,6 @@
  */
 import { sha256BytesHex } from "../hash.js";
 import {
-  nativeHistoryCursorFromRows,
   validNativeStateCheckpointMac,
 } from "../native-state-checkpoint.js";
 import { readThreadHistory, ThreadTranscriptError } from "../thread-transcript.js";
@@ -63,7 +62,6 @@ import {
   turnStateCheckpointOperationKey,
 } from "./shared/keys.js";
 import type {
-  PendingTerminal,
   TurnRequest,
   TurnStateCheckpointOperation,
 } from "./shared/types.js";
@@ -98,9 +96,6 @@ export type TurnBrokerHost = Pick<
   | "emitTurnEvent"
   | "executeTurnStateCheckpoint"
 >;
-
-/** @see src/build-session/shared/keys.ts */
-export { turnBrokerCredentialsPath } from "./shared/keys.js";
 
 const registryBookkeepingAfterCheckpoint = async <T>(
   historyCursor: string,

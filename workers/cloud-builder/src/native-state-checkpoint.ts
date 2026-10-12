@@ -28,14 +28,6 @@ export type NativeStateCheckpointPayload = {
   checkpoint: NativeStateCheckpoint;
 };
 
-export type NativeStateCheckpointReceipt = {
-  schemaVersion: typeof NATIVE_STATE_CHECKPOINT_SCHEMA_VERSION;
-  cursor: string;
-  treeDigest: string;
-  receipt: string;
-  replayed: boolean;
-};
-
 export type NativeStateCheckpointVersion = {
   checkpoint: NativeStateCheckpoint;
   descriptor: DirectoryBackup;
@@ -178,12 +170,6 @@ export const nativeHistoryCursorFromRows = async (
   )}`;
 };
 
-export const nativeStateCheckpointKey = async (
-  workspaceKey: string,
-  threadId: string,
-): Promise<string> =>
-  `${workspaceKey}:native-state:${await sha256Hex(threadId)}`;
-
 export const nativeStateCheckpointPrefix = (workspaceKey: string): string =>
   `${workspaceKey}:native-state:`;
 
@@ -191,12 +177,6 @@ export const nativeStateBackupName = async (
   checkpointKey: string,
 ): Promise<string> =>
   `native-state-${(await sha256Hex(checkpointKey)).slice(0, 40)}`;
-
-export const emptyNativeStateCheckpointRecord =
-  (): NativeStateCheckpointRecord => ({
-    schemaVersion: NATIVE_STATE_CHECKPOINT_SCHEMA_VERSION,
-    candidates: [],
-  });
 
 const parseDirectoryBackup = (value: unknown): DirectoryBackup | null => {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
@@ -291,140 +271,3 @@ export const parseNativeStateCheckpointRecord = (
     candidates: parsedCandidates,
   };
 };
-
-const versionMatchesRequest = (
-  version: NativeStateCheckpointVersion,
-  checkpoint: NativeStateCheckpoint,
-  requestFingerprint: string,
-): boolean =>
-  version.checkpoint.cursor === checkpoint.cursor &&
-  version.checkpoint.tree.digest === checkpoint.tree.digest &&
-  version.checkpoint.mac === checkpoint.mac &&
-  version.requestFingerprint === requestFingerprint;
-
-export type StageNativeStateCheckpointResult =
-  | {
-      kind: "replay";
-      record: NativeStateCheckpointRecord;
-      version: NativeStateCheckpointVersion;
-    }
-  | {
-      kind: "staged";
-      record: NativeStateCheckpointRecord;
-      version: NativeStateCheckpointVersion;
-    }
-  | { kind: "conflict" }
-  | { kind: "capacity" };
-
-export const stageNativeStateCheckpoint = (args: {
-  record: NativeStateCheckpointRecord;
-  checkpoint: NativeStateCheckpoint;
-  descriptor: DirectoryBackup;
-  requestFingerprint: string;
-  receipt: string;
-  createdAt: number;
-}): StageNativeStateCheckpointResult => {
-  const versions = [
-    ...(args.record.committed ? [args.record.committed] : []),
-    ...args.record.candidates,
-  ];
-  const sameCursor = versions.find(
-    (version) => version.checkpoint.cursor === args.checkpoint.cursor,
-  );
-  if (sameCursor) {
-    return versionMatchesRequest(
-      sameCursor,
-      args.checkpoint,
-      args.requestFingerprint,
-    )
-      ? { kind: "replay", record: args.record, version: sameCursor }
-      : { kind: "conflict" };
-  }
-  if (args.record.candidates.length >= MAX_NATIVE_STATE_CANDIDATES) {
-    return { kind: "capacity" };
-  }
-  const version: NativeStateCheckpointVersion = {
-    checkpoint: args.checkpoint,
-    descriptor: args.descriptor,
-    requestFingerprint: args.requestFingerprint,
-    receipt: args.receipt,
-    createdAt: args.createdAt,
-  };
-  return {
-    kind: "staged",
-    version,
-    record: {
-      ...args.record,
-      candidates: [...args.record.candidates, version],
-    },
-  };
-};
-
-export type ResolveNativeStateCheckpointResult = {
-  record: NativeStateCheckpointRecord;
-  restore?: NativeStateCheckpointVersion;
-  retiredBackupIds: string[];
-  promoted: boolean;
-};
-
-/**
- * Canonical transcript state is the commit decision. A candidate becomes the
- * resumable head only when its cursor is now authoritative; otherwise the
- * previous committed bytes remain the sole restore source.
- */
-export const resolveNativeStateCheckpoint = (
-  record: NativeStateCheckpointRecord,
-  expectedCursor: string,
-): ResolveNativeStateCheckpointResult => {
-  const committedMatches =
-    record.committed?.checkpoint.cursor === expectedCursor;
-  const candidate = record.candidates.find(
-    (version) => version.checkpoint.cursor === expectedCursor,
-  );
-  const restore = committedMatches ? record.committed : candidate;
-  const retained = restore ? [restore] : [];
-  const retiredBackupIds = [
-    ...(record.committed ? [record.committed] : []),
-    ...record.candidates,
-  ]
-    .filter((version) => !retained.includes(version))
-    .map((version) => version.descriptor.id)
-    .filter((id): id is string => typeof id === "string" && id.length > 0);
-  return {
-    record: {
-      schemaVersion: NATIVE_STATE_CHECKPOINT_SCHEMA_VERSION,
-      ...(restore ? { committed: restore } : {}),
-      candidates: [],
-    },
-    ...(restore ? { restore } : {}),
-    retiredBackupIds: [...new Set(retiredBackupIds)],
-    promoted: Boolean(candidate && restore === candidate),
-  };
-};
-
-export const nativeStateCheckpointReceipt = async (args: {
-  descriptor: DirectoryBackup;
-  checkpoint: NativeStateCheckpoint;
-  requestFingerprint: string;
-}): Promise<string> =>
-  await sha256Hex(
-    JSON.stringify([
-      NATIVE_STATE_CHECKPOINT_SCHEMA_VERSION,
-      args.descriptor.id,
-      args.checkpoint.cursor,
-      args.checkpoint.tree.digest,
-      args.checkpoint.mac,
-      args.requestFingerprint,
-    ]),
-  );
-
-export const publicNativeStateCheckpointReceipt = (
-  version: NativeStateCheckpointVersion,
-  replayed: boolean,
-): NativeStateCheckpointReceipt => ({
-  schemaVersion: NATIVE_STATE_CHECKPOINT_SCHEMA_VERSION,
-  cursor: version.checkpoint.cursor,
-  treeDigest: version.checkpoint.tree.digest,
-  receipt: version.receipt,
-  replayed,
-});

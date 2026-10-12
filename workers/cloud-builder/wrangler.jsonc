@@ -75,9 +75,6 @@
     "SANDBOX_SNAPSHOTS": "1",
     "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
     "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-dev.fromyou.workers.dev",
-    // Strictly a dev-target proof seam. Production configs must omit both
-    // values; the Worker and DO independently deny the route without them.
-    "ENABLE_DEV_ACCEPTANCE_PROBES": "1",
     // Dev only: `/api/admin/test-accounts/session` mints signed-in
     // `@test.stella.local` users, whose magic links are logged, not sent.
     // Production and acceptance configs must omit it.
@@ -100,8 +97,6 @@
     "R2_DRIVE_BUCKET": "stella-v2-drive-dev",
     // The MEDIA binding's bucket, by name, for presigned media reads.
     "R2_MEDIA_BUCKET": "stella-v2-media-dev",
-    // The CANVAS_SHARES binding's bucket, by name.
-    "R2_CANVAS_SHARES_BUCKET": "stella-canvas-shares",
     // The BACKUP_BUCKET binding's bucket, by name: the owner's container
     // uploads and restores its own opaque Claude Code login backup there with
     // presigned URLs, so the Worker never carries those bytes.
@@ -346,7 +341,6 @@
       "SANDBOX_SNAPSHOTS": "1",
       "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
       "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-dev.fromyou.workers.dev",
-      "ENABLE_DEV_ACCEPTANCE_PROBES": "1",
       "STELLA_TEST_ACCOUNTS": "1",
       "STELLA_DEPLOYMENT_IDENTITY": "dev:outgoing-bulldog-865",
       "MODEL_GATEWAY_URL": "https://stella-v2-model-gateway-dev.fromyou.workers.dev",
@@ -355,7 +349,6 @@
       "R2_S3_ENDPOINT": "https://f34b91c9c7dc22f0aef0ba855a9f026f.r2.cloudflarestorage.com",
       "R2_DRIVE_BUCKET": "stella-v2-drive-preview",
       "R2_MEDIA_BUCKET": "stella-v2-media-preview",
-      "R2_CANVAS_SHARES_BUCKET": "stella-canvas-shares",
       "R2_BACKUP_BUCKET": "stella-v2-app-builds-preview",
       "CANVAS_SHARE_BASE_URL": "https://stellashare.app",
       "CANVAS_OWNER_SITE_URL": "https://stella-website-dev.fromyou.workers.dev",
@@ -707,7 +700,6 @@
         "R2_S3_ENDPOINT": "https://f34b91c9c7dc22f0aef0ba855a9f026f.r2.cloudflarestorage.com",
         "R2_DRIVE_BUCKET": "stella-v2-drive-prod",
         "R2_MEDIA_BUCKET": "stella-v2-media-prod",
-        "R2_CANVAS_SHARES_BUCKET": "stella-canvas-shares",
         "R2_BACKUP_BUCKET": "stella-v2-app-builds-prod",
         "CANVAS_SHARE_BASE_URL": "https://stellashare.app",
         "CANVAS_OWNER_SITE_URL": "https://stella.sh",

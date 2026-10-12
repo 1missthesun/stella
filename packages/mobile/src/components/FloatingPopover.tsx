@@ -9,7 +9,7 @@ import {
 import {
   POPOVER_MAX_WIDTH,
   POPOVER_SIDE_MARGIN,
-  PopoverActionRow,
+  PopoverFooter,
   PopoverSurface,
   type FloatingPopoverProps,
 } from "./FloatingPopoverParts";
@@ -17,8 +17,9 @@ import {
 const PANEL_TOP = 64;
 
 /**
- * The floating bubble for platforms without iOS's popover: the same surface
- * and glass controls over a dimmed backdrop, near the top of the screen.
+ * The floating bubble for platforms without iOS's popover: the same surface,
+ * its glass controls in a footer inside it, over a dimmed backdrop near the
+ * top of the screen.
  */
 export function FloatingPopover({
   onClose,
@@ -54,13 +55,8 @@ export function FloatingPopover({
       >
         <PopoverSurface width={width} height={height} maxHeight={maxHeight} style={styles.shadow}>
           {typeof children === "function" ? children(onClose) : children}
+          <PopoverFooter actions={actions} closeLabel={closeLabel} onClose={onClose} />
         </PopoverSurface>
-        <PopoverActionRow
-          width={width}
-          actions={actions}
-          closeLabel={closeLabel}
-          onClose={onClose}
-        />
       </View>
     </View>
   );

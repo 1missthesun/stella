@@ -7,16 +7,15 @@ import {
   opacity,
   presentationBackground,
 } from "@expo/ui/swift-ui/modifiers";
-import { useTheme } from "../theme/theme-context";
+import { useColors, useTheme } from "../theme/theme-context";
 import { recentTouchAnchor, type TouchAnchor } from "../lib/touch-anchor";
 import { TOP_BAR_BAR_HEIGHT } from "./AppBackdrop";
 import {
-  POPOVER_BUTTON_SIZE,
+  POPOVER_FOOTER_HEIGHT,
   POPOVER_MAX_WIDTH,
-  POPOVER_ROW_GAP,
   POPOVER_SIDE_MARGIN,
-  PopoverActionRow,
-  PopoverSurface,
+  PopoverFooter,
+  popoverSurfaceFill,
   type FloatingPopoverProps,
 } from "./FloatingPopoverParts";
 
@@ -30,9 +29,8 @@ const MIN_BUBBLE_HEIGHT = 160;
  * iOS's own popover, pointing at what was tapped. SwiftUI presents it with
  * compact adaptation forced to `.popover`, so iPhone gets a real popover
  * rather than a sheet: system placement, tap-outside dismissal and VoiceOver
- * focus. Its system background is cleared so the content is a bubble that
- * wears the assistant fill and a specular rim, with its glass controls
- * floating free underneath.
+ * focus. The system surface itself wears the assistant fill, arrow included,
+ * so the content and its footer of glass controls read as one card.
  */
 export function FloatingPopover({
   anchor,
@@ -46,6 +44,7 @@ export function FloatingPopover({
   children,
 }: FloatingPopoverProps) {
   const { isDark } = useTheme();
+  const fill = popoverSurfaceFill(useColors()).solid;
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const rootRef = useRef<View>(null);
@@ -90,7 +89,7 @@ export function FloatingPopover({
   const placeBelow = below >= above;
   const room = Math.max(
     MIN_BUBBLE_HEIGHT,
-    Math.floor(Math.max(above, below) - POPOVER_ROW_GAP - POPOVER_BUTTON_SIZE),
+    Math.floor(Math.max(above, below) - POPOVER_FOOTER_HEIGHT),
   );
   const bubbleHeight = height === undefined ? undefined : Math.min(height, room);
   const bubbleMaxHeight = Math.min(maxHeight ?? room, room);
@@ -131,18 +130,19 @@ export function FloatingPopover({
               />
             </Popover.Trigger>
             <Popover.Content>
-              <ZStack modifiers={[presentationBackground(CLEAR)]}>
+              <ZStack modifiers={[presentationBackground(fill)]}>
                 <RNHostView matchContents>
-                  <View style={[styles.column, { width }]}>
-                    <PopoverSurface
-                      width={width}
-                      height={bubbleHeight}
-                      maxHeight={bubbleMaxHeight}
+                  <View style={[styles.column, { width, backgroundColor: fill }]}>
+                    <View
+                      style={[
+                        styles.body,
+                        bubbleHeight !== undefined ? { height: bubbleHeight } : null,
+                        { maxHeight: bubbleMaxHeight },
+                      ]}
                     >
                       {typeof children === "function" ? children(close) : children}
-                    </PopoverSurface>
-                    <PopoverActionRow
-                      width={width}
+                    </View>
+                    <PopoverFooter
                       actions={actions}
                       closeLabel={closeLabel}
                       onClose={close}
@@ -158,8 +158,7 @@ export function FloatingPopover({
   );
 }
 
-const CLEAR = "#00000000";
-
 const styles = StyleSheet.create({
-  column: { alignItems: "center" },
+  column: { alignItems: "stretch" },
+  body: { flexShrink: 1, overflow: "hidden" },
 });

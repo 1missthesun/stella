@@ -12,7 +12,9 @@ export const POPOVER_SIDE_MARGIN = 18;
 export const POPOVER_MAX_WIDTH = 560;
 export const POPOVER_RADIUS = 24;
 export const POPOVER_BUTTON_SIZE = 44;
-export const POPOVER_ROW_GAP = 12;
+export const POPOVER_FOOTER_PAD = 10;
+const POPOVER_FOOTER_GAP = 10;
+export const POPOVER_FOOTER_HEIGHT = POPOVER_BUTTON_SIZE + POPOVER_FOOTER_PAD * 2;
 const RIM = 1;
 const CONFIRM_MS = 1400;
 
@@ -203,29 +205,23 @@ function ActionButton({ action }: { action: PopoverAction }) {
 }
 
 /**
- * The glass controls floating under the bubble: close in the middle, the
- * bubble's actions split either side of it so close stays centred.
+ * The popover's footer, inside the same surface as its content: the actions
+ * and close, right-aligned and centred in the row.
  */
-export function PopoverActionRow({
-  width,
+export function PopoverFooter({
   actions = [],
   closeLabel,
   onClose,
 }: {
-  width: number;
   actions?: readonly PopoverAction[];
   closeLabel: string;
   onClose: () => void;
 }) {
-  const leading = actions.filter((_, index) => index % 2 === 0);
-  const trailing = actions.filter((_, index) => index % 2 === 1);
   return (
-    <View style={[styles.row, { width }]}>
-      <View style={[styles.side, styles.leading]}>
-        {leading.map((action) => (
-          <ActionButton key={action.key} action={action} />
-        ))}
-      </View>
+    <View style={styles.footer}>
+      {actions.map((action) => (
+        <ActionButton key={action.key} action={action} />
+      ))}
       <GlassIconButton
         icon="x"
         size={POPOVER_BUTTON_SIZE}
@@ -233,11 +229,6 @@ export function PopoverActionRow({
         accessibilityLabel={closeLabel}
         onPress={onClose}
       />
-      <View style={[styles.side, styles.trailing]}>
-        {trailing.map((action) => (
-          <ActionButton key={action.key} action={action} />
-        ))}
-      </View>
     </View>
   );
 }
@@ -256,17 +247,11 @@ const styles = StyleSheet.create({
     borderCurve: "continuous",
     overflow: "hidden",
   },
-  row: {
-    flexDirection: "row",
+  footer: {
     alignItems: "center",
-    marginTop: POPOVER_ROW_GAP,
-    gap: POPOVER_ROW_GAP,
-  },
-  side: {
-    flex: 1,
     flexDirection: "row",
-    gap: POPOVER_ROW_GAP,
+    gap: POPOVER_FOOTER_GAP,
+    justifyContent: "flex-end",
+    padding: POPOVER_FOOTER_PAD,
   },
-  leading: { justifyContent: "flex-end" },
-  trailing: { justifyContent: "flex-start" },
 });

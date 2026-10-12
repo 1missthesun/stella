@@ -672,9 +672,7 @@ export function ChatPane({
   // overlay; the chat tail supplies the gap between the last row and it.
   const listBottomInsetPx =
     footerHeight + (listLiftedWithKeyboard ? 0 : keyboardExtra);
-  useEffect(() => {
-    onFooterHeightChange?.(footerHeight);
-  }, [footerHeight, onFooterHeightChange]);
+
   const listTrailingSlackPx = listBottomInsetPx + CHAT_TAIL_GAP;
 
   // The footer (working indicator + composer) re-measures on every frame of any
@@ -687,8 +685,10 @@ export function ChatPane({
   const footerShrinkTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
+  const [composerHeight, setComposerHeight] = useState(0);
   const onFooterLayout = useCallback((e: LayoutChangeEvent) => {
     const h = Math.round(e.nativeEvent.layout.height);
+    setComposerHeight(h);
     if (footerShrinkTimerRef.current) {
       clearTimeout(footerShrinkTimerRef.current);
       footerShrinkTimerRef.current = null;
@@ -704,6 +704,9 @@ export function ChatPane({
       return prev;
     });
   }, []);
+  useEffect(() => {
+    onFooterHeightChange?.(composerHeight);
+  }, [composerHeight, onFooterHeightChange]);
   useEffect(
     () => () => {
       if (footerShrinkTimerRef.current) {
@@ -2112,7 +2115,7 @@ export function ChatPane({
           {replyFocus && (
             <ReplyViewer
               key={`${conversationId}:${replyFocus.kind === "agent" ? replyFocus.threadId : replyFocus.id}`}
-              bottomReserve={footerHeight}
+              bottomReserve={composerHeight}
               root={replyFocus}
               messages={visibleMessages}
               colors={colors}

@@ -28,7 +28,9 @@ import {
 } from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { TopSheet } from "./TopSheet";
-import { ArtifactSheetHeader } from "./ArtifactSheetHeader";
+import { FileViewerFooter } from "./FileViewerPanel";
+import { TopSheetDragHandle } from "./TopSheet";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   cachedViewerEntry,
   storeViewerEntry,
@@ -39,7 +41,6 @@ import type { ChatArtifact } from "../types";
 import type { StoredPhoneAccess } from "../lib/phone-access";
 import {
   artifactPrimaryFilePath,
-  artifactSubtitle,
   artifactTitle,
   viewedArtifact,
 } from "../lib/mobile-artifacts";
@@ -100,6 +101,8 @@ type ArtifactViewerProps = {
   access: StoredPhoneAccess | null;
   visible: boolean;
   onClose: () => void;
+  /** Height of the composer the sheet must end above, when there is one. */
+  bottomReserve?: number;
 } & ArtifactSwipeProps &
   ArtifactDeviceProps;
 
@@ -471,9 +474,9 @@ const loadedTextChars = (loaded: LoadedArtifact): number =>
   "html" in loaded ? loaded.html.length : "text" in loaded ? loaded.text.length : 0;
 
 /**
- * The artifact display itself: a header with the file's name and its copy,
- * share and link actions over the rendered preview. `ArtifactViewer` hosts it
- * in the top sheet.
+ * The artifact display itself: the rendered preview over a footer with the
+ * file's name and its copy, share and link actions. Pulling the footer up
+ * closes the sheet. `ArtifactViewer` hosts it in the top sheet.
  */
 export function ArtifactViewerContent({
   artifact: openedArtifact,
@@ -509,6 +512,7 @@ export function ArtifactViewerContent({
   }, [openedArtifact]);
   const onBack = trail.length > 0 ? popTrail : undefined;
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const cacheKey = useMemo(
     () => viewerCacheKey(artifact, preferDeviceId, colors.background),
@@ -568,9 +572,6 @@ export function ArtifactViewerContent({
   const title = shownFolder
     ? folderName(shownFolder.listing.path)
     : artifactTitle(artifact.payload);
-  const subtitle = shownFolder
-    ? `On ${shownFolder.deviceName}`
-    : artifactSubtitle(artifact.payload);
 
   const neighbours = useMemo(
     () => imageNeighbours(artifact, siblings),
@@ -1177,13 +1178,7 @@ export function ArtifactViewerContent({
   }, [access, artifact, cacheKey, cachedEntry, colors, preferDeviceId]);
 
   return (
-    <View style={styles.root}>
-      <ArtifactSheetHeader
-        title={title}
-        subtitle={subtitle}
-        actions={actions}
-        onBack={onBack}
-      />
+    <View style={[styles.root, { paddingTop: insets.top }]}>
         <View style={styles.body}>
           {(loading || error) && swipeable ? (
             <SwipeArea onSwipe={onSwipe}>
@@ -1296,6 +1291,11 @@ export function ArtifactViewerContent({
             </ScrollView>
           ) : null}
       </View>
+      <TopSheetDragHandle>
+        <View>
+          <FileViewerFooter name={title} actions={actions} onBack={onBack} />
+        </View>
+      </TopSheetDragHandle>
     </View>
   );
 }
@@ -1313,12 +1313,19 @@ export function ArtifactViewer({
   siblings,
   onNavigate,
   deviceIdOf,
+  bottomReserve = 0,
 }: ArtifactViewerProps) {
   const lastRef = useRef<ChatArtifact | null>(null);
   if (artifact) lastRef.current = artifact;
   const shown = artifact ?? lastRef.current;
   return (
-    <TopSheet visible={visible && Boolean(artifact)} onClose={onClose} dim={false}>
+    <TopSheet
+      visible={visible && Boolean(artifact)}
+      onClose={onClose}
+      dim={false}
+      presentation="overlay"
+      bottomReserve={bottomReserve}
+    >
       {shown ? (
         <ArtifactViewerContent
           artifact={shown}

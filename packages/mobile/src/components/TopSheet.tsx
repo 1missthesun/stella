@@ -1,5 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
+import {
+  BackHandler,
   Modal,
   Pressable,
   StyleSheet,
@@ -7,23 +17,31 @@ import {
   View,
   type LayoutChangeEvent,
 } from "react-native";
-import { GestureHandlerRootView } from "react-native-gesture-handler";
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+  type PanGesture,
+} from "react-native-gesture-handler";
 import Animated, {
   Easing,
   cancelAnimation,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from "react-native-reanimated";
 import {
   TOP_SHEET_HEIGHT_FRACTION,
   topSheetMaxHeight,
 } from "../lib/top-sheet-metrics";
+import { useBottomObstruction } from "../lib/use-bottom-obstruction";
 import { useColors } from "../theme/theme-context";
 import { type Colors } from "../theme/colors";
 
 import { GlassSurface } from "./glass";
+import { OverlayPortal } from "./OverlayHost";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -32,6 +50,26 @@ const SHADOW_CLEARANCE = 40;
 const RADIUS = 26;
 /** Starts the slide even if the modal never reports that it is showing. */
 const SHOW_FALLBACK_MS = 250;
+/** Room kept between an overlay sheet and the composer or keyboard under it. */
+const EDGE_GAP = 8;
+/** How much of the composer's transparent top padding the sheet may cover. */
+const COMPOSER_TOP_SLACK = 12;
+/** An upward drag on the handle this far, or this fast, closes the sheet. */
+const DISMISS_DISTANCE = 56;
+const DISMISS_VELOCITY = 600;
+const DRAG_RETURN_SPRING = { duration: 300, dampingRatio: 1 };
+
+const TopSheetDragContext = createContext<PanGesture | null>(null);
+
+/**
+ * Wraps the part of a sheet that drags it: pulling it up closes the sheet,
+ * a short pull springs back. Outside a `TopSheet` it renders its children.
+ */
+export function TopSheetDragHandle({ children }: { children: ReactNode }) {
+  const pan = useContext(TopSheetDragContext);
+  if (!pan) return <>{children}</>;
+  return <GestureDetector gesture={pan}>{children}</GestureDetector>;
+}
 
 type TopSheetProps = {
   visible: boolean;
@@ -61,6 +99,14 @@ type TopSheetProps = {
   floatingFooter?: React.ReactNode;
   /** Dim the screen behind the sheet. A tap outside still closes it either way. */
   dim?: boolean;
+  /**
+   * `"overlay"` draws the sheet in the app's overlay layer instead of a modal,
+   * so the composer under it stays usable: the sheet then ends above the
+   * composer (`bottomReserve` tall) and the keyboard, and shrinks with them
+   * as they move.
+   */
+  presentation?: "modal" | "overlay";
+  bottomReserve?: number;
 };
 
 const OPEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
@@ -87,11 +133,40 @@ export function TopSheet({
   glass = false,
   floatingFooter,
   dim = true,
+  presentation = "modal",
+  bottomReserve = 0,
 }: TopSheetProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { height } = useWindowDimensions();
   const maxSheetHeight = topSheetMaxHeight(height, heightFraction);
+  const overlay = presentation === "overlay";
+  const obstruction = useBottomObstruction(bottomReserve, COMPOSER_TOP_SLACK);
+  const dragY = useSharedValue(0);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const requestClose = useCallback(() => closeRef.current(), []);
+  const pan = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetY([-8, 8])
+        .failOffsetX([-24, 24])
+        .onUpdate((e) => {
+          dragY.value =
+            e.translationY < 0 ? e.translationY : e.translationY * 0.15;
+        })
+        .onEnd((e) => {
+          if (
+            e.translationY < -DISMISS_DISTANCE ||
+            e.velocityY < -DISMISS_VELOCITY
+          ) {
+            runOnJS(requestClose)();
+            return;
+          }
+          dragY.value = withSpring(0, DRAG_RETURN_SPRING);
+        }),
+    [dragY, requestClose],
+  );
 
   const progress = useSharedValue(0);
   const hideDistance = useSharedValue(maxSheetHeight + SHADOW_CLEARANCE);
@@ -112,13 +187,25 @@ export function TopSheet({
   };
 
   useEffect(() => {
+    if (!overlay || !visible) return;
+    const handler = BackHandler.addEventListener("hardwareBackPress", () => {
+      closeRef.current();
+      return true;
+    });
+    return () => handler.remove();
+  }, [overlay, visible]);
+
+  useEffect(() => {
     if (visible) {
+      dragY.value = 0;
       awaitingOpen.current = true;
+      if (overlay) shown.current = true;
       if (rendered) {
         maybeStartOpen();
         return;
       }
       setRendered(true);
+      if (overlay) return;
       const fallback = setTimeout(() => {
         shown.current = true;
         maybeStartOpen();
@@ -145,8 +232,9 @@ export function TopSheet({
     if (!rendered) {
       sheetHeight.current = null;
       shown.current = false;
+      dragY.value = 0;
     }
-  }, [rendered]);
+  }, [dragY, rendered]);
 
   const onShow = () => {
     shown.current = true;
@@ -162,11 +250,96 @@ export function TopSheet({
   };
 
   const slide = useAnimatedStyle(() => ({
-    transform: [{ translateY: -hideDistance.value * (1 - progress.value) }],
+    transform: [
+      { translateY: -hideDistance.value * (1 - progress.value) + dragY.value },
+    ],
   }));
+  const keepsComposer = bottomReserve > 0;
+  const overlayBackdrop = useAnimatedStyle(() => ({
+    bottom: overlay && keepsComposer ? obstruction.value : 0,
+  }));
+  const fitsAboveObstruction = overlay && !contentSized;
+  const sheetFit = useAnimatedStyle(() =>
+    fitsAboveObstruction
+      ? {
+          height:
+            Math.min(maxSheetHeight, height - obstruction.value - EDGE_GAP) +
+            RADIUS,
+        }
+      : {},
+  );
   const scrim = useAnimatedStyle(() => ({
     opacity: progress.value * 0.4,
   }));
+
+  const layer = (
+    <>
+      <AnimatedPressable
+        style={[
+          dim ? [styles.backdrop, scrim] : styles.clearBackdrop,
+          overlayBackdrop,
+        ]}
+        onPress={onClose}
+        accessibilityRole="button"
+        accessibilityLabel="Close"
+      />
+      {/* Auto-height: the sheet takes its own height and the floating
+          footer sits under it, so the pair slide together and the footer
+          always hugs the sheet's bottom edge. */}
+      <Animated.View
+        style={[styles.slide, slide]}
+        pointerEvents="box-none"
+        onLayout={onSheetLayout}
+      >
+        <Animated.View
+          style={[
+            styles.shadow,
+            glass && styles.glassShadow,
+            contentSized
+              ? { maxHeight: maxSheetHeight + RADIUS }
+              : { height: maxSheetHeight + RADIUS },
+            sheetFit,
+          ]}
+        >
+          <View
+            style={[
+              styles.sheet,
+              contentSized ? styles.sheetHug : styles.sheetFill,
+              glass && { backgroundColor: "transparent" },
+            ]}
+          >
+            {glass ? (
+              <GlassSurface
+                radius={RADIUS}
+                legible
+                fallbackColor={colors.background}
+                style={StyleSheet.absoluteFill}
+                pointerEvents="none"
+              />
+            ) : null}
+            <TopSheetDragContext.Provider value={pan}>
+              {children}
+            </TopSheetDragContext.Provider>
+          </View>
+        </Animated.View>
+        {floatingFooter ? (
+          <View style={styles.floatingFooter} pointerEvents="box-none">
+            {floatingFooter}
+          </View>
+        ) : null}
+      </Animated.View>
+    </>
+  );
+
+  if (overlay) {
+    return rendered ? (
+      <OverlayPortal>
+        <View style={styles.overlayRoot} pointerEvents="box-none">
+          {layer}
+        </View>
+      </OverlayPortal>
+    ) : null;
+  }
 
   return (
     <Modal
@@ -179,56 +352,7 @@ export function TopSheet({
     >
       {/* A Modal is its own native root, so gestures inside it (the image
           viewer's pinch and swipe) need their own gesture-handler root. */}
-      <GestureHandlerRootView style={styles.fill}>
-        <AnimatedPressable
-          style={dim ? [styles.backdrop, scrim] : styles.clearBackdrop}
-          onPress={onClose}
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-        />
-        {/* Auto-height: the sheet takes its own height and the floating
-            footer sits under it, so the pair slide together and the footer
-            always hugs the sheet's bottom edge. */}
-        <Animated.View
-          style={[styles.slide, slide]}
-          pointerEvents="box-none"
-          onLayout={onSheetLayout}
-        >
-          <View
-            style={[
-              styles.shadow,
-              glass && styles.glassShadow,
-              contentSized
-                ? { maxHeight: maxSheetHeight + RADIUS }
-                : { height: maxSheetHeight + RADIUS },
-            ]}
-          >
-            <View
-              style={[
-                styles.sheet,
-                contentSized ? styles.sheetHug : styles.sheetFill,
-                glass && { backgroundColor: "transparent" },
-              ]}
-            >
-              {glass ? (
-                <GlassSurface
-                  radius={RADIUS}
-                  legible
-                  fallbackColor={colors.background}
-                  style={StyleSheet.absoluteFill}
-                  pointerEvents="none"
-                />
-              ) : null}
-              {children}
-            </View>
-          </View>
-          {floatingFooter ? (
-            <View style={styles.floatingFooter} pointerEvents="box-none">
-              {floatingFooter}
-            </View>
-          ) : null}
-        </Animated.View>
-      </GestureHandlerRootView>
+      <GestureHandlerRootView style={styles.fill}>{layer}</GestureHandlerRootView>
     </Modal>
   );
 }
@@ -237,6 +361,10 @@ const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     fill: {
       flex: 1,
+    },
+    overlayRoot: {
+      ...StyleSheet.absoluteFill,
+      zIndex: 40,
     },
     backdrop: {
       ...StyleSheet.absoluteFill,

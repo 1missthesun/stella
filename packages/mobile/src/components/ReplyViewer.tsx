@@ -19,7 +19,7 @@ import { replyTitle } from "./ReplyPreview";
 
 export type AgentReplyRef = Extract<ReplyRef, { kind: "agent" }>;
 
-const FOOTER_FALLBACK_HEIGHT = 49;
+const FOOTER_FALLBACK_HEIGHT = 56;
 
 export function ReplyViewer({
   root,

@@ -309,6 +309,7 @@ function ChatSurface(props: {
   const offline = useIsOffline();
   const isFocused = useIsFocused();
   const composerModelPinned = useComposerModelPinned();
+  const [composerReserve, setComposerReserve] = useState(0);
   const [selectedArtifact, setSelectedArtifact] = useState<ChatArtifact | null>(
     null,
   );
@@ -698,6 +699,7 @@ function ChatSurface(props: {
         activityTasks={thread.conversationTasks}
         onOpenActivity={requestOpenSidebar}
         catchingUp={thread.catchingUp}
+        onFooterHeightChange={setComposerReserve}
         {...(thread.authorityIssue ? { topInset: 0 } : {})}
       />
       <ArtifactViewer
@@ -710,6 +712,7 @@ function ChatSurface(props: {
         }}
         siblings={selectedGallery ?? conversationArtifacts}
         onNavigate={setSelectedArtifact}
+        bottomReserve={composerReserve}
       />
     </View>
   );

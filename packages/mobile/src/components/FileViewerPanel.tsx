@@ -1,18 +1,16 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BackHandler,
-  Keyboard,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
   useWindowDimensions,
-  type KeyboardEvent,
 } from "react-native";
 import Animated, {
   Easing,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
@@ -24,6 +22,7 @@ import type { IconName } from "./Icon";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
+import { useBottomObstruction } from "../lib/use-bottom-obstruction";
 
 const SIDE_MARGIN = 8;
 const MAX_WIDTH = 760;
@@ -31,41 +30,22 @@ const EDGE_GAP = 8;
 export const FILE_VIEWER_MIN_HEIGHT = 140;
 const CONFIRM_MS = 1400;
 const BUTTON_SIZE = 36;
+const FOOTER_PAD = 10;
 export const FILE_VIEWER_SURFACE_RIM = 1;
-const COMPOSER_TOP_SLACK = 12;
+export const COMPOSER_TOP_SLACK = 12;
 const RESIZE_TIMING = { duration: 240, easing: Easing.out(Easing.cubic) };
 
 export const fileViewerPanelWidth = (screenWidth: number): number =>
   Math.min(screenWidth - SIDE_MARGIN * 2, MAX_WIDTH);
 
-function useKeyboardHeight(): number {
-  const [height, setHeight] = useState(0);
-  useEffect(() => {
-    const show = (event: KeyboardEvent) => setHeight(event.endCoordinates.height);
-    const hide = () => setHeight(0);
-    const subs =
-      Platform.OS === "ios"
-        ? [
-            Keyboard.addListener("keyboardWillShow", show),
-            Keyboard.addListener("keyboardWillHide", hide),
-          ]
-        : [
-            Keyboard.addListener("keyboardDidShow", show),
-            Keyboard.addListener("keyboardDidHide", hide),
-          ];
-    return () => {
-      for (const sub of subs) sub.remove();
-    };
-  }, []);
-  return height;
-}
-
 /**
  * The centred popover reply and task chains open in. It takes `preferredHeight`
  * on its very first frame, so a caller that knows the content's size never
- * shows a max-size frame first; later changes ease to the new size. Without a
- * preferred height it fills the room between the top of the screen and the
- * composer. `ready={false}` keeps it invisible while the caller measures.
+ * shows a max-size frame first; later content changes ease to the new size.
+ * Without a preferred height it fills the room between the top of the screen
+ * and the composer. The keyboard and the composer shrink that room as they
+ * move, on the UI thread, so the popover keeps pace with them frame for frame.
+ * `ready={false}` keeps it invisible while the caller measures.
  */
 export function FileViewerPanel({
   onClose,
@@ -84,7 +64,7 @@ export function FileViewerPanel({
 }) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const keyboardHeight = useKeyboardHeight();
+  const obstruction = useBottomObstruction(bottomReserve, COMPOSER_TOP_SLACK);
   const rootRef = useRef<View>(null);
   const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
 
@@ -96,49 +76,50 @@ export function FileViewerPanel({
     return () => handler.remove();
   }, [onClose]);
 
-  const keyboardLift = Math.max(0, keyboardHeight - insets.bottom);
-  const obstruction =
-    bottomReserve > 0
-      ? Math.max(0, bottomReserve - COMPOSER_TOP_SLACK) + keyboardLift
-      : Math.max(insets.bottom, keyboardHeight);
   const bandTop = insets.top + EDGE_GAP;
-  const maxHeight = Math.max(
-    FILE_VIEWER_MIN_HEIGHT,
-    screenHeight - bandTop - obstruction - EDGE_GAP,
-  );
-  const height =
-    preferredHeight === null
-      ? maxHeight
-      : Math.min(
-          maxHeight,
-          Math.max(
-            FILE_VIEWER_MIN_HEIGHT,
-            Math.ceil(preferredHeight + FILE_VIEWER_SURFACE_RIM * 2),
-          ),
-        );
-  const top = bandTop + Math.max(0, Math.floor((maxHeight - height) / 2));
   const width = fileViewerPanelWidth(screenWidth);
+  const wanted =
+    preferredHeight === null
+      ? -1
+      : Math.max(
+          FILE_VIEWER_MIN_HEIGHT,
+          Math.ceil(preferredHeight + FILE_VIEWER_SURFACE_RIM * 2),
+        );
 
-  const animatedHeight = useSharedValue(height);
-  const animatedTop = useSharedValue(top);
+  const preferred = useSharedValue(wanted);
   const shown = useSharedValue(0);
   const visible = ready && origin !== null;
   useEffect(() => {
     if (!visible || shown.value === 0) {
-      animatedHeight.value = height;
-      animatedTop.value = top;
+      preferred.value = wanted;
       shown.value = visible ? 1 : 0;
       return;
     }
-    animatedHeight.value = withTiming(height, RESIZE_TIMING);
-    animatedTop.value = withTiming(top, RESIZE_TIMING);
-  }, [animatedHeight, animatedTop, height, shown, top, visible]);
+    preferred.value =
+      wanted < 0 || preferred.value < 0 ? wanted : withTiming(wanted, RESIZE_TIMING);
+  }, [preferred, shown, visible, wanted]);
+
+  const frame = useDerivedValue(() => {
+    const room = Math.max(
+      FILE_VIEWER_MIN_HEIGHT,
+      screenHeight - bandTop - obstruction.value - EDGE_GAP,
+    );
+    const height = preferred.value < 0 ? room : Math.min(room, preferred.value);
+    return {
+      height,
+      top: bandTop + Math.max(0, Math.floor((room - height) / 2)),
+    };
+  });
   const offscreen = -2 * screenHeight;
   const frameStyle = useAnimatedStyle(() => ({
-    height: animatedHeight.value,
+    height: frame.value.height,
     transform: [
-      { translateY: shown.value === 1 ? animatedTop.value : offscreen },
+      { translateY: shown.value === 1 ? frame.value.top : offscreen },
     ],
+  }));
+  const keepsComposer = bottomReserve > 0;
+  const backdropStyle = useAnimatedStyle(() => ({
+    bottom: keepsComposer ? obstruction.value : 0,
   }));
 
   const originX = origin?.x ?? 0;
@@ -157,18 +138,14 @@ export function FileViewerPanel({
         )
       }
     >
-      <Pressable
+      <AnimatedPressable
         accessibilityRole="button"
         accessibilityLabel={closeLabel}
         onPress={onClose}
         style={[
           styles.backdrop,
-          {
-            top: -originY,
-            left: -originX,
-            width: screenWidth,
-            bottom: bottomReserve > 0 ? obstruction : 0,
-          },
+          { top: -originY, left: -originX, width: screenWidth },
+          backdropStyle,
         ]}
       />
       <Animated.View
@@ -191,6 +168,8 @@ export function FileViewerPanel({
   );
   return <OverlayPortal>{panel}</OverlayPortal>;
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 function FooterButton({
   icon,
@@ -250,11 +229,11 @@ export function FileViewerFooter({
   actions: readonly PopoverAction[];
   onBack?: (() => void) | undefined;
   onClose?: (() => void) | undefined;
-  closeLabel: string;
+  closeLabel?: string;
 }) {
   const colors = useColors();
   return (
-    <View style={[styles.footer, { borderTopColor: colors.border }]}>
+    <View style={styles.footer}>
       {onBack ? (
         <FooterButton icon="chevron-left" accessibilityLabel="Back" onPress={onBack} />
       ) : null}
@@ -280,7 +259,7 @@ export function FileViewerFooter({
           />
         ))}
         {onClose ? (
-          <FooterButton icon="x" accessibilityLabel={closeLabel} onPress={onClose} />
+          <FooterButton icon="x" accessibilityLabel={closeLabel ?? "Close"} onPress={onClose} />
         ) : null}
       </View>
     </View>
@@ -310,13 +289,12 @@ const styles = StyleSheet.create({
   },
   footer: {
     alignItems: "center",
-    borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
     gap: 8,
-    minHeight: 48,
-    paddingLeft: 14,
-    paddingRight: 8,
-    paddingVertical: 6,
+    minHeight: BUTTON_SIZE + FOOTER_PAD * 2,
+    paddingLeft: 16,
+    paddingRight: FOOTER_PAD,
+    paddingVertical: FOOTER_PAD,
   },
   name: {
     flex: 1,

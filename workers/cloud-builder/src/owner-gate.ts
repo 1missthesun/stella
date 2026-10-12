@@ -230,10 +230,6 @@ export {
 export class OwnerGate extends OwnerGateCloudDispatch {
   private testClaudeChecked = false;
 
-  /**
-   * Dev test accounts only (`test-claude.ts`): a test owner's cloud gets the
-   * shared test Claude login the first time this object reads its state.
-   */
   private async ensureTestClaude(): Promise<void> {
     if (this.testClaudeChecked) return;
     if (!testClaudeConfigured(this.env)) {

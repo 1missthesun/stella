@@ -187,8 +187,6 @@ probe-plant)
   json '{ok:true}'
   ;;
 test-seed)
-  # Dev test accounts only: the shared test login (test-claude.ts), written
-  # where a sign-in would leave it.
   dir="$accounts/$2"
   mkdir -p "$dir" && chmod 700 "$dir"
   printf '%s' "$TEST_CREDENTIALS" >"$dir/.credentials.json.tmp" && chmod 600 "$dir/.credentials.json.tmp" \
@@ -407,10 +405,6 @@ export const claudeLoginProbe = async (
   return await runScript(env, ownerId, ["probe-inspect", key], { timeoutMs: 120_000 });
 };
 
-/**
- * Dev test accounts only: put the shared test Claude login into an agent's
- * container, after its restore, for a test owner's turn on that account.
- */
 export const seedTestClaudeLogin = async (
   env: Cloudflare.Env,
   ownerId: string,

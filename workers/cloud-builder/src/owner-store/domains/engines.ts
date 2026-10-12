@@ -984,11 +984,6 @@ const finishClaudeCloud = async (
   return { accountId, email: finished.email };
 };
 
-/**
- * Dev test accounts only (`test-claude.ts`): the shared test Claude login as
- * a cloud account, once. Signing it out in the cloud keeps the account, so
- * it stays signed out.
- */
 export const ensureTestClaudeCloudAccount = (ctx: OwnerContext): void => {
   const known = ctx.db.one<{ account_id: string }>(
     "SELECT account_id FROM engine_accounts WHERE provider = 'anthropic' AND identity = ?",

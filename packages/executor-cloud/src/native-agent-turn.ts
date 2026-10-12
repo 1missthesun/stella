@@ -498,6 +498,7 @@ export const buildClaudeChildEnv = (options: {
     // sandbox container. Claude Code refuses --dangerously-skip-permissions
     // as root unless told it is in a sandbox.
     IS_SANDBOX: "1",
+    MCP_CONNECTION_NONBLOCKING: "0",
   };
   // Nothing may point the CLI at another endpoint or another credential.
   delete childEnv.ANTHROPIC_BASE_URL;

@@ -12,15 +12,11 @@ import path from "node:path";
 /** The single checkpointed root, mirrored from the builder worker. */
 export const WORLD_ROOT = "/workspace/world";
 
-/** Stella's own editable renderer source, a plain directory in the world. */
-
 /**
  * Where the user's drive is hydrated and where deliverables are collected
  * from. A file anywhere else in the world is the agent's working material,
  * not something the user receives.
  */
-export const WORLD_DRIVE_ROOT = `${WORLD_ROOT}/drive`;
-
 export const worldDriveRoot = (worldRoot: string): string =>
   path.join(worldRoot, "drive");
 

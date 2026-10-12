@@ -234,6 +234,8 @@ export const STELLA_MEDIA_MODELS = {
   /** `image_gen` through Stella: text to image, and with references, edit. */
   image: "openai/gpt-image-2.5/flare/text-to-image",
   imageEdit: "openai/gpt-image-2.5/flare/edit",
+  video: "bytedance/seedance-2.5/text-to-video",
+  imageToVideo: "bytedance/seedance-2.5/image-to-video",
   /** Read-aloud; fal and OpenRouter both name it this. */
   speech: "google/gemini-3.8-flash-lite-tts",
   /** Record-then-transcribe dictation, on OpenRouter (Stella's key or the user's own). */
@@ -284,6 +286,34 @@ export const stellaImageRequest = (args: {
       ...(args.numImages ? { num_images: args.numImages } : {}),
       ...(args.outputFormat ? { output_format: args.outputFormat } : {}),
       ...(imageUrls.length > 0 ? { image_urls: imageUrls } : {}),
+    },
+  };
+};
+
+export const stellaVideoRequest = (args: {
+  prompt: string;
+  durationSeconds: number;
+  resolution?: string | null;
+  aspectRatio?: string | null;
+  generateAudio?: boolean | null;
+  imageUrl?: string | null;
+  endImageUrl?: string | null;
+}): { model: string; input: Record<string, unknown> } => {
+  const fromImage = Boolean(args.imageUrl);
+  return {
+    model: fromImage ? STELLA_MEDIA_MODELS.imageToVideo : STELLA_MEDIA_MODELS.video,
+    input: {
+      prompt: args.prompt,
+      duration: String(args.durationSeconds),
+      resolution: args.resolution || "720p",
+      generate_audio: args.generateAudio ?? true,
+      codec: "H264",
+      ...(fromImage
+        ? {
+            image_url: args.imageUrl,
+            ...(args.endImageUrl ? { end_image_url: args.endImageUrl } : {}),
+          }
+        : { aspect_ratio: args.aspectRatio || "16:9" }),
     },
   };
 };

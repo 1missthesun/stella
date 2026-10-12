@@ -306,6 +306,8 @@ export type PiAgentInfo = {
 /** A file an agent delivered: in the owner's drive, for the conversation's files card. */
 export type PiDeliveredFile = { path: string; name: string; sizeBytes: number; contentType: string };
 
+export type PiAgentFileDelivery = { threadId: string; deliver: (files: PiDeliveredFile[]) => Promise<void> };
+
 /** A report of an agent thread's agent (`PiConversationRuntime.threadAttempt`). */
 export type PiThreadReport = {
   threadId: string;
@@ -452,6 +454,7 @@ export type PiRuntimeOptions = {
     authority: PiAuthority,
     browser?: CloudBrowserClient,
     history?: CloudHistoryClient,
+    delivery?: PiAgentFileDelivery,
   ): Promise<readonly CloudCodeSourceAgentTool[]>;
   /**
    * Show a login handoff to the user and wait until it ends: the user
@@ -968,6 +971,7 @@ export class PiConversationRuntime {
                 (await this.#agentState()).authority,
                 this.#browser(active),
                 call.threadId ? this.#ownHistory(call.threadId) : undefined,
+                call.threadId ? this.#fileDelivery(call.threadId) : undefined,
               );
         const tool = tools.find((candidate) => candidate.name === call.name);
         if (!tool) throw new Error(`${call.name} is not available here.`);
@@ -1772,6 +1776,16 @@ export class PiConversationRuntime {
       this.#options.report(error);
       return brokerFailure(502);
     }
+  }
+
+  #fileDelivery(threadId: string): PiAgentFileDelivery {
+    return {
+      threadId,
+      deliver: async (files) => {
+        await this.#noteDeliveredFiles(threadId, { files });
+        this.#options.log("pi_agent_media_delivered", { threadId, files: files.length });
+      },
+    };
   }
 
   /** The files a lease's quiesce delivered, kept for the agent's report. */

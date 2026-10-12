@@ -7,6 +7,8 @@ description: Generate images, video, music, speech and 3D models, or transcribe 
 
 `stella-media` (on PATH in Bash) runs Stella's media models on Stella's account, billed to the user's plan.
 
+**In the cloud** (an agent running in Stella's cloud, with no `stella-media` on PATH): use the `image_gen` and `video_gen` tools instead. They run the same models on the same account, save the result to the user's drive, and attach it to your report; the result also gives a download URL if your shell needs the file. Other media kinds (music, speech, 3D) are not available there yet.
+
 ## 1. Pick a model
 
 ```bash

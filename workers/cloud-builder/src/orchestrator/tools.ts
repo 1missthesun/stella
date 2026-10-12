@@ -8,6 +8,7 @@ import {
   createCloudCodeAgentTool,
 } from "../cloud-code-tool.js";
 import { createCloudImageGenTool } from "../cloud-image-gen-tool.js";
+import { createCloudVideoGenTool } from "../cloud-video-gen-tool.js";
 import { createCloudWebTool } from "../cloud-web-tool.js";
 import { createCloudHtmlTool } from "../cloud-html-tool.js";
 import { unwrapRpc } from "../owner-store/errors.js";
@@ -56,7 +57,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
   /**
    * The cloud orchestrator's own tools for pi: the desktop orchestrator's
    * model-visible contract (`orchestrator.md`'s allowlist — code, html,
-   * image_gen, web, map, Read — plus the demoted schedule_* and
+   * image_gen, video_gen, web, map, Read — plus the demoted schedule_* and
    * connector_status tools reachable inside code, and the `connect`,
    * `history` and `memory` clients inside code). The agent tools and
    * `switch_destination` are pi's own. The model reads one description and
@@ -163,6 +164,14 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           publishFiles: (writerKey, files) =>
             this.publishTurnFilesCard(turn.turnId, writerKey, files),
         }),
+        createCloudVideoGenTool({
+          ownerGeneration: turn.ownerGeneration,
+          conversationId: turn.conversationId,
+          turnId: turn.turnId,
+          ownerInternal: toolContext.ownerInternal,
+          publishFiles: (writerKey, files) =>
+            this.publishTurnFilesCard(turn.turnId, writerKey, files),
+        }),
         createCloudHtmlTool({
           turnId: turn.turnId,
           ownerInternal: toolContext.ownerInternal,
@@ -201,6 +210,14 @@ export abstract class OrchestratorTools extends OrchestratorPi {
     const tools: CloudCodeSourceAgentTool[] = [
       createCloudWebTool({ ownerInternal: toolContext.ownerInternal }),
       createCloudImageGenTool({
+        ownerGeneration: turn.ownerGeneration,
+        conversationId: turn.conversationId,
+        turnId: turn.turnId,
+        ownerInternal: toolContext.ownerInternal,
+        publishFiles: (writerKey, files) =>
+          this.publishTurnFilesCard(turn.turnId, writerKey, files),
+      }),
+      createCloudVideoGenTool({
         ownerGeneration: turn.ownerGeneration,
         conversationId: turn.conversationId,
         turnId: turn.turnId,

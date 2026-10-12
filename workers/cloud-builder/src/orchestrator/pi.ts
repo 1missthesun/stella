@@ -74,6 +74,8 @@ import {
 } from "../cloud-code-tool.js";
 import type { CloudBrowserClient } from "../cloud-browser.js";
 import { createCloudWebTool } from "../cloud-web-tool.js";
+import { createCloudImageGenTool } from "../cloud-image-gen-tool.js";
+import { createCloudVideoGenTool } from "../cloud-video-gen-tool.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import { sha256Hex } from "../hash.js";
 import {
@@ -337,8 +339,8 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               });
             });
           },
-          agentTools: (authority, browser, history) =>
-            this.createPiAgentTools(authority, browser, history),
+          agentTools: (authority, browser, history, delivery) =>
+            this.createPiAgentTools(authority, browser, history, delivery),
           ...(slack
             ? {}
             : {
@@ -1989,6 +1991,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     },
     browser: CloudBrowserClient | undefined,
     history?: import("../cloud-code-tool.js").CloudHistoryClient,
+    delivery?: import("../pi-runtime.js").PiAgentFileDelivery,
   ): Promise<CloudCodeSourceAgentTool[]> {
     const ownerInternal = async (name: string, args: unknown) =>
       unwrapRpc(
@@ -2020,7 +2023,21 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       ...(browser ? { browser } : {}),
       ...(history ? { history } : {}),
     });
-    return [code, web];
+    const media = {
+      ownerGeneration: authority.ownerGeneration,
+      conversationId: authority.conversationId,
+      turnId: `pi-agent:${delivery?.threadId ?? "unbound"}`,
+      ownerInternal,
+      downloadLinks: true,
+      publishFiles: async (
+        _writerKey: string,
+        files: import("../pi-runtime.js").PiDeliveredFile[],
+      ) => {
+        if (!delivery) throw new Error("Media generation is only available while this agent is running.");
+        await delivery.deliver(files);
+      },
+    };
+    return [code, web, createCloudImageGenTool(media), createCloudVideoGenTool(media)];
   }
 
   /**

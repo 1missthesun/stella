@@ -262,6 +262,9 @@ export const createHostRunnerHandlers = (context, options) => ({
             tokenKey: payload.tokenKey,
             displayName: payload.displayName,
             description: payload.description,
+            conversationId: payload.conversationId,
+            agentId: payload.agentId,
+            toolCallId: payload.toolCallId,
             ...payload.preregisteredOAuth,
         })
         : context.services.connectorCredentialService.requestCredential(payload),

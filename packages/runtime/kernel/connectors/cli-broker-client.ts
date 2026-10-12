@@ -1,8 +1,8 @@
 /**
  * Client for the worker's CLI bridge UDS. The node_repl `connect` client
  * (via `connect-service.ts`) dials it when an MCP/REST call fails with
- * auth, the worker pops a credential dialog via the host, the user
- * submits, the host persists the token, and we get `{ ok: true }` back so
+ * auth, the host asks the user with a secure input card in the calling
+ * chat, persists the token, and we get `{ ok: true }` back so
  * the caller can retry the original operation. Backend Composio actions
  * are brokered through the same socket (`connector.runBackendAction`),
  * and the `stella-computer` daemon-spawn RPC rides it too.
@@ -11,7 +11,7 @@
  * connection = one line of JSON request, one line of JSON response,
  * server closes. Keeps the dependency surface small (no shared RPC
  * client framework needed) and avoids holding a long-lived socket
- * open across the auth dialog.
+ * open across the credential card.
  */
 
 import { connect, type Socket } from "node:net";
@@ -195,6 +195,7 @@ export const requestConnectorCredentialFromBridge = async ({
   preregisteredOAuth,
   description,
   placeholder,
+  caller,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
   socketPath: string;
@@ -230,6 +231,8 @@ export const requestConnectorCredentialFromBridge = async ({
   };
   description?: string;
   placeholder?: string;
+  /** Who made the call, so the credential card opens in their chat. */
+  caller?: { conversationId?: string; agentId?: string; toolCallId?: string };
   timeoutMs?: number;
 }): Promise<ConnectorCredentialResult> => {
   const result = await sendRequest(
@@ -246,6 +249,7 @@ export const requestConnectorCredentialFromBridge = async ({
       preregisteredOAuth,
       description,
       placeholder,
+      ...(caller ? { caller } : {}),
     },
     timeoutMs,
   );

@@ -1342,10 +1342,16 @@ class NodeReplKernel {
     }
 
     try {
-      const client = this.connectClient;
-      if (!client) {
+      const shared = this.connectClient;
+      if (!shared) {
         throw new Error("connect is not available in this session.");
       }
+      const client =
+        shared.forCaller?.({
+          conversationId: active.context.conversationId,
+          ...(active.context.agentId ? { agentId: active.context.agentId } : {}),
+          toolCallId: active.context.requestId,
+        }) ?? shared;
       const value = await this.dispatchConnectCall(
         client,
         message.method,

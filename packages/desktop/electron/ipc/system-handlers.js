@@ -78,8 +78,6 @@ import {
   IPC_HOST_CONFIGURE_RUNTIME,
   IPC_HOST_SET_CLOUD_SYNC,
   IPC_APP_HARD_RESET,
-  IPC_CONNECTOR_CREDENTIAL_SUBMIT,
-  IPC_CONNECTOR_CREDENTIAL_CANCEL,
   IPC_CONNECTOR_CONNECT_RESPOND,
   IPC_SHELL_OPEN_EXTERNAL,
   IPC_SHELL_SHOW_IN_FOLDER,
@@ -533,18 +531,6 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted ask policy update.");
         }
         return await options.setUserAskPolicy(payload);
-    });
-    handleIpc(IPC_CONNECTOR_CREDENTIAL_SUBMIT, async (event, payload) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CONNECTOR_CREDENTIAL_SUBMIT)) {
-            throw new Error("Blocked untrusted connector credential submission.");
-        }
-        return await options.submitConnectorCredential(payload);
-    });
-    handleIpc(IPC_CONNECTOR_CREDENTIAL_CANCEL, (event, payload) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CONNECTOR_CREDENTIAL_CANCEL)) {
-            throw new Error("Blocked untrusted connector credential cancellation.");
-        }
-        return options.cancelConnectorCredential(payload);
     });
     handleIpc(IPC_CONNECTOR_CONNECT_RESPOND, (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CONNECTOR_CONNECT_RESPOND)) {

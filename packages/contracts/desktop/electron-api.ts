@@ -122,10 +122,6 @@ import {
   IPC_CONNECTOR_CONNECT_REQUEST,
   IPC_CONNECTOR_CONNECT_RESPOND,
   IPC_CONNECTOR_CONNECT_UPDATE,
-  IPC_CONNECTOR_CREDENTIAL_CANCEL,
-  IPC_CONNECTOR_CREDENTIAL_COMPLETE,
-  IPC_CONNECTOR_CREDENTIAL_REQUEST,
-  IPC_CONNECTOR_CREDENTIAL_SUBMIT,
   IPC_CUSTOMIZATIONS_RESET,
   IPC_DEVICE_GET_ID,
   IPC_DIAGNOSTICS_EXPORT_LOGS,
@@ -863,14 +859,6 @@ export const createElectronApi = (
       saveLlmCredential: invoker(IPC_LLM_CREDENTIALS_SAVE),
       deleteLlmCredential: (provider: string) =>
         ipc.invoke(IPC_LLM_CREDENTIALS_DELETE, { provider }),
-      onConnectorCredentialRequest: onWithEvent(
-        IPC_CONNECTOR_CREDENTIAL_REQUEST,
-      ),
-      onConnectorCredentialComplete: onWithEvent(
-        IPC_CONNECTOR_CREDENTIAL_COMPLETE,
-      ),
-      submitConnectorCredential: invoker(IPC_CONNECTOR_CREDENTIAL_SUBMIT),
-      cancelConnectorCredential: invoker(IPC_CONNECTOR_CREDENTIAL_CANCEL),
       onConnectorConnectRequest: onWithEvent(IPC_CONNECTOR_CONNECT_REQUEST),
       onConnectorConnectUpdate: onWithEvent(IPC_CONNECTOR_CONNECT_UPDATE),
       respondConnectorConnect: invoker(IPC_CONNECTOR_CONNECT_RESPOND),

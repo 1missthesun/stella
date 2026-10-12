@@ -67,9 +67,18 @@ import {
 import type { ConnectorCommandConfig, ConnectorToolInfo } from "./types.js";
 import { loadGoogleWorkspaceTools } from "../google-workspace/load-google-workspace-tools.js";
 
+/** Who made a connector call, so a credential card opens in their chat. */
+export type ConnectorCaller = {
+  conversationId?: string;
+  agentId?: string;
+  toolCallId?: string;
+};
+
 export type ConnectClientOptions = {
   stellaAppDir: string;
-  /** UDS path of the worker's CLI bridge (credential dialogs + broker). */
+  /** The conversation, agent and tool call a credential card belongs to. */
+  caller?: ConnectorCaller;
+  /** UDS path of the worker's CLI bridge (credential cards + broker). */
   cliBridgeSocketPath?: string;
   /** Non-fatal bridge diagnostics (logged by the host). */
   onBridgeUnreachable?: (message: string) => void;
@@ -209,8 +218,8 @@ export const resolveConnectorAuthHints = async (
 
 /**
  * Run `attempt`. If it throws `ConnectorAuthError` AND the bridge socket
- * is wired AND the error carries a `tokenKey`, dial the bridge to pop a
- * credential dialog; on `{ ok: true }` retry once. Anything else (no
+ * is wired AND the error carries a `tokenKey`, dial the bridge to ask the
+ * user with a credential card; on `{ ok: true }` retry once. Anything else (no
  * socket, no tokenKey, user cancel/timeout, second auth failure) rethrows
  * to the caller. Single retry is intentional: a second auth failure means
  * a bad key, not that another round-trip would help.
@@ -236,9 +245,9 @@ export const withAuthRetry = async <T>(
 
     let result: ConnectorCredentialResult;
     try {
-      // No `description` — we deliberately let the renderer's canonical
-      // copy fire instead of leaking the upstream HTTP status /
-      // generic-error verbiage into a user-facing dialog.
+      // No `description`: the host's canonical copy is used instead of
+      // leaking the upstream HTTP status / generic-error verbiage into a
+      // user-facing card.
       result = await requestConnectorCredentialFromBridge({
         socketPath,
         tokenKey: error.tokenKey,
@@ -249,6 +258,7 @@ export const withAuthRetry = async <T>(
         oauthResource: hints.oauthResource,
         scopes: hints.scopes,
         preregisteredOAuth: hints.preregisteredOAuth,
+        ...(options.caller ? { caller: options.caller } : {}),
       });
     } catch (bridgeError) {
       // The bridge was advertised but isn't reachable — fall through to
@@ -913,8 +923,8 @@ const refreshDeferredMcpSkill = async (
 };
 
 /**
- * Shared MCP tools listing: probe through the bridge (popping the auth
- * dialog on 401/403 via `withAuthRetry`), then opportunistically complete
+ * Shared MCP tools listing: probe through the bridge (asking for
+ * credentials on 401/403 via `withAuthRetry`), then opportunistically complete
  * a deferred generated skill while the session is still warm.
  */
 const probeMcpConnector = async (
@@ -1141,7 +1151,7 @@ export const discoverConnectorsDetailed = async (
         ? `Ready. Inspect actions: await connect.actions("${match.id}").`
         : match.kind === "native"
           ? `Not connected. Connect offers are handled by the orchestrator's connector_status tool (inline connect card) or the Store — do not initiate one from here unless the user explicitly asked this turn. Proceed via the browser/computer fallback meanwhile.`
-          : `Configured but not authorized. Calling it pops the auth dialog: await connect.actions("${match.id}").`;
+          : `Configured but not authorized. Calling it asks the user for credentials: await connect.actions("${match.id}").`;
       return {
         id: match.id,
         name: match.name,
@@ -1568,6 +1578,8 @@ export type ReplConnectClient = {
   ): Promise<unknown>;
   addMcp(options: Record<string, unknown>): Promise<unknown>;
   remove(id: string): Promise<unknown>;
+  /** The same client for one caller's calls (`ConnectClientOptions.caller`). */
+  forCaller?(caller: ConnectorCaller): ReplConnectClient;
 };
 
 export const createReplConnectClient = (
@@ -1575,6 +1587,7 @@ export const createReplConnectClient = (
 ): ReplConnectClient => {
   const catalog = () => loadConnectCatalog(options.stellaAppDir);
   return {
+    forCaller: (caller) => createReplConnectClient({ ...options, caller }),
     discover: async (query) => {
       const trimmed = typeof query === "string" ? query.trim() : "";
       if (!trimmed) {

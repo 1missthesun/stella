@@ -13,9 +13,8 @@ import type { LocalTerminalPhase } from "../local-turn-protocol.js";
 export type WakeReport = { prompt: string; lifecycleReport?: string };
 
 /**
- * Binding names/types come from Wrangler. Storage and dev-acceptance fields
- * remain optional here solely for rolling-deploy compatibility and production
- * configurations that omit acceptance probes.
+ * Binding names/types come from Wrangler. Storage fields remain optional here
+ * solely for rolling-deploy compatibility.
  */
 export type Env = Pick<
   Cloudflare.Env,
@@ -31,8 +30,6 @@ export type Env = Pick<
       Cloudflare.Env,
       | "AGENT_HOME"
       | "CONVERSATION_ARCHIVE"
-      | "ENABLE_DEV_ACCEPTANCE_PROBES"
-      | "STELLA_DEPLOYMENT_IDENTITY"
       | "MODEL_GATEWAY"
       | "MODEL_GATEWAY_CONTROL"
       | "MODEL_GATEWAY_OWNERS"

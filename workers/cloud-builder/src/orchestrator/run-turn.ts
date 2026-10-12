@@ -735,13 +735,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
                       ),
                     });
                   }
-                  // Count physical requests after privacy validation, including
-                  // compaction and tool continuations, rather than Agent invocations.
-                  await this.noteDevAcceptanceProviderDispatch();
                   assertTurnExecutionActive(turnCancellation, executionSignal);
-                  // The dev counter is an asynchronous boundary. Freeze may
-                  // arrive while it is pending, so check the local grant again
-                  // at the last point before the request body is released.
                   activeGrant?.assertValid();
                 },
               });
@@ -857,13 +851,6 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           await this.ctx.storage.setAlarm(Date.now() + 30_000);
         }
       }
-      await this.observeDevAcceptanceContextFailure(contextFailure).catch(
-        (probeError) => {
-          log("error", "dev_acceptance_context_fault_repair_failed", {
-            message: errorMessage(probeError),
-          });
-        },
-      );
       await this.afterTerminal(turn);
       return json(
         contextFailure

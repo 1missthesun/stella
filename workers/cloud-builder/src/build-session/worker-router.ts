@@ -1335,22 +1335,6 @@ app.post("/conversations/:id/cancel", jsonBody(tinyControl), (c) =>
     c.req.raw,
   ),
 );
-app.post(
-  "/internal/dev-acceptance/conversations/:id/probe",
-  jsonBody(tinyControl),
-  (c) => {
-    // Hidden unless this exact deployment was built as a non-production
-    // acceptance target. The DO repeats this gate and checks the disposable
-    // owner/conversation markers before any side effect.
-    if (!devAcceptanceProbesEnabled(c.env)) return json({ error: "Not found." }, 404);
-    return forwardBody(
-      c.env.ORCHESTRATOR_SESSIONS.getByName(c.req.param("id")),
-      "https://orchestrator-session/internal/dev-acceptance/probe",
-      c.req.raw,
-      { "x-stella-acceptance-service-secret": c.env.BUILDER_SERVICE_SECRET },
-    );
-  },
-);
 // The journal probe reads the canonical journal exactly the way a client
 // does, including through R2 segments.
 app.get("/conversations/:id/journal", (c) => {

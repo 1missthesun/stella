@@ -75,9 +75,6 @@
     "SANDBOX_SNAPSHOTS": "1",
     "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
     "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-dev.fromyou.workers.dev",
-    // Strictly a dev-target proof seam. Production configs must omit both
-    // values; the Worker and DO independently deny the route without them.
-    "ENABLE_DEV_ACCEPTANCE_PROBES": "1",
     // Dev only: `/api/admin/test-accounts/session` mints signed-in
     // `@test.stella.local` users, whose magic links are logged, not sent.
     // Production and acceptance configs must omit it.
@@ -344,7 +341,6 @@
       "SANDBOX_SNAPSHOTS": "1",
       "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
       "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-dev.fromyou.workers.dev",
-      "ENABLE_DEV_ACCEPTANCE_PROBES": "1",
       "STELLA_TEST_ACCOUNTS": "1",
       "STELLA_DEPLOYMENT_IDENTITY": "dev:outgoing-bulldog-865",
       "MODEL_GATEWAY_URL": "https://stella-v2-model-gateway-dev.fromyou.workers.dev",

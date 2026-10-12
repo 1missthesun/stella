@@ -471,9 +471,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (url.pathname === CLOUD_CLI_TURN_DO_PATHS.terminal) {
       return this.handleCliTurnTerminal(request);
     }
-    if (url.pathname === "/internal/dev-acceptance/probe") {
-      return this.handleDevAcceptanceProbe(request);
-    }
     if (url.pathname === "/local-turns/begin") {
       return this.handleLocalTurnBegin(request);
     }

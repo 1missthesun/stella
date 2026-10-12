@@ -31,6 +31,15 @@ import { git, gitRaw } from "./git.js";
  * is what the apply path commits.
  */
 
+/** A change here takes a relaunch (main and preload build on launch). */
+const RESTART_PREFIX = "packages/desktop/electron/";
+/** Changed files that take a `bun install`. */
+export const installs = (paths: string[]) =>
+  paths.some((file) => file === "bun.lock" || file.endsWith("package.json"));
+/** Changed files that take a relaunch of the app. */
+export const relaunches = (paths: string[]) =>
+  installs(paths) || paths.some((file) => file.startsWith(RESTART_PREFIX));
+
 export type UpdatePlan =
   | { kind: "none" }
   | {

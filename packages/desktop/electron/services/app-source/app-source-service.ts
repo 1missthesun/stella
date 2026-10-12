@@ -32,6 +32,8 @@ import type { CoveredWindow, RelaunchHold } from "./update-transition.js";
 import {
   classifyUpdate,
   conflictedPaths,
+  installs,
+  relaunches,
   type UpdatePlan,
 } from "./update-plan.js";
 import {
@@ -39,6 +41,11 @@ import {
   prebuildElectronBundles,
   prepareInstallAhead,
 } from "./update-gate.js";
+import {
+  UpdatePreparer,
+  type PrepareJob,
+  type PreparedUpdate,
+} from "./update-prepare.js";
 import {
   mergeDraftName,
   remoteMergeBrief,
@@ -97,7 +104,11 @@ type AppSourceServiceOptions = {
    * while the window is held, so its run finds the work done.
    */
   launcherPreparesOnRelaunch?: boolean;
-  /** Scratch worktree for checking a merged update. Removed after each check. */
+  /**
+   * Scratch copy for checking a merged update, removed after each check.
+   * Versions prepared before they are offered keep their records next to
+   * it (see `UpdatePreparer`).
+   */
   updateScratchDir: string;
   /**
    * Hand git work that needs a judgement to a background agent. Absent when
@@ -191,12 +202,6 @@ const CHANGE_TAG = "stella-change/";
 const CHANGE_TAG_PREFIX = `refs/tags/${CHANGE_TAG}`;
 /** Every computer's change tags, as last fetched from the fork. */
 const FORK_CHANGES_PREFIX = "refs/stella/fork-changes/";
-/** A change here takes a relaunch (main and preload build on launch). */
-const RESTART_PREFIX = "packages/desktop/electron/";
-const installs = (paths: string[]) =>
-  paths.some((file) => file === "bun.lock" || file.endsWith("package.json"));
-const relaunches = (paths: string[]) =>
-  installs(paths) || paths.some((file) => file.startsWith(RESTART_PREFIX));
 /** Public: anonymous users read upstream with a shared, edge-cached token. */
 const BOOTSTRAP_PATH = "/api/app-source/bootstrap";
 const ACCESS_ATTEMPTS = 5;
@@ -297,9 +302,17 @@ export class AppSourceService {
   private timeline: { last: number; startedAt: number; steps: string[] } | null =
     null;
   private readonly onFocus = () => void this.refresh();
+  private readonly preparer: UpdatePreparer;
 
   constructor(options: AppSourceServiceOptions) {
     this.options = options;
+    this.preparer = new UpdatePreparer({
+      cwd: options.stellaAppDir,
+      root: `${options.updateScratchDir}-prepared`,
+      scratch: `${options.updateScratchDir}-prepare`,
+      log: options.log,
+      onPrepared: () => void this.refresh(),
+    });
   }
 
   start() {
@@ -326,6 +339,7 @@ export class AppSourceService {
 
   dispose() {
     this.disposed = true;
+    this.preparer.pause();
     app.removeListener("browser-window-focus", this.onFocus);
     for (const timer of this.timers) clearTimeout(timer);
     this.timers = [];
@@ -590,11 +604,18 @@ export class AppSourceService {
     source: TakeSource,
   ): Promise<void | { background: true }> {
     const head = await git(cwd, ["rev-parse", "HEAD"]);
-    const plan = await classifyUpdate(cwd, head, source.ref);
+    // Prepared before it was offered: the plan, the merge and its check are
+    // already done, for exactly this HEAD and this tip.
+    const tip = (
+      await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${source.ref}^{commit}`])
+    ).stdout.trim();
+    const prepared = tip ? await this.preparer.recordFor(head, tip) : null;
+    const plan = prepared?.plan ?? (await classifyUpdate(cwd, head, source.ref));
     this.mark("plan");
     this.options.log("app-source.take-planned", {
       from: source.kind,
       kind: plan.kind,
+      prepared: Boolean(prepared),
       ...(plan.kind === "clean"
         ? { identical: plan.identical, localChanges: plan.localChanges }
         : {}),
@@ -605,7 +626,16 @@ export class AppSourceService {
     if (plan.kind === "conflict") {
       return await this.dispatchMerge(cwd, source, source.brief(plan, head));
     }
-    if (plan.kind === "clean") {
+    if (plan.kind === "clean" && prepared?.to) {
+      to = prepared.to;
+      if (prepared.gate && !prepared.gate.ok) {
+        return await this.dispatchMerge(
+          cwd,
+          source,
+          source.brief(plan, head, prepared.gate.output),
+        );
+      }
+    } else if (plan.kind === "clean") {
       // The merge exists as objects only: nothing is checked out and the
       // checkout's branch has not moved, so giving up here leaves no state.
       to = await git(
@@ -644,7 +674,13 @@ export class AppSourceService {
     // No line in the chat for this: it applied while the user watched the
     // button, exactly like a fast-forward. The two lines belong to the work
     // that had to go on in the background.
-    await this.swapIn(cwd, head, to, source.settle && (() => source.settle!(to)));
+    await this.swapIn(
+      cwd,
+      head,
+      to,
+      source.settle && (() => source.settle!(to)),
+      prepared,
+    );
   }
 
   /**
@@ -767,6 +803,7 @@ export class AppSourceService {
       this.timeline = { startedAt: requestedAt, last: requestedAt, steps: [] };
       this.mark("queued");
       this.setBusy(true);
+      this.preparer.pause();
       try {
         await this.options.beforeAction?.(this.options.stellaAppDir);
         this.mark("verify");
@@ -783,6 +820,7 @@ export class AppSourceService {
       } finally {
         this.timeline = null;
         this.setBusy(false);
+        this.preparer.resume();
         void this.refresh();
       }
     });
@@ -823,6 +861,7 @@ export class AppSourceService {
     from: string,
     to: string,
     settle?: () => Promise<void>,
+    prepared?: PreparedUpdate | null,
   ) {
     const paths = (await git(cwd, ["diff", "--name-only", from, to]))
       .split("\n")
@@ -879,6 +918,7 @@ export class AppSourceService {
           cwd,
           `${this.options.updateScratchDir}-prebuild.mjs`,
           this.options.log,
+          prepared?.bundles && prepared.to === to ? prepared.dir : undefined,
         ),
         this.options.launcherPreparesOnRelaunch
           ? prepareInstallAhead(cwd, this.options.log)
@@ -1041,23 +1081,84 @@ export class AppSourceService {
     } else if (upstreamOffer?.catchUp) {
       this.catchUpLater(UPSTREAM_REF, upstreamOffer.tip, head);
     }
+    // A version is offered once it is prepared, so pressing Update only has
+    // to swap it in. One the user skipped is not prepared; it can still be
+    // added, the slower way.
+    const skippedNow = await this.skippedKeys(cwd);
+    const jobs: PrepareJob[] = [];
+    const identityEnv = () => this.identityEnv(cwd);
+    const preparedFor = async (
+      job: Omit<PrepareJob, "head" | "identityEnv">,
+      keys: string[],
+    ) => {
+      if (keys.some((key) => skippedNow.has(key))) return true;
+      jobs.push({ ...job, head, identityEnv });
+      return await this.preparer.isReady(head, job.tip);
+    };
+    const shownDrafts = async (drafts: AppSourceDraft[]) => {
+      const shown: AppSourceDraft[] = [];
+      for (const draft of drafts) {
+        const ready = await preparedFor(
+          {
+            tip: draft.sha,
+            ref: `${DRAFT_REF_PREFIX}${draft.name}`,
+            subject: draft.subject,
+            trustIdenticalTree: false,
+          },
+          [`draft:${draft.sha}`, `version:${draft.sha}`],
+        );
+        if (ready) shown.push(draft);
+      }
+      return shown;
+    };
+    const readyShown = await shownDrafts(ready);
+    const staleShown = await shownDrafts(stale);
+    let upstreamShown = false;
+    if (upstreamOffer?.real) {
+      const ref = (await this.mergedElsewhere(cwd, upstreamOffer.tip)) ?? UPSTREAM_REF;
+      upstreamShown = await preparedFor(
+        {
+          tip:
+            ref === UPSTREAM_REF
+              ? upstreamOffer.tip
+              : await git(cwd, ["rev-parse", "--verify", `${ref}^{commit}`]),
+          ref,
+          subject: `${UPSTREAM_MERGE_SUBJECT} ${upstreamOffer.tip.slice(0, 12)}`,
+          trustIdenticalTree: true,
+        },
+        [`version:${upstreamOffer.tip}`],
+      );
+    }
+    const forkShown =
+      forkRef && forkOffer?.real
+        ? await preparedFor(
+            {
+              tip: forkOffer.tip,
+              ref: forkRef,
+              subject: `${REMOTE_MERGE_SUBJECT} ${forkOffer.tip.slice(0, 12)}`,
+              trustIdenticalTree: false,
+            },
+            [`other:${forkOffer.tip}`],
+          )
+        : false;
+    void this.preparer.want(jobs);
     const [remote, upstream] = await Promise.all([
-      forkRef && forkOffer?.real ? this.compareRef(cwd, head, forkRef) : null,
-      upstreamOffer?.real ? this.compareRef(cwd, head, UPSTREAM_REF) : null,
+      forkRef && forkShown ? this.compareRef(cwd, head, forkRef) : null,
+      upstreamShown ? this.compareRef(cwd, head, UPSTREAM_REF) : null,
     ]);
     const merging =
       this.updateState?.state === "merging" ? this.updateState.from : null;
     const offered: AppSourceWaiting[] = [];
-    const updateDraft = ready.find((draft) => isUpdateDraft(draft.name));
-    if (upstreamOffer?.real || updateDraft) {
+    const updateDraft = readyShown.find((draft) => isUpdateDraft(draft.name));
+    if ((upstreamOffer?.real && upstreamShown) || updateDraft) {
       offered.push({
         kind: "version",
-        key: `version:${upstreamOffer?.real ? upstreamOffer.tip : updateDraft!.sha}`,
+        key: `version:${upstreamOffer?.real && upstreamShown ? upstreamOffer.tip : updateDraft!.sha}`,
         adding: merging === "upstream",
         ...(updateDraft ? { draft: updateDraft.name } : {}),
       });
     }
-    if (forkRef && forkOffer?.real) {
+    if (forkRef && forkOffer?.real && forkShown) {
       const [summary, device] = await Promise.all([
         this.forkSummary(cwd, head, forkOffer.tip),
         this.forkDevice(cwd),
@@ -1070,7 +1171,7 @@ export class AppSourceService {
         summary,
       });
     }
-    for (const draft of [...ready, ...stale]) {
+    for (const draft of [...readyShown, ...staleShown]) {
       if (isStellaDraft(draft.name)) continue;
       offered.push({
         kind: "draft",
@@ -1102,10 +1203,10 @@ export class AppSourceService {
       });
     }
     this.offeredKeys = offered.map((offer) => offer.key);
-    const skipped = await this.skippedKeys(cwd);
+    const skipped = skippedNow;
     return {
-      ready,
-      stale,
+      ready: readyShown,
+      stale: staleShown,
       remote: remote
         ? { status: remote.status, count: remote.count }
         : { status: "none", count: 0 },

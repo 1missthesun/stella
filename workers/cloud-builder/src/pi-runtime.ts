@@ -249,8 +249,9 @@ type PiAgentState = {
 };
 
 export type PiDeviceAgents = {
+  /** `parentThreadId`: the agent that starts it, which its reports go back to; absent for Stella's own. */
   start(
-    args: { key: string; deviceId: string; description: string; prompt: string; model?: string },
+    args: { key: string; deviceId: string; description: string; prompt: string; model?: string; parentThreadId?: string },
     authority: PiAuthority,
     parentTurnId: string,
   ): Promise<{ threadId: string; waiting?: boolean }>;

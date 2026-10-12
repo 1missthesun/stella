@@ -307,8 +307,11 @@ export type DesktopChatsOptions = {
 
 /** Stella's agents on the owner's other computers (`DesktopChatsOptions.deviceAgents`). */
 export type DesktopDeviceAgents = {
-  /** Start one there, once per `key`; `model` is what that computer runs it on, absent its own default. */
-  start(args: { key: string; deviceId: string; description: string; prompt: string; model?: string }): Promise<{
+  /**
+   * Start one there, once per `key`; `model` is what that computer runs it on, absent its own default.
+   * `parentThreadId`: the agent that starts it, which its reports go back to.
+   */
+  start(args: { key: string; deviceId: string; description: string; prompt: string; model?: string; parentThreadId?: string }): Promise<{
     threadId: string;
     waitingForDevice: boolean;
   }>;
@@ -319,8 +322,8 @@ export type DesktopDeviceAgents = {
 
 /** Agents another runtime runs as a whole (`DesktopChatsOptions.cloudThreads`). */
 export type DesktopEngineAgents = {
-  /** Start one, once per `key`, on `model`. */
-  start(args: { key: string; description: string; prompt: string; model: string }): Promise<{ threadId: string }>;
+  /** Start one, once per `key`, on `model`; `parentThreadId` is the agent that starts it, which its reports go back to. */
+  start(args: { key: string; description: string; prompt: string; model: string; parentThreadId?: string }): Promise<{ threadId: string }>;
   /** Another message for it: steers it while it runs, or starts its next run. */
   message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
   pause(threadId: string): Promise<void>;
@@ -895,8 +898,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       return agents?.[threadId]?.description ?? threadId;
     };
     return {
-      start: async ({ key, description, prompt, model }) =>
-        await engine.start({ key, description, prompt, model: model ?? defaultModel }),
+      start: async ({ key, description, prompt, model, parentThreadId }) =>
+        await engine.start({ key, description, prompt, model: model ?? defaultModel, ...(parentThreadId ? { parentThreadId } : {}) }),
       message: async ({ key, threadId, message, framed }) => {
         const description = await descriptionOf(threadId);
         if ((await engine.message({ key, threadId, description, message, ...(framed ? { framed } : {}) })) === "steered") {
@@ -939,7 +942,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       return known?.[threadId]?.description ?? threadId;
     };
     return {
-      start: async ({ key, description, prompt, model }) => {
+      start: async ({ key, description, prompt, model, parentThreadId }) => {
         if (model && /^claude-code(?:[/:]|$)/u.test(model)) {
           const there = await device();
           const name = there?.label?.trim() || deviceId;
@@ -949,7 +952,14 @@ export function desktopChats(options: DesktopChatsOptions) {
             );
           }
         }
-        const started = await agents.start({ key, deviceId, description, prompt, ...(model ? { model } : {}) });
+        const started = await agents.start({
+          key,
+          deviceId,
+          description,
+          prompt,
+          ...(model ? { model } : {}),
+          ...(parentThreadId ? { parentThreadId } : {}),
+        });
         return { threadId: started.threadId, ...(started.waitingForDevice ? { waiting: true } : {}) };
       },
       message: async ({ key, threadId, message, framed }) => {

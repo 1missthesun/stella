@@ -287,6 +287,8 @@ export type PiCloudAgentThreads = {
     description: string;
     prompt: string;
     model: string;
+    /** The agent that starts it, which its reports go back to; absent for Stella's own. */
+    parentThreadId?: string;
   }) => Promise<{ threadId: string }>;
   startOnDevice: (request: {
     conversationId: string;
@@ -295,6 +297,8 @@ export type PiCloudAgentThreads = {
     prompt: string;
     targetDeviceId: string;
     model?: string;
+    /** The agent that starts it, which its reports go back to; absent for Stella's own. */
+    parentThreadId?: string;
   }) => Promise<{ threadId: string; waitingForDevice: boolean }>;
   message: (request: {
     conversationId: string;

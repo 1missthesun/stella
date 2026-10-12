@@ -498,7 +498,10 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return {
       start: async (args, authority, parentTurnId) => {
         const started = await spawnDeviceAgent(
-          caller(authority, parentTurnId),
+          {
+            ...caller(authority, parentTurnId),
+            ...(args.parentThreadId ? { parentThreadId: args.parentThreadId } : {}),
+          },
           {
             clientMsgId: requestId(authority, args.key),
             targetDeviceId: args.deviceId,

@@ -261,7 +261,7 @@ export const createRunnerContext = ({
 
   const piCloudAgentThreads: PiCloudAgentThreads = {
     execution: cloudExecutionFor,
-    start: async ({ conversationId, requestId, description, prompt, model }) => {
+    start: async ({ conversationId, requestId, description, prompt, model, parentThreadId }) => {
       const execution = await cloudExecutionFor(model);
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to run agents in the cloud.");
@@ -276,6 +276,7 @@ export const createRunnerContext = ({
           originDeviceId: deviceId,
           originConversationId: conversationId,
           execution,
+          ...(parentThreadId ? { parentThreadId } : {}),
         }),
         AGENT_SPAWN_TIMEOUT_MS,
         () =>
@@ -285,7 +286,7 @@ export const createRunnerContext = ({
       );
       return { threadId: started.threadId };
     },
-    startOnDevice: async ({ conversationId, requestId, description, prompt, targetDeviceId, model }) => {
+    startOnDevice: async ({ conversationId, requestId, description, prompt, targetDeviceId, model, parentThreadId }) => {
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to run agents on your other computers.");
       }
@@ -301,6 +302,7 @@ export const createRunnerContext = ({
           originConversationId: conversationId,
           targetDeviceId,
           ...(model ? { model } : {}),
+          ...(parentThreadId ? { parentThreadId } : {}),
         }),
         AGENT_SPAWN_TIMEOUT_MS,
         () =>

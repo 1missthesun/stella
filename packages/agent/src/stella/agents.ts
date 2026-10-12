@@ -339,16 +339,19 @@ export type PlacedAgentResult = { threadId: string } & (
 /**
  * An agent that runs on another host as a whole, so it keeps working while
  * this one sleeps: the host starts it there and carries messages to it, and
- * its report reaches the orchestrator the way that host's reports do (a
- * wake turn in the cloud, the conversation's journal on a computer).
+ * its report reaches its starter the way that host's reports do (a wake
+ * turn in the cloud, the conversation's journal on a computer, or a message
+ * to the agent that started it, through the owner's agent threads).
  */
 export type RemoteAgentHost = {
   /**
    * Start it there. Its thread id there names it everywhere. Once per `key`.
    * `model` is the one its caller asked for, which the host there runs it on.
+   * `parentThreadId`: the agent that starts it, when Stella does not; its
+   * reports go back to that agent wherever it runs.
    */
   start(
-    args: { key: string; description: string; prompt: string; model?: string },
+    args: { key: string; description: string; prompt: string; model?: string; parentThreadId?: string },
     context: Context,
   ): Promise<{ threadId: string; waiting?: boolean }>;
   /**
@@ -1163,7 +1166,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         // Only Stella's own agents move themselves; theirs run where they run.
         remove: [
           ...(depth >= MAX_AGENT_DEPTH ? [spawnAgent, pauseAgent] : []),
-          ...(switchDestination && (depth > 1 || !agentsMove) ? [switchDestination] : []),
+          ...(switchDestination && !agentsMove ? [switchDestination] : []),
         ],
       },
     });
@@ -1218,7 +1221,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       destination: Type.Optional(
         Type.String({
           description:
-            'Where the agent runs: "cloud", or a device_id from the connected devices list. Omit to run it where you run. Stella only: the agent runs entirely there, on that computer\'s own Stella with its own files, browser, apps and sign-ins (Claude Code there too), and waits up to an hour for a computer that is offline. An agent\'s own agents always run where it runs.',
+            'Where the agent runs: "cloud", or a device_id from the connected devices list. Omit to run it where you run. The agent runs entirely there, on that computer\'s own Stella with its own files, browser, apps and sign-ins (Claude Code there too), and waits up to an hour for a computer that is offline. Its reports come back to you wherever you run.',
         }),
       ),
       directory: Type.Optional(
@@ -1244,12 +1247,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       if ("error" in placed) throw new Error(placed.error);
       const placement: StellaPlacement = placed;
       const here = samePlacement(placement, host.rootPlacement);
-      // An agent's agents run where it runs, so their reports climb the chain.
-      if (!orchestrator && !here) {
-        throw new Error(
-          `Your agents run where you run (${describePlacement(host.rootPlacement)}). Leave out destination, or ask Stella with send_message to "stella" to start an agent on ${describePlacement(placement)}.`,
-        );
-      }
       if (directory && !here) {
         throw new Error(
           "directory works only for an agent that runs where you are. Leave it out, and name the directory in the prompt instead.",
@@ -1277,10 +1274,12 @@ export function stellaAgents(host: StellaAgentsHost) {
       const engine = choice && "engine" in choice ? choice.engine : undefined;
       const engineHost = engine ? host.engine?.(engine) : undefined;
       if (engine && !engineHost) throw new Error(`"${requested}" runs on ${engine}, which this host cannot start agents on.`);
+      // Only Stella starts an agent on another engine; an agent's agent elsewhere answers to it.
+      if (engineHost && !orchestrator) {
+        throw new Error(`Only Stella can start an agent on "${requested}". Omit model to run this agent on yours.`);
+      }
       const remote = engineHost ?? placedRemote;
       if (remote) {
-        // Its report comes back to the orchestrator only.
-        if (!orchestrator) throw new Error(`Only Stella can start an agent on "${requested}". Omit model to run this agent on yours.`);
         const callKey = String(api.taskId);
         const prior = (await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.calls[callKey];
         const started = prior
@@ -1291,6 +1290,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 description,
                 prompt: args.prompt,
                 ...(requested ? { model: requested } : {}),
+                ...(!orchestrator && caller.threadId ? { parentThreadId: caller.threadId } : {}),
               },
               context,
             );
@@ -2338,11 +2338,7 @@ export function stellaAgents(host: StellaAgentsHost) {
    */
   const agentSwitch: AgentSwitch = async (args, api, context) => {
     const self = await roleOf(api, api.conversationId, context);
-    if (!self.threadId || self.depth > 1) {
-      throw new Error(
-        "Another agent started you, so you run where it runs. If the work needs another computer, tell the agent that started you with send_message.",
-      );
-    }
+    if (!self.threadId) throw new Error("Only an agent moves itself this way.");
     const moveAgent = execution?.moveAgent;
     const agentTarget = execution?.agentTarget;
     if (!moveAgent || !agentTarget) throw new Error("This chat is stored only on this computer, so you can only run here.");

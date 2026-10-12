@@ -198,8 +198,15 @@ const cloudAgentThreadsFor = (
   };
   const requestId = (key: string) => `pi:${conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128);
   return {
-    start: async ({ key, description, prompt, model }) =>
-      await threads().start({ conversationId, requestId: requestId(`start:${key}`), description, prompt, model }),
+    start: async ({ key, description, prompt, model, parentThreadId }) =>
+      await threads().start({
+        conversationId,
+        requestId: requestId(`start:${key}`),
+        description,
+        prompt,
+        model,
+        ...(parentThreadId ? { parentThreadId } : {}),
+      }),
     message: async ({ key, threadId, description, message, framed }) =>
       await threads().message({
         conversationId,
@@ -233,7 +240,7 @@ const deviceAgentThreadsFor = (
   };
   const requestId = (key: string) => `pi:${conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128);
   return {
-    start: async ({ key, deviceId, description, prompt, model }) =>
+    start: async ({ key, deviceId, description, prompt, model, parentThreadId }) =>
       await threads().startOnDevice({
         conversationId,
         requestId: requestId(`device:${key}`),
@@ -241,6 +248,7 @@ const deviceAgentThreadsFor = (
         prompt,
         targetDeviceId: deviceId,
         ...(model ? { model } : {}),
+        ...(parentThreadId ? { parentThreadId } : {}),
       }),
     message: async ({ key, threadId, description, message, framed }) =>
       await threads().message({

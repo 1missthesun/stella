@@ -20,7 +20,6 @@
     "required": ["BROWSER_PROFILE_KEK_V1"],
   },
   "vars": {
-    "STELLA_DEPLOYMENT_IDENTITY": "dev",
     "BROWSER_KEEP_ALIVE_MS": "600000",
     "BROWSER_LIVE_VIEW_TTL_MS": "300000",
     "BROWSER_HANDOFF_TIMEOUT_MS": "600000",
@@ -61,7 +60,6 @@
         "required": ["BROWSER_PROFILE_KEK_V1"],
       },
       "vars": {
-        "STELLA_DEPLOYMENT_IDENTITY": "basic-nightingale-118",
         "BROWSER_KEEP_ALIVE_MS": "600000",
         "BROWSER_LIVE_VIEW_TTL_MS": "300000",
         "BROWSER_HANDOFF_TIMEOUT_MS": "600000",
@@ -110,7 +108,6 @@
         "required": ["BROWSER_PROFILE_KEK_V1"],
       },
       "vars": {
-        "STELLA_DEPLOYMENT_IDENTITY": "intent-jackal-330",
         "BROWSER_KEEP_ALIVE_MS": "600000",
         "BROWSER_LIVE_VIEW_TTL_MS": "300000",
         "BROWSER_HANDOFF_TIMEOUT_MS": "600000",

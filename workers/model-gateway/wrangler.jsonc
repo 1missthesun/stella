@@ -27,7 +27,6 @@
     "cpu_ms": 60000,
   },
   "vars": {
-    "ENVIRONMENT": "development",
     // Canonical development deployment used by source builds and test traffic.
     "STELLA_BACKEND_URL": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev",
     // Dev only, never production: a desktop signed in to a cloud-builder
@@ -144,7 +143,6 @@
         "cpu_ms": 60000,
       },
       "vars": {
-        "ENVIRONMENT": "production",
         // Pinned to the packaged desktop release authority.
         "STELLA_BACKEND_URL": "https://stella-v2-cloud-builder-prod.fromyou.workers.dev",
         // Public production keys for the cloud-builder issuer.

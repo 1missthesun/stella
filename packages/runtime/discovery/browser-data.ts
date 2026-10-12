@@ -17,6 +17,7 @@ import { exec } from "child_process";
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { Effect } from "effect";
+import { mainMemoryPath } from "../kernel/memory/memory-layout.js";
 import {
   acquireCloseable,
   runDiscovery,
@@ -1452,26 +1453,15 @@ export const collectBrowserActivityWindows = async (
   );
 
 /**
- * Check if core memory already exists
+ * Check if the main memory file already exists
  */
 export const coreMemoryExists = async (StellaDataDir: string): Promise<boolean> =>
   runDiscovery(
-    Effect.gen(function* () {
-      const candidatePaths = [
-        path.join(StellaDataDir, "core-memory.md"),
-        path.join(StellaDataDir, "CORE_MEMORY.MD"),
-      ];
-      for (const coreMemoryPath of candidatePaths) {
-        const exists = yield* tryDiscovery(() =>
-          fs.access(coreMemoryPath),
-        ).pipe(
-          Effect.match({ onSuccess: () => true, onFailure: () => false }),
-        );
-        if (exists) return true;
-      }
-      return false;
-    }),
+    tryDiscovery(() => fs.access(mainMemoryPath(StellaDataDir))).pipe(
+      Effect.match({ onSuccess: () => true, onFailure: () => false }),
+    ),
   );
+
 // IP geolocation providers, tried in order. Each maps its response shape onto
 // the same city/region/postal/country fields. Multiple providers guard against
 // any single one being down or rate-limiting the user's IP.
@@ -1611,12 +1601,39 @@ const fetchUserLocationLineEffect: Effect.Effect<string | null> = Effect.gen(
   },
 );
 
+const WHO_HEADING = "## Who the user is";
+
+const MAIN_MEMORY_TEMPLATE = (who: string) =>
+  [
+    "# Memory",
+    "",
+    WHO_HEADING,
+    who,
+    "",
+    "## How the user wants Stella to work",
+    "",
+    "## Global rules",
+    "",
+    "## Areas",
+    "",
+  ].join("\n");
+
+const withWhoSection = (existing: string | null, who: string): string => {
+  if (!existing?.trim()) return MAIN_MEMORY_TEMPLATE(who);
+  const start = existing.indexOf(WHO_HEADING);
+  if (start === -1) return `${WHO_HEADING}\n${who}\n\n${existing}`;
+  const bodyStart = start + WHO_HEADING.length;
+  const next = existing.indexOf("\n## ", bodyStart);
+  return `${existing.slice(0, bodyStart)}\n${who}\n${next === -1 ? "" : existing.slice(next)}`;
+};
+
 /**
- * Write core memory profile to disk. When `includeLocation` is true (gated by
- * the discovery categories the user opted into during onboarding), appends a
- * one-time `## Location` section resolved via IP geolocation (cross-platform,
- * no native APIs) so the agent always knows the user's city/region/postal/
- * country.
+ * Write the onboarding profile into the main memory file,
+ * `~/.stella/memories/main.md`: a new file gets the main layout, an existing
+ * one has only its "Who the user is" section replaced. When
+ * `includeLocation` is true (gated by the discovery categories the user
+ * opted into during onboarding), a location line resolved via IP
+ * geolocation is added to that section.
  */
 export const writeCoreMemory = async (
   StellaDataDir: string,
@@ -1625,19 +1642,23 @@ export const writeCoreMemory = async (
 ): Promise<void> =>
   runDiscovery(
     Effect.gen(function* () {
-      const statePath = StellaDataDir;
-      yield* tryDiscovery(() => fs.mkdir(statePath, { recursive: true }));
-      const coreMemoryPath = path.join(statePath, "core-memory.md");
+      const filePath = mainMemoryPath(StellaDataDir);
+      yield* tryDiscovery(() =>
+        fs.mkdir(path.dirname(filePath), { recursive: true }),
+      );
       const location = options?.includeLocation
         ? yield* fetchUserLocationLineEffect
         : null;
-      const finalContent = location
-        ? `${content.trimEnd()}\n\n## Location\n${location}\n`
-        : content;
+      const who = location
+        ? `${content.trim()}\n\nLocation: ${location}`
+        : content.trim();
+      const existing = yield* tryDiscovery(() =>
+        fs.readFile(filePath, "utf-8"),
+      ).pipe(Effect.catch(() => Effect.succeed(null)));
       yield* tryDiscovery(() =>
-        fs.writeFile(coreMemoryPath, finalContent, "utf-8"),
+        fs.writeFile(filePath, withWhoSection(existing, who), "utf-8"),
       );
-      log(`Wrote ~/.stella/core-memory.md${location ? " (with location)" : ""}`);
+      log(`Wrote ~/.stella/memories/main.md${location ? " (with location)" : ""}`);
     }),
   );
 

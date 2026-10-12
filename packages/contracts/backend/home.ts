@@ -79,7 +79,7 @@ type MemoryEpochRequest = {
 
 /**
  * One memory file in the owner's cloud, by its `~/.stella`-relative path:
- * `core-memory.md`, `PERSONALITY.md` or a Markdown file under `memories/`.
+ * `PERSONALITY.md` or a Markdown file under `memories/`.
  * `sha` is the hex SHA-256 of its bytes.
  */
 export type MemorySyncFile = {

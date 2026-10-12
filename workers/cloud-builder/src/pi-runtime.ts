@@ -509,9 +509,7 @@ export const thinkingLevelFor = (effort: AgentModelReasoningEffort | string): Mo
   effort === "none" ? "off" : normalizeReasoningEffortLevel(effort);
 
 const MEMORY_FIELDS: Record<string, keyof Omit<StellaMemory, "enabled">> = {
-  "~/.stella/core-memory.md": "core",
-  "~/.stella/memories/profile.md": "profile",
-  "~/.stella/memories/index.md": "index",
+  "~/.stella/memories/main.md": "main",
 };
 
 export const memoryFromDocuments = (

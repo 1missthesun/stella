@@ -2,9 +2,8 @@
  * The owner's cloud memory: plain Markdown files in their world, laid out and
  * named exactly as the desktop keeps them under `~/.stella`.
  *
- *   /workspace/world/.stella/core-memory.md
- *   /workspace/world/.stella/memories/profile.md
- *   /workspace/world/.stella/memories/index.md
+ *   /workspace/world/.stella/memories/main.md
+ *   /workspace/world/.stella/memories/areas/<area>.md
  *   /workspace/world/.stella/memories/**.md
  *   /workspace/world/.stella/PERSONALITY.md
  *
@@ -31,7 +30,6 @@ import {
   type MemoryFileStore,
 } from "@stella/runtime/kernel/memory/memory-client.js";
 import {
-  CORE_MEMORY_FILE,
   MEMORIES_DIR,
   PERSONALITY_FILE,
 } from "@stella/runtime/kernel/memory/memory-layout.js";
@@ -216,21 +214,20 @@ const createWorldMemoryStore = (
 });
 
 /**
- * The memory files in the world (`core-memory.md`, `PERSONALITY.md`,
+ * The memory files in the world (`PERSONALITY.md`,
  * `memories/**`), and whether the `memories/` listing was cut short.
  */
 const listWorldMemoryFiles = async (
   store: MemoryWorld,
 ): Promise<{ files: MemoryFileInfo[]; cutShort: boolean }> => {
-  const [core, personality, nested] = await Promise.all([
-    store.stat(worldStellaPath(CORE_MEMORY_FILE)),
+  const [personality, nested] = await Promise.all([
     store.stat(worldStellaPath(PERSONALITY_FILE)),
     store.list(worldStellaPath(MEMORIES_DIR), {
       limit: MEMORY_LIST_MAX_FILES * 4,
     }),
   ]);
   return {
-    files: [core, personality, ...nested.entries].flatMap((entry) =>
+    files: [personality, ...nested.entries].flatMap((entry) =>
       entry?.kind === "file" && entry.sha256
         ? [
             {
@@ -381,7 +378,6 @@ export type WorldMemorySync = ReturnType<typeof createWorldMemorySync>;
 
 /** Everything a memory wipe erases, as world paths. */
 export const WORLD_MEMORY_WIPE_PATHS: readonly string[] = [
-  worldStellaPath(CORE_MEMORY_FILE),
   worldStellaPath(MEMORIES_DIR),
   worldStellaPath(WORLD_PERSONALITY_FILE),
 ];

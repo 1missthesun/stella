@@ -19,9 +19,8 @@ import {
 import { STELLA_MESSAGE_TARGET } from "@stella/contracts/agent-directory";
 import { renderStellaPrompt, stellaPromptTools } from "@stella/contracts/stella-prompts";
 import {
-  CORE_MEMORY_INJECTED_MAX_CHARS,
-  MEMORY_INDEX_INJECTED_MAX_CHARS,
-  USER_PROFILE_INJECTED_MAX_CHARS,
+  MAIN_MEMORY_DISPLAY_PATH,
+  MAIN_MEMORY_INJECTED_MAX_CHARS,
 } from "@stella/runtime/kernel/memory/memory-layout";
 import { shapeResidentMemoryDoc } from "@stella/runtime/kernel/memory/resident-doc-shape";
 import { responseLanguageSection } from "@stella/runtime/kernel/runner/locale-prompt";
@@ -144,30 +143,10 @@ export function stellaPromptExtension(sources: StellaContextSources) {
         { tag: false },
       ),
       section(
-        "core-memory",
+        "main-memory",
         orchestratorOnly(async (_input, context) => {
           const docs = await memory(context);
-          return docs.enabled ? memoryDoc("~/.stella/core-memory.md", docs.core, CORE_MEMORY_INJECTED_MAX_CHARS) : undefined;
-        }),
-        { tag: false },
-      ),
-      section(
-        "memory-profile",
-        orchestratorOnly(async (_input, context) => {
-          const docs = await memory(context);
-          return docs.enabled
-            ? memoryDoc("~/.stella/memories/profile.md", docs.profile, USER_PROFILE_INJECTED_MAX_CHARS)
-            : undefined;
-        }),
-        { tag: false },
-      ),
-      section(
-        "memory-index",
-        orchestratorOnly(async (_input, context) => {
-          const docs = await memory(context);
-          return docs.enabled
-            ? memoryDoc("~/.stella/memories/index.md", docs.index, MEMORY_INDEX_INJECTED_MAX_CHARS)
-            : undefined;
+          return docs.enabled ? memoryDoc(MAIN_MEMORY_DISPLAY_PATH, docs.main, MAIN_MEMORY_INJECTED_MAX_CHARS) : undefined;
         }),
         { tag: false },
       ),

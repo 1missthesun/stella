@@ -19,16 +19,14 @@ export type AgentCapabilities = {
   /**
    * Load the personality doc into the agent context so it is injected as a
    * hidden `~/.stella/PERSONALITY.md` startup doc on the first turn (then
-   * replayed from history), mirroring core memory.
+   * replayed from history), mirroring main memory.
    */
   injectsPersonality?: boolean;
   /**
-   * Load the user's core memory into the agent context so it is injected as a
-   * hidden `~/.stella/core-memory.md` startup doc on the first turn.
+   * Load the user's main memory into the agent context so it is injected as
+   * a hidden `~/.stella/memories/main.md` startup doc on the first turn.
    */
-  injectsCoreMemory?: boolean;
-  /** Push-inject the durable user profile as a hidden startup document. */
-  injectsUserProfile?: boolean;
+  injectsMainMemory?: boolean;
   /** Inject runtime reminder hidden messages. */
   injectsRuntimeReminders?: boolean;
   /**
@@ -75,8 +73,7 @@ const BUILTIN_AGENT_DEFINITIONS = [
     },
     capabilities: {
       injectsPersonality: true,
-      injectsCoreMemory: true,
-      injectsUserProfile: true,
+      injectsMainMemory: true,
       injectsRuntimeReminders: true,
       injectsExecutionContext: true,
       injectsSkillCatalog: true,

@@ -3,11 +3,12 @@
  * host: `memory.read(path)`, `memory.write(path, content, { expectSha })` and
  * `memory.list()` over the memory files under `~/.stella`.
  *
- * Paths are relative to `~/.stella` and name only memory: `core-memory.md`
- * or a Markdown file under `memories/`. Writes are redacted with the memory
- * redaction and capped per file: a resident document at its injection budget
- * (so a write can never produce a file the model is shown truncated), any
- * other memory file at `MEMORY_FILE_MAX_CHARS`. A `sha` is the hex SHA-256 of
+ * Paths are relative to `~/.stella` and name only memory: a Markdown file
+ * under `memories/`, such as `memories/main.md` or
+ * `memories/areas/finance.md`. Writes are redacted with the memory redaction
+ * and capped per file: the main file at its injection budget (so a write can
+ * never produce a file the model is shown truncated), any other memory file
+ * at `MEMORY_FILE_MAX_CHARS`. A `sha` is the hex SHA-256 of
  * the file's bytes.
  *
  * This module does no I/O. Each side has one module that owns its files and
@@ -20,14 +21,10 @@
 
 import { redactMemoryText } from "./redaction.js";
 import {
-  CORE_MEMORY_FILE,
-  CORE_MEMORY_INJECTED_MAX_CHARS,
+  MAIN_MEMORY_INJECTED_MAX_CHARS,
+  MAIN_MEMORY_RELATIVE_PATH,
   MEMORIES_DIR,
-  MEMORY_INDEX_FILE,
-  MEMORY_INDEX_INJECTED_MAX_CHARS,
   PERSONALITY_FILE,
-  USER_PROFILE_FILE,
-  USER_PROFILE_INJECTED_MAX_CHARS,
 } from "./memory-layout.js";
 
 /** Cap for a memory file that is not resident, in unicode code points. */
@@ -41,7 +38,7 @@ const MAX_SEGMENTS = 8;
 const SHA256_HEX = /^[0-9a-f]{64}$/u;
 
 export type MemoryFileInfo = {
-  /** Relative to `~/.stella`, e.g. `memories/profile.md`. */
+  /** Relative to `~/.stella`, e.g. `memories/main.md`. */
   path: string;
   /** UTF-8 bytes. */
   size: number;
@@ -97,12 +94,12 @@ export const memorySha = async (bytes: Uint8Array): Promise<string> => {
 
 const pathError = (op: string, input: unknown, reason: string): Error =>
   new Error(
-    `memory.${op}: ${JSON.stringify(typeof input === "string" ? input : String(input))} ${reason}. Memory paths are relative to ~/.stella: "core-memory.md" or a Markdown file under "memories/", such as "memories/profile.md".`,
+    `memory.${op}: ${JSON.stringify(typeof input === "string" ? input : String(input))} ${reason}. Memory paths are relative to ~/.stella: a Markdown file under "memories/", such as "memories/main.md" or "memories/areas/finance.md".`,
   );
 
 /**
  * The validated memory path for `input`, or a thrown error naming what is
- * wrong. Only `core-memory.md` and `memories/**\/*.md`; no absolute, home,
+ * wrong. Only `memories/**\/*.md`; no absolute, home,
  * parent, hidden or empty segments.
  */
 export const memoryPath = (input: unknown, op = "read"): string => {
@@ -138,7 +135,6 @@ export const memoryPath = (input: unknown, op = "read"): string => {
   ) {
     throw pathError(op, input, "is not a valid path");
   }
-  if (input === CORE_MEMORY_FILE) return input;
   if (segments[0] !== MEMORIES_DIR || segments.length < 2) {
     throw pathError(op, input, "is not a memory file");
   }
@@ -167,13 +163,7 @@ export const isSyncedMemoryPath = (path: string): boolean =>
 
 /** Characters one memory file may hold after redaction. */
 export const memoryFileMaxChars = (path: string): number => {
-  if (path === CORE_MEMORY_FILE) return CORE_MEMORY_INJECTED_MAX_CHARS;
-  if (path === `${MEMORIES_DIR}/${USER_PROFILE_FILE}`) {
-    return USER_PROFILE_INJECTED_MAX_CHARS;
-  }
-  if (path === `${MEMORIES_DIR}/${MEMORY_INDEX_FILE}`) {
-    return MEMORY_INDEX_INJECTED_MAX_CHARS;
-  }
+  if (path === MAIN_MEMORY_RELATIVE_PATH) return MAIN_MEMORY_INJECTED_MAX_CHARS;
   return MEMORY_FILE_MAX_CHARS;
 };
 
@@ -211,7 +201,7 @@ export const prepareMemoryWrite = async (
   const maxChars = memoryFileMaxChars(path);
   if (chars > maxChars) {
     throw new Error(
-      `memory.write: ${path} would be ${chars.toLocaleString("en-US")} characters; its limit is ${maxChars.toLocaleString("en-US")}. Nothing was written. Curate it down (rewrite stale lines, or move detail into its own file under memories/ with one line in memories/index.md) and write again.`,
+      `memory.write: ${path} would be ${chars.toLocaleString("en-US")} characters; its limit is ${maxChars.toLocaleString("en-US")}. Nothing was written. Curate it down (rewrite stale lines, or move area detail into its area file under memories/areas/) and write again.`,
     );
   }
   const bytes = encoder.encode(text);
@@ -244,9 +234,9 @@ export const createMemoryClient = (store: MemoryFileStore): MemoryClient => ({
     (await store.list())
       .filter((file) => isMemoryPath(file.path))
       .sort((left, right) =>
-        left.path === CORE_MEMORY_FILE
+        left.path === MAIN_MEMORY_RELATIVE_PATH
           ? -1
-          : right.path === CORE_MEMORY_FILE
+          : right.path === MAIN_MEMORY_RELATIVE_PATH
             ? 1
             : left.path.localeCompare(right.path),
       )

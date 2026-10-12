@@ -136,7 +136,7 @@ export const startDiscoveryJob = (input: DiscoveryJobInput) => {
       }
 
       publish({ status: "saving", result: null, error: null });
-      // Location is only resolved (and stored in core-memory.md) when the
+      // Location is only resolved (and stored in memories/main.md) when the
       // user opted into a category that already implies their physical
       // location — browsing history or apps/system signals.
       const includeLocation =

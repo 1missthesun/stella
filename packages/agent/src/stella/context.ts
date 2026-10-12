@@ -17,12 +17,8 @@ export type StellaAgentPromptId = "agents/orchestrator.md" | "agents/general.md"
 export type StellaMemory = {
   /** Memory is a user preference; when off, no memory text is shown. */
   enabled: boolean;
-  /** `~/.stella/core-memory.md`. */
-  core?: string;
-  /** `~/.stella/memories/profile.md`. */
-  profile?: string;
-  /** `~/.stella/memories/index.md`. */
-  index?: string;
+  /** `~/.stella/memories/main.md`. */
+  main?: string;
 };
 
 export type StellaContextSources = {

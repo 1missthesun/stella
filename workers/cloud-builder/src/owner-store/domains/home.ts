@@ -529,7 +529,7 @@ const finishWipe = (ctx: OwnerContext, wipe: WipeRow, filesDeleted: number): num
 };
 
 /**
- * Erase the memory files (`core-memory.md`, `memories/`, `PERSONALITY.md`
+ * Erase the memory files (`memories/`, `PERSONALITY.md`
  * under `.stella/`) from the owner's world, then open the next epoch. A
  * failure retries with backoff and stays visible in the status.
  */

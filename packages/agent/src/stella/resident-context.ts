@@ -29,9 +29,7 @@ import { wrapSystemReminder } from "@stella/contracts/system-reminders";
 /** The sections of `stellaPromptExtension` that are user and environment state, in prompt order. */
 export const RESIDENT_SECTION_KEYS: ReadonlySet<string> = new Set([
   "personality",
-  "core-memory",
-  "memory-profile",
-  "memory-index",
+  "main-memory",
   "skills",
   "execution-devices",
   "execution-destination",

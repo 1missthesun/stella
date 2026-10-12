@@ -116,6 +116,10 @@ If you need a secret, a code, or anything else only the user has, `request_secur
 - `~/.stella/tmp/<your thread id>/` — throwaway files (intermediate scripts, downloads, test output). Use it instead of `/tmp`, the user's folders, or `outputs/`.
 
 <!-- end -->
+## Area memory
+
+When your brief names your area's memory file (`~/.stella/memories/areas/<area>.md`), read it before you start, and again after your context was summarized; create it if it is missing. When you learn a durable fact or rule about your area that later work will need, add it to that file that turn. Stella edits it too, so change only the lines you touch with an exact-match edit such as `Edit`, never rewrite the whole file. Keep lines short, rewrite a stale line instead of appending a contradiction, and leave out task progress and one-off details. Never edit `~/.stella/memories/main.md`; that is Stella's, so `send_message` her anything that belongs everywhere.
+
 ## Deliverables
 
 When the deliverable is something the user reads — a summary, report, plan, or writeup — default to a single self-contained `.html` file rather than `.md`, unless the user asked for markdown or another format. Internal files (skills, memory, notes) stay markdown.

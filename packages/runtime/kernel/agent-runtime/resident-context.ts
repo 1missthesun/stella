@@ -5,7 +5,7 @@
  * A resident block is a piece of context that must sit at a byte-stable
  * position in the provider request for the lifetime of a thread so that
  * provider prompt caches keep hitting: the pinned startup docs (personality,
- * core memory, user profile) and the skill catalog.
+ * main memory) and the skill catalog.
  * Every block registers here once and gets exactly two mutation paths. The
  * registry does no I/O: each host (the desktop runtime, the cloud
  * orchestrator) reads its own files and hands the raw text in, so both shape
@@ -35,9 +35,9 @@
  */
 import { shapeResidentMemoryDoc } from "../memory/resident-doc-shape.js";
 import {
-  CORE_MEMORY_INJECTED_MAX_CHARS,
-  MEMORY_INDEX_INJECTED_MAX_CHARS,
-  USER_PROFILE_INJECTED_MAX_CHARS,
+  MAIN_MEMORY_DISPLAY_PATH,
+  MAIN_MEMORY_INJECTED_MAX_CHARS,
+  MAIN_MEMORY_RELATIVE_PATH,
 } from "../memory/memory-layout.js";
 import {
   renderExecutionDevices,
@@ -56,9 +56,7 @@ type CustomMessage = {
 type HistoryEntry = { role: string; customMessage?: CustomMessage };
 export type ResidentContext = {
   personality?: string;
-  coreMemory?: string;
-  userProfile?: string;
-  memoryIndex?: string;
+  mainMemory?: string;
   skillsCatalog?: string;
   executionContext?: ExecutionContextSnapshot;
   /** The orchestrator's agent list (`renderAgentRoster`); boundary-only. */
@@ -78,7 +76,7 @@ type ResidentBlock = {
 };
 type ResidentFoldDoc = { customType: string; text: string };
 type ResidentFold = { docs: ResidentFoldDoc[] };
-type ResidentMemoryField = "coreMemory" | "userProfile" | "memoryIndex";
+type ResidentMemoryField = "mainMemory";
 
 export const BOOTSTRAP_STARTUP_DOC_CUSTOM_TYPE = "bootstrap.startup_doc";
 export const BOOTSTRAP_SKILLS_CUSTOM_TYPE = "bootstrap.skills_catalog";
@@ -107,10 +105,10 @@ export const RESIDENT_FOLD_ENTRY_ID_MARKER = "::resident:";
 export const PINNED_INSTRUCTION_ENTRY_ID_MARKER = "::pinned-instruction";
 
 export const LIFE_PERSONALITY_DISPLAY_PATH = "~/.stella/PERSONALITY.md";
-export const LIFE_CORE_MEMORY_DISPLAY_PATH = "~/.stella/core-memory.md";
-export const LIFE_USER_PROFILE_DISPLAY_PATH = "~/.stella/memories/profile.md";
-export const LIFE_MEMORY_INDEX_DISPLAY_PATH = "~/.stella/memories/index.md";
 export const RETIRED_MEMORY_DISPLAY_PATHS = [
+  "~/.stella/core-memory.md",
+  "~/.stella/memories/profile.md",
+  "~/.stella/memories/index.md",
   "~/.stella/memories/MEMORY.md",
   "~/.stella/memories/memory_map.md",
   "~/.stella/memories/memory_summary.md",
@@ -153,55 +151,20 @@ export const RESIDENT_BLOCKS: ResidentBlock[] = [
     renderDiskBody: (raw) => raw.trim() || undefined,
   },
   {
-    id: "core-memory",
+    id: "main-memory",
     customType: BOOTSTRAP_STARTUP_DOC_CUSTOM_TYPE,
-    docPath: LIFE_CORE_MEMORY_DISPLAY_PATH,
-    diskFile: "core-memory.md",
+    docPath: MAIN_MEMORY_DISPLAY_PATH,
+    diskFile: MAIN_MEMORY_RELATIVE_PATH,
     memoryDoc: true,
     resolve: (context) =>
-      context.coreMemory
+      context.mainMemory
         ? shapeResidentMemoryDoc(
-            context.coreMemory,
-            CORE_MEMORY_INJECTED_MAX_CHARS,
+            context.mainMemory,
+            MAIN_MEMORY_INJECTED_MAX_CHARS,
           )
         : undefined,
     renderDiskBody: (raw) =>
-      shapeResidentMemoryDoc(raw, CORE_MEMORY_INJECTED_MAX_CHARS),
-  },
-  {
-    id: "user-profile",
-    customType: BOOTSTRAP_STARTUP_DOC_CUSTOM_TYPE,
-    docPath: LIFE_USER_PROFILE_DISPLAY_PATH,
-    diskFile: "memories/profile.md",
-    memoryDoc: true,
-    resolve: (context) =>
-      context.userProfile
-        ? shapeResidentMemoryDoc(
-            context.userProfile,
-            USER_PROFILE_INJECTED_MAX_CHARS,
-          )
-        : undefined,
-    renderDiskBody: (raw) =>
-      shapeResidentMemoryDoc(raw, USER_PROFILE_INJECTED_MAX_CHARS),
-  },
-  {
-    // The routing index: one line per nested memory file. Resident because an
-    // index the agent cannot see cannot tell it when to go look, which is the
-    // whole point of keeping the rest of memory on demand.
-    id: "memory-index",
-    customType: BOOTSTRAP_STARTUP_DOC_CUSTOM_TYPE,
-    docPath: LIFE_MEMORY_INDEX_DISPLAY_PATH,
-    diskFile: "memories/index.md",
-    memoryDoc: true,
-    resolve: (context) =>
-      context.memoryIndex
-        ? shapeResidentMemoryDoc(
-            context.memoryIndex,
-            MEMORY_INDEX_INJECTED_MAX_CHARS,
-          )
-        : undefined,
-    renderDiskBody: (raw) =>
-      shapeResidentMemoryDoc(raw, MEMORY_INDEX_INJECTED_MAX_CHARS),
+      shapeResidentMemoryDoc(raw, MAIN_MEMORY_INJECTED_MAX_CHARS),
   },
   {
     id: "skills",
@@ -271,20 +234,16 @@ export const renderResidentBlockText = (
 
 /** The memory documents kept resident, by the display path the model sees. */
 export const RESIDENT_MEMORY_DISPLAY_PATHS: string[] = [
-  LIFE_CORE_MEMORY_DISPLAY_PATH,
-  LIFE_USER_PROFILE_DISPLAY_PATH,
-  LIFE_MEMORY_INDEX_DISPLAY_PATH,
+  MAIN_MEMORY_DISPLAY_PATH,
 ];
 
 const MEMORY_FIELD_BY_DISPLAY_PATH = new Map<string, ResidentMemoryField>([
-  [LIFE_CORE_MEMORY_DISPLAY_PATH, "coreMemory"],
-  [LIFE_USER_PROFILE_DISPLAY_PATH, "userProfile"],
-  [LIFE_MEMORY_INDEX_DISPLAY_PATH, "memoryIndex"],
+  [MAIN_MEMORY_DISPLAY_PATH, "mainMemory"],
 ]);
 
 /**
  * The resident memory fields from a host's documents, keyed by the display
- * path the model sees (`~/.stella/core-memory.md`, ...). Documents at any
+ * path the model sees (`~/.stella/memories/main.md`). Documents at any
  * other path are not resident; they are read on demand.
  */
 export const residentMemoryFromDocs = (
@@ -450,7 +409,7 @@ const MAX_FOLD_DOCS = 16;
  * that accumulated duplicate appends), then re-renders registered docs from
  * current disk state where possible:
  *
- *   - personality/core-memory/profile/index re-read their files through
+ *   - personality and main memory re-read their files through
  *     the host's `readDiskFile` (memory docs only when
  *     `refreshMemoryDocsFromDisk`), falling back to the newest in-thread
  *     copy when the file is missing/empty;
@@ -466,7 +425,7 @@ const MAX_FOLD_DOCS = 16;
  */
 export const buildResidentFold = (args: {
   messages: readonly HistoryEntry[];
-  /** Reads a data-dir-relative file (e.g. `memories/profile.md`), or null. */
+  /** Reads a data-dir-relative file (e.g. `memories/main.md`), or null. */
   readDiskFile?: (relativePath: string) => string | null;
   refreshMemoryDocsFromDisk?: boolean;
   /** Fresh values for boundary-only blocks; without one, the block is dropped. */

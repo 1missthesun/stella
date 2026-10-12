@@ -7,7 +7,7 @@
  * - `signed_out`: no connected account, so nothing syncs.
  * - `off`: the owner turned memory off (or it is being erased); nothing syncs.
  * - `syncing` / `synced`: the files under `~/.stella` that are memory
- *   (`core-memory.md`, `memories/**.md`, `PERSONALITY.md`) are kept the same
+ *   (`memories/**.md`, `PERSONALITY.md`) are kept the same
  *   here and in the cloud.
  * - `held`: this computer has memory it will not upload. `wiped`: cloud
  *   memory was erased after this computer last synced (or before it ever

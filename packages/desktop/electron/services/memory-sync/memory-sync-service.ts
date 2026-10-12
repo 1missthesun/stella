@@ -18,7 +18,6 @@ import type {
   MemorySyncStatus,
 } from "@stella/contracts/desktop/memory-sync";
 import {
-  CORE_MEMORY_FILE,
   MEMORIES_DIR,
   PERSONALITY_FILE,
 } from "@stella/runtime/kernel/memory/memory-layout.js";
@@ -32,8 +31,8 @@ import {
 } from "./memory-sync-plan.js";
 
 /**
- * Keeps this computer's memory files (`~/.stella/core-memory.md`,
- * `memories/**.md`, `PERSONALITY.md`) the same as the owner's cloud copy in
+ * Keeps this computer's memory files (`~/.stella/memories/**.md`,
+ * `PERSONALITY.md`) the same as the owner's cloud copy in
  * their world, both ways. Every computer syncs with the cloud on its own;
  * the cloud is the hub. Runs in Electron main, off the UI thread.
  *
@@ -71,7 +70,7 @@ const CONFLICTS_DIR = "conflicts";
 const PERIODIC_MS = 3 * 60_000;
 const FOCUS_MIN_GAP_MS = 30_000;
 const LOCAL_DEBOUNCE_MS = 1_500;
-/** Stat polling for `core-memory.md`, `PERSONALITY.md` and `memories/` itself. */
+/** Stat polling for `PERSONALITY.md` and `memories/` itself. */
 const POLL_MS = 2_000;
 const SIGN_IN_DELAY_MS = 1_000;
 /** A pass that met a concurrent change runs again this soon, a few times. */
@@ -345,9 +344,7 @@ export class MemorySyncService {
       watchFile(file, { interval: POLL_MS, persistent: false }, listener);
       this.polled.push(() => unwatchFile(file, listener));
     };
-    for (const name of [CORE_MEMORY_FILE, PERSONALITY_FILE]) {
-      poll(path.join(this.options.stellaDataDir, name), onChange);
-    }
+    poll(path.join(this.options.stellaDataDir, PERSONALITY_FILE), onChange);
     poll(memoriesDir, (exists) => {
       if (exists) watchMemories();
       else {

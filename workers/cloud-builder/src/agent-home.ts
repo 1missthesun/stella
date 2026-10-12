@@ -110,8 +110,8 @@ export class AgentHome {
   }
 
   /**
-   * The owner's resident memory documents (`~/.stella/core-memory.md`,
-   * `memories/profile.md`, `memories/index.md`) as raw file text from the
+   * The owner's resident memory document (`~/.stella/memories/main.md`) as
+   * raw file text from the
    * world, keyed by the display path the model sees. The shared resident
    * registry shapes them (redaction, caps) exactly as it does on the desktop.
    */

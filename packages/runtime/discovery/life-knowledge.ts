@@ -143,7 +143,7 @@ const buildSkillFile = (
     "",
     "- Start with the summary pages below — they are LLM-summarized from raw discovery data.",
     "- Drop into raw when you need the full unprocessed source material.",
-    "- Prefer updating these pages over expanding `~/.stella/core-memory.md` when new durable context appears.",
+    "- Prefer updating these pages over expanding `~/.stella/memories/main.md` when new durable context appears.",
     "",
     "## Summary Pages",
     "",

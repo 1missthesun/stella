@@ -408,7 +408,7 @@ const DURABLE_MEMORY_DOC_MAX_CHARS = 8_000;
 
 /**
  * The "already known, do not repeat" reference the summarizer gets: the
- * user profile, which the orchestrator sees as a resident block every turn.
+ * main memory file, which the orchestrator sees as a resident block every turn.
  */
 export const durableMemoryReference = (
   profile: string | undefined,
@@ -419,7 +419,7 @@ export const durableMemoryReference = (
     text.length > DURABLE_MEMORY_DOC_MAX_CHARS
       ? `${text.slice(0, DURABLE_MEMORY_DOC_MAX_CHARS)}\n[truncated]`
       : text;
-  return `### User profile (memories/profile.md)\n${capped}`;
+  return `### Main memory (memories/main.md)\n${capped}`;
 };
 
 const SUMMARY_STRUCTURE = `## Topic

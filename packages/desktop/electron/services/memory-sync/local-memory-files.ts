@@ -7,7 +7,6 @@ import {
   isSyncedMemoryPath,
 } from "@stella/runtime/kernel/memory/memory-client.js";
 import {
-  CORE_MEMORY_FILE,
   MEMORIES_DIR,
   PERSONALITY_FILE,
 } from "@stella/runtime/kernel/memory/memory-layout.js";
@@ -45,7 +44,7 @@ export class LocalMemoryFiles {
    * short, which a pass would read as deletions.
    */
   async scan(): Promise<Map<string, string>> {
-    const relatives = [CORE_MEMORY_FILE, PERSONALITY_FILE];
+    const relatives = [PERSONALITY_FILE];
     let visited = 0;
     const walk = async (relativeDir: string): Promise<void> => {
       let entries;
@@ -73,7 +72,7 @@ export class LocalMemoryFiles {
       }
     };
     await walk(MEMORIES_DIR);
-    if (relatives.length > MEMORY_LIST_MAX_FILES + 2) {
+    if (relatives.length > MEMORY_LIST_MAX_FILES + 1) {
       throw new Error("memories/ holds more files than sync handles.");
     }
     const files = new Map<string, string>();

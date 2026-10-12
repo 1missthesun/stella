@@ -20,7 +20,7 @@ import {
   type MemoryFileInfo,
   type MemoryFileStore,
 } from "./memory-client.js";
-import { CORE_MEMORY_FILE, MEMORIES_DIR } from "./memory-layout.js";
+import { MEMORIES_DIR } from "./memory-layout.js";
 
 /** Directory entries one `list()` walks before it stops. */
 const MAX_WALK_ENTRIES = 5_000;
@@ -103,7 +103,7 @@ const createDiskMemoryStore = (stellaDataDir: string): MemoryFileStore => {
         return { ok: true as const };
       }),
     list: async () => {
-      const relatives: string[] = [CORE_MEMORY_FILE];
+      const relatives: string[] = [];
       let visited = 0;
       const walk = async (relativeDir: string): Promise<void> => {
         const entries = await fs

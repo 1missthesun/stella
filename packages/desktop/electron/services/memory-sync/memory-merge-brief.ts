@@ -1,9 +1,8 @@
 import path from "node:path";
 
 import {
-  CORE_MEMORY_INJECTED_MAX_CHARS,
-  MEMORY_INDEX_INJECTED_MAX_CHARS,
-  USER_PROFILE_INJECTED_MAX_CHARS,
+  MAIN_MEMORY_INJECTED_MAX_CHARS,
+  MAIN_MEMORY_RELATIVE_PATH,
 } from "@stella/runtime/kernel/memory/memory-layout.js";
 import { MEMORY_FILE_MAX_CHARS } from "@stella/runtime/kernel/memory/memory-client.js";
 
@@ -11,13 +10,9 @@ import { MEMORY_FILE_MAX_CHARS } from "@stella/runtime/kernel/memory/memory-clie
 export type MemoryMerge = { path: string; copy: string };
 
 const limit = (relative: string): number =>
-  relative === "core-memory.md"
-    ? CORE_MEMORY_INJECTED_MAX_CHARS
-    : relative === "memories/profile.md"
-      ? USER_PROFILE_INJECTED_MAX_CHARS
-      : relative === "memories/index.md"
-        ? MEMORY_INDEX_INJECTED_MAX_CHARS
-        : MEMORY_FILE_MAX_CHARS;
+  relative === MAIN_MEMORY_RELATIVE_PATH
+    ? MAIN_MEMORY_INJECTED_MAX_CHARS
+    : MEMORY_FILE_MAX_CHARS;
 
 /**
  * The brief a background agent gets when memory changed here and in the

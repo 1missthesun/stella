@@ -34,7 +34,6 @@ export const stellaStateRuntimePaths = [
   'raw',
   'tmp',
   'skills/user-profile',
-  'core-memory.md',
   'device.json',
   'local-scheduler.json',
   'preferences.json',

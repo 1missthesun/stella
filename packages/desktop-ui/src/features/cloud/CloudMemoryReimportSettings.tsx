@@ -232,7 +232,7 @@ export function CloudMemoryReimportSettings() {
           <DialogHeader>
             <DialogTitle>Erase this computer's Memory?</DialogTitle>
             <DialogDescription>
-              Deletes core-memory.md, PERSONALITY.md and the Markdown files
+              Deletes PERSONALITY.md and the Markdown files
               under memories/ in this computer's Stella folder, then syncs with
               the cloud's Memory. Other computers keep theirs. This cannot be
               undone.

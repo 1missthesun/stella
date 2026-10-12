@@ -14,7 +14,6 @@ import {
 import { runToolEffect } from "../effect-runtime.js";
 import { isDangerousCommand } from "../command-safety.js";
 import { sanitizeToolVisibleText } from "../safety.js";
-import type { OfficePreviewRef } from "@stella/contracts/office-preview";
 import { resolveManagedShellCommand } from "./launch.js";
 import {
   acquireShellInteraction,
@@ -70,48 +69,6 @@ export const EXEC_UPDATE_MAX_BYTES = 8 * 1024;
 const MAX_EXEC_UPDATE_CHUNKS = 10_000;
 
 const APPROX_BYTES_PER_TOKEN = 4;
-
-const OFFICE_PREVIEW_REF_MARKER = "__STELLA_OFFICE_PREVIEW_REF__";
-
-export const extractOfficePreviewRef = (
-  output: string,
-): { cleanedOutput: string; officePreviewRef?: OfficePreviewRef } => {
-  let officePreviewRef: OfficePreviewRef | undefined;
-  const keptLines: string[] = [];
-
-  for (const line of output.split(/\r?\n/)) {
-    if (!line.startsWith(OFFICE_PREVIEW_REF_MARKER)) {
-      keptLines.push(line);
-      continue;
-    }
-
-    const rawPayload = line.slice(OFFICE_PREVIEW_REF_MARKER.length).trim();
-    if (!rawPayload) {
-      continue;
-    }
-
-    try {
-      const parsed = JSON.parse(rawPayload) as OfficePreviewRef;
-      if (
-        typeof parsed.sessionId === "string" &&
-        typeof parsed.title === "string" &&
-        typeof parsed.sourcePath === "string"
-      ) {
-        officePreviewRef = parsed;
-      }
-    } catch {
-      keptLines.push(line);
-    }
-  }
-
-  const cleanedOutput = keptLines.join("\n").trim();
-  return {
-    cleanedOutput:
-      cleanedOutput ||
-      (officePreviewRef ? "Started inline office preview." : ""),
-    ...(officePreviewRef ? { officePreviewRef } : {}),
-  };
-};
 
 export const resolveExecOutputTokens = (value: unknown): number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0

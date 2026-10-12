@@ -2,8 +2,6 @@ import { promises as fs } from "fs";
 import path from "path";
 import { resolveRuntimeStatePath } from "../home/stella-paths.js";
 
-export const DEFERRED_DELETE_RETENTION_MS = 24 * 60 * 60 * 1000;
-
 const DEFERRED_DELETE_DIR = "deferred-delete";
 const DEFERRED_DELETE_ITEMS_DIR = "items";
 const DEFERRED_DELETE_TRASH_DIR = "trash";
@@ -18,22 +16,6 @@ export type DeferredDeleteRecord = {
   requestId?: string;
   agentType?: string;
   conversationId?: string;
-};
-
-export type TrashPathsOptions = {
-  source: string;
-  cwd?: string;
-  force?: boolean;
-  stellaDataDir?: string;
-  requestId?: string;
-  agentType?: string;
-  conversationId?: string;
-};
-
-export type TrashPathsResult = {
-  trashed: DeferredDeleteRecord[];
-  skipped: string[];
-  errors: Array<{ path: string; error: string }>;
 };
 
 export type DeferredDeleteSweepResult = {

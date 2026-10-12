@@ -149,15 +149,6 @@ export const importDpopPublicKey = async (
   ]);
 };
 
-export const signDpopInput = async (
-  alg: DpopAlgorithm,
-  privateKey: CryptoKey,
-  input: string,
-): Promise<string> =>
-  base64UrlEncode(
-    new Uint8Array(await crypto.subtle.sign(signAlgorithm(alg), privateKey, textBytes(input))),
-  );
-
 export const verifyDpopInput = async (
   alg: DpopAlgorithm,
   publicKey: CryptoKey,

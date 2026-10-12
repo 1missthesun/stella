@@ -100,8 +100,6 @@ export const TERMINAL_CLOSE_CODES: ReadonlySet<number> = new Set([
   CLOSE_FRAME_TOO_LARGE,
 ]);
 
-export type JournalKind = "message" | "turn" | "card";
-
 export type MessageRole = "user" | "assistant" | "toolResult";
 
 export type TurnPhase =

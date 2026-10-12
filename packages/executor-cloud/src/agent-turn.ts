@@ -14,7 +14,6 @@
 import type { CloudTurnAttemptPaths } from "@stella/contracts/cloud-turn-attempt";
 import { constants as fsConstants, existsSync } from "node:fs";
 import {
-  chmod,
   chown,
   readFile,
   mkdir,

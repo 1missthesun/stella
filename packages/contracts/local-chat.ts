@@ -19,12 +19,6 @@ export type LocalChatUpdatedPayload = {
   event?: EventRecord;
 };
 
-/** Stable keyset cursor for the conversation-history list. */
-export type ConversationSummaryCursor = {
-  updatedAt: number;
-  conversationId: string;
-};
-
 /** Lightweight conversation metadata for history and top-bar tabs. */
 export type ConversationSummary = {
   conversationId: string;
@@ -33,12 +27,6 @@ export type ConversationSummary = {
   latestMessageAt?: number;
   createdAt: number;
   updatedAt: number;
-};
-
-export type ConversationSummaryPage = {
-  conversations: ConversationSummary[];
-  nextCursor?: ConversationSummaryCursor;
-  hasMore: boolean;
 };
 
 /** One locally persisted provider call, attributed to its runtime thread. */

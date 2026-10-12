@@ -17,7 +17,6 @@
  */
 
 import { Deferred, Effect, Layer, ManagedRuntime } from "effect";
-import type { ChildProcessWithoutNullStreams } from "node:child_process";
 
 /** Shared runtime for every Effect run in `kernel/integrations`. */
 export const integrationsRuntime = ManagedRuntime.make(Layer.empty);
@@ -52,15 +51,4 @@ export const forkCancelableTimeout = (
     Deferred.doneUnsafe(cancelLatch, Effect.void);
   };
 };
-
-/**
- * True only when the child has actually terminated. `child.killed` must NOT
- * be used for ladder guards: it flips true as soon as any signal was SENT,
- * which previously made every later rung unreachable — after a SIGINT,
- * neither SIGTERM nor SIGKILL could ever fire, so a signal-ignoring CLI
- * survived cancellation.
- */
-export const externalCliProcessIsDead = (
-  child: ChildProcessWithoutNullStreams,
-): boolean => child.exitCode !== null || child.signalCode !== null;
 

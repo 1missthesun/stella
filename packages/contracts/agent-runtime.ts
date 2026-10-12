@@ -5,7 +5,6 @@ export const AGENT_IDS = {
 } as const;
 
 export type AgentId = (typeof AGENT_IDS)[keyof typeof AGENT_IDS];
-export type AgentIdLike = AgentId | (string & {});
 
 type AgentPromptRole = "orchestrator" | "subagent";
 type LocalCliWorkingDirectory = "home" | "frontend";
@@ -201,23 +200,6 @@ export const AGENT_STREAM_EVENT_TYPES = {
   ASSISTANT_MESSAGE: "assistant-message",
 } as const;
 
-export type AgentStreamEventType =
-  (typeof AGENT_STREAM_EVENT_TYPES)[keyof typeof AGENT_STREAM_EVENT_TYPES];
-
-/**
- * Worker run-event recorder seqs are a per-run counter (1, 2, 3…). Hidden-run
- * mirrors and similar paths stamp `Date.now()`-scale synthetics, and a few
- * terminals use `Number.MAX_SAFE_INTEGER`. Anything at or above this ceiling
- * is not a recorder cursor and must not be fed to `resumeAfter`.
- */
-export const AGENT_RECORDER_SEQ_CEILING = 10_000_000_000;
-
-export const isAgentRecorderSeq = (seq: unknown): seq is number =>
-  typeof seq === "number" &&
-  Number.isFinite(seq) &&
-  seq > 0 &&
-  seq < AGENT_RECORDER_SEQ_CEILING;
-
 // Per-agent lifecycle (subset of AGENT_STREAM_EVENT_TYPES). Tracks one
 // subagent task from spawn to terminal state.
 export const TASK_LIFECYCLE_EVENT_TYPES = [
@@ -283,18 +265,6 @@ export type TerminalTaskLifecycleStatus = Exclude<
   TaskLifecycleStatus,
   "running"
 >;
-
-export type TaskLifecycleFeedEventType =
-  | typeof AGENT_STREAM_EVENT_TYPES.AGENT_REASONING
-  | TaskLifecycleEventType;
-
-export const isTerminalTaskLifecycleStatus = (
-  status: TaskLifecycleStatus | undefined,
-): status is TerminalTaskLifecycleStatus =>
-  status === "completed" ||
-  status === "error" ||
-  status === "canceled" ||
-  status === "paused";
 
 // Outcome of a single run (RUN_FINISHED). Mirrors the terminal subset of
 // TaskLifecycleStatus.

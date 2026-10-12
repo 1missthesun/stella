@@ -6,7 +6,6 @@ import type {
 } from "../agent-core/types.js";
 import type { HookEmitter } from "../extensions/hook-emitter.js";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
-import { DEVICE_TOOL_NAMES } from "../tools/schemas.js";
 import type { AgentModelConfigSnapshot } from "@stella/contracts/agent-engine";
 import type {
   AuthorizedToolImage,
@@ -50,11 +49,6 @@ import {
   truncateStringToBytesFromStart,
   utf8ByteLength,
 } from "../tools/truncate.js";
-
-export const STELLA_LOCAL_TOOLS = [
-  ...DEVICE_TOOL_NAMES,
-  TOOL_IDS.NO_RESPONSE,
-] as const;
 
 const COMMAND_OUTPUT_TOOL_NAMES = new Set(["Bash", "exec_command", "write_stdin"]);
 const MULTI_TOOL_USE_PARALLEL_TOOL_NAME = "multi_tool_use_parallel";
@@ -119,13 +113,6 @@ const modelVisibleLimitsFor = (
   containsCommandOutput(toolName, toolResult)
     ? commandResultLimitsFor(toolResult)
     : undefined;
-
-export const getRequestedRuntimeToolNames = (
-  toolsAllowlist?: string[],
-): string[] =>
-  Array.isArray(toolsAllowlist) && toolsAllowlist.length > 0
-    ? toolsAllowlist
-    : [...STELLA_LOCAL_TOOLS];
 
 const formatToolResult = (
   toolResult: ToolResult,

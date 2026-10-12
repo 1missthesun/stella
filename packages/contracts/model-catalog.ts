@@ -57,10 +57,6 @@ export type RuntimeModelCatalogSnapshot = {
   catalogError?: string;
 };
 
-export type RuntimeListModelsRequest = {
-  forceRefresh?: boolean;
-};
-
 export function getAllModels(): CatalogModel[] {
   const models = getLoadedModelRegistry();
   return Object.keys(models)

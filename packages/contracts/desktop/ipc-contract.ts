@@ -650,12 +650,6 @@ export type ConnectorConnectUpdate = {
   message?: string;
 };
 
-export type BrowserFetchInit = {
-  method?: "GET" | "POST";
-  headers?: Record<string, string>;
-  body?: string;
-};
-
 export type AppWindowCapture = {
   capture: {
     title: string;

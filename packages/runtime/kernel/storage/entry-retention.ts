@@ -21,7 +21,6 @@ import type { SqliteDatabase } from "./shared.js";
 
 export const LEGACY_RUN_EVENT_ENTRY_TYPE = "run_event";
 export const LEGACY_RUN_EVENT_SWEEP_BATCH = 5_000;
-export const LEGACY_RUN_EVENT_SWEEP_PAUSE_MS = 50;
 
 type Transaction = <T>(work: () => T) => T;
 
@@ -32,30 +31,6 @@ export type LegacyRunEventBatchResult = {
    * `run_event` rows remain at or after the batch's starting conversation.
    */
   resumeFrom: string | null;
-};
-
-export type LegacyRunEventSweepOptions = {
-  /** Upper bound on rows deleted per transaction. */
-  batchSize?: number;
-  /** Pause between batches, so other writers and readers interleave. */
-  pauseMs?: number;
-  /**
-   * Checked before every batch; returning false ends the pass with outcome
-   * "busy" so the caller can reschedule it for the next idle window.
-   */
-  isIdle?: () => boolean;
-  /**
-   * Wrap each batch in the owner's transaction helper (for example
-   * `SessionStore.withImmediateTransaction`) so nesting rules match the
-   * rest of the store. Defaults to BEGIN IMMEDIATE / COMMIT.
-   */
-  transaction?: Transaction;
-};
-
-export type LegacyRunEventSweepResult = {
-  deleted: number;
-  batches: number;
-  outcome: "complete" | "busy" | "aborted";
 };
 
 const immediateTransaction =

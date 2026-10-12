@@ -13,7 +13,6 @@ import type {
   EventRecord,
   MessageMetadata,
   MessagePayload,
-  ToolRequestPayload,
   ToolResultPayload,
 } from "@stella/contracts/local-chat"
 import type { DesktopThreadActivityRecord as ThreadActivityRecord } from "@/features/chat/thread-activity-types"
@@ -334,11 +333,6 @@ function createEventGuard<T extends Record<string, unknown>>(
     (requiredFields === undefined ||
       requiredFields.every((field) => field in (event.payload as object)))
 }
-
-export const isToolRequest = createEventGuard<ToolRequestPayload>(
-  'tool_request',
-  ['toolName'],
-)
 
 export const isToolResult = createEventGuard<ToolResultPayload>('tool_result')
 

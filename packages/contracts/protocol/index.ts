@@ -3,7 +3,6 @@ import type {
 } from "@stella/contracts";
 import type {
   AgentRunFinishOutcome,
-  TaskLifecycleStatus,
 } from "@stella/contracts/agent-runtime";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
@@ -571,26 +570,6 @@ export type RuntimeAgentEventPayload = {
   assistantMessageText?: string;
   /** Resolved citations for an `ASSISTANT_MESSAGE` boundary (`reply-refs`). */
   replyRefs?: ReplyRef[];
-};
-
-export type RuntimeConversationActiveRunSnapshot = {
-  runId: string;
-  conversationId: string;
-  requestId?: string;
-  userMessageId?: string;
-  uiVisibility?: "visible" | "hidden";
-};
-
-export type RuntimeConversationTaskSnapshot = {
-  runId: string;
-  agentId: string;
-  agentType?: string;
-  description?: string;
-  parentAgentId?: string;
-  status: TaskLifecycleStatus;
-  statusText?: string;
-  result?: string;
-  error?: string;
 };
 
 export type HostDeviceIdentity = {

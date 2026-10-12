@@ -47,12 +47,6 @@ export type BrowserCollectionOptions = {
   selectedProfile?: string | null;
 };
 
-export type BrowserActivityWindowRequest = {
-  id: string;
-  label: string;
-  sinceMs: number;
-};
-
 type SqliteDatabase = {
   prepare(sql: string): { all(...params: unknown[]): unknown[] };
   close(): void;

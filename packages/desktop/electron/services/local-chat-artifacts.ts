@@ -86,29 +86,11 @@ export type LocalChatSyncMessageWithArtifacts = {
   tasks?: MobileTask[];
 };
 
-export type LocalChatMobileSyncCursor = {
-  timestamp: number;
-  id: string;
-
-  sequence?: number;
-};
-
-export type LocalChatMobileSyncResult = {
-  messages: LocalChatSyncMessageWithArtifacts[];
-  cursor: string | null;
-  /** Whether the supplied cursor was consumed or a bounded snapshot recovered it. */
-  cursorStatus?: "valid" | "snapshot" | "invalid";
-  /** True when another forward delta page exists after `cursor`. */
-  hasMore?: boolean;
-};
-
 type MobileArtifactOptions = {
   includeDeveloperArtifacts?: boolean;
 };
 
 const ARTIFACT_LIMIT_PER_MESSAGE = 8;
-const SYNC_CURSOR_VERSION = "v2";
-const LEGACY_SYNC_CURSOR_VERSION = "v1";
 
 type ArtifactEventRecord = {
   _id?: string;
@@ -127,17 +109,6 @@ type ArtifactMessageRecord = {
   requestId?: string;
   payload?: Record<string, unknown>;
   toolEvents: readonly ArtifactEventRecord[];
-};
-
-export const encodeMobileSyncCursor = (
-  cursor: LocalChatMobileSyncCursor,
-): string => {
-  const timestamp = Math.floor(cursor.timestamp);
-  if (!Number.isFinite(timestamp) || !cursor.id.trim()) return "";
-  const sequence = Math.floor(cursor.sequence ?? Number.NaN);
-  return Number.isFinite(sequence) && sequence >= 0
-    ? `${SYNC_CURSOR_VERSION}:${sequence}:${timestamp}:${encodeURIComponent(cursor.id)}`
-    : `${LEGACY_SYNC_CURSOR_VERSION}:${timestamp}:${encodeURIComponent(cursor.id)}`;
 };
 
 const IMAGE_EXTS = new Set([

@@ -77,7 +77,6 @@ import { StellaAgentDoc } from "@stella/agent/stella/agent-doc";
 import { ownHistoryQuery } from "@stella/agent/stella/own-history";
 import { deviceRefusal, deviceStanding, type StellaExecutionHost } from "@stella/agent/stella/execution";
 import { findDeviceDestination } from "@stella/contracts/turn-plane/placement";
-import type { StellaPlacement } from "@stella/agent/stella/placement";
 import type { PiBrainHost } from "@stella/contracts/turn-plane/pi-brain";
 import {
   agentRunOutcome,
@@ -148,7 +147,6 @@ import {
 import { bundledPrompt } from "./prompts/bundled.js";
 import type {
   SerializedAgentToolResult,
-  SerializedAuthorizedImage,
 } from "@stella/executor-cloud/attached-tool-protocol";
 import { generalAgentWorldGuidance } from "@stella/executor-cloud/general-agent-prompt";
 import { extractDriveLinkPaths, extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
@@ -563,11 +561,6 @@ type AgentLease = {
 
 /** How long saving a run's browser profile may take when the run ends. */
 const BROWSER_CHECKPOINT_MS = 30_000;
-
-const sha256Hex = async (value: string): Promise<string> =>
-  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
 
 /** A lease is renewed before its credentials run out, when no call is on it. */
 const LEASE_RENEW_MS = 3 * 60_000;

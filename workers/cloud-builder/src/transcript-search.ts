@@ -18,12 +18,6 @@ const INDEXED_TEXT_MAX_BYTES = 64 * 1024;
 
 import { historySearchKind } from "@stella/contracts/history-search";
 
-export {
-  HISTORY_SEARCH_KINDS,
-  historySearchKind,
-  type HistorySearchKind,
-} from "@stella/contracts/history-search";
-
 export type TranscriptSearchRow = Readonly<{
   seq: number;
   turnId: string;

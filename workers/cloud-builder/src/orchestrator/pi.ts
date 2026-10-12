@@ -2,7 +2,6 @@ import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import {
   agentAttemptOutcomeOf,
   isLiveAgentStatus,
-  reportStatusOf,
   type AgentAttemptOutcome,
 } from "@stella/contracts/agent-status";
 import { normalizeAgentDirectoryStatus } from "@stella/contracts/agent-directory";

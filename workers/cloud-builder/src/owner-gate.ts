@@ -186,15 +186,11 @@ import { OwnerGateCloudDispatch } from "./owner-gate/cloud-dispatch.js";
  */
 
 export type {
-  OwnerGateEnv,
-  OwnerGateLane,
   OwnerGateAdmitInput,
   OwnerGateRefusalCode,
-  OwnerGateRefusal,
   OwnerGateAdmission,
   OwnerGateAdmissionWithLease,
   OwnerGateFenceLeaseRequest,
-  OwnerGateFenceLeaseOutcome,
   OwnerGateSnapshotWithLease,
   OwnerGateSubmitInput,
   OwnerGateCancelInput,
@@ -206,21 +202,12 @@ export {
   HEADER_DEVICE_REQUEST_MOBILE_ID,
   HEADER_DEVICE_REQUEST_ID,
   HEADER_DEVICE_REQUEST_METHOD,
-  OWNER_GATE_RUNNING_GRACE_MS,
-  OWNER_AGENT_CONTAINER_LIMIT,
-  DISPATCH_CLOUD_RETRY_DELAY_MS,
-  DISPATCH_CLOUD_MAX_ATTEMPTS,
 } from "./owner-gate/constants.js";
-export {
-  devicePresenceProofMessage,
-  verifyDevicePresenceProof,
-} from "./owner-gate/presence.js";
 export {
   OwnerGateSnapshotError,
   executionUnavailableMessage,
   snapshotAllowsExecution,
   snapshotAllowsCloudSandbox,
-  dispatchSummary,
 } from "./owner-gate/support.js";
 
 export class OwnerGate extends OwnerGateCloudDispatch {

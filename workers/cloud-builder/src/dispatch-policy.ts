@@ -39,7 +39,6 @@ export const CLOUD_PROVIDED_CAPABILITIES: readonly ExecutionCapability[] = [
   "attachments",
 ];
 
-export const MAX_DISPATCH_ID_CHARS = 64;
 export const MAX_DEVICE_ID_CHARS = 256;
 export const MAX_IDEMPOTENCY_KEY_CHARS = 128;
 export const MAX_CONVERSATION_ID_CHARS = 256;
@@ -180,10 +179,6 @@ export const cloudUnsupportedCapabilities = (
 
 export const isTerminalDispatchState = (state: DispatchState): boolean =>
   TERMINAL_DISPATCH_STATES.includes(state);
-
-/** Placement may only change while local execution is provably unaccepted. */
-export const mayFallbackToCloud = (state: DispatchState): boolean =>
-  state === "offering" || state === "computer_claimed";
 
 // ---------------------------------------------------------------------------
 // Request parsing
@@ -492,8 +487,3 @@ export const dispatchErrorResponse = (
     },
   });
 
-/** True when a JSON body carries the `DispatchError` shape. */
-export const isDispatchError = (value: unknown): value is DispatchError =>
-  isRecord(value) &&
-  isRecord(value.error) &&
-  typeof value.error.code === "string";

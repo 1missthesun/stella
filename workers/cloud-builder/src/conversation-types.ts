@@ -1,7 +1,6 @@
 import type { AgentActivityEntry } from "@stella/contracts/conversation-agent-activity";
 import type { CloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
 import type {
-  JournalKind,
   MessageRole,
   TurnPhase,
 } from "@stella/contracts/conversation-protocol";
@@ -41,7 +40,6 @@ export {
   SOCKET_STALE_MS,
 } from "@stella/contracts/conversation-protocol";
 export type { MessageRole, TurnPhase };
-export type JournalRecordKind = JournalKind;
 
 /**
  * 2 adds `spills.bytes`; 3 added owner-move object tracking (since removed);
@@ -181,7 +179,6 @@ export const PREVIEW_MAX_CHARS = 160;
 // JWKS (consumed by the hub's auth module)
 // ---------------------------------------------------------------------------
 
-export const JWKS_TTL_MS = 10 * 60_000;
 export const JWKS_MIN_REFETCH_MS = 60_000;
 export const CLOCK_SKEW_S = 60;
 

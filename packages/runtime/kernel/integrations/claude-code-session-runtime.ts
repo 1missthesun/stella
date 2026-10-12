@@ -11,7 +11,12 @@ import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { Deferred, Effect } from "effect";
 import { executeToolWithInactivityBound } from "./tool-inactivity.js";
+import {
+  forkCancelableTimeout,
+  integrationsRuntime,
+} from "./effect-runtime.js";
 import { watchChildStdio } from "../shared/child-stdio.js";
 import { trackAgentProcess } from "../shared/agent-process-registry.js";
 import { sanitizeSensitiveData } from "@stella/contracts/sensitive-data";
@@ -457,12 +462,13 @@ const activeMcpTurnFor = (
   return new Promise((resolve) => {
     const waiters = (session.mcpTurnWaiters ??= new Set());
     const settle = (turn: ClaudeCodeToolMcpActiveTurn | undefined) => {
-      clearTimeout(timer);
+      cancelTimeout();
       waiters.delete(settle);
       resolve(turn);
     };
-    const timer = setTimeout(() => settle(undefined), ADRIFT_TOOL_TURN_WAIT_MS);
-    timer.unref?.();
+    const cancelTimeout = forkCancelableTimeout(ADRIFT_TOOL_TURN_WAIT_MS, () =>
+      settle(undefined),
+    );
     waiters.add(settle);
   });
 };
@@ -717,9 +723,9 @@ const waitUntil = (until: number, signal: AbortSignal | undefined) =>
       reject(signal.reason ?? new Error("Stopped."));
       return;
     }
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let cancelTick: (() => void) | undefined;
     const onAbort = () => {
-      if (timer) clearTimeout(timer);
+      cancelTick?.();
       reject(signal?.reason ?? new Error("Stopped."));
     };
     const tick = () => {
@@ -729,7 +735,7 @@ const waitUntil = (until: number, signal: AbortSignal | undefined) =>
         resolve();
         return;
       }
-      timer = setTimeout(tick, Math.min(remaining, 60_000));
+      cancelTick = forkCancelableTimeout(Math.min(remaining, 60_000), tick);
     };
     signal?.addEventListener("abort", onAbort, { once: true });
     tick();
@@ -3116,16 +3122,16 @@ class ClaudeCodeSessionRuntime {
     request: ClaudeCodeTurnRequest,
   ) {
     const child = processState.child;
-    const exited = new AbortController();
+    let exitError: ClaudeCodeProcessEndedError | undefined;
+    const exited = Deferred.makeUnsafe<void>();
     const onExit = () => {
-      if (exited.signal.aborted) return;
-      exited.abort(
-        new ClaudeCodeProcessEndedError(
-          processState.stderrText.trim() ||
-            `Claude Code exited with code ${child.exitCode ?? "unknown"} before it loaded Stella's tools.`,
-          child.exitCode,
-        ),
+      if (exitError) return;
+      exitError = new ClaudeCodeProcessEndedError(
+        processState.stderrText.trim() ||
+          `Claude Code exited with code ${child.exitCode ?? "unknown"} before it loaded Stella's tools.`,
+        child.exitCode,
       );
+      Deferred.doneUnsafe(exited, Effect.void);
     };
     child.once("close", onExit);
     child.once("error", onExit);
@@ -3135,15 +3141,24 @@ class ClaudeCodeSessionRuntime {
       DEFAULT_TOOL_CATALOG_TIMEOUT_MS,
     );
     try {
-      await mcpHost.waitForClientReady(
-        request.abortSignal
-          ? AbortSignal.any([request.abortSignal, exited.signal])
-          : exited.signal,
-        timeoutMs,
+      await integrationsRuntime.runPromise(
+        Effect.raceFirst(
+          Effect.tryPromise({
+            try: (waitSignal) =>
+              mcpHost.waitForClientReady(
+                request.abortSignal
+                  ? AbortSignal.any([request.abortSignal, waitSignal])
+                  : waitSignal,
+                timeoutMs,
+              ),
+            catch: (error) => error,
+          }),
+          Deferred.await(exited).pipe(Effect.flatMap(() => Effect.fail(exitError))),
+        ),
       );
     } catch (error) {
       if (request.abortSignal?.aborted) throw error;
-      if (exited.signal.aborted) throw exited.signal.reason;
+      if (exitError) throw exitError;
       if (session.process === processState) {
         this.resetStreamingProcess(request.sessionKey, session);
       }

@@ -16,6 +16,7 @@ import {
   watchEvents,
   type AgentEventStream,
   type Conversation,
+  type Cursor,
   type EntryDraft,
   type EntryId,
   type EntryRecord,
@@ -139,6 +140,7 @@ const LocalLogSyncDoc = defineDoc<{ importedSeq?: number; mirrored?: number; rep
 });
 
 const PAGE = 200;
+const RELAY_SCAN_PAGE = 4;
 /** Log rows imported per commit. */
 const IMPORT_PAGE = 1000;
 /** A log message to import, and its text. */
@@ -373,14 +375,21 @@ export async function localLogMirror(args: {
   /** The report a reply relays, if the reply is the first after one (`relayOf`). */
   const relayedReport = (entryId: EntryId) =>
     harness.commit(async (tx): Promise<LocalLogWrite | undefined> => {
-      const earlier = await tx.scanEntries(
-        { conversationId: root.id, maxEntryId: (entryId - 1) as EntryId, order: "descending" },
-        PAGE,
-      );
-      for (const previous of earlier.items) {
-        if (previous.kind === "pi.user") return taskEnded(previous);
-        if (isReply(previous)) return undefined;
-      }
+      let cursor: Cursor | undefined;
+      let scanned = 0;
+      do {
+        const earlier = await tx.scanEntries(
+          { conversationId: root.id, maxEntryId: (entryId - 1) as EntryId, order: "descending" },
+          RELAY_SCAN_PAGE,
+          cursor,
+        );
+        for (const previous of earlier.items) {
+          if (previous.kind === "pi.user") return taskEnded(previous);
+          if (isReply(previous)) return undefined;
+        }
+        scanned += earlier.items.length;
+        cursor = earlier.next;
+      } while (cursor !== undefined && scanned < PAGE);
       return undefined;
     }, context);
   const mirrorOnce = async () => {

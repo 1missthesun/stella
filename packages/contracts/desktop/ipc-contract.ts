@@ -209,10 +209,6 @@ import {
   IPC_CONNECTOR_CONNECT_REQUEST,
   IPC_CONNECTOR_CONNECT_RESPOND,
   IPC_CONNECTOR_CONNECT_UPDATE,
-  IPC_CONNECTOR_CREDENTIAL_CANCEL,
-  IPC_CONNECTOR_CREDENTIAL_COMPLETE,
-  IPC_CONNECTOR_CREDENTIAL_REQUEST,
-  IPC_CONNECTOR_CREDENTIAL_SUBMIT,
   IPC_CUSTOMIZATIONS_RESET,
   IPC_DEVICE_GET_ID,
   IPC_DIAGNOSTICS_EXPORT_LOGS,
@@ -606,24 +602,6 @@ export type LocalModelPreferences = {
 export type LocalLlmOAuthProviderSummary = {
   provider: string;
   label: string;
-};
-
-export type ConnectorCredentialRequest = {
-  requestId: string;
-  tokenKey: string;
-  displayName: string;
-  mode: "api_key" | "oauth";
-  completionMode?: "approve" | "wait";
-  description?: string;
-  placeholder?: string;
-  oauthUserCode?: string;
-  oauthVerificationUri?: string;
-};
-
-export type ConnectorCredentialComplete = {
-  requestId: string;
-  ok: boolean;
-  reason?: string;
 };
 
 export type ConnectorConnectRequest = {
@@ -1199,14 +1177,6 @@ export type IpcInvokeContract = {
     [policy: UserAskEscalationPolicy],
     UserAskEscalationPolicy
   >;
-  [IPC_CONNECTOR_CREDENTIAL_SUBMIT]: Invoke<
-    [payload: { requestId: string; value: string; label?: string }],
-    OkErrorResult
-  >;
-  [IPC_CONNECTOR_CREDENTIAL_CANCEL]: Invoke<
-    [payload: { requestId: string }],
-    OkErrorResult
-  >;
   [IPC_CONNECTOR_CONNECT_RESPOND]: Invoke<
     [payload: { requestId: string; action: "accept" | "decline" | "cancel" }],
     OkErrorResult
@@ -1569,8 +1539,6 @@ export type IpcEventContract = {
   [IPC_USER_ASK_OPENED]: UserAsk;
   [IPC_USER_ASK_UPDATED]: UserAsk;
   [IPC_USER_ASK_CLOSED]: { askId: string; state: UserAskState };
-  [IPC_CONNECTOR_CREDENTIAL_REQUEST]: ConnectorCredentialRequest;
-  [IPC_CONNECTOR_CREDENTIAL_COMPLETE]: ConnectorCredentialComplete;
   [IPC_CONNECTOR_CONNECT_REQUEST]: ConnectorConnectRequest;
   [IPC_CONNECTOR_CONNECT_UPDATE]: ConnectorConnectUpdate;
   [IPC_BROWSER_BRIDGE_STATUS]: StellaBrowserBridgeStatus;

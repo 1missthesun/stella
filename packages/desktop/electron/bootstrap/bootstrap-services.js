@@ -163,7 +163,8 @@ export const createBootstrapServices = (options) => {
     });
     const connectorOAuthService = new ConnectorOAuthService();
     connectorCredentialService = new ConnectorCredentialService({
-        windowManagerTarget: lifecycle,
+        getUserAskService: () => userAskService,
+        getActiveConversationId: () => uiStateService.state.conversationId?.trim() || null,
         getStellaAppDir: () => lifecycle.getStellaDataDir(),
         getAuthToken: () => authService.getAuthToken(),
         getBackendUrl: () => authService.getBackendUrl(),

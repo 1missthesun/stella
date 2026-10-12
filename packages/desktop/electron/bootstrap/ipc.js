@@ -296,8 +296,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         cancelUserAsk: (payload) => services.userAskService.cancel(payload),
         getUserAskPolicy: () => services.userAskService.getPolicy(),
         setUserAskPolicy: (payload) => services.userAskService.setPolicy(payload),
-        submitConnectorCredential: (payload) => services.connectorCredentialService.submitCredential(payload),
-        cancelConnectorCredential: (payload) => services.connectorCredentialService.cancelCredential(payload),
         respondConnectorConnect: (payload) => services.connectorConnectService.respond(payload),
         onPermissionGranted: (kind) => {
             if (kind === "accessibility") {

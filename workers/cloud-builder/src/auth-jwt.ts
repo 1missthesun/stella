@@ -20,6 +20,7 @@
 
 import type { IdentityLevel } from "@stella/contracts/gateway/api";
 import { CLOCK_SKEW_S, JWKS_MIN_REFETCH_MS } from "./conversation-types.js";
+import { withInfrastructureDeadline } from "./build-session/shared/keys.js";
 
 export type VerifiedToken = {
   /** The owner id: `sub`, the Better Auth user id. */
@@ -145,24 +146,13 @@ const importUserKeys = async (jwks: unknown): Promise<UserKeys> => {
 };
 
 const loadUserKeys = async (env: Cloudflare.Env): Promise<UserKeys> => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const deadline = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(
-      () => reject(new Error("jwks_load_timeout")),
-      USER_KEYS_LOAD_TIMEOUT_MS,
-    );
-  });
   const load = (async () => {
     const { createAuth } = await import("./auth/auth.js");
     return importUserKeys(await createAuth(env).api.getJwks());
   })();
-  try {
-    const loaded = await Promise.race([load, deadline]);
-    userKeys = loaded;
-    return loaded;
-  } finally {
-    clearTimeout(timer);
-  }
+  const loaded = await withInfrastructureDeadline(load, USER_KEYS_LOAD_TIMEOUT_MS, "jwks_load_timeout");
+  userKeys = loaded;
+  return loaded;
 };
 
 /** The key for `kid`, refetching once per JWKS_MIN_REFETCH_MS when it is unknown (a rotation). */

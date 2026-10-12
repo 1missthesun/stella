@@ -2,6 +2,8 @@ import type { ExecutionContextSnapshot } from "@stella/contracts/execution-conte
 import { formatTurnClock } from "@stella/contracts/schedule-zone";
 import type { ClaudeUsageLimit, ClaudeUsageLimitCard } from "@stella/contracts/claude-usage-limit";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
+import { runToolEffect, sleepWithAbortEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
+import { Effect } from "effect";
 import type { ClaudeSessionManifest } from "@stella/contracts/backend/claude-sessions";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import type { CloudOrchestratorCliAdoptedSession } from "@stella/contracts/cloud-orchestrator-cli";
@@ -67,17 +69,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
       },
       adoption: (turn) => this.claudeCodeAdoption(turn),
       sleep: (ms, signal) =>
-        new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, ms);
-          signal.addEventListener(
-            "abort",
-            () => {
-              clearTimeout(timer);
-              resolve();
-            },
-            { once: true },
-          );
-        }),
+        runToolEffect(sleepWithAbortEffect(ms, signal, () => new Error("aborted")).pipe(Effect.ignore)),
       log: (event, fields) => log("info", event, fields),
     });
     return this.#claudeCode;

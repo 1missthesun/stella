@@ -13,12 +13,14 @@
 // key is an ordinary provider key.
 
 import type { Api, Model, OAuthCredential, OAuthAuth } from "@earendil-works/pi-ai";
+import { Cause, Effect, Exit, Fiber } from "effect";
 import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
 import { githubCopilotProvider } from "@earendil-works/pi-ai/providers/github-copilot";
 import { kimiCodingProvider } from "@earendil-works/pi-ai/providers/kimi-coding";
 import { metaProvider } from "@earendil-works/pi-ai/providers/meta";
 import { xaiProvider } from "@earendil-works/pi-ai/providers/xai";
 import { accountProviderBaseUrls, accountProviderModels } from "@stella/agent/provider/account-byok";
+import { runToolEffect, toolsRuntime } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import {
   isAccountProviderId,
   PROVIDER_OAUTH_CALLBACK_PATH,
@@ -407,7 +409,7 @@ const removeCredential = (ctx: OwnerContext, args: ProviderCalls["providers.remo
   ctx.db.run("DELETE FROM provider_credentials WHERE provider = ?", provider);
   for (const [key, flow] of flows) {
     if (flow.ownerId === ctx.ownerId && flow.provider === provider) {
-      flow.abort.abort();
+      flow.cancel();
       flows.delete(key);
     }
   }
@@ -430,7 +432,7 @@ type DeviceFlow = {
   error?: string;
   expiresAt: number;
   credential?: OAuthCredential;
-  abort: AbortController;
+  cancel: () => void;
   changed: () => Promise<void>;
   notifyChange: () => void;
 };
@@ -453,7 +455,12 @@ const newChangeSignal = () => {
 };
 
 const waitForChange = async (flow: DeviceFlow, ms: number): Promise<void> => {
-  await Promise.race([flow.changed(), new Promise((resolve) => setTimeout(resolve, ms))]);
+  await runToolEffect(
+    Effect.raceFirst(
+      Effect.promise(() => flow.changed()),
+      Effect.sleep(ms),
+    ),
+  );
 };
 
 const flowView = (flow: DeviceFlow): ProviderOAuthFlow => ({
@@ -480,56 +487,66 @@ const startDeviceFlow = async (ctx: OwnerContext, entry: CatalogEntry, oauth: OA
     status: "pending",
     step: { kind: "working", message: "Starting sign-in…" },
     expiresAt: ctx.now + FLOW_TTL_MS,
-    abort: new AbortController(),
+    cancel: () => {},
     ...signal,
   };
   for (const [key, other] of flows) {
     if (other.ownerId === ctx.ownerId && (other.provider === entry.id || other.expiresAt <= ctx.now)) {
-      other.abort.abort();
+      other.cancel();
       flows.delete(key);
     }
   }
   flows.set(flowKey(ctx.ownerId, flowId), flow);
-  const timeout = setTimeout(() => flow.abort.abort(), FLOW_TTL_MS);
-  void oauth
-    .login({
-      signal: flow.abort.signal,
-      // GitHub asks for an Enterprise domain first; a phone sign-in is github.com.
-      prompt: async (prompt) => {
-        if (prompt.type === "text") return "";
-        throw new Error("This sign-in needs input Stella can't give it here.");
-      },
-      notify: (event) => {
-        if (event.type === "device_code") {
-          flow.step = {
-            kind: "device_code",
-            userCode: event.userCode,
-            verificationUri: event.verificationUri,
-            intervalMs: Math.max(2_000, (event.intervalSeconds ?? 5) * 1000),
-          };
-          if (event.expiresInSeconds) {
-            flow.expiresAt = Math.min(flow.expiresAt, Date.now() + event.expiresInSeconds * 1000);
+  const login = Effect.tryPromise({
+    try: (abortSignal) =>
+      oauth.login({
+        signal: abortSignal,
+        // GitHub asks for an Enterprise domain first; a phone sign-in is github.com.
+        prompt: async (prompt) => {
+          if (prompt.type === "text") return "";
+          throw new Error("This sign-in needs input Stella can't give it here.");
+        },
+        notify: (event) => {
+          if (event.type === "device_code") {
+            flow.step = {
+              kind: "device_code",
+              userCode: event.userCode,
+              verificationUri: event.verificationUri,
+              intervalMs: Math.max(2_000, (event.intervalSeconds ?? 5) * 1000),
+            };
+            if (event.expiresInSeconds) {
+              flow.expiresAt = Math.min(flow.expiresAt, Date.now() + event.expiresInSeconds * 1000);
+            }
+          } else if (event.type === "auth_url") {
+            flow.step = { kind: "open_url", url: event.url, ...(event.instructions ? { instructions: event.instructions } : {}) };
+          } else if (event.type === "progress" && flow.step?.kind !== "device_code") {
+            flow.step = { kind: "working", message: event.message };
           }
-        } else if (event.type === "auth_url") {
-          flow.step = { kind: "open_url", url: event.url, ...(event.instructions ? { instructions: event.instructions } : {}) };
-        } else if (event.type === "progress" && flow.step?.kind !== "device_code") {
-          flow.step = { kind: "working", message: event.message };
+          flow.notifyChange();
+        },
+      }),
+    catch: (error) => error,
+  }).pipe(
+    Effect.timeout(FLOW_TTL_MS),
+    Effect.onExit((exit) =>
+      Effect.sync(() => {
+        if (Exit.isSuccess(exit)) {
+          flow.credential = exit.value;
+          flow.step = { kind: "working", message: "Saving…" };
+        } else {
+          const error = Cause.squash(exit.cause);
+          const cancelled = Cause.hasInterrupts(exit.cause) || Cause.isTimeoutError(error);
+          flow.status = cancelled && Date.now() >= flow.expiresAt ? "expired" : "failed";
+          flow.error = cancelled ? "The sign-in was cancelled or timed out." : signInMessage(error);
         }
         flow.notifyChange();
-      },
-    })
-    .then((credential) => {
-      flow.credential = credential;
-      flow.step = { kind: "working", message: "Saving…" };
-    })
-    .catch((error: unknown) => {
-      flow.status = flow.abort.signal.aborted && Date.now() >= flow.expiresAt ? "expired" : "failed";
-      flow.error = flow.abort.signal.aborted ? "The sign-in was cancelled or timed out." : signInMessage(error);
-    })
-    .finally(() => {
-      clearTimeout(timeout);
-      flow.notifyChange();
-    });
+      }),
+    ),
+  );
+  const fiber = toolsRuntime.runFork(login);
+  flow.cancel = () => {
+    toolsRuntime.runFork(Fiber.interrupt(fiber));
+  };
   await waitForChange(flow, STEP_WAIT_MS);
   return flowView(flow);
 };
@@ -691,7 +708,7 @@ const cancelOAuth = (ctx: OwnerContext, args: ProviderCalls["providers.cancelOAu
   const key = flowKey(ctx.ownerId, args.flowId);
   const flow = flows.get(key);
   if (flow) {
-    flow.abort.abort();
+    flow.cancel();
     flows.delete(key);
   }
   return null;
@@ -865,7 +882,7 @@ export const providersDomain = {
   purge: async (ctx) => {
     for (const [key, flow] of flows) {
       if (flow.ownerId === ctx.ownerId) {
-        flow.abort.abort();
+        flow.cancel();
         flows.delete(key);
       }
     }

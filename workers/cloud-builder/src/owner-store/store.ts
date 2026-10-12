@@ -25,6 +25,7 @@ import {
   type LiveClientFrame,
   type LiveServerFrame,
 } from "@stella/contracts/backend/protocol";
+import { forkAbortTimer } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import { RpcError, toBackendError } from "./errors.js";
 import type {
   OwnerCaller,
@@ -169,7 +170,7 @@ export class OwnerStore {
   private dirty = false;
   private dirtyTables: Set<string> | null = new Set();
   private flushQueued = false;
-  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private cancelFlush: (() => void) | null = null;
   private lastFlushAt = 0;
   private knownTables: Set<string> | null = null;
   private readonly queryTables = new Map<string, string[]>();
@@ -634,16 +635,22 @@ export class OwnerStore {
       this.flushNow();
       return;
     }
-    this.flushTimer ??= setTimeout(() => {
-      this.flushTimer = null;
-      this.flushNow();
-    }, wait);
+    this.cancelFlush ??= forkAbortTimer(wait, () => {
+      this.cancelFlush = null;
+      try {
+        this.flushNow();
+      } catch (error) {
+        this.log("error", "owner_views_flush_failed", {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    });
   }
 
   private flushNow(): void {
-    if (this.flushTimer) {
-      clearTimeout(this.flushTimer);
-      this.flushTimer = null;
+    if (this.cancelFlush) {
+      this.cancelFlush();
+      this.cancelFlush = null;
     }
     if (!this.dirty) return;
     const written = this.dirtyTables;

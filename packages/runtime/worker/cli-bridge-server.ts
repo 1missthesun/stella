@@ -61,18 +61,18 @@ type ResponseMessage =
 export type CliBridgeHandlers = {
   /**
    * Resolves with `{ ok: true }` once the credential is persisted on
-   * disk, or `{ ok: false, reason }` when the user dismisses the dialog
-   * or the host can't service the request.
+   * disk, or `{ ok: false, reason }` when the user dismisses the card
+   * or the host can't service the request. The host asks with a secure
+   * input card in the calling conversation (else the one on screen).
    *
    * `authType: "oauth"` switches the host to the browser-based OAuth
    * flow (`connectConnectorOAuth`) and requires `resourceUrl` (the MCP
-   * server URL — used for protected-resource metadata discovery). The
-   * renderer shows a no-input "Connecting <X>... Authorize in the
-   * browser tab Stella opened." indicator with Cancel; the host opens
-   * the user's external browser via `shell.openExternal` and listens
-   * on a local 127.0.0.1 callback port. Cancel aborts the listener.
+   * server URL — used for protected-resource metadata discovery): the
+   * card asks to open the sign-in page, then the host opens the user's
+   * external browser via `shell.openExternal` and listens on a local
+   * 127.0.0.1 callback port.
    *
-   * `authType: "api_key"` (or omitted) keeps the paste-key modal flow.
+   * `authType: "api_key"` (or omitted) asks for the key in a masked field.
    */
   requestConnectorCredential: (params: {
     tokenKey: string;
@@ -105,6 +105,10 @@ export type CliBridgeHandlers = {
     };
     description?: string;
     placeholder?: string;
+    /** Who made the call: the credential card opens in their chat. */
+    conversationId?: string;
+    agentId?: string;
+    toolCallId?: string;
   }) => Promise<
     | { ok: true }
     | { ok: false; reason: "cancelled" | "timeout" | "unsupported" | string }
@@ -123,6 +127,11 @@ export type CliBridgeHandlers = {
     limit?: number;
     signal?: AbortSignal;
   }) => Promise<BackendConnectorActionsResult>;
+  /** Withdraw a caller's open credential card (its run stopped). */
+  cancelConnectorCredential?: (params: {
+    conversationId?: string;
+    toolCallId: string;
+  }) => Promise<void>;
   requestDesktopPermission?: (params: {
     kind: "accessibility" | "screen";
   }) =>
@@ -438,6 +447,28 @@ const dispatch = async (
         ...(signal ? { signal } : {}),
       });
     }
+    case "connector.cancelCredential": {
+      const request =
+        params && typeof params === "object"
+          ? (params as Record<string, unknown>)
+          : {};
+      const caller =
+        request.caller && typeof request.caller === "object"
+          ? (request.caller as Record<string, unknown>)
+          : {};
+      const id = (value: unknown) =>
+        typeof value === "string" && value.trim() && value.length <= 256
+          ? value.trim()
+          : undefined;
+      const toolCallId = id(caller.toolCallId);
+      const conversationId = id(caller.conversationId);
+      if (!toolCallId || !handlers.cancelConnectorCredential) return { ok: false };
+      await handlers.cancelConnectorCredential({
+        toolCallId,
+        ...(conversationId ? { conversationId } : {}),
+      });
+      return { ok: true };
+    }
     case "connector.requestCredential": {
       const record =
         params && typeof params === "object"
@@ -589,6 +620,17 @@ const dispatch = async (
         typeof record.description === "string" ? record.description : undefined;
       const placeholder =
         typeof record.placeholder === "string" ? record.placeholder : undefined;
+      const caller =
+        record.caller && typeof record.caller === "object"
+          ? (record.caller as Record<string, unknown>)
+          : {};
+      const callerId = (value: unknown) =>
+        typeof value === "string" && value.trim() && value.length <= 256
+          ? value.trim()
+          : undefined;
+      const conversationId = callerId(caller.conversationId);
+      const agentId = callerId(caller.agentId);
+      const toolCallId = callerId(caller.toolCallId);
       return await handlers.requestConnectorCredential({
         tokenKey,
         displayName,
@@ -600,6 +642,9 @@ const dispatch = async (
         preregisteredOAuth: normalizedPreregisteredOAuth,
         description,
         placeholder,
+        ...(conversationId ? { conversationId } : {}),
+        ...(agentId ? { agentId } : {}),
+        ...(toolCallId ? { toolCallId } : {}),
       });
     }
     default:

@@ -115,7 +115,7 @@ export class ConnectorConnectService {
                     return;
                 // A card the user never answered times out. An accepted flow
                 // normally settles itself well before this fires (the
-                // credential service's modal timeout, or the backend Composio
+                // credential service's OAuth timeout, or the backend Composio
                 // completion wait's own deadline) — but none of those owners
                 // can cover a wedged await (e.g. a hung status probe), so
                 // this is the unconditional last-resort backstop: nothing may
@@ -288,8 +288,8 @@ export class ConnectorConnectService {
                 ...payload,
                 presentation: "headless",
             }),
-            // Device flow needs to show the user a pairing code — keep the
-            // modal for that rare shape rather than losing the code.
+            // Device flow needs to show the user a pairing code, so it asks
+            // with a secure input card that carries the code.
             requestDeviceOAuth: (payload) => credentialService.requestDeviceOAuth(payload),
         };
         try {

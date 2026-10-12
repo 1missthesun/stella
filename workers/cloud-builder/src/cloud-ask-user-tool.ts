@@ -1,4 +1,5 @@
 import type { TSchema } from "@sinclair/typebox";
+import { Effect } from "effect";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import {
   clampUserAskTimeoutMs,
@@ -19,6 +20,7 @@ import {
   prepareAskUser,
   userAskResolutionResult,
 } from "@stella/runtime/kernel/tools/defs/ask-user-def.js";
+import { runToolEffect, sleepWithAbortEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
 import type { OwnerInternalCall } from "./owner-store/registry.js";
 
@@ -41,16 +43,9 @@ export type CloudAskUserToolContext = Readonly<{
 }>;
 
 const sleep = (milliseconds: number, signal?: AbortSignal): Promise<void> =>
-  new Promise((resolve) => {
-    if (signal?.aborted) return resolve();
-    const timer = setTimeout(done, milliseconds);
-    function done() {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", done);
-      resolve();
-    }
-    signal?.addEventListener("abort", done, { once: true });
-  });
+  runToolEffect(
+    sleepWithAbortEffect(milliseconds, signal, () => new Error("aborted")).pipe(Effect.ignore),
+  );
 
 const answered = (
   askId: string,

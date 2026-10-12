@@ -14,13 +14,16 @@ import type { AssistantMessage, Message, ModelThinkingLevel, TextContent } from 
 import { createModels } from "@earendil-works/pi-ai/models";
 import {
   ConversationBusy,
+  type ContextEdit,
   defineDoc,
   LiveDoc,
   watchEvents,
   type AgentEventStream,
   type Conversation,
   type ConversationId,
+  type Cursor,
   type EntryId,
+  type EntryRecord,
   type Harness,
   type ModelRef,
   type Submission,
@@ -326,6 +329,13 @@ type Chat = {
   /** Reads the journal closely while a turn runs elsewhere (`follow`). */
   followCheck: ReturnType<typeof setInterval>;
   followUntil: number;
+  reminderContext?: ReminderContext;
+};
+
+type ReminderContext = {
+  tail: EntryId;
+  previousUserAt?: number;
+  shown: Set<string>;
 };
 
 const context = BACKGROUND_CONTEXT;
@@ -1422,6 +1432,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     const previous = chat.stream;
     const stream = await watchEvents(chat.harness, chat.root.id, context);
     chat.stream = stream;
+    if (options.userReminders) chat.reminderContext = reminderContextFrom(stream.snapshot.entries);
     stream.start(async (events) => {
       if (chat.stream !== stream) return;
       options.emit({ conversationId, events: eventsForClients(events as unknown as PiChatEvent[]) });
@@ -1571,6 +1582,61 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { submissionId: submission.id };
   };
 
+  const noteUserMessages = (messages: readonly Message[], into: ReminderContext): void => {
+    for (const message of messages) {
+      if (message.role !== "user") continue;
+      const user = message as unknown as PiUserMessage;
+      if (typeof user.content !== "string") {
+        for (const part of user.content) if (part.type === "text" && part.stella?.hidden) into.shown.add(part.text);
+      }
+      if (piUserView(user).text.trim() && !isPiAgentInput(user)) into.previousUserAt = user.timestamp;
+    }
+  };
+
+  const reminderContextFrom = (entries: readonly EntryRecord[]): ReminderContext | undefined => {
+    const first = entries[0];
+    if (!first) return undefined;
+    const edits = new Map<EntryId, ContextEdit>();
+    for (const entry of entries) for (const edit of entry.edits ?? []) edits.set(edit.target, edit);
+    const into: ReminderContext = { tail: first.id, shown: new Set() };
+    for (const entry of entries) {
+      const edit = edits.get(entry.id);
+      noteUserMessages(edit?.action === "omit" ? [] : edit?.action === "replace" ? edit.messages : (entry.model ?? []), into);
+      if (entry.id > into.tail) into.tail = entry.id;
+    }
+    return into;
+  };
+
+  const reminderContextOf = async (chat: Chat): Promise<Pick<ReminderContext, "previousUserAt" | "shown">> => {
+    const latest = (await chat.root.entries({}, 1, undefined, context)).items[0];
+    if (!latest) return { shown: new Set() };
+    const known = chat.reminderContext;
+    if (known && known.tail <= latest.id) {
+      const added: EntryRecord[] = [];
+      let cursor: Cursor | undefined;
+      do {
+        const page = await chat.root.entries(
+          { minEntryId: (known.tail + 1) as EntryId, maxEntryId: latest.id, order: "ascending" },
+          HISTORY_PAGE,
+          cursor,
+          context,
+        );
+        added.push(...page.items);
+        cursor = page.next;
+      } while (cursor !== undefined);
+      if (added.every((entry) => entry.head === undefined && entry.edits === undefined)) {
+        for (const entry of added) noteUserMessages(entry.model ?? [], known);
+        known.tail = latest.id;
+        return known;
+      }
+    }
+    const view = await chat.root.context(context, { at: latest.id });
+    const fresh: ReminderContext = { tail: latest.id, shown: new Set() };
+    noteUserMessages(view.messages, fresh);
+    chat.reminderContext = fresh;
+    return fresh;
+  };
+
   const withReminders = async (
     conversationId: string,
     chat: Chat,
@@ -1580,17 +1646,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (!options.userReminders) return content;
     const text = typeof content === "string" ? content : piUserView({ role: "user", content, timestamp: 0 } as PiUserMessage).text;
     if (!text.trim()) return content;
-    const view = await chat.root.context(context);
-    let previousUserAt: number | undefined;
-    const shown = new Set<string>();
-    for (const message of view.messages) {
-      if (message.role !== "user") continue;
-      const user = message as unknown as PiUserMessage;
-      if (typeof user.content !== "string") {
-        for (const part of user.content) if (part.type === "text" && part.stella?.hidden) shown.add(part.text);
-      }
-      if (piUserView(user).text.trim() && !isPiAgentInput(user)) previousUserAt = user.timestamp;
-    }
+    const { previousUserAt, shown } = await reminderContextOf(chat);
     const reminders = (
       await options
         .userReminders({

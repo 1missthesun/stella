@@ -29,7 +29,6 @@ import { prepareChatInput } from "./chat-input.js";
 import { piUserContent } from "./pi-chat-input.js";
 import { brainFor } from "./pi-brain.js";
 import { cloudJournalFor } from "./pi-journal.js";
-import { claudeCodeEngineFor } from "./claude-code-engine.js";
 import { piUserReminders } from "./pi-reminders.js";
 import { piModelUsage } from "./pi-usage.js";
 import {
@@ -277,7 +276,7 @@ export const piChatsFor = (
     import("@stella/agent/host/desktop-chats"),
     import("../../kernel/model-routing.js"),
     import("../../kernel/integrations/claude-code-agent-runtime.js"),
-    claudeCodeEngineFor(session),
+    import("./claude-code-engine.js").then(({ claudeCodeEngineFor }) => claudeCodeEngineFor(session)),
     import("@stella/agent/host/desktop-execution"),
   ]).then(([{ desktopChats }, { resolveDirectLlmRoute }, { getClaudeCodeAgentModelId }, claudeCodeEngine, { httpDevices }]) =>
     desktopChats({

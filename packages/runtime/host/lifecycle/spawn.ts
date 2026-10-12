@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
-import { join } from "node:path";
+import { delimiter, join } from "node:path";
 import { Cause, Effect, Exit, type Scope } from "effect";
 import { runtimeIpcListenUrl, type RuntimePaths } from "../../worker/runtime-paths.js";
 import { rotateLogIfOversized } from "../../observability/rotate-file.js";
@@ -67,6 +67,14 @@ const CLOSE_INHERITED_THEN_EXEC =
   'for fd in /dev/fd/*; do n=${fd##*/}; if [ "$n" -gt 2 ] 2>/dev/null; then eval "exec $n>&-" 2>/dev/null; fi; done; exec "$@"';
 const BASH = "/bin/bash";
 
+const onPath = (command: string): string | null => {
+  if (command.includes("/")) return existsSync(command) ? command : null;
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (dir && existsSync(join(dir, command))) return join(dir, command);
+  }
+  return null;
+};
+
 const spawnDetachedWorkerProcess = (
   options: LifecycleStartOptions,
   paths: RuntimePaths,
@@ -105,10 +113,10 @@ const spawnDetachedWorkerProcess = (
     if (options.env?.NODE_ENV === "development") {
       console.warn(`[runtime-host] Detached worker logs: ${paths.logFile}`);
     }
-    const [command, commandArgs] =
-      process.platform !== "win32" && existsSync(BASH) && existsSync(bunBinaryPath)
-        ? [BASH, ["-c", CLOSE_INHERITED_THEN_EXEC, "stella-runtime", bunBinaryPath, ...args]]
-        : [bunBinaryPath, args];
+    const found = process.platform !== "win32" && existsSync(BASH) ? onPath(bunBinaryPath) : null;
+    const [command, commandArgs] = found
+      ? [BASH, ["-c", CLOSE_INHERITED_THEN_EXEC, "stella-runtime", found, ...args]]
+      : [bunBinaryPath, args];
     child = spawn(command, commandArgs, {
       detached: process.platform !== "win32",
       stdio: ["ignore", logFd, logFd],

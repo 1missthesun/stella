@@ -30,7 +30,7 @@ export function NativeMenu(props: NativeMenuProps) {
       onPress={props.onFallbackPress}
     >
       <GlassSurface
-        radius={props.circular ? props.height / 2 : 14}
+        radius={props.circular ? props.height / 2 : (props.radius ?? 14)}
         legible
         style={{
           width: props.width,

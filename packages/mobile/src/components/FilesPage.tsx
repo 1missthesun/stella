@@ -8,12 +8,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { KeyboardStickyView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../i18n";
 import { authClient } from "../lib/auth-client";
@@ -31,6 +31,7 @@ import {
   useActivityHub,
   useComputerControl,
 } from "../lib/main-shell-store";
+import { GlassSurface } from "./glass";
 import { pastSection } from "../lib/list-sections";
 import {
   artifactIconName,
@@ -55,13 +56,24 @@ const EMPTY_ARTIFACTS: ChatArtifact[] = [];
 /** The owner's newest drive files the page lists beside the conversation's. */
 const DRIVE_VIEW_ARGS = { limit: 200 };
 const EMPTY_PAIRED: StoredPhoneAccess[] = [];
-const SEARCH_HEIGHT = 40;
-const TOP_BAR_CONTROL = 44;
+const SEARCH_HEIGHT = 48;
+const CONTROL_HEIGHT = 44;
+const STACK_GAP = 10;
 
 type SortOrder = "newest" | "oldest" | "name";
 type SourceFilter = "all" | "cloud" | "upload" | `computer:${string}`;
 
 const UNKNOWN_COMPUTER = "computer:unknown";
+
+const TYPE_SYMBOLS: Record<FileType, NativeMenuItem["systemImage"]> = {
+  images: "photo",
+  videos: "video",
+  audio: "waveform",
+  documents: "doc.text",
+  pages: "globe",
+  code: "chevron.left.forwardslash.chevron.right",
+  other: "doc",
+};
 
 type FileType =
   | "images"
@@ -447,32 +459,10 @@ export function FilesPage() {
   }, [buckets, sourceFilter]);
 
   const narrowed = sourceFilter !== "all" || sortOrder !== "newest";
-  const accessory = useMemo(
-    () =>
-      hasAnything ? (
-        <NativeMenu
-          label={
-            <Icon
-              name="filter"
-              size={18}
-              color={narrowed ? colors.accent : colors.text}
-            />
-          }
-          accessibilityLabel={t("mobile.activityHub.files.filterLabel")}
-          items={menuItems}
-          width={TOP_BAR_CONTROL}
-          height={TOP_BAR_CONTROL}
-          circular
-          onFallbackPress={cycleFilter}
-        />
-      ) : null,
-    [colors.accent, colors.text, cycleFilter, hasAnything, menuItems, narrowed, t],
-  );
 
   useEffect(() => {
-    publishTopBarAccessory(accessory);
-  }, [accessory]);
-  useEffect(() => () => publishTopBarAccessory(null), []);
+    publishTopBarAccessory(null);
+  }, []);
 
   const renderRow = useCallback(
     ({ item }: LegendListRenderItemProps<ListItem>) =>
@@ -510,15 +500,36 @@ export function FilesPage() {
     [colors.textMuted, openArtifact, styles],
   );
 
-  const pills = useMemo(() => {
-    const list: { id: TypeFilter; label: string }[] = [];
-    if (presentTypes.length < 2) return list;
-    list.push({ id: "all", label: t("mobile.activityHub.files.types.all") });
-    for (const type of presentTypes) {
-      list.push({ id: type, label: t(`mobile.activityHub.files.types.${type}`) });
-    }
-    return list;
-  }, [presentTypes, t]);
+  const typeLabel = (type: TypeFilter) =>
+    type === "all"
+      ? t("mobile.activityHub.files.filterAll")
+      : t(`mobile.activityHub.files.types.${type}`);
+  const typeMenuItems = useMemo<NativeMenuItem[]>(
+    () => [
+      {
+        id: "type:all",
+        title: t("mobile.activityHub.files.filterAll"),
+        selected: activeType === "all",
+        onPress: () => setTypeFilter("all"),
+      },
+      ...presentTypes.map((type) => ({
+        id: `type:${type}`,
+        title: t(`mobile.activityHub.files.types.${type}`),
+        selected: activeType === type,
+        systemImage: TYPE_SYMBOLS[type],
+        onPress: () => setTypeFilter(type),
+      })),
+    ],
+    [activeType, presentTypes, t],
+  );
+  const cycleType = useCallback(() => {
+    const order: TypeFilter[] = ["all", ...presentTypes];
+    setTypeFilter(order[(order.indexOf(activeType) + 1) % order.length] ?? "all");
+  }, [activeType, presentTypes]);
+  const [typeLabelWidth, setTypeLabelWidth] = useState(0);
+  const [stackHeight, setStackHeight] = useState(
+    SEARCH_HEIGHT + CONTROL_HEIGHT + STACK_GAP,
+  );
 
   if (!signedIn && !hasAnything) {
     return (
@@ -544,92 +555,14 @@ export function FilesPage() {
     );
   }
 
+  const currentTypeLabel = typeLabel(activeType);
   return (
     <View style={styles.root}>
-      <View style={styles.search}>
-        <Icon name="search" size={15} color={colors.textMuted} />
-        <TextInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={t("mobile.activityHub.files.searchPlaceholder")}
-          placeholderTextColor={fadeHex(colors.textMuted, 0.7)}
-          selectionColor={colors.accent}
-          style={styles.searchInput}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        />
-        {query.length > 0 ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("mobile.activityHub.search.clear")}
-            hitSlop={10}
-            onPress={() => setQuery("")}
-          >
-            <Icon name="x" size={14} color={colors.textMuted} />
-          </Pressable>
-        ) : null}
-      </View>
-
-      {pills.length > 0 || sourceFilter !== "all" ? (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          style={styles.pillScroll}
-          contentContainerStyle={styles.pills}
-        >
-          {sourceFilter !== "all" ? (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("mobile.activityHub.files.filterAll")}
-              onPress={() => setSourceFilter("all")}
-              style={[styles.pill, styles.pillSelected]}
-            >
-              <Text
-                style={[styles.pillText, styles.pillTextSelected]}
-                numberOfLines={1}
-                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-              >
-                {bucketLabel(sourceFilter)}
-              </Text>
-              <Icon name="x" size={10} color={colors.background} />
-            </Pressable>
-          ) : null}
-          {pills.map((pill) => {
-            const selected = activeType === pill.id;
-            return (
-              <Pressable
-                key={pill.id}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() => {
-                  tapLight();
-                  setTypeFilter(pill.id);
-                }}
-                style={({ pressed }) => [
-                  styles.pill,
-                  selected && styles.pillSelected,
-                  pressed && !selected && styles.pillPressed,
-                ]}
-              >
-                <Text
-                  style={[styles.pillText, selected && styles.pillTextSelected]}
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                >
-                  {pill.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-      ) : null}
-
       <LegendList<ListItem>
         style={styles.list}
-        contentContainerStyle={{ paddingBottom: bottomInset + 24 }}
+        contentContainerStyle={{
+          paddingBottom: stackHeight + bottomInset + 16,
+        }}
         data={items}
         keyExtractor={(item) => item.key}
         getItemType={(item) => item.kind}
@@ -660,6 +593,97 @@ export function FilesPage() {
         recycleItems
       />
 
+      <KeyboardStickyView
+        style={[styles.stack, { paddingBottom: bottomInset + 6 }]}
+        offset={{ closed: 0, opened: bottomInset }}
+        pointerEvents="box-none"
+      >
+        <View
+          pointerEvents="box-none"
+          onLayout={(event) => setStackHeight(event.nativeEvent.layout.height)}
+        >
+          <View style={styles.controls} pointerEvents="box-none">
+            <Text
+              style={[styles.typeLabel, styles.measure]}
+              onLayout={(event) =>
+                setTypeLabelWidth(Math.ceil(event.nativeEvent.layout.width))
+              }
+              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+            >
+              {currentTypeLabel}
+            </Text>
+            {typeLabelWidth > 0 ? (
+              <NativeMenu
+                label={
+                  <View style={styles.typeControl}>
+                    <Text
+                      style={styles.typeLabel}
+                      numberOfLines={1}
+                      maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                    >
+                      {currentTypeLabel}
+                    </Text>
+                    <Icon name="chevrons-up-down" size={12} color={colors.textMuted} />
+                  </View>
+                }
+                accessibilityLabel={currentTypeLabel}
+                items={typeMenuItems}
+                width={typeLabelWidth + 12 + 6 + 36}
+                height={CONTROL_HEIGHT}
+                radius={CONTROL_HEIGHT / 2}
+                onFallbackPress={cycleType}
+              />
+            ) : null}
+            <NativeMenu
+              label={
+                <Icon
+                  name="filter"
+                  size={18}
+                  color={narrowed ? colors.accent : colors.text}
+                />
+              }
+              accessibilityLabel={t("mobile.activityHub.files.filterLabel")}
+              items={menuItems}
+              width={CONTROL_HEIGHT}
+              height={CONTROL_HEIGHT}
+              circular
+              onFallbackPress={cycleFilter}
+            />
+          </View>
+          <GlassSurface
+            legible
+            ringed
+            interactive
+            radius={SEARCH_HEIGHT / 2}
+            style={styles.search}
+          >
+            <Icon name="search" size={16} color={colors.textMuted} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder={t("mobile.activityHub.files.searchPlaceholder")}
+              placeholderTextColor={fadeHex(colors.textMuted, 0.8)}
+              selectionColor={colors.accent}
+              style={styles.searchInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+            />
+            {query.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("mobile.activityHub.search.clear")}
+                hitSlop={10}
+                onPress={() => setQuery("")}
+              >
+                <Icon name="x" size={14} color={colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </GlassSurface>
+        </View>
+      </KeyboardStickyView>
+
       <ArtifactViewer
         visible={Boolean(viewerArtifact)}
         artifact={viewerArtifact}
@@ -686,62 +710,49 @@ const makeStyles = (colors: Colors) =>
       alignItems: "center",
       justifyContent: "center",
     },
-    search: {
+    stack: {
+      bottom: 0,
+      left: 0,
+      position: "absolute",
+      right: 0,
+    },
+    controls: {
       alignItems: "center",
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderRadius: SEARCH_HEIGHT / 2,
-      borderWidth: StyleSheet.hairlineWidth,
       flexDirection: "row",
       gap: 8,
+      justifyContent: "flex-end",
+      marginBottom: STACK_GAP,
+    },
+    measure: {
+      opacity: 0,
+      position: "absolute",
+    },
+    typeControl: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 6,
+      justifyContent: "center",
+    },
+    typeLabel: {
+      color: colors.text,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 15,
+      letterSpacing: -0.2,
+    },
+    search: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
       height: SEARCH_HEIGHT,
-      marginBottom: 14,
-      marginTop: 8,
-      paddingHorizontal: 14,
+      paddingHorizontal: 16,
     },
     searchInput: {
       color: colors.text,
       flex: 1,
       fontFamily: fonts.sans.regular,
-      fontSize: 15,
+      fontSize: 16,
       letterSpacing: -0.2,
       padding: 0,
-    },
-    pillScroll: {
-      flexGrow: 0,
-      marginBottom: 6,
-      marginHorizontal: -20,
-    },
-    pills: {
-      gap: 8,
-      paddingHorizontal: 20,
-    },
-    pill: {
-      alignItems: "center",
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-      borderRadius: 16,
-      borderWidth: StyleSheet.hairlineWidth,
-      flexDirection: "row",
-      gap: 6,
-      height: 32,
-      paddingHorizontal: 14,
-    },
-    pillSelected: {
-      backgroundColor: colors.text,
-      borderColor: colors.text,
-    },
-    pillPressed: {
-      backgroundColor: colors.surfaceInset,
-    },
-    pillText: {
-      color: colors.text,
-      fontFamily: fonts.sans.medium,
-      fontSize: 14,
-      letterSpacing: -0.15,
-    },
-    pillTextSelected: {
-      color: colors.background,
     },
     list: {
       flex: 1,

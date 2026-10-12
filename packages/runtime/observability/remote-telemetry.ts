@@ -323,17 +323,22 @@ export class RemoteTelemetryClient {
 
   /**
    * Stop timers, wait for pending spool writes, and make one final send attempt.
-   * Unsent events remain in the durable spool for the next process.
+   * Unsent events remain in the durable spool for the next process. With
+   * `send: false` (a relaunch, whose next process starts in seconds) nothing
+   * is sent: the spool alone carries the events over.
    */
-  async close(options: { timeoutMs?: number } = {}): Promise<boolean> {
+  async close(
+    options: { timeoutMs?: number; send?: boolean } = {},
+  ): Promise<boolean> {
     if (this.closed) return true;
     this.closing = true;
     this.clearScheduledFlush();
     const timeoutMs = positiveInt(options.timeoutMs, 5_000);
+    const send = options.send !== false;
     const result = await withUnrefTimeout(
       (async () => {
         await this.writeTail;
-        return await this.flush();
+        return send ? await this.flush() : false;
       })(),
       timeoutMs,
     ).catch(() => null);

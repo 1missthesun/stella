@@ -341,11 +341,15 @@ export class InAppBrowserCdpAdapter {
   async stop(): Promise<void> {
     this.unsubscribeDebuggerEvents?.();
     this.unsubscribeDebuggerEvents = null;
-    for (const client of this.clients) {
-      await this.hideClientAgentCursors(client);
-      await this.detachChildSessions(client);
-      client.socket.close();
-    }
+    await Promise.all(
+      [...this.clients].map(async (client) => {
+        await this.hideClientAgentCursors(client);
+        await this.detachChildSessions(client);
+        // Only ever stopped on quit: a closing handshake the client never
+        // answers would hold the server open (and quit) until it times out.
+        client.socket.terminate();
+      }),
+    );
     this.clients.clear();
     this.ownerRoutes.clear();
     this.webSocketServer?.close();
@@ -354,7 +358,9 @@ export class InAppBrowserCdpAdapter {
     this.httpServer = null;
     this.webSocketUrl = null;
     if (!server) return;
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+    const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+    server.closeAllConnections();
+    await closed;
   }
 
   private attachClient(socket: WebSocket, ownerId?: string) {

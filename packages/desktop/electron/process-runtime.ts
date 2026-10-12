@@ -155,24 +155,27 @@ export class ProcessRuntime {
       this.clearTimers();
     }
 
-    const run = (async () => {
-      for (const [key, cleanup] of [...this.cleanups[phase].entries()].reverse()) {
+    // Every cleanup starts at once, last registered first, and the phase
+    // takes as long as the slowest of them rather than their sum: quitting
+    // (and so every update that relaunches) waits on this.
+    const run = Promise.all(
+      [...this.cleanups[phase].entries()].reverse().map(async ([key, cleanup]) => {
         const startedAt = Date.now();
         try {
           await cleanup();
         } catch (error) {
           console.error(`[process-runtime] Cleanup failed for ${phase}:${key}`, error);
         }
-        // Quit is on a deadline (Squirrel waits on this process to exit before
-        // installing an update), so a cleanup that drags is a real regression.
-        // Report per-cleanup timing so the culprit is named, not just the total.
+        // Quit is on a deadline, so a cleanup that drags is a real
+        // regression. Report per-cleanup timing so the culprit is named, not
+        // just the total.
         options.onCleanupTiming?.({
           phase,
           key,
           elapsedMs: Date.now() - startedAt,
         });
-      }
-    })();
+      }),
+    ).then(() => undefined);
 
     this.phaseRuns.set(phase, run);
     await run;

@@ -3,6 +3,7 @@ import { stopOrphanedStellaBrowserDaemons } from "../services/stella-browser-bri
 import { stopNativeHelperDaemons } from "../native-helper-daemon.js";
 import { stopOfficePreviewSessions } from "./office-preview-bridge.js";
 import { joinWithTimeout } from "@stella/runtime/kernel/shared/join-timeout";
+import { isRelaunching } from "../launcher-client.js";
 const RUNTIME_SHELLS_SHUTDOWN_TIMEOUT_MS = 4_000;
 const RUNTIME_EXIT_TIMEOUT_MS = 2_500;
 const RUNTIME_TEARDOWN_TIMEOUT_MS = RUNTIME_SHELLS_SHUTDOWN_TIMEOUT_MS + RUNTIME_EXIT_TIMEOUT_MS + 500;
@@ -61,7 +62,12 @@ export const registerBootstrapProcessCleanups = (context) => {
             component: "desktop-main",
             phase: "stopping",
         });
-        await context.services.telemetry.close({ timeoutMs: 3000 });
+        // A relaunch leaves the events in the spool for the next process,
+        // seconds away, instead of holding the restart on a network send.
+        await context.services.telemetry.close({
+            timeoutMs: 3000,
+            send: !isRelaunching(),
+        });
     });
     processRuntime.registerCleanup("before-quit", "runtime-worker", async () => {
         const runner = context.state.stellaHostRunner;

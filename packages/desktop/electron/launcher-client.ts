@@ -40,6 +40,7 @@ let channel: net.Socket | null = null;
 let buffered = "";
 let readySent = false;
 let relaunchRequested = false;
+let relaunching = false;
 let nextSignId = 1;
 const pendingSigns = new Map<number, PendingSign>();
 
@@ -216,6 +217,7 @@ export const assertHeadSigned = async (cwd: string): Promise<void> => {
  * prepares, verifies and respawns; otherwise `app.relaunch()`.
  */
 export const relaunchApp = () => {
+  relaunching = true;
   if (isLauncherPresent()) {
     relaunchRequested = true;
     app.quit();
@@ -225,6 +227,9 @@ export const relaunchApp = () => {
   app.relaunch();
   app.quit();
 };
+
+/** This quit is a relaunch: the next process starts right after it. */
+export const isRelaunching = () => relaunching;
 
 /**
  * The exit code for a clean quit (75 when a relaunch was requested), also

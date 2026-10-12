@@ -13,7 +13,6 @@ import type {
   LocalHeartbeatConfigRecord,
   LocalHeartbeatUpsertInput,
 } from "@stella/contracts/scheduling";
-import type { PersistedRuntimeThreadPayload } from "../storage/shared.js";
 import type { ToolReplayPolicy } from "./defs/replay-policy.js";
 
 /**
@@ -191,14 +190,6 @@ export type ShellRecord = {
   kill: () => void | Promise<void>;
 };
 
-export type CloudAgentControlReceipt = {
-  threadId: string;
-  ownerGeneration: string;
-  attemptGeneration: number;
-  threadUpdatedAt: number;
-  status: "running" | "completed" | "failed" | "canceled" | "paused";
-};
-
 export type AgentToolSnapshot = {
   id: string;
   status: TaskLifecycleStatus;
@@ -229,14 +220,6 @@ export type AgentToolSnapshot = {
     text: string;
     timestamp: number;
   }>;
-};
-
-/** One durable thread-store row surfaced to the `agent_status` projection. */
-export type AgentThreadStatusMessage = {
-  timestamp: number;
-  role: string;
-  content: string;
-  payload?: PersistedRuntimeThreadPayload;
 };
 
 export type ToolHostOptions = {

@@ -2,7 +2,6 @@ import { Effect, Exit, Layer, ManagedRuntime } from "effect";
 import { causeToThrowable } from "./lifecycle/errors.js";
 import {
   startOrAttachWorkerEffect,
-  stopRunningWorkerEffect,
 } from "./lifecycle/attach.js";
 import type {
   LifecycleConnection,
@@ -48,16 +47,6 @@ export const startOrAttachWorker = async (
   options: LifecycleStartOptions,
 ): Promise<LifecycleConnection> =>
   runLifecycle(Effect.scoped(startOrAttachWorkerEffect(options)));
-
-/**
- * Stop a running worker by SIGTERM-then-SIGKILL for `runtime restart` flows
- * that need a synchronous tear-down.
- */
-export const stopRunningWorker = async (
-  stellaAppDir: string,
-  options?: { graceMs?: number },
-): Promise<{ stopped: boolean; pid: number | null }> =>
-  runLifecycle(stopRunningWorkerEffect(stellaAppDir, options));
 
 // v2: the desktop host resolves the packaged Bun binary through this seam.
 export { resolveBunBinaryPath } from "./lifecycle/spawn.js";

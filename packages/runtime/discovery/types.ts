@@ -4,16 +4,12 @@
 
 import type {
   DevProject,
-  CommandFrequency,
-  ShellAnalysis,
   AllUserSignals,
   AllUserSignalsResult,
 } from "@stella/contracts"
 
 export type {
   DevProject,
-  CommandFrequency,
-  ShellAnalysis,
   AllUserSignals,
   AllUserSignalsResult,
 }

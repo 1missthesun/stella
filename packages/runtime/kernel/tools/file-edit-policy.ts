@@ -5,7 +5,6 @@ import type { Api, Model } from "@earendil-works/pi-ai";
 export const APPLY_PATCH_TOOL_NAME = "apply_patch";
 export const WRITE_TOOL_NAME = "Write";
 export const EDIT_TOOL_NAME = "Edit";
-export const WRITE_EDIT_TOOL_NAMES = [WRITE_TOOL_NAME, EDIT_TOOL_NAME] as const;
 
 export type FileEditToolFamily = "apply_patch" | "write_edit";
 export type FileEditAgentEngine = AgentRuntimeEngine;

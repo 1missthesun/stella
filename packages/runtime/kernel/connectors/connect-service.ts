@@ -687,10 +687,6 @@ export const validateMcpConnectorId = (value: string): string => {
   return id;
 };
 
-export type AddMcpTransport =
-  | { command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
-  | { url: string };
-
 export type AddMcpResult = {
   imported: ConnectorCommandConfig;
   toolCount: number;

@@ -12,9 +12,6 @@ import {
   type ComputerUseTarget,
 } from "./contract.js";
 import {
-  type CliDiagnosticsComputerUseSessionOptions,
-} from "./cli-diagnostics-session.js";
-import {
   executeComputerUseRequest,
   type ComputerUseSession,
 } from "./session.js";
@@ -158,9 +155,6 @@ export type CreateSkyClientWithSessionOptions = CreateSkyClientCommonOptions &
   Readonly<{
     session: ComputerUseSession;
   }>;
-
-export type CreateSkyClientDiagnosticsOptions = CreateSkyClientCommonOptions &
-  Omit<CliDiagnosticsComputerUseSessionOptions, "signal" | "getSignal">;
 
 export type CreateSkyClientOptions = CreateSkyClientWithSessionOptions;
 

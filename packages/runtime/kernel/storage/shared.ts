@@ -1,9 +1,7 @@
 import crypto from "crypto";
-import { z } from "zod";
 import type {
   AssistantMessage,
   ImageContent,
-  TextContent,
   ToolResultMessage,
   UserMessage,
 } from "@earendil-works/pi-ai";
@@ -127,13 +125,6 @@ export type PersistedRuntimeThreadPayload =
   | (Omit<ToolResultMessage, "details"> & {
       details?: PersistedToolResultDetails;
     });
-
-export type RuntimeThreadSessionEntryBase = {
-  type: string;
-  id: string;
-  parentId: string | null;
-  timestamp: string;
-};
 
 export type SqliteStatement = {
   run(...params: unknown[]): unknown;
@@ -276,27 +267,6 @@ export const parseJsonRecord = (
   }
 };
 
-const textContentSchema = z.object({
-  type: z.literal("text"),
-  text: z.string(),
-});
-
-const imageContentSchema = z.object({
-  type: z.literal("image"),
-  data: z.string(),
-  mimeType: z.string(),
-});
-
-const userContentSchema = z.union([
-  z.string(),
-  z.array(z.union([textContentSchema, imageContentSchema])),
-]);
-
-export const isUserContent = (
-  value: unknown,
-): value is string | (TextContent | ImageContent)[] =>
-  userContentSchema.safeParse(value).success;
-
 export const eventTextFromPayload = (
   payload?: Record<string, unknown>,
 ): string => {
@@ -316,12 +286,4 @@ export type LocalContextEvent = {
   payload?: unknown;
   requestId?: string;
 };
-
-/** Event types that describe conversation content (vs lifecycle noise). */
-export const LOCAL_CONTEXT_EVENT_TYPES = new Set<string>([
-  "user_message",
-  "assistant_message",
-  "tool_request",
-  "tool_result",
-]);
 

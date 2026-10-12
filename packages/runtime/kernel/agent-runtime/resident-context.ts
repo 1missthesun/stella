@@ -47,7 +47,6 @@ import {
 import { wrapSystemReminder } from "@stella/contracts/system-reminders";
 import { AGENT_ROSTER_DOC_PATH } from "@stella/contracts/agent-directory";
 import type { ExecutionContextSnapshot } from "@stella/contracts/execution-context";
-import type { RuntimePromptMessage } from "@stella/contracts/protocol";
 
 type CustomMessage = {
   customType: string;
@@ -241,21 +240,6 @@ export const isRetiredMemoryCustomMessage = (
   );
 };
 
-const latestResidentText = (context: ResidentContext, block: ResidentBlock) => {
-  const identity = block.docPath ? `doc:${block.docPath}` : block.id;
-  const history = context.threadHistory ?? [];
-  for (let index = history.length - 1; index >= 0; index -= 1) {
-    const entry = history[index];
-    if (
-      entry.role !== "runtimeInternal" ||
-      residentIdentityForCustomMessage(entry.customMessage) !== identity
-    )
-      continue;
-    return customMessageContentText(entry.customMessage!.content).trim();
-  }
-  return undefined;
-};
-
 /** Whether the thread already carries any resident block (its head was sent). */
 export const hasResidentHead = (
   context: Pick<ResidentContext, "threadHistory">,
@@ -265,48 +249,6 @@ export const hasResidentHead = (
       entry.role === "runtimeInternal" &&
       residentIdentityForCustomMessage(entry.customMessage) !== null,
   );
-
-const createInternalPromptMessage = (
-  text: string,
-  customType: string,
-): RuntimePromptMessage => ({
-  text,
-  uiVisibility: "hidden",
-  messageType: "message",
-  customType,
-});
-
-/**
- * The single mid-thread mutation path: render every registered block from
- * the current agent context and emit an appended copy for each block whose
- * exact bytes are not already present in the thread. First turn → the full
- * canonical head; later turns → only the blocks that actually changed.
- */
-export const buildResidentContextMessages = (
-  context: ResidentContext,
-): RuntimePromptMessage[] => {
-  const messages: RuntimePromptMessage[] = [];
-  const freshHead = !hasResidentHead(context);
-  for (const block of RESIDENT_BLOCKS) {
-    if (block.boundaryOnly && !freshHead) continue;
-    const text = renderResidentBlockText(block, context);
-    if (!text) continue;
-    // Compare with the latest copy, not any historical match: A → B → A
-    // is still a change and must restore A before the next user message.
-    const previous = latestResidentText(context, block);
-    if (previous === text.trim()) continue;
-    messages.push(createInternalPromptMessage(text, block.customType));
-    if (previous && block.changeReminder) {
-      messages.push(
-        createInternalPromptMessage(
-          block.changeReminder(context),
-          `${CONTEXT_DELTA_CUSTOM_TYPE_PREFIX}${block.id}`,
-        ),
-      );
-    }
-  }
-  return messages;
-};
 
 const STARTUP_DOC_PATH_RE = /^<startup_doc path="([^"]+)">/;
 

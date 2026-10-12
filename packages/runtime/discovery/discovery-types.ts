@@ -5,19 +5,9 @@
  * and type definitions for all signal collectors.
  */
 
-import type { DiscoveryCategory } from '@stella/contracts/discovery'
-
 // ---------------------------------------------------------------------------
 // Discovery Categories
 // ---------------------------------------------------------------------------
-
-export type DiscoveryCategoryConfig = {
-  id: DiscoveryCategory;
-  label: string;
-  description: string;
-  defaultEnabled: boolean;
-  requiresFDA: boolean; // macOS Full Disk Access
-};
 
 // ---------------------------------------------------------------------------
 // Category 1: Browsing & Bookmarks

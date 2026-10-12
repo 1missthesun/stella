@@ -53,9 +53,6 @@ export const forkCancelableTimeout = (
   };
 };
 
-/** Grace between SIGTERM and the final SIGKILL rung. */
-const SIGKILL_TIMEOUT_MS = 4_000;
-
 /**
  * True only when the child has actually terminated. `child.killed` must NOT
  * be used for ladder guards: it flips true as soon as any signal was SENT,
@@ -66,47 +63,4 @@ const SIGKILL_TIMEOUT_MS = 4_000;
 export const externalCliProcessIsDead = (
   child: ChildProcessWithoutNullStreams,
 ): boolean => child.exitCode !== null || child.signalCode !== null;
-
-/**
- * SIGTERM→4s→SIGKILL ladder. The escalation is a forked fiber racing the
- * child's `exit` event (a `Deferred` exit latch) against the 4s deadline:
- * if the child exits first the fiber ends immediately; if it is still alive
- * at the deadline it is SIGKILLed. Bounded to 4s of fiber lifetime per
- * invocation, so repeated kills stay cheap.
- */
-export const killExternalCliProcess = (
-  child: ChildProcessWithoutNullStreams,
-): void => {
-  if (externalCliProcessIsDead(child)) return;
-  try {
-    child.kill("SIGTERM");
-  } catch {
-    // Process may have already exited.
-  }
-
-  integrationsRuntime.runFork(
-    Effect.gen(function* () {
-      const exited = yield* Deferred.make<void>();
-      const onExit = () => {
-        Deferred.doneUnsafe(exited, Effect.void);
-      };
-      child.once("exit", onExit);
-      yield* Effect.ensuring(
-        Effect.raceFirst(
-          Effect.sleep(SIGKILL_TIMEOUT_MS),
-          Deferred.await(exited),
-        ),
-        Effect.sync(() => {
-          child.removeListener("exit", onExit);
-        }),
-      );
-      if (externalCliProcessIsDead(child)) return;
-      try {
-        child.kill("SIGKILL");
-      } catch {
-        // Process may have already exited.
-      }
-    }),
-  );
-};
 

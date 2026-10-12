@@ -17,7 +17,6 @@
  * pass stopped, because the only state is the rows themselves.
  */
 
-import { Effect } from "effect";
 import type { SqliteDatabase } from "./shared.js";
 
 export const LEGACY_RUN_EVENT_ENTRY_TYPE = "run_event";
@@ -142,42 +141,4 @@ export const deleteLegacyRunEventBatch = (
     return { deleted: rowIds.length, resumeFrom: conversationId };
   });
 };
-
-/**
- * One bounded retention pass as an Effect. Interrupting the fiber stops the
- * pass between batches (each batch is a single synchronous transaction, so
- * it either commits whole or never starts). `progress` is updated after each
- * batch so an interrupted caller can still report what was deleted.
- */
-export const sweepLegacyRunEventEntriesEffect = (
-  db: SqliteDatabase,
-  options: LegacyRunEventSweepOptions = {},
-  progress: { deleted: number; batches: number } = { deleted: 0, batches: 0 },
-): Effect.Effect<LegacyRunEventSweepResult> =>
-  Effect.gen(function* () {
-    const pauseMs = Math.max(
-      0,
-      options.pauseMs ?? LEGACY_RUN_EVENT_SWEEP_PAUSE_MS,
-    );
-    let resumeFrom: string | null = null;
-    for (;;) {
-      if (options.isIdle && !options.isIdle()) {
-        return { ...progress, outcome: "busy" as const };
-      }
-      const batch = deleteLegacyRunEventBatch(db, {
-        batchSize: options.batchSize,
-        fromConversationId: resumeFrom,
-        transaction: options.transaction,
-      });
-      if (batch.deleted > 0) {
-        progress.deleted += batch.deleted;
-        progress.batches += 1;
-      }
-      if (batch.resumeFrom === null) {
-        return { ...progress, outcome: "complete" as const };
-      }
-      resumeFrom = batch.resumeFrom;
-      yield* Effect.sleep(pauseMs);
-    }
-  });
 

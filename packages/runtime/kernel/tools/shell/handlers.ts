@@ -16,7 +16,6 @@ import { isDangerousCommand } from "../command-safety.js";
 import { sanitizeToolVisibleText } from "../safety.js";
 import type { OfficePreviewRef } from "@stella/contracts/office-preview";
 import { resolveManagedShellCommand } from "./launch.js";
-import { runShell } from "./process.js";
 import {
   acquireShellInteraction,
   cleanupShellSessions,
@@ -668,85 +667,6 @@ export const handleWriteStdin = async (
     record.activeInteractionReceipt = undefined;
     interaction.release();
   }
-};
-
-export const handleBash = async (
-  state: ShellState,
-  args: Record<string, unknown>,
-  context?: ToolContext,
-  signal?: AbortSignal,
-): Promise<ToolResult> => {
-  if (signal?.aborted) {
-    return { error: toolErrorMessage(signal.reason ?? new Error("Aborted")) };
-  }
-  const prepared = resolveManagedShellCommand(state, args, context);
-  const command = prepared.command;
-
-  // Safety check: reject dangerous commands
-  const dangerReason = isDangerousCommand(command, prepared.cwd);
-  if (dangerReason) {
-    return {
-      error: `Command blocked: this operation is potentially destructive and has been denied for safety. (${dangerReason})`,
-    };
-  }
-
-  const timeout = Math.min(Number(args.timeout ?? 120_000), 600_000);
-  const cwd = prepared.cwd;
-  const runInBackground = Boolean(args.run_in_background ?? false);
-  const envOverrides = prepared.envOverrides;
-
-  if (runInBackground) {
-    const record = startShell(
-      state,
-      command,
-      cwd,
-      envOverrides,
-      undefined,
-      undefined,
-      prepared.launchOptions,
-      prepared.processIdentity,
-    );
-    setShellOwner(record, context);
-    const extracted = extractOfficePreviewRef(record.output || "");
-    return {
-      result: `Command running in background.\nShell ID: ${record.id}\n\n${truncate(
-        extracted.cleanedOutput || "(no output yet)",
-      )}`,
-      ...(extracted.officePreviewRef
-        ? {
-            details: {
-              text: `Command running in background.\nShell ID: ${record.id}\n\n${truncate(
-                extracted.cleanedOutput || "(no output yet)",
-              )}`,
-              officePreviewRef: extracted.officePreviewRef,
-            },
-          }
-        : {}),
-    };
-  }
-
-  const output = await runShell(
-    state,
-    command,
-    cwd,
-    timeout,
-    envOverrides,
-    prepared.launchOptions,
-    prepared.processIdentity,
-  );
-  const extracted = extractOfficePreviewRef(sanitizeToolVisibleText(output));
-  const text = truncate(extracted.cleanedOutput);
-  return {
-    result: text,
-    ...(extracted.officePreviewRef
-      ? {
-          details: {
-            text,
-            officePreviewRef: extracted.officePreviewRef,
-          },
-        }
-      : {}),
-  };
 };
 
 export const handleShellStatus = async (

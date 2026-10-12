@@ -40,11 +40,6 @@ import {
   type ImageCapTarget,
 } from "../shared/image-caps.js";
 import { decodeAndValidateImage } from "../tools/image-decode-validation.js";
-import { buildDemotedCodeSuffix } from "../tools/code-catalog.js";
-import {
-  CODE_TOOL_NAME,
-  toolRequiresExplicitApproval,
-} from "../tools/code-tool.js";
 import { spillSanitizedToolOutput } from "./tool-output-spill.js";
 import {
   DEFAULT_MAX_BYTES,
@@ -131,44 +126,6 @@ export const getRequestedRuntimeToolNames = (
   Array.isArray(toolsAllowlist) && toolsAllowlist.length > 0
     ? toolsAllowlist
     : [...STELLA_LOCAL_TOOLS];
-
-/**
- * Resolve the agent's tool allowlist against the host's catalog.
- *
- * The catalog is the single source of truth for tool metadata — every tool
- * lives as a self-contained `ToolDefinition` under
- * `runtime/kernel/tools/defs/` and is registered into the catalog by the
- * host. If a name in the allowlist isn't in the catalog, it's silently
- * dropped and a warning is logged.
- */
-export const getRuntimeToolMetadata = (opts: {
-  toolsAllowlist?: string[];
-  toolCatalog?: ToolMetadata[];
-}): ToolMetadata[] => {
-  const catalog = new Map<string, ToolMetadata>(
-    (opts.toolCatalog ?? []).map((tool) => [tool.name, tool]),
-  );
-  const resolved: ToolMetadata[] = [];
-  const seen = new Set<string>();
-  const missing: string[] = [];
-  for (const toolName of getRequestedRuntimeToolNames(opts.toolsAllowlist)) {
-    if (seen.has(toolName)) continue;
-    seen.add(toolName);
-    const entry = catalog.get(toolName);
-    if (!entry) {
-      missing.push(toolName);
-      continue;
-    }
-    resolved.push(entry);
-  }
-  if (missing.length > 0) {
-    // eslint-disable-next-line no-console
-    console.warn(
-      `[tool-adapters] dropped unknown tools from allowlist: ${missing.join(", ")}`,
-    );
-  }
-  return resolved;
-};
 
 const formatToolResult = (
   toolResult: ToolResult,
@@ -601,31 +558,6 @@ export const collectVisibleDemotedTools = (
     const requiredProvider = tool.demoted.requiredConnectorProvider;
     return !requiredProvider || requiredProvider === connectorProvider;
   });
-
-/**
- * The code catalog for external engines: engines that build their tool
- * list through `getRuntimeToolMetadata` get the workflow text + signature
- * catalog appended to code's
- * description, so demoted tools are discoverable there the same way. No-op
- * when code is absent from the metadata or nothing is demoted.
- */
-export const appendDemotedCatalogToCode = (
-  toolMetadata: ToolMetadata[],
-  toolCatalog: ToolMetadata[] | undefined,
-  connectorProvider: string | undefined,
-): ToolMetadata[] => {
-  const suffix = buildDemotedCodeSuffix(
-    collectVisibleDemotedTools(toolCatalog ?? [], connectorProvider).filter(
-      (tool) => !toolRequiresExplicitApproval(tool.approval),
-    ),
-  );
-  if (!suffix) return toolMetadata;
-  return toolMetadata.map((tool) =>
-    tool.name === CODE_TOOL_NAME
-      ? { ...tool, description: `${tool.description}${suffix}` }
-      : tool,
-  );
-};
 
 export const extractAttachImageBlocks = async (
   text: string,

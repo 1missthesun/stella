@@ -53,10 +53,6 @@ export type BrowserActivityWindowRequest = {
   sinceMs: number;
 };
 
-export type BrowserActivityWindow = BrowserActivityWindowRequest & {
-  data: BrowserData;
-};
-
 type SqliteDatabase = {
   prepare(sql: string): { all(...params: unknown[]): unknown[] };
   close(): void;

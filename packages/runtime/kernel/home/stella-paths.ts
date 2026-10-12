@@ -12,48 +12,6 @@ import type { App } from "electron";
  * Electron-only seeding/sync lives in `stella-home.ts`.
  */
 
-/**
- * Capability-bearing agent metadata and prompt bodies stay authoritative in
- * the install tree. Backend/cloud prompt defaults are derived from these
- * bundled files after runtime-only frontmatter is stripped.
- */
-export const resolveBundledAgentMetadataDir = (
-  stellaAppDir: string,
-): string => {
-  const resourcesPath = process.env.STELLA_APP_RESOURCES_PATH?.trim();
-  const candidates = [
-    ...(resourcesPath
-      ? [
-          path.join(
-            resourcesPath,
-            "runtime",
-            "extensions",
-            "stella-runtime",
-            "agent-metadata",
-          ),
-        ]
-      : []),
-    path.join(
-      stellaAppDir,
-      "packages",
-      "runtime",
-      "extensions",
-      "stella-runtime",
-      "agent-metadata",
-    ),
-    path.join(
-      stellaAppDir,
-      "runtime",
-      "extensions",
-      "stella-runtime",
-      "agent-metadata",
-    ),
-  ];
-  return (
-    candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]!
-  );
-};
-
 const __dirname = import.meta.dirname;
 
 export const resolveStellaAppDir = (

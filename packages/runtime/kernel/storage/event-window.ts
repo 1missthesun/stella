@@ -25,33 +25,3 @@ export type LocalChatEventWindow = {
   query(query: LocalChatEventWindowQuery): LocalContextEvent[];
 };
 
-const hasOwnPayloadKey = (payload: unknown, key: string): boolean =>
-  Boolean(payload) &&
-  typeof payload === "object" &&
-  Object.prototype.hasOwnProperty.call(payload, key);
-
-/**
- * Reference semantics for {@link LocalChatEventWindowQuery} over an
- * already-read window (oldest first). Callers re-apply it to SQL results so a
- * query means the same thing whichever implementation answered it.
- */
-export const filterLocalChatEventWindow = <T extends LocalContextEvent>(
-  events: readonly T[],
-  query: LocalChatEventWindowQuery,
-): T[] => {
-  const types = new Set(query.types);
-  const matched = events.filter(
-    (event) =>
-      types.has(event.type) &&
-      (query.beforeTimestamp === undefined ||
-        event.timestamp < query.beforeTimestamp) &&
-      (query.payloadKey === undefined ||
-        hasOwnPayloadKey(event.payload, query.payloadKey)),
-  );
-  return query.limit !== undefined &&
-    query.limit >= 0 &&
-    matched.length > query.limit
-    ? matched.slice(matched.length - query.limit)
-    : matched;
-};
-

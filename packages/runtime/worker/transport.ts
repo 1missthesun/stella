@@ -95,22 +95,6 @@ export const parseWorkerListenUrl = (
   };
 };
 
-export const parseWorkerArgs = (
-  argv: string[],
-): { listenUrl: string } => {
-  let listenUrl = DEFAULT_LISTEN_URL;
-  for (let i = 0; i < argv.length; i += 1) {
-    const arg = argv[i];
-    if (arg === "--listen" && i + 1 < argv.length) {
-      listenUrl = argv[i + 1] ?? DEFAULT_LISTEN_URL;
-      i += 1;
-    } else if (arg?.startsWith("--listen=")) {
-      listenUrl = arg.slice("--listen=".length);
-    }
-  }
-  return { listenUrl };
-};
-
 export type StartTransportArgs = {
   transport: WorkerTransport;
   /** Takes each connection's peer: the worker broker, or the runtime's client server. */

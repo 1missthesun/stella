@@ -180,13 +180,6 @@ export type BrowserTurnEndBehavior = "retain-tabs" | "close-tabs";
 
 export type BrowserBackend = "in-app" | "external";
 
-export const BROWSER_SESSION_CLIENT_METHODS = [
-  "command",
-  "chain",
-  "selectBackend",
-  "dispose",
-] as const;
-
 export interface BrowserSessionClient {
   command<TData = unknown>(
     action: BrowserSessionAction,

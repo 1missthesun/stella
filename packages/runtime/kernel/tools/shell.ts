@@ -31,7 +31,6 @@
  */
 
 export {
-  handleBash,
   handleExecCommand,
   handleKillShell,
   handleShellStatus,

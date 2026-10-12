@@ -3,8 +3,6 @@ import os from "os";
 import path from "path";
 import { getLocalCliWorkingDirectory } from "@stella/contracts/agent-runtime";
 
-export const now = () => Date.now();
-
 const expandWorkingDirectory = (
   value: string,
   homeDirectory: string,

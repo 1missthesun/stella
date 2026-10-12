@@ -11,7 +11,6 @@
 
 export const DEFAULT_MAX_LINES = 2000;
 export const DEFAULT_MAX_BYTES = 50 * 1024;
-export const GREP_MAX_LINE_LENGTH = 500;
 
 export type TruncatedBy = "lines" | "bytes" | null;
 

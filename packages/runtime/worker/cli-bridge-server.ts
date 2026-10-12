@@ -127,6 +127,11 @@ export type CliBridgeHandlers = {
     limit?: number;
     signal?: AbortSignal;
   }) => Promise<BackendConnectorActionsResult>;
+  /** Withdraw a caller's open credential card (its run stopped). */
+  cancelConnectorCredential?: (params: {
+    conversationId?: string;
+    toolCallId: string;
+  }) => Promise<void>;
   requestDesktopPermission?: (params: {
     kind: "accessibility" | "screen";
   }) =>
@@ -441,6 +446,28 @@ const dispatch = async (
         ...(parsed.data as XApiOperation),
         ...(signal ? { signal } : {}),
       });
+    }
+    case "connector.cancelCredential": {
+      const request =
+        params && typeof params === "object"
+          ? (params as Record<string, unknown>)
+          : {};
+      const caller =
+        request.caller && typeof request.caller === "object"
+          ? (request.caller as Record<string, unknown>)
+          : {};
+      const id = (value: unknown) =>
+        typeof value === "string" && value.trim() && value.length <= 256
+          ? value.trim()
+          : undefined;
+      const toolCallId = id(caller.toolCallId);
+      const conversationId = id(caller.conversationId);
+      if (!toolCallId || !handlers.cancelConnectorCredential) return { ok: false };
+      await handlers.cancelConnectorCredential({
+        toolCallId,
+        ...(conversationId ? { conversationId } : {}),
+      });
+      return { ok: true };
     }
     case "connector.requestCredential": {
       const record =

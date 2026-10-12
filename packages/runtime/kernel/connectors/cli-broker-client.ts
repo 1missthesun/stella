@@ -267,6 +267,19 @@ export const requestConnectorCredentialFromBridge = async ({
   };
 };
 
+/** Withdraw the open credential card of a caller whose run stopped. */
+export const cancelConnectorCredentialFromBridge = async ({
+  socketPath,
+  caller,
+  timeoutMs = 10_000,
+}: {
+  socketPath: string;
+  caller: { conversationId?: string; toolCallId?: string };
+  timeoutMs?: number;
+}): Promise<void> => {
+  await sendRequest(socketPath, "connector.cancelCredential", { caller }, timeoutMs);
+};
+
 export const requestBackendConnectorActionFromBridge = async ({
   socketPath,
   connectorId,

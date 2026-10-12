@@ -26,6 +26,7 @@ import { getNativeConnectorReadiness } from "./connection-status.js";
 import {
   requestBackendConnectorActionFromBridge,
   requestBackendConnectorActionsFromBridge,
+  cancelConnectorCredentialFromBridge,
   requestConnectorCredentialFromBridge,
   type BackendConnectorActionResult,
   type ConnectorCredentialResult,
@@ -78,6 +79,10 @@ export type ConnectClientOptions = {
   stellaAppDir: string;
   /** The conversation, agent and tool call a credential card belongs to. */
   caller?: ConnectorCaller;
+  /** Runs while the user answers a credential card (the code cell's clock stops). */
+  awaitUser?: <T>(task: () => Promise<T>) => Promise<T>;
+  /** The caller's run stopped: an open credential card is withdrawn. */
+  signal?: AbortSignal;
   /** UDS path of the worker's CLI bridge (credential cards + broker). */
   cliBridgeSocketPath?: string;
   /** Non-fatal bridge diagnostics (logged by the host). */
@@ -234,7 +239,8 @@ export const withAuthRetry = async <T>(
   } catch (error) {
     if (!(error instanceof ConnectorAuthError)) throw error;
     const socketPath = options.cliBridgeSocketPath;
-    if (!socketPath || !error.tokenKey) throw error;
+    const tokenKey = error.tokenKey;
+    if (!socketPath || !tokenKey) throw error;
 
     const hints =
       explicitHints ??
@@ -248,9 +254,9 @@ export const withAuthRetry = async <T>(
       // No `description`: the host's canonical copy is used instead of
       // leaking the upstream HTTP status / generic-error verbiage into a
       // user-facing card.
-      result = await requestConnectorCredentialFromBridge({
+      const ask = () => requestConnectorCredentialFromBridge({
         socketPath,
-        tokenKey: error.tokenKey,
+        tokenKey,
         displayName: error.serverDisplayName,
         authType: hints.authType,
         resourceUrl: hints.resourceUrl,
@@ -260,6 +266,18 @@ export const withAuthRetry = async <T>(
         preregisteredOAuth: hints.preregisteredOAuth,
         ...(options.caller ? { caller: options.caller } : {}),
       });
+      const caller = options.caller;
+      const withdraw = () => {
+        if (caller?.toolCallId) {
+          void cancelConnectorCredentialFromBridge({ socketPath, caller }).catch(() => undefined);
+        }
+      };
+      options.signal?.addEventListener("abort", withdraw, { once: true });
+      try {
+        result = options.awaitUser ? await options.awaitUser(ask) : await ask();
+      } finally {
+        options.signal?.removeEventListener("abort", withdraw);
+      }
     } catch (bridgeError) {
       // The bridge was advertised but isn't reachable — fall through to
       // the original auth error so the agent gets a clean signal rather
@@ -1578,8 +1596,11 @@ export type ReplConnectClient = {
   ): Promise<unknown>;
   addMcp(options: Record<string, unknown>): Promise<unknown>;
   remove(id: string): Promise<unknown>;
-  /** The same client for one caller's calls (`ConnectClientOptions.caller`). */
-  forCaller?(caller: ConnectorCaller): ReplConnectClient;
+  /** The same client for one caller's calls (`ConnectClientOptions.caller`, `awaitUser`, `signal`). */
+  forCaller?(
+    caller: ConnectorCaller,
+    run?: Pick<ConnectClientOptions, "awaitUser" | "signal">,
+  ): ReplConnectClient;
 };
 
 export const createReplConnectClient = (
@@ -1587,7 +1608,7 @@ export const createReplConnectClient = (
 ): ReplConnectClient => {
   const catalog = () => loadConnectCatalog(options.stellaAppDir);
   return {
-    forCaller: (caller) => createReplConnectClient({ ...options, caller }),
+    forCaller: (caller, run) => createReplConnectClient({ ...options, caller, ...run }),
     discover: async (query) => {
       const trimmed = typeof query === "string" ? query.trim() : "";
       if (!trimmed) {

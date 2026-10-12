@@ -1347,11 +1347,17 @@ class NodeReplKernel {
         throw new Error("connect is not available in this session.");
       }
       const client =
-        shared.forCaller?.({
-          conversationId: active.context.conversationId,
-          ...(active.context.agentId ? { agentId: active.context.agentId } : {}),
-          toolCallId: active.context.requestId,
-        }) ?? shared;
+        shared.forCaller?.(
+          {
+            conversationId: active.context.conversationId,
+            ...(active.context.agentId ? { agentId: active.context.agentId } : {}),
+            toolCallId: active.context.requestId,
+          },
+          {
+            awaitUser: (task) => this.whileAwaitingUser(active, task),
+            signal: active.controller.signal,
+          },
+        ) ?? shared;
       const value = await this.dispatchConnectCall(
         client,
         message.method,

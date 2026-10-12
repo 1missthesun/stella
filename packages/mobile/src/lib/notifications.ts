@@ -16,7 +16,10 @@ import {
   REMINDER_PUSH_CATEGORY,
   parseReminderPushData,
 } from "@stella/contracts/reminders";
-import { markReminderDone, snoozeReminder } from "./reminders";
+import {
+  handleReminderActionResponse,
+  isReminderActionId,
+} from "./reminder-notification-actions";
 import { backendOrigin, postJson } from "./http";
 import { getOrCreateMobileDeviceId } from "./phone-access";
 import { getNotificationsMuted } from "./notifications-prefs";
@@ -378,12 +381,8 @@ const handleNotificationResponse = (
   if (!pushDeliveryEnabled()) return;
   const reminder = parseReminderPushData(response.notification.request.content.data);
   if (reminder) {
-    if (response.actionIdentifier === REMINDER_ACTION_DONE) {
-      void markReminderDone(reminder.fireId).catch(() => undefined);
-      return;
-    }
-    if (response.actionIdentifier === REMINDER_ACTION_SNOOZE) {
-      void snoozeReminder(reminder.fireId).catch(() => undefined);
+    if (isReminderActionId(response.actionIdentifier)) {
+      void handleReminderActionResponse(response).catch(() => undefined);
       return;
     }
     requestMainChat();

@@ -189,11 +189,21 @@ const containerStyle = StyleSheet.create({
   hug: {},
 });
 
+/**
+ * Image sources a file preview may show. Its relative images are read from
+ * the computer or Drive copy that has them and inlined as `data:` URIs, which
+ * load nothing from anywhere; chat replies stay on http and https.
+ */
+const EMBEDDED_IMAGE_OPTIONS = {
+  allowedProtocols: ["http:", "https:", "data:"],
+} as const;
+
 export const AssistantMarkdown = memo(function AssistantMarkdown({
   text,
   colors,
   selectable = false,
   fill = true,
+  embeddedImages = false,
   onStellaFileLink,
   onAskStella,
   moreLinks,
@@ -208,6 +218,11 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
    * rendering at its max width.
    */
   fill?: boolean;
+  /**
+   * A file preview whose relative images were inlined as `data:` URIs: show
+   * them. Off for chat, where a reply's images stay http and https.
+   */
+  embeddedImages?: boolean;
   /**
    * Tap handler for `stella://file/<path>` links — the assistant's way of
    * pointing at a local file. When provided, such links open the in-app
@@ -360,6 +375,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
       renderers={renderers}
       onLinkPress={onLinkPress}
       selectable={selectable}
+      {...(embeddedImages ? { imageOptions: EMBEDDED_IMAGE_OPTIONS } : {})}
     >
       {withMoreLinks(text, moreLabels.length)}
     </Markdown>

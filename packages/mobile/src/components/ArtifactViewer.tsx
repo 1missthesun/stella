@@ -176,6 +176,8 @@ type LoadedArtifact =
     };
 
 const CANVAS_ASSET_MAX_BYTES = 16 * 1024 * 1024;
+/** All of a markdown preview's inlined images together, before base64. */
+const MARKDOWN_IMAGES_MAX_BYTES = 32 * 1024 * 1024;
 const VIEWER_MEDIA_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 
 type FolderTrailEntry = { artifact: ChatArtifact; preferDeviceId: string | null };
@@ -1098,6 +1100,7 @@ export function ArtifactViewerContent({
         };
       }
       if (payload.kind === "markdown") {
+        let imageBytes = 0;
         const text = await rewriteRelativeMarkdownImages(
           bytesToText(result.bytes),
           filePath,
@@ -1112,10 +1115,12 @@ export function ArtifactViewerContent({
             if (
               image.missing ||
               image.sizeBytes > CANVAS_ASSET_MAX_BYTES ||
-              !image.mimeType.startsWith("image/")
+              !image.mimeType.startsWith("image/") ||
+              imageBytes + image.bytes.byteLength > MARKDOWN_IMAGES_MAX_BYTES
             ) {
               return null;
             }
+            imageBytes += image.bytes.byteLength;
             return bytesToDataUri(image.bytes, image.mimeType);
           },
           controller.signal,
@@ -1308,7 +1313,7 @@ export function ArtifactViewerContent({
             <ScrollView
               contentContainerStyle={styles.scrollContent}
             >
-              <AssistantMarkdown text={loaded.text} colors={colors} />
+              <AssistantMarkdown text={loaded.text} colors={colors} embeddedImages />
             </ScrollView>
           ) : loaded?.kind === "text" ? (
             <ScrollView

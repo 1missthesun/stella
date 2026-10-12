@@ -1,12 +1,18 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Effect } from "effect";
 import type { BackendClient } from "@stella/contracts/backend/client";
-import type { ScheduleKind, ScheduleRow } from "@stella/contracts/backend/schedules";
+import type { ScheduleRow } from "@stella/contracts/backend/schedules";
+import {
+  cronJobOfScheduleRow as toCronJob,
+  scheduleKindOf as kindFor,
+  schedulePromptOf as promptFor,
+  scheduleUpdateArgsOf,
+  scheduleWatchFieldsOf as watchFields,
+} from "@stella/contracts/schedule-records";
 import type {
   LocalCronJobCreateInput,
   LocalCronJobRecord,
   LocalCronJobUpdatePatch,
-  LocalCronSchedule,
 } from "@stella/contracts/scheduling";
 
 /**
@@ -37,61 +43,6 @@ export const isCloudSchedulePayload = (
   (payload.kind === "watch" && Boolean(payload.script) && !payload.scriptPath);
 
 const LIST_TIMEOUT_MS = 15_000;
-const DEFAULT_WATCH_INSTRUCTIONS = "Tell the user what it found.";
-
-/** A reminder is stored as its text; a task as its prompt; a watch as what to do with a finding. */
-const promptFor = (payload: LocalCronJobCreateInput["payload"]): string => {
-  if (payload.kind === "notify") return payload.text;
-  if (payload.kind === "task") return payload.prompt;
-  if (payload.kind === "watch") return payload.instructions?.trim() || DEFAULT_WATCH_INSTRUCTIONS;
-  throw new Error("Only reminders, tasks and cloud watches can be stored in the cloud.");
-};
-
-const kindFor = (payload: LocalCronJobCreateInput["payload"]): ScheduleKind =>
-  payload.kind === "notify" ? "reminder" : payload.kind === "watch" ? "watch" : "task";
-
-const watchFields = (payload: LocalCronJobCreateInput["payload"]) =>
-  payload.kind === "watch"
-    ? {
-        ...(payload.script ? { script: payload.script } : {}),
-        ...(payload.route ? { route: payload.route } : {}),
-        ...(payload.once !== undefined ? { once: payload.once } : {}),
-      }
-    : payload.kind === "task" && payload.route
-      ? { route: payload.route }
-      : {};
-
-const payloadOf = (row: ScheduleRow): LocalCronJobRecord["payload"] => {
-  if (row.kind === "reminder") return { kind: "notify", text: row.prompt };
-  if (row.kind === "watch") {
-    return {
-      kind: "watch",
-      instructions: row.prompt,
-      ...(row.route === "agent" ? { route: "agent" as const } : {}),
-      ...(row.once ? { once: true } : {}),
-    };
-  }
-  return { kind: "task", prompt: row.prompt, route: row.route };
-};
-
-const toCronJob = (row: ScheduleRow): LocalCronJobRecord => {
-  return {
-    id: row.scheduleId,
-    conversationId: row.conversationId ?? "",
-    name: row.description,
-    description: row.description,
-    enabled: row.status === "active",
-    schedule: JSON.parse(row.schedule) as LocalCronSchedule,
-    ...(row.zone ? { zone: row.zone } : {}),
-    payload: payloadOf(row),
-    nextRunAtMs: row.nextRunAt,
-    ...(row.lastRunAt !== undefined ? { lastRunAtMs: row.lastRunAt } : {}),
-    ...(row.lastFinding ? { lastOutputPreview: row.lastFinding } : {}),
-    ...(row.lastError ? { lastStatus: "error", lastError: row.lastError } : {}),
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  };
-};
 
 /** Stable per intent, so a retried write replays instead of duplicating. */
 const requestIdFor = (...parts: unknown[]): string =>
@@ -175,19 +126,7 @@ export const createCloudSchedules = (options: {
     jobId: string,
     patch: LocalCronJobUpdatePatch,
   ): Promise<LocalCronJobRecord | null> => {
-    const description =
-      patch.name !== undefined || patch.description !== undefined
-        ? (patch.name ?? patch.description)
-        : undefined;
-    const args = {
-      scheduleId: jobId,
-      ...(patch.payload ? { prompt: promptFor(patch.payload), ...watchFields(patch.payload) } : {}),
-      ...(patch.schedule ? { schedule: patch.schedule } : {}),
-      ...(description !== undefined ? { description } : {}),
-      ...(patch.enabled !== undefined
-        ? { status: patch.enabled ? ("active" as const) : ("paused" as const) }
-        : {}),
-    };
+    const args = scheduleUpdateArgsOf(jobId, patch);
     const row = await client().call("schedules.update", {
       requestId: requestIdFor("update", args, Date.now()),
       ...args,

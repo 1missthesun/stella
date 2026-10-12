@@ -302,6 +302,8 @@ export type PiCloudAgentThreads = {
     requestId: string;
     description: string;
     message: string;
+    /** `message` is already framed as the agent reads it. */
+    framed?: boolean;
   }) => Promise<"steered" | "resumed">;
   pause: (request: {
     conversationId: string;

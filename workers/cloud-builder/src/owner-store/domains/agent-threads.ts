@@ -43,6 +43,7 @@ import {
   AGENT_MESSAGE_MAX_CHARS,
   STELLA_MESSAGE_TARGET,
   formatAgentMessage,
+  isFramedAgentMessage,
   normalizeAgentDirectoryStatus,
   type AgentDirectoryAgentRow,
   type AgentDirectorySessionRow,
@@ -80,7 +81,7 @@ import { queueStellaNote } from "./agent-reports.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
 import { AGENT_LOG_CLOUD_HOLDER, agentLogDeviceHolder } from "@stella/contracts/backend/agent-logs";
-import { array, literal, number, object, optional, string, type Parser } from "../args.js";
+import { array, boolean, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { executionUnavailableMessage, snapshotAllowsExecution } from "../../owner-gate/support.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -1654,6 +1655,9 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
   if (!text || text.length > AGENT_MESSAGE_MAX_CHARS) {
     throw new RpcError("BAD_REQUEST", `A message must be 1 to ${AGENT_MESSAGE_MAX_CHARS} characters.`);
   }
+  if (args.framed && !isFramedAgentMessage(text)) {
+    throw new RpcError("BAD_REQUEST", "A framed message must be one whole agent message.");
+  }
   const to = senderStella(ctx, args.to.trim(), args.from);
   if (to === args.from.threadId) {
     throw new RpcError("BAD_REQUEST", "That thread_id is the sender's own.");
@@ -1662,7 +1666,7 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
     throw new RpcError("NOT_FOUND", "No agent or session has that thread_id.");
   }
   const fingerprint = await sha256Hex(
-    JSON.stringify(["agent-message/v1", to, text, args.from.threadId, args.from.label]),
+    JSON.stringify(["agent-message/v1", to, text, args.from.threadId, args.from.label, args.framed === true]),
   );
   const receipt = ctx.db.one<{ fingerprint: string; result_json: string }>(
     "SELECT fingerprint, result_json FROM agent_message_receipts WHERE message_id = ?",
@@ -1689,6 +1693,7 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
       to,
       text,
       from: args.from,
+      ...(args.framed ? { framed: true } : {}),
       kind: "message",
       source: `${ctx.caller ? "client" : "cloud"}:${args.from.threadId}`,
     }),
@@ -1775,10 +1780,14 @@ const deliverAgentMessage = async (
     to: string;
     text: string;
     from: AgentMessageSender;
+    /** `text` is already framed as the receiver reads it. */
+    framed?: boolean;
     kind: "message" | "resume";
     source: string;
   },
 ): Promise<AgentControlResult> => {
+  const framed = (starter?: boolean) =>
+    args.framed ? args.text : formatAgentMessage(args.from, args.text, starter ? { starter } : undefined);
   const to = isPlacementThreadId(args.to) ? (placementAliasThreadId(ctx.db, args.to) ?? args.to) : args.to;
   const conversation = ctx.db.one<{ conversation_id: string }>(
     "SELECT conversation_id FROM conversations WHERE conversation_id = ? AND deleted_at IS NULL",
@@ -1790,7 +1799,7 @@ const deliverAgentMessage = async (
       conversationId: to,
       ownerGeneration: args.ownerGeneration,
       fromThreadId: args.from.threadId,
-      text: formatAgentMessage(args.from, args.text),
+      text: framed(),
     });
     return { threadId: to, command: args.kind, outcome: "queued" };
   }
@@ -1811,7 +1820,7 @@ const deliverAgentMessage = async (
       kind: args.kind,
       thread,
       ownerGeneration: args.ownerGeneration,
-      text: formatAgentMessage(args.from, args.text, { starter: sentByStarter(thread, args.from) }),
+      text: framed(sentByStarter(thread, args.from)),
       source: args.source,
       detail: { from: args.from.threadId },
       next: { clientMsgId: args.commandId, fingerprint: "agent-message" },
@@ -3536,6 +3545,7 @@ const messageParser = object({
   to: id(256),
   text: string({ max: AGENT_MESSAGE_MAX_CHARS * 2 }),
   from: senderParser,
+  framed: optional(boolean()),
 });
 const pauseParser = object({
   ownerGeneration: generation,

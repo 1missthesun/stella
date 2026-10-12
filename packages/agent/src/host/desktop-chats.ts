@@ -312,7 +312,7 @@ export type DesktopDeviceAgents = {
     waitingForDevice: boolean;
   }>;
   /** Another message for it: steers it while it runs, or starts its next run. */
-  message(args: { key: string; threadId: string; description: string; message: string }): Promise<"steered" | "resumed">;
+  message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
   pause(threadId: string): Promise<void>;
 };
 
@@ -321,7 +321,7 @@ export type DesktopEngineAgents = {
   /** Start one, once per `key`, on `model`. */
   start(args: { key: string; description: string; prompt: string; model: string }): Promise<{ threadId: string }>;
   /** Another message for it: steers it while it runs, or starts its next run. */
-  message(args: { key: string; threadId: string; description: string; message: string }): Promise<"steered" | "resumed">;
+  message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
   pause(threadId: string): Promise<void>;
 };
 
@@ -896,9 +896,9 @@ export function desktopChats(options: DesktopChatsOptions) {
     return {
       start: async ({ key, description, prompt, model }) =>
         await engine.start({ key, description, prompt, model: model ?? defaultModel }),
-      message: async ({ key, threadId, message }) => {
+      message: async ({ key, threadId, message, framed }) => {
         const description = await descriptionOf(threadId);
-        if ((await engine.message({ key, threadId, description, message })) === "steered") {
+        if ((await engine.message({ key, threadId, description, message, ...(framed ? { framed } : {}) })) === "steered") {
           await settle(threadId, `steered:${key}`);
         }
       },
@@ -951,9 +951,9 @@ export function desktopChats(options: DesktopChatsOptions) {
         const started = await agents.start({ key, deviceId, description, prompt, ...(model ? { model } : {}) });
         return { threadId: started.threadId, ...(started.waitingForDevice ? { waiting: true } : {}) };
       },
-      message: async ({ key, threadId, message }) => {
+      message: async ({ key, threadId, message, framed }) => {
         const description = await descriptionOf(threadId);
-        if ((await agents.message({ key, threadId, description, message })) === "steered") {
+        if ((await agents.message({ key, threadId, description, message, ...(framed ? { framed } : {}) })) === "steered") {
           await settle(threadId, `steered:${key}`);
         }
       },

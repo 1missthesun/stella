@@ -44,6 +44,7 @@ import {
   agentDirectoryEntry,
   buildAgentDirectoryResult,
   formatAgentMessage,
+  isFramedAgentMessage,
   AGENT_MESSAGE_STARTER_RELATION,
   sessionDirectoryEntry,
   STELLA_MESSAGE_TARGET,
@@ -335,8 +336,16 @@ export type RemoteAgentHost = {
     args: { key: string; description: string; prompt: string; model?: string },
     context: Context,
   ): Promise<{ threadId: string; waiting?: boolean }>;
-  /** Another message for it: steers it there, starts its next run, or is held for its offline computer. Once per `key`. */
-  message(args: { key: string; threadId: string; message: string }, context: Context): Promise<AgentMessageDelivery | void>;
+  /**
+   * Another message for it: steers it there, starts its next run, or is held
+   * for its offline computer. Once per `key`. `framed`: `message` is already
+   * framed as the agent reads it (`formatAgentMessage`), so the host there
+   * delivers it as it is.
+   */
+  message(
+    args: { key: string; threadId: string; message: string; framed?: boolean },
+    context: Context,
+  ): Promise<AgentMessageDelivery | void>;
   pause?(threadId: string, context: Context): Promise<void>;
 };
 
@@ -756,7 +765,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (current?.moved) {
           const remote = remoteHostOf(current);
           const text = [...carried, message].join("\n\n");
-          if (remote) await remote.message({ key: `moved:${reporter.id}`, threadId, message: text }, context);
+          if (remote) await remote.message({ key: `moved:${reporter.id}`, threadId, message: text, framed: true }, context);
           else await host.directory?.message({ key: `moved:${reporter.id}`, to: threadId, text, from: { threadId: STELLA_MESSAGE_TARGET, label: "Stella" } }, context);
           await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), context);
           return;
@@ -1424,7 +1433,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       );
       if (known?.remote) {
         if (!remote) return await messageThroughLedger(api, threadId, args.message, conversation, context);
-        const delivery = await remote.message({ key: `message:${api.taskId}`, threadId, message: framed }, context);
+        const delivery = await remote.message({ key: `message:${api.taskId}`, threadId, message: framed, framed: true }, context);
         await expectRemoteReport(api, api.conversationId, String(api.taskId), threadId, context);
         return deliveredResult(delivery ?? { threadId });
       }
@@ -1683,7 +1692,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (target.record.remote) {
         const remote = remoteHostOf(target.record);
         if (!remote) return await messageThroughLedger(api, threadId, message, conversation, context);
-        const delivery = await remote.message({ key, threadId, message: text }, context);
+        const delivery = await remote.message({ key, threadId, message: text, framed: true }, context);
         await expectRemoteReport(api, target.parentConversationId, key, threadId, context);
         return deliveredResult(delivery ?? { threadId });
       }
@@ -2081,7 +2090,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (known?.remote) {
       const remote = remoteHostOf(known);
       if (!remote) throw new Error(`${args.threadId} runs where this conversation cannot reach it now.`);
-      await remote.message({ key: `user:${args.key}`, threadId: args.threadId, message: args.message }, context);
+      await remote.message(
+        {
+          key: `user:${args.key}`,
+          threadId: args.threadId,
+          message: args.message,
+          ...(args.fromOrchestrator && isFramedAgentMessage(args.message) ? { framed: true } : {}),
+        },
+        context,
+      );
       await expectRemoteReport(harness, root.id, `user:${args.key}`, args.threadId, context);
       return;
     }

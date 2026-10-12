@@ -200,8 +200,15 @@ const cloudAgentThreadsFor = (
   return {
     start: async ({ key, description, prompt, model }) =>
       await threads().start({ conversationId, requestId: requestId(`start:${key}`), description, prompt, model }),
-    message: async ({ key, threadId, description, message }) =>
-      await threads().message({ conversationId, threadId, requestId: requestId(`message:${key}`), description, message }),
+    message: async ({ key, threadId, description, message, framed }) =>
+      await threads().message({
+        conversationId,
+        threadId,
+        requestId: requestId(`message:${key}`),
+        description,
+        message,
+        ...(framed ? { framed } : {}),
+      }),
     pause: async (threadId) => {
       await threads().pause({ conversationId, threadId, requestId: requestId(`pause:${threadId}:${Date.now()}`) });
     },
@@ -235,8 +242,15 @@ const deviceAgentThreadsFor = (
         targetDeviceId: deviceId,
         ...(model ? { model } : {}),
       }),
-    message: async ({ key, threadId, description, message }) =>
-      await threads().message({ conversationId, threadId, requestId: requestId(`message:${key}`), description, message }),
+    message: async ({ key, threadId, description, message, framed }) =>
+      await threads().message({
+        conversationId,
+        threadId,
+        requestId: requestId(`message:${key}`),
+        description,
+        message,
+        ...(framed ? { framed } : {}),
+      }),
     pause: async (threadId) => {
       await threads().pause({ conversationId, threadId, requestId: requestId(`pause:${threadId}:${Date.now()}`) });
     },

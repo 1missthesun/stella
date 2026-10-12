@@ -195,7 +195,9 @@ export type AgentThreadCalls = {
    * `send_message` to a thread this caller cannot reach itself: a running
    * agent takes it before its next model call, an idle one resumes with it,
    * and a conversation id queues it as that Stella's next turn. Idempotent
-   * per `messageId`.
+   * per `messageId`. `framed`: the caller's host already framed `text` as
+   * the receiver reads it (`formatAgentMessage`), so it is delivered as it
+   * is, never framed twice; it must then be one whole frame.
    */
   "agentThreads.message": {
     args: {
@@ -204,6 +206,7 @@ export type AgentThreadCalls = {
       to: string;
       text: string;
       from: AgentMessageSender;
+      framed?: boolean;
     };
     result: AgentMessageDelivery;
   };

@@ -273,3 +273,12 @@ export const formatAgentMessage = (
   `<agent-message from="${escapeAttribute(from.label)}" thread_id="${escapeAttribute(from.threadId)}"${
     options?.starter ? ` relation="${AGENT_MESSAGE_STARTER_RELATION}"` : ""
   }>\n${text.trim()}\n</agent-message>`;
+
+const FRAMED_AGENT_MESSAGE_RE =
+  /^<agent-message from="[^"\n]*" thread_id="[^"\n]*"(?: relation="[^"\n]*")?>\n[\s\S]*\n<\/agent-message>$/u;
+
+/**
+ * Text that is already one `formatAgentMessage` frame (or several, carried
+ * together): a host relaying it says so (`framed`), so it is framed once.
+ */
+export const isFramedAgentMessage = (text: string): boolean => FRAMED_AGENT_MESSAGE_RE.test(text.trim());

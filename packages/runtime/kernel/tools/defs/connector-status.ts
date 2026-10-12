@@ -170,6 +170,7 @@ export const createConnectorStatusTool = (
   workingText: CONNECTOR_STATUS_TOOL_WORKING_TEXT,
   // Orchestrator-only chat affordance, mirroring the map/html tools.
   agentTypes: [AGENT_IDS.ORCHESTRATOR],
+  awaitsUser: true,
   // Demoted out of the direct tool list when node_repl is available; the
   // connector-availability reminder points the orchestrator at calling it
   // (directly or as tools.connector_status inside node_repl).

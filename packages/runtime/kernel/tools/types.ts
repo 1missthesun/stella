@@ -185,6 +185,7 @@ export type ToolMetadata = {
    * `agentType === ORCHESTRATOR` checks at the tool-handler layer.
    */
   agentTypes?: readonly string[];
+  awaitsUser?: boolean;
 };
 
 export type ShellRecord = {
@@ -564,6 +565,7 @@ export type ToolDefinition = {
    * surface area easy to audit.
    */
   agentTypes?: readonly string[];
+  awaitsUser?: boolean;
   /**
    * Optional one-line snippet for an auto-generated "Available tools" block in
    * the agent's system prompt. Tools omit this when their use is so context-

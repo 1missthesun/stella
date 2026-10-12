@@ -38,7 +38,6 @@ import {
   ATTACHED_TOOL_MAX_IMAGES,
   ATTACHED_TOOL_PROTOCOL_VERSION,
   ATTACHED_TOOL_REQUEST_MAX_BYTES,
-  ATTACHED_TOOL_RESPONSE_MAX_BYTES,
   type AttachedToolPaths,
   AttachedToolProtocolError,
   decodeAttachedToolFrame,
@@ -828,6 +827,3 @@ export const attachedToolAnswerFailure = (
     message,
   );
 };
-
-export const ATTACHED_TOOL_HOST_RESPONSE_MAX_BYTES =
-  ATTACHED_TOOL_RESPONSE_MAX_BYTES;

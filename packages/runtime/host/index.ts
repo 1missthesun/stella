@@ -92,7 +92,6 @@ import type {
 import type { SqliteDatabase } from "../kernel/storage/shared.js";
 import type { CloudSchedules } from "./cloud-schedules.js";
 import type { RuntimeHostHandler } from "./client-protocol.js";
-import type { HostTimerHandle } from "./effect-runtime.js";
 import type {
   DispatchWatchHandle,
   ExecutionPlacementAvailability,
@@ -246,7 +245,6 @@ export class StellaRuntimeHost {
   schedulerSubscription: (() => void) | null = null;
   cloudScheduleUnsubscribe: (() => void) | null = null;
   cloudSchedules: CloudSchedules | null = null;
-  reloadTimer: HostTimerHandle | null = null;
   deferredRuntimeReload = false;
   // Coalescing for the requested-reload path only: while a
   // scheduled reload's restart is queued or running, further reload requests
@@ -415,21 +413,9 @@ export class StellaRuntimeHost {
    * runtime as soon as it is idle (between turns).
    */
   async requestRuntimeRestart() {
-    this.scheduleRuntimeReload();
-    return { ok: true };
-  }
-  /**
-   * Records the reload intent and debounces a gated flush. The actual restart
-   * only proceeds when {@link canRestartWorkerNow} holds (worker not busy) — evaluated in
-   * `flushWorkerRestart`.
-   */
-  scheduleRuntimeReload() {
     this.deferredRuntimeReload = true;
-    this.reloadTimer?.cancel();
-    this.reloadTimer = forkDelayed(150, () => {
-      this.reloadTimer = null;
-      void this.flushWorkerRestart();
-    });
+    void this.flushWorkerRestart();
+    return { ok: true };
   }
   /*
    * ---- Stale-worker detection + idle/deferred restart -------------------
@@ -1267,8 +1253,6 @@ export class StellaRuntimeHost {
     // the next host's reconnect handshake picks the deferral back up.
     this.pendingStaleWorkerRestart = null;
     this.stopStaleWorkerQuiescencePoll();
-    this.reloadTimer?.cancel();
-    this.reloadTimer = null;
     await this.workerController.stop(
       options?.killWorker ? "restart" : "stopped",
     );

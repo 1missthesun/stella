@@ -78,6 +78,7 @@ const RUNTIME_EXIT_TIMEOUT_MS = 15_000;
 
 /** Backoff between reconnect attempts after the runtime goes away. */
 const RECONNECT_DELAYS_MS = [100, 250, 500, 1_000, 2_000, 5_000];
+const REAP_POLL_MS = 5;
 
 type RuntimeHostCalls = {
   [K in RuntimeHostCall]: (...args: any[]) => Promise<any>;
@@ -396,19 +397,44 @@ export class RemoteRuntimeHost {
     this.events.emit("runtime-disconnected", {
       reason: "Stella is reconnecting to its runtime.",
     });
-    if (this.started) this.scheduleReconnect();
+    if (this.started) this.scheduleReconnect(connection.pid);
   }
 
-  private scheduleReconnect(): void {
+  /**
+   * After a runtime goes away, the first attempt waits only for its process
+   * to be gone (a restart ends it within a few milliseconds of closing the
+   * socket), bounded by the first backoff; while it still runs, its pidfile
+   * would send the attempt down the slow stale-runtime path.
+   */
+  private scheduleReconnect(gonePid?: number): void {
     if (this.reconnectTimer || !this.started) return;
     const delay =
       RECONNECT_DELAYS_MS[
         Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)
       ]!;
+    const first = this.reconnectAttempt === 0 && Boolean(gonePid);
     this.reconnectAttempt += 1;
-    this.reconnectTimer = forkDelayed(delay, () => {
+    const deadline = Date.now() + delay;
+    const alive = (pid: number) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (error) {
+        return (error as NodeJS.ErrnoException).code === "EPERM";
+      }
+    };
+    const wait = () =>
+      first && Date.now() < deadline && alive(gonePid!)
+        ? REAP_POLL_MS
+        : 0;
+    const attempt = () => {
       this.reconnectTimer = null;
       if (!this.started) return;
+      const more = wait();
+      if (more > 0) {
+        this.reconnectTimer = forkDelayed(more, attempt);
+        return;
+      }
       this.ensureConnected().catch((error) => {
         console.warn(
           "[runtime-client] Reconnect failed:",
@@ -416,7 +442,8 @@ export class RemoteRuntimeHost {
         );
         this.scheduleReconnect();
       });
-    });
+    };
+    this.reconnectTimer = forkDelayed(first ? 0 : delay, attempt);
   }
 
   private async runHostHandler(

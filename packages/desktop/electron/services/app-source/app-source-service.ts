@@ -281,6 +281,9 @@ export class AppSourceService {
   private skipped: Set<string> | null = null;
   private offeredKeys: string[] = [];
   private disposed = false;
+  /** The action under way: where its time went, step by step. */
+  private timeline: { last: number; startedAt: number; steps: string[] } | null =
+    null;
   private readonly onFocus = () => void this.refresh();
 
   constructor(options: AppSourceServiceOptions) {
@@ -466,6 +469,7 @@ export class AppSourceService {
         throw new Error(merge.stderr.trim() || "Could not compute the undo.");
       }
       const tree = merge.stdout.split("\n")[0]!.trim();
+      this.mark("plan");
       const revert = await git(
         cwd,
         ["commit-tree", tree, "-p", head, "-m", `Revert "${subject}"`],
@@ -481,6 +485,7 @@ export class AppSourceService {
         this.options.updateScratchDir,
         this.options.log,
       );
+      this.mark("gate");
       if (!gate.ok) {
         return await this.dispatchUndo(cwd, {
           sha,
@@ -492,6 +497,7 @@ export class AppSourceService {
         });
       }
       await git(cwd, ["merge", "--ff-only", revert]);
+      this.mark("merge");
       // Undoing an agent's change (or an undo of it) stays that agent's.
       const change = await this.changeOf(cwd, sha);
       if (change) await this.writeChange(cwd, revert, change.agentId, !change.undone);
@@ -570,6 +576,7 @@ export class AppSourceService {
   ): Promise<void | { background: true }> {
     const head = await git(cwd, ["rev-parse", "HEAD"]);
     const plan = await classifyUpdate(cwd, head, source.ref);
+    this.mark("plan");
     this.options.log("app-source.take-planned", {
       from: source.kind,
       kind: plan.kind,
@@ -609,6 +616,7 @@ export class AppSourceService {
           this.options.updateScratchDir,
           this.options.log,
         );
+        this.mark("gate");
         if (!gate.ok) {
           return await this.dispatchMerge(
             cwd,
@@ -622,7 +630,9 @@ export class AppSourceService {
     // button, exactly like a fast-forward. The two lines belong to the work
     // that had to go on in the background.
     await git(cwd, ["merge", "--ff-only", to]);
+    this.mark("merge");
     await source.settle?.(to);
+    this.mark("settle");
     await this.swapIn(cwd, head, to);
   }
 
@@ -741,19 +751,26 @@ export class AppSourceService {
   private exclusive(
     task: (cwd: string) => Promise<void | { background: true }>,
   ): Promise<AppSourceActionResult> {
+    const requestedAt = performance.now();
     const result = this.queue.then(async (): Promise<AppSourceActionResult> => {
+      this.timeline = { startedAt: requestedAt, last: requestedAt, steps: [] };
+      this.mark("queued");
       this.setBusy(true);
       try {
         await this.options.beforeAction?.(this.options.stellaAppDir);
+        this.mark("verify");
         const outcome = await task(this.options.stellaAppDir);
         this.pushToFork();
+        this.logTimeline(outcome ? "background" : "applied");
         return { ok: true, ...(outcome ?? {}) };
       } catch (error) {
         this.options.log("app-source.action-failed", {
           message: errorMessage(error),
         });
+        this.logTimeline("failed");
         return { ok: false, error: errorMessage(error) };
       } finally {
+        this.timeline = null;
         this.setBusy(false);
         void this.refresh();
       }
@@ -762,11 +779,33 @@ export class AppSourceService {
     return result;
   }
 
+  /** Note how long the step that just ended took. */
+  private mark(step: string) {
+    const timeline = this.timeline;
+    if (!timeline) return;
+    const now = performance.now();
+    timeline.steps.push(`${step} ${Math.round(now - timeline.last)}`);
+    timeline.last = now;
+  }
+
+  /** One line per action: every step's milliseconds, and the total. */
+  private logTimeline(outcome: string) {
+    const timeline = this.timeline;
+    if (!timeline || timeline.steps.length === 0) return;
+    this.options.log("app-source.timing", {
+      outcome,
+      totalMs: Math.round(performance.now() - timeline.startedAt),
+      steps: timeline.steps.join(" | "),
+    });
+    timeline.steps = [];
+  }
+
   /** Make a change that just landed in the checkout take effect. */
   private async swapIn(cwd: string, from: string, to: string) {
     const paths = (await git(cwd, ["diff", "--name-only", from, to]))
       .split("\n")
       .filter(Boolean);
+    this.mark("diff");
     const touches = (prefix: string) =>
       paths.some((file) => file.startsWith(prefix));
     const install = installs(paths);
@@ -789,6 +828,7 @@ export class AppSourceService {
       await (await covering)?.cancel();
       throw error;
     }
+    this.mark("sign");
     this.options.log("app-source.applied", { files: paths.length });
     if (install) {
       const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
@@ -801,6 +841,7 @@ export class AppSourceService {
           `The change is applied, but bun install failed: ${result.stderr.trim().slice(-400)}`,
         );
       }
+      this.mark("install");
     }
     if (touches("packages/runtime/") || touches("packages/contracts/")) {
       this.options.requestRuntimeRestart();
@@ -808,14 +849,18 @@ export class AppSourceService {
     if (restart) {
       // Main and preload are rebuilt from source on launch.
       await this.options.beforeRelaunch?.();
+      this.mark("hold");
+      this.logTimeline("relaunch");
       this.options.relaunch();
       return;
     }
     const covered = await covering;
+    this.mark("cover");
     const swap = async () => {
       await this.options.applyRendererChanges(paths);
     };
     await (covered ? covered.reveal(swap) : swap());
+    this.mark("reveal");
   }
 
   private async identityEnv(

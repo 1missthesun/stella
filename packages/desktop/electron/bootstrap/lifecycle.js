@@ -17,11 +17,17 @@ const QUIT_PHASE_DEADLINE_MS = {
 };
 const SLOW_QUIT_PHASE_MS = 1_500;
 const SLOW_CLEANUP_MS = 750;
+/** Cleanups shorter than this are left out of the per-phase timing line. */
+const LISTED_CLEANUP_MS = 20;
 const runQuitPhase = async (context, phase) => {
     const startedAt = Date.now();
+    const timings = [];
     const phaseRun = context.state.processRuntime
         .runPhase(phase, {
         onCleanupTiming: ({ key, elapsedMs }) => {
+            if (elapsedMs >= LISTED_CLEANUP_MS) {
+                timings.push(`${key} ${elapsedMs}`);
+            }
             if (elapsedMs >= SLOW_CLEANUP_MS) {
                 getMainLogger()?.process("main.quit-cleanup-slow", {
                     phase,
@@ -55,6 +61,11 @@ const runQuitPhase = async (context, phase) => {
     else if (elapsedMs >= SLOW_QUIT_PHASE_MS) {
         getMainLogger()?.process("main.quit-phase-slow", { phase, elapsedMs });
     }
+    getMainLogger()?.process("main.quit-phase", {
+        phase,
+        elapsedMs,
+        cleanups: timings.join(" | "),
+    });
 };
 export const initializeBootstrapSingleInstance = (context) => {
     context.services.authService.bindSingleInstanceHandler();
@@ -154,9 +165,7 @@ export const registerBootstrapLifecycle = (context) => {
             await runQuitPhase(context, "before-quit");
             await runQuitPhase(context, "will-quit");
             const elapsedMs = Date.now() - startedAt;
-            if (elapsedMs >= SLOW_QUIT_PHASE_MS) {
-                getMainLogger()?.process("main.quit-cleanup-elapsed", { elapsedMs });
-            }
+            getMainLogger()?.process("main.quit-cleanup-elapsed", { elapsedMs });
             quitAfterCleanup = true;
             app.exit(launcherExitCode());
         })();

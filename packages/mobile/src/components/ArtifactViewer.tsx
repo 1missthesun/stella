@@ -22,6 +22,8 @@ import {
 import * as Sharing from "expo-sharing";
 import { Directory, File, Paths } from "expo-file-system";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
+import { getRandomBytes } from "expo-crypto";
+import { canvasBridgeScript, withCanvasPolicy } from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { FloatingPopover } from "./FloatingPopover";
 import type { PopoverAction } from "./FloatingPopoverParts";
@@ -186,91 +188,77 @@ const escapeHtml = (value: string): string =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-const CANVAS_NAVIGATION_SCRIPT = String.raw`
-(() => {
-  const navigate = (rawHref) => {
-    const href = rawHref.trim();
-    if (href.startsWith("#")) {
-      let fragment;
-      try { fragment = decodeURIComponent(href.slice(1)); } catch { return; }
-      if (!fragment) {
-        window.scrollTo({ top: 0, behavior: "auto" });
-        return;
-      }
-      const target = document.getElementById(fragment) ||
-        document.querySelector('[name="' + CSS.escape(fragment) + '"]');
-      target?.scrollIntoView();
-      return;
-    }
-    window.ReactNativeWebView.postMessage(JSON.stringify({
-      type: "stella:canvas-navigate",
-      href,
-    }));
-  };
-
-  document.addEventListener("click", (event) => {
-    const target = event.target;
-    const anchor = target && typeof target.closest === "function"
-      ? target.closest("a[href]")
-      : null;
-    if (!anchor) return;
-    event.preventDefault();
-    event.stopPropagation();
-    navigate(anchor.getAttribute("href") || "");
-  }, true);
-
-  document.addEventListener("submit", (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const form = event.target;
-    if (form && typeof form.getAttribute === "function") {
-      navigate(form.getAttribute("action") || "");
-    }
-  }, true);
-})();
-true;
-`;
-
 function CanvasDocumentWebView({ html, style }: { html: string; style: object }) {
-  const webViewRef = useRef<WebView>(null);
-  const allowedInitialLoadRef = useRef(false);
+  const token = useMemo(
+    () =>
+      Array.from(getRandomBytes(24), (byte) =>
+        byte.toString(16).padStart(2, "0"),
+      ).join(""),
+    [html],
+  );
+  const source = useMemo(() => ({ html: withCanvasPolicy(html) }), [html]);
+  const bridgeScript = useMemo(() => canvasBridgeScript(token), [token]);
+  const loadedTokenRef = useRef<string | null>(null);
 
-  const handleMessage = useCallback((event: WebViewMessageEvent) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data) as {
-        type?: unknown;
-        href?: unknown;
-      };
-      if (
-        message.type !== "stella:canvas-navigate" ||
-        typeof message.href !== "string"
-      ) {
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      try {
+        const message = JSON.parse(event.nativeEvent.data) as {
+          type?: unknown;
+          token?: unknown;
+          href?: unknown;
+        };
+        if (
+          message.type !== "stella:canvas-navigate" ||
+          message.token !== token ||
+          typeof message.href !== "string"
+        ) {
+          return;
+        }
+        const navigation = classifyCanvasNavigation(message.href);
+        if (navigation.kind === "external") {
+          void Linking.openURL(navigation.url).catch(() => undefined);
+        }
+      } catch {
         return;
       }
-      const navigation = classifyCanvasNavigation(message.href);
-      if (navigation.kind === "external") {
-        void Linking.openURL(navigation.url).catch(() => undefined);
-      }
-    } catch {
-      // Ignore malformed messages from untrusted canvas code.
-    }
-  }, []);
+    },
+    [token],
+  );
 
   return (
     <WebView
-      ref={webViewRef}
+      key={token}
       originWhitelist={["*"]}
-      source={{ html }}
+      source={source}
       style={style}
       forceDarkOn={false}
-      injectedJavaScript={CANVAS_NAVIGATION_SCRIPT}
+      incognito
+      cacheEnabled={false}
+      allowFileAccess={false}
+      allowFileAccessFromFileURLs={false}
+      allowUniversalAccessFromFileURLs={false}
+      allowsLinkPreview={false}
+      javaScriptCanOpenWindowsAutomatically={false}
+      setSupportMultipleWindows={false}
+      sharedCookiesEnabled={false}
+      thirdPartyCookiesEnabled={false}
+      geolocationEnabled={false}
+      mixedContentMode="never"
+      dataDetectorTypes="none"
+      injectedJavaScriptBeforeContentLoaded={bridgeScript}
+      injectedJavaScript={bridgeScript}
       onMessage={handleMessage}
       onShouldStartLoadWithRequest={(request) => {
         const isCanvasDocument =
           request.url === "about:blank" ||
           request.url.startsWith("data:text/html");
-        if (!allowedInitialLoadRef.current && isCanvasDocument) {
-          allowedInitialLoadRef.current = true;
+        if (
+          loadedTokenRef.current !== token &&
+          isCanvasDocument &&
+          request.isTopFrame !== false
+        ) {
+          loadedTokenRef.current = token;
           return true;
         }
         return false;

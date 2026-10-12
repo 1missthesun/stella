@@ -148,9 +148,9 @@
       "ceiling": 50.3
     },
     "turn.plain.sqlRows.p50": {
-      "value": 72,
+      "value": 84,
       "kind": "count",
-      "ceiling": 77.6
+      "ceiling": 90.2
     },
     "turn.plain.rpcLinesOut.p50": {
       "value": 8,
@@ -203,9 +203,9 @@
       "ceiling": 97.55
     },
     "turn.tool.sqlRows.p50": {
-      "value": 149,
+      "value": 167,
       "kind": "count",
-      "ceiling": 158.45
+      "ceiling": 177.35
     },
     "turn.tool.rpcLinesOut.p50": {
       "value": 12,
@@ -238,9 +238,9 @@
       "ceiling": 33.43
     },
     "history.1000.turnOnHistory.sqlRows": {
-      "value": 72,
+      "value": 84.2,
       "kind": "count",
-      "ceiling": 77.6
+      "ceiling": 90.41
     },
     "history.1000.listEvents.sqlStatementsPerCall": {
       "value": 1,
@@ -358,14 +358,14 @@
       "ceiling": 51.73
     },
     "bundle.outputJsBytes": {
-      "value": 12886479,
+      "value": 12401501,
       "kind": "bytes",
-      "ceiling": 13531826.95
+      "ceiling": 13022600.05
     },
     "bundle.bootReachableBytes": {
-      "value": 2316782,
+      "value": 2001045,
       "kind": "bytes",
-      "ceiling": 2433645.1
+      "ceiling": 2102121.25
     },
     "boot.source.warm.bootRpc.linesOut": {
       "value": 4,
@@ -478,9 +478,9 @@
       "ceiling": 0
     },
     "bundle.bootReachableFiles": {
-      "value": 23,
+      "value": 30,
       "kind": "count",
-      "ceiling": 26.15
+      "ceiling": 33.5
     },
     "history.1000.openMs": {
       "value": 498.98,

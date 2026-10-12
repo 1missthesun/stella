@@ -1,4 +1,4 @@
-import { git, gitRaw, isAncestor } from "./git.js";
+import { git, gitRaw } from "./git.js";
 
 /**
  * What taking some other version means for this checkout, decided before
@@ -87,19 +87,19 @@ export const classifyUpdate = async (
   head: string,
   ref: string,
 ): Promise<UpdatePlan> => {
-  const tip = (
-    await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])
-  ).stdout.trim();
-  if (!tip || tip === head || (await isAncestor(cwd, tip, head))) {
-    return { kind: "none" };
-  }
-  const [count, subject] = await Promise.all([
-    git(cwd, ["rev-list", "--count", `${head}..${tip}`]).then(Number),
-    git(cwd, ["log", "-1", "--format=%s", tip]),
-  ]);
-  if (await isAncestor(cwd, head, tip)) {
-    return { kind: "fast-forward", tip, count, subject };
-  }
+  // Two git calls settle the common cases: the tip and its subject, then how
+  // many commits each side has that the other lacks (none on ours is a
+  // fast-forward, none on theirs is nothing to take).
+  const found = await gitRaw(cwd, ["log", "-1", "--format=%H%x00%s", `${ref}^{commit}`, "--"]);
+  const [tip = "", subject = ""] = found.code === 0 ? found.stdout.trim().split("\0") : [];
+  if (!tip || tip === head) return { kind: "none" };
+  const [ours = 0, count = 0] = (
+    await git(cwd, ["rev-list", "--left-right", "--count", `${head}...${tip}`])
+  )
+    .split(/\s+/)
+    .map(Number);
+  if (count === 0) return { kind: "none" };
+  if (ours === 0) return { kind: "fast-forward", tip, count, subject };
   const base = await git(cwd, ["merge-base", head, tip]);
   // One diff settles the provably-safe subcase: no net local difference from
   // the upstream commit last merged means no merge judgement exists to make.

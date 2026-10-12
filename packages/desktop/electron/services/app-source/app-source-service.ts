@@ -28,13 +28,17 @@ import {
   run,
 } from "./git.js";
 import { DRAFT_AGENTS_DIR, installCheckoutGuard } from "./checkout-guard.js";
-import type { CoveredWindow } from "./update-transition.js";
+import type { CoveredWindow, RelaunchHold } from "./update-transition.js";
 import {
   classifyUpdate,
   conflictedPaths,
   type UpdatePlan,
 } from "./update-plan.js";
-import { checkMergedUpdate } from "./update-gate.js";
+import {
+  checkMergedUpdate,
+  prebuildElectronBundles,
+  prepareInstallAhead,
+} from "./update-gate.js";
 import {
   mergeDraftName,
   remoteMergeBrief,
@@ -83,8 +87,16 @@ type AppSourceServiceOptions = {
    * then runs the swap and reveals it. Null runs the swap plain.
    */
   coverRenderer?: () => Promise<CoveredWindow | null>;
-  /** Before a relaunch: hold the window on screen. Never throws. */
-  beforeRelaunch?: () => Promise<void>;
+  /**
+   * Before a relaunch: frost the window on screen while the next process is
+   * made ready, committed once the relaunch is certain. Never throws.
+   */
+  beforeRelaunch?: () => Promise<RelaunchHold | null>;
+  /**
+   * The launcher prepares the tree again on every relaunch: do that here,
+   * while the window is held, so its run finds the work done.
+   */
+  launcherPreparesOnRelaunch?: boolean;
   /** Scratch worktree for checking a merged update. Removed after each check. */
   updateScratchDir: string;
   /**
@@ -335,17 +347,21 @@ export class AppSourceService {
     return this.exclusive(async (cwd) => {
       if (!isDraftName(name)) throw new Error("Unknown draft.");
       const ref = `${DRAFT_REF_PREFIX}${name}`;
-      if ((await listWorktrees(cwd)).some((tree) => tree.branch === ref)) {
+      const [worktrees, subject] = await Promise.all([
+        listWorktrees(cwd),
+        // Fails for a draft that does not exist.
+        git(cwd, ["log", "-1", "--format=%s", `${ref}^{commit}`]),
+      ]);
+      if (worktrees.some((tree) => tree.branch === ref)) {
         throw new Error(`The draft "${name}" is still being worked on.`);
       }
-      await git(cwd, ["rev-parse", "--verify", `${ref}^{commit}`]);
       return await this.take(cwd, {
         kind: "draft",
         ref,
         emptyMessage: "That change is already in this version.",
         // The change's own subject, so the chat's card and the recent list
         // still name what it does rather than saying "Merge".
-        subject: await git(cwd, ["log", "-1", "--format=%s", ref]),
+        subject,
         trustIdenticalTree: false,
         brief: (plan, head, gateOutput) =>
           staleDraftBrief(plan, head, name, gateOutput),
@@ -496,12 +512,11 @@ export class AppSourceService {
           buildOutput: gate.output,
         });
       }
-      await git(cwd, ["merge", "--ff-only", revert]);
-      this.mark("merge");
-      // Undoing an agent's change (or an undo of it) stays that agent's.
-      const change = await this.changeOf(cwd, sha);
-      if (change) await this.writeChange(cwd, revert, change.agentId, !change.undone);
-      await this.swapIn(cwd, head, revert);
+      await this.swapIn(cwd, head, revert, async () => {
+        // Undoing an agent's change (or an undo of it) stays that agent's.
+        const change = await this.changeOf(cwd, sha);
+        if (change) await this.writeChange(cwd, revert, change.agentId, !change.undone);
+      });
     });
   }
 
@@ -629,11 +644,7 @@ export class AppSourceService {
     // No line in the chat for this: it applied while the user watched the
     // button, exactly like a fast-forward. The two lines belong to the work
     // that had to go on in the background.
-    await git(cwd, ["merge", "--ff-only", to]);
-    this.mark("merge");
-    await source.settle?.(to);
-    this.mark("settle");
-    await this.swapIn(cwd, head, to);
+    await this.swapIn(cwd, head, to, source.settle && (() => source.settle!(to)));
   }
 
   /**
@@ -800,8 +811,19 @@ export class AppSourceService {
     timeline.steps = [];
   }
 
-  /** Make a change that just landed in the checkout take effect. */
-  private async swapIn(cwd: string, from: string, to: string) {
+  /**
+   * Advance the checkout from `from` onto `to` and make the change take
+   * effect. The window is pictured while the checkout moves and the launcher
+   * signs it; `settle` (bookkeeping nothing on screen depends on) runs
+   * alongside the swap and is done before the action ends or Stella
+   * relaunches.
+   */
+  private async swapIn(
+    cwd: string,
+    from: string,
+    to: string,
+    settle?: () => Promise<void>,
+  ) {
     const paths = (await git(cwd, ["diff", "--name-only", from, to]))
       .split("\n")
       .filter(Boolean);
@@ -823,36 +845,55 @@ export class AppSourceService {
     // screen moves meanwhile).
     const covering = visible ? this.options.coverRenderer?.() ?? null : null;
     try {
+      await git(cwd, ["merge", "--ff-only", to]);
+      this.mark("merge");
       await this.options.afterApply?.(cwd);
     } catch (error) {
       await (await covering)?.cancel();
       throw error;
     }
     this.mark("sign");
+    const settling = settle?.() ?? Promise.resolve();
+    // Failing here leaves the change applied but its swap undone; awaited
+    // where it is reported instead.
+    settling.catch(() => undefined);
     this.options.log("app-source.applied", { files: paths.length });
-    if (install) {
-      const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
-      const result = await run(bun, ["install"], {
-        cwd,
-        timeoutMs: 10 * 60_000,
-      });
-      if (result.code !== 0) {
-        throw new Error(
-          `The change is applied, but bun install failed: ${result.stderr.trim().slice(-400)}`,
-        );
-      }
-      this.mark("install");
-    }
-    if (touches("packages/runtime/") || touches("packages/contracts/")) {
-      this.options.requestRuntimeRestart();
-    }
     if (restart) {
-      // Main and preload are rebuilt from source on launch.
-      await this.options.beforeRelaunch?.();
+      // The window is frosted while the next process is made ready, not
+      // after: its dependencies installed and main and preload built here, so
+      // the relaunch only has to start. The runtime restarts with the app.
+      const holding = this.options.beforeRelaunch?.() ?? Promise.resolve(null);
+      try {
+        if (install) {
+          await this.install(cwd);
+          this.mark("install");
+        }
+      } catch (error) {
+        await (await holding)?.release();
+        throw error;
+      }
+      // A main that does not build is left to the next launch, which fails
+      // the same way and shows the launcher's recovery.
+      await Promise.all([
+        prebuildElectronBundles(
+          cwd,
+          `${this.options.updateScratchDir}-prebuild.mjs`,
+          this.options.log,
+        ),
+        this.options.launcherPreparesOnRelaunch
+          ? prepareInstallAhead(cwd, this.options.log)
+          : null,
+      ]);
+      this.mark("prebuild");
+      await settling;
+      (await holding)?.commit();
       this.mark("hold");
       this.logTimeline("relaunch");
       this.options.relaunch();
       return;
+    }
+    if (touches("packages/runtime/") || touches("packages/contracts/")) {
+      this.options.requestRuntimeRestart();
     }
     const covered = await covering;
     this.mark("cover");
@@ -861,6 +902,20 @@ export class AppSourceService {
     };
     await (covered ? covered.reveal(swap) : swap());
     this.mark("reveal");
+    await settling;
+  }
+
+  private async install(cwd: string) {
+    const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
+    const result = await run(bun, ["install"], {
+      cwd,
+      timeoutMs: 10 * 60_000,
+    });
+    if (result.code !== 0) {
+      throw new Error(
+        `The change is applied, but bun install failed: ${result.stderr.trim().slice(-400)}`,
+      );
+    }
   }
 
   private async identityEnv(

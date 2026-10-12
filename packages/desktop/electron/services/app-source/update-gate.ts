@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { git, gitRaw, run } from "./git.js";
 
 /**
@@ -126,5 +127,71 @@ export const checkMergedUpdate = async (
   } finally {
     await gitRaw(cwd, ["worktree", "remove", "--force", scratch]);
     await fs.rm(scratch, { recursive: true, force: true });
+  }
+};
+
+/**
+ * Build Electron main and preload in the checkout itself, ahead of a
+ * relaunch, so the next process finds them fresh and only has to start. The
+ * same build the next launch would run, from the same tree; a failure is
+ * logged and left to that launch. Never throws.
+ */
+export const prebuildElectronBundles = async (
+  cwd: string,
+  runner: string,
+  log: (event: string, data: Record<string, unknown>) => void,
+): Promise<void> => {
+  const startedAt = Date.now();
+  try {
+    const script = pathToFileURL(
+      path.join(cwd, "packages", "desktop", "scripts", "dev-electron-build.mjs"),
+    ).href;
+    await fs.mkdir(path.dirname(runner), { recursive: true });
+    await fs.writeFile(
+      runner,
+      `import { ensureElectronBundlesFresh } from ${JSON.stringify(script)};\n` +
+        `await ensureElectronBundlesFresh();\n`,
+    );
+    const result = await run(process.execPath, [runner], {
+      cwd,
+      env: { ELECTRON_RUN_AS_NODE: "1" },
+      timeoutMs: BUILD_TIMEOUT_MS,
+    });
+    log("app-source.prebuild", { code: result.code, ms: Date.now() - startedAt });
+  } catch (error) {
+    log("app-source.prebuild", {
+      code: -1,
+      ms: Date.now() - startedAt,
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
+
+/**
+ * Run the launcher's own setup step (native helpers, the browser, office
+ * previews) for the checkout as it now stands, ahead of a relaunch. It notes
+ * the commit it prepared, so the launcher's run of it on the way back up
+ * returns at once instead of holding the restart. Never throws: the launcher
+ * runs it again regardless.
+ */
+export const prepareInstallAhead = async (
+  cwd: string,
+  log: (event: string, data: Record<string, unknown>) => void,
+): Promise<void> => {
+  const startedAt = Date.now();
+  const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
+  try {
+    const result = await run(
+      bun,
+      [path.join(cwd, "packages", "desktop", "scripts", "prepare-install.mjs")],
+      { cwd, timeoutMs: 10 * 60_000 },
+    );
+    log("app-source.prepare-install", { code: result.code, ms: Date.now() - startedAt });
+  } catch (error) {
+    log("app-source.prepare-install", {
+      code: -1,
+      ms: Date.now() - startedAt,
+      message: error instanceof Error ? error.message : String(error),
+    });
   }
 };

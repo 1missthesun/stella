@@ -38,6 +38,14 @@ export type CoveredWindow = {
   cancel(): Promise<void>;
 };
 
+/** A window frosted for a relaunch that has not been committed to yet. */
+export type RelaunchHold = {
+  /** The relaunch is certain: hand the frame to the launcher. */
+  commit(): void;
+  /** The relaunch is off: uncover the window and drop the frame. */
+  release(): Promise<void>;
+};
+
 export type UpdateHold = {
   /** The frosted frame, a JPEG beside the hold record. */
   image: string;
@@ -364,15 +372,20 @@ export class UpdateTransition {
   }
 
   /**
-   * Before a relaunch: frost the window, keep the frosted frame for the
-   * launcher and the next process, and start the label. Never throws.
+   * Before a relaunch: frost the window, keep the frosted frame for the next
+   * process, and start the label. The launcher is handed the frame only on
+   * `commit`, once the relaunch is certain; `release` uncovers the window when
+   * the update fails before it. Never throws; null when nothing was held.
    */
-  async holdForRelaunch(): Promise<void> {
+  async holdForRelaunch(): Promise<RelaunchHold | null> {
     const win = this.visibleWindow();
-    if (!win) return;
+    if (!win) return null;
     const since = Date.now();
     try {
-      if (!(await this.freeze(win))) return;
+      if (!(await this.freeze(win))) {
+        await win.webContents.executeJavaScript(THAW_SCRIPT).catch(() => {});
+        return null;
+      }
       const view = await this.attach(win);
       const before = await this.capture(win);
       await this.call(view, "cover", jpegUrl(before), []);
@@ -393,11 +406,23 @@ export class UpdateTransition {
       await fs.writeFile(hold.image, Buffer.from(frosted, "base64"));
       await fs.writeFile(hold.mark, Buffer.from(mark, "base64"));
       await fs.writeFile(path.join(this.options.holdDir, HOLD_RECORD), JSON.stringify(hold));
-      this.options.onHold?.(hold);
       // The old window keeps holding until the process exits.
       void this.call(view, "hold", `data:image/jpeg;base64,${frosted}`, this.holdOptions(hold)).catch(() => {});
+      return {
+        commit: () => this.options.onHold?.(hold),
+        release: async () => {
+          await this.uncover(win);
+          await Promise.all(
+            [path.join(this.options.holdDir, HOLD_RECORD), hold.image, hold.mark].map((file) =>
+              fs.rm(file, { force: true }),
+            ),
+          );
+        },
+      };
     } catch (error) {
       this.fail("hold", error);
+      await this.uncover(win);
+      return null;
     }
   }
 

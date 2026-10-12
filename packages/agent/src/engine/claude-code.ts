@@ -202,6 +202,12 @@ type Turn = {
   unsent: Message[];
   waiting: Map<string, (outcome: ClaudeCodeToolOutcome) => void>;
   early: Map<string, ClaudeCodeToolOutcome>;
+  /** Stella tool calls the CLI asked its MCP server to run. */
+  claimed: Set<string>;
+  /** Calls the CLI answered itself, without asking the MCP server: what it told the model. */
+  refused: Map<string, string>;
+  /** Stella tool calls held until the CLI runs or refuses them (`cliRuns`). */
+  gates: Set<() => boolean>;
   inject?: (input: { text: string; images: ImageContent[]; onConsumed?: () => void; onDropped?: () => void }) => boolean;
   endStep?: () => boolean;
   toolSet: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
@@ -271,6 +277,17 @@ const textOf = (content: string | readonly (TextContent | ImageContent | Thinkin
         .map((part) => (part.type === "text" ? part.text : ""))
         .filter((text) => text.length > 0)
         .join("\n\n");
+
+/** Text of a stream-json `tool_result` block's content. */
+const cliResultText = (content: unknown): string =>
+  typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content
+          .map((part) => (asRecord(part)?.type === "text" && typeof asRecord(part)?.text === "string" ? (asRecord(part)!.text as string) : ""))
+          .filter((text) => text.length > 0)
+          .join("\n")
+      : "";
 
 const imagesOf = (content: Message["content"]): ImageContent[] =>
   typeof content === "string" ? [] : (content as { type: string }[]).filter((part): part is ImageContent => part.type === "image");
@@ -524,6 +541,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       calls.delete(id);
     }
     turn.waiting.clear();
+    reconsiderGates(turn);
     push(turn, { kind: "end" });
   };
 
@@ -531,6 +549,53 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     if (!turn || turn.done) return;
     turn.abort.abort(new Error(reason));
   };
+
+  const reconsiderGates = (turn: Turn) => {
+    for (const gate of [...turn.gates]) gate();
+  };
+
+  /** The CLI's `tool_result`s for calls it never asked the MCP server to run: it refused them itself. */
+  const noteRefusals = (turn: Turn, event: Record<string, unknown>) => {
+    const content = asRecord(event.message)?.content;
+    if (!Array.isArray(content)) return;
+    let changed = false;
+    for (const raw of content) {
+      const block = asRecord(raw);
+      if (block?.type !== "tool_result" || typeof block.tool_use_id !== "string") continue;
+      if (turn.claimed.has(block.tool_use_id) || turn.refused.has(block.tool_use_id)) continue;
+      turn.refused.set(block.tool_use_id, cliResultText(block.content) || "Claude Code did not run this call.");
+      changed = true;
+    }
+    if (changed) reconsiderGates(turn);
+  };
+
+  /**
+   * A Stella tool call runs only once the CLI asks the MCP server for it, so a
+   * call the CLI refuses never has effects. Resolves to why it must not run,
+   * or undefined to run it. While the CLI waits on another call of the same
+   * step, it is running that step's tools in order and reaches this one only
+   * after Stella answers, so the call runs then too.
+   */
+  const cliRuns = (turn: Turn, toolUseId: string, name: string, context: Context): Promise<string | undefined> =>
+    new Promise((resolve) => {
+      const signal = context.abortSignal;
+      const gate = (): boolean => {
+        let verdict: { run: true } | { refused: string } | undefined;
+        if (turn.claimed.has(toolUseId)) verdict = { run: true };
+        else if (turn.refused.has(toolUseId)) verdict = { refused: `Claude Code did not run ${name}; it answered: ${turn.refused.get(toolUseId)}` };
+        else if (turn.done) verdict = { refused: `Claude Code ended its step without running ${name}, so it did not run.` };
+        else if (signal?.aborted) verdict = { refused: "Stopped." };
+        else if ([...turn.waiting.keys()].some((id) => id !== toolUseId)) verdict = { run: true };
+        if (!verdict) return false;
+        turn.gates.delete(gate);
+        signal?.removeEventListener("abort", gate);
+        resolve("run" in verdict ? undefined : verdict.refused);
+        return true;
+      };
+      if (gate()) return;
+      turn.gates.add(gate);
+      signal?.addEventListener("abort", gate, { once: true });
+    });
 
   const toolSetFor = (binding: Binding, tools: readonly { name: string; description: string; parameters: unknown }[]) => {
     const offered = new Set(tools.map((tool) => tool.name));
@@ -665,6 +730,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       unsent: [],
       waiting: new Map(),
       early: new Map(),
+      claimed: new Set(),
+      refused: new Map(),
+      gates: new Set(),
       toolSet: { tools: request.tools, nativeTools: request.nativeTools },
     };
     session.turn = turn;
@@ -703,13 +771,16 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         },
         executeTool: (toolUseId, _name, _args, signal) =>
           new Promise<ClaudeCodeToolOutcome>((resolve) => {
+            turn.claimed.add(toolUseId);
             const early = turn.early.get(toolUseId);
             if (early) {
               turn.early.delete(toolUseId);
               resolve(early);
+              reconsiderGates(turn);
               return;
             }
             turn.waiting.set(toolUseId, resolve);
+            reconsiderGates(turn);
             signal?.addEventListener(
               "abort",
               () => {
@@ -723,6 +794,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         onEvent: (event) => {
           if (turn.done) return;
           if (event.type === "stream_event") answered();
+          if (event.type === "user") noteRefusals(turn, event as Record<string, unknown>);
           push(turn, { kind: "event", event: event as Record<string, any> });
         },
         onNativeToolEnd: ({ toolUseId, result, isError }) => {
@@ -1321,9 +1393,20 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           }),
           hook(CompactionTask, { beforeCompact: () => ({ decline: true }) }),
           hook(ToolTask, {
-            beforeTool: (call) => {
-              const truncated = calls.get(call.id)?.truncated;
-              return truncated ? { block: truncated } : undefined;
+            // Only what the CLI really runs has effects: a name it called natively runs here only as its
+            // own built-in, answered with what it said; a Stella tool waits for the CLI's MCP request.
+            beforeTool: async (call, _api, context) => {
+              const record = calls.get(call.id);
+              if (!record) return undefined;
+              if (record.truncated) return { block: record.truncated };
+              if (record.native) {
+                if ((CLAUDE_CODE_BUILTIN_TOOLS as readonly string[]).includes(record.name)) return undefined;
+                const result = await nativeResult(call.id, context);
+                calls.delete(call.id);
+                return { block: `Claude Code did not run ${record.name} as a Stella tool; it answered: ${result.text || "(no output)"}` };
+              }
+              const refused = await cliRuns(record.turn, call.id, record.name, context);
+              return refused === undefined ? undefined : { block: refused };
             },
             // A Stella tool (switch_destination) may have just moved the file and shell tools: a CLI
             // still holding built-ins is fenced at once, not at the next request.

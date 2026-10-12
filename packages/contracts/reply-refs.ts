@@ -160,6 +160,59 @@ export const splitReplyRefs = (
   return { text: stripped, refs, reactions: [...reactionsBySequence.values()] };
 };
 
+const contentTexts = (content: unknown): string[] => {
+  if (typeof content === "string") return [content];
+  if (!Array.isArray(content)) return [];
+  const texts: string[] = [];
+  for (const block of content) {
+    if (
+      block &&
+      typeof block === "object" &&
+      (block as { type?: unknown }).type === "text" &&
+      typeof (block as { text?: unknown }).text === "string"
+    ) {
+      texts.push((block as { text: string }).text);
+    }
+  }
+  return texts;
+};
+
+/**
+ * `splitReplyRefs` for a whole assistant message. A message can carry more
+ * than one reply (a provider that keeps one message open while new input
+ * arrives mid-turn), each in its own text block and each ending in its own
+ * `refs` fence, so every text block is split on its own.
+ */
+export const splitMessageReplyRefs = (
+  message: { content?: unknown } | undefined,
+): { text: string; refs: RawReplyRef[]; reactions: ReplyReaction[] } => {
+  const texts: string[] = [];
+  const seen = new Set<string>();
+  const refs: RawReplyRef[] = [];
+  const reactionsBySequence = new Map<number, ReplyReaction>();
+  for (const block of contentTexts(message?.content)) {
+    const split = splitReplyRefs(block);
+    const text = split.text.trim();
+    if (text) texts.push(text);
+    for (const ref of split.refs) {
+      const key =
+        ref.kind === "message" ? `m:${ref.sequence}` : `a:${ref.threadId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      refs.push(ref);
+    }
+    for (const reaction of split.reactions) {
+      reactionsBySequence.delete(reaction.sequence);
+      reactionsBySequence.set(reaction.sequence, reaction);
+    }
+  }
+  return {
+    text: texts.join("\n\n"),
+    refs,
+    reactions: [...reactionsBySequence.values()],
+  };
+};
+
 /** Trailing tag that tells the model a user message's sequence number. */
 export const formatMessageRefTag = (sequence: number): string =>
   `<${SYSTEM_REMINDER_TAG}>message #${sequence}</${SYSTEM_REMINDER_TAG}>`;

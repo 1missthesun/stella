@@ -22,7 +22,7 @@ import {
   journalUserReactions,
   resolveJournalReplyRefs,
 } from "@stella/contracts/conversation-journal-projection";
-import { splitReplyRefs, type ReplyRef } from "@stella/contracts/reply-refs";
+import { splitMessageReplyRefs, type ReplyRef } from "@stella/contracts/reply-refs";
 
 const userEventId = (record: JournalMessageRecord): string =>
   record.clientMsgId ?? `cloud:${record.turnId}:message:${record.seq}`;
@@ -504,7 +504,7 @@ export const journalRecordsToMessageRecords = (
       if (record.role === "assistant") {
         // The trailing `refs` fence is model-facing (it stays in the journal
         // so the model sees its own citations); the user sees chips instead.
-        const { text, refs } = splitReplyRefs(messageText(record.payload));
+        const { text, refs } = splitMessageReplyRefs(record.payload);
         if (text) {
           events.push({
             _id: `cloud:${turnId}:message:${record.seq}`,

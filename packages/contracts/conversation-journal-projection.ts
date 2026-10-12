@@ -15,7 +15,7 @@ import {
 } from "./conversation-protocol.js";
 import type { AgentAttemptOutcome } from "./agent-status.js";
 import {
-  splitReplyRefs,
+  splitMessageReplyRefs,
   toReplyPreview,
   type MessageReaction,
   type RawReplyRef,
@@ -39,7 +39,7 @@ export const journalUserReactions = (
       continue;
     }
     if (record.role !== "assistant") continue;
-    for (const reaction of splitReplyRefs(messageText(record.payload)).reactions) {
+    for (const reaction of splitMessageReplyRefs(record.payload).reactions) {
       if (!userSeqs.has(reaction.sequence)) continue;
       reactions.set(reaction.sequence, {
         emoji: reaction.emoji,
@@ -269,7 +269,7 @@ export const resolveJournalReplyRefs = (args: {
       id: args.messageId(record),
       role: record.role,
       preview: toReplyPreview(
-        record.role === "assistant" ? splitReplyRefs(text).text : text,
+        record.role === "assistant" ? splitMessageReplyRefs(record.payload).text : text,
       ),
     });
   }

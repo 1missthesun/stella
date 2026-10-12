@@ -17,7 +17,7 @@ import {
   type PiEntry,
   type PiUserMessage,
 } from "@stella/contracts/pi-chat";
-import { splitReplyRefs } from "@stella/contracts/reply-refs";
+import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 
 /** `say`: worth speaking. `note`: context only, never announced. */
 export type ConversationUpdateKind = "say" | "note";
@@ -117,7 +117,7 @@ const createPiFeed = (args: {
       }
     } else if (entry.kind === "pi.assistant" && message.role === "assistant") {
       if (hiddenTurn || message.stella?.hidden || message.source === "voice") return;
-      const text = splitReplyRefs(piMessageText(message)).text.trim();
+      const text = splitMessageReplyRefs(message).text.trim();
       if (text) update = { id: `pi:${entry.id}`, kind: "note", text: textTurnNote("Stella replied", text) };
     }
     if (update && emitting) args.onUpdate(update);

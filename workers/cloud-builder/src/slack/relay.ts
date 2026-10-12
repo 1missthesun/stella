@@ -129,7 +129,8 @@ const assistantText = (payload: unknown): string | null => {
             typeof (part as { text?: unknown }).text === "string",
         ),
       )
-      .map((part) => part.text);
+      .map((part) => withoutRefs(splitReplyRefs(part.text).text).trim())
+      .filter(Boolean);
     text = parts.length ? parts.join("\n\n") : null;
   }
   return text === null

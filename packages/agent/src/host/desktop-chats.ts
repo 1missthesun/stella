@@ -41,7 +41,7 @@ import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/b
 import { agentReportReceipt, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
-import { splitReplyRefs } from "@stella/contracts/reply-refs";
+import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import {
   isPiAgentInput,
   isPiAgentText,
@@ -1795,7 +1795,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     const page = await chat.root.entries({ minEntryId: answer, maxEntryId: answer }, 1, undefined, context);
     const message = (page.items[0] as unknown as PiEntry | undefined)?.model?.[0];
     // What gets delivered or spoken is the prose, without the reply's citations.
-    return { status: "ok", finalText: splitReplyRefs(piMessageText(message)).text.trim() };
+    return { status: "ok", finalText: splitMessageReplyRefs(message).text.trim() };
   };
 
   /**
@@ -1864,7 +1864,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           items.push({ role: "user", content: text, timestamp: message.timestamp });
         }
       } else if (entry.kind === "pi.assistant" && message?.role === "assistant") {
-        const text = splitReplyRefs(piMessageText(message)).text.trim();
+        const text = splitMessageReplyRefs(message).text.trim();
         if (text.trim()) items.push({ role: "assistant", content: text, timestamp: message.timestamp });
       }
     }

@@ -3,7 +3,7 @@ import { parseAskUserToolResult, type UserAskRecord } from "@stella/contracts/us
 import { projectMobileLifecycle } from "./mobile-reply-context";
 import { cloudFileArtifact } from "./cloud-file-payload";
 import type { ChatArtifact, ChatMessage } from "../types";
-import { splitReplyRefs } from "@stella/contracts/reply-refs";
+import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import {
   completeJournalWindowRecords,
   journalMessageTimestamp as timestampOf,
@@ -416,7 +416,7 @@ export const projectCloudConversationMessages = (args: {
       });
       // The trailing `refs` fence is model-facing (see `reply-refs`); it
       // never renders. Preserve its relationships for contextual navigation.
-      const split = splitReplyRefs(messageText(record.payload));
+      const split = splitMessageReplyRefs(record.payload);
       const value = split.text;
       // Desktop-executed turns persist resolved refs instead of a model fence.
       const storedRefs = storedJournalReplyRefs(record.payload);

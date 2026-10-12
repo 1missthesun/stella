@@ -1,4 +1,5 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   chmodSync,
   closeSync,
@@ -275,15 +276,23 @@ export const startTestBrowser = async ({ runDir, extension, display, softwareGl 
   return { pid: child.pid, chromium };
 };
 
-const claudeCredentialSources = () => {
-  const dirs = [process.env.STELLA_VERIFY_CLAUDE_SOURCE_DIR?.trim(), process.env.CLAUDE_CONFIG_DIR?.trim(), path.join(os.homedir(), ".claude")].filter(Boolean);
-  return [...new Set(dirs)].map((dir) => path.join(dir, ".credentials.json"));
-};
+const claudeSourceDirs = () => [
+  ...new Set([process.env.STELLA_VERIFY_CLAUDE_SOURCE_DIR?.trim(), process.env.CLAUDE_CONFIG_DIR?.trim(), path.join(os.homedir(), ".claude")].filter(Boolean)),
+];
 
-const readMacKeychainCredential = () => {
+const claudeCredentialSources = () => claudeSourceDirs().map((dir) => path.join(dir, ".credentials.json"));
+
+const claudeKeychainServices = () => [
+  "Claude Code-credentials",
+  ...claudeSourceDirs()
+    .filter((dir) => dir !== path.join(os.homedir(), ".claude"))
+    .map((dir) => `Claude Code-credentials-${createHash("sha256").update(dir).digest("hex").slice(0, 8)}`),
+];
+
+const readMacKeychainCredential = (service) => {
   if (process.platform !== "darwin") return null;
   try {
-    const raw = execFileSync("security", ["find-generic-password", "-s", "Claude Code-credentials", "-w"], {
+    const raw = execFileSync("security", ["find-generic-password", "-s", service, "-w"], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
@@ -315,8 +324,10 @@ export const borrowClaudeLogin = ({ claudeConfigDir, oauthToken }) => {
         if (parsed?.accessToken) candidates.push({ oauth: parsed, source: file });
       } catch {}
     }
-    const keychain = readMacKeychainCredential()?.claudeAiOauth;
-    if (keychain?.accessToken) candidates.push({ oauth: keychain, source: "macOS keychain: Claude Code-credentials" });
+    for (const service of claudeKeychainServices()) {
+      const keychain = readMacKeychainCredential(service)?.claudeAiOauth;
+      if (keychain?.accessToken) candidates.push({ oauth: keychain, source: `macOS keychain: ${service}` });
+    }
     candidates.sort((a, b) => (b.oauth.expiresAt ?? 0) - (a.oauth.expiresAt ?? 0));
     const best = candidates[0];
     if (!best) throw new Error("No Claude Code login on this computer to borrow (looked at $CLAUDE_CONFIG_DIR, ~/.claude and the macOS keychain).");

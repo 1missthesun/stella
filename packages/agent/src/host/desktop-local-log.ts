@@ -31,7 +31,7 @@ import {
   type PiUserDisplay,
   type PiUserMessage,
 } from "@stella/contracts/pi-chat";
-import { splitReplyRefs } from "@stella/contracts/reply-refs";
+import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import { lifecycleWakeOutcome, lifecycleWakeTask } from "@stella/contracts/conversation-journal-projection";
 import { NO_MESSAGE_ID, recordMessageId } from "../stella/message-ids.ts";
 
@@ -349,7 +349,7 @@ export async function localLogMirror(args: {
     return (
       entry.kind === "pi.assistant" &&
       message?.role === "assistant" &&
-      splitReplyRefs(piMessageText(message)).text.trim().length > 0
+      splitMessageReplyRefs(message).text.trim().length > 0
     );
   };
   /**
@@ -442,7 +442,7 @@ export async function localLogMirror(args: {
               if (clientMsgId) await recordMessageId(harness, root.id, clientMsgId, row.seq ?? NO_MESSAGE_ID, context);
             }
           } else if (entry.kind === "pi.assistant" && message.role === "assistant") {
-            const split = splitReplyRefs(piMessageText(message));
+            const split = splitMessageReplyRefs(message);
             const text = split.text.trim();
             const calls = message.content.flatMap((part) => (part.type === "toolCall" ? [part] : []));
             for (const reaction of split.reactions) {

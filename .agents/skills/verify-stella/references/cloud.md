@@ -23,8 +23,10 @@ teardown) is faster to drive headless:
   attached; an agent on Stella's models runs in its conversation as a pi
   agent, logged as `pi_thread_attempt_started` and
   `pi_thread_attempt_settled`).
-  The tail samples under load and dies with the shell that started it, so
-  scope it to the tested owner, conversation and turn.
+  The tail samples under load, dies with the shell that started it and
+  misses Durable Object logs, so scope it to the tested owner, conversation
+  and turn, and read stored logs with `node scripts/worker-logs.mjs --search
+  <text>` (DEPLOY.md, "Reading Worker logs").
 - Reproduce executor bugs before deploying: the built sandbox image can run
   the attached tool host locally (`docker run --rm --entrypoint sh
   stella-v2-cloud-builder-dev-sandboxsmall:<version>`), where stderr is on the

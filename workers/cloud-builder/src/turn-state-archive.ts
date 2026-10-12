@@ -954,6 +954,28 @@ export const restoreTurnStateArchive = async (args: {
   }
   const scratchId = newScratchId();
   const { archivePath } = scratchPaths(args.target, scratchId);
+  // One command under the target's lock: nothing can swap the tree while it
+  // is packed, and the packed copy is removed before the lock is let go.
+  const onDisk = await runOwnedLockedCommand(
+    args.session,
+    args.target,
+    [
+      prepareScratchCommand(args.target, scratchId),
+      currentTargetDigestCommand(args.target, scratchId),
+    ].join("\n"),
+    "Turn state archive current tree digest",
+  )
+    .then((stdout) =>
+      /STELLA_ARCHIVE_ABSENT=1/u.test(stdout) ? null : parseArchiveDigest(stdout),
+    )
+    .catch(() => null);
+  if (
+    onDisk &&
+    onDisk.sizeBytes === args.archive.sizeBytes &&
+    onDisk.sha256 === args.archive.sha256
+  ) {
+    return "current";
+  }
   return await withScratchCleanup(args.session, args.target, scratchId, async () => {
     await runLockedCommand(
       args.session,
@@ -964,28 +986,6 @@ export const restoreTurnStateArchive = async (args: {
       ].join("\n"),
       "Turn state archive scratch preparation",
     );
-    const onDisk = await runOwnedLockedCommand(
-      args.session,
-      args.target,
-      [
-        heartbeatTargetScratchCommand(args.target, scratchId),
-        currentTargetDigestCommand(args.target, scratchId),
-      ].join("\n"),
-      "Turn state archive current tree digest",
-    )
-      .then((stdout) =>
-        /STELLA_ARCHIVE_ABSENT=1/u.test(stdout)
-          ? null
-          : parseArchiveDigest(stdout),
-      )
-      .catch(() => null);
-    if (
-      onDisk &&
-      onDisk.sizeBytes === args.archive.sizeBytes &&
-      onDisk.sha256 === args.archive.sha256
-    ) {
-      return "current" as const;
-    }
     const expected: ArchiveExpectation = {
       ...args.archive,
       target: args.target,

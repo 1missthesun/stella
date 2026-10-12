@@ -1412,16 +1412,22 @@ export const runAgentAttempt = async (
   // before the CLI looks for them; its own copy may be older. Nothing below
   // reads them before the turn input is written, so they come down while
   // the skills and the attempt directory are set up.
-  let claudeLoginsMs: number | undefined;
+  let claudeLoginsMs: Record<string, number> | undefined;
   const claudeLogins = (async () => {
     if (turn.execution?.engine !== "anthropic") return null;
     const started = performance.now();
     const account = await claudeCloudAccountFor(host.env, turn);
+    const accountAt = performance.now();
     await restoreClaudeCloudLogins(host.env, turn.ownerId, sandbox);
+    const restoredAt = performance.now();
     if (account.email === TEST_CLAUDE_EMAIL && testClaudeConfigured(host.env)) {
       await seedTestClaudeLogin(host.env, turn.ownerId, sandbox);
     }
-    claudeLoginsMs = Math.round(performance.now() - started);
+    claudeLoginsMs = {
+      account: Math.round(accountAt - started),
+      restore: Math.round(restoredAt - accountAt),
+      testSeed: Math.round(performance.now() - restoredAt),
+    };
     return account;
   })();
   claudeLogins.catch(() => undefined);

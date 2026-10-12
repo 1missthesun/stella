@@ -502,6 +502,9 @@ export const buildClaudeChildEnv = (options: {
     // as root unless told it is in a sandbox.
     IS_SANDBOX: "1",
     MCP_CONNECTION_NONBLOCKING: "0",
+    // No telemetry, error reporting or update check: nothing the turn needs
+    // goes out before its first model request.
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
   };
   // Nothing may point the CLI at another endpoint or another credential.
   delete childEnv.ANTHROPIC_BASE_URL;

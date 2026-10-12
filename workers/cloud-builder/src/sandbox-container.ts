@@ -118,8 +118,15 @@ const STOP_PENDING_KEY = "stopPending";
  * container that changed nothing never replaces a newer archive.
  */
 const DEPENDENCY_BASELINE_KEY = "dependencyBaseline";
+/** When a released container is due to stop; the snapshot is taken before. */
+const STOP_DUE_KEY = "stopDueAt";
 /** Lets a released turn finish its last writes before the filesystem is frozen. */
 const RELEASE_DELAY_MS = 2_000;
+/**
+ * How long a released container stays up after its snapshot, so the thread's
+ * next turn soon after reuses it instead of booting and setting up again.
+ */
+const WARM_WINDOW_MS = 45_000;
 /** The 0.12 SDK ran commands here unless a call named another directory. */
 const DEFAULT_CWD = "/workspace";
 
@@ -577,6 +584,7 @@ export class Sandbox extends DurableObject<Env> {
     // takes its snapshot but leaves it running.
     if (this.ctx.storage.kv.get<boolean>(STOP_PENDING_KEY)) {
       this.ctx.storage.kv.delete(STOP_PENDING_KEY);
+      this.ctx.storage.kv.delete(STOP_DUE_KEY);
     }
     if (this.#stopping) await this.#stopping;
     if (this.#booting) {
@@ -653,6 +661,7 @@ export class Sandbox extends DurableObject<Env> {
     if (!options.keepSnapshot) {
       this.ctx.storage.kv.delete(RELEASE_DUE_KEY);
       this.ctx.storage.kv.delete(STOP_PENDING_KEY);
+      this.ctx.storage.kv.delete(STOP_DUE_KEY);
       await this.#world(this.ctx.storage.kv.get<SandboxBoot>("boot"))
         ?.forgetContainerSnapshot({ sandbox: this.ctx.id.toString() })
         .catch(() => undefined);
@@ -665,28 +674,75 @@ export class Sandbox extends DurableObject<Env> {
 
   /**
    * The turn using this container has let go of it: snapshot it for the next
-   * agent container of this owner to start from, bring the owner's caches and
-   * dependencies archive up to date, then stop it rather than leave it idle.
-   * The alarm does all three, so the caller's turn never waits; a call that
-   * needs the container before then keeps it running.
+   * agent container of this owner to start from and bring the owner's caches
+   * and dependencies archive up to date, then keep it up for the warm window
+   * so the thread's next turn soon after reuses it, and stop it after that
+   * rather than leave it idle. A turn that was stopped or failed passes
+   * `warm: false`: nothing is expected to follow it, so the container stops
+   * right after its snapshot. The alarm does all of it, so the caller's turn
+   * never waits; a call that needs the container before the stop keeps it
+   * running.
    */
-  async release(): Promise<void> {
+  async release(options: { warm?: boolean } = {}): Promise<void> {
     if (!this.ctx.container?.running) return;
-    const due = Date.now() + RELEASE_DELAY_MS;
-    this.ctx.storage.kv.put(RELEASE_DUE_KEY, due);
+    const snapshotDue = Date.now() + RELEASE_DELAY_MS;
+    this.ctx.storage.kv.put(RELEASE_DUE_KEY, snapshotDue);
+    this.ctx.storage.kv.put(
+      STOP_DUE_KEY,
+      options.warm === false ? snapshotDue : snapshotDue + WARM_WINDOW_MS,
+    );
     this.ctx.storage.kv.put(STOP_PENDING_KEY, true);
+    await this.#armReleaseAlarm();
+  }
+
+  /** The alarm at the earliest pending release step, never later than one already set. */
+  async #armReleaseAlarm(): Promise<void> {
+    const kv = this.ctx.storage.kv;
+    const steps = [
+      kv.get<number>(RELEASE_DUE_KEY),
+      kv.get<boolean>(STOP_PENDING_KEY) ? kv.get<number>(STOP_DUE_KEY) : undefined,
+    ].filter((due): due is number => due !== undefined);
+    if (steps.length === 0) return;
+    const due = Math.min(...steps);
     const alarm = await this.ctx.storage.getAlarm();
     if (alarm === null || alarm > due) await this.ctx.storage.setAlarm(due);
   }
 
   async alarm(): Promise<void> {
-    const due = this.ctx.storage.kv.get<number>(RELEASE_DUE_KEY);
-    if (due === undefined) return;
-    if (due > Date.now()) {
-      await this.ctx.storage.setAlarm(due);
+    const kv = this.ctx.storage.kv;
+    const snapshotDue = kv.get<number>(RELEASE_DUE_KEY);
+    if (snapshotDue !== undefined && snapshotDue <= Date.now()) {
+      kv.delete(RELEASE_DUE_KEY);
+      // A failed snapshot leaves the owner's previous one; the stop still runs.
+      await this.#snapshotReleased().catch((error: unknown) => {
+        console.log(
+          JSON.stringify({
+            level: "error",
+            event: "sandbox_snapshot_failed",
+            sandbox: this.ctx.id.toString().slice(0, 12),
+            message: errorText(error),
+          }),
+        );
+      });
+    }
+    const stopDue = kv.get<number>(STOP_DUE_KEY);
+    if (stopDue !== undefined && stopDue <= Date.now()) {
+      kv.delete(STOP_DUE_KEY);
+      if (kv.get<boolean>(STOP_PENDING_KEY)) {
+        kv.delete(STOP_PENDING_KEY);
+        await this.#stopReleased();
+      }
+    }
+    if (!this.ctx.container?.running) {
+      kv.delete(RELEASE_DUE_KEY);
+      kv.delete(STOP_DUE_KEY);
+      kv.delete(STOP_PENDING_KEY);
       return;
     }
-    this.ctx.storage.kv.delete(RELEASE_DUE_KEY);
+    await this.#armReleaseAlarm();
+  }
+
+  async #snapshotReleased(): Promise<void> {
     if (this.#booting) await this.#booting.catch(() => undefined);
     const container = this.ctx.container;
     if (!container?.running) return;
@@ -718,33 +774,32 @@ export class Sandbox extends DurableObject<Env> {
       }
     } finally {
       if (boot?.world) await this.#backupDependencies(boot.world);
-      if (this.ctx.storage.kv.get<boolean>(STOP_PENDING_KEY)) {
-        this.ctx.storage.kv.delete(STOP_PENDING_KEY);
-        // A stop that fails leaves the inactivity timeout to do it.
-        let failure: string | undefined;
-        this.#stopping = (
-          this.ctx.container?.running
-            ? this.#container.destroy()
-            : Promise.resolve()
-        )
-          .catch((error: unknown) => {
-            failure = errorText(error);
-          })
-          .finally(() => {
-            this.#stopping = null;
-          });
-        await this.#stopping;
-        console.log(
-          JSON.stringify({
-            level: failure ? "error" : "info",
-            event: failure ? "sandbox_container_stop_failed" : "sandbox_container_stopped",
-            sandbox: this.ctx.id.toString().slice(0, 12),
-            reason: "released",
-            ...(failure ? { message: failure } : {}),
-          }),
-        );
-      }
     }
+  }
+
+  async #stopReleased(): Promise<void> {
+    if (this.#booting) await this.#booting.catch(() => undefined);
+    if (!this.ctx.container?.running) return;
+    // A stop that fails leaves the inactivity timeout to do it.
+    let failure: string | undefined;
+    this.#stopping = this.#container
+      .destroy()
+      .catch((error: unknown) => {
+        failure = errorText(error);
+      })
+      .finally(() => {
+        this.#stopping = null;
+      });
+    await this.#stopping;
+    console.log(
+      JSON.stringify({
+        level: failure ? "error" : "info",
+        event: failure ? "sandbox_container_stop_failed" : "sandbox_container_stopped",
+        sandbox: this.ctx.id.toString().slice(0, 12),
+        reason: "released",
+        ...(failure ? { message: failure } : {}),
+      }),
+    );
   }
 
   /**

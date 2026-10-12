@@ -531,7 +531,11 @@ export const terminateCurrentAgentSession = async (
   });
   if (!target) return;
   if (turn.kind !== "agent") return;
-  await host.releaseAgentSessionResources({ ...target, workload: "world" });
+  await host.releaseAgentSessionResources({
+    ...target,
+    workload: "world",
+    warm: false,
+  });
 };
 
 export const releaseAgentSessionResources = async (
@@ -542,6 +546,8 @@ export const releaseAgentSessionResources = async (
     workload: "world";
     sessionId: string;
     daemonDirectory: string;
+    /** False when the turn was stopped or failed: no warm window after it. */
+    warm?: boolean;
   },
 ): Promise<void> => {
   const sandbox = host.sandbox(target.sandboxId, target.size, target.workload);
@@ -629,6 +635,10 @@ export const releaseAgentSessionResources = async (
   if (turn?.agentRole === "orchestrator") return;
   // A released agent container is the warmest copy of this owner's setup:
   // the next agent container to start, this thread's or another's, resumes
-  // from its filesystem. Then it stops instead of idling until its timeout.
-  await sandbox.release().catch(() => undefined);
+  // from its filesystem. It stays up for the warm window, so the thread's
+  // next turn soon after reuses it, then stops instead of idling until its
+  // timeout.
+  await sandbox
+    .release({ warm: target.warm !== false })
+    .catch(() => undefined);
 };

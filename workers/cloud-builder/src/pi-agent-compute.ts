@@ -76,8 +76,11 @@ export type PiComputeLease = {
   call(call: PiWorkspaceCall): Promise<SerializedAgentToolResult>;
   /** Push the world, write the drive back and deliver what the answer links. */
   quiesce(linkedPaths: readonly string[]): Promise<{ deliveredFiles: readonly string[] }>;
-  /** Let the container go: its daemon, session and slot. */
-  release(): Promise<void>;
+  /**
+   * Let the container go: its daemon, session and slot. `warm` keeps it up
+   * for the warm window, for a run that ended normally.
+   */
+  release(options?: { warm?: boolean }): Promise<void>;
   /** When its broker and world credentials stop working. */
   readonly expiresAt: number;
   /** Stops anything still running on it. */
@@ -133,11 +136,17 @@ const quoted = (value: string) => `'${value.replace(/'/gu, `'"'"'`)}'`;
 
 /**
  * Release one lease's resources by its record: the daemon's process group
- * and directory, its session, its slot, then the container (which snapshots
- * and stops, the warmest start for the owner's next agent). Each step is
- * best-effort; a container that is not running holds none of them.
+ * and directory, its session, its slot, then the container (which snapshots,
+ * the warmest start for the owner's next agent, and stops: after the warm
+ * window when `warm`, so the agent's next run soon after reuses it, else
+ * right after the snapshot). Each step is best-effort; a container that is
+ * not running holds none of them.
  */
-export const releasePiCompute = async (host: PiComputeHost, record: PiComputeRecord) => {
+export const releasePiCompute = async (
+  host: PiComputeHost,
+  record: PiComputeRecord,
+  options: { warm?: boolean } = {},
+) => {
   await host.releaseSlot(record.owner, record.sandboxId).catch(() => undefined);
   const sandbox = sandboxFor(host, record.sandboxId, INSTANCE_SIZE, await worldName(record.owner.ownerId));
   const running = await sandbox
@@ -164,7 +173,7 @@ export const releasePiCompute = async (host: PiComputeHost, record: PiComputeRec
     await sandbox.killProcess(`attached-daemon-${record.sessionId}`.slice(0, 64), "SIGKILL").catch(() => undefined);
     await sandbox.exec(`rm -rf -- ${quoted(record.daemonDirectory)}`, { origin: "internal" }).catch(() => undefined);
     await sandbox.deleteSession(record.sessionId).catch(() => undefined);
-    await sandbox.release().catch(() => undefined);
+    await sandbox.release({ warm: options.warm === true }).catch(() => undefined);
   }
   const brokerKey = turnBrokerStorageKey(record);
   const broker = await host.storage.get<TurnBrokerRecord>(brokerKey);
@@ -213,6 +222,7 @@ export const openPiComputeLease = async (
   };
   const expiresAt = Date.now() + CREDENTIAL_TTL_MS;
   let sandbox: SandboxHandle | undefined;
+  let releaseWarm = false;
 
   const attachWorld = async (target: { sandboxId: string; sessionId: string }) => {
     const started = Date.now();
@@ -322,7 +332,7 @@ export const openPiComputeLease = async (
         processId: options.processId,
       });
     },
-    release: async () => await releasePiCompute(host, record),
+    release: async () => await releasePiCompute(host, record, { warm: releaseWarm }),
     destroy: async (target) => {
       await host.releaseSlot(owner, target.sandboxId).catch(() => undefined);
       await sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world)
@@ -396,7 +406,10 @@ export const openPiComputeLease = async (
         });
         return { deliveredFiles: response.status === "quiesced" ? response.deliveredFiles : [] };
       })()),
-    release: () => (releasing ??= attachment.release(target)),
+    release: (options) => {
+      if (releasing === undefined) releaseWarm = options?.warm === true;
+      return (releasing ??= attachment.release(target));
+    },
     abort: (reason) => {
       void execution.interrupt(reason).catch(() => undefined);
       released();

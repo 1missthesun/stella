@@ -261,6 +261,7 @@ export interface BuildSessionInternals {
     workload: "world";
     sessionId: string;
     daemonDirectory: string;
+    warm?: boolean;
   }): Promise<void>;
   scheduleAppBuildPublicationRetry(
     turn: TurnRequest,

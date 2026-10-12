@@ -657,6 +657,7 @@ export class BuildSessionObject extends DurableObject<Env> {
     workload: "world";
     sessionId: string;
     daemonDirectory: string;
+    warm?: boolean;
   }): Promise<void> {
     return releaseAgentSessionResources(this.self, target);
   }

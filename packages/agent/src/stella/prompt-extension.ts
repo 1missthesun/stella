@@ -29,7 +29,6 @@ import { messageIdsHook } from "./message-ids.ts";
 import { processableImagesHook } from "./processable-images.ts";
 import { residentContextHook } from "./resident-context.ts";
 import type { StellaAgentPromptId, StellaContextSources } from "./context.ts";
-import { placementOf, StellaPlacementDoc } from "./placement.ts";
 
 export const STELLA_PROMPT_EXTENSION = "stella-prompt";
 
@@ -66,9 +65,6 @@ const workingDirectory: PromptSection["render"] = async (input, context) => {
   const cwd = input.agent.cwd;
   const env = input.env;
   if (!cwd || !env || (await role(input, context)).agentType === "orchestrator") return undefined;
-  // An agent in the cloud starts in its container's home.
-  const placement = placementOf(await input.read.snapshot(StellaPlacementDoc, input.conversationId, context));
-  if (placement && placement.kind !== "local") return undefined;
   const lines = [
     `Your working directory is ${cwd}: shell commands and relative paths start there. You can still read and change files anywhere the work needs.`,
   ];
@@ -160,7 +156,7 @@ export function stellaPromptExtension(sources: StellaContextSources) {
         const snapshot = await sources.executionContext(input.conversationId, context);
         return snapshot && renderExecutionDestination(snapshot);
       }),
-      section("working-directory", workingDirectory),
+      section("working-directory", async (input, context) => (sources.env === "cloud" ? undefined : workingDirectory(input, context))),
       section("agent-identity", agentIdentity),
       section("media-access", async (input, context) => {
         const snapshot = await sources.executionContext(input.conversationId, context);

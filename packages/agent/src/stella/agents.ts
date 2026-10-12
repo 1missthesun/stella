@@ -67,9 +67,7 @@ import {
   describePlacement,
   parseSpawnDestination,
   placementOf,
-  placementRecord,
   samePlacement,
-  StellaPlacementDoc,
   type SpawnDestination,
   type StellaPlacement,
 } from "./placement.ts";
@@ -295,8 +293,6 @@ export type PlacedAgentRun = {
   prompt: string;
   /** The model it runs on, when the host that placed it named one; otherwise the orchestrator's. */
   runsOn?: RunsOn;
-  /** Where its file and shell tools start, when not where this host's run (an agent's destination). */
-  placement?: StellaPlacement;
   /** The host that placed it canceled it: it stops, or never starts. */
   signal?: AbortSignal;
 };
@@ -1063,7 +1059,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     role.threadId = threadId;
     role.parentConversationId = parentConversationId;
     if (args.startedBy) role.startedBy = { threadId: args.startedBy.threadId, label: args.startedBy.label };
-    Object.assign(await tx.doc(StellaPlacementDoc, child.id), placementRecord(placement));
     state.agents[threadId] = {
       conversationId: child.id,
       description,
@@ -2042,7 +2037,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           description: args.description.trim() || "agent",
           prompt: args.prompt,
           runsOn,
-          placement: args.placement ?? host.rootPlacement,
+          placement: host.rootPlacement,
           detached: true,
           ...(args.threadId ? { threadId: args.threadId } : {}),
         }),

@@ -4,7 +4,6 @@
  * holds it; an agent placed elsewhere runs there as a whole
  * (`StellaAgentsHost.remote`), and its record here names where.
  */
-import { defineDoc } from "@earendil-works/pi-durable";
 
 /** What is known of a computer an agent runs on. */
 export type DevicePlacementInfo = {
@@ -28,15 +27,6 @@ export const parseSpawnDestination = (value: unknown): SpawnDestination => {
   return { kind: "device", deviceId: text };
 };
 
-export const StellaPlacementDoc = defineDoc<{ kind: "local" | "cloud" | "device"; deviceId?: string } & DevicePlacementInfo>({
-  kind: "stella.placement",
-  version: 1,
-  scope: "conversation",
-  history: "latest",
-  fork: "current",
-  initial: () => ({ kind: "local" }),
-});
-
 export const placementOf = (
   value: ({ kind: string; deviceId?: string } & DevicePlacementInfo) | undefined,
 ): StellaPlacement | undefined => {
@@ -48,12 +38,6 @@ export const placementOf = (
   if (value.kind === "local") return { kind: "local" };
   return undefined;
 };
-
-/** A placement as the placement doc holds it. */
-export const placementRecord = (placement: StellaPlacement): { kind: StellaPlacement["kind"]; deviceId?: string } & DevicePlacementInfo =>
-  placement.kind !== "device"
-    ? { kind: placement.kind }
-    : { kind: "device", deviceId: placement.deviceId, ...(placement.label ? { label: placement.label } : {}) };
 
 export const describePlacement = (placement: StellaPlacement): string =>
   placement.kind === "cloud"

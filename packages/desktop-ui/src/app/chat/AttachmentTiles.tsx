@@ -17,11 +17,17 @@ const ATTACHMENT_TILE_GAP = 6;
 
 export type AttachmentTileItem = { key: string; node: ReactNode };
 
-const tileCapacity = (width: number): number =>
-  Math.max(
-    1,
-    Math.floor((width + ATTACHMENT_TILE_GAP) / (ATTACHMENT_TILE_SIZE + ATTACHMENT_TILE_GAP)),
-  );
+const fitCount = (widths: readonly number[], available: number): number => {
+  let used = 0;
+  for (let index = 0; index < widths.length; index += 1) {
+    const next = used + (index > 0 ? ATTACHMENT_TILE_GAP : 0) + widths[index]!;
+    const remaining = widths.length - index - 1;
+    const reserve = remaining > 0 ? ATTACHMENT_TILE_GAP + ATTACHMENT_TILE_SIZE : 0;
+    if (next + reserve > available) return index;
+    used = next;
+  }
+  return widths.length;
+};
 
 function OverflowTile({ items }: { items: AttachmentTileItem[] }) {
   const t = useT();
@@ -102,35 +108,51 @@ function MeasuredAttachmentTileRow({
   className,
 }: AttachmentTileRowProps) {
   const rowRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(0);
+  const [shownCount, setShownCount] = useState(items.length);
+  const signature = items.map((item) => item.key).join("|");
 
   useLayoutEffect(() => {
     const row = rowRef.current;
     if (!row) return undefined;
     const measure = () => {
-      const next = Math.floor(row.clientWidth);
-      setWidth((previous) => (previous === next ? previous : next));
+      const wrappers = Array.from(
+        row.querySelectorAll<HTMLElement>(":scope > .attachment-tiles__item"),
+      );
+      const widths = wrappers.map((el) => el.offsetWidth);
+      const next = fitCount(widths, row.clientWidth);
+      setShownCount((previous) => (previous === next ? previous : next));
     };
     measure();
     if (typeof ResizeObserver === "undefined") return undefined;
     const observer = new ResizeObserver(measure);
     observer.observe(row);
+    for (const el of row.querySelectorAll<HTMLElement>(":scope > .attachment-tiles__item")) {
+      observer.observe(el);
+    }
     return () => observer.disconnect();
-  }, []);
+  }, [signature]);
 
-  const capacity = width > 0 ? tileCapacity(width) : items.length;
-  const overflowing = items.length > capacity;
-  const shown = overflowing ? items.slice(0, capacity - 1) : items;
-  const hidden = overflowing ? items.slice(capacity - 1) : [];
+  const hidden = items.slice(shownCount);
 
   return (
     <div
       ref={rowRef}
       className={cn("attachment-tiles", `attachment-tiles--${align}`, className)}
     >
-      {shown.map((item) => (
-        <Fragment key={item.key}>{item.node}</Fragment>
-      ))}
+      {items.map((item, index) => {
+        const offFlow = index >= shownCount;
+        return (
+          <span
+            key={item.key}
+            className="attachment-tiles__item"
+            data-off-flow={offFlow ? "true" : undefined}
+            aria-hidden={offFlow ? true : undefined}
+            inert={offFlow ? true : undefined}
+          >
+            {item.node}
+          </span>
+        );
+      })}
       {hidden.length > 0 ? <OverflowTile items={hidden} /> : null}
     </div>
   );

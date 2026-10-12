@@ -841,7 +841,6 @@ const makeComposerStyles = (colors: Colors) =>
       height: 64,
       overflow: "hidden",
       position: "relative",
-      width: 64,
     },
     // Covers the whole tile while an upload is in flight or broken, so a chip
     // never reads as ready when it is not.

@@ -786,31 +786,74 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     const showText = item.text.trim().length > 0;
     const quotedText = item.quotedText?.trim();
     const pastedTexts = item.pastedTexts ?? [];
-    const imageUris =
+    const imageUris: { key: string; uri: string; name?: string; path?: string }[] =
       attachmentPreviews.length > 0
         ? attachmentPreviews.flatMap((preview) =>
-            preview.imageUri ? [{ key: preview.path, uri: preview.imageUri, name: preview.name }] : [],
+            preview.imageUri
+              ? [{ key: preview.path, uri: preview.imageUri, name: preview.name, path: preview.path }]
+              : [],
           )
-        : thumbs.map((uri) => ({ key: uri, uri, name: undefined }));
-    const fileNames =
+        : thumbs.map((uri) => ({ key: uri, uri }));
+    const fileEntries: { name: string; path?: string }[] =
       attachmentPreviews.length > 0
-        ? attachmentPreviews.filter((preview) => !preview.imageUri).map((preview) => preview.name)
-        : documentNames;
+        ? attachmentPreviews
+            .filter((preview) => !preview.imageUri)
+            .map((preview) => ({ name: preview.name, path: preview.path }))
+        : documentNames.map((name) => ({ name }));
+    const fileNames = fileEntries.map((entry) => entry.name);
+    const imageGallery = imageUris.flatMap((image) => (image.path ? [image.path] : []));
+    const openPastedText = (text: string) =>
+      onOpenArtifact?.({
+        id: `${conversationId}:pasted-text:${item.id}:${text.length}`,
+        conversationId,
+        payload: { kind: "media", asset: { kind: "text", text }, createdAt: item.createdAt ?? Date.now() },
+      });
     const hasAttachmentRow =
       imageUris.length > 0 || fileNames.length > 0 || pastedTexts.length > 0;
     const hasBubbleBody = showText;
     const attachmentTiles: AttachmentTileItem[] = [
       ...imageUris.map((image) => ({
         key: `image-${image.key}`,
-        node: <ImageTile uri={image.uri} name={image.name} colors={colors} />,
+        node: (
+          <ImageTile
+            uri={image.uri}
+            name={image.name}
+            colors={colors}
+            onPress={
+              image.path && onOpenStellaFile
+                ? () => onOpenStellaFile(image.path!, imageGallery)
+                : undefined
+            }
+          />
+        ),
       })),
-      ...fileNames.map((name, index) => ({
-        key: `file-${index}-${name}`,
-        node: <FileTile name={fileDisplayName(name)} colors={colors} />,
+      ...fileEntries.map((entry, index) => ({
+        key: `file-${index}-${entry.name}`,
+        node: (
+          <FileTile
+            name={fileDisplayName(entry.name)}
+            colors={colors}
+            onPress={
+              entry.path && onOpenStellaFile
+                ? () => onOpenStellaFile(entry.path!)
+                : undefined
+            }
+          />
+        ),
       })),
       ...pastedTexts.map((pasted, index) => ({
         key: `pasted-${index}`,
-        node: <PastedTextTile text={pasted.text ?? ""} colors={colors} />,
+        node: (
+          <PastedTextTile
+            text={pasted.text ?? ""}
+            colors={colors}
+            onPress={
+              pasted.text && onOpenArtifact && !menuClone
+                ? () => openPastedText(pasted.text!)
+                : undefined
+            }
+          />
+        ),
       })),
     ];
     const attachmentRow = hasAttachmentRow ? (

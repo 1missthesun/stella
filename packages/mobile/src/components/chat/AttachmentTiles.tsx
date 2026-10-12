@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -31,6 +31,7 @@ const makeAttachmentTileStyles = (colors: Colors) =>
     rowStart: { justifyContent: "flex-start" },
     rowEnd: { justifyContent: "flex-end" },
     rowWrap: { flexWrap: "wrap" },
+    offFlow: { left: 0, opacity: 0, position: "absolute", top: 0 },
     tile: {
       alignItems: "center",
       backgroundColor: fadeHex(colors.textMuted, 0.12),
@@ -86,37 +87,80 @@ const tileStyles = (colors: Colors): TileStyles => {
 
 export const attachmentTileStyle = (colors: Colors) => tileStyles(colors).tile;
 
+export const IMAGE_TILE_MAX_WIDTH = 180;
+const IMAGE_TILE_MIN_WIDTH = 40;
+
+function TilePress({
+  onPress,
+  label,
+  children,
+}: {
+  onPress?: () => void;
+  label?: string;
+  children: ReactNode;
+}) {
+  if (!onPress) return <>{children}</>;
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => (pressed ? { opacity: 0.7 } : null)}
+    >
+      {children}
+    </Pressable>
+  );
+}
+
 export function ImageTile({
   uri,
   name,
   colors,
+  onPress,
 }: {
   uri: string;
   name?: string;
   colors: Colors;
+  onPress?: () => void;
 }) {
   const styles = tileStyles(colors);
+  const [aspect, setAspect] = useState(1);
+  const width = Math.round(
+    Math.min(
+      Math.max(ATTACHMENT_TILE_SIZE * aspect, IMAGE_TILE_MIN_WIDTH),
+      IMAGE_TILE_MAX_WIDTH,
+    ),
+  );
   return (
-    <View style={styles.tile}>
-      <Image
-        source={{ uri }}
-        style={styles.image}
-        contentFit="contain"
-        accessibilityLabel={name}
-      />
-    </View>
+    <TilePress onPress={onPress} label={name}>
+      <View style={[styles.tile, { width }]}>
+        <Image
+          source={{ uri }}
+          style={styles.image}
+          contentFit="contain"
+          accessibilityLabel={name}
+          onLoad={(event) => {
+            const { width: w, height: h } = event.source;
+            if (w > 0 && h > 0) setAspect(w / h);
+          }}
+        />
+      </View>
+    </TilePress>
   );
 }
 
 export function FileTile({
   name,
   colors,
+  onPress,
 }: {
   name: string;
   colors: Colors;
+  onPress?: () => void;
 }) {
   const styles = tileStyles(colors);
   return (
+    <TilePress onPress={onPress} label={name}>
     <View style={styles.tile} accessibilityLabel={name}>
       <Icon name="file-text" size={18} color={colors.textMuted} />
       <Text
@@ -127,6 +171,7 @@ export function FileTile({
         {name}
       </Text>
     </View>
+    </TilePress>
   );
 }
 
@@ -142,12 +187,15 @@ const firstLines = (text: string): string =>
 export function PastedTextTile({
   text,
   colors,
+  onPress,
 }: {
   text: string;
   colors: Colors;
+  onPress?: () => void;
 }) {
   const styles = tileStyles(colors);
   return (
+    <TilePress onPress={onPress} label="Pasted text">
     <View
       style={[styles.tile, styles.textTile]}
       accessibilityLabel="Pasted text"
@@ -160,12 +208,33 @@ export function PastedTextTile({
         {firstLines(text) || "Pasted text"}
       </Text>
     </View>
+    </TilePress>
   );
 }
 
 /**
  * One row of same-size attachment tiles. When more tiles exist than fit, the
  * last slot becomes a "+N" tile; tapping it reveals the rest.
+ */
+const fitCount = (
+  widths: readonly number[],
+  available: number,
+): number => {
+  let used = 0;
+  for (let index = 0; index < widths.length; index += 1) {
+    const next = used + (index > 0 ? TILE_GAP : 0) + widths[index]!;
+    const remaining = widths.length - index - 1;
+    const reserve = remaining > 0 ? TILE_GAP + ATTACHMENT_TILE_SIZE : 0;
+    if (next + reserve > available) return index;
+    used = next;
+  }
+  return widths.length;
+};
+
+/**
+ * One row of same-height attachment tiles. When more tiles exist than fit,
+ * the last slot becomes a "+N" tile; tapping it reveals the rest. Tiles past
+ * the fit stay mounted off-flow so their widths keep being measured.
  */
 export function AttachmentTileRow({
   items,
@@ -181,20 +250,16 @@ export function AttachmentTileRow({
   const styles = tileStyles(colors);
   const [width, setWidth] = useState(0);
   const [expanded, setExpanded] = useState(false);
-  const capacity = useMemo(
-    () =>
-      width > 0
-        ? Math.max(
-            1,
-            Math.floor((width + TILE_GAP) / (ATTACHMENT_TILE_SIZE + TILE_GAP)),
-          )
-        : items.length,
-    [items.length, width],
-  );
+  const [itemWidths, setItemWidths] = useState<Record<string, number>>({});
+  const shownCount = useMemo(() => {
+    if (expanded || width <= 0) return items.length;
+    const widths = items.map(
+      (item) => itemWidths[item.key] ?? ATTACHMENT_TILE_SIZE,
+    );
+    return fitCount(widths, width);
+  }, [expanded, itemWidths, items, width]);
   if (items.length === 0) return null;
-  const overflowing = !expanded && items.length > capacity;
-  const shown = overflowing ? items.slice(0, capacity - 1) : items;
-  const hiddenCount = overflowing ? items.length - shown.length : 0;
+  const hiddenCount = items.length - shownCount;
   return (
     <View
       onLayout={(event: LayoutChangeEvent) => {
@@ -208,8 +273,22 @@ export function AttachmentTileRow({
         style,
       ]}
     >
-      {shown.map((item) => (
-        <Fragment key={item.key}>{item.node}</Fragment>
+      {items.map((item, index) => (
+        <View
+          key={item.key}
+          style={index < shownCount ? null : styles.offFlow}
+          pointerEvents={index < shownCount ? "auto" : "none"}
+          onLayout={(event: LayoutChangeEvent) => {
+            const next = Math.round(event.nativeEvent.layout.width);
+            setItemWidths((previous) =>
+              previous[item.key] === next
+                ? previous
+                : { ...previous, [item.key]: next },
+            );
+          }}
+        >
+          {item.node}
+        </View>
       ))}
       {hiddenCount > 0 ? (
         <Pressable

@@ -8,6 +8,23 @@
   padding-top: 4px;
 }
 
+.attachment-tiles {
+  position: relative;
+}
+
+.attachment-tiles__item {
+  display: inline-flex;
+  flex: 0 0 auto;
+}
+
+.attachment-tiles__item[data-off-flow="true"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .attachment-tiles--end {
   justify-content: flex-end;
 }
@@ -58,13 +75,17 @@ button.attachment-tile:focus-visible {
 }
 
 .attachment-tile--image {
+  width: auto;
+  min-width: 40px;
+  max-width: 180px;
   cursor: zoom-in;
 }
 
 .attachment-tile__image {
   display: block;
-  width: 100%;
+  width: auto;
   height: 100%;
+  max-width: 180px;
   object-fit: contain;
 }
 

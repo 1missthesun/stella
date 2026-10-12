@@ -4,8 +4,13 @@ import type {
   EmailDigestItem,
   EmailDigestOutcome,
 } from "@stella/contracts/backend/email-digest";
-import { composioConfig, composioToolkitConnected } from "../../integrations/composio.js";
-import { GMAIL_INTEGRATION_ID, fetchGmailSince, pickImportant } from "../../integrations/gmail-digest.js";
+import { ComposioHttpError, composioConfig, composioToolkitConnected } from "../../integrations/composio.js";
+import {
+  GMAIL_INTEGRATION_ID,
+  type GmailMessage,
+  fetchGmailSince,
+  pickImportant,
+} from "../../integrations/gmail-digest.js";
 import { empty } from "../args.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -24,6 +29,9 @@ const SEEN_RETENTION_MS = 3 * 24 * HOUR;
 const KEPT_DIGESTS = 50;
 const FEED_DIGESTS = 30;
 const STALE_RUN_MS = 5 * MIN;
+const MAX_FRESH_PER_RUN = 30;
+const MAX_PAGES_PER_RUN = 5;
+const CONTINUE_DELAY_MS = MIN;
 
 export const EMAIL_DIGEST_MIGRATION = {
   id: "emailDigest.1-init",
@@ -54,6 +62,16 @@ export const EMAIL_DIGEST_MIGRATION = {
   ],
 };
 
+export const EMAIL_DIGEST_WINDOW_MIGRATION = {
+  id: "emailDigest.2-window",
+  statements: [
+    "ALTER TABLE email_digest_state ADD COLUMN window_since INTEGER",
+    "ALTER TABLE email_digest_state ADD COLUMN window_end INTEGER",
+    "ALTER TABLE email_digest_state ADD COLUMN window_count INTEGER",
+    "ALTER TABLE email_digest_state ADD COLUMN page_token TEXT",
+  ],
+};
+
 type StateRow = {
   enabled: number;
   running_since: number | null;
@@ -62,11 +80,16 @@ type StateRow = {
   last_error: string | null;
   next_check_at: number | null;
   rate_per_hour: number | null;
+  window_since: number | null;
+  window_end: number | null;
+  window_count: number | null;
+  page_token: string | null;
 };
 
 const stateOf = (db: OwnerDbReader): StateRow | null =>
   db.one<StateRow>(
-    `SELECT enabled, running_since, last_checked_at, last_outcome, last_error, next_check_at, rate_per_hour
+    `SELECT enabled, running_since, last_checked_at, last_outcome, last_error, next_check_at, rate_per_hour,
+            window_since, window_end, window_count, page_token
        FROM email_digest_state WHERE id = 1`,
   );
 
@@ -98,8 +121,9 @@ const gmailConnected = async (ctx: OwnerContext): Promise<boolean> => {
   if (!sessionId || !config) return false;
   try {
     return await composioToolkitConnected(config, sessionId, GMAIL_INTEGRATION_ID);
-  } catch {
-    return false;
+  } catch (error) {
+    if (error instanceof ComposioHttpError && error.status === 404) return false;
+    throw error;
   }
 };
 
@@ -115,7 +139,14 @@ const errorText = (error: unknown): string => {
 
 const finishRun = (
   ctx: OwnerContext,
-  outcome: { kind: EmailDigestOutcome; error?: string; newCount: number; since: number; rate: number | null },
+  outcome: {
+    kind: EmailDigestOutcome;
+    error?: string;
+    newCount: number;
+    since: number;
+    checkedAt?: number;
+    rate: number | null;
+  },
 ): void => {
   const now = Date.now();
   const hours = Math.max((now - outcome.since) / HOUR, 0.25);
@@ -129,9 +160,16 @@ const finishRun = (
   const interval = outcome.kind === "error" ? MIN_INTERVAL_MS * 2 : nextInterval(rate);
   ctx.db.run(
     `UPDATE email_digest_state SET running_since = NULL, last_checked_at = CASE WHEN ? THEN last_checked_at ELSE ? END,
+       window_since = CASE WHEN ? THEN window_since ELSE NULL END,
+       window_end = CASE WHEN ? THEN window_end ELSE NULL END,
+       window_count = CASE WHEN ? THEN window_count ELSE NULL END,
+       page_token = NULL,
        last_outcome = ?, last_error = ?, rate_per_hour = ?, updated_at = ? WHERE id = 1`,
     outcome.kind === "error" ? 1 : 0,
-    now,
+    outcome.checkedAt ?? now,
+    outcome.kind === "error" ? 1 : 0,
+    outcome.kind === "error" ? 1 : 0,
+    outcome.kind === "error" ? 1 : 0,
     outcome.kind,
     outcome.error ?? null,
     rate,
@@ -157,60 +195,115 @@ const recordDigest = (ctx: OwnerContext, newCount: number, items: EmailDigestIte
   );
 };
 
+const disableDisconnected = (ctx: OwnerContext): void => {
+  ctx.db.run(
+    `UPDATE email_digest_state SET enabled = 0, running_since = NULL, next_check_at = NULL, page_token = NULL,
+       last_outcome = 'error', last_error = 'Gmail is not connected.', updated_at = ? WHERE id = 1`,
+    Date.now(),
+  );
+};
+
+const continueWindow = (
+  ctx: OwnerContext,
+  window: { since: number; end: number; count: number; pageToken: string; outcome: EmailDigestOutcome },
+): void => {
+  const now = Date.now();
+  ctx.db.run(
+    `UPDATE email_digest_state SET running_since = NULL, window_since = ?, window_end = ?, window_count = ?,
+       page_token = ?, last_outcome = ?, last_error = NULL, updated_at = ? WHERE id = 1`,
+    window.since,
+    window.end,
+    window.count,
+    window.pageToken,
+    window.outcome,
+    now,
+  );
+  scheduleRun({ ...ctx, now }, now + CONTINUE_DELAY_MS);
+};
+
 const runDigest = async (ctx: OwnerContext): Promise<void> => {
   const state = stateOf(ctx.db);
   if (!state || state.enabled !== 1) return;
   if (state.running_since !== null && ctx.now - state.running_since < STALE_RUN_MS) return;
-  const since = state.last_checked_at === null ? ctx.now - FIRST_WINDOW_MS : state.last_checked_at - OVERLAP_MS;
+  const since =
+    state.window_since ??
+    (state.last_checked_at === null ? ctx.now - FIRST_WINDOW_MS : state.last_checked_at - OVERLAP_MS);
+  const windowEnd = state.window_end ?? ctx.now;
+  const priorCount = state.window_count ?? 0;
   const sessionId = gmailSession(ctx.db);
   const config = composioConfig(ctx.env);
-  if (!sessionId || !config || !(await gmailConnected(ctx))) {
-    ctx.db.run(
-      `UPDATE email_digest_state SET enabled = 0, running_since = NULL, next_check_at = NULL,
-         last_outcome = 'error', last_error = 'Gmail is not connected.', updated_at = ? WHERE id = 1`,
-      Date.now(),
-    );
+  let connected: boolean;
+  try {
+    connected = Boolean(sessionId && config) && (await gmailConnected(ctx));
+  } catch (error) {
+    console.error(JSON.stringify({ event: "email_digest_probe_failed", message: errorText(error) }));
+    finishRun(ctx, { kind: "error", error: errorText(error), newCount: 0, since, rate: state.rate_per_hour });
     return;
   }
-  ctx.db.run("UPDATE email_digest_state SET running_since = ?, updated_at = ? WHERE id = 1", ctx.now, ctx.now);
+  if (!sessionId || !config || !connected) {
+    disableDisconnected(ctx);
+    return;
+  }
+  ctx.db.run(
+    "UPDATE email_digest_state SET running_since = ?, window_since = ?, window_end = ?, updated_at = ? WHERE id = 1",
+    ctx.now,
+    since,
+    windowEnd,
+    ctx.now,
+  );
   let newCount = 0;
   try {
-    const messages = await fetchGmailSince(config, sessionId, since);
-    const fresh = messages.filter(
-      (message) =>
-        (message.receivedAt === undefined || message.receivedAt >= since) &&
-        !ctx.db.one("SELECT 1 AS seen FROM email_digest_seen WHERE message_id = ?", message.id),
-    );
+    const fresh: GmailMessage[] = [];
+    const taken = new Set<string>();
+    let pageToken = state.page_token ?? undefined;
+    let pages = 0;
+    do {
+      const page = await fetchGmailSince(config, sessionId, since, pageToken);
+      pages += 1;
+      for (const message of page.messages) {
+        if (taken.has(message.id)) continue;
+        if (message.receivedAt !== undefined && message.receivedAt < since) continue;
+        if (ctx.db.one("SELECT 1 AS seen FROM email_digest_seen WHERE message_id = ?", message.id)) continue;
+        taken.add(message.id);
+        fresh.push(message);
+      }
+      pageToken = page.nextPageToken;
+    } while (pageToken && fresh.length < MAX_FRESH_PER_RUN && pages < MAX_PAGES_PER_RUN);
     newCount = fresh.length;
-    if (fresh.length === 0) {
-      finishRun(ctx, { kind: "nothing_new", newCount, since, rate: state.rate_per_hour });
+    let outcome: EmailDigestOutcome = "nothing_new";
+    if (fresh.length > 0) {
+      const snapshot = await ctx.host.snapshot();
+      const { verdict, model } = await pickImportant({
+        env: ctx.env,
+        ownerId: ctx.ownerId,
+        ownerGeneration: snapshot.ownerGeneration,
+        runId: crypto.randomUUID(),
+        execution: snapshot.execution,
+        audience: snapshot.allowance.audience,
+        budgetMicroCents: snapshot.allowance.budgetMicroCents,
+        messages: fresh,
+      });
+      const seenAt = Date.now();
+      for (const message of fresh) {
+        ctx.db.run(
+          "INSERT OR IGNORE INTO email_digest_seen (message_id, seen_at) VALUES (?, ?)",
+          message.id,
+          seenAt,
+        );
+      }
+      ctx.db.run("DELETE FROM email_digest_seen WHERE seen_at < ?", seenAt - SEEN_RETENTION_MS);
+      if (verdict.kind === "important") recordDigest(ctx, newCount, verdict.items, model);
+      outcome = verdict.kind === "important" ? "digest" : "nothing_important";
+    }
+    if (pageToken) {
+      continueWindow(ctx, { since, end: windowEnd, count: priorCount + newCount, pageToken, outcome });
       return;
     }
-    const snapshot = await ctx.host.snapshot();
-    const { verdict, model } = await pickImportant({
-      env: ctx.env,
-      ownerId: ctx.ownerId,
-      ownerGeneration: snapshot.ownerGeneration,
-      runId: crypto.randomUUID(),
-      execution: snapshot.execution,
-      audience: snapshot.allowance.audience,
-      budgetMicroCents: snapshot.allowance.budgetMicroCents,
-      messages: fresh,
-    });
-    const seenAt = Date.now();
-    for (const message of fresh) {
-      ctx.db.run(
-        "INSERT OR IGNORE INTO email_digest_seen (message_id, seen_at) VALUES (?, ?)",
-        message.id,
-        seenAt,
-      );
-    }
-    ctx.db.run("DELETE FROM email_digest_seen WHERE seen_at < ?", seenAt - SEEN_RETENTION_MS);
-    if (verdict.kind === "important") recordDigest(ctx, newCount, verdict.items, model);
     finishRun(ctx, {
-      kind: verdict.kind === "important" ? "digest" : "nothing_important",
-      newCount,
+      kind: outcome,
+      newCount: priorCount + newCount,
       since,
+      checkedAt: windowEnd,
       rate: state.rate_per_hour,
     });
   } catch (error) {
@@ -278,7 +371,7 @@ const checkNow = async (ctx: OwnerContext): Promise<{ connected: boolean }> => {
 
 export const emailDigestDomain = {
   name: "emailDigest",
-  migrations: [EMAIL_DIGEST_MIGRATION],
+  migrations: [EMAIL_DIGEST_MIGRATION, EMAIL_DIGEST_WINDOW_MIGRATION],
   calls: {
     "emailDigest.start": {
       scope: "owner",

@@ -42,20 +42,32 @@ const clip = (value: string, max: number): string => {
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 };
 
-const messagesIn = (payload: Record<string, unknown>): unknown[] => {
-  const queue: unknown[] = [payload];
+const responseRecords = (payload: Record<string, unknown>): Record<string, unknown>[] => {
+  const found: Record<string, unknown>[] = [];
+  let queue: unknown[] = [payload];
   for (let depth = 0; depth < 4 && queue.length > 0; depth += 1) {
     const next: unknown[] = [];
     for (const value of queue) {
       if (!isRecord(value)) continue;
-      if (Array.isArray(value.messages)) return value.messages;
+      found.push(value);
       for (const key of ["data", "response_data", "result"]) {
         if (isRecord(value[key])) next.push(value[key]);
       }
     }
-    queue.splice(0, queue.length, ...next);
+    queue = next;
   }
-  return [];
+  return found;
+};
+
+const messagesIn = (payload: Record<string, unknown>): unknown[] =>
+  responseRecords(payload).find((record) => Array.isArray(record.messages))?.messages as unknown[] | undefined ?? [];
+
+const nextPageTokenIn = (payload: Record<string, unknown>): string | undefined => {
+  for (const record of responseRecords(payload)) {
+    const token = text(record.nextPageToken ?? record.next_page_token);
+    if (token) return token;
+  }
+  return undefined;
 };
 
 const timestampOf = (raw: Record<string, unknown>): number | undefined => {
@@ -85,23 +97,37 @@ const toMessage = (raw: unknown): GmailMessage | null => {
   };
 };
 
+export type GmailPage = { messages: GmailMessage[]; nextPageToken?: string };
+
 export const fetchGmailSince = async (
   config: ComposioConfig,
   sessionId: string,
   sinceMs: number,
-): Promise<GmailMessage[]> => {
+  pageToken?: string,
+): Promise<GmailPage> => {
   const query = `in:inbox -category:promotions -category:social after:${Math.floor(sinceMs / 1000)}`;
   const payload = await composioExecute(config, sessionId, {
     action: FETCH_ACTION,
-    input: { query, max_results: MAX_MESSAGES, include_payload: false, verbose: true, user_id: "me" },
+    input: {
+      query,
+      max_results: MAX_MESSAGES,
+      include_payload: false,
+      verbose: true,
+      user_id: "me",
+      ...(pageToken ? { page_token: pageToken } : {}),
+    },
   });
   if (payload.successful === false || (isRecord(payload) && text(payload.error))) {
     throw new Error(`Gmail fetch failed: ${clip(text(payload.error) || "unknown error", 200)}`);
   }
-  return messagesIn(payload).flatMap((raw) => {
-    const message = toMessage(raw);
-    return message ? [message] : [];
-  });
+  const nextPageToken = nextPageTokenIn(payload);
+  return {
+    messages: messagesIn(payload).flatMap((raw) => {
+      const message = toMessage(raw);
+      return message ? [message] : [];
+    }),
+    ...(nextPageToken ? { nextPageToken } : {}),
+  };
 };
 
 const REPORT_TOOL = "report_emails";

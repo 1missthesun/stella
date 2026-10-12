@@ -14,7 +14,6 @@
     "typecheck": "bun run i18n:sync && tsc --noEmit"
   },
   "dependencies": {
-    "@better-auth/expo": "^1.7.7",
     "@better-fetch/fetch": "1.3.2",
     "@config-plugins/react-native-webrtc": "15.0.2",
     "@expo-google-fonts/ibm-plex-mono": "^0.4.1",
@@ -71,7 +70,6 @@
     "expo-video-thumbnails": "~57.0.2",
     "expo-web-browser": "~57.0.2",
     "expo-widgets": "~57.0.16",
-    "fflate": "^0.8.3",
     "punycode": "^2.3.1",
     "ratex-react-native": "^0.1.9",
     "react": "19.2.3",

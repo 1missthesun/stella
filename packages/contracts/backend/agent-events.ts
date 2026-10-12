@@ -24,6 +24,7 @@ export const AGENT_EVENT_KINDS = [
   "command_routed",
   "command_delivered",
   "command_dropped",
+  "brain_lease_claimed",
   "brain_lease_moved",
   "brain_lease_taken_over",
   "brain_lease_refused",

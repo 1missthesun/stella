@@ -402,6 +402,11 @@ export type StellaAgentsHost = {
    */
   agentDirectory?(threadId: string): string;
   /**
+   * Why an agent can't start in `directory` on this host (it is missing, or
+   * not a folder); undefined when it can. Absent, the directory is not checked.
+   */
+  directoryProblem?(directory: string): Promise<string | undefined>;
+  /**
    * Where a conversation's tools can run apart from the conversation: an
    * agent started with a device destination keeps its brain here and runs
    * its tools there, and `switch_destination` moves them. Absent, an
@@ -1120,6 +1125,8 @@ export function stellaAgents(host: StellaAgentsHost) {
           "directory works only for an agent whose tools run where you are. Leave it out, and name the directory in the prompt instead.",
         );
       }
+      const problem = directory ? await host.directoryProblem?.(directory) : undefined;
+      if (problem) throw new Error(problem);
       const callerAgent = await api.agent(context);
       const named = args.model?.trim();
       const requested = named && named !== "default" ? named : host.defaultAgentModel?.(callerAgent);

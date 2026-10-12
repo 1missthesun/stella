@@ -7,7 +7,8 @@
  * only its tools there (`execution`), as does any conversation whose tools
  * `switch_destination` moved.
  */
-import { mkdir } from "node:fs/promises";
+import { mkdir, stat } from "node:fs/promises";
+import { hostname } from "node:os";
 import type { Context } from "@earendil-works/chord";
 import type { EnvTarget } from "@earendil-works/pi-durable";
 import { NodeExecutionEnv } from "@earendil-works/pi-durable/env/node";
@@ -52,6 +53,14 @@ export function desktopAgentsHost(
     ...(options.directory ? { directory: options.directory } : {}),
     ...(options.dataDir ? { agentDirectory: (threadId: string) => defaultAgentDirectory(options.dataDir!, threadId) } : {}),
     ...(options.execution ? { execution: options.execution } : {}),
+    directoryProblem: async (directory) => {
+      const found = await stat(directory).catch(() => undefined);
+      if (found?.isDirectory()) return undefined;
+      const here = `this computer (${hostname()})`;
+      return found
+        ? `directory ${directory} is not a folder on ${here}. Pass a folder that exists here, or leave directory out.`
+        : `directory ${directory} does not exist on ${here}, where this agent would run. It may be a path from another computer: pass a folder that exists here, or leave directory out and name the path in the prompt.`;
+    },
     rootPlacement: { kind: "local" },
     place: (destination, caller) => {
       if (destination.kind === "here") return caller;

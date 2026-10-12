@@ -645,11 +645,16 @@ const persistPiCancel = (
   reason?: string,
 ) => persistPlacementCancellation({ store: session.storage.runtimeStore.chat, kind, executionId, ...(reason ? { reason } : {}) });
 
-/** Stop a placed chat pi is answering; false when pi has no such run. */
+/**
+ * Stop a placed chat pi is answering. Once the cancel is kept it holds: a
+ * run this process holds stops, and one it does not (never started, or
+ * started by a process that has since exited) can no longer start.
+ */
 export const cancelPiPlacement = async (session: OpenSession, placementRunId: string, reason?: string): Promise<boolean> => {
   persistPiCancel(session, "chat", placementRunId, reason);
   const chats = await chatsBySession.get(session)?.catch(() => undefined);
-  return (await chats?.cancelPlacement(placementRunId))?.canceled === true;
+  await chats?.cancelPlacement(placementRunId);
+  return true;
 };
 
 /** Stop a run of an agent placed here that pi is running; false when pi has no such run. */

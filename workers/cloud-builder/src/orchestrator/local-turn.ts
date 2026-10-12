@@ -832,7 +832,8 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       }
 
       // A computer from before the lease journals as it always did; one that
-      // claims it answers only as the brain's holder, or by taking it over
+      // claims it answers only as the brain's holder, by claiming it for a
+      // message its user typed while no host holds it, or by taking it over
       // from a holder that can't answer.
       if (brainClaim) {
         const current = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
@@ -851,6 +852,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
           claimEpoch: brainClaim.epoch,
           ...(holder ? { holder } : {}),
           turnId,
+          claimFree: !promptHidden,
         });
         if (claim.decision.kind === "elsewhere" && claim.record) {
           return this.piBrainElsewhereResponse(claim.record);

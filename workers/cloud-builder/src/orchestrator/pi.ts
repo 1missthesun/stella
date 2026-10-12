@@ -12,6 +12,7 @@ import type {
 } from "../cloud-chat-admission.js";
 import { PLACEMENT_PROTOCOL } from "@stella/contracts/turn-plane/placement";
 import {
+  claimFreePiBrain,
   decidePiBrainClaim,
   movePiBrain,
   piBrainHandoffPrompt,
@@ -1492,8 +1493,10 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
 
   /**
    * A host's claim on this conversation's brain for a turn it would answer:
-   * the record's holder renews its lease, a host that finds the holder
-   * gone or lapsed takes the lease over under the next epoch, and
+   * the record's holder renews its lease, a computer answering its own
+   * user's message (`claimFree`) while no host holds one claims it, a host
+   * that finds the holder gone or lapsed takes the lease over under the
+   * next epoch, and
    * any other claim is refused (`decidePiBrainClaim`). `holder` is the
    * holding computer's state, read before this so no request interleaves
    * between the record read and its write; a record that moved meanwhile
@@ -1509,6 +1512,8 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       gone?: true;
     };
     turnId?: string;
+    /** A device's turn on a message its user typed there: with no lease held, it claims one. */
+    claimFree?: boolean;
   }): Promise<{
     decision: PiBrainClaimDecision;
     record: PiBrainRecord | null;
@@ -1536,6 +1541,18 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       ...(holder?.gone ? { holderGone: true } : {}),
       now,
     });
+    if (
+      decision.kind === "free" &&
+      args.claimFree &&
+      args.claimant.host === "device"
+    ) {
+      record = claimFreePiBrain(args.claimant, now);
+      await this.ctx.storage.put(PI_BRAIN_KEY, record);
+      this.notePiBrainLease("claimed", record, {
+        ...(args.turnId ? { turnId: args.turnId } : {}),
+      });
+      return { decision: { kind: "holder" }, record, takenOver: false };
+    }
     if (decision.kind === "holder" && record) {
       const renewed = renewPiBrainLease(record, now);
       if (renewed) {
@@ -1614,7 +1631,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
    * under the lease's epoch, once per event.
    */
   protected notePiBrainLease(
-    kind: "moved" | "taken_over" | "refused",
+    kind: "claimed" | "moved" | "taken_over" | "refused",
     record: PiBrainRecord,
     detail: Record<string, unknown> = {},
   ): void {

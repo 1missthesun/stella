@@ -294,5 +294,3 @@ export const makeCardStyles = (colors: Colors) =>
       lineHeight: 18,
     },
   });
-
-export type CardStyles = ReturnType<typeof makeCardStyles>;

@@ -30,11 +30,6 @@ export const loadDictationRealtimeConfig = (): Promise<RealtimeConfig> => {
   return entry.value;
 };
 
-/** Drop the cached config (tests, and after a relay origin change). */
-export const clearDictationRealtimeConfigCache = (): void => {
-  cachedConfig = null;
-};
-
 /**
  * Provider error frames are forwarded verbatim by the relay. Reword the ones
  * a person cannot act on; the pacer in `dictation-pacer.ts` exists to keep the

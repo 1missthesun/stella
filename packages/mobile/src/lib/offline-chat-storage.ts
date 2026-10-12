@@ -17,7 +17,6 @@ import {
   accountChatMetadataReadsBlocked,
   beginAccountChatMetadataCleanup,
   finishAccountChatMetadataCleanup,
-  waitForAccountChatMetadataWrites,
 } from "./chat-account-metadata-queue";
 import { parseChatArtifacts } from "./mobile-artifacts";
 import {
@@ -26,10 +25,8 @@ import {
 } from "./transcript-snapshot";
 import {
   clearAsyncTranscriptRows,
-  findAsyncTranscriptCursor,
   loadNewerAsyncTranscriptRows,
   loadOldestAsyncTranscriptRows,
-  loadOlderAsyncTranscriptRows,
   loadRecentAsyncTranscriptRows,
   saveAsyncTranscriptRows,
   synchronizeAsyncTranscriptRows,
@@ -335,22 +332,15 @@ async function recoverInterruptedAccountCleanup(): Promise<void> {
 async function openTranscriptDb(): Promise<SQLiteDatabase | null> {
   let SQLite: typeof import("expo-sqlite");
   try {
-    // Dynamic import keeps Bun's non-native unit-test runtime on the explicit
-    // AsyncStorage fallback while native iOS/Android builds use expo-sqlite.
     SQLite = await import("expo-sqlite");
   } catch {
     return null;
   }
-  try {
-    const db = (await SQLite.openDatabaseAsync(
-      TRANSCRIPT_DB_NAME,
-    )) as unknown as SQLiteDatabase;
-    await db.execAsync(TRANSCRIPT_SCHEMA);
-    return db;
-  } catch (error) {
-    if ("Bun" in globalThis) return null;
-    throw error;
-  }
+  const db = (await SQLite.openDatabaseAsync(
+    TRANSCRIPT_DB_NAME,
+  )) as unknown as SQLiteDatabase;
+  await db.execAsync(TRANSCRIPT_SCHEMA);
+  return db;
 }
 
 const getTranscriptDb = async () => {
@@ -699,37 +689,6 @@ async function migrateLegacyTranscript(
   await AsyncStorage.removeItem(MESSAGES_KEY[thread]).catch(() => {});
 }
 
-/** Narrow test seam for deterministic crash/retry coverage without a native runtime. */
-export const __migrateLegacyTranscriptForTests = (
-  db: unknown,
-  thread: ChatThreadId,
-): Promise<void> => migrateLegacyTranscript(db as SQLiteDatabase, thread);
-
-/** Install a real in-memory SQLite adapter for repository contract tests. */
-export async function __setTranscriptDatabaseForTests(
-  database: unknown,
-): Promise<void> {
-  for (const thread of CHAT_THREAD_IDS) invalidateTranscriptWrites(thread);
-  await transcriptWriteQueue.catch(() => {});
-  const db = database as SQLiteDatabase | null;
-  if (db) await db.execAsync(TRANSCRIPT_SCHEMA);
-  transcriptDbPromise = Promise.resolve(db);
-  transcriptWriteQueue = Promise.resolve();
-  orderKeysByThread.clear();
-  serializedByThread.clear();
-  fallbackMigrations.clear();
-}
-
-export function __getTranscriptCacheSizesForTests(thread: ChatThreadId): {
-  orderKeys: number;
-  serialized: number;
-} {
-  return {
-    orderKeys: orderKeysByThread.get(thread)?.size ?? 0,
-    serialized: serializedByThread.get(thread)?.size ?? 0,
-  };
-}
-
 const cursorForRow = (row: StoredMessageRow): ChatTranscriptCursor => ({
   orderKey: row.order_key,
   id: row.message_id,
@@ -822,51 +781,6 @@ function pageFromAsyncRows(
   });
 }
 
-async function saveFallbackMessages(
-  thread: ChatThreadId,
-  incoming: ChatMessage[],
-): Promise<void> {
-  await ensureIncrementalFallback(thread);
-  const serialized =
-    serializedByThread.get(thread) ?? new Map<string, string>();
-  serializedByThread.set(thread, serialized);
-  const candidates = incoming.map((message) => ({
-    message,
-    messageJson: JSON.stringify(message),
-  }));
-  if (
-    candidates.every(
-      ({ message, messageJson }) => serialized.get(message.id) === messageJson,
-    )
-  ) {
-    return;
-  }
-  // Keep unchanged neighbors in the bounded write. They are ordering anchors
-  // for historical prefixes and middle insertions; filtering them before the
-  // fallback allocates keys would misclassify an adjacent page as a
-  // disconnected newer delta.
-  const saved = await saveAsyncTranscriptRows(
-    thread,
-    candidates.map(({ message, messageJson }) => ({
-      id: message.id,
-      messageJson,
-      ...(message.canonicalId ? { canonicalId: message.canonicalId } : {}),
-    })),
-  );
-  const orderKeys = orderKeysByThread.get(thread) ?? new Map<string, number>();
-  orderKeysByThread.set(thread, orderKeys);
-  for (let index = 0; index < candidates.length; index += 1) {
-    const { message, messageJson } = candidates[index]!;
-    if (message.canonicalId && message.canonicalId !== message.id) {
-      orderKeys.delete(message.canonicalId);
-      serialized.delete(message.canonicalId);
-    }
-    touchCacheValue(orderKeys, message.id, saved[index]!.orderKey);
-    touchCacheValue(serialized, message.id, messageJson);
-  }
-  trimThreadCaches(thread);
-}
-
 export async function loadRecentChatMessages(
   thread: ChatThreadId,
   limit = CHAT_TRANSCRIPT_INITIAL_LIMIT,
@@ -928,65 +842,6 @@ export async function loadOldestChatMessages(
   });
 }
 
-export async function loadOlderChatMessages(
-  thread: ChatThreadId,
-  before: ChatTranscriptCursor,
-  limit = CHAT_TRANSCRIPT_PAGE_LIMIT,
-): Promise<ChatTranscriptPage> {
-  const boundedLimit = Math.max(1, Math.floor(limit));
-  const db = await getTranscriptDb();
-  if (!db) {
-    await ensureIncrementalFallback(thread);
-    return pageFromAsyncRows(
-      thread,
-      await loadOlderAsyncTranscriptRows(thread, before, boundedLimit),
-    );
-  }
-  await migrateLegacyTranscript(db, thread);
-  const resolvedBefore = await db.getFirstAsync<{
-    order_key: number;
-    message_id: string;
-  }>(
-    `SELECT order_key, message_id FROM mobile_chat_messages
-      WHERE thread_id = ? AND message_id = ?
-      LIMIT 1`,
-    thread,
-    before.id,
-  );
-  const currentBefore = resolvedBefore
-    ? { orderKey: resolvedBefore.order_key, id: resolvedBefore.message_id }
-    : before;
-  const descending = await db.getAllAsync<StoredMessageRow>(
-    `SELECT message_id, order_key, payload_json
-       FROM mobile_chat_messages
-      WHERE thread_id = ?
-        AND (order_key < ? OR (order_key = ? AND message_id < ?))
-      ORDER BY order_key DESC, message_id DESC
-      LIMIT ?`,
-    thread,
-    currentBefore.orderKey,
-    currentBefore.orderKey,
-    currentBefore.id,
-    boundedLimit + 1,
-  );
-  const hasOlder = descending.length > boundedLimit;
-  const rows = descending.slice(0, boundedLimit).reverse();
-  const newest = rows[rows.length - 1];
-  const newer = newest
-    ? await db.getFirstAsync<{ present: number }>(
-        `SELECT 1 AS present FROM mobile_chat_messages
-          WHERE thread_id = ?
-            AND (order_key > ? OR (order_key = ? AND message_id > ?))
-          LIMIT 1`,
-        thread,
-        newest.order_key,
-        newest.order_key,
-        newest.message_id,
-      )
-    : null;
-  return pageFromRows({ thread, rows, hasOlder, hasNewer: Boolean(newer) });
-}
-
 export async function loadNewerChatMessages(
   thread: ChatThreadId,
   after: ChatTranscriptCursor,
@@ -1044,264 +899,6 @@ export async function loadNewerChatMessages(
       )
     : null;
   return pageFromRows({ thread, rows, hasOlder: Boolean(older), hasNewer });
-}
-
-/** Resolve a canonical transcript row to the keyset cursor used by paging. */
-export async function findChatMessageCursor(
-  thread: ChatThreadId,
-  messageId: string,
-): Promise<ChatTranscriptCursor | null> {
-  const id = messageId.trim();
-  if (!id) return null;
-  const db = await getTranscriptDb();
-  if (!db) {
-    await ensureIncrementalFallback(thread);
-    return findAsyncTranscriptCursor(thread, id);
-  }
-  await migrateLegacyTranscript(db, thread);
-  const row = await db.getFirstAsync<{
-    message_id: string;
-    order_key: number;
-  }>(
-    `SELECT message_id, order_key
-       FROM mobile_chat_messages
-      WHERE thread_id = ? AND message_id = ?
-      LIMIT 1`,
-    thread,
-    id,
-  );
-  return row ? { orderKey: row.order_key, id: row.message_id } : null;
-}
-
-/** Compatibility helper for call sites that only need the bounded recent tail. */
-export async function loadChatMessages(
-  thread: ChatThreadId,
-): Promise<ChatMessage[]> {
-  return (await loadRecentChatMessages(thread)).messages;
-}
-
-async function assignOrderKeys(
-  db: SQLiteDatabase,
-  thread: ChatThreadId,
-  messages: ChatMessage[],
-  allowRebalance = true,
-): Promise<Map<string, number>> {
-  const known = orderKeysByThread.get(thread) ?? new Map<string, number>();
-  orderKeysByThread.set(thread, known);
-  for (const message of messages) {
-    if (known.has(message.id)) continue;
-    const canonicalId = message.canonicalId?.trim();
-    if (canonicalId && known.has(canonicalId)) {
-      known.set(message.id, known.get(canonicalId)!);
-      continue;
-    }
-    const stored = await db.getFirstAsync<{ order_key: number }>(
-      `SELECT order_key FROM mobile_chat_messages
-        WHERE thread_id = ? AND message_id IN (?, ?)
-        ORDER BY CASE WHEN message_id = ? THEN 0 ELSE 1 END
-        LIMIT 1`,
-      thread,
-      message.id,
-      canonicalId ?? message.id,
-      message.id,
-    );
-    if (stored) known.set(message.id, stored.order_key);
-  }
-
-  const bounds = await db.getFirstAsync<{
-    min_key: number | null;
-    max_key: number | null;
-  }>(
-    `SELECT MIN(order_key) AS min_key, MAX(order_key) AS max_key
-       FROM mobile_chat_messages WHERE thread_id = ?`,
-    thread,
-  );
-  let globalMin = bounds?.min_key ?? 0;
-  let globalMax = bounds?.max_key ?? -ORDER_STRIDE;
-
-  for (let index = 0; index < messages.length; index += 1) {
-    const message = messages[index]!;
-    if (known.has(message.id)) continue;
-    let runEnd = index + 1;
-    while (runEnd < messages.length && !known.has(messages[runEnd]!.id)) {
-      runEnd += 1;
-    }
-    const previous = index > 0 ? known.get(messages[index - 1]!.id) : undefined;
-    const next =
-      runEnd < messages.length ? known.get(messages[runEnd]!.id) : undefined;
-    const count = runEnd - index;
-    if (previous !== undefined && next !== undefined) {
-      const step = (next - previous) / (count + 1);
-      let priorCandidate = previous;
-      let precisionExhausted = next > previous && !Number.isFinite(step);
-      if (next > previous) {
-        for (let offset = 0; offset < count; offset += 1) {
-          const candidate = previous + step * (offset + 1);
-          if (!(candidate > priorCandidate && candidate < next)) {
-            precisionExhausted = true;
-            break;
-          }
-          priorCandidate = candidate;
-        }
-      }
-      if (precisionExhausted) {
-        if (!allowRebalance) {
-          throw new Error("Could not allocate stable transcript order keys");
-        }
-        const cachedIds = new Set(known.keys());
-        for (const candidate of messages) {
-          cachedIds.add(candidate.id);
-          if (candidate.canonicalId) cachedIds.add(candidate.canonicalId);
-        }
-        const durable = await db.getAllAsync<{ message_id: string }>(
-          `SELECT message_id FROM mobile_chat_messages
-            WHERE thread_id = ?
-            ORDER BY order_key ASC, message_id ASC`,
-          thread,
-        );
-        await db.withTransactionAsync(async () => {
-          for (
-            let durableIndex = 0;
-            durableIndex < durable.length;
-            durableIndex += 1
-          ) {
-            await db.runAsync(
-              `UPDATE mobile_chat_messages SET order_key = ?
-                WHERE thread_id = ? AND message_id = ?`,
-              durableIndex * ORDER_STRIDE,
-              thread,
-              durable[durableIndex]!.message_id,
-            );
-          }
-        });
-        known.clear();
-        for (
-          let durableIndex = 0;
-          durableIndex < durable.length;
-          durableIndex += 1
-        ) {
-          const id = durable[durableIndex]!.message_id;
-          if (cachedIds.has(id)) known.set(id, durableIndex * ORDER_STRIDE);
-        }
-        return assignOrderKeys(db, thread, messages, false);
-      }
-      for (let offset = 0; offset < count; offset += 1) {
-        known.set(messages[index + offset]!.id, previous + step * (offset + 1));
-      }
-    } else if (previous !== undefined) {
-      for (let offset = 0; offset < count; offset += 1) {
-        globalMax = Math.max(globalMax, previous) + ORDER_STRIDE;
-        known.set(messages[index + offset]!.id, globalMax);
-      }
-    } else if (next !== undefined) {
-      const first = Math.min(globalMin, next) - ORDER_STRIDE * count;
-      for (let offset = 0; offset < count; offset += 1) {
-        known.set(messages[index + offset]!.id, first + ORDER_STRIDE * offset);
-      }
-      globalMin = first;
-    } else {
-      // A disconnected batch is empty only during first persistence. A cursor
-      // delta can legitimately have no overlap with a stale local window; in
-      // that case it is newer and must append after the durable maximum rather
-      // than reusing order key zero (which violates the unique order index).
-      const emptyTranscript =
-        bounds?.min_key == null && bounds?.max_key == null;
-      for (let offset = 0; offset < count; offset += 1) {
-        const orderKey = emptyTranscript
-          ? offset * ORDER_STRIDE
-          : globalMax + ORDER_STRIDE;
-        known.set(messages[index + offset]!.id, orderKey);
-        globalMax = orderKey;
-      }
-      if (emptyTranscript) globalMin = 0;
-    }
-    index = runEnd - 1;
-  }
-  return known;
-}
-
-export async function saveChatMessages(
-  thread: ChatThreadId,
-  messages: ChatMessage[],
-): Promise<void> {
-  if (transcriptCleanupInProgress) return;
-  invalidateCanonicalSnapshot(thread);
-  const generation = transcriptGeneration(thread);
-  const db = await getTranscriptDb();
-  if (!db) {
-    // Non-native tests/web do not have expo-sqlite. Keep an explicit uncapped,
-    // incremental compatibility store; native builds never take this branch.
-    await enqueueTranscriptWrite(() =>
-      generation === transcriptGeneration(thread)
-        ? saveFallbackMessages(thread, messages)
-        : Promise.resolve(),
-    );
-    return;
-  }
-  await migrateLegacyTranscript(db, thread);
-  await enqueueTranscriptWrite(async () => {
-    if (generation !== transcriptGeneration(thread)) return;
-    invalidateCanonicalSnapshot(thread);
-    const orderKeys = await assignOrderKeys(db, thread, messages);
-    const priorSerialized =
-      serializedByThread.get(thread) ?? new Map<string, string>();
-    serializedByThread.set(thread, priorSerialized);
-    const changed = messages.flatMap((message) => {
-      const payload = JSON.stringify(message);
-      return priorSerialized.get(message.id) === payload
-        ? []
-        : [{ message, payload }];
-    });
-    if (changed.length === 0) {
-      trimThreadCaches(thread);
-      return;
-    }
-    await db.withTransactionAsync(async () => {
-      for (const { message, payload } of changed) {
-        if (message.canonicalId && message.canonicalId !== message.id) {
-          // A crash between a canonical pull and optimistic-row reconciliation
-          // can leave both identities on disk. Once the stable local row links
-          // to the desktop id it owns that canonical row; remove the raw twin
-          // in the same transaction so hydration cannot render both.
-          await db.runAsync(
-            `DELETE FROM mobile_chat_messages
-              WHERE thread_id = ? AND message_id = ?`,
-            thread,
-            message.canonicalId,
-          );
-        }
-        await db.runAsync(
-          `INSERT INTO mobile_chat_messages(
-             thread_id, message_id, order_key, canonical_id,
-             canonical_created_at, sequence, payload_json, updated_at
-           ) VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT(thread_id, message_id) DO UPDATE SET
-             canonical_id = excluded.canonical_id,
-             canonical_created_at = excluded.canonical_created_at,
-             sequence = excluded.sequence,
-             payload_json = excluded.payload_json,
-             updated_at = excluded.updated_at
-           WHERE mobile_chat_messages.payload_json <> excluded.payload_json`,
-          thread,
-          message.id,
-          orderKeys.get(message.id) ?? 0,
-          message.canonicalId ?? null,
-          message.canonicalCreatedAt ?? null,
-          message.sequence ?? null,
-          payload,
-          Date.now(),
-        );
-      }
-    });
-    for (const { message, payload } of changed) {
-      if (message.canonicalId && message.canonicalId !== message.id) {
-        orderKeys.delete(message.canonicalId);
-        priorSerialized.delete(message.canonicalId);
-      }
-      touchCacheValue(priorSerialized, message.id, payload);
-    }
-    trimThreadCaches(thread);
-  });
 }
 
 /**
@@ -1416,32 +1013,6 @@ export async function synchronizeChatMessages(
     // reordered identities. This path compares against durable rows directly.
     orderKeysByThread.delete(thread);
     serializedByThread.delete(thread);
-  });
-}
-
-/** Replace one thread's canonical transcript without touching account metadata. */
-export async function clearChatMessages(thread: ChatThreadId): Promise<void> {
-  invalidateTranscriptWrites(thread);
-  const db = await getTranscriptDb();
-  await recoverInterruptedCleanup(db);
-  await fallbackMigrations.get(thread)?.catch(() => {});
-  await enqueueTranscriptWrite(async () => {
-    if (db) {
-      await db.runAsync(
-        "DELETE FROM mobile_chat_messages WHERE thread_id = ?",
-        thread,
-      );
-      await db.runAsync(
-        "DELETE FROM mobile_chat_meta WHERE key = ?",
-        journalCacheMetaKey(thread),
-      );
-    }
-    await clearAsyncTranscriptRows(thread);
-    await AsyncStorage.removeItem(MESSAGES_KEY[thread]);
-    await AsyncStorage.removeItem(JOURNAL_CACHE_KEY[thread]);
-    orderKeysByThread.delete(thread);
-    serializedByThread.delete(thread);
-    fallbackMigrations.delete(thread);
   });
 }
 
@@ -1598,7 +1169,6 @@ export async function clearAllChatStorage(): Promise<void> {
     // the caller gets an error and canonical data remains intact for a retry;
     // the process-local latch still prevents this process from serving it.
     await AsyncStorage.setItem(TRANSCRIPT_CLEANUP_REQUIRED_KEY, "1");
-    await waitForAccountChatMetadataWrites();
     await waitForDesktopChatOutboxWrites().catch(() => {});
     let databaseOpenFailed = false;
     const db = await getTranscriptDb().catch(() => {

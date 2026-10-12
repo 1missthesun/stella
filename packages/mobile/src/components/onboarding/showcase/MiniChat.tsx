@@ -599,5 +599,3 @@ export const makeMiniStyles = (colors: Colors) =>
       width: 26,
     },
   });
-
-export type MiniStyles = ReturnType<typeof makeMiniStyles>;

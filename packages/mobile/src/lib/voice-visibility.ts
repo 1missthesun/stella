@@ -12,15 +12,10 @@ const STORAGE_KEY = "stella-mobile_voice.enabled";
 type Listener = (enabled: boolean) => void;
 
 let enabled = false;
-let hydrated = false;
 const listeners = new Set<Listener>();
 
 export function getVoiceEnabled(): boolean {
   return enabled;
-}
-
-export function voiceVisibilityHydrated(): boolean {
-  return hydrated;
 }
 
 export async function loadVoiceEnabled(): Promise<boolean> {
@@ -30,14 +25,12 @@ export async function loadVoiceEnabled(): Promise<boolean> {
   } catch {
     enabled = false;
   }
-  hydrated = true;
   for (const fn of listeners) fn(enabled);
   return enabled;
 }
 
 export async function setVoiceEnabled(next: boolean): Promise<void> {
   enabled = next;
-  hydrated = true;
   try {
     if (next) {
       await AsyncStorage.setItem(STORAGE_KEY, "1");

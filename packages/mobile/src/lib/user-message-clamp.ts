@@ -17,26 +17,8 @@ export const USER_MESSAGE_COLLAPSE_LINES = 4;
 export const USER_MESSAGE_MEASURE_LINES = USER_MESSAGE_COLLAPSE_LINES + 1;
 
 
-/**
- * Mobile bubble type in ChatPane: 17px at 1.52 line-height.
- * Kept as an explicit assumption so tests fail if the bubble type drifts
- * without a matching clamp-height update.
- */
-export const USER_MESSAGE_MOBILE_FONT_SIZE_PX = 17;
-export const USER_MESSAGE_MOBILE_LINE_HEIGHT = 1.52;
-
 /** Ignore sub-pixel width jitter when deciding to remasure wrap. */
 export const USER_MESSAGE_WIDTH_REMEASURE_EPSILON_PX = 1;
-
-export function collapsedUserMessageMaxHeight(args: {
-  fontSizePx: number;
-  lineHeight: number;
-  maxLines?: number;
-}): number {
-  const lineHeightPx =
-    args.lineHeight > 8 ? args.lineHeight : args.fontSizePx * args.lineHeight;
-  return lineHeightPx * (args.maxLines ?? USER_MESSAGE_COLLAPSE_LINES);
-}
 
 export function isUserMessageTruncatable(
   totalLines: number | null,
@@ -59,13 +41,6 @@ export function userMessageNumberOfLines(args: {
   if (args.expanded) return undefined;
   if (args.measuring) return USER_MESSAGE_MEASURE_LINES;
   return args.truncatable ? USER_MESSAGE_COLLAPSE_LINES : undefined;
-}
-
-export function shouldShowUserMessageToggle(args: {
-  overflowing: boolean;
-  expanded: boolean;
-}): boolean {
-  return args.overflowing || args.expanded;
 }
 
 export function shouldRemeasureUserMessageWidth(

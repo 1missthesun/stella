@@ -13,8 +13,6 @@ import {
 } from "./linked-device-files";
 import type { StoredPhoneAccess } from "./phone-access";
 
-export { locateDeviceFile } from "./linked-device-files";
-
 /**
  * Files and office previews that live on the owner's computers. The phone asks
  * the cloud, the cloud asks the computer that has the file over its presence
@@ -146,16 +144,6 @@ const renderOfficePreview = async (
   });
   assertActive(signal);
   return decodeUtf8(bytes);
-};
-
-export const loadOfficePreviewHtml = async (
-  access: StoredPhoneAccess,
-  conversationId: string,
-  filePath: string,
-  signal?: AbortSignal,
-): Promise<string> => {
-  assertReadableOnPairedComputer(filePath);
-  return await renderOfficePreview(access, { filePath, conversationId }, signal);
 };
 
 export const loadExistingOfficePreviewHtml = (

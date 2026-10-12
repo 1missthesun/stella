@@ -182,13 +182,6 @@ export function resolveManagedGatewayProvider(args: {
   );
 }
 
-export function resolveManagedGatewayConfig(args: {
-  model: string;
-  configuredProvider?: ManagedGatewayProvider;
-}): ManagedGatewayConfig {
-  return getManagedGatewayConfig(resolveManagedGatewayProvider(args));
-}
-
 /** Resolve the wire protocol for a managed route from its provider and config. */
 export const resolveManagedProtocol = (args: {
   provider: ManagedGatewayProvider;

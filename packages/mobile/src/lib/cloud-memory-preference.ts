@@ -16,11 +16,7 @@ import {
  */
 export {
   CloudMemoryPreferenceError as MobileCloudMemoryPreferenceError,
-  cloudMemoryPreferenceMutationInput as mobileCloudMemoryPreferenceMutationInput,
-  decodeCloudMemorySwitch as decodeMobileCloudMemoryPreference,
   followsOwnerGeneration as followsMobileOwnerGeneration,
-  normalizeCloudMemoryPreferenceIssue as normalizeMobileCloudMemoryPreferenceIssue,
-  type CloudMemoryPreferenceIssue as MobileCloudMemoryPreferenceIssue,
 } from "@stella/contracts/cloud-memory-preference";
 
 export type MobileCloudMemoryPreference = CloudMemorySwitch;
@@ -53,15 +49,6 @@ const readIdentityRevision = (value: unknown): number => {
   }
   return value;
 };
-
-export const createMobileCloudMemoryOwnerSubject = (
-  issuer: string,
-  userSubject: string,
-): string =>
-  `${readNormalizedIdentity(issuer, "token issuer")}|${readNormalizedIdentity(
-    userSubject,
-    "user subject",
-  )}`;
 
 /**
  * Strictly decodes a `memory.preference` view value or `memory.setEnabled`

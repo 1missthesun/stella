@@ -135,11 +135,6 @@ export function useComputerControl(): ComputerControl | null {
   return useSyncExternalStore(subscribe, readComputer, readComputer);
 }
 
-/** Current snapshot, for tests and non-React callers. */
-export function readMainShellState(): ShellState {
-  return state;
-}
-
 // ---------------------------------------------------------------------------
 // Sidebar open requests: the running-tasks pill in the chat asks the layout to
 // reveal the sidebar, where the activity now lives.
@@ -155,11 +150,4 @@ export function subscribeSidebarOpenRequests(listener: () => void): () => void {
   return () => {
     openRequestListeners.delete(listener);
   };
-}
-
-/** Test hook: drop every subscriber and published value. */
-export function resetMainShellStore(): void {
-  state = EMPTY_STATE;
-  listeners.clear();
-  openRequestListeners.clear();
 }

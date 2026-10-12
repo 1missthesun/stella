@@ -4,10 +4,7 @@ import type { CloudConnectorConnectRequest } from "@stella/contracts/cloud-conne
 import { authClient } from "./auth-client";
 import { getBackendClient, useBackendView } from "./backend";
 
-export type {
-  CloudConnectorConnectRequest,
-  CloudConnectorConnectState,
-} from "@stella/contracts/cloud-connector-connect";
+export type { CloudConnectorConnectRequest } from "@stella/contracts/cloud-connector-connect";
 
 /**
  * Pending inline connect cards for the signed-in account: what a cloud

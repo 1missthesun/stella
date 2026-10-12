@@ -11,7 +11,6 @@ import {
 import { useRouter } from "expo-router";
 import { GlassToggle } from "./glass";
 import { Icon, type IconName } from "./Icon";
-import { PrimaryButton } from "./PrimaryButton";
 import { SubscriptionSection } from "./SubscriptionSection";
 import { UserAskEscalationSection } from "./settings/UserAskEscalationSection";
 import {

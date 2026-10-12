@@ -23,8 +23,6 @@ import {
   type NativeRelayRequest,
 } from "./native-relay";
 
-export { isInternalRelayRequestHeader } from "./native-relay";
-
 /** The fields of an authorized relay request that body shaping reads. */
 export type RelayRequestShape = NativeRelayRequest & {
   resolvedModel: string;

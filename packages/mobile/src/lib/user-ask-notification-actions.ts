@@ -4,7 +4,6 @@ import * as TaskManager from "expo-task-manager";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import {
   USER_ASK_ACTION_CATEGORY_PREFIX,
-  USER_ASK_ACTION_OPEN,
   USER_ASK_PUSH_CAPABILITY,
   isUserAskReplyActionId,
   userAskActionCategoryId,
@@ -230,10 +229,6 @@ const presentReplyFailure = async (
 export const isAskReplyResponse = (
   response: Pick<Notifications.NotificationResponse, "actionIdentifier">,
 ): boolean => isUserAskReplyActionId(response.actionIdentifier);
-
-export const isAskOpenResponse = (
-  response: Pick<Notifications.NotificationResponse, "actionIdentifier">,
-): boolean => response.actionIdentifier === USER_ASK_ACTION_OPEN;
 
 let deviceIdReader: (() => Promise<string | null>) | null = null;
 

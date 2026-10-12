@@ -26,12 +26,6 @@ export const STELLA_PROVIDER = "stella";
 // Opaque "let the backend pick" sentinel. The concrete model is chosen per
 // agent type + audience on the backend; this stays the per-agent *default*.
 export const STELLA_DEFAULT_MODEL = `${STELLA_PROVIDER}/default`;
-// Legacy branded aliases remain parseable for old clients. The public catalog
-// exposes DeepSeek V4.1 Flash as the selectable default
-// and explicit selection.
-export const STELLA_STANDARD_MODEL = `${STELLA_PROVIDER}/standard`;
-export const STELLA_PRIORITY_MODEL = `${STELLA_PROVIDER}/priority`;
-export const STELLA_LIGHT_MODEL = `${STELLA_PROVIDER}/light`;
 // Bump this whenever Stella default/model/mode mappings change. The catalog
 // route reports it as `updatedAt`; clients revalidate by ETag.
 export const STELLA_MODEL_CATALOG_UPDATED_AT = Date.UTC(2026, 9, 6, 0, 0);
@@ -128,9 +122,6 @@ const catalogApiForModel = (upstreamModel: string): ManagedProtocol => {
 export const toStellaModelId = (upstreamModel: string): string =>
   `${STELLA_PROVIDER}/${upstreamModel.trim()}`;
 
-export const toStellaModeModelId = (mode: ModelMode): string =>
-  `${STELLA_PROVIDER}/${mode}`;
-
 export const isStellaModel = (model: string | null | undefined): boolean => {
   const trimmed = model?.trim();
   return Boolean(trimmed) && trimmed!.startsWith(`${STELLA_PROVIDER}/`);
@@ -171,36 +162,6 @@ export const parseStellaModelSelection = (
     return { kind: "mode", mode: aliasOrUpstreamModel };
   }
   return { kind: "upstream", model: aliasOrUpstreamModel };
-};
-
-/**
- * Resolve an explicit Stella override (mode or upstream) to its upstream model
- * id. The opaque `default` selection has no concrete model without an agent +
- * audience, so it's rejected here — callers resolve defaults via
- * `getModelConfig` instead.
- */
-export const resolveStellaModelSelection = (
-  selection?: string | null,
-  audience: ManagedModelAudience = "free",
-): string => {
-  const trimmed = selection?.trim();
-  if (
-    trimmed?.startsWith(`${STELLA_PROVIDER}/`) &&
-    !isStellaModelAllowedForAudience(trimmed, audience)
-  ) {
-    throw new Error(`Unsupported Stella model selection: ${trimmed}`);
-  }
-  const parsed = parseStellaModelSelection(selection);
-  if (parsed?.kind === "upstream") {
-    return resolveManagedModelRouteAlias(parsed.model);
-  }
-  if (parsed?.kind === "mode") {
-    return getModeConfig(parsed.mode, audience).model;
-  }
-  if (trimmed && !trimmed.startsWith(`${STELLA_PROVIDER}/`)) {
-    return trimmed;
-  }
-  throw new Error(`Unsupported Stella model selection: ${trimmed ?? ""}`);
 };
 
 /**

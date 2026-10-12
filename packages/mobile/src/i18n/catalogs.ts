@@ -63,14 +63,6 @@ export const getEnglishCatalog = (): Catalog => {
 
 export const getCatalog = (locale: Locale): Catalog => readCatalog(locale);
 
-/**
- * Catalogs are plain JSON and `require` is synchronous under Metro, so
- * there is nothing to await — but the async shape matches the desktop
- * provider's contract and keeps the parse off the very first render.
- */
-export const loadCatalog = (locale: Locale): Promise<Catalog> =>
-  Promise.resolve(readCatalog(locale));
-
 const lookupPath = (catalog: Catalog | undefined, key: string): unknown => {
   if (!catalog) return undefined;
   let cursor: unknown = catalog;

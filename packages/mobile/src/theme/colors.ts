@@ -160,6 +160,3 @@ function fallbackFor(isDark: boolean): Colors {
  *  resolves matches what most users actually see. */
 export const lightColors: Colors = fallbackFor(false);
 export const darkColors: Colors = fallbackFor(true);
-
-/** @deprecated Use `useColors()` from theme-context instead. */
-export const colors = lightColors;

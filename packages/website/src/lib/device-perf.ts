@@ -4,9 +4,8 @@
  * marketing-mock animations) on low-end or GPU-less machines.
  *
  * Everything here is memoized and SSR-safe (returns conservative defaults on
- * the server). The cheap heuristics are mirrored by the inline `PerfInitScript`
- * so `<html data-low-power>` is set before first paint; this module is the
- * source of truth for components that need the WebGL tier too.
+ * the server). The core/memory heuristic lives in the inline `PerfInitScript`
+ * so `<html data-low-power>` is set before first paint.
  */
 
 export type WebGLTier = "hardware" | "software" | "none";
@@ -23,7 +22,6 @@ type WebGLProbe = {
 };
 
 let cachedProbe: WebGLProbe | undefined;
-let cachedLowPower: boolean | undefined;
 
 function probeWebGL(): WebGLProbe {
   if (cachedProbe !== undefined) return cachedProbe;
@@ -98,33 +96,6 @@ export function getWebGLTier(): WebGLTier {
  */
 export function hasReliableHighpFragment(): boolean {
   return probeWebGL().reliableHighp;
-}
-
-export function prefersReducedMotion(): boolean {
-  if (typeof window === "undefined" || !window.matchMedia) return false;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-/**
- * Cheap, allocation-free heuristic for a memory/CPU-constrained device. Kept in
- * sync with the inline `PerfInitScript`. Conservative on purpose: 8-core / 8GB+
- * machines keep the full experience; only genuinely small devices opt out.
- */
-export function isLowPowerDevice(): boolean {
-  if (cachedLowPower !== undefined) return cachedLowPower;
-  if (typeof navigator === "undefined") return false;
-
-  const cores =
-    typeof navigator.hardwareConcurrency === "number"
-      ? navigator.hardwareConcurrency
-      : 0;
-  const memory =
-    typeof (navigator as { deviceMemory?: number }).deviceMemory === "number"
-      ? (navigator as { deviceMemory?: number }).deviceMemory!
-      : 0;
-
-  cachedLowPower = (cores > 0 && cores <= 4) || (memory > 0 && memory <= 4);
-  return cachedLowPower;
 }
 
 /**

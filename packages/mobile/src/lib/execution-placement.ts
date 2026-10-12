@@ -26,15 +26,10 @@ export {
   automaticExecutionCancellationCommand,
   automaticExecutionResultText,
   bindAutomaticExecutionAdmission,
-  buildAutomaticExecutionAdmission,
-  isAutomaticExecutionTerminal,
   isAutomaticExecutionPairCredentialRejection,
   requestAutomaticExecutionCancellation,
 } from "./execution-placement-core";
 export type {
-  AutomaticExecutionCapability,
-  AutomaticExecutionKind,
-  AutomaticExecutionSubject,
   AutomaticExecutionTarget,
   AutomaticExecutionTurnControl,
 } from "./execution-placement-core";

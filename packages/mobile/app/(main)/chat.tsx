@@ -309,10 +309,6 @@ function ChatSurface(props: {
   const offline = useIsOffline();
   const isFocused = useIsFocused();
   const composerModelPinned = useComposerModelPinned();
-  const cloudModelsActive = usesCloudModelSettings(
-    executionTarget,
-    Boolean(access),
-  );
   const [selectedArtifact, setSelectedArtifact] = useState<ChatArtifact | null>(
     null,
   );

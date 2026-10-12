@@ -34,10 +34,6 @@ export function setDebugStorefrontOverride(codeOrNull) {
     codeOrNull == null ? codeOrNull : String(codeOrNull).trim().toUpperCase();
 }
 
-export function getDebugStorefrontOverride() {
-  return __DEV__ ? debugStorefrontOverride : undefined;
-}
-
 async function resolveStorefrontCountryCode() {
   if (__DEV__ && debugStorefrontOverride !== undefined) {
     return debugStorefrontOverride;

@@ -39,9 +39,6 @@ export const resetDictationTranscriptPreview = (): void => publish("");
 export const updateDictationTranscriptPreview = (text: string): void =>
   publish(text);
 
-export const getDictationTranscriptPreviewSnapshot =
-  (): DictationTranscriptSnapshot => snapshot;
-
 export const useDictationTranscriptPreview = (): DictationTranscriptSnapshot =>
   useSyncExternalStore(
     (listener) => {

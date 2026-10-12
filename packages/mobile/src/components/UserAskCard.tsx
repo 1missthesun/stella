@@ -33,7 +33,6 @@ import {
   userAskDeckEntries,
   userAskDeckKey,
   userAskRecordFromAnswer,
-  type UserAskDeckEntry,
   type UserAskRecord,
   type UserAskDraft,
   type UserAskDrafts,

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
-  ActivityIndicator,
   BackHandler,
   Keyboard,
   LayoutAnimation,
@@ -15,7 +14,8 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TOP_BAR_BAR_HEIGHT } from "./AppBackdrop";
 import { PopoverSurface, type PopoverAction } from "./FloatingPopoverParts";
-import { Icon, type IconName } from "./Icon";
+import { GlassIconButton } from "./GlassIconButton";
+import type { IconName } from "./Icon";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
@@ -25,6 +25,7 @@ const MAX_WIDTH = 760;
 const EDGE_GAP = 8;
 const MIN_HEIGHT = 140;
 const CONFIRM_MS = 1400;
+const BUTTON_SIZE = 36;
 
 function useKeyboardHeight(): number {
   const [height, setHeight] = useState(0);
@@ -164,12 +165,14 @@ function FooterButton({
     [],
   );
   return (
-    <Pressable
-      accessibilityRole="button"
+    <GlassIconButton
+      icon={confirmed ? "check" : icon}
+      size={BUTTON_SIZE}
+      iconSize={16}
       accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled: Boolean(disabled), busy: Boolean(loading) }}
-      disabled={disabled || loading}
-      hitSlop={6}
+      loading={Boolean(loading)}
+      disabled={Boolean(disabled)}
+      dot={active ? colors.accent : null}
       onPress={() => {
         void Promise.resolve(onPress()).then((result) => {
           if (!confirm || result === false) return;
@@ -178,22 +181,7 @@ function FooterButton({
           timer.current = setTimeout(() => setConfirmed(false), CONFIRM_MS);
         });
       }}
-      style={({ pressed }) => [
-        styles.button,
-        pressed && { backgroundColor: colors.border },
-        disabled && styles.disabled,
-      ]}
-    >
-      {loading ? (
-        <ActivityIndicator size="small" color={colors.textMuted} />
-      ) : (
-        <Icon
-          name={confirmed ? "check" : icon}
-          size={18}
-          color={active ? colors.accent : colors.text}
-        />
-      )}
-    </Pressable>
+    />
   );
 }
 
@@ -270,11 +258,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
-    gap: 4,
-    minHeight: 44,
+    gap: 8,
+    minHeight: 48,
     paddingLeft: 14,
-    paddingRight: 6,
-    paddingVertical: 4,
+    paddingRight: 8,
+    paddingVertical: 6,
   },
   name: {
     flex: 1,
@@ -286,14 +274,6 @@ const styles = StyleSheet.create({
   actions: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 2,
+    gap: 8,
   },
-  button: {
-    alignItems: "center",
-    borderRadius: 16,
-    height: 32,
-    justifyContent: "center",
-    width: 32,
-  },
-  disabled: { opacity: 0.4 },
 });

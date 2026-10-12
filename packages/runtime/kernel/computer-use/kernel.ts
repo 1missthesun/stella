@@ -581,12 +581,18 @@ export const isBunNodeReplRuntime = (
   versions: NodeJS.ProcessVersions & { bun?: string } = process.versions,
 ) => Boolean(versions.bun);
 
+const nodeReplExecutable = (env: NodeJS.ProcessEnv): string =>
+  env.STELLA_NODE_BIN?.trim() ||
+  env.STELLA_HOST_EXECUTABLE_PATH?.trim() ||
+  "node";
+
 export const nodeReplChildUsesElectronRuntime = (
   env: NodeJS.ProcessEnv = process.env,
 ): boolean => {
   if (env.STELLA_NODE_IS_ELECTRON?.trim() === "1") return true;
-  if (env.STELLA_NODE_BIN?.trim()) return false;
-  return Boolean(env.STELLA_HOST_EXECUTABLE_PATH?.trim());
+  const executable = nodeReplExecutable(env);
+  if (executable === env.STELLA_HOST_EXECUTABLE_PATH?.trim()) return true;
+  return /^electron(\.exe)?$/i.test(path.basename(executable));
 };
 
 /**
@@ -638,10 +644,7 @@ export const createExternalNodeReplTransport = (
   options: ExternalNodeReplTransportOptions = {},
 ): NodeReplTransport => {
   const env = options.env ?? process.env;
-  const executable =
-    env.STELLA_NODE_BIN?.trim() ||
-    env.STELLA_HOST_EXECUTABLE_PATH?.trim() ||
-    "node";
+  const executable = nodeReplExecutable(env);
   const isolation = options.isolation;
   const launch = isolation
     ? isolateToolProcessLaunch({

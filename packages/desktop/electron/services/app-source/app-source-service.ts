@@ -909,6 +909,12 @@ export class AppSourceService {
     const bun = process.env.STELLA_BUN_PATH?.trim() || "bun";
     const result = await run(bun, ["install"], {
       cwd,
+      // The browser and office downloads are prepare-install.mjs's job when
+      // the launcher prepares the relaunch (run ahead of it here); the
+      // postinstall would only check them a second time.
+      env: this.options.launcherPreparesOnRelaunch
+        ? { STELLA_SKIP_BROWSER_HYDRATE: "1", STELLA_SKIP_OFFICE_HYDRATE: "1" }
+        : undefined,
       timeoutMs: 10 * 60_000,
     });
     if (result.code !== 0) {

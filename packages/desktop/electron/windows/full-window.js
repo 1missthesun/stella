@@ -59,7 +59,7 @@ export class FullWindowController {
                     // the native frame because traffic lights are hidden-inset under it.
                     frame: process.platform !== 'win32',
                     transparent: false,
-                    backgroundColor: isMac ? '#f2f4f8' : '#101016',
+                    backgroundColor: createOptions?.backgroundColor ?? (isMac ? '#f2f4f8' : '#101016'),
                     hasShadow: true,
                     vibrancy: useNativeVibrancy ? 'menu' : undefined,
                     visualEffectState: useNativeVibrancy ? 'active' : undefined,

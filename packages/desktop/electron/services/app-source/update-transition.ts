@@ -1,4 +1,4 @@
-import { existsSync, promises as fs } from "node:fs";
+import { existsSync, promises as fs, readFileSync } from "node:fs";
 import path from "node:path";
 import {
   type BrowserWindow,
@@ -274,6 +274,46 @@ const LIVE_SCRIPT = `(() => {
 
 const delay = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+export type PendingHold = { backgroundColor: string; image: string };
+
+/** The held frame inside the window's own first page (see `heldFirstPage`). */
+const HELD_FRAME_ID = "stella-update-hold";
+
+/**
+ * A restart left a hold for this process to show (cheap, synchronous: read
+ * before the window is made). The window then opens in the hold's colors,
+ * and its first page shows the held frame (`heldFirstPage`) until the
+ * overlay holds it.
+ */
+export const pendingHold = (holdDir: string): PendingHold | null => {
+  try {
+    const hold = JSON.parse(readFileSync(path.join(holdDir, HOLD_RECORD), "utf8")) as UpdateHold;
+    if (Date.now() - hold.since > HOLD_MAX_AGE_MS || !existsSync(hold.image)) return null;
+    return { backgroundColor: hold.dark ? "#1c1c1e" : "#f2f2f3", image: hold.image };
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The window's first page after an update restart, with the held frame over
+ * its launch splash: the page paints well before the overlay can, and the
+ * splash would otherwise be the first thing on screen. The overlay takes the
+ * hold over and this frame is removed under it.
+ */
+export const heldFirstPage = (html: string, hold: PendingHold) => {
+  let image: string;
+  try {
+    image = readFileSync(hold.image).toString("base64");
+  } catch {
+    return html;
+  }
+  const frame = `<div id="${HELD_FRAME_ID}" aria-hidden="true" style="position:fixed;inset:0;z-index:2147483647;pointer-events:none;background:${hold.backgroundColor} url(data:image/jpeg;base64,${image}) 0 0 / 100% 100% no-repeat"></div>`;
+  return html.includes("</body>") ? html.replace("</body>", `${frame}\n</body>`) : `${html}${frame}`;
+};
+
+const REMOVE_HELD_FRAME = `document.getElementById(${JSON.stringify(HELD_FRAME_ID)})?.remove()`;
+
 export class UpdateTransition {
   private readonly options: UpdateTransitionOptions;
   private view: WebContentsView | null = null;
@@ -515,24 +555,30 @@ export class UpdateTransition {
     await fs.rm(record, { force: true });
     if (!hold || Date.now() - hold.since > HOLD_MAX_AGE_MS) return;
     let view: WebContentsView;
+    const removeHeldFrame = () =>
+      win.isDestroyed() ? Promise.resolve() : win.webContents.executeJavaScript(REMOVE_HELD_FRAME).catch(() => {});
     try {
       const started = Date.now();
       const image = await fs.readFile(hold.image);
       view = await this.attach(win);
       const attached = Date.now();
       await this.call(view, "hold", `data:image/jpeg;base64,${image.toString("base64")}`, this.holdOptions(hold));
+      // The overlay holds the frame now; the page's copy goes from under it.
+      void removeHeldFrame();
       this.options.log("app-source.resume-hold", {
         attachMs: attached - started,
         holdMs: Date.now() - attached,
       });
     } catch (error) {
       this.fail("resume-hold", error);
+      await removeHeldFrame();
       await this.uncover(win);
       return;
     }
     void (async () => {
       try {
         await this.waitUntilShown(win, { reloaded: () => true });
+        await removeHeldFrame();
         const after = await this.capture(win);
         await this.call(view, "focusIn", jpegUrl(after), focusIn());
         this.options.log("app-source.relaunch-transition", {
@@ -541,6 +587,7 @@ export class UpdateTransition {
       } catch (error) {
         this.fail("focus-in", error);
       } finally {
+        await removeHeldFrame();
         await this.uncover(win);
         await fs.rm(hold.image, { force: true });
         await fs.rm(hold.mark, { force: true });
@@ -551,6 +598,7 @@ export class UpdateTransition {
   private holdOptions(hold: UpdateHold): HoldOptions {
     return {
       labelDelayMs: hold.since + LABEL_DELAY_MS - Date.now(),
+      heldMs: Date.now() - hold.since,
       dark: hold.dark,
       label: this.options.holdLabel(),
       markSvg: MARK_SVG,

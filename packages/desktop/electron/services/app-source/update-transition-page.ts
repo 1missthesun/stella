@@ -56,6 +56,8 @@ export type FrostMotion = {
 export type HoldOptions = {
   /** Show the mark and label after this many ms (the label waits 0.7 s in all). */
   labelDelayMs: number;
+  /** How long the update has been holding: keeps the label's shimmer in step. */
+  heldMs: number;
   dark: boolean;
   label: string;
   markSvg: string;
@@ -324,7 +326,11 @@ function transitionPage() {
     layer.append(picture, center);
     root.replaceChildren(layer);
     holdLayer = layer;
-    inner.animate(options.appear.keyframes, { ...options.appear.timing, delay: Math.max(0, options.labelDelayMs), fill: "both" });
+    // Paced from when the update started holding, so a hold shown again in
+    // the next process carries on where the last one was rather than
+    // starting over.
+    inner.animate(options.appear.keyframes, { ...options.appear.timing, delay: options.labelDelayMs, fill: "both" });
+    label.style.animationDelay = `${-((options.heldMs % 1800) + 1800) % 1800}ms`;
     // A window that isn't shown yet paints the hold as its first frame.
     if (document.visibilityState === "visible") await painted();
   }

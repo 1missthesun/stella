@@ -13,6 +13,7 @@ import { resolveRendererBuildMode, serveRendererSource, } from "../source/render
 import { getAllWindows, } from "./context.js";
 import { startDeferredStartup } from "./deferred-startup.js";
 import { getMainLogger } from "../observability/main-logger.js";
+import { heldFirstPage, pendingHold } from "../services/app-source/update-transition.js";
 const initializeBootstrapLocalState = async (context) => {
     const { config, lifecycle, services, state } = context;
     const stellaDataDir = await resolveStellaDataDir(app, config.stellaAppDir, config.stellaDataDirPath);
@@ -32,6 +33,10 @@ const initializeWindowShell = (context) => {
     // Every install runs the renderer from its source tree (see source/), so
     // this is unconditional; only the build mode depends on who we are. The
     // handle swaps updated files into the windows (`applyChanges`).
+    // After an update restart, the window opens in the hold's colors and its
+    // first page shows the held frame, never the launch splash.
+    const hold = pendingHold(app.getPath("userData"));
+    state.pendingUpdateHold = hold;
     state.rendererSource = serveRendererSource({
         partition: config.sessionPartition,
         sourceRoot: config.stellaAppDir,
@@ -39,6 +44,7 @@ const initializeWindowShell = (context) => {
             isInstalledProduct: config.isInstalledProduct,
         }),
         log: (message) => getMainLogger()?.process("renderer.source", { message }),
+        firstPage: hold ? (html) => heldFirstPage(html, hold) : undefined,
     });
     configureNotificationActivationHandling(context);
     state.overlayController = new OverlayWindowController({
@@ -126,15 +132,7 @@ const finalizeWindowLaunch = (context) => {
         // is live. The runtime starts now, alongside the renderer, rather
         // than after first paint, so Stella is back to usable sooner.
         triggerDeferredStartup("update-relaunch");
-        void Promise.race([
-            transition.resumeAfterRelaunch(fullWindow).then(() => "hold"),
-            new Promise((resolve) => setTimeout(() => resolve("timeout"), 800)),
-        ]).then((shownWith) => {
-            getMainLogger()?.process("startup.window-shown", {
-                shownWith,
-                elapsedMs: Math.round(process.uptime() * 1000),
-            });
-        }).finally(() => state.windowManager.showWindow());
+        void transition.resumeAfterRelaunch(fullWindow);
     }
     else {
         state.windowManager.showWindow();
@@ -161,7 +159,28 @@ const finalizeWindowLaunch = (context) => {
  * launch and page load overlap with that registration work.
  */
 export const createBootstrapInitialWindows = (context) => {
-    context.state.windowManager.createInitialWindows();
+    // After an update restart the window opens in the hold's colors, and its
+    // first page is the held frame (see initializeWindowShell). It is not
+    // made hidden until then: a hidden window's pages paint late, so it would
+    // only add to the time with no window at all.
+    const hold = context.state.pendingUpdateHold;
+    context.state.windowManager.createInitialWindows(hold ? { backgroundColor: hold.backgroundColor } : undefined);
+    const fullWindow = context.state.windowManager.getFullWindow();
+    if (hold && fullWindow) {
+        let raised = false;
+        const raise = (shownWith) => {
+            if (raised || fullWindow.isDestroyed())
+                return;
+            raised = true;
+            getMainLogger()?.process("startup.window-shown", {
+                shownWith,
+                elapsedMs: Math.round(process.uptime() * 1000),
+            });
+            context.state.windowManager.showWindow();
+        };
+        fullWindow.once("ready-to-show", () => raise("first-page"));
+        setTimeout(() => raise("timeout"), 800);
+    }
     getMainLogger()?.process("startup.window-created", {
         elapsedMs: Math.round(process.uptime() * 1000),
     });

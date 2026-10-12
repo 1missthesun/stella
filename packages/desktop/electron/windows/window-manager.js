@@ -150,8 +150,8 @@ export class WindowManager {
     ensureFullWindow(options) {
         return this.createFullWindow(options);
     }
-    createInitialWindows() {
-        this.createFullWindow();
+    createInitialWindows(createOptions) {
+        this.createFullWindow(createOptions);
     }
     getFullWindow() {
         return this.fullWindowController.getWindow();

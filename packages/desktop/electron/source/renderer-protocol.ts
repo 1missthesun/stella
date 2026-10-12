@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { app, protocol, session, webContents } from "electron";
 import { RENDERER_ORIGIN, RENDERER_SCHEME } from "./origin.js";
@@ -25,6 +26,14 @@ export const registerRendererScheme = () => {
 };
 
 export const isRendererSourceUrl = (url: string) => url.startsWith(`${RENDERER_ORIGIN}/`);
+
+/** A top-level script in desktop-ui's public/ that `url` asks for, as is. */
+const earlyPublicFile = (uiRoot: string, url: URL) => {
+  const name = url.pathname.slice(1);
+  if (url.search || !/^[\w.-]+\.js$/.test(name)) return null;
+  const file = path.join(uiRoot, "public", name);
+  return fs.existsSync(file) ? file : null;
+};
 
 /**
  * How the renderer is built from source.
@@ -81,6 +90,12 @@ export const serveRendererSource = (options: {
   envRoot?: string;
   mode: RendererBuildMode;
   log: (message: string) => void;
+  /**
+   * Rewrites the main window's first page, once. In production it is served
+   * straight from disk rather than after the source server has loaded, so
+   * it can paint sooner.
+   */
+  firstPage?: (html: string) => string;
 }): RendererSourceHandle => {
   const partitionSession = session.fromPartition(options.partition);
   serveMediaProtocol(options.partition);
@@ -110,9 +125,46 @@ export const serveRendererSource = (options: {
         onReloadNeeded: reloadPages,
       }),
   );
-  partitionSession.protocol.handle(RENDERER_SCHEME, async (request) =>
-    (await ready).handle(request),
+  let firstPage = options.firstPage ?? null;
+  const uiRoot = path.join(options.sourceRoot, "packages", "desktop-ui");
+  let sourceReady = false;
+  void ready.then(
+    () => {
+      sourceReady = true;
+    },
+    () => undefined,
   );
+  partitionSession.protocol.handle(RENDERER_SCHEME, async (request) => {
+    const url = new URL(request.url);
+    // The first page's own scripts are plain files in public/: served from
+    // disk while the source server is still loading, so the page can paint.
+    const early = !sourceReady && options.mode === "production" ? earlyPublicFile(uiRoot, url) : null;
+    if (early) {
+      const body = await fs.promises.readFile(early).catch(() => null);
+      if (body) {
+        return new Response(body, {
+          headers: { "content-type": "text/javascript; charset=utf-8", "cache-control": "no-cache" },
+        });
+      }
+    }
+    if (
+      firstPage &&
+      (url.pathname === "/" || url.pathname === "/index.html") &&
+      url.searchParams.get("window") === "full"
+    ) {
+      const rewrite = firstPage;
+      firstPage = null;
+      const headers = { "content-type": "text/html; charset=utf-8", "cache-control": "no-cache" };
+      if (options.mode === "production") {
+        const source = await fs.promises.readFile(path.join(uiRoot, "index.html"), "utf8").catch(() => null);
+        if (source !== null) return new Response(rewrite(source), { headers });
+      }
+      const response = await (await ready).handle(request);
+      if (!response.ok) return response;
+      return new Response(rewrite(await response.text()), { status: response.status, headers });
+    }
+    return (await ready).handle(request);
+  });
   void ready
     .then((source) => source.prepare())
     .catch((error) => {

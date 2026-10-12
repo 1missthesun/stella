@@ -428,9 +428,7 @@ export type ToolDefinition = {
    * scoping and connector context, NOT by per-agent frontmatter allowlists;
    * flagging a tool demoted exposes it to every agent type its definition
    * allows (matching the old deferred mechanism, which was gated by
-   * tool_search presence rather than frontmatter). The only exception is
-   * the empty-allowlist STELLA_LOCAL_TOOLS fallback surface, which never
-   * receives demoted tools.
+   * tool_search presence rather than frontmatter).
    */
   demoted?: {
     searchTerms?: readonly string[];

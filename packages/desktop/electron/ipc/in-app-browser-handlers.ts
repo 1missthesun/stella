@@ -19,7 +19,6 @@ import {
   IPC_BROWSER_VIEW_SELECT_TAB,
   IPC_BROWSER_VIEW_SET_LAYOUT,
   IPC_BROWSER_VIEW_SET_OWNER_SCOPE,
-  IPC_BROWSER_VIEW_SET_VISIBLE_OWNER,
   IPC_BROWSER_VIEW_SHOW,
 } from "@stella/contracts/desktop/ipc-channels";
 import type { InAppBrowserService } from "../services/in-app-browser-service.js";
@@ -156,12 +155,6 @@ export const registerInAppBrowserHandlers = (
   register(IPC_BROWSER_VIEW_SHOW, (payload) =>
     options.service.show(parseLayout(payload)),
   );
-  register(IPC_BROWSER_VIEW_SET_VISIBLE_OWNER, (payload) => {
-    const record = requireObject(payload, "Browser owner");
-    return options.service.setVisibleOwner(
-      requireString(record.ownerId, "ownerId"),
-    );
-  });
   register(IPC_BROWSER_VIEW_SET_OWNER_SCOPE, (payload) => {
     const record = ownerScopePayloadSchema.parse(payload);
     return options.service.setOwnerScope(record.ownerId);

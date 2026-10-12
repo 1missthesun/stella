@@ -1,4 +1,4 @@
-import { BrowserWindow, screen, shell } from "electron";
+import { shell } from "electron";
 import { hasMacPermission, requestMacPermission, } from "../utils/macos-permissions.js";
 import {
   IPC_CHAT_CONTEXT_GET,
@@ -11,9 +11,6 @@ import {
   IPC_REGION_GET_WINDOW_CAPTURE,
   IPC_REGION_CLICK,
   IPC_SCREENSHOT_CAPTURE,
-  IPC_SCREENSHOT_CAPTURE_VISION,
-  IPC_CAPTURE_CURSOR_DISPLAY_INFO,
-  IPC_CAPTURE_PAGE_DATA_URL,
   IPC_CAPTURE_BEGIN_REGION_CAPTURE,
 } from "@stella/contracts/desktop/ipc-channels";
 import {
@@ -76,33 +73,6 @@ export const registerCaptureHandlers = (options) => {
             return null;
         }
         return options.captureService.captureScreenshot(point);
-    });
-    handleIpc(IPC_SCREENSHOT_CAPTURE_VISION, async (event, point) => {
-        if (!options.assertPrivilegedSender(event, IPC_SCREENSHOT_CAPTURE_VISION)) {
-            throw new Error("Blocked untrusted request.");
-        }
-        if (!(await ensureScreenCapturePermission())) {
-            return [];
-        }
-        return options.captureService.captureVisionScreenshots(point);
-    });
-    handleIpc(IPC_CAPTURE_CURSOR_DISPLAY_INFO, () => {
-        const cursor = screen.getCursorScreenPoint();
-        const display = screen.getDisplayNearestPoint(cursor);
-        return {
-            x: display.bounds.x,
-            y: display.bounds.y,
-            width: display.bounds.width,
-            height: display.bounds.height,
-            scaleFactor: display.scaleFactor ?? 1,
-        };
-    });
-    handleIpc(IPC_CAPTURE_PAGE_DATA_URL, async (event) => {
-        const win = BrowserWindow.fromWebContents(event.sender);
-        if (!win)
-            return null;
-        const image = await win.webContents.capturePage();
-        return image.toDataURL();
     });
     // Composer capture entry point: hide the full shell, run the overlay, merge
     // any capture, then restore the shell's previous visibility/focus state.

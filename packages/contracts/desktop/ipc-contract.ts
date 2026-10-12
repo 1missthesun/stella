@@ -19,7 +19,6 @@
  */
 import type {
   AllUserSignalsResult,
-  BrowserDataResult,
   BrowserProfile,
   ChatContext,
   ChatContextUpdate,
@@ -33,7 +32,6 @@ import type {
   ScheduledConversationEvent,
   VoiceRuntimeSnapshot,
 } from "../index.js";
-import type { AgentStreamEvent } from "../agent-stream.js";
 import type { ReasoningEffortLevel } from "../reasoning-effort.js";
 import type { AuthSessionSnapshot } from "../auth-session.js";
 import type { StellaBrowserBridgeStatus } from "../browser-bridge-status.js";
@@ -70,12 +68,9 @@ import type {
 import type { DiscoveryKnowledgeSeedPayload } from "../discovery.js";
 import type { ExecutionTarget } from "../execution-placement.js";
 import type {
-  ConversationSummaryCursor,
-  ConversationSummaryPage,
   EventRecord,
   LocalChatLineageWindow,
   LocalChatMessageWindow,
-  LocalChatToolEventPage,
   LocalChatUpdatedPayload,
   LocalModelUsagePage,
 } from "../local-chat.js";
@@ -87,7 +82,7 @@ import type {
   OfficePreviewSnapshot,
 } from "../office-preview.js";
 import type { RuntimeVoiceOrchestratorConfig } from "../protocol/index.js";
-import type { ConversationFocusRoot, ReplyCounts } from "../reply-refs.js";
+import type { ConversationFocusRoot } from "../reply-refs.js";
 import type {
   UserAsk,
   UserAskAnswer,
@@ -117,16 +112,13 @@ import type {
 } from "./onboarding.js";
 import type { UiState } from "./ui.js";
 import {
-  IPC_AGENT_EVENT,
   IPC_PI_CHAT_EVENTS,
   IPC_PI_CHAT_REQUEST,
-  IPC_AGENT_ONE_SHOT_COMPLETION,
   IPC_AGENT_SEND_INPUT,
   IPC_APP_HARD_RESET,
   IPC_APP_QUIT_FOR_RESTART,
   IPC_APP_RELAUNCH,
   IPC_APP_RELOAD,
-  IPC_APP_RESET_MESSAGES,
   IPC_APP_SET_READY,
   IPC_APP_SOURCE_APPLY,
   IPC_APP_SOURCE_APPLY_REMOTE,
@@ -142,12 +134,9 @@ import {
   IPC_AUTH_GET_TOKEN,
   IPC_AUTH_REVOKE_SESSIONS,
   IPC_AUTH_SESSION_INVALIDATED,
-  IPC_AUTH_SIGN_DEVICE,
   IPC_AUTH_SIGN_IN_ANONYMOUS,
   IPC_AUTH_SIGN_OUT,
   IPC_BROWSER_BRIDGE_STATUS,
-  IPC_BROWSER_FETCH_JSON,
-  IPC_BROWSER_FETCH_TEXT,
   IPC_BROWSER_VIEW_CLOSE_TAB,
   IPC_BROWSER_VIEW_CONNECT,
   IPC_BROWSER_VIEW_CREATE_TAB,
@@ -161,12 +150,9 @@ import {
   IPC_BROWSER_VIEW_SELECT_TAB,
   IPC_BROWSER_VIEW_SET_LAYOUT,
   IPC_BROWSER_VIEW_SET_OWNER_SCOPE,
-  IPC_BROWSER_VIEW_SET_VISIBLE_OWNER,
   IPC_BROWSER_VIEW_SHOW,
   IPC_BROWSER_VIEW_STATE,
   IPC_CAPTURE_BEGIN_REGION_CAPTURE,
-  IPC_CAPTURE_CURSOR_DISPLAY_INFO,
-  IPC_CAPTURE_PAGE_DATA_URL,
   IPC_CAPTURE_REGION_FAILED,
   IPC_CHAT_CONTEXT_GET,
   IPC_CHAT_CONTEXT_REMOVE_SCREENSHOT,
@@ -174,7 +160,6 @@ import {
   IPC_CHAT_CONTEXT_UPDATED,
   IPC_CHAT_EVIDENCE_CARDS,
   IPC_CHAT_EVIDENCE_DRIVE_CARDS,
-  IPC_CHAT_OPEN_SIDEBAR,
   IPC_CHATGPT_CANCEL_SIGN_IN,
   IPC_CHATGPT_LIST_MODELS,
   IPC_CHATGPT_LIST_PROFILES,
@@ -230,8 +215,6 @@ import {
   IPC_CONNECTOR_CREDENTIAL_SUBMIT,
   IPC_CUSTOMIZATIONS_RESET,
   IPC_DEVICE_GET_ID,
-  IPC_DEVTEST_FIX_VITE_ERROR,
-  IPC_DEVTEST_TRIGGER_VITE_ERROR,
   IPC_DIAGNOSTICS_EXPORT_LOGS,
   IPC_DIAGNOSTICS_OPEN_LOGS,
   IPC_DIAGNOSTICS_RECORD_HEAP_TRACE,
@@ -248,10 +231,7 @@ import {
   IPC_DICTATION_TOGGLE,
   IPC_DICTATION_TRANSCRIBE_WITH_OPENROUTER,
   IPC_DISCOVERY_COLLECT_ALL_SIGNALS,
-  IPC_DISCOVERY_COLLECT_BROWSER_DATA,
-  IPC_DISCOVERY_CORE_MEMORY_EXISTS,
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
-  IPC_DISCOVERY_KNOWLEDGE_EXISTS,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
   IPC_DISCOVERY_WRITE_CORE_MEMORY,
   IPC_DISCOVERY_WRITE_KNOWLEDGE,
@@ -272,7 +252,6 @@ import {
   IPC_EXECUTION_ANSWER_REMOTE_REQUEST,
   IPC_EXECUTION_REMOTE_REQUEST,
   IPC_EXECUTION_TARGET_SET,
-  IPC_GLOBAL_SHORTCUTS_GET_SUSPENDED,
   IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED,
   IPC_HOME_CAPTURE_APP_WINDOW,
   IPC_HOME_GET_ACTIVE_BROWSER_TAB,
@@ -288,27 +267,18 @@ import {
   IPC_LLM_CREDENTIALS_LOGIN_OAUTH,
   IPC_LLM_CREDENTIALS_SAVE,
   IPC_LLM_CREDENTIALS_VALIDATE_OAUTH,
-  IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID,
-  IPC_LOCAL_CHAT_DELETE_CONVERSATION,
-  IPC_LOCAL_CHAT_GET_EVENT_COUNT,
   IPC_LOCAL_CHAT_GET_OR_CREATE_ID,
   IPC_LOCAL_CHAT_LIST_ACTIVITY,
-  IPC_LOCAL_CHAT_LIST_CONVERSATIONS,
-  IPC_LOCAL_CHAT_LIST_EVENTS,
   IPC_LOCAL_CHAT_LIST_FILES,
   IPC_LOCAL_CHAT_LIST_LINEAGE_MESSAGES,
-  IPC_LOCAL_CHAT_LIST_MESSAGE_TOOL_EVENTS,
   IPC_LOCAL_CHAT_LIST_MESSAGES,
   IPC_LOCAL_CHAT_LIST_MESSAGES_AFTER,
   IPC_LOCAL_CHAT_LIST_MESSAGES_BEFORE,
   IPC_LOCAL_CHAT_LIST_MODEL_USAGE,
-  IPC_LOCAL_CHAT_LIST_REPLY_COUNTS,
-  IPC_LOCAL_CHAT_PERSIST_WELCOME,
   IPC_LOCAL_CHAT_SET_ACTIVE_ID,
   IPC_LOCAL_CHAT_UPDATED,
   IPC_MEDIA_COPY_ATTACHMENT,
   IPC_MEDIA_COPY_IMAGE,
-  IPC_MEDIA_GET_DIR,
   IPC_MEDIA_SAVE_OUTPUT,
   IPC_MEETINGS_OPEN_FOLDER,
   IPC_MEETINGS_PAUSE,
@@ -327,17 +297,10 @@ import {
   IPC_OFFICE_PREVIEW_START,
   IPC_OFFICE_PREVIEW_UPDATE,
   IPC_ONBOARDING_SYNTHESIZE,
-  IPC_OVERLAY_DISPLAY_CHANGE,
   IPC_OVERLAY_END_REGION_CAPTURE,
-  IPC_OVERLAY_HIDE_SCREEN_GUIDE,
-  IPC_OVERLAY_HIDE_SELECTION_CHIP,
   IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT,
-  IPC_OVERLAY_SELECTION_CHIP_CLICKED,
   IPC_OVERLAY_SET_INTERACTIVE,
-  IPC_OVERLAY_SHOW_SCREEN_GUIDE,
-  IPC_OVERLAY_SHOW_SELECTION_CHIP,
-  IPC_OVERLAY_SHOW_WINDOW_HIGHLIGHT,
   IPC_OVERLAY_START_REGION_CAPTURE,
   IPC_OVERLAY_WINDOW_HIGHLIGHT,
   IPC_PERMISSIONS_GET_STATUS,
@@ -375,7 +338,6 @@ import {
   IPC_REGION_PREPARE_SELECTION,
   IPC_REGION_SELECT,
   IPC_RUNTIME_AVAILABILITY,
-  IPC_SCHEDULE_GET_EVENT_COUNT,
   IPC_SCHEDULE_LIST_CONVERSATION_EVENTS,
   IPC_SCHEDULE_LIST_CRON_JOBS,
   IPC_SCHEDULE_LIST_HEARTBEATS,
@@ -385,19 +347,13 @@ import {
   IPC_SCHEDULE_UPDATE_CRON_JOB,
   IPC_SCHEDULE_UPDATED,
   IPC_SCHEDULE_UPSERT_HEARTBEAT,
-  IPC_SCREEN_GUIDE_HIDE,
-  IPC_SCREEN_GUIDE_SHOW,
   IPC_SCREENSHOT_CAPTURE,
-  IPC_SCREENSHOT_CAPTURE_VISION,
-  IPC_SHELL_KILL_BY_PORT,
   IPC_SHELL_LIST_OPENERS,
   IPC_SHELL_OPEN_EXTERNAL,
   IPC_SHELL_OPEN_PATH,
   IPC_SHELL_OPEN_WITH,
   IPC_SHELL_SAVE_FILE_AS,
   IPC_SHELL_SHOW_IN_FOLDER,
-  IPC_SYSTEM_DETECT_TECHNICAL_USER_SIGNALS,
-  IPC_SYSTEM_OPEN_FDA,
   IPC_THEME_LIST_INSTALLED,
   IPC_UI_GET_STATE,
   IPC_UI_SET_STATE,
@@ -431,7 +387,6 @@ import {
   IPC_VOICE_RUNTIME_STATE,
   IPC_VOICE_SESSION_ERROR,
   IPC_VOICE_SESSION_ERROR_STATE,
-  IPC_VOICE_WEB_SEARCH,
   IPC_WEBSITE_GET_BASE_URL,
   IPC_WINDOW_CLOSE,
   IPC_WINDOW_IS_MAXIMIZED,
@@ -956,10 +911,6 @@ export type IpcInvokeContract = {
     [point?: IpcPoint],
     CapturedScreenshot | null
   >;
-  [IPC_SCREENSHOT_CAPTURE_VISION]: Invoke<
-    [point?: IpcPoint],
-    VisionScreenshot[]
-  >;
   [IPC_REGION_PREPARE_SELECTION]: Invoke<
     [selection: IpcRect],
     { screenshot: CapturedScreenshot | null; window: null } | null
@@ -968,11 +919,6 @@ export type IpcInvokeContract = {
     [point: IpcPoint],
     { bounds: IpcRect; thumbnail: string; result: RegionCaptureResult } | null
   >;
-  [IPC_CAPTURE_CURSOR_DISPLAY_INFO]: Invoke<
-    [],
-    IpcRect & { scaleFactor: number }
-  >;
-  [IPC_CAPTURE_PAGE_DATA_URL]: Invoke<[], string | null>;
   [IPC_CAPTURE_BEGIN_REGION_CAPTURE]: Invoke<
     [],
     { ok: true } | { cancelled: true }
@@ -993,13 +939,6 @@ export type IpcInvokeContract = {
   [IPC_VOICE_ORCHESTRATOR_CONFIG]: Invoke<
     [payload: { conversationId: string }],
     RuntimeVoiceOrchestratorConfig
-  >;
-  [IPC_VOICE_WEB_SEARCH]: Invoke<
-    [payload: { query: string; category?: string }],
-    {
-      text: string;
-      results: Array<{ title: string; url: string; snippet: string }>;
-    }
   >;
   [IPC_VOICE_CREATE_OPENAI_SESSION]: Invoke<
     [payload: { instructions?: string }],
@@ -1039,11 +978,6 @@ export type IpcInvokeContract = {
   [IPC_COMPANION_GET_VISIBLE]: Invoke<[], CompanionVisibility>;
   [IPC_COMPANION_SET_VISIBLE]: Invoke<[visible: boolean], CompanionVisibility>;
 
-  // Agent
-  [IPC_AGENT_ONE_SHOT_COMPLETION]: Invoke<
-    [payload: OneShotCompletionRequest],
-    { text: string }
-  >;
   [IPC_AGENT_SEND_INPUT]: Invoke<
     [
       payload: {
@@ -1055,15 +989,9 @@ export type IpcInvokeContract = {
     ],
     { delivered: boolean }
   >;
-  [IPC_DEVTEST_TRIGGER_VITE_ERROR]: Invoke<[], OkResult>;
-  [IPC_DEVTEST_FIX_VITE_ERROR]: Invoke<[], OkResult>;
 
   // System / auth
   [IPC_DEVICE_GET_ID]: Invoke<[], string | null>;
-  [IPC_AUTH_SIGN_DEVICE]: Invoke<
-    [input: string],
-    { alg: "ed25519"; rawPublicKey: number[]; signature: string }
-  >;
   [IPC_HOST_CONFIGURE_RUNTIME]: Invoke<
     [config: { backendUrl: string }],
     { deviceId: string | null }
@@ -1084,7 +1012,6 @@ export type IpcInvokeContract = {
   [IPC_AUTH_REVOKE_SESSIONS]: Invoke<[], OkResult>;
   [IPC_HOST_SET_CLOUD_SYNC]: Invoke<[payload: { enabled: boolean }], OkResult>;
   [IPC_APP_QUIT_FOR_RESTART]: Invoke<[], OkResult>;
-  [IPC_APP_RESET_MESSAGES]: Invoke<[], OkResult>;
   [IPC_PERMISSIONS_GET_STATUS]: Invoke<[], PermissionStatus>;
   [IPC_PERMISSIONS_OPEN_SETTINGS]: Invoke<[payload: { kind: string }], void>;
   [IPC_PERMISSIONS_REQUEST]: Invoke<
@@ -1109,11 +1036,6 @@ export type IpcInvokeContract = {
     OkErrorResult
   >;
   [IPC_SHELL_OPEN_PATH]: Invoke<[payload: { filePath: string }], OkErrorResult>;
-  [IPC_SHELL_KILL_BY_PORT]: Invoke<[payload: { port: number }], void>;
-  [IPC_SYSTEM_DETECT_TECHNICAL_USER_SIGNALS]: Invoke<
-    [],
-    { signals: TechnicalUserSignal[] }
-  >;
 
   // Preferences
   [IPC_PREFERENCES_GET_PREVENT_SLEEP]: Invoke<[], boolean>;
@@ -1151,10 +1073,6 @@ export type IpcInvokeContract = {
   >;
   [IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED]: Invoke<
     [suspended: boolean],
-    { supported: boolean; suspended: boolean }
-  >;
-  [IPC_GLOBAL_SHORTCUTS_GET_SUSPENDED]: Invoke<
-    [],
     { supported: boolean; suspended: boolean }
   >;
   [IPC_DIAGNOSTICS_RECORD_HEAP_TRACE]: Invoke<
@@ -1354,12 +1272,6 @@ export type IpcInvokeContract = {
     [payload: OnboardingSynthesisRequest],
     OnboardingSynthesisResponse
   >;
-  [IPC_DISCOVERY_CORE_MEMORY_EXISTS]: Invoke<[], boolean>;
-  [IPC_DISCOVERY_KNOWLEDGE_EXISTS]: Invoke<[], boolean>;
-  [IPC_DISCOVERY_COLLECT_BROWSER_DATA]: Invoke<
-    [options?: { selectedBrowser?: string; selectedProfile?: string }],
-    BrowserDataResult
-  >;
   [IPC_DISCOVERY_DETECT_PREFERRED_BROWSER]: Invoke<[], PreferredBrowserProfile>;
   [IPC_DISCOVERY_LIST_BROWSER_PROFILES]: Invoke<
     [browserType: string],
@@ -1384,9 +1296,6 @@ export type IpcInvokeContract = {
     AllUserSignalsResult
   >;
 
-  // Browser fetch / in-app browser view
-  [IPC_BROWSER_FETCH_JSON]: Invoke<[payload: BrowserFetchRequest], unknown>;
-  [IPC_BROWSER_FETCH_TEXT]: Invoke<[payload: BrowserFetchRequest], string>;
   [IPC_BROWSER_VIEW_GET_STATE]: Invoke<[], BrowserViewState>;
   [IPC_BROWSER_VIEW_CONNECT]: Invoke<
     [
@@ -1400,10 +1309,6 @@ export type IpcInvokeContract = {
   >;
   [IPC_BROWSER_VIEW_SHOW]: Invoke<
     [layout: BrowserViewLayout],
-    BrowserViewState
-  >;
-  [IPC_BROWSER_VIEW_SET_VISIBLE_OWNER]: Invoke<
-    [payload: { ownerId: string }],
     BrowserViewState
   >;
   [IPC_BROWSER_VIEW_SET_OWNER_SCOPE]: Invoke<
@@ -1464,7 +1369,6 @@ export type IpcInvokeContract = {
     [payload: { url: string; fileName: string }],
     FileResult
   >;
-  [IPC_MEDIA_GET_DIR]: Invoke<[], string | null>;
   [IPC_MEDIA_COPY_IMAGE]: Invoke<
     [payload: { pngBase64: string }],
     OkErrorResult
@@ -1503,10 +1407,6 @@ export type IpcInvokeContract = {
     [payload: { conversationId: string; maxItems?: number }],
     ScheduledConversationEvent[]
   >;
-  [IPC_SCHEDULE_GET_EVENT_COUNT]: Invoke<
-    [payload: { conversationId: string }],
-    number
-  >;
   [IPC_SCHEDULE_RUN_CRON_JOB]: Invoke<[payload: { jobId: string }], unknown>;
   [IPC_SCHEDULE_REMOVE_CRON_JOB]: Invoke<[payload: { jobId: string }], boolean>;
   [IPC_SCHEDULE_UPDATE_CRON_JOB]: Invoke<
@@ -1524,22 +1424,9 @@ export type IpcInvokeContract = {
 
   // Local chat
   [IPC_LOCAL_CHAT_GET_OR_CREATE_ID]: Invoke<[], string>;
-  [IPC_LOCAL_CHAT_CREATE_NEW_DEFAULT_ID]: Invoke<[], string>;
   [IPC_LOCAL_CHAT_SET_ACTIVE_ID]: Invoke<
     [payload: { conversationId: string }],
     { ok: true }
-  >;
-  [IPC_LOCAL_CHAT_LIST_CONVERSATIONS]: Invoke<
-    [payload: { limit?: number; cursor?: ConversationSummaryCursor | null }],
-    ConversationSummaryPage
-  >;
-  [IPC_LOCAL_CHAT_DELETE_CONVERSATION]: Invoke<
-    [payload: { conversationId: string }],
-    { deleted: boolean }
-  >;
-  [IPC_LOCAL_CHAT_LIST_EVENTS]: Invoke<
-    [payload: { conversationId: string; maxItems?: number }],
-    EventRecord[]
   >;
   [IPC_LOCAL_CHAT_LIST_MESSAGES]: Invoke<
     [payload: { conversationId: string; maxVisibleMessages?: number }],
@@ -1568,21 +1455,6 @@ export type IpcInvokeContract = {
     ],
     LocalChatMessageWindow
   >;
-  [IPC_LOCAL_CHAT_LIST_MESSAGE_TOOL_EVENTS]: Invoke<
-    [
-      payload: {
-        conversationId: string;
-        messageTimestampMs: number;
-        messageId: string;
-        messageSequence?: number;
-        afterTimestampMs?: number;
-        afterId?: string;
-        afterSequence?: number;
-        limit?: number;
-      },
-    ],
-    LocalChatToolEventPage
-  >;
   [IPC_LOCAL_CHAT_LIST_ACTIVITY]: Invoke<
     [
       payload: {
@@ -1604,10 +1476,6 @@ export type IpcInvokeContract = {
       },
     ],
     LocalChatLineageWindow
-  >;
-  [IPC_LOCAL_CHAT_LIST_REPLY_COUNTS]: Invoke<
-    [payload: { conversationId: string }],
-    ReplyCounts
   >;
   [IPC_LOCAL_CHAT_LIST_MODEL_USAGE]: Invoke<
     [
@@ -1631,14 +1499,6 @@ export type IpcInvokeContract = {
       },
     ],
     { files: EventRecord[] }
-  >;
-  [IPC_LOCAL_CHAT_GET_EVENT_COUNT]: Invoke<
-    [payload: { conversationId: string }],
-    number
-  >;
-  [IPC_LOCAL_CHAT_PERSIST_WELCOME]: Invoke<
-    [payload: { conversationId: string; message: string }],
-    { ok: true }
   >;
 
   // Native integrations
@@ -1676,14 +1536,8 @@ export type IpcSendContract = {
   [IPC_REGION_CLICK]: [point: IpcPoint];
   [IPC_REGION_CANCEL]: [];
   [IPC_OVERLAY_SET_INTERACTIVE]: [interactive: boolean];
-  [IPC_OVERLAY_SHOW_WINDOW_HIGHLIGHT]: [
-    payload: { bounds: IpcRect; tone?: WindowHighlightTone },
-  ];
   [IPC_OVERLAY_HIDE_WINDOW_HIGHLIGHT]: [];
   [IPC_OVERLAY_PREVIEW_WINDOW_HIGHLIGHT_AT_POINT]: [point: IpcPoint];
-  [IPC_OVERLAY_SELECTION_CHIP_CLICKED]: [payload: { requestId: number }];
-  [IPC_SCREEN_GUIDE_SHOW]: [payload: { annotations: ScreenGuideAnnotation[] }];
-  [IPC_SCREEN_GUIDE_HIDE]: [];
   [IPC_VOICE_RTC_TOGGLE]: [];
   [IPC_VOICE_PERSIST_TRANSCRIPT]: [payload: VoiceTranscriptPayload];
   [IPC_VOICE_RUNTIME_STATE]: [state: VoiceRuntimeSnapshot];
@@ -1707,7 +1561,6 @@ export type IpcSendContract = {
   [IPC_COMPANION_SEND]: [payload: CompanionSendRequest];
   [IPC_COMPANION_STOP]: [];
   [IPC_COMPANION_PUBLISH_STATE]: [state: CompanionState];
-  [IPC_SYSTEM_OPEN_FDA]: [];
   [IPC_SHELL_OPEN_EXTERNAL]: [url: string];
   [IPC_SHELL_SHOW_IN_FOLDER]: [filePath: string];
   [IPC_DIAGNOSTICS_REPORT_ERROR]: [
@@ -1734,7 +1587,6 @@ export type IpcEventContract = {
   [IPC_DISPLAY_OPEN_SHARE_LINK]: { url: string };
   [IPC_OFFICE_PREVIEW_UPDATE]: OfficePreviewSnapshot;
   [IPC_UI_STATE]: UiState;
-  [IPC_CHAT_OPEN_SIDEBAR]: void;
   [IPC_EXECUTION_REMOTE_REQUEST]: {
     requestedAt: number;
     requesterLabel?: string;
@@ -1748,15 +1600,6 @@ export type IpcEventContract = {
   [IPC_OVERLAY_WINDOW_HIGHLIGHT]:
     | (IpcRect & { tone?: WindowHighlightTone })
     | null;
-  [IPC_OVERLAY_SHOW_SCREEN_GUIDE]: { annotations: ScreenGuideAnnotation[] };
-  [IPC_OVERLAY_HIDE_SCREEN_GUIDE]: void;
-  [IPC_OVERLAY_SHOW_SELECTION_CHIP]: {
-    requestId: number;
-    text: string;
-    rect: IpcRect;
-  };
-  [IPC_OVERLAY_HIDE_SELECTION_CHIP]: { requestId?: number } | null;
-  [IPC_OVERLAY_DISPLAY_CHANGE]: { origin: IpcPoint; bounds: IpcRect };
   [IPC_UI_STATE_KV_CHANGED]: Record<string, string | null>;
   [IPC_VOICE_ORCHESTRATOR_ACTIVITY]: VoiceOrchestratorActivity;
   [IPC_VOICE_RUNTIME_STATE]: VoiceRuntimeSnapshot;
@@ -1771,7 +1614,6 @@ export type IpcEventContract = {
   [IPC_COMPANION_SEND_REQUESTED]: CompanionSendRequest;
   [IPC_COMPANION_STOP_REQUESTED]: void;
   [IPC_COMPANION_VISIBLE_CHANGED]: CompanionVisibility;
-  [IPC_AGENT_EVENT]: AgentStreamEvent;
   [IPC_PI_CHAT_EVENTS]: PiChatEventsPayload;
   [IPC_RUNTIME_AVAILABILITY]: RuntimeAvailabilitySnapshot;
   [IPC_AUTH_SESSION_INVALIDATED]: void;

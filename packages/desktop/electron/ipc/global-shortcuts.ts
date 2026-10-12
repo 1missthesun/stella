@@ -20,8 +20,3 @@ export const setGlobalShortcutsSuspended = (suspended: boolean) => {
     suspended: areGlobalShortcutsSuspended(),
   };
 };
-
-export const getGlobalShortcutsSuspended = () => ({
-  supported: true,
-  suspended: areGlobalShortcutsSuspended(),
-});

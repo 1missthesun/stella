@@ -1,8 +1,6 @@
-import { createMonotonicSeqGenerator } from "./monotonic-seq.js";
 import { applyShortcutRegistration } from "./shortcut-registration.js";
 import { getRealtimeVoicePreferences, loadLocalPreferences, resolveRealtimeVoiceId, saveLocalPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { DEFAULT_OPENAI_REALTIME_VOICE, DEFAULT_XAI_REALTIME_VOICE, buildXaiRealtimeClientSecretRequest, } from "@stella/contracts/realtime-voice-catalog";
-import { AGENT_STREAM_EVENT_TYPES } from "@stella/contracts/agent-runtime";
 import { getLocalLlmCredential } from "@stella/runtime/kernel/storage/llm-credentials";
 import { getLocalLlmOAuthApiKey } from "@stella/runtime/kernel/storage/llm-oauth-credentials";
 import {
@@ -12,7 +10,6 @@ import {
   IPC_VOICE_REPORT_SESSION_ERROR,
   IPC_VOICE_RTC_TOGGLE,
   IPC_VOICE_SESSION_ERROR,
-  IPC_AGENT_EVENT,
   IPC_VOICE_ORCHESTRATOR_ACTIVITY,
   IPC_DISPLAY_UPDATE,
   IPC_VOICE_RUNTIME_STATE,
@@ -23,7 +20,6 @@ import {
   IPC_VOICE_RTC_GET_SHORTCUT,
   IPC_VOICE_PERSIST_TRANSCRIPT,
   IPC_VOICE_ORCHESTRATOR_CHAT,
-  IPC_VOICE_WEB_SEARCH,
   IPC_VOICE_GET_RUNTIME_STATE,
 } from "@stella/contracts/desktop/ipc-channels";
 import { requireMatchingCloudConversationId, requireRequestedCloudConversationId, } from "../cloud-conversation-mode.js";
@@ -45,22 +41,14 @@ const DEFAULT_RUNTIME_STATE = {
 export const registerVoiceHandlers = (options) => {
     let currentVoiceRtcShortcut = "";
     let runtimeState = DEFAULT_RUNTIME_STATE;
-    const nextTaskEventSeq = createMonotonicSeqGenerator();
     const ts = () => {
         const d = new Date();
         return `${d.toLocaleTimeString("en-US", { hour12: false })}.${String(d.getMilliseconds()).padStart(3, "0")}`;
     };
-    const emitVoiceAgentEvent = (eventPayload) => {
-        const fullWindow = options.windowManager.getFullWindow();
-        if (fullWindow && !fullWindow.isDestroyed()) {
-            fullWindow.webContents.send(IPC_AGENT_EVENT, eventPayload);
-        }
-    };
     /**
-     * The delegated orchestrator's own progress, for the voice runtime. It
-     * lives in the hidden overlay window, which never receives the
-     * `agent:event` stream that goes to the full window, so GPT-Live would
-     * otherwise have to guess what the backend is doing.
+     * The delegated orchestrator's own progress, for the voice runtime, which
+     * lives in the hidden overlay window; without it GPT-Live would have to
+     * guess what the backend is doing.
      */
     const emitVoiceOrchestratorActivity = (activity) => {
         for (const window of options.windowManager.getAllWindows()) {
@@ -134,34 +122,6 @@ export const registerVoiceHandlers = (options) => {
                 ? { createdAt: details.createdAt }
                 : {}),
         };
-    };
-    const emitVoiceToolStart = (payload) => {
-        emitVoiceAgentEvent({
-            type: AGENT_STREAM_EVENT_TYPES.TOOL_START,
-            runId: payload.requestId || `voice:${payload.callId}`,
-            conversationId: payload.conversationId,
-            requestId: payload.requestId,
-            seq: nextTaskEventSeq(),
-            agentType: "orchestrator",
-            toolCallId: payload.callId,
-            toolName: payload.name,
-            args: payload.args,
-        });
-    };
-    const emitVoiceToolEnd = (payload, result) => {
-        emitVoiceAgentEvent({
-            type: AGENT_STREAM_EVENT_TYPES.TOOL_END,
-            runId: payload.requestId || `voice:${payload.callId}`,
-            conversationId: payload.conversationId,
-            requestId: payload.requestId,
-            seq: nextTaskEventSeq(),
-            agentType: "orchestrator",
-            toolCallId: payload.callId,
-            toolName: payload.name,
-            resultPreview: result.output,
-            ...(result.details !== undefined ? { details: result.details } : {}),
-            ...(result.error ? { error: result.error } : {}),
-        });
     };
     const broadcastRuntimeState = () => {
         const windows = options.windowManager.getAllWindows();
@@ -403,7 +363,6 @@ export const registerVoiceHandlers = (options) => {
                 });
             },
             onToolStart: (event) => {
-                emitVoiceAgentEvent({ ...event, type: "tool-start" });
                 emitVoiceOrchestratorActivity({
                     requestId,
                     kind: "tool-start",
@@ -412,7 +371,6 @@ export const registerVoiceHandlers = (options) => {
                 });
             },
             onToolEnd: (event) => {
-                emitVoiceAgentEvent({ ...event, type: "tool-end" });
                 emitVoiceOrchestratorActivity({
                     requestId,
                     kind: "tool-end",
@@ -421,25 +379,10 @@ export const registerVoiceHandlers = (options) => {
                     isError: Boolean(event?.error),
                 });
             },
-            onAgentEvent: (event) => {
-                emitVoiceAgentEvent({
-                    type: event.type,
-                    runId: event.rootRunId ?? "voice",
-                    seq: nextTaskEventSeq(),
-                    agentId: event.agentId,
-                    agentType: event.agentType,
-                    description: event.description,
-                    parentAgentId: event.parentAgentId,
-                    result: event.result,
-                    error: event.error,
-                    statusText: event.statusText,
-                });
-            },
             onRunFinished: (event) => {
                 if (event.outcome === "error") {
                     console.error(`[${ts()}] [Voice] orchestratorChat error:`, event.error ?? event.reason);
                 }
-                emitVoiceAgentEvent({ ...event, type: "run-finished" });
             },
         });
     });
@@ -462,32 +405,13 @@ export const registerVoiceHandlers = (options) => {
         if (!stellaHostRunner) {
             throw new Error("Stella runtime not initialized");
         }
-        emitVoiceToolStart(currentPayload);
-        try {
-            const result = await stellaHostRunner.executeVoiceTool(currentPayload);
-            emitVoiceToolEnd(currentPayload, result);
-            const displayPayload = htmlDisplayPayloadFromVoiceTool(currentPayload, result);
-            if (displayPayload) {
-                emitVoiceDisplayPayload(displayPayload);
-            }
-            return result;
+        const result = await stellaHostRunner.executeVoiceTool(currentPayload);
+        const displayPayload = htmlDisplayPayloadFromVoiceTool(currentPayload, result);
+        if (displayPayload) {
+            emitVoiceDisplayPayload(displayPayload);
         }
-        catch (error) {
-            const message = errorMessage(error);
-            emitVoiceToolEnd(currentPayload, {
-                output: `Error: ${message}`,
-                error: message,
-            });
-            throw error;
-        }
+        return result;
     };
-    handleIpc(IPC_VOICE_WEB_SEARCH, async (_event, payload) => {
-        const stellaHostRunner = options.getStellaHostRunner();
-        if (!stellaHostRunner) {
-            return { text: "Stella runtime not initialized.", results: [] };
-        }
-        return await stellaHostRunner.voiceWebSearch(payload);
-    });
     handleIpc(IPC_VOICE_GET_RUNTIME_STATE, () => runtimeState);
     onIpc(IPC_VOICE_RUNTIME_STATE, (_event, nextState) => {
         runtimeState = {

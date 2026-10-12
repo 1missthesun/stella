@@ -28,7 +28,6 @@
     "./electron/bootstrap/runtime.js": "./electron/bootstrap/runtime.js",
     "./electron/input/mouse-hook.js": "./electron/input/mouse-hook.js",
     "./electron/ipc/agent-handlers.js": "./electron/ipc/agent-handlers.js",
-    "./electron/ipc/browser-fetch-session.js": "./electron/ipc/browser-fetch-session.js",
     "./electron/ipc/browser-handlers.js": "./electron/ipc/browser-handlers.js",
     "./electron/ipc/capture-handlers.js": "./electron/ipc/capture-handlers.js",
     "./electron/ipc/dictation-handlers.js": "./electron/ipc/dictation-handlers.js",

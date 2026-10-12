@@ -750,8 +750,8 @@ export const AssistantMessageRow = memo(
           : !evidencePathSet.has(file.path)) &&
         all.findIndex((other) => fileKey(other) === fileKey(file)) === index,
     );
-    // Links whose files the reply attaches keep their words in a sentence
-    // (the Markdown pass unlinks them); a line made only of such links goes.
+    // Links whose files the reply attaches stay clickable inside a sentence;
+    // a line made only of such links, even after a short "Label:", goes.
     const hiddenFileKeys = linkedFiles
       .map(fileKey)
       .concat(evidencePaths.map((filePath) => `local:${filePath}`))

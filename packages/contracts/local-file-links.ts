@@ -37,9 +37,6 @@ const withoutMarkdownCode = (markdown: string): string =>
 const MARKDOWN_LINK_PARTS_RE =
   /(!?)\[([^\]]*?)\]\(\s*(?:<([^>\r\n]+)>|([^()<>\s]+))\s*(?:["'][^"'\r\n]*["'])?\s*\)/g;
 
-const basenameOfPath = (filePath: string): string =>
-  filePath.slice(Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\")) + 1);
-
 const FENCE_LINE_RE = /^[ \t]{0,3}(`{3,}|~{3,})/;
 const LINE_MARKER_RE = /^\s*(?:(?:[-*+]|\d+[.)])\s+|>\s*)*/;
 const SEPARATORS_ONLY_RE = /^(?:\s|[·•∙|/\\,;:.&+*_~—–-]|\band\b|\bor\b)*$/i;
@@ -77,13 +74,27 @@ const rewriteProseLines = (
   return dropped ? joined.replace(/\n[ \t]*\n(?:[ \t]*\n)+/g, "\n\n").trim() : joined;
 };
 
-/** True when `line` is nothing but links to attached files plus separators. */
+const LEAD_LABEL_RE = /^[*_]{0,3}([^\s:*_[\]()`][^:*_[\]()`\n]{0,47}?)[*_]{0,3}\s*:[*_]{0,3}/;
+const MAX_LEAD_LABEL_WORDS = 5;
+
+const withoutLeadLabel = (line: string): string => {
+  const match = LEAD_LABEL_RE.exec(line);
+  if (!match) return line;
+  const words = match[1]!.trim().split(/\s+/).length;
+  return words <= MAX_LEAD_LABEL_WORDS ? line.slice(match[0].length) : line;
+};
+
+/**
+ * True when `line` is nothing but links to attached files plus separators,
+ * optionally after a short lead-in label such as `Screenshots:`.
+ */
 const isAttachmentOnlyLine = (
   line: string,
   isAttached: (filePath: string) => boolean,
 ): boolean => {
   let linked = false;
-  const rest = line.replace(
+  const marker = LINE_MARKER_RE.exec(line)?.[0] ?? "";
+  const rest = withoutLeadLabel(line.slice(marker.length)).replace(
     MARKDOWN_LINK_PARTS_RE,
     (match, _bang: string, _label: string, angled?: string, bare?: string) => {
       const filePath = parseFileLinkTarget(angled ?? bare ?? "");
@@ -92,15 +103,17 @@ const isAttachmentOnlyLine = (
       return "";
     },
   );
-  return linked && SEPARATORS_ONLY_RE.test(rest.replace(LINE_MARKER_RE, ""));
+  return linked && SEPARATORS_ONLY_RE.test(rest);
 };
 
 /**
  * Drop every line that is nothing but links to attached files plus separator
  * punctuation (`·`, `/`, `|`, `,`, dashes, "and"), such as a closing
- * `[Live homepage](…) · [Before](…) / [after](…)`: the attachments already show
- * those files, and keeping the line would leave a stray `· /` behind. Lines
- * with any other words are untouched.
+ * `[Live homepage](…) · [Before](…) / [after](…)` or
+ * `Screenshots: [Menu](…) · [Final](…)`: the attachments already show those
+ * files, and keeping the line would leave dead labels or a stray `· /` behind.
+ * A short lead-in label (up to five words before a colon) goes with the line;
+ * lines with any other words are untouched.
  */
 export const dropAttachmentOnlyLines = (
   markdown: string,
@@ -113,11 +126,11 @@ export const dropAttachmentOnlyLines = (
     : markdown;
 
 /**
- * Keep a reply's words when its linked files render as attachments: a line of
- * nothing but such links goes (see `dropAttachmentOnlyLines`), a link inside a
- * sentence becomes its own label as plain text (the file name when the label
- * is empty or just the path), and an image embed of one is dropped because
- * the image itself shows beside the message. Code blocks are left alone.
+ * Present a reply whose linked files render as attachments: a line of nothing
+ * but such links (after an optional short label like `Screenshots:`) goes, see
+ * `dropAttachmentOnlyLines`; an image embed of one is dropped because the image
+ * shows beside the message; a link inside a sentence stays a link, so its
+ * words still open the file. Code blocks are left alone.
  */
 export const unlinkLocalFileLinks = (
   markdown: string,
@@ -131,12 +144,9 @@ export const unlinkLocalFileLinks = (
       ? null
       : line.replace(
           MARKDOWN_LINK_PARTS_RE,
-          (match, bang: string, label: string, angled?: string, bare?: string) => {
+          (match, bang: string, _label: string, angled?: string, bare?: string) => {
             const filePath = parseFileLinkTarget(angled ?? bare ?? "");
-            if (!filePath || !attached.has(filePath)) return match;
-            if (bang) return "";
-            const text = label.trim();
-            return text && text !== filePath ? label : basenameOfPath(filePath);
+            return bang && filePath && attached.has(filePath) ? "" : match;
           },
         ),
   );

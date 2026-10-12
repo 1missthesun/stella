@@ -78,6 +78,11 @@ const SAFE_SKILL_PATH =
   /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*\\)(?!.*(?:^|\/)\.)[^\u0000-\u001f\u007f]+$/u;
 
 type SandboxFileWriter = {
+  /** Reads what an earlier turn left; without it every file is written. */
+  exec?(
+    command: string,
+    options?: { origin?: "internal" },
+  ): Promise<{ success: boolean; stdout: string }>;
   mkdir(path: string, options?: { recursive?: boolean }): Promise<unknown>;
   writeFile(
     path: string,
@@ -124,6 +129,32 @@ const base64Bytes = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
+const SKILL_WRITE_CONCURRENCY = 8;
+
+/**
+ * Digests of the skill files already in the container, by path: only
+ * root-owned regular files that nothing else may write, under directories
+ * root owns. Anything else is written again.
+ */
+const presentSkillFiles = async (
+  session: SandboxFileWriter,
+): Promise<Map<string, string>> => {
+  const present = new Map<string, string>();
+  if (!session.exec) return present;
+  const listed = await session
+    .exec(
+      `find ${CLOUD_SKILL_SANDBOX_ROOT} -xdev \\( -type d ! -user root -prune \\) -o \\( -type d -perm /022 -prune \\) -o \\( -type f -user root ! -perm /022 -links 1 -print0 \\) 2>/dev/null | xargs -0 -r sha256sum 2>/dev/null; true`,
+      { origin: "internal" },
+    )
+    .catch(() => null);
+  if (!listed?.success) return present;
+  for (const line of listed.stdout.split("\n")) {
+    const match = /^([0-9a-f]{64})  (\/.+)$/u.exec(line);
+    if (match) present.set(match[2]!, match[1]!);
+  }
+  return present;
+};
+
 const directoryOf = (filePath: string): string =>
   filePath.slice(0, Math.max(0, filePath.lastIndexOf("/"))) ||
   CLOUD_SKILL_SANDBOX_ROOT;
@@ -168,7 +199,19 @@ export const materializeCloudSkillSnapshot = async (args: {
   args.assertActive();
   await args.session.mkdir(CLOUD_SKILL_SANDBOX_ROOT, { recursive: true });
   args.assertActive();
+  const present = await presentSkillFiles(args.session);
+  args.assertActive();
   const materialized: MaterializedCloudSkill[] = [];
+  const writes: Array<() => Promise<void>> = [];
+  const directories = new Map<string, Promise<unknown>>();
+  const directory = (path: string) => {
+    let made = directories.get(path);
+    if (!made) {
+      made = args.session.mkdir(path, { recursive: true });
+      directories.set(path, made);
+    }
+    return made;
+  };
   for (const entry of args.snapshot.entries) {
     const skillSegment = `skill-${(await sha256Hex(entry.skillId)).slice(
       0,
@@ -179,37 +222,39 @@ export const materializeCloudSkillSnapshot = async (args: {
       32,
     )}`;
     const root = `${CLOUD_SKILL_SANDBOX_ROOT}/${skillSegment}/${versionSegment}`;
-    args.assertActive();
-    await args.session.mkdir(root, { recursive: true });
-    args.assertActive();
     for (const file of entry.files) {
       const relative = safeRelativePath(file.path);
       const target = `${root}/${relative}`;
-      args.assertActive();
-      await args.session.mkdir(directoryOf(target), { recursive: true });
-      args.assertActive();
-      const bytes = await args.home.readSkillFile(
-        args.snapshot,
-        entry.skillId,
-        relative,
-      );
-      args.assertActive();
-      if (bytes.byteLength !== file.sizeBytes) {
-        throw new Error("Cloud skill bytes changed after catalog pinning.");
-      }
-      args.assertActive();
-      const result = await args.session.writeFile(target, base64Bytes(bytes), {
-        encoding: "base64",
+      // An earlier turn's copy of these exact bytes stays as it is.
+      if (present.get(target) === file.sha256) continue;
+      writes.push(async () => {
+        args.assertActive();
+        await directory(directoryOf(target));
+        args.assertActive();
+        const bytes = await args.home.readSkillFile(
+          args.snapshot,
+          entry.skillId,
+          relative,
+        );
+        args.assertActive();
+        if (bytes.byteLength !== file.sizeBytes) {
+          throw new Error("Cloud skill bytes changed after catalog pinning.");
+        }
+        const result = await args.session.writeFile(
+          target,
+          base64Bytes(bytes),
+          { encoding: "base64" },
+        );
+        args.assertActive();
+        if (
+          result &&
+          typeof result === "object" &&
+          "success" in result &&
+          result.success === false
+        ) {
+          throw new Error("Cloud skill file could not be materialized.");
+        }
       });
-      args.assertActive();
-      if (
-        result &&
-        typeof result === "object" &&
-        "success" in result &&
-        result.success === false
-      ) {
-        throw new Error("Cloud skill file could not be materialized.");
-      }
     }
     materialized.push({
       skillId: entry.skillId,
@@ -221,6 +266,12 @@ export const materializeCloudSkillSnapshot = async (args: {
       root,
     });
   }
+  for (let next = 0; next < writes.length; next += SKILL_WRITE_CONCURRENCY) {
+    await Promise.all(
+      writes.slice(next, next + SKILL_WRITE_CONCURRENCY).map((write) => write()),
+    );
+  }
+  args.assertActive();
   return {
     loadedAt: args.snapshot.loadedAt,
     root: CLOUD_SKILL_SANDBOX_ROOT,

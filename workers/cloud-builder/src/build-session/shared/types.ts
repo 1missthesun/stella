@@ -206,6 +206,8 @@ export type AgentExecutorResult = {
   usage?: Record<string, unknown>;
   checkpointPolicy?: "preserve_prior" | "builder_fallback";
   checkpointMs?: number;
+  /** When each executor step happened, epoch ms, for the timing log only. */
+  timings?: Record<string, number>;
   turnStateCheckpoint?: TurnBrokerTurnStateCheckpointReceipt;
   builderFallback?: {
     historyCursor: string;

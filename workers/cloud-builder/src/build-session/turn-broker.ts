@@ -276,7 +276,12 @@ export const confirmAgentTurnStateRestore = async (
   // Deletion begins only after both archives were restored and verified and
   // the exact candidate was atomically promoted. A lost drain response is
   // safe: retirement rows remain authoritative until DELETE+HEAD succeeds.
-  await host.callOwnerTurnState(turn, "drain", { limit: 32 });
+  // So it runs beside the turn instead of ahead of it.
+  host.ctx.waitUntil(
+    host
+      .callOwnerTurnState(turn, "drain", { limit: 32 })
+      .then(() => undefined, () => undefined),
+  );
 };
 
 export const exactTurnStateCheckpointOperations = async (

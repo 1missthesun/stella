@@ -18,8 +18,15 @@ import {
   writeAttachedToolDaemonIdentity,
 } from "./attached-tool-host.js";
 import { attachedToolPathsForDirectory } from "./attached-tool-protocol.js";
+import { markTurnStep, turnTimings } from "./turn-timing.js";
 
+markTurnStep("modulesLoaded");
 await loadModelRegistry();
+markTurnStep("modelRegistryLoaded");
+
+// A container that just started runs this once in the background so the
+// turn's own executor finds its modules already read.
+if (process.argv.includes("--warm")) process.exit(0);
 
 // The daemon and the one-call client never produce a turn result, so they exit
 // before the turn-result plumbing below.
@@ -89,7 +96,8 @@ if (!attempt) {
   );
 }
 const result = await Effect.runPromise(runAgentTurn(attempt));
-const serialized = JSON.stringify(result);
+markTurnStep("turnFinished");
+const serialized = JSON.stringify({ ...result, timings: turnTimings() });
 await writeFile(attempt.result, `${serialized}\n`, {
   encoding: "utf8",
   mode: 0o600,

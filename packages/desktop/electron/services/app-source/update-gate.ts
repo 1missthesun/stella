@@ -93,8 +93,29 @@ const linkNodeModules = async (cwd: string, scratch: string) => {
 };
 
 /**
+ * Whether a path can change what main and preload build into: the build's
+ * source roots and config (`dev-electron-build.mjs`), the build scripts, any
+ * package manifest or lockfile, and anything at the top of the repo. Broader
+ * than the build's own list on purpose; erring here only costs the check.
+ */
+const isBundleInput = (file: string) =>
+  !file.includes("/") ||
+  file.startsWith("packages/contracts/") ||
+  file.startsWith("packages/desktop/") ||
+  file.startsWith("packages/runtime/") ||
+  file.startsWith("packages/desktop-ui/src/shared/i18n/") ||
+  file.startsWith("packages/desktop-ui/.env") ||
+  path.posix.basename(file) === "package.json" ||
+  path.posix.basename(file).startsWith("tsconfig") ||
+  path.posix.basename(file) === "bun.lock";
+
+/**
  * Build Electron main and preload from `commit` in a scratch worktree.
  * Always removes the worktree, including when the build throws.
+ *
+ * Passes at once when `commit` changes nothing the build reads from the
+ * checkout's HEAD: its main and preload are then the ones this process was
+ * started from.
  */
 export const checkMergedUpdate = async (
   cwd: string,
@@ -102,6 +123,14 @@ export const checkMergedUpdate = async (
   scratch: string,
   log: (event: string, data: Record<string, unknown>) => void,
 ): Promise<GateResult> => {
+  const changed = await gitRaw(cwd, ["diff", "--name-only", "-z", "--no-renames", "HEAD", commit]);
+  if (changed.code === 0) {
+    const files = changed.stdout.split("\0").filter(Boolean);
+    if (!files.some(isBundleInput)) {
+      log("app-source.update-gate", { code: 0, ms: 0, skipped: "no build inputs changed" });
+      return { ok: true };
+    }
+  }
   // A scratch directory left by a crash would fail `worktree add`.
   await fs.rm(scratch, { recursive: true, force: true });
   await gitRaw(cwd, ["worktree", "prune"]);

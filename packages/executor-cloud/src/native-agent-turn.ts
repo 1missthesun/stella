@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
+import { markTurnStep } from "./turn-timing.js";
 import * as Effect from "effect/Effect";
 import {
   chmod,
@@ -276,6 +277,7 @@ const runJsonLines = async (options: {
       commandArgs: options.args,
       identity: options.processIdentity,
     });
+    markTurnStep("claudeSpawned");
     const child = spawn(launch.command, launch.args, {
       cwd: options.cwd,
       env: options.env,
@@ -303,6 +305,7 @@ const runJsonLines = async (options: {
       }
     };
     child.stdout.on("data", (chunk: Buffer) => {
+      markTurnStep("claudeFirstStdout");
       pending += chunk.toString();
       const lines = pending.split(/\r?\n/);
       pending = lines.pop() ?? "";
@@ -708,6 +711,7 @@ export const runCloudClaude = async (options: {
     marked && isClaudeSessionId(marked)
       ? marked
       : deterministicUuid(profile.sessionKey);
+  markTurnStep("claudeStateChecked");
   const mcpConfig = await createCloudClaudeMcpConfig(options.mcpServerConfig);
   // One latch, two sources: the caller's cancellation and our own
   // compaction-loop verdict both have to reach one child process. A turn
@@ -820,6 +824,7 @@ export const runCloudClaude = async (options: {
         options.onStreamEvent?.(event);
         const type = event.type;
         if (type === "system" && event.subtype === "init") {
+          markTurnStep("claudeInit");
           initialized = true;
           void writeFile(markerPath, `${sessionId}\n`, { mode: 0o600 });
           const unavailable = stellaToolsUnavailable(event);
@@ -861,6 +866,7 @@ export const runCloudClaude = async (options: {
           return;
         }
         if (type === "assistant") {
+          markTurnStep("claudeFirstAssistant");
           llmCalls += 1;
           const texts = textBlocks(
             (event.message as { content?: unknown } | undefined)?.content,
@@ -869,6 +875,7 @@ export const runCloudClaude = async (options: {
           return;
         }
         if (type === "result") {
+          markTurnStep("claudeResult");
           const resultText =
             typeof event.result === "string" ? event.result.trim() : "";
           // A message Claude answered as one more query adds its answer to
@@ -1081,6 +1088,7 @@ export const runNativeAgentTurn = async (options: {
       integrityKey: options.stateIntegrityKey,
     });
   }
+  markTurnStep("nativeParityChecked");
   const run = () =>
     runCloudClaude({
       profile: options.profile,

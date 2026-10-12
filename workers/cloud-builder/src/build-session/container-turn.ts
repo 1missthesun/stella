@@ -436,6 +436,7 @@ export const runContainerAgentTurn = async (
 ): Promise<void> => {
   const commandTimeoutMs = Number(host.env.TURN_TIMEOUT_MS);
   const requestStarted = performance.now();
+  const turnStartedAt = Date.now();
   const ownerWorld = await worldName(turn.ownerId);
   let sandbox = host.sandbox(sandboxId, "large", "world", ownerWorld);
   const sessionId = agentTurnSessionId(turn.turnId);
@@ -675,6 +676,14 @@ export const runContainerAgentTurn = async (
       execution.assertActive();
     }
     const { coldContainerStartMs, restoreMs } = attempt;
+    if (attempt.result.timings) {
+      log("info", "agent_turn_timing", {
+        turnId: turn.turnId,
+        threadId: turn.threadId,
+        turnStartedAt,
+        executor: attempt.result.timings,
+      });
+    }
     let result = attempt.result;
     // A stale turn (alarm fired, or a successor continuation took over
     // this thread's DO) must not checkpoint over the successor's restore

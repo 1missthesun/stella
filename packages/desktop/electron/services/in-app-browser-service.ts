@@ -155,6 +155,7 @@ type InAppBrowserServiceOptions = {
 };
 
 const PREVIEW_URL_PREFIX = "stella-preview://";
+const AGENT_ACTIVITY_IDLE_MS = 2_500;
 const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECTION_POLL_MS = 250;
 // Extension wake (MV3 service worker) plus native-host/daemon spawn can take
@@ -981,8 +982,16 @@ export class InAppBrowserService {
     return true;
   }
 
+  /**
+   * An agent asking to show its tab (`tab.show()`): the panel switches to it.
+   * Nothing else an agent does switches the panel.
+   */
   async activateDebuggerTarget(tabId: string, ownerId?: string): Promise<void> {
-    await this.selectTab({ tabId, ownerId: resolveOwnerId(ownerId) });
+    await this.selectTab({
+      tabId,
+      ownerId: resolveOwnerId(ownerId),
+      activate: true,
+    });
   }
 
   sendDebuggerCommand(
@@ -992,9 +1001,7 @@ export class InAppBrowserService {
     ownerId?: string,
     debuggerSessionId?: string,
   ): Promise<unknown> {
-    if (method === "Page.navigate" && !debuggerSessionId) {
-      this.revealAgentNavigation(tabId, resolveOwnerId(ownerId));
-    }
+    this.markAgentActivity(tabId);
     return this.debuggerProxy.sendCommand(
       tabId,
       method,
@@ -1004,17 +1011,25 @@ export class InAppBrowserService {
     );
   }
 
-  private revealAgentNavigation(tabId: string, ownerId: string) {
-    if (!this.tabs.isOwnedBy(tabId, ownerId)) return;
-    if (
-      this.tabs.visibleOwnerId === ownerId &&
-      this.tabs.activeTabId(ownerId) === tabId
-    ) {
-      return;
-    }
-    this.tabs.select(tabId, ownerId);
+  /**
+   * Lights the tab's activity dot while an agent drives it, and clears it
+   * once the agent has been quiet for a moment. State is emitted only when
+   * the dot turns on or off, not per command.
+   */
+  private markAgentActivity(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+    clearTimeout(tab.agentIdleTimer);
+    tab.agentIdleTimer = setTimeout(() => {
+      tab.agentIdleTimer = undefined;
+      if (!tab.agentActive || !this.tabs.has(tab.id)) return;
+      tab.agentActive = false;
+      this.syncState();
+    }, AGENT_ACTIVITY_IDLE_MS);
+    tab.agentIdleTimer.unref?.();
+    if (tab.agentActive) return;
+    tab.agentActive = true;
     this.syncState();
-    this.attachActiveView();
   }
 
   recoverDebuggerTarget(
@@ -1299,6 +1314,7 @@ export class InAppBrowserService {
 
   private closeTabInternal(tabId: string, ownerId: string) {
     const tab = this.tabs.require(tabId, ownerId);
+    clearTimeout(tab.agentIdleTimer);
     if (this.attachedView === tab.view) this.detachAttachedView();
     this.debuggerProxy.releaseTab(tab);
     if (this.tabs.remove(tab, "neighbor")) this.errorsByOwner.delete(ownerId);

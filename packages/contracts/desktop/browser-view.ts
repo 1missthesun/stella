@@ -18,6 +18,8 @@ export type BrowserViewTabState = {
   loading: boolean;
   canGoBack: boolean;
   canGoForward: boolean;
+  /** An agent is driving this tab right now. */
+  agentActive?: boolean;
 };
 
 export type BrowserViewOwnerState = {

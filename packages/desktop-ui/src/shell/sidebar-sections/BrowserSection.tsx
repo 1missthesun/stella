@@ -639,6 +639,7 @@ export function BrowserSection() {
                     className="browser-section__tab-shell"
                     data-tab-id={tab.id}
                     data-active={active || undefined}
+                    data-agent-active={tab.agentActive || undefined}
                   >
                     <button
                       type="button"
@@ -668,6 +669,12 @@ export function BrowserSection() {
                         />
                       )}
                       <span>{tab.title || "New tab"}</span>
+                      {tab.agentActive ? (
+                        <i
+                          className="browser-section__agent-dot"
+                          aria-label="Agent working"
+                        />
+                      ) : null}
                     </button>
                     <button
                       type="button"

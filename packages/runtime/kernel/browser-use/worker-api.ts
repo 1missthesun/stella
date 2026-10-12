@@ -222,6 +222,7 @@ export interface BrowserWorkerTab {
   close(): Promise<unknown>;
   markDeliverable(): Promise<unknown>;
   markHandoff(): Promise<unknown>;
+  show(): Promise<unknown>;
   url(): Promise<string>;
   title(): Promise<string>;
   snapshot(options?: Record<string, unknown>): Promise<unknown>;

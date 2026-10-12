@@ -154,7 +154,8 @@ restore)
   # The stored backup is the owner's logins; whatever this container's disk
   # or snapshot carried may be older, so it is replaced. Without a backup
   # the container keeps what it has. A container that already holds the
-  # backup it would fetch (ETAG, the one it last restored) keeps its copy.
+  # backup it would fetch (ETAG, the one it last restored) keeps its copy;
+  # ETAG=absent says there is no backup to fetch.
   parent=$(dirname "$accounts")
   archive=$parent/.claude-accounts-restore.tgz
   stage=$parent/.claude-accounts-restore
@@ -162,6 +163,11 @@ restore)
   headers=$parent/.claude-accounts-restore.headers
   if [ -n "${"$"}{ETAG:-}" ] && [ -d "$accounts" ] && [ ! -L "$accounts" ] && [ -f "$marker" ] && [ ! -L "$marker" ] && [ "$(cat "$marker")" = "$ETAG" ]; then
     json '{ok:true,restored:false,current:true}'
+    exit 0
+  fi
+  if [ "${"$"}{ETAG:-}" = absent ]; then
+    mkdir -p "$accounts" && chmod 700 "$accounts"
+    json '{ok:true,restored:false}'
     exit 0
   fi
   rm -f -- "$marker" "$headers"
@@ -350,13 +356,19 @@ export const restoreClaudeCloudLogins = async (
 ): Promise<boolean> => {
   const url = await loginBackupUrl(env, ownerId, "GET");
   if (!url) return false;
+  // What the container is about to fetch, so a copy it already has, or a
+  // backup that does not exist, costs no download. An unreadable head
+  // fetches as before.
   const stored = await (env as unknown as { BACKUP_BUCKET?: R2Bucket }).BACKUP_BUCKET?.head(
     await loginBackupKey(ownerId),
-  ).catch(() => null);
+  ).then(
+    (object) => (object ? object.etag.replace(/"/gu, "") : "absent"),
+    () => undefined,
+  );
   const result = await runScript(env, ownerId, ["restore"], {
     url,
     timeoutMs: 120_000,
-    ...(stored?.etag ? { extraEnv: { ETAG: stored.etag.replace(/"/gu, "") } } : {}),
+    ...(stored ? { extraEnv: { ETAG: stored } } : {}),
     ...(container ? { container } : {}),
   });
   if (!result.ok) {

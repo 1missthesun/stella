@@ -1,5 +1,4 @@
 import { formatDateTimeReminder, THIRTY_MINUTES_MS, wrapSystemReminder } from "@stella/contracts/message-timestamp";
-import { getConnectorDecline } from "../../kernel/connectors/connect-preferences.js";
 import { getNativeConnectorConnectionState } from "../../kernel/connectors/connection-status.js";
 import { getConnectorKeywordIndex, matchConnectorsInMessage } from "../../kernel/connectors/keyword-index.js";
 import type { NativeConnectorCatalogEntry } from "../../kernel/connectors/native-integrations.js";
@@ -37,7 +36,7 @@ const connectorHints = async (dataDir: string, text: string): Promise<string[]> 
         hints.push(connectedHint(entry));
         continue;
       }
-      if (!entry.connectable || (await getConnectorDecline(dataDir, entry.id))) continue;
+      if (!entry.connectable) continue;
       hints.push(offerHint(entry));
     } catch {
       continue;

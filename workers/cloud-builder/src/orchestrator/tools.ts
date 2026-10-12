@@ -22,7 +22,6 @@ import {
 import { worldRelativeToolPath } from "../world/path.js";
 import { createCloudScheduleTools } from "../cloud-schedule-tools.js";
 import {
-  type CloudConnectorDeclines,
   CloudConnectorDirectory,
   createCloudConnectClient,
 } from "../cloud-connect-client.js";
@@ -131,7 +130,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           };
         })()
       : undefined;
-    const declines = this.connectorDeclines();
     // Connectors belong to the account: the same Store integrations the
     // desktop app connected, from the global catalog and the owner object.
     // One directory per turn memoizes the catalog and the owner's live
@@ -146,7 +144,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           },
         run: (args) => toolContext.ownerInternal("integrations.run", args),
       },
-      declines,
     });
 
     const tools: CloudCodeSourceAgentTool[] = [
@@ -183,7 +180,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       ...createCloudScheduleTools(toolContext),
       createCloudConnectorStatusTool({
         directory: connectors,
-        declines,
         requestConnection: (request, signal) =>
           this.requestCloudConnectorConnection(
             turn,
@@ -229,21 +225,6 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         : {}),
     });
     return { catalog: [codeTool, ...tools] };
-  }
-
-  /**
-   * The user's memory of connect offers they declined, so the card is never
-   * re-shown for that connector in this conversation.
-   */
-  protected connectorDeclines(): CloudConnectorDeclines {
-    const key = (id: string) => `connector_decline:${id}`;
-    return {
-      isDeclined: async (id) =>
-        (await this.ctx.storage.get<boolean>(key(id))) === true,
-      recordDecline: async (id) => {
-        await this.ctx.storage.put(key(id), true);
-      },
-    };
   }
 
   /**

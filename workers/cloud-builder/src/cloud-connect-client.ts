@@ -27,12 +27,6 @@ import type {
 import type { CloudConnectClient } from "./cloud-code-tool.js";
 import { RpcError } from "./owner-store/errors.js";
 
-/** Persisted per-conversation memory of connect offers the user declined. */
-export type CloudConnectorDeclines = Readonly<{
-  isDeclined(id: string): Promise<boolean>;
-  recordDecline(id: string): Promise<void>;
-}>;
-
 /**
  * Where the directory reads: the global catalog (D1) and the owner's
  * connections and runs (the owner object's `integrations.*` internals).
@@ -57,7 +51,6 @@ export type CloudConnectorSource = Readonly<{
 
 export type CloudConnectClientContext = Readonly<{
   source: CloudConnectorSource;
-  declines?: CloudConnectorDeclines;
 }>;
 
 export type CloudConnectorCatalogEntry = Readonly<{
@@ -269,10 +262,6 @@ export class CloudConnectorDirectory {
     return connections.some((entry) => entry.id === id && entry.connected);
   }
 
-  async isDeclined(id: string): Promise<boolean> {
-    return (await this.#context.declines?.isDeclined(id)) ?? false;
-  }
-
   async listActions(
     id: string,
     options: { query?: string; limit?: number },
@@ -345,13 +334,10 @@ const requireConnectorId = (id: string): string => {
 const nextHint = (
   entry: CloudConnectorCatalogEntry,
   connected: boolean,
-  declined: boolean,
 ): string =>
   connected
     ? `Ready. Inspect actions: await connect.actions("${entry.id}").`
-    : declined
-      ? "The user previously declined connecting this in chat. Do not offer it again; they can enable it in the Store."
-      : `Not connected. Connect offers are handled by the orchestrator's connector_status tool (inline connect card) or the Store — do not initiate one from here unless the user explicitly asked this turn. Proceed via the browser/computer fallback meanwhile.`;
+    : `Not connected. Connect offers are handled by the orchestrator's connector_status tool (inline connect card) or the Store — do not initiate one from here unless the user explicitly asked this turn. Proceed via the browser/computer fallback meanwhile.`;
 
 export const createCloudConnectClient = (
   directory: CloudConnectorDirectory,
@@ -379,7 +365,6 @@ export const createCloudConnectClient = (
       ranked.map(async ({ entry }) => {
         const connection = connections.find((row) => row.id === entry.id);
         const connected = connection?.connected === true;
-        const declined = await directory.isDeclined(entry.id);
         return {
           id: entry.id,
           name: entry.name,
@@ -391,8 +376,7 @@ export const createCloudConnectClient = (
           provider: "backend-composio" as const,
           toolCount: entry.catalogToolCount,
           executable: connected,
-          declined,
-          next: nextHint(entry, connected, declined),
+          next: nextHint(entry, connected),
         };
       }),
     );

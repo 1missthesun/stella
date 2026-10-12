@@ -13,11 +13,11 @@
  * Calling it with a connector name/id is pure lookup + card trigger —
  * no LLM inside:
  *  - connected → reports that, nothing else happens;
- *  - previously declined → reports that with Store-later guidance, no card;
  *  - otherwise → shows the inline connect card (the same
  *    ConnectorConnectService flow the CLI path uses), blocks until the
- *    user resolves it, and reports the outcome. A decline is persisted
- *    so the offer is never repeated.
+ *    user resolves it, and reports the outcome. Nothing about the
+ *    outcome is persisted: whether to offer again after a decline is the
+ *    orchestrator's judgment.
  */
 
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
@@ -25,10 +25,6 @@ import {
   resolveNativeConnectorCatalog,
   type NativeCatalogSource,
 } from "../../connectors/catalog-cache.js";
-import {
-  getConnectorDecline,
-  recordConnectorDecline,
-} from "../../connectors/connect-preferences.js";
 import { getNativeConnectorReadiness } from "../../connectors/connection-status.js";
 import { scoreConnectorMatch } from "../../connectors/discovery.js";
 import type { NativeConnectorCatalogEntry } from "../../connectors/native-integrations.js";
@@ -240,21 +236,6 @@ export const createConnectorStatusTool = (
       };
     }
 
-    const priorDecline = await getConnectorDecline(
-      options.stellaDataDir,
-      entry.id,
-    );
-    if (priorDecline) {
-      return {
-        result: `The user previously declined connecting ${entry.name}, so no connect card was shown. If it comes up, mention once — concisely — that they can connect ${entry.name} from the Store whenever they like, then proceed by other means (agents fall back to the browser). Do not offer again.`,
-        details: {
-          id: entry.id,
-          status: "declined",
-          reason: "declined_previously",
-        },
-      };
-    }
-
     if (!entry.connectable || !options.requestConnectorConnection) {
       return {
         result: `${entry.name} ${state.enabled ? "is locally enabled but does not have a verified provider credential" : "exists in the catalog"} and cannot be connected from here${entry.connectable ? "" : " (its connect flow isn't available in this build)"}. It is not ready to use; proceed via the browser/computer fallback or the Store.`,
@@ -288,11 +269,8 @@ export const createConnectorStatusTool = (
       };
     }
     if (outcome.reason === "declined") {
-      await recordConnectorDecline(options.stellaDataDir, entry.id).catch(
-        () => undefined,
-      );
       return {
-        result: `The user declined connecting ${entry.name}. Tell them once — concisely — that they can always connect it from the Store later, then proceed with the task by other means (the executing agent can use the browser). Do not offer ${entry.name} again.`,
+        result: `The user declined connecting ${entry.name}. Tell them once — concisely — that they can always connect it from the Store later, then proceed with the task by other means (the executing agent can use the browser). Do not offer ${entry.name} again unless the user asks to connect it.`,
         details: { id: entry.id, status: "declined" },
       };
     }
@@ -309,10 +287,6 @@ export const createConnectorStatusTool = (
       };
     }
     if (outcome.reason === "cancelled" || outcome.reason === "timeout") {
-      // No decline is persisted for these — suppression only holds for
-      // the current context window (the availability reminder's window
-      // gate), so the honest phrasing is "for now", not "ever" or even
-      // "this conversation".
       return {
         result: `The connect card for ${entry.name} was ${outcome.reason === "timeout" ? "not answered in time" : "dismissed"} — the user neither connected nor declined. Don't re-offer it for now; mention once that ${entry.name} is available in the Store, and proceed via other means (browser fallback).`,
         details: {

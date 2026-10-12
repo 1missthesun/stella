@@ -8,7 +8,7 @@
  * compact matches spanning the WHOLE catalog (native Store integrations
  * — Google Workspace, backend Composio toolkits, recovered OAuth
  * providers — plus imported MCP/API connectors), each annotated with
- * enabled/declined state so the agent knows whether to just use it,
+ * enabled state so the agent knows whether to just use it,
  * offer an in-chat connect card, or stay quiet.
  *
  * Scoring is intentionally dumb (token prefix/substring over id, name,
@@ -25,7 +25,6 @@ import {
   listConfiguredApiConnectors,
   listConfiguredConnectorCommands,
 } from "./state.js";
-import { listConnectorDeclines } from "./connect-preferences.js";
 
 export type ConnectorDiscoveryKind = "native" | "mcp" | "api";
 
@@ -40,8 +39,6 @@ export type ConnectorDiscoveryMatch = {
   enabled: boolean;
   /** Whether Stella can currently run a connect flow for this entry. */
   connectable: boolean;
-  /** The user declined an in-chat connect offer for this integration. */
-  declined: boolean;
   score: number;
 };
 
@@ -82,12 +79,9 @@ export const discoverConnectors = async (
   const tokens = normalizeQueryTokens(query);
   if (tokens.length === 0) return [];
 
-  const [commands, apis, declines] = await Promise.all([
+  const [commands, apis] = await Promise.all([
     listConfiguredConnectorCommands(stellaAppDir).catch(() => []),
     listConfiguredApiConnectors(stellaAppDir).catch(() => []),
-    listConnectorDeclines(stellaAppDir).catch(
-      (): Awaited<ReturnType<typeof listConnectorDeclines>> => ({}),
-    ),
   ]);
 
   const matches: ConnectorDiscoveryMatch[] = [];
@@ -108,7 +102,6 @@ export const discoverConnectors = async (
       // known to the desktop); google-workspace and backend-composio
       // entries carry an accurate flag.
       connectable: entry.connectable,
-      declined: Boolean(declines[entry.id]),
       score,
     });
   }
@@ -127,7 +120,6 @@ export const discoverConnectors = async (
       description: truncateDescription(command.description),
       enabled: true,
       connectable: false,
-      declined: Boolean(declines[command.id]),
       score,
     });
   }
@@ -146,7 +138,6 @@ export const discoverConnectors = async (
       description: truncateDescription(api.description),
       enabled: true,
       connectable: false,
-      declined: Boolean(declines[api.id]),
       score,
     });
   }

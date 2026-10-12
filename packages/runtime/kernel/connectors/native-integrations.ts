@@ -20,7 +20,6 @@ import {
   getOAuthCatalogProviderTools,
   getOAuthProviderSummaries,
 } from "./oauth-provider-catalog.js";
-import { clearConnectorDecline } from "./connect-preferences.js";
 import { getConnectorStateRoot } from "./state.js";
 import type { ConnectorToolInfo } from "./types.js";
 
@@ -782,9 +781,6 @@ export const enableNativeConnector = async (
     skillPath,
   };
   await writeState(stellaAppDir, state);
-  // Enabling — from the Store, the CLI, or an accepted in-chat connect
-  // card — supersedes any earlier "don't re-offer this in chat" decline.
-  await clearConnectorDecline(stellaAppDir, id).catch(() => undefined);
   // `toolCount` mirrors what `listNativeConnectors` returns so the
   // website can drop the updated entry straight into its local state
   // without re-listing. Omitting it would briefly render "undefined

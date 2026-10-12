@@ -7,7 +7,7 @@
  */
 export const CONNECT_DOCUMENTATION = `Connect client — third-party app integrations (Gmail, Google Docs, Notion, Slack, ...). All methods are async; results are plain JS values and failures throw Error with the broker's message.
 
-connect.discover(query) — keyword-search the whole integration catalog (max 8 matches). Each match carries enabled/connected/declined state and a "next" hint; follow it instead of guessing.
+connect.discover(query) — keyword-search the whole integration catalog (max 8 matches). Each match carries enabled/connected state and a "next" hint; follow it instead of guessing.
 connect.connectors() — integrations enabled right now: { id, name, kind, connected, description }.
 connect.actions(id, { query, limit }) — capped action list (default 25, max 100) for one connector: name, one-line description, param summary. Pass query keywords to filter; "total" reports the full count.
 connect.schema(id, action) — the full JSON input schema for one action. Check it before the first call of an unfamiliar action.

@@ -229,7 +229,7 @@ const authenticateConversationCaller = async (
         }).catch(() => null)
       : null;
     if (!ticketCaller) {
-      log("error", "conversation_auth_rejected", {
+      log("info", "conversation_auth_rejected", {
         requestId,
         reason: "bad_socket_ticket",
       });
@@ -252,7 +252,7 @@ const authenticateConversationCaller = async (
   const verified = await verifyUserToken(token, env);
   if (!verified.ok) {
     // The reason is a log-only discriminator; the caller is told one thing.
-    log("error", "conversation_auth_rejected", {
+    log(verified.retryable ? "error" : "info", "conversation_auth_rejected", {
       requestId,
       reason: verified.reason,
     });

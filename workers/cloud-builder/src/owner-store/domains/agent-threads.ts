@@ -3388,18 +3388,37 @@ const recentThreads = (db: OwnerDbReader, ownerId: string, limit: number): Agent
  * started whose rows sit in another cloud conversation (a desktop's cloud
  * agents), so each client reads one list.
  */
-const CONVERSATION_THREADS_SQL = "(conversation_id = ? OR origin_conversation_id = ?)";
+const conversationThreadRows = (
+  db: OwnerDbReader,
+  conversationId: string,
+  filter: string,
+  limit: number,
+): ThreadRow[] => {
+  const rows = new Map<string, ThreadRow>();
+  for (const column of ["conversation_id", "origin_conversation_id"] as const) {
+    for (const row of db.all<ThreadRow>(
+      `SELECT * FROM agent_threads WHERE ${column} = ?${filter}
+        ORDER BY updated_at DESC, thread_id DESC LIMIT ?`,
+      conversationId,
+      limit,
+    )) {
+      rows.set(row.thread_id, row);
+    }
+  }
+  return [...rows.values()]
+    .sort((a, b) =>
+      b.updated_at - a.updated_at || (a.thread_id < b.thread_id ? 1 : a.thread_id > b.thread_id ? -1 : 0),
+    )
+    .slice(0, limit);
+};
 
 const runningThreads = (db: OwnerDbReader, ownerId: string, conversationId: string): AgentThreadSummary[] =>
-  db
-    .all<ThreadRow>(
-      `SELECT * FROM agent_threads WHERE ${CONVERSATION_THREADS_SQL} AND status IN ${LIVE_STATUSES_SQL}
-        ORDER BY updated_at DESC LIMIT ?`,
-      conversationId,
-      conversationId,
-      RUNNING_AGENT_THREADS_LIMIT,
-    )
-    .map((row) => summary(row, ownerId));
+  conversationThreadRows(
+    db,
+    conversationId,
+    ` AND status IN ${LIVE_STATUSES_SQL}`,
+    RUNNING_AGENT_THREADS_LIMIT,
+  ).map((row) => summary(row, ownerId));
 
 const deviceThreads = (
   db: OwnerDbReader,
@@ -3556,6 +3575,23 @@ export const agentThreadsDomain = {
     },
     AGENT_THREADS_HARNESS_MIGRATION,
     AGENT_COMMANDS_MIGRATION,
+    {
+      id: "agent-threads.11-live-indexes",
+      statements: [
+        `CREATE INDEX agent_threads_live_conversation
+           ON agent_threads (conversation_id, updated_at DESC)
+           WHERE status IN ${LIVE_STATUSES_SQL}`,
+        `CREATE INDEX agent_threads_live_origin_conversation
+           ON agent_threads (origin_conversation_id, updated_at DESC)
+           WHERE status IN ${LIVE_STATUSES_SQL}`,
+        `CREATE INDEX agent_threads_executor_conversation
+           ON agent_threads (conversation_id) WHERE executor_device_id IS NOT NULL`,
+        `CREATE INDEX agent_threads_executor_origin_conversation
+           ON agent_threads (origin_conversation_id) WHERE executor_device_id IS NOT NULL`,
+        `CREATE INDEX agent_threads_executor_updated
+           ON agent_threads (updated_at DESC) WHERE executor_device_id IS NOT NULL`,
+      ],
+    },
   ],
   calls: {
     "agentThreads.page": {
@@ -3737,13 +3773,7 @@ export const agentThreadsDomain = {
       }),
       read: (ctx, args) => {
         const limit = args.limit ?? 30;
-        const rows = ctx.db.all<ThreadRow>(
-          `SELECT * FROM agent_threads WHERE ${CONVERSATION_THREADS_SQL}
-           ORDER BY updated_at DESC, thread_id DESC LIMIT ?`,
-          args.conversationId,
-          args.conversationId,
-          limit + 1,
-        );
+        const rows = conversationThreadRows(ctx.db, args.conversationId, "", limit + 1);
         return {
           threads: rows.slice(0, limit).map((row) => summary(row, ctx.ownerId)),
           hasMore: rows.length > limit,

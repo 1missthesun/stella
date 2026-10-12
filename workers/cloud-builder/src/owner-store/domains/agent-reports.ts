@@ -561,8 +561,9 @@ const deliver = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   } catch (error) {
     const failures =
       (ctx.db.one<{ failures: number }>(
-        "SELECT COUNT(*) AS failures FROM agent_events WHERE event_key LIKE ?",
-        `report_failed:${row.report_id}:%`,
+        "SELECT COUNT(*) AS failures FROM agent_events WHERE event_key > ? AND event_key < ?",
+        `report_failed:${row.report_id}:`,
+        `report_failed:${row.report_id};`,
       )?.failures ?? 0) + 1;
     const reason =
       error instanceof Error

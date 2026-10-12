@@ -57,6 +57,15 @@ export const isMuseEndStreamFrame = (value: unknown): value is string => {
   }
 };
 
+const trySend = (socket: WebSocket, data: ArrayBuffer | string): boolean => {
+  try {
+    socket.send(data);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 const closeSocket = (socket: WebSocket, code: number, reason: string): void => {
   try {
     const validCode =
@@ -175,7 +184,10 @@ const startProvider = async (
       socket.addEventListener("message", onEarlyMessage);
       socket.addEventListener("close", onEarlyClose);
       socket.addEventListener("error", onEarlyClose);
-      socket.send(JSON.stringify(createMuseHandshake(apiKey)));
+      if (!trySend(socket, JSON.stringify(createMuseHandshake(apiKey)))) {
+        closeSocket(socket, 1011, "Muse handshake failed");
+        return { response, socket: null };
+      }
       handshakeSentAt = Date.now();
       return { response, socket };
     });
@@ -307,7 +319,10 @@ const bridge = (
     if (inputEnded || closing || settled) return;
     inputEnded = true;
     cancelDeadline?.();
-    upstream.send(JSON.stringify({ type: "endStream" }));
+    if (!trySend(upstream, JSON.stringify({ type: "endStream" }))) {
+      closeBoth(1011, "Muse transcription failed");
+      return;
+    }
     // No more billable audio is admitted. Allow a bounded provider flush so
     // reaching the allowance returns the transcript already recorded.
     cancelDeadline = forkAbortTimer(10_000, () => {
@@ -336,7 +351,10 @@ const bridge = (
       }
       const frame = data.slice(0, maxAudioBytes - audioBytes);
       audioBytes += frame.byteLength;
-      upstream.send(frame);
+      if (!trySend(upstream, frame)) {
+        closeBoth(1011, "Muse transcription failed");
+        return;
+      }
       if (audioBytes === maxAudioBytes) endInput();
       return;
     }
@@ -372,7 +390,7 @@ const bridge = (
         // Forward provider frames unchanged; clients ignore unknown payloads.
       }
     }
-    gateway.send(data);
+    if (!trySend(gateway, data)) closeBoth(1001, "Client went away");
   };
   start.detach();
   upstream.addEventListener("message", (event) =>
@@ -458,7 +476,8 @@ const handleDeferredStart = (
     if (!start.ok) {
       if (phase === "closed") return;
       phase = "closed";
-      gateway.send(
+      trySend(
+        gateway,
         JSON.stringify({
           type: "error",
           message: start.usageMessage ?? start.message,
@@ -530,7 +549,7 @@ export const handleMuseTranscribeSocket = async (
   if (!start.ok) {
     if (start.usageMessage) {
       const { gateway, response } = acceptClientSocket();
-      gateway.send(JSON.stringify({ type: "error", message: start.usageMessage }));
+      trySend(gateway, JSON.stringify({ type: "error", message: start.usageMessage }));
       gateway.close(1008, "Dictation usage limit reached");
       return response;
     }

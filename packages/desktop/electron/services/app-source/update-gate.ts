@@ -76,13 +76,15 @@ try {
 `;
 
 /**
- * What main and preload are built from: the build's source roots, the
- * directories of every file the checkout's last build read, and the files
- * that steer resolution (the top of the repo, package manifests, tsconfigs).
+ * What main and preload are built from: the build script and what it
+ * imports, the build's source roots, the directories of every file the
+ * checkout's last build read, and the files that steer resolution (the top
+ * of the repo, package manifests, tsconfigs).
  * About a quarter of the tree. A build that fails on just these is tried
  * again on the whole tree, so leaving something out only costs time.
  */
 const BUILD_ROOTS = [
+  "scripts/lib/",
   "packages/contracts/",
   "packages/desktop/",
   "packages/runtime/",

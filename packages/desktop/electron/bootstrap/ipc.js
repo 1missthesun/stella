@@ -456,7 +456,10 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             beforeRelaunch: () => updateTransition.holdForRelaunch(),
             launcherPreparesOnRelaunch: isLauncherPresent(),
             reportPrepared,
-            relaunch: relaunchApp,
+            relaunch: (options) => {
+                state.keepRuntimeAcrossRelaunch = options?.keepRuntime === true;
+                relaunchApp();
+            },
             // Checking a merged update happens on a scratch worktree here,
             // never in the checkout that is running.
             updateScratchDir: path.join(app.getPath("userData"), "update-merge"),

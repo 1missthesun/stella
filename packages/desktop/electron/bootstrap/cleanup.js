@@ -23,7 +23,14 @@ export const registerBootstrapProcessCleanups = (context) => {
             return Promise.resolve();
         }
         if (runtimeTeardown?.runner !== runner) {
-            const teardown = (async () => {
+            // An update relaunch that left the runtime as it is detaches from
+            // it instead: it stays up, turns and agent shells included, and
+            // the next process attaches within seconds (it exits on its own
+            // 10 s after the last app goes, should none come).
+            const keep = isRelaunching() && context.state.keepRuntimeAcrossRelaunch;
+            const teardown = keep ? runner.stop({}).catch((error) => {
+                console.warn("[cleanup] Runtime detach failed:", error);
+            }) : (async () => {
                 await joinWithTimeout(Promise.resolve()
                     .then(() => runner.killAllShells())
                     .catch((error) => {

@@ -35,6 +35,7 @@ import {
   conflictedPaths,
   installs,
   relaunches,
+  restartsRuntime,
   type UpdatePlan,
 } from "./update-plan.js";
 import {
@@ -73,7 +74,11 @@ type AppSourceServiceOptions = {
   isAnyWindowVisible: () => boolean;
   requestRuntimeRestart: () => void;
   applyRendererChanges: (paths: string[]) => Promise<unknown> | undefined;
-  relaunch: () => void;
+  /**
+   * Quit and start again. With `keepRuntime`, the runtime stays up for the
+   * next process to attach to: the update did not change it.
+   */
+  relaunch: (options?: { keepRuntime?: boolean }) => void;
   hasConnectedAccount: () => boolean;
   getBackendUrl: () => string | null;
   getAuthToken: () => Promise<string | null>;
@@ -874,8 +879,6 @@ export class AppSourceService {
       .split("\n")
       .filter(Boolean);
     this.mark("diff");
-    const touches = (prefix: string) =>
-      paths.some((file) => file.startsWith(prefix));
     const install = installs(paths);
     const restart = relaunches(paths);
     // Only changes the renderer can show get the transition: the runtime and
@@ -948,10 +951,13 @@ export class AppSourceService {
       await (await holding)?.commit();
       this.mark("hold");
       this.logTimeline("relaunch");
-      this.options.relaunch();
+      // The runtime outlives the relaunch when the update leaves it and its
+      // packages as they are: turns keep running and the next window finds
+      // it ready. Not across an install, which changes what it loads.
+      this.options.relaunch({ keepRuntime: !install && !restartsRuntime(paths) });
       return;
     }
-    if (touches("packages/runtime/") || touches("packages/contracts/")) {
+    if (restartsRuntime(paths)) {
       this.options.requestRuntimeRestart();
     }
     const covered = await covering;

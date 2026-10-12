@@ -36,6 +36,11 @@ const RESTART_PREFIX = "packages/desktop/electron/";
 /** Changed files that take a `bun install`. */
 export const installs = (paths: string[]) =>
   paths.some((file) => file === "bun.lock" || file.endsWith("package.json"));
+/** What the runtime process runs: a change here restarts it. */
+const RUNTIME_PREFIXES = ["packages/runtime/", "packages/contracts/", "packages/agent/"];
+/** Changed files that take a restart of the runtime. */
+export const restartsRuntime = (paths: string[]) =>
+  paths.some((file) => RUNTIME_PREFIXES.some((prefix) => file.startsWith(prefix)));
 /** Changed files that take a relaunch of the app. */
 export const relaunches = (paths: string[]) =>
   installs(paths) || paths.some((file) => file.startsWith(RESTART_PREFIX));

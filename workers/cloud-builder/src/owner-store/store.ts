@@ -7,9 +7,11 @@
  * - **Calls:** `call()` parses arguments, runs the handler against this
  *   owner's SQLite, then pushes any view that changed.
  * - **Views:** live sockets (tag `live`) subscribe to views. Subscriptions
- *   live in `owner_live_subs` so they survive hibernation. After every write,
- *   each open subscription is rerun and its value is sent only when its hash
- *   moved.
+ *   live in `owner_live_subs` so they survive hibernation. Every write names
+ *   the tables it touched; a flush reruns only the subscriptions whose last
+ *   read used one of them (or whose dependencies are not known yet, after a
+ *   wake), and sends a value only when its hash moved. Flushes in quick
+ *   succession coalesce into one.
  * - **Jobs:** `owner_jobs` are the owner's scheduled work. The owner
  *   object's single alarm fires at `nextDeadline()` and calls `onAlarm()`.
  */
@@ -46,6 +48,10 @@ const LIVE_REAUTH_LEAD_MS = 2 * 60_000;
 const LIVE_REAUTH_RETRY_BASE_MS = 5_000;
 const LIVE_REAUTH_RETRY_MAX_MS = 60_000;
 const JOB_BATCH = 32;
+const FLUSH_COALESCE_MS = 250;
+const CLOCK_VIEW_REFRESH_MS = 30_000;
+const FLUSH_LOG_ROWS = 1_000;
+const QUERY_TABLES_CACHE_MAX = 4_096;
 const JOB_DEFAULT_MAX_ATTEMPTS = 20;
 const JOB_MAX_BACKOFF_MS = 60 * 60_000;
 
@@ -132,6 +138,25 @@ export const valueHash = (text: string): string => {
 
 const encodeJson = (value: unknown): string => JSON.stringify(value ?? null);
 
+const IDENTIFIER = /[A-Za-z_][A-Za-z0-9_]*/g;
+const WRITE_TARGET =
+  /\b(?:INSERT(?:\s+OR\s+[A-Za-z]+)?\s+INTO|REPLACE\s+INTO|UPDATE(?:\s+OR\s+[A-Za-z]+)?|DELETE\s+FROM)\s+["`[]?([A-Za-z_][A-Za-z0-9_]*)/gi;
+const SCHEMA_CHANGE = /^\s*(?:CREATE|DROP|ALTER)\b/i;
+
+const writeTargets = (query: string): string[] | null => {
+  if (SCHEMA_CHANGE.test(query)) return null;
+  const tables = new Set<string>();
+  for (const match of query.matchAll(WRITE_TARGET)) {
+    const name = match[1]!.toLowerCase();
+    if (name !== "set") tables.add(name);
+  }
+  return tables.size > 0 ? [...tables] : null;
+};
+
+type ViewDeps = { tables: ReadonlySet<string> | null; clock: boolean; at: number };
+
+const subKey = (connId: string, subId: string): string => `${connId}\u0000${subId}`;
+
 export class OwnerStore {
   private readonly ctx: DurableObjectState;
   private readonly env: Cloudflare.Env;
@@ -142,7 +167,14 @@ export class OwnerStore {
   private readonly log: OwnerStoreLog;
   private schemaReady = false;
   private dirty = false;
+  private dirtyTables: Set<string> | null = new Set();
   private flushQueued = false;
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastFlushAt = 0;
+  private knownTables: Set<string> | null = null;
+  private readonly queryTables = new Map<string, string[]>();
+  private readonly writeTables = new Map<string, string[] | null>();
+  private readonly viewDeps = new Map<string, ViewDeps>();
 
   constructor(options: OwnerStoreOptions) {
     this.ctx = options.ctx;
@@ -171,6 +203,7 @@ export class OwnerStore {
       if (applied.has(migration.id)) continue;
       this.transaction(() => {
         for (const statement of migration.statements) this.sql.exec(statement);
+        this.forgetSchema();
         this.sql.exec(
           "INSERT INTO _owner_migrations (id, applied_at) VALUES (?, ?)",
           migration.id,
@@ -199,7 +232,83 @@ export class OwnerStore {
         sql.exec<T>(query, ...params).toArray()[0] ?? null,
       run: (query: string, ...params: SqlValue[]) => {
         sql.exec(query, ...params);
-        this.dirty = true;
+        this.noteWrite(query);
+      },
+      transaction: <T>(fn: () => T): T => this.transaction(fn),
+    };
+  }
+
+  private noteWrite(query: string): void {
+    this.dirty = true;
+    if (this.dirtyTables === null) return;
+    let targets = this.writeTables.get(query);
+    if (targets === undefined) {
+      targets = writeTargets(query);
+      if (this.writeTables.size >= QUERY_TABLES_CACHE_MAX) this.writeTables.clear();
+      this.writeTables.set(query, targets);
+    }
+    const known = this.tables();
+    if (targets === null || targets.some((table) => !known.has(table))) {
+      this.forgetSchema();
+      this.dirtyTables = null;
+      return;
+    }
+    for (const table of targets) this.dirtyTables.add(table);
+  }
+
+  private forgetSchema(): void {
+    this.knownTables = null;
+    this.queryTables.clear();
+  }
+
+  private tables(): Set<string> {
+    this.knownTables ??= new Set(
+      this.sql
+        .exec<{ name: string }>(
+          "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')",
+        )
+        .toArray()
+        .map((row) => row.name.toLowerCase()),
+    );
+    return this.knownTables;
+  }
+
+  private readTables(query: string): string[] {
+    let tables = this.queryTables.get(query);
+    if (tables === undefined) {
+      const known = this.tables();
+      const found = new Set<string>();
+      for (const word of query.match(IDENTIFIER) ?? []) {
+        const name = word.toLowerCase();
+        if (known.has(name)) found.add(name);
+      }
+      tables = [...found];
+      if (this.queryTables.size >= QUERY_TABLES_CACHE_MAX) this.queryTables.clear();
+      this.queryTables.set(query, tables);
+    }
+    return tables;
+  }
+
+  private trackingReader(
+    tables: Set<string>,
+    stats: { rowsRead: number },
+  ): OwnerDb {
+    const sql = this.sql;
+    const exec = <T extends Record<string, SqlValue>>(query: string, params: SqlValue[]) => {
+      for (const table of this.readTables(query)) tables.add(table);
+      const cursor = sql.exec<T>(query, ...params);
+      const rows = cursor.toArray();
+      stats.rowsRead += cursor.rowsRead;
+      return rows;
+    };
+    return {
+      all: <T extends Record<string, SqlValue>>(query: string, ...params: SqlValue[]) =>
+        exec<T>(query, params),
+      one: <T extends Record<string, SqlValue>>(query: string, ...params: SqlValue[]) =>
+        exec<T>(query, params)[0] ?? null,
+      run: (query: string, ...params: SqlValue[]) => {
+        sql.exec(query, ...params);
+        this.noteWrite(query);
       },
       transaction: <T>(fn: () => T): T => this.transaction(fn),
     };
@@ -317,6 +426,7 @@ export class OwnerStore {
    */
   changed(): void {
     this.dirty = true;
+    this.dirtyTables = null;
     if (this.flushQueued) return;
     this.flushQueued = true;
     queueMicrotask(() => {
@@ -487,6 +597,7 @@ export class OwnerStore {
           attachment.connId,
           String(frame.id),
         );
+        this.viewDeps.delete(subKey(attachment.connId, String(frame.id)));
         return true;
       default:
         this.closeLive(socket, LIVE_CLOSE.protocol, "bad_frame");
@@ -498,7 +609,7 @@ export class OwnerStore {
     const attachment = this.liveAttachment(socket);
     if (attachment) {
       this.ensureSchema();
-      this.sql.exec("DELETE FROM owner_live_subs WHERE conn_id = ?", attachment.connId);
+      this.dropConnection(attachment.connId);
     }
     try {
       socket.close(1000, "");
@@ -507,13 +618,42 @@ export class OwnerStore {
     }
   }
 
-  /** Rerun every open subscription and push the ones that changed. */
+  private dropConnection(connId: string): void {
+    this.sql.exec("DELETE FROM owner_live_subs WHERE conn_id = ?", connId);
+    const prefix = subKey(connId, "");
+    for (const key of this.viewDeps.keys()) {
+      if (key.startsWith(prefix)) this.viewDeps.delete(key);
+    }
+  }
+
+  /** Rerun the subscriptions the writes since the last flush may have changed and push the ones that did. */
   flush(): void {
     if (!this.dirty) return;
+    const wait = this.lastFlushAt + FLUSH_COALESCE_MS - Date.now();
+    if (wait <= 0) {
+      this.flushNow();
+      return;
+    }
+    this.flushTimer ??= setTimeout(() => {
+      this.flushTimer = null;
+      this.flushNow();
+    }, wait);
+  }
+
+  private flushNow(): void {
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
+    if (!this.dirty) return;
+    const written = this.dirtyTables;
     this.dirty = false;
+    this.dirtyTables = new Set();
     const sockets = this.liveSockets();
     if (sockets.length === 0) return;
     this.ensureSchema();
+    const now = Date.now();
+    this.lastFlushAt = now;
     const byConn = new Map<string, { socket: WebSocket; attachment: LiveAttachment }>();
     for (const socket of sockets) {
       const attachment = this.liveAttachment(socket);
@@ -523,16 +663,33 @@ export class OwnerStore {
       .exec<LiveSubRow>("SELECT * FROM owner_live_subs ORDER BY conn_id")
       .toArray();
     const orphaned = new Set<string>();
+    const stats = { rowsRead: 0 };
+    let rerun = 0;
     for (const row of rows) {
       const live = byConn.get(row.conn_id);
       if (!live) {
         orphaned.add(row.conn_id);
         continue;
       }
-      this.pushSubscription(live.socket, live.attachment, row);
+      const deps = this.viewDeps.get(subKey(row.conn_id, row.sub_id));
+      const stale =
+        !deps ||
+        written === null ||
+        deps.tables === null ||
+        [...written].some((table) => deps.tables!.has(table)) ||
+        (deps.clock && now - deps.at >= CLOCK_VIEW_REFRESH_MS);
+      if (!stale) continue;
+      rerun += 1;
+      this.pushSubscription(live.socket, live.attachment, row, stats);
     }
-    for (const connId of orphaned) {
-      this.sql.exec("DELETE FROM owner_live_subs WHERE conn_id = ?", connId);
+    for (const connId of orphaned) this.dropConnection(connId);
+    if (stats.rowsRead >= FLUSH_LOG_ROWS) {
+      this.log("info", "owner_views_flushed", {
+        subscriptions: rows.length,
+        rerun,
+        rowsRead: stats.rowsRead,
+        written: written === null ? "*" : [...written].slice(0, 12),
+      });
     }
   }
 
@@ -540,9 +697,14 @@ export class OwnerStore {
     socket: WebSocket,
     attachment: LiveAttachment,
     row: LiveSubRow,
+    stats: { rowsRead: number } = { rowsRead: 0 },
   ): void {
     let frame: LiveServerFrame;
     let hash: string;
+    const key = subKey(row.conn_id, row.sub_id);
+    const tables = new Set<string>();
+    let clock = false;
+    const now = Date.now();
     try {
       const def = this.registry.views.get(row.view);
       if (!def) throw new RpcError("NOT_FOUND", `Unknown view ${row.view}.`);
@@ -553,14 +715,18 @@ export class OwnerStore {
       const viewContext: OwnerViewContext = {
         ownerId: this.ownerIdOf(),
         caller: attachment.caller,
-        db: this.reader(),
+        db: this.trackingReader(tables, stats),
         env: this.env,
-        now: Date.now(),
+        get now() {
+          clock = true;
+          return now;
+        },
       };
       const value = def.read(viewContext, args as never);
       const text = encodeJson(value);
       hash = valueHash(text);
       frame = { t: "value", id: row.sub_id, value: JSON.parse(text) };
+      this.viewDeps.set(key, { tables, clock, at: now });
     } catch (error) {
       if (!(error instanceof RpcError)) {
         this.log("error", "owner_view_failed", {
@@ -571,6 +737,7 @@ export class OwnerStore {
       const backendError = toBackendError(error);
       hash = `error:${backendError.code}`;
       frame = { t: "error", id: row.sub_id, error: backendError };
+      this.viewDeps.set(key, { tables: null, clock, at: now });
     }
     if (hash === row.hash) return;
     this.sql.exec(
@@ -592,9 +759,7 @@ export class OwnerStore {
 
   private closeLive(socket: WebSocket, code: number, reason: string): void {
     const attachment = this.liveAttachment(socket);
-    if (attachment) {
-      this.sql.exec("DELETE FROM owner_live_subs WHERE conn_id = ?", attachment.connId);
-    }
+    if (attachment) this.dropConnection(attachment.connId);
     try {
       socket.close(code, reason);
     } catch {

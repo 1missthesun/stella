@@ -41,7 +41,7 @@ export type DeviceRequestRelayHost = {
   /** The device's one proven presence socket, when it is online. */
   liveSocket: (deviceId: string) => WebSocket | null;
   send: (socket: WebSocket, frame: DeviceRequestServerFrame) => void;
-  log: (event: string, fields: Record<string, unknown>) => void;
+  log: (level: "info" | "error", event: string, fields: Record<string, unknown>) => void;
 };
 
 const noStore = { "cache-control": "no-store" } as const;
@@ -246,7 +246,7 @@ export class DeviceRequestRelay {
   ): void {
     if (!this.pending.has(entry.requestId)) return;
     this.finish(entry);
-    this.host.log("device_request_failed", {
+    this.host.log(code === "failed" ? "error" : "info", "device_request_failed", {
       deviceId: entry.deviceId,
       method: entry.method,
       code,

@@ -242,8 +242,11 @@ const repeatJobId = (askId: string): string => `${USER_ASKS_REPEAT_JOB}:${askId}
 const cloudEscalateJobId = (askId: string): string =>
   `${USER_ASKS_CLOUD_ESCALATE_JOB}:${askId}`;
 
-const log = (event: string, fields: Record<string, unknown>): void =>
-  console.error(JSON.stringify({ service: "owner-user-asks", event, ...fields }));
+const log = (
+  level: "info" | "error",
+  event: string,
+  fields: Record<string, unknown>,
+): void => console[level](JSON.stringify({ service: "owner-user-asks", event, ...fields }));
 
 const requireAccountCaller = (caller: OwnerCaller | null): OwnerCaller => {
   if (!caller || caller.isAnonymous) {
@@ -295,7 +298,7 @@ const quietHoursMinute = (
   if (timeZone) {
     const minute = minuteOfDayInZone(ctx.now, timeZone);
     if (minute !== null) return minute;
-    log("user_ask_policy_time_zone_unusable", { timeZone });
+    log("info", "user_ask_policy_time_zone_unusable", { timeZone });
     return localMinuteOf(ctx.now, null);
   }
   return localMinuteOf(ctx.now, fallbackOffsetMinutes);
@@ -942,7 +945,7 @@ const sendAskPush = async (
     signal: AbortSignal.timeout(15_000),
   }).catch(() => null);
   if (!response?.ok) {
-    log("user_ask_push_failed", { askId: row.ask_id, level });
+    log("error", "user_ask_push_failed", { askId: row.ask_id, level });
     return "send_failed";
   }
   const parsed = (await response.json().catch(() => null)) as {
@@ -1508,7 +1511,7 @@ const escalateCloudAsk = async (
   }
   const outcome = await sendAskPush(ctx, row, level, policy);
   if (outcome === "no_push_target") {
-    log("user_ask_cloud_escalation_unreachable", { askId, level });
+    log("info", "user_ask_cloud_escalation_unreachable", { askId, level });
     ctx.db.run(
       "UPDATE user_asks SET next_escalation_at = NULL, updated_at = ? WHERE ask_id = ?",
       ctx.now,
@@ -1553,15 +1556,15 @@ const announceAsk = async (ctx: OwnerContext, payload: unknown): Promise<void> =
     quietHoursMinute(ctx, row.local_offset_minutes),
   );
   if (allowed < PUSH_LEVEL_FLOOR) {
-    log("user_ask_announce_held", { askId, reason: "ceiling" });
+    log("info", "user_ask_announce_held", { askId, reason: "ceiling" });
     return;
   }
   if (pushesInWindow(ctx) >= policy.maxPerHour) {
-    log("user_ask_announce_held", { askId, reason: "max_per_hour" });
+    log("info", "user_ask_announce_held", { askId, reason: "max_per_hour" });
     return;
   }
   const outcome = await sendAskPush(ctx, row, allowed, policy);
-  if (outcome !== "sent") log("user_ask_announce_failed", { askId, outcome });
+  if (outcome !== "sent") log("info", "user_ask_announce_failed", { askId, outcome });
 };
 
 type ReplyResult = {

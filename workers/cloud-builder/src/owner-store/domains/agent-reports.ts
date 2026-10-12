@@ -151,7 +151,7 @@ const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
            JOIN tree ON child.parent_thread_id = tree.thread_id
           WHERE tree.depth < ${TREE_DEPTH_MAX}
        )
-       SELECT DISTINCT t.thread_id FROM agent_threads t JOIN tree ON t.thread_id = tree.thread_id
+       SELECT DISTINCT t.thread_id FROM tree CROSS JOIN agent_threads t ON t.thread_id = tree.thread_id
         WHERE t.status IN ${LIVE_STATUSES_SQL}
            OR EXISTS (SELECT 1 FROM agent_commands c
                        WHERE c.thread_id = t.thread_id AND c.state = 'pending' AND c.kind IN ('message', 'resume'))
@@ -561,8 +561,9 @@ const deliver = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   } catch (error) {
     const failures =
       (ctx.db.one<{ failures: number }>(
-        "SELECT COUNT(*) AS failures FROM agent_events WHERE event_key LIKE ?",
-        `report_failed:${row.report_id}:%`,
+        "SELECT COUNT(*) AS failures FROM agent_events WHERE event_key > ? AND event_key < ?",
+        `report_failed:${row.report_id}:`,
+        `report_failed:${row.report_id};`,
       )?.failures ?? 0) + 1;
     const reason =
       error instanceof Error

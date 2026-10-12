@@ -347,8 +347,8 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     return (this.deviceRequestRelayState ??= new DeviceRequestRelay({
       liveSocket: (deviceId) => this.liveSocket(deviceId),
       send: (socket, frame) => this.send(socket, frame),
-      log: (event, fields) =>
-        log("error", event, { ownerId: this.ownerId(), ...fields }),
+      log: (level, event, fields) =>
+        log(level, event, { ownerId: this.ownerId(), ...fields }),
     }));
   }
 

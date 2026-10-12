@@ -100,6 +100,11 @@ jobs:
       group: stella-browser-current-publish
       cancel-in-progress: false
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
           path: browser-assets
@@ -162,12 +167,8 @@ jobs:
             --content-type application/json \
             --cache-control "public, max-age=31536000, immutable" \
             --endpoint-url "$R2_ENDPOINT"
-          master_sha="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/master | awk '{print $1}')"
-          if [ -z "$master_sha" ]; then
-            echo "Could not resolve origin/master; refusing to update current.json." >&2
-            exit 1
-          fi
-          if [ "$SOURCE_SHA" = "$master_sha" ]; then
+          git fetch --quiet origin master
+          if git diff --quiet "$SOURCE_SHA" origin/master -- packages/stella-browser/cli packages/stella-browser/package.json packages/stella-browser/scripts; then
             aws s3 cp "$manifest_path" \
               "s3://${R2_BUCKET}/stella-browser/dev/current.json" \
               --content-type application/json \
@@ -175,5 +176,5 @@ jobs:
               --endpoint-url "$R2_ENDPOINT"
             echo "Published $SOURCE_SHA to the dev channel (stella-browser/dev/current.json). Installs keep stella-browser/current.json until promote-stella-browser.yml moves it."
           else
-            echo "Published immutable artifacts for $SOURCE_SHA; current master is $master_sha, so dev/current.json was left unchanged."
+            echo "Published immutable artifacts for $SOURCE_SHA; master's stella-browser source has moved on since, so dev/current.json was left unchanged."
           fi

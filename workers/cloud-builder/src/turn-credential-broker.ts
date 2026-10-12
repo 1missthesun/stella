@@ -1,3 +1,4 @@
+import { CLOUD_AGENT_MOVE_PATH } from "@stella/executor-cloud/cloud-agent-move-protocol";
 import {
   TURN_BROKER_AUTH_SCHEME,
   TURN_BROKER_HEADERS,
@@ -62,6 +63,9 @@ export const TURN_BROKER_HISTORY_PATH = "/api/cloud/history";
 
 export const TURN_BROKER_USER_ASK_PATH = "/api/cloud/user-ask";
 
+/** An agent's `switch_destination`, kept by its BuildSession for the turn's end. */
+export const TURN_BROKER_AGENT_MOVE_PATH = CLOUD_AGENT_MOVE_PATH;
+
 /** Raw-token-free durable state owned by one BuildSession. */
 export type TurnBrokerRecord = TurnBrokerIdentity & {
   version: typeof TURN_BROKER_VERSION;
@@ -96,6 +100,7 @@ export type TurnBrokerTarget = {
     | "thread-messages"
     | "thread-history"
     | "user-ask"
+    | "agent-move"
     | "orchestrator-tool"
     | "orchestrator-events";
   method: "POST";
@@ -406,6 +411,14 @@ export const validateTurnBrokerTarget = (
   if (parsed.pathname === TURN_BROKER_USER_ASK_PATH) {
     return {
       kind: "user-ask",
+      method: "POST",
+      path: parsed.pathname,
+      maxBodyBytes: MAX_CONTROL_BODY_BYTES,
+    };
+  }
+  if (parsed.pathname === TURN_BROKER_AGENT_MOVE_PATH) {
+    return {
+      kind: "agent-move",
       method: "POST",
       path: parsed.pathname,
       maxBodyBytes: MAX_CONTROL_BODY_BYTES,

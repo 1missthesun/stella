@@ -124,6 +124,8 @@ import {
 import { Effect } from "effect";
 import { ownerGateStub } from "../rpc-release.js";
 import { importAgentLogIntoThread } from "./agent-log-bridge.js";
+import { agentDevicesSection, takeAgentMove } from "./agent-move.js";
+import { CLOUD_AGENT_MOVE_TOOL } from "@stella/executor-cloud/cloud-agent-move-protocol";
 
 export type ContainerTurnHost = Pick<
   BuildSessionInternals,
@@ -935,6 +937,19 @@ export const runContainerAgentTurn = async (
         threadError: message,
       };
     }
+    if (result.ok && turn.agentRole !== "orchestrator") {
+      const move = await takeAgentMove(host.ctx.storage, host.env, turn);
+      if (move && "failed" in move && pending.kind === "completed") {
+        const finalText = (pending.payload as { finalText?: string }).finalText ?? "";
+        pending = {
+          ...pending,
+          payload: {
+            ...(pending.payload as Record<string, unknown>),
+            finalText: `${finalText}\n\n[switch_destination: the move did not happen: ${move.failed} The agent still runs in the cloud; message it to carry on there.]`.trim(),
+          },
+        } as PendingTerminal;
+      }
+    }
     const delivered = await host.deliverTerminal(turn, pending);
     await host
       .releaseAgentSessionResources({
@@ -1552,12 +1567,17 @@ export const runAgentAttempt = async (
     // An agent turn runs `general.md` rendered here, from this deploy's
     // bundle, for exactly the tools the executor will give this engine;
     // its `code` reads its own thread's history. The image never supplies prose.
+    const canMove = turn.agentDepth <= 1;
+    const devicesSection = canMove ? await agentDevicesSection(host.env, turn) : undefined;
     let roleInput: CloudCliTurnRoleInput = {
       role: "agent",
-      systemPrompt: renderCloudAgentPrompt("agents/general.md", {
-        names: cloudGeneralToolNames(),
-        history: true,
-      }),
+      systemPrompt: [
+        renderCloudAgentPrompt("agents/general.md", {
+          names: canMove ? [...cloudGeneralToolNames(), CLOUD_AGENT_MOVE_TOOL] : cloudGeneralToolNames(),
+          history: true,
+        }),
+        ...(devicesSection ? [devicesSection] : []),
+      ].join("\n\n"),
     };
     if (orchestrator) {
       // The admitted dispatch carries the spec; the stored copy covers a

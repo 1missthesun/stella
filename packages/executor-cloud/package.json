@@ -8,7 +8,8 @@
     "./agent-history": "./src/agent-history.ts",
     "./general-agent-prompt": "./src/general-agent-prompt.ts",
     "./cloud-general-tools": "./src/cloud-general-tools.ts",
-    "./attached-tool-protocol": "./src/attached-tool-protocol.ts"
+    "./attached-tool-protocol": "./src/attached-tool-protocol.ts",
+    "./cloud-agent-move-protocol": "./src/cloud-agent-move-protocol.ts"
   },
   "scripts": {
     "typecheck": "node ../../node_modules/typescript-7/bin/tsc --noEmit"

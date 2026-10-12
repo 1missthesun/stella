@@ -58,6 +58,7 @@ import {
   type GeneralAgentPromptSkills,
 } from "./general-agent-prompt.js";
 import { cloudGeneralToolNames } from "./cloud-general-tools.js";
+import { CLOUD_AGENT_MOVE_TOOL, cloudAgentMoveTool, runCloudAgentMove } from "./cloud-agent-move.js";
 import {
   toolStateDir,
   worldDriveWorkspace,
@@ -639,6 +640,7 @@ export const runAgentTurn = (
         ...cloudGeneralToolNames()
           .map((name) => byName.get(name))
           .filter((tool): tool is ToolMetadata => Boolean(tool)),
+        cloudAgentMoveTool,
       ];
       const executeCloudTool = async (
         toolCallId: string,
@@ -648,6 +650,9 @@ export const runAgentTurn = (
         onUpdate?: ToolUpdateCallback,
       ): Promise<ToolResult> => {
         markTurnStep("firstToolCall");
+        if (name === CLOUD_AGENT_MOVE_TOOL) {
+          return await runCloudAgentMove(postJson, input.turnId, params);
+        }
         const result = await toolHost.executeTool(
           name,
           params,

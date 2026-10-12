@@ -5,7 +5,7 @@ import { fonts } from "../theme/fonts";
 import { getBackendClient } from "../lib/backend";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { replyTitle } from "./ReplyPreview";
-import type { AgentReplyRef } from "./ReplyFocus";
+import type { AgentReplyRef } from "./ReplyViewer";
 
 export type { TouchAnchor as ReportAnchor } from "../lib/touch-anchor";
 

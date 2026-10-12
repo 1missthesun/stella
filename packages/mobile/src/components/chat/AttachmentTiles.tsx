@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Icon } from "../Icon";
+import { rememberMediaSize } from "../../lib/viewer-size-hints";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
@@ -141,6 +142,7 @@ export function ImageTile({
           accessibilityLabel={name}
           onLoad={(event) => {
             const { width: w, height: h } = event.source;
+            rememberMediaSize(uri, w, h);
             if (w > 0 && h > 0) setAspect(w / h);
           }}
         />

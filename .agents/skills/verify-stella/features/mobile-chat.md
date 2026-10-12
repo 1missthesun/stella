@@ -10,7 +10,7 @@ Mobile chat lets connected and anonymous users open the canonical thread, compos
 - `mobile-timeline` renders user, assistant, tool, error, and working states. The
   working mark uses the bouncing ellipsis while thinking and animated character
   poses while a labelled tool is active.
-- `mobile-replies` matches desktop: ordinary adjacent replies stay plain; returning work has one compact context label. That label and the lifecycle row open a focused chain above the composer, with Report inside focus.
+- `mobile-replies` matches desktop: ordinary adjacent replies stay plain; returning work has one compact context label. That label and the lifecycle row open the chain in the same centred popover files open in (sized to the chain, app background, no dim); Show more opens the report.
 - `mobile-artifacts` opens or shares files and completion output.
 - `mobile-browser-intervention` presents pending cloud-browser actions.
 

@@ -5,7 +5,7 @@ import {
   projectAgentLabels,
   type AgentLabelRow,
 } from "@stella/contracts/agent-labels";
-import { ReplyFocus, type AgentReplyRef } from "./ReplyFocus";
+import { ReplyViewer, type AgentReplyRef } from "./ReplyViewer";
 import { AgentReportPopover } from "./AgentReportPopover";
 import type { ReportAnchor } from "./AgentReport";
 import { type ReplyAgentStatus } from "./ReplyPreview";
@@ -2092,10 +2092,9 @@ export function ChatPane({
             </>
           )}
           {replyFocus && (
-            <ReplyFocus
+            <ReplyViewer
               key={`${conversationId}:${replyFocus.kind === "agent" ? replyFocus.threadId : replyFocus.id}`}
-              topInset={topInset}
-              bottomInset={footerHeight + keyboardExtra}
+              bottomReserve={footerHeight}
               root={replyFocus}
               messages={visibleMessages}
               colors={colors}
@@ -2148,8 +2147,7 @@ export function ChatPane({
               glass-on-glass suppression that renders those menus clear. A plain
               `box-none` View passes touches through to the list and lets each
               button — and the popovers — keep their own Liquid Glass. While a
-              focused chain is open they hide: its glass backdrop would sit over
-              them and, being glass over glass, render them clear. */}
+              reply chain is open its popover covers them, so they hide. */}
           <View
             pointerEvents={replyFocus ? "none" : "box-none"}
             style={[
@@ -2174,7 +2172,7 @@ export function ChatPane({
                   hasUnread={unread}
                   onPress={scroll.scrollToBottom}
                   colors={colors}
-                  bottomOffset={footerHeight + FLOATING_CONTROL_LIFT - 24}
+                  bottomOffset={footerHeight + FLOATING_CONTROL_LIFT - 34}
                 />
               </Reanimated.View>
             ) : null}

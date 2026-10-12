@@ -3,13 +3,13 @@ import {
   ActivityIndicator,
   Alert,
   Image as NativeImage,
-  LayoutAnimation,
   Linking,
   ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { AudioPlayerView } from "./AudioPlayerView";
@@ -29,7 +29,22 @@ import {
   withCanvasPolicy,
 } from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
-import { FileViewerFooter, FileViewerPanel } from "./FileViewerPanel";
+import {
+  FILE_VIEWER_MIN_HEIGHT,
+  FileViewerFooter,
+  FileViewerPanel,
+  fileViewerContentWidth,
+} from "./FileViewerPanel";
+import {
+  cachedViewerEntry,
+  rememberViewerContentHeight,
+  storeViewerEntry,
+} from "../lib/artifact-viewer-cache";
+import {
+  mediaAspect,
+  parseAspectRatio,
+  rememberMediaSize,
+} from "../lib/viewer-size-hints";
 import type { PopoverAction } from "./FloatingPopoverParts";
 import { canvasSlugFor, useCanvasShareToggle } from "../lib/use-canvas-share-toggle";
 import type { ChatArtifact } from "../types";
@@ -80,7 +95,10 @@ import type { Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { classifyCanvasNavigation } from "../lib/canvas-navigation";
-import { resolveCloudDriveFileUri } from "../lib/use-cloud-drive-file-uri";
+import {
+  cloudDriveUrlExpiry,
+  resolveCloudDriveFileUri,
+} from "../lib/use-cloud-drive-file-uri";
 import { notifyError, notifySuccess, tapLight } from "../lib/haptics";
 import {
   SwipeArea,
@@ -113,19 +131,10 @@ type ArtifactSwipeProps = {
 };
 
 type ArtifactViewerContentProps = {
-  artifact: ChatArtifact | null;
+  artifact: ChatArtifact;
   access: StoredPhoneAccess | null;
-  /**
-   * When hosted inside another sheet (the activity hub), renders a back
-   * chevron in the header for returning to the host's list instead of
-   * dismissing the whole sheet.
-   */
-  onBack?: () => void;
-  /** Close the popover hosting the viewer: an image's vertical swipe. */
-  onClose?: () => void;
-  /** The copy, share and link controls this artifact offers, as they change. */
-  onActionsChange?: (actions: PopoverAction[]) => void;
-  onPreferredHeightChange?: (height: number | null) => void;
+  onClose: () => void;
+  bottomReserve?: number;
 } & ArtifactSwipeProps &
   ArtifactDeviceProps;
 
@@ -415,20 +424,107 @@ const imageBase64 = async (uri: string): Promise<string> => {
   return await new File(await sharedImageFile(uri)).base64();
 };
 
+const withoutQuery = (value: string): string => value.split(/[?#]/)[0] ?? value;
+
+const viewerCacheKey = (
+  artifact: ChatArtifact,
+  preferDeviceId: string | null,
+  theme: string,
+): string | null => {
+  const payload = artifact.payload;
+  let target: string | null;
+  if (payload.kind === "url") target = payload.url;
+  else if (payload.kind === "office") target = `office:${payload.previewRef.sessionId}`;
+  else if (payload.kind === "pdf" && payload.localUri) target = payload.localUri;
+  else if (payload.kind === "media" && payload.asset.kind === "text") return null;
+  else if (payload.kind === "source-diff") {
+    target = `${payload.filePath}#${payload.patch?.length ?? 0}`;
+  } else target = artifactPrimaryFilePath(payload);
+  if (!target) return null;
+  if (target.startsWith("data:")) target = `data:${artifact.id}:${target.length}`;
+  const subKind = payload.kind === "media" ? payload.asset.kind : "";
+  return [
+    artifact.conversationId,
+    payload.kind,
+    subKind,
+    withoutQuery(target),
+    preferDeviceId ?? "",
+    theme,
+  ].join("|");
+};
+
+const loadedUri = (loaded: LoadedArtifact): string | null =>
+  loaded.kind === "image" ||
+  loaded.kind === "pdf" ||
+  loaded.kind === "audio" ||
+  loaded.kind === "video" ||
+  loaded.kind === "url"
+    ? loaded.uri
+    : null;
+
+const loadedStillThere = (loaded: LoadedArtifact): boolean => {
+  const uri = loadedUri(loaded);
+  if (!uri || !/^file:/i.test(uri)) return true;
+  try {
+    return new File(uri).exists;
+  } catch {
+    return false;
+  }
+};
+
+const fileSize = (uri: string): number => {
+  try {
+    return new File(uri).size ?? 0;
+  } catch {
+    return 0;
+  }
+};
+
+const loadedTextChars = (loaded: LoadedArtifact): number =>
+  "html" in loaded ? loaded.html.length : "text" in loaded ? loaded.text.length : 0;
+
+type ViewerShape = "fill" | "image" | "audio" | "content";
+
+/** How the viewer sizes an artifact, known from its payload before it loads. */
+const viewerShape = (artifact: ChatArtifact): ViewerShape => {
+  const payload = artifact.payload;
+  switch (payload.kind) {
+    case "media":
+      if (payload.asset.kind === "image") return "image";
+      if (payload.asset.kind === "audio") return "audio";
+      if (payload.asset.kind === "video") return "fill";
+      return "content";
+    case "markdown":
+    case "source-diff":
+    case "canvas-html":
+      return "content";
+    case "file-artifact":
+      return payload.artifactKind === "delimited-table" ? "content" : "fill";
+    default:
+      return "fill";
+  }
+};
+
+const payloadAspect = (artifact: ChatArtifact): number | null => {
+  const payload = artifact.payload;
+  if (payload.kind !== "media") return null;
+  const paths = "filePaths" in payload.asset ? payload.asset.filePaths : [];
+  return mediaAspect(...paths) ?? parseAspectRatio(payload.aspectRatio);
+};
+
 /**
- * The artifact display itself (header + rendered preview), without the
- * popover around it. `ArtifactViewer` hosts it in the floating popover, whose
- * glass row carries the actions this reports through `onActionsChange`.
+ * The artifact display itself (body + footer) inside the file viewer panel.
+ * The panel's size is worked out from what is already known (cached loads,
+ * media dimensions seen in chat, the file type) so its first frame is its
+ * final size; where that cannot be known it opens small and grows.
  */
 export function ArtifactViewerContent({
   artifact: openedArtifact,
   access,
-  onBack: hostBack,
   onClose,
+  bottomReserve,
   siblings: openedSiblings,
   onNavigate,
-  onActionsChange,
-  onPreferredHeightChange,
   deviceIdOf,
 }: ArtifactViewerContentProps) {
   const [trailState, setTrailState] = useState<{
@@ -444,10 +540,7 @@ export function ArtifactViewerContent({
     top?.preferDeviceId ??
     (openedArtifact && deviceIdOf ? deviceIdOf(openedArtifact) : null);
   const shownArtifact = top?.artifact ?? openedArtifact;
-  const artifact = useMemo(
-    () => (shownArtifact ? viewedArtifact(shownArtifact) : null),
-    [shownArtifact],
-  );
+  const artifact = useMemo(() => viewedArtifact(shownArtifact), [shownArtifact]);
   const siblings = useMemo(
     () => (trail.length > 0 ? undefined : openedSiblings?.map(viewedArtifact)),
     [openedSiblings, trail.length],
@@ -458,12 +551,34 @@ export function ArtifactViewerContent({
       entries: (current.root === openedArtifact ? current.entries : []).slice(0, -1),
     }));
   }, [openedArtifact]);
-  const onBack = trail.length > 0 ? popTrail : hostBack;
+  const onBack = trail.length > 0 ? popTrail : undefined;
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const [loaded, setLoaded] = useState<LoadedArtifact | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
+  const cacheKey = useMemo(
+    () => viewerCacheKey(artifact, preferDeviceId, colors.background),
+    [artifact, colors.background, preferDeviceId],
+  );
+  const cachedEntry = useMemo(
+    () => cachedViewerEntry<LoadedArtifact>(cacheKey, loadedStillThere),
+    [cacheKey],
+  );
+  const [result, setResult] = useState<{
+    artifact: ChatArtifact;
+    key: string | null;
+    loaded: LoadedArtifact | null;
+    error: string | null;
+  } | null>(null);
+  const current =
+    result &&
+    (result.artifact === artifact || (cacheKey !== null && result.key === cacheKey))
+      ? result
+      : null;
+  const loaded = current?.loaded ?? cachedEntry?.value ?? null;
+  const error = current?.error ?? null;
+  const loading = !loaded && !error;
+  const resultRef = useRef(result);
+  resultRef.current = result;
 
   const [progress, setProgress] = useState<{
     received: number;
@@ -471,7 +586,7 @@ export function ArtifactViewerContent({
   } | null>(null);
   useEffect(() => {
     setProgress(null);
-    const filePath = artifact ? artifactPrimaryFilePath(artifact.payload) : null;
+    const filePath = artifactPrimaryFilePath(artifact.payload);
     if (!filePath) return;
     return subscribeLinkedFileProgress(filePath, (received, total) =>
       setProgress({ received, total }),
@@ -480,7 +595,7 @@ export function ArtifactViewerContent({
 
   const openFolderEntry = useCallback(
     (entry: DeviceFolderEntry) => {
-      if (!artifact || loaded?.kind !== "folder") return;
+      if (loaded?.kind !== "folder") return;
       tapLight();
       const child = stellaFileChatArtifact(entry.path, artifact.conversationId);
       setTrailState((current) => ({
@@ -497,9 +612,7 @@ export function ArtifactViewerContent({
   const shownFolder = loaded?.kind === "folder" ? loaded : null;
   const title = shownFolder
     ? folderName(shownFolder.listing.path)
-    : artifact
-      ? artifactFileName(artifact.payload)
-      : "Artifact";
+    : artifactFileName(artifact.payload);
 
   const neighbours = useMemo(
     () => imageNeighbours(artifact, siblings),
@@ -521,11 +634,11 @@ export function ArtifactViewerContent({
   // A paired-computer video shows its poster while it loads: the chat row
   // usually made one already, and the request for it is shared.
   const isVideo =
-    artifact?.payload.kind === "media" && artifact.payload.asset.kind === "video";
+    artifact.payload.kind === "media" && artifact.payload.asset.kind === "video";
   const [pendingPoster, setPendingPoster] = useState<string | null>(null);
   useEffect(() => {
     setPendingPoster(null);
-    if (!artifact || artifact.payload.kind !== "media") return;
+    if (artifact.payload.kind !== "media") return;
     if (artifact.payload.asset.kind !== "video") return;
     if ("driveBacked" in artifact.payload && artifact.payload.driveBacked === true) return;
     const filePath = artifactPrimaryFilePath(artifact.payload);
@@ -549,7 +662,6 @@ export function ArtifactViewerContent({
   // On-device PDFs carry a local file URI we can hand straight to the OS share
   // sheet (save to Files / open in another app), without asking the computer.
   const localPdf =
-    artifact &&
     artifact.payload.kind === "pdf" &&
     artifact.payload.localUri
       ? artifact.payload
@@ -585,7 +697,7 @@ export function ArtifactViewerContent({
     [],
   );
   const canvas =
-    artifact?.payload.kind === "canvas-html" ? artifact.payload : null;
+    artifact.payload.kind === "canvas-html" ? artifact.payload : null;
   const canvasShare = useCanvasShareToggle(
     canvas ? canvasSlugFor(canvas.slug, canvas.filePath) : null,
     loaded?.kind === "canvas-html" ? loaded.html : null,
@@ -750,11 +862,10 @@ export function ArtifactViewerContent({
         return [];
     }
   }, [canvas, canvasShare, copy, loaded, localPdf, shareFile, sharing]);
-  useEffect(() => {
-    onActionsChange?.(actions);
-  }, [actions, onActionsChange]);
 
-  const [contentWidth, setContentWidth] = useState(0);
+  const [contentWidth, setContentWidth] = useState(() =>
+    fileViewerContentWidth(screenWidth),
+  );
   const [footerHeight, setFooterHeight] = useState(FOOTER_FALLBACK_HEIGHT);
   const [measured, setMeasured] = useState<{
     source: LoadedArtifact;
@@ -764,27 +875,36 @@ export function ArtifactViewerContent({
     uri: string;
     aspect: number;
   } | null>(null);
-  const measuredHeight = measured && measured.source === loaded ? measured.height : null;
+  const measuredHeight =
+    loaded && measured && measured.source === loaded
+      ? measured.height
+      : loaded && loaded === cachedEntry?.value
+        ? cachedEntry.contentHeight
+        : null;
   const reportScrollHeight = useCallback(
     (_width: number, height: number) => {
       if (!loaded || height <= 0) return;
+      rememberViewerContentHeight(cacheKey, height);
       setMeasured((current) =>
         current?.source === loaded && Math.abs(current.height - height) < 1
           ? current
           : { source: loaded, height },
       );
     },
-    [loaded],
+    [cacheKey, loaded],
   );
   const reportDocumentHeight = useCallback(
     (height: number) => {
       if (!loaded) return;
       setMeasured((current) => {
-        if (current?.source !== loaded) return { source: loaded, height };
-        return height > current.height + 1 ? { source: loaded, height } : current;
+        if (current?.source === loaded && height <= current.height + 1) {
+          return current;
+        }
+        rememberViewerContentHeight(cacheKey, height);
+        return { source: loaded, height };
       });
     },
-    [loaded],
+    [cacheKey, loaded],
   );
   const imageUri = loaded?.kind === "image" ? loaded.uri : null;
   useEffect(() => {
@@ -794,6 +914,8 @@ export function ArtifactViewerContent({
       imageUri,
       (width, height) => {
         if (!cancelled && width > 0 && height > 0) {
+          rememberMediaSize(imageUri, width, height);
+          rememberMediaSize(artifactPrimaryFilePath(artifact.payload), width, height);
           setImageAspect({ uri: imageUri, aspect: width / height });
         }
       },
@@ -802,47 +924,39 @@ export function ArtifactViewerContent({
     return () => {
       cancelled = true;
     };
-  }, [imageUri]);
+  }, [artifact, imageUri]);
 
+  const shape = viewerShape(artifact);
+  const knownAspect =
+    (imageUri && imageAspect?.uri === imageUri ? imageAspect.aspect : null) ??
+    mediaAspect(imageUri) ??
+    payloadAspect(artifact);
+  const placeholderBody = Math.max(0, FILE_VIEWER_MIN_HEIGHT - footerHeight);
   const bodyPreferredHeight: number | null = (() => {
-    if (loading || error || !loaded) {
-      return loading && isVideo ? null : STATUS_BODY_HEIGHT;
+    if (shape === "fill") return null;
+    if (shape === "audio") return AUDIO_BODY_HEIGHT;
+    if (shape === "image") {
+      if (knownAspect && contentWidth > 0) return contentWidth / knownAspect;
+      return error ? STATUS_BODY_HEIGHT : placeholderBody;
     }
-    switch (loaded.kind) {
-      case "image":
-        return imageAspect?.uri === loaded.uri && contentWidth > 0
-          ? contentWidth / imageAspect.aspect
-          : null;
-      case "markdown":
-      case "text":
-      case "canvas-html":
-      case "html-document":
-      case "html":
-        return measuredHeight;
-      case "audio":
-        return AUDIO_BODY_HEIGHT;
-      default:
-        return null;
-    }
+    if (error) return STATUS_BODY_HEIGHT;
+    return measuredHeight ?? placeholderBody;
   })();
   const preferredHeight =
     bodyPreferredHeight === null
       ? null
       : Math.ceil(bodyPreferredHeight + footerHeight);
-  useEffect(() => {
-    onPreferredHeightChange?.(preferredHeight);
-  }, [onPreferredHeightChange, preferredHeight]);
 
   useEffect(() => {
-    if (!artifact) return;
+    if (cachedEntry) return;
+    const settled = resultRef.current;
+    if (settled?.loaded && cacheKey !== null && settled.key === cacheKey) return;
     let cancelled = false;
     const controller = new AbortController();
-    // PDFs and audio are handed to native renderers as real files; they live
-    // in the cache only as long as this artifact is on screen.
+    // PDFs and audio are handed to native renderers as real files. The viewer
+    // cache takes them over when it keeps the load; otherwise they live only
+    // as long as this artifact is on screen.
     let materialized: ArtifactMediaFile | null = null;
-    setLoaded(null);
-    setError(null);
-    setLoading(true);
 
     const materialize = (
       bytes: Uint8Array,
@@ -1157,16 +1271,28 @@ export function ArtifactViewerContent({
     };
 
     void load()
-      .then((next) => {
-        if (!cancelled) setLoaded(next);
-      })
-      .catch((caught) => {
-        if (!cancelled) {
-          setError(caught instanceof Error ? caught.message : String(caught));
+      .then((next: LoadedArtifact) => {
+        if (cancelled) return;
+        if (cacheKey !== null && next.kind !== "folder") {
+          const uri = loadedUri(next);
+          const owned = storeViewerEntry(cacheKey, next, {
+            file: materialized,
+            fileBytes: materialized ? fileSize(materialized.uri) : 0,
+            textChars: loadedTextChars(next),
+            expiresAt: uri && /^https?:/i.test(uri) ? cloudDriveUrlExpiry(uri) : null,
+          });
+          if (owned) materialized = null;
         }
+        setResult({ artifact, key: cacheKey, loaded: next, error: null });
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
+      .catch((caught: unknown) => {
+        if (cancelled) return;
+        setResult({
+          artifact,
+          key: cacheKey,
+          loaded: null,
+          error: caught instanceof Error ? caught.message : String(caught),
+        });
       });
 
     return () => {
@@ -1174,12 +1300,21 @@ export function ArtifactViewerContent({
       controller.abort();
       materialized?.remove();
     };
-  }, [access, artifact, colors, preferDeviceId]);
+  }, [access, artifact, cacheKey, cachedEntry, colors, preferDeviceId]);
 
   return (
+    <FileViewerPanel
+      onClose={onClose}
+      closeLabel="Close"
+      preferredHeight={preferredHeight}
+      {...(bottomReserve !== undefined ? { bottomReserve } : {})}
+    >
     <View
       style={styles.root}
-      onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}
+      onLayout={(event) => {
+        const next = event.nativeEvent.layout.width;
+        if (next > 0) setContentWidth(next);
+      }}
     >
         <View style={styles.body}>
           {(loading || error) && swipeable ? (
@@ -1313,12 +1448,13 @@ export function ArtifactViewerContent({
         />
       </View>
     </View>
+    </FileViewerPanel>
   );
 }
 
 /**
- * The artifact viewer opened from chat cards, links and Files: a floating
- * popover pointing at what was tapped, its controls in a glass row beneath.
+ * The artifact viewer opened from chat cards, links and Files: a centred
+ * popover sized to its content, the file name and actions in its footer.
  */
 export function ArtifactViewer({
   artifact,
@@ -1330,32 +1466,17 @@ export function ArtifactViewer({
   deviceIdOf,
   bottomReserve,
 }: ArtifactViewerProps) {
-  const [preferredHeight, setPreferredHeight] = useState<number | null>(null);
-  const updatePreferredHeight = useCallback((next: number | null) => {
-    setPreferredHeight((current) => {
-      if (current === next) return current;
-      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-      return next;
-    });
-  }, []);
   if (!visible || !artifact) return null;
   return (
-    <FileViewerPanel
+    <ArtifactViewerContent
+      artifact={artifact}
+      access={access}
       onClose={onClose}
-      closeLabel="Close"
-      preferredHeight={preferredHeight}
       {...(bottomReserve !== undefined ? { bottomReserve } : {})}
-    >
-      <ArtifactViewerContent
-        artifact={artifact}
-        access={access}
-        onClose={onClose}
-        onPreferredHeightChange={updatePreferredHeight}
-        {...(siblings ? { siblings } : {})}
-        {...(onNavigate ? { onNavigate } : {})}
-        {...(deviceIdOf ? { deviceIdOf } : {})}
-      />
-    </FileViewerPanel>
+      {...(siblings ? { siblings } : {})}
+      {...(onNavigate ? { onNavigate } : {})}
+      {...(deviceIdOf ? { deviceIdOf } : {})}
+    />
   );
 }
 

@@ -48,6 +48,7 @@ export function AgentActivityRow({
   working,
   colors,
   onPress,
+  roomy = false,
 }: {
   title: string;
   /** Omit for a plain read-out line with no status tell. */
@@ -61,6 +62,8 @@ export function AgentActivityRow({
   colors: Colors;
   /** Opens the agent detail (activity hub). Row is inert when absent. */
   onPress?: () => void;
+  /** Slightly larger, airier text for the top-bar menu. */
+  roomy?: boolean;
 }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
@@ -116,11 +119,14 @@ export function AgentActivityRow({
             working
               ? [
                   styles.title,
+                  ...(roomy ? [styles.titleRoomy] : []),
                   {
                     color: fadeHex(colors.textStrong, RUNNING_REST_ALPHA),
                   },
                 ]
-              : styles.title
+              : roomy
+                ? [styles.title, styles.titleRoomy]
+                : styles.title
           }
           durationMs={TITLE_SHIMMER_MS}
           dimAlpha={RUNNING_REST_ALPHA}
@@ -173,6 +179,11 @@ const makeStyles = (colors: Colors) =>
       fontSize: 15,
       lineHeight: 20,
       letterSpacing: -0.2,
+    },
+    titleRoomy: {
+      fontSize: 16.5,
+      lineHeight: 23,
+      letterSpacing: -0.1,
     },
     chevron: {
       opacity: 0.7,

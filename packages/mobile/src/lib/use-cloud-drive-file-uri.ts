@@ -50,6 +50,14 @@ export const resolveCloudDriveFileUri = async (
   path: string,
 ): Promise<string> => (await resolveCloudDriveFile(path)).url;
 
+/** When a signed URL this module handed out stops working, if it is known. */
+export const cloudDriveUrlExpiry = (url: string): number | null => {
+  for (const entry of cache.values()) {
+    if (entry.url === url) return entry.expiresAt - REFRESH_MARGIN_MS;
+  }
+  return null;
+};
+
 /** Drop cached URLs when the signed-in owner changes. */
 export const clearCloudDriveFileUris = (): void => {
   generation += 1;

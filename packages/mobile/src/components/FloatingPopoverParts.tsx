@@ -105,23 +105,35 @@ export function popoverRimColors(isDark: boolean): [string, string, ...string[]]
       ];
 }
 
-/** The bubble: the assistant fill inside a specular rim, clipping its content. */
+/**
+ * The bubble inside a specular rim, clipping its content: the assistant fill
+ * by default, or the app's own background with `fill="background"`.
+ */
 export function PopoverSurface({
   width,
   height,
   maxHeight,
+  fill: fillKind = "assistant",
   children,
   style,
 }: {
   width: number;
   height?: number;
   maxHeight?: number;
+  fill?: "assistant" | "background";
   children: ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
   const colors = useColors();
   const { isDark } = useTheme();
-  const fill = popoverSurfaceFill(colors);
+  const fill =
+    fillKind === "background"
+      ? {
+          top: colors.background,
+          bottom: colors.background,
+          solid: toHex(parseColorOr(colors.background)),
+        }
+      : popoverSurfaceFill(colors);
   return (
     <View
       style={[
@@ -140,12 +152,19 @@ export function PopoverSurface({
         colors={popoverRimColors(isDark)}
         style={StyleSheet.absoluteFill}
       />
-      <View style={styles.inner}>
-        <LinearGradient
-          pointerEvents="none"
-          colors={[fill.top, fill.bottom]}
-          style={StyleSheet.absoluteFill}
-        />
+      <View
+        style={[
+          styles.inner,
+          fillKind === "background" ? { backgroundColor: fill.solid } : null,
+        ]}
+      >
+        {fillKind === "background" ? null : (
+          <LinearGradient
+            pointerEvents="none"
+            colors={[fill.top, fill.bottom]}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
         {children}
       </View>
     </View>

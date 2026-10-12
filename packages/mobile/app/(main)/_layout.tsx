@@ -27,6 +27,7 @@ import { Icon } from "../../src/components/Icon";
 import { GlassIconButton } from "../../src/components/GlassIconButton";
 import { StellaStatusHeader } from "../../src/components/StellaStatusHeader";
 import { StellaActivityMenu } from "../../src/components/StellaActivityMenu";
+import { OverlayHost } from "../../src/components/OverlayHost";
 import { ChatSettingsPanel } from "../../src/components/ChatSettingsPanel";
 import {
   AppBackdrop,
@@ -499,6 +500,7 @@ export default function MainLayout() {
               </View>
             ) : null}
           </Animated.View>
+          <OverlayHost />
         </DrawerStage>
       )}
       <StellaActivityMenu

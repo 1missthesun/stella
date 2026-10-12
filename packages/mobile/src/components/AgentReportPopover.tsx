@@ -7,7 +7,7 @@ import type { TouchAnchor } from "../lib/touch-anchor";
 import { AgentReportContent, useAgentReport } from "./AgentReport";
 import { FloatingPopover } from "./FloatingPopover";
 import type { PopoverAction } from "./FloatingPopoverParts";
-import type { AgentReplyRef } from "./ReplyFocus";
+import type { AgentReplyRef } from "./ReplyViewer";
 
 const MAX_HEIGHT_RATIO = 0.58;
 const PLACEHOLDERS = new Set([

@@ -15,7 +15,7 @@
  * `app-source.relaunch-transition`) give the breakdown.
  *
  *   setup                     clone this checkout's HEAD into the sandbox and install
- *   sync                      move the sandbox to this checkout's HEAD (reinstalls on a lock change)
+ *   sync [--ref r]            move the sandbox to this checkout's HEAD or r (reinstalls on a lock change)
  *   launch [--mode m]         start the sandbox's Stella (m: production | development renderer)
  *   run --variation v [--iterations n] [--label l]
  *                             v: renderer | main | runtime | deps | stale | undo
@@ -81,7 +81,7 @@ const setup = () => {
 };
 
 const sync = () => {
-  const sha = git(repoRoot, ["rev-parse", "HEAD"]);
+  const sha = git(repoRoot, ["rev-parse", option("ref", "HEAD")]);
   const lockBefore = existsSync(path.join(appDir, "bun.lock"))
     ? readFileSync(path.join(appDir, "bun.lock"), "utf8")
     : "";
@@ -155,6 +155,7 @@ const launch = async () => {
   if (!result.ok) throw new Error(JSON.stringify(result.error));
   const run = readRun();
   run.benchMode = mode;
+  run.benchSha = git(appDir, ["rev-parse", "HEAD"]);
   writeFileSync(pointerFile, JSON.stringify(run, null, 2));
   log(`launched (${mode} renderer) on CDP ${run.cdpPort}`);
   await waitForLive(run, Date.now() + 60_000);
@@ -287,8 +288,8 @@ class LogTail {
 
 const TOPBAR = "packages/desktop-ui/src/shell/ShellTopBarFull.tsx";
 const TOPBAR_ANCHOR = `<div className="shell-topbar-full__spacer" aria-hidden="true" />`;
-const NAV = "packages/desktop-ui/src/shell/sidebar/ShellTopBarNav.tsx";
-const NAV_ANCHOR = `<nav className="shell-topbar-nav" aria-label={t("shell.sidebar.nav.apps")}>`;
+const NAV = "packages/desktop-ui/src/shell/ShellTopBarActivity.tsx";
+const NAV_ANCHOR = `<div className="shell-topbar-activity" data-busy={busy ? "true" : "false"}>`;
 const MAIN = "packages/desktop/electron/main.ts";
 const RUNTIME = "packages/runtime/worker/entry.ts";
 const DEP_PACKAGE = "packages/contracts/package.json";
@@ -412,6 +413,18 @@ const iterate = async (variation) => {
     const name = `bench-${variation}-${nonce}`;
     const commit = commitOnto(change.base, change.files, `Update bench: ${variation} ${nonce}${change.note ? ` (${change.note})` : ""}`);
     git(appDir, ["branch", "--force", `draft/${name}`, commit]);
+    // As the user sees it: the draft offered in Updates (which also loads the
+    // transition overlay ahead of the press) before Update is pressed.
+    const offeredBy = Date.now() + 20_000;
+    while (Date.now() < offeredBy) {
+      const ready = await tryEvaluate(
+        run.cdpPort,
+        `window.electronAPI.appSource.getState().then((state) => [...(state?.ready ?? []), ...(state?.stale ?? [])].some((draft) => draft.name === ${JSON.stringify(name)}))`,
+      );
+      if (ready) break;
+      await sleep(200);
+    }
+    await sleep(1000);
     action = `window.electronAPI.appSource.apply(${JSON.stringify(name)})`;
     if (variation === "renderer") markerSelector = `[data-update-bench="${nonce}"]`;
     if (variation === "stale") markerSelector = `[data-update-bench-stale="${nonce}"]`;
@@ -507,6 +520,11 @@ const iterate = async (variation) => {
       if (!bundle.includes(nonce)) throw new Error("the relaunched main does not hold the change");
     }
   }
+  tail.poll();
+  const readiness = tail.events.filter((entry) => entry.event === "renderer.cloud_readiness");
+  if (readiness.length > 0) {
+    record.readiness = Object.fromEntries(readiness.map((entry) => [entry.fields.phase, entry.fields.elapsedMs]));
+  }
   return record;
 };
 
@@ -517,9 +535,11 @@ const runBench = async () => {
   const label = option("label", git(repoRoot, ["rev-parse", "--short=12", "HEAD"]));
   mkdirSync(path.dirname(resultsFile), { recursive: true });
   for (let i = 0; i < iterations; i += 1) {
-    // Let the previous swap, focus-in and background refresh settle.
-    await sleep(Number(option("settle", "3000")));
-    const record = { label, sha: git(repoRoot, ["rev-parse", "HEAD"]), ...(await iterate(variation)), iteration: i };
+    // Let the previous swap, focus-in and background refresh settle. A
+    // runtime restarted seconds after the last one is still starting up and
+    // stops slower than any the user would see, so that one waits longer.
+    await sleep(Number(option("settle", variation === "runtime" ? "12000" : "3000")));
+    const record = { label, sha: readRun().benchSha ?? null, ...(await iterate(variation)), iteration: i };
     appendFileSync(resultsFile, `${JSON.stringify(record)}\n`);
     console.log(JSON.stringify(record));
   }

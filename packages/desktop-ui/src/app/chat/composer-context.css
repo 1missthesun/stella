@@ -539,8 +539,10 @@ button.chat-composer-file-chip.composer-chip-previewable {
 }
 
 .chat-composer-context-region-thumb {
-  width: 72px;
+  width: auto;
   height: 54px;
+  max-width: 160px;
+  object-fit: contain;
 }
 
 /* ── File attachment chips ── */

@@ -569,7 +569,7 @@ export const Composer = memo(function Composer({
                     <Image
                       source={{ uri: attachment.uri }}
                       style={styles.attachmentImage}
-                      contentFit="cover"
+                      contentFit="contain"
                     />
                   ) : (
                     <View style={styles.attachmentFile}>
@@ -863,7 +863,12 @@ const makeComposerStyles = (colors: Colors) =>
       position: "relative",
       width: 64,
     },
-    attachmentImage: { borderRadius: 10, height: 64, width: 64 },
+    attachmentImage: {
+      backgroundColor: fadeHex(colors.textMuted, 0.12),
+      borderRadius: 10,
+      height: 64,
+      width: 64,
+    },
     // A document has no preview to show, so the tile becomes its name.
     attachmentFile: {
       alignItems: "center",

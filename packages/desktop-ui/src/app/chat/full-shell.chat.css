@@ -832,14 +832,6 @@ button.event-context-chip--overflow:focus-visible {
   background: color-mix(in srgb, var(--foreground) 35%, transparent);
 }
 
-/* A sent image shows whole at its own aspect ratio, never cropped. */
-.event-row .chat-composer-context-region-thumb {
-  width: auto;
-  height: 54px;
-  max-width: 160px;
-  object-fit: contain;
-}
-
 .event-pasted-text-chip[data-has-preview] {
   cursor: default;
 }

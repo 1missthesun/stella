@@ -56,6 +56,17 @@ export const resolveBunBinaryPath = (): string => {
   return "bun";
 };
 
+/**
+ * The runtime is started through this, so it holds nothing of the app's but
+ * its own stdio. A child keeps every descriptor of its parent that is not
+ * close-on-exec, and Chromium leaves some that way: the runtime held the
+ * app's profile files and, under a debugging port, its listening socket, so
+ * a runtime that outlived its app kept the next one from opening that port.
+ */
+const CLOSE_INHERITED_THEN_EXEC =
+  'for fd in /dev/fd/*; do n=${fd##*/}; if [ "$n" -gt 2 ] 2>/dev/null; then eval "exec $n>&-" 2>/dev/null; fi; done; exec "$@"';
+const BASH = "/bin/bash";
+
 const spawnDetachedWorkerProcess = (
   options: LifecycleStartOptions,
   paths: RuntimePaths,
@@ -94,7 +105,11 @@ const spawnDetachedWorkerProcess = (
     if (options.env?.NODE_ENV === "development") {
       console.warn(`[runtime-host] Detached worker logs: ${paths.logFile}`);
     }
-    child = spawn(bunBinaryPath, args, {
+    const [command, commandArgs] =
+      process.platform !== "win32" && existsSync(BASH) && existsSync(bunBinaryPath)
+        ? [BASH, ["-c", CLOSE_INHERITED_THEN_EXEC, "stella-runtime", bunBinaryPath, ...args]]
+        : [bunBinaryPath, args];
+    child = spawn(command, commandArgs, {
       detached: process.platform !== "win32",
       stdio: ["ignore", logFd, logFd],
       env: {

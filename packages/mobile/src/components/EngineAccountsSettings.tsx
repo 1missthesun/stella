@@ -26,7 +26,6 @@ import { CHATGPT_SIWC } from "@stella/contracts/chatgpt-siwc";
 import { GlassIconButton } from "./GlassIconButton";
 import { Icon } from "./Icon";
 import { LineField, PrimaryButton, TextAction } from "./chat-settings/kit";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import { NativeMenu } from "./NativeMenu";
 import type { NativeMenuItem } from "./NativeMenu.types";
 import { makeSettingsStyles } from "./settings/settings-styles";
@@ -965,8 +964,6 @@ function ProviderSection({
                 styles.panelLabel,
                 styles.panelAddLabel,
               ]}
-              numberOfLines={2}
-              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
             >
               {t(section.connectKey)}
             </Text>
@@ -1159,7 +1156,7 @@ const makeStyles = (colors: Colors) =>
     pasteStep: { gap: 14 },
     pasteCard: { padding: 16 },
     panelPasteStep: { paddingBottom: 8, paddingTop: 4 },
-    pasteInput: { maxHeight: 120, paddingTop: 12 },
+    pasteInput: { paddingTop: 12 },
     pasteLinks: {
       columnGap: 20,
       flexDirection: "row",

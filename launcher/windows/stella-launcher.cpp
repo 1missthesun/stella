@@ -3185,6 +3185,37 @@ struct Outcome {
     vector<string> output;
 };
 
+// Stella installed the dependencies and ran prepare-install.mjs for the
+// checkout it is about to relaunch into: note it, so the relaunch's own
+// prepare finds that work done instead of repeating it. Only what still
+// matches the checkout is taken.
+static void handlePrepared(const mj_value *message) {
+    const char *lockHash = mj_get_string(message, "lockHash");
+    const char *head = mj_get_string(message, "head");
+    bool noted = false;
+    try {
+        if (lockHash) {
+            string actual = sha256File(P.app() + L"\\bun.lock");
+            if (actual == lockHash) {
+                S.bunLockHash = actual;
+                LOG("supervisor: Stella installed the dependencies for lock %s", short12(actual).c_str());
+                noted = true;
+            }
+        }
+        if (head) {
+            string actual = gGit->run({"rev-parse", "HEAD"}, P.app());
+            if (actual == head) {
+                S.preparedHead = actual;
+                LOG("supervisor: Stella prepared %s", short12(actual).c_str());
+                noted = true;
+            }
+        }
+    } catch (const LauncherError &e) {
+        LOG("supervisor: could not check what Stella prepared: %s", e.message.c_str());
+    }
+    if (noted) S.save();
+}
+
 static void handleSign(const mj_value *message, ElectronProcess &process) {
     const mj_value *id = mj_get(message, "id");
     string idText = "null";
@@ -3268,6 +3299,8 @@ static Outcome supervise(const wstring &electron) {
                 }
             } else if (op && !strcmp(op, "sign")) {
                 handleSign(message, *process);
+            } else if (op && !strcmp(op, "prepared")) {
+                handlePrepared(message);
             } else if (op && !strcmp(op, "exiting")) {
                 double code = 0;
                 mj_get_number(message, "code", &code);

@@ -2300,6 +2300,39 @@ typedef struct {
 
 enum { T_READY_TIMEOUT, T_STABLE, T_SELF_TEST_QUIT, T_QUIT_TIMEOUT, T_EXIT_GRACE, T_COUNT };
 
+/* Stella installed the dependencies and ran prepare-install.mjs for the
+ * checkout it is about to relaunch into: note it, so the relaunch's own
+ * prepare finds that work done instead of repeating it. Only what still
+ * matches the checkout is taken. */
+static void handle_prepared(const mj_value *msg) {
+    const char *lock_hash = mj_get_string(msg, "lockHash");
+    const char *head = mj_get_string(msg, "head");
+    int noted = 0;
+    if (lock_hash) {
+        char *lock = xasprintf("%s/bun.lock", P.app);
+        char *actual = sha256_file(lock);
+        free(lock);
+        if (actual && !strcmp(actual, lock_hash)) {
+            free(S.bun_lock_hash);
+            S.bun_lock_hash = xstrdup(actual);
+            LOG("supervisor: Stella installed the dependencies for lock %.12s", actual);
+            noted = 1;
+        }
+        free(actual);
+    }
+    if (head) {
+        char *actual = GIT("rev-parse", "HEAD");
+        if (actual && !strcmp(actual, head)) {
+            free(S.prepared_head);
+            S.prepared_head = xstrdup(actual);
+            LOG("supervisor: Stella prepared %.12s", actual);
+            noted = 1;
+        }
+        free(actual);
+    }
+    if (noted) state_save();
+}
+
 static void handle_sign(Electron *e, const mj_value *msg) {
     const mj_value *id = mj_get(msg, "id");
     const char *commit = mj_get_string(msg, "commit");
@@ -2401,6 +2434,8 @@ static Outcome supervise(const char *electron_bin) {
                         }
                     } else if (op && !strcmp(op, "sign")) {
                         handle_sign(e, msg);
+                    } else if (op && !strcmp(op, "prepared")) {
+                        handle_prepared(msg);
                     } else if (op && !strcmp(op, "exiting")) {
                         double code = 0;
                         mj_get_number(msg, "code", &code);

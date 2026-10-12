@@ -429,6 +429,8 @@ final class Launcher {
                     }
                 case "sign":
                     handleSign(message, process: process, git: git, signer: signer)
+                case "prepared":
+                    adoptPrepared(message, git: git)
                 case "hold":
                     if let update = UpdateHold(message) {
                         log("supervisor: holding the window for a restart")
@@ -505,6 +507,29 @@ final class Launcher {
             }
         }
         return .failed("Lost track of Stella.", [])
+    }
+
+    /// Stella installed the dependencies and ran prepare-install.mjs for the
+    /// checkout it is about to relaunch into: note it, so the relaunch's own
+    /// prepare finds that work done instead of repeating it. Only what still
+    /// matches the checkout is taken.
+    private func adoptPrepared(_ message: [String: Any], git: GitTool) {
+        var noted: [String] = []
+        if let lockHash = message["lockHash"] as? String,
+           let actual = try? sha256File(paths.app.appendingPathComponent("bun.lock")),
+           actual == lockHash {
+            state.bunLockHash = actual
+            noted.append("dependencies for lock \(actual.prefix(12))")
+        }
+        if let head = message["head"] as? String,
+           let actual = try? git.run(["rev-parse", "HEAD"], cwd: paths.app),
+           actual == head {
+            state.preparedHead = actual
+            noted.append("setup for \(actual.prefix(12))")
+        }
+        guard !noted.isEmpty else { return }
+        state.save(paths)
+        log("supervisor: Stella prepared \(noted.joined(separator: " and "))")
     }
 
     private func handleSign(_ message: [String: Any], process: ElectronProcess, git: GitTool, signer: TreeSigner) {

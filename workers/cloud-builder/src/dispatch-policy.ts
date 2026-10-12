@@ -18,6 +18,7 @@ import {
   type DispatchPayload,
   type DispatchState,
   type DispatchSubmitRequest,
+  EXECUTION_CAPABILITIES,
   type ExecutionCapability,
   type ExecutionIngress,
   type ExecutionKind,
@@ -26,16 +27,6 @@ import {
   PLACEMENT_PROTOCOL,
 } from "@stella/contracts/turn-plane/placement";
 import { parseCloudExecutionSelection } from "./turn-start-request.js";
-
-export const EXECUTION_CAPABILITIES: readonly ExecutionCapability[] = [
-  "chat",
-  "agent",
-  "computer-use",
-  "local-files",
-  "local-apps",
-  "attachments",
-  "claude-code",
-];
 
 /**
  * Capabilities the cloud sandbox has by construction. A dispatch requiring

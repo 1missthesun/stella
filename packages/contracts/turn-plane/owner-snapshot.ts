@@ -3,6 +3,7 @@ import type { ManagedModelAudience } from "../gateway/capability.js";
 import type { OwnerEnforcement } from "../gateway/usage.js";
 import type { IdentityLevel } from "../gateway/api.js";
 import type { CloudSandboxAccess } from "../backend/billing.js";
+import type { ExecutionCapability } from "./placement.js";
 
 /**
  * The owner snapshot is what the owner gate Durable Object admits turns
@@ -80,15 +81,7 @@ export type OwnerSnapshot = {
     /** The account's home computer, where Stella's brain stays while it is up. */
     brainHome?: true;
     label?: string;
-    capabilities?: Array<
-      | "chat"
-      | "agent"
-      | "computer-use"
-      | "local-files"
-      | "local-apps"
-      | "attachments"
-      | "claude-code"
-    >;
+    capabilities?: ExecutionCapability[];
   }>;
   /**
    * Engines the owner has a live connected credential for. Lets the gate

@@ -160,15 +160,29 @@ export type ExecutionIngress =
 export type ExecutionSubject = "portable" | "computer" | "cloud";
 export type ExecutionTargetMode = "automatic" | "cloud" | "device";
 export type ExecutionKind = "chat" | "agent";
-export type ExecutionCapability =
-  | "chat"
-  | "agent"
-  | "computer-use"
-  | "local-files"
-  | "local-apps"
-  | "attachments"
-  /** Claude Code is signed in there, so agents on Claude Code can run there. */
-  | "claude-code";
+/**
+ * What an executor can do. `claude-code`: Claude Code is signed in there, so
+ * agents on Claude Code can run there.
+ */
+export const EXECUTION_CAPABILITIES = [
+  "chat",
+  "agent",
+  "computer-use",
+  "local-files",
+  "local-apps",
+  "attachments",
+  "claude-code",
+] as const;
+export type ExecutionCapability = (typeof EXECUTION_CAPABILITIES)[number];
+
+/** The capabilities this protocol knows from a list, deduplicated; newer clients' others are ignored. */
+export const knownExecutionCapabilities = (values: readonly unknown[]): ExecutionCapability[] => [
+  ...new Set(
+    values.filter((value): value is ExecutionCapability =>
+      (EXECUTION_CAPABILITIES as readonly unknown[]).includes(value),
+    ),
+  ),
+];
 
 export const CLOUD_CAPABILITIES: readonly ExecutionCapability[] = [
   "chat",

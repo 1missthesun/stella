@@ -12,15 +12,6 @@
 
 import type { DeviceRemoteExecution } from "../turn-plane/placement.js";
 
-export type ExecutionCapability =
-  | "chat"
-  | "agent"
-  | "computer-use"
-  | "local-files"
-  | "local-apps"
-  | "attachments"
-  | "claude-code";
-
 export type ActivityNotificationKind = "started" | "completed" | "failed";
 
 export type DeviceCalls = {
@@ -49,7 +40,8 @@ export type DeviceCalls = {
       devicePublicKey: string;
       deviceName?: string;
       platform?: string;
-      capabilities?: ExecutionCapability[];
+      /** What it can do; the backend keeps the ones it knows (`knownExecutionCapabilities`). */
+      capabilities?: string[];
     };
     result: {
       deviceId: string;

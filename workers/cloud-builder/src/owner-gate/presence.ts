@@ -1,6 +1,7 @@
 import {
   DEVICE_PRESENCE_PROOF_PREFIX,
   type DeviceAvailability,
+  knownExecutionCapabilities,
   type ExecutionCapability,
 } from "@stella/contracts/turn-plane/placement";
 import type { DevicePresenceState } from "../dispatch-policy.js";
@@ -94,16 +95,6 @@ export const verifyDevicePresenceProof = async (args: {
   }
 };
 
-const CAPABILITY_VALUES: readonly ExecutionCapability[] = [
-  "chat",
-  "agent",
-  "computer-use",
-  "local-files",
-  "local-apps",
-  "attachments",
-  "claude-code",
-];
-
 export const withReleasedClientSelectability = (
   availability: DeviceAvailability,
 ) => {
@@ -119,18 +110,9 @@ export const parseAvailability = (
   if (!Array.isArray(value.capabilities) || value.capabilities.length > 16) {
     return null;
   }
-  const capabilities: ExecutionCapability[] = [];
-  for (const capability of value.capabilities) {
-    if (!CAPABILITY_VALUES.includes(capability as ExecutionCapability)) {
-      return null;
-    }
-    if (!capabilities.includes(capability as ExecutionCapability)) {
-      capabilities.push(capability as ExecutionCapability);
-    }
-  }
   return {
     ready: value.ready,
-    capabilities,
+    capabilities: knownExecutionCapabilities(value.capabilities),
   };
 };
 

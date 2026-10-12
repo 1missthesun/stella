@@ -21,16 +21,6 @@ export type ExecutionTarget =
   | { mode: "cloud" }
   | { mode: "device"; deviceId: string };
 
-export type ExecutionCapability =
-  | "chat"
-  | "agent"
-  | "computer-use"
-  | "local-files"
-  | "local-apps"
-  | "attachments"
-  /** Claude Code is signed in there, so agents on Claude Code can run there. */
-  | "claude-code";
-
 export type ExecutionDispatchState =
   | "queued"
   | "offering"

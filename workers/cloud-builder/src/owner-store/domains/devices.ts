@@ -8,11 +8,10 @@
 import type {
   ActivityNotificationKind,
   DeviceCalls,
-  ExecutionCapability,
 } from "@stella/contracts/backend/devices";
 import { sha256Hex } from "@stella/contracts/turn-plane/pairing-proof";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
-import type { DeviceRemoteExecution } from "@stella/contracts/turn-plane/placement";
+import { knownExecutionCapabilities, type DeviceRemoteExecution } from "@stella/contracts/turn-plane/placement";
 import { array, boolean, empty, literal, nullable, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -220,16 +219,6 @@ type PairedPhoneRow = {
   revoked_at: number | null;
 };
 
-const CAPABILITIES: ExecutionCapability[] = [
-  "chat",
-  "agent",
-  "computer-use",
-  "local-files",
-  "local-apps",
-  "attachments",
-  "claude-code",
-];
-
 // ── Small helpers ──────────────────────────────────────────────────────────
 
 const randomFrom = (alphabet: string, length: number): string => {
@@ -293,7 +282,7 @@ const register = async (
   args: DeviceCalls["devices.register"]["args"],
 ): Promise<DeviceCalls["devices.register"]["result"]> => {
   const snapshot = await ctx.host.snapshot();
-  const capabilities = JSON.stringify([...new Set(args.capabilities ?? [])].sort());
+  const capabilities = JSON.stringify(knownExecutionCapabilities(args.capabilities ?? []).sort());
   const existing = ctx.db.one<DeviceRow>("SELECT * FROM devices WHERE device_id = ?", args.deviceId);
   if (!existing) {
     const count = ctx.db.one<{ count: number }>("SELECT COUNT(*) AS count FROM devices")?.count ?? 0;
@@ -556,9 +545,7 @@ export const snapshotDevices = (
   devices: db
     .all<DeviceRow>("SELECT * FROM devices WHERE public_key IS NOT NULL ORDER BY device_id")
     .map((row) => {
-      const capabilities = (JSON.parse(row.capabilities) as string[]).filter(
-        (entry): entry is ExecutionCapability => CAPABILITIES.includes(entry as ExecutionCapability),
-      );
+      const capabilities = knownExecutionCapabilities(JSON.parse(row.capabilities) as string[]);
       const remoteExecution = remoteExecutionOf(row);
       return {
         deviceId: row.device_id,
@@ -1058,7 +1045,7 @@ export const devicesDomain = {
         devicePublicKey: string({ min: 1, max: 512 }),
         deviceName: optional(string({ max: 96 })),
         platform: optional(string({ max: 32 })),
-        capabilities: optional(array(literal(...CAPABILITIES), { max: 8 })),
+        capabilities: optional(array(string({ max: 64 }), { max: 16 })),
       }),
       handler: (ctx: OwnerContext, args: DeviceCalls["devices.register"]["args"]) => register(ctx, args),
     },

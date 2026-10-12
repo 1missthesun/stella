@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
 import { useBackendView } from "../lib/backend";
 import {
   setDebugStorefrontOverride,
@@ -51,7 +50,6 @@ function formatDate(ms) {
 export function SubscriptionSection() {
   const colors = useColors();
   const t = useT();
-  const router = useRouter();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const status = useBackendView("billing.status", {}).value;

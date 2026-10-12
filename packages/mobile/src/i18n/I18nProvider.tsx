@@ -179,7 +179,7 @@ const FALLBACK: I18nContextValue = {
  * (see the boot-crash ErrorBoundary in `app/_layout.tsx`), and untranslated
  * English is strictly better than a dead app.
  */
-export function useI18n(): I18nContextValue {
+function useI18n(): I18nContextValue {
   return useContext(I18nContext) ?? FALLBACK;
 }
 

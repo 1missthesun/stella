@@ -2,7 +2,7 @@ import { reminderMarkOf } from "@stella/contracts/reminders";
 import { parseAskUserToolResult, type UserAskRecord } from "@stella/contracts/user-ask-deck";
 import { projectMobileLifecycle } from "./mobile-reply-context";
 import { cloudFileArtifact } from "./cloud-file-payload";
-import type { ChatArtifact, ChatMessage, MobileDisplayPayload } from "../types";
+import type { ChatArtifact, ChatMessage } from "../types";
 import { splitReplyRefs } from "@stella/contracts/reply-refs";
 import {
   completeJournalWindowRecords,
@@ -16,7 +16,6 @@ import { isMapRouteArtifact } from "@stella/contracts/map-artifact";
 import { isPiAgentText } from "@stella/contracts/pi-chat";
 import type { ToolStep } from "./tool-activity";
 import {
-  hasToolCalls,
   messageText,
   type JournalMessageRecord,
   type JournalRecord,
@@ -563,19 +562,6 @@ export const activeCloudTurnId = (
     if (phase === "started") return turnId;
   }
   return null;
-};
-
-/** What the journal can prove about a running turn for the working indicator. */
-export type CloudTurnActivity = {
-  /**
-   * True once this turn committed an assistant reply that is not on its way
-   * into another tool. Assistant text lands whole, so this flips exactly once
-   * per answer and lets the indicator step aside rather than fade over a reply
-   * the user is already reading.
-   */
-  answerLanded: boolean;
-  /** True once any tool ran this turn. Gates the pre-tool think label. */
-  hasToolActivity: boolean;
 };
 
 export { journalWorkingActivity as cloudTurnActivity } from "@stella/contracts/journal-working-activity";

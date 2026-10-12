@@ -20,7 +20,7 @@
  * talking so a loud moment still reads louder.
  */
 
-import { BREATHE_AMPLITUDE, BREATHE_MS, clamp01 } from "./motion";
+import { BREATHE_AMPLITUDE, BREATHE_MS } from "./motion";
 
 export type VoiceCharacterPhase =
   | "connecting"
@@ -49,34 +49,16 @@ export const HEARING_LEAN = 0.06;
 
 const TAU = Math.PI * 2;
 
-/** 0..1 syllable pulse: fast beats shaped by a slow phrase envelope. */
-export function talkPulse(timeMs: number): number {
-  "worklet";
-  const syllable = 0.5 + 0.5 * Math.sin((timeMs / TALK_SYLLABLE_MS) * TAU);
-  const phrase = 0.55 + 0.45 * Math.sin((timeMs / TALK_PHRASE_MS) * TAU);
-  // A second, incommensurate beat keeps the mouth-less body from looking
-  // metronomic.
-  const jitter = 0.85 + 0.15 * Math.sin(timeMs * 0.0071);
-  return clamp01(syllable * phrase * jitter);
-}
-
-/** Amplitude multiplier from live level: the floor keeps motion visible. */
-export function levelGain(energy: number): number {
-  "worklet";
-  return 0.6 + 0.4 * clamp01(energy);
-}
-
 export function voiceBodyMotion(
   phase: VoiceCharacterPhase,
   timeMs: number,
   energy: number,
 ): VoiceBodyMotion {
   "worklet";
-  // `levelGain` and `talkPulse` are inlined here rather than called: the iOS
+  // The level gain and talk pulse are inlined here rather than called: the iOS
   // worklet serializer has left same-file helper references undefined on the
   // UI thread (see the note in `toolCharacterMotion`), which takes the app down
-  // the first time the rig mounts. The exported helpers remain the tested
-  // reference for the same arithmetic.
+  // the first time the rig mounts.
   const clampedEnergy = !Number.isFinite(energy)
     ? 0
     : energy <= 0

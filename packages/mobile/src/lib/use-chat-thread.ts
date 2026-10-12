@@ -1,7 +1,6 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, LayoutAnimation } from "react-native";
-import * as ImagePicker from "expo-image-picker";
 import {
   CHAT_TRANSCRIPT_MAX_LOADED,
   subscribeChatStorageCleanup,

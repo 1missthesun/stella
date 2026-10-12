@@ -10,8 +10,3 @@ export function assertObject(
 ): asserts value is Record<string, unknown> {
   assert(typeof value === "object" && value !== null, message);
 }
-
-export function errorMessage(error: unknown): string {
-  assert(error instanceof Error, "Expected Error.");
-  return error.message;
-}

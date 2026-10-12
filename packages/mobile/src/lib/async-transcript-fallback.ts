@@ -522,21 +522,6 @@ export function loadOldestAsyncTranscriptRows(
   return loadMatchingRows({ threadId, direction: "oldest", limit });
 }
 
-export async function loadOlderAsyncTranscriptRows(
-  threadId: string,
-  cursor: AsyncTranscriptCursor,
-  limit: number,
-): Promise<AsyncTranscriptPage> {
-  const currentCursor =
-    (await findAsyncTranscriptCursor(threadId, cursor.id)) ?? cursor;
-  return loadMatchingRows({
-    threadId,
-    cursor: currentCursor,
-    direction: "older",
-    limit,
-  });
-}
-
 export async function loadNewerAsyncTranscriptRows(
   threadId: string,
   cursor: AsyncTranscriptCursor,
@@ -553,7 +538,7 @@ export async function loadNewerAsyncTranscriptRows(
 }
 
 /** Resolve a durable row identity to its paging cursor without loading history. */
-export async function findAsyncTranscriptCursor(
+async function findAsyncTranscriptCursor(
   threadId: string,
   messageId: string,
 ): Promise<AsyncTranscriptCursor | null> {

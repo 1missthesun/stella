@@ -1,14 +1,7 @@
 /**
- * SQLite FTS5-backed message index for the offline chat.
- *
- * An on-device SQLite database with an FTS5 full-text index over the chat's
- * own messages. Messages are mirrored into `messages` as they are persisted,
- * and an external-content FTS5 table (`messages_fts`) is kept in sync by
- * triggers. On first run the existing AsyncStorage transcript is backfilled
- * once.
- *
- * The key/value memory (remember/forget) and checkpoint compaction stay on
- * AsyncStorage — only the search layer is SQLite-backed.
+ * SQLite FTS5 message index left on devices by the removed mobile recall
+ * search. Nothing reads it; account cleanup still wipes and rebuilds it so a
+ * signed-out account's rows never survive on disk.
  */
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -25,7 +18,6 @@ import {
   loadAccountChatCleanupProgress,
   markAccountChatIndexCleared,
 } from "./chat-account-cleanup-state";
-import { accountChatMetadataReadsBlocked } from "./chat-account-metadata-queue";
 
 const DB_NAME = "stella-chat-index.db";
 
@@ -117,10 +109,8 @@ function enqueueWrite<T>(work: () => Promise<T>): Promise<T> {
 
 let backfilled = false;
 let backfillGeneration = 0;
-let rebuildBlocked = false;
 let rebuildPhase: "idle" | "intent" | "rebuilding" | "failed" = "idle";
 let rebuildPromise: Promise<void> | null = null;
-let initializationPromise: Promise<void> | null = null;
 let rebuildMarkerQueue: Promise<unknown> = Promise.resolve();
 let rebuildIntentSequence = 0;
 
@@ -157,39 +147,6 @@ function clearRebuildIntent(expectedToken: string): Promise<boolean> {
   });
 }
 
-/** Narrow state seam for deterministic rebuild/crash tests in Bun. */
-export async function __setMessageIndexDatabaseForTests(
-  database: unknown,
-): Promise<void> {
-  if (rebuildPromise) await rebuildPromise.catch(() => {});
-  if (initializationPromise) await initializationPromise.catch(() => {});
-  await writeQueue.catch(() => {});
-  await rebuildMarkerQueue.catch(() => {});
-  dbPromise = database
-    ? Promise.resolve(database as SQLite.SQLiteDatabase)
-    : null;
-  writeQueue = Promise.resolve();
-  backfilled = false;
-  backfillGeneration += 1;
-  rebuildBlocked = false;
-  rebuildPhase = "idle";
-  rebuildPromise = null;
-  initializationPromise = null;
-  rebuildMarkerQueue = Promise.resolve();
-}
-
-export function __getMessageIndexStateForTests(): {
-  blocked: boolean;
-  phase: "idle" | "intent" | "rebuilding" | "failed";
-  rebuilding: boolean;
-} {
-  return {
-    blocked: rebuildBlocked,
-    phase: rebuildPhase,
-    rebuilding: rebuildPromise !== null,
-  };
-}
-
 const deleteIndexContents = async (
   db: SQLite.SQLiteDatabase,
 ): Promise<void> => {
@@ -203,7 +160,6 @@ async function recoverAccountCleanupIndex(
 ): Promise<void> {
   const token = await loadAccountChatCleanupIntent();
   if (!token) return;
-  rebuildBlocked = true;
   rebuildPhase = "rebuilding";
   backfilled = false;
   const progress = await loadAccountChatCleanupProgress(token);
@@ -226,10 +182,8 @@ async function recoverAccountCleanupIndex(
     if (!(await finalizeAccountChatCleanup(token))) {
       throw new Error("Chat account cleanup did not finalize");
     }
-    rebuildBlocked = false;
     rebuildPhase = "idle";
   } catch (error) {
-    rebuildBlocked = true;
     rebuildPhase = "failed";
     throw error;
   }
@@ -240,11 +194,7 @@ async function recoverAccountCleanupIndex(
  * touch the FTS index (the conflict WHERE guard skips no-op rewrites, so
  * streaming the same reply many times doesn't re-index on every chunk).
  */
-async function indexMessageRows(
-  messages: ChatMessage[],
-  allowDuringRebuild: boolean,
-): Promise<void> {
-  if (rebuildBlocked && !allowDuringRebuild) return;
+async function indexMessageRows(messages: ChatMessage[]): Promise<void> {
   const rows = messages.filter(
     (message) =>
       typeof message.text === "string" && message.text.trim().length > 0,
@@ -282,22 +232,12 @@ async function indexMessageRows(
   );
 }
 
-export async function indexMessages(messages: ChatMessage[]): Promise<void> {
-  if (await accountChatMetadataReadsBlocked()) return;
-  await indexMessageRows(messages, false);
-}
-
 /**
  * Open the DB and backfill canonical history oldest-first in bounded pages.
  * The durable completion marker is written only after the final page; a kill
  * mid-scan retries harmlessly through idempotent upserts on the next mount.
  */
-async function initializeMessageIndex(
-  allowDuringRebuild: boolean,
-): Promise<void> {
-  if (rebuildBlocked && !allowDuringRebuild) {
-    throw new Error("Message recall index is rebuilding");
-  }
+async function initializeMessageIndex(): Promise<void> {
   const db = await getDb();
   await recoverAccountCleanupIndex(db);
   if (backfilled) return;
@@ -309,7 +249,6 @@ async function initializeMessageIndex(
     durableRebuildIntent = await readRebuildIntent();
     if (durableRebuildIntent) {
       recoveringDurableRebuild = true;
-      rebuildBlocked = true;
       rebuildPhase = "rebuilding";
       await deleteIndexContents(db);
       if (generation !== backfillGeneration) return;
@@ -326,10 +265,7 @@ async function initializeMessageIndex(
     while (true) {
       if (generation !== backfillGeneration) return;
       if (page.messages.length > 0) {
-        await indexMessageRows(
-          page.messages,
-          allowDuringRebuild || recoveringDurableRebuild,
-        );
+        await indexMessageRows(page.messages);
       }
       if (generation !== backfillGeneration) return;
       if (!page.hasNewer || !page.newestCursor) break;
@@ -355,7 +291,6 @@ async function initializeMessageIndex(
     }
     if (generation !== backfillGeneration) return;
     if (recoveringDurableRebuild && generation === backfillGeneration) {
-      rebuildBlocked = false;
       rebuildPhase = "idle";
     }
   } catch (error) {
@@ -363,65 +298,10 @@ async function initializeMessageIndex(
     // persistence retry or mount can complete the canonical backfill.
     if (generation === backfillGeneration) backfilled = false;
     if (recoveringDurableRebuild && generation === backfillGeneration) {
-      rebuildBlocked = true;
       rebuildPhase = "failed";
     }
     throw error;
   }
-}
-
-export async function initMessageIndex(): Promise<void> {
-  if (rebuildBlocked) {
-    // A failed in-process rebuild must be recoverable without restarting the
-    // app. Do not race the interval between durable intent and canonical
-    // truncation, though: only the owner may rebuild while that mutation is
-    // active.
-    if (rebuildPhase === "failed") {
-      await rebuildMessageIndex();
-      return;
-    }
-    throw new Error("Message recall index is rebuilding");
-  }
-  if (initializationPromise) return initializationPromise;
-  const run = initializeMessageIndex(false).finally(() => {
-    if (initializationPromise === run) initializationPromise = null;
-  });
-  initializationPromise = run;
-  await run;
-}
-
-/**
- * Persist a rebuild intent before canonical rewind. The process-local block
- * prevents an eager mount retry from rebuilding against the pre-rewind rows;
- * the AsyncStorage marker survives a kill on either side of truncation.
- */
-export async function beginMessageIndexRebuild(): Promise<void> {
-  if (rebuildPhase === "intent" || rebuildPhase === "rebuilding") {
-    throw new Error("Message recall index rebuild is already active");
-  }
-  backfillGeneration += 1;
-  backfilled = false;
-  rebuildBlocked = true;
-  rebuildPhase = "intent";
-  // The durable marker is the commit point. Once it exists, stale rows may
-  // remain physically present because readers are blocked and initialization
-  // must rebuild before serving recall.
-  try {
-    await persistRebuildIntent();
-  } catch (error) {
-    // Canonical history has not changed yet, so a failed intent write aborts
-    // rewind and restores normal initialization against the intact transcript.
-    rebuildBlocked = false;
-    rebuildPhase = "idle";
-    throw error;
-  }
-  // Clearing now minimizes stale-data lifetime, but the durable marker is the
-  // actual commit point. If physical deletion fails, canonical rewind may
-  // still proceed: readers remain blocked and rebuild retries deletion before
-  // indexing the surviving transcript.
-  await getDb()
-    .then(deleteIndexContents)
-    .catch(() => {});
 }
 
 /** Idempotent variant owned only by durable cross-store account recovery. */
@@ -429,12 +309,10 @@ export async function ensureMessageIndexRebuildIntent(): Promise<void> {
   if (rebuildPhase === "intent") return;
   backfillGeneration += 1;
   backfilled = false;
-  rebuildBlocked = true;
   rebuildPhase = "intent";
   try {
     await persistRebuildIntent();
   } catch (error) {
-    rebuildBlocked = true;
     rebuildPhase = "failed";
     throw error;
   }
@@ -446,20 +324,17 @@ export async function ensureMessageIndexRebuildIntent(): Promise<void> {
 /** Unblock and rebuild the derived index from the canonical transcript. */
 export function rebuildMessageIndex(): Promise<void> {
   if (rebuildPromise) return rebuildPromise;
-  rebuildBlocked = true;
   rebuildPhase = "rebuilding";
   backfilled = false;
   const generation = backfillGeneration;
   const run = (async () => {
     try {
-      await initializeMessageIndex(true);
+      await initializeMessageIndex();
       if (generation === backfillGeneration) {
-        rebuildBlocked = false;
         rebuildPhase = "idle";
       }
     } catch (error) {
       if (generation === backfillGeneration) {
-        rebuildBlocked = true;
         rebuildPhase = "failed";
       }
       throw error;
@@ -476,7 +351,6 @@ export async function clearMessageIndex(): Promise<void> {
   if (rebuildPromise) await rebuildPromise.catch(() => {});
   backfillGeneration += 1;
   backfilled = false;
-  rebuildBlocked = true;
   rebuildPhase = "rebuilding";
   const [markerResult, databaseResult] = await Promise.allSettled([
     persistRebuildIntent(),
@@ -489,7 +363,6 @@ export async function clearMessageIndex(): Promise<void> {
     if (markerResult.status === "fulfilled") {
       await clearRebuildIntent(markerResult.value).catch(() => {});
     }
-    rebuildBlocked = false;
     rebuildPhase = "idle";
     return;
   }

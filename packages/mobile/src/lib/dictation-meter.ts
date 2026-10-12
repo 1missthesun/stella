@@ -80,9 +80,6 @@ const subscribe = (listener: () => void) => {
   };
 };
 
-export const useDictationMeter = (): DictationMeterSnapshot =>
-  useSyncExternalStore(subscribe, getDictationMeterSnapshot, getDictationMeterSnapshot);
-
 /**
  * Re-renders once per waveform tick. Read the level through
  * `getDictationMeterSnapshot()` so identical consecutive levels (silence)

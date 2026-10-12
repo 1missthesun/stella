@@ -10,16 +10,6 @@ export const usesCloudModelSettings = (
   paired: boolean,
 ): boolean => target.mode === "cloud" || !paired;
 
-export const managedCloudModelSelection = (
-  model: string,
-  previous: CloudExecutionSelection,
-): CloudExecutionSelection => ({
-  engine: "stella",
-  provider: "stella",
-  model,
-  reasoningEffort: previous.reasoningEffort,
-});
-
 /** Do not issue a request after token resolution crosses an account boundary. */
 export async function runOwnerBoundModelRequest<T>(args: {
   getToken: () => Promise<string>;

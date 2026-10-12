@@ -45,8 +45,6 @@ const subscribe = (listener: () => void) => {
 
 const getSnapshot = () => notices;
 
-export const getComposerNotices = (): readonly ComposerNotice[] => notices;
-
 export function showComposerNotice(input: ComposerNoticeInput): string {
   const id = input.id ?? `composer-notice-${++nextId}`;
   notices = [
@@ -74,11 +72,6 @@ export function clearComposerNotices(
   );
   if (remaining.length === notices.length) return;
   notices = remaining;
-  emit();
-}
-
-export function resetComposerNotices(): void {
-  notices = [];
   emit();
 }
 

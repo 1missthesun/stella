@@ -38,9 +38,3 @@ export const observeCloudConversationIdentity = (
     revision: observedRevision,
   };
 };
-
-/** Test-only reset for the process-lifetime revision clock. */
-export const resetCloudConversationIdentityForTests = (): void => {
-  observedIdentityKey = null;
-  observedRevision = 0;
-};

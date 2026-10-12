@@ -105,9 +105,8 @@ export type MobileDisplayPayload =
       filePath: string;
       title?: string;
       /**
-       * On-device PDF (the standalone cloud chat's `pdf` tool generates the
-       * file locally with `expo-print`). Present only for phone-generated
-       * PDFs; a `file://` URI in the app's cache directory that the artifact
+       * On-device PDF, kept on rows saved by the removed phone-side `pdf`
+       * tool. Present only for phone-generated PDFs; a `file://` URI that the artifact
        * viewer previews and the share sheet saves/opens directly, with no
        * desktop bridge. Absent for bridged desktop PDFs, which stream their
        * bytes over the bridge from `filePath`.
@@ -315,9 +314,7 @@ export type ChatMessage = {
   text: string;
   artifacts?: ChatArtifact[];
   /**
-   * Assistant message: settled tool calls for this turn (oldest first), folded
-   * into the inline tool-activity trace. Paired desktop-side and sent over the
-   * bridge; see {@link import("./lib/tool-activity").deriveToolActivity}.
+   * Assistant message: settled tool calls for this turn (oldest first).
    */
   toolSteps?: ToolStep[];
   /**

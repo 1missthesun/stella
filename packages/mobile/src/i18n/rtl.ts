@@ -27,9 +27,6 @@
 import { I18nManager } from "react-native";
 import { isRtlLocale, type Locale } from "./locales";
 
-/** True when the native layout direction is currently right-to-left. */
-export const isNativeRTL = (): boolean => I18nManager.isRTL;
-
 /** Would applying `locale` require a native direction flip (and a reload)? */
 export const needsDirectionFlip = (locale: Locale): boolean =>
   isRtlLocale(locale) !== I18nManager.isRTL;

@@ -9,7 +9,6 @@ import {
   type ViewStyle,
 } from "react-native";
 import {
-  GlassContainer,
   GlassView,
   isLiquidGlassAvailable,
   type GlassStyle,
@@ -144,48 +143,6 @@ export function GlassSurface({
       ) : null}
       {children}
     </View>
-  );
-}
-
-type GlassGroupProps = ViewProps & {
-  /** Distance under which sibling glass surfaces start merging into one. */
-  spacing?: number;
-};
-
-/**
- * Apple's glass container: sibling {@link GlassSurface}s inside it blend into
- * one fluid shape (a segmented pill of individually interactive buttons, for
- * instance). Size it to the group exactly — the native container ignores
- * `pointerEvents`, so a larger one would swallow touches around it. A plain
- * `View` off iOS 26 so the fallback tints keep their own layout.
- */
-export function GlassGroup({ spacing = 24, style, ...rest }: GlassGroupProps) {
-  if (liquidGlassSupported) {
-    return <GlassContainer spacing={spacing} style={style} {...rest} />;
-  }
-  return <View style={style} {...rest} />;
-}
-
-type GlassCardProps = ViewProps & {
-  intensity?: GlassStyle;
-  ringed?: boolean;
-  radius?: number;
-  /** See {@link GlassSurface}: strong surface tint for text-bearing glass. */
-  legible?: boolean;
-};
-
-/**
- * Back-compatible card wrapper (sidebar, pairing input, etc.). Thin alias over
- * {@link GlassSurface} so existing call sites keep working unchanged.
- */
-export function GlassCard({
-  intensity = "regular",
-  ringed = false,
-  radius = 16,
-  ...rest
-}: GlassCardProps) {
-  return (
-    <GlassSurface glass={intensity} ringed={ringed} radius={radius} {...rest} />
   );
 }
 

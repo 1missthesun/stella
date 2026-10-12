@@ -13,12 +13,6 @@ type JsonRequest =
       headers?: Record<string, string>;
     };
 
-type StreamRequestOptions = {
-  headers?: Record<string, string>;
-  /** Aborts the in-flight XHR. Callers receive an `AbortError` rejection. */
-  signal?: AbortSignal;
-};
-
 export class StreamAbortError extends Error {
   constructor() {
     super("aborted");
@@ -82,7 +76,6 @@ async function requestJson(
   path: string,
   request: JsonRequest,
   options?: {
-    anonymous?: boolean;
     timeoutMs?: number;
     signal?: AbortSignal;
     /** Absolute origin override; defaults to the backend worker. */
@@ -90,9 +83,7 @@ async function requestJson(
   },
 ) {
   const origin = options?.origin?.replace(/\/+$/, "") || backendOrigin();
-  const authHeader = options?.anonymous
-    ? null
-    : `Bearer ${await getAuthToken()}`;
+  const authHeader = `Bearer ${await getAuthToken()}`;
   const controller = new AbortController();
   let timedOut = false;
   const timer = setTimeout(
@@ -110,7 +101,7 @@ async function requestJson(
     response = await fetch(`${origin}${path}`, {
       ...request,
       headers: {
-        ...(authHeader ? { Authorization: authHeader } : {}),
+        Authorization: authHeader,
         ...(request.method === "GET"
           ? {}
           : { "Content-Type": "application/json" }),
@@ -220,29 +211,6 @@ export const putJson = (
     },
   );
 
-export const postJsonAnonymous = (
-  path: string,
-  body: unknown,
-  options?: {
-    headers?: Record<string, string>;
-    timeoutMs?: number;
-    signal?: AbortSignal;
-  },
-) =>
-  requestJson(
-    path,
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-      headers: options?.headers,
-    },
-    {
-      anonymous: true,
-      timeoutMs: options?.timeoutMs,
-      signal: options?.signal,
-    },
-  );
-
 /** Authenticated non-JSON POST to the backend (the voice SDP route). */
 export const postText = async (
   path: string,
@@ -288,158 +256,3 @@ export const postText = async (
     options?.signal?.removeEventListener("abort", onAbort);
   }
 };
-
-/**
- * Drive the offline-chat SSE lane.
- *
- * The transport is unchanged, but the payload contract is: a `{"t": …}` frame
- * now arrives exactly ONCE per completed assistant text segment and carries
- * that segment's full text (tool-loop interleaving preserved). So `onSegment`
- * fires per whole message segment, not per token — there is nothing to smooth
- * or reassemble on this side. The only buffering left is at the LINE level:
- * progress events fire on arbitrary network-buffer boundaries, so a frame can
- * still arrive split in two.
- */
-function executeStream(
-  path: string,
-  body: unknown,
-  onSegment: (text: string) => void,
-  authHeader: string | null,
-  options?: StreamRequestOptions,
-): Promise<void> {
-  const origin = backendOrigin();
-
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${origin}${path}`);
-    if (authHeader) {
-      xhr.setRequestHeader("Authorization", authHeader);
-    }
-    xhr.setRequestHeader("Content-Type", "application/json");
-    for (const [name, value] of Object.entries(options?.headers ?? {})) {
-      xhr.setRequestHeader(name, value);
-    }
-    xhr.responseType = "text";
-
-    const signal = options?.signal;
-    let aborted = false;
-    const onAbort = () => {
-      if (aborted) return;
-      aborted = true;
-      try {
-        xhr.abort();
-      } catch {
-        // ignore: xhr may already be done
-      }
-      reject(new StreamAbortError());
-    };
-    if (signal) {
-      if (signal.aborted) {
-        onAbort();
-        return;
-      }
-      signal.addEventListener("abort", onAbort);
-    }
-
-    let processed = 0;
-    let pending = "";
-    let finished = false;
-
-    // Returns false once the stream is finished ([DONE] or an error frame).
-    const handleLine = (line: string): boolean => {
-      if (!line.startsWith("data: ")) return true;
-      const payload = line.slice(6);
-      if (payload === "[DONE]") return false;
-      try {
-        const parsed = JSON.parse(payload) as { t?: string; error?: string };
-        if (parsed.error) {
-          reject(new Error(parsed.error));
-          xhr.abort();
-          return false;
-        }
-        if (parsed.t) onSegment(parsed.t);
-      } catch {
-        // skip malformed lines
-      }
-      return true;
-    };
-
-    // Only complete lines are parseable: hold the trailing partial line until
-    // the next chunk (or the final flush in onload), otherwise its segment is
-    // silently lost.
-    const consume = (flush: boolean) => {
-      if (finished) return;
-      pending += xhr.responseText.slice(processed);
-      processed = xhr.responseText.length;
-      const cut = pending.lastIndexOf("\n");
-      let complete: string;
-      if (flush) {
-        complete = pending;
-        pending = "";
-      } else if (cut === -1) {
-        return;
-      } else {
-        complete = pending.slice(0, cut);
-        pending = pending.slice(cut + 1);
-      }
-      for (const line of complete.split("\n")) {
-        if (!handleLine(line)) {
-          finished = true;
-          return;
-        }
-      }
-    };
-
-    xhr.onprogress = () => consume(false);
-
-    xhr.onload = () => {
-      if (signal) signal.removeEventListener("abort", onAbort);
-      if (aborted) return;
-      if (xhr.status >= 200 && xhr.status < 300) {
-        consume(true);
-        resolve();
-      } else {
-        let msg = "Could not complete that request. Try again.";
-        try {
-          const parsed = JSON.parse(xhr.responseText) as Record<string, unknown>;
-          if (typeof parsed.error === "string") msg = parsed.error;
-          else if (typeof parsed.message === "string") msg = parsed.message;
-        } catch { /* use default */ }
-        reject(new Error(msg));
-      }
-    };
-
-    xhr.onerror = () => {
-      if (signal) signal.removeEventListener("abort", onAbort);
-      if (aborted) return;
-      reject(new Error("Network error"));
-    };
-    xhr.ontimeout = () => {
-      if (signal) signal.removeEventListener("abort", onAbort);
-      if (aborted) return;
-      reject(new Error("Request timed out"));
-    };
-
-    xhr.send(JSON.stringify(body));
-  });
-}
-
-export function postStream(
-  path: string,
-  body: unknown,
-  onSegment: (text: string) => void,
-  options?: StreamRequestOptions,
-): Promise<void> {
-  return getAuthToken().then((token) =>
-    executeStream(path, body, onSegment, `Bearer ${token}`, options),
-  );
-}
-
-export function postStreamAnonymous(
-  path: string,
-  body: unknown,
-  onSegment: (text: string) => void,
-  options?: StreamRequestOptions,
-): Promise<void> {
-  return executeStream(path, body, onSegment, null, options);
-}

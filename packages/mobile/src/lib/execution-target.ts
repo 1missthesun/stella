@@ -1,11 +1,7 @@
 import * as SecureStore from "./secure-store";
-import {
-  AUTOMATIC_EXECUTION_TARGET,
-  type AutomaticExecutionTarget,
-} from "./execution-placement";
+import type { AutomaticExecutionTarget } from "./execution-placement";
 
 const KEY = "stella-mobile.execution-target.v1";
-export { AUTOMATIC_EXECUTION_TARGET };
 
 /**
  * The phone offers Cloud or a specific computer. Nothing saved, or the old

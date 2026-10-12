@@ -8,10 +8,7 @@ import { env } from "../config/env";
 import { assert } from "./assert";
 import { nativeBearerClient } from "./native-auth-client";
 
-export {
-  clearMobileAuthStorage,
-  MOBILE_SESSION_TOKEN_KEY,
-} from "./native-auth-client";
+export { MOBILE_SESSION_TOKEN_KEY } from "./native-auth-client";
 
 // `nativeBearerClient` replaces `expoClient`. React Native has no cookie jar,
 // so the Expo plugin emulated one in SecureStore and mirrored `Set-Cookie`

@@ -7,10 +7,7 @@
  * than showing a fake thumbnail.
  */
 import { useEffect, useMemo, useState } from "react";
-import {
-  formatByteSize,
-  formatDuration,
-} from "@stella/contracts/chat-evidence-naming";
+import { formatDuration } from "@stella/contracts/chat-evidence-naming";
 import {
   EVIDENCE_TILE_HEIGHT,
   EVIDENCE_TILE_WIDTH,
@@ -203,7 +200,3 @@ export const useChatEvidence = (args: {
     return { media, pills, overflowCount };
   }, [sources, previews]);
 };
-
-export const evidencePillSubtitle = (card: EvidenceCard): string =>
-  card.subtitle ??
-  (card.byteSize ? formatByteSize(card.byteSize) : (card.extensionLabel ?? "File"));

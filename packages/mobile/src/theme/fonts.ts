@@ -20,11 +20,6 @@ export const deferredStellaFontAssets = {
   Manrope_500Medium,
 };
 
-export const stellaFontAssets = {
-  ...criticalStellaFontAssets,
-  ...deferredStellaFontAssets,
-};
-
 export const fonts = {
   sans: {
     regular: "Manrope_400Regular",

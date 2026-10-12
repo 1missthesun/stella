@@ -34,7 +34,6 @@ import { GlassSurface } from "./glass";
 import { fadeHex } from "../theme/oklch";
 import { Icon } from "./Icon";
 
-export { replyTitle } from "./ReplyPreview";
 
 export type AgentReplyRef = Extract<ReplyRef, { kind: "agent" }>;
 

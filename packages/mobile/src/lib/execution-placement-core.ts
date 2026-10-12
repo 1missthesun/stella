@@ -20,7 +20,7 @@ export type AutomaticExecutionTarget =
   | { mode: "device"; deviceId: string };
 export const AUTOMATIC_EXECUTION_TARGET: AutomaticExecutionTarget =
   Object.freeze({ mode: "automatic" });
-export type AutomaticExecutionCapability =
+type AutomaticExecutionCapability =
   | "chat"
   | "agent"
   | "computer-use"
@@ -222,7 +222,7 @@ const TERMINAL_EXECUTION_STATES = new Set([
   "blocked",
 ]);
 
-export const isAutomaticExecutionTerminal = (
+const isAutomaticExecutionTerminal = (
   dispatch: AutomaticExecutionStatusSnapshot,
 ) => TERMINAL_EXECUTION_STATES.has(dispatch.state);
 
@@ -353,7 +353,7 @@ export type AutomaticExecutionAdmissionInput = {
 };
 
 /** Mirrors the server's cap so a turn is never admitted and then truncated. */
-export const AUTOMATIC_EXECUTION_MAX_ATTACHMENTS = 4;
+const AUTOMATIC_EXECUTION_MAX_ATTACHMENTS = 4;
 
 const validAttachmentPath = (path: string): boolean =>
   path.length > 0 &&

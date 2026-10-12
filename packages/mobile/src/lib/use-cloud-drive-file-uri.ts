@@ -14,6 +14,7 @@ const REFRESH_MARGIN_MS = 30_000;
 
 const cache = new Map<string, DriveFileUrl>();
 const inflight = new Map<string, Promise<DriveFileUrl>>();
+let generation = 0;
 
 const fresh = (entry: DriveFileUrl | undefined): entry is DriveFileUrl =>
   entry !== undefined && entry.expiresAt > Date.now() + REFRESH_MARGIN_MS;
@@ -28,20 +29,20 @@ export const resolveCloudDriveFile = async (
 ): Promise<DriveFileUrl> => {
   const cached = cache.get(path);
   if (fresh(cached)) return cached;
-  let pending = inflight.get(path);
-  if (!pending) {
-    pending = getBackendClient()
-      .call("drive.fileUrl", { path })
-      .then((entry) => {
-        cache.set(path, entry);
-        return entry;
-      })
-      .finally(() => {
-        inflight.delete(path);
-      });
-    inflight.set(path, pending);
-  }
-  return await pending;
+  const pending = inflight.get(path);
+  if (pending) return await pending;
+  const owner = generation;
+  const request: Promise<DriveFileUrl> = getBackendClient()
+    .call("drive.fileUrl", { path })
+    .then((entry) => {
+      if (owner === generation) cache.set(path, entry);
+      return entry;
+    })
+    .finally(() => {
+      if (inflight.get(path) === request) inflight.delete(path);
+    });
+  inflight.set(path, request);
+  return await request;
 };
 
 /** Resolve one drive path to a signed URL, sharing in-flight requests. */
@@ -51,7 +52,9 @@ export const resolveCloudDriveFileUri = async (
 
 /** Drop cached URLs when the signed-in owner changes. */
 export const clearCloudDriveFileUris = (): void => {
+  generation += 1;
   cache.clear();
+  inflight.clear();
 };
 
 /**

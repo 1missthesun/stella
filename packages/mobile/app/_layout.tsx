@@ -16,6 +16,8 @@ import * as SplashScreen from "expo-splash-screen";
 import { useEffect } from "react";
 import { authClient } from "../src/lib/auth-client";
 import { reconnectBackend } from "../src/lib/backend";
+import { clearEvidencePreviews } from "../src/lib/chat-evidence-previews";
+import { clearCloudDriveFileUris } from "../src/lib/use-cloud-drive-file-uri";
 import { hasMobileConfig } from "../src/config/env";
 import {
   installNotificationCategoriesAndListeners,
@@ -191,7 +193,11 @@ function useBackendFollowsAccount(
     if (session.isPending) return;
     const before = previous.current;
     previous.current = account;
-    if (before !== undefined && before !== account) reconnectBackend();
+    if (before !== undefined && before !== account) {
+      clearCloudDriveFileUris();
+      clearEvidencePreviews();
+      reconnectBackend();
+    }
   }, [account, session.isPending]);
 }
 

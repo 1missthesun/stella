@@ -9,54 +9,31 @@ export {
   registerTheme,
   resolveThemeColors,
   subscribeThemes,
-  type ResolvedTheme,
 } from "./catalog";
 export { THEME_CSS_VARS } from "./css-vars";
+export { deriveTokens, type ThemeTokens } from "./tokens";
 export {
-  deriveTokens,
-  type DeriveTokensOptions,
-  type ThemeTokens,
-} from "./tokens";
-export {
-  formatColor,
-  generateGradientTokens,
   hexToOklch,
-  mixOklch,
-  mixOklchCss,
   mixSrgb,
   mixSrgbCss,
-  oklchToHex,
   parseColor,
   parseColorOr,
-  relativeOklch,
   toHex,
   withAlpha,
-  type GradientSeeds,
-  type GradientTokens,
-  type OklchColor,
   type Rgba,
 } from "./color";
 export {
   BASE_POSITIONS,
   buildGradientPalette,
   FALLBACK_BACKGROUND,
-  generateBlobs,
   gradientBufferSize,
-  mixRgb,
-  OVERLAY_ALPHA,
   parseThemeColor,
   planGradientFrame,
-  RENDER_SCALE,
   renderGradientPixels,
   rgbToCss,
   type Blob,
   type GradientColor,
-  type GradientFrameInput,
   type GradientMode,
   type RGB,
 } from "./gradient";
-export {
-  encodePng,
-  renderGradientImage,
-  type GradientImage,
-} from "./gradient-image";
+export { renderGradientImage } from "./gradient-image";

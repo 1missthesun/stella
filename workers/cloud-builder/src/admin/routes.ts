@@ -11,6 +11,11 @@
  *   POST /api/admin/test-accounts/conversation-restart  {conversationId} → restart that conversation's object (dev only)
  *
  * Owners are addressed by id only.
+ *
+ * Privacy invariant: no admin route returns conversation, message, memory,
+ * or file content — identity, billing, enforcement, and storage metadata
+ * only. There is deliberately no staff view of what a user said or saved.
+ * Every call is audit-logged below with the route and status only.
  */
 
 import { OWNER_ENFORCEMENT_STATUSES, type OwnerEnforcementStatus } from "@stella/contracts/gateway/usage";
@@ -367,7 +372,15 @@ export const handleAdminRoute = async (request: Request, env: AdminEnv): Promise
   const denied = await authorized(request, env);
   if (denied) return denied;
   try {
-    return await route.run(request, url, env);
+    const response = await route.run(request, url, env);
+    console.log(
+      JSON.stringify({
+        event: "admin_route",
+        path: url.pathname,
+        status: response.status,
+      }),
+    );
+    return response;
   } catch (error) {
     console.error(JSON.stringify({ event: "admin_route_failed", path: url.pathname, message: message(error) }));
     return fail(500, "Admin request failed.", { detail: message(error) });

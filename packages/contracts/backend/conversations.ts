@@ -23,6 +23,19 @@ export type OwnerIdentity = {
   isAnonymous: boolean;
 };
 
+/** One conversation in an owner data export: its index row and journal records. */
+export type ConversationExport = {
+  summary: ConversationSummary;
+  records: unknown[];
+  truncated: boolean;
+};
+
+export type DataExport = {
+  exportedAt: number;
+  truncated: boolean;
+  conversations: ConversationExport[];
+};
+
 export type ConversationCalls = {
   "owner.identity": { args: Record<string, never>; result: OwnerIdentity };
   /**
@@ -37,6 +50,11 @@ export type ConversationCalls = {
     args: { clientCreateId?: string; preferConversationId?: string };
     result: OwnerIdentity & { conversationId: string };
   };
+  /**
+   * The owner's conversations with their journal records, for download.
+   * Bounded; `truncated` says the cap cut something off.
+   */
+  "data.export": { args: Record<string, never>; result: DataExport };
 };
 
 export type ConversationViews = {

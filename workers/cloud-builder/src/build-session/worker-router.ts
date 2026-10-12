@@ -978,6 +978,27 @@ app.use(async (c, next) => {
 // ── Public ────────────────────────────────────────────────────────────────
 
 app.get("/healthz", () => json({ ok: true, service: "stella-v2-cloud-builder" }));
+// What is actually deployed, so the open-source claim is checkable: the
+// platform's own version id (and the source commit when the deploy set it).
+app.get("/version", (c) => {
+  const env = c.env as unknown as Record<string, unknown>;
+  const metadata = env.CF_VERSION_METADATA as
+    | { id?: string; tag?: string; timestamp?: string }
+    | undefined;
+  const commit =
+    typeof env.STELLA_BUILD_COMMIT === "string" ? env.STELLA_BUILD_COMMIT : null;
+  return json({
+    service: "stella-v2-cloud-builder",
+    versionId: metadata?.id ?? null,
+    versionTag: metadata?.tag ?? null,
+    deployedAt: metadata?.timestamp ?? null,
+    commit,
+    source: "https://github.com/1missthesun/stella-v2",
+    ...(commit
+      ? { commitUrl: `https://github.com/1missthesun/stella-v2/commit/${commit}` }
+      : {}),
+  });
+});
 app.get("/readyz", (c) => {
   const readiness = evaluateCloudBuilderReadiness(c.env);
   return json(

@@ -13,8 +13,11 @@
 
 import type {
   ConversationCalls,
+  ConversationExport,
   ConversationSummary,
+  DataExport,
 } from "@stella/contracts/backend/conversations";
+import { enforceOwnerRateLimit } from "../rate-limit.js";
 import {
   CONVERSATION_PREVIEW_MAX,
   CONVERSATION_TITLE_MAX,
@@ -148,6 +151,89 @@ const recentConversations = (db: OwnerDbReader, ownerId: string): ConversationSu
       RECENT_CONVERSATIONS_LIMIT,
     )
     .map((row) => summary(row, ownerId));
+
+const EXPORT_MAX_CONVERSATIONS = 50;
+const EXPORT_MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+const EXPORT_MAX_CONVERSATION_BYTES = 10 * 1024 * 1024;
+
+/**
+ * The owner's downloadable copy: every live conversation's journal, read
+ * through each conversation's own history op (which decrypts it there).
+ * Bounded so one click cannot materialize an unbounded transcript.
+ */
+const exportData = async (ctx: OwnerContext): Promise<DataExport> => {
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "data.export",
+    { count: 3, windowMs: 60 * 60 * 1000 },
+    "Too many exports. Please wait before downloading again.",
+  );
+  const rows = ctx.db.all<ConversationRow>(
+    `SELECT * FROM conversations WHERE deleted_at IS NULL AND ${NOT_SLACK_CONVERSATION_SQL}
+      ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
+    EXPORT_MAX_CONVERSATIONS,
+  );
+  let totalBytes = 0;
+  let truncated = false;
+  const conversations: ConversationExport[] = [];
+  for (const row of rows) {
+    if (totalBytes >= EXPORT_MAX_TOTAL_BYTES) {
+      truncated = true;
+      break;
+    }
+    const records: unknown[] = [];
+    let bytes = 0;
+    let conversationTruncated = false;
+    let fromSeq = 0;
+    try {
+      const stub = ctx.env.ORCHESTRATOR_SESSIONS.getByName(row.conversation_id);
+      for (;;) {
+        const range = (await stub.queryHistory(ctx.ownerId, {
+          op: "read",
+          fromSeq,
+          toSeq: Number.MAX_SAFE_INTEGER,
+        })) as {
+          records?: Array<{ seq?: unknown }>;
+          complete?: boolean;
+          missingBelowSeq?: number;
+        };
+        const batch = Array.isArray(range.records) ? range.records : [];
+        for (const record of batch) {
+          bytes += JSON.stringify(record).length;
+          if (
+            bytes > EXPORT_MAX_CONVERSATION_BYTES ||
+            totalBytes + bytes > EXPORT_MAX_TOTAL_BYTES
+          ) {
+            conversationTruncated = true;
+            break;
+          }
+          records.push(record);
+        }
+        if (conversationTruncated || range.complete) break;
+        const last = batch[batch.length - 1];
+        const next =
+          typeof last?.seq === "number"
+            ? last.seq + 1
+            : typeof range.missingBelowSeq === "number"
+              ? range.missingBelowSeq
+              : null;
+        if (next === null || next <= fromSeq) break;
+        fromSeq = next;
+      }
+    } catch {
+      conversationTruncated = records.length === 0 ? conversationTruncated : true;
+    }
+    totalBytes += bytes;
+    truncated = truncated || conversationTruncated;
+    conversations.push({
+      summary: summary(row, ctx.ownerId),
+      records,
+      truncated: conversationTruncated,
+    });
+  }
+  return { exportedAt: ctx.now, truncated, conversations };
+};
 
 const ownerIdentity = async (ctx: OwnerContext) => {
   const snapshot = await ctx.host.snapshot();
@@ -357,6 +443,11 @@ export const conversationsDomain = {
     scope: "owner",
     parse: empty(),
     handler: (ctx: OwnerContext) => ownerIdentity(ctx),
+  },
+  "data.export": {
+    scope: "owner",
+    parse: empty(),
+    handler: (ctx: OwnerContext) => exportData(ctx),
   },
   "conversations.bootstrap": {
     scope: "owner",

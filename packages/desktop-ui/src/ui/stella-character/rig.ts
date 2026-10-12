@@ -19,6 +19,13 @@ import {
   SPARKLE_PATH,
 } from "./shapes";
 import { EYE_N, EYE_POSES, lerpPose, type EyePoseName } from "./eyes";
+import {
+  WORKING_DOTS_CYCLE_MS,
+  WORKING_DOTS_STAGGER,
+  sampleWorkingDots,
+  workingDotsReducedOpacity,
+  type WorkingDotsFrame,
+} from "@stella/contracts/working-dots-bounce";
 
 /**
  * Activities the mark can portray. The rig maps each to a silhouette, an eye
@@ -69,7 +76,7 @@ export interface CreateStellaMarkOptions {
 }
 
 export interface StellaMarkHandle {
-  el: SVGSVGElement;
+  el: HTMLElement;
   readonly state: StellaCharacterState;
   setState(state: StellaCharacterState): void;
   readonly shape: StellaCharacterShape;
@@ -153,17 +160,11 @@ const smoothstep = (t: number) => t * t * (3 - 2 * t);
 const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
 /**
- * The thinking ellipsis: three dots riding one travelling Gaussian, with the
- * character mark itself as the middle one. `wave` is that Gaussian, sampled for
- * a slot at a time — rise, pop and tone all come off the same curve, so the
- * three dots read as one motion passing along the row.
+ * The thinking ellipsis: three dots, with the character mark itself as the
+ * middle one. The rig only lays them out; their hop is the shared bounce
+ * (`@stella/contracts/working-dots-bounce`) played by WAAPI on a wrapper per
+ * dot, so a settled ellipsis costs the rig no frames at all.
  */
-const CYCLE = 1400,
-  PHASE0 = 0.119,
-  SIGMA = 0.15;
-const LIFT = 9,
-  POP_LO = 0.84,
-  POP_K = 0.22;
 const DOT_R = 22,
   DOT_X = 62,
   DOT_FUDGE = 1.02,
@@ -184,17 +185,66 @@ const ENV_W = 14,
 const FADE_W = 11,
   FADE_Z = 1;
 
-function wave(now: number, slot: number, amount: number, t0: number) {
-  const p = ((((now - t0) / CYCLE + PHASE0) % 1) + 1) % 1;
-  let d = Math.abs(p - slot / 3);
-  d = Math.min(d, 1 - d);
-  const g = Math.exp(-(d * d) / (2 * SIGMA * SIGMA));
-  return {
-    g,
-    lift: g * LIFT * amount,
-    pop: POP_LO + POP_K * g,
-    tone: 1 - 0.5 * (1 - g),
-  };
+/** The first crouch waits for the star to have mostly become the orb, so it
+ *  reads as a dot's hop rather than the star's. */
+const BOUNCE_ENTRY_MS = 260;
+/** How long a dot takes to settle back to rest when thinking ends mid-hop. */
+const BOUNCE_RELEASE_MS = 220;
+const REDUCED_SAMPLES = 24;
+
+/** Each slot's centre and radius in the dots layout, in mark units. */
+const BOUNCE_SLOTS = [
+  { x: C - DOT_X, r: DOT_R * DOT_FUDGE },
+  { x: C, r: DOT_R },
+  { x: C + DOT_X, r: DOT_R * DOT_FUDGE },
+] as const;
+
+const VIEW_SPAN = C * 2 + BLEED * 2;
+
+/**
+ * Each hopping thing is its own `<svg>` layer, so the bounce is a transform on
+ * an element with a CSS box — composited, with no SVG layout per frame. That
+ * box is the whole mark, so the dot's floor (its bottom edge, where the squash
+ * pivots) and its lift are expressed as fractions of it, zoom included.
+ */
+function bounceOrigin(slot: number, zoom: number) {
+  const { x, r } = BOUNCE_SLOTS[slot];
+  const at = (u: number) => (50 + ((u - VIEW_CENTER) * zoom * 100) / VIEW_SPAN).toFixed(3);
+  return `${at(x)}% ${at(C + r)}%`;
+}
+
+function bounceTransform(slot: number, zoom: number, f: WorkingDotsFrame) {
+  const lift = (f.lift * 2 * BOUNCE_SLOTS[slot].r * zoom * 100) / VIEW_SPAN;
+  return (
+    `translateY(${(-lift).toFixed(3)}%) ` +
+    `scale(${f.scaleX.toFixed(4)}, ${f.scaleY.toFixed(4)})`
+  );
+}
+
+const bounceKeyframeCache = new Map<string, Keyframe[]>();
+function bounceKeyframes(
+  slot: number,
+  zoom: number,
+  reduced: boolean,
+): Keyframe[] {
+  const key = `${slot}:${zoom.toFixed(3)}:${reduced}`;
+  let frames = bounceKeyframeCache.get(key);
+  if (frames) return frames;
+  if (reduced) {
+    frames = Array.from({ length: REDUCED_SAMPLES + 1 }, (_, i) => ({
+      offset: i / REDUCED_SAMPLES,
+      opacity: workingDotsReducedOpacity(i / REDUCED_SAMPLES),
+    }));
+  } else {
+    const samples = sampleWorkingDots();
+    frames = samples.map((f, i) => ({
+      offset: i / (samples.length - 1),
+      transform: bounceTransform(slot, zoom, f),
+      opacity: f.opacity,
+    }));
+  }
+  bounceKeyframeCache.set(key, frames);
+  return frames;
 }
 
 const SQ_CYCLE = 1500;
@@ -399,11 +449,34 @@ export function createStellaMark(
   svg.setAttribute("viewBox", VIEWBOX);
   svg.setAttribute("aria-hidden", "true");
   svg.style.cssText =
-    "display:block;width:100%;height:auto;overflow:visible;user-select:none";
+    "display:block;position:relative;width:100%;height:auto;overflow:visible;user-select:none";
+
+  /** The mark is a stack of `<svg>` layers sharing one viewBox: the base
+   *  carries the decorations, and everything that hops gets a layer of its
+   *  own (see `bounceOrigin`). */
+  const frameEl = document.createElement("span");
+  frameEl.setAttribute("aria-hidden", "true");
+  frameEl.style.cssText = "display:block;position:relative;width:100%";
   if (o.size) {
-    svg.style.width = `${o.size}px`;
+    frameEl.style.width = `${o.size}px`;
+    frameEl.style.height = `${o.size}px`;
     svg.style.height = `${o.size}px`;
   }
+  const zoomGs: SVGGElement[] = [];
+  const layer = () => {
+    const el = document.createElement("span");
+    el.style.cssText =
+      "position:absolute;inset:0;display:block;pointer-events:none";
+    const layerSvg = document.createElementNS(SVGNS, "svg");
+    layerSvg.setAttribute("viewBox", VIEWBOX);
+    layerSvg.style.cssText =
+      "display:block;width:100%;height:100%;overflow:visible";
+    const g = document.createElementNS(SVGNS, "g");
+    layerSvg.appendChild(g);
+    el.appendChild(layerSvg);
+    zoomGs.push(g);
+    return { el, g };
+  };
 
   const defs = document.createElementNS(SVGNS, "defs");
   const clip = document.createElementNS(SVGNS, "clipPath");
@@ -478,15 +551,25 @@ export function createStellaMark(
 
   const zoomG = document.createElementNS(SVGNS, "g");
   svg.appendChild(zoomG);
+  zoomGs.push(zoomG);
+
+  /** Layers painted beneath the base (glow, side dots) and above it (the
+   *  body, then the burst), in stacking order. */
+  const under: HTMLSpanElement[] = [];
+  const over: HTMLSpanElement[] = [];
 
   let glowEl: SVGCircleElement | null = null;
+  let glowWrap: HTMLSpanElement | null = null;
   if (o.glow) {
+    const l = layer();
+    under.push(l.el);
+    glowWrap = l.el;
     glowEl = document.createElementNS(SVGNS, "circle");
     glowEl.setAttribute("cx", String(C));
     glowEl.setAttribute("cy", String(C));
     glowEl.setAttribute("r", String(C * 1.02));
     glowEl.setAttribute("fill", `url(#${id}-glow)`);
-    zoomG.appendChild(glowEl);
+    l.g.appendChild(glowEl);
   }
 
   const inkFill = o.flat
@@ -497,12 +580,14 @@ export function createStellaMark(
 
   /** The ellipsis' side dots. The middle one is the character itself, which the
    *  silhouette morph turns into an orb. */
-  const dots = [0, 1].map(() => {
+  const dotLayers = [layer(), layer()];
+  const dots = dotLayers.map((l) => {
+    under.push(l.el);
     const p = document.createElementNS(SVGNS, "path");
     p.setAttribute("d", toPath(ORB_RING));
     p.setAttribute("fill", inkFill);
     p.style.display = "none";
-    zoomG.appendChild(p);
+    l.g.appendChild(p);
     return p;
   });
 
@@ -575,12 +660,24 @@ export function createStellaMark(
     return p;
   });
   bodyG.appendChild(eyeG);
-  zoomG.appendChild(bodyG);
+  const bodyLayer = layer();
+  over.push(bodyLayer.el);
+  bodyLayer.g.appendChild(bodyG);
 
-  const burstG = document.createElementNS(SVGNS, "g");
-  zoomG.appendChild(burstG);
+  /** Every hopping wrapper with the ellipsis slot it rides. */
+  const bounceTargets: [HTMLSpanElement, number][] = [
+    [dotLayers[0].el, 0],
+    [bodyLayer.el, 1],
+    [dotLayers[1].el, 2],
+  ];
+  if (glowWrap) bounceTargets.unshift([glowWrap, 1]);
 
-  host.appendChild(svg);
+  const burstLayer = layer();
+  over.push(burstLayer.el);
+  const burstG = burstLayer.g;
+
+  frameEl.append(...under, svg, ...over);
+  host.appendChild(frameEl);
 
   let state = o.state;
   let shapeName = o.shape;
@@ -639,6 +736,11 @@ export function createStellaMark(
   let destroyed = false;
 
   const suspended = () => paused || !onscreen;
+  const smallness = () =>
+    1 -
+    smoothstep(
+      clamp((boxW - ZOOM_SMALL_PX) / (ZOOM_LARGE_PX - ZOOM_SMALL_PX), 0, 1),
+    );
 
   const weightOf = (name: Activity) => {
     const e = clamp(env.x, 0, 1);
@@ -646,6 +748,68 @@ export function createStellaMark(
     if (name === prevActivity) return e * (1 - clamp(fade.x, 0, 1));
     return 0;
   };
+
+  /**
+   * The ellipsis' hop runs on WAAPI rather than in the frame loop: it starts
+   * when thinking begins, pauses with the loop (blur, offscreen), and when
+   * thinking ends each dot eases from wherever it is back to rest instead of
+   * snapping out of the air.
+   */
+  let bounce: Animation[] = [];
+  function startBounce() {
+    const zoom = 1 + (DOTS_ZOOM - 1) * smallness();
+    for (const [el, slot] of bounceTargets) {
+      el.style.transformOrigin = bounceOrigin(slot, zoom);
+      const keyframes = bounceKeyframes(slot, zoom, reduced);
+      const delay =
+        BOUNCE_ENTRY_MS + slot * WORKING_DOTS_STAGGER * WORKING_DOTS_CYCLE_MS;
+      // The fade from full to the loop's resting tone runs on the inner svg:
+      // an opacity animation still running on the wrapper when the loop
+      // starts would keep the loop off the compositor for good.
+      const inner = el.firstElementChild;
+      if (inner) {
+        bounce.push(
+          inner.animate(
+            [{ opacity: 1 }, { opacity: keyframes[0].opacity as number }],
+            { duration: delay, easing: "ease-in-out" },
+          ),
+        );
+      }
+      bounce.push(
+        el.animate(keyframes, {
+          duration: WORKING_DOTS_CYCLE_MS,
+          delay,
+          iterations: Infinity,
+          easing: "linear",
+        }),
+      );
+    }
+  }
+  function releaseBounce() {
+    const from = bounceTargets.map(([el]) => {
+      const cs = getComputedStyle(el);
+      return { transform: cs.transform, opacity: cs.opacity };
+    });
+    for (const a of bounce) a.cancel();
+    bounce = [];
+    if (destroyed) return;
+    bounceTargets.forEach(([el], i) => {
+      el.animate([from[i], { transform: "none", opacity: 1 }], {
+        duration: BOUNCE_RELEASE_MS,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      });
+    });
+  }
+  function syncBounce() {
+    const want = activity === "dots" && !destroyed;
+    if (want && !bounce.length) startBounce();
+    else if (!want && bounce.length) releaseBounce();
+    const run = !suspended();
+    for (const a of bounce) {
+      if (run && a.playState === "paused") a.play();
+      else if (!run && a.playState === "running") a.pause();
+    }
+  }
 
   function setPose(name: EyePoseName, dur = 160) {
     const next = EYE_POSES[name] ?? EYE_POSES.neutral;
@@ -704,6 +868,7 @@ export function createStellaMark(
     setPose(pool[0], 200);
     scheduleFace(clock);
     if (state === "celebrate") burst(18);
+    syncBounce();
     wake();
   }
 
@@ -828,7 +993,7 @@ export function createStellaMark(
     // out of the frame path entirely.
     if (!sizeObserver && now - measuredAt > 500) {
       measuredAt = now;
-      setBoxW(svg.getBoundingClientRect().width);
+      setBoxW(frameEl.getBoundingClientRect().width);
     }
 
     env.t = activity ? 1 : 0;
@@ -885,7 +1050,7 @@ export function createStellaMark(
     }
 
     if (pointer) {
-      const r = svg.getBoundingClientRect();
+      const r = frameEl.getBoundingClientRect();
       if (r.width > 0) {
         const nx = clamp(
           (pointer.x - (r.left + r.width / 2)) / r.width,
@@ -966,23 +1131,19 @@ export function createStellaMark(
       sweepShown = false;
     }
 
-    // The character holds the ellipsis' middle slot, so it rides slot 1 of the
-    // same wave the side dots do.
-    const w1 = wave(t, 1, act, activityStart);
     const bodyR = activity
       ? (BODY_R[activity] ?? C) * clamp(fade.x, 0, 1) +
         (prevActivity ? (BODY_R[prevActivity] ?? C) : (BODY_R[activity] ?? C)) *
           (1 - clamp(fade.x, 0, 1))
       : C;
-    const pop = 1 + (w1.pop - 1) * (wDots / Math.max(act, 0.001));
     const rest = 1 - act;
-    const scale = rest * breathe.x + (bodyR / C) * act * pop;
+    const scale = rest * breathe.x + (bodyR / C) * act;
     let scaleX = scale,
       scaleY = scale;
     const tx = C + bobX.x * rest;
-    let ty = C + bobY.x * rest - w1.lift * wDots;
+    let ty = C + bobY.x * rest;
     let rot = 0;
-    let bodyAlpha = 1 - (1 - w1.tone) * wDots;
+    let bodyAlpha = 1;
 
     if (wSqueeze > 0.004) {
       const inside = Math.exp(-(band * band) / (2 * 0.72 * 0.72));
@@ -1081,25 +1242,20 @@ export function createStellaMark(
       decorHidden = !decorActive;
     }
 
-    if (wDots > 0.004) drawDots(wDots, t);
+    if (wDots > 0.004) drawDots(wDots);
     if (wOrbit > 0.004) drawOrbit(wOrbit, t);
     if (wRadar > 0.004) drawRadar(wRadar, t, (bodyR / C) * C);
     if (wProgress > 0.004) drawProgress(wProgress, t);
 
     stepParticles(dt);
 
-    const small =
-      1 -
-      smoothstep(
-        clamp((boxW - ZOOM_SMALL_PX) / (ZOOM_LARGE_PX - ZOOM_SMALL_PX), 0, 1),
-      );
-    const z = 1 + (DOTS_ZOOM - 1) * wDots * small;
+    const z = 1 + (DOTS_ZOOM - 1) * wDots * smallness();
     const zt =
       z === 1
         ? ""
         : `translate(${VIEW_CENTER} ${VIEW_CENTER}) scale(${z.toFixed(4)}) translate(${-VIEW_CENTER} ${-VIEW_CENTER})`;
     if (zt !== lastZoom) {
-      zoomG.setAttribute("transform", zt);
+      for (const g of zoomGs) g.setAttribute("transform", zt);
       lastZoom = zt;
     }
 
@@ -1114,7 +1270,11 @@ export function createStellaMark(
     // One frame always lands before the loop can suspend, so a mark that
     // mounts blurred or offscreen shows the mark rather than an empty box.
     painted = true;
-    if (suspended() || (reduced && settled)) {
+    // A settled ellipsis is a still picture under its WAAPI bounce, so the
+    // loop parks until the next state change rather than redrawing it.
+    const dotsAtRest =
+      activity === "dots" && !prevActivity && Math.abs(fade.x - 1) < 0.001;
+    if (suspended() || (settled && (reduced || dotsAtRest))) {
       running = false;
       raf = 0;
       return;
@@ -1127,23 +1287,22 @@ export function createStellaMark(
    * ramp, springing outward with an ease-out-back so the ellipsis lays itself
    * down left-to-right instead of arriving all at once.
    */
-  function drawDots(w: number, t: number) {
+  function drawDots(w: number) {
     const xs = [C - DOT_X, C + DOT_X];
     for (let i = 0; i < 2; i++) {
       const k = clamp((w - i * DOT_STAGGER) / (1 - i * DOT_STAGGER), 0, 1);
       if (k <= 0.004) continue;
       const app = easeOutCubic(k),
         spread = easeOutBack(k);
-      const wv = wave(t, i === 0 ? 0 : 2, w, activityStart);
-      const s = (DOT_R * app * wv.pop * DOT_FUDGE) / C;
+      const s = (DOT_R * app * DOT_FUDGE) / C;
       const x = C + (xs[i] - C) * spread,
-        y = C - wv.lift;
+        y = C;
       dots[i].style.display = "";
       dots[i].setAttribute(
         "transform",
         `translate(${x.toFixed(1)} ${y.toFixed(1)}) scale(${s.toFixed(4)}) translate(${-C} ${-C})`,
       );
-      dots[i].setAttribute("opacity", (app * wv.tone).toFixed(3));
+      dots[i].setAttribute("opacity", app.toFixed(3));
     }
   }
 
@@ -1234,7 +1393,7 @@ export function createStellaMark(
     sizeObserver = new ResizeObserver((entries) => {
       setBoxW(entries[entries.length - 1]?.contentRect?.width ?? 0);
     });
-    sizeObserver.observe(svg);
+    sizeObserver.observe(frameEl);
   }
 
   /**
@@ -1249,6 +1408,7 @@ export function createStellaMark(
         const next = entries[entries.length - 1]?.isIntersecting ?? true;
         if (next === onscreen) return;
         onscreen = next;
+        syncBounce();
         if (onscreen) {
           last = 0;
           wake();
@@ -1256,7 +1416,7 @@ export function createStellaMark(
       },
       { rootMargin: "64px" },
     );
-    viewObserver.observe(svg);
+    viewObserver.observe(frameEl);
   }
 
   applyStateInitial();
@@ -1268,10 +1428,11 @@ export function createStellaMark(
     env.x = 0;
     env.t = activity ? 1 : 0;
   }
+  syncBounce();
   wake();
 
   return {
-    el: svg,
+    el: frameEl,
     get state() {
       return state;
     },
@@ -1299,15 +1460,19 @@ export function createStellaMark(
     // frame clock so motion continues from where it stopped instead of jumping.
     pause() {
       paused = true;
+      syncBounce();
     },
     resume() {
       paused = false;
+      syncBounce();
       last = 0;
       wake();
     },
     destroy() {
       destroyed = true;
       cancelAnimationFrame(raf);
+      for (const a of bounce) a.cancel();
+      bounce = [];
       sizeObserver?.disconnect();
       viewObserver?.disconnect();
       window.removeEventListener("pointermove", onPointerMove);
@@ -1315,7 +1480,7 @@ export function createStellaMark(
         "pointerleave",
         onPointerLeave,
       );
-      svg.remove();
+      frameEl.remove();
     },
   };
 }

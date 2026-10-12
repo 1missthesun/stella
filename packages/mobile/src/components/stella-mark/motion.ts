@@ -11,17 +11,11 @@
  * desktop rig one-for-one. Turning those units into pixels is `layout.ts`.
  */
 
-/** Full bounce cycle. */
-export const DOT_CYCLE_MS = 1400;
-
-/** Phase the whole wave is shifted by, so the cycle doesn't start on a peak. */
-export const DOT_PHASE_OFFSET = 0.119;
-
-/** Width of the per-dot Gaussian, in cycle fractions. */
-export const DOT_SIGMA = 0.15;
-
-/** Peak rise of a dot, in viewBox units. */
-export const DOT_LIFT_UNITS = 9;
+import {
+  WORKING_DOTS_CYCLE_MS,
+  WORKING_DOTS_STAGGER,
+  sampleWorkingDots,
+} from "@stella/contracts/working-dots-bounce";
 
 /** Radius of a thinking dot, in viewBox units. */
 export const DOT_RADIUS_UNITS = 22;
@@ -35,7 +29,7 @@ export const SIDE_DOT_SCALE = 1.02;
 /** Per-slot delay of the dots' entrance, in envelope fractions. */
 export const DOT_ENTRANCE_STAGGER = 0.12;
 
-/** Number of dots (also the phase denominator: slot `i` peaks at `i / 3`). */
+/** Number of dots in the ellipsis. */
 export const DOT_COUNT = 3;
 
 /**
@@ -63,38 +57,58 @@ export function morphEnvelope(t: number): number {
   return (1 - (1 + k) * Math.exp(-k)) / MORPH_NORMALIZER;
 }
 
-/** Shortest distance between two points on a unit circle (both in 0..1). */
-export function wrappedDistance(a: number, b: number): number {
-  "worklet";
-  const raw = Math.abs(a - b);
-  return raw > 0.5 ? 1 - raw : raw;
-}
+const BOUNCE_FRAMES = sampleWorkingDots();
+const BOUNCE_LIFT = BOUNCE_FRAMES.map((f) => f.lift);
+const BOUNCE_SCALE_X = BOUNCE_FRAMES.map((f) => f.scaleX);
+const BOUNCE_SCALE_Y = BOUNCE_FRAMES.map((f) => f.scaleY);
+const BOUNCE_OPACITY = BOUNCE_FRAMES.map((f) => f.opacity);
+const BOUNCE_LAST = BOUNCE_FRAMES.length - 1;
+const TWO_PI = Math.PI * 2;
+
+/** The first crouch waits for the star to have mostly become the orb. */
+export const DOT_BOUNCE_ENTRY_MS = 260;
+
+export type DotBounce = {
+  /** Rise in dot diameters. */
+  lift: number;
+  scaleX: number;
+  scaleY: number;
+  opacity: number;
+};
 
 /**
- * How "lit" slot `i` is at `timeMs`: a Gaussian centred on the slot's own
- * phase (`i / 3`), measured around the wrapped cycle so the travelling bump
- * crosses the seam without a hitch.
+ * Bounce of slot `i` at `timeMs`, read off the shared curve
+ * (`@stella/contracts/working-dots-bounce`) the desktop plays as WAAPI
+ * keyframes. The curve is tabulated once on the JS thread and interpolated
+ * here, so both platforms draw exactly the same hop. Before a slot's first
+ * hop it holds the resting frame. Scales are about the dot's bottom edge.
+ * Under reduced motion only the opacity breathes.
  */
-export function dotGaussian(slot: number, timeMs: number): number {
-  "worklet";
-  const cycle = (timeMs / DOT_CYCLE_MS) % 1;
-  const progress = (cycle + DOT_PHASE_OFFSET) % 1;
-  const distance = wrappedDistance(progress, slot / DOT_COUNT);
-  return Math.exp(-(distance * distance) / (2 * DOT_SIGMA * DOT_SIGMA));
-}
-
-/** Bounce state of one dot: rise, pop and tone all ride the same Gaussian. */
-export function dotWave(
+export function dotBounce(
   slot: number,
   timeMs: number,
-): { gaussian: number; liftUnits: number; scale: number; opacity: number } {
+  reduced: boolean,
+): DotBounce {
   "worklet";
-  const gaussian = dotGaussian(slot, timeMs);
+  const local =
+    (timeMs -
+      DOT_BOUNCE_ENTRY_MS -
+      slot * WORKING_DOTS_STAGGER * WORKING_DOTS_CYCLE_MS) /
+    WORKING_DOTS_CYCLE_MS;
+  const phase = local <= 0 ? 0 : local - Math.floor(local);
+  if (reduced) {
+    const k = 0.5 - 0.5 * Math.cos(phase * TWO_PI);
+    return { lift: 0, scaleX: 1, scaleY: 1, opacity: 0.55 + 0.45 * k };
+  }
+  const at = phase * BOUNCE_LAST;
+  const i = Math.min(Math.floor(at), BOUNCE_LAST - 1);
+  const t = at - i;
   return {
-    gaussian,
-    liftUnits: gaussian * DOT_LIFT_UNITS,
-    scale: 0.84 + 0.22 * gaussian,
-    opacity: 0.5 + 0.5 * gaussian,
+    lift: BOUNCE_LIFT[i] + (BOUNCE_LIFT[i + 1] - BOUNCE_LIFT[i]) * t,
+    scaleX: BOUNCE_SCALE_X[i] + (BOUNCE_SCALE_X[i + 1] - BOUNCE_SCALE_X[i]) * t,
+    scaleY: BOUNCE_SCALE_Y[i] + (BOUNCE_SCALE_Y[i + 1] - BOUNCE_SCALE_Y[i]) * t,
+    opacity:
+      BOUNCE_OPACITY[i] + (BOUNCE_OPACITY[i + 1] - BOUNCE_OPACITY[i]) * t,
   };
 }
 
@@ -189,10 +203,10 @@ export function orbitMarkMotion(
 
 /**
  * Length of the linear clock ramp every periodic term reads. A common multiple
- * of the bounce cycle (1400ms) and the breathe period (4000ms), so the wrap is
- * seamless for both; at ~47 minutes it is far outside any single activation.
+ * of the bounce cycle (1500ms) and the breathe period (4000ms), so the wrap is
+ * seamless for both; at 50 minutes it is far outside any single activation.
  */
-export const CLOCK_SPAN_MS = 2_800_000;
+export const CLOCK_SPAN_MS = 3_000_000;
 
 /** How much full mic/output energy inflates the mark over its resting size. */
 export const VOICE_PULSE_GAIN = 0.22;

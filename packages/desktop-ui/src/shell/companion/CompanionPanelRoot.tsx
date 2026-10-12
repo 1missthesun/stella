@@ -30,6 +30,7 @@ import {
   type CompanionEdgeV,
 } from "@stella/contracts/desktop/companion";
 import { useUiState } from "@/context/ui-state";
+import { WorkingDots } from "@/ui/working-dots";
 import { useComposerMessageState } from "@/features/chat/hooks/use-composer-message-state";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
 import { setReadAloudEnabled } from "@/features/voice/services/read-aloud/read-aloud-pref";
@@ -269,14 +270,10 @@ export function CompanionPanelRoot() {
                 {bubble.text ? (
                   <span className="companion-bubble__text">{bubble.text}</span>
                 ) : (
-                  <span
+                  <WorkingDots
                     className="companion-bubble__typing"
-                    aria-label={t("companion.bubble.typing")}
-                  >
-                    <i />
-                    <i />
-                    <i />
-                  </span>
+                    label={t("companion.bubble.typing")}
+                  />
                 )}
               </button>
             ))}

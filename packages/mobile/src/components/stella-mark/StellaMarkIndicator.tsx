@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
+  ReduceMotion,
   cancelAnimation,
   useAnimatedStyle,
   useDerivedValue,
@@ -21,7 +22,6 @@ import {
 } from "./layout";
 import { MarkLayer } from "./MarkLayer";
 import { StellaFace } from "./StellaFace";
-import { shouldRunContinuousAnimation } from "../../lib/continuous-animation";
 import { useAppVisible } from "../../lib/use-app-visible";
 import type { WorkingIndicatorCharacterState } from "../working-indicator-character";
 import {
@@ -29,8 +29,8 @@ import {
   BREATHE_MS,
   CLOCK_SPAN_MS,
   MORPH_MS,
+  dotBounce,
   dotEntrance,
-  dotWave,
   easeOutBack,
   easeOutCubic,
   morphEnvelope,
@@ -45,8 +45,9 @@ import {
  *
  * ACTIVE while `thinking`: the star cross-fades into its fully inflated profile
  * (the orb) while shrinking to dot size, two sibling dots spread out from
- * underneath it with a staggered ease-out-back, and all three ride one
- * travelling Gaussian: rise, pop and tone. Tool states run the desktop-matched
+ * underneath it with a staggered ease-out-back, and all three run the shared
+ * squash-and-stretch hop (`@stella/contracts/working-dots-bounce`), a fixed
+ * stagger apart so it reads as one wave. Tool states run the desktop-matched
  * character poses instead: working and writing reshape and bob the body, while
  * searching and reading add orbiting marks around a smaller character. The
  * face follows the same state-specific expressions and blink cadence as the
@@ -63,8 +64,8 @@ import {
  * opacity is computed inside `useAnimatedStyle` worklets on the UI thread, on
  * plain `Animated.View`s, so no per-frame JS runs and React never re-renders
  * while the indicator animates. The clock is suspended outright while the app
- * is backgrounded or reduced motion is on, so a phone in a pocket with a run
- * still going animates nothing.
+ * is backgrounded, so a phone in a pocket with a run still going animates
+ * nothing; under reduced motion it runs only for the dots' opacity breath.
  *
  * The geometry (`geometry.ts`) is baked from the same source as the desktop
  * rig, and its viewBox is centred on the mark's own centre, so a View-level
@@ -143,49 +144,49 @@ export function StellaMarkIndicator({
   const uid = useId().replace(/[^a-zA-Z0-9-]/g, "");
 
   const layout = useMemo(() => stellaMarkLayout(size), [size]);
-  const { dotPx, sideDotPx, pxPerUnit, spreadPx, zoom } = layout;
+  const { dotPx, sideDotPx, spreadPx, zoom } = layout;
 
   /** Linear millisecond ramp; every periodic term derives from it. */
   const clock = useSharedValue(0);
   /** Linear 0..1 morph ramp — the spring shape is applied in the worklets. */
   const morphT = useSharedValue(0);
 
-  const [running, setRunning] = useState(() =>
-    shouldRunContinuousAnimation({
-      logicalActive: active,
-      appVisible,
-      reducedMotion: reduceMotion,
-    }),
+  // Under reduced motion only the thinking dots move at all (an opacity
+  // breath), so every other state parks the clock.
+  const wantsClock = !reduceMotion || state === "thinking";
+  const [running, setRunning] = useState(
+    () => active && appVisible && wantsClock,
   );
 
+  // The clock opts out of Reanimated's reduced-motion skip: the dots' opacity
+  // breath is the one motion reduced motion keeps, and it needs the ramp.
   useEffect(() => {
     cancelAnimation(clock);
-    if (reduceMotion) {
-      // Park static: the resting star, no breathe, no bounce.
-      clock.value = 0;
-      return;
-    }
     if (!running) return;
     clock.value = 0;
     clock.value = withRepeat(
       withTiming(CLOCK_SPAN_MS, {
         duration: CLOCK_SPAN_MS,
         easing: Easing.linear,
+        reduceMotion: ReduceMotion.Never,
       }),
       -1,
       false,
+      undefined,
+      ReduceMotion.Never,
     );
     return () => cancelAnimation(clock);
-  }, [clock, reduceMotion, running]);
+  }, [clock, running]);
 
   useEffect(() => {
     cancelAnimation(morphT);
+    const target = active && state === "thinking" ? 1 : 0;
     if (reduceMotion) {
-      // Reduced motion never leaves the resting star — the dots are the motion.
-      morphT.value = 0;
+      // No morph: the dots simply appear in place of the star.
+      morphT.value = target;
       return;
     }
-    morphT.value = withTiming(active && state === "thinking" ? 1 : 0, {
+    morphT.value = withTiming(target, {
       duration: MORPH_MS,
       easing: Easing.linear,
     });
@@ -194,7 +195,7 @@ export function StellaMarkIndicator({
 
   // The desktop rig suspends on window blur; this is its counterpart.
   useEffect(() => {
-    if (reduceMotion || !appVisible) {
+    if (!appVisible || !wantsClock) {
       setRunning(false);
       return;
     }
@@ -204,7 +205,7 @@ export function StellaMarkIndicator({
     }
     const timer = setTimeout(() => setRunning(false), MORPH_MS + STOP_GRACE_MS);
     return () => clearTimeout(timer);
-  }, [active, appVisible, reduceMotion]);
+  }, [active, appVisible, wantsClock]);
 
   /** Critically damped 0..1 morph envelope, shared by every layer below. */
   const envelope = useDerivedValue(() => morphEnvelope(morphT.value));
@@ -240,16 +241,26 @@ export function StellaMarkIndicator({
     };
   });
 
+  // Every dot squashes about its own floor: a View scales about its centre,
+  // so each one is shifted down by the height its squash took off the bottom.
   // The character, full size. It shrinks toward the middle dot's box and hands
   // over to it, so the two are one shape crossing the morph rather than two.
   const starStyle = useAnimatedStyle(() => {
     const env = envelope.value;
-    const wave = dotWave(1, clock.value);
+    const bounce = dotBounce(1, clock.value, reduceMotion);
+    const scale = morphShrink(env, zoom);
+    const scaleX = 1 + (bounce.scaleX - 1) * env;
+    const scaleY = 1 + (bounce.scaleY - 1) * env;
     return {
-      opacity: (1 - env) * (1 - (1 - wave.opacity) * env),
+      opacity: (1 - env) * (1 - (1 - bounce.opacity) * env),
       transform: [
-        { translateY: -wave.liftUnits * pxPerUnit * zoom * env },
-        { scale: morphShrink(env, zoom) * (1 + (wave.scale - 1) * env) },
+        {
+          translateY:
+            -bounce.lift * dotPx * env + (size * scale * (1 - scaleY)) / 2,
+        },
+        { scale },
+        { scaleX },
+        { scaleY },
       ],
     };
   });
@@ -257,40 +268,62 @@ export function StellaMarkIndicator({
   // Middle slot (index 1): the orb the character becomes, drawn at dot size.
   const middleStyle = useAnimatedStyle(() => {
     const env = envelope.value;
-    const wave = dotWave(1, clock.value);
+    const bounce = dotBounce(1, clock.value, reduceMotion);
+    const scale = middleDotScale(env, layout);
+    const scaleX = 1 + (bounce.scaleX - 1) * env;
+    const scaleY = 1 + (bounce.scaleY - 1) * env;
     return {
-      opacity: env * (1 - (1 - wave.opacity) * env),
+      opacity: env * (1 - (1 - bounce.opacity) * env),
       transform: [
-        { translateY: -wave.liftUnits * pxPerUnit * zoom * env },
-        { scale: middleDotScale(env, layout) * (1 + (wave.scale - 1) * env) },
+        {
+          translateY:
+            -bounce.lift * dotPx * env + (dotPx * scale * (1 - scaleY)) / 2,
+        },
+        { scale },
+        { scaleX },
+        { scaleY },
       ],
     };
   });
 
   const leftStyle = useAnimatedStyle(() => {
     const env = envelope.value;
-    const wave = dotWave(0, clock.value);
+    const bounce = dotBounce(0, clock.value, reduceMotion);
     const entrance = dotEntrance(0, env);
+    const scale = sideDotScale(env, zoom);
     return {
-      opacity: wave.opacity * easeOutCubic(entrance),
+      opacity: bounce.opacity * easeOutCubic(entrance),
       transform: [
         { translateX: -spreadPx * easeOutBack(entrance) },
-        { translateY: -wave.liftUnits * pxPerUnit * zoom * env },
-        { scale: sideDotScale(env, zoom) * wave.scale },
+        {
+          translateY:
+            -bounce.lift * sideDotPx * env +
+            (sideDotPx * scale * (1 - bounce.scaleY)) / 2,
+        },
+        { scale },
+        { scaleX: bounce.scaleX },
+        { scaleY: bounce.scaleY },
       ],
     };
   });
 
   const rightStyle = useAnimatedStyle(() => {
     const env = envelope.value;
-    const wave = dotWave(2, clock.value);
+    const bounce = dotBounce(2, clock.value, reduceMotion);
     const entrance = dotEntrance(2, env);
+    const scale = sideDotScale(env, zoom);
     return {
-      opacity: wave.opacity * easeOutCubic(entrance),
+      opacity: bounce.opacity * easeOutCubic(entrance),
       transform: [
         { translateX: spreadPx * easeOutBack(entrance) },
-        { translateY: -wave.liftUnits * pxPerUnit * zoom * env },
-        { scale: sideDotScale(env, zoom) * wave.scale },
+        {
+          translateY:
+            -bounce.lift * sideDotPx * env +
+            (sideDotPx * scale * (1 - bounce.scaleY)) / 2,
+        },
+        { scale },
+        { scaleX: bounce.scaleX },
+        { scaleY: bounce.scaleY },
       ],
     };
   });

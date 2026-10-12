@@ -318,14 +318,6 @@ export const IPC_USER_ASK_POLICY_SET = "userAsk:policySet" as const;
 
 // ── Connector credentials / connect prompts ────────────────────────────────
 
-export const IPC_CONNECTOR_CREDENTIAL_REQUEST =
-  "connector-credential:request" as const;
-export const IPC_CONNECTOR_CREDENTIAL_COMPLETE =
-  "connector-credential:complete" as const;
-export const IPC_CONNECTOR_CREDENTIAL_SUBMIT =
-  "connector-credential:submit" as const;
-export const IPC_CONNECTOR_CREDENTIAL_CANCEL =
-  "connector-credential:cancel" as const;
 export const IPC_CONNECTOR_CONNECT_REQUEST =
   "connector-connect:request" as const;
 export const IPC_CONNECTOR_CONNECT_UPDATE = "connector-connect:update" as const;

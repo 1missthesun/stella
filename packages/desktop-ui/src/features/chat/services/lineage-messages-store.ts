@@ -221,7 +221,7 @@ const getApi = () =>
   typeof window === "undefined" ? undefined : window.electronAPI?.localChat;
 
 const entryKey = (conversationId: string, root: ConversationFocusRoot) =>
-  `${conversationId} ${focusRootKey(root)}`;
+  `${conversationId}\0${focusRootKey(root)}`;
 
 const emit = (entry: Entry) => {
   for (const listener of entry.listeners) listener(entry.snapshot);

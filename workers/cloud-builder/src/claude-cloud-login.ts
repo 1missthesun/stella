@@ -142,23 +142,45 @@ backup)
   # this container straight to the owner's backup object (presigned URL in
   # URL). Nothing reads what is inside.
   [ -d "$accounts" ] || { json '{ok:true,skipped:true}'; exit 0; }
+  # The stored object is then this container's own copy: its ETag is kept
+  # beside the logins, so the next restore here downloads nothing.
   archive=$(dirname "$accounts")/.claude-accounts-backup.tgz
-  rm -f -- "$archive"
+  marker=$(dirname "$accounts")/.claude-accounts-etag
+  headers=$(dirname "$accounts")/.claude-accounts-backup.headers
+  rm -f -- "$archive" "$marker" "$headers"
   tar -C "$(dirname "$accounts")" -czf "$archive" "$(basename "$accounts")" || { rm -f -- "$archive"; fail "Couldn't pack the Claude Code logins."; }
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 -T "$archive" "$URL")
-  rm -f -- "$archive"
+  code=$(curl -s -D "$headers" -o /dev/null -w '%{http_code}' --max-time 60 -T "$archive" "$URL")
+  stored=$(tr -d '\r"' <"$headers" 2>/dev/null | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p' | tail -n 1)
+  rm -f -- "$archive" "$headers"
   [ "$code" = 200 ] || fail "Couldn't store the Claude Code login backup ($code)."
+  if [ -n "$stored" ]; then printf '%s\n' "$stored" >"$marker"; fi
   json '{ok:true}'
   ;;
 restore)
   # The stored backup is the owner's logins; whatever this container's disk
   # or snapshot carried may be older, so it is replaced. Without a backup
-  # the container keeps what it has.
+  # the container keeps what it has. A container that already holds the
+  # backup it would fetch (ETAG, the one it last restored) keeps its copy;
+  # ETAG=absent says there is no backup to fetch.
   parent=$(dirname "$accounts")
   archive=$parent/.claude-accounts-restore.tgz
   stage=$parent/.claude-accounts-restore
+  marker=$parent/.claude-accounts-etag
+  headers=$parent/.claude-accounts-restore.headers
+  if [ -n "${"$"}{ETAG:-}" ] && [ -d "$accounts" ] && [ ! -L "$accounts" ] && [ -f "$marker" ] && [ ! -L "$marker" ] && [ "$(cat "$marker")" = "$ETAG" ]; then
+    json '{ok:true,restored:false,current:true}'
+    exit 0
+  fi
+  if [ "${"$"}{ETAG:-}" = absent ]; then
+    mkdir -p "$accounts" && chmod 700 "$accounts"
+    json '{ok:true,restored:false}'
+    exit 0
+  fi
+  rm -f -- "$marker" "$headers"
   rm -rf -- "$archive" "$stage"
-  code=$(curl -s -o "$archive" -w '%{http_code}' --max-time 60 "$URL")
+  code=$(curl -s -D "$headers" -o "$archive" -w '%{http_code}' --max-time 60 "$URL")
+  fetched=$(tr -d '\r"' <"$headers" 2>/dev/null | sed -n 's/^[Ee][Tt][Aa][Gg]: *//p' | tail -n 1)
+  rm -f -- "$headers"
   if [ "$code" = 404 ]; then
     rm -f -- "$archive"
     mkdir -p "$accounts" && chmod 700 "$accounts"
@@ -175,6 +197,7 @@ restore)
   [ -e "$accounts" ] && mv -- "$accounts" "$accounts.old"
   mv -- "$stage/$name" "$accounts" && chown root:root "$accounts" && chmod 700 "$accounts"
   rm -rf -- "$stage" "$accounts.old"
+  if [ -n "$fetched" ]; then printf '%s\n' "$fetched" >"$marker"; fi
   json '{ok:true,restored:true}'
   ;;
 probe-plant)
@@ -337,13 +360,37 @@ export const restoreClaudeCloudLogins = async (
   ownerId: string,
   container?: SandboxHandle,
 ): Promise<boolean> => {
+  const started = Date.now();
   const url = await loginBackupUrl(env, ownerId, "GET");
   if (!url) return false;
+  const signedAt = Date.now();
+  // What the container is about to fetch, so a copy it already has, or a
+  // backup that does not exist, costs no download. An unreadable head
+  // fetches as before.
+  const stored = await (env as unknown as { BACKUP_BUCKET?: R2Bucket }).BACKUP_BUCKET?.head(
+    await loginBackupKey(ownerId),
+  ).then(
+    (object) => (object ? object.etag.replace(/"/gu, "") : "absent"),
+    () => undefined,
+  );
+  const headAt = Date.now();
   const result = await runScript(env, ownerId, ["restore"], {
     url,
     timeoutMs: 120_000,
+    ...(stored ? { extraEnv: { ETAG: stored } } : {}),
     ...(container ? { container } : {}),
   });
+  console.log(
+    JSON.stringify({
+      level: "info",
+      event: "claude_cloud_login_restore_timing",
+      backup: stored === undefined ? "unknown" : stored === "absent" ? "absent" : "present",
+      outcome: !result.ok ? "failed" : result.current === true ? "current" : result.restored === true ? "restored" : "kept",
+      signMs: signedAt - started,
+      headMs: headAt - signedAt,
+      scriptMs: Date.now() - headAt,
+    }),
+  );
   if (!result.ok) {
     console.error(
       JSON.stringify({ level: "error", event: "claude_cloud_login_restore_failed", message: result.error }),

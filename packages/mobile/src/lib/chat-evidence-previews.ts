@@ -415,11 +415,15 @@ export const requestEvidencePreview = (
     if (request.kind === "audio") return await audioPreviewFor(request, remote);
     throw new Error(`No preview for ${request.kind}.`);
   }).catch((error: unknown) => {
-    inFlight.delete(key);
+    if (inFlight.get(key) === work) inFlight.delete(key);
     throw error;
   });
   inFlight.set(key, work);
   return work;
+};
+
+export const clearEvidencePreviews = (): void => {
+  inFlight.clear();
 };
 
 /** The playable `file://` URI for an audio card, downloaded only on press. */

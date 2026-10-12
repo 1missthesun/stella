@@ -100,6 +100,8 @@ import {
 import { CLOUD_TOOL_HOME } from "@stella/contracts/cloud-tool-home";
 import { cloudAgentToolContext } from "./cloud-tool-context.js";
 
+import { markTurnStep } from "./turn-timing.js";
+
 /**
  * turn-input.json. `role` (from the shared contract) says which loop runs:
  * an orchestrator turn also carries the DO's system prompt and tool catalog.
@@ -362,6 +364,7 @@ export const runAgentTurn = (
         try: async () => {
           const raw = await readFile(attempt.input, "utf8");
           await rm(attempt.input, { force: true });
+          markTurnStep("inputRead");
           return JSON.parse(raw) as AgentTurnInput;
         },
         catch: asError,
@@ -376,6 +379,7 @@ export const runAgentTurn = (
         }),
         (client) => Effect.sync(() => client.close()),
       );
+      markTurnStep("brokerReady");
       // This loop builds an agent's own prompt and tools; an orchestrator
       // turn runs the DO's, in its own executor mode.
       if (input.role === "orchestrator") {
@@ -451,6 +455,7 @@ export const runAgentTurn = (
           pullWorldProjection({ root: workspaceRoot, access: input.world }),
         catch: asError,
       });
+      markTurnStep("worldPulled");
       yield* Effect.tryPromise({
         try: () =>
           prepareCloudToolFilesystem({
@@ -461,6 +466,7 @@ export const runAgentTurn = (
           }),
         catch: asError,
       });
+      markTurnStep("toolFilesystemPrepared");
       const postJson = async (
         route: string,
         body: unknown,
@@ -534,12 +540,14 @@ export const runAgentTurn = (
         };
       }
       const driveSync = hydration.value;
+      markTurnStep("driveHydrated");
       // What the drive copy looks like before any agent process exists: the
       // write-back saves what changes from here. An unreadable tree counts
       // every file as changed, and the ledger still spares the unchanged.
       const driveBefore = yield* Effect.promise(() =>
         snapshotDriveTree(driveWorkspace.root).catch(() => new Map()),
       );
+      markTurnStep("driveSnapshotted");
 
       const officeBinPath = resolveOfficeBinPath();
       const cloudSystemPrompt = CLOUD_GENERAL_PROMPT({
@@ -595,6 +603,7 @@ export const runAgentTurn = (
           }).pipe(Effect.orDie),
       );
 
+      markTurnStep("toolHostCreated");
       const context: ToolContext = cloudAgentToolContext({
         threadId: input.threadId,
         workspaceRoot,
@@ -624,6 +633,7 @@ export const runAgentTurn = (
         signal?: AbortSignal,
         onUpdate?: ToolUpdateCallback,
       ): Promise<ToolResult> => {
+        markTurnStep("firstToolCall");
         const result = await toolHost.executeTool(
           name,
           params,
@@ -665,6 +675,7 @@ export const runAgentTurn = (
             }),
         );
 
+      markTurnStep("mcpHostReady");
       // Messages sent to this agent while it works. It stops taking them
       // when it finishes; a message that lands later is refused, never lost.
       const inbox = yield* Effect.acquireRelease(
@@ -675,6 +686,7 @@ export const runAgentTurn = (
         (opened) => Effect.promise(() => opened.close().catch(() => [])),
       );
 
+      markTurnStep("inboxOpened");
       let llmCalls = 0;
       let inputTokens = 0;
       let outputTokens = 0;

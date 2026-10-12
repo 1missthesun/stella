@@ -26,6 +26,7 @@ import { getNativeConnectorReadiness } from "./connection-status.js";
 import {
   requestBackendConnectorActionFromBridge,
   requestBackendConnectorActionsFromBridge,
+  cancelConnectorCredentialFromBridge,
   requestConnectorCredentialFromBridge,
   type BackendConnectorActionResult,
   type ConnectorCredentialResult,
@@ -67,9 +68,22 @@ import {
 import type { ConnectorCommandConfig, ConnectorToolInfo } from "./types.js";
 import { loadGoogleWorkspaceTools } from "../google-workspace/load-google-workspace-tools.js";
 
+/** Who made a connector call, so a credential card opens in their chat. */
+export type ConnectorCaller = {
+  conversationId?: string;
+  agentId?: string;
+  toolCallId?: string;
+};
+
 export type ConnectClientOptions = {
   stellaAppDir: string;
-  /** UDS path of the worker's CLI bridge (credential dialogs + broker). */
+  /** The conversation, agent and tool call a credential card belongs to. */
+  caller?: ConnectorCaller;
+  /** Runs while the user answers a credential card (the code cell's clock stops). */
+  awaitUser?: <T>(task: () => Promise<T>) => Promise<T>;
+  /** The caller's run stopped: an open credential card is withdrawn. */
+  signal?: AbortSignal;
+  /** UDS path of the worker's CLI bridge (credential cards + broker). */
   cliBridgeSocketPath?: string;
   /** Non-fatal bridge diagnostics (logged by the host). */
   onBridgeUnreachable?: (message: string) => void;
@@ -209,8 +223,8 @@ export const resolveConnectorAuthHints = async (
 
 /**
  * Run `attempt`. If it throws `ConnectorAuthError` AND the bridge socket
- * is wired AND the error carries a `tokenKey`, dial the bridge to pop a
- * credential dialog; on `{ ok: true }` retry once. Anything else (no
+ * is wired AND the error carries a `tokenKey`, dial the bridge to ask the
+ * user with a credential card; on `{ ok: true }` retry once. Anything else (no
  * socket, no tokenKey, user cancel/timeout, second auth failure) rethrows
  * to the caller. Single retry is intentional: a second auth failure means
  * a bad key, not that another round-trip would help.
@@ -225,7 +239,8 @@ export const withAuthRetry = async <T>(
   } catch (error) {
     if (!(error instanceof ConnectorAuthError)) throw error;
     const socketPath = options.cliBridgeSocketPath;
-    if (!socketPath || !error.tokenKey) throw error;
+    const tokenKey = error.tokenKey;
+    if (!socketPath || !tokenKey) throw error;
 
     const hints =
       explicitHints ??
@@ -236,12 +251,12 @@ export const withAuthRetry = async <T>(
 
     let result: ConnectorCredentialResult;
     try {
-      // No `description` — we deliberately let the renderer's canonical
-      // copy fire instead of leaking the upstream HTTP status /
-      // generic-error verbiage into a user-facing dialog.
-      result = await requestConnectorCredentialFromBridge({
+      // No `description`: the host's canonical copy is used instead of
+      // leaking the upstream HTTP status / generic-error verbiage into a
+      // user-facing card.
+      const ask = () => requestConnectorCredentialFromBridge({
         socketPath,
-        tokenKey: error.tokenKey,
+        tokenKey,
         displayName: error.serverDisplayName,
         authType: hints.authType,
         resourceUrl: hints.resourceUrl,
@@ -249,7 +264,20 @@ export const withAuthRetry = async <T>(
         oauthResource: hints.oauthResource,
         scopes: hints.scopes,
         preregisteredOAuth: hints.preregisteredOAuth,
+        ...(options.caller ? { caller: options.caller } : {}),
       });
+      const caller = options.caller;
+      const withdraw = () => {
+        if (caller?.toolCallId) {
+          void cancelConnectorCredentialFromBridge({ socketPath, caller }).catch(() => undefined);
+        }
+      };
+      options.signal?.addEventListener("abort", withdraw, { once: true });
+      try {
+        result = options.awaitUser ? await options.awaitUser(ask) : await ask();
+      } finally {
+        options.signal?.removeEventListener("abort", withdraw);
+      }
     } catch (bridgeError) {
       // The bridge was advertised but isn't reachable — fall through to
       // the original auth error so the agent gets a clean signal rather
@@ -913,8 +941,8 @@ const refreshDeferredMcpSkill = async (
 };
 
 /**
- * Shared MCP tools listing: probe through the bridge (popping the auth
- * dialog on 401/403 via `withAuthRetry`), then opportunistically complete
+ * Shared MCP tools listing: probe through the bridge (asking for
+ * credentials on 401/403 via `withAuthRetry`), then opportunistically complete
  * a deferred generated skill while the session is still warm.
  */
 const probeMcpConnector = async (
@@ -1141,7 +1169,7 @@ export const discoverConnectorsDetailed = async (
         ? `Ready. Inspect actions: await connect.actions("${match.id}").`
         : match.kind === "native"
           ? `Not connected. Connect offers are handled by the orchestrator's connector_status tool (inline connect card) or the Store — do not initiate one from here unless the user explicitly asked this turn. Proceed via the browser/computer fallback meanwhile.`
-          : `Configured but not authorized. Calling it pops the auth dialog: await connect.actions("${match.id}").`;
+          : `Configured but not authorized. Calling it asks the user for credentials: await connect.actions("${match.id}").`;
       return {
         id: match.id,
         name: match.name,
@@ -1568,6 +1596,11 @@ export type ReplConnectClient = {
   ): Promise<unknown>;
   addMcp(options: Record<string, unknown>): Promise<unknown>;
   remove(id: string): Promise<unknown>;
+  /** The same client for one caller's calls (`ConnectClientOptions.caller`, `awaitUser`, `signal`). */
+  forCaller?(
+    caller: ConnectorCaller,
+    run?: Pick<ConnectClientOptions, "awaitUser" | "signal">,
+  ): ReplConnectClient;
 };
 
 export const createReplConnectClient = (
@@ -1575,6 +1608,7 @@ export const createReplConnectClient = (
 ): ReplConnectClient => {
   const catalog = () => loadConnectCatalog(options.stellaAppDir);
   return {
+    forCaller: (caller, run) => createReplConnectClient({ ...options, caller, ...run }),
     discover: async (query) => {
       const trimmed = typeof query === "string" ? query.trim() : "";
       if (!trimmed) {

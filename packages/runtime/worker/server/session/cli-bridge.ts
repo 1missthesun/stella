@@ -230,6 +230,13 @@ export const layer = Layer.effect(
                 };
               }
             },
+            cancelConnectorCredential: async (params) => {
+              await hostBus
+                .request(METHOD_NAMES.HOST_ASK_USER_CANCEL, params, {
+                  retryOnDisconnect: true,
+                })
+                .catch(() => undefined);
+            },
             requestDesktopPermission: async ({ kind }) => {
               try {
                 const result = await hostBus.request<{

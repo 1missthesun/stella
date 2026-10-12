@@ -120,6 +120,14 @@ const storeSecureValue = (stellaAppDir, entry) => {
     writeSecureValueStore(stellaAppDir, secrets);
     return handle;
 };
+const deleteSecureValue = (stellaAppDir, handle) => {
+    const secrets = readSecureValueStore(stellaAppDir);
+    if (!(handle in secrets)) {
+        return;
+    }
+    delete secrets[handle];
+    writeSecureValueStore(stellaAppDir, secrets);
+};
 const resolveSecureValue = (stellaAppDir, handle) => {
     const entry = readSecureValueStore(stellaAppDir)[handle];
     if (!entry || typeof entry.valueProtected !== "string") {
@@ -624,6 +632,20 @@ export class UserAskService {
         const fingerprints = fingerprintSecrets(values, fingerprintParams);
         this.fingerprintCache = { key, fingerprints };
         return fingerprints;
+    }
+    /**
+     * Read a secure value once, for this computer's own use (a connector
+     * key it saves itself), and forget its handle. Never returned to an
+     * agent or the runtime.
+     */
+    takeSecureValue(handle) {
+        const stellaAppDir = this.options.getStellaAppDir();
+        if (!stellaAppDir || !isUserAskSecretHandle(handle)) {
+            return null;
+        }
+        const value = resolveSecureValue(stellaAppDir, handle);
+        deleteSecureValue(stellaAppDir, handle);
+        return value;
     }
     async useSecureValue(request) {
         const handle = typeof request?.handle === "string" ? request.handle : "";

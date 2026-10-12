@@ -282,3 +282,34 @@ export const verifyUserToken = async (
     },
   };
 };
+
+const PREVIEW_HOST_LABEL = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
+
+/**
+ * The backend whose sign-in this exchange pins: `pinnedIssuer`, unless
+ * `previewHostSuffix` is set (dev only) and the token claims a cloud-builder
+ * Preview, `https://<name><suffix>`. The claim only picks which issuer's
+ * keys verify the token; `verifyUserToken` still checks the signature.
+ */
+export const sessionIssuerFor = (
+  token: string,
+  pinnedIssuer: string,
+  previewHostSuffix: string | undefined,
+): { issuer: string; preview: boolean } => {
+  const pinned = { issuer: pinnedIssuer, preview: false };
+  const suffix = previewHostSuffix?.trim() ?? "";
+  if (!suffix.startsWith("-") || !suffix.includes(".")) return pinned;
+  const payload = decodeSegment(token.split(".")[1] ?? "");
+  const claimed = typeof payload?.iss === "string" ? payload.iss : "";
+  let url: URL;
+  try {
+    url = new URL(claimed);
+  } catch {
+    return pinned;
+  }
+  if (url.protocol !== "https:" || url.origin !== claimed) return pinned;
+  if (!url.hostname.endsWith(suffix)) return pinned;
+  const label = url.hostname.slice(0, -suffix.length);
+  if (!PREVIEW_HOST_LABEL.test(label)) return pinned;
+  return { issuer: url.origin, preview: true };
+};

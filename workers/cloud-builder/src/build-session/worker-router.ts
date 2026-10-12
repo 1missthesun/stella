@@ -95,6 +95,7 @@ import { verifyServiceBearerRequest } from "../service-bearer.js";
 import { handleBillingRoute } from "../billing/routes.js";
 import { handleAdminRoute } from "../admin/routes.js";
 import { handleStellaModelsRoute } from "../catalog/models.js";
+import { handlePreviewSessionCapabilityRoute } from "../billing/preview-session-capability.js";
 import { handleDevicesRoute } from "../devices/routes.js";
 import { handleUserAsksRoute } from "../user-asks/routes.js";
 import { handleDeviceRequestRoute } from "../devices/device-request-route.js";
@@ -1055,6 +1056,7 @@ app.all(`/owners/me/apps/:slug{${APP_SLUG}}/preview`, methodNotAllowed("Method n
 // model catalog and app-source bootstrap are public.
 app.use(mount(handleBackendRoute));
 app.use(mount(handleStellaModelsRoute));
+app.use(mount(handlePreviewSessionCapabilityRoute));
 app.use(mount(handleMediaRoute));
 app.use(mount(handleMapsRoute));
 app.use(mount(handleDictationTranscribeRoute));

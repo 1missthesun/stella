@@ -76,7 +76,7 @@ How it is isolated:
   values, and `STELLA_ADMIN_API_SECRET` and `BUILDER_SERVICE_SECRET` equal
   dev's, so existing tooling works unchanged. `CAPABILITY_SIGNING_KEY` is the
   `builder-preview-1` key, which the dev model gateway trusts (its
-  `CAPABILITY_JWKS`). To give one Preview a third-party key (fal,
+  `CAPABILITY_JWKS`) for the Preview's cloud turns and desktop sessions. To give one Preview a third-party key (fal,
   Stripe test, …):
   `... | bunx wrangler preview secret put NAME --worker-name stella-v2-cloud-builder-preview --name <name>`.
 - **Web search** needs no secret anywhere: every environment and Preview
@@ -104,15 +104,16 @@ What a Preview cannot do yet (Cloudflare limits, 2026-10):
   enforcement and usage) go to **dev** cloud-builder. For a Preview's owners,
   that means inert per-owner records in dev's `OwnerGate` namespace, under
   owner ids dev has never issued. No dev user is affected.
-- **The desktop's own model calls fail with HTTP 401.** The desktop exchanges
-  its sign-in token for a capability directly at the dev gateway, which only
-  trusts dev-issued JWTs. The chat shows no reply and no error;
-  `electron.log` says "refused the session capability exchange (HTTP 401
-  unauthorized: The bearer token is not a valid Stella sign-in.)", and the
-  verify harness warns at launch. Cloud turns (`cloud-turn.mjs`, the
-  desktop's cloud lane) work, and so does sign-in. Local agents on Stella
-  models do not: prove desktop turns on Claude Code
-  (`session launch --claude-login host`) or against dev.
+- **The desktop's own model calls go through the dev gateway.** The desktop
+  exchanges its Preview sign-in at the dev gateway as usual. The dev gateway
+  (var `PREVIEW_BACKEND_HOST_SUFFIX`, never set in production) verifies a
+  token from `https://<name>-stella-v2-cloud-builder-preview.fromyou.workers.dev`
+  against that Preview's own JWKS, runs its usual gates, and has the Preview
+  issue the capability (`POST /api/gateway/preview-session-capability`,
+  served only by a Worker that signs with `builder-preview-1`). The Preview's
+  billing admits the session; usage settles into dev's `BillingControl`,
+  which rejects it as an unknown grant (logged, never retried). If desktop
+  turns show no reply, `electron.log` names the refused exchange.
 - Cron Triggers, queue consumers and the `auth-dev.stella.sh` route don't run
   on Previews. `wrangler tail` doesn't support Previews either. Logs and
   traces are persisted at full sampling under the Preview's Observability tab

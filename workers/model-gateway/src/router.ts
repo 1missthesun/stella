@@ -19,7 +19,8 @@ import {
   type GatewayDeviceKeyProof,
 } from "@stella/contracts/gateway/dpop";
 import { managedModelDescriptor } from "@stella/model-catalog/gateway-resolution";
-import { verifyUserToken } from "./auth-jwt.js";
+import { sessionIssuerFor, verifyUserToken } from "./auth-jwt.js";
+import { issuePreviewSessionCapability } from "./preview-session.js";
 import {
   authenticateCapability,
   bearerToken,
@@ -188,9 +189,14 @@ const handleSessionCapability = async (
       "A Better Auth bearer token is required.",
     );
   }
-  const verified = await verifyUserToken(
+  const sessionIssuer = sessionIssuerFor(
     token,
     env.STELLA_BACKEND_URL,
+    env.PREVIEW_BACKEND_HOST_SUFFIX,
+  );
+  const verified = await verifyUserToken(
+    token,
+    sessionIssuer.issuer,
     deps.fetch,
   );
   if (!verified.ok) {
@@ -309,16 +315,31 @@ const handleSessionCapability = async (
       );
     }
   }
-  const result = await billingControl(env).issueSessionCapability({
-    ownerId,
-    isAnonymous: verified.token.isAnonymous,
-    ipHash,
-    networkClass,
-    deviceKeyHash: deviceProof.deviceKeyHash,
-    ...(rawTurnstileToken !== undefined
-      ? { turnstileToken: rawTurnstileToken }
-      : {}),
-  });
+  const result = sessionIssuer.preview
+    ? await issuePreviewSessionCapability({
+        issuer: sessionIssuer.issuer,
+        token,
+        request: {
+          deviceKey,
+          ipHash,
+          networkClass,
+          ...(rawTurnstileToken !== undefined
+            ? { turnstileToken: rawTurnstileToken }
+            : {}),
+        },
+        fetch: deps.fetch,
+        traceId,
+      })
+    : await billingControl(env).issueSessionCapability({
+        ownerId,
+        isAnonymous: verified.token.isAnonymous,
+        ipHash,
+        networkClass,
+        deviceKeyHash: deviceProof.deviceKeyHash,
+        ...(rawTurnstileToken !== undefined
+          ? { turnstileToken: rawTurnstileToken }
+          : {}),
+      });
   if (!result.ok) {
     if (result.status === 403 && result.code === "challenge_required") {
       throw new GatewayError(

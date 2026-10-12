@@ -1007,11 +1007,6 @@ const cmdLaunch = async (options) => {
 
 const launchWarnings = (run) => {
   const warnings = [];
-  if (/-preview\.[^/]*workers\.dev/.test(run.backendUrl ?? "") && !run.claudeLogin) {
-    warnings.push(
-      "Backend is a Worker Preview: the desktop's own Stella-model turns get HTTP 401 from the dev model gateway and the chat shows no reply (electron.log: \"refused the session capability exchange\"). Prove desktop turns with --claude-login host, or against dev; cloud turns work on the Preview.",
-    );
-  }
   if (process.platform === "linux" && run.display?.mode === "host") {
     warnings.push(`The window is on the real display ${run.display.display ?? ""}${run.display.reason ? `: ${run.display.reason}` : ""}`);
   }

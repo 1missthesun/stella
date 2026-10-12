@@ -28,9 +28,7 @@ without asking.
   Drive. Removing a worktree deletes what is in it.
 - **Backend changes go to your own Preview** (`bun run preview -- up` in
   `workers/cloud-builder`; DEPLOY.md, "Previews"). A Preview cannot start
-  agent containers, and the desktop's own Stella-model turns fail there
-  (401 from the dev gateway, with no reply in the chat). Claims about those
-  go to dev: deploying dev needs no go-ahead, but only from a tree that
+  agent containers; claims about those go to dev: deploying dev needs no go-ahead, but only from a tree that
   contains origin/master (`deploy:dev` refuses anything else), and you say so
   in your report. Prod only when asked.
 - **Some pushes publish to prod.** A master push touching `packages/native/`

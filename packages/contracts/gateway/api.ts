@@ -170,6 +170,24 @@ export type GatewaySessionCapabilityRequest = {
   deviceKey: GatewayDeviceKeyProof;
 };
 
+/**
+ * Session capabilities for a desktop signed in to a cloud-builder Preview
+ * (DEPLOY.md, "Previews"). The dev gateway verifies the Preview's sign-in
+ * and runs its own gates, then asks the Preview's cloud-builder, which holds
+ * the owner's billing, to issue on this route: the caller's bearer and
+ * device key proof, plus the network facts the gateway saw. The Preview
+ * re-verifies both, signs with its `builder-preview-1` key and answers a
+ * `BillingControlResult` (gateway/usage.ts). Only a Worker signing with
+ * that key serves the route.
+ */
+export const PREVIEW_SESSION_CAPABILITY_PATH =
+  "/api/gateway/preview-session-capability" as const;
+
+export type PreviewSessionCapabilityRequest = GatewaySessionCapabilityRequest & {
+  ipHash: string;
+  networkClass: NetworkClass;
+};
+
 export type GatewaySessionCapabilityResponse = {
   capability: string;
   expiresAt: number;

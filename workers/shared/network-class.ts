@@ -56,7 +56,7 @@ const organizationMatches = (
   fragments: readonly string[],
 ): boolean => fragments.some((fragment) => organization.includes(fragment));
 
-const parseNetworkClass = (value: string | null): NetworkClass | null => {
+export const parseNetworkClass = (value: string | null): NetworkClass | null => {
   switch (value?.trim()) {
     case "hosting":
       return "hosting";

@@ -18,9 +18,9 @@ import {
   IPC_CONNECTOR_CONNECT_REQUEST,
   IPC_CONNECTOR_CONNECT_UPDATE,
 } from "@stella/contracts/desktop/ipc-channels";
-// Slightly under the CLI's 10-minute bridge timeout so the card always
+// Under Claude Code's 5-minute MCP tool idle timeout so the card always
 // resolves (and disappears) before the agent-side wait gives up.
-const CARD_TIMEOUT_MS = 9.5 * 60 * 1000;
+const CARD_TIMEOUT_MS = 4.5 * 60 * 1000;
 // Browser-extension flavor: how the install wait behaves after the user
 // accepts. Detection is the same cheap profile-directory scan the bridge
 // service uses at startup; the grace delays give the freshly installed

@@ -184,32 +184,6 @@ export class RuntimeHostAdapter {
             });
         });
     }
-    async waitUntilReady(timeoutMs = 10_000) {
-        const deadline = Date.now() + timeoutMs;
-        while (true) {
-            // Host readiness only proves that the socket and host-owned services are
-            // online. The worker builds its runner lazily after that handshake, and
-            // a failed lazy import leaves the socket healthy while chats cannot run.
-            // Require both layers to report ready before accepting a send.
-            this.lastRuntimeHealth = await this.host.health();
-            const workerHealth = await this.agentHealthCheck();
-            this.emitAvailabilityChange();
-            const snapshot = this.getAvailabilitySnapshot();
-            // A pending restart is intentionally informational: the current worker
-            // remains authoritative and usable until its active work drains. During
-            // the actual stop/start window workerHealth is not ready, so sends still
-            // wait without locking the user out for the entire deferral period.
-            if (workerHealth?.ready === true && snapshot.ready) {
-                return;
-            }
-            if (Date.now() >= deadline) {
-                throw createRuntimeUnavailableError(workerHealth?.reason ??
-                    snapshot.reason ??
-                    "Stella is reconnecting to its runtime. Please try again.");
-            }
-            await new Promise((resolve) => setTimeout(resolve, 100));
-        }
-    }
     async waitUntilConnected(timeoutMs = 10_000) {
         if (this.getAvailabilitySnapshot().connected) {
             return;
@@ -267,9 +241,6 @@ export class RuntimeHostAdapter {
     }
     runAutomationTurn(payload) {
         return this.host.runAutomationTurn(payload);
-    }
-    runBlockingLocalAgent(payload) {
-        return this.host.runBlockingLocalAgent(payload);
     }
     createBackgroundAgent(payload) {
         return this.host.createBackgroundAgent(payload);
@@ -389,9 +360,6 @@ export class RuntimeHostAdapter {
     webSearch(query, options) {
         return this.host.webSearch(query, options);
     }
-    voiceWebSearch(payload) {
-        return this.host.voiceWebSearch(payload);
-    }
     runOneShotCompletion(payload) {
         return this.host.runOneShotCompletion(payload);
     }
@@ -419,9 +387,6 @@ export class RuntimeHostAdapter {
     listConversationEvents(args) {
         return this.host.listConversationEvents(args);
     }
-    getConversationEventCount(args) {
-        return this.host.getConversationEventCount(args);
-    }
     onScheduleUpdated(listener) {
         return this.host.on("schedule-updated", listener);
     }
@@ -441,20 +406,8 @@ export class RuntimeHostAdapter {
     async killAllShells() {
         await this.host.killAllShells();
     }
-    killShellsByPort(port) {
-        return this.host.killShellsByPort(port);
-    }
-    collectBrowserData(options) {
-        return this.host.collectBrowserData(options);
-    }
     collectAllSignals(options) {
         return this.host.collectAllSignals(options);
-    }
-    coreMemoryExists() {
-        return this.host.coreMemoryExists();
-    }
-    discoveryKnowledgeExists() {
-        return this.host.discoveryKnowledgeExists();
     }
     writeCoreMemory(content, options) {
         return this.host.writeCoreMemory(content, options);

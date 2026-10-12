@@ -81,15 +81,4 @@ export const voiceHandlers: WorkerRpcHandlers = {
       error: "Voice tools are not available; the call delegates to Stella.",
     }),
 
-  [METHOD_NAMES.INTERNAL_WORKER_VOICE_WEB_SEARCH]: (params) =>
-    Effect.gen(function* () {
-      const session = yield* voiceSession;
-      const runner = yield* fromPromise(() => session.runner.ensureInitialized());
-      const request = params as { query: string; category?: string };
-      return yield* fromPromise(() =>
-        runner.webSearch(request.query, {
-          ...(request.category ? { category: request.category } : {}),
-        }),
-      );
-    }),
 };

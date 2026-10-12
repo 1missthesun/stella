@@ -241,7 +241,6 @@ export type RunnerContext = {
     ) => string[];
     killAllShells: () => Promise<void>;
     killShell: (sessionId: string) => Promise<void> | void;
-    killShellsByPort: (port: number) => void;
     shutdown: () => Promise<void>;
   };
 };
@@ -344,7 +343,6 @@ export type RunnerPublicApi = {
     import("@stella/contracts/execution-context").ExecutionContextSnapshot | undefined
   >;
   killAllShells: () => Promise<void>;
-  killShellsByPort: (port: number) => void;
   /** Stella's tools for the pi-durable harness. */
   piTools: import("./pi-tools.js").RunnerPiTools;
   agentHealthCheck: () => AgentHealth;

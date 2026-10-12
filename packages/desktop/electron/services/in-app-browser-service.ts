@@ -613,20 +613,6 @@ export class InAppBrowserService {
     return this.snapshot();
   }
 
-  setVisibleOwner(ownerId?: string): BrowserViewState {
-    const resolvedOwnerId = resolveOwnerId(ownerId);
-    if (
-      resolvedOwnerId !== MANUAL_OWNER_ID &&
-      !this.tabs.hasOwner(resolvedOwnerId)
-    ) {
-      throw new Error(`Browser owner not found: ${resolvedOwnerId}`);
-    }
-    this.tabs.scopedOwnerId = undefined;
-    this.tabs.visibleOwnerId = resolvedOwnerId;
-    this.syncState();
-    this.attachActiveView();
-    return this.snapshot();
-  }
 
   setOwnerScope(ownerId?: string): BrowserViewState {
     const normalizedOwnerId = ownerId?.trim();

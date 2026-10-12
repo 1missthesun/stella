@@ -688,15 +688,6 @@ export const createToolHost = ({
 
   const killAllShells = () => shutdownManagedShells(shellState);
 
-  const killShellsByPort = (port: number) => {
-    const portStr = String(port);
-    for (const shell of shellState.shells.values()) {
-      if (shell.running && shell.command.includes(portStr)) {
-        shell.kill();
-      }
-    }
-  };
-
   const killShell = async (sessionId: string) => {
     const shell = shellState.shells.get(sessionId);
     if (!shell) return;
@@ -824,7 +815,6 @@ export const createToolHost = ({
     ) => nodeReplRegistry.endBrowserTurn(runId, behavior),
     killAllShells,
     killShell,
-    killShellsByPort,
     shutdown,
     registerExtensionTools: (tools: ToolDefinition[]) => {
       // Reject tools that collide with built-in names. Pre-fix, an

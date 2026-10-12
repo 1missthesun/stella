@@ -1375,16 +1375,6 @@ export const collectBrowserData = async (
 ): Promise<BrowserData> =>
   runDiscovery(collectBrowserDataEffect(StellaDataDir, options));
 
-/**
- * Check if the main memory file already exists
- */
-export const coreMemoryExists = async (StellaDataDir: string): Promise<boolean> =>
-  runDiscovery(
-    tryDiscovery(() => fs.access(mainMemoryPath(StellaDataDir))).pipe(
-      Effect.match({ onSuccess: () => true, onFailure: () => false }),
-    ),
-  );
-
 // IP geolocation providers, tried in order. Each maps its response shape onto
 // the same city/region/postal/country fields. Multiple providers guard against
 // any single one being down or rate-limiting the user's IP.

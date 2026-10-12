@@ -1,13 +1,6 @@
 import { promises as fs } from "fs";
 import { session } from "electron";
 import path from "path";
-import { resetMessageStorage } from "@stella/runtime/kernel/storage/reset-message-storage";
-import { broadcastLocalChatUpdated } from "./context.js";
-export const scheduleBootstrapRuntimeShutdown = (context, options = {}) => {
-    return void shutdownBootstrapRuntime(context, options).catch((error) => {
-        console.error("Failed to shut down Stella runtime during scheduled shutdown.", error);
-    });
-};
 /**
  * `stopRuntime` also stops the runtime process, so a reset can delete the
  * files it holds; the next runner start spawns a fresh one.
@@ -63,23 +56,6 @@ export const createBootstrapResetFlows = (context, options) => ({
             await options.initializeStellaHostRunner();
         }
         services.uiStateService.broadcast();
-        return { ok: true };
-    },
-    resetLocalMessages: async () => {
-        const { services, state } = context;
-        if (!state.stellaDataDirPath) {
-            return { ok: true };
-        }
-        await shutdownBootstrapRuntime(context, { stopRuntime: true });
-        await services.localChatHistoryService.closeForReset();
-        try {
-            await resetMessageStorage(state.stellaDataDirPath);
-        }
-        finally {
-            await services.localChatHistoryService.reopen();
-        }
-        await options.initializeStellaHostRunner();
-        broadcastLocalChatUpdated(context);
         return { ok: true };
     },
 });

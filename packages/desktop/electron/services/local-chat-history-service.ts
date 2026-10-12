@@ -3,7 +3,6 @@ import {
   getDesktopDatabasePath,
   initializeDesktopDatabase,
 } from "@stella/runtime/kernel/storage/database-init";
-import { prepareStoredLocalChatPayload } from "@stella/runtime/kernel/storage/local-chat-payload";
 import {
   SessionStore,
   projectLocalChatUpdateEvent,
@@ -24,13 +23,10 @@ import type {
   CloudConversationCacheSnapshot,
 } from "@stella/contracts/cloud-conversation-cache";
 import type {
-  ConversationSummaryCursor,
-  ConversationSummaryPage,
   LocalChatUpdatedPayload,
 } from "@stella/contracts/local-chat";
 import type {
   ConversationFocusRoot,
-  ReplyCounts,
 } from "@stella/contracts/reply-refs";
 import {
   buildMobileSyncMessages,
@@ -126,35 +122,14 @@ export class LocalChatHistoryService {
     return this.getStore().chat.getOrCreateDefaultConversationId();
   }
 
-  createNewDefaultConversationId(): string {
-    return this.getStore().chat.createNewDefaultConversationId();
-  }
 
   setActiveConversationId(conversationId: string): { ok: true } {
     this.getStore().chat.setActiveDefaultConversationId(conversationId);
     return { ok: true };
   }
 
-  listConversations(args: {
-    limit?: number;
-    cursor?: ConversationSummaryCursor | null;
-  }): ConversationSummaryPage {
-    return this.getStore().chat.listConversationSummaries(args);
-  }
 
-  deleteConversation(conversationId: string): { deleted: boolean } {
-    return { deleted: this.getStore().chat.deleteConversation(conversationId) };
-  }
 
-  listEvents(args: {
-    conversationId: string;
-    maxItems?: number;
-  }): LocalChatEventRecord[] {
-    return this.getStore().chat.listEvents(
-      args.conversationId,
-      args.maxItems,
-    ) as LocalChatEventRecord[];
-  }
 
 
   listMessages(args: {
@@ -206,21 +181,6 @@ export class LocalChatHistoryService {
     return { messages, visibleMessageCount, nextCursor };
   }
 
-  listMessageToolEvents(args: {
-    conversationId: string;
-    messageTimestampMs: number;
-    messageId: string;
-    messageSequence?: number;
-    afterTimestampMs?: number;
-    afterId?: string;
-    afterSequence?: number;
-    limit?: number;
-  }) {
-    return this.getStore().messageWindows.listMessageToolEvents(
-      args.conversationId,
-      args,
-    );
-  }
 
   listActivity(args: {
     conversationId: string;
@@ -260,9 +220,6 @@ export class LocalChatHistoryService {
     return { messages: window.messages, hasOlder: window.hasOlder };
   }
 
-  listReplyCounts(args: { conversationId: string }): ReplyCounts {
-    return this.getStore().chat.listReplyCounts(args.conversationId);
-  }
 
 
 
@@ -279,9 +236,6 @@ export class LocalChatHistoryService {
     }) as LocalChatFilesWindow;
   }
 
-  getEventCount(args: { conversationId: string }): number {
-    return this.getStore().chat.getEventCount(args.conversationId);
-  }
 
   appendEvent(args: LocalChatAppendEventArgs): LocalChatEventRecord {
     const event = this.getStore().chat.appendEvent(args);
@@ -310,36 +264,6 @@ export class LocalChatHistoryService {
     return this.getStore().chat.hasEventId(args.eventId, args.type);
   }
 
-  persistDiscoveryWelcome(args: { conversationId: string; message: string }): {
-    ok: true;
-  } {
-    const message = args.message.trim();
-    const store = this.getStore();
-    let latestEvent: LocalChatEventRecord | undefined;
-    if (message.length > 0) {
-      latestEvent = store.chat.appendEvent({
-        conversationId: args.conversationId,
-        type: "assistant_message",
-        payload: prepareStoredLocalChatPayload({
-          type: "assistant_message",
-          payload: { text: message },
-          timestamp: Date.now(),
-        }),
-      });
-    }
-
-    this.onUpdated?.({
-      conversationId: args.conversationId,
-      ...(latestEvent
-        ? {
-            event: projectLocalChatUpdateEvent(
-              latestEvent,
-            ) as unknown as LocalChatUpdatedPayload["event"],
-          }
-        : {}),
-    });
-    return { ok: true };
-  }
 
   listSyncMessages(args: {
     conversationId: string;

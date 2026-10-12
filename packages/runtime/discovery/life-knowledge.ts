@@ -159,15 +159,6 @@ const buildSkillFile = (
   ].join("\n");
 };
 
-export const discoveryKnowledgeExists = async (
-  stellaDataDir: string,
-): Promise<boolean> =>
-  runDiscovery(
-    tryDiscovery(() =>
-      fs.access(path.join(topicDir(stellaDataDir), "SKILL.md")),
-    ).pipe(Effect.match({ onSuccess: () => true, onFailure: () => false })),
-  );
-
 export const writeDiscoveryKnowledge = async (
   stellaDataDir: string,
   payload: DiscoveryKnowledgeSeedPayload,

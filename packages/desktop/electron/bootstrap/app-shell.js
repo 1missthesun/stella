@@ -157,10 +157,6 @@ export const createBootstrapInitialWindows = (context) => {
         elapsedMs: Math.round(process.uptime() * 1000),
     });
 };
-export const initializeBootstrapAppShell = async (context) => {
-    await prepareBootstrapAppShell(context);
-    launchBootstrapAppShell(context);
-};
 export const prepareBootstrapAppShell = async (context) => {
     await initializeBootstrapLocalState(context);
     initializeWindowShell(context);

@@ -29,11 +29,3 @@ export const scheduleGlobalInputHooksAfterAppReady = (context) => {
         context.state.globalInputHooksStarted = true;
     }, GLOBAL_INPUT_HOOK_DELAY_MS);
 };
-export const installGlobalInputHookFocusRetry = (context) => {
-    if (process.platform !== "darwin") {
-        return;
-    }
-    app.on("browser-window-focus", () => {
-        scheduleGlobalInputHooksAfterAppReady(context);
-    });
-};

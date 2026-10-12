@@ -358,7 +358,6 @@ export const createStellaHostRunner = (
     },
     loadExecutionContext: async () => await context.loadExecutionContext?.(),
     killAllShells: () => context.toolHost.killAllShells(),
-    killShellsByPort: (port) => context.toolHost.killShellsByPort(port),
     piTools: createRunnerPiTools(context),
     agentHealthCheck,
     warmModelCatalog,

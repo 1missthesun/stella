@@ -12,28 +12,6 @@ const initializedSession = WorkerSessions.sessionOrFail(
 );
 
 export const discoveryHandlers: WorkerRpcHandlers = {
-  [METHOD_NAMES.INTERNAL_WORKER_DISCOVERY_COLLECT_BROWSER_DATA]: (params) =>
-    Effect.flatMap(initializedSession, (session) =>
-      fromPromise(async () => {
-        const payload =
-          (params as
-            | { selectedBrowser?: string; selectedProfile?: string }
-            | undefined) ?? {};
-        const { collectBrowserData, formatBrowserDataForSynthesis } =
-          await import("../../../discovery/browser-data.js");
-        const data = await collectBrowserData(
-          session.config.get().stellaDataDirPath,
-          {
-            selectedBrowser: payload.selectedBrowser as
-              | import("../../../discovery/browser-data.js").BrowserType
-              | undefined,
-            selectedProfile: payload.selectedProfile,
-          },
-        );
-        return { data, formatted: formatBrowserDataForSynthesis(data) };
-      }),
-    ),
-
   [METHOD_NAMES.INTERNAL_WORKER_DISCOVERY_COLLECT_ALL_SIGNALS]: (params) =>
     Effect.flatMap(initializedSession, (session) =>
       fromPromise(async () => {

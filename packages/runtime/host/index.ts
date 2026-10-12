@@ -447,9 +447,6 @@ export class StellaRuntimeHost {
   getRuntimeControlPaths() {
     return resolveRuntimePaths(this.options.initializeParams.stellaAppDir);
   }
-  getPendingWorkerRestart() {
-    return this.pendingStaleWorkerRestart;
-  }
   async markPendingWorkerRestart(reason: string) {
     if (!this.pendingStaleWorkerRestart) {
       this.pendingStaleWorkerRestart = { reason, detectedAtMs: Date.now() };
@@ -1912,17 +1909,6 @@ export class StellaRuntimeHost {
       },
     );
   }
-  async runBlockingLocalAgent(payload: unknown) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_RUN_BLOCKING_AGENT,
-      payload,
-      {
-        ensureWorker: true,
-        recordActivity: true,
-        rpc: AGENT_RUN_RPC_OPTIONS,
-      },
-    );
-  }
   async cancelBlockingLocalAgent(
     agentId: string,
     reason: string,
@@ -2018,16 +2004,6 @@ export class StellaRuntimeHost {
       },
     );
   }
-  async voiceWebSearch(payload: unknown) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_VOICE_WEB_SEARCH,
-      payload,
-      {
-        ensureWorker: true,
-        recordActivity: true,
-      },
-    );
-  }
   async getOrCreateDefaultConversationId() {
     return await this.requestWorker(
       METHOD_NAMES.INTERNAL_WORKER_LOCAL_CHAT_GET_OR_CREATE_DEFAULT,
@@ -2038,27 +2014,6 @@ export class StellaRuntimeHost {
   async listLocalChatEvents(payload: unknown) {
     return await this.requestWorker(
       METHOD_NAMES.INTERNAL_WORKER_LOCAL_CHAT_LIST_EVENTS,
-      payload,
-      { ensureWorker: true, recordActivity: false },
-    );
-  }
-  async getLocalChatEventCount(payload: unknown) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_LOCAL_CHAT_GET_EVENT_COUNT,
-      payload,
-      { ensureWorker: true, recordActivity: false },
-    );
-  }
-  async persistDiscoveryWelcome(payload: unknown) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_LOCAL_CHAT_PERSIST_DISCOVERY_WELCOME,
-      payload,
-      { ensureWorker: true, recordActivity: true },
-    );
-  }
-  async listLocalChatSyncMessages(payload: unknown) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_LOCAL_CHAT_LIST_SYNC_MESSAGES,
       payload,
       { ensureWorker: true, recordActivity: false },
     );
@@ -2136,11 +2091,6 @@ export class StellaRuntimeHost {
       payload.maxItems,
     );
   }
-  async getConversationEventCount(payload: { conversationId: string }) {
-    return this.ensureScheduler().getConversationEventCount(
-      payload.conversationId,
-    );
-  }
   async killAllShells() {
     return await this.requestWorker(
       METHOD_NAMES.INTERNAL_WORKER_KILL_ALL_SHELLS,
@@ -2148,39 +2098,11 @@ export class StellaRuntimeHost {
       { ensureWorker: false, recordActivity: true },
     );
   }
-  async killShellsByPort(port: number) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_KILL_SHELL_BY_PORT,
-      { port },
-      { ensureWorker: false, recordActivity: true },
-    );
-  }
-  async collectBrowserData(options: unknown) {
-    return await this.requestWorker(
-      METHOD_NAMES.INTERNAL_WORKER_DISCOVERY_COLLECT_BROWSER_DATA,
-      options,
-      { ensureWorker: true, recordActivity: false },
-    );
-  }
   async collectAllSignals(options: unknown) {
     return await this.requestWorker(
       METHOD_NAMES.INTERNAL_WORKER_DISCOVERY_COLLECT_ALL_SIGNALS,
       options,
       { ensureWorker: true, recordActivity: false },
-    );
-  }
-  async coreMemoryExists() {
-    const { coreMemoryExists } = await import("../discovery/browser-data.js");
-    return await coreMemoryExists(
-      this.options.initializeParams.stellaDataDirPath,
-    );
-  }
-  async discoveryKnowledgeExists() {
-    const { discoveryKnowledgeExists } = await import(
-      "../discovery/life-knowledge.js"
-    );
-    return await discoveryKnowledgeExists(
-      this.options.initializeParams.stellaDataDirPath,
     );
   }
   async writeCoreMemory(

@@ -30,12 +30,6 @@ export const runnerOpsHandlers: WorkerRpcHandlers = {
         ).pipe(Effect.as({ ok: true })),
     ),
 
-  [METHOD_NAMES.INTERNAL_WORKER_KILL_SHELL_BY_PORT]: (params) =>
-    Effect.map(runnerNow, (runner) => {
-      runner.killShellsByPort((params as { port: number }).port);
-      return { ok: true };
-    }),
-
   [METHOD_NAMES.INTERNAL_WORKER_GOOGLE_WORKSPACE_AUTH_STATUS]: () =>
     Effect.flatMap(runnerNow, (runner) =>
       fromPromise(() => runner.googleWorkspaceGetAuthStatus()),

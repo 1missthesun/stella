@@ -997,10 +997,6 @@ export class LocalSchedulerService {
     return events.slice(events.length - normalizedMax).map(cloneGeneratedEvent)
   }
 
-  getConversationEventCount(conversationId: string) {
-    return this.state.generatedEvents[conversationId]?.length ?? 0
-  }
-
   private readState(): LocalSchedulerState {
     try {
       const raw = fs.readFileSync(this.statePath, 'utf-8')

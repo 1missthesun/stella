@@ -135,9 +135,7 @@ export const METHOD_NAMES = {
   INTERNAL_WORKER_VOICE_ORCHESTRATOR_CONFIG:
     "internal.worker.voice.orchestratorConfig",
   INTERNAL_WORKER_VOICE_EXECUTE_TOOL: "internal.worker.voice.executeTool",
-  INTERNAL_WORKER_VOICE_WEB_SEARCH: "internal.worker.voice.webSearch",
   INTERNAL_WORKER_KILL_ALL_SHELLS: "internal.worker.killAllShells",
-  INTERNAL_WORKER_KILL_SHELL_BY_PORT: "internal.worker.killShellByPort",
   INTERNAL_WORKER_LOCAL_CHAT_GET_OR_CREATE_DEFAULT:
     "internal.worker.localChat.getOrCreateDefaultConversationId",
   INTERNAL_WORKER_LOCAL_CHAT_APPEND_EVENT:
@@ -146,12 +144,6 @@ export const METHOD_NAMES = {
     "internal.worker.localChat.listEvents",
   INTERNAL_WORKER_LOCAL_CHAT_GET_EVENT_COUNT:
     "internal.worker.localChat.getEventCount",
-  INTERNAL_WORKER_LOCAL_CHAT_PERSIST_DISCOVERY_WELCOME:
-    "internal.worker.localChat.persistDiscoveryWelcome",
-  INTERNAL_WORKER_LOCAL_CHAT_LIST_SYNC_MESSAGES:
-    "internal.worker.localChat.listSyncMessages",
-  INTERNAL_WORKER_DISCOVERY_COLLECT_BROWSER_DATA:
-    "internal.worker.discovery.collectBrowserData",
   INTERNAL_WORKER_DISCOVERY_COLLECT_ALL_SIGNALS:
     "internal.worker.discovery.collectAllSignals",
   INTERNAL_WORKER_ONE_SHOT_COMPLETION: "internal.worker.oneShotCompletion",
@@ -734,9 +726,6 @@ export type RuntimeScheduleApi = {
     conversationId: string;
     maxItems?: number;
   }) => Promise<ScheduledConversationEvent[]>;
-  getConversationEventCount: (args: {
-    conversationId: string;
-  }) => Promise<number>;
 };
 
 export type RuntimeHealthApi = {

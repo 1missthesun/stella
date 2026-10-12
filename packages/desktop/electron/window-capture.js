@@ -40,21 +40,6 @@ const parseWindowInfoJson = (stdout) => {
         return null;
     }
 };
-const parseWindowInfoBatchJson = (stdout, expectedLength) => {
-    try {
-        const parsed = JSON.parse(stdout);
-        if (!Array.isArray(parsed) || parsed.length !== expectedLength)
-            return null;
-        return parsed.map((entry) => !entry ||
-            typeof entry !== 'object' ||
-            entry.error
-            ? null
-            : entry);
-    }
-    catch {
-        return null;
-    }
-};
 /**
  * Resolve the topmost window at a point, preferring the persistent
  * `window_info --serve` daemon (a pipe write, no process spawn) and falling
@@ -133,79 +118,6 @@ export const getWindowInfoAtPoint = (x, y, options) => {
     })
         .finally(() => {
         windowInfoPointInFlight.delete(key);
-    });
-};
-/**
- * Resolve the topmost window at each of several screen points in a single
- * native-helper invocation (`window_info --points=...`). Returns one entry
- * per input point (null where no window matched), or `null` when the helper
- * is unavailable / too old to support batch mode / returns an unexpected
- * shape — callers should fall back to per-point `getWindowInfoAtPoint` in
- * that case. Lets a caller probe a whole sample grid with one
- * process spawn instead of one per point (far cheaper on Windows, where each
- * spawn is a full CreateProcess).
- */
-export const getWindowInfoBatchAtPoints = async (points, options) => {
-    if (points.length === 0)
-        return [];
-    const pointsArg = points
-        .map((p) => `${Math.round(p.x)},${Math.round(p.y)}`)
-        .join(';');
-    const tokens = [`--points=${pointsArg}`];
-    tokens.push(...exclusionArgs(options));
-    // Prefer the persistent daemon (one pipe write for all points). The client
-    // self-gates by platform and returns undefined when it's unavailable.
-    const daemonResponse = await requestWindowInfoDaemon(tokens);
-    if (daemonResponse !== undefined) {
-        const parsed = parseWindowInfoBatchJson(daemonResponse, points.length);
-        if (parsed)
-            return parsed;
-        // Daemon answered but the shape was unexpected — fall through to a
-        // one-shot spawn rather than reporting a probe failure.
-    }
-    // Old binaries without batch support exit non-zero here; the caller falls
-    // back to per-point queries, so this is expected, not logged.
-    const stdout = await runNativeHelper(WINDOW_INFO_HELPER, tokens, {
-        timeout: 3000,
-        onError: () => { },
-    });
-    if (!stdout)
-        return null;
-    return parseWindowInfoBatchJson(stdout, points.length);
-};
-export const moveResizeWindowAtPoint = (x, y, options) => {
-    return new Promise((resolve) => {
-        const args = [String(x), String(y)];
-        args.push(...exclusionArgs(options));
-        const { bounds } = options;
-        args.push(`--set-bounds=${[bounds.x, bounds.y, bounds.width, bounds.height]
-            .map((value) => Math.round(value))
-            .join(',')}`);
-        void runNativeHelper(WINDOW_INFO_HELPER, args, {
-            timeout: 3000,
-            onError: (error) => {
-                console.warn('window_info move failed', error);
-            },
-        }).then((stdout) => {
-            if (!stdout) {
-                resolve(null);
-                return;
-            }
-            try {
-                const info = JSON.parse(stdout);
-                if (info.error) {
-                    resolve(null);
-                    return;
-                }
-                resolve({
-                    windowInfo: info,
-                    moved: info.moved === true,
-                });
-            }
-            catch {
-                resolve(null);
-            }
-        });
     });
 };
 const safeParseJson = (raw) => {

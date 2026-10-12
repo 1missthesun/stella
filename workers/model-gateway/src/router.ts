@@ -291,7 +291,9 @@ const handleSessionCapability = async (
     throw new GatewayError(
       429,
       "rate_limited",
-      "Too many capability exchanges for this account.",
+      ownerAdmission.refused === "refused_attempts"
+        ? "Too many refused capability exchanges for this account. Wait a while before trying again."
+        : "Too many capability exchanges for this account.",
       quotaErrorOptions({
         scope: "owner",
         now: deps.now(),
@@ -316,7 +318,9 @@ const handleSessionCapability = async (
         throw new GatewayError(
           429,
           "rate_limited",
-          "Too many capability exchanges from this network.",
+          networkAdmission.refused === "refused_attempts"
+            ? "Too many refused capability exchanges from this network. Wait a while before trying again."
+            : "Too many capability exchanges from this network.",
           quotaErrorOptions({
             scope: "network",
             now: deps.now(),

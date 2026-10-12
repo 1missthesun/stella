@@ -20,6 +20,7 @@ import {
 } from "../shared-config.js";
 import {
   GATEWAY_OWNER_RELAY_LIMITS,
+  GATEWAY_REFUSED_MINTS_PER_HOUR,
   GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR,
   GATEWAY_THROTTLED_LIMIT_SHARE,
   GATEWAY_UPSTREAM_MAX_DURATION_MS,
@@ -67,7 +68,7 @@ export type GateAdmission =
  */
 export type MintAdmission =
   | { ok: true; admissionId: number }
-  | { ok: false; refused: "rate_limited"; resetAt: number };
+  | { ok: false; refused: "rate_limited" | "refused_attempts"; resetAt: number };
 
 type CountRow = { count: number };
 type OldestRow = { oldest: number | null };
@@ -131,6 +132,12 @@ const SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS mint_admissions_at
     ON mint_admissions(admitted_at)`,
+  `CREATE TABLE IF NOT EXISTS mint_refusals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    refused_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS mint_refusals_at
+    ON mint_refusals(refused_at)`,
   `CREATE TABLE IF NOT EXISTS mint_audience (
     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
     audience TEXT NOT NULL,
@@ -635,6 +642,23 @@ export class OwnerRelayGate extends DurableObject<Env> {
       "DELETE FROM mint_admissions WHERE admitted_at <= ?",
       now - HOUR_MS,
     );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM mint_refusals WHERE refused_at <= ?",
+      now - HOUR_MS,
+    );
+    const refusals = this.ctx.storage.sql
+      .exec<CountRow>("SELECT COUNT(*) AS count FROM mint_refusals")
+      .one().count;
+    if (refusals >= GATEWAY_REFUSED_MINTS_PER_HOUR.owner) {
+      const oldest = this.ctx.storage.sql
+        .exec<OldestRow>("SELECT MIN(refused_at) AS oldest FROM mint_refusals")
+        .one().oldest;
+      return {
+        ok: false,
+        refused: "refused_attempts",
+        resetAt: (oldest ?? now) + HOUR_MS,
+      };
+    }
     const issued =
       args.audience === "anonymous"
         ? undefined
@@ -672,11 +696,13 @@ export class OwnerRelayGate extends DurableObject<Env> {
   /**
    * The end of an admitted exchange: issued, it keeps counting and its
    * capability's audience is the owner's tier from now on; refused or
-   * failed, it is given back.
+   * failed, it is given back and counts only as a refused attempt
+   * (`GATEWAY_REFUSED_MINTS_PER_HOUR`).
    */
   async settleMint(args: { admissionId: number; issuedAudience?: string }): Promise<void> {
     if (args.issuedAudience === undefined) {
       this.ctx.storage.sql.exec("DELETE FROM mint_admissions WHERE id = ?", args.admissionId);
+      this.ctx.storage.sql.exec("INSERT INTO mint_refusals (refused_at) VALUES (?)", Date.now());
       return;
     }
     this.ctx.storage.sql.exec(

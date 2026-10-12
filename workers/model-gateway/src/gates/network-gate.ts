@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import {
   GATEWAY_NETWORK_LIMITS,
+  GATEWAY_REFUSED_MINTS_PER_HOUR,
   limitsAudienceFor,
 } from "@stella/contracts/gateway/api";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
@@ -15,7 +16,7 @@ export type NetworkAdmission =
 /** An anonymous session exchange from this network, held until `releaseMint` gives a refused one back. */
 export type NetworkMintAdmission =
   | { ok: true; admissionId: number }
-  | { ok: false; refused: "rate_limited"; resetAt: number };
+  | { ok: false; refused: "rate_limited" | "refused_attempts"; resetAt: number };
 
 type CountRow = { count: number };
 type OldestRow = { oldest: number | null };
@@ -34,6 +35,12 @@ const SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS network_mint_admissions_at
     ON mint_admissions(admitted_at)`,
+  `CREATE TABLE IF NOT EXISTS mint_refusals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    refused_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS network_mint_refusals_at
+    ON mint_refusals(refused_at)`,
 ];
 
 /** One SQLite Durable Object per `sha256(ip).slice(0, 32)`. */
@@ -105,6 +112,19 @@ export class NetworkGate extends DurableObject<Env> {
       "DELETE FROM mint_admissions WHERE admitted_at <= ?",
       now - DAY_MS,
     );
+    this.ctx.storage.sql.exec(
+      "DELETE FROM mint_refusals WHERE refused_at <= ?",
+      now - HOUR_MS,
+    );
+    const refusals = this.ctx.storage.sql
+      .exec<CountRow>("SELECT COUNT(*) AS count FROM mint_refusals")
+      .one().count;
+    if (refusals >= GATEWAY_REFUSED_MINTS_PER_HOUR.network) {
+      const oldest = this.ctx.storage.sql
+        .exec<OldestRow>("SELECT MIN(refused_at) AS oldest FROM mint_refusals")
+        .one().oldest;
+      return { ok: false, refused: "refused_attempts", resetAt: (oldest ?? now) + HOUR_MS };
+    }
     const count = this.ctx.storage.sql
       .exec<CountRow>("SELECT COUNT(*) AS count FROM mint_admissions")
       .one().count;
@@ -129,9 +149,10 @@ export class NetworkGate extends DurableObject<Env> {
     return { ok: true, admissionId };
   }
 
-  /** An admitted exchange that issued no capability: it does not count. */
+  /** An admitted exchange that issued no capability: it counts only as a refused attempt. */
   async releaseMint(admissionId: number): Promise<void> {
     this.ctx.storage.sql.exec("DELETE FROM mint_admissions WHERE id = ?", admissionId);
+    this.ctx.storage.sql.exec("INSERT INTO mint_refusals (refused_at) VALUES (?)", Date.now());
   }
 
   private refusal(args: {

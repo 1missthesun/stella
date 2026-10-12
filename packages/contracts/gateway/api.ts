@@ -303,6 +303,15 @@ export const GATEWAY_OWNER_RELAY_LIMITS: Readonly<
  */
 export const GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR = 240;
 
+/**
+ * Refused session exchanges (no capability issued: sign-in or challenge
+ * required, an outage) per rolling hour, for one owner and, for anonymous
+ * owners, one network. Refusals never touch the exchange allowance; this
+ * separate cap only stops a stuck client from hammering the backend, well
+ * above any retry pattern a working client has.
+ */
+export const GATEWAY_REFUSED_MINTS_PER_HOUR = { owner: 120, network: 360 } as const;
+
 /** A throttled owner (enforcement status) gets this share of its tier limits. */
 export const GATEWAY_THROTTLED_LIMIT_SHARE = 0.5;
 

@@ -21,6 +21,7 @@ import type { WakeReport, ChatTurnRequest } from "./types.js";
 import { LIVE_TOOL_LIMIT } from "./constants.js";
 import { json, log, previewArgs } from "./support.js";
 import { OrchestratorTools } from "./tools.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 /** How long a Claude Code turn waits for its chat turn to bind (after an eviction). */
 const CLAUDE_CODE_TURN_WAIT_MS = 60_000;
@@ -105,7 +106,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
       )
       .toArray()[0]?.seq;
     if (typeof prior !== "number") return null;
-    const response = (await this.env.OWNER_GATES.getByName(turn.ownerId)
+    const response = (await ownerGateStub(this.env.OWNER_GATES, turn.ownerId)
       .ownerInternal({
         name: "claudeSessions.latestForRestore",
         args: { threadId: turn.conversationId },
@@ -276,7 +277,7 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
     limit: ClaudeUsageLimit,
   ): Promise<boolean> {
     try {
-      const response = (await this.env.OWNER_GATES.getByName(turn.ownerId).ownerInternal({
+      const response = (await ownerGateStub(this.env.OWNER_GATES, turn.ownerId).ownerInternal({
         name: "agentThreads.holdForUsageLimit",
         args: {
           conversationId: turn.conversationId,

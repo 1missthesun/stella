@@ -39,6 +39,7 @@ import { ttsText } from "../owner-store/domains/voice.js";
 import { createPcmMp3Encoder, estimateTtsUsage, openTtsPcm, pcmToWav, resolveGeminiTtsVoice, ttsProvider } from "./tts.js";
 import { buildHlsPlaylist, HLS_MANIFEST_FILE, type HlsManifest } from "./hls.js";
 import { readTtsTicket, ttsObjectKey } from "./ticket.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 type VoiceEnv = Cloudflare.Env;
 
@@ -78,7 +79,7 @@ const errorResponse = (error: unknown): Response => {
 /** The owner's current generation, read from the owner's object. */
 export const ownerGeneration = async (env: Pick<VoiceEnv, "OWNER_GATES">, ownerId: string): Promise<string> => {
   try {
-    return (await env.OWNER_GATES.getByName(ownerId).snapshot()).ownerGeneration;
+    return (await ownerGateStub(env.OWNER_GATES, ownerId).snapshot()).ownerGeneration;
   } catch {
     throw new RpcError("UNAVAILABLE", "Account state is unavailable. Try again.");
   }
@@ -93,7 +94,7 @@ export const voiceInternal = async <T>(
   args: unknown,
 ): Promise<T> =>
   unwrapRpc(
-    await env.OWNER_GATES.getByName(ownerId).ownerInternal({ name, args, ownerGeneration: generation }),
+    await ownerGateStub(env.OWNER_GATES, ownerId).ownerInternal({ name, args, ownerGeneration: generation }),
   ) as T;
 
 /** The Muse relay's metering, on the owner's object under one generation. */

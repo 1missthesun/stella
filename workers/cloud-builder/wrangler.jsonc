@@ -52,6 +52,7 @@
   "compatibility_flags": ["nodejs_compat", "durable_object_io_tasks_prevent_eviction"],
   "observability": {
     "enabled": true,
+    "issues": { "enabled": true },
     "logs": {
       "enabled": true,
       "invocation_logs": true,
@@ -362,6 +363,7 @@
     },
     "observability": {
       "enabled": true,
+      "issues": { "enabled": true },
       "logs": {
         "enabled": true,
         "invocation_logs": true,

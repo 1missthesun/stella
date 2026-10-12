@@ -7,6 +7,7 @@
  */
 
 import type { VerifiedToken } from "./auth-jwt.js";
+import { ownerGateStub } from "./rpc-release.js";
 
 const NOTED_MAX = 10_000;
 const NOTE_TIMEOUT_MS = 3_000;
@@ -21,7 +22,7 @@ export const noteOwnerIdentity = async (
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
-      env.OWNER_GATES.getByName(token.ownerId).noteIdentity({
+      ownerGateStub(env.OWNER_GATES, token.ownerId).noteIdentity({
         isAnonymous: token.isAnonymous,
         identityLevel: token.identityLevel,
       }),

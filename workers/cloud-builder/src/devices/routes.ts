@@ -12,6 +12,7 @@
 import { readJsonObject } from "../http/body.js";
 import { requireCaller } from "../http/caller.js";
 import { fail, failRpcError } from "../http/response.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 const MOBILE_PREFIX = "/api/mobile/";
 const MAX_BODY_BYTES = 64 * 1024;
@@ -29,7 +30,7 @@ const mobileRoute = async (request: Request, env: Cloudflare.Env, url: URL): Pro
   request.headers.forEach((value, name) => {
     if (name.startsWith("x-stella-mobile-")) headers[name] = value;
   });
-  const result = await env.OWNER_GATES.getByName(verified.caller.ownerId).mobileRoute({
+  const result = await ownerGateStub(env.OWNER_GATES, verified.caller.ownerId).mobileRoute({
     route: `${request.method} ${url.pathname.slice(MOBILE_PREFIX.length)}`,
     caller: verified.caller,
     query: Object.fromEntries(url.searchParams),

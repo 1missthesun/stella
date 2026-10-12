@@ -67,6 +67,7 @@ import {
   type TurnEventEvent,
 } from "@stella/contracts/turn-plane/owner-events";
 import type { AgentHistoryRow } from "@stella/executor-cloud/agent-history";
+import { ownerGateStub } from "../rpc-release.js";
 
 export type SessionCoreHost = Pick<
   BuildSessionInternals,
@@ -169,7 +170,7 @@ export const deleteTurnStoragePreservingExactCancellations = async (
 };
 
 export const ownerGateFor = (host: SessionCoreHost, ownerId: string) => {
-  return host.env.OWNER_GATES.getByName(ownerId);
+  return ownerGateStub(host.env.OWNER_GATES, ownerId);
 };
 
 /**
@@ -368,7 +369,7 @@ export const trackTurn = <T>(
 };
 
 const ownerFence = (host: SessionCoreHost, ownerId: string) => {
-  return host.env.OWNER_GATES.getByName(ownerId);
+  return ownerGateStub(host.env.OWNER_GATES, ownerId);
 };
 
 export const callOwnerFence = async (

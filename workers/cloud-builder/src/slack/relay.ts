@@ -33,6 +33,7 @@ import {
 import { toolLabel } from "./format.js";
 import { STOP_ACTION, stopValue } from "./interactivity.js";
 import { loadInstallation, type SlackInstallation } from "./store.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 export type SlackRelayBinding = {
   teamId: string;
@@ -708,7 +709,7 @@ export class SlackRelay {
     const install = await this.token();
     if (!install) return;
     const binding = this.binding!;
-    const gate = this.env.OWNER_GATES.getByName(binding.ownerId);
+    const gate = ownerGateStub(this.env.OWNER_GATES, binding.ownerId);
     const { ownerGeneration } = await gate.snapshot();
     const tooLarge: string[] = [];
     for (const file of files) {

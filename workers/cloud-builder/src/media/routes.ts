@@ -20,6 +20,7 @@ import type { OwnerCaller } from "../owner-store/registry.js";
 import { MEDIA_MODELS } from "@stella/contracts/media-models";
 import { MEDIA_DOCS_URL } from "../owner-store/domains/media.js";
 import { FAL_WEBHOOK_PATH, readFalWebhookUrl, verifyFalSignature } from "./fal.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 const BASE = "/api/media/v1";
 /** Inline sources ride in the body; the owner object stages them in R2. */
@@ -64,10 +65,10 @@ const authenticate = async (
 };
 
 const rpc = async (env: RouteEnv, caller: OwnerCaller, name: string, args: unknown): Promise<RpcResponse> =>
-  await env.OWNER_GATES.getByName(caller.ownerId).ownerRpc({ name, args, caller });
+  await ownerGateStub(env.OWNER_GATES, caller.ownerId).ownerRpc({ name, args, caller });
 
 const internal = async (env: RouteEnv, ownerId: string, name: string, args: unknown): Promise<RpcResponse> => {
-  const gate = env.OWNER_GATES.getByName(ownerId);
+  const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   const { ownerGeneration } = await gate.snapshot();
   return await gate.ownerInternal({ name, args, ownerGeneration });
 };

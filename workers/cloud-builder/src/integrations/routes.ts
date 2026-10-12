@@ -32,6 +32,7 @@ import { verifyServiceBearerRequest } from "../service-bearer.js";
 import { listIntegrationActions, listIntegrationCatalog, publishIntegration } from "./catalog.js";
 import { exchangeNativeOAuthToken, listNativeOAuthProviders } from "./native-oauth.js";
 import { X_STATE_KIND, xResultPage } from "./x.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_ADMIN_BODY_BYTES = 8 * 1024 * 1024;
@@ -100,10 +101,10 @@ const failBody = (body: Extract<BodyResult<unknown>, { ok: false }>, invalid: st
   fail(body.status, body.status === 413 ? body.error : invalid);
 
 const rpc = async (env: RouteEnv, caller: OwnerCaller, name: string, args: unknown): Promise<RpcResponse> =>
-  await env.OWNER_GATES.getByName(caller.ownerId).ownerRpc({ name, args, caller });
+  await ownerGateStub(env.OWNER_GATES, caller.ownerId).ownerRpc({ name, args, caller });
 
 const internal = async (env: RouteEnv, ownerId: string, name: string, args: unknown): Promise<RpcResponse> => {
-  const gate = env.OWNER_GATES.getByName(ownerId);
+  const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   const { ownerGeneration } = await gate.snapshot();
   return await gate.ownerInternal({ name, args, ownerGeneration });
 };

@@ -18,6 +18,7 @@ import { rpcErrorStatus, type RpcResponse } from "@stella/contracts/backend/prot
 import { bearerCredential } from "../../../shared/bearer.js";
 import { fail, json } from "../http/response.js";
 import { fixedWorkSha256SecretEqual } from "../service-bearer.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 type AdminEnv = Pick<Cloudflare.Env, "OWNER_GATES" | "DB" | "WORLDS" | "ORCHESTRATOR_SESSIONS">;
 
@@ -60,7 +61,7 @@ const authorized = async (request: Request, env: AdminEnv): Promise<Response | n
  * read (an unknown or purged owner) answers 404 with why.
  */
 const ownerGate = async (env: AdminEnv, ownerId: string) => {
-  const gate = env.OWNER_GATES.getByName(ownerId);
+  const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   try {
     return { gate, snapshot: await gate.snapshot() };
   } catch (error) {
@@ -167,7 +168,7 @@ const enforcement = async (request: Request, env: AdminEnv): Promise<Response> =
   if (until !== undefined && (typeof until !== "number" || !Number.isFinite(until))) {
     return fail(400, "until must be a timestamp.");
   }
-  const state = await env.OWNER_GATES.getByName(ownerId).setOwnerEnforcement({
+  const state = await ownerGateStub(env.OWNER_GATES, ownerId).setOwnerEnforcement({
     status: status as OwnerEnforcementStatus,
     reason,
     actor: "admin",
@@ -284,7 +285,7 @@ const testAccountSession = async (request: Request, env: AdminEnv): Promise<Resp
 
   const ownerId = userId;
   if (plan) {
-    await env.OWNER_GATES.getByName(ownerId).setBillingPlan({
+    await ownerGateStub(env.OWNER_GATES, ownerId).setBillingPlan({
       plan: plan as "free" | "go" | "pro",
       ...(usageMode ? { usageMode: usageMode as "default" | "unlimited" } : {}),
     });

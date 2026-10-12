@@ -12,6 +12,7 @@ import {
   ownerReadsEvent,
   type OwnerEvent,
 } from "@stella/contracts/turn-plane/owner-events";
+import { ownerGateStub } from "./rpc-release.js";
 
 export type OwnerEventsEnv = Pick<Cloudflare.Env, "OWNER_GATES">;
 
@@ -27,6 +28,6 @@ export const deliverOwnerEvents = async (
     byOwner.set(event.ownerId, batch);
   }
   for (const [ownerId, batch] of byOwner) {
-    await env.OWNER_GATES.getByName(ownerId).applyOwnerEvents(batch);
+    await ownerGateStub(env.OWNER_GATES, ownerId).applyOwnerEvents(batch);
   }
 };

@@ -7,6 +7,7 @@ import type { BillingControlResult } from "@stella/contracts/gateway/usage";
 import { bearerCredential } from "../../../shared/bearer.js";
 import { parseNetworkClass } from "../../../shared/network-class.js";
 import { verifyUserToken } from "../auth-jwt.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 /**
  * `POST /api/gateway/preview-session-capability` (contracts gateway/api.ts):
@@ -93,7 +94,7 @@ export async function handlePreviewSessionCapabilityRoute(
   if (!deviceProof.ok) return refuse(400, "dpop_invalid");
 
   try {
-    const result = await env.OWNER_GATES.getByName(ownerId).issueSessionCapability({
+    const result = await ownerGateStub(env.OWNER_GATES, ownerId).issueSessionCapability({
       ownerId,
       isAnonymous: verified.token.isAnonymous,
       ipHash,

@@ -60,9 +60,10 @@ import {
   R2_SWEEP_MAX_PAGES,
   sweepR2Prefix,
 } from "./shared/keys.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 const ownerFenceStub = (env: Env, ownerId: string) =>
-  env.OWNER_GATES.getByName(ownerId);
+  ownerGateStub(env.OWNER_GATES, ownerId);
 
 export const callOwnerFence = async (
   env: Env,
@@ -411,7 +412,7 @@ export const purgeOwnerStorage = async (
   await (async (): Promise<void> => {
     const store = "sandbox-dependencies";
     try {
-      const agents = await env.OWNER_GATES.getByName(ownerId).agentContainers();
+      const agents = await ownerGateStub(env.OWNER_GATES, ownerId).agentContainers();
       for (const sandboxId of [...agents, await worldSandboxId(ownerId)]) {
         await env.Sandbox.getByName(sandboxId.toLowerCase()).destroy();
       }

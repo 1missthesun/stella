@@ -32,6 +32,7 @@ import {
   verifyInstallationBelongsToUser,
 } from "./github.js";
 import { json } from "../http/response.js";
+import { ownerGateStub } from "../rpc-release.js";
 
 const CALLBACK_PATH = "/api/cloud/projects/github/callback";
 const WEBHOOK_PATH = "/api/cloud/projects/github/webhook";
@@ -56,7 +57,7 @@ const page = (title: string, detail: string, status = 200, extra = ""): Response
   );
 
 const internal = async (env: Cloudflare.Env, ownerId: string, name: string, args: unknown): Promise<RpcResponse> => {
-  const gate = env.OWNER_GATES.getByName(ownerId);
+  const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   const { ownerGeneration } = await gate.snapshot();
   return await gate.ownerInternal({ name, args, ownerGeneration });
 };

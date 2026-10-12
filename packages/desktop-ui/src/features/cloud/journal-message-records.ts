@@ -45,6 +45,25 @@ const lifecycleAgentIdsOnTurn = (
   return ids;
 };
 
+/**
+ * Agents with a start card anywhere in the journal. A computer's agent has its
+ * card on the agent's own thread turn, not on the turn that spawned it, and
+ * that card already renders its start.
+ */
+const startCardedAgentIds = (records: readonly JournalRecord[]): Set<string> => {
+  const ids = new Set<string>();
+  for (const record of records) {
+    if (
+      record.kind === "card" &&
+      record.card.type === "agent-lifecycle" &&
+      record.card.event.type === "agent-started"
+    ) {
+      ids.add(record.card.event.payload.agentId);
+    }
+  }
+  return ids;
+};
+
 const spawnResultThreadId = (
   record: JournalMessageRecord,
 ): string | null => {
@@ -77,8 +96,9 @@ const spawnResultThreadId = (
 const mirroredLifecycleEvents = (
   turnId: string,
   turnRecords: readonly JournalRecord[],
+  startCarded: ReadonlySet<string>,
 ): { spawns: Map<number, EventRecord>; wake: EventRecord | null } => {
-  const carded = lifecycleAgentIdsOnTurn(turnRecords);
+  const carded = new Set([...lifecycleAgentIdsOnTurn(turnRecords), ...startCarded]);
   const descriptionsByCall = new Map<string, string>();
   for (const record of turnRecords) {
     if (record.kind !== "message" || record.role !== "assistant") continue;
@@ -397,6 +417,7 @@ export const journalRecordsToMessageRecords = (
   const recordsBySeq = new Map<number, JournalMessageRecord>();
   const agentTitles = journalAgentTitles(records);
   const reactions = journalUserReactions(records);
+  const startCarded = startCardedAgentIds(records);
   for (const record of records) {
     const turn = byTurn.get(record.turnId);
     if (turn) turn.push(record);
@@ -409,7 +430,7 @@ export const journalRecordsToMessageRecords = (
     const events: EventRecord[] = [];
     let userMessageId: string | undefined;
     let turnUserRecord: JournalMessageRecord | undefined;
-    const mirrored = mirroredLifecycleEvents(turnId, turnRecords);
+    const mirrored = mirroredLifecycleEvents(turnId, turnRecords, startCarded);
     // A wake turn can record its lifecycle card ahead of its own prompt. The
     // reply that relays it follows the prompt, so the card waits for it.
     const promptAhead = turnRecords.some(

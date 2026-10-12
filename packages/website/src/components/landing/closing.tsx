@@ -48,8 +48,6 @@ const SOURCE = `  private async take(
     await this.swapIn(cwd, head, to);
   }`;
 
-const HIGHLIGHT = `    await git(cwd, ["merge", "--ff-only", to]);`;
-
 export function OpenSourceAct() {
   const ref = useRef<HTMLElement>(null);
   const lines = SOURCE.split("\n");
@@ -70,11 +68,15 @@ export function OpenSourceAct() {
           </pre>
         ))}
       </div>
-      <h2 id="source-title" className={o.sourceTitle}>
-        Open <span>source.</span>
+      <h2 id="source-title" className={o.repo}>
+        <a href="https://github.com/1missthesun/stella-v2" target="_blank" rel="noopener noreferrer">
+          github.com/
+          <wbr />
+          1missthesun/
+          <wbr />
+          stella-v2
+        </a>
       </h2>
-      <code className={o.hot}>{HIGHLIGHT.trim()}</code>
-      <span className={o.license}>Apache-2.0</span>
     </section>
   );
 }

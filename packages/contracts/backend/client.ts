@@ -115,6 +115,7 @@ type Subscription = {
 
 const SOCKET_OPEN = 1;
 const PING_INTERVAL_MS = 30_000;
+const SILENCE_LIMIT_MS = 2 * PING_INTERVAL_MS + 5_000;
 const IDLE_CLOSE_DELAY_MS = 5_000;
 
 const subscriptionKey = (view: string, args: unknown): string =>
@@ -163,6 +164,7 @@ export class BackendClient {
   private reconnectAttempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
+  private socketHeardAt = 0;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
   private forceTokenOnConnect = false;
   private socketTokenExpiryMs: number | null = null;
@@ -383,6 +385,7 @@ export class BackendClient {
     };
     socket.onmessage = (event) => {
       if (this.socket !== socket) return;
+      this.socketHeardAt = Date.now();
       this.reconnectAttempt = 0;
       this.handleFrame(event.data);
     };
@@ -515,10 +518,15 @@ export class BackendClient {
 
   private startPing(): void {
     this.stopPing();
-    this.pingTimer = setInterval(
-      () => this.sendKeepalive(),
-      PING_INTERVAL_MS,
-    );
+    this.socketHeardAt = Date.now();
+    this.pingTimer = setInterval(() => {
+      if (Date.now() - this.socketHeardAt > SILENCE_LIMIT_MS) {
+        this.closeSocket(4001, "silent");
+        if (this.subscriptions.size > 0) this.scheduleReconnect();
+        return;
+      }
+      this.sendKeepalive();
+    }, PING_INTERVAL_MS);
   }
 
   private stopPing(): void {

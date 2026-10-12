@@ -67,6 +67,7 @@ const TOKEN_REFRESH_MARGIN_MS = 60_000;
 const MIN_TOKEN_REFRESH_DELAY_MS = 30_000;
 const HTTP_TIMEOUT_MS = 15_000;
 const DISPATCH_WATCH_POLL_MS = 750;
+const DEVICE_PRESENCE_SILENCE_MS = 3 * DEVICE_PRESENCE_PING_INTERVAL_MS + 2_000;
 
 type PlacementKind = ExecutionKind;
 type PlacementCapability = ExecutionCapability;
@@ -118,6 +119,7 @@ export type ExecutionPlacementSocket = {
   readonly readyState: number;
   send(data: string): void;
   close(code?: number, reason?: string): void;
+  terminate?(): void;
   on(event: "open", listener: () => void): unknown;
   on(event: "message", listener: (data: unknown) => void): unknown;
   on(
@@ -401,6 +403,7 @@ export class ExecutionPlacementBridge {
   private socket: ExecutionPlacementSocket | null = null;
   private socketProven = false;
   private socketPingTimer: HostTimerHandle | null = null;
+  private socketHeardAt = 0;
   private socketTokenTimer: HostTimerHandle | null = null;
   private advertisedAvailability = "";
   private stopTask: Promise<void> | null = null;
@@ -815,6 +818,17 @@ export class ExecutionPlacementBridge {
     }
     this.socket = socket;
     this.socketProven = false;
+    this.socketHeardAt = this.now();
+    this.socketPingTimer?.cancel();
+    this.socketPingTimer = forkInterval(DEVICE_PRESENCE_PING_INTERVAL_MS, () => {
+      if (this.socket !== socket) return;
+      if (this.now() - this.socketHeardAt > DEVICE_PRESENCE_SILENCE_MS) {
+        this.log("warn", "The device presence socket went silent; reconnecting.");
+        this.dropSocket(socket, 4001, "silent");
+        return;
+      }
+      this.sendKeepalive();
+    });
     // A JWT that dies mid-connection cannot be replaced in place: the gate
     // authenticates on the handshake, so re-authentication is a reconnect.
     const expiresAt = jwtExpiryMs(token);
@@ -832,6 +846,7 @@ export class ExecutionPlacementBridge {
     }
 
     socket.on("message", (data: unknown) => {
+      if (this.socket === socket) this.socketHeardAt = this.now();
       let frame: DevicePresenceServerFrame;
       try {
         const text =
@@ -867,21 +882,35 @@ export class ExecutionPlacementBridge {
         this.log("error", "A device presence frame failed.", error),
       );
     });
-    socket.on("close", () => {
-      if (this.socket !== socket) return;
-      this.socket = null;
-      this.socketProven = false;
-      this.advertisedAvailability = "";
-      this.socketPingTimer?.cancel();
-      this.socketPingTimer = null;
-      this.socketTokenTimer?.cancel();
-      this.socketTokenTimer = null;
-      this.rejectPendingWaits("The device presence socket closed.");
-      this.scheduleReconnect();
-    });
+    socket.on("close", () => this.dropSocket(socket));
     socket.on("error", (error: unknown) => {
       this.log("warn", "The device presence socket disconnected.", error);
     });
+  }
+
+  /**
+   * A dead link can look open for minutes until TCP gives up, so silence past
+   * a few keepalives ends the socket here and reconnects right away.
+   */
+  private dropSocket(socket: ExecutionPlacementSocket, code?: number, reason?: string) {
+    if (this.socket !== socket) return;
+    this.socket = null;
+    this.socketProven = false;
+    this.advertisedAvailability = "";
+    this.socketPingTimer?.cancel();
+    this.socketPingTimer = null;
+    this.socketTokenTimer?.cancel();
+    this.socketTokenTimer = null;
+    if (code !== undefined) {
+      try {
+        if (socket.terminate) socket.terminate();
+        else if (socket.readyState < 2) socket.close(code, reason);
+      } catch (error) {
+        this.log("warn", "A silent device presence socket could not be closed.", error);
+      }
+    }
+    this.rejectPendingWaits("The device presence socket closed.");
+    this.scheduleReconnect();
   }
 
   /** `begin` announces the session and availability; `proof` signs the nonce. */
@@ -930,13 +959,7 @@ export class ExecutionPlacementBridge {
     connected: async () => {
       this.socketProven = true;
       this.leases.resetReconnectBackoff();
-      this.socketPingTimer?.cancel();
-      this.socketPingTimer = forkInterval(
-        DEVICE_PRESENCE_PING_INTERVAL_MS,
-        () => {
-          this.sendKeepalive();
-        },
-      );
+      this.sendKeepalive();
       await this.resumeAfterConnect();
     },
     offer: (frame) => {

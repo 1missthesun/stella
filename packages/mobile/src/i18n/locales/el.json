@@ -894,7 +894,17 @@
         "sortNewest": "Νεότερα πρώτα",
         "sortOldest": "Παλαιότερα πρώτα",
         "sourceCloud": "Cloud",
-        "sourceUpload": "Από εσάς"
+        "sourceUpload": "Από εσάς",
+        "types": {
+          "all": "Όλα",
+          "images": "Εικόνες",
+          "videos": "Βίντεο",
+          "audio": "Ήχος",
+          "documents": "Έγγραφα",
+          "code": "Κώδικας",
+          "pages": "Σελίδες",
+          "other": "Άλλα"
+        }
       },
       "schedule": {
         "actionFailed": "Δεν ολοκληρώθηκε.",
@@ -910,7 +920,8 @@
         "next": "Επόμενη εκτέλεση {when}",
         "pauseSchedule": "Παύση προγράμματος",
         "paused": "Σε παύση",
-        "resumeSchedule": "Συνέχιση προγράμματος"
+        "resumeSchedule": "Συνέχιση προγράμματος",
+        "editPrompt": "Άλλαξε το πρόγραμμα «{title}»: "
       },
       "search": {
         "clear": "Καθαρισμός αναζήτησης",
@@ -928,6 +939,12 @@
         "finished": "Ολοκληρώθηκε",
         "stopped": "Διακόπηκε",
         "working": "Εργάζεται στο παρασκήνιο"
+      },
+      "time": {
+        "today": "Σήμερα",
+        "yesterday": "Χθες",
+        "tomorrow": "Αύριο",
+        "earlierThisMonth": "Νωρίτερα αυτόν τον μήνα"
       }
     },
     "apps": {

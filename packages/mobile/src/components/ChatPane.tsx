@@ -1454,14 +1454,14 @@ export function ChatPane({
             {
               id: "model-thinking",
               label: t("app.chat.miniModelPicker.reasoningEffortLabel"),
-              icon: "sparkles",
+              icon: "brain",
               trailingLabel: composerModelPicker.effortLabel,
               disabled: composerModelPicker.loading,
               submenuTitle: t("app.chat.miniModelPicker.reasoningEffortLabel"),
               submenu: composerModelPicker.effortOptions.map((effort) => ({
                 id: `model-effort-${effort.id}`,
                 label: effort.label,
-                icon: "sparkles",
+                icon: "brain",
                 selected: effort.selected,
                 disabled,
                 onSelect: () => composerModelPicker.onSelectEffort(effort.id),

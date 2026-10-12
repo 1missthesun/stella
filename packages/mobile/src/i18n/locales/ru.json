@@ -910,7 +910,17 @@
         "sortNewest": "Сначала новые",
         "sortOldest": "Сначала старые",
         "sourceCloud": "Облако",
-        "sourceUpload": "Отправлено вами"
+        "sourceUpload": "Отправлено вами",
+        "types": {
+          "all": "Все",
+          "images": "Изображения",
+          "videos": "Видео",
+          "audio": "Аудио",
+          "documents": "Документы",
+          "code": "Код",
+          "pages": "Страницы",
+          "other": "Другое"
+        }
       },
       "schedule": {
         "actionFailed": "Не получилось.",
@@ -926,7 +936,8 @@
         "next": "Следующий запуск {when}",
         "pauseSchedule": "Приостановить расписание",
         "paused": "На паузе",
-        "resumeSchedule": "Возобновить расписание"
+        "resumeSchedule": "Возобновить расписание",
+        "editPrompt": "Измени моё расписание «{title}»: "
       },
       "search": {
         "clear": "Очистить поиск",
@@ -944,6 +955,12 @@
         "finished": "Готово",
         "stopped": "Остановлено",
         "working": "Работает в фоне"
+      },
+      "time": {
+        "today": "Сегодня",
+        "yesterday": "Вчера",
+        "tomorrow": "Завтра",
+        "earlierThisMonth": "Ранее в этом месяце"
       }
     },
     "apps": {

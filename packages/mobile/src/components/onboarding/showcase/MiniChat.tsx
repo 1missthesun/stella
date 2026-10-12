@@ -264,7 +264,7 @@ export function MiniConfirm({
       ]}
     >
       <View style={styles.confirmIcon}>
-        <Icon name={done ? "check" : "sparkles"} size={12} color={done ? colors.ok : colors.accent} />
+        <Icon name={done ? "check" : "credit-card"} size={12} color={done ? colors.ok : colors.accent} />
       </View>
       <View style={styles.confirmText}>
         <Text style={styles.confirmTitle} numberOfLines={1}>

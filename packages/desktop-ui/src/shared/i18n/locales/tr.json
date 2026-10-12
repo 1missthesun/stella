@@ -894,7 +894,17 @@
         "sortNewest": "Önce en yeni",
         "sortOldest": "Önce en eski",
         "sourceCloud": "Bulut",
-        "sourceUpload": "Senin gönderdiklerin"
+        "sourceUpload": "Senin gönderdiklerin",
+        "types": {
+          "all": "Tümü",
+          "images": "Görseller",
+          "videos": "Videolar",
+          "audio": "Ses",
+          "documents": "Belgeler",
+          "code": "Kod",
+          "pages": "Sayfalar",
+          "other": "Diğer"
+        }
       },
       "schedule": {
         "actionFailed": "Bu işlem gerçekleşemedi.",
@@ -910,7 +920,8 @@
         "next": "Sonraki çalışma {when}",
         "pauseSchedule": "Zamanlamayı duraklat",
         "paused": "Duraklatıldı",
-        "resumeSchedule": "Zamanlamayı sürdür"
+        "resumeSchedule": "Zamanlamayı sürdür",
+        "editPrompt": "“{title}” zamanlamamı değiştir: "
       },
       "search": {
         "clear": "Aramayı temizle",
@@ -928,6 +939,12 @@
         "finished": "Tamamlandı",
         "stopped": "Durduruldu",
         "working": "Arka planda çalışıyor"
+      },
+      "time": {
+        "today": "Bugün",
+        "yesterday": "Dün",
+        "tomorrow": "Yarın",
+        "earlierThisMonth": "Bu ayın başlarında"
       }
     },
     "apps": {

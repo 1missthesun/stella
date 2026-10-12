@@ -910,7 +910,17 @@
         "sortNewest": "Od nejnovějších",
         "sortOldest": "Od nejstarších",
         "sourceCloud": "Cloud",
-        "sourceUpload": "Odeslané vámi"
+        "sourceUpload": "Odeslané vámi",
+        "types": {
+          "all": "Vše",
+          "images": "Obrázky",
+          "videos": "Videa",
+          "audio": "Zvuk",
+          "documents": "Dokumenty",
+          "code": "Kód",
+          "pages": "Stránky",
+          "other": "Ostatní"
+        }
       },
       "schedule": {
         "actionFailed": "Nepovedlo se to.",
@@ -926,7 +936,8 @@
         "next": "Příště {when}",
         "pauseSchedule": "Pozastavit plán",
         "paused": "Pozastaveno",
-        "resumeSchedule": "Obnovit plán"
+        "resumeSchedule": "Obnovit plán",
+        "editPrompt": "Změň můj plán „{title}“: "
       },
       "search": {
         "clear": "Vymazat hledání",
@@ -944,6 +955,12 @@
         "finished": "Hotovo",
         "stopped": "Zastaveno",
         "working": "Pracuje na pozadí"
+      },
+      "time": {
+        "today": "Dnes",
+        "yesterday": "Včera",
+        "tomorrow": "Zítra",
+        "earlierThisMonth": "Dříve tento měsíc"
       }
     },
     "apps": {

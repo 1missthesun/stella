@@ -894,7 +894,17 @@
         "sortNewest": "Nieuwste eerst",
         "sortOldest": "Oudste eerst",
         "sourceCloud": "Cloud",
-        "sourceUpload": "Door jou verstuurd"
+        "sourceUpload": "Door jou verstuurd",
+        "types": {
+          "all": "Alles",
+          "images": "Afbeeldingen",
+          "videos": "Video’s",
+          "audio": "Audio",
+          "documents": "Documenten",
+          "code": "Code",
+          "pages": "Pagina’s",
+          "other": "Overig"
+        }
       },
       "schedule": {
         "actionFailed": "Dat is niet gelukt.",
@@ -910,7 +920,8 @@
         "next": "Volgende {when}",
         "pauseSchedule": "Schema pauzeren",
         "paused": "Gepauzeerd",
-        "resumeSchedule": "Schema hervatten"
+        "resumeSchedule": "Schema hervatten",
+        "editPrompt": "Wijzig mijn planning ‘{title}’: "
       },
       "search": {
         "clear": "Zoekopdracht wissen",
@@ -928,6 +939,12 @@
         "finished": "Voltooid",
         "stopped": "Gestopt",
         "working": "Werkt op de achtergrond"
+      },
+      "time": {
+        "today": "Vandaag",
+        "yesterday": "Gisteren",
+        "tomorrow": "Morgen",
+        "earlierThisMonth": "Eerder deze maand"
       }
     },
     "apps": {

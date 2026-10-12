@@ -47,7 +47,7 @@ export function NativeMenu(props: NativeMenuProps) {
                 buttonStyle(liquidGlassSupported ? "glass" : "bordered"),
                 buttonBorderShape(
                   props.circular ? "circle" : "roundedRectangle",
-                  14,
+                  props.radius ?? 14,
                 ),
               ]),
           frame({ width: props.width, height: props.height }),

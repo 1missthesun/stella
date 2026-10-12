@@ -902,7 +902,17 @@
         "sortNewest": "Più recenti prima",
         "sortOldest": "Meno recenti prima",
         "sourceCloud": "Cloud",
-        "sourceUpload": "Inviati da te"
+        "sourceUpload": "Inviati da te",
+        "types": {
+          "all": "Tutti",
+          "images": "Immagini",
+          "videos": "Video",
+          "audio": "Audio",
+          "documents": "Documenti",
+          "code": "Codice",
+          "pages": "Pagine",
+          "other": "Altro"
+        }
       },
       "schedule": {
         "actionFailed": "Non è andata a buon fine.",
@@ -918,7 +928,8 @@
         "next": "Prossima esecuzione {when}",
         "pauseSchedule": "Metti in pausa la pianificazione",
         "paused": "In pausa",
-        "resumeSchedule": "Riprendi la pianificazione"
+        "resumeSchedule": "Riprendi la pianificazione",
+        "editPrompt": "Modifica la mia pianificazione “{title}”: "
       },
       "search": {
         "clear": "Cancella ricerca",
@@ -936,6 +947,12 @@
         "finished": "Completato",
         "stopped": "Interrotto",
         "working": "Lavora in background"
+      },
+      "time": {
+        "today": "Oggi",
+        "yesterday": "Ieri",
+        "tomorrow": "Domani",
+        "earlierThisMonth": "Prima questo mese"
       }
     },
     "apps": {

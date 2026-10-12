@@ -1,221 +1,124 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { Icon } from "./Icon";
-import {
-  scheduleCadence,
-  scheduleRowBadge,
-  type MobileSchedule,
-  type MobileScheduleAction,
-} from "../lib/schedules";
-import { tapLight } from "../lib/haptics";
-import { useT } from "../i18n";
+import { Pressable, StyleSheet, Text } from "react-native";
+import { Icon, type IconName } from "./Icon";
+import type { MobileSchedule } from "../lib/schedules";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import type { Colors } from "../theme/colors";
 import { fonts } from "../theme/fonts";
-import { fadeHex } from "../theme/oklch";
 
 export type ScheduleRowStyles = ReturnType<typeof makeScheduleRowStyles>;
 
-/**
- * One schedule in the Schedule list: a cadence line with a leading clock or
- * waveform, the next run (or "Paused"), and pause/delete controls for cron
- * schedules. Ported from the retired activity-hub sheet, whose other row kinds
- * (agents and their files) went away with the sidebar's activity list.
- */
+const scheduleIcon = (schedule: MobileSchedule): IconName => {
+  if (schedule.kind === "heartbeat") return "waveform";
+  if (schedule.scheduleKind === "watch") return "eye";
+  if (schedule.scheduleKind === "task") return "checklist";
+  if (schedule.scheduleKind === "reminder") return "bell";
+  return "clock";
+};
+
 export function ScheduleRow({
   schedule,
-  nowMs,
+  trailing,
   busy,
   styles,
   colors,
-  onAction,
+  onPress,
 }: {
   schedule: MobileSchedule;
-  nowMs: number;
+  trailing: string | null;
   busy: boolean;
   styles: ScheduleRowStyles;
   colors: Colors;
-  onAction: (action: MobileScheduleAction) => void;
+  onPress: () => void;
 }) {
-  const t = useT();
-  const cadence =
-    scheduleCadence(schedule) || t("mobile.activityHub.schedule.customCadence");
-  const badge = scheduleRowBadge(schedule, nowMs);
-  const paused = badge.kind === "paused";
-
+  const paused = !schedule.enabled;
+  const failed = !paused && Boolean(schedule.lastError);
   return (
-    <View style={[styles.scheduleGroup, busy && styles.scheduleRowBusy]}>
-      <View style={styles.scheduleRow}>
-        <View style={styles.scheduleGlyph}>
-          <Icon
-            name={
-              schedule.kind === "heartbeat"
-                ? "waveform"
-                : schedule.scheduleKind === "watch"
-                  ? "eye"
-                  : schedule.scheduleKind === "task"
-                    ? "sparkles"
-                    : "clock"
-            }
-            size={14}
-            color={paused ? colors.textMuted : colors.accent}
-          />
-        </View>
-        <View style={styles.scheduleText}>
-          <Text
-            style={styles.scheduleTitle}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          >
-            {schedule.title}
-          </Text>
-          <Text
-            style={[
-              styles.scheduleSub,
-              ...(paused ? [styles.scheduleBadgePaused] : []),
-            ]}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          >
-            {[
-              schedule.scheduleKind
-                ? t(`schedule.kind.${schedule.scheduleKind}`)
-                : null,
-              cadence,
-              badge.kind === "paused"
-                ? t("mobile.activityHub.schedule.paused")
-                : t("mobile.activityHub.schedule.next", { when: badge.label }),
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </Text>
-          {!paused && schedule.lastError ? (
-            <Text
-              style={styles.scheduleError}
-              numberOfLines={2}
-              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-            >
-              {t("mobile.activityHub.schedule.lastRunFailed", {
-                error: schedule.lastError,
-              })}
-            </Text>
-          ) : null}
-        </View>
-        {schedule.kind === "cron" ? (
-          <View style={styles.scheduleActions}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                paused
-                  ? t("mobile.activityHub.schedule.resumeSchedule")
-                  : t("mobile.activityHub.schedule.pauseSchedule")
-              }
-              disabled={busy}
-              hitSlop={8}
-              onPress={() => {
-                tapLight();
-                onAction(paused ? "resume" : "pause");
-              }}
-              style={({ pressed }) => [
-                styles.scheduleActionButton,
-                pressed && styles.scheduleActionButtonPressed,
-              ]}
-            >
-              <Icon
-                name={paused ? "play" : "pause"}
-                size={13}
-                color={colors.textMuted}
-              />
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t(
-                "mobile.activityHub.schedule.deleteSchedule",
-              )}
-              disabled={busy}
-              hitSlop={8}
-              onPress={() => {
-                tapLight();
-                onAction("remove");
-              }}
-              style={({ pressed }) => [
-                styles.scheduleActionButton,
-                pressed && styles.scheduleActionButtonPressed,
-              ]}
-            >
-              <Icon name="x" size={13} color={colors.danger} />
-            </Pressable>
-          </View>
-        ) : null}
-      </View>
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={[schedule.title, trailing].filter(Boolean).join(", ")}
+      disabled={busy}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.row,
+        pressed && styles.rowPressed,
+        busy && styles.rowBusy,
+      ]}
+    >
+      <Icon
+        name={scheduleIcon(schedule)}
+        size={19}
+        color={paused ? colors.textMuted : colors.accent}
+        style={styles.icon}
+      />
+      <Text
+        style={[styles.title, paused && styles.titlePaused]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+      >
+        {schedule.title}
+      </Text>
+      {failed ? (
+        <Icon name="alert-circle" size={15} color={colors.danger} />
+      ) : null}
+      {trailing ? (
+        <Text
+          style={styles.trailing}
+          numberOfLines={1}
+          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+        >
+          {trailing}
+        </Text>
+      ) : null}
+    </Pressable>
   );
 }
 
 export const makeScheduleRowStyles = (colors: Colors) =>
   StyleSheet.create({
-    scheduleGroup: {
-      gap: 2,
+    section: {
+      alignSelf: "center",
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 12,
+      letterSpacing: -0.1,
+      paddingBottom: 6,
+      paddingTop: 16,
     },
-    scheduleRow: {
+    row: {
       alignItems: "center",
+      borderRadius: 12,
       flexDirection: "row",
-      gap: 10,
-      paddingHorizontal: 2,
+      gap: 14,
+      marginHorizontal: -8,
+      minHeight: 48,
+      paddingHorizontal: 8,
       paddingVertical: 10,
     },
-    scheduleGlyph: {
-      alignItems: "center",
-      height: 20,
-      justifyContent: "center",
-      width: 20,
+    rowPressed: {
+      backgroundColor: colors.surfaceInset,
     },
-    scheduleText: {
-      flex: 1,
-      flexShrink: 1,
-      minWidth: 0,
-    },
-    scheduleTitle: {
-      color: colors.text,
-      fontFamily: fonts.sans.medium,
-      fontSize: 14.5,
-      letterSpacing: -0.2,
-    },
-    scheduleSub: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12.5,
-      letterSpacing: -0.1,
-      marginTop: 1,
-    },
-    scheduleError: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12.5,
-      letterSpacing: -0.1,
-      lineHeight: 16,
-      marginTop: 2,
-    },
-    scheduleRowBusy: {
+    rowBusy: {
       opacity: 0.5,
     },
-    scheduleBadgePaused: {
-      color: colors.accent,
-    },
-    scheduleActions: {
-      alignItems: "center",
-      flexDirection: "row",
-      gap: 6,
-    },
-    scheduleActionButton: {
-      alignItems: "center",
-      borderColor: colors.border,
-      borderRadius: 12,
-      borderWidth: StyleSheet.hairlineWidth,
-      height: 24,
-      justifyContent: "center",
+    icon: {
       width: 24,
     },
-    scheduleActionButtonPressed: {
-      backgroundColor: fadeHex(colors.text, 0.08),
+    title: {
+      color: colors.text,
+      flex: 1,
+      fontFamily: fonts.sans.regular,
+      fontSize: 17,
+      letterSpacing: -0.3,
+      minWidth: 0,
+    },
+    titlePaused: {
+      color: colors.textMuted,
+    },
+    trailing: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.regular,
+      fontSize: 15,
+      fontVariant: ["tabular-nums"],
+      letterSpacing: -0.2,
     },
   });

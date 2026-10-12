@@ -902,7 +902,17 @@
         "sortNewest": "Cele mai noi întâi",
         "sortOldest": "Cele mai vechi întâi",
         "sourceCloud": "Cloud",
-        "sourceUpload": "Trimise de tine"
+        "sourceUpload": "Trimise de tine",
+        "types": {
+          "all": "Toate",
+          "images": "Imagini",
+          "videos": "Videoclipuri",
+          "audio": "Audio",
+          "documents": "Documente",
+          "code": "Cod",
+          "pages": "Pagini",
+          "other": "Altele"
+        }
       },
       "schedule": {
         "actionFailed": "Nu a reușit.",
@@ -918,7 +928,8 @@
         "next": "Următoarea rulare {when}",
         "pauseSchedule": "Întrerupe programul",
         "paused": "Întrerupt",
-        "resumeSchedule": "Reia programul"
+        "resumeSchedule": "Reia programul",
+        "editPrompt": "Schimbă programarea „{title}”: "
       },
       "search": {
         "clear": "Șterge căutarea",
@@ -936,6 +947,12 @@
         "finished": "Finalizat",
         "stopped": "Oprit",
         "working": "Lucrează în fundal"
+      },
+      "time": {
+        "today": "Azi",
+        "yesterday": "Ieri",
+        "tomorrow": "Mâine",
+        "earlierThisMonth": "Mai devreme luna aceasta"
       }
     },
     "apps": {

@@ -21,7 +21,7 @@ import {
 } from "../OnboardingCard";
 
 const PILLARS: { icon: IconName; key: string }[] = [
-  { icon: "sparkles", key: "done" },
+  { icon: "checklist", key: "done" },
   { icon: "clock", key: "background" },
   { icon: "check", key: "asks" },
 ];
@@ -44,7 +44,7 @@ export function HelloCard({ active, answered, fresh, onContinue }: HelloCardProp
   if (answered) {
     return (
       <SettledCard
-        icon="sparkles"
+        icon="hand-wave"
         title={t("mobile.onboarding.hello.settledTitle")}
         description={PILLARS.map((pillar) =>
           t(`mobile.onboarding.hello.pillars.${pillar.key}.title`),

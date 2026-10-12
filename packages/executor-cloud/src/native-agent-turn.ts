@@ -60,6 +60,12 @@ import {
   type NativeStateAttestation,
 } from "./native-state-integrity.js";
 import type { AgentInbox } from "./agent-inbox.js";
+import type { ClaudeKeeperClient } from "./claude-keeper-client.js";
+import {
+  CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER,
+  type ClaudeKeeperState,
+} from "./claude-keeper-protocol.js";
+import { NATIVE_STATE_ATTESTATION_FILE } from "./native-state-integrity.js";
 import {
   createNativeTurnCancellation,
   type NativeTurnCancellation,
@@ -84,6 +90,24 @@ type NativeCliTurnResult = Omit<
   sessionId: string;
   /** Inbox messages Claude took during the turn, in the order it took them. */
   steered: string[];
+  /** Claude waits stopped in its keeper for this thread's next turn. */
+  kept?: KeptClaude;
+};
+
+/** A parked process: handed on once its state is sealed, or ended. */
+type KeptClaude = {
+  release: (mac: string) => Promise<void>;
+  discard: () => Promise<void>;
+};
+
+/**
+ * The keeper that holds this thread's Claude between turns, and what decides
+ * whether its parked process may take this turn.
+ */
+export type CloudClaudeKeeperInput = {
+  client: ClaudeKeeperClient;
+  /** Claude lists the tools once; another catalog needs another process. */
+  toolCatalogHash: string;
 };
 
 /** How often a running agent's inbox is checked for new messages. */
@@ -258,6 +282,70 @@ type ProcessResult = {
   stderr: string;
 };
 
+const consumeJsonLine = (
+  line: string,
+  onJson: (value: Record<string, unknown>) => void,
+): void => {
+  const trimmed = line.trim();
+  if (!trimmed) return;
+  try {
+    const value = JSON.parse(trimmed) as unknown;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      onJson(value as Record<string, unknown>);
+    }
+  } catch {
+    // Native CLIs occasionally write a startup notice to stdout. It is not
+    // part of their JSON event protocol and must not poison the turn.
+  }
+};
+
+/** Which login file the CLI holds: replaced by a restore, rewritten by a refresh. */
+const credentialsIdentity = async (accountDirectory: string): Promise<string> => {
+  const details = await stat(path.join(accountDirectory, ".credentials.json"));
+  return `${details.dev}:${details.ino}:${details.size}:${details.mtimeMs}`;
+};
+
+/**
+ * The state root's files by inode, size and mtime: a restore that rewrote
+ * them, even byte for byte, leaves a process holding the old ones.
+ */
+const stateFilesIdentity = async (root: string): Promise<string> => {
+  const parts: string[] = [];
+  const walk = async (directory: string, relative: string): Promise<void> => {
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = path.join(directory, entry.name);
+      const name = relative ? `${relative}/${entry.name}` : entry.name;
+      const details = await stat(full);
+      parts.push(`${name}\0${details.ino}\0${details.size}\0${details.mtimeMs}`);
+      if (entry.isDirectory()) await walk(full, name);
+    }
+  };
+  await walk(root, "");
+  return createHash("sha256").update(parts.sort().join("\n")).digest("hex");
+};
+
+/** The sealed state's MAC, once the parity check has accepted the root. */
+const sealedStateMac = async (stateRoot: string): Promise<string | undefined> => {
+  const raw = await readFile(
+    path.join(stateRoot, NATIVE_STATE_ATTESTATION_FILE),
+    "utf8",
+  ).catch(() => "");
+  try {
+    const mac = (JSON.parse(raw) as { mac?: unknown }).mac;
+    return typeof mac === "string" && mac ? mac : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const stringEnv = (env: NodeJS.ProcessEnv): Record<string, string> =>
+  Object.fromEntries(
+    Object.entries(env)
+      .filter((entry): entry is [string, string] => typeof entry[1] === "string")
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)),
+  );
+
 const runJsonLines = async (options: {
   command: string;
   args: string[];
@@ -291,19 +379,7 @@ const runJsonLines = async (options: {
     });
     let pending = "";
     let stderr = "";
-    const consume = (line: string): void => {
-      const trimmed = line.trim();
-      if (!trimmed) return;
-      try {
-        const value = JSON.parse(trimmed) as unknown;
-        if (value && typeof value === "object" && !Array.isArray(value)) {
-          options.onJson(value as Record<string, unknown>);
-        }
-      } catch {
-        // Native CLIs occasionally write a startup notice to stdout. It is not
-        // part of their JSON event protocol and must not poison the turn.
-      }
-    };
+    const consume = (line: string): void => consumeJsonLine(line, options.onJson);
     child.stdout.on("data", (chunk: Buffer) => {
       markTurnStep("claudeFirstStdout");
       pending += chunk.toString();
@@ -682,6 +758,16 @@ export const runCloudClaude = async (options: {
   cancellation?: NativeTurnCancellation;
   /** Messages for the agent while it works (an agent turn's inbox). */
   inbox?: AgentInbox;
+  /**
+   * Run Claude in this thread's keeper, which keeps it for the next turn.
+   * `reusable` is false when this turn must start a new process, and
+   * `sealedMac` names the sealed state the parity check accepted.
+   */
+  keeper?: CloudClaudeKeeperInput & {
+    reusable: boolean;
+    sealedMac?: string;
+    threadId: string;
+  };
 }): Promise<NativeCliTurnResult> => {
   const { profile, inbox } = options;
   const stateRoot = options.stateRoot;
@@ -719,28 +805,103 @@ export const runCloudClaude = async (options: {
       ? marked
       : deterministicUuid(profile.sessionKey);
   markTurnStep("claudeStateChecked");
-  const mcpConfig = await createCloudClaudeMcpConfig(options.mcpServerConfig);
   // One latch, two sources: the caller's cancellation and our own
   // compaction-loop verdict both have to reach one child process. A turn
   // without a caller latch still owns one for the verdict.
   const cancellation = options.cancellation ?? createNativeTurnCancellation();
-  try {
-    const args = buildCloudClaudeTakeoverArgs({
+  const argsFor = (mcpConfigPath: string, resumeSession: boolean) =>
+    buildCloudClaudeTakeoverArgs({
       model: options.execution.model,
       reasoningEffort: options.execution.reasoningEffort,
       systemPrompt: options.systemPrompt,
-      mcpConfigPath: mcpConfig.path,
-      resume,
+      mcpConfigPath,
+      resume: resumeSession,
       sessionId,
       includePartialMessages: profile.includePartialMessages,
       streamInput: Boolean(inbox),
     });
+  const childEnv = buildClaudeChildEnv({
+    initialEnv: process.env,
+    stateRoot,
+    accountDirectory,
+    reasoningEffort: options.execution.reasoningEffort,
+    ...(profile.mcpToolTimeoutMs !== undefined
+      ? { mcpToolTimeoutMs: profile.mcpToolTimeoutMs }
+      : {}),
+    ...(profile.autoCompactWindowTokens !== undefined
+      ? { autoCompactWindowTokens: profile.autoCompactWindowTokens }
+      : {}),
+  });
+  // The keeper runs Claude when it answers; anything short of an attached
+  // process runs it here, as every turn did before.
+  let keeper: ClaudeKeeperClient | undefined;
+  if (options.keeper && inbox) {
+    const env = stringEnv(childEnv);
+    // Everything the process was started with, except whether it resumed:
+    // a kept process has its session in memory either way.
+    const key = createHash("sha256")
+      .update(
+        JSON.stringify({
+          threadId: options.keeper.threadId,
+          account: options.claudeAccount,
+          toolCatalogHash: options.keeper.toolCatalogHash,
+          args: argsFor(CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER, false),
+          env,
+          cwd: profile.cwd,
+        }),
+      )
+      .digest("hex");
+    const state: ClaudeKeeperState | null = options.keeper.sealedMac
+      ? {
+          mac: options.keeper.sealedMac,
+          credentials: await credentialsIdentity(accountDirectory),
+          files: await stateFilesIdentity(stateRoot),
+        }
+      : null;
+    try {
+      const attached = await options.keeper.client.attach({
+        t: "attach",
+        key,
+        reusable: options.keeper.reusable,
+        state,
+        upstream: {
+          url: options.mcpServerConfig.url,
+          authorization: options.mcpServerConfig.headers.Authorization,
+        },
+        spawn: {
+          command: "claude",
+          args: argsFor(CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER, resume),
+          env,
+          cwd: profile.cwd,
+        },
+      });
+      keeper = options.keeper.client;
+      markTurnStep(attached.reused ? "claudeReused" : "claudeSpawned");
+      if (attached.fresh !== "none") {
+        markTurnStep(
+          `claudeFresh${attached.fresh[0]!.toUpperCase()}${attached.fresh.slice(1)}`,
+        );
+      }
+    } catch (error) {
+      console.error(
+        `claude keeper attach failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      markTurnStep("claudeKeeperFailed");
+    }
+  }
+  const mcpConfig = keeper
+    ? undefined
+    : await createCloudClaudeMcpConfig(options.mcpServerConfig);
+  let kept: KeptClaude | undefined;
+  let handedOn = false;
+  try {
+    const args = argsFor(mcpConfig?.path ?? "", resume);
     // With an inbox, the prompt is the first stream-json message and stdin
     // stays open while Claude works: a message that arrives is written after
     // it, Claude folds it in at its next tool boundary (or answers it as one
     // more query) and echoes it back by uuid once it has. Input ends after a
     // result that leaves nothing unanswered and an inbox that closes empty.
-    let stdin: NodeJS.WritableStream | undefined;
+    let stdin: { write(data: string): void; end(): void } | undefined;
     let inputEnded = false;
     const injected = new Map<string, string>();
     const steered: string[] = [];
@@ -799,35 +960,7 @@ export const runCloudClaude = async (options: {
     let initialized = resume;
     let compacting = false;
     let compactions = 0;
-    const childEnv = buildClaudeChildEnv({
-      initialEnv: process.env,
-      stateRoot,
-      accountDirectory,
-      reasoningEffort: options.execution.reasoningEffort,
-      ...(profile.mcpToolTimeoutMs !== undefined
-        ? { mcpToolTimeoutMs: profile.mcpToolTimeoutMs }
-        : {}),
-      ...(profile.autoCompactWindowTokens !== undefined
-        ? { autoCompactWindowTokens: profile.autoCompactWindowTokens }
-        : {}),
-    });
-    const result = await runJsonLines({
-      ...(inbox
-        ? {
-            feedInput: (input: NodeJS.WritableStream) => {
-              stdin = input;
-              input.write(
-                `${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`,
-              );
-            },
-          }
-        : { input: options.inputPrompt }),
-      command: "claude",
-      args,
-      cwd: profile.cwd,
-      env: childEnv,
-      cancellation,
-      onJson: (event) => {
+    const onJson = (event: ClaudeStreamJsonEvent): void => {
         options.onStreamEvent?.(event);
         const type = event.type;
         if (type === "system" && event.subtype === "init") {
@@ -912,8 +1045,92 @@ export const runCloudClaude = async (options: {
             void finishInput();
           }
         }
-      },
-    }).finally(endInput);
+    };
+    const runKept = (
+      client: ClaudeKeeperClient,
+    ): Promise<ProcessResult & { parked: boolean }> =>
+      new Promise((resolve) => {
+        let settled = false;
+        const finish = (outcome: ProcessResult & { parked: boolean }) => {
+          if (settled) return;
+          settled = true;
+          killOnCancel.interruptUnsafe();
+          resolve(outcome);
+        };
+        const kill = () => {
+          void client.kill();
+        };
+        const killOnCancel = Effect.runFork(
+          cancellation.awaitAborted.pipe(Effect.catch(() => Effect.sync(kill))),
+        );
+        client.onLine((line) => {
+          markTurnStep("claudeFirstStdout");
+          consumeJsonLine(line, onJson);
+        });
+        void client.exited.then((exit) =>
+          finish({ exitCode: exit.code, stderr: exit.stderr, parked: false }),
+        );
+        stdin = {
+          write: (data) => client.write(data),
+          // A turn that ended cleanly leaves Claude parked for the next one;
+          // any other end takes the process with it.
+          end: () => {
+            if (settled) return;
+            if (error || cancellation.aborted) {
+              kill();
+              return;
+            }
+            client.park(stateRoot).then(
+              () => finish({ exitCode: 0, stderr: "", parked: true }),
+              kill,
+            );
+          },
+        };
+        stdin.write(`${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`);
+        markTurnStep("claudePromptSent");
+      });
+    const result = keeper
+      ? await runKept(keeper).finally(endInput)
+      : await runJsonLines({
+          ...(inbox
+            ? {
+                feedInput: (input: NodeJS.WritableStream) => {
+                  stdin = input;
+                  input.write(
+                    `${streamJsonUserMessage(sessionId, options.inputPrompt)}\n`,
+                  );
+                },
+              }
+            : { input: options.inputPrompt }),
+          command: "claude",
+          args,
+          cwd: profile.cwd,
+          env: childEnv,
+          cancellation,
+          onJson,
+        }).finally(endInput);
+    if (keeper && "parked" in result && result.parked) {
+      const client = keeper;
+      kept = {
+        release: async (mac) => {
+          try {
+            await client.release({
+              mac,
+              credentials: await credentialsIdentity(accountDirectory),
+              files: await stateFilesIdentity(stateRoot),
+            });
+          } catch (failure) {
+            await client.kill();
+            throw failure;
+          } finally {
+            client.close();
+          }
+        },
+        discard: async () => {
+          await client.kill().finally(() => client.close());
+        },
+      };
+    }
     if (initialized) {
       await writeFile(markerPath, `${sessionId}\n`, { mode: 0o600 });
     }
@@ -934,17 +1151,27 @@ export const runCloudClaude = async (options: {
           ? `Claude usage limit reached for ${options.claudeAccount.email}. It resets at ${new Date(limit.resetsAt).toISOString()}.`
           : `Claude usage limit reached for ${options.claudeAccount.email}.`;
     }
+    if (kept && error) {
+      await kept.discard().catch(() => undefined);
+      kept = undefined;
+    }
+    handedOn = Boolean(kept);
     return {
       finalText,
       ...(error ? { error } : {}),
       usage: { inputTokens, outputTokens, llmCalls },
       sessionId: initialized ? sessionId : "",
       steered,
+      ...(kept ? { kept } : {}),
     };
   } finally {
     // This directory contains the private loopback MCP bearer. It lives
     // outside every checkpoint root and exists only while Claude is alive.
-    await mcpConfig.cleanup();
+    await mcpConfig?.cleanup();
+    if (keeper && !handedOn) {
+      if (kept) await kept.discard().catch(() => undefined);
+      else keeper.close();
+    }
   }
 };
 
@@ -1039,6 +1266,8 @@ export const runNativeAgentTurn = async (options: {
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
+  /** This thread's Claude keeper; without one each turn starts Claude. */
+  keeper?: CloudClaudeKeeperInput;
 }): Promise<NativeAgentTurnResult> => {
   const mcpServerConfig = options.claudeMcpServerConfig;
   if (!mcpServerConfig) {
@@ -1096,6 +1325,12 @@ export const runNativeAgentTurn = async (options: {
     });
   }
   markTurnStep("nativeParityChecked");
+  // A kept process holds the session as this thread's last sealed state
+  // left it; only a root the parity check accepted as that state may
+  // continue in it. Recovery and adoption rewrite the session first.
+  const reusable = !adopted && recoveryHistory === undefined;
+  const sealedMac = reusable ? await sealedStateMac(stateRoot) : undefined;
+  let keeper = options.keeper;
   const run = () =>
     runCloudClaude({
       profile: options.profile,
@@ -1108,8 +1343,20 @@ export const runNativeAgentTurn = async (options: {
       ...(options.onStreamEvent ? { onStreamEvent: options.onStreamEvent } : {}),
       ...(options.cancellation ? { cancellation: options.cancellation } : {}),
       ...(options.inbox ? { inbox: options.inbox } : {}),
+      ...(keeper
+        ? {
+            keeper: {
+              ...keeper,
+              reusable,
+              threadId: options.threadId,
+              ...(sealedMac ? { sealedMac } : {}),
+            },
+          }
+        : {}),
     });
   let result = await run();
+  // A second run of this turn starts its own process.
+  keeper = undefined;
   // Thinking signed under the other host's login may not verify here: the
   // session goes on without its thinking blocks, as the desktop does.
   if (
@@ -1117,6 +1364,7 @@ export const runNativeAgentTurn = async (options: {
     result.error &&
     isRejectedThinkingSignatureError(result.error) &&
     !options.cancellation?.aborted &&
+    !result.kept &&
     (await stripClaudeThinkingFromSessionFile(
       path.join(
         claudeSessionProjectDir(
@@ -1137,23 +1385,42 @@ export const runNativeAgentTurn = async (options: {
     usage: result.usage,
     ...(result.error ? { error: result.error } : {}),
   });
-  if (!result.sessionId) {
-    // The CLI exited before its init event; its own error says why.
-    throw new Error(
-      result.error
-        ? `Claude Code did not start: ${result.error.slice(-1_000)}`
-        : "Claude did not establish durable native session state.",
-    );
+  const kept = result.kept;
+  let checkpoint: Awaited<ReturnType<typeof sealNativeState>>;
+  try {
+    if (!result.sessionId) {
+      // The CLI exited before its init event; its own error says why.
+      throw new Error(
+        result.error
+          ? `Claude Code did not start: ${result.error.slice(-1_000)}`
+          : "Claude did not establish durable native session state.",
+      );
+    }
+    checkpoint = await sealNativeState({
+      stateRoot,
+      engine: "anthropic",
+      threadId: options.threadId,
+      sessionId: result.sessionId,
+      cursor: nativeHistoryCursorFromMessages(options.turnId, messages),
+      integrityKey: options.stateIntegrityKey,
+    });
+  } catch (error) {
+    await kept?.discard().catch(() => undefined);
+    throw error;
   }
-  const checkpoint = await sealNativeState({
-    stateRoot,
-    engine: "anthropic",
-    threadId: options.threadId,
-    sessionId: result.sessionId,
-    cursor: nativeHistoryCursorFromMessages(options.turnId, messages),
-    integrityKey: options.stateIntegrityKey,
+  // The sealed state is what the parked process holds; the next turn's
+  // parity check has to accept exactly it before it continues there.
+  await kept?.release(checkpoint.mac).catch((error: unknown) => {
+    console.error(
+      `keeping Claude for the next turn failed: ${error instanceof Error ? error.message : String(error)}`,
+    );
   });
-  const { sessionId: _sessionId, steered: _steered, ...publicResult } = result;
+  const {
+    sessionId: _sessionId,
+    steered: _steered,
+    kept: _kept,
+    ...publicResult
+  } = result;
   return {
     ...publicResult,
     messages,

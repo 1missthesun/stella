@@ -213,7 +213,15 @@ test-seed)
   dir="$accounts/$2"
   mkdir -p "$dir" && chmod 700 "$dir"
   printf '%s' "$TEST_CREDENTIALS" >"$dir/.credentials.json.tmp" && chmod 600 "$dir/.credentials.json.tmp" \
-    && mv -f -- "$dir/.credentials.json.tmp" "$dir/.credentials.json" \
+    || { rm -f -- "$dir/.credentials.json.tmp"; fail "Couldn't set up the test Claude login."; }
+  # The same login stays the same file, so a Claude process kept from the
+  # last turn still holds the current one.
+  if cmp -s -- "$dir/.credentials.json.tmp" "$dir/.credentials.json"; then
+    rm -f -- "$dir/.credentials.json.tmp"
+    json '{ok:true}'
+    exit 0
+  fi
+  mv -f -- "$dir/.credentials.json.tmp" "$dir/.credentials.json" \
     || { rm -f -- "$dir/.credentials.json.tmp"; fail "Couldn't set up the test Claude login."; }
   json '{ok:true}'
   ;;

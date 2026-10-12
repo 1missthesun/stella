@@ -101,6 +101,7 @@ import { CLOUD_TOOL_HOME } from "@stella/contracts/cloud-tool-home";
 import { cloudAgentToolContext } from "./cloud-tool-context.js";
 
 import { markTurnStep } from "./turn-timing.js";
+import { openClaudeKeeper } from "./claude-keeper-client.js";
 
 /**
  * turn-input.json. `role` (from the shared contract) says which loop runs:
@@ -446,6 +447,19 @@ export const runAgentTurn = (
           checkpointPolicy: "preserve_prior",
         };
       }
+      // This thread's Claude may still be up from its last turn; the keeper
+      // that holds it (or a new one) is reached while the turn gets ready.
+      const claudeKeeper = yield* Effect.acquireRelease(
+        Effect.sync(() => {
+          const opening = openClaudeKeeper(input.threadId);
+          opening.catch(() => undefined);
+          return opening;
+        }),
+        (opening) =>
+          Effect.promise(async () => {
+            (await opening)?.close();
+          }),
+      );
       const workspaceRoot = WORLD_ROOT;
       const workspaceStateDir = toolStateDir(workspaceRoot);
       const driveWorkspace = worldDriveWorkspace(workspaceRoot);
@@ -729,6 +743,16 @@ export const runAgentTurn = (
               claudeMcpServerConfig: claudeToolMcpHost.mcpServerConfig,
               onStreamEvent: cloudAgentProgressFromStream(emitEvent),
               inbox,
+              ...(await claudeKeeper.then((client) =>
+                client
+                  ? {
+                      keeper: {
+                        client,
+                        toolCatalogHash: claudeToolMcpHost.toolCatalogHash,
+                      },
+                    }
+                  : {},
+              )),
             }),
           };
         } catch (error) {

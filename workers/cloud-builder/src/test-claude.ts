@@ -34,6 +34,9 @@ export const isTestAccountOwner = async (env: unknown, ownerId: string): Promise
   return Boolean(row?.emailVerified) && email.endsWith(TEST_ACCOUNT_SUFFIX);
 };
 
+/** 2100-01-01: a setup token has no refresh, and this one never needs one. */
+const TEST_CREDENTIALS_EXPIRE_AT = 4_102_444_800_000;
+
 export const testClaudeCredentials = (env: unknown): string | null => {
   const token = testClaudeToken(env);
   if (!token) return null;
@@ -41,7 +44,9 @@ export const testClaudeCredentials = (env: unknown): string | null => {
     claudeAiOauth: {
       accessToken: token,
       refreshToken: null,
-      expiresAt: Date.now() + 365 * 24 * 60 * 60 * 1000,
+      // Fixed, so each turn writes the same file and a Claude process kept
+      // from the last turn still counts as holding the current login.
+      expiresAt: TEST_CREDENTIALS_EXPIRE_AT,
       scopes: ["user:inference"],
     },
   });

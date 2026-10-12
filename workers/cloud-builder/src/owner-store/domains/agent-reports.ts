@@ -151,7 +151,7 @@ const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
            JOIN tree ON child.parent_thread_id = tree.thread_id
           WHERE tree.depth < ${TREE_DEPTH_MAX}
        )
-       SELECT DISTINCT t.thread_id FROM agent_threads t JOIN tree ON t.thread_id = tree.thread_id
+       SELECT DISTINCT t.thread_id FROM tree CROSS JOIN agent_threads t ON t.thread_id = tree.thread_id
         WHERE t.status IN ${LIVE_STATUSES_SQL}
            OR EXISTS (SELECT 1 FROM agent_commands c
                        WHERE c.thread_id = t.thread_id AND c.state = 'pending' AND c.kind IN ('message', 'resume'))

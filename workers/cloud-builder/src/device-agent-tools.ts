@@ -12,7 +12,6 @@
 import type {
   AgentMessageDelivery,
   AgentThreadControl,
-  AgentThreadSummary,
 } from "@stella/contracts/backend/agent-threads";
 import type {
   CloudAgentControlReceipt,
@@ -134,29 +133,4 @@ export const cancelDeviceAgent = async (
     ...(prior.description ? { description: prior.description } : {}),
     executorDeviceId: prior.executorDeviceId!,
   });
-};
-
-/** The ledger's current state of a device agent, as a receipt. */
-export const readDeviceAgent = async (
-  caller: DeviceAgentCaller,
-  prior: CloudAgentControlReceipt,
-): Promise<CloudAgentControlReceipt> => {
-  const thread = (await caller.ownerInternal("agentThreads.deviceThread", {
-    ownerGeneration: caller.ownerGeneration,
-    conversationId: caller.conversationId,
-    threadId: prior.threadId,
-  })) as AgentThreadSummary;
-  return receiptOf(
-    {
-      threadId: thread.threadId,
-      conversationId: thread.conversationId,
-      attemptGeneration: thread.attemptGeneration,
-      threadUpdatedAt: thread.updatedAt,
-      status: thread.status,
-    },
-    {
-      ...(prior.description ? { description: prior.description } : {}),
-      executorDeviceId: prior.executorDeviceId!,
-    },
-  );
 };

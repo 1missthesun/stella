@@ -1,3 +1,4 @@
+import { readAgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
 import {
   createRunnerContext,
   getConfiguredModel,
@@ -446,10 +447,12 @@ export const createStellaHostRunner = (
       directory: async (conversationId) =>
         await context.backend.require().call("agentThreads.directory", { conversationId }),
       message: async (args) =>
-        await context.backend.require().call("agentThreads.message", {
-          ...args,
-          ownerGeneration: await context.cloudOwnerGeneration(),
-        }),
+        readAgentMessageDelivery(
+          await context.backend.require().call("agentThreads.message", {
+            ...args,
+            ownerGeneration: await context.cloudOwnerGeneration(),
+          }),
+        ),
       pause: async (args) =>
         await context.backend.require().call("agentThreads.pause", {
           ...args,

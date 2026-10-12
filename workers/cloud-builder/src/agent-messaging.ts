@@ -76,8 +76,6 @@ export const pauseAgentThread = async (
     threadId: result.threadId,
     outcome:
       result.outcome === "held" || result.outcome === "not_running" ? result.outcome : "paused",
-    status: result.status ?? "unknown",
-    attemptGeneration: result.attemptGeneration ?? 0,
     where: result.where ?? "in Stella's cloud",
     ...(result.note ? { note: result.note } : {}),
   };

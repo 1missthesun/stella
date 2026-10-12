@@ -2,7 +2,6 @@ import type {
   AgentReportOutcome,
   DeviceAgentReport,
 } from "@stella/contracts/backend/agent-reports";
-import { formatAgentTerminalStateSystemReminder } from "@stella/contracts/system-reminders";
 import { boundParentAgentReport } from "./agent-report-bounds.js";
 import { forkDelayedCall } from "./cloud-effect-runtime.js";
 
@@ -73,25 +72,21 @@ const parseReport = (value: unknown): DeviceAgentReport | null => {
 
 const MAX_REPORT_ERROR_CHARS = 30_000;
 
-/** What Stella reads for one report: the agent's outcome, as a hidden reminder. */
+/** What Stella reads for one report: the agent's outcome, hidden from the user. */
 export const agentReportText = (report: DeviceAgentReport): string => {
-  const lines: string[] = [];
-  if (report.outcome === "completed") {
-    lines.push("[Agent completed]");
-    if (report.description) lines.push(`description: ${report.description}`);
-  } else {
-    lines.push(report.outcome === "canceled" ? "[Task canceled]" : "[Task failed]");
-  }
+  const lines = [
+    report.outcome === "completed"
+      ? "[Agent completed]"
+      : report.outcome === "canceled"
+        ? "[Task canceled]"
+        : "[Task failed]",
+  ];
+  if (report.description) lines.push(`description: ${report.description}`);
   if (report.threadId) lines.push(`thread_id: ${report.threadId}`);
-  if (report.agentType) lines.push(`agent_type: ${report.agentType}`);
-  if (report.outcome !== "completed" && report.description) {
-    lines.push(`description: ${report.description}`);
-  }
+  lines.push(`status: ${report.outcome}`);
   if (report.outcome === "completed") {
     lines.push(
       `result: ${boundParentAgentReport(report.text || "The agent completed without a report.", report.threadId)}`,
-      "agent_state: paused; use send_message on the same thread if follow-up work is needed.",
-      "presentation: for a report or dense result, present it as a canvas with the `html` tool (write the complete HTML document yourself) and keep the chat reply short; for a quick answer, reply directly in chat. Be concise and human-friendly — the user delegated this and lacks the context, so say what happened in plain terms rather than implementation detail. End the reply with a `refs` block citing this thread_id (see Replies in your instructions) so the update attaches to the work it reports on.",
     );
   } else {
     const error =
@@ -104,7 +99,7 @@ export const agentReportText = (report: DeviceAgentReport): string => {
       }`,
     );
   }
-  return formatAgentTerminalStateSystemReminder(lines);
+  return lines.join("\n");
 };
 
 export const createAgentReportInbox = (options: AgentReportInboxOptions) => {

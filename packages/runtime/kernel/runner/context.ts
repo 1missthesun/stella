@@ -1,3 +1,4 @@
+import { readAgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
 import { loadDeviceExecutionContext, loadMediaAccess } from "./execution-context.js";
 import { resolveRuntimeSourceAsset } from "../shared/runtime-paths.js";
 import { createCloudTranscriptWriter } from "./cloud-transcript-write.js";
@@ -329,7 +330,7 @@ export const createRunnerContext = ({
         AGENT_MESSAGE_TIMEOUT_MS,
         () => new Error("Stella's cloud did not answer, so the message may not have been delivered."),
       );
-      return delivery.delivered === "steered" ? "steered" : "resumed";
+      return readAgentMessageDelivery(delivery).outcome === "steered" ? "steered" : "resumed";
     },
     pause: async (request) => {
       await pauseAgentThread(request);

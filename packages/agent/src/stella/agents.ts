@@ -43,6 +43,8 @@ import {
   agentDirectoryEntry,
   buildAgentDirectoryResult,
   formatAgentMessage,
+  AGENT_MESSAGE_STARTER_RELATION,
+  sessionDirectoryEntry,
   STELLA_MESSAGE_TARGET,
   type AgentDirectoryAgentRow,
   type AgentDirectorySessionRow,
@@ -320,8 +322,6 @@ export type RemoteAgentHost = {
   ): Promise<{ threadId: string; waiting?: boolean }>;
   /** Another message for it: steers it there, starts its next run, or is held for its offline computer. Once per `key`. */
   message(args: { key: string; threadId: string; message: string }, context: Context): Promise<AgentMessageDelivery | void>;
-  /** Its status there, as one line. */
-  status?(threadId: string, context: Context): Promise<string>;
   pause?(threadId: string, context: Context): Promise<void>;
 };
 
@@ -513,19 +513,18 @@ export const completedReport = (args: {
     "[Agent completed]",
     `description: ${args.description}`,
     `thread_id: ${args.threadId}`,
-    "agent_type: general",
+    "status: completed",
     ...(args.userMessage === undefined
       ? []
       : [`user_message: the user wrote to this agent in its thread: ${JSON.stringify(bounded(args.userMessage))}`]),
     `result: ${bounded(args.result || "(no reply)")}`,
-    "agent_state: paused; use send_message on the same thread if follow-up work is needed.",
     ...(args.toParentAgent
       ? ["routing: your subagent's report has returned. It reaches only you, not the user; continue your own task with it."]
       : []),
   ].join("\n");
 
 export const failedReport = (args: { threadId: string; description: string; error: string }): string =>
-  ["[Task failed]", `thread_id: ${args.threadId}`, "agent_type: general", `description: ${args.description}`, `error: ${bounded(args.error)}`].join("\n");
+  ["[Task failed]", `description: ${args.description}`, `thread_id: ${args.threadId}`, "status: failed", `error: ${bounded(args.error)}`].join("\n");
 
 const roleOf = async (
   reader: Pick<TaskRuntime<unknown, { phase: string }, unknown, object>, "snapshot">,
@@ -653,18 +652,18 @@ const senderOf = (self: StellaAgentRole, stellaThreadId: string): AgentMessageSe
     ? { threadId: stellaThreadId, label: "Stella" }
     : { threadId: self.threadId, label: self.description ?? "An agent" };
 
-const deliveredResult = (delivery: { threadId: string; delivered?: AgentMessageDelivery["delivered"]; note?: string }) => ({
+const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDelivery["outcome"]; note?: string }) => ({
   content: [
     {
       type: "text" as const,
       text: `Delivered to ${delivery.threadId}. ${
-        delivery.delivered === "steered"
+        delivery.outcome === "steered"
           ? "It is working and reads your message before its next step."
-          : delivery.delivered === "resumed"
+          : delivery.outcome === "resumed"
             ? "It was idle, so your message started its next run; its report goes to whoever started it."
-            : delivery.delivered === "queued"
+            : delivery.outcome === "queued"
               ? "That Stella reads it as its next turn."
-              : delivery.delivered === "held"
+              : delivery.outcome === "held"
                 ? "Its computer is offline, so the message is held and reaches it once that computer reconnects; its report goes to whoever started it."
                 : "It reads your message before its next step; its report goes to whoever started it."
       }${delivery.note ? ` ${delivery.note}` : ""}`,
@@ -673,15 +672,16 @@ const deliveredResult = (delivery: { threadId: string; delivered?: AgentMessageD
 });
 
 const statusResult = (view: Record<string, unknown>) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(view, null, 2) }],
+  content: [{ type: "text" as const, text: JSON.stringify(view) }],
 });
 
-const controlNote = (starter: boolean) => ({
-  send_message: starter
-    ? "reaches it as an instruction from you, since you started it: it steers it while it runs, or resumes it once it stopped. Its report comes back to you."
-    : "reaches it as a note from you, which it weighs against its own work; its report still goes to whoever started it.",
-  pause_agent: "pauses it wherever it runs; a message later resumes it.",
-});
+/** What an agent is to the caller of `agent_status`. */
+const relationOf = (row: { threadId: string; parentThreadId?: string }, self: { threadId?: string }, parentThreadId?: string) =>
+  (self.threadId ? row.parentThreadId === self.threadId : !row.parentThreadId)
+    ? "you started it"
+    : row.threadId === parentThreadId
+      ? AGENT_MESSAGE_STARTER_RELATION
+      : "teammate";
 
 export function stellaAgents(host: StellaAgentsHost) {
   const moveBrain = host.execution?.moveBrain;
@@ -1349,7 +1349,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         );
         state.calls[String(api.taskId)] = { threadId, reporter };
       }, context);
-      return deliveredResult({ threadId, delivered: running ? "steered" : "resumed" });
+      return deliveredResult({ threadId, outcome: running ? "steered" : "resumed" });
     },
   });
 
@@ -1399,12 +1399,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     agent: AgentRecord,
     context: Context,
   ): Promise<Record<string, unknown>> => {
-    if (agent.remote) {
-      const there = await remoteHostOf(agent)
-        ?.status?.(threadId, context)
-        .catch(() => undefined);
-      return there ? { status_there: there } : {};
-    }
+    if (agent.remote) return {};
     const conversationId = agent.conversationId as ConversationId;
     const live = await api.snapshot(LiveDoc, conversationId, context);
     const running = live?.tools?.filter((tool) => tool.status === "running").map((tool) => tool.name) ?? [];
@@ -1559,9 +1554,9 @@ export function stellaAgents(host: StellaAgentsHost) {
       // An agent this harness holds is listed as it knows it.
       agents: [...rows, ...(elsewhere?.agents ?? []).filter((row) => !known.has(row.threadId)).map((row) => ({ ...row, conversationId }))],
       sessions: elsewhere?.sessions ?? [],
+      ...(elsewhere?.unavailable ? { unavailable: elsewhere.unavailable } : {}),
     });
-    const result = elsewhere?.unavailable ? { ...listing, note: `${listing.note} ${elsewhere.unavailable}` } : listing;
-    return { content: [{ type: "text" as const, text: JSON.stringify(result, null, 2) }] };
+    return { content: [{ type: "text" as const, text: listing }] };
   };
 
   /**
@@ -1619,7 +1614,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       }, context);
       return deliveredResult({
         threadId,
-        delivered: running ? "steered" : "resumed",
+        outcome: running ? "steered" : "resumed",
       });
     }
     const delivery = await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context);
@@ -1645,7 +1640,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const agentStatus = defineTool({
     name: "agent_status",
     description:
-      "Without thread_id: list who you can reach — subagents you started, your teammates (Stella and the other agents in this conversation), other Stella sessions on this computer, and the user's cloud sessions — with each one's thread_id, what it is working on, where it runs, and its status. With thread_id: that agent's status and where it runs, whether send_message and pause_agent reach it from here (controllable_here) and how a message lands, and its latest message and tool call. Read-only: it never interrupts or messages anyone.",
+      "Without thread_id: list who you can reach, one line each (thread_id · status · where, when not this computer · last active — description): subagents you started, your teammates (Stella and the other agents in this conversation), other Stella sessions on this computer, and the user's cloud sessions. With thread_id: that agent's status, where it runs, who started it, its relation to you, and its latest message and tool call. send_message reaches anyone listed: to an agent you started it is an instruction that steers it while it runs or resumes it once stopped, and its report comes back to you; to anyone else it is a note they weigh, and a report still goes to whoever started them. pause_agent pauses an agent wherever it runs; a later message resumes it. reachable: false means neither reaches that agent from here. Read-only: it never interrupts or messages anyone.",
     parameters: Type.Object({
       thread_id: Type.Optional(Type.String({ description: "The agent to inspect. Omit it to list everyone you can reach." })),
     }),
@@ -1653,17 +1648,16 @@ export function stellaAgents(host: StellaAgentsHost) {
     execute: async (args, api, context) => {
       const threadId = args.thread_id?.trim();
       if (!threadId) return await directoryStatus(api, context);
-      const { self, root } = await chainOf(api, context);
+      const { self, root, parentThreadId } = await chainOf(api, context);
       const conversation = await host.directory?.conversationId(context).catch(() => undefined);
       const conversationId = conversation ?? STELLA_MESSAGE_TARGET;
       if (root !== undefined && (threadId.toLowerCase() === STELLA_MESSAGE_TARGET || threadId === conversation)) {
         const running = (await api.snapshot(LiveDoc, root, context))?.run !== undefined;
         return statusResult({
           thread_id: conversationId,
-          role: "Stella for this conversation",
+          description: "Stella for this conversation",
           status: running ? "running" : "idle",
-          controllable_here: true,
-          send_message: `reaches it as a note from you, with "${STELLA_MESSAGE_TARGET}" or this thread_id; it reads it as its next turn.`,
+          relation: "stella",
         });
       }
       const ownState = await api.snapshot(StellaAgentsDoc, api.conversationId, context);
@@ -1682,40 +1676,26 @@ export function stellaAgents(host: StellaAgentsHost) {
             }
           : undefined);
       if (found) {
-        const starter = found.parentConversationId === api.conversationId;
         const ledger = found.record.remote ? (await host.directory?.list(context).catch(() => undefined))?.agents : undefined;
         const row = await directoryRow(api, found, conversationId, context, ledger);
         const reachable = !found.record.remote || remoteHostOf(found.record) !== undefined || host.directory !== undefined;
         return statusResult({
           ...agentDirectoryEntry(row),
-          ...(row.parentThreadId ? {} : { started_by: "Stella" }),
-          controllable_here: reachable,
-          ...(reachable ? controlNote(starter) : {}),
+          relation: found.parentConversationId === api.conversationId ? "you started it" : relationOf(row, self, parentThreadId),
+          ...(reachable ? {} : { reachable: false }),
           ...(await agentDetails(api, threadId, found.record, context)),
         });
       }
       const elsewhere = await host.directory?.list(context).catch(() => undefined);
       const session = elsewhere?.sessions.find((row) => row.conversationId === threadId);
       if (session) {
-        return statusResult({
-          thread_id: threadId,
-          role: "another Stella session",
-          title: session.title.trim() || "Untitled chat",
-          status: session.active ? "running" : "idle",
-          where: session.where,
-          last_active: new Date(session.updatedAt).toISOString(),
-          controllable_here: true,
-          send_message: "queues a note from you as its next turn.",
-        });
+        return statusResult(sessionDirectoryEntry(session));
       }
       const agent = elsewhere?.agents.find((row) => row.threadId === threadId);
       if (agent) {
-        const starter = self.threadId ? agent.parentThreadId === self.threadId : !agent.parentThreadId;
         return statusResult({
           ...agentDirectoryEntry(agent),
-          ...(agent.parentThreadId ? {} : { started_by: "Stella" }),
-          controllable_here: true,
-          ...controlNote(starter),
+          relation: relationOf(agent, self, parentThreadId),
         });
       }
       throw new Error(`Thread not found: ${threadId}. agent_status without a thread_id lists who you can reach.`);
@@ -1727,7 +1707,6 @@ export function stellaAgents(host: StellaAgentsHost) {
     description: "Pause a running agent by thread_id. Resume the same thread later with send_message.",
     parameters: Type.Object({
       thread_id: Type.String({ description: "Durable thread id of the agent to pause." }),
-      reason: Type.Optional(Type.String({ description: "Optional explanation for why the agent is being paused." })),
     }),
     replay: "safe",
     execute: async (args, api, context) => {

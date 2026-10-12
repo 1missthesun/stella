@@ -1,10 +1,8 @@
 import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
 import {
   agentAttemptOutcomeOf,
-  isLiveAgentStatus,
   type AgentAttemptOutcome,
 } from "@stella/contracts/agent-status";
-import { normalizeAgentDirectoryStatus } from "@stella/contracts/agent-directory";
 import type {
   AdmittedCloudChat,
   CloudChatPreparation,
@@ -53,7 +51,6 @@ import {
   cancelDeviceAgent,
   continueDeviceAgent,
   type DeviceAgentCaller,
-  readDeviceAgent,
   spawnDeviceAgent,
 } from "../device-agent-tools.js";
 import {
@@ -512,30 +509,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         await this.ctx.storage.put(receiptKey(args.threadId), next);
         return delivery;
       },
-      status: async (threadId, authority, parentTurnId) => {
-        const current = await readDeviceAgent(
-          caller(authority, parentTurnId),
-          await receipt(threadId),
-        );
-        await this.ctx.storage.put(receiptKey(threadId), current);
-        const deviceId = current.executorDeviceId;
-        const device = deviceId
-          ? (
-              await this.ownerGate(authority.ownerId)
-                .devices()
-                .catch(() => undefined)
-            )?.devices.find((entry) => entry.deviceId === deviceId)
-          : undefined;
-        const name = device?.label?.trim() || deviceId || "its computer";
-        const status = normalizeAgentDirectoryStatus(current.status);
-        const offline =
-          device && !device.online && isLiveAgentStatus(status)
-            ? `, but ${name} is offline${
-                device.lastSeenAt ? ` (last seen ${new Date(device.lastSeenAt).toISOString()})` : ""
-              }, so this may be out of date; it reports when ${name} reconnects`
-            : "";
-        return `${status} on ${name}${offline}`;
-      },
       pause: async (args, authority, parentTurnId) => {
         const next = await cancelDeviceAgent(
           caller(authority, parentTurnId),
@@ -660,10 +633,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           prompt: args.message,
           execution: prior.execution ?? authority.execution,
         });
-      },
-      status: async (threadId) => {
-        const control = await this.requireCloudAgentControlReceipt(threadId, "any");
-        return `${control.status} in Stella's cloud`;
       },
       pause: async (args, authority, parentTurnId) => {
         const control = await this.requireCloudAgentControlReceipt(args.threadId, "any");

@@ -12,6 +12,9 @@ export const STELLA_MESSAGE_TARGET = "stella";
 
 export const AGENT_MESSAGE_MAX_CHARS = 8_000;
 
+/** What the sender is to the receiver when it started the receiver. */
+export const AGENT_MESSAGE_STARTER_RELATION = "started you";
+
 /** Active agents listed at most; past this the rest are counted, not shown. */
 export const AGENT_ROSTER_ACTIVE_LIMIT = 200;
 /** Slots inactive agents fill once the active ones are listed. */
@@ -105,14 +108,36 @@ const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefin
     ? `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}, so this status may be out of date; it reports when ${row.where} reconnects`
     : undefined;
 
-const rosterLine = (row: AgentDirectoryAgentRow, now: number): string =>
+/** Where an agent runs, unless that is the reader's own computer. */
+const placeOf = (where: string): string[] => (where === "this computer" ? [] : [where]);
+
+const oneLine = (text: string) => text.replace(/\s+/g, " ").trim().slice(0, 200);
+
+/** One agent as every listing shows it: one line, its description last. */
+const rosterLine = (
+  row: AgentDirectoryAgentRow,
+  now: number,
+  options?: { starter?: boolean; startedYou?: boolean },
+): string =>
   [
     `- ${row.threadId}`,
     row.offline ? `${row.status}, computer offline` : row.status,
-    row.where,
+    ...placeOf(row.where),
     `last active ${formatAge(row.updatedAt, now)}`,
-    ...(row.parentThreadId ? [`started by ${row.parentThreadId}`] : []),
-  ].join(" · ") + `\n  ${row.description.replace(/\s+/g, " ").trim().slice(0, 200)}`;
+    ...(options?.startedYou
+      ? [AGENT_MESSAGE_STARTER_RELATION]
+      : options?.starter !== false && row.parentThreadId
+        ? [`started by ${row.parentThreadId}`]
+        : []),
+  ].join(" · ") + ` — ${oneLine(row.description)}`;
+
+const sessionLine = (row: AgentDirectorySessionRow, now: number): string =>
+  [
+    `- ${row.conversationId}`,
+    row.active ? "running" : "idle",
+    ...placeOf(row.where),
+    `last active ${formatAge(row.updatedAt, now)}`,
+  ].join(" · ") + ` — ${oneLine(row.title) || "Untitled chat"}`;
 
 /**
  * The orchestrator's resident agent list: a snapshot taken where its context
@@ -143,6 +168,7 @@ export const renderAgentRoster = (
   ].join("\n");
 };
 
+/** One agent as `agent_status` with its thread_id shows it. */
 export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now()) => {
   const offline = offlineText(row, now);
   return {
@@ -151,22 +177,34 @@ export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now(
     status: row.status,
     where: row.where,
     last_active: formatAge(row.updatedAt, now),
-    ...(row.parentThreadId ? { started_by: row.parentThreadId } : {}),
-    ...(offline ? { computer: offline } : {}),
+    started_by: row.parentThreadId ?? STELLA_MESSAGE_TARGET,
+    ...(offline ? { offline } : {}),
   };
 };
 
+/** Another Stella session as `agent_status` with its thread_id shows it. */
+export const sessionDirectoryEntry = (row: AgentDirectorySessionRow, now = Date.now()) => ({
+  thread_id: row.conversationId,
+  description: row.title.trim() || "Untitled chat",
+  status: row.active ? "running" : "idle",
+  where: row.where,
+  last_active: formatAge(row.updatedAt, now),
+  relation: "another session",
+});
+
 /**
- * The model-facing listing. Agents are this conversation's; sessions are the
- * other conversations. Agents follow `selectAgentRoster`; older work stays
- * reachable through the history.
+ * The model-facing listing, one line per agent or session. Agents are this
+ * conversation's; sessions are the other conversations. Agents follow
+ * `selectAgentRoster`; older work stays reachable through the history.
  */
 export const buildAgentDirectoryResult = (input: {
   caller: AgentDirectoryCaller;
   agents: AgentDirectoryAgentRow[];
   sessions: AgentDirectorySessionRow[];
   now?: number;
-}) => {
+  /** Why part of the listing is missing. */
+  unavailable?: string;
+}): string => {
   const now = input.now ?? Date.now();
   const { caller } = input;
   const roster = selectAgentRoster(
@@ -181,46 +219,34 @@ export const buildAgentDirectoryResult = (input: {
     caller.threadId
       ? row.parentThreadId === caller.threadId
       : !row.parentThreadId;
-  const subagents = kept.filter(isOwn).map((row) => agentDirectoryEntry(row, now));
+  const subagents = kept
+    .filter(isOwn)
+    .map((row) => rosterLine(row, now, { starter: false }));
   const teammates = kept
     .filter((row) => !isOwn(row))
-    .map((row) => ({
-      ...agentDirectoryEntry(row, now),
-      ...(row.threadId === caller.parentThreadId ? { relation: "started you" } : {}),
-    }));
+    .map((row) =>
+      rosterLine(row, now, { startedYou: row.threadId === caller.parentThreadId }),
+    );
   const sessions = input.sessions
     .filter((row) => row.conversationId !== caller.conversationId)
     .sort((a, b) => Number(b.active) - Number(a.active) || b.updatedAt - a.updatedAt)
     .slice(0, DIRECTORY_SESSION_LIMIT)
-    .map((row) => ({
-      thread_id: row.conversationId,
-      title: row.title.trim() || "Untitled chat",
-      status: row.active ? "running" : "idle",
-      where: row.where,
-      last_active: formatAge(row.updatedAt, now),
-    }));
+    .map((row) => sessionLine(row, now));
+  const section = (title: string, lines: string[]) =>
+    lines.length === 0 ? [] : [`${title}:`, ...lines];
   const hidden = roster.hiddenActive + roster.hiddenInactive;
-  return {
-    you: caller.threadId
-      ? { thread_id: caller.threadId }
-      : { thread_id: caller.conversationId, role: "Stella for this conversation" },
-    ...(caller.threadId
-      ? {
-          stella: {
-            thread_id: caller.conversationId,
-            note: `Stella for this conversation; "${STELLA_MESSAGE_TARGET}" also reaches it.`,
-          },
-        }
-      : {}),
-    subagents,
-    teammates,
-    sessions,
-    note: `Message any thread_id here with send_message.${
-      hidden > 0 ? ` ${hidden} older agent${hidden === 1 ? "" : "s"} not shown; find them in the history.` : ""
-    }`,
-  };
+  const lines = [
+    ...(caller.threadId ? [`stella: ${caller.conversationId}`] : []),
+    ...section("subagents", subagents),
+    ...section("teammates", teammates),
+    ...section("sessions", sessions),
+    ...(hidden > 0 ? [`(${hidden} older agent${hidden === 1 ? "" : "s"} in history)`] : []),
+    ...(input.unavailable ? [input.unavailable] : []),
+  ];
+  return subagents.length + teammates.length + sessions.length === 0
+    ? [...lines, "No other agents or sessions."].join("\n")
+    : lines.join("\n");
 };
-
 export type AgentMessageSender = {
   /** The sender's thread id; the conversation id when it is Stella. */
   threadId: string;
@@ -230,9 +256,6 @@ export type AgentMessageSender = {
 
 const escapeAttribute = (value: string) =>
   value.replace(/[\r\n]+/g, " ").replace(/"/g, "'").trim().slice(0, 200);
-
-/** What the sender is to the receiver when it started the receiver. */
-export const AGENT_MESSAGE_STARTER_RELATION = "started you";
 
 /**
  * A message from Stella or another agent, as the receiver reads it. Every

@@ -7,6 +7,7 @@ const HIDDEN_REPORT_FIELDS = new Set([
   "thread_id",
   "agent_type",
   "agent_state",
+  "status",
   "presentation",
 ]);
 

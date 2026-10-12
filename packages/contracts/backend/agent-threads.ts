@@ -12,10 +12,19 @@ import { agentAttemptOutcomeOf, type AgentAttemptOutcome, type AgentStatus } fro
  * `held` for an agent whose computer is offline until it reconnects.
  */
 export type AgentMessageDelivery = {
-  delivered: "steered" | "resumed" | "queued" | "held";
+  outcome: "steered" | "resumed" | "queued" | "held";
   threadId: string;
   /** Why the message waits, when it was queued for a computer that is offline. */
   note?: string;
+};
+
+/** A delivery as the owner's agent threads returned it; an older backend named its outcome `delivered`. */
+export const readAgentMessageDelivery = (
+  value: AgentMessageDelivery | (Omit<AgentMessageDelivery, "outcome"> & { delivered: AgentMessageDelivery["outcome"] }),
+): AgentMessageDelivery => {
+  if ("outcome" in value) return value;
+  const { delivered, ...rest } = value;
+  return { ...rest, outcome: delivered };
 };
 
 export { AGENT_PAUSED_REASON } from "../agent-status.js";
@@ -40,8 +49,6 @@ export const agentThreadTerminalStatus = (
 export type AgentPauseResult = {
   threadId: string;
   outcome: "paused" | "held" | "not_running";
-  status: string;
-  attemptGeneration: number;
   /** Where it runs: "in Stella's cloud", "on omarchy". */
   where: string;
   note?: string;
@@ -88,7 +95,7 @@ export type AgentControlResult = {
 };
 
 export const agentMessageDelivery = (result: AgentControlResult): AgentMessageDelivery => ({
-  delivered:
+  outcome:
     result.outcome === "resumed" || result.outcome === "held"
       ? result.outcome
       : result.outcome === "queued" && result.executor === undefined

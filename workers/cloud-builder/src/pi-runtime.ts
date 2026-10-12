@@ -246,7 +246,6 @@ export type PiDeviceAgents = {
     authority: PiAuthority,
     parentTurnId: string,
   ): Promise<AgentMessageDelivery | undefined>;
-  status(threadId: string, authority: PiAuthority, parentTurnId: string): Promise<string>;
   pause(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
 };
 
@@ -266,7 +265,6 @@ export type PiThreadAgents = {
     parentTurnId: string,
   ): Promise<{ threadId: string }>;
   message(args: { key: string; threadId: string; message: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
-  status(threadId: string, authority: PiAuthority, parentTurnId: string): Promise<string>;
   pause(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
 };
 
@@ -1314,10 +1312,6 @@ export class PiConversationRuntime {
         const { authority, parentTurnId } = await scope();
         await threads.message(args, authority, parentTurnId);
       },
-      status: async (threadId) => {
-        const { authority, parentTurnId } = await scope();
-        return await threads.status(threadId, authority, parentTurnId);
-      },
       pause: async (threadId) => {
         const { authority, parentTurnId } = await scope();
         await threads.pause({ key: `pause:${threadId}:${Date.now()}`, threadId }, authority, parentTurnId);
@@ -1354,10 +1348,6 @@ export class PiConversationRuntime {
       message: async (args) => {
         const { authority, parentTurnId } = await scope();
         return await devices.message(args, authority, parentTurnId);
-      },
-      status: async (threadId) => {
-        const { authority, parentTurnId } = await scope();
-        return await devices.status(threadId, authority, parentTurnId);
       },
       pause: async (threadId) => {
         const { authority, parentTurnId } = await scope();

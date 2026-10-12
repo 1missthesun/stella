@@ -302,7 +302,6 @@ export type DesktopEngineAgents = {
   start(args: { key: string; description: string; prompt: string; model: string }): Promise<{ threadId: string }>;
   /** Another message for it: steers it while it runs, or starts its next run. */
   message(args: { key: string; threadId: string; description: string; message: string }): Promise<"steered" | "resumed">;
-  status(threadId: string): Promise<string>;
   pause(threadId: string): Promise<void>;
 };
 
@@ -854,7 +853,6 @@ export function desktopChats(options: DesktopChatsOptions) {
           await settle(threadId, `steered:${key}`);
         }
       },
-      status: async (threadId) => await engine.status(threadId),
       pause: async (threadId) => {
         await engine.pause(threadId);
         await settle(threadId, `paused:${threadId}:${Date.now()}`, "paused");
@@ -909,11 +907,6 @@ export function desktopChats(options: DesktopChatsOptions) {
         if ((await agents.message({ key, threadId, description, message })) === "steered") {
           await settle(threadId, `steered:${key}`);
         }
-      },
-      status: async () => {
-        const there = await device();
-        const name = there?.label?.trim() || deviceId;
-        return there && !there.online ? `runs on ${name}, which is offline now` : `runs on ${name}`;
       },
       pause: async (threadId) => {
         await agents.pause(threadId);
@@ -1030,11 +1023,11 @@ export function desktopChats(options: DesktopChatsOptions) {
         if (!remoteStella && to !== conversationId) {
           // Another chat here: its Stella reads the note as its next turn, and the user does not see it.
           if (chats.has(to) || localSessions().some((row) => row.conversationId === to)) {
-            if (await noteOnBrain(to, `agent-note:${id}`, framed)) return { delivered: "queued", threadId: to };
+            if (await noteOnBrain(to, `agent-note:${id}`, framed)) return { outcome: "queued", threadId: to };
             const chat = await ready(to);
             const note: TextContent & { stella: { hidden: true } } = { type: "text", text: framed, stella: { hidden: true } };
             await chat.root.submit({ type: "input", content: [note], whenBusy: "followUp", requestId: `agent-note:${id}` }, context);
-            return { delivered: "queued", threadId: to };
+            return { outcome: "queued", threadId: to };
           }
           // One of another chat's agents here: it reaches the agent as that chat's Stella's messages do.
           const home = (await threadIndex())[to];
@@ -1043,7 +1036,7 @@ export function desktopChats(options: DesktopChatsOptions) {
             const record = await chat.agentStanding(to, context);
             if (record) {
               await chat.messageAgent({ key: `note:${id}`, threadId: to, message: framed, fromOrchestrator: true }, context);
-              return { delivered: record.status === "running" ? "steered" : "resumed", threadId: to };
+              return { outcome: record.status === "running" ? "steered" : "resumed", threadId: to };
             }
           }
         }
@@ -1057,7 +1050,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       pause: async ({ key, threadId }) => {
         // Another chat's agent here stops here; any other agent stops where it runs.
         if ((await pauseLocalAgent(threadId)) === "paused") {
-          return { threadId, outcome: "paused", status: "paused", attemptGeneration: 0, where: "on this computer" };
+          return { threadId, outcome: "paused", where: "on this computer" };
         }
         if (!cloud) {
           throw new Error(`No agent ${threadId} on this computer. This chat is stored only on this computer, so it can pause only agents here.`);

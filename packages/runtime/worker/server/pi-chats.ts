@@ -202,7 +202,6 @@ const cloudAgentThreadsFor = (
       await threads().start({ conversationId, requestId: requestId(`start:${key}`), description, prompt, model }),
     message: async ({ key, threadId, description, message }) =>
       await threads().message({ conversationId, threadId, requestId: requestId(`message:${key}`), description, message }),
-    status: async () => "runs in Stella's cloud",
     pause: async (threadId) => {
       await threads().pause({ conversationId, threadId, requestId: requestId(`pause:${threadId}:${Date.now()}`) });
     },

@@ -178,10 +178,21 @@ type RelayFetch = ReturnType<typeof managedRelayFetch>;
 const routed = (relay: RelayFetch, sessionId: string | undefined): typeof fetch =>
   ((input: string | URL | Request, init?: RequestInit) => relay(input, init, { ...(sessionId ? { sessionId } : {}) })) as typeof fetch;
 
+/**
+ * The window a Stella model reports is what pi compacts against, which can be
+ * below what the upstream serves (GPT-6 Luna's price tier). pi-ai would also
+ * cap each request's output at that window less a characters/4 estimate of
+ * its input, and a summary request carries nearly the whole window, so an
+ * overestimate leaves it a single output token. The gateway caps output
+ * itself, so the adapter gets no window.
+ */
+const unwindowed = <T extends { contextWindow: number }>(model: T): T => ({ ...model, contextWindow: 0 });
+
 const withFetch = (streams: ProviderStreams, relay: RelayFetch): ProviderStreams => ({
-  stream: (model, context, options) => streams.stream(model, context, { ...options, fetch: routed(relay, options?.sessionId) }),
+  stream: (model, context, options) =>
+    streams.stream(unwindowed(model), context, { ...options, fetch: routed(relay, options?.sessionId) }),
   streamSimple: (model, context, options) =>
-    streams.streamSimple(model, context, { ...options, fetch: routed(relay, options?.sessionId) }),
+    streams.streamSimple(unwindowed(model), context, { ...options, fetch: routed(relay, options?.sessionId) }),
 });
 
 export type StellaProviderOptions = {

@@ -2,14 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Image as NativeImage,
   Linking,
   ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import { AudioPlayerView } from "./AudioPlayerView";
@@ -29,29 +27,20 @@ import {
   withCanvasPolicy,
 } from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
-import {
-  FILE_VIEWER_MIN_HEIGHT,
-  FileViewerFooter,
-  FileViewerPanel,
-  fileViewerContentWidth,
-} from "./FileViewerPanel";
+import { TopSheet } from "./TopSheet";
+import { ArtifactSheetHeader } from "./ArtifactSheetHeader";
 import {
   cachedViewerEntry,
-  rememberViewerContentHeight,
   storeViewerEntry,
 } from "../lib/artifact-viewer-cache";
-import {
-  mediaAspect,
-  parseAspectRatio,
-  rememberMediaSize,
-} from "../lib/viewer-size-hints";
 import type { PopoverAction } from "./FloatingPopoverParts";
 import { canvasSlugFor, useCanvasShareToggle } from "../lib/use-canvas-share-toggle";
 import type { ChatArtifact } from "../types";
 import type { StoredPhoneAccess } from "../lib/phone-access";
 import {
   artifactPrimaryFilePath,
-  artifactFileName,
+  artifactSubtitle,
+  artifactTitle,
   viewedArtifact,
 } from "../lib/mobile-artifacts";
 import {
@@ -111,7 +100,6 @@ type ArtifactViewerProps = {
   access: StoredPhoneAccess | null;
   visible: boolean;
   onClose: () => void;
-  bottomReserve?: number;
 } & ArtifactSwipeProps &
   ArtifactDeviceProps;
 
@@ -134,7 +122,6 @@ type ArtifactViewerContentProps = {
   artifact: ChatArtifact;
   access: StoredPhoneAccess | null;
   onClose: () => void;
-  bottomReserve?: number;
 } & ArtifactSwipeProps &
   ArtifactDeviceProps;
 
@@ -483,46 +470,15 @@ const fileSize = (uri: string): number => {
 const loadedTextChars = (loaded: LoadedArtifact): number =>
   "html" in loaded ? loaded.html.length : "text" in loaded ? loaded.text.length : 0;
 
-type ViewerShape = "fill" | "image" | "audio" | "content";
-
-/** How the viewer sizes an artifact, known from its payload before it loads. */
-const viewerShape = (artifact: ChatArtifact): ViewerShape => {
-  const payload = artifact.payload;
-  switch (payload.kind) {
-    case "media":
-      if (payload.asset.kind === "image") return "image";
-      if (payload.asset.kind === "audio") return "audio";
-      if (payload.asset.kind === "video") return "fill";
-      return "content";
-    case "markdown":
-    case "source-diff":
-    case "canvas-html":
-      return "content";
-    case "file-artifact":
-      return payload.artifactKind === "delimited-table" ? "content" : "fill";
-    default:
-      return "fill";
-  }
-};
-
-const payloadAspect = (artifact: ChatArtifact): number | null => {
-  const payload = artifact.payload;
-  if (payload.kind !== "media") return null;
-  const paths = "filePaths" in payload.asset ? payload.asset.filePaths : [];
-  return mediaAspect(...paths) ?? parseAspectRatio(payload.aspectRatio);
-};
-
 /**
- * The artifact display itself (body + footer) inside the file viewer panel.
- * The panel's size is worked out from what is already known (cached loads,
- * media dimensions seen in chat, the file type) so its first frame is its
- * final size; where that cannot be known it opens small and grows.
+ * The artifact display itself: a header with the file's name and its copy,
+ * share and link actions over the rendered preview. `ArtifactViewer` hosts it
+ * in the top sheet.
  */
 export function ArtifactViewerContent({
   artifact: openedArtifact,
   access,
   onClose,
-  bottomReserve,
   siblings: openedSiblings,
   onNavigate,
   deviceIdOf,
@@ -554,7 +510,6 @@ export function ArtifactViewerContent({
   const onBack = trail.length > 0 ? popTrail : undefined;
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { width: screenWidth } = useWindowDimensions();
   const cacheKey = useMemo(
     () => viewerCacheKey(artifact, preferDeviceId, colors.background),
     [artifact, colors.background, preferDeviceId],
@@ -612,7 +567,10 @@ export function ArtifactViewerContent({
   const shownFolder = loaded?.kind === "folder" ? loaded : null;
   const title = shownFolder
     ? folderName(shownFolder.listing.path)
-    : artifactFileName(artifact.payload);
+    : artifactTitle(artifact.payload);
+  const subtitle = shownFolder
+    ? `On ${shownFolder.deviceName}`
+    : artifactSubtitle(artifact.payload);
 
   const neighbours = useMemo(
     () => imageNeighbours(artifact, siblings),
@@ -862,90 +820,6 @@ export function ArtifactViewerContent({
         return [];
     }
   }, [canvas, canvasShare, copy, loaded, localPdf, shareFile, sharing]);
-
-  const [contentWidth, setContentWidth] = useState(() =>
-    fileViewerContentWidth(screenWidth),
-  );
-  const [footerHeight, setFooterHeight] = useState(FOOTER_FALLBACK_HEIGHT);
-  const [measured, setMeasured] = useState<{
-    source: LoadedArtifact;
-    height: number;
-  } | null>(null);
-  const [imageAspect, setImageAspect] = useState<{
-    uri: string;
-    aspect: number;
-  } | null>(null);
-  const measuredHeight =
-    loaded && measured && measured.source === loaded
-      ? measured.height
-      : loaded && loaded === cachedEntry?.value
-        ? cachedEntry.contentHeight
-        : null;
-  const reportScrollHeight = useCallback(
-    (_width: number, height: number) => {
-      if (!loaded || height <= 0) return;
-      rememberViewerContentHeight(cacheKey, height);
-      setMeasured((current) =>
-        current?.source === loaded && Math.abs(current.height - height) < 1
-          ? current
-          : { source: loaded, height },
-      );
-    },
-    [cacheKey, loaded],
-  );
-  const reportDocumentHeight = useCallback(
-    (height: number) => {
-      if (!loaded) return;
-      setMeasured((current) => {
-        if (current?.source === loaded && height <= current.height + 1) {
-          return current;
-        }
-        rememberViewerContentHeight(cacheKey, height);
-        return { source: loaded, height };
-      });
-    },
-    [cacheKey, loaded],
-  );
-  const imageUri = loaded?.kind === "image" ? loaded.uri : null;
-  useEffect(() => {
-    if (!imageUri) return;
-    let cancelled = false;
-    NativeImage.getSize(
-      imageUri,
-      (width, height) => {
-        if (!cancelled && width > 0 && height > 0) {
-          rememberMediaSize(imageUri, width, height);
-          rememberMediaSize(artifactPrimaryFilePath(artifact.payload), width, height);
-          setImageAspect({ uri: imageUri, aspect: width / height });
-        }
-      },
-      () => undefined,
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [artifact, imageUri]);
-
-  const shape = viewerShape(artifact);
-  const knownAspect =
-    (imageUri && imageAspect?.uri === imageUri ? imageAspect.aspect : null) ??
-    mediaAspect(imageUri) ??
-    payloadAspect(artifact);
-  const placeholderBody = Math.max(0, FILE_VIEWER_MIN_HEIGHT - footerHeight);
-  const bodyPreferredHeight: number | null = (() => {
-    if (shape === "fill") return null;
-    if (shape === "audio") return AUDIO_BODY_HEIGHT;
-    if (shape === "image") {
-      if (knownAspect && contentWidth > 0) return contentWidth / knownAspect;
-      return error ? STATUS_BODY_HEIGHT : placeholderBody;
-    }
-    if (error) return STATUS_BODY_HEIGHT;
-    return measuredHeight ?? placeholderBody;
-  })();
-  const preferredHeight =
-    bodyPreferredHeight === null
-      ? null
-      : Math.ceil(bodyPreferredHeight + footerHeight);
 
   useEffect(() => {
     if (cachedEntry) return;
@@ -1303,19 +1177,13 @@ export function ArtifactViewerContent({
   }, [access, artifact, cacheKey, cachedEntry, colors, preferDeviceId]);
 
   return (
-    <FileViewerPanel
-      onClose={onClose}
-      closeLabel="Close"
-      preferredHeight={preferredHeight}
-      {...(bottomReserve !== undefined ? { bottomReserve } : {})}
-    >
-    <View
-      style={styles.root}
-      onLayout={(event) => {
-        const next = event.nativeEvent.layout.width;
-        if (next > 0) setContentWidth(next);
-      }}
-    >
+    <View style={styles.root}>
+      <ArtifactSheetHeader
+        title={title}
+        subtitle={subtitle}
+        actions={actions}
+        onBack={onBack}
+      />
         <View style={styles.body}>
           {(loading || error) && swipeable ? (
             <SwipeArea onSwipe={onSwipe}>
@@ -1366,13 +1234,11 @@ export function ArtifactViewerContent({
             <CanvasDocumentWebView
               html={loaded.html}
               style={styles.documentWebview}
-              onContentHeight={reportDocumentHeight}
             />
           ) : loaded?.kind === "html-document" ? (
             <DocumentWebView
               html={loaded.html}
               style={styles.documentWebview}
-              onContentHeight={reportDocumentHeight}
             />
           ) : loaded?.kind === "folder" ? (
             <DeviceFolderView
@@ -1405,7 +1271,6 @@ export function ArtifactViewerContent({
             <DocumentWebView
               html={loaded.html}
               style={styles.webview}
-              onContentHeight={reportDocumentHeight}
             />
           ) : loaded?.kind === "image" ? (
             <ZoomableImageView
@@ -1420,41 +1285,25 @@ export function ArtifactViewerContent({
           ) : loaded?.kind === "markdown" ? (
             <ScrollView
               contentContainerStyle={styles.scrollContent}
-              onContentSizeChange={reportScrollHeight}
             >
               <AssistantMarkdown text={loaded.text} colors={colors} />
             </ScrollView>
           ) : loaded?.kind === "text" ? (
             <ScrollView
               contentContainerStyle={styles.scrollContent}
-              onContentSizeChange={reportScrollHeight}
             >
               <Text style={styles.monospace}>{loaded.text}</Text>
             </ScrollView>
           ) : null}
       </View>
-      <View
-        onLayout={(event) => {
-          const next = Math.ceil(event.nativeEvent.layout.height);
-          if (next > 0) setFooterHeight(next);
-        }}
-      >
-        <FileViewerFooter
-          name={title}
-          actions={actions}
-          onBack={onBack}
-          onClose={onClose}
-          closeLabel="Close"
-        />
-      </View>
     </View>
-    </FileViewerPanel>
   );
 }
 
 /**
- * The artifact viewer opened from chat cards, links and Files: a centred
- * popover sized to its content, the file name and actions in its footer.
+ * The artifact viewer opened from chat cards, links and Files: the top sheet
+ * that slides down from the top of the screen, with no dimming behind it.
+ * The last artifact stays on screen while the sheet slides away.
  */
 export function ArtifactViewer({
   artifact,
@@ -1464,25 +1313,25 @@ export function ArtifactViewer({
   siblings,
   onNavigate,
   deviceIdOf,
-  bottomReserve,
 }: ArtifactViewerProps) {
-  if (!visible || !artifact) return null;
+  const lastRef = useRef<ChatArtifact | null>(null);
+  if (artifact) lastRef.current = artifact;
+  const shown = artifact ?? lastRef.current;
   return (
-    <ArtifactViewerContent
-      artifact={artifact}
-      access={access}
-      onClose={onClose}
-      {...(bottomReserve !== undefined ? { bottomReserve } : {})}
-      {...(siblings ? { siblings } : {})}
-      {...(onNavigate ? { onNavigate } : {})}
-      {...(deviceIdOf ? { deviceIdOf } : {})}
-    />
+    <TopSheet visible={visible && Boolean(artifact)} onClose={onClose} dim={false}>
+      {shown ? (
+        <ArtifactViewerContent
+          artifact={shown}
+          access={access}
+          onClose={onClose}
+          {...(siblings ? { siblings } : {})}
+          {...(onNavigate ? { onNavigate } : {})}
+          {...(deviceIdOf ? { deviceIdOf } : {})}
+        />
+      ) : null}
+    </TopSheet>
   );
 }
-
-const FOOTER_FALLBACK_HEIGHT = 49;
-const STATUS_BODY_HEIGHT = 200;
-const AUDIO_BODY_HEIGHT = 260;
 
 const makeStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({

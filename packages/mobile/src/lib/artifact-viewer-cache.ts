@@ -12,7 +12,6 @@ const MAX_TEXT_CHARS = 8 * 1024 * 1024;
 
 type Entry<T> = {
   value: T;
-  contentHeight: number | null;
   file: ArtifactMediaFile | null;
   fileBytes: number;
   textChars: number;
@@ -57,7 +56,7 @@ const trim = () => {
 export function cachedViewerEntry<T>(
   key: string | null,
   stillValid: (value: T) => boolean = () => true,
-): { value: T; contentHeight: number | null } | null {
+): { value: T } | null {
   if (!key) return null;
   const entry = entries.get(key) as Entry<T> | undefined;
   if (!entry) return null;
@@ -70,7 +69,7 @@ export function cachedViewerEntry<T>(
   }
   entries.delete(key);
   entries.set(key, entry);
-  return { value: entry.value, contentHeight: entry.contentHeight };
+  return { value: entry.value };
 }
 
 /**
@@ -95,7 +94,6 @@ export function storeViewerEntry<T>(
   drop(key);
   entries.set(key, {
     value,
-    contentHeight: null,
     file: options.file ?? null,
     fileBytes,
     textChars,
@@ -103,10 +101,4 @@ export function storeViewerEntry<T>(
   });
   trim();
   return entries.has(key);
-}
-
-export function rememberViewerContentHeight(key: string | null, height: number): void {
-  if (!key) return;
-  const entry = entries.get(key);
-  if (entry) entry.contentHeight = height;
 }

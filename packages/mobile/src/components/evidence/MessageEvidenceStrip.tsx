@@ -171,6 +171,13 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
     [],
   );
 
+  const [rowHeight, setRowHeight] = useState<number | null>(null);
+  const onRowContentSize = useCallback((_width: number, height: number) => {
+    if (height <= 0) return;
+    const next = Math.ceil(height);
+    setRowHeight((current) => (current === next ? current : next));
+  }, []);
+
   const showMedia = part !== "documents" && media.length > 0;
   const showPills = part !== "media" && pills.length > 0;
   const showOverflow = part !== "media" && overflowCount > 0;
@@ -182,7 +189,12 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
+          showsVerticalScrollIndicator={false}
+          alwaysBounceVertical={false}
+          directionalLockEnabled
+          style={rowHeight === null ? undefined : { height: rowHeight }}
           contentContainerStyle={styles.row}
+          onContentSizeChange={onRowContentSize}
           onScroll={onScroll}
           scrollEventThrottle={96}
           accessibilityLabel="Attached media"

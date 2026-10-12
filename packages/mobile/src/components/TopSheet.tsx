@@ -59,6 +59,8 @@ type TopSheetProps = {
    * behind is showing. Outside the scroll, so it never scrolls away.
    */
   floatingFooter?: React.ReactNode;
+  /** Dim the screen behind the sheet. A tap outside still closes it either way. */
+  dim?: boolean;
 };
 
 const OPEN_TIMING = { duration: 300, easing: Easing.out(Easing.cubic) };
@@ -84,6 +86,7 @@ export function TopSheet({
   contentSized = false,
   glass = false,
   floatingFooter,
+  dim = true,
 }: TopSheetProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -178,7 +181,7 @@ export function TopSheet({
           viewer's pinch and swipe) need their own gesture-handler root. */}
       <GestureHandlerRootView style={styles.fill}>
         <AnimatedPressable
-          style={[styles.backdrop, scrim]}
+          style={dim ? [styles.backdrop, scrim] : styles.clearBackdrop}
           onPress={onClose}
           accessibilityRole="button"
           accessibilityLabel="Close"
@@ -238,6 +241,10 @@ const makeStyles = (colors: Colors) =>
     backdrop: {
       ...StyleSheet.absoluteFill,
       backgroundColor: "#000000",
+    },
+    clearBackdrop: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: "transparent",
     },
     // The sheet starts one corner radius above the screen, so all four
     // corners can share a radius and only the bottom two are ever seen. With

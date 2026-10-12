@@ -28,7 +28,6 @@ import {
   type EvidencePreview,
 } from "./chat-evidence-previews";
 import type { StoredPhoneAccess } from "./phone-access";
-import { rememberMediaSize } from "./viewer-size-hints";
 
 /** Tile geometry is shared with the desktop strip. */
 export const EVIDENCE_MEDIA_CARD_HEIGHT = EVIDENCE_TILE_HEIGHT;
@@ -47,14 +46,6 @@ export type ChatEvidence = {
 const EMPTY: ChatEvidence = { media: [], pills: [], overflowCount: 0 };
 
 const imageCard = (
-  source: EvidenceSource,
-  preview: Extract<EvidencePreview, { kind: "image" }>,
-): EvidenceCard => {
-  rememberMediaSize(source.filePath, preview.width, preview.height);
-  return imageCardFor(source, preview);
-};
-
-const imageCardFor = (
   source: EvidenceSource,
   preview: Extract<EvidencePreview, { kind: "image" }>,
 ): EvidenceCard => ({

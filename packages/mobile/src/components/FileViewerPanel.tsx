@@ -38,9 +38,6 @@ const RESIZE_TIMING = { duration: 240, easing: Easing.out(Easing.cubic) };
 export const fileViewerPanelWidth = (screenWidth: number): number =>
   Math.min(screenWidth - SIDE_MARGIN * 2, MAX_WIDTH);
 
-export const fileViewerContentWidth = (screenWidth: number): number =>
-  fileViewerPanelWidth(screenWidth) - FILE_VIEWER_SURFACE_RIM * 2;
-
 function useKeyboardHeight(): number {
   const [height, setHeight] = useState(0);
   useEffect(() => {
@@ -64,7 +61,7 @@ function useKeyboardHeight(): number {
 }
 
 /**
- * The centred popover files and replies open in. It takes `preferredHeight`
+ * The centred popover reply and task chains open in. It takes `preferredHeight`
  * on its very first frame, so a caller that knows the content's size never
  * shows a max-size frame first; later changes ease to the new size. Without a
  * preferred height it fills the room between the top of the screen and the

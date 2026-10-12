@@ -1,6 +1,6 @@
 /**
  * What a reply card opens: the message or task it points at and the replies
- * that follow from it, in the same centred popover files open in. The chain
+ * that follow from it, in a centred popover. The chain
  * is measured before the popover shows, so it opens at its final size.
  */
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";

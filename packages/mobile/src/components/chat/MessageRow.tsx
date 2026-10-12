@@ -82,7 +82,6 @@ import { fonts } from "../../theme/fonts";
 import type { ChatArtifact, ChatMessage } from "../../types";
 import { UserAskRecordView } from "../UserAskCard";
 import { ReminderActions } from "./ReminderActions";
-import { rememberMediaSize } from "../../lib/viewer-size-hints";
 
 export type MessageRowStyles = ReturnType<typeof makeMessageRowStyles>;
 
@@ -359,11 +358,6 @@ const GeneratedImageTile = memo(function GeneratedImageTile({
           source={{ uri }}
           style={generatedImageStyles.image}
           contentFit="cover"
-          onLoad={(event) => {
-            const { width, height } = event.source;
-            rememberMediaSize(uri, width, height);
-            rememberMediaSize(filePath, width, height);
-          }}
         />
       ) : (
         <View style={generatedImageStyles.placeholder}>

@@ -220,7 +220,9 @@ export const piPendingRows = (args: {
   const opening = sinceMs === null;
   if (pending.length === 0 && !opening) return NO_PENDING_ROWS;
   const canonicalReplies = new Map<string, number>();
+  const canonicalUsers = new Set<string>();
   for (const message of canonical) {
+    if (message.type === "user_message") canonicalUsers.add(message._id);
     const owner = message.type === "assistant_message" ? message.payload?.userMessageId : undefined;
     if (typeof owner === "string") canonicalReplies.set(owner, (canonicalReplies.get(owner) ?? 0) + 1);
   }
@@ -241,7 +243,9 @@ export const piPendingRows = (args: {
     }
     const turn = byUser.get(owner);
     if (!turn) continue;
-    const journal = journaled.get(turn.entryId);
+    const journal =
+      journaled.get(turn.entryId) ??
+      (canonicalUsers.has(turn.userMessageId) ? { userMessageId: turn.userMessageId, settled: false } : undefined);
     if (!journal) {
       messages.push(message);
       continue;

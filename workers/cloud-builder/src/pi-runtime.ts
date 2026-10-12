@@ -329,6 +329,8 @@ export type PiTurnSources = {
   executionContext: ExecutionContextSnapshot;
   /** The conversation's reply language. */
   locale?: string;
+  /** Whether `code` reads this conversation's history; absent, it does while memory is on. */
+  history?: boolean;
 };
 
 export type PiTurnBinding = {
@@ -913,7 +915,11 @@ export class PiConversationRuntime {
         this.#binding?.sources.executionContext ?? (await this.#agentState()).executionContext,
       locale: async () => (this.#binding ? this.#binding.sources.locale : (await this.#agentState()).locale),
       // Stella reads the journal while memory is on; an agent reads its own thread.
-      codeHistory: async (agentType) => agentType !== "orchestrator" || (await turn()).memory.enabled,
+      codeHistory: async (agentType) => {
+        if (agentType !== "orchestrator") return true;
+        const sources = await turn();
+        return sources.history ?? sources.memory.enabled;
+      },
     };
   }
 

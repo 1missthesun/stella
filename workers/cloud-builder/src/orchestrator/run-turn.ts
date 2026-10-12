@@ -4,6 +4,12 @@ import { formatTurnClock } from "@stella/contracts/schedule-zone";
 import { attachedFilesText } from "../prompt-context.js";
 import { formatMessageRefTag } from "@stella/contracts/reply-refs";
 import { buildCloudSkillsBlock } from "../cloud-skills.js";
+import { unwrapRpc } from "../owner-store/errors.js";
+import {
+  isSlackConversationId,
+  renderSlackSystemPrompt,
+  slackSkillCatalog,
+} from "../slack/workspace.js";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import {
   assertTurnExecutionActive,
@@ -914,7 +920,51 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
       import("../pi-runtime.js"),
     ]);
     await assertExactTurnActive();
-    const executionContext = cloudExecutionContext(turn, destinations);
+    const slack = isSlackConversationId(turn.conversationId);
+    const slackPrompt = slack
+      ? await renderSlackSystemPrompt(
+          await this.slack().workspace(),
+          async (name, args) =>
+            unwrapRpc(
+              await this.ownerGate(turn.ownerId).ownerInternal({
+                name,
+                args,
+                ownerGeneration: turn.ownerGeneration,
+              }),
+            ),
+        )
+      : null;
+    const skillCatalog = slack
+      ? slackSkillCatalog(home.skillCatalog)
+      : home.skillCatalog;
+    const executionContext = cloudExecutionContext(
+      turn,
+      slack ? null : destinations,
+    );
+    const locale = await this.resolveTurnLocale(turn);
+    const sources: import("../pi-runtime.js").PiTurnSources =
+      slackPrompt !== null
+        ? {
+            orchestratorPrompt: slackPrompt,
+            personality: undefined,
+            memory: { enabled: false },
+            history: true,
+            skillsCatalog: buildCloudSkillsBlock(skillCatalog) || undefined,
+            executionContext,
+            locale,
+          }
+        : {
+            orchestratorPrompt: canonicalPrompts.orchestratorBody,
+            personality:
+              home.personalityOverride ?? canonicalPrompts.personalityBody,
+            memory: pi.memoryFromDocuments(
+              home.memoryPreference.memoryEnabled,
+              home.memoryDocuments,
+            ),
+            skillsCatalog: buildCloudSkillsBlock(skillCatalog) || undefined,
+            executionContext,
+            locale,
+          };
     const modelSpec = (
       agentType: "orchestrator" | "general",
       execution: Extract<CloudExecutionSelection, { engine: "stella" }>,
@@ -947,22 +997,11 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           await this.createTools(
             turn,
             this.cloudAgentHome(turn),
-            home.skillCatalog,
+            skillCatalog,
             home.memoryPreference.memoryEnabled,
           )
         ).catalog,
-      sources: {
-        orchestratorPrompt: canonicalPrompts.orchestratorBody,
-        personality:
-          home.personalityOverride ?? canonicalPrompts.personalityBody,
-        memory: pi.memoryFromDocuments(
-          home.memoryPreference.memoryEnabled,
-          home.memoryDocuments,
-        ),
-        skillsCatalog: buildCloudSkillsBlock(home.skillCatalog) || undefined,
-        executionContext,
-        locale: await this.resolveTurnLocale(turn),
-      },
+      sources,
     };
     const runtime = await this.openPiRuntime(args.gatewayOrigin);
     const unbind = await runtime.bind(binding);

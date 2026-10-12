@@ -45,6 +45,11 @@ import {
   CONNECT_CARD_POLL_MS,
 } from "./constants.js";
 import { OrchestratorPi } from "./pi.js";
+import {
+  createSlackMemoryTool,
+  isSlackConversationId,
+  SLACK_CONNECTOR_SOURCE,
+} from "../slack/workspace.js";
 
 /** The orchestrator's tool set and connector connection requests. */
 export abstract class OrchestratorTools extends OrchestratorPi {
@@ -146,6 +151,53 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       },
     });
 
+    const slack = isSlackConversationId(turn.conversationId);
+    if (slack) {
+      const tools: CloudCodeSourceAgentTool[] = [
+        createCloudWebTool({ ownerInternal: toolContext.ownerInternal }),
+        createCloudImageGenTool({
+          ownerGeneration: turn.ownerGeneration,
+          conversationId: turn.conversationId,
+          turnId: turn.turnId,
+          ownerInternal: toolContext.ownerInternal,
+          publishFiles: (writerKey, files) =>
+            this.publishTurnFilesCard(turn.turnId, writerKey, files),
+        }),
+        createCloudHtmlTool({
+          turnId: turn.turnId,
+          ownerInternal: toolContext.ownerInternal,
+          publishFiles: (writerKey, files) =>
+            this.publishTurnFilesCard(turn.turnId, writerKey, files),
+        }),
+        createCloudMapTool({
+          apiKey: mapsServerKey(this.env),
+          ownerInternal: toolContext.ownerInternal,
+        }),
+        createCloudReadTool({
+          ...(agentHome.available
+            ? { skills: { home: agentHome.cloudStore(), snapshot: skillCatalog } }
+            : {}),
+          ...(world ? { world } : {}),
+        }),
+        createCloudDriveTool({ ownerInternal: toolContext.ownerInternal }),
+        createSlackMemoryTool({
+          turnId: turn.turnId,
+          ownerInternal: toolContext.ownerInternal,
+          context: () => this.slack().workspace(),
+        }),
+      ];
+      const codeTool = await createCloudCodeAgentTool({
+        loader: this.env.LOADER,
+        tools,
+        executionScope: `${turn.ownerGeneration}:${turn.conversationId}:${turn.turnId}`,
+        connect: createCloudConnectClient(
+          new CloudConnectorDirectory({ source: SLACK_CONNECTOR_SOURCE }),
+        ),
+        history: this.historyClient(),
+      });
+      return { catalog: [codeTool, ...tools] };
+    }
+
     const tools: CloudCodeSourceAgentTool[] = [
       createCloudWebTool({ ownerInternal: toolContext.ownerInternal }),
       createCloudImageGenTool({
@@ -205,26 +257,27 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       executionScope: `${turn.ownerGeneration}:${turn.conversationId}:${turn.turnId}`,
       connect: createCloudConnectClient(connectors),
       ...(memory ? { memory } : {}),
-      ...(memoryEnabled
-        ? {
-            history: {
-              search: async (text: string, options: unknown) => {
-                await this.archive.reindexArchivedSearch();
-                return searchHistory(this.ctx.storage, text, historySearchOptions(options));
-              },
-              sql: (query: string, params: readonly SqlStorageValue[]) =>
-                runHistoryQuery(this.ctx.storage, query, params),
-              read: (fromSeq: number, toSeq: number) =>
-                this.archive.readRange(
-                  Math.max(0, fromSeq),
-                  toSeq,
-                  BACKFILL_BATCH_RECORDS,
-                ),
-            },
-          }
-        : {}),
+      ...(memoryEnabled ? { history: this.historyClient() } : {}),
     });
     return { catalog: [codeTool, ...tools] };
+  }
+
+  /** `history` inside code: this conversation's own journal. */
+  private historyClient() {
+    return {
+      search: async (text: string, options: unknown) => {
+        await this.archive.reindexArchivedSearch();
+        return searchHistory(this.ctx.storage, text, historySearchOptions(options));
+      },
+      sql: (query: string, params: readonly SqlStorageValue[]) =>
+        runHistoryQuery(this.ctx.storage, query, params),
+      read: (fromSeq: number, toSeq: number) =>
+        this.archive.readRange(
+          Math.max(0, fromSeq),
+          toSeq,
+          BACKFILL_BATCH_RECORDS,
+        ),
+    };
   }
 
   /**

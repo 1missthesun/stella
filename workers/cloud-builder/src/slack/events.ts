@@ -1,19 +1,20 @@
 /**
- * Events API handling: a Slack message becomes a Stella turn.
+ * Events API handling: a Slack message becomes a turn of the workspace's
+ * shared Stella (`workspace.ts`).
  *
  * - **Triggers:** an `@Stella` mention in a channel or group DM, any direct
- *   message, and a reply from the thread's requester in a thread Stella is
- *   already working in. Everything else in channels Stella belongs to is
- *   cached (`slack_messages`) as context and answers nothing.
- * - **Whose Stella:** the requester's own linked account. An unlinked person
- *   gets the connect button privately. A thread belongs to whoever started
- *   it; another person's mention there is turned away politely.
- * - **Which conversation:** one Stella conversation per Slack thread (and one
- *   for a person's DM with Stella), id derived from the Slack coordinates.
- *   It is the requester's conversation like any new chat, so it reads their
- *   memory and shows in their Stella apps.
- * - **Delivery:** the conversation object is told where its replies go
- *   (`/slack/bind`, see `relay.ts`) before the turn starts.
+ *   message, and any reply in a thread Stella is already working in: anyone
+ *   there can steer her without tagging her again. Everything else in
+ *   channels Stella belongs to is cached (`slack_messages`) as context.
+ * - **Whose Stella:** the workspace's. It runs on the Stella account of
+ *   whoever installed the app, which owns the workspace's home and pays for
+ *   it; nobody else needs a Stella account. Until the installer connects
+ *   theirs, Stella says so.
+ * - **Which conversation:** one per Slack thread (and one per person's DM),
+ *   id derived from the Slack coordinates. They live under the owner's
+ *   account but never show in the owner's own Stella apps.
+ * - **Delivery:** the conversation object is told where its replies go and
+ *   who is asking (`/slack/bind`, see `relay.ts`) before the turn starts.
  */
 
 import {
@@ -42,7 +43,6 @@ import {
   cachedThread,
   cachedUser,
   type CachedSlackMessage,
-  linkedOwner,
   loadInstallation,
   loadThread,
   revokeInstallation,
@@ -51,8 +51,10 @@ import {
   type SlackInstallation,
   type SlackUserProfile,
 } from "./store.js";
-import { publishHome, sendConnectPrompt } from "./ui.js";
+import { publishHome, sendSetupPrompt } from "./ui.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { DEFAULT_REASONING_EFFORT } from "@stella/contracts/reasoning-effort";
+import type { SlackPerson, SlackWorkspaceContext } from "./workspace.js";
 
 type SlackFile = {
   id: string;
@@ -115,12 +117,7 @@ export const handleSlackEvent = async (
   if (!install) return;
   if (event.type === "app_home_opened") {
     if (event.tab === "home" && event.user) {
-      await publishHome(
-        env,
-        install,
-        event.user,
-        Boolean(await linkedOwner(env, teamId, event.user)),
-      );
+      await publishHome(env, install, event.user);
     }
     return;
   }
@@ -267,7 +264,7 @@ const ownerInternal = async (
     }),
   );
 
-/** The message's files, copied into the requester's drive as turn attachments. */
+/** The message's files, copied into the workspace's home as turn attachments. */
 const importFiles = async (
   env: Cloudflare.Env,
   install: SlackInstallation,
@@ -295,7 +292,7 @@ const importFiles = async (
       skipped.push(name);
       continue;
     }
-    const path = `Slack/${day}/${ts.replace(".", "-")}-${name}`;
+    const path = `${install.homeFolder}/files/${day}/${ts.replace(".", "-")}-${name}`;
     try {
       const result = (await ownerInternal(
         env,
@@ -371,41 +368,35 @@ const handleMessage = async (
 
   const threadKey = isDm ? DM_THREAD_KEY : (threadTs ?? ts);
   let binding = await loadThread(env, install.teamId, channelId, threadKey);
-  if (trigger === "reply" && (!binding || binding.requesterUserId !== userId))
-    return;
+  if (trigger === "reply" && !binding) return;
 
-  const ownerId = await linkedOwner(env, install.teamId, userId);
+  const ownerId = install.ownerId;
   if (!ownerId) {
-    await sendConnectPrompt(env, install, {
+    if (trigger === "reply") return;
+    await sendSetupPrompt(env, install, {
       channelId,
       slackUserId: userId,
       isDm,
       ...(threadTs ? { threadTs } : {}),
     });
-    log("slack_unlinked_prompted", { teamId: install.teamId, trigger });
+    log("slack_setup_prompted", { teamId: install.teamId, trigger });
     return;
   }
-  if (binding && binding.ownerId !== ownerId) {
-    await slackTry(install.botToken, "chat.postEphemeral", {
-      channel: channelId,
-      user: userId,
-      thread_ts: threadKey,
-      text: `This thread is running on <@${binding.requesterUserId}>'s Stella. Mention @Stella in a new message to start your own.`,
-    });
-    return;
-  }
+  if (binding && binding.ownerId !== ownerId) binding = null;
 
-  await slackTry(install.botToken, "reactions.add", {
-    channel: channelId,
-    timestamp: ts,
-    name: "eyes",
-  });
+  if (trigger !== "reply") {
+    await slackTry(install.botToken, "reactions.add", {
+      channel: channelId,
+      timestamp: ts,
+      name: "eyes",
+    });
+  }
 
   const gate = ownerGateStub(env.OWNER_GATES, ownerId);
   const { ownerGeneration } = await gate.snapshot();
   const conversationId =
     binding?.conversationId ??
-    `slack-${await sha256Short(`${install.teamId}:${channelId}:${threadKey}`)}`;
+    `slack-${await sha256Short(`${install.teamId}:${channelId}:${threadKey}:${ownerId}`)}`;
 
   const requester = await slackUser(env, install, userId);
   const names = async (id: string): Promise<string> =>
@@ -462,12 +453,32 @@ const handleMessage = async (
     requesterName: requester.name,
     teamName: install.teamName,
     place,
-    firstTurn: !binding,
+    trigger,
     context,
     contextLabel,
     tz: requester.tz,
     skippedFiles: skipped,
   });
+
+  const participants: SlackPerson[] = [];
+  if (!isDm) {
+    const seen = new Set([userId, install.botUserId]);
+    const thread = await cachedThread(env, install.teamId, channelId, threadKey);
+    for (const message of [...thread].reverse()) {
+      if (!message.userId || message.isBot || seen.has(message.userId)) continue;
+      seen.add(message.userId);
+      participants.push({ id: message.userId, name: await names(message.userId) });
+      if (participants.length >= 8) break;
+    }
+  }
+  const workspace: SlackWorkspaceContext = {
+    teamName: install.teamName,
+    homeFolder: install.homeFolder,
+    channelId,
+    place,
+    requester: { id: userId, name: requester.name },
+    participants,
+  };
 
   const clientMsgId = `slack:${channelId}:${ts}`.slice(0, 64);
   const stub = env.ORCHESTRATOR_SESSIONS.getByName(conversationId);
@@ -483,6 +494,7 @@ const handleMessage = async (
       shared: !isDm,
       clientMsgId,
       triggerTs: ts,
+      workspace,
     }),
   });
   if (!bound.ok) {
@@ -501,6 +513,12 @@ const handleMessage = async (
     prompt,
     lane: "chat",
     source: "slack",
+    execution: {
+      engine: "stella",
+      provider: "stella",
+      model: "stella/default",
+      reasoningEffort: DEFAULT_REASONING_EFFORT,
+    },
     title:
       place.kind === "channel"
         ? `Slack · #${place.name}`

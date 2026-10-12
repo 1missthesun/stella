@@ -120,6 +120,10 @@ import {
   errorMessage,
   log,
 } from "./support.js";
+import {
+  isSlackConversationId,
+  SLACK_CONNECTOR_SOURCE,
+} from "../slack/workspace.js";
 import { OrchestratorCloudAgents } from "./cloud-agents.js";
 import { resolveCloudSpawnExecution } from "../cloud-spawn-model.js";
 
@@ -266,6 +270,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   protected async openPiRuntime(
     gatewayOrigin: string,
   ): Promise<import("../pi-runtime.js").PiConversationRuntime> {
+    const slack = isSlackConversationId(this.conversationId());
     this.piRuntime ??= import("../pi-runtime.js").then(
       ({ PiConversationRuntime }) =>
         new PiConversationRuntime({
@@ -334,15 +339,21 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           },
           agentTools: (authority, browser, history) =>
             this.createPiAgentTools(authority, browser, history),
-          browserHandoff: (handoff, signal) =>
-            this.awaitPiBrowserHandoff(handoff, signal),
+          ...(slack
+            ? {}
+            : {
+                browserHandoff: (
+                  handoff: Parameters<OrchestratorPi["awaitPiBrowserHandoff"]>[0],
+                  signal: AbortSignal | undefined,
+                ) => this.awaitPiBrowserHandoff(handoff, signal),
+                deviceAgents: this.piDeviceAgents(),
+                claudeCode: this.claudeCodeTransport(),
+                threadAgents: this.piThreadAgents(),
+              }),
           agentGuard: (authority, turnId) =>
             this.piAgentGuard(authority, turnId),
-          deviceAgents: this.piDeviceAgents(),
-          claudeCode: this.claudeCodeTransport(),
-          threadAgents: this.piThreadAgents(),
           // Her brief continues there once this turn ends (`runPiTurn`).
-          moveBrain: async (authority, host, brief) => {
+          moveBrain: slack ? undefined : async (authority, host, brief) => {
             const handoff: BrainHandoff = {
               turnId: this.activeTurnId ?? "",
               ownerId: authority.ownerId,
@@ -1989,15 +2000,17 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       );
     const web = createCloudWebTool({ ownerInternal });
     const connectors = new CloudConnectorDirectory({
-      source: {
-        catalog: () => listIntegrationCatalog(this.env),
-        actions: (args) => listIntegrationActions(this.env, args),
-        connections: async () =>
-          (await ownerInternal("integrations.connections", {})) as {
-            connections: Array<{ id: string; connected: boolean }>;
+      source: isSlackConversationId(authority.conversationId)
+        ? SLACK_CONNECTOR_SOURCE
+        : {
+            catalog: () => listIntegrationCatalog(this.env),
+            actions: (args) => listIntegrationActions(this.env, args),
+            connections: async () =>
+              (await ownerInternal("integrations.connections", {})) as {
+                connections: Array<{ id: string; connected: boolean }>;
+              },
+            run: (args) => ownerInternal("integrations.run", args),
           },
-        run: (args) => ownerInternal("integrations.run", args),
-      },
     });
     const code = await createCloudCodeAgentTool({
       loader: this.env.LOADER,

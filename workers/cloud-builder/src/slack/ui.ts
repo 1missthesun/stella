@@ -1,4 +1,8 @@
-/** Slack-side messages and views: the connect prompt and the App Home tab. */
+/**
+ * Slack-side messages and views: setting up the workspace's Stella (the
+ * installer connects the Stella account that owns and pays for it) and the
+ * App Home tab.
+ */
 
 import { slackTry } from "./api.js";
 import { SLACK_PATHS, slackPublicOrigin } from "./config.js";
@@ -31,17 +35,20 @@ export const connectBlocks = (url: string, lead: string): unknown[] => [
     elements: [
       {
         type: "mrkdwn",
-        text: "Stella works on your own Stella account, so she can use your memory and connected apps. The link is yours alone and expires in 30 minutes.",
+        text: "Stella is the whole workspace's shared assistant. Your Stella account pays for her usage here and keeps the workspace's files in your Drive under Slack/. Your personal memory, chats and connected apps stay out of Slack. The link is yours alone and expires in 30 minutes.",
       },
     ],
   },
 ];
 
-const CONNECT_LEAD =
-  "*Connect your Stella account to use Stella here.* It takes a few seconds.";
+const SETUP_LEAD =
+  "*Connect your Stella account to set up Stella for this workspace.* You installed her, so your account runs her here. It takes a few seconds.";
 
-/** The connect button, privately: ephemeral in a channel, a DM in a DM. */
-export const sendConnectPrompt = async (
+/**
+ * Stella isn't set up yet: the installer gets the connect button privately;
+ * anyone else is told who can set her up.
+ */
+export const sendSetupPrompt = async (
   env: Cloudflare.Env,
   install: SlackInstallation,
   args: {
@@ -51,14 +58,23 @@ export const sendConnectPrompt = async (
     isDm: boolean;
   },
 ): Promise<void> => {
-  const url = await connectUrl(env, install.teamId, args.slackUserId);
-  const blocks = connectBlocks(url, CONNECT_LEAD);
-  const text = "Connect your Stella account to use Stella here.";
+  const installer = args.slackUserId === install.installedBy;
+  const text = installer
+    ? "Connect your Stella account to set up Stella for this workspace."
+    : install.installedBy
+      ? `Stella isn't set up here yet. <@${install.installedBy}> installed her and needs to connect a Stella account first (\`/stella connect\`).`
+      : "Stella isn't set up here yet. Whoever installed her needs to connect a Stella account first (`/stella connect`).";
+  const blocks = installer
+    ? connectBlocks(
+        await connectUrl(env, install.teamId, args.slackUserId),
+        SETUP_LEAD,
+      )
+    : undefined;
   if (args.isDm) {
     await slackTry(install.botToken, "chat.postMessage", {
       channel: args.channelId,
       text,
-      blocks,
+      ...(blocks ? { blocks } : {}),
     });
     return;
   }
@@ -66,7 +82,7 @@ export const sendConnectPrompt = async (
     channel: args.channelId,
     user: args.slackUserId,
     text,
-    blocks,
+    ...(blocks ? { blocks } : {}),
     ...(args.threadTs ? { thread_ts: args.threadTs } : {}),
   });
 };
@@ -75,7 +91,6 @@ export const publishHome = async (
   env: Cloudflare.Env,
   install: SlackInstallation,
   slackUserId: string,
-  linked: boolean,
 ): Promise<void> => {
   const blocks: unknown[] = [
     { type: "header", text: { type: "plain_text", text: "Stella" } },
@@ -83,26 +98,49 @@ export const publishHome = async (
       type: "section",
       text: {
         type: "mrkdwn",
-        text: "Mention *@Stella* in a channel (invite her first with `/invite @Stella`) or message her here. She works on it with your Stella account, posts progress in the thread, and posts results when her background agents finish.",
+        text:
+          `Stella is ${install.teamName}'s shared assistant. Mention *@Stella* in a channel (invite her first with \`/invite @Stella\`) or message her here. ` +
+          "She answers in the thread, and anyone in it can keep steering her by replying. Longer work runs in the background with a progress checklist and a Stop button, and files she makes are posted in the thread.",
+      },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: "She keeps short notes about the workspace, each channel and the people she works with. Ask her what she remembers, or to forget something.",
       },
     },
     { type: "divider" },
   ];
-  if (linked) {
+  if (install.ownerId) {
+    blocks.push({
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: install.installedBy
+            ? `:white_check_mark: Set up by <@${install.installedBy}>.`
+            : ":white_check_mark: Set up.",
+        },
+      ],
+    });
+  } else if (slackUserId === install.installedBy) {
+    blocks.push(
+      ...connectBlocks(
+        await connectUrl(env, install.teamId, slackUserId),
+        SETUP_LEAD,
+      ),
+    );
+  } else {
     blocks.push({
       type: "section",
       text: {
         type: "mrkdwn",
-        text: ":white_check_mark: Your Stella account is connected. Use `/stella disconnect` to disconnect it.",
+        text: install.installedBy
+          ? `Stella isn't set up yet: <@${install.installedBy}> needs to connect a Stella account.`
+          : "Stella isn't set up yet: whoever installed her needs to connect a Stella account.",
       },
     });
-  } else {
-    blocks.push(
-      ...connectBlocks(
-        await connectUrl(env, install.teamId, slackUserId),
-        CONNECT_LEAD,
-      ),
-    );
   }
   await slackTry(install.botToken, "views.publish", {
     user_id: slackUserId,

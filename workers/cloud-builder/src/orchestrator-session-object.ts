@@ -42,6 +42,7 @@ import { AGENT_REPORT_TARGET_PATH } from "./agent-report-target.js";
 import type { AgentReportTarget } from "./owner-store/registry.js";
 import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import { PI_BRAIN_KEY } from "./orchestrator/constants.js";
+import { parseSlackWorkspaceContext } from "./slack/workspace.js";
 
 /**
  * The cloud orchestrator: Stella's delegation-only agent loop running inside
@@ -341,6 +342,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (this.purged()) return json({ error: "Conversation deleted." }, 410);
     const owner = this.journal.meta().owner_id;
     if (owner && owner !== ownerId) return json({ error: "owner_mismatch" }, 403);
+    const workspace = parseSlackWorkspaceContext(body?.workspace);
     await this.slack().bind({
       teamId,
       channelId,
@@ -350,6 +352,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       shared: body?.shared === true,
       clientMsgId,
       triggerTs,
+      ...(workspace ? { workspace } : {}),
     });
     return json({ bound: true });
   }

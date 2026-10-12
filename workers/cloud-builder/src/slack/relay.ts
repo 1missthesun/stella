@@ -33,6 +33,7 @@ import {
 import { toolLabel } from "./format.js";
 import { STOP_ACTION, stopValue } from "./interactivity.js";
 import { loadInstallation, type SlackInstallation } from "./store.js";
+import { SLACK_NO_REPLY, type SlackWorkspaceContext } from "./workspace.js";
 import { ownerGateStub } from "../rpc-release.js";
 
 export type SlackRelayBinding = {
@@ -43,6 +44,8 @@ export type SlackRelayBinding = {
   ownerId: string;
   requesterUserId: string;
   shared: boolean;
+  /** Who and where the latest request came from, for the Slack prompt. */
+  workspace?: SlackWorkspaceContext;
 };
 
 type Line = {
@@ -65,7 +68,7 @@ type TurnState = {
   acked?: boolean;
   /** Someone pressed Stop; the request ends here whatever still reports. */
   stopped?: boolean;
-  /** Woken by an agent's progress note rather than its report: brief replies stay in the app. */
+  /** Woken by an agent's progress note rather than its report: brief replies are not posted. */
   noteWake?: boolean;
   updatedAt: number;
 };
@@ -116,7 +119,7 @@ const assistantText = (payload: unknown): string | null => {
   if (!payload || typeof payload !== "object") return null;
   const message = payload as { $spill?: unknown; content?: unknown };
   if (message.$spill)
-    return "_This reply is too long for Slack. Open it in Stella to read it._";
+    return "_This reply is too long for Slack. Ask me for a shorter version or a file._";
   let text: string | null = null;
   if (typeof message.content === "string") text = message.content;
   else if (Array.isArray(message.content)) {
@@ -191,6 +194,7 @@ export class SlackRelay {
       ownerId: input.ownerId,
       requesterUserId: input.requesterUserId,
       shared: input.shared,
+      ...(input.workspace ? { workspace: input.workspace } : {}),
     };
     const triggers = trimRecord(
       {
@@ -205,6 +209,15 @@ export class SlackRelay {
       [TRIGGERS_KEY]: triggers,
     });
     this.binding = binding;
+  }
+
+  /** The workspace context of the latest Slack request; null outside Slack. */
+  async workspace(): Promise<SlackWorkspaceContext | null> {
+    if (this.binding === undefined) {
+      this.binding =
+        (await this.storage.get<SlackRelayBinding>(BINDING_KEY)) ?? null;
+    }
+    return this.binding?.workspace ?? null;
   }
 
   observe(record: JournalRecord): void {
@@ -407,7 +420,7 @@ export class SlackRelay {
       }
       if (record.role === "assistant" && !record.hidden) {
         const text = assistantText(record.payload)?.trim();
-        if (!text) return;
+        if (!text || text === SLACK_NO_REPLY) return;
         const host = await this.hostOf(record.turnId);
         const turns = await this.loadTurns();
         if (host && turns[host]?.stopped && !turns[record.turnId]?.triggerTs)

@@ -1,8 +1,7 @@
-/** Block Kit actions: the progress message's Stop button. */
+/** Block Kit actions: the progress message's Stop button, which anyone in the thread may press. */
 
 import { ORCHESTRATOR_INTERNAL_ORIGIN } from "../build-session/shared/keys.js";
-import { slackTry } from "./api.js";
-import { linkedOwner, loadInstallation, threadOwnerOf } from "./store.js";
+import { loadInstallation, threadOwnerOf } from "./store.js";
 
 type BlockAction = { action_id?: string; value?: string };
 
@@ -39,21 +38,8 @@ export const handleSlackInteraction = async (
   if (typeof target.c !== "string" || typeof target.t !== "string") return;
   const installation = await loadInstallation(env, teamId);
   if (!installation) return;
-  const ownerId = await linkedOwner(env, teamId, userId);
-  const threadOwner = await threadOwnerOf(env, target.c);
-  if (!ownerId || ownerId !== threadOwner) {
-    if (payload.channel?.id) {
-      await slackTry(installation.botToken, "chat.postEphemeral", {
-        channel: payload.channel.id,
-        user: userId,
-        ...(payload.message?.thread_ts
-          ? { thread_ts: payload.message.thread_ts }
-          : {}),
-        text: "Only the person who asked can stop this.",
-      });
-    }
-    return;
-  }
+  const ownerId = await threadOwnerOf(env, teamId, target.c);
+  if (!ownerId) return;
   const response = await env.ORCHESTRATOR_SESSIONS.getByName(target.c).fetch(
     `${ORCHESTRATOR_INTERNAL_ORIGIN}/slack/stop`,
     {

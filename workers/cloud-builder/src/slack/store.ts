@@ -14,6 +14,12 @@ export type SlackInstallation = {
   appId: string;
   botUserId: string;
   botToken: string;
+  /** The Slack user who installed the app. */
+  installedBy: string;
+  /** The installer's Stella account: it owns the workspace's home and pays for it. */
+  ownerId: string | null;
+  /** The workspace home's folder in the owner's Drive. */
+  homeFolder: string;
 };
 
 export type SlackThreadBinding = {
@@ -41,7 +47,9 @@ const USER_CACHE_MS = 24 * 60 * 60 * 1000;
 
 export const saveInstallation = async (
   env: Cloudflare.Env,
-  install: SlackInstallation & { scopes: string; installedBy: string },
+  install: Omit<SlackInstallation, "ownerId" | "homeFolder"> & {
+    scopes: string;
+  },
 ): Promise<void> => {
   const sealed = await encryptToken(env, install.botToken);
   await d1(env)
@@ -52,6 +60,8 @@ export const saveInstallation = async (
      ON CONFLICT (team_id) DO UPDATE SET
        enterprise_id = excluded.enterprise_id, team_name = excluded.team_name, app_id = excluded.app_id,
        bot_user_id = excluded.bot_user_id, bot_token_enc = excluded.bot_token_enc, scopes = excluded.scopes,
+       owner_id = CASE WHEN slack_installations.installed_by = excluded.installed_by
+         THEN slack_installations.owner_id ELSE NULL END,
        installed_by = excluded.installed_by, installed_at = excluded.installed_at, revoked_at = NULL`,
     )
     .bind(
@@ -74,7 +84,8 @@ export const loadInstallation = async (
 ): Promise<SlackInstallation | null> => {
   const row = await d1(env)
     .prepare(
-      `SELECT team_id, enterprise_id, team_name, app_id, bot_user_id, bot_token_enc
+      `SELECT team_id, enterprise_id, team_name, app_id, bot_user_id, bot_token_enc,
+              installed_by, owner_id, home_folder
        FROM slack_installations WHERE team_id = ? AND revoked_at IS NULL`,
     )
     .bind(teamId)
@@ -85,8 +96,21 @@ export const loadInstallation = async (
       app_id: string;
       bot_user_id: string;
       bot_token_enc: string;
+      installed_by: string;
+      owner_id: string | null;
+      home_folder: string | null;
     }>();
   if (!row) return null;
+  let homeFolder = row.home_folder;
+  if (!homeFolder) {
+    homeFolder = workspaceHomeFolder(row.team_name, row.team_id);
+    await d1(env)
+      .prepare(
+        "UPDATE slack_installations SET home_folder = ? WHERE team_id = ? AND home_folder IS NULL",
+      )
+      .bind(homeFolder, row.team_id)
+      .run();
+  }
   return {
     teamId: row.team_id,
     enterpriseId: row.enterprise_id,
@@ -94,7 +118,31 @@ export const loadInstallation = async (
     appId: row.app_id,
     botUserId: row.bot_user_id,
     botToken: await decryptToken(env, row.bot_token_enc),
+    installedBy: row.installed_by,
+    ownerId: row.owner_id,
+    homeFolder,
   };
+};
+
+const workspaceHomeFolder = (teamName: string, teamId: string): string => {
+  const name = teamName
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .replace(/^[.\s]+|[.\s]+$/gu, "")
+    .slice(0, 60);
+  return `Slack/${name || teamId}`;
+};
+
+/** The workspace's owner: the installer's Stella account, once they connect it. */
+export const setInstallationOwner = async (
+  env: Cloudflare.Env,
+  teamId: string,
+  ownerId: string | null,
+): Promise<void> => {
+  await d1(env)
+    .prepare("UPDATE slack_installations SET owner_id = ? WHERE team_id = ?")
+    .bind(ownerId, teamId)
+    .run();
 };
 
 /** Uninstall or token revocation: the token is dropped, not just flagged. */
@@ -171,6 +219,15 @@ export const purgeSlackOwner = async (
   if (mode === "delete") {
     statements.push(
       d1(env)
+        .prepare(
+          "UPDATE slack_installations SET owner_id = NULL WHERE owner_id = ?",
+        )
+        .bind(ownerId),
+    );
+  }
+  if (mode === "delete") {
+    statements.push(
+      d1(env)
         .prepare("DELETE FROM slack_identities WHERE owner_id = ?")
         .bind(ownerId),
     );
@@ -217,7 +274,8 @@ export const saveThread = async (
       `INSERT INTO slack_threads
        (team_id, channel_id, thread_key, conversation_id, owner_id, requester_user_id, created_at, last_turn_ts)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT (team_id, channel_id, thread_key) DO UPDATE SET last_turn_ts = excluded.last_turn_ts`,
+     ON CONFLICT (team_id, channel_id, thread_key) DO UPDATE SET last_turn_ts = excluded.last_turn_ts,
+       conversation_id = excluded.conversation_id, owner_id = excluded.owner_id`,
     )
     .bind(
       binding.teamId,
@@ -402,13 +460,14 @@ export const saveUser = async (
 
 export const threadOwnerOf = async (
   env: Cloudflare.Env,
+  teamId: string,
   conversationId: string,
 ): Promise<string | null> => {
   const row = await d1(env)
     .prepare(
-      "SELECT owner_id FROM slack_threads WHERE conversation_id = ? LIMIT 1",
+      "SELECT owner_id FROM slack_threads WHERE team_id = ? AND conversation_id = ? LIMIT 1",
     )
-    .bind(conversationId)
+    .bind(teamId, conversationId)
     .first<{ owner_id: string }>();
   return row?.owner_id ?? null;
 };

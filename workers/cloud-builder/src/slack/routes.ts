@@ -44,6 +44,7 @@ import {
   linkIdentity,
   loadInstallation,
   saveInstallation,
+  setInstallationOwner,
   unlinkIdentity,
 } from "./store.js";
 import { connectBlocks, connectUrl, publishHome } from "./ui.js";
@@ -203,11 +204,24 @@ const oauthCallback = async (
     installedBy: access.authed_user?.id ?? "",
   });
   console.log(JSON.stringify({ event: "slack_installed", teamId }));
+  const installer = access.authed_user?.id ?? "";
+  const installerOwner = installer
+    ? await linkedOwner(env, teamId, installer)
+    : null;
+  if (installerOwner) await setInstallationOwner(env, teamId, installerOwner);
   const open = `slack://app?team=${encodeURIComponent(teamId)}&id=${encodeURIComponent(access.app_id)}`;
+  const usage = `<p>Stella is now the whole workspace's shared assistant. Mention <b>@Stella</b> in a channel (invite her first with <code>/invite @Stella</code>) or send her a direct message. Nobody else needs a Stella account.</p>`;
+  if (installerOwner || !installer) {
+    return page(
+      `Stella is in ${access.team?.name ?? "your workspace"}`,
+      usage + `<a class="button primary" href="${escapeHtml(open)}">Open Slack</a>`,
+    );
+  }
   return page(
     `Stella is in ${access.team?.name ?? "your workspace"}`,
-    `<p>Mention <b>@Stella</b> in a channel (invite her first with <code>/invite @Stella</code>) or send her a direct message. Each person connects their own Stella account the first time.</p>` +
-      `<a class="button primary" href="${escapeHtml(open)}">Open Slack</a>`,
+    usage +
+      `<p>One last step: connect the Stella account that runs her here. It pays for her usage in this workspace and keeps the workspace's files in its Drive under Slack/. Your personal memory, chats and connected apps stay out of Slack.</p>` +
+      `<a class="button primary" href="${escapeHtml(await connectUrl(env, teamId, installer))}">Connect Stella account</a>`,
   );
 };
 
@@ -289,37 +303,49 @@ const commands = async (
   const installation = await loadInstallation(env, teamId);
   if (!installation)
     return ephemeral("Stella isn't installed in this workspace anymore.");
-  const owner = await linkedOwner(env, teamId, userId);
+  const installer = userId === installation.installedBy;
   if (action === "disconnect" || action === "unlink") {
-    const removed = await unlinkIdentity(env, teamId, userId);
-    await publishHome(env, installation, userId, false);
+    if (!installer || !installation.ownerId) {
+      return ephemeral(
+        installer
+          ? "No Stella account is connected here."
+          : "Only the person who installed Stella can disconnect her account.",
+      );
+    }
+    await unlinkIdentity(env, teamId, userId);
+    await setInstallationOwner(env, teamId, null);
+    await publishHome(env, { ...installation, ownerId: null }, userId);
     return ephemeral(
-      removed
-        ? "Disconnected. Stella won't act for you in this workspace until you connect again."
-        : "Your Stella account wasn't connected here.",
+      "Disconnected. Stella won't answer in this workspace until you connect a Stella account again.",
     );
   }
-  if (action === "status") {
+  if (action === "connect" && installer) {
+    const url = await connectUrl(env, teamId, userId);
     return ephemeral(
-      owner
-        ? "Your Stella account is connected. Mention @Stella or DM her to hand her something."
-        : "Your Stella account isn't connected yet. Run `/stella connect`.",
+      "Connect your Stella account",
+      connectBlocks(
+        url,
+        installation.ownerId
+          ? "*Connect a different Stella account?* It replaces the current one for the whole workspace."
+          : "*Connect your Stella account to set up Stella for this workspace.*",
+      ),
     );
   }
-  if (owner && action !== "connect") {
+  const setupBy = installation.installedBy
+    ? `<@${installation.installedBy}>`
+    : "whoever installed her";
+  if (!installation.ownerId) {
     return ephemeral(
-      "Your Stella account is connected. Mention @Stella in a channel or DM her. `/stella disconnect` to disconnect.",
+      installer
+        ? "Stella isn't set up yet. Run `/stella connect` to connect your Stella account."
+        : `Stella isn't set up yet: ${setupBy} needs to connect a Stella account.`,
     );
   }
-  const url = await connectUrl(env, teamId, userId);
   return ephemeral(
-    "Connect your Stella account",
-    connectBlocks(
-      url,
-      owner
-        ? "*Connect a different Stella account?* This replaces the current one."
-        : "*Connect your Stella account to use Stella here.*",
-    ),
+    `Stella is this workspace's shared assistant, set up by ${setupBy}. Mention @Stella in a channel or DM her.` +
+      (installer
+        ? " `/stella connect` switches the Stella account she runs on; `/stella disconnect` turns her off."
+        : ""),
   );
 };
 
@@ -352,7 +378,7 @@ const linkPage = async (
     : "";
   return page(
     "Connect Slack to Stella",
-    `<p>Sign in to the Stella account that <b>@${escapeHtml(who.name)}</b> in <b>${escapeHtml(installation.teamName)}</b> should use. Stella will work on your requests from Slack with this account.</p>` +
+    `<p>Sign in to the Stella account that runs Stella for <b>${escapeHtml(installation.teamName)}</b>. It pays for her usage in the workspace and keeps the workspace's files in its Drive under Slack/. Your personal memory, chats and connected apps stay out of Slack.</p>` +
       google +
       `<form method="post" action="${SLACK_PATHS.linkStart}">${hidden}<input type="hidden" name="method" value="email">` +
       `<input type="email" name="email" required placeholder="you@example.com" value="${escapeHtml(who.email ?? "")}" autocomplete="email">` +
@@ -494,7 +520,7 @@ const linkFinish = async (
     typeof user.email === "string" ? user.email : "this Stella account";
   return page(
     "Connect this account?",
-    `<p>Slack user <b>@${escapeHtml(who.name)}</b> in <b>${escapeHtml(installation.teamName)}</b> will use the Stella account <b>${escapeHtml(email)}</b>. Stella will act for them with this account when they mention her or message her in Slack.</p>` +
+    `<p>Stella in <b>${escapeHtml(installation.teamName)}</b> (set up by <b>@${escapeHtml(who.name)}</b>) will run on the Stella account <b>${escapeHtml(email)}</b>, for everyone in the workspace.</p>` +
       `<form method="post" action="${SLACK_PATHS.linkConfirm}"><input type="hidden" name="c" value="${escapeHtml(confirm)}"><button class="primary" type="submit">Connect</button></form>` +
       `<p class="muted">Didn't start this from Slack yourself? Close this page.</p>`,
   );
@@ -524,12 +550,20 @@ const linkConfirm = async (
       "<p>Stella was removed from that workspace.</p>",
       410,
     );
+  if (confirmed.slackUserId !== installation.installedBy) {
+    return page(
+      "Only the installer can connect",
+      "<p>Stella is the workspace's shared assistant, and runs on the Stella account of the person who installed her. Nobody else needs to connect an account.</p>",
+      403,
+    );
+  }
   await linkIdentity(
     env,
     confirmed.teamId,
     confirmed.slackUserId,
     confirmed.ownerId,
   );
+  await setInstallationOwner(env, confirmed.teamId, confirmed.ownerId);
   console.log(
     JSON.stringify({
       event: "slack_identity_linked",
@@ -538,13 +572,17 @@ const linkConfirm = async (
   );
   await slackTry(installation.botToken, "chat.postMessage", {
     channel: confirmed.slackUserId,
-    text: "Your Stella account is connected. Mention @Stella in a channel or message me here to hand me something.",
+    text: "Your Stella account is connected, and I'm ready for the whole workspace. Mention @Stella in a channel or message me here.",
   });
-  await publishHome(env, installation, confirmed.slackUserId, true);
+  await publishHome(
+    env,
+    { ...installation, ownerId: confirmed.ownerId },
+    confirmed.slackUserId,
+  );
   const open = `slack://app?team=${encodeURIComponent(installation.teamId)}&id=${encodeURIComponent(installation.appId)}`;
   return page(
     "Connected",
-    `<p>Go back to Slack and mention <b>@Stella</b> again.</p><a class="button primary" href="${escapeHtml(open)}">Open Slack</a>`,
+    `<p>Stella is ready for everyone in ${escapeHtml(installation.teamName)}. Go back to Slack and mention <b>@Stella</b>.</p><a class="button primary" href="${escapeHtml(open)}">Open Slack</a>`,
   );
 };
 

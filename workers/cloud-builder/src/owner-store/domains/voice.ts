@@ -33,7 +33,7 @@ import { log } from "../../build-session/shared/keys.js";
 import { resolveGeminiTtsVoice, ttsProvider } from "../../voice/tts.js";
 import { HLS_MANIFEST_FILE, synthesizeHls, type HlsManifest } from "../../voice/hls.js";
 import { mintTtsTicket, ttsObjectKey, ttsOwnerPrefix } from "../../voice/ticket.js";
-import { array, empty, json, literal, number, object, optional, string, type Parser } from "../args.js";
+import { array, empty, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDomain, OwnerPurgeMode } from "../registry.js";

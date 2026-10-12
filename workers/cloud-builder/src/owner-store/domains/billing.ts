@@ -15,7 +15,6 @@ import type {
   BillingPlan,
   BillingStatus,
   CloudSandboxAccess,
-  PaidBillingPlan,
 } from "@stella/contracts/backend/billing";
 import {
   GATEWAY_SESSION_BUDGET_CHUNK_MICRO_CENTS,
@@ -1090,5 +1089,3 @@ export const billingDomain = {
     },
   },
 } satisfies OwnerDomain;
-
-export type { PaidBillingPlan };

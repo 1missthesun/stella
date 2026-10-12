@@ -12,7 +12,6 @@
  */
 
 import type { TSchema } from "@sinclair/typebox";
-import type { AgentTool } from "@stella/runtime/kernel/agent-core/types.js";
 import {
   CONNECTOR_STATUS_SEARCH_TERMS,
   CONNECTOR_STATUS_TOOL_DESCRIPTION,

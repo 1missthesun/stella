@@ -17,9 +17,6 @@ import { sandboxLifecycleId } from "./sandbox-lifecycle.js";
 /** The single checkpointed mount every cloud turn runs in. */
 export const WORLD_ROOT = "/workspace/world";
 
-/** The optional user Drive materialized for a cloud turn. */
-export const WORLD_DRIVE_ROOT = `${WORLD_ROOT}/drive`;
-
 /**
  * Scratch root for the legacy app-build turn. Outside the world on purpose:
  * an app build is rebuilt from its sources every time and is never restored.

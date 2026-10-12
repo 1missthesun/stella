@@ -25,7 +25,6 @@ import { nativeHistoryCursorFromRows } from "../native-state-checkpoint.js";
 import {
   CapturedSessionAbandonedError,
   capturedSessionExec,
-  strictSessionExec,
 } from "../strict-session-process.js";
 import { emitCloudTurnTelemetry } from "../telemetry.js";
 import { createTurnRetryCancellation } from "../turn-cancellation.js";
@@ -43,7 +42,6 @@ import type { TurnBrokerRecord } from "../turn-credential-broker.js";
 import { readOrchestratorCliSpec } from "../orchestrator-cli-turn-store.js";
 import { writeAdoptedClaudeSession } from "./claude-session-adoption.js";
 import { restoreTurnStateArchive } from "../turn-state-archive.js";
-import { parseTurnStateCheckpointRequest } from "../turn-state-checkpoint.js";
 import type {
   TurnStateCandidate,
   TurnStateWorkspaceHead,
@@ -67,7 +65,6 @@ import { TEST_CLAUDE_EMAIL, testClaudeConfigured } from "../test-claude.js";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
   parseAgentExecutorResult,
-  validBuilderFallbackMessages,
   validTurnStateCheckpointReceipt,
 } from "./public-helpers.js";
 import {
@@ -584,7 +581,6 @@ export const runContainerAgentTurn = async (
       ...(prewarmMs === undefined ? {} : { prewarmMs }),
     });
     sandbox = host.sandbox(sandboxId, size, "world", ownerWorld);
-    let escalated = false;
     let attempt = await host.runAgentAttempt({
       turn,
       execution,
@@ -621,7 +617,6 @@ export const runContainerAgentTurn = async (
       );
       execution.assertActive();
       size = "large";
-      escalated = true;
       await host.ctx.storage.put({
         sandboxId,
         sandboxSize: size,
@@ -1473,7 +1468,6 @@ export const runAgentAttempt = async (
     attemptPaths.directory,
   );
   let credentialsPath: string | undefined;
-  let projectInput: Record<string, unknown> | undefined;
   let execution: Execution | undefined;
   let capturedExecutionError: unknown;
   let recordedExecutorResultText: string | undefined;

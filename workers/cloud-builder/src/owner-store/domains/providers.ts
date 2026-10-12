@@ -319,16 +319,6 @@ const readSettings = (db: OwnerDbReader): ProviderSettings => {
   };
 };
 
-/** Providers whose saved credential can serve a turn. */
-export const connectedProvidersOf = (db: OwnerDbReader): string[] =>
-  readOrDefault(
-    () =>
-      db
-        .all<{ provider: string }>("SELECT provider FROM provider_credentials WHERE status = 'ok' ORDER BY provider")
-        .map((row) => row.provider),
-    [] as string[],
-  );
-
 const writeCredential = async (
   ctx: OwnerContext,
   provider: string,

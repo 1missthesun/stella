@@ -218,8 +218,6 @@ export {
   HEADER_SESSION,
   HEADER_SUBJECT,
   HEADER_TOKEN_EXP,
-  STELLA_HEADER_PREFIX,
-  parseSocketIdentity,
 } from "./conversation-types.js";
 
 export const SUBPROTOCOL = "stella.v1";
@@ -1393,7 +1391,3 @@ class ConversationHubImpl implements ConversationHub {
 registerConversationHubFactory((deps: ConversationHubDeps) =>
   new ConversationHubImpl(deps),
 );
-
-export const createConversationHubImpl = (
-  deps: ConversationHubDeps,
-): ConversationHub => new ConversationHubImpl(deps);

@@ -8,16 +8,6 @@ export const ownerAppBuildRoot = (ownerHash: string): string => {
   return `builds/${ownerHash}`;
 };
 
-export const ownerAppBuildPrefix = (
-  ownerHash: string,
-  buildId: string,
-): string => {
-  if (!BUILD_ID.test(buildId)) {
-    throw new Error("Invalid app-build id.");
-  }
-  return `${ownerAppBuildRoot(ownerHash)}/${buildId}`;
-};
-
 export const isOwnerAppBuildPrefix = (
   prefix: string,
   ownerHash: string,
@@ -32,30 +22,6 @@ export const isOwnerAppBuildPrefix = (
     prefix.startsWith(`${root}/`) &&
     BUILD_ID.test(prefix.slice(root.length + 1))
   );
-};
-
-/**
- * A lost/5xx/overload response is ambiguous: the receiver may have committed the
- * idempotent build row before the response disappeared, so the worker must
- * replay the callback and retain the bytes. A received permanent 4xx proves
- * that this callback did not commit and the transient prefix can be swept.
- */
-export const appBuildCallbackDisposition = (
-  status?: number,
-): "accepted" | "cleanup" | "retry" => {
-  if (status !== undefined && status >= 200 && status < 300) {
-    return "accepted";
-  }
-  if (
-    status === undefined ||
-    status === 408 ||
-    status === 425 ||
-    status === 429 ||
-    status >= 500
-  ) {
-    return "retry";
-  }
-  return "cleanup";
 };
 
 /**

@@ -87,24 +87,6 @@ const id3v2Length = (buf: Uint8Array): number => {
   return total <= buf.length ? total : 0;
 };
 
-/** The playing time of a complete MP3 file, or null when it has no frames. */
-export const mp3DurationSeconds = (buf: Uint8Array): number | null => {
-  let cursor = id3v2Length(buf);
-  let seconds = 0;
-  let frames = 0;
-  while (cursor + 4 <= buf.length) {
-    const frame = readFrame(buf, cursor);
-    if (!frame) {
-      cursor += 1;
-      continue;
-    }
-    seconds += frame.durationSec;
-    frames += 1;
-    cursor += frame.frameLen;
-  }
-  return frames > 0 ? Math.round(seconds * 1000) / 1000 : null;
-};
-
 const concat = (parts: Uint8Array[]): Uint8Array => {
   let total = 0;
   for (const part of parts) total += part.length;

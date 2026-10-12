@@ -16,7 +16,6 @@
 
 import type { TSchema } from "@sinclair/typebox";
 import { sleepWithAbort } from "@stella/runtime/kernel/tools/effect-runtime.js";
-import type { AgentTool } from "@stella/runtime/kernel/agent-core/types.js";
 import type { MediaGenerateAccepted, MediaJob } from "@stella/contracts/backend/media";
 import { generatedImageFileName } from "@stella/contracts/generated-image-name";
 import { stellaImageRequest } from "@stella/contracts/media-models";

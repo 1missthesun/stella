@@ -374,8 +374,6 @@ export const createWorldMemorySync = (world: () => Promise<MemoryWorld>) => {
   };
 };
 
-export type WorldMemorySync = ReturnType<typeof createWorldMemorySync>;
-
 /** Everything a memory wipe erases, as world paths. */
 export const WORLD_MEMORY_WIPE_PATHS: readonly string[] = [
   worldStellaPath(MEMORIES_DIR),

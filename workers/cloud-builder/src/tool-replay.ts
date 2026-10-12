@@ -12,11 +12,3 @@ import type { ToolReplayPolicy } from "@stella/runtime/kernel/tools/defs/replay-
 export type { ToolReplayPolicy };
 
 export type ReplayableAgentTool = AgentTool & { replay?: ToolReplayPolicy };
-
-export const replayPolicyOf = (
-  tools: readonly AgentTool[],
-  toolName: string,
-): ToolReplayPolicy =>
-  (tools.find((tool) => tool.name === toolName) as
-    | ReplayableAgentTool
-    | undefined)?.replay ?? "unsafe";

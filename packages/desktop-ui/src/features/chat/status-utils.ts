@@ -509,32 +509,6 @@ export function normalizeDisplayStatusText(
   return trimmed;
 }
 
-const IDLE_VARIATIONS: readonly string[] = [
-  "Thinking",
-  "Mulling it over",
-  "Figuring it out",
-  "Working it out",
-  "Putting it together",
-  "Lining things up",
-  "Weighing options",
-  "Settling on a plan",
-  "Sorting it out",
-  "Considering",
-];
-
-const REASONING_VARIATIONS: readonly string[] = [
-  "Thinking",
-  "Mulling it over",
-  "Working through it",
-  "Turning it over",
-  "Reasoning",
-  "Chewing on this",
-  "Connecting the dots",
-  "Sitting with it",
-  "Untangling it",
-  "Piecing it together",
-];
-
 const FALLBACK_VARIATIONS: readonly string[] = [
   "Working on it",
   "On it",
@@ -572,13 +546,11 @@ const pickVariation = (
 export function computeStatus({
   toolName,
   seed,
-  isReasoning,
 }: {
   toolName?: string;
   /** Stable id (e.g. tool call request id) used to lock in one
    * variation per call. Without it, the first variation is used. */
   seed?: string;
-  isReasoning?: boolean;
 } = {}): string {
   if (toolName) {
     const normalizedToolName = toToolStatusKey(toolName);
@@ -589,7 +561,5 @@ export function computeStatus({
     return pickVariation(FALLBACK_VARIATIONS, seed ?? normalizedToolName);
   }
 
-  if (isReasoning) return pickVariation(REASONING_VARIATIONS, seed);
-
-  return pickVariation(IDLE_VARIATIONS, seed);
+  return "";
 }

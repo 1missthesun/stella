@@ -2,7 +2,12 @@ import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
 import { ShimmerText } from "./ShimmerText";
 import { StellaMarkIndicator } from "./stella-mark/StellaMarkIndicator";
-import { computeWorkingIndicatorStatus } from "./working-indicator-status";
+import {
+  computeWorkingIndicatorStatus,
+  getWorkingIndicatorThinkingText,
+  WORKING_INDICATOR_LONG_THINKING_MS,
+  WORKING_INDICATOR_THINKING_LABEL_MS,
+} from "./working-indicator-status";
 import {
   getWorkingIndicatorCharacterState,
   WORKING_INDICATOR_POSE_ROTATE_MS,
@@ -180,6 +185,25 @@ function SwapText({
   );
 }
 
+function useThinkingText(thinking: boolean): string {
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!thinking) {
+      setStartedAt(null);
+      return;
+    }
+    setStartedAt(Date.now());
+    const timers = [
+      WORKING_INDICATOR_THINKING_LABEL_MS,
+      WORKING_INDICATOR_LONG_THINKING_MS,
+    ].map((ms) => setTimeout(() => setTick((tick) => tick + 1), ms));
+    return () => timers.forEach((timer) => clearTimeout(timer));
+  }, [thinking]);
+  if (!thinking || startedAt === null) return "";
+  return getWorkingIndicatorThinkingText(Date.now() - startedAt);
+}
+
 /**
  * Stella's working state above the composer, wearing an assistant-style bubble
  * that hugs its content so it reads as an incoming message.
@@ -216,20 +240,23 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const previousPoseRef = useRef<WorkingIndicatorCharacterState | undefined>(
     undefined,
   );
+  const toolStatus = computeWorkingIndicatorStatus({
+    status,
+    toolName,
+    seed: toolCallId ?? reasoningSeed,
+  });
+  const thinkingText = useThinkingText(active && !toolStatus);
   const liveDisplay = useMemo(
     () => ({
-      status: computeWorkingIndicatorStatus({
-        status,
-        toolName,
-        seed: toolCallId ?? reasoningSeed,
-      }),
+      status: toolStatus || thinkingText,
+      thinking: !toolStatus,
       characterState: getWorkingIndicatorCharacterState(
         toolName,
         `${toolCallId ?? reasoningSeed}:${poseEpoch}`,
         previousPoseRef.current,
       ),
     }),
-    [poseEpoch, reasoningSeed, status, toolCallId, toolName],
+    [poseEpoch, reasoningSeed, thinkingText, toolCallId, toolName, toolStatus],
   );
   previousPoseRef.current = liveDisplay.characterState;
   const labelledDisplay = liveDisplay;
@@ -240,8 +267,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const heldDisplay = useMinimumVisibleValue(
     labelledDisplay,
     labelledDisplay.characterState === "thinking" ? 0 : STATUS_MIN_VISIBLE_MS,
-    (a, b) =>
-      a.status === b.status && a.characterState === b.characterState,
+    (a, b) => a.status === b.status && a.characterState === b.characterState,
   );
 
   // Snapshot the label while active so the exit animation shows a stable
@@ -254,11 +280,12 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   // With no label there is nothing to read, so the mark itself carries the
   // state as the thinking ellipsis. A label gets the matching character pose.
   const hasLabel = displayStatus.length > 0;
-  const characterState: WorkingIndicatorCharacterState = hasLabel
-    ? display.characterState === "thinking"
-      ? "working"
-      : display.characterState
-    : "thinking";
+  const characterState: WorkingIndicatorCharacterState =
+    hasLabel && !display.thinking
+      ? display.characterState === "thinking"
+        ? "working"
+        : display.characterState
+      : "thinking";
   const [renderShell, setRenderShell] = useState(false);
   const shellProgress = useRef(new Animated.Value(0)).current;
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

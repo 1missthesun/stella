@@ -542,6 +542,22 @@ export function normalizeDisplayStatusText(
 }
 
 /**
+ * Thinking stays bare dots while it is short. A stretch of thinking that
+ * lasts gets one calm label, and a long one switches once to a second; the
+ * clock restarts whenever a tool hands back to thinking. Same rule as desktop.
+ */
+export const WORKING_INDICATOR_THINKING_LABEL_MS = 3500;
+export const WORKING_INDICATOR_LONG_THINKING_MS = 15000;
+
+export function getWorkingIndicatorThinkingText(elapsedMs: number): string {
+  if (elapsedMs >= WORKING_INDICATOR_LONG_THINKING_MS) {
+    return "Thinking it through";
+  }
+  if (elapsedMs >= WORKING_INDICATOR_THINKING_LABEL_MS) return "Thinking";
+  return "";
+}
+
+/**
  * The label beside the mark, or `""` when there is nothing worth saying.
  *
  * Only tool work and explicit run statuses get words. Plain thinking returns

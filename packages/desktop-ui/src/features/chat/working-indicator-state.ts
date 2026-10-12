@@ -14,6 +14,26 @@ export const WORKING_INDICATOR_HANDOFF_MS = 240;
 
 export const WORKING_INDICATOR_COMPACTING_TEXT = "Compacting";
 
+/**
+ * Thinking stays bare dots while it is short. A stretch of thinking that
+ * lasts gets one calm label, and a long one switches once to a second; the
+ * clock restarts whenever a tool hands back to thinking.
+ */
+export const WORKING_INDICATOR_THINKING_LABEL_MS = 3500;
+export const WORKING_INDICATOR_LONG_THINKING_MS = 15000;
+export const WORKING_INDICATOR_THINKING_TEXT = "Thinking";
+export const WORKING_INDICATOR_LONG_THINKING_TEXT = "Thinking it through";
+
+export function getWorkingIndicatorThinkingText(elapsedMs: number): string {
+  if (elapsedMs >= WORKING_INDICATOR_LONG_THINKING_MS) {
+    return WORKING_INDICATOR_LONG_THINKING_TEXT;
+  }
+  if (elapsedMs >= WORKING_INDICATOR_THINKING_LABEL_MS) {
+    return WORKING_INDICATOR_THINKING_TEXT;
+  }
+  return "";
+}
+
 export type InlineWorkingIndicatorProps = {
   runningTool?: string;
   compacting?: boolean;
@@ -198,17 +218,11 @@ export function getWorkingIndicatorDisplayStatus({
   toolName,
   toolCallId,
   tasks,
-  isReasoning,
-  reasoningSeed,
 }: {
   status?: string;
   toolName?: string;
   toolCallId?: string;
   tasks?: TaskItem[];
-  isReasoning?: boolean;
-  /** Per-turn seed for the no-tool reasoning/idle label so it rotates
-   * across turns instead of always reading "Thinking". */
-  reasoningSeed?: string;
 }): string {
   if (status) {
     return normalizeDisplayStatusText(status) ?? status;
@@ -235,9 +249,5 @@ export function getWorkingIndicatorDisplayStatus({
     }
   }
 
-  return computeStatus({
-    toolName,
-    seed: toolCallId ?? reasoningSeed,
-    isReasoning,
-  });
+  return computeStatus({ toolName, seed: toolCallId });
 }

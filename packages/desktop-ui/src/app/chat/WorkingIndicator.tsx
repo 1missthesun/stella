@@ -8,9 +8,12 @@ import { CHAT_ACTIVITY_SHIMMER_GROUP } from "./TextShimmer";
 import {
   getWorkingIndicatorCharacterState,
   getWorkingIndicatorDisplayStatus,
+  getWorkingIndicatorThinkingText,
   INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS,
   WORKING_INDICATOR_COMPACTING_TEXT,
+  WORKING_INDICATOR_LONG_THINKING_MS,
   WORKING_INDICATOR_POSE_ROTATE_MS,
+  WORKING_INDICATOR_THINKING_LABEL_MS,
   type WorkingIndicatorCharacterState,
 } from "@/features/chat/working-indicator-state";
 import "./indicators.css";
@@ -36,6 +39,26 @@ interface WorkingIndicatorProps {
   /** Stops persistent motion while the shell finishes its finite exit. */
   animationActive?: boolean;
   minimumVisibleMs?: number;
+}
+
+function useThinkingText(thinking: boolean): string {
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!thinking) {
+      setStartedAt(null);
+      return;
+    }
+    const began = Date.now();
+    setStartedAt(began);
+    const timers = [
+      WORKING_INDICATOR_THINKING_LABEL_MS,
+      WORKING_INDICATOR_LONG_THINKING_MS,
+    ].map((ms) => window.setTimeout(() => setTick((tick) => tick + 1), ms));
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [thinking]);
+  if (!thinking || startedAt === null) return "";
+  return getWorkingIndicatorThinkingText(Date.now() - startedAt);
 }
 
 export function WorkingIndicator({
@@ -68,27 +91,36 @@ export function WorkingIndicator({
     undefined,
   );
 
+  const thinkingText = useThinkingText(
+    !toolName && Boolean(isReasoning) && !compacting,
+  );
+
   // Pose and label are held as one tuple so they can never disagree: holding
   // them separately would let a stale label sit under the next activity's
   // pose for the remainder of its floor.
-  const liveDisplay = useMemo(
-    () => ({
-      status: getWorkingIndicatorDisplayStatus({
-        status,
-        toolName,
-        toolCallId,
-        isReasoning,
-        reasoningSeed,
-      }),
-      characterState: getWorkingIndicatorCharacterState({
-        toolName,
-        isReasoning,
-        seed: `${toolCallId ?? reasoningSeed ?? ""}:${poseEpoch}`,
-        avoid: previousPoseRef.current,
-      }),
-    }),
-    [status, toolName, toolCallId, isReasoning, reasoningSeed, poseEpoch],
-  );
+  const liveDisplay = useMemo(() => {
+    const characterState = getWorkingIndicatorCharacterState({
+      toolName,
+      isReasoning,
+      seed: `${toolCallId ?? reasoningSeed ?? ""}:${poseEpoch}`,
+      avoid: previousPoseRef.current,
+    });
+    return {
+      status:
+        characterState === "thinking"
+          ? thinkingText
+          : getWorkingIndicatorDisplayStatus({ status, toolName, toolCallId }),
+      characterState,
+    };
+  }, [
+    status,
+    toolName,
+    toolCallId,
+    isReasoning,
+    reasoningSeed,
+    poseEpoch,
+    thinkingText,
+  ]);
   previousPoseRef.current = liveDisplay.characterState;
   // Dots have no text to read: a tool can replace them immediately.
   const held = useMinimumVisibleValue(
@@ -96,10 +128,11 @@ export function WorkingIndicator({
     liveDisplay.characterState === "thinking" ? 0 : minimumVisibleMs,
     (a, b) => a.status === b.status && a.characterState === b.characterState,
   );
-  // Thinking has nothing worth narrating, so it shows as the mark alone and
-  // the row stays quiet until a tool gives it something to say. Engine-side
-  // compaction is the exception: it is a minutes-long wait, so it is named.
-  const dotsOnly = held.characterState === "thinking" && !compacting;
+  // Short thinking shows as the mark alone; a stretch that lasts gets its
+  // calm label. Engine-side compaction is named from the start: it is a
+  // minutes-long wait.
+  const dotsOnly =
+    held.characterState === "thinking" && !held.status && !compacting;
 
   return (
     <div

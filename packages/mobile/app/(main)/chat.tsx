@@ -316,6 +316,7 @@ function ChatSurface(props: {
   const [selectedArtifact, setSelectedArtifact] = useState<ChatArtifact | null>(
     null,
   );
+  const [composerReserve, setComposerReserve] = useState(0);
   const [selectedGallery, setSelectedGallery] = useState<
     readonly ChatArtifact[] | null
   >(null);
@@ -703,8 +704,10 @@ function ChatSurface(props: {
         onOpenActivity={requestOpenSidebar}
         catchingUp={thread.catchingUp}
         {...(thread.authorityIssue ? { topInset: 0 } : {})}
+        onFooterHeightChange={setComposerReserve}
       />
       <ArtifactViewer
+        bottomReserve={composerReserve}
         visible={Boolean(selectedArtifact)}
         artifact={selectedArtifact}
         access={access}

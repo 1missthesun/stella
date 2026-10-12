@@ -482,6 +482,7 @@ export type ChatPaneProps = {
    * Steady-state polls and send-path pulls must not set this.
    */
   catchingUp?: boolean;
+  onFooterHeightChange?: (height: number) => void;
 };
 
 const NO_HISTORY: ChatPaneHistory = {};
@@ -550,6 +551,7 @@ export function ChatPane({
   onOpenActivity,
   catchingUp = false,
   topInset: topInsetProp,
+  onFooterHeightChange,
 }: ChatPaneProps) {
   const {
     loading: historyLoading = false,
@@ -656,6 +658,9 @@ export function ChatPane({
   // The list runs under the composer, so its reserved inset is exactly the
   // overlay; the chat tail supplies the gap between the last row and it.
   const listBottomInsetPx = footerHeight;
+  useEffect(() => {
+    onFooterHeightChange?.(footerHeight);
+  }, [footerHeight, onFooterHeightChange]);
   const listTrailingSlackPx = listBottomInsetPx + CHAT_TAIL_GAP;
 
   // The footer (working indicator + composer) re-measures on every frame of any

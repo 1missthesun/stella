@@ -3,16 +3,13 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
 import * as Clipboard from "expo-clipboard";
-import { Icon } from "./Icon";
 import { AudioPlayerView } from "./AudioPlayerView";
 import { PosterCover, VideoPlayerView } from "./VideoPlayerView";
 import {
@@ -25,15 +22,14 @@ import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { getRandomBytes } from "expo-crypto";
 import { canvasBridgeScript, withCanvasPolicy } from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
-import { FloatingPopover } from "./FloatingPopover";
+import { FileViewerFooter, FileViewerPanel } from "./FileViewerPanel";
 import type { PopoverAction } from "./FloatingPopoverParts";
 import { canvasSlugFor, useCanvasShareToggle } from "../lib/use-canvas-share-toggle";
 import type { ChatArtifact } from "../types";
 import type { StoredPhoneAccess } from "../lib/phone-access";
 import {
   artifactPrimaryFilePath,
-  artifactSubtitle,
-  artifactTitle,
+  artifactFileName,
   viewedArtifact,
 } from "../lib/mobile-artifacts";
 import {
@@ -62,7 +58,6 @@ import type {
 } from "@stella/contracts/device-file-reads";
 import { DeviceFolderView, formatFileSize } from "./DeviceFolderView";
 import { stellaFileChatArtifact } from "../lib/stella-file-links";
-import { useT } from "../i18n";
 import { embedRelativeHtmlAssets } from "@stella/contracts/html-relative-assets";
 import { sharePdf } from "../lib/chat-pdf";
 import {
@@ -74,7 +69,6 @@ import {
   DOCUMENT_PAGE_BACKGROUND,
   prepareDocumentHtml,
 } from "../lib/html-document-preview";
-import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import type { Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
@@ -92,6 +86,7 @@ type ArtifactViewerProps = {
   access: StoredPhoneAccess | null;
   visible: boolean;
   onClose: () => void;
+  bottomReserve?: number;
 } & ArtifactSwipeProps &
   ArtifactDeviceProps;
 
@@ -189,14 +184,15 @@ const escapeHtml = (value: string): string =>
     .replace(/"/g, "&quot;");
 
 function CanvasDocumentWebView({ html, style }: { html: string; style: object }) {
-  const token = useMemo(
-    () =>
-      Array.from(getRandomBytes(24), (byte) =>
+  const { token, source } = useMemo(
+    () => ({
+      token: Array.from(getRandomBytes(24), (byte) =>
         byte.toString(16).padStart(2, "0"),
       ).join(""),
+      source: { html: withCanvasPolicy(html) },
+    }),
     [html],
   );
-  const source = useMemo(() => ({ html: withCanvasPolicy(html) }), [html]);
   const bridgeScript = useMemo(() => canvasBridgeScript(token), [token]);
   const loadedTokenRef = useRef<string | null>(null);
 
@@ -338,7 +334,6 @@ export function ArtifactViewerContent({
   onActionsChange,
   deviceIdOf,
 }: ArtifactViewerContentProps) {
-  const t = useT();
   const [trailState, setTrailState] = useState<{
     root: ChatArtifact | null;
     entries: FolderTrailEntry[];
@@ -406,13 +401,8 @@ export function ArtifactViewerContent({
   const title = shownFolder
     ? folderName(shownFolder.listing.path)
     : artifact
-      ? artifactTitle(artifact.payload)
+      ? artifactFileName(artifact.payload)
       : "Artifact";
-  const subtitle = shownFolder
-    ? t("shell.display.folder.onDevice", { device: shownFolder.deviceName })
-    : artifact
-      ? artifactSubtitle(artifact.payload)
-      : "";
 
   const neighbours = useMemo(
     () => imageNeighbours(artifact, siblings),
@@ -1012,38 +1002,6 @@ export function ArtifactViewerContent({
 
   return (
     <View style={styles.root}>
-      <View style={styles.header}>
-        {onBack ? (
-          <Pressable
-            onPress={onBack}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-            hitSlop={10}
-            style={({ pressed }) => [
-              styles.backButton,
-              pressed && styles.backButtonPressed,
-            ]}
-          >
-            <Icon name="chevron-left" size={20} color={colors.text} />
-          </Pressable>
-        ) : null}
-        <View style={styles.headerText}>
-          <Text
-            style={styles.title}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          >
-            {title}
-          </Text>
-          <Text
-            style={styles.subtitle}
-            numberOfLines={1}
-            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-          >
-            {subtitle}
-          </Text>
-        </View>
-      </View>
         <View style={styles.body}>
           {(loading || error) && swipeable ? (
             <SwipeArea onSwipe={onSwipe}>
@@ -1157,11 +1115,16 @@ export function ArtifactViewerContent({
             </ScrollView>
           ) : null}
       </View>
+      <FileViewerFooter
+        name={title}
+        actions={actions}
+        onBack={onBack}
+        onClose={onClose}
+        closeLabel="Close"
+      />
     </View>
   );
 }
-
-const VIEWER_HEIGHT_RATIO = 0.6;
 
 /**
  * The artifact viewer opened from chat cards, links and Files: a floating
@@ -1175,29 +1138,24 @@ export function ArtifactViewer({
   siblings,
   onNavigate,
   deviceIdOf,
+  bottomReserve,
 }: ArtifactViewerProps) {
-  const { height: screenHeight } = useWindowDimensions();
-  const [actions, setActions] = useState<PopoverAction[]>([]);
   if (!visible || !artifact) return null;
   return (
-    <FloatingPopover
+    <FileViewerPanel
       onClose={onClose}
       closeLabel="Close"
-      height={Math.round(screenHeight * VIEWER_HEIGHT_RATIO)}
-      actions={actions}
+      {...(bottomReserve !== undefined ? { bottomReserve } : {})}
     >
-      {(close) => (
-        <ArtifactViewerContent
-          artifact={artifact}
-          access={access}
-          onClose={close}
-          onActionsChange={setActions}
-          {...(siblings ? { siblings } : {})}
-          {...(onNavigate ? { onNavigate } : {})}
-          {...(deviceIdOf ? { deviceIdOf } : {})}
-        />
-      )}
-    </FloatingPopover>
+      <ArtifactViewerContent
+        artifact={artifact}
+        access={access}
+        onClose={onClose}
+        {...(siblings ? { siblings } : {})}
+        {...(onNavigate ? { onNavigate } : {})}
+        {...(deviceIdOf ? { deviceIdOf } : {})}
+      />
+    </FileViewerPanel>
   );
 }
 
@@ -1205,41 +1163,6 @@ const makeStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     root: {
       flex: 1,
-    },
-    header: {
-      alignItems: "center",
-      borderBottomColor: colors.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      flexDirection: "row",
-      gap: 8,
-      paddingBottom: 10,
-      paddingHorizontal: 16,
-      paddingTop: 12,
-    },
-    headerText: {
-      flex: 1,
-      minWidth: 0,
-    },
-    backButton: {
-      alignItems: "center",
-      justifyContent: "center",
-      marginLeft: -6,
-      width: 28,
-    },
-    backButtonPressed: {
-      opacity: 0.6,
-    },
-    title: {
-      color: colors.text,
-      fontFamily: fonts.sans.semiBold,
-      fontSize: 15,
-      letterSpacing: -0.2,
-    },
-    subtitle: {
-      color: colors.textMuted,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12,
-      marginTop: 2,
     },
     body: {
       flex: 1,

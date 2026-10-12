@@ -276,6 +276,21 @@ export const artifactAttachmentTarget = (
   });
 };
 
+export const artifactFileName = (payload: MobileDisplayPayload): string => {
+  const path = artifactPrimaryFilePath(payload);
+  if (path && !/^(?:data|blob):/i.test(path.trim())) {
+    const name = basenameOf(path);
+    if (name) {
+      try {
+        return decodeURIComponent(name);
+      } catch {
+        return name;
+      }
+    }
+  }
+  return artifactTitle(payload);
+};
+
 export const artifactTitle = (payload: MobileDisplayPayload): string => {
   switch (payload.kind) {
     case "canvas-html":

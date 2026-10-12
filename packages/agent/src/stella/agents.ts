@@ -1471,8 +1471,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   /**
    * An agent under the orchestrator as `agent_status` lists it. A whole agent
    * elsewhere is listed as the owner's agent threads (`ledger`) know it, the
-   * place it runs on and whether that is online; one here says so, with the
-   * computer its tools run on and whether that is online.
+   * place it runs on and whether that is online; one here says so.
    */
   const directoryRow = async (
     api: ToolExecutionApi,

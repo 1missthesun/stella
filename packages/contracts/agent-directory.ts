@@ -34,11 +34,8 @@ export type AgentDirectoryAgentRow = {
   /** "this computer", "cloud", or a device's name. */
   where: string;
   updatedAt: number;
-  /**
-   * The computer it depends on is offline: the one it runs on, or, with
-   * `tools`, only the one its tools run on (by name), while it runs in `where`.
-   */
-  offline?: { lastSeenAt?: number; tools?: string };
+  /** The computer it runs on is offline. */
+  offline?: { lastSeenAt?: number };
 };
 
 export type AgentDirectorySessionRow = {
@@ -106,21 +103,15 @@ export const selectAgentRoster = (rows: readonly AgentDirectoryAgentRow[]) => {
 const lastSeen = (lastSeenAt: number | undefined, now: number) =>
   lastSeenAt !== undefined ? ` (last seen ${formatAge(lastSeenAt, now)})` : "";
 
-/** What an agent whose tools run on an offline computer can do: it reads messages, but its tools wait. */
-export const toolsOfflineText = (computer: string, lastSeenAt: number | undefined, now = Date.now()): string =>
-  `Its tools run on ${computer}, which is offline${lastSeen(lastSeenAt, now)}: it still reads messages where it runs, but its tools there can't run until ${computer} reconnects`;
-
 const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefined =>
-  !row.offline
-    ? undefined
-    : row.offline.tools !== undefined
-      ? toolsOfflineText(row.offline.tools, row.offline.lastSeenAt, now)
-      : `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}, so this status may be out of date; it reports when ${row.where} reconnects`;
+  row.offline
+    ? `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}, so this status may be out of date; it reports when ${row.where} reconnects`
+    : undefined;
 
 const rosterLine = (row: AgentDirectoryAgentRow, now: number): string =>
   [
     `- ${row.threadId}`,
-    row.offline ? `${row.status}, ${row.offline.tools !== undefined ? "its tools' computer" : "computer"} offline` : row.status,
+    row.offline ? `${row.status}, computer offline` : row.status,
     row.where,
     `last active ${formatAge(row.updatedAt, now)}`,
     ...(row.parentThreadId ? [`started by ${row.parentThreadId}`] : []),

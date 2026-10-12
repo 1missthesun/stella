@@ -25,7 +25,6 @@ export type PromptDefinition<TId extends PromptId = PromptId> = {
   module: string
   title: string
   defaultText: string
-  render: (template: string, values: PromptTemplateValues[TId]) => string
 }
 
 export type PromptCatalog = {

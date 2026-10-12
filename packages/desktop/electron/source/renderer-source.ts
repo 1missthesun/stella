@@ -7,7 +7,7 @@ import { createModuleGraph, isInNodeModules, isInside, SOURCE_EXTENSIONS } from 
 import { RENDERER_ORIGIN } from "./origin.js";
 import type { RendererBuildMode } from "./renderer-protocol.js";
 import { createRouteTreeGenerator } from "./routes.js";
-import type { SourceTools } from "./tools.js";
+import { loadDepTools, loadRouteTools, loadTailwindTools, type OxcTools } from "./tools.js";
 
 /**
  * Serves the renderer straight from its source tree, with no dev server and
@@ -101,7 +101,7 @@ export type ApplyResult =
   | { mode: "hot"; payload: { updates: HotUpdate[]; stale: string[] } };
 
 export type RendererSourceOptions = {
-  tools: SourceTools;
+  tools: OxcTools;
   uiRoot: string;
   repoRoot: string;
   /** The desktop-ui directory whose `.env` files supply `import.meta.env`. */
@@ -130,7 +130,7 @@ export const createRendererSource = (options: RendererSourceOptions) => {
     development: hot,
     defines: envDefines(env),
   });
-  const routes = createRouteTreeGenerator(tools, uiRoot);
+  const routes = createRouteTreeGenerator(loadRouteTools, uiRoot, options.cacheDir);
   const publicDir = path.join(uiRoot, "public");
   const lockfile = path.join(repoRoot, "bun.lock");
   const hotClientFile = path.join(uiRoot, HOT_CLIENT_URL);
@@ -140,7 +140,7 @@ export const createRendererSource = (options: RendererSourceOptions) => {
   let depsBuild: Promise<DepBundle> | null = null;
   const buildDeps = () => {
     const build = bundleDependencies({
-      tools,
+      loadTools: loadDepTools,
       files: depFiles,
       cacheDir: options.cacheDir,
       lockfile,
@@ -286,7 +286,7 @@ export const createRendererSource = (options: RendererSourceOptions) => {
       if (!compiled) {
         let build = tailwindBuilds.get(file);
         if (!build) {
-          build = createTailwindBuild({ tools, file, root: uiRoot });
+          build = createTailwindBuild({ loadTools: loadTailwindTools, file, root: uiRoot, cacheDir: options.cacheDir });
           tailwindBuilds.set(file, build);
         }
         compiled = build.build(source);

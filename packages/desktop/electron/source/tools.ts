@@ -3,31 +3,52 @@
  * import would be hoisted to the top of the Electron main bundle and load on
  * every launch, including packaged ones, which don't ship them.
  */
-export const loadSourceTools = async () => {
-  const [rolldown, utils, experimental, tailwindNode, tailwindOxide, routerGenerator, cjsLexer] =
-    await Promise.all([
-      import("rolldown"),
-      import("rolldown/utils"),
-      import("rolldown/experimental"),
-      import("@tailwindcss/node"),
-      import("@tailwindcss/oxide"),
-      import("@tanstack/router-generator"),
-      import("cjs-module-lexer"),
-    ]);
-  const lexerInit = (cjsLexer as { init?: () => Promise<void> }).init;
-  if (lexerInit) await lexerInit();
+
+const once = <T>(load: () => Promise<T>) => {
+  let loaded: Promise<T> | null = null;
+  return () => (loaded ??= load());
+};
+
+export const loadOxcTools = once(async () => {
+  const [utils, experimental] = await Promise.all([import("rolldown/utils"), import("rolldown/experimental")]);
   return {
-    rolldown: rolldown.rolldown,
     transform: utils.transform,
     parse: utils.parse,
     parseSync: utils.parseSync,
     ResolverFactory: experimental.ResolverFactory,
-    compileTailwind: tailwindNode.compile,
-    TailwindScanner: tailwindOxide.Scanner,
-    RouteGenerator: routerGenerator.Generator,
-    getRouteConfig: routerGenerator.getConfig,
-    parseCommonJs: cjsLexer.parse,
   };
+});
+
+export const loadDepTools = once(async () => {
+  const [rolldown, oxc, cjsLexer] = await Promise.all([import("rolldown"), loadOxcTools(), import("cjs-module-lexer")]);
+  const lexerInit = (cjsLexer as { init?: () => Promise<void> }).init;
+  if (lexerInit) await lexerInit();
+  return { rolldown: rolldown.rolldown, parseSync: oxc.parseSync, parseCommonJs: cjsLexer.parse };
+});
+
+export const loadTailwindTools = once(async () => {
+  const [tailwindNode, tailwindOxide] = await Promise.all([import("@tailwindcss/node"), import("@tailwindcss/oxide")]);
+  return { compileTailwind: tailwindNode.compile, TailwindScanner: tailwindOxide.Scanner };
+});
+
+export const loadRouteTools = once(async () => {
+  const routerGenerator = await import("@tanstack/router-generator");
+  return { RouteGenerator: routerGenerator.Generator, getRouteConfig: routerGenerator.getConfig };
+});
+
+export type OxcTools = Awaited<ReturnType<typeof loadOxcTools>>;
+export type DepTools = Awaited<ReturnType<typeof loadDepTools>>;
+export type TailwindTools = Awaited<ReturnType<typeof loadTailwindTools>>;
+export type RouteTools = Awaited<ReturnType<typeof loadRouteTools>>;
+
+export const loadSourceTools = async () => {
+  const [oxc, deps, tailwind, routes] = await Promise.all([
+    loadOxcTools(),
+    loadDepTools(),
+    loadTailwindTools(),
+    loadRouteTools(),
+  ]);
+  return { ...oxc, ...deps, ...tailwind, ...routes };
 };
 
 export type SourceTools = Awaited<ReturnType<typeof loadSourceTools>>;

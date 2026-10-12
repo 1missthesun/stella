@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import type { SourceTools } from "./tools.js";
+import type { OxcTools } from "./tools.js";
 
 /**
  * The renderer's source modules: resolve an import the way the browser build
@@ -64,7 +64,7 @@ const hotAcceptedSpecifiers = (code: string): string[] => {
 };
 
 export type ModuleGraphOptions = {
-  tools: SourceTools;
+  tools: OxcTools;
   uiRoot: string;
   repoRoot: string;
   cacheDir: string;

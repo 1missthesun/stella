@@ -119,7 +119,7 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     development: false,
     defines,
   });
-  await createRouteTreeGenerator(tools, uiRoot).run();
+  await createRouteTreeGenerator(async () => tools, uiRoot).run();
 
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(path.join(outDir, ASSETS), { recursive: true });
@@ -168,7 +168,9 @@ export const buildWebRenderer = async (options: WebBuildOptions): Promise<{ file
     let compiled = compiledCss.get(file);
     if (!compiled) {
       compiled = fs.promises.readFile(file, "utf8").then((source) =>
-        isTailwindStylesheet(source) ? createTailwindBuild({ tools, file, root: uiRoot }).build(source) : source,
+        isTailwindStylesheet(source)
+          ? createTailwindBuild({ loadTools: async () => tools, file, root: uiRoot }).build(source)
+          : source,
       );
       compiledCss.set(file, compiled);
     }

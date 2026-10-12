@@ -113,9 +113,9 @@ export const serveRendererSource = (options: {
     for (const contents of pages()) contents.reload();
   };
   const ready = Promise.all([import("./renderer-source.js"), import("./tools.js")]).then(
-    async ([{ createRendererSource }, { loadSourceTools }]) =>
+    async ([{ createRendererSource }, { loadOxcTools }]) =>
       createRendererSource({
-        tools: await loadSourceTools(),
+        tools: await loadOxcTools(),
         uiRoot: path.join(options.sourceRoot, "packages", "desktop-ui"),
         repoRoot: options.sourceRoot,
         envDir: path.join(options.envRoot ?? options.sourceRoot, "packages", "desktop-ui"),

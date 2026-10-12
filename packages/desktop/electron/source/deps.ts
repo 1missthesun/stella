@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
-import type { SourceTools } from "./tools.js";
+import type { DepTools } from "./tools.js";
 
 /**
  * Pre-bundles the renderer's npm dependencies into ESM chunks the source
@@ -37,7 +37,7 @@ const entryName = (file: string): string => {
   return `${readable}-${digest}`;
 };
 
-const hasModuleSyntax = (tools: SourceTools, file: string): boolean => {
+const hasModuleSyntax = (tools: DepTools, file: string): boolean => {
   if (file.endsWith(".mjs")) return true;
   if (file.endsWith(".cjs")) return false;
   try {
@@ -49,7 +49,7 @@ const hasModuleSyntax = (tools: SourceTools, file: string): boolean => {
 
 /** The names a CommonJS file exports, following `module.exports = require(...)`. */
 const commonJsExportNames = (
-  tools: SourceTools,
+  tools: DepTools,
   file: string,
   seen = new Set<string>(),
 ): Set<string> => {
@@ -79,7 +79,7 @@ const commonJsExportNames = (
 const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
 const RESERVED = new Set(["default", "__esModule", "import", "export", "class", "function", "delete", "new", "this", "var", "let", "const", "enum", "await", "yield"]);
 
-const facadeSource = (tools: SourceTools, file: string): string => {
+const facadeSource = (tools: DepTools, file: string): string => {
   const names = [...commonJsExportNames(tools, file)].filter(
     (name) => IDENTIFIER.test(name) && !RESERVED.has(name),
   );
@@ -92,7 +92,7 @@ const facadeSource = (tools: SourceTools, file: string): string => {
   ].join("\n");
 };
 
-const fileDigest = (file: string): string => {
+export const fileDigest = (file: string): string => {
   try {
     return createHash("sha256").update(fs.readFileSync(file)).digest("hex");
   } catch {
@@ -104,7 +104,7 @@ const fileDigest = (file: string): string => {
 const building = new Map<string, Promise<DepBundle>>();
 
 export const bundleDependencies = (options: {
-  tools: SourceTools;
+  loadTools: () => Promise<DepTools>;
   files: Iterable<string>;
   cacheDir: string;
   lockfile: string;
@@ -138,7 +138,7 @@ const buildBundle = async (
   files: string[],
   dir: string,
 ): Promise<DepBundle> => {
-  const { tools } = options;
+  const tools = await options.loadTools();
   const startedAt = Date.now();
   const entries = new Map<string, string>();
   const input: Record<string, string> = {};

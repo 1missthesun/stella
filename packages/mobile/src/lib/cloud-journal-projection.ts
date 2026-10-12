@@ -84,7 +84,7 @@ const userAttachmentPresentation = (payload: Record<string, unknown>) => {
   // not a search for prose that happens to mention attachments or storage.
   const suffix = attachmentPaths.length ? withAttachmentPreamble("", attachmentPaths) : "";
   return {
-    text: suffix && text.endsWith(suffix) ? text.slice(0, -suffix.length) : text,
+    text: !suffix ? text : text === suffix.trimStart() ? "" : text.endsWith(suffix) ? text.slice(0, -suffix.length) : text,
     ...(attachmentPaths.length ? {
       attachmentPaths,
       attachmentPreviews: attachmentPaths.map(path => ({ path, name: path.split("/").at(-1) ?? path })),

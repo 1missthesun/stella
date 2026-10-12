@@ -253,6 +253,7 @@ const withoutDrivePreamble = (
     "",
     paths.map((path) => ({ path, name: path, sizeBytes: 0 })),
   );
+  if (text === suffix.trimStart()) return "";
   return text.endsWith(suffix) ? text.slice(0, -suffix.length) : text;
 };
 

@@ -87,6 +87,10 @@ type PiPlacedChat = {
   placedAt: number;
 };
 
+function unplacedCancelRequestId(clientMsgId: string): string {
+  return `pi-brain-unplaced:${clientMsgId}`.slice(0, 128);
+}
+
 /** Turn start: admission, idempotency, ownership, and the owner gate. */
 export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
   private async followPlacedChat(placed: PiPlacedChat): Promise<void> {
@@ -123,7 +127,14 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
       const dispatch = status?.ok ? status.response.dispatch : undefined;
       const terminal =
         dispatch !== undefined && TERMINAL_DISPATCH_STATES.includes(dispatch.state);
-      if (dispatch?.state === "canceled" && dispatch.cancelRequestId) continue;
+      const ownCancelRequestId = unplacedCancelRequestId(placed.clientMsgId);
+      if (
+        dispatch?.state === "canceled" &&
+        dispatch.cancelRequestId &&
+        dispatch.cancelRequestId !== ownCancelRequestId
+      ) {
+        continue;
+      }
       if (dispatch?.state === "completed") continue;
       const stuck =
         dispatch?.state === "blocked" ||
@@ -137,7 +148,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         await this.ownerGate(placed.ownerId)
           .cancelDispatch({
             dispatchId: placed.dispatchId,
-            cancelRequestId: `pi-brain-unplaced:${placed.clientMsgId}`.slice(0, 128),
+            cancelRequestId: ownCancelRequestId,
             reason: "The computer holding Stella did not take this message.",
           })
           .catch(() => undefined);

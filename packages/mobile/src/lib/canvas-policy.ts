@@ -36,6 +36,70 @@ export function withCanvasPolicy(html: string): string {
   return preamble + CSP_META + html.slice(preamble.length);
 }
 
+const measureSource = (postSize: string) => String.raw`
+  const measureDocument = () => {
+    const body = document.body;
+    if (!body) return;
+    const root = document.documentElement;
+    const scrollY = window.scrollY || 0;
+    const marginBottom = (element) => parseFloat(getComputedStyle(element).marginBottom) || 0;
+    let bottom = body.getBoundingClientRect().bottom + scrollY + marginBottom(body);
+    for (const child of body.children) {
+      const rect = child.getBoundingClientRect();
+      if (rect.height > 0) bottom = Math.max(bottom, rect.bottom + scrollY + marginBottom(child));
+    }
+    const width = root.clientWidth || window.innerWidth;
+    if (bottom > 0 && width > 0) ${postSize}(Math.ceil(bottom), width);
+  };
+  let measureQueued = false;
+  const queueMeasure = () => {
+    if (measureQueued) return;
+    measureQueued = true;
+    requestAnimationFrame(() => {
+      measureQueued = false;
+      measureDocument();
+    });
+  };
+  const startMeasuring = () => {
+    queueMeasure();
+    try {
+      const observer = new ResizeObserver(queueMeasure);
+      observer.observe(document.documentElement);
+      if (document.body) observer.observe(document.body);
+    } catch {}
+    window.addEventListener("load", queueMeasure);
+    setTimeout(queueMeasure, 400);
+    setTimeout(queueMeasure, 1500);
+  };
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startMeasuring);
+  } else {
+    startMeasuring();
+  }
+`;
+
+export const DOCUMENT_SIZE_MESSAGE = "stella:document-size";
+
+export function documentSizeScript(token: string): string {
+  const key = JSON.stringify(`__stellaDocumentSize_${token}`);
+  const tokenLiteral = JSON.stringify(token);
+  return String.raw`
+(() => {
+  const key = ${key};
+  if (window[key]) return;
+  Object.defineProperty(window, key, { value: true });
+  const token = ${tokenLiteral};
+  const bridge = window.ReactNativeWebView;
+  if (!bridge || typeof bridge.postMessage !== "function") return;
+  const post = bridge.postMessage.bind(bridge);
+  const stringify = JSON.stringify;
+  const postSize = (height, width) => post(stringify({ type: "${"stella:document-size"}", token, height, width }));
+  ${measureSource("postSize")}
+})();
+true;
+`;
+}
+
 export function canvasBridgeScript(token: string): string {
   const key = JSON.stringify(`__stellaCanvas_${token}`);
   const tokenLiteral = JSON.stringify(token);
@@ -87,6 +151,9 @@ export function canvasBridgeScript(token: string): string {
   window.addEventListener("submit", (event) => {
     event.preventDefault();
   }, true);
+
+  const postSize = (height, width) => post(stringify({ type: "${"stella:document-size"}", token, height, width }));
+  ${measureSource("postSize")}
 })();
 true;
 `;

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image as NativeImage,
+  LayoutAnimation,
   Linking,
   ScrollView,
   Share,
@@ -20,7 +22,12 @@ import * as Sharing from "expo-sharing";
 import { Directory, File, Paths } from "expo-file-system";
 import { WebView, type WebViewMessageEvent } from "react-native-webview";
 import { getRandomBytes } from "expo-crypto";
-import { canvasBridgeScript, withCanvasPolicy } from "../lib/canvas-policy";
+import {
+  DOCUMENT_SIZE_MESSAGE,
+  canvasBridgeScript,
+  documentSizeScript,
+  withCanvasPolicy,
+} from "../lib/canvas-policy";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { FileViewerFooter, FileViewerPanel } from "./FileViewerPanel";
 import type { PopoverAction } from "./FloatingPopoverParts";
@@ -118,6 +125,7 @@ type ArtifactViewerContentProps = {
   onClose?: () => void;
   /** The copy, share and link controls this artifact offers, as they change. */
   onActionsChange?: (actions: PopoverAction[]) => void;
+  onPreferredHeightChange?: (height: number | null) => void;
 } & ArtifactSwipeProps &
   ArtifactDeviceProps;
 
@@ -183,43 +191,128 @@ const escapeHtml = (value: string): string =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-function CanvasDocumentWebView({ html, style }: { html: string; style: object }) {
+const newDocumentToken = (): string =>
+  Array.from(getRandomBytes(24), (byte) => byte.toString(16).padStart(2, "0")).join("");
+
+type DocumentMessage = {
+  type?: unknown;
+  token?: unknown;
+  href?: unknown;
+  height?: unknown;
+  width?: unknown;
+};
+
+const parseDocumentMessage = (data: string): DocumentMessage | null => {
+  try {
+    const parsed: unknown = JSON.parse(data);
+    return parsed && typeof parsed === "object" ? (parsed as DocumentMessage) : null;
+  } catch {
+    return null;
+  }
+};
+
+const documentHeightInPoints = (
+  message: DocumentMessage,
+  token: string,
+  viewWidth: number,
+): number | null => {
+  if (
+    message.type !== DOCUMENT_SIZE_MESSAGE ||
+    message.token !== token ||
+    typeof message.height !== "number" ||
+    typeof message.width !== "number" ||
+    message.width <= 0 ||
+    viewWidth <= 0
+  ) {
+    return null;
+  }
+  const points = message.height * (viewWidth / message.width);
+  return Number.isFinite(points) && points > 0 ? Math.ceil(points) : null;
+};
+
+function DocumentWebView({
+  html,
+  style,
+  onContentHeight,
+}: {
+  html: string;
+  style: object;
+  onContentHeight?: (height: number) => void;
+}) {
+  const { token, source } = useMemo(
+    () => ({ token: newDocumentToken(), source: { html } }),
+    [html],
+  );
+  const sizeScript = useMemo(() => documentSizeScript(token), [token]);
+  const viewWidthRef = useRef(0);
+  const handleMessage = useCallback(
+    (event: WebViewMessageEvent) => {
+      const message = parseDocumentMessage(event.nativeEvent.data);
+      if (!message) return;
+      const height = documentHeightInPoints(message, token, viewWidthRef.current);
+      if (height !== null) onContentHeight?.(height);
+    },
+    [onContentHeight, token],
+  );
+  return (
+    <WebView
+      key={token}
+      originWhitelist={["*"]}
+      source={source}
+      style={style}
+      forceDarkOn={false}
+      onLayout={(event) => {
+        viewWidthRef.current = event.nativeEvent.layout.width;
+      }}
+      injectedJavaScriptBeforeContentLoaded={sizeScript}
+      injectedJavaScript={sizeScript}
+      onMessage={handleMessage}
+    />
+  );
+}
+
+function CanvasDocumentWebView({
+  html,
+  style,
+  onContentHeight,
+}: {
+  html: string;
+  style: object;
+  onContentHeight?: (height: number) => void;
+}) {
   const { token, source } = useMemo(
     () => ({
-      token: Array.from(getRandomBytes(24), (byte) =>
-        byte.toString(16).padStart(2, "0"),
-      ).join(""),
+      token: newDocumentToken(),
       source: { html: withCanvasPolicy(html) },
     }),
     [html],
   );
   const bridgeScript = useMemo(() => canvasBridgeScript(token), [token]);
   const loadedTokenRef = useRef<string | null>(null);
+  const viewWidthRef = useRef(0);
 
   const handleMessage = useCallback(
     (event: WebViewMessageEvent) => {
-      try {
-        const message = JSON.parse(event.nativeEvent.data) as {
-          type?: unknown;
-          token?: unknown;
-          href?: unknown;
-        };
-        if (
-          message.type !== "stella:canvas-navigate" ||
-          message.token !== token ||
-          typeof message.href !== "string"
-        ) {
-          return;
-        }
-        const navigation = classifyCanvasNavigation(message.href);
-        if (navigation.kind === "external") {
-          void Linking.openURL(navigation.url).catch(() => undefined);
-        }
-      } catch {
+      const message = parseDocumentMessage(event.nativeEvent.data);
+      if (!message) return;
+      const height = documentHeightInPoints(message, token, viewWidthRef.current);
+      if (height !== null) {
+        onContentHeight?.(height);
         return;
       }
+      if (
+        message.type !== "stella:canvas-navigate" ||
+        message.token !== token ||
+        typeof message.href !== "string"
+      ) {
+        return;
+      }
+      const navigation = classifyCanvasNavigation(message.href);
+      if (navigation.kind === "external") {
+        void Linking.openURL(navigation.url).catch(() => undefined);
+      }
     },
-    [token],
+    [onContentHeight, token],
   );
 
   return (
@@ -242,6 +335,9 @@ function CanvasDocumentWebView({ html, style }: { html: string; style: object })
       geolocationEnabled={false}
       mixedContentMode="never"
       dataDetectorTypes="none"
+      onLayout={(event) => {
+        viewWidthRef.current = event.nativeEvent.layout.width;
+      }}
       injectedJavaScriptBeforeContentLoaded={bridgeScript}
       injectedJavaScript={bridgeScript}
       onMessage={handleMessage}
@@ -332,6 +428,7 @@ export function ArtifactViewerContent({
   siblings: openedSiblings,
   onNavigate,
   onActionsChange,
+  onPreferredHeightChange,
   deviceIdOf,
 }: ArtifactViewerContentProps) {
   const [trailState, setTrailState] = useState<{
@@ -656,6 +753,85 @@ export function ArtifactViewerContent({
   useEffect(() => {
     onActionsChange?.(actions);
   }, [actions, onActionsChange]);
+
+  const [contentWidth, setContentWidth] = useState(0);
+  const [footerHeight, setFooterHeight] = useState(FOOTER_FALLBACK_HEIGHT);
+  const [measured, setMeasured] = useState<{
+    source: LoadedArtifact;
+    height: number;
+  } | null>(null);
+  const [imageAspect, setImageAspect] = useState<{
+    uri: string;
+    aspect: number;
+  } | null>(null);
+  const measuredHeight = measured && measured.source === loaded ? measured.height : null;
+  const reportScrollHeight = useCallback(
+    (_width: number, height: number) => {
+      if (!loaded || height <= 0) return;
+      setMeasured((current) =>
+        current?.source === loaded && Math.abs(current.height - height) < 1
+          ? current
+          : { source: loaded, height },
+      );
+    },
+    [loaded],
+  );
+  const reportDocumentHeight = useCallback(
+    (height: number) => {
+      if (!loaded) return;
+      setMeasured((current) => {
+        if (current?.source !== loaded) return { source: loaded, height };
+        return height > current.height + 1 ? { source: loaded, height } : current;
+      });
+    },
+    [loaded],
+  );
+  const imageUri = loaded?.kind === "image" ? loaded.uri : null;
+  useEffect(() => {
+    if (!imageUri) return;
+    let cancelled = false;
+    NativeImage.getSize(
+      imageUri,
+      (width, height) => {
+        if (!cancelled && width > 0 && height > 0) {
+          setImageAspect({ uri: imageUri, aspect: width / height });
+        }
+      },
+      () => undefined,
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUri]);
+
+  const bodyPreferredHeight: number | null = (() => {
+    if (loading || error || !loaded) {
+      return loading && isVideo ? null : STATUS_BODY_HEIGHT;
+    }
+    switch (loaded.kind) {
+      case "image":
+        return imageAspect?.uri === loaded.uri && contentWidth > 0
+          ? contentWidth / imageAspect.aspect
+          : null;
+      case "markdown":
+      case "text":
+      case "canvas-html":
+      case "html-document":
+      case "html":
+        return measuredHeight;
+      case "audio":
+        return AUDIO_BODY_HEIGHT;
+      default:
+        return null;
+    }
+  })();
+  const preferredHeight =
+    bodyPreferredHeight === null
+      ? null
+      : Math.ceil(bodyPreferredHeight + footerHeight);
+  useEffect(() => {
+    onPreferredHeightChange?.(preferredHeight);
+  }, [onPreferredHeightChange, preferredHeight]);
 
   useEffect(() => {
     if (!artifact) return;
@@ -1001,7 +1177,10 @@ export function ArtifactViewerContent({
   }, [access, artifact, colors, preferDeviceId]);
 
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      onLayout={(event) => setContentWidth(event.nativeEvent.layout.width)}
+    >
         <View style={styles.body}>
           {(loading || error) && swipeable ? (
             <SwipeArea onSwipe={onSwipe}>
@@ -1052,15 +1231,13 @@ export function ArtifactViewerContent({
             <CanvasDocumentWebView
               html={loaded.html}
               style={styles.documentWebview}
+              onContentHeight={reportDocumentHeight}
             />
           ) : loaded?.kind === "html-document" ? (
-            <WebView
-              originWhitelist={["*"]}
-              source={{ html: loaded.html }}
+            <DocumentWebView
+              html={loaded.html}
               style={styles.documentWebview}
-              // Documents render on their own paper-white surface; never let
-              // Android WebView force-darken them into unreadability.
-              forceDarkOn={false}
+              onContentHeight={reportDocumentHeight}
             />
           ) : loaded?.kind === "folder" ? (
             <DeviceFolderView
@@ -1090,10 +1267,10 @@ export function ArtifactViewerContent({
               colors={colors}
             />
           ) : loaded?.kind === "html" ? (
-            <WebView
-              originWhitelist={["*"]}
-              source={{ html: loaded.html }}
+            <DocumentWebView
+              html={loaded.html}
               style={styles.webview}
+              onContentHeight={reportDocumentHeight}
             />
           ) : loaded?.kind === "image" ? (
             <ZoomableImageView
@@ -1106,22 +1283,35 @@ export function ArtifactViewerContent({
               {...(onClose ? { onDismiss: onClose } : {})}
             />
           ) : loaded?.kind === "markdown" ? (
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              onContentSizeChange={reportScrollHeight}
+            >
               <AssistantMarkdown text={loaded.text} colors={colors} />
             </ScrollView>
           ) : loaded?.kind === "text" ? (
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              onContentSizeChange={reportScrollHeight}
+            >
               <Text style={styles.monospace}>{loaded.text}</Text>
             </ScrollView>
           ) : null}
       </View>
-      <FileViewerFooter
-        name={title}
-        actions={actions}
-        onBack={onBack}
-        onClose={onClose}
-        closeLabel="Close"
-      />
+      <View
+        onLayout={(event) => {
+          const next = Math.ceil(event.nativeEvent.layout.height);
+          if (next > 0) setFooterHeight(next);
+        }}
+      >
+        <FileViewerFooter
+          name={title}
+          actions={actions}
+          onBack={onBack}
+          onClose={onClose}
+          closeLabel="Close"
+        />
+      </View>
     </View>
   );
 }
@@ -1140,17 +1330,27 @@ export function ArtifactViewer({
   deviceIdOf,
   bottomReserve,
 }: ArtifactViewerProps) {
+  const [preferredHeight, setPreferredHeight] = useState<number | null>(null);
+  const updatePreferredHeight = useCallback((next: number | null) => {
+    setPreferredHeight((current) => {
+      if (current === next) return current;
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+      return next;
+    });
+  }, []);
   if (!visible || !artifact) return null;
   return (
     <FileViewerPanel
       onClose={onClose}
       closeLabel="Close"
+      preferredHeight={preferredHeight}
       {...(bottomReserve !== undefined ? { bottomReserve } : {})}
     >
       <ArtifactViewerContent
         artifact={artifact}
         access={access}
         onClose={onClose}
+        onPreferredHeightChange={updatePreferredHeight}
         {...(siblings ? { siblings } : {})}
         {...(onNavigate ? { onNavigate } : {})}
         {...(deviceIdOf ? { deviceIdOf } : {})}
@@ -1158,6 +1358,10 @@ export function ArtifactViewer({
     </FileViewerPanel>
   );
 }
+
+const FOOTER_FALLBACK_HEIGHT = 49;
+const STATUS_BODY_HEIGHT = 200;
+const AUDIO_BODY_HEIGHT = 260;
 
 const makeStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({

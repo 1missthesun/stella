@@ -19,11 +19,9 @@
  *   admitted by the owner gate on the `agent` lane, with a capability of its
  *   own for the `general` agent type, released when the agent answers.
  *
- * An agent's file and shell tools run in its execution environment, apart
- * from its conversation: its cloud container, or one of the owner's
- * computers, where the owner gate relays each call over that computer's
- * presence socket (`@stella/contracts/turn-plane/device-tools`).
- * `switch_destination` moves the environment; the conversation stays here.
+ * An agent's file and shell tools run in its own cloud container. An agent
+ * placed on one of the owner's computers runs there as a whole, on that
+ * computer's own Stella, through the owner's agent threads (`deviceAgents`).
  *
  * What an agent needs between turns (the owner's authority, the model specs,
  * its prompt material) is kept in this object's storage, so an agent can
@@ -79,14 +77,8 @@ import { StellaAgentDoc } from "@stella/agent/stella/agent-doc";
 import { ownHistoryQuery } from "@stella/agent/stella/own-history";
 import { deviceRefusal, deviceStanding, type StellaExecutionHost } from "@stella/agent/stella/execution";
 import { findDeviceDestination } from "@stella/contracts/turn-plane/placement";
-import { placementOf, StellaPlacementDoc, type StellaPlacement } from "@stella/agent/stella/placement";
+import type { StellaPlacement } from "@stella/agent/stella/placement";
 import type { PiBrainHost } from "@stella/contracts/turn-plane/pi-brain";
-import {
-  isDeviceToolName,
-  type DeviceToolCall,
-  type DeviceToolOutcome,
-  type DeviceToolResult,
-} from "@stella/contracts/turn-plane/device-tools";
 import {
   agentRunOutcome,
   StellaAgentsDoc,
@@ -249,7 +241,7 @@ export type PiDeviceAgents = {
     args: { key: string; deviceId: string; description: string; prompt: string; model?: string },
     authority: PiAuthority,
     parentTurnId: string,
-  ): Promise<{ threadId: string }>;
+  ): Promise<{ threadId: string; waiting?: boolean }>;
   message(
     args: { key: string; threadId: string; message: string },
     authority: PiAuthority,
@@ -572,22 +564,11 @@ type AgentLease = {
 /** How long saving a run's browser profile may take when the run ends. */
 const BROWSER_CHECKPOINT_MS = 30_000;
 
-/** The image types a computer's tool result may carry to the model. */
-const DEVICE_IMAGE_TYPES: ReadonlySet<string> = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
-
-const deviceFailure = (message: string): SerializedAgentToolResult => ({
-  outcome: { kind: "error", message },
-  details: null,
-  authorizedImages: [],
-});
-
 const sha256Hex = async (value: string): Promise<string> =>
   [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)))]
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 
-/** How long a computer's container is kept here with no call on it. */
-const WORKSPACE_IDLE_MS = 10 * 60_000;
 /** A lease is renewed before its credentials run out, when no call is on it. */
 const LEASE_RENEW_MS = 3 * 60_000;
 /** How long a released lease's container is given to stop coming up. */
@@ -684,13 +665,6 @@ export class PiConversationRuntime {
   readonly #runs = new Map<string, ActiveRun[]>();
   /** Agents' containers by their conversation. */
   readonly #leases = new Map<number, Promise<AgentLease>>();
-  /**
-   * Containers the owner's computers hold here for their own conversations'
-   * tools (a desktop chat's agent switched to "cloud"), by scope: the
-   * computer and its conversation. Each is let go when its computer says so,
-   * or when it sits idle.
-   */
-  readonly #workspaces = new Map<string, { held: Promise<AgentLease>; lastUsed: number }>();
   /** Leases whose daemon may call the broker, by `turnId:attemptGeneration` (until released). */
   readonly #live = new Map<string, AgentLease>();
   /** Broker claims, one at a time. */
@@ -970,34 +944,6 @@ export class PiConversationRuntime {
       specs: (role) => (role === "orchestrator" ? this.#state?.tools : this.#state?.agentTools) ?? [],
       run: async (call, context) => {
         const signal = context.abortSignal;
-        // Stella's Read reads where her tools run: on a computer she switched to.
-        if (call.role === "orchestrator" && isDeviceToolName(call.name)) {
-          const { harness, root } = await this.open();
-          const placement = placementOf(await harness.snapshot(StellaPlacementDoc, root.id, context));
-          if (placement?.kind === "device") {
-            const turn = await this.#turn(signal);
-            const result = await this.#deviceTool(
-              turn.authority,
-              placement,
-              `${root.id}:${call.callId}`,
-              {
-                kind: "tool",
-                toolName: call.name,
-                params: call.args,
-                callId: call.callId,
-                conversationId: turn.authority.conversationId,
-              },
-              signal,
-            );
-            return {
-              content: [
-                { type: "text", text: result.outcome.kind === "ok" ? result.outcome.text : result.outcome.message },
-                ...result.authorizedImages.map((image) => ({ type: "image" as const, data: image.data, mimeType: image.mimeType })),
-              ],
-              ...(result.outcome.kind === "error" ? { isError: true } : {}),
-            };
-          }
-        }
         // An agent's code drives its run's cloud browser.
         const active = call.role === "orchestrator" ? undefined : this.#runOf(call.threadId);
         // The orchestrator's tools are its turn's: recovered work waits for the turn to bind again.
@@ -1169,18 +1115,14 @@ export class PiConversationRuntime {
   #agents(): StellaAgentsHost {
     return {
       rootPlacement: { kind: "cloud" },
-      // An agent stays here, its tools where it was asked to run them (where
-      // its caller's run, by default). Only a whole agent leaves: on a
-      // device's own Stella, through the owner's agent threads.
-      place: (destination, caller) => {
-        if (destination.kind === "here") return caller.kind === "device" ? caller : { kind: "cloud" };
-        if (destination.kind === "cloud") return { kind: "cloud" };
-        if (!destination.whole) return { kind: "device", deviceId: destination.deviceId };
-        if (this.#options.deviceAgents) return { kind: "device", deviceId: destination.deviceId, whole: true };
+      // An agent runs here, in the cloud, or as a whole on one of the
+      // owner's devices, on that device's own Stella, through the owner's agent threads.
+      place: (destination) => {
+        if (destination.kind !== "device") return { kind: "cloud" };
+        if (this.#options.deviceAgents) return { kind: "device", deviceId: destination.deviceId };
         return { error: `This conversation cannot start an agent on device ${destination.deviceId}.` };
       },
-      remote: (placement) =>
-        placement.kind === "device" && placement.whole ? this.#deviceAgentHost(placement.deviceId) : undefined,
+      remote: (placement) => (placement.kind === "device" ? this.#deviceAgentHost(placement.deviceId) : undefined),
       // Another Stella model runs here for a caller on Stella's models; any
       // other model runs as an agent thread on its own execution.
       agentModel: async (requested, caller, placement) => {
@@ -1235,14 +1177,10 @@ export class PiConversationRuntime {
         this.#notify(active.sessionId);
         this.#options.heartbeat();
         this.#options.log("pi_agent_run_started", { threadId: run.threadId, turnId });
-        // The agent's container comes up while its first model call runs,
-        // unless its tools run on one of the owner's computers.
-        const placement = placementOf(await harness.snapshot(StellaPlacementDoc, run.agentConversationId, context));
-        if (placement?.kind !== "device") {
-          void this.#lease(run.agentConversationId as ConversationId, active, context).catch((error: unknown) =>
-            this.#options.report(error),
-          );
-        }
+        // The agent's container comes up while its first model call runs.
+        void this.#lease(run.agentConversationId as ConversationId, active, context).catch((error: unknown) =>
+          this.#options.report(error),
+        );
         await this.#recordAgentRun(run, authority, turnId, context).catch((error: unknown) => this.#options.report(error));
         // Stella's own agents, not their subagents: those report to the agent
         // that started them, so nothing in this conversation would end their cards.
@@ -1418,6 +1356,19 @@ export class PiConversationRuntime {
     return {
       start: async (args) => {
         const { authority, parentTurnId } = await scope();
+        // An agent on Claude Code runs on that computer's own Claude login.
+        if (args.model && /^claude-code(?:[/:]|$)/u.test(args.model)) {
+          const listed = await this.#gate(authority)
+            .devices()
+            .catch(() => undefined);
+          const there = listed?.devices.find((entry) => entry.deviceId === deviceId);
+          const name = there?.label?.trim() || deviceId;
+          if (there?.online && there.availability && !there.availability.capabilities.includes("claude-code")) {
+            throw new Error(
+              `${name} isn't signed in to Claude Code, so a Claude Code agent can't run there. Ask the user to sign in to Claude on ${name} (Settings › Account there) and try again, or start the agent in the cloud with destination "cloud".`,
+            );
+          }
+        }
         return await devices.start({ ...args, deviceId }, authority, parentTurnId);
       },
       message: async (args) => {
@@ -1529,24 +1480,6 @@ export class PiConversationRuntime {
     const agentConversationId = call.conversationId as ConversationId;
     const sessionId = await this.#providerSession(harness, agentConversationId, context);
     const active = await this.#agentRun(sessionId, context.abortSignal);
-    const placement = placementOf(await harness.snapshot(StellaPlacementDoc, agentConversationId, context));
-    if (placement?.kind === "device") {
-      if (!isDeviceToolName(call.toolName)) return deviceFailure(`${call.toolName} does not run on a computer.`);
-      return await this.#deviceTool(
-        active.authority,
-        placement,
-        `${agentConversationId}:${call.callId}`,
-        {
-          kind: "tool",
-          toolName: call.toolName,
-          params: call.params,
-          callId: call.callId,
-          conversationId: active.authority.conversationId,
-          threadId: active.run.threadId,
-        },
-        context.abortSignal,
-      );
-    }
     const held = await this.#lease(agentConversationId, active, context);
     held.inFlight += 1;
     // A pause or stop while the command runs takes the container's work down
@@ -1571,76 +1504,8 @@ export class PiConversationRuntime {
   }
 
   /**
-   * One call on a computer, through the owner gate: the same call id is the
-   * same request there, so a replay joins it rather than running it twice.
-   * A stop of `signal` withdraws it on the computer too.
-   */
-  async #deviceTool(
-    authority: PiAuthority,
-    placement: Extract<StellaPlacement, { kind: "device" }>,
-    callKey: string,
-    call: DeviceToolCall,
-    signal: AbortSignal | undefined,
-  ): Promise<SerializedAgentToolResult> {
-    const gate = this.#gate(authority);
-    const requestId = `pt:${await sha256Hex(`${authority.conversationId}:${callKey}`)}`;
-    const name = placement.label || placement.deviceId;
-    signal?.throwIfAborted();
-    const started = Date.now();
-    // The RPC stub types a result's free-form details as unknown; it is the outcome as sent.
-    const outcome = gate.deviceTool({ deviceId: placement.deviceId, requestId, call }) as Promise<DeviceToolOutcome>;
-    let stop: (() => void) | undefined;
-    const stopped = new Promise<never>((_resolve, reject) => {
-      stop = () => {
-        void gate.cancelDeviceTool({ requestId }).catch(() => undefined);
-        reject(signal?.reason ?? new Error("aborted"));
-      };
-      signal?.addEventListener("abort", stop, { once: true });
-    });
-    stopped.catch(() => undefined);
-    let answered: DeviceToolOutcome;
-    try {
-      answered = await Promise.race([outcome, stopped]);
-    } catch (error) {
-      if (signal?.aborted) throw error;
-      answered = { ok: false, code: "failed", message: error instanceof Error ? error.message : String(error) };
-    } finally {
-      if (stop) signal?.removeEventListener("abort", stop);
-    }
-    this.#options.log("pi_device_tool", {
-      deviceId: placement.deviceId,
-      tool: call.kind === "tool" ? call.toolName : call.kind,
-      ok: answered.ok,
-      ...(answered.ok ? {} : { code: answered.code }),
-      ms: Date.now() - started,
-    });
-    if (!answered.ok) {
-      const unreachable = answered.code === "device_offline" || answered.code === "not_ready" || answered.code === "not_enabled";
-      return deviceFailure(
-        `${answered.message.replace(/^That computer/u, name)}${
-          unreachable
-            ? ` Your tools are set to run on ${name}. Tell the user, wait for it, or switch_destination to "cloud" and carry on there.`
-            : ""
-        }`,
-      );
-    }
-    if (!("result" in answered)) return deviceFailure(`${name} sent no result.`);
-    const { result } = answered;
-    return {
-      outcome: result.isError ? { kind: "error", message: result.text } : { kind: "ok", text: result.text },
-      details: result.details ?? null,
-      authorizedImages: (result.images ?? []).flatMap((image) =>
-        DEVICE_IMAGE_TYPES.has(image.mimeType)
-          ? [{ data: image.data, mimeType: image.mimeType as SerializedAuthorizedImage["mimeType"], sourcePath: "" }]
-          : [],
-      ),
-    };
-  }
-
-  /**
-   * Where conversations' tools can run: the cloud, or one of the owner's
-   * computers that is online, ready and enabled for remote work, asked to
-   * describe itself so the agent knows its home there.
+   * Where Stella can move herself (one of the owner's computers that is
+   * online, ready and enabled for remote work), and how those computers stand.
    */
   #execution(): StellaExecutionHost {
     return {
@@ -1652,182 +1517,31 @@ export class PiConversationRuntime {
         const device = listed?.devices.find((entry) => entry.deviceId === deviceId);
         return device ? deviceStanding(device) : undefined;
       },
-      prepare: async (target) => {
-        if (target.kind !== "device") return { placement: { kind: "cloud" } };
-        const { authority } = await this.#agentState();
-        const gate = this.#gate(authority);
-        const listed = await gate.devices().catch(() => undefined);
-        if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
-        const device = findDeviceDestination(listed.devices, target.deviceId);
-        if (!device) {
-          return {
-            error: `No connected device has the device_id or name ${target.deviceId}. Use a device_id from the connected devices list, or "cloud".`,
-          };
-        }
-        const name = device.label?.trim() || device.deviceId;
-        const refusal = deviceRefusal(device, name);
-        if (refusal) return { error: refusal };
-        const described = await gate
-          .deviceTool({ deviceId: device.deviceId, requestId: `describe:${crypto.randomUUID()}`, call: { kind: "describe" } })
-          .catch((error: unknown) => ({ ok: false as const, code: "failed" as const, message: error instanceof Error ? error.message : String(error) }));
-        if (!described.ok) return { error: `${name} could not take tool calls: ${described.message.replace(/^That computer/u, "it")}` };
-        if (!("description" in described)) return { error: `${name} did not describe itself.` };
-        const { home, hostname, platform } = described.description;
-        return {
-          placement: {
-            kind: "device",
-            deviceId: device.deviceId,
-            label: name,
-            home,
-            ...(hostname ? { hostname } : {}),
-            ...(platform ? { platform } : {}),
-          },
-        };
-      },
-      // Leaving the cloud saves the container's work into the world, then lets it go.
-      moved: async (conversationId, from) => {
-        if (from.kind === "cloud") await this.#endLease(conversationId, {});
-      },
-      // Stella here moves to one of the owner's computers, which must be able to take work now.
       ...(this.#options.moveBrain
         ? {
             moveBrain: async (target, brief, context) => {
               if (target.kind !== "device") return { error: "You already run in the cloud." };
-              const prepared = await this.#execution().prepare(target, context);
-              if ("error" in prepared) return prepared;
-              const placement = prepared.placement;
-              if (placement.kind !== "device") return { error: "You already run in the cloud." };
+              const { authority } = await this.#agentState();
+              const listed = await this.#gate(authority)
+                .devices()
+                .catch(() => undefined);
+              if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
+              const device = findDeviceDestination(listed.devices, target.deviceId);
+              if (!device) {
+                return {
+                  error: `No connected device has the device_id or name ${target.deviceId}. Use a device_id from the connected devices list, or "cloud".`,
+                };
+              }
+              const name = device.label?.trim() || device.deviceId;
+              const refusal = deviceRefusal(device, name);
+              if (refusal) return { error: refusal };
               const turn = await this.#turn(context.abortSignal);
-              await this.#options.moveBrain!(
-                turn.authority,
-                { host: "device", deviceId: placement.deviceId, ...(placement.label ? { label: placement.label } : {}) },
-                brief,
-              );
-              return { moved: placement };
+              await this.#options.moveBrain!(turn.authority, { host: "device", deviceId: device.deviceId, label: name }, brief);
+              return { moved: { kind: "device", deviceId: device.deviceId, label: name } };
             },
           }
         : {}),
     };
-  }
-
-  /**
-   * One file or shell call from one of the owner's computers, for its own
-   * conversation's tools, in the container this object holds for `scope`
-   * (`POST /conversations/:id/pi-workspace`). The container comes up on the
-   * first call, as an agent's here does, with the owner's world on its disk
-   * and the drive kept in step; `release` saves its work into the world and
-   * lets it go.
-   */
-  async workspace(owner: PiComputeOwner, request: unknown): Promise<{ result: DeviceToolResult } | { ok: true }> {
-    const body = (request && typeof request === "object" ? request : {}) as Record<string, unknown>;
-    const scope = typeof body.scope === "string" ? body.scope.trim() : "";
-    if (!scope || scope.length > 200 || !/^[A-Za-z0-9._:-]+$/u.test(scope)) throw new Error("A workspace scope is required.");
-    if (body.op === "release") {
-      await this.#endWorkspace(scope, {});
-      return { ok: true };
-    }
-    if (body.op !== "call") throw new Error("Unknown workspace operation.");
-    const threadId = typeof body.threadId === "string" && body.threadId.trim() ? body.threadId.trim().slice(0, 200) : "stella";
-    const callId = typeof body.callId === "string" ? body.callId.trim() : "";
-    const toolName = typeof body.toolName === "string" ? body.toolName : "";
-    const params = body.params;
-    if (!callId || callId.length > 200 || !isDeviceToolName(toolName) || !params || typeof params !== "object" || Array.isArray(params)) {
-      throw new Error("Malformed workspace call.");
-    }
-    // A computer's container is this conversation's pi work: its broker is served, its heartbeat kept.
-    this.#options.heartbeat();
-    const entry = await this.#workspaceLease(owner, scope, threadId);
-    const held = await entry.held;
-    held.inFlight += 1;
-    entry.lastUsed = Date.now();
-    let outcome: SerializedAgentToolResult;
-    try {
-      held.used = true;
-      outcome = await held.lease.call({
-        toolCallId: callId,
-        toolName: toolName === "exec_command" ? "Bash" : toolName,
-        params: params as Record<string, unknown>,
-      });
-    } catch (error) {
-      // A container that did not come up, or went down, is let go: the next call starts a fresh one.
-      if (this.#workspaces.get(scope) === entry) {
-        this.#workspaces.delete(scope);
-        void this.#releaseLease(`ws:${scope}`, held, { aborted: true }).catch((dropError: unknown) => this.#options.report(dropError));
-      }
-      throw error;
-    } finally {
-      held.inFlight -= 1;
-      entry.lastUsed = Date.now();
-    }
-    const text = outcome.outcome.kind === "ok" ? outcome.outcome.text : outcome.outcome.message;
-    return {
-      result: {
-        text,
-        ...(outcome.outcome.kind === "error" ? { isError: true } : {}),
-        ...(outcome.authorizedImages.length > 0
-          ? { images: outcome.authorizedImages.map((image) => ({ data: image.data, mimeType: image.mimeType })) }
-          : {}),
-      },
-    };
-  }
-
-  /** The container a computer's scope holds here: the one it has, renewed near its credentials' end, or a new one. */
-  async #workspaceLease(
-    owner: PiComputeOwner,
-    scope: string,
-    threadId: string,
-  ): Promise<{ held: Promise<AgentLease>; lastUsed: number }> {
-    const current = this.#workspaces.get(scope);
-    if (current) {
-      const held = await current.held.catch(() => undefined);
-      if (held && (held.inFlight > 0 || held.lease.expiresAt - Date.now() > LEASE_RENEW_MS)) return current;
-      if (this.#workspaces.get(scope) === current) {
-        this.#workspaces.delete(scope);
-        if (held) await this.#releaseLease(`ws:${scope}`, held, {});
-      }
-      return await this.#workspaceLease(owner, scope, threadId);
-    }
-    const generation = Date.now().toString(36);
-    const opening = (async (): Promise<AgentLease> => {
-      const lease = await openPiComputeLease(this.#computeHost(), {
-        owner,
-        agentConversationId: `ws:${scope}`,
-        // One container per computer's agent, as a cloud agent's thread has.
-        threadId: `${scope}:${threadId}`,
-        turnId: `pi:${owner.conversationId}:ws:${await sha256Hex(scope)}:${generation}`,
-      });
-      const held: AgentLease = { lease, threadId, inFlight: 0, used: false };
-      this.#live.set(`${lease.record.turnId}:${lease.record.attemptGeneration}`, held);
-      this.#options.log("pi_workspace_leased", { scope, threadId });
-      return held;
-    })();
-    const entry = { held: opening, lastUsed: Date.now() };
-    this.#workspaces.set(scope, entry);
-    opening.catch(() => {
-      if (this.#workspaces.get(scope) === entry) this.#workspaces.delete(scope);
-    });
-    return entry;
-  }
-
-  /** Let a computer's container go, its work saved into the world unless `end` says it was stopped. */
-  async #endWorkspace(scope: string, end: AgentRunEnd): Promise<void> {
-    const current = this.#workspaces.get(scope);
-    if (!current) return;
-    this.#workspaces.delete(scope);
-    const held = await current.held.catch(() => undefined);
-    if (held) await this.#releaseLease(`ws:${scope}`, held, end);
-    this.#options.log("pi_workspace_released", { scope });
-  }
-
-  /** Containers no call has used for a while: their computer went quiet, so they are let go. */
-  async #releaseIdleWorkspaces(): Promise<void> {
-    const now = Date.now();
-    for (const [scope, entry] of [...this.#workspaces]) {
-      const held = await entry.held.catch(() => undefined);
-      if (held && held.inFlight === 0 && now - entry.lastUsed > WORKSPACE_IDLE_MS) {
-        await this.#endWorkspace(scope, {}).catch((error: unknown) => this.#options.report(error));
-      }
-    }
   }
 
   /**
@@ -1927,10 +1641,7 @@ export class PiConversationRuntime {
     for (const [key, record] of left) {
       const id = key.slice("piCompute:".length);
       const agentConversationId: PiComputeKey = id.startsWith("ws:") ? (id as `ws:${string}`) : Number(id);
-      const holding =
-        typeof agentConversationId === "number"
-          ? this.#leases.has(agentConversationId)
-          : this.#workspaces.has(agentConversationId.slice("ws:".length));
+      const holding = typeof agentConversationId === "number" && this.#leases.has(agentConversationId);
       if (holding || record?.version !== 1) continue;
       const released = releasePiCompute(this.#computeHost(), record).catch((error: unknown) => this.#options.report(error));
       await Promise.race([released, scheduler.wait(20_000)]);
@@ -2158,9 +1869,8 @@ export class PiConversationRuntime {
   /** Whether pi has work in flight here: agents running, reports on their way. */
   async busy(context: Context): Promise<boolean> {
     const { harness } = await this.open();
-    await this.#releaseIdleWorkspaces();
     const inspection = await harness.inspect(context);
-    return inspection.tasks.length > 0 || inspection.submissions.length > 0 || this.#workspaces.size > 0;
+    return inspection.tasks.length > 0 || inspection.submissions.length > 0;
   }
 
   /**
@@ -2647,11 +2357,7 @@ export class PiConversationRuntime {
     const runs = [...this.#runs.values()].flat();
     this.#runs.clear();
     const leases = [...this.#leases.keys()];
-    const workspaces = [...this.#workspaces.keys()];
     await this.close();
-    await Promise.all(
-      workspaces.map((scope) => this.#endWorkspace(scope, { aborted: true }).catch((error: unknown) => this.#options.report(error))),
-    );
     const authority = this.#state?.authority;
     // Nothing a purged conversation's agents did is saved anywhere.
     await Promise.all(

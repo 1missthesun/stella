@@ -16,7 +16,6 @@ import { DurableObject } from "cloudflare:workers";
 import type { GatewayUsageEvent } from "@stella/contracts/gateway/usage";
 import type { TelemetryEventV1 } from "@stella/contracts/telemetry";
 import { DeviceRequestRelay } from "../device-request-relay.js";
-import type { DeviceToolRelay } from "../device-tool-relay.js";
 import type {
   AgentMessageDeviceOutcome,
   AgentPauseDeviceOutcome,
@@ -87,8 +86,6 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     (outcome: AgentPauseDeviceOutcome) => void
   >();
   protected deviceRequestRelayState?: DeviceRequestRelay;
-  /** Loaded with the first device tool call; until then no call is pending. */
-  protected deviceToolRelayState?: DeviceToolRelay;
   protected ownerStoreState?: OwnerStore;
   protected ownerHostState?: OwnerHost;
 

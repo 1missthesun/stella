@@ -253,33 +253,6 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
    * exactly what the cloud code tool's history client runs.
    */
   /**
-   * A call from one of the owner's computers for its own copy of this
-   * conversation, whose tools it moved to the cloud: run in a container this
-   * object holds for it, as its cloud agents' are (`PiConversationRuntime.workspace`).
-   */
-  protected async handlePiWorkspace(request: Request): Promise<Response> {
-    const owner = await this.localTurnOwner(request);
-    if (owner instanceof Response) return owner;
-    const body = await request.json().catch(() => null);
-    try {
-      const runtime = await this.openPiRuntime(this.piGatewayOrigin());
-      return json(
-        await runtime.workspace(
-          {
-            ownerId: owner.ownerId,
-            ownerGeneration: owner.ownerGeneration,
-            conversationId: this.conversationId(),
-          },
-          body,
-        ),
-      );
-    } catch (error) {
-      log("info", "pi_workspace_failed", { message: errorMessage(error) });
-      return json({ error: errorMessage(error) }, 400);
-    }
-  }
-
-  /**
    * Where this conversation's Stella runs: `GET` reads the record, `POST`
    * moves her (a computer's user flipping it, or her own `switch_destination`
    * there). From then on that host takes the conversation's turns, while

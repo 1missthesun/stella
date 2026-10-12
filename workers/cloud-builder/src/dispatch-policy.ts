@@ -34,6 +34,7 @@ export const EXECUTION_CAPABILITIES: readonly ExecutionCapability[] = [
   "local-files",
   "local-apps",
   "attachments",
+  "claude-code",
 ];
 
 /**

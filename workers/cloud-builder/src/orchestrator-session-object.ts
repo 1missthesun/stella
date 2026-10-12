@@ -440,9 +440,6 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (url.pathname === JOURNAL_CHECKPOINT_PATH) {
       return this.handleJournalCheckpoint(request);
     }
-    if (url.pathname === "/pi-workspace") {
-      return this.handlePiWorkspace(request);
-    }
     if (url.pathname === "/pi-brain") {
       return this.handlePiBrain(request);
     }

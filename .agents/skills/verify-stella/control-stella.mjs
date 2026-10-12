@@ -313,6 +313,13 @@ const isolatedElectronEnvironment = () => {
   );
   const tmpdir = shortSocketTmpdir(env.TMPDIR);
   if (tmpdir) env.TMPDIR = tmpdir;
+  // An agent's own Stella shell puts its git and node shims first on PATH;
+  // they need that Stella's environment, so the test app gets the real tools.
+  if (env.PATH) {
+    env.PATH = env.PATH.split(path.delimiter)
+      .filter((entry) => path.basename(entry) !== "shell-shims")
+      .join(path.delimiter);
+  }
   return env;
 };
 

@@ -219,7 +219,7 @@ const waitForLive = async (run, deadline) => {
 /* ------------------------------------------------------------------- logs */
 
 const processLog = (run) => {
-  const root = path.join(run.homeDir, ".stella", "logs");
+  const root = path.join(run.dataDir, "logs");
   let newest = null;
   for (const dir of existsSync(root) ? readdirSync(root) : []) {
     for (const name of readdirSync(path.join(root, dir))) {

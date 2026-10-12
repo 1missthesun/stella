@@ -3,6 +3,7 @@
 // node live in `home-path.ts`.
 
 import { isUserAskSecretHandle } from "@stella/contracts/user-ask";
+import { redactWrappedSecretTokens } from "@stella/contracts/secret-redaction";
 
 const STRUCTURAL_TAG_RE =
   /<\/?(?:tool_call|function_call|result|response|output|input|system|assistant|user)>/gi;
@@ -110,8 +111,9 @@ export const redactSensitiveText = (
   options?: { codeFile?: boolean },
 ): string => {
   if (!text) return text;
-  let out = text.replace(SECRET_PREFIX_RE, (_m, token: string) =>
-    maskSecret(token),
+  let out = redactWrappedSecretTokens(text, maskSecret).replace(
+    SECRET_PREFIX_RE,
+    (_m, token: string) => maskSecret(token),
   );
   out = out.replace(
     AUTH_HEADER_RE,

@@ -56,7 +56,12 @@ import {
 import { buildBuiltinTools } from "./defs/index.js";
 import { AGENT_CONTROL_TOOL_NAMES } from "./defs/agent-orchestration-def.js";
 import type { ToolDefinition as BuiltinToolDefinition } from "./types.js";
-import { sanitizeToolError, sanitizeToolResult } from "./safety.js";
+import {
+  sanitizeToolError,
+  sanitizeToolResult,
+  sanitizeToolVisibleText,
+} from "./safety.js";
+import { redactSecureValues, redactSecureValuesInText } from "../shared/secure-value-redaction.js";
 import { describeToolCatalogEntry, searchToolCatalog } from "./code-catalog.js";
 import {
   LEGACY_NODE_REPL_TOOL_NAME,
@@ -646,7 +651,7 @@ export const createToolHost = ({
     try {
       const rawResult = await handler(toolArgs, context, extras);
       const authorizedImages = rawResult[TOOL_RESULT_AUTHORIZED_IMAGES];
-      const result = sanitizeToolResult(rawResult);
+      const result = await redactSecureValues(sanitizeToolResult(rawResult));
       // `sanitizeToolResult` deliberately rebuilds enumerable JSON-shaped
       // data. Reattach only the symbol-keyed trusted bytes emitted by the
       // built-in handler so a descriptor-authorized image is not reopened by
@@ -672,12 +677,14 @@ export const createToolHost = ({
       return result;
     } catch (error) {
       const duration = Date.now() - startedAt;
-      logError(`Tool ${toolName} threw after ${duration}ms:`, error);
-      return {
-        error: sanitizeToolError(
-          `Tool ${toolName} failed: ${(error as Error).message}`,
-        ),
-      };
+      const message = await redactSecureValuesInText(
+        sanitizeToolError(`Tool ${toolName} failed: ${(error as Error).message}`),
+      );
+      const stack = await redactSecureValuesInText(
+        sanitizeToolVisibleText(String((error as Error)?.stack ?? "")),
+      );
+      logError(`Tool ${toolName} threw after ${duration}ms: ${message}`, stack);
+      return { error: message };
     }
   };
 

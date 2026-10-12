@@ -319,6 +319,7 @@ type ClaudeCodeSession = {
   mcpHost?: ClaudeCodeToolMcpHost;
   mcpToolCatalogKey?: string;
   mcpConfigPath?: string;
+  settingsPath?: string;
   activeMcpTurn?: ClaudeCodeToolMcpActiveTurn;
   activeNativeToolUseCorrelator?: ClaudeNativeToolUseCorrelator;
   modelOverride?: string;
@@ -734,9 +735,9 @@ const waitUntil = (until: number, signal: AbortSignal | undefined) =>
     signal?.addEventListener("abort", onAbort, { once: true });
     tick();
   });
-const buildClaudeCodeHookSettings = () => {
+const buildClaudeCodeHookSettingsObject = () => {
   const command = `"${process.execPath}" -e ""`;
-  return JSON.stringify({
+  return {
     // Keep the CLI's built-in workflow/keyword-trigger feature from hijacking
     // sub-agent turns whose prompts merely mention workflow-related keywords.
     workflowKeywordTriggerEnabled: false,
@@ -744,10 +745,31 @@ const buildClaudeCodeHookSettings = () => {
     hooks: {
       PreCompact: [{ hooks: [{ type: "command", command }] }],
       PostCompact: [{ hooks: [{ type: "command", command }] }],
-    },
-  });
+    } as Record<string, unknown[]>,
+  };
 };
-const CLAUDE_CODE_HOOK_SETTINGS = buildClaudeCodeHookSettings();
+const CLAUDE_CODE_HOOK_SETTINGS = JSON.stringify(
+  buildClaudeCodeHookSettingsObject(),
+);
+const buildClaudeCodeRedactingSettings = (
+  hook: ClaudeCodeToolMcpHost["postToolUseHook"],
+) => {
+  const settings = buildClaudeCodeHookSettingsObject();
+  settings.hooks.PostToolUse = [
+    {
+      matcher: "^(?!mcp__).*",
+      hooks: [
+        {
+          type: "http",
+          url: hook.url,
+          headers: hook.headers,
+          timeout: 15,
+        },
+      ],
+    },
+  ];
+  return JSON.stringify(settings);
+};
 /**
  * Message-level stop reasons that mean the model's stream ended BEFORE the
  * content block it was generating was complete. `refusal` is a mid-stream
@@ -1824,6 +1846,7 @@ const cleanupSessionMcpHost = (session: ClaudeCodeSession) => {
   session.mcpHost = undefined;
   session.mcpToolCatalogKey = undefined;
   session.mcpConfigPath = undefined;
+  session.settingsPath = undefined;
   session.activeMcpTurn = undefined;
   if (host) {
     void host.close().catch(() => {
@@ -2529,7 +2552,9 @@ class ClaudeCodeSessionRuntime {
       "--include-hook-events",
       "--replay-user-messages",
       "--settings",
-      CLAUDE_CODE_HOOK_SETTINGS,
+      !request.vanilla && session.settingsPath
+        ? session.settingsPath
+        : CLAUDE_CODE_HOOK_SETTINGS,
     ];
     if (!request.vanilla) {
       if (!mcpHost || !session.mcpConfigPath) {
@@ -2595,6 +2620,7 @@ class ClaudeCodeSessionRuntime {
         session.mcpHost = undefined;
         session.mcpToolCatalogKey = undefined;
         session.mcpConfigPath = undefined;
+        session.settingsPath = undefined;
       }
       return undefined;
     }
@@ -2631,6 +2657,16 @@ class ClaudeCodeSessionRuntime {
     );
     // writeFile's mode does not tighten an existing path after host rotation.
     fs.chmodSync(session.mcpConfigPath, 0o600);
+    session.settingsPath = path.join(
+      ensureArtifactDir(session),
+      "claude-code-settings.json",
+    );
+    fs.writeFileSync(
+      session.settingsPath,
+      buildClaudeCodeRedactingSettings(session.mcpHost.postToolUseHook),
+      { encoding: "utf8", mode: 0o600 },
+    );
+    fs.chmodSync(session.settingsPath, 0o600);
     return session.mcpHost;
   }
   async ensureStreamingProcess(

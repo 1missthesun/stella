@@ -9,6 +9,10 @@ import { resolveBundledRuntimeFile } from "../../../kernel/shared/runtime-paths.
 // transport is up.
 import type { StellaHostRunnerOptions } from "../../../kernel/runner.js";
 import { RunnerUnavailableError } from "../errors.js";
+import {
+  invalidateSecureValueFingerprints,
+  setSecureValueFingerprintSource,
+} from "../../../kernel/shared/secure-value-redaction.js";
 import * as HostBus from "../host-bus.js";
 import * as RunnerModule from "../runner-module.js";
 import * as SessionConfig from "./config.js";
@@ -91,6 +95,9 @@ export const layer = Layer.effect(
     const runnerCell = yield* RunnerCell.Service;
     const runnerModule = yield* RunnerModule.Service;
     const init = config.get();
+    setSecureValueFingerprintSource(() =>
+      hostBus.request(METHOD_NAMES.HOST_SECURE_VALUE_FINGERPRINTS, {}),
+    );
     let deviceSignerPromise: ReturnType<typeof createRemoteDeviceSigner> | null =
       null;
     const getDeviceSigner = () => {
@@ -125,11 +132,9 @@ export const layer = Layer.effect(
           signal,
         ),
       requestSecureInput: (payload, signal) =>
-        hostBus.requestUserAsk(
-          METHOD_NAMES.HOST_SECURE_INPUT_REQUEST,
-          payload,
-          signal,
-        ),
+        hostBus
+          .requestUserAsk(METHOD_NAMES.HOST_SECURE_INPUT_REQUEST, payload, signal)
+          .finally(invalidateSecureValueFingerprints),
       useSecureValue: async (payload) =>
         await hostBus.request(METHOD_NAMES.HOST_SECURE_VALUE_USE, payload, {
           retryOnDisconnect: true,

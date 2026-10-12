@@ -1,3 +1,5 @@
+import { redactWrappedSecretTokens } from "./secret-redaction.js";
+
 const SENSITIVE_KEY_RE =
   /(authorization|proxy-authorization|cookie|set-cookie|token|secret|password|passwd|api[-_]?key|client[-_]?secret|session|csrf|x[-_]api[-_]?key)/i;
 const PRIVATE_KEY_RE =
@@ -125,7 +127,7 @@ const redactAssignment = (
     : match;
 
 export const redactSensitiveText = (input: string): string =>
-  input
+  redactWrappedSecretTokens(input)
     .replace(PRIVATE_KEY_RE, "[REDACTED PRIVATE KEY]")
     .replace(URL_SECRET_RE, "$1[REDACTED]")
     .replace(AUTH_HEADER_RE, "$1: [REDACTED]")

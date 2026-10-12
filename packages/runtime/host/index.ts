@@ -2532,6 +2532,15 @@ export class StellaRuntimeHost {
       },
     );
     peer.registerRequestHandler(
+      METHOD_NAMES.HOST_SECURE_VALUE_FINGERPRINTS,
+      async () => {
+        if (!this.options.hostHandlers.getSecureValueFingerprints) {
+          return { baseA: 1, baseB: 1, windows: [] };
+        }
+        return await this.options.hostHandlers.getSecureValueFingerprints();
+      },
+    );
+    peer.registerRequestHandler(
       METHOD_NAMES.HOST_LLM_CREDENTIALS_REQUEST,
       async (params) => {
         if (!this.options.hostHandlers.requestLlmCredentials) {

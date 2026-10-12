@@ -24,7 +24,7 @@ export const createRequestSecureInputTool = (
   replay: "unsafe",
   awaitsUser: true,
   description:
-    "Ask the user for information through a secure card, describing exactly the fields you need this time. Non-sensitive fields (an address, a one-time code) come back as values you can read. Sensitive fields (passwords, card numbers) never reach you: you get a handle instead, which `use_secure_value` can type into a browser field, pass to a command, or store in the keychain. Mark each field sensitive yourself; the user can override it. The user may answer on another device and the value travels end-to-end encrypted to this one.",
+    "Ask the user for information through a secure card, describing exactly the fields you need this time. Non-sensitive fields (an address, a one-time code) come back as values you can read. Sensitive fields (passwords, card numbers) never reach you: you get a handle instead, which `use_secure_value` can type into a browser field, pass to a command, or store in the keychain. Mark each field sensitive yourself; the user can override it. The user may answer on another device and the value travels end-to-end encrypted to this one. Never print, echo, cat, grep or log a secret yourself, and that includes one a command creates (a CLI that prints a new token): send that output to a private file without displaying it, check it by length or prefix only, and pass the file to the command that needs it. Stella redacts values it knows about from tool output, but a secret it never collected is only caught by pattern.",
   promptSnippet:
     "Ask for information the user has to supply (`request_secure_input`) — describe the fields; sensitive ones come back as handles you use, never as values",
   parameters: {
@@ -107,7 +107,7 @@ export const createUseSecureValueTool = (
   workingText: "Using it",
   replay: "unsafe",
   description:
-    "Use a sensitive value you hold a handle for, without ever seeing it. Types it into a browser field, substitutes it into one command, or stores it in the OS keychain. You get back confirmation that it was used, never the value.",
+    "Use a sensitive value you hold a handle for, without ever seeing it. Types it into a browser field, substitutes it into one command, or stores it in the OS keychain. You get back confirmation that it was used, never the value. A command's output comes back with the value redacted, even when split across lines; never write a command meant to reveal or transform it (echo, base64, rev, writing it to a file you then read).",
   parameters: {
     type: "object",
     properties: {

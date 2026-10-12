@@ -26,10 +26,12 @@ import {
 } from "../agent-runtime/tool-adapters.js";
 import { normalizeProviderToolInputSchema } from "../tools/provider-tool-schema.js";
 import { forkCancelableTimeout } from "./effect-runtime.js";
+import { claudeCodePostToolUseHookResponse } from "./claude-code-output-redaction.js";
 
 const HOST = "127.0.0.1";
 const MAX_TOOL_RESULT_CHARS = 80_000;
 const MAX_SETTLED_CALL_LEDGER_ENTRIES = 512;
+const MAX_HOOK_BODY_BYTES = 32 * 1024 * 1024;
 
 export type ClaudeCodeToolMcpActiveTurn = {
   /** Stable Stella run identity; survives a Claude process restart. */
@@ -88,6 +90,8 @@ export type ClaudeCodeToolMcpHost = {
   authorizationHeader: string;
   /** Stable digest of the immutable tool catalog exposed by this host. */
   toolCatalogHash: string;
+  /** Loopback endpoint for Claude Code's PostToolUse HTTP hook, which redacts built-in tool output. */
+  postToolUseHook: { url: string; headers: { Authorization: string } };
   /** Object accepted as one entry in Claude Code's `mcpServers` config. */
   mcpServerConfig: {
     type: "http";
@@ -341,6 +345,7 @@ export const createClaudeCodeToolMcpHost = async (
     .digest("hex");
   const bearer = `Bearer ${crypto.randomBytes(32).toString("base64url")}`;
   const endpointPath = `/mcp/${crypto.randomBytes(32).toString("base64url")}`;
+  const hookPath = `/hooks/${crypto.randomBytes(32).toString("base64url")}`;
   const activeCalls = new Set<AbortController>();
   // Streamable HTTP clients may retry a JSON-RPC request after losing its
   // response. Retain the original promise for the session so a successful
@@ -617,7 +622,45 @@ export const createClaudeCodeToolMcpHost = async (
 
   const sockets = new Set<Socket>();
   let closed = false;
+  const answerHook = async (
+    request: http.IncomingMessage,
+    response: http.ServerResponse,
+  ) => {
+    const chunks: Buffer[] = [];
+    let size = 0;
+    for await (const chunk of request) {
+      size += (chunk as Buffer).length;
+      if (size > MAX_HOOK_BODY_BYTES) {
+        response.writeHead(200, { "content-type": "application/json" });
+        response.end("{}");
+        return;
+      }
+      chunks.push(chunk as Buffer);
+    }
+    let body: unknown = null;
+    try {
+      body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    } catch {
+      body = null;
+    }
+    const answer = await claudeCodePostToolUseHookResponse(body);
+    response.writeHead(200, { "content-type": "application/json" });
+    response.end(JSON.stringify(answer));
+  };
   const httpServer = http.createServer((request, response) => {
+    if (request.url === hookPath && request.method === "POST") {
+      if (!sameSecret(request.headers.authorization, bearer)) {
+        unauthorized(response);
+        return;
+      }
+      void answerHook(request, response).catch(() => {
+        if (!response.headersSent) {
+          response.writeHead(200, { "content-type": "application/json" });
+        }
+        if (!response.writableEnded) response.end("{}");
+      });
+      return;
+    }
     if (request.url !== endpointPath) {
       response.writeHead(404).end();
       return;
@@ -758,6 +801,10 @@ export const createClaudeCodeToolMcpHost = async (
     url,
     authorizationHeader: bearer,
     toolCatalogHash: catalogHash,
+    postToolUseHook: {
+      url: `http://${HOST}:${port}${hookPath}`,
+      headers: { Authorization: bearer },
+    },
     mcpServerConfig: {
       type: "http",
       url,

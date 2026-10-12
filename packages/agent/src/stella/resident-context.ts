@@ -15,8 +15,11 @@
  * `residentContextHook` reshapes each request instead: the resident sections
  * of every system message go out as a hidden user message at that same
  * position. The baseline lands right after the system prompt; a later change
- * lands where it happened (before the user message that started that turn)
- * and carries only what changed; compaction writes a
+ * lands in front of the next input (a user message, or an agent's report or
+ * message) and carries only what changed since the model last saw it. A
+ * context update never starts or steers a turn: one written mid-turn is held
+ * until that next input, and repeated updates fold into the latest state,
+ * so a device that went offline and back shows nothing; compaction writes a
  * fresh baseline, which folds the changes in. The system prompt itself keeps
  * only Stella's static prompt, so it reads the same for every conversation.
  * The transcript is unchanged; this is a pure function of it, so every request
@@ -63,7 +66,35 @@ export const withResidentContext = (messages: readonly Message[]): readonly Mess
   let baselineSeen = false;
   const out: Message[] = [];
   const residentMessages = new Set<Message>();
+  const seen = new Map<string, string>();
+  const pending = new Map<string, string | null>();
+  let pendingTimestamp = 0;
+  let pendingAt: number | undefined;
+  const hold = (sections: [string, string | null][], timestamp: number) => {
+    for (const [key, text] of sections) {
+      pending.delete(key);
+      pending.set(key, text);
+    }
+    pendingTimestamp = timestamp;
+  };
+  const place = () => {
+    const at = pendingAt;
+    pendingAt = undefined;
+    if (at === undefined) return;
+    const sections = [...pending].filter(([key, text]) => (text === null ? seen.has(key) : seen.get(key) !== text));
+    pending.clear();
+    if (sections.length === 0) return;
+    for (const [key, text] of sections) {
+      if (text === null) seen.delete(key);
+      else seen.set(key, text);
+    }
+    const user: UserMessage = { role: "user", content: residentText(sections, false), timestamp: pendingTimestamp };
+    out.splice(at, 0, user);
+    residentMessages.add(user);
+  };
   for (const message of messages) {
+    if (message.role === "user" && pending.size > 0 && pendingAt === undefined) pendingAt = out.length;
+    if (message.role !== "system" && message.role !== "user") place();
     if (message.role !== "system" || message.sections === undefined) {
       out.push(message);
       continue;
@@ -87,24 +118,32 @@ export const withResidentContext = (messages: readonly Message[]): readonly Mess
     ) {
       out.push(system);
     }
-    // The first system message of a context is its complete baseline; later ones are patches.
+    if (baselineSeen) {
+      // A change lands in front of the input that starts a turn, folded with any change held since. One
+      // written mid-turn is held for the next input, so it never reaches the running turn.
+      let end = out.length;
+      while (end > 0 && out[end - 1]!.role === "system") end -= 1;
+      let at = end;
+      while (at > 0 && out[at - 1]!.role === "user" && !residentMessages.has(out[at - 1]!)) at -= 1;
+      hold(resident, message.timestamp);
+      if (at < end) pendingAt = Math.min(pendingAt ?? at, at);
+      continue;
+    }
+    // The first system message of a context is its complete baseline; after a compaction it is written
+    // behind the kept messages, and it belongs at the head.
+    let at = 0;
+    while (at < out.length && out[at]!.role === "system") at += 1;
+    for (const [key, text] of resident) if (text !== null) seen.set(key, text);
     const user: UserMessage = {
       role: "user",
-      content: residentText(resident, !baselineSeen),
+      content: residentText(resident, true),
       timestamp: message.timestamp,
     };
-    let at = out.length;
-    if (!baselineSeen) {
-      // After a compaction the baseline is written behind the kept messages; it belongs at the head.
-      at = 0;
-      while (at < out.length && out[at]!.role === "system") at += 1;
-    } else {
-      while (at > 0 && out[at - 1]!.role === "user" && !residentMessages.has(out[at - 1]!)) at -= 1;
-    }
     out.splice(at, 0, user);
     residentMessages.add(user);
     baselineSeen = true;
   }
+  place();
   return changed ? out : messages;
 };
 

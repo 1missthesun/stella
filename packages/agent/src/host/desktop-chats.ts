@@ -363,9 +363,10 @@ export function desktopChats(options: DesktopChatsOptions) {
   const chats = new Map<string, Promise<Chat>>();
   /**
    * The owner's devices and media access for every conversation's prompt,
-   * read once per `EXECUTION_CONTEXT_TTL_MS`: the first request waits for it,
-   * later ones get the last answer while a newer one loads, and a failed
-   * read keeps the last answer, so a moment offline does not rewrite the prompt.
+   * read at most once per `EXECUTION_CONTEXT_TTL_MS`: a request after that
+   * waits for a fresh read, so a turn that starts after a quiet spell sees the
+   * devices as they are now, and a failed read keeps the last answer, so a
+   * moment offline does not rewrite the prompt.
    */
   let executionContextRead: { snapshot?: ExecutionContextSnapshot; at: number; pending?: Promise<void> } = { at: 0 };
   const sharedExecutionContext = async (): Promise<ExecutionContextSnapshot | undefined> => {
@@ -377,8 +378,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           at: Date.now(),
         };
       })());
-    if (executionContextRead.at === 0) await loadOnce();
-    else if (Date.now() - executionContextRead.at >= EXECUTION_CONTEXT_TTL_MS) void loadOnce();
+    if (executionContextRead.at === 0 || Date.now() - executionContextRead.at >= EXECUTION_CONTEXT_TTL_MS) await loadOnce();
     return executionContextRead.snapshot;
   };
   /** The conversation each agent placed here runs in, by its key at the placing host. */

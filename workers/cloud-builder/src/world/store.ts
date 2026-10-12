@@ -1601,39 +1601,6 @@ export class WorldSqlStore implements WorldToolFileApi {
     };
   }
 
-  /** Exact-path lookups in one call, without following any symlink. */
-  async statMany(inputs: readonly string[]): Promise<(WorldEntry | null)[]> {
-    if (inputs.length > 256) {
-      throw new Error("statMany accepts at most 256 paths.");
-    }
-    const manifest = this.liveManifest();
-    return inputs.map((input) => {
-      const path = normalizeWorldPath(input, { allowRoot: true });
-      if (path === "")
-        return { path: "", kind: "dir", mode: 0o755, mtime: 0, size: 0 };
-      const row = this.entryRow(path, manifest);
-      return row ? rowEntry(row) : null;
-    });
-  }
-
-  /** A directory's direct children, by name. Deeper entries are not listed. */
-  async children(input: string): Promise<WorldEntry[]> {
-    const parent = normalizeWorldPath(input, { allowRoot: true });
-    return this.sql
-      .exec<EntryRow>(
-        `SELECT (? || CASE WHEN d.parent_path = '' THEN '' ELSE '/' END || d.name) AS path,
-              n.node_id, n.kind, n.mode, n.mtime, n.size, n.blob_sha256, n.target
-         FROM world_dirents d JOIN world_nodes n ON n.node_id = d.node_id
-        WHERE d.manifest_id = ? AND d.parent_path = ?
-        ORDER BY d.name LIMIT 10001`,
-        parent,
-        this.liveManifest(),
-        parent,
-      )
-      .toArray()
-      .map(rowEntry);
-  }
-
   /**
    * Apply a code cell's `fs` change set, but only if nothing it read or
    * wrote changed after `baseRevision`. The check and the apply happen in one

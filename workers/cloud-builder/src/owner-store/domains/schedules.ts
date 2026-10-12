@@ -199,6 +199,12 @@ export const SCHEDULES_ZONE_SOURCE_MIGRATION = {
   ],
 };
 
+/** A failing watch's repair handed to Stella, separate from the failure being seen. */
+export const SCHEDULES_WATCH_REPAIR_MIGRATION = {
+  id: "schedules.7-watch-repair",
+  statements: [`ALTER TABLE schedules ADD COLUMN repair_sent_at INTEGER`],
+};
+
 type Row = {
   schedule_id: string;
   kind: string;
@@ -210,6 +216,7 @@ type Row = {
   last_check_at: number | null;
   last_finding: string | null;
   failing_since: number | null;
+  repair_sent_at: number | null;
   conversation_id: string | null;
   target_device_id: string | null;
   prompt: string;
@@ -632,6 +639,7 @@ const createSchedule = async (
         last_check_at: first ? ctx.now : null,
         last_finding: first?.check.ok && first.check.found ? first.check.found : null,
         failing_since: null,
+        repair_sent_at: null,
         conversation_id: conversationId,
         target_device_id: targetDeviceId,
         prompt,
@@ -740,6 +748,7 @@ const updateSchedule = async (
               last_check_at: ctx.now,
               last_finding: first.check.ok && first.check.found ? first.check.found : null,
               failing_since: null,
+              repair_sent_at: null,
               last_error: null,
               last_error_at: null,
             }
@@ -749,8 +758,8 @@ const updateSchedule = async (
       ctx.db.run(
         `UPDATE schedules SET prompt = ?, schedule_json = ?, next_run_at = ?, status = ?,
                 description = ?, route = ?, once = ?, script = ?, state_json = ?, pending_finding = ?,
-                last_check_at = ?, last_finding = ?, failing_since = ?, last_error = ?, last_error_at = ?,
-                updated_at = ? WHERE schedule_id = ?`,
+                last_check_at = ?, last_finding = ?, failing_since = ?, repair_sent_at = ?, last_error = ?,
+                last_error_at = ?, updated_at = ? WHERE schedule_id = ?`,
         next.prompt,
         next.schedule_json,
         next.next_run_at,
@@ -764,6 +773,7 @@ const updateSchedule = async (
         next.last_check_at,
         next.last_finding,
         next.failing_since,
+        next.repair_sent_at,
         next.last_error,
         next.last_error_at,
         next.updated_at,
@@ -1355,7 +1365,8 @@ const watchFailedPrompt = (row: Row, error: string): string =>
  * it. A finding is handed to the orchestrator, or to an agent when the user
  * already approved the action; it waits on the row until it is, so a busy
  * or refused start never loses it and never runs the check again for it. A
- * failing script is reported once per failing streak, for repair.
+ * failing script is reported once per failing streak, for repair, and
+ * again on a later failing check until that report reaches Stella.
  */
 const fireWatch = async (
   ctx: OwnerContext,
@@ -1387,7 +1398,8 @@ const fireWatch = async (
     }
     if (run.ok) {
       ctx.db.run(
-        `UPDATE schedules SET state_json = ?, last_check_at = ?, failing_since = NULL, pending_finding = ?,
+        `UPDATE schedules SET state_json = ?, last_check_at = ?, failing_since = NULL, repair_sent_at = NULL,
+                pending_finding = ?,
                 last_finding = COALESCE(?, last_finding) WHERE schedule_id = ?`,
         run.stateJson,
         ctx.now,
@@ -1407,7 +1419,7 @@ const fireWatch = async (
         ctx.now,
         scheduleId,
       );
-      if (current.failing_since !== null) {
+      if (current.repair_sent_at !== null) {
         finishFire(ctx, scheduleId, fireId, { error: run.error });
         return;
       }
@@ -1437,6 +1449,12 @@ const fireWatch = async (
     ctx.db.run(
       `UPDATE schedules SET pending_finding = NULL, status = CASE WHEN once = 1 THEN 'done' ELSE status END
         WHERE schedule_id = ?`,
+      scheduleId,
+    );
+  } else {
+    ctx.db.run(
+      "UPDATE schedules SET repair_sent_at = ? WHERE schedule_id = ? AND failing_since IS NOT NULL",
+      ctx.now,
       scheduleId,
     );
   }
@@ -1484,6 +1502,7 @@ export const schedulesDomain = {
     SCHEDULES_DUE_MIGRATION,
     SCHEDULES_ZONE_MIGRATION,
     SCHEDULES_ZONE_SOURCE_MIGRATION,
+    SCHEDULES_WATCH_REPAIR_MIGRATION,
   ],
   views: {
     "schedules.list": {

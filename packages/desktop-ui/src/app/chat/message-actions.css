@@ -67,6 +67,7 @@
 .event-row:focus-within .message-actions,
 .message-actions-rail[data-open="true"] .message-actions,
 .message-actions[data-open="true"],
+.message-actions[data-copied="true"],
 .message-actions[data-active="true"] {
   opacity: 1;
   pointer-events: auto;

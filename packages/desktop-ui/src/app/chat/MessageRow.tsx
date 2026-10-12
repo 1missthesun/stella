@@ -578,8 +578,8 @@ export const UserMessageRow = memo(
         data-chat-row-id={row.id}
       >
         {chips.length > 0 && <UserContextChips chips={chips} />}
-        {/* Bubble + its hover control share one horizontal line: the ellipsis
-            sits to the LEFT of the right-aligned bubble and costs no vertical
+        {/* Bubble + its hover controls share one horizontal line: Reply and
+            Copy sit to the LEFT of the right-aligned bubble and costs no vertical
             space. It mounts for any user message that has visible content —
             text OR attachment/context chips — so attachment-only messages keep
             the same actions. Copy falls back to the attachment when there is

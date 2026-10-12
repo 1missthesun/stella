@@ -1,5 +1,5 @@
 /**
- * Per-message actions, as a vertical-ellipsis button beside the bubble.
+ * Per-message actions, as small buttons beside the bubble.
  *
  * This used to be a row of icon buttons rendered BELOW the message. That row
  * reserved its height at all times (the reveal had to not move the bubble, so
@@ -9,9 +9,11 @@
  * bubble: it costs nothing vertically, so the gap between messages is purely
  * the timeline's own rhythm (see the ROW_GAP family in ChatTimeline.tsx).
  *
- * - User messages: Copy.
- * - Assistant messages: Copy + Read aloud (on-demand TTS) — but only a turn's
- *   FINAL assistant message. Intra-turn segments (preambles that ended in a
+ * - User messages: Reply + Copy as direct buttons; the time rides on Copy's
+ *   tooltip.
+ * - Assistant messages: Copy + Read aloud (on-demand TTS) in the ellipsis menu,
+ *   because three inline buttons overflow the free space beside a full-width
+ *   bubble at narrow widths. Only a turn's FINAL assistant message gets them. Intra-turn segments (preambles that ended in a
  *   tool call) never mount this control at all (see the `isIntraTurn` gate in
  *   `AssistantMessageRow`).
  *
@@ -163,6 +165,35 @@ function MessageActionsImpl({
 
   const canReply = Boolean(onReply && text.trim());
 
+  const handleCopyClick = useCallback(async () => {
+    const value = text.trim();
+    let ok = false;
+    if (value) {
+      ok = await copyTextToClipboard(value);
+    } else if (copyAttachment) {
+      const result =
+        await window.electronAPI?.media?.copyAttachment?.(copyAttachment);
+      ok = Boolean(result?.ok);
+    } else {
+      return;
+    }
+    if (!ok) {
+      console.warn("[message-actions] copy failed");
+      return;
+    }
+    setCopied(true);
+    if (copiedTimerRef.current) clearTimeout(copiedTimerRef.current);
+    copiedTimerRef.current = setTimeout(
+      () => setCopied(false),
+      COPIED_RESET_MS,
+    );
+  }, [text, copyAttachment]);
+
+  const inlineCopy = !showReadAloud;
+  const copyLabel = copied
+    ? t("app.chat.messageActions.copied")
+    : t("app.chat.messageActions.copy");
+
   return (
     <div
       className={`message-actions-rail message-actions-rail--${align}`}
@@ -180,72 +211,93 @@ function MessageActionsImpl({
             <Reply size={15} strokeWidth={2} aria-hidden="true" />
           </button>
         )}
-        <DropdownMenu open={open} onOpenChange={handleOpenChange}>
-          <DropdownMenuTrigger asChild>
+        {inlineCopy ? (
+          hasCopyable && (
             <button
               type="button"
               className={`message-actions message-actions--${align}`}
-              data-open={open ? "true" : undefined}
-              data-active={isPlaying ? "true" : undefined}
-              aria-label={t("app.chat.messageActions.more")}
-              title={t("app.chat.messageActions.more")}
+              data-copied={copied ? "true" : undefined}
+              aria-label={copyLabel}
+              title={
+                timestampLabel ? `${copyLabel} · ${timestampLabel}` : copyLabel
+              }
+              onClick={handleCopyClick}
             >
-              <MoreVertical size={16} strokeWidth={2} aria-hidden="true" />
+              {copied ? (
+                <Check size={15} strokeWidth={2} aria-hidden="true" />
+              ) : (
+                <Copy size={15} strokeWidth={2} aria-hidden="true" />
+              )}
             </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="message-actions-menu"
-            align={align === "end" ? "end" : "start"}
-            sideOffset={6}
-            collisionPadding={12}
-          >
-            {timestampLabel && (
-              <DropdownMenuLabel className="message-actions-menu__time">
-                {timestampLabel}
-              </DropdownMenuLabel>
-            )}
-            {hasCopyable && (
-              <DropdownMenuItem onSelect={handleCopySelect}>
-                <span data-slot="dropdown-menu-item-icon">
-                  {copied ? (
-                    <Check size={16} strokeWidth={2} aria-hidden="true" />
-                  ) : (
-                    <Copy size={16} strokeWidth={2} aria-hidden="true" />
-                  )}
-                </span>
-                {copied
-                  ? t("app.chat.messageActions.copied")
-                  : t("app.chat.messageActions.copy")}
-              </DropdownMenuItem>
-            )}
-            {showReadAloud && (
-              <DropdownMenuItem onSelect={handleReadAloudSelect}>
-                <span data-slot="dropdown-menu-item-icon">
-                  {readAloudStatus === "loading" ? (
-                    <LoaderCircle
-                      className="message-actions__spinner"
-                      size={16}
-                      strokeWidth={2}
-                      aria-hidden="true"
-                    />
-                  ) : readAloudStatus === "playing" ? (
-                    <Square
-                      size={14}
-                      strokeWidth={2}
-                      fill="currentColor"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <Volume2 size={16} strokeWidth={2} aria-hidden="true" />
-                  )}
-                </span>
-                {isPlaying
-                  ? t("app.chat.messageActions.stopReading")
-                  : t("app.chat.messageActions.readAloud")}
-              </DropdownMenuItem>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )
+        ) : (
+          <DropdownMenu open={open} onOpenChange={handleOpenChange}>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className={`message-actions message-actions--${align}`}
+                data-open={open ? "true" : undefined}
+                data-active={isPlaying ? "true" : undefined}
+                aria-label={t("app.chat.messageActions.more")}
+                title={t("app.chat.messageActions.more")}
+              >
+                <MoreVertical size={16} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              className="message-actions-menu"
+              align={align === "end" ? "end" : "start"}
+              sideOffset={6}
+              collisionPadding={12}
+            >
+              {timestampLabel && (
+                <DropdownMenuLabel className="message-actions-menu__time">
+                  {timestampLabel}
+                </DropdownMenuLabel>
+              )}
+              {hasCopyable && (
+                <DropdownMenuItem onSelect={handleCopySelect}>
+                  <span data-slot="dropdown-menu-item-icon">
+                    {copied ? (
+                      <Check size={16} strokeWidth={2} aria-hidden="true" />
+                    ) : (
+                      <Copy size={16} strokeWidth={2} aria-hidden="true" />
+                    )}
+                  </span>
+                  {copied
+                    ? t("app.chat.messageActions.copied")
+                    : t("app.chat.messageActions.copy")}
+                </DropdownMenuItem>
+              )}
+              {showReadAloud && (
+                <DropdownMenuItem onSelect={handleReadAloudSelect}>
+                  <span data-slot="dropdown-menu-item-icon">
+                    {readAloudStatus === "loading" ? (
+                      <LoaderCircle
+                        className="message-actions__spinner"
+                        size={16}
+                        strokeWidth={2}
+                        aria-hidden="true"
+                      />
+                    ) : readAloudStatus === "playing" ? (
+                      <Square
+                        size={14}
+                        strokeWidth={2}
+                        fill="currentColor"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Volume2 size={16} strokeWidth={2} aria-hidden="true" />
+                    )}
+                  </span>
+                  {isPlaying
+                    ? t("app.chat.messageActions.stopReading")
+                    : t("app.chat.messageActions.readAloud")}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );

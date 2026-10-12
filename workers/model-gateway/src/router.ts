@@ -299,92 +299,109 @@ const handleSessionCapability = async (
       }),
     );
   }
-  const ipHash = await ipHashFrom(request);
-  if (verified.token.isAnonymous) {
-    const networkGate = env.NETWORK_GATE.get(
-      env.NETWORK_GATE.idFromName(ipHash),
-    );
-    const networkAdmission = await networkGate.admitMint();
-    if (!networkAdmission.ok) {
-      throw new GatewayError(
-        429,
-        "rate_limited",
-        "Too many capability exchanges from this network.",
-        quotaErrorOptions({
-          scope: "network",
-          now: deps.now(),
-          resetAt: networkAdmission.resetAt,
-        }),
+  // Only an exchange that issues a capability counts against the allowances.
+  let issuedAudience: string | undefined;
+  let releaseNetworkMint: (() => Promise<void>) | undefined;
+  try {
+    const ipHash = await ipHashFrom(request);
+    if (verified.token.isAnonymous) {
+      const networkGate = env.NETWORK_GATE.get(
+        env.NETWORK_GATE.idFromName(ipHash),
       );
+      const networkAdmission = await networkGate.admitMint();
+      if (networkAdmission.ok) {
+        const { admissionId } = networkAdmission;
+        releaseNetworkMint = () => networkGate.releaseMint(admissionId);
+      } else {
+        throw new GatewayError(
+          429,
+          "rate_limited",
+          "Too many capability exchanges from this network.",
+          quotaErrorOptions({
+            scope: "network",
+            now: deps.now(),
+            resetAt: networkAdmission.resetAt,
+          }),
+        );
+      }
     }
-  }
-  const result = sessionIssuer.preview
-    ? await issuePreviewSessionCapability({
-        issuer: sessionIssuer.issuer,
-        token,
-        request: {
-          deviceKey,
+    const result = sessionIssuer.preview
+      ? await issuePreviewSessionCapability({
+          issuer: sessionIssuer.issuer,
+          token,
+          request: {
+            deviceKey,
+            ipHash,
+            networkClass,
+            ...(rawTurnstileToken !== undefined
+              ? { turnstileToken: rawTurnstileToken }
+              : {}),
+          },
+          fetch: deps.fetch,
+          traceId,
+        })
+      : await billingControl(env).issueSessionCapability({
+          ownerId,
+          isAnonymous: verified.token.isAnonymous,
           ipHash,
           networkClass,
+          deviceKeyHash: deviceProof.deviceKeyHash,
           ...(rawTurnstileToken !== undefined
             ? { turnstileToken: rawTurnstileToken }
             : {}),
-        },
-        fetch: deps.fetch,
-        traceId,
+        });
+    if (!result.ok) {
+      if (result.status === 403 && result.code === "challenge_required") {
+        throw new GatewayError(
+          403,
+          "challenge_required",
+          "Complete the verification challenge and try again.",
+        );
+      }
+      if (result.status === 403 && result.code === "sign_in_required") {
+        throw new GatewayError(
+          403,
+          "sign_in_required",
+          GATEWAY_SIGN_IN_REQUIRED_MESSAGE,
+        );
+      }
+      if (result.code) {
+        throw new GatewayError(
+          result.status ?? 503,
+          result.code,
+          "A session capability could not be issued.",
+          {
+            retryable: result.retryable,
+          },
+        );
+      }
+      if (result.retryable || result.status === null) {
+        throw new GatewayError(
+          503,
+          "internal",
+          "Session capabilities are temporarily unavailable.",
+          {
+            retryable: true,
+          },
+        );
+      }
+      throw new GatewayError(
+        403,
+        "unauthorized",
+        "A session capability could not be issued for this account.",
+      );
+    }
+    issuedAudience = result.body.audience;
+    return jsonResponse(200, result.body, traceId);
+  } finally {
+    await ownerGate
+      .settleMint({
+        admissionId: ownerAdmission.admissionId,
+        ...(issuedAudience !== undefined ? { issuedAudience } : {}),
       })
-    : await billingControl(env).issueSessionCapability({
-        ownerId,
-        isAnonymous: verified.token.isAnonymous,
-        ipHash,
-        networkClass,
-        deviceKeyHash: deviceProof.deviceKeyHash,
-        ...(rawTurnstileToken !== undefined
-          ? { turnstileToken: rawTurnstileToken }
-          : {}),
-      });
-  if (!result.ok) {
-    if (result.status === 403 && result.code === "challenge_required") {
-      throw new GatewayError(
-        403,
-        "challenge_required",
-        "Complete the verification challenge and try again.",
-      );
-    }
-    if (result.status === 403 && result.code === "sign_in_required") {
-      throw new GatewayError(
-        403,
-        "sign_in_required",
-        GATEWAY_SIGN_IN_REQUIRED_MESSAGE,
-      );
-    }
-    if (result.code) {
-      throw new GatewayError(
-        result.status ?? 503,
-        result.code,
-        "A session capability could not be issued.",
-        {
-          retryable: result.retryable,
-        },
-      );
-    }
-    if (result.retryable || result.status === null) {
-      throw new GatewayError(
-        503,
-        "internal",
-        "Session capabilities are temporarily unavailable.",
-        {
-          retryable: true,
-        },
-      );
-    }
-    throw new GatewayError(
-      403,
-      "unauthorized",
-      "A session capability could not be issued for this account.",
-    );
+      .catch(() => undefined);
+    if (issuedAudience === undefined) await releaseNetworkMint?.().catch(() => undefined);
   }
-  return jsonResponse(200, result.body, traceId);
 };
 
 const handleResolve = async (

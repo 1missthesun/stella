@@ -12,6 +12,11 @@ export type NetworkAdmission =
   | { ok: true }
   | { ok: false; refused: "rate_limited"; resetAt: number };
 
+/** An anonymous session exchange from this network, held until `releaseMint` gives a refused one back. */
+export type NetworkMintAdmission =
+  | { ok: true; admissionId: number }
+  | { ok: false; refused: "rate_limited"; resetAt: number };
+
 type CountRow = { count: number };
 type OldestRow = { oldest: number | null };
 
@@ -94,7 +99,7 @@ export class NetworkGate extends DurableObject<Env> {
     return { ok: true };
   }
 
-  async admitMint(): Promise<NetworkAdmission> {
+  async admitMint(): Promise<NetworkMintAdmission> {
     const now = Date.now();
     this.ctx.storage.sql.exec(
       "DELETE FROM mint_admissions WHERE admitted_at <= ?",
@@ -115,11 +120,18 @@ export class NetworkGate extends DurableObject<Env> {
         resetAt: (oldest ?? now) + DAY_MS,
       };
     }
-    this.ctx.storage.sql.exec(
-      "INSERT INTO mint_admissions (admitted_at) VALUES (?)",
-      now,
-    );
-    return { ok: true };
+    const admissionId = this.ctx.storage.sql
+      .exec<{ id: number }>(
+        "INSERT INTO mint_admissions (admitted_at) VALUES (?) RETURNING id",
+        now,
+      )
+      .one().id;
+    return { ok: true, admissionId };
+  }
+
+  /** An admitted exchange that issued no capability: it does not count. */
+  async releaseMint(admissionId: number): Promise<void> {
+    this.ctx.storage.sql.exec("DELETE FROM mint_admissions WHERE id = ?", admissionId);
   }
 
   private refusal(args: {

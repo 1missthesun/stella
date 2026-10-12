@@ -61,9 +61,18 @@ export type GateAdmission =
       resetAt: number;
     };
 
+/**
+ * A session exchange admitted for an owner: it counts against the hourly
+ * allowance only once it issues a capability (`settleMint`).
+ */
+export type MintAdmission =
+  | { ok: true; admissionId: number }
+  | { ok: false; refused: "rate_limited"; resetAt: number };
+
 type CountRow = { count: number };
 type OldestRow = { oldest: number | null };
 type InFlightRow = { started_at: number };
+type AudienceRow = { audience: string };
 
 const parseAuthoritativeOwnerEnforcement = (
   value: unknown,
@@ -122,6 +131,11 @@ const SCHEMA = [
   )`,
   `CREATE INDEX IF NOT EXISTS mint_admissions_at
     ON mint_admissions(admitted_at)`,
+  `CREATE TABLE IF NOT EXISTS mint_audience (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    audience TEXT NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
   `CREATE TABLE IF NOT EXISTS managed_cancellations (
     identity TEXT PRIMARY KEY,
     expires_at INTEGER NOT NULL
@@ -604,18 +618,30 @@ export class OwnerRelayGate extends DurableObject<Env> {
     );
   }
 
+  /**
+   * Admit one session exchange. A signed-in owner's tier is its plan as the
+   * last capability issued to it named it (the sign-in token does not carry
+   * the plan), the free tier until one was. The admission is held until
+   * `settleMint`: kept once a capability is issued, given back otherwise.
+   */
   async admitMint(args: {
     audience: ManagedModelAudience;
     throttled: boolean;
     /** A dev test account on a gateway that serves them (`GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR`). */
     testAccount?: boolean;
-  }): Promise<GateAdmission> {
+  }): Promise<MintAdmission> {
     const now = Date.now();
     this.ctx.storage.sql.exec(
       "DELETE FROM mint_admissions WHERE admitted_at <= ?",
       now - HOUR_MS,
     );
-    const policy = GATEWAY_OWNER_RELAY_LIMITS[limitsAudienceFor(args.audience)];
+    const issued =
+      args.audience === "anonymous"
+        ? undefined
+        : this.ctx.storage.sql
+            .exec<AudienceRow>("SELECT audience FROM mint_audience WHERE singleton = 1")
+            .toArray()[0]?.audience;
+    const policy = GATEWAY_OWNER_RELAY_LIMITS[limitsAudienceFor(issued ?? args.audience)];
     const limit = args.testAccount
       ? GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR
       : scaledLimit(policy.mintsPerHour, args.throttled);
@@ -634,10 +660,31 @@ export class OwnerRelayGate extends DurableObject<Env> {
         resetAt: (oldest ?? now) + HOUR_MS,
       };
     }
-    this.ctx.storage.sql.exec(
-      "INSERT INTO mint_admissions (admitted_at) VALUES (?)",
-      now,
-    );
-    return { ok: true };
+    const admissionId = this.ctx.storage.sql
+      .exec<{ id: number }>(
+        "INSERT INTO mint_admissions (admitted_at) VALUES (?) RETURNING id",
+        now,
+      )
+      .one().id;
+    return { ok: true, admissionId };
   }
+
+  /**
+   * The end of an admitted exchange: issued, it keeps counting and its
+   * capability's audience is the owner's tier from now on; refused or
+   * failed, it is given back.
+   */
+  async settleMint(args: { admissionId: number; issuedAudience?: string }): Promise<void> {
+    if (args.issuedAudience === undefined) {
+      this.ctx.storage.sql.exec("DELETE FROM mint_admissions WHERE id = ?", args.admissionId);
+      return;
+    }
+    this.ctx.storage.sql.exec(
+      `INSERT INTO mint_audience (singleton, audience, updated_at) VALUES (1, ?, ?)
+       ON CONFLICT (singleton) DO UPDATE SET audience = excluded.audience, updated_at = excluded.updated_at`,
+      args.issuedAudience,
+      Date.now(),
+    );
+  }
+
 }

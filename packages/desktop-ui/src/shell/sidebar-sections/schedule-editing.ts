@@ -10,7 +10,7 @@ export type EveryUnit = "minutes" | "hours" | "days";
 
 export type TimingDraft =
   | { kind: "at"; local: string }
-  | { kind: "every"; amount: string; unit: EveryUnit }
+  | { kind: "every"; amount: string; unit: EveryUnit; anchorMs?: number }
   | { kind: "weekly"; time: string; days: number[]; tz?: string }
   | { kind: "cron"; expr: string; tz?: string };
 
@@ -50,7 +50,12 @@ export const draftOf = (schedule: LocalCronSchedule): TimingDraft => {
   if (schedule.kind === "every") {
     const unit: EveryUnit =
       schedule.everyMs % UNIT_MS.days === 0 ? "days" : schedule.everyMs % UNIT_MS.hours === 0 ? "hours" : "minutes";
-    return { kind: "every", amount: String(Math.max(1, Math.round(schedule.everyMs / UNIT_MS[unit]))), unit };
+    return {
+      kind: "every",
+      amount: String(Math.max(1, Math.round(schedule.everyMs / UNIT_MS[unit]))),
+      unit,
+      ...(schedule.anchorMs !== undefined ? { anchorMs: schedule.anchorMs } : {}),
+    };
   }
   const simple = simpleCron(schedule.expr);
   if (simple) {
@@ -77,7 +82,13 @@ export const scheduleOf = (draft: TimingDraft): { schedule: LocalCronSchedule } 
   if (draft.kind === "every") {
     const amount = Number(draft.amount);
     if (!Number.isFinite(amount) || amount <= 0) return { error: "pickEvery" };
-    return { schedule: { kind: "every", everyMs: Math.round(amount * UNIT_MS[draft.unit]) } };
+    return {
+      schedule: {
+        kind: "every",
+        everyMs: Math.round(amount * UNIT_MS[draft.unit]),
+        ...(draft.anchorMs !== undefined ? { anchorMs: draft.anchorMs } : {}),
+      },
+    };
   }
   const tz = draft.tz;
   if (draft.kind === "weekly") {
@@ -92,3 +103,6 @@ export const scheduleOf = (draft: TimingDraft): { schedule: LocalCronSchedule } 
   if (!draft.expr.trim()) return { error: "pickCron" };
   return { schedule: { kind: "cron", expr: draft.expr.trim(), ...(tz ? { tz } : {}) } };
 };
+
+export const sameTiming = (draft: TimingDraft, schedule: LocalCronSchedule): boolean =>
+  JSON.stringify(draft) === JSON.stringify(draftOf(schedule));

@@ -5,7 +5,7 @@
  * Stella's own do, so every device shows them at once. Rows read the same
  * as on the phone (`@stella/contracts/schedule-format`).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   getCronTriggerKind,
   type LocalCronJobRecord,
@@ -13,12 +13,15 @@ import {
   type LocalCronPayload,
 } from "@stella/contracts/scheduling";
 import { formatNextRun, summarizeSchedule } from "@stella/contracts/schedule-format";
+import { cronJobOfScheduleRow, scheduleUpdateArgsOf } from "@stella/contracts/schedule-records";
+import { backendClient } from "@/platform/backend/backend-client";
+import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useI18n, useT } from "@/shared/i18n";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { EmptyState } from "@/ui/empty-state/EmptyState";
 import { Clock, Eye, Pause, Pencil, Play, Trash2, Wand2 } from "@/ui/icons";
 import type { IconComponent } from "@/ui/icons";
-import { draftOf, scheduleOf, type EveryUnit, type TimingDraft } from "./schedule-editing";
+import { draftOf, sameTiming, scheduleOf, type EveryUnit, type TimingDraft } from "./schedule-editing";
 import "./updates-section.css";
 import "./schedule-section.css";
 
@@ -36,8 +39,27 @@ const errorText = (error: unknown): string => {
   return message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, "");
 };
 
-/** Every schedule, live; undefined until the first read. */
-const useAllSchedules = (enabled: boolean): LocalCronJobRecord[] | undefined => {
+type ScheduleApi = {
+  update: (jobId: string, patch: LocalCronJobUpdatePatch) => Promise<unknown>;
+  remove: (jobId: string) => Promise<unknown>;
+};
+
+const desktopScheduleApi: ScheduleApi = {
+  update: async (jobId, patch) => window.electronAPI?.schedule.updateCronJob({ jobId, patch }),
+  remove: async (jobId) => window.electronAPI?.schedule.removeCronJob({ jobId }),
+};
+
+const webRequestId = (action: string): string => `web-${action}-${crypto.randomUUID()}`;
+
+const cloudScheduleApi: ScheduleApi = {
+  update: (jobId, patch) =>
+    backendClient.call("schedules.update", { requestId: webRequestId("update"), ...scheduleUpdateArgsOf(jobId, patch) }),
+  remove: (jobId) => backendClient.call("schedules.remove", { requestId: webRequestId("remove"), scheduleId: jobId }),
+};
+
+const ScheduleApiContext = createContext<ScheduleApi>(desktopScheduleApi);
+
+const useDesktopSchedules = (enabled: boolean): LocalCronJobRecord[] | undefined => {
   const [jobs, setJobs] = useState<LocalCronJobRecord[] | undefined>(undefined);
   useEffect(() => {
     const api = window.electronAPI?.schedule;
@@ -63,6 +85,22 @@ const useAllSchedules = (enabled: boolean): LocalCronJobRecord[] | undefined => 
     };
   }, [enabled]);
   return jobs;
+};
+
+const useCloudSchedules = (enabled: boolean): LocalCronJobRecord[] | undefined => {
+  const view = useBackendView("schedules.list", enabled ? {} : "skip");
+  return useMemo(() => {
+    if (!enabled) return undefined;
+    if (view.value) return view.value.map(cronJobOfScheduleRow);
+    return view.status === "error" ? [] : undefined;
+  }, [enabled, view.value, view.status]);
+};
+
+const useAllSchedules = (enabled: boolean): { jobs: LocalCronJobRecord[] | undefined; api: ScheduleApi } => {
+  const desktop = Boolean(window.electronAPI?.schedule);
+  const desktopJobs = useDesktopSchedules(enabled && desktop);
+  const cloudJobs = useCloudSchedules(enabled && !desktop);
+  return desktop ? { jobs: desktopJobs, api: desktopScheduleApi } : { jobs: cloudJobs, api: cloudScheduleApi };
 };
 
 const KIND_ICON: Record<string, IconComponent> = { reminder: Clock, task: Wand2, watch: Eye };
@@ -121,13 +159,13 @@ function TimingFields({ draft, onChange }: { draft: TimingDraft; onChange: (draf
           min={1}
           value={draft.amount}
           aria-label={t("schedule.edit.every")}
-          onChange={(event) => onChange({ ...draft, amount: event.target.value })}
+          onChange={(event) => onChange({ kind: "every", unit: draft.unit, amount: event.target.value })}
         />
         <select
           className="schedule-edit__input schedule-edit__input--short"
           value={draft.unit}
           aria-label={t("schedule.edit.unit")}
-          onChange={(event) => onChange({ ...draft, unit: event.target.value as EveryUnit })}
+          onChange={(event) => onChange({ kind: "every", amount: draft.amount, unit: event.target.value as EveryUnit })}
         >
           <option value="minutes">{t("schedule.edit.minutes")}</option>
           <option value="hours">{t("schedule.edit.hours")}</option>
@@ -184,6 +222,7 @@ function TimingFields({ draft, onChange }: { draft: TimingDraft; onChange: (draf
 
 function ScheduleEditor({ job, onDone }: { job: LocalCronJobRecord; onDone: () => void }) {
   const t = useT();
+  const api = useContext(ScheduleApiContext);
   const [name, setName] = useState(job.name);
   const [text, setText] = useState(textOf(job.payload));
   const [draft, setDraft] = useState<TimingDraft>(() => draftOf(job.schedule));
@@ -191,16 +230,15 @@ function ScheduleEditor({ job, onDone }: { job: LocalCronJobRecord; onDone: () =
   const [saving, setSaving] = useState(false);
 
   const save = async () => {
-    const timing = scheduleOf(draft);
-    if ("error" in timing) {
+    const timing = sameTiming(draft, job.schedule) ? null : scheduleOf(draft);
+    if (timing && "error" in timing) {
       setError(t(`schedule.edit.errors.${timing.error}`));
       return;
     }
     const payload = text.trim() ? withText(job.payload, text.trim()) : null;
-    const scheduleChanged = JSON.stringify(timing.schedule) !== JSON.stringify(job.schedule);
     const patch: LocalCronJobUpdatePatch = {
       ...(name.trim() && name.trim() !== job.name ? { name: name.trim() } : {}),
-      ...(scheduleChanged ? { schedule: timing.schedule } : {}),
+      ...(timing ? { schedule: timing.schedule } : {}),
       ...(payload ? { payload } : {}),
     };
     if (Object.keys(patch).length === 0) {
@@ -210,7 +248,7 @@ function ScheduleEditor({ job, onDone }: { job: LocalCronJobRecord; onDone: () =
     setSaving(true);
     setError(null);
     try {
-      await window.electronAPI?.schedule.updateCronJob({ jobId: job.id, patch });
+      await api.update(job.id, patch);
       onDone();
     } catch (cause) {
       setError(errorText(cause));
@@ -320,7 +358,7 @@ function ScheduleItem({
       setBusy(false);
     }
   };
-  const api = window.electronAPI?.schedule;
+  const api = useContext(ScheduleApiContext);
 
   return (
     <li className="schedule-section__item" data-paused={job.enabled ? undefined : "true"} data-busy={busy || undefined}>
@@ -345,7 +383,7 @@ function ScheduleItem({
             aria-label={job.enabled ? t("schedule.pause") : t("schedule.resume")}
             title={job.enabled ? t("schedule.pause") : t("schedule.resume")}
             disabled={busy}
-            onClick={() => void act(() => api?.updateCronJob({ jobId: job.id, patch: { enabled: !job.enabled } }))}
+            onClick={() => void act(() => api.update(job.id, { enabled: !job.enabled }))}
           >
             {job.enabled ? <Pause size={14} strokeWidth={1.75} /> : <Play size={14} strokeWidth={1.75} />}
           </button>
@@ -372,7 +410,7 @@ function ScheduleItem({
                 setConfirmDelete(true);
                 return;
               }
-              void act(() => api?.removeCronJob({ jobId: job.id }));
+              void act(() => api.remove(job.id));
             }}
           >
             <Trash2 size={14} strokeWidth={1.75} />
@@ -388,7 +426,7 @@ function ScheduleItem({
 export function ScheduleSection({ active }: { active: boolean }) {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();
-  const jobs = useAllSchedules(hasConnectedAccount);
+  const { jobs, api } = useAllSchedules(hasConnectedAccount);
   const [editing, setEditing] = useState<string | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
@@ -428,19 +466,21 @@ export function ScheduleSection({ active }: { active: boolean }) {
     </ul>
   );
   return (
-    <div className="updates-section schedule-section sidebar-section__scroll" data-testid="schedule-section">
-      {running.length > 0 ? (
-        <>
-          <h2 className="updates-section__heading">{t("schedule.upcoming")}</h2>
-          {renderList(running, "schedule-upcoming")}
-        </>
-      ) : null}
-      {paused.length > 0 ? (
-        <>
-          <h2 className="updates-section__heading">{t("schedule.pausedHeading")}</h2>
-          {renderList(paused, "schedule-paused")}
-        </>
-      ) : null}
-    </div>
+    <ScheduleApiContext.Provider value={api}>
+      <div className="updates-section schedule-section sidebar-section__scroll" data-testid="schedule-section">
+        {running.length > 0 ? (
+          <>
+            <h2 className="updates-section__heading">{t("schedule.upcoming")}</h2>
+            {renderList(running, "schedule-upcoming")}
+          </>
+        ) : null}
+        {paused.length > 0 ? (
+          <>
+            <h2 className="updates-section__heading">{t("schedule.pausedHeading")}</h2>
+            {renderList(paused, "schedule-paused")}
+          </>
+        ) : null}
+      </div>
+    </ScheduleApiContext.Provider>
   );
 }

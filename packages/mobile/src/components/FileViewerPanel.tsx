@@ -26,6 +26,9 @@ const EDGE_GAP = 8;
 const MIN_HEIGHT = 140;
 const CONFIRM_MS = 1400;
 const BUTTON_SIZE = 36;
+const SURFACE_RIM = 1;
+const TOP_GAP = 12;
+const COMPOSER_TOP_SLACK = 12;
 
 function useKeyboardHeight(): number {
   const [height, setHeight] = useState(0);
@@ -61,11 +64,13 @@ export function FileViewerPanel({
   onClose,
   closeLabel,
   bottomReserve = 0,
+  preferredHeight = null,
   children,
 }: {
   onClose: () => void;
   closeLabel: string;
   bottomReserve?: number;
+  preferredHeight?: number | null;
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
@@ -85,10 +90,15 @@ export function FileViewerPanel({
   const keyboardLift = Math.max(0, keyboardHeight - insets.bottom);
   const obstruction =
     bottomReserve > 0
-      ? bottomReserve + keyboardLift
+      ? Math.max(0, bottomReserve - COMPOSER_TOP_SLACK) + keyboardLift
       : Math.max(insets.bottom, keyboardHeight);
-  const top = insets.top + TOP_BAR_BAR_HEIGHT + EDGE_GAP;
-  const height = Math.max(MIN_HEIGHT, screenHeight - top - obstruction - EDGE_GAP);
+  const bandTop = insets.top + TOP_BAR_BAR_HEIGHT + TOP_GAP;
+  const maxHeight = Math.max(MIN_HEIGHT, screenHeight - bandTop - obstruction - EDGE_GAP);
+  const height =
+    preferredHeight === null
+      ? maxHeight
+      : Math.min(maxHeight, Math.max(MIN_HEIGHT, Math.ceil(preferredHeight + SURFACE_RIM * 2)));
+  const top = bandTop + Math.max(0, Math.floor((maxHeight - height) / 2));
   const width = Math.min(screenWidth - SIDE_MARGIN * 2, MAX_WIDTH);
 
   return (

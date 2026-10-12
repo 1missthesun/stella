@@ -232,13 +232,22 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     [poseEpoch, reasoningSeed, status, toolCallId, toolName],
   );
   previousPoseRef.current = liveDisplay.characterState;
+  const lastLabelRef = useRef<typeof liveDisplay | null>(null);
+  let labelledDisplay = liveDisplay;
+  if (!active) {
+    lastLabelRef.current = null;
+  } else if (liveDisplay.status) {
+    lastLabelRef.current = liveDisplay;
+  } else if (lastLabelRef.current) {
+    labelledDisplay = lastLabelRef.current;
+  }
   // The hold covers the mark as well as the label. Without it the character
   // would flap between thinking and tool poses whenever a quick tool starts
   // and ends.
   // Dots have no text to read: a tool can replace them immediately.
   const heldDisplay = useMinimumVisibleValue(
-    liveDisplay,
-    liveDisplay.characterState === "thinking" ? 0 : STATUS_MIN_VISIBLE_MS,
+    labelledDisplay,
+    labelledDisplay.characterState === "thinking" ? 0 : STATUS_MIN_VISIBLE_MS,
     (a, b) =>
       a.status === b.status && a.characterState === b.characterState,
   );

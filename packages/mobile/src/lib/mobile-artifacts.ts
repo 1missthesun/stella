@@ -295,7 +295,11 @@ export const artifactFileName = (payload: MobileDisplayPayload): string => {
     /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(stem) ||
     /^[0-9a-f_-]{16,}$/i.test(stem) ||
     /^\d{10,}/.test(stem);
-  const readableTitle = title.trim().replace(/[\\/:*?"<>|\r\n]+/g, " ").trim();
+  const readableTitle = title
+    .trim()
+    .replace(/[\\/:*?"<>|\r\n]+/g, " ")
+    .replace(/[\s.,;:!?…]+$/u, "")
+    .trim();
   if (machineNamed && readableTitle && readableTitle !== name) {
     const titled = readableTitle;
     return titled.toLowerCase().endsWith(extension.toLowerCase())

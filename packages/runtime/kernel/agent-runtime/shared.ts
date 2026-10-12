@@ -1,18 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import type { AgentMessage } from "../agent-core/types.js";
 import { getLocalCliWorkingDirectory } from "@stella/contracts/agent-runtime";
-
-// Loop-adjacent helpers now live in the workerd-safe `run-shared.ts` so the
-// cloud DO and sandbox executor run the same code; re-exported here for the
-// desktop-side callers that always imported them from this module.
-export {
-  assistantMessageHasToolCall,
-  extractAssistantText,
-} from "./run-shared.js";
-
-const MAX_RESULT_PREVIEW = 200;
 
 export const now = () => Date.now();
 
@@ -70,9 +59,6 @@ export const resolveAgentWorkingDirectory = ({
   return undefined;
 };
 
-/** Historical name for {@link resolveAgentWorkingDirectory}. */
-export const resolveLocalCliCwd = resolveAgentWorkingDirectory;
-
 export const textFromUnknown = (value: unknown): string => {
   if (typeof value === "string") return value;
   if (value == null) return "";
@@ -83,74 +69,3 @@ export const textFromUnknown = (value: unknown): string => {
   }
 };
 
-const textFromToolLikeValue = (value: unknown): string => {
-  if (typeof value === "string") {
-    return value;
-  }
-  if (value && typeof value === "object") {
-    const record = value as Record<string, unknown>;
-    if (typeof record.result === "string") {
-      return record.result;
-    }
-    if (typeof record.error === "string") {
-      return record.error;
-    }
-    if (typeof record.text === "string") {
-      return record.text;
-    }
-    if (record.details && typeof record.details === "object") {
-      const details = record.details as Record<string, unknown>;
-      if (typeof details.text === "string") {
-        return details.text;
-      }
-    }
-  }
-  return textFromUnknown(value);
-};
-
-export const getToolResultPreview = (
-  _toolName: string,
-  result: unknown,
-): string => textFromToolLikeValue(result).slice(0, MAX_RESULT_PREVIEW);
-
-export const toAgentMessages = (
-  history: Array<{ role: "user" | "assistant"; content: string }>,
-): AgentMessage[] => {
-  const usage = {
-    input: 0,
-    output: 0,
-    cacheRead: 0,
-    cacheWrite: 0,
-    totalTokens: 0,
-    cost: {
-      input: 0,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      total: 0,
-    },
-  };
-
-  return history
-    .filter((entry) => entry.content.trim().length > 0)
-    .map((entry) => {
-      if (entry.role === "user") {
-        return {
-          role: "user" as const,
-          content: [{ type: "text" as const, text: entry.content }],
-          timestamp: now(),
-        };
-      }
-
-      return {
-        role: "assistant" as const,
-        content: [{ type: "text" as const, text: entry.content }],
-        api: "openai-completions" as const,
-        provider: "openai",
-        model: "history",
-        usage,
-        stopReason: "stop" as const,
-        timestamp: now(),
-      };
-    });
-};

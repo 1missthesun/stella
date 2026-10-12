@@ -501,9 +501,3 @@ export const createBackendConnectorActionBroker =
     return { ok: true, result: sanitizeSensitiveData(payload) };
   };
 
-export const __test = {
-  isPlainJsonValue,
-  jwtStatus,
-  validateActionInput,
-  readBoundedJson,
-};

@@ -3,7 +3,6 @@ import { METHOD_NAMES } from "@stella/contracts/protocol";
 import { sweepStaleConnectorBridgeProcesses } from "../../../kernel/connectors/process-registry.js";
 import {
   setConnectorTokenStoreBroker,
-  type ConnectorTokenPayload,
 } from "../../../kernel/connectors/oauth.js";
 import type {
   ConnectorTokenStoreRequest,

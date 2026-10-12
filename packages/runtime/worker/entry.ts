@@ -21,7 +21,6 @@ import { RuntimeClientServer } from "../host/client-server.js";
 import { workerRuntime } from "./effect-runtime.js";
 import {
   WorkerLifecycleServer,
-  removeStaleRuntimeArtifacts,
 } from "./lifecycle-server.js";
 import { WorkerPeerBroker } from "./peer-broker.js";
 import { createRuntimeWorkerServer } from "./server/index.js";
@@ -34,10 +33,8 @@ import {
   type RuntimeServerIdentity,
 } from "./server-identity.js";
 import {
-  parseWorkerArgs,
   parseWorkerListenUrl,
   startWorkerTransport,
-  type WorkerTransport,
 } from "./transport.js";
 
 /**
@@ -372,8 +369,5 @@ export {
   // Re-exports for external callers.
   WorkerPeerBroker,
   parseWorkerListenUrl,
-  parseWorkerArgs,
   startWorkerTransport,
-  removeStaleRuntimeArtifacts,
 };
-export type { WorkerTransport };

@@ -57,7 +57,6 @@
     "./electron/stella-host-runner.js": "./electron/stella-host-runner.js",
     "./electron/types.js": "./electron/types.js",
     "./electron/window-capture.js": "./electron/window-capture.js",
-    "./electron/window-content-capture.js": "./electron/window-content-capture.js",
     "./electron/windows-composition.js": "./electron/windows-composition.js",
     "./electron/windows/full-window.js": "./electron/windows/full-window.js",
     "./electron/windows/overlay-window.js": "./electron/windows/overlay-window.js",

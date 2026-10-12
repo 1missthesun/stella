@@ -31,49 +31,26 @@
  */
 
 export {
-  BACKGROUND_EXEC_SETTLE_MS,
-  DEFAULT_EMPTY_POLL_YIELD_MS,
-  DEFAULT_EXEC_OUTPUT_TOKENS,
-  DEFAULT_EXEC_YIELD_MS,
-  DEFAULT_WRITE_STDIN_YIELD_MS,
-  EXEC_UPDATE_MAX_BYTES,
-  approxTokenCount,
-  extractOfficePreviewRef,
   handleBash,
   handleExecCommand,
   handleKillShell,
   handleShellStatus,
   handleWriteStdin,
-  resolveExecOutputTokens,
 } from "./shell/handlers.js";
 export {
   buildAgentShellEnvironment,
-  buildShellCommand,
-  resolveDefaultShell,
-  resolveShellLaunch,
-  resolveShellNodeBinary,
   resolveToolProcessIdentity,
-  type ResolvedShellLaunch,
-  type ShellDetectionOptions,
-  type ShellLaunchOptions,
 } from "./shell/launch.js";
-export { runShell } from "./shell/process.js";
 export {
   COMPLETED_SHELL_TTL_MS,
-  MAX_RETAINED_COMPLETED_SHELLS,
-  PRUNED_SHELL_RECEIPT_TTL_MS,
   cleanupShellSessions,
   createShellState,
   listRunningShellSessionsOwnedBy,
   readShellExitSnapshot,
-  setShellOwner,
   shutdownManagedShells,
-  startShell,
   waitForShellExit,
   watchShellExit,
-  type ManagedShellRecord,
   type ShellExitSnapshot,
   type ShellSessionAccess,
-  type ShellSessionOwner,
   type ShellState,
 } from "./shell/sessions.js";

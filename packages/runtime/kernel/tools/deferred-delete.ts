@@ -306,17 +306,6 @@ export const trashPathsForDeferredDelete = async (
   return result;
 };
 
-export const trashPathForDeferredDelete = async (
-  target: string,
-  options: TrashPathsOptions,
-): Promise<DeferredDeleteRecord | null> => {
-  const result = await trashPathsForDeferredDelete([target], options);
-  if (result.errors.length > 0) {
-    throw new Error(result.errors[0].error);
-  }
-  return result.trashed[0] ?? null;
-};
-
 const parseRecord = (raw: string): DeferredDeleteRecord | null => {
   try {
     const parsed = JSON.parse(raw) as Partial<DeferredDeleteRecord>;

@@ -691,19 +691,6 @@ export type AddMcpTransport =
   | { command: string; args?: string[]; env?: Record<string, string>; cwd?: string }
   | { url: string };
 
-export type AddMcpOptions = {
-  id: string;
-  name?: string;
-  description?: string;
-  transport: AddMcpTransport;
-  auth?: {
-    type: "oauth" | "api_key";
-    tokenKey?: string;
-    headerName?: string;
-    scheme?: "bearer" | "basic" | "oauth" | "raw";
-  };
-};
-
 export type AddMcpResult = {
   imported: ConnectorCommandConfig;
   toolCount: number;

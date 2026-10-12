@@ -75,13 +75,6 @@ const waitForWorkerProcessExitEffect = (
     ),
   );
 
-export const waitForWorkerProcessExit = async (
-  child: ChildProcessWithoutNullStreams,
-  timeoutMs = 1_500,
-) => {
-  await hostRuntime.runPromise(waitForWorkerProcessExitEffect(child, timeoutMs));
-};
-
 /**
  * Close the IPC channel without killing the worker process. Used when
  * the worker self-supervises (UDS detached mode) so an Electron restart
@@ -127,13 +120,6 @@ const disconnectWorkerEffect = (
       Effect.sleep(timeoutMs),
     );
   });
-
-export const disconnectWorker = async (
-  child: ChildProcessWithoutNullStreams,
-  timeoutMs = 1_500,
-) => {
-  await hostRuntime.runPromise(disconnectWorkerEffect(child, timeoutMs));
-};
 
 export type RuntimeWorkerLifecycleControllerOptions = {
   workerEntryPath: string;

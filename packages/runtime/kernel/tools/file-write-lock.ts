@@ -26,29 +26,6 @@ const lockKeyForPath = (filePath: string): string => {
 };
 
 /**
- * Resolve aliases before selecting the process-local lock key. Existing
- * files use their real path; new files use the real parent plus basename.
- * This keeps a symlinked Stella data directory on the same queue as its
- * canonical path, which is essential for archive read-modify-write calls.
- */
-export const canonicalFileWriteLockPath = async (
-  filePath: string,
-): Promise<string> => {
-  try {
-    return await fs.realpath(filePath);
-  } catch {
-    try {
-      return path.join(
-        await fs.realpath(path.dirname(filePath)),
-        path.basename(filePath),
-      );
-    } catch {
-      return path.resolve(filePath);
-    }
-  }
-};
-
-/**
  * Run `fn` with an exclusive async lock on `filePath`. Calls targeting the
  * same resolved path are chained FIFO; other paths are unaffected. The
  * caller's read-modify-write cycle must live entirely inside `fn` — no
@@ -91,9 +68,6 @@ export const withFileWriteLocks = async <T>(
   );
   return run();
 };
-
-/** Exposed for tests: number of paths with an in-flight lock chain. */
-export const pendingFileWriteLockCount = (): number => queues.size;
 
 const containsUnexpectedNul = (written: string, intended: string): boolean =>
   written.includes("\u0000") && !intended.includes("\u0000");
@@ -144,49 +118,3 @@ export const writeFileWithNulGuard = async (
   );
 };
 
-/**
- * Crash-safe whole-file replacement. The temp file and containing directory
- * are fsynced before returning, so a completed rewrite survives a crash as a
- * coherent old-or-new file and leaves no ambiguous partial target.
- */
-export const writeFileAtomicWithVerify = async (
-  filePath: string,
-  content: string,
-): Promise<void> => {
-  const tmpPath = path.join(
-    path.dirname(filePath),
-    `.${path.basename(filePath)}.tmp-${process.pid}-${Math.random()
-      .toString(36)
-      .slice(2)}`,
-  );
-  try {
-    const handle = await fs.open(tmpPath, "wx");
-    try {
-      await handle.writeFile(content, "utf-8");
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    const written = await fs.readFile(tmpPath, "utf-8");
-    if (written !== utf8OnDiskIntent(content)) {
-      throw new Error(
-        `Atomic write verification failed for ${filePath}: temp bytes differ from intent.`,
-      );
-    }
-    await fs.rename(tmpPath, filePath);
-    const directory = await fs.open(path.dirname(filePath), "r");
-    try {
-      await directory.sync();
-    } finally {
-      await directory.close();
-    }
-  } catch (error) {
-    try {
-      await fs.unlink(tmpPath);
-    } catch {
-      // A successfully renamed temp path no longer exists; otherwise cleanup
-      // is best-effort and the dot-file is never a memory read source.
-    }
-    throw error;
-  }
-};

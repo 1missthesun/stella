@@ -17,8 +17,6 @@ import {
   EDIT_TOOL_REPLAY,
 } from "./edit-def.js";
 
-export { EDIT_TOOL_PARAMETERS } from "./edit-def.js";
-
 export const editTool: ToolDefinition = {
   name: EDIT_TOOL_NAME,
   replay: EDIT_TOOL_REPLAY,

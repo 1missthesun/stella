@@ -25,7 +25,6 @@
 import path from "node:path";
 
 export const MEMORIES_DIR = "memories";
-export const MEMORY_AREAS_DIR = "areas";
 
 export const MAIN_MEMORY_FILE = "main.md";
 /** `memories/main.md`, relative to `~/.stella`. */
@@ -64,9 +63,6 @@ export const mainMemoryCapNote = (chars: number): string | undefined => {
   }
   return undefined;
 };
-
-export const memoriesDirPath = (stellaDataDir: string): string =>
-  path.join(stellaDataDir, MEMORIES_DIR);
 
 export const mainMemoryPath = (stellaDataDir: string): string =>
   path.join(stellaDataDir, MEMORIES_DIR, MAIN_MEMORY_FILE);

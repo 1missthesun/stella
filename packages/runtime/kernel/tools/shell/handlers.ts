@@ -71,12 +71,6 @@ export const EXEC_UPDATE_MAX_BYTES = 8 * 1024;
 const MAX_EXEC_UPDATE_CHUNKS = 10_000;
 
 const APPROX_BYTES_PER_TOKEN = 4;
-/**
- * Cheap byte-count → token estimate. Off by a small constant from any real
- * tokenizer, but stable enough for "did this output get truncated".
- */
-export const approxTokenCount = (text: string): number =>
-  Math.ceil(text.length / APPROX_BYTES_PER_TOKEN);
 
 const OFFICE_PREVIEW_REF_MARKER = "__STELLA_OFFICE_PREVIEW_REF__";
 

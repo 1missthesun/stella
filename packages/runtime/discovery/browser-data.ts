@@ -37,13 +37,9 @@ import type {
 
 export type {
   BrowserType,
-  DomainVisit,
-  DomainDetail,
   BrowserData,
   PreferredBrowserProfile,
   BrowserProfile,
-  ClusterKeyword,
-  SearchQuery,
 }
 
 export type BrowserCollectionOptions = {
@@ -1295,27 +1291,6 @@ const emptyBrowserData = (browser: BrowserType | null = null): BrowserData => ({
   clusterKeywords: [],
 });
 
-const buildBrowserDataWindow = (
-  db: SqliteDatabase,
-  browserType: BrowserType,
-  sinceMs: number,
-): BrowserData => {
-  const recentDomains = queryRecentDomains(db, sinceMs, { allowFallback: false });
-  const clusterKeywords = queryClusterKeywords(db, toChromeTime(new Date(sinceMs)));
-  const domainDetails = queryDomainDetails(
-    db,
-    getTopDomainsForDetails(recentDomains, 15),
-  );
-  return {
-    browser: browserType,
-    clusterDomains: [],
-    recentDomains,
-    allTimeDomains: [],
-    domainDetails,
-    clusterKeywords,
-  };
-};
-
 /** The full-history query pass, run against an already-open history db. */
 const buildFullBrowserData = (
   db: SqliteDatabase,
@@ -1403,54 +1378,6 @@ export const collectBrowserData = async (
   options: BrowserCollectionOptions = {},
 ): Promise<BrowserData> =>
   runDiscovery(collectBrowserDataEffect(StellaDataDir, options));
-
-const collectBrowserActivityWindowsEffect = (
-  StellaDataDir: string,
-  windows: BrowserActivityWindowRequest[],
-  options: BrowserCollectionOptions = {},
-): Effect.Effect<BrowserActivityWindow[], unknown> =>
-  Effect.gen(function* () {
-    const browser = yield* tryDiscovery(() => findBrowserWithOptions(options));
-    if (!browser) {
-      return windows.map((window) => ({
-        ...window,
-        data: emptyBrowserData(options.selectedBrowser ?? null),
-      }));
-    }
-
-    return yield* Effect.scoped(
-      Effect.gen(function* () {
-        const db = yield* acquireCloseable(() =>
-          openDatabase(browser.historyPath),
-        );
-        return yield* tryDiscoverySync(() =>
-          windows.map((window) => ({
-            ...window,
-            data: buildBrowserDataWindow(db, browser.type, window.sinceMs),
-          })),
-        );
-      }),
-    ).pipe(
-      Effect.catch((error) =>
-        Effect.sync(() => {
-          log("Error collecting browser activity windows:", error);
-          return windows.map((window) => ({
-            ...window,
-            data: emptyBrowserData(browser.type),
-          }));
-        }),
-      ),
-    );
-  });
-
-export const collectBrowserActivityWindows = async (
-  StellaDataDir: string,
-  windows: BrowserActivityWindowRequest[],
-  options: BrowserCollectionOptions = {},
-): Promise<BrowserActivityWindow[]> =>
-  runDiscovery(
-    collectBrowserActivityWindowsEffect(StellaDataDir, windows, options),
-  );
 
 /**
  * Check if the main memory file already exists

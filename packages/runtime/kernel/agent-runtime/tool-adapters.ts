@@ -192,13 +192,6 @@ const formatToolResult = (
   };
 };
 
-// Model-visible tool text is bounded once, before the tool-result message is
-// appended to history. That exact content is then reused until compaction.
-// Dual limits match the Pi harness: 2000 lines or 50KB UTF-8, first hit wins.
-export const MODEL_VISIBLE_TOOL_RESULT_MAX_LINES = DEFAULT_MAX_LINES;
-export const MODEL_VISIBLE_TOOL_RESULT_MAX_BYTES = DEFAULT_MAX_BYTES;
-export const MODEL_VISIBLE_TOOL_RESULT_MAX_CHARS = DEFAULT_MAX_BYTES;
-
 type ModelVisibleLimits =
   | number
   | { maxBytes?: number; maxLines?: number; previewMaxBytes?: number };
@@ -610,19 +603,6 @@ export const collectVisibleDemotedTools = (
   });
 
 /**
- * Names to widen `allowedToolNames` with so code's nested dispatcher
- * (and multi_tool_use_parallel) or a provider's direct-schema fallback can
- * reach demoted tools.
- */
-export const collectDemotedToolNames = (
-  toolCatalog: readonly ToolMetadata[] | undefined,
-  connectorProvider: string | undefined,
-): string[] =>
-  collectVisibleDemotedTools(toolCatalog, connectorProvider).map(
-    (tool) => tool.name,
-  );
-
-/**
  * The code catalog for external engines: engines that build their tool
  * list through `getRuntimeToolMetadata` get the workflow text + signature
  * catalog appended to code's
@@ -645,73 +625,6 @@ export const appendDemotedCatalogToCode = (
       ? { ...tool, description: `${tool.description}${suffix}` }
       : tool,
   );
-};
-
-/** @deprecated Source-compatibility alias; only `code` is advertised. */
-export const appendDemotedCatalogToNodeRepl = appendDemotedCatalogToCode;
-
-/**
- * Provider-visible metadata with deferred-tool semantics applied.
- *
- * The metadata external engines offer: when code is active, demoted tools
- * are removed from the eager
- * function list and summarized in code's bounded catalog. Without code,
- * visible demoted tools retain their full direct schemas so a
- * profile can never strand them.
- */
-export const getProviderToolMetadata = (opts: {
-  toolsAllowlist?: string[];
-  toolCatalog?: ToolMetadata[];
-  connectorProvider?: string;
-}): ToolMetadata[] => {
-  const catalog = opts.toolCatalog ?? [];
-  const requestedNames = getRequestedRuntimeToolNames(opts.toolsAllowlist);
-  const codeAvailable =
-    requestedNames.includes(CODE_TOOL_NAME) &&
-    catalog.some((tool) => tool.name === CODE_TOOL_NAME);
-  const hasExplicitAllowlist =
-    Array.isArray(opts.toolsAllowlist) && opts.toolsAllowlist.length > 0;
-  const visibleDemotedTools = hasExplicitAllowlist
-    ? collectVisibleDemotedTools(catalog, opts.connectorProvider)
-    : [];
-  const visibleDemotedNames = new Set(
-    visibleDemotedTools.map((tool) => tool.name),
-  );
-  const eager: ToolMetadata[] = [];
-  const eagerNames = new Set<string>();
-  for (const tool of getRuntimeToolMetadata(opts)) {
-    if (tool.demoted) {
-      if (
-        !visibleDemotedNames.has(tool.name) ||
-        (codeAvailable && !toolRequiresExplicitApproval(tool.approval))
-      ) {
-        continue;
-      }
-    }
-    eager.push(tool);
-    eagerNames.add(tool.name);
-  }
-  if (codeAvailable) {
-    for (const tool of visibleDemotedTools) {
-      if (
-        eagerNames.has(tool.name) ||
-        !toolRequiresExplicitApproval(tool.approval)
-      ) {
-        continue;
-      }
-      eager.push(tool);
-      eagerNames.add(tool.name);
-    }
-  }
-  if (!codeAvailable) {
-    for (const tool of visibleDemotedTools) {
-      if (eagerNames.has(tool.name)) continue;
-      eager.push(tool);
-      eagerNames.add(tool.name);
-    }
-    return eager;
-  }
-  return appendDemotedCatalogToCode(eager, catalog, opts.connectorProvider);
 };
 
 export const extractAttachImageBlocks = async (
@@ -963,9 +876,6 @@ export const extractCodeImageBlocks = async (
   }
   return images;
 };
-
-/** @deprecated Reads both legacy `nodeRepl` and current `code` details. */
-export const extractNodeReplImageBlocks = extractCodeImageBlocks;
 
 type RuntimeToolContextArgs = {
   executionHost: "device" | "sandbox";

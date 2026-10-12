@@ -157,5 +157,3 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
   };
 };
 
-/** @deprecated Internal source-compatibility alias; the returned tool is `code`. */
-export const createNodeReplTool = createCodeTool;

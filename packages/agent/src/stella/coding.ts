@@ -8,7 +8,6 @@ import { defineExtension } from "@earendil-works/pi-durable";
 import { createBashTool, createEditTool, createReadTool, createWriteTool } from "@earendil-works/pi-durable/tools";
 
 export const STELLA_CODING_EXTENSION = "stella-coding";
-export const STELLA_CODING_TOOL_NAMES = ["Bash", "Read", "Write", "Edit"] as const;
 
 export const StellaCoding = defineExtension({
   name: STELLA_CODING_EXTENSION,

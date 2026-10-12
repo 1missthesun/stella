@@ -733,14 +733,6 @@ const applyDelete = async (
   });
 };
 
-export const extractApplyPatchTargetPaths = (patch: string): string[] =>
-  parsePatch(patch).flatMap((op) => {
-    if (op.kind === "add" || op.kind === "delete") {
-      return [op.path];
-    }
-    return op.moveTo ? [op.path, op.moveTo] : [op.path];
-  });
-
 const isPathInsideRoot = (candidate: string, root: string): boolean => {
   const relative = path.relative(root, candidate);
   return (

@@ -62,7 +62,6 @@ const truncateDescription = (value: string | undefined): string => {
 
 export {
   scoreConnectorMatch,
-  type ConnectorScoreFields,
 } from "./discovery-score.js";
 import { scoreConnectorMatch } from "./discovery-score.js";
 

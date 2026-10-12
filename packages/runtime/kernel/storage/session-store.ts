@@ -16,14 +16,10 @@ import { ChatLog } from "./chat-log.js";
 import { MessageWindowReader } from "./message-window.js";
 import { OutboxRepo } from "./outbox-repo.js";
 import {
-  EAGER_TOOL_EVENT_LIMIT,
-  EAGER_TOOL_EVENT_PAYLOAD_BYTES,
   projectLocalChatUpdateEvent,
 } from "./view.js";
 
 export {
-  EAGER_TOOL_EVENT_LIMIT,
-  EAGER_TOOL_EVENT_PAYLOAD_BYTES,
   projectLocalChatUpdateEvent,
 };
 

@@ -10,8 +10,6 @@
     "./host/index": "./host/index.ts",
     "./host/index.js": "./host/index.ts",
     "./host/remote": "./host/remote.ts",
-    "./kernel/agent-runtime/context-budget": "./kernel/agent-runtime/context-budget.ts",
-    "./kernel/agent-runtime/context-budget.js": "./kernel/agent-runtime/context-budget.ts",
     "./kernel/agent-runtime/resident-context": "./kernel/agent-runtime/resident-context.ts",
     "./kernel/agent-runtime/resident-context.js": "./kernel/agent-runtime/resident-context.ts",
     "./kernel/agent-runtime/shared": "./kernel/agent-runtime/shared.ts",

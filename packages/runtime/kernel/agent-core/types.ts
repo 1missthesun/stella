@@ -1,17 +1,10 @@
 import type {
-  AssistantMessage,
   ImageContent,
   Message,
   TextContent,
 } from "@earendil-works/pi-ai";
 import type { Static, TSchema } from "@sinclair/typebox";
 import type { StoredImageContent } from "../storage/shared.js";
-
-/** A single tool call content block emitted by an assistant message. */
-export type AgentToolCall = Extract<
-  AssistantMessage["content"][number],
-  { type: "toolCall" }
->;
 
 /**
  * Extensible interface for custom app messages.

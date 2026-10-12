@@ -53,7 +53,6 @@ export const writeComputerStdout = (value: string) => append("stdout", value);
 export const writeComputerStderr = (value: string) => append("stderr", value);
 
 export const getComputerExecutionEnv = () => context()?.env ?? process.env;
-export const getComputerExecutionCwd = () => context()?.cwd ?? process.cwd();
 export const getComputerExecutionCliPath = () => context()?.cliPath;
 export const getComputerExecutionSignal = () => context()?.signal;
 export const getComputerExecutionTimeoutMs = () => context()?.timeoutMs;

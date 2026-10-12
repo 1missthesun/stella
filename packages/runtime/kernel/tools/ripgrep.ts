@@ -103,7 +103,3 @@ export const resolveRipgrepPath = async (
   }
 };
 
-export const clearRipgrepPathCacheForTests = () => {
-  cachedRipgrepPath = null;
-  pendingResolve = null;
-};

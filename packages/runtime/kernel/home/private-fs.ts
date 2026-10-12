@@ -2,7 +2,5 @@
 // Canonical location: ../shared/private-fs.ts
 export {
   ensurePrivateDir,
-  ensurePrivateDirSync,
   writePrivateFile,
-  writePrivateFileSync,
 } from "../shared/private-fs.js";

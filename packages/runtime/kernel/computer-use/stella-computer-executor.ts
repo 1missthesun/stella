@@ -73,12 +73,8 @@ import {
 } from "./mac/ax-format.js";
 import {
   automationDaemonRequestTimeoutMs,
-  automationHostPidPath,
-  automationPidPath,
-  automationSocketPath,
   automationSocketsDir,
   parseJson,
-  recoverAutomationDaemon,
   runAutomationDaemonCommand,
   runAutomationDaemonTypedOperation,
   stopAutomationDaemon,
@@ -244,17 +240,6 @@ const withStatePath = (args: string[], statePath: string) => {
     return args;
   }
   return ["--state", statePath, ...args];
-};
-
-export const __testOnlyRecoverAutomationDaemon = (sessionId: string) => {
-  const sessionPaths = resolveSessionPaths(sessionId);
-  const pid = recoverAutomationDaemon(sessionPaths);
-  return {
-    pid,
-    pidPath: automationPidPath(sessionPaths),
-    socketPath: automationSocketPath(sessionPaths),
-    hostPidPath: automationHostPidPath(sessionPaths),
-  };
 };
 
 const ensureSnapshotArgs = (args: string[], sessionPaths: SessionPaths) => {
@@ -1758,8 +1743,6 @@ const requestDeadlineMs = (
         : configuredMs;
   return Math.max(1, Math.min(configuredMs, operationLimit));
 };
-
-export const __testOnlyComputerRequestDeadlineMs = requestDeadlineMs;
 
 export const createMacComputerUseSession = (options: {
   sessionId: string;

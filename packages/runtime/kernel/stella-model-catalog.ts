@@ -262,12 +262,6 @@ const writeCatalogToDiskEffect = (
     );
   });
 
-export const invalidateStellaModelCatalogCache = (): void => {
-  catalogCache.clear();
-  inFlightCatalogRequests.clear();
-  lastCatalogFetchAttemptAtMs.clear();
-};
-
 const getJwtCacheIdentity = (authorization: string | undefined): string => {
   if (!authorization?.startsWith("Bearer ")) {
     return "auth:none";

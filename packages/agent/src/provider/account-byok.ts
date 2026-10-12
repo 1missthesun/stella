@@ -48,7 +48,7 @@ const CATALOGS: Record<string, Catalog> = {
   "github-copilot": GITHUB_COPILOT_MODELS as unknown as Catalog,
 };
 
-export { ACCOUNT_PROVIDER_IDS, isAccountProviderId } from "@stella/contracts/backend/providers";
+export { isAccountProviderId } from "@stella/contracts/backend/providers";
 
 /** Google's OpenAI-compatible endpoint: its own adapter can't be routed through the gateway. */
 const GOOGLE_OPENAI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";

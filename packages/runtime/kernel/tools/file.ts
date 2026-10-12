@@ -93,50 +93,6 @@ export const resolveFilePath = (
   return resolvedPath;
 };
 
-export const readTextFile = async (
-  rawPath: unknown,
-  context?: ToolContext,
-): Promise<{ path: string; content: string }> => {
-  const filePath = resolveFilePath(rawPath, context);
-  const pathBlock = isBlockedPath(filePath, context);
-  if (pathBlock) {
-    throw new Error(pathBlock);
-  }
-
-  const scopedRoot = context?.toolWorkspaceRoot?.trim();
-  if (scopedRoot) {
-    try {
-      const read = await readWorkspaceFileNoFollow(
-        filePath,
-        scopedRoot,
-        MAX_FILE_BYTES,
-        context?.toolProcessIdentity
-          ? { owner: context.toolProcessIdentity }
-          : undefined,
-      );
-      return { path: read.path, content: read.bytes.toString("utf8") };
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        throw new Error(`File not found: ${filePath}`);
-      }
-      throw error;
-    }
-  }
-
-  let metadata: Awaited<ReturnType<typeof fs.stat>>;
-  try {
-    metadata = await fs.stat(filePath);
-  } catch {
-    throw new Error(`File not found: ${filePath}`);
-  }
-  if (metadata.size > MAX_FILE_BYTES) {
-    throw new Error(
-      `File too large to read safely (${metadata.size} bytes): ${filePath}`,
-    );
-  }
-  return { path: filePath, content: await fs.readFile(filePath, "utf8") };
-};
-
 // A scoped tool workspace (the cloud sandbox) writes through the same
 // no-follow boundary as apply_patch, owned by the tool identity, so the
 // tool account can read back what Write and Edit produced.

@@ -14,10 +14,8 @@
  */
 
 import {
-  Cause,
   Deferred,
   Effect,
-  Exit,
   Layer,
   ManagedRuntime,
   Schedule,
@@ -25,21 +23,6 @@ import {
 
 /** Shared runtime for every Effect run in `kernel/storage`. */
 export const storageRuntime = ManagedRuntime.make(Layer.empty);
-
-/**
- * Run a storage Effect on the shared runtime, rejecting with the ORIGINAL
- * failure object (`Cause.squash`) so facade callers see the exact error the
- * pre-Effect code would have thrown.
- */
-export const runStorageEffect = async <A>(
-  effect: Effect.Effect<A, unknown>,
-): Promise<A> => {
-  const exit = await storageRuntime.runPromiseExit(effect);
-  if (Exit.isSuccess(exit)) {
-    return exit.value;
-  }
-  throw Cause.squash(exit.cause);
-};
 
 /**
  * Fork a fixed-rate tick fiber — the Effect replacement for `setInterval`:

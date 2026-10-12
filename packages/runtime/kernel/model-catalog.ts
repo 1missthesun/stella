@@ -12,14 +12,6 @@ export const getModels = (providerId: string): Model<Api>[] =>
 
 export const getModelProviders = (): string[] => modelRuntime.getProviderIds();
 
-export const getAllModels = (): Model<Api>[] => modelRuntime.getAllModels();
-
-/** Publish the models a provider offers now (the backend's Stella models). */
-export const setManagedProviderModels = (
-  providerId: string,
-  models: readonly Model<Api>[],
-): void => modelRuntime.setManagedProviderModels(providerId, models);
-
 /**
  * Whether a user-facing model reference names a known model. Both the
  * catalog's provider namespace and the model's own provider are accepted,

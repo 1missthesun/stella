@@ -413,21 +413,6 @@ export const EXTERNAL_CONTENT_FTS_TABLES = ["entry_fts"] as const;
 export const rebuildFtsIndexSql = (table: string): string =>
   `INSERT INTO ${table}(${table}) VALUES ('rebuild');`;
 
-/**
- * Rebuild every external-content FTS index from its content table.
- * The maintenance entry point for a corrupted or manually cleared index —
- * never part of the boot path.
- */
-export const rebuildSearchIndexes = (db: SqliteDatabase): void => {
-  for (const table of EXTERNAL_CONTENT_FTS_TABLES) {
-    db.exec(rebuildFtsIndexSql(table));
-  }
-  db.prepare(
-    `INSERT INTO meta (key, value, updated_at) VALUES ('fts_ready', '1', ?)
-     ON CONFLICT(key) DO UPDATE SET value = '1', updated_at = excluded.updated_at`,
-  ).run(Date.now());
-};
-
 export const applyConnectionPragmas = (db: SqliteDatabase): void => {
   db.exec("PRAGMA journal_mode = WAL;");
   db.exec("PRAGMA synchronous = NORMAL;");

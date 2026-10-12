@@ -53,8 +53,6 @@ export const forkCancelableTimeout = (
   };
 };
 
-/** Grace between the soft SIGINT and the SIGTERM rung of the abort ladder. */
-const SIGTERM_TIMEOUT_MS = 1_500;
 /** Grace between SIGTERM and the final SIGKILL rung. */
 const SIGKILL_TIMEOUT_MS = 4_000;
 
@@ -112,30 +110,3 @@ export const killExternalCliProcess = (
   );
 };
 
-/**
- * Cooperative abort ladder: SIGINT first (the CLIs flush partial state on
- * it), then after 1.5s hand off to the SIGTERM→SIGKILL ladder. The handoff
- * fiber is deliberately not canceled on early exit —
- * `killExternalCliProcess` is a no-op on a dead child, exactly like the old
- * always-firing `setTimeout` rung.
- */
-export const abortExternalCliProcess = (
-  child: ChildProcessWithoutNullStreams,
-): void => {
-  if (externalCliProcessIsDead(child)) return;
-  try {
-    child.kill("SIGINT");
-  } catch {
-    // Ignore and fall through to SIGTERM/SIGKILL.
-  }
-
-  integrationsRuntime.runFork(
-    Effect.sleep(SIGTERM_TIMEOUT_MS).pipe(
-      Effect.flatMap(() =>
-        Effect.sync(() => {
-          killExternalCliProcess(child);
-        }),
-      ),
-    ),
-  );
-};

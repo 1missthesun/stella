@@ -7,7 +7,6 @@
 
 import {
   type LocalChatEventRecord,
-  type PersistedRuntimeThreadPayload,
 } from "./shared.js";
 
 export const EAGER_TOOL_EVENT_LIMIT = 32;
@@ -185,14 +184,3 @@ export const projectLocalChatUpdateEvent = (
 /* Message previews                                                    */
 /* ------------------------------------------------------------------ */
 
-export const THREAD_CHECKPOINT_MARKER = "[[THREAD_CHECKPOINT]]";
-
-export type ThreadMessageInput = {
-  timestamp: number;
-  threadKey: string;
-  role: "user" | "assistant" | "toolResult" | "runtimeInternal";
-  content: string;
-  toolCallId?: string;
-  payload?: PersistedRuntimeThreadPayload;
-  preservePayloadExactly?: boolean;
-};

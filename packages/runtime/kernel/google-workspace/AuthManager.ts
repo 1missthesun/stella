@@ -27,7 +27,6 @@ import {
 
 const TOKEN_KEY = "google-workspace";
 const TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
-const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000;
 
 const stellaAppDirFromProjectRoot = () => {
   const projectRoot = getProjectRoot();

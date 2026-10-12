@@ -35,7 +35,6 @@ import {
   type Harness,
   type Tx,
   type ModelRef,
-  type TaskId,
   type TaskRuntime,
   type ToolExecutionApi,
 } from "@earendil-works/pi-durable";
@@ -2159,6 +2158,4 @@ export function stellaAgents(host: StellaAgentsHost) {
   };
 }
 
-export const stellaAgentsExtension = (host: StellaAgentsHost) => stellaAgents(host).extension;
-
-export type { TaskId, EntryId };
+export type { EntryId };

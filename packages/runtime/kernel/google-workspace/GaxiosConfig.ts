@@ -29,12 +29,6 @@ export const gaxiosOptions: GaxiosOptions = {
   timeout: 30000,
 };
 
-// Extended timeout for media upload operations
-export const mediaUploadOptions: GaxiosOptions = {
-  ...gaxiosOptions,
-  timeout: 60000, // 60 seconds for media uploads
-};
-
 export function createGoogleClientOptions(
   auth: OAuth2Client,
 ): GlobalOptions {

@@ -11,7 +11,6 @@ import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { extractAttachImageBlocks } from "../agent-runtime/tool-adapters.js";
 import { executeToolWithInactivityBound } from "./tool-inactivity.js";
 import { watchChildStdio } from "../shared/child-stdio.js";
 import { trackAgentProcess } from "../shared/agent-process-registry.js";
@@ -3688,9 +3687,6 @@ export const isClaudeCodeModel = (modelId: string) =>
   modelId.trim().startsWith(CLAUDE_CODE_MODEL_PREFIX);
 export const runClaudeCodeTurn = async (request: ClaudeCodeTurnRequest) =>
   await runtime.runTurn(request);
-/** Diagnostic/test hook: is a live CLI process tracked for this session key? */
-export const claudeCodeSessionHasActiveProcess = (sessionKey: string) =>
-  runtime.hasActiveProcess(sessionKey);
 export const claudeCodeResumableSessionId = (
   sessionKey: string,
   cwd: string | undefined,
@@ -3763,7 +3759,4 @@ export const listClaudeCodeModels = async (
     return { models: [...models.values()] };
   }
   return { models: [...models.values()] };
-};
-export const shutdownClaudeCodeRuntime = () => {
-  runtime.dispose();
 };

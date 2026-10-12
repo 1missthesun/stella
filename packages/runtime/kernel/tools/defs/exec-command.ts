@@ -23,8 +23,6 @@ import {
   EXEC_COMMAND_TOOL_REPLAY,
 } from "./exec-command-def.js";
 
-export { EXEC_COMMAND_TOOL_PARAMETERS } from "./exec-command-def.js";
-
 export type ExecCommandToolOptions = {
   /**
    * Desktop hop that renders the inline "connect the Stella browser

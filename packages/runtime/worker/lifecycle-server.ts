@@ -387,13 +387,3 @@ export const removeStaleRuntimeArtifacts = async (
   }
 };
 
-export const ensureRuntimeRootDir = async (
-  stellaAppDir: string,
-): Promise<RuntimePaths> => {
-  const paths = resolveRuntimePaths(stellaAppDir);
-  await Promise.all([
-    fsPromises.mkdir(paths.rootDir, { recursive: true }),
-    ensureRuntimeIpcDir(paths),
-  ]);
-  return paths;
-};

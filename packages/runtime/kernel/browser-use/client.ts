@@ -40,9 +40,6 @@ import {
 } from "./protocol.js";
 
 export {
-  BROWSER_CHAIN_ACTIONS,
-  BROWSER_PROTOCOL_ACTIONS,
-  MAX_BROWSER_CHAIN_STEPS,
   WORKER_BOUND_BACKEND_PARAM,
   type BrowserChainAction,
   type BrowserProtocolAction,
@@ -189,9 +186,6 @@ export const BROWSER_SESSION_CLIENT_METHODS = [
   "selectBackend",
   "dispose",
 ] as const;
-
-export type BrowserSessionClientMethod =
-  (typeof BROWSER_SESSION_CLIENT_METHODS)[number];
 
 export interface BrowserSessionClient {
   command<TData = unknown>(

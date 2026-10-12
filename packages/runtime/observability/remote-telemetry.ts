@@ -545,6 +545,3 @@ export class RemoteTelemetryClient {
   }
 }
 
-export const createRemoteTelemetryClient = (
-  options: RemoteTelemetryClientOptions,
-): RemoteTelemetryClient => new RemoteTelemetryClient(options);

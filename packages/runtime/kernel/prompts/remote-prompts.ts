@@ -275,10 +275,6 @@ export const configureRemotePrompts = (options: {
 export const getRemotePromptBody = (id: string): string | undefined =>
   state.bodies.get(id);
 
-/** Revision of the loaded publication, for diagnostics. */
-export const getRemotePromptRevision = (): string | null =>
-  state.manifest?.revision ?? null;
-
 /**
  * Conditional refresh. Cheap enough to call on every turn: with a loaded
  * publication it is one `304` round trip. Never throws; a failure leaves the
@@ -325,10 +321,3 @@ export const scheduleRemotePromptRevalidation = (): void => {
   void revalidateRemotePrompts();
 };
 
-/** Wait for the initial disk cache to load (startup ordering only). */
-export const remotePromptsReady = (): Promise<void> =>
-  state.cacheLoaded ?? Promise.resolve();
-
-export const resetRemotePromptsForTests = (): void => {
-  state = createState();
-};

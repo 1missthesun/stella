@@ -77,12 +77,6 @@ type OfferGateState = {
 
 const gate: OfferGateState = { lastRefusedAt: null, inFlight: false };
 
-/** Test hook: reset the module-level offer gate. */
-export const resetBrowserExtensionOfferGate = () => {
-  gate.lastRefusedAt = null;
-  gate.inFlight = false;
-};
-
 export const isBrowserExtensionFailure = (
   command: string,
   payload: { running?: unknown; output?: unknown } | undefined,

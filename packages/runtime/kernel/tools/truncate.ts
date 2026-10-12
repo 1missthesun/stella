@@ -99,15 +99,6 @@ function replaceUnpairedSurrogates(content: string): string {
   return output;
 }
 
-export function formatSize(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes}B`;
-  } else if (bytes < 1024 * 1024) {
-    return `${(bytes / 1024).toFixed(1)}KB`;
-  }
-  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
-}
-
 function withinLimits(
   content: string,
   maxLines: number,
@@ -335,12 +326,3 @@ export function truncateStringToBytesFromStart(
   return needsReplacement ? replaceUnpairedSurrogates(output) : output;
 }
 
-export function truncateLine(
-  line: string,
-  maxChars: number = GREP_MAX_LINE_LENGTH,
-): { text: string; wasTruncated: boolean } {
-  if (line.length <= maxChars) {
-    return { text: line, wasTruncated: false };
-  }
-  return { text: `${line.slice(0, maxChars)}... [truncated]`, wasTruncated: true };
-}

@@ -51,7 +51,6 @@ import {
 } from "@stella/contracts/user-ask";
 
 type AgentEngine = AgentRuntimeEngine;
-export { DEFAULT_CODEX_MODEL } from "@stella/contracts/agent-engine";
 export const DEFAULT_CLAUDE_CODE_MODEL = "default";
 export type ReasoningEffort = ReasoningEffortLevel;
 export type ImageGenerationProvider =
@@ -66,15 +65,8 @@ export type ImageGenerationPreferences = {
 };
 
 export type {
-  RealtimeVoiceProvider,
   RealtimeVoiceUnderlyingProvider,
-  RealtimeVoiceSelections,
   RealtimeVoicePreferences,
-  ReadAloudVoiceProvider,
-} from "@stella/contracts/local-preferences";
-export {
-  resolveRealtimeUnderlyingProvider,
-  resolveReadAloudProvider,
 } from "@stella/contracts/local-preferences";
 
 export type LocalPreferences = {
@@ -581,10 +573,6 @@ export const getSubscriptionHarnessEnabled = (
   return false;
 };
 
-export const getMaxAgentConcurrency = (stellaDataDir: string): number => {
-  return loadLocalPreferences(stellaDataDir).maxAgentConcurrency;
-};
-
 export const getImageGenerationPreferences = (
   stellaDataDir: string,
 ): ImageGenerationPreferences => {
@@ -719,10 +707,6 @@ export const getPreventComputerSleep = (stellaDataDir: string): boolean => {
   return loadLocalPreferences(stellaDataDir).preventComputerSleep;
 };
 
-export const getLockedComputerUseEnabled = (stellaDataDir: string): boolean => {
-  return loadLocalPreferences(stellaDataDir).lockedComputerUseEnabled;
-};
-
 export const getSoundNotificationsEnabled = (
   stellaDataDir: string,
 ): boolean => {
@@ -834,30 +818,6 @@ export const setPromptPresetSelection = (
   saveLocalPreferences(stellaDataDir, {
     ...prefs,
     promptPresetSelections: selections,
-  });
-};
-
-export const getChronicleEnabled = (stellaDataDir: string): boolean => {
-  return loadLocalPreferences(stellaDataDir).chronicleEnabled;
-};
-
-export const getChroniclePendingEnable = (stellaDataDir: string): boolean => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  return (
-    prefs.chronicleEnabled !== true && prefs.chroniclePendingEnable === true
-  );
-};
-
-export const setChronicleMemoryPreference = (
-  stellaDataDir: string,
-  value: { enabled: boolean; pendingEnable?: boolean },
-): void => {
-  const prefs = loadLocalPreferences(stellaDataDir);
-  saveLocalPreferences(stellaDataDir, {
-    ...prefs,
-    chronicleEnabled: value.enabled,
-    chroniclePendingEnable:
-      value.enabled === true ? false : value.pendingEnable === true,
   });
 };
 

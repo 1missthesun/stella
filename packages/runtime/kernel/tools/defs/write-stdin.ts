@@ -27,8 +27,6 @@ import {
   WRITE_STDIN_TOOL_REPLAY,
 } from "./write-stdin-def.js";
 
-export { WRITE_STDIN_TOOL_PARAMETERS } from "./write-stdin-def.js";
-
 export type WriteStdinToolOptions = {
   /** See `ExecCommandToolOptions.requestBrowserExtensionConnect`. */
   requestBrowserExtensionConnect?: BrowserExtensionConnectRequester;

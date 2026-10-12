@@ -7,14 +7,6 @@ export type SpawnDestination =
   | { kind: "cloud" }
   | { kind: "device"; deviceId: string };
 
-/** Blank means where the caller runs; any other value names a device. */
-export const parseSpawnDestination = (value: unknown): SpawnDestination => {
-  const text = typeof value === "string" ? value.trim() : "";
-  if (!text) return { kind: "here" };
-  if (text.toLowerCase() === "cloud") return { kind: "cloud" };
-  return { kind: "device", deviceId: text };
-};
-
 export const SPAWN_AGENT_TOOL_DESCRIPTOR = {
   name: "spawn_agent",
   description:
@@ -109,20 +101,6 @@ export const AGENT_STATUS_TOOL_DESCRIPTOR = {
   },
 } as const;
 
-export const AGENT_ORCHESTRATION_TOOL_DESCRIPTORS = [
-  SPAWN_AGENT_TOOL_DESCRIPTOR,
-  SEND_MESSAGE_TOOL_DESCRIPTOR,
-  PAUSE_AGENT_TOOL_DESCRIPTOR,
-  AGENT_STATUS_TOOL_DESCRIPTOR,
-] as const;
-
-export const AGENT_ORCHESTRATION_TOOL_NAMES: readonly string[] = [
-  "spawn_agent",
-  "send_message",
-  "pause_agent",
-  "agent_status",
-];
-
 /**
  * The orchestration tools an agent at the depth limit loses. It keeps
  * agent_status and send_message, so it can still see and message others.
@@ -132,19 +110,3 @@ export const AGENT_CONTROL_TOOL_NAMES: readonly string[] = [
   "pause_agent",
 ];
 
-/**
- * Replay policies (`ToolReplayPolicy` in ../types.ts) shared by every host.
- * `spawn_agent` is per host: the cloud derives the child's thread and turn
- * ids from the tool call id (keyed), the desktop's local spawn mints a random
- * thread key (unsafe), so each host declares its own.
- */
-/** A status snapshot; no effect. */
-export const AGENT_STATUS_TOOL_REPLAY = "safe" as const;
-/** Pausing an agent that is already paused or finished is a no-op. */
-export const PAUSE_AGENT_TOOL_REPLAY = "safe" as const;
-/**
- * A steer is keyed by an id derived from the tool call, but the receiver
- * deletes the mailbox row once it consumes it, so a rerun after consumption
- * delivers the message twice.
- */
-export const SEND_MESSAGE_TOOL_REPLAY = "unsafe" as const;

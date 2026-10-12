@@ -59,19 +59,3 @@ export const toGoogleWorkspaceToolRegistrationName = (
   name: string,
 ): string => canonicalizeGoogleWorkspaceToolName(name).replace(/\./g, "_");
 
-export const getGoogleWorkspaceToolAliases = (name: string): string[] => {
-  const canonicalName = canonicalizeGoogleWorkspaceToolName(name);
-  return Array.from(
-    new Set([
-      canonicalName,
-      toGoogleWorkspaceToolRegistrationName(canonicalName),
-    ]),
-  );
-};
-
-const ALLOWLIST_SET = new Set<string>(
-  GOOGLE_WORKSPACE_TOOL_ALLOWLIST.map(canonicalizeGoogleWorkspaceToolName),
-);
-
-export const isAllowedGoogleWorkspaceTool = (name: string): boolean =>
-  ALLOWLIST_SET.has(canonicalizeGoogleWorkspaceToolName(name));

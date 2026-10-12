@@ -100,11 +100,9 @@ export const truncate = (
 // Edit-diff utilities live in a dependency-free module (shared with workerd).
 export {
   detectLineEnding,
-  fuzzyFindText,
   normalizeToLF,
   restoreLineEndings,
   stripBom,
-  type FuzzyMatchResult,
 } from "./edit-diff.js";
 
 // Directory utilities
@@ -174,26 +172,6 @@ export const readFileSafe = async (filePath: string) => {
   }
 };
 
-export const formatWithLineNumbers = (content: string, offset = 1, limit = 2000) => {
-  const lines = content.split("\n");
-  const startLine = Math.max(0, offset - 1);
-  const endLine = Math.min(lines.length, startLine + limit);
-  const selected = lines.slice(startLine, endLine);
-
-  const body = selected
-    .map((line, index) => {
-      const lineNum = startLine + index + 1;
-      const truncatedLine = line.length > 2000 ? `${line.slice(0, 2000)}...` : line;
-      return `${String(lineNum).padStart(6, " ")}\t${truncatedLine}`;
-    })
-    .join("\n");
-
-  return {
-    header: `File has ${lines.length} lines. Showing ${startLine + 1}-${endLine}.`,
-    body,
-  };
-};
-
 export const loadJson = async <T>(filePath: string, fallback: T) => {
   try {
     const raw = await fs.readFile(filePath, "utf-8");
@@ -201,11 +179,6 @@ export const loadJson = async <T>(filePath: string, fallback: T) => {
   } catch {
     return fallback;
   }
-};
-
-export const saveJson = async (filePath: string, value: unknown) => {
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(value, null, 2), "utf-8");
 };
 
 const getDefaultSecretStateRoot = () => {

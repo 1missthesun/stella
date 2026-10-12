@@ -84,22 +84,6 @@ let cachedCatalog: readonly OAuthCatalogProvider[] | null = null;
 let cachedSummaries: readonly OAuthCatalogProviderSummary[] | null = null;
 const cachedToolsById = new Map<string, readonly OAuthCatalogTool[]>();
 
-/**
- * Lazily load and memoize the full OAuth provider catalog (one ~12MB
- * JSON.parse, retained for the process lifetime). Runtime paths should use
- * `getOAuthProviderSummaries` / `getOAuthCatalogProviderTools` instead so a
- * worker never retains the whole catalog; this stays for scripts and tests.
- */
-export const getOAuthProviderCatalog = (): readonly OAuthCatalogProvider[] => {
-  if (cachedCatalog) {
-    return cachedCatalog;
-  }
-  cachedCatalog = readCatalogAsset<OAuthCatalogProvider[]>(
-    CATALOG_JSON_BASENAME,
-  );
-  return cachedCatalog;
-};
-
 /** Memoized provider summaries from the small generated sidecar. */
 export const getOAuthProviderSummaries =
   (): readonly OAuthCatalogProviderSummary[] => {

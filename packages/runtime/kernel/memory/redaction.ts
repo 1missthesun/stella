@@ -81,5 +81,3 @@ export const redactMemoryText = (text: string): string =>
       ),
   );
 
-export const redactMemoryStringArray = (items: string[]): string[] =>
-  items.map(redactMemoryText);

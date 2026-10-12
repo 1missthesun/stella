@@ -143,10 +143,6 @@ const collectSafariHistoryEffect: Effect.Effect<
   );
 });
 
-export const collectSafariHistory = async (): Promise<
-  { domain: string; visits: number }[]
-> => runDiscovery(collectSafariHistoryEffect);
-
 // ---------------------------------------------------------------------------
 // Safari Bookmarks
 // ---------------------------------------------------------------------------
@@ -240,9 +236,6 @@ const collectSafariBookmarksEffect: Effect.Effect<BookmarkEntry[]> =
       ),
     );
   });
-
-export const collectSafariBookmarks = async (): Promise<BookmarkEntry[]> =>
-  runDiscovery(collectSafariBookmarksEffect);
 
 // ---------------------------------------------------------------------------
 // Main Collection

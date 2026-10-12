@@ -417,26 +417,6 @@ export const settleImageOperation = (args: {
   }
 };
 
-export const markImageOperationDelivered = (args: {
-  stellaDataDir?: string;
-  conversationId: string;
-  toolCallId: string;
-}): void => {
-  if (!args.stellaDataDir) return;
-  const db = openDatabase(args.stellaDataDir);
-  try {
-    db.prepare(
-      `UPDATE image_tool_operations SET delivered_at = ?, updated_at = ?
-       WHERE operation_id = (
-         SELECT operation_id FROM image_tool_operation_aliases
-         WHERE conversation_id = ? AND tool_call_id = ?
-       ) AND state != 'pending'`,
-    ).run(Date.now(), Date.now(), args.conversationId, args.toolCallId);
-  } finally {
-    db.close();
-  }
-};
-
 export const pruneImageOperationLedger = (args: {
   stellaDataDir: string;
   deliveredBefore?: number;

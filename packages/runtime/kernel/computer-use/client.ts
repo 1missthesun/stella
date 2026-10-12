@@ -12,7 +12,6 @@ import {
   type ComputerUseTarget,
 } from "./contract.js";
 import {
-  createCliDiagnosticsComputerUseSession,
   type CliDiagnosticsComputerUseSessionOptions,
 } from "./cli-diagnostics-session.js";
 import {
@@ -707,22 +706,3 @@ export const createSkyClient = (options: CreateSkyClientOptions): SkyClient => {
   return Object.freeze(methods);
 };
 
-export const createSkyClientForCliDiagnostics = (
-  options: CreateSkyClientDiagnosticsOptions,
-): SkyClient =>
-  createSkyClient({
-    sessionId: options.sessionId,
-    session: createCliDiagnosticsComputerUseSession({
-      cliPath: options.cliPath,
-      cwd: options.cwd,
-      runner: options.runner,
-      env: options.env,
-      signal: options.signal,
-      getSignal: options.getSignal,
-      commandTimeoutMs: options.commandTimeoutMs,
-      maxOutputBytes: options.maxOutputBytes,
-    }),
-    signal: options.signal,
-    getSignal: options.getSignal,
-    authorizeApp: options.authorizeApp,
-  });

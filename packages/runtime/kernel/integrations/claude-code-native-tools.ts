@@ -129,10 +129,6 @@ export const withoutToolsReplacedByNative = <
   return tools.filter((tool) => !replaced.has(tool.name));
 };
 
-/** MCP tools are `mcp__<server>__<name>`; everything else is a CLI built-in. */
-export const isClaudeCodeNativeToolName = (toolName: string): boolean =>
-  !toolName.startsWith("mcp__");
-
 /**
  * A session's built-ins and Stella MCP tools: the role's built-ins, unless
  * the host runs the CLI with none (`builtinsOff`).

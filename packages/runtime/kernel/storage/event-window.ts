@@ -55,9 +55,3 @@ export const filterLocalChatEventWindow = <T extends LocalContextEvent>(
     : matched;
 };
 
-/** Window over an already-read event list (tests, hosts without SQL). */
-export const createListedLocalChatEventWindow = (
-  events: readonly LocalContextEvent[],
-): LocalChatEventWindow => ({
-  query: (query) => filterLocalChatEventWindow(events, query),
-});

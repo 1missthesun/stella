@@ -54,13 +54,6 @@ export class WorkerRequestError extends Data.TaggedError(
   "@stella/runtime/worker/WorkerRequestError",
 )<{ readonly message: string }> {}
 
-/** Union used by the session-guard table in rpc.ts. */
-export type SessionMissingError =
-  | WorkerNotInitializedError
-  | RunnerUnavailableError
-  | ChatStoreUnavailableError
-  | VoiceUnavailableError;
-
 /**
  * Recover the original failure from a Cause so the JSON-RPC adapter rethrows
  * the same object the handler failed with (tagged error, runner error, …).

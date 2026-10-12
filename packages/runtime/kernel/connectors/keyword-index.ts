@@ -244,11 +244,6 @@ type CachedIndexState = {
 
 let cachedIndex: CachedIndexState | null = null;
 
-/** Test hook. */
-export const resetConnectorKeywordIndexCache = () => {
-  cachedIndex = null;
-};
-
 export const getConnectorKeywordIndex = async (
   stellaDataDir: string,
 ): Promise<ConnectorKeywordIndex> => {

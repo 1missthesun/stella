@@ -5,7 +5,6 @@ import path from "node:path";
 import { Effect } from "effect";
 
 import { ensurePrivateDir } from "../shared/private-fs.js";
-import { runHomeEffect } from "./effect-run.js";
 
 /**
  * Reusable hash-history reconciliation of bundled entries into Stella home.
@@ -343,15 +342,6 @@ export const reconcileBundledEntriesEffect = (
     return { actions };
   });
 
-/** Plain-Promise facade preserved for existing callers. */
-export const reconcileBundledEntries = (
-  bundledDir: string,
-  homeDir: string,
-  adapter: BundledEntryAdapter,
-  options: BundledSyncOptions = {},
-): Promise<BundledSyncReport> =>
-  runHomeEffect(reconcileBundledEntriesEffect(bundledDir, homeDir, adapter, options));
-
 export const summarizeBundledSync = (report: BundledSyncReport): string => {
   const tally = {
     seeded: 0,
@@ -509,56 +499,3 @@ export const createDirectoryEntryAdapter = (
   },
 });
 
-/**
- * Adapter for entries that are single files with a fixed extension (e.g.
- * agent prompts as `<id>.md`). Ids are basenames without the extension.
- */
-export const createFileEntryAdapter = (
-  extension: string,
-): BundledEntryAdapter => {
-  const fileName = (id: string) => `${id}${extension}`;
-  return {
-    listIds: async (dir) => {
-      let entries;
-      try {
-        entries = await fs.readdir(dir, { withFileTypes: true });
-      } catch {
-        return [];
-      }
-      return entries
-        .filter(
-          (entry) =>
-            entry.isFile() &&
-            !entry.name.startsWith(".") &&
-            entry.name.endsWith(extension),
-        )
-        .map((entry) => entry.name.slice(0, -extension.length))
-        .sort((a, b) => a.localeCompare(b));
-    },
-    hash: async (dir, id) => {
-      const filePath = path.join(dir, fileName(id));
-      let content: Buffer;
-      try {
-        content = await fs.readFile(filePath);
-      } catch {
-        return null;
-      }
-      return createHash("sha256").update(content).digest("hex");
-    },
-    copy: async (srcDir, destDir, id) => {
-      await ensurePrivateDir(destDir);
-      const target = path.join(destDir, fileName(id));
-      const temp = `${target}.tmp-${process.pid}-${Date.now()}`;
-      await fs.copyFile(path.join(srcDir, fileName(id)), temp);
-      try {
-        await fs.rename(temp, target);
-      } catch (error) {
-        await fs.rm(temp, { force: true }).catch(() => {});
-        throw error;
-      }
-    },
-    remove: async (dir, id) => {
-      await fs.rm(path.join(dir, fileName(id)), { force: true });
-    },
-  };
-};

@@ -1,9 +1,3 @@
-import type {
-  AgentIdLike,
-  AgentRunFinishOutcome,
-  AgentStreamEventType,
-} from "@stella/contracts/agent-runtime";
-import type { RuntimeAgentEventPayload } from "@stella/contracts/protocol";
 import type { createStellaHostRunner } from "../../kernel/runner.js";
 
 /**
@@ -25,45 +19,6 @@ export type WorkerInitializationState = {
 };
 
 export type RuntimeRunner = ReturnType<typeof createStellaHostRunner>;
-
-export type AgentEventPayload = {
-  type: AgentStreamEventType;
-  runId: string;
-  seq: number;
-  conversationId?: string;
-  requestId?: string;
-  userMessageId?: string;
-  uiVisibility?: "visible" | "hidden";
-  chunk?: string;
-  statusState?:
-    | "running"
-    | "compacting"
-    | "engine-compacting"
-    | "provider-retry"
-    | "model-fallback";
-  toolCallId?: string;
-  toolName?: string;
-  args?: Record<string, unknown>;
-  resultPreview?: string;
-  details?: unknown;
-  error?: string;
-  fatal?: boolean;
-  finalText?: string;
-  persisted?: boolean;
-  agentId?: string;
-  agentType?: AgentIdLike;
-  rootRunId?: string;
-  description?: string;
-  parentAgentId?: string;
-  result?: string;
-  statusText?: string;
-  outcome?: AgentRunFinishOutcome;
-  reason?: string;
-  replacedByRunId?: string;
-  responseTarget?: RuntimeAgentEventPayload["responseTarget"];
-  assistantMessageEventId?: string;
-  assistantMessageText?: string;
-};
 
 export type ConnectCardOutcome =
   | { ok: true; status: "connected" | "already_connected" }

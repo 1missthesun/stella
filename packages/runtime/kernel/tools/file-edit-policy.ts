@@ -56,37 +56,3 @@ export const getFileEditToolFamily = (args: {
   return isOpenAiAuthoredModel(args.model) ? "apply_patch" : "write_edit";
 };
 
-export const rewriteFileEditToolNames = (
-  toolNames: readonly string[] | undefined,
-  family: FileEditToolFamily,
-): string[] | undefined => {
-  if (!Array.isArray(toolNames)) {
-    return undefined;
-  }
-  const rewritten: string[] = [];
-  const seen = new Set<string>();
-  const add = (toolName: string) => {
-    if (seen.has(toolName)) return;
-    seen.add(toolName);
-    rewritten.push(toolName);
-  };
-
-  for (const toolName of toolNames) {
-    if (family === "write_edit" && toolName === APPLY_PATCH_TOOL_NAME) {
-      for (const replacement of WRITE_EDIT_TOOL_NAMES) {
-        add(replacement);
-      }
-      continue;
-    }
-    if (
-      family === "apply_patch" &&
-      (toolName === WRITE_TOOL_NAME || toolName === EDIT_TOOL_NAME)
-    ) {
-      add(APPLY_PATCH_TOOL_NAME);
-      continue;
-    }
-    add(toolName);
-  }
-
-  return rewritten;
-};

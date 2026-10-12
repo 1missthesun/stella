@@ -542,11 +542,6 @@ const getSession = (stellaAppDir: string, server: ConnectorCommandConfig) => {
   return session;
 };
 
-export const listConnectorBridgeTools = async (
-  stellaAppDir: string,
-  server: ConnectorCommandConfig,
-) => getSession(stellaAppDir, server).listTools();
-
 export type ConnectorBridgeProbe = {
   tools: ConnectorToolInfo[];
   /** Server-provided usage guidance from the MCP `initialize` response. */

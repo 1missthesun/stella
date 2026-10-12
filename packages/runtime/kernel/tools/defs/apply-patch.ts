@@ -20,8 +20,6 @@ import {
   APPLY_PATCH_TOOL_REPLAY,
 } from "./apply-patch-def.js";
 
-export { APPLY_PATCH_TOOL_PARAMETERS } from "./apply-patch-def.js";
-
 export const applyPatchTool: ToolDefinition = {
   name: APPLY_PATCH_TOOL_NAME,
   replay: APPLY_PATCH_TOOL_REPLAY,

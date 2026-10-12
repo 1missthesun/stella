@@ -5,10 +5,6 @@
  * Worker executor for that name.
  */
 
-import { CODE_TOOL_NAME } from "../code-tool.js";
-
-export { CODE_TOOL_NAME };
-
 /** Shared by the device and cloud `code` descriptions. */
 export const CODE_TOOL_HISTORY_SENTENCE =
   "history: await history.search(text, { kinds, limit, order }) finds messages and agent reports in this conversation's whole history, await history.sql(query, params) runs one read-only SELECT over it, and await history.read(fromSeq, toSeq) returns its full records for a seq range.";

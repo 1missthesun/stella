@@ -25,41 +25,13 @@ import type { AllUserSignalsResult } from "./types.js";
 import type { DiscoveryCategory } from "@stella/contracts/discovery";
 import type {
   DiscoveryCollectionOptions,
-  ExtendedUserSignals,
 } from "./service.js";
 
-export type { DiscoveryCollectionOptions, ExtendedUserSignals };
-
-const discovery = DiscoveryService.make();
+export type { DiscoveryCollectionOptions };
 
 // ---------------------------------------------------------------------------
 // Main Collection
 // ---------------------------------------------------------------------------
-
-/**
- * Collect all user signals, filtered by selected categories.
- * When `selectedBrowser` is provided, only that browser's collectors run
- * (skips Firefox, Safari, and generic bookmarks scan for other browsers).
- */
-export const collectAllUserSignals = async (
-  StellaDataDir: string,
-  categories: DiscoveryCategory[] = DiscoveryService.DEFAULT_CATEGORIES,
-  selectedBrowser?: string | null,
-  selectedProfile?: string | null,
-  options?: DiscoveryCollectionOptions,
-): Promise<ExtendedUserSignals> =>
-  runDiscovery(
-    Effect.gen(function* () {
-      const service = yield* DiscoveryService.Service;
-      return yield* service.collectAllUserSignals(
-        StellaDataDir,
-        categories,
-        selectedBrowser,
-        selectedProfile,
-        options,
-      );
-    }).pipe(Effect.provide(DiscoveryService.layer)),
-  );
 
 // ---------------------------------------------------------------------------
 // IPC Handler Helper

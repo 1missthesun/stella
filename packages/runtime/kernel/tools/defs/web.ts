@@ -23,10 +23,6 @@ import {
   WEB_TOOL_REPLAY,
 } from "./web-def.js";
 
-// Re-export the model-visible schema so tool-host consumers (and tests) can
-// import the canonical parameters from the executable tool module too.
-export { WEB_TOOL_PARAMETERS } from "./web-def.js";
-
 export type WebToolOptions = {
   webSearch?: WebSearchCapability;
 };

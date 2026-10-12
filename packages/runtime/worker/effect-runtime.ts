@@ -12,31 +12,14 @@
  */
 
 import {
-  Cause,
   Deferred,
   Effect,
-  Exit,
   Layer,
   ManagedRuntime,
 } from "effect";
 
 /** Shared runtime for every Effect run in the worker's top-level plumbing. */
 export const workerRuntime = ManagedRuntime.make(Layer.empty);
-
-/**
- * Run a worker-plumbing Effect on the shared runtime, rejecting with the
- * ORIGINAL failure object (`Cause.squash`) so facade callers see the exact
- * error the pre-Effect code would have thrown.
- */
-export const runWorkerEffect = async <A>(
-  effect: Effect.Effect<A, unknown>,
-): Promise<A> => {
-  const exit = await workerRuntime.runPromiseExit(effect);
-  if (Exit.isSuccess(exit)) {
-    return exit.value;
-  }
-  throw Cause.squash(exit.cause);
-};
 
 /** Cancellation handle for a forked timer fiber. Cancel is idempotent and
  * a no-op once the timer has fired (matching `clearTimeout`). */

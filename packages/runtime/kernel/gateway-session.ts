@@ -94,13 +94,6 @@ export const getRememberedStellaGatewayOrigin = (
 ): string | null =>
   siteBaseUrl ? (knownGatewayOrigins.get(siteKey(siteBaseUrl)) ?? null) : null;
 
-/** Test seam: forget every remembered origin and cached capability. */
-export const resetGatewaySessionState = (): void => {
-  knownGatewayOrigins.clear();
-  capabilityCache.clear();
-  inFlightExchanges.clear();
-};
-
 // ---------------------------------------------------------------------------
 // Session capability cache
 // ---------------------------------------------------------------------------

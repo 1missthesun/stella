@@ -1,11 +1,9 @@
 import {
   RPC_ERROR_CODES,
-  type JsonRpcMessage,
 } from "@stella/contracts/protocol";
 import {
   JsonRpcPeer,
   RpcError,
-  type JsonRpcPeer as JsonRpcPeerInstance,
 } from "@stella/contracts/protocol/rpc-peer";
 import { forkDelayed } from "./effect-runtime.js";
 
@@ -274,4 +272,3 @@ export class WorkerPeerBroker {
   }
 }
 
-export type { JsonRpcPeerInstance, JsonRpcMessage };

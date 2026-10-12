@@ -24,12 +24,6 @@ import { getConnectorStateRoot } from "./state.js";
 import type { ConnectorToolInfo } from "./types.js";
 
 export type NativeConnectorAvailability = "ready";
-export type NativeConnectorOAuthSetupStatus =
-  | "ready"
-  | "local_implementation_incomplete"
-  | "missing_oauth_app"
-  | "missing_backend_exchange"
-  | "missing_callback_bridge";
 
 export type NativeConnectorCatalogEntry = {
   id: string;

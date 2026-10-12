@@ -74,9 +74,6 @@ type ResidentBlock = {
   renderDiskBody?: (raw: string) => string | undefined;
   changeReminder?: (context: ResidentContext) => string;
 };
-type ResidentFoldDoc = { customType: string; text: string };
-type ResidentFold = { docs: ResidentFoldDoc[] };
-type ResidentMemoryField = "mainMemory";
 
 export const BOOTSTRAP_STARTUP_DOC_CUSTOM_TYPE = "bootstrap.startup_doc";
 export const BOOTSTRAP_SKILLS_CUSTOM_TYPE = "bootstrap.skills_catalog";
@@ -88,21 +85,6 @@ export const BOOTSTRAP_SKILLS_CUSTOM_TYPE = "bootstrap.skills_catalog";
  * been re-rendered.
  */
 export const CONTEXT_DELTA_CUSTOM_TYPE_PREFIX = "runtime.context_delta.";
-
-/**
- * Marker inside the synthetic entryIds of fold-materialized doc messages
- * (`<overlayEntryId>::resident:<n>`). These entries exist only in the
- * materialized view — compaction span boundaries must never land on one.
- */
-export const RESIDENT_FOLD_ENTRY_ID_MARKER = "::resident:";
-
-/**
- * Marker inside the synthetic entryId of the pinned latest-user-instruction
- * message a compaction overlay re-emits right after its checkpoint
- * (`<overlayEntryId>::pinned-instruction`). Exists only in the materialized
- * view — compaction span boundaries must never land on it.
- */
-export const PINNED_INSTRUCTION_ENTRY_ID_MARKER = "::pinned-instruction";
 
 export const LIFE_PERSONALITY_DISPLAY_PATH = "~/.stella/PERSONALITY.md";
 export const RETIRED_MEMORY_DISPLAY_PATHS = [
@@ -237,26 +219,6 @@ export const RESIDENT_MEMORY_DISPLAY_PATHS: string[] = [
   MAIN_MEMORY_DISPLAY_PATH,
 ];
 
-const MEMORY_FIELD_BY_DISPLAY_PATH = new Map<string, ResidentMemoryField>([
-  [MAIN_MEMORY_DISPLAY_PATH, "mainMemory"],
-]);
-
-/**
- * The resident memory fields from a host's documents, keyed by the display
- * path the model sees (`~/.stella/memories/main.md`). Documents at any
- * other path are not resident; they are read on demand.
- */
-export const residentMemoryFromDocs = (
-  docs: ReadonlyArray<{ displayPath: string; content: string }>,
-): Pick<ResidentContext, ResidentMemoryField> => {
-  const fields: Pick<ResidentContext, ResidentMemoryField> = {};
-  for (const doc of docs) {
-    const field = MEMORY_FIELD_BY_DISPLAY_PATH.get(doc.displayPath);
-    if (field && doc.content.trim()) fields[field] = doc.content;
-  }
-  return fields;
-};
-
 export const customMessageContentText = (
   content: CustomMessage["content"],
 ): string => {
@@ -347,17 +309,12 @@ export const buildResidentContextMessages = (
 };
 
 const STARTUP_DOC_PATH_RE = /^<startup_doc path="([^"]+)">/;
-const STARTUP_DOC_BODY_RE =
-  /^<startup_doc path="[^"]+">\n([\s\S]*)\n<\/startup_doc>$/;
 
 /** Display path from a rendered `<startup_doc>` body, or null. */
 export const parseStartupDocPath = (text: string): string | null => {
   const match = STARTUP_DOC_PATH_RE.exec(text.trim());
   return match?.[1] ?? null;
 };
-
-const parseStartupDocBody = (text: string) =>
-  STARTUP_DOC_BODY_RE.exec(text.trim())?.[1] ?? null;
 
 /**
  * Stable fold identity for a persisted resident-block custom message:
@@ -383,175 +340,3 @@ export const residentIdentityForCustomMessage = (
   return null;
 };
 
-const blockByDocIdentity = new Map<string, ResidentBlock>(
-  RESIDENT_BLOCKS.filter((block) => block.docPath).map((block) => [
-    `doc:${block.docPath}`,
-    block,
-  ]),
-);
-
-const canonicalizeInThreadDocText = (identity: string, text: string) => {
-  const block = blockByDocIdentity.get(identity);
-  if (!block?.docPath || !block.renderDiskBody) return text;
-  const body = parseStartupDocBody(text);
-  const canonicalBody = body === null ? undefined : block.renderDiskBody(body);
-  return canonicalBody
-    ? buildStartupDocText(block.docPath, canonicalBody)
-    : text;
-};
-
-/** Upper bound on folded docs; guards against a pathological thread. */
-const MAX_FOLD_DOCS = 16;
-
-/**
- * Compaction-time fold plan. Scans the materialized thread for resident
- * blocks (newest copy wins per identity — this is what heals legacy threads
- * that accumulated duplicate appends), then re-renders registered docs from
- * current disk state where possible:
- *
- *   - personality and main memory re-read their files through
- *     the host's `readDiskFile` (memory docs only when
- *     `refreshMemoryDocsFromDisk`), falling back to the newest in-thread
- *     copy when the file is missing/empty;
- *   - the skills block keeps the newest in-thread copy — its render options
- *     (engine-specific omissions) are unknown at compaction time, and the
- *     per-turn delta path re-appends a fresh catalog next turn if disk
- *     state drifted.
- *
- * Returns `{ docs: [{ customType, text }] }` in canonical head order (plus
- * unknown legacy docs in first-seen order), or null when the thread has no
- * resident blocks. The result rides the compaction entry's `details` and is
- * applied by the overlay materializer in `storage/session-store.js`.
- */
-export const buildResidentFold = (args: {
-  messages: readonly HistoryEntry[];
-  /** Reads a data-dir-relative file (e.g. `memories/main.md`), or null. */
-  readDiskFile?: (relativePath: string) => string | null;
-  refreshMemoryDocsFromDisk?: boolean;
-  /** Fresh values for boundary-only blocks; without one, the block is dropped. */
-  fresh?: Pick<ResidentContext, "agentRoster">;
-}): ResidentFold | null => {
-  const newestByIdentity = new Map<string, ResidentFoldDoc>();
-  const firstSeenOrder: string[] = [];
-  for (const message of args.messages) {
-    if (message.role !== "runtimeInternal" || !message.customMessage) {
-      continue;
-    }
-    if (isRetiredMemoryCustomMessage(message.customMessage)) continue;
-    const identity = residentIdentityForCustomMessage(message.customMessage);
-    if (!identity) continue;
-    if (!newestByIdentity.has(identity)) {
-      firstSeenOrder.push(identity);
-    }
-    newestByIdentity.set(identity, {
-      customType: message.customMessage.customType,
-      text: customMessageContentText(message.customMessage.content).trim(),
-    });
-  }
-  const freshText = (block: ResidentBlock) => {
-    const text = args.fresh
-      ? renderResidentBlockText(block, args.fresh)
-      : undefined;
-    return text?.trim() || undefined;
-  };
-  const boundaryDocs = RESIDENT_BLOCKS.filter((block) => block.boundaryOnly);
-  if (
-    newestByIdentity.size === 0 &&
-    !boundaryDocs.some((block) => freshText(block))
-  ) {
-    return null;
-  }
-
-  const readDiskFile = args.readDiskFile;
-  const refreshMemoryDocs = args.refreshMemoryDocsFromDisk === true;
-  const docs: ResidentFoldDoc[] = [];
-  const emitted = new Set<string>();
-  const emit = (identity: string) => {
-    if (emitted.has(identity) || docs.length >= MAX_FOLD_DOCS) return;
-    const boundaryBlock = blockByDocIdentity.get(identity);
-    if (boundaryBlock?.boundaryOnly) {
-      emitted.add(identity);
-      const text = freshText(boundaryBlock);
-      if (text) docs.push({ customType: boundaryBlock.customType, text });
-      return;
-    }
-    const inThread = newestByIdentity.get(identity);
-    if (!inThread?.text) return;
-    const block = blockByDocIdentity.get(identity);
-    let text = canonicalizeInThreadDocText(identity, inThread.text);
-    if (
-      block?.diskFile &&
-      block.renderDiskBody &&
-      readDiskFile &&
-      (!block.memoryDoc || refreshMemoryDocs)
-    ) {
-      const raw = readDiskFile(block.diskFile);
-      const body = raw === null ? undefined : block.renderDiskBody(raw);
-      if (body) {
-        text = buildStartupDocText(block.docPath!, body);
-      }
-    }
-    emitted.add(identity);
-    docs.push({ customType: inThread.customType, text });
-  };
-
-  // Canonical order first, then unknown legacy identities as encountered.
-  for (const block of RESIDENT_BLOCKS) {
-    emit(block.docPath ? `doc:${block.docPath}` : "skills");
-  }
-  for (const identity of firstSeenOrder) {
-    emit(identity);
-  }
-  return docs.length > 0 ? { docs } : null;
-};
-
-/**
- * Validate a `residentFold` recovered from a persisted compaction entry's
- * `details`. Returns `{ docs, identities }` or null when malformed.
- */
-export const parseResidentFold = (
-  details: unknown,
-): (ResidentFold & { identities: Set<string> }) | null => {
-  const fold =
-    details && typeof details === "object" && !Array.isArray(details)
-      ? (details as { residentFold?: unknown }).residentFold
-      : undefined;
-  const rawDocs: Array<Partial<ResidentFoldDoc> | null> | null =
-    fold &&
-    typeof fold === "object" &&
-    Array.isArray((fold as { docs?: unknown }).docs)
-      ? (fold as { docs: Array<Partial<ResidentFoldDoc> | null> }).docs
-      : null;
-  if (!rawDocs || rawDocs.length === 0) return null;
-  const docs: ResidentFoldDoc[] = [];
-  const identities = new Set<string>();
-  for (const doc of rawDocs.slice(0, MAX_FOLD_DOCS)) {
-    if (
-      !doc ||
-      typeof doc.customType !== "string" ||
-      !doc.customType.trim() ||
-      typeof doc.text !== "string" ||
-      !doc.text.trim()
-    ) {
-      continue;
-    }
-    if (
-      isRetiredMemoryCustomMessage({
-        customType: doc.customType,
-        content: doc.text,
-      })
-    ) {
-      continue;
-    }
-    const identity = residentIdentityForCustomMessage({
-      customType: doc.customType,
-      content: doc.text,
-    });
-    const text = identity
-      ? canonicalizeInThreadDocText(identity, doc.text)
-      : doc.text;
-    docs.push({ customType: doc.customType, text });
-    if (identity) identities.add(identity);
-  }
-  return docs.length > 0 ? { docs, identities } : null;
-};

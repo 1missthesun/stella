@@ -17,10 +17,6 @@ export type WindowManagerTarget<TWindow = unknown> = {
   getWindowManager: () => WindowManagerLike<TWindow> | null;
 };
 
-export type StellaAppDirTarget = {
-  getStellaAppDir: () => string | null;
-};
-
 export type StellaHostRunnerTarget = {
   getRunner: () => {
     runAutomationTurn: (

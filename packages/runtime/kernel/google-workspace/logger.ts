@@ -10,10 +10,6 @@ import { getProjectRoot } from "./paths.js";
 
 let isLoggingEnabled = false;
 
-export function setLoggingEnabled(enabled: boolean) {
-  isLoggingEnabled = enabled;
-}
-
 export function logToFile(message: string) {
   if (!isLoggingEnabled) {
     return;

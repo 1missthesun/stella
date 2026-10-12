@@ -32,8 +32,6 @@ import {
  */
 
 export type {
-  LogChannel,
-  LogLevel,
   LogFields,
   FileLoggerOptions,
 } from "./logger.js";

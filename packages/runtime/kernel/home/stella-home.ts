@@ -16,8 +16,6 @@ import {
 } from "./skills-sync.js";
 import { withHome } from "./home-runtime.js";
 import {
-  resolveBundledAgentMetadataDir,
-  resolveDefaultStellaDataDir,
   resolveRuntimeStatePath,
   resolveStellaAppDir,
   resolveStellaDataSeedDir,
@@ -27,8 +25,6 @@ import {
 // working; runtime-worker code must import `stella-paths.js` directly so this
 // module (and the sync machinery it drags in) stays out of the worker bundle.
 export {
-  resolveBundledAgentMetadataDir,
-  resolveDefaultStellaDataDir,
   resolveRuntimeStatePath,
   resolveStellaAppDir,
   resolveStellaDataSeedDir,

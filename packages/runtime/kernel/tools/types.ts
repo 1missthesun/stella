@@ -4,14 +4,7 @@
 
 import type { TaskLifecycleStatus } from "@stella/contracts/agent-runtime";
 import type {
-  AgentDirectoryAgentRow,
-  AgentDirectorySessionRow,
-} from "@stella/contracts/agent-directory";
-import type {
   AgentModelConfigSnapshot,
-  CloudExecutionSelection,
-  SpawnEngineSelection,
-  SpawnReasoningEffort,
 } from "@stella/contracts/agent-engine";
 import type {
   LocalCronJobCreateInput,
@@ -20,8 +13,6 @@ import type {
   LocalHeartbeatConfigRecord,
   LocalHeartbeatUpsertInput,
 } from "@stella/contracts/scheduling";
-import type { RuntimeThreadLiveState } from "../runtime-threads.js";
-import type { RuntimeAttachmentRef } from "@stella/contracts/protocol";
 import type { PersistedRuntimeThreadPayload } from "../storage/shared.js";
 import type { ToolReplayPolicy } from "./defs/replay-policy.js";
 
@@ -200,98 +191,12 @@ export type ShellRecord = {
   kill: () => void | Promise<void>;
 };
 
-export type AgentRecord = {
-  id: string;
-  description: string;
-  status: "running" | "completed" | "error" | "paused";
-  result?: string;
-  error?: string;
-  startedAt: number;
-  completedAt: number | null;
-};
-
-export type AgentToolRequest = {
-  conversationId: string;
-  description: string;
-  prompt: string;
-  agentType: string;
-  /**
-   * Attachments the agent inherits, already materialized into local files with
-   * a `sourcePath`. Named in the agent's brief so it can Read them and pass
-   * the paths on; an agent never receives the conversation's image blocks.
-   */
-  attachments?: RuntimeAttachmentRef[];
-  /**
-   * Per-spawn model override (plain model-reference string, e.g.
-   * `stella/light` or `anthropic/claude-...`). Resolved through the normal
-   * model-routing path, exactly as if the user had set it as the agent's
-   * model override. Never persisted.
-   */
-  model?: string;
-  /**
-   * Per-spawn engine selection. Plain model references pin `default` so a
-   * saved external-engine preference cannot override the requested model;
-   * `stella` explicitly selects `default`, while `codex` / `claude-code`
-   * optionally carry a pinned engine-native model.
-   * Never persisted.
-   */
-  spawnEngine?: SpawnEngineSelection;
-  /** Per-spawn reasoning override parsed from model's `:<effort>` suffix. */
-  spawnReasoningEffort?: SpawnReasoningEffort;
-  /** Durable effective route inherited by a subagent from its Orchestrator. */
-  modelConfigSnapshot?: AgentModelConfigSnapshot;
-  toolWorkspaceRoot?: string;
-  /** The absolute directory spawn_agent asked the agent to start in. */
-  workingDirectory?: string;
-  rootRunId?: string;
-  agentDepth?: number;
-  maxAgentDepth?: number;
-  parentAgentId?: string;
-  threadId?: string;
-  remoteThreadId?: string;
-  storageMode: "cloud" | "local";
-  /** Required by the local manager whenever storageMode is cloud. */
-  ownerGeneration?: string;
-};
-
-/**
- * A spawn the caller placed in the cloud. A computer placement, and an
- * omitted one, never produce these: those stay local by construction.
- */
-export type CloudDispatchRequest = {
-  /** Local conversation the spawn came from, used to keep cloud threads together. */
-  conversationId: string;
-  /** Stable tool-call identity used as the cloud mutation's replay key. */
-  requestId: string;
-  /** Immutable owner-data epoch when the caller already runs in cloud mode. */
-  ownerGeneration?: string;
-  description: string;
-  prompt: string;
-  /**
-   * Exact route selected on desktop; the cloud validates it without fallback.
-   * Absent for a device target, which runs on that device's own models.
-   */
-  execution?: CloudExecutionSelection;
-  /** Run on this paired device instead of in the cloud. */
-  targetDeviceId?: string;
-  /** Device target: the `spawn_agent` model that device runs the agent on. */
-  requestedModel?: string;
-  parentThreadId?: string;
-};
-
 export type CloudAgentControlReceipt = {
   threadId: string;
   ownerGeneration: string;
   attemptGeneration: number;
   threadUpdatedAt: number;
   status: "running" | "completed" | "failed" | "canceled" | "paused";
-};
-
-export type CloudDispatchResult = CloudAgentControlReceipt & {
-  /** Cloud thread id, addressable by desktop send_message and pause_agent. */
-  threadId: string;
-  /** Cloud conversation the agent reports into. */
-  conversationId: string;
 };
 
 export type AgentToolSnapshot = {
@@ -332,52 +237,6 @@ export type AgentThreadStatusMessage = {
   role: string;
   content: string;
   payload?: PersistedRuntimeThreadPayload;
-};
-
-/**
- * Raw, read-only view of one agent thread backing the `agent_status` tool.
- * Produced entirely from existing durable reads (`runtime_agents` +
- * `loadThreadMessages`); building it never messages, resumes, or otherwise
- * steers the target thread.
- */
-export type AgentThreadStatusRead = {
-  /** Live execution state: active while a turn runs, otherwise paused. */
-  status: RuntimeThreadLiveState;
-  /** Roster-style label, e.g. "active" or "paused (last run errored)". */
-  statusLabel: string;
-  /** `runtime_agents.status` detail (running / completed / error / ...). */
-  agentStatus?: TaskLifecycleStatus | string;
-  description?: string;
-  /** External engine the thread runs on (e.g. "codex_cli"); absent = default. */
-  engine?: string;
-  /** When the agent record was last written (turn start / terminal). */
-  lastActiveAt?: number;
-  /** Who this thread's report goes to: `user_thread` or `parent_agent:<id>`. */
-  owner?: string;
-  /** Whether that owner has accepted the report yet. */
-  reportDeliveredTo?:
-    | "parent_agent"
-    | "user_thread"
-    | "user_thread_escalated"
-    | "pending";
-  messages: AgentThreadStatusMessage[];
-};
-
-/** Everyone `agent_status` without a thread_id lists, before rendering. */
-export type AgentDirectoryListing = {
-  agents: AgentDirectoryAgentRow[];
-  sessions: AgentDirectorySessionRow[];
-  /** The owner's cloud index could not be read, so only local rows are listed. */
-  cloudUnavailable?: boolean;
-};
-
-/** A local agent row, as `send_message` needs it to decide ownership. */
-export type LocalAgentThreadIdentity = {
-  threadId: string;
-  conversationId: string;
-  parentAgentId?: string;
-  description: string;
-  remoteThreadId?: string;
 };
 
 export type ToolHostOptions = {

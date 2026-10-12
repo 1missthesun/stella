@@ -2,7 +2,6 @@ import { randomUUID } from "node:crypto";
 import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { STELLA_BROWSER_EXTENSION_ID } from "@stella/contracts/browser-extension";
 
 export {
   STELLA_BROWSER_EXTENSION_ID,

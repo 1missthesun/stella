@@ -68,7 +68,6 @@ import {
   NODE_REPL_TOOL_SEARCH_NAME,
   type ConnectMethod,
   type NodeReplContentItem,
-  type NodeReplImageDetail,
   type NodeReplResetReason,
   type NodeReplResetReceipt,
   type NodeReplWorkerData,
@@ -103,35 +102,6 @@ const DEFAULT_IDLE_TIMEOUT_MS = 4 * 60 * 60_000;
 const DEFAULT_KERNEL_DISPOSE_TIMEOUT_MS = 10_000;
 const DEFAULT_COMPLETED_CELL_RETENTION_MS = 5 * 60_000;
 const DEFAULT_MAX_RETAINED_CELLS = 128;
-
-export type NodeReplMetadata = Readonly<{
-  cwd: string;
-  home: string;
-  tmp: string;
-  homeDir: string;
-  tmpDir: string;
-  write: (...values: unknown[]) => void;
-  emitImage: (
-    value: string | Readonly<{ attached: true; path: string }>,
-    options?: Readonly<{
-      mimeType?: "image/jpeg" | "image/png" | "image/gif" | "image/webp";
-      detail?: NodeReplImageDetail;
-    }>,
-  ) => Readonly<{ type: "image"; path: string; attached: true }> | undefined;
-  emitAudio: (
-    value: string,
-    options?: Readonly<{ mimeType?: string }>,
-  ) => undefined;
-  status: () => Readonly<{
-    generation: number;
-    generationStartedAt: number;
-    persistentBindings: true;
-    state: "ready" | "evaluating";
-    activeEvaluationId: number | null;
-  }>;
-  reset: () => NodeReplResetReceipt;
-  help: (topic?: "bindings" | "images" | "reset" | "tools") => string;
-}>;
 
 export type NodeReplToolSearchResult = {
   name: string;
@@ -3050,4 +3020,3 @@ export class NodeReplKernelRegistry {
   }
 }
 
-export { NodeReplKernelRegistry as NodeReplKernelManager };

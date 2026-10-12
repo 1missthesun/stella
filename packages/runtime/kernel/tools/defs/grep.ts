@@ -11,8 +11,6 @@ import {
   GREP_TOOL_REPLAY,
 } from "./grep-def.js";
 
-export { GREP_TOOL_PARAMETERS } from "./grep-def.js";
-
 export const grepTool: ToolDefinition = {
   name: GREP_TOOL_NAME,
   replay: GREP_TOOL_REPLAY,

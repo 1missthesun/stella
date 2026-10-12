@@ -417,44 +417,6 @@ export const statWorkspaceFileNoFollow = async (
   }
 };
 
-/** Authorize a directory path component-by-component without following it. */
-export const assertWorkspaceDirectoryNoFollow = async (
-  directoryPath: string,
-  workspaceRoot: string,
-  options: { owner?: WorkspaceFileOwner } = {},
-): Promise<string> => {
-  const { lexicalRoot, relative } = relativeTarget(
-    directoryPath,
-    workspaceRoot,
-  );
-  const lexicalRootMetadata = await lstat(lexicalRoot);
-  if (
-    !lexicalRootMetadata.isDirectory() ||
-    lexicalRootMetadata.isSymbolicLink() ||
-    !ownedBy(lexicalRootMetadata, options.owner)
-  ) {
-    throw new Error("Shared session workspace root is not a directory.");
-  }
-  const canonicalRoot = await realpath(lexicalRoot);
-  const parts = relative.split(path.sep);
-  const anchored =
-    process.platform === "linux"
-      ? await openLinuxParent({
-          canonicalRoot,
-          parentParts: parts,
-          createParents: false,
-          ...(options.owner ? { owner: options.owner } : {}),
-        })
-      : await openPortableParent({
-          canonicalRoot,
-          parentParts: parts,
-          createParents: false,
-          ...(options.owner ? { owner: options.owner } : {}),
-        });
-  await closeAll(anchored.handles);
-  return path.join(canonicalRoot, relative);
-};
-
 export const writeWorkspaceBytesNoFollow = async (
   filePath: string,
   workspaceRoot: string,

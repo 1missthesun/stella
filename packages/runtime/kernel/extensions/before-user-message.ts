@@ -32,17 +32,3 @@ export type BeforeUserMessageHookResult = {
   appendMessages?: RuntimePromptMessage[];
 };
 
-/** Required bundled hooks fail the turn on error. Optional extensions use HookEmitter's isolation. */
-export const runBeforeUserMessageHooks = async (
-  hooks: readonly {
-    event: "before_user_message";
-    handler(
-      payload: BeforeUserMessagePayload,
-    ): Promise<BeforeUserMessageHookResult | void>;
-  }[],
-  payload: BeforeUserMessagePayload,
-): Promise<Array<BeforeUserMessageHookResult | void>> => {
-  const results: Array<BeforeUserMessageHookResult | void> = [];
-  for (const hook of hooks) results.push(await hook.handler(payload));
-  return results;
-};

@@ -2,7 +2,6 @@ import type { ToolContext, ToolResult } from "../tools/types.js";
 import type { ParsedAgent } from "../agents/types.js";
 import type { AgentMessage, AgentToolResult } from "../agent-core/types.js";
 import type { AssistantMessageEvent } from "@earendil-works/pi-ai";
-import type { RuntimePromptMessage } from "@stella/contracts/protocol";
 import type {
   BeforeUserMessageHookResult,
   BeforeUserMessagePayload as BeforeUserMessageHookPayload,

@@ -9,36 +9,6 @@ import {
 
 export const MAX_IMAGE_REFERENCE_BYTES = 20 * 1024 * 1024;
 
-const IMAGE_SIGNATURES: Array<{
-  mimeType: string;
-  matches: (bytes: Buffer) => boolean;
-}> = [
-  {
-    mimeType: "image/png",
-    matches: (bytes) =>
-      bytes.subarray(0, 8).equals(Buffer.from("89504e470d0a1a0a", "hex")),
-  },
-  {
-    mimeType: "image/jpeg",
-    matches: (bytes) =>
-      bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff,
-  },
-  {
-    mimeType: "image/gif",
-    matches: (bytes) =>
-      ["GIF87a", "GIF89a"].includes(bytes.subarray(0, 6).toString("ascii")),
-  },
-  {
-    mimeType: "image/webp",
-    matches: (bytes) =>
-      bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
-      bytes.subarray(8, 12).toString("ascii") === "WEBP",
-  },
-];
-
-export const detectSupportedImageMimeType = (bytes: Buffer): string | null =>
-  IMAGE_SIGNATURES.find((entry) => entry.matches(bytes))?.mimeType ?? null;
-
 const isWithin = (candidate: string, root: string): boolean => {
   const relative = path.relative(root, candidate);
   return (

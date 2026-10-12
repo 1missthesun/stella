@@ -20,8 +20,6 @@ export const DEVICE_TOOL_NAMES = [
   "use_secure_value",
 ] as const;
 
-export type DeviceToolName = (typeof DEVICE_TOOL_NAMES)[number];
-
 export function getDangerousCommandReason(
   command: string,
   cwd?: string,

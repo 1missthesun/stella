@@ -226,10 +226,6 @@ type VersionCacheEntry = {
  */
 const versionCache = new Map<string, VersionCacheEntry>();
 
-export const resetExternalCliResolutionCache = (): void => {
-  versionCache.clear();
-};
-
 const realPathOf = (executablePath: string): string => {
   try {
     return fs.realpathSync(executablePath);

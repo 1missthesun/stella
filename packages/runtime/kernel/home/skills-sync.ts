@@ -20,7 +20,6 @@ import {
   reconcileBundledEntriesEffect,
   type BundledSyncReport,
 } from "./bundled-sync.js";
-import { withHome } from "./home-runtime.js";
 
 // Live re-export (not a top-level binding read): this module sits inside the
 // home facade/service import cycle, and reading the binding at evaluation
@@ -96,15 +95,6 @@ export const reconcileBundledSkillsEffect = (
     },
   );
 };
-
-export const reconcileBundledSkills = (
-  bundledSkillsDir: string,
-  homeSkillsDir: string,
-  options: SkillsSyncOptions = {},
-): Promise<SkillsSyncReport> =>
-  withHome((home) =>
-    home.reconcileBundledSkills(bundledSkillsDir, homeSkillsDir, options),
-  );
 
 /**
  * Skill ids Stella has installed into the canonical root, including ones the

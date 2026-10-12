@@ -31,7 +31,5 @@ export const StellaAgentDoc = defineDoc<StellaAgentRole>({
   initial: () => ({ agentType: "orchestrator", depth: 0 }),
 });
 
-export const ORCHESTRATOR_ROLE: StellaAgentRole = { agentType: "orchestrator", depth: 0 };
-
 /** Agents below the orchestrator, and below them; Stella's `maxAgentDepth`. */
 export const MAX_AGENT_DEPTH = 2;

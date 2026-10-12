@@ -100,11 +100,6 @@ const tryIO = <A>(f: () => Promise<A>): Effect.Effect<A, unknown> =>
 export const getDeviceRecordPath = (statePath: string) =>
   path.join(statePath, DEVICE_FILE);
 
-export const getOrCreateDeviceId = async (statePath: string) => {
-  const identity = await getOrCreateDeviceIdentity(statePath);
-  return identity.deviceId;
-};
-
 export const deviceSignerForIdentity = (
   identity: DeviceIdentity,
 ): DeviceSigner => {
@@ -343,12 +338,6 @@ export const resetDeviceIdentityEffect = (
     if (parsed?.deviceId) deviceSignerCache.delete(parsed.deviceId);
     return identity;
   });
-
-export const resetDeviceIdentity = (
-  statePath: string,
-  options: { preservePairings?: boolean } = {},
-): Promise<DeviceIdentity> =>
-  withHome((home) => home.resetDeviceIdentity(statePath, options));
 
 /**
  * Drop the retained predecessor once the backend has accepted the succession,

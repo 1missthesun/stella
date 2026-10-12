@@ -17,8 +17,7 @@
  * pass stopped, because the only state is the rows themselves.
  */
 
-import { Cause, Effect, Exit } from "effect";
-import { storageRuntime } from "./effect-runtime.js";
+import { Effect } from "effect";
 import type { SqliteDatabase } from "./shared.js";
 
 export const LEGACY_RUN_EVENT_ENTRY_TYPE = "run_event";
@@ -182,26 +181,3 @@ export const sweepLegacyRunEventEntriesEffect = (
     }
   });
 
-/**
- * Entry point for the maintenance scheduler: drain legacy `run_event` rows
- * in bounded batches while `isIdle()` holds. Aborting `signal` stops the
- * pass between batches and resolves with outcome "aborted"; rows deleted so
- * far stay deleted and the next pass picks up the rest.
- */
-export const sweepLegacyRunEventEntries = async (
-  db: SqliteDatabase,
-  options: LegacyRunEventSweepOptions & { signal?: AbortSignal } = {},
-): Promise<LegacyRunEventSweepResult> => {
-  const { signal, ...sweepOptions } = options;
-  const progress = { deleted: 0, batches: 0 };
-  if (signal?.aborted) return { ...progress, outcome: "aborted" };
-  const exit = await storageRuntime.runPromiseExit(
-    sweepLegacyRunEventEntriesEffect(db, sweepOptions, progress),
-    signal ? { signal } : undefined,
-  );
-  if (Exit.isSuccess(exit)) return exit.value;
-  if (Cause.hasInterruptsOnly(exit.cause)) {
-    return { ...progress, outcome: "aborted" };
-  }
-  throw Cause.squash(exit.cause);
-};

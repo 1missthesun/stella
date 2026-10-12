@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { rm } from "node:fs/promises";
 import { attachJsonRpcPeerToStreams } from "@stella/contracts/protocol/jsonl";
 import { RPC_ERROR_CODES } from "@stella/contracts/protocol";
 import {
@@ -30,16 +29,14 @@ import {
 import { readRuntimeLaunchEnv } from "../worker/server-identity.js";
 import {
   probeRunningWorker,
-  removeStaleRuntimeArtifacts,
 } from "../worker/lifecycle-server.js";
-import { resolveRuntimePaths } from "../worker/runtime-paths.js";
 import { Effect } from "effect";
 import {
   forkDelayed,
   runHostEffect,
   type HostTimerHandle,
 } from "./effect-runtime.js";
-import { startOrAttachWorker, stopRunningWorker } from "./lifecycle.js";
+import { startOrAttachWorker } from "./lifecycle.js";
 
 export type RemoteRuntimeHostOptions = {
   initializeParams: RuntimeClientAttachParams["initializeParams"];
@@ -457,25 +454,3 @@ export class RemoteRuntimeHost {
 const isServerMismatch = (error: unknown): boolean =>
   error instanceof Error && error.message.includes(RUNTIME_SERVER_MISMATCH);
 
-/**
- * Permanently retire a runtime root the app no longer uses (a moved
- * install): stop its runtime and remove its control files, so nothing is
- * left running under the old identity.
- */
-export const retireRuntimeRoot = async (
-  stellaAppDir: string,
-): Promise<{ stopped: boolean; pid: number | null }> => {
-  const result = await stopRunningWorker(stellaAppDir, { graceMs: 1_500 });
-  const remainingPid = await probeRunningWorker(stellaAppDir);
-  if (remainingPid != null) {
-    throw new Error(
-      `Runtime ${remainingPid} did not stop while retiring ${JSON.stringify(stellaAppDir)}.`,
-    );
-  }
-  await removeStaleRuntimeArtifacts(stellaAppDir);
-  await rm(resolveRuntimePaths(stellaAppDir).rootDir, {
-    recursive: true,
-    force: true,
-  });
-  return result;
-};

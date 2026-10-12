@@ -1206,7 +1206,7 @@ export function stellaAgents(host: StellaAgentsHost) {
             {
               type: "text",
               text: [
-                `${prior ? "Already started" : "Started"} ${threadId} (${describePlacement(where ?? placement)}). thread_id: ${threadId}. Its report arrives in [Agent completed].`,
+                `${prior ? "Already started" : "Started"} ${threadId} (${describePlacement(where ?? placement)}).`,
                 "waiting" in started && started.waiting
                   ? `${describePlacement(where ?? placement)} can't take it yet (offline, not ready, or waiting for the user to allow work from other devices there), so it starts once it can, waiting up to an hour. Tell the user.`
                   : "",
@@ -1242,7 +1242,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         content: [
           {
             type: "text",
-            text: `${existing ? "Already started" : "Started"} ${threadId} (${describePlacement(placement)}). thread_id: ${threadId}. Its report arrives in [Agent completed].`,
+            text: `${existing ? "Already started" : "Started"} ${threadId} (${describePlacement(placement)}).`,
           },
         ],
         details: { thread_id: threadId },

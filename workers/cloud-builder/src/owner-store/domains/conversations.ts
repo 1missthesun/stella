@@ -34,6 +34,10 @@ import {
   scheduleConversationPurge,
 } from "../purge.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
+import {
+  isSlackConversationId,
+  NOT_SLACK_CONVERSATION_SQL,
+} from "../../slack/conversation-id.js";
 
 export type ConversationRow = {
   conversation_id: string;
@@ -139,7 +143,7 @@ export const liveConversation = (
 const recentConversations = (db: OwnerDbReader, ownerId: string): ConversationSummary[] =>
   db
     .all<ConversationRow>(
-      `SELECT * FROM conversations WHERE deleted_at IS NULL
+      `SELECT * FROM conversations WHERE deleted_at IS NULL AND ${NOT_SLACK_CONVERSATION_SQL}
         ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
       RECENT_CONVERSATIONS_LIMIT,
     )
@@ -163,14 +167,16 @@ const pinnedMainConversationId = (db: OwnerDbReader): string | null => {
   const pinned = db.one<{ conversation_id: string }>(
     "SELECT conversation_id FROM conversation_main WHERE id = 1",
   );
-  return pinned && isLiveConversation(db, pinned.conversation_id)
+  return pinned &&
+    !isSlackConversationId(pinned.conversation_id) &&
+    isLiveConversation(db, pinned.conversation_id)
     ? pinned.conversation_id
     : null;
 };
 
 const newestConversationId = (db: OwnerDbReader): string | null =>
   db.one<{ conversation_id: string }>(
-    `SELECT conversation_id FROM conversations WHERE deleted_at IS NULL
+    `SELECT conversation_id FROM conversations WHERE deleted_at IS NULL AND ${NOT_SLACK_CONVERSATION_SQL}
       ORDER BY updated_at DESC, conversation_id DESC LIMIT 1`,
   )?.conversation_id ?? null;
 
@@ -193,7 +199,9 @@ const resolveMainConversation = (
   const pinned = pinnedMainConversationId(ctx.db);
   if (pinned) return pinned;
   let conversationId =
-    preferConversationId && isLiveConversation(ctx.db, preferConversationId)
+    preferConversationId &&
+    !isSlackConversationId(preferConversationId) &&
+    isLiveConversation(ctx.db, preferConversationId)
       ? preferConversationId
       : newestConversationId(ctx.db);
   if (!conversationId) {

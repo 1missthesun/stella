@@ -90,6 +90,7 @@ import {
   type OwnerDomain,
   type OwnerJobs,
 } from "../registry.js";
+import { isSlackConversationId, NOT_SLACK_CONVERSATION_SQL } from "../../slack/conversation-id.js";
 
 type ThreadRow = {
   thread_id: string;
@@ -1459,12 +1460,14 @@ const agentDirectory = async (
         : {}),
     };
   });
-  const sessions = ctx.db
-    .all<{ conversation_id: string; title: string; updated_at: number; activity: string | null }>(
-      `SELECT conversation_id, title, updated_at, activity FROM conversations
-        WHERE deleted_at IS NULL ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
-      DIRECTORY_SESSIONS_RECENT + 1,
-    )
+  const sessions = (isSlackConversationId(args.conversationId)
+    ? []
+    : ctx.db.all<{ conversation_id: string; title: string; updated_at: number; activity: string | null }>(
+        `SELECT conversation_id, title, updated_at, activity FROM conversations
+          WHERE deleted_at IS NULL AND ${NOT_SLACK_CONVERSATION_SQL}
+          ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
+        DIRECTORY_SESSIONS_RECENT + 1,
+      ))
     .filter((row) => row.conversation_id !== args.conversationId)
     .slice(0, DIRECTORY_SESSIONS_RECENT)
     .map(
@@ -1503,6 +1506,9 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
   const to = senderStella(ctx, args.to.trim(), args.from);
   if (to === args.from.threadId) {
     throw new RpcError("BAD_REQUEST", "That thread_id is the sender's own.");
+  }
+  if (crossesSlackBoundary(ctx, args.from.threadId, to)) {
+    throw new RpcError("NOT_FOUND", "No agent or session has that thread_id.");
   }
   const fingerprint = await sha256Hex(
     JSON.stringify(["agent-message/v1", to, text, args.from.threadId, args.from.label]),
@@ -1552,6 +1558,24 @@ const messageAgent = async (ctx: OwnerContext, args: MessageArgs): Promise<Messa
 };
 
 const messageDelivery = (result: AgentControlResult): MessageDelivery => agentMessageDelivery(result);
+
+/** The conversation a thread id is or works in, when this owner has it. */
+const conversationOfThread = (ctx: OwnerContext, threadId: string): string | null => {
+  const direct = ctx.db.one<{ conversation_id: string }>(
+    "SELECT conversation_id FROM conversations WHERE conversation_id = ?",
+    threadId,
+  );
+  if (direct) return direct.conversation_id;
+  const id = isPlacementThreadId(threadId) ? (placementAliasThreadId(ctx.db, threadId) ?? threadId) : threadId;
+  return readThread(ctx.db, id)?.conversation_id ?? null;
+};
+
+/** A Slack workspace's Stella and the owner's own Stella don't reach each other. */
+const crossesSlackBoundary = (ctx: OwnerContext, from: string, to: string): boolean => {
+  const fromConversation = conversationOfThread(ctx, from) ?? from;
+  const toConversation = conversationOfThread(ctx, to) ?? to;
+  return isSlackConversationId(fromConversation) !== isSlackConversationId(toConversation);
+};
 
 /**
  * Whether the sender is the one that started the thread: its conversation's

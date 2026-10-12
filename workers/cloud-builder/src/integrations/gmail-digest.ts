@@ -1,4 +1,6 @@
+import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
+import type { TSchema } from "@sinclair/typebox";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { EmailDigestItem } from "@stella/contracts/backend/email-digest";
 import { gatewayRelayBaseUrl } from "@stella/contracts/gateway/api";
@@ -102,6 +104,9 @@ export const fetchGmailSince = async (
   });
 };
 
+const REPORT_TOOL = "report_emails";
+const NOTHING_TOOL = "nothing_important";
+
 const SYSTEM_PROMPT = [
   "You write a very short email digest for one person.",
   "From the new emails below, keep only the ones that genuinely matter to them:",
@@ -110,11 +115,48 @@ const SYSTEM_PROMPT = [
   "legal, health, or news they would clearly want to know.",
   "Leave out newsletters, marketing, routine notifications and receipts that need nothing.",
   "Most runs keep few or none. Never pad.",
-  'Answer with JSON only: {"items":[{"id":"<id>","summary":"<one plain line, at most 15 words>"}]}',
-  "Order by importance. The summary says what it is and what, if anything, is needed.",
-  "Do not repeat the sender or subject in the summary.",
-  'If nothing matters, answer {"items":[]}.',
+  "Answer by calling exactly one tool and write nothing else.",
+  `If at least one email matters, call ${REPORT_TOOL} with those emails, ordered by importance.`,
+  "Each summary is one plain line of at most 15 words saying what it is and what, if anything, is needed,",
+  "without repeating the sender or subject.",
+  `If none of them matters, call ${NOTHING_TOOL}.`,
 ].join("\n");
+
+const DIGEST_TOOLS: Tool[] = [
+  {
+    name: REPORT_TOOL,
+    description: "Report the emails that matter, most important first.",
+    parameters: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          minItems: 1,
+          items: {
+            type: "object",
+            properties: {
+              id: { type: "string", description: "The email's id, such as m1." },
+              summary: { type: "string", description: "One plain line, at most 15 words." },
+            },
+            required: ["id", "summary"],
+            additionalProperties: false,
+          },
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+    } as unknown as TSchema,
+  },
+  {
+    name: NOTHING_TOOL,
+    description: "None of the new emails is worth mentioning.",
+    parameters: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    } as unknown as TSchema,
+  },
+];
 
 const promptFor = (messages: GmailMessage[]): string =>
   messages
@@ -131,14 +173,13 @@ const promptFor = (messages: GmailMessage[]): string =>
     )
     .join("\n\n");
 
-const parseItems = (answer: string, messages: GmailMessage[]): EmailDigestItem[] => {
-  const start = answer.indexOf("{");
-  const end = answer.lastIndexOf("}");
-  if (start < 0 || end <= start) throw new Error("The digest model did not answer with JSON.");
-  const parsed = JSON.parse(answer.slice(start, end + 1)) as unknown;
-  const items = isRecord(parsed) && Array.isArray(parsed.items) ? parsed.items : [];
+export type DigestVerdict =
+  | { kind: "nothing_important" }
+  | { kind: "important"; items: EmailDigestItem[] };
+
+const itemsFrom = (raw: unknown, messages: GmailMessage[]): EmailDigestItem[] => {
   const seen = new Set<number>();
-  return items.flatMap((item) => {
+  return (Array.isArray(raw) ? raw : []).flatMap((item) => {
     if (!isRecord(item)) return [];
     const index = Number(text(item.id).replace(/^m/u, "")) - 1;
     const message = messages[index];
@@ -155,6 +196,22 @@ const parseItems = (answer: string, messages: GmailMessage[]): EmailDigestItem[]
       },
     ];
   });
+};
+
+const verdictFrom = (calls: ToolCall[], messages: GmailMessage[]): DigestVerdict => {
+  const names = new Set(calls.map((call) => call.name));
+  if (names.has(REPORT_TOOL) && names.has(NOTHING_TOOL)) {
+    throw new Error("The digest model both reported emails and said nothing was important.");
+  }
+  if (names.has(NOTHING_TOOL)) return { kind: "nothing_important" };
+  const reports = calls.filter((call) => call.name === REPORT_TOOL);
+  if (reports.length === 0) throw new Error("The digest model did not call a digest tool.");
+  const items = itemsFrom(
+    reports.flatMap((call) => (Array.isArray(call.arguments.items) ? call.arguments.items : [])),
+    messages,
+  );
+  if (items.length === 0) throw new Error("The digest model reported no email it was given.");
+  return { kind: "important", items };
 };
 
 export const digestExecution = (
@@ -175,7 +232,7 @@ export type DigestModelInput = {
   messages: GmailMessage[];
 };
 
-export const pickImportant = async (input: DigestModelInput): Promise<{ items: EmailDigestItem[]; model: string }> => {
+export const pickImportant = async (input: DigestModelInput): Promise<{ verdict: DigestVerdict; model: string }> => {
   const gateway = input.env.MODEL_GATEWAY;
   const origin = input.env.MODEL_GATEWAY_URL?.trim() ?? "";
   if (!gateway || !origin) throw new Error("Model gateway is not configured.");
@@ -212,12 +269,13 @@ export const pickImportant = async (input: DigestModelInput): Promise<{ items: E
     {
       systemPrompt: SYSTEM_PROMPT,
       messages: [{ role: "user", content: promptFor(input.messages), timestamp: Date.now() }],
+      tools: DIGEST_TOOLS,
     },
     { maxTokens: MAX_OUTPUT_TOKENS, signal: AbortSignal.timeout(MODEL_TIMEOUT_MS) },
   );
   if (answer.stopReason === "error" || answer.stopReason === "aborted") {
     throw new Error(clip(answer.errorMessage ?? "The digest model call failed.", 300));
   }
-  const reply = answer.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("");
-  return { items: parseItems(reply, input.messages), model: execution.model };
+  const calls = answer.content.flatMap((part) => (part.type === "toolCall" ? [part] : []));
+  return { verdict: verdictFrom(calls, input.messages), model: execution.model };
 };

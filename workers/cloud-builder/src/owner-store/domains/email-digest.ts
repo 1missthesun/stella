@@ -13,8 +13,8 @@ import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 const RUN_JOB = "emailDigest.run";
 const MIN = 60_000;
 const HOUR = 60 * MIN;
-export const MIN_INTERVAL_MS = 15 * MIN;
-export const MAX_INTERVAL_MS = 4 * HOUR;
+export const MIN_INTERVAL_MS = HOUR;
+export const MAX_INTERVAL_MS = 8 * HOUR;
 const FIRST_RUN_DELAY_MS = 2_000;
 const FIRST_WINDOW_MS = 24 * HOUR;
 const OVERLAP_MS = 10 * MIN;
@@ -187,7 +187,7 @@ const runDigest = async (ctx: OwnerContext): Promise<void> => {
       return;
     }
     const snapshot = await ctx.host.snapshot();
-    const { items, model } = await pickImportant({
+    const { verdict, model } = await pickImportant({
       env: ctx.env,
       ownerId: ctx.ownerId,
       ownerGeneration: snapshot.ownerGeneration,
@@ -206,9 +206,9 @@ const runDigest = async (ctx: OwnerContext): Promise<void> => {
       );
     }
     ctx.db.run("DELETE FROM email_digest_seen WHERE seen_at < ?", seenAt - SEEN_RETENTION_MS);
-    if (items.length > 0) recordDigest(ctx, newCount, items, model);
+    if (verdict.kind === "important") recordDigest(ctx, newCount, verdict.items, model);
     finishRun(ctx, {
-      kind: items.length > 0 ? "digest" : "nothing_important",
+      kind: verdict.kind === "important" ? "digest" : "nothing_important",
       newCount,
       since,
       rate: state.rate_per_hour,

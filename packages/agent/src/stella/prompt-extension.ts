@@ -146,11 +146,11 @@ export function stellaPromptExtension(sources: StellaContextSources) {
         { tag: false },
       ),
       section("skills", async (_input, context) => sources.skillsCatalog(context), { tag: false }),
-      // Stella's: where she can start agents.
       section("execution-devices", async (input, context) => {
-        if ((await role(input, context)).agentType !== "orchestrator") return undefined;
+        const orchestrator = (await role(input, context)).agentType === "orchestrator";
+        if (!orchestrator && !input.agent.tools.some((tool) => tool.name === "switch_destination")) return undefined;
         const snapshot = await sources.executionContext(input.conversationId, context);
-        return snapshot && renderExecutionDevices(snapshot);
+        return snapshot && renderExecutionDevices(snapshot, orchestrator ? "orchestrator" : "agent");
       }),
       section("execution-destination", async (input, context) => {
         const snapshot = await sources.executionContext(input.conversationId, context);

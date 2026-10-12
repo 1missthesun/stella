@@ -206,6 +206,7 @@ const remoteExecutionNote = (device: ExecutionContextDevice): string => {
 
 export const renderExecutionDevices = (
   snapshot: ExecutionContextSnapshot,
+  reader: "orchestrator" | "agent" = "orchestrator",
 ): string =>
   [
     "# Connected devices and execution destinations",
@@ -217,7 +218,9 @@ export const renderExecutionDevices = (
     ...(!snapshot.devicesKnown
       ? ["The connected device list is currently unavailable."]
       : []),
-    'To run an agent on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination: it runs entirely there. A running agent can move itself to another of these computers with switch_destination, keeping its conversation.',
+    reader === "agent"
+      ? "To move yourself to another of these computers, pass its device_id to switch_destination."
+      : 'To run an agent on one of these, pass its device_id (or "cloud") as spawn_agent\'s destination: it runs entirely there. A running agent can move itself to another of these computers with switch_destination, keeping its conversation.',
   ].join("\n");
 
 export const renderExecutionDestination = (

@@ -224,12 +224,13 @@ export class ConversationArchive {
     const prefix = await this.prefix();
     if (!this.bucket || !prefix) return null;
     const key = `${prefix}/spill/${(await sha256Hex(writerKey)).slice(0, 32)}.json.gz`;
-    const body = await gzip([new TextEncoder().encode(payloadJson)]);
+    const stored = this.journal.encodePayload(payloadJson);
+    const body = await gzip([new TextEncoder().encode(stored)]);
     await withTimeout(this.bucket.put(key, body), R2_TIMEOUT_MS);
     // Registered whether or not the conversation was tombstoned while the put
     // was in flight: an unregistered object is an undeletable one, and this
     // table is what the purge reads.
-    this.journal.recordSpill(key, utf8Length(payloadJson), Date.now());
+    this.journal.recordSpill(key, utf8Length(stored), Date.now());
     return key;
   }
 
@@ -241,7 +242,7 @@ export class ConversationArchive {
       object.body.pipeThrough(new DecompressionStream("gzip")),
     ).text();
     try {
-      return JSON.parse(text);
+      return JSON.parse(this.journal.decodePayload(text));
     } catch {
       return null;
     }

@@ -146,6 +146,7 @@ import { stableValueMarker } from "../hash.js";
 import { orchestratorCliSpecDigest } from "../orchestrator-cli-turn-store.js";
 import type { SandboxTarget, SandboxWorkload } from "../sandbox-lifecycle.js";
 import type { ThreadMessageInput } from "../thread-transcript.js";
+import { configureThreadTranscriptCrypto } from "../thread-transcript.js";
 import type {
   TurnExecution,
   TurnExecutionContext,
@@ -185,6 +186,16 @@ export class BuildSessionObject extends DurableObject<Env> {
   private readonly exactTurnCancellations = new ExactTurnCancellationLedger(
     this.ctx.storage,
   );
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    configureThreadTranscriptCrypto(
+      ctx.storage.sql,
+      typeof (env as unknown as Record<string, unknown>).OWNER_SECRETS_KEK === "string"
+        ? ((env as unknown as Record<string, unknown>).OWNER_SECRETS_KEK as string)
+        : null,
+    );
+  }
 
   /**
    * The structural view of this instance handed to every extracted module in

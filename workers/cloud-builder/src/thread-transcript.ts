@@ -25,7 +25,14 @@ import { AGENT_HISTORY_MAX_ROWS } from "@stella/executor-cloud/agent-history";
 import {
   TranscriptSearchIndex,
   transcriptSearchDdl,
+  transcriptSearchTextDdl,
 } from "./transcript-search.js";
+import {
+  JournalCrypto,
+  isEncryptedJournalValue,
+} from "./journal-crypto.js";
+import { historyTokens } from "@stella/contracts/history-search";
+import { redactSensitiveText } from "@stella/contracts/sensitive-data";
 
 const THREAD_SEARCH_TABLE = "thread_fts";
 
@@ -47,7 +54,132 @@ export const THREAD_TRANSCRIPT_DDL = [
      PRIMARY KEY (scope, turn_id, attempt_generation)
    )`,
   transcriptSearchDdl(THREAD_SEARCH_TABLE),
+  transcriptSearchTextDdl(THREAD_SEARCH_TABLE),
+  `CREATE TABLE IF NOT EXISTS thread_crypto (
+     id          INTEGER PRIMARY KEY CHECK (id = 1),
+     wrapped_dek TEXT    NOT NULL,
+     migrated    INTEGER NOT NULL DEFAULT 0
+   )`,
 ] as const;
+
+/** Per-object envelope encryption, configured once by the owning Durable Object. */
+const cryptos = new WeakMap<SqlStorage, JournalCrypto | null>();
+
+const indexFor = (sql: SqlStorage): TranscriptSearchIndex => {
+  const crypto = cryptos.get(sql) ?? null;
+  return new TranscriptSearchIndex(
+    sql,
+    THREAD_SEARCH_TABLE,
+    crypto
+      ? {
+          indexedText: (text) =>
+            historyTokens(text)
+              .map((token) => crypto.searchToken(token))
+              .join(" "),
+          encryptSideText: (text) => crypto.encryptText(text),
+        }
+      : null,
+  );
+};
+
+const encode = (sql: SqlStorage, payloadJson: string): string =>
+  cryptos.get(sql)?.encryptText(payloadJson) ?? payloadJson;
+
+const decode = (sql: SqlStorage, stored: string): string => {
+  if (!isEncryptedJournalValue(stored)) return stored;
+  const crypto = cryptos.get(sql);
+  if (!crypto) throw new ThreadTranscriptError("Thread encryption key unavailable.");
+  return crypto.decryptText(stored);
+};
+
+/**
+ * Provision this thread's DEK (wrapped under the deployment KEK) and, once,
+ * encrypt rows a pre-encryption isolate wrote. Call from the owning
+ * object's constructor; without a KEK the transcript keeps its legacy form.
+ */
+export const configureThreadTranscriptCrypto = (
+  sql: SqlStorage,
+  kekBase64: string | null,
+): void => {
+  if (cryptos.has(sql)) return;
+  if (!kekBase64) {
+    cryptos.set(sql, null);
+    return;
+  }
+  ensureThreadTranscriptSchema(sql, true);
+  const existing = sql
+    .exec<{ wrapped_dek: string; migrated: number }>(
+      `SELECT wrapped_dek, migrated FROM thread_crypto WHERE id = 1`,
+    )
+    .toArray()[0];
+  let crypto: JournalCrypto | null;
+  let migrated = existing?.migrated === 1;
+  if (existing) {
+    crypto = JournalCrypto.fromWrappedDek(kekBase64, existing.wrapped_dek);
+  } else {
+    const dek = JournalCrypto.randomDek();
+    const wrapped = JournalCrypto.wrapDek(kekBase64, dek);
+    if (!wrapped) {
+      cryptos.set(sql, null);
+      return;
+    }
+    sql.exec(
+      `INSERT OR IGNORE INTO thread_crypto (id, wrapped_dek, migrated) VALUES (1, ?, 0)`,
+      wrapped,
+    );
+    const stored = sql
+      .exec<{ wrapped_dek: string }>(
+        `SELECT wrapped_dek FROM thread_crypto WHERE id = 1`,
+      )
+      .one().wrapped_dek;
+    crypto = JournalCrypto.fromWrappedDek(kekBase64, stored);
+    migrated = false;
+  }
+  cryptos.set(sql, crypto);
+  if (!crypto || migrated) return;
+  const rows = sql
+    .exec<{
+      seq: number;
+      turn_id: string;
+      role: string;
+      payload_json: string;
+      created_at: number;
+    }>(
+      `SELECT rowid AS seq, turn_id, role, payload_json, created_at
+         FROM thread_messages ORDER BY rowid ASC`,
+    )
+    .toArray();
+  for (const row of rows) {
+    if (!isEncryptedJournalValue(row.payload_json)) {
+      sql.exec(
+        `UPDATE thread_messages SET payload_json = ? WHERE rowid = ?`,
+        crypto.encryptText(row.payload_json),
+        row.seq,
+      );
+    }
+  }
+  sql.exec(`DROP TABLE IF EXISTS ${THREAD_SEARCH_TABLE}`);
+  sql.exec(transcriptSearchDdl(THREAD_SEARCH_TABLE));
+  const index = indexFor(sql);
+  for (const row of rows) {
+    let payload: unknown;
+    try {
+      payload = JSON.parse(decode(sql, row.payload_json));
+    } catch {
+      continue;
+    }
+    index.index({
+      seq: row.seq,
+      turnId: row.turn_id,
+      role: row.role,
+      createdAt: row.created_at,
+      hidden: false,
+      spillKey: null,
+      payload,
+    });
+  }
+  sql.exec(`UPDATE thread_crypto SET migrated = 1 WHERE id = 1`);
+};
 
 export type ThreadTranscriptRole = AgentHistoryRow["role"];
 
@@ -79,15 +211,19 @@ const isRole = (value: unknown): value is ThreadTranscriptRole =>
  */
 const provisioned = new WeakSet<SqlStorage>();
 
-export const ensureThreadTranscriptSchema = (sql: SqlStorage): void => {
+export const ensureThreadTranscriptSchema = (
+  sql: SqlStorage,
+  skipBackfill = false,
+): void => {
   if (provisioned.has(sql)) return;
   for (const statement of THREAD_TRANSCRIPT_DDL) sql.exec(statement);
   provisioned.add(sql);
+  if (skipBackfill) return;
   // Backfill only when the index is behind the transcript: a thread created
   // before `thread_fts` existed has rows the per-append indexing never saw.
   // Every later provisioning (one per isolate lifetime) finds the counts equal
   // and skips the scan, so a cold start does not re-index the whole thread.
-  const index = new TranscriptSearchIndex(sql, THREAD_SEARCH_TABLE);
+  const index = indexFor(sql);
   const stored = sql
     .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM thread_messages`)
     .one().count;
@@ -107,7 +243,7 @@ export const ensureThreadTranscriptSchema = (sql: SqlStorage): void => {
   for (const row of rows) {
     let payload: unknown;
     try {
-      payload = JSON.parse(row.payload_json);
+      payload = JSON.parse(decode(sql, row.payload_json));
     } catch {
       continue;
     }
@@ -253,7 +389,7 @@ export const appendThreadMessages = (
   }
   const validated = validateAppend(args.messages);
   ensureThreadTranscriptSchema(sql);
-  const index = new TranscriptSearchIndex(sql, THREAD_SEARCH_TABLE);
+  const index = indexFor(sql);
   for (const message of validated) {
     sql.exec(
       `INSERT OR IGNORE INTO thread_messages
@@ -263,7 +399,12 @@ export const appendThreadMessages = (
       args.attemptGeneration,
       message.ordinal,
       message.role,
-      message.payloadJson,
+      encode(
+        sql,
+        message.role === "toolResult"
+          ? redactSensitiveText(message.payloadJson)
+          : message.payloadJson,
+      ),
       args.now,
     );
     const stored = sql
@@ -284,7 +425,7 @@ export const appendThreadMessages = (
       .one();
     let payload: unknown;
     try {
-      payload = JSON.parse(stored.payload_json);
+      payload = JSON.parse(decode(sql, stored.payload_json));
     } catch {
       continue;
     }
@@ -346,7 +487,7 @@ export const readThreadHistory = (
     .map((row) => ({
       seq: row.seq,
       role: row.role as ThreadTranscriptRole,
-      payloadJson: row.payload_json,
+      payloadJson: decode(sql, row.payload_json),
       turnId: row.turn_id,
     }));
 };
@@ -354,7 +495,10 @@ export const readThreadHistory = (
 /** Owner purge: the thread's private job state goes with the rest of it. */
 export const purgeThreadTranscript = (sql: SqlStorage): void => {
   sql.exec(`DROP TABLE IF EXISTS ${THREAD_SEARCH_TABLE}`);
+  sql.exec(`DROP TABLE IF EXISTS ${THREAD_SEARCH_TABLE}_text`);
   sql.exec(`DROP TABLE IF EXISTS thread_messages`);
   sql.exec(`DROP TABLE IF EXISTS turn_counters`);
+  sql.exec(`DROP TABLE IF EXISTS thread_crypto`);
   provisioned.delete(sql);
+  cryptos.delete(sql);
 };

@@ -1,4 +1,5 @@
 import { parseCloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
+import { redactSensitiveText } from "@stella/contracts/sensitive-data";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import type { ConversationDeletedEvent } from "@stella/contracts/turn-plane/owner-events";
 import { sha256Hex } from "../hash.js";
@@ -450,7 +451,12 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
     }
     if (role !== "assistant") {
       const spillKey = await this.archive
-        .writeSpill(writerKey, payloadJson)
+        .writeSpill(
+          writerKey,
+          role === "toolResult"
+            ? redactSensitiveText(payloadJson)
+            : payloadJson,
+        )
         .catch(() => null);
       if (spillKey) return { message, payloadJson, spillKey };
     }

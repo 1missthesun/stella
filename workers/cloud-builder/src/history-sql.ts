@@ -1,7 +1,11 @@
 /**
  * `history.sql(query, params)` in the orchestrator's code tool: one read-only
  * statement over this conversation's Durable Object SQLite (`journal`,
- * `journal_fts`, `turns`, ...).
+ * `journal_fts`, `turns`, ...). Payloads are encrypted at rest, so
+ * `payload_json` and the `journal_fts` text column hold ciphertext and
+ * hashed tokens here; `history.search` and `history.read` (on the journal)
+ * are the readable paths. `history.search` lives on `Journal` for the same
+ * reason: only it holds the conversation's key.
  *
  * Two independent guards. The text must be a single SELECT/WITH statement
  * with no write or schema keyword outside literals and comments, and it runs
@@ -12,15 +16,7 @@
 
 import { CLOUD_CODE_WORKER_VALUE_MAX_BYTES } from "./cloud-code-worker-executor.js";
 import { utf8Length } from "./conversation-types.js";
-import { DEFAULT_TRANSCRIPT_SEARCH_TABLE } from "./transcript-search.js";
-import {
-  historySearchKinds,
-  historySearchLimit,
-  historySearchMatch,
-  readOnlyHistoryQuery,
-  type HistorySearchHit,
-  type HistorySearchOptions,
-} from "@stella/contracts/history-search";
+import { readOnlyHistoryQuery } from "@stella/contracts/history-search";
 
 export { historySearchOptions } from "@stella/contracts/history-search";
 
@@ -55,62 +51,4 @@ export const runHistoryQuery = (
     }
     return rows;
   });
-};
-
-/**
- * `history.search(text, options)`: matches from `journal_fts`, newest or
- * best first, each with its seq, kind, time and a snippet. The index outlives
- * rollover, so archived rows match too; `archived` says `history.read` is the
- * way to their full record.
- */
-export const searchHistory = (
-  storage: DurableObjectStorage,
-  text: string,
-  options: HistorySearchOptions = {},
-): HistorySearchHit[] => {
-  const match = historySearchMatch(text);
-  if (!match) throw new Error("history.search needs at least one word to look for.");
-  const kinds = historySearchKinds(options);
-  const limit = historySearchLimit(options);
-  const table = DEFAULT_TRANSCRIPT_SEARCH_TABLE;
-  const where = [`${table} MATCH ?`];
-  const params: SqlStorageValue[] = [match];
-  if (kinds.length > 0) {
-    where.push(`role IN (${kinds.map(() => "?").join(", ")})`);
-    params.push(...kinds);
-  }
-  if (Number.isSafeInteger(options.beforeSeq)) {
-    where.push("rowid < ?");
-    params.push(options.beforeSeq as number);
-  }
-  const floor =
-    storage.sql
-      .exec<{ hot_min_seq: number }>("SELECT hot_min_seq FROM meta WHERE id = 0")
-      .toArray()[0]?.hot_min_seq ?? 0;
-  const rows = storage.sql
-    .exec<{
-      seq: number;
-      kind: string;
-      turn_id: string;
-      created_at: number;
-      snippet: string;
-    }>(
-      `SELECT rowid AS seq, role AS kind, turn_id, created_at,
-              snippet(${table}, 0, '[', ']', '…', 32) AS snippet
-         FROM ${table}
-        WHERE ${where.join(" AND ")}
-        ORDER BY ${options.order === "newest" ? "rowid DESC" : "rank"}
-        LIMIT ?`,
-      ...params,
-      limit,
-    )
-    .toArray();
-  return rows.map((row) => ({
-    seq: row.seq,
-    kind: row.kind,
-    at: new Date(Number(row.created_at)).toISOString(),
-    turnId: row.turn_id,
-    snippet: row.snippet,
-    archived: row.seq < floor,
-  }));
 };

@@ -60,7 +60,22 @@ import {
   collapseWhitespace,
   extractMessageText,
   transcriptSearchDdl,
+  transcriptSearchTextDdl,
 } from "./transcript-search.js";
+import {
+  JournalCrypto,
+  isEncryptedJournalValue,
+} from "./journal-crypto.js";
+import {
+  historySearchKinds,
+  historySearchLimit,
+  historySearchMatch,
+  historySearchTerms,
+  historyTokens,
+  type HistorySearchHit,
+  type HistorySearchOptions,
+} from "@stella/contracts/history-search";
+import { redactSensitiveText } from "@stella/contracts/sensitive-data";
 
 /**
  * A payload the activity fold can read. A spilled payload is a stub pointing at
@@ -91,7 +106,8 @@ const DDL = [
      deleted_at       INTEGER,
      hot_rows         INTEGER NOT NULL DEFAULT 0,
      hot_bytes        INTEGER NOT NULL DEFAULT 0,
-     hot_tokens       INTEGER NOT NULL DEFAULT 0
+     hot_tokens       INTEGER NOT NULL DEFAULT 0,
+     wrapped_dek      TEXT
    )`,
   `CREATE TABLE IF NOT EXISTS journal (
      seq           INTEGER PRIMARY KEY,
@@ -120,6 +136,7 @@ const DDL = [
   `CREATE INDEX IF NOT EXISTS journal_turn ON journal(turn_id, seq)`,
   `CREATE INDEX IF NOT EXISTS journal_context ON journal(kind, model_skip, seq)`,
   transcriptSearchDdl(),
+  transcriptSearchTextDdl(),
   `CREATE TABLE IF NOT EXISTS turns (
      turn_id       TEXT PRIMARY KEY,
      session_id    TEXT NOT NULL,
@@ -230,6 +247,7 @@ const CURRENT_SCHEMA_OBJECT_NAMES = [
   "journal_turn",
   "journal_context",
   "journal_fts",
+  "journal_fts_text",
   "turns",
   "turns_state",
   "inbox",
@@ -256,6 +274,8 @@ const MIGRATIONS: Array<{
   statements: string[];
   backfillTranscriptSearch?: boolean;
   reindexArchivedSearch?: boolean;
+  encryptJournalPayloads?: boolean;
+  fullArchivedReindex?: boolean;
 }> = [
   {
     to: 2,
@@ -335,6 +355,19 @@ const MIGRATIONS: Array<{
        WHERE id = 0`,
     ],
   },
+  {
+    to: 11,
+    statements: [
+      `ALTER TABLE meta ADD COLUMN wrapped_dek TEXT`,
+      transcriptSearchTextDdl(),
+      `DROP TABLE IF EXISTS journal_fts`,
+      transcriptSearchDdl(),
+    ],
+    encryptJournalPayloads: true,
+    backfillTranscriptSearch: true,
+    reindexArchivedSearch: true,
+    fullArchivedReindex: true,
+  },
 ];
 
 /**
@@ -343,7 +376,12 @@ const MIGRATIONS: Array<{
  * re-read for them so far.
  */
 const SEARCH_REINDEX_KEY = "searchReindex";
-type SearchReindex = { ceilingSeq: number; reindexedThrough: number };
+type SearchReindex = {
+  ceilingSeq: number;
+  reindexedThrough: number;
+  /** Rebuild every message's entry, not only the kinds search once skipped. */
+  full?: boolean;
+};
 
 /** Durable witness of the highest epoch this DO name has ever used. */
 const EPOCH_WITNESS_KEY = "conversationEpoch";
@@ -615,13 +653,89 @@ export class Journal {
   private readonly sql: SqlStorage;
   private readonly transcriptSearch: TranscriptSearchIndex;
   private transactionDepth = 0;
+  private crypto: JournalCrypto | null | undefined;
 
   constructor(
     private readonly ctx: DurableObjectState,
     private readonly log: ConversationLogger,
+    private readonly kekBase64: string | null = null,
   ) {
     this.sql = ctx.storage.sql;
-    this.transcriptSearch = new TranscriptSearchIndex(this.sql);
+    this.transcriptSearch = new TranscriptSearchIndex(this.sql, undefined, {
+      indexedText: (text) => {
+        const crypto = this.ensureCrypto();
+        if (!crypto) return text;
+        return historyTokens(text)
+          .map((token) => crypto.searchToken(token))
+          .join(" ");
+      },
+      encryptSideText: (text) =>
+        this.ensureCrypto()?.encryptText(text) ?? null,
+    });
+  }
+
+  /**
+   * This conversation's encryption, provisioned on first use: a fresh
+   * random DEK wrapped under the deployment KEK and kept on `meta`. Null
+   * when no KEK is configured (a deployment without one keeps the legacy
+   * plaintext form rather than bricking its conversations).
+   */
+  ensureCrypto(): JournalCrypto | null {
+    if (this.crypto !== undefined) return this.crypto;
+    if (!this.kekBase64) {
+      this.crypto = null;
+      return null;
+    }
+    let row: { wrapped_dek: string | null } | undefined;
+    try {
+      row = this.sql
+        .exec<{ wrapped_dek: string | null }>(
+          `SELECT wrapped_dek FROM meta WHERE id = 0`,
+        )
+        .toArray()[0];
+    } catch {
+      return null;
+    }
+    if (!row) return null;
+    if (row.wrapped_dek) {
+      this.crypto = JournalCrypto.fromWrappedDek(
+        this.kekBase64,
+        row.wrapped_dek,
+      );
+      return this.crypto;
+    }
+    const dek = JournalCrypto.randomDek();
+    const wrapped = JournalCrypto.wrapDek(this.kekBase64, dek);
+    if (!wrapped) {
+      this.crypto = null;
+      return null;
+    }
+    this.sql.exec(
+      `UPDATE meta SET wrapped_dek = ? WHERE id = 0 AND wrapped_dek IS NULL`,
+      wrapped,
+    );
+    const stored = this.sql
+      .exec<{ wrapped_dek: string | null }>(
+        `SELECT wrapped_dek FROM meta WHERE id = 0`,
+      )
+      .toArray()[0]?.wrapped_dek;
+    this.crypto = stored
+      ? JournalCrypto.fromWrappedDek(this.kekBase64, stored)
+      : JournalCrypto.fromDek(dek);
+    return this.crypto;
+  }
+
+  /** Stored form of one payload JSON string. Idempotent. */
+  encodePayload(payloadJson: string): string {
+    return this.ensureCrypto()?.encryptText(payloadJson) ?? payloadJson;
+  }
+
+  /** Plaintext JSON of a stored payload. Legacy plaintext reads unchanged. */
+  decodePayload(stored: string): string {
+    if (!isEncryptedJournalValue(stored)) return stored;
+    const crypto = this.ensureCrypto();
+    if (!crypto) throw new Error("Journal encryption key unavailable.");
+    return crypto.decryptText(stored);
   }
 
   // -------------------------------------------------------------------------
@@ -631,6 +745,7 @@ export class Journal {
   async bootstrap(): Promise<void> {
     const current = this.currentBootstrapMeta();
     if (current) {
+      this.ensureCrypto();
       const witness =
         (await this.ctx.storage.get<number>(EPOCH_WITNESS_KEY)) ?? 0;
       if (current.epoch > witness) {
@@ -657,6 +772,7 @@ export class Journal {
         epoch,
       );
       await this.ctx.storage.put(EPOCH_WITNESS_KEY, epoch);
+      this.ensureCrypto();
       return;
     }
     const meta = this.meta();
@@ -665,18 +781,24 @@ export class Journal {
     }
     if (meta.schema_version !== JOURNAL_SCHEMA_VERSION) {
       let reindexArchived = false;
+      let fullArchivedReindex = false;
       for (const migration of MIGRATIONS) {
         if (meta.schema_version >= migration.to) continue;
         for (const statement of migration.statements) this.sql.exec(statement);
+        if (migration.encryptJournalPayloads) {
+          this.encryptExistingPayloads();
+        }
         if (migration.backfillTranscriptSearch) {
           this.backfillTranscriptSearch();
         }
         if (migration.reindexArchivedSearch) reindexArchived = true;
+        if (migration.fullArchivedReindex) fullArchivedReindex = true;
       }
       if (reindexArchived && meta.hot_min_seq > 0) {
         await this.ctx.storage.put<SearchReindex>(SEARCH_REINDEX_KEY, {
           ceilingSeq: meta.hot_min_seq,
           reindexedThrough: -1,
+          ...(fullArchivedReindex ? { full: true } : {}),
         });
       }
       this.sql.exec(
@@ -684,6 +806,46 @@ export class Journal {
         JOURNAL_SCHEMA_VERSION,
       );
     }
+    this.ensureCrypto();
+  }
+
+  /** Migration 11: encrypt every resident payload under the new DEK. */
+  private encryptExistingPayloads(): void {
+    const crypto = this.ensureCrypto();
+    if (!crypto) return;
+    const rows = this.sql
+      .exec<{ seq: number; payload_json: string }>(
+        `SELECT seq, payload_json FROM journal`,
+      )
+      .toArray();
+    for (const row of rows) {
+      if (isEncryptedJournalValue(row.payload_json)) continue;
+      const encoded = crypto.encryptText(row.payload_json);
+      this.sql.exec(
+        `UPDATE journal SET payload_json = ?, bytes = ? WHERE seq = ?`,
+        encoded,
+        utf8Length(encoded),
+        row.seq,
+      );
+    }
+    const staged = this.sql
+      .exec<{ id: number; payload_json: string }>(
+        `SELECT id, payload_json FROM inbox`,
+      )
+      .toArray();
+    for (const row of staged) {
+      if (isEncryptedJournalValue(row.payload_json)) continue;
+      const encoded = crypto.encryptText(row.payload_json);
+      this.sql.exec(
+        `UPDATE inbox SET payload_json = ?, bytes = ? WHERE id = ?`,
+        encoded,
+        utf8Length(encoded),
+        row.id,
+      );
+    }
+    this.sql.exec(
+      `UPDATE meta SET hot_bytes = (SELECT COALESCE(SUM(bytes), 0) FROM journal) WHERE id = 0`,
+    );
   }
 
   /**
@@ -772,7 +934,7 @@ export class Journal {
     this.transactionSync(() => {
       for (const row of rows) {
         if (row.kind !== "message") continue;
-        const unindexed = (row.role === "user" && row.hidden === 1) || ((row.role === "user" || row.role === "assistant") && row.spill_key !== null);
+        const unindexed = state.full === true || (row.role === "user" && row.hidden === 1) || ((row.role === "user" || row.role === "assistant") && row.spill_key !== null);
         if (!unindexed) continue;
         this.indexStoredMessage(row);
       }
@@ -797,7 +959,7 @@ export class Journal {
   ): void {
     let payload: unknown;
     try {
-      payload = JSON.parse(row.payload_json);
+      payload = JSON.parse(this.decodePayload(row.payload_json));
     } catch {
       return;
     }
@@ -810,6 +972,113 @@ export class Journal {
       spillKey: row.spill_key,
       payload,
     });
+  }
+
+  /**
+   * `history.search`: matches from the transcript index, newest or best
+   * first. With encryption on, the index holds keyed hash tokens and the
+   * snippet is rebuilt from the encrypted side text; without it, the
+   * original plaintext FTS snippet path serves.
+   */
+  searchTranscript(
+    text: string,
+    options: HistorySearchOptions = {},
+  ): HistorySearchHit[] {
+    const crypto = this.ensureCrypto();
+    const match = crypto
+      ? historySearchTerms(text)
+          .map(
+            (tokens) =>
+              `"${tokens.map((token) => crypto.searchToken(token)).join(" ")}"`,
+          )
+          .join(" ")
+      : historySearchMatch(text);
+    if (!match) {
+      throw new Error("history.search needs at least one word to look for.");
+    }
+    const kinds = historySearchKinds(options);
+    const limit = historySearchLimit(options);
+    const where = [`journal_fts MATCH ?`];
+    const params: SqlStorageValue[] = [match];
+    if (kinds.length > 0) {
+      where.push(`role IN (${kinds.map(() => "?").join(", ")})`);
+      params.push(...kinds);
+    }
+    if (Number.isSafeInteger(options.beforeSeq)) {
+      where.push("rowid < ?");
+      params.push(options.beforeSeq as number);
+    }
+    const floor = this.meta().hot_min_seq;
+    const rows = this.sql
+      .exec<{
+        seq: number;
+        kind: string;
+        turn_id: string;
+        created_at: number;
+        snippet: string;
+      }>(
+        `SELECT rowid AS seq, role AS kind, turn_id, created_at,
+                ${crypto ? "''" : "snippet(journal_fts, 0, '[', ']', '…', 32)"} AS snippet
+           FROM journal_fts
+          WHERE ${where.join(" AND ")}
+          ORDER BY ${options.order === "newest" ? "rowid DESC" : "rank"}
+          LIMIT ?`,
+        ...params,
+        limit,
+      )
+      .toArray();
+    return rows.map((row) => ({
+      seq: row.seq,
+      kind: row.kind,
+      at: new Date(Number(row.created_at)).toISOString(),
+      turnId: row.turn_id,
+      snippet: crypto ? this.searchSnippet(row.seq, text) : row.snippet,
+      archived: row.seq < floor,
+    }));
+  }
+
+  private searchSnippet(seq: number, queryText: string): string {
+    const crypto = this.ensureCrypto();
+    if (!crypto) return "";
+    let text: string | null = null;
+    const side = this.sql
+      .exec<{ enc_text: string }>(
+        `SELECT enc_text FROM journal_fts_text WHERE seq = ?`,
+        seq,
+      )
+      .toArray()[0];
+    if (side) {
+      try {
+        text = crypto.decryptText(side.enc_text);
+      } catch {
+        text = null;
+      }
+    }
+    if (!text) {
+      const row = this.sql
+        .exec<{ payload_json: string }>(
+          `SELECT payload_json FROM journal WHERE seq = ?`,
+          seq,
+        )
+        .toArray()[0];
+      if (!row) return "";
+      try {
+        text = collapseWhitespace(
+          extractMessageText(JSON.parse(this.decodePayload(row.payload_json))),
+        );
+      } catch {
+        return "";
+      }
+    }
+    const lower = text.toLowerCase();
+    for (const token of historyTokens(queryText)) {
+      const at = lower.indexOf(token);
+      if (at < 0) continue;
+      const start = Math.max(0, at - 80);
+      const end = Math.min(text.length, at + token.length + 80);
+      return `${start > 0 ? "…" : ""}${text.slice(start, at)}[${text.slice(at, at + token.length)}]${text.slice(at + token.length, end)}${end < text.length ? "…" : ""}`;
+    }
+    return text.length > 160 ? `${text.slice(0, 160)}…` : text;
   }
 
   // -------------------------------------------------------------------------
@@ -951,9 +1220,22 @@ export class Journal {
    * spin on forever.
    */
   private insert(
-    columns: Record<string, string | number | null>,
+    inputColumns: Record<string, string | number | null>,
     writerKey: string,
   ): { seq: number; inserted: boolean } {
+    const columns = { ...inputColumns };
+    if (typeof columns.payload_json === "string") {
+      // A tool result can carry a secret a command happened to print. The
+      // stored copy keeps none of it; the user's own messages are their
+      // history and are never rewritten.
+      if (columns.role === "toolResult") {
+        columns.payload_json = redactSensitiveText(columns.payload_json);
+      }
+      columns.payload_json = this.encodePayload(columns.payload_json);
+      if (typeof columns.bytes === "number") {
+        columns.bytes = utf8Length(columns.payload_json);
+      }
+    }
     return this.transactionSync(() => {
       const existing = this.sql
         .exec<{
@@ -1257,7 +1539,7 @@ export class Journal {
     this.recordSpill(spillKey, bytes, Date.now());
     this.sql.exec(
       `UPDATE journal SET payload_json = ?, spill_key = ? WHERE seq = ? AND spill_key IS NULL`,
-      JSON.stringify({ $spill: true, role, bytes }),
+      this.encodePayload(JSON.stringify({ $spill: true, role, bytes })),
       spillKey,
       seq,
     );
@@ -1313,7 +1595,7 @@ export class Journal {
       if (row.spill_key) continue;
       let parsed: unknown;
       try {
-        parsed = JSON.parse(row.payload_json);
+        parsed = JSON.parse(this.decodePayload(row.payload_json));
       } catch {
         continue;
       }
@@ -1400,7 +1682,7 @@ export class Journal {
       if (row.spill_key) continue;
       let parsed: unknown;
       try {
-        parsed = JSON.parse(row.payload_json);
+        parsed = JSON.parse(this.decodePayload(row.payload_json));
       } catch {
         continue;
       }
@@ -1555,7 +1837,9 @@ export class Journal {
       rows: rows.map((row) => {
         let message: AgentMessage | null = null;
         try {
-          const parsed = JSON.parse(row.payload_json) as unknown;
+          const parsed = JSON.parse(
+            this.decodePayload(row.payload_json),
+          ) as unknown;
           message =
             row.spill_key && isSpillStub(parsed)
               ? null
@@ -1584,7 +1868,7 @@ export class Journal {
       .toArray()[0];
     if (!row) return null;
     try {
-      return JSON.parse(row.payload_json) as AgentMessage;
+      return JSON.parse(this.decodePayload(row.payload_json)) as AgentMessage;
     } catch {
       return null;
     }
@@ -1715,7 +1999,7 @@ export class Journal {
       });
       let parsed: unknown;
       try {
-        parsed = JSON.parse(row.payload_json);
+        parsed = JSON.parse(this.decodePayload(row.payload_json));
       } catch {
         // Never silently omit canonical history. Doing so lets the provider
         // answer from a context the user cannot inspect or repair and makes a
@@ -1781,7 +2065,7 @@ export class Journal {
   rowToRecord(row: JournalRow): JournalRecord {
     const parse = (): unknown => {
       try {
-        return JSON.parse(row.payload_json);
+        return JSON.parse(this.decodePayload(row.payload_json));
       } catch {
         return null;
       }
@@ -2151,8 +2435,8 @@ export class Journal {
       input.role ?? null,
       input.hidden ? 1 : 0,
       input.now,
-      utf8Length(input.payloadJson),
-      input.payloadJson,
+      utf8Length(this.encodePayload(input.payloadJson)),
+      this.encodePayload(input.payloadJson),
     );
   }
 
@@ -2174,7 +2458,11 @@ export class Journal {
            FROM inbox ORDER BY id ASC LIMIT ?`,
         limit,
       )
-      .toArray();
+      .toArray()
+      .map((row) => ({
+        ...row,
+        payload_json: this.decodePayload(row.payload_json),
+      }));
   }
 
   dropInbox(id: number): void {
@@ -2198,7 +2486,7 @@ export class Journal {
       if (row.spill_key) continue;
       let parsed: unknown;
       try {
-        parsed = JSON.parse(row.payload_json);
+        parsed = JSON.parse(this.decodePayload(row.payload_json));
       } catch {
         continue;
       }

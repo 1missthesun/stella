@@ -180,7 +180,13 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     this.exactTurnCancellations = new ExactTurnCancellationLedger(ctx.storage);
-    this.journal = new Journal(ctx, log);
+    this.journal = new Journal(
+      ctx,
+      log,
+      typeof (env as unknown as Record<string, unknown>).OWNER_SECRETS_KEK === "string"
+        ? ((env as unknown as Record<string, unknown>).OWNER_SECRETS_KEK as string)
+        : null,
+    );
     this.archive = new ConversationArchive(
       env.CONVERSATION_ARCHIVE,
       this.journal,

@@ -82,12 +82,32 @@ const capUtf8 = (value: string, maxBytes: number): string => {
     .replace(/\uFFFD$/u, "");
 };
 
+/**
+ * Privacy codec for an index whose owner encrypts at rest: the FTS table
+ * then holds keyed hash tokens instead of words, and the readable text a
+ * snippet is built from lives encrypted in `<table>_text`. Without a codec
+ * the index keeps its original plaintext form.
+ */
+export type TranscriptSearchCodec = {
+  indexedText: (text: string) => string;
+  encryptSideText: (text: string) => string | null;
+};
+
+export const transcriptSearchTextDdl = (
+  tableName = DEFAULT_TRANSCRIPT_SEARCH_TABLE,
+): string =>
+  `CREATE TABLE IF NOT EXISTS ${tableIdentifier(tableName)}_text (
+     seq      INTEGER PRIMARY KEY,
+     enc_text TEXT    NOT NULL
+   )`;
+
 export class TranscriptSearchIndex {
   private readonly table: string;
 
   constructor(
     private readonly sql: SqlStorage,
     tableName = DEFAULT_TRANSCRIPT_SEARCH_TABLE,
+    private readonly codec: TranscriptSearchCodec | null = null,
   ) {
     this.table = tableIdentifier(tableName);
   }
@@ -103,15 +123,27 @@ export class TranscriptSearchIndex {
       `INSERT INTO ${this.table} (rowid, text, turn_id, role, created_at)
        VALUES (?, ?, ?, ?, ?)`,
       row.seq,
-      text,
+      this.codec ? this.codec.indexedText(text) : text,
       row.turnId,
       kind,
       row.createdAt,
     );
+    const encText = this.codec?.encryptSideText(text);
+    if (encText) {
+      this.sql.exec(
+        `INSERT INTO ${this.table}_text (seq, enc_text) VALUES (?, ?)
+         ON CONFLICT(seq) DO UPDATE SET enc_text = excluded.enc_text`,
+        row.seq,
+        encText,
+      );
+    }
   }
 
   remove(seq: number): void {
     this.sql.exec(`DELETE FROM ${this.table} WHERE rowid = ?`, seq);
+    if (this.codec) {
+      this.sql.exec(`DELETE FROM ${this.table}_text WHERE seq = ?`, seq);
+    }
   }
 
   count(): number {

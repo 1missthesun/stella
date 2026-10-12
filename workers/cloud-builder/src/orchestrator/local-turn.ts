@@ -21,7 +21,7 @@ import {
   parseJournalCheckpointFirstKept,
 } from "@stella/contracts/journal-checkpoint";
 import { sha256Hex } from "../hash.js";
-import { historySearchOptions, runHistoryQuery, searchHistory } from "../history-sql.js";
+import { historySearchOptions, runHistoryQuery } from "../history-sql.js";
 import {
   APPEND_WINDOW_MAX_BYTES,
   APPEND_WINDOW_MAX_REQUESTS,
@@ -350,7 +350,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         throw new Error("history.search requires the text to look for.");
       }
       await this.archive.reindexArchivedSearch();
-      return searchHistory(this.ctx.storage, body.text, historySearchOptions(body.options));
+      return this.journal.searchTranscript(body.text, historySearchOptions(body.options));
     }
     if (body?.op === "sql") {
       if (typeof body.query !== "string" || !body.query.trim()) {

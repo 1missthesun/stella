@@ -49,9 +49,10 @@ export type { MessageRole, TurnPhase };
  * the new epoch; 6 adds atomic edit receipts for crash-safe rewind replay;
  * 7 adds retired turn fences; 8 moves transcript search into a
  * rollover-surviving FTS5 table; 9 searches agents' reports and messages too;
- * 10 keeps the resident set's rows, bytes and tokens on `meta`.
+ * 10 keeps the resident set's rows, bytes and tokens on `meta`; 11 encrypts
+ * payloads under a per-conversation key and hashes the search index.
  */
-export const JOURNAL_SCHEMA_VERSION = 10;
+export const JOURNAL_SCHEMA_VERSION = 11;
 
 // ---------------------------------------------------------------------------
 // Residency / rollover

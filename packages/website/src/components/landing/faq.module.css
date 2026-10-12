@@ -147,3 +147,17 @@
     transition: none;
   }
 }
+
+.a p a {
+  color: #0a0a0d;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: #703cff;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  transition: color 150ms ease;
+}
+
+.a p a:hover {
+  color: #703cff;
+}

@@ -31,11 +31,11 @@ export const FAQ: Answer[] = [
   },
   {
     q: "Is Stella open source?",
-    a: "Yes. Stella is open source under the Apache 2.0 license. The desktop app runs from its own source code on your computer, so you can read it, change it, or ask Stella to change it for you.",
+    a: "Yes. Stella is open source under the Apache 2.0 license, with the code [on GitHub](https://github.com/1missthesun/stella-v2). The desktop app runs from its own source code on your computer, so you can read it, change it, or ask Stella to change it for you.",
   },
   {
     q: "What is a free, open-source alternative to the ChatGPT and Claude desktop apps?",
-    a: "Stella. It is open source under Apache 2.0, the Free plan costs nothing, and it can act across your whole computer. It also runs on the same models: sign in with your ChatGPT plan, use Claude Code, or add your own Anthropic or OpenAI key.",
+    a: "Stella. It is [open source](https://github.com/1missthesun/stella-v2) under Apache 2.0, the Free plan costs nothing, and it can act across your whole computer. It also runs on the same models: sign in with your ChatGPT plan, use Claude Code, or add your own Anthropic or OpenAI key.",
   },
   {
     q: "Can I use Claude Code, ChatGPT or my own API keys with Stella?",
@@ -198,11 +198,11 @@ export const ANSWER_PAGES: AnswerPage[] = [
     eyebrow: "Stella for Linux",
     headline: "An AI assistant for Linux.",
     answer:
-      "Stella is an open-source AI assistant with a Linux desktop app. Install it with one command, including on Arch and Omarchy, and it works with your files, terminal, browser and chat from one ongoing conversation. Free.",
+      "Stella is an [open-source](https://github.com/1missthesun/stella-v2) AI assistant with a Linux desktop app. Install it with one command, including on Arch and Omarchy, and it works with your files, terminal, browser and chat from one ongoing conversation. Free.",
     points: [
       { title: "One-line install", body: "curl -fsSL https://stella.sh/install.sh | sh, with Arch and Omarchy packaging." },
       { title: "Files, terminal, browser", body: "Stella organises files, runs commands, fixes broken environments and browses for you." },
-      { title: "Open source", body: "Apache 2.0. The app runs from its own source, so you can read it and change it." },
+      { title: "Open source", body: "Apache 2.0, [on GitHub](https://github.com/1missthesun/stella-v2). The app runs from its own source, so you can read it and change it." },
     ],
     questions: [
       faq("Does Stella work on Linux, Arch or Omarchy?"),
@@ -225,9 +225,9 @@ export const ANSWER_PAGES: AnswerPage[] = [
     eyebrow: "Open source",
     headline: "An open-source AI assistant.",
     answer:
-      "Stella is an open-source personal AI assistant under the Apache 2.0 license. It runs on Mac, Windows and Linux, uses your computer, browser and files, and works with the models you choose: its own, Claude Code, your ChatGPT plan, your API keys or local models. Free.",
+      "Stella is an [open-source](https://github.com/1missthesun/stella-v2) personal AI assistant under the Apache 2.0 license. It runs on Mac, Windows and Linux, uses your computer, browser and files, and works with the models you choose: its own, Claude Code, your ChatGPT plan, your API keys or local models. Free.",
     points: [
-      { title: "Read it, change it", body: "The desktop app runs from its own source code on your computer." },
+      { title: "Read it, change it", body: "The desktop app runs from its own source code on your computer. Read it [on GitHub](https://github.com/1missthesun/stella-v2)." },
       { title: "Or ask it to change itself", body: "Tell Stella how you want it to look or work, preview the change, and click Update." },
       { title: "Your models", body: "Bring Claude Code, ChatGPT, OpenRouter, any supported key, or a local model." },
     ],
@@ -297,6 +297,25 @@ export function getAnswerPage(slug: string) {
   return ANSWER_PAGES.find((page) => page.slug === slug);
 }
 
+const LINK = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+
+export function plainText(text: string): string {
+  return text.replace(LINK, (_, label: string, href: string) => `${label} (${href})`);
+}
+
+export function linkParts(text: string): ({ text: string } | { label: string; href: string })[] {
+  const parts: ({ text: string } | { label: string; href: string })[] = [];
+  let last = 0;
+  for (const match of text.matchAll(LINK)) {
+    const index = match.index ?? 0;
+    if (index > last) parts.push({ text: text.slice(last, index) });
+    parts.push({ label: match[1], href: match[2] });
+    last = index + match[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
+  return parts;
+}
+
 export function faqJsonLd(items: Answer[], url: string) {
   return {
     "@context": "https://schema.org",
@@ -306,7 +325,7 @@ export function faqJsonLd(items: Answer[], url: string) {
     mainEntity: items.map((item) => ({
       "@type": "Question",
       name: item.q,
-      acceptedAnswer: { "@type": "Answer", text: item.a },
+      acceptedAnswer: { "@type": "Answer", text: plainText(item.a) },
     })),
   };
 }

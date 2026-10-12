@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ANSWER_PAGES, FAQ, faqJsonLd } from "@/lib/answers";
 import { getSiteUrl } from "@/lib/site-url";
+import { LinkedText } from "./linked-text";
 import f from "./faq.module.css";
 
 export function FaqSection() {
@@ -24,7 +25,9 @@ export function FaqSection() {
               <i className={f.icon} aria-hidden="true" />
             </summary>
             <div className={f.a}>
-              <p>{item.a}</p>
+              <p>
+                <LinkedText text={item.a} />
+              </p>
             </div>
           </details>
         ))}

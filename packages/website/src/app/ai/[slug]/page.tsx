@@ -7,6 +7,7 @@ import { Finale, LandingFooter } from "@/components/landing/closing";
 import { landingFontVars } from "@/components/landing/fonts";
 import { LandingHeader } from "@/components/landing/landing-header";
 import l from "@/components/landing/landing.module.css";
+import { LinkedText } from "@/components/landing/linked-text";
 import { ANSWER_PAGES, faqJsonLd, getAnswerPage } from "@/lib/answers";
 import { getSiteUrl } from "@/lib/site-url";
 import a from "./answer.module.css";
@@ -68,7 +69,7 @@ export default async function AnswerPage({
           <h1 id="answer-title" className={a.title}>
             {page.headline}
           </h1>
-          <p className={a.answer}>{page.answer}</p>
+          <p className={a.answer}><LinkedText text={page.answer} /></p>
           <div className={a.cta}>
             <DownloadButton />
             <span className={a.free}>Free.</span>
@@ -79,7 +80,9 @@ export default async function AnswerPage({
           {page.points.map((point) => (
             <div key={point.title} className={a.point}>
               <h2>{point.title}</h2>
-              <p>{point.body}</p>
+              <p>
+                <LinkedText text={point.body} />
+              </p>
             </div>
           ))}
         </section>
@@ -92,7 +95,9 @@ export default async function AnswerPage({
             {page.questions.map((item) => (
               <div key={item.q} className={a.qaItem}>
                 <h3>{item.q}</h3>
-                <p>{item.a}</p>
+                <p>
+                  <LinkedText text={item.a} />
+                </p>
               </div>
             ))}
             <Link href="/#faq" className={a.qaMore}>

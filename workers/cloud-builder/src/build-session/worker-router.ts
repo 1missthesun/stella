@@ -120,6 +120,7 @@ import {
   json,
   log,
   ORCHESTRATOR_INTERNAL_ORIGIN,
+  withInfrastructureDeadline,
 } from "./shared/keys.js";
 import type { ConversationCaller, DispatchCaller } from "./shared/types.js";
 import {
@@ -1182,17 +1183,12 @@ app.all("/conversations/:id/socket", socketOnly, userAuth({ socket: "conversatio
   const requestId = c.var.requestId;
   const startedAt = Date.now();
   log("info", "conversation_socket_forwarding", { requestId, conversationId });
-  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    return await Promise.race([
+    return await withInfrastructureDeadline(
       forwardToConversation(c.req.raw, c.env, conversationId, "/socket", c.var.caller),
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(
-          () => reject(new Error("conversation socket hand-off timed out")),
-          SOCKET_HANDOFF_TIMEOUT_MS,
-        );
-      }),
-    ]);
+      SOCKET_HANDOFF_TIMEOUT_MS,
+      "conversation socket hand-off timed out",
+    );
   } catch (error) {
     log("error", "conversation_socket_forward_failed", {
       requestId,
@@ -1206,8 +1202,6 @@ app.all("/conversations/:id/socket", socketOnly, userAuth({ socket: "conversatio
       "Stella couldn't open this conversation. Try again.",
       { retryable: true, ref: requestId },
     );
-  } finally {
-    clearTimeout(timer);
   }
 });
 app.post("/conversations/:id/turns", (c) =>

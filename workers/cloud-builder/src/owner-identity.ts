@@ -7,6 +7,7 @@
  */
 
 import type { VerifiedToken } from "./auth-jwt.js";
+import { withInfrastructureDeadline } from "./build-session/shared/keys.js";
 import { ownerGateStub } from "./rpc-release.js";
 
 const NOTED_MAX = 10_000;
@@ -19,28 +20,21 @@ export const noteOwnerIdentity = async (
 ): Promise<void> => {
   const identity = `${token.isAnonymous ? 1 : 0}:${token.identityLevel}`;
   if (noted.get(token.ownerId) === identity) return;
-  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    await Promise.race([
+    await withInfrastructureDeadline(
       ownerGateStub(env.OWNER_GATES, token.ownerId).noteIdentity({
         isAnonymous: token.isAnonymous,
         identityLevel: token.identityLevel,
       }),
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(
-          () => reject(new Error("owner identity note timed out")),
-          NOTE_TIMEOUT_MS,
-        );
-      }),
-    ]);
+      NOTE_TIMEOUT_MS,
+      "owner identity note timed out",
+    );
   } catch (error) {
     // The owner object refuses the turn itself if it is unreachable.
     console.error(
       JSON.stringify({ event: "owner_identity_note_failed", message: error instanceof Error ? error.message : String(error) }),
     );
     return;
-  } finally {
-    clearTimeout(timer);
   }
   if (noted.size >= NOTED_MAX) noted.clear();
   noted.set(token.ownerId, identity);

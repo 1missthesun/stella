@@ -607,6 +607,8 @@ const iterate = async (variation) => {
     const processStart = starting.at - starting.fields.startupMs;
     const firstPaint = tail.find("startup.first-paint", (entry) => entry.at > starting.at);
     const hostReady = tail.find("startup.host-runner.ready", (entry) => entry.at > starting.at);
+    const shown = tail.find("startup.window-shown", (entry) => entry.at > starting.at);
+    const resumeHold = tail.find("app-source.resume-hold", (entry) => entry.at > starting.at);
     const quitElapsed = tail.find("main.quit-cleanup-elapsed");
     const phases = tail.events.filter((entry) => entry.event === "main.quit-phase");
     record.liveMs = liveAt - t0;
@@ -622,6 +624,9 @@ const iterate = async (variation) => {
       hostReadyMs: hostReady ? hostReady.at - processStart : undefined,
       liveMs: liveAt - processStart,
       transitionDoneMs: transition ? transition.at - processStart : undefined,
+      windowShownMs: shown ? shown.at - processStart : undefined,
+      shownWith: shown?.fields.shownWith,
+      resumeHold: resumeHold ? `attach ${resumeHold.fields.attachMs} hold ${resumeHold.fields.holdMs}` : undefined,
     };
     const pid = starting.fields.pid;
     run = { ...readRun(), electronPid: pid };

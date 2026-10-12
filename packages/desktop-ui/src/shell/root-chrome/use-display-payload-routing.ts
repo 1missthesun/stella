@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { useCallback, useEffect, type RefObject } from "react";
 import { useMediaMaterializer } from "@/app/media/use-media-materializer";
 import {
   type DisplayTabPayload,
@@ -9,16 +9,6 @@ import { maybeHandleCanvasShareUrl } from "@/features/canvas-share/open-shared-c
 
 type UseDisplayPayloadRoutingOptions = {
   rightSidebarRef: RefObject<RightSidebarHandle | null>;
-};
-
-type UseDisplayPayloadRoutingResult = {
-  routeDisplayPayload: (payload: DisplayTabPayload) => void;
-  /**
-   * The most recently routed payload, kept around so the workspace
-   * panel can fall back to it when the user manually summons the
-   * panel without an active payload (see `useWorkspacePanelEvents`).
-   */
-  latestDisplayPayloadRef: RefObject<DisplayTabPayload | null>;
 };
 
 /**
@@ -34,12 +24,9 @@ type UseDisplayPayloadRoutingResult = {
  */
 export function useDisplayPayloadRouting({
   rightSidebarRef,
-}: UseDisplayPayloadRoutingOptions): UseDisplayPayloadRoutingResult {
-  const latestDisplayPayloadRef = useRef<DisplayTabPayload | null>(null);
-
+}: UseDisplayPayloadRoutingOptions): void {
   const routeDisplayPayload = useCallback(
     (payload: DisplayTabPayload) => {
-      latestDisplayPayloadRef.current = payload;
       const ds = rightSidebarRef.current;
       if (!ds) return;
       ds.update(payload);
@@ -91,9 +78,4 @@ export function useDisplayPayloadRouting({
   // another device, the agent, the studio, …) gets downloaded into
   // `~/.stella/media/outputs/` and surfaced in the workspace panel.
   useMediaMaterializer({ onMaterialized: routeDisplayPayload });
-
-  return {
-    routeDisplayPayload,
-    latestDisplayPayloadRef,
-  };
 }

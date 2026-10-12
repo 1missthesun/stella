@@ -8,7 +8,6 @@ import {
 import { useIdleHomeVisibility } from "@/features/chat/hooks/use-idle-home-visibility";
 import { uiState } from "@/platform/ui-state";
 import {
-  STELLA_ENTER_CHAT_EVENT,
   STELLA_SHOW_HOME_EVENT,
 } from "@/shared/lib/stella-orb-chat";
 
@@ -146,12 +145,6 @@ export function useChatHomeSurface({
     setIsHomeDismissed(true);
     writePersistedChatHomeSurface("chat");
   }, []);
-
-  useEffect(() => {
-    const handler = () => enterChatSurfaceForInteraction();
-    window.addEventListener(STELLA_ENTER_CHAT_EVENT, handler);
-    return () => window.removeEventListener(STELLA_ENTER_CHAT_EVENT, handler);
-  }, [enterChatSurfaceForInteraction]);
 
   const dismissHome = useCallback(() => {
     setIsHomeDismissed(true);

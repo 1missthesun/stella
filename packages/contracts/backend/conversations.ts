@@ -1,5 +1,3 @@
-import type { CloudExecutionSelection } from "../agent-engine.js";
-
 /**
  * Conversations and the owner identity, served from the owner's object.
  * The conversation's transcript stays in its own `OrchestratorSession`; this
@@ -28,19 +26,6 @@ export type OwnerIdentity = {
 export type ConversationCalls = {
   "owner.identity": { args: Record<string, never>; result: OwnerIdentity };
   /**
-   * Create a conversation without starting a turn. `clientCreateId` makes a
-   * retried create return the same conversation.
-   */
-  "conversations.create": {
-    args: {
-      clientCreateId: string;
-      requestedConversationId?: string;
-      title?: string;
-      execution?: CloudExecutionSelection;
-    };
-    result: ConversationSummary;
-  };
-  /**
    * The account's main conversation plus the owner identity: everything a
    * client needs before showing its chat. Every client opens the same main
    * conversation. The server pins it the first time any client asks: the
@@ -51,14 +36,6 @@ export type ConversationCalls = {
   "conversations.bootstrap": {
     args: { clientCreateId?: string; preferConversationId?: string };
     result: OwnerIdentity & { conversationId: string };
-  };
-  /** Sidebar history, newest first; pass the last row back as the cursor. */
-  "conversations.page": {
-    args: {
-      before?: { updatedAt: number; conversationId: string };
-      limit?: number;
-    };
-    result: { conversations: ConversationSummary[]; hasMore: boolean };
   };
 };
 

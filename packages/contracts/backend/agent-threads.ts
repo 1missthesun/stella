@@ -158,14 +158,6 @@ export type AgentThreadControl = {
 type Origin = { originDeviceId: string; originConversationId: string };
 
 export type AgentThreadCalls = {
-  "agentThreads.page": {
-    args: {
-      conversationId: string;
-      before?: { updatedAt: number; threadId: string };
-      limit?: number;
-    };
-    result: { threads: AgentThreadSummary[]; hasMore: boolean };
-  };
   /**
    * Start a remote agent for a desktop: in the cloud, or on another of the
    * owner's devices when `targetDeviceId` names one. `clientMsgId` makes a
@@ -186,10 +178,6 @@ export type AgentThreadCalls = {
       parentThreadId?: string;
     };
     result: AgentThreadControl;
-  };
-  "agentThreads.lookup": {
-    args: { conversationId: string; threadId: string };
-    result: AgentThreadLookup | null;
   };
   /**
    * What `agent_status` without a thread_id lists from the owner's index:
@@ -241,23 +229,6 @@ export type AgentThreadCalls = {
       command: AgentControlCommand;
     };
     result: AgentControlResult;
-  };
-  /**
-   * A follow-up to a remote thread from any desktop of the owner, for a
-   * thread its conversation started (`originConversationId`): it steers a
-   * running attempt or starts the next one.
-   */
-  "agentThreads.continueFromDesktop": {
-    args: Origin & {
-      ownerGeneration: string;
-      threadId: string;
-      expectedAttemptGeneration: number;
-      expectedTerminalUpdatedAt: number;
-      description: string;
-      prompt: string;
-      controlRequestId: string;
-    };
-    result: AgentThreadControl;
   };
   /**
    * Stop a running remote thread from any desktop of the owner, for a
@@ -357,7 +328,6 @@ export type ComputerThreadRecord = {
 };
 
 export type AgentThreadViews = {
-  "agentThreads.recent": { args: { limit?: number }; result: AgentThreadSummary[] };
   "agentThreads.running": {
     args: { conversationId: string };
     result: AgentThreadSummary[];

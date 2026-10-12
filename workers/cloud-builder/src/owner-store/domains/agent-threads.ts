@@ -35,7 +35,6 @@ import {
   type AgentControlResult,
   type AgentThreadCalls,
   type AgentThreadControl,
-  type AgentThreadLookup,
   type AgentThreadSummary,
   type ComputerThreadRecord,
   type DeviceAgentThread,
@@ -57,7 +56,6 @@ import {
 import {
   agentMessageDelivery,
   AGENT_PROMPT_MAX_CHARS,
-  AGENT_THREAD_PAGE_MAX,
   RUNNING_AGENT_THREADS_LIMIT,
   CONVERSATION_AGENT_THREADS_MAX,
 } from "@stella/contracts/backend/agent-threads";
@@ -983,43 +981,6 @@ const deviceLabels = async (ctx: OwnerContext): Promise<Map<string, string>> => 
   return labels;
 };
 
-const lookupConversationThread = async (
-  ctx: OwnerContext,
-  args: { conversationId: string; threadId: string; ownerGeneration?: string },
-): Promise<AgentThreadLookup | null> => {
-  const thread = readConversationThread(ctx.db, args.conversationId, args.threadId);
-  if (
-    !thread ||
-    (thread.conversation_id !== args.conversationId &&
-      thread.origin_conversation_id !== args.conversationId) ||
-    (args.ownerGeneration !== undefined &&
-      thread.owner_generation !== null &&
-      thread.owner_generation !== args.ownerGeneration)
-  ) {
-    return null;
-  }
-  const labels =
-    thread.executor_device_id || thread.origin_device_id
-      ? await deviceLabels(ctx)
-      : new Map<string, string>();
-  const executorLabel = thread.executor_device_id ? labels.get(thread.executor_device_id) : undefined;
-  const originLabel = thread.origin_device_id ? labels.get(thread.origin_device_id) : undefined;
-  return {
-    ...summary(thread, ctx.ownerId),
-    ...(thread.origin_device_id ? { originDeviceId: thread.origin_device_id } : {}),
-    ...(originLabel ? { originDeviceLabel: originLabel } : {}),
-    ...(executorLabel ? { executorDeviceLabel: executorLabel } : {}),
-  };
-};
-
-const conversationThreadForCloud = async (
-  ctx: OwnerContext,
-  raw: unknown,
-): Promise<AgentThreadLookup | null> => {
-  const args = object({ ownerGeneration: generation, conversationId: id(), threadId: id() })(raw);
-  return await lookupConversationThread(ctx, args);
-};
-
 /** A cloud requester's follow-up to a device thread of its conversation: steered, or its next attempt. */
 const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<AgentThreadControl> => {
   const args = object({
@@ -1411,61 +1372,6 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
     },
   );
   return { ...control(thread), ...(destination?.waiting ? { waitingForDevice: true } : {}) };
-};
-
-type ContinueArgs = AgentThreadCalls["agentThreads.continueFromDesktop"]["args"];
-
-const continueFromDesktop = async (
-  ctx: OwnerContext,
-  args: ContinueArgs,
-): Promise<AgentThreadControl> => {
-  if (!CONTROL_REQUEST_ID_PATTERN.test(args.controlRequestId)) {
-    throw new RpcError("BAD_REQUEST", "That follow-up could not be sent. Try again.");
-  }
-  assertPrompt(args.prompt, args.description);
-  const fingerprint = await sha256Hex(
-    JSON.stringify([
-      "continue-agent-intent/v1",
-      args.threadId,
-      args.expectedAttemptGeneration,
-      args.expectedTerminalUpdatedAt,
-      args.description,
-      args.prompt,
-      args.originDeviceId,
-      args.originConversationId,
-    ]),
-  );
-  const replay = replayAttempt(ctx.db, args.controlRequestId, fingerprint, args.ownerGeneration);
-  if (replay) return replay;
-  await assertGeneration(ctx, args.ownerGeneration);
-  const thread = readThread(ctx.db, args.threadId);
-  if (
-    !thread ||
-    !conversationControls(thread, { ownerGeneration: args.ownerGeneration, conversationId: args.originConversationId })
-  ) {
-    throw new RpcError("NOT_FOUND", "That cloud thread no longer exists.");
-  }
-  if (ACTIVE_STATUSES.has(thread.status)) {
-    if (thread.attempt_generation !== args.expectedAttemptGeneration) {
-      throw threadChanged(thread.thread_id);
-    }
-  } else if (
-    thread.attempt_generation !== args.expectedAttemptGeneration ||
-    thread.updated_at !== args.expectedTerminalUpdatedAt
-  ) {
-    throw threadChanged(thread.thread_id);
-  }
-  await controlAgent(ctx, {
-    commandId: `continue:${args.controlRequestId}`,
-    kind: "message",
-    thread,
-    ownerGeneration: args.ownerGeneration,
-    text: args.prompt,
-    source: `device:${args.originDeviceId}`,
-    detail: { requester: args.originConversationId, controlRequestId: args.controlRequestId },
-    next: { clientMsgId: args.controlRequestId, fingerprint },
-  });
-  return control(readThread(ctx.db, thread.thread_id)!);
 };
 
 // ── Agent directory and messages ──────────────────────────────────────────
@@ -3378,11 +3284,6 @@ export const applyAgentThreadEvent = (
 
 // ── Views ─────────────────────────────────────────────────────────────────
 
-const recentThreads = (db: OwnerDbReader, ownerId: string, limit: number): AgentThreadSummary[] =>
-  db
-    .all<ThreadRow>("SELECT * FROM agent_threads ORDER BY updated_at DESC, thread_id DESC LIMIT ?", limit)
-    .map((row) => summary(row, ownerId));
-
 /**
  * A conversation's agents for its clients: the ones it holds and the ones it
  * started whose rows sit in another cloud conversation (a desktop's cloud
@@ -3440,32 +3341,6 @@ const deviceThreads = (
       originConversationId: row.origin_conversation_id ?? row.conversation_id,
       ownerGeneration: row.owner_generation!,
     }));
-
-const threadPage = (
-  db: OwnerDbReader,
-  ownerId: string,
-  args: AgentThreadCalls["agentThreads.page"]["args"],
-): AgentThreadCalls["agentThreads.page"]["result"] => {
-  const limit = Math.min(Math.max(args.limit ?? 30, 1), AGENT_THREAD_PAGE_MAX);
-  const rows = args.before
-    ? db.all<ThreadRow>(
-        `SELECT * FROM agent_threads WHERE conversation_id = ?
-           AND (updated_at < ? OR (updated_at = ? AND thread_id < ?))
-         ORDER BY updated_at DESC, thread_id DESC LIMIT ?`,
-        args.conversationId,
-        args.before.updatedAt,
-        args.before.updatedAt,
-        args.before.threadId,
-        limit + 1,
-      )
-    : db.all<ThreadRow>(
-        `SELECT * FROM agent_threads WHERE conversation_id = ?
-         ORDER BY updated_at DESC, thread_id DESC LIMIT ?`,
-        args.conversationId,
-        limit + 1,
-      );
-  return { threads: rows.slice(0, limit).map((row) => summary(row, ownerId)), hasMore: rows.length > limit };
-};
 
 // ── Registration ──────────────────────────────────────────────────────────
 
@@ -3594,20 +3469,6 @@ export const agentThreadsDomain = {
     },
   ],
   calls: {
-    "agentThreads.page": {
-      scope: "owner",
-      parse: object({
-        conversationId: id(),
-        before: optional(object({ updatedAt: number({ int: true, min: 0 }), threadId: id() })),
-        limit: optional(number({ int: true, min: 1, max: AGENT_THREAD_PAGE_MAX })),
-      }),
-      handler: (ctx, args) => threadPage(ctx.db, ctx.ownerId, args),
-    },
-    "agentThreads.lookup": {
-      scope: "owner",
-      parse: object({ conversationId: id(256), threadId: id(256) }),
-      handler: (ctx, args) => lookupConversationThread(ctx, args),
-    },
     "agentThreads.directory": {
       scope: "owner",
       parse: object({ conversationId: id(256) }),
@@ -3647,21 +3508,6 @@ export const agentThreadsDomain = {
         parentThreadId: optional(id()),
       }),
       handler: spawnFromDesktop,
-    },
-    "agentThreads.continueFromDesktop": {
-      scope: "owner",
-      requireAccount: true,
-      parse: object({
-        ...origin,
-        ownerGeneration: generation,
-        threadId: id(),
-        expectedAttemptGeneration: number({ int: true, min: 1 }),
-        expectedTerminalUpdatedAt: number({ int: true, min: 0 }),
-        description: string({ max: 2_000 }),
-        prompt: string({ max: AGENT_PROMPT_MAX_CHARS }),
-        controlRequestId: id(),
-      }),
-      handler: continueFromDesktop,
     },
     "agentThreads.cancel": {
       scope: "owner",
@@ -3758,10 +3604,6 @@ export const agentThreadsDomain = {
     },
   },
   views: {
-    "agentThreads.recent": {
-      parse: object({ limit: optional(number({ int: true, min: 1, max: 100 })) }),
-      read: (ctx, args) => recentThreads(ctx.db, ctx.ownerId, args.limit ?? 30),
-    },
     "agentThreads.running": {
       parse: object({ conversationId: id() }),
       read: (ctx, args) => runningThreads(ctx.db, ctx.ownerId, args.conversationId),
@@ -3803,7 +3645,6 @@ export const agentThreadsDomain = {
     "agentThreads.holdForUsageLimit": holdConversationForUsageLimit,
     "agentThreads.spawnOnDevice": spawnOnDeviceForCloud,
     "agentThreads.deviceThread": deviceThreadForCloud,
-    "agentThreads.conversationThread": conversationThreadForCloud,
     "agentThreads.continueOnDevice": continueDeviceForCloud,
     "agentThreads.cancelOnDevice": cancelDeviceForCloud,
     "agentThreads.deviceSettled": deviceSettled,

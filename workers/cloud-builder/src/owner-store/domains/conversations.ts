@@ -20,25 +20,19 @@ import {
   CONVERSATION_TITLE_MAX,
   RECENT_CONVERSATIONS_LIMIT,
 } from "@stella/contracts/backend/conversations";
-import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type {
   ConversationCreatedEvent,
   ConversationDeletedEvent,
   ConversationIndexEvent,
   TurnStartedEvent,
 } from "@stella/contracts/turn-plane/owner-events";
-import { parseCloudExecutionSelection } from "../../turn-start-request.js";
-import { empty, number, object, optional, string } from "../args.js";
-import type { Parser } from "../args.js";
-import { RpcError } from "../errors.js";
+import { empty, object, optional, string } from "../args.js";
 import {
   CONVERSATION_PURGE_JOB,
   conversationPurgeJob,
   purgeConversationData,
   scheduleConversationPurge,
 } from "../purge.js";
-import { executionUnavailableMessage, snapshotAllowsExecution } from "../../owner-gate/support.js";
-import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
 export type ConversationRow = {
@@ -110,7 +104,6 @@ export const CONVERSATIONS_MAIN_MIGRATION = {
 export const CONVERSATION_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export const CLIENT_CREATE_ID_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
-const MAX_PAGE = 50;
 
 export const clip = (value: string, max: number): string =>
   value.length > max ? `${value.slice(0, max - 1)}…` : value;
@@ -153,24 +146,6 @@ const recentConversations = (db: OwnerDbReader, ownerId: string): ConversationSu
     )
     .map((row) => summary(row, ownerId));
 
-const executionParser: Parser<CloudExecutionSelection> = (value, path = "") => {
-  const parsed = parseCloudExecutionSelection(value);
-  if (!parsed) throw new RpcError("BAD_REQUEST", `${path || "execution"} is invalid.`);
-  return parsed;
-};
-
-/** A non-Stella engine needs a connected credential before a turn can use it. */
-const assertExecutionAvailable = async (
-  ctx: OwnerContext,
-  execution: CloudExecutionSelection,
-): Promise<void> => {
-  if (execution.engine === "stella") return;
-  const snapshot = await ctx.host.snapshot();
-  if (!snapshotAllowsExecution(snapshot, execution)) {
-    throw new RpcError("CONFLICT", executionUnavailableMessage(execution));
-  }
-};
-
 const ownerIdentity = async (ctx: OwnerContext) => {
   const snapshot = await ctx.host.snapshot();
   return {
@@ -178,56 +153,6 @@ const ownerIdentity = async (ctx: OwnerContext) => {
     ownerGeneration: snapshot.ownerGeneration,
     isAnonymous: ctx.caller?.isAnonymous ?? snapshot.isAnonymous,
   };
-};
-
-const createConversation = async (
-  ctx: OwnerContext,
-  args: ConversationCalls["conversations.create"]["args"],
-): Promise<ConversationSummary> => {
-  if (!CLIENT_CREATE_ID_PATTERN.test(args.clientCreateId)) {
-    throw new RpcError("BAD_REQUEST", "That conversation could not be created. Try again.");
-  }
-  if (args.requestedConversationId && !CONVERSATION_ID_PATTERN.test(args.requestedConversationId)) {
-    throw new RpcError("BAD_REQUEST", "That conversation could not be created. Try again.");
-  }
-  const existing = ctx.db.one<ConversationRow>(
-    "SELECT * FROM conversations WHERE client_create_id = ?",
-    args.clientCreateId,
-  );
-  if (existing) {
-    if (existing.deleted_at !== null) throw new RpcError("NOT_FOUND", "Conversation not found.");
-    return summary(existing, ctx.ownerId);
-  }
-  if (args.execution) await assertExecutionAvailable(ctx, args.execution);
-  // Re-read after the await: a retried create may have landed meanwhile.
-  const raced = ctx.db.one<ConversationRow>(
-    "SELECT * FROM conversations WHERE client_create_id = ?",
-    args.clientCreateId,
-  );
-  if (raced) return summary(raced, ctx.ownerId);
-  enforceOwnerRateLimit(
-    ctx.db,
-    ctx.now,
-    "conversations.create",
-    { count: 30, windowMs: 10 * 60_000 },
-    "Too many conversations created at once. Wait a moment and try again.",
-  );
-  const conversationId = args.requestedConversationId ?? crypto.randomUUID();
-  if (readConversation(ctx.db, conversationId)) {
-    throw new RpcError("CONFLICT", "That conversation could not be created. Try again.");
-  }
-  ctx.db.run(
-    `INSERT INTO conversations
-       (conversation_id, title, created_at, updated_at, client_create_id, allow_empty, execution_json)
-     VALUES (?, ?, ?, ?, ?, 1, ?)`,
-    conversationId,
-    clip(args.title?.trim() ?? "", CONVERSATION_TITLE_MAX),
-    ctx.now,
-    ctx.now,
-    args.clientCreateId,
-    args.execution ? JSON.stringify(args.execution) : null,
-  );
-  return summary(readConversation(ctx.db, conversationId)!, ctx.ownerId);
 };
 
 const isLiveConversation = (db: OwnerDbReader, conversationId: string): boolean => {
@@ -291,33 +216,6 @@ const resolveMainConversation = (
     ctx.now,
   );
   return conversationId;
-};
-
-const page = (
-  db: OwnerDbReader,
-  ownerId: string,
-  args: ConversationCalls["conversations.page"]["args"],
-): ConversationCalls["conversations.page"]["result"] => {
-  const limit = Math.min(Math.max(args.limit ?? 25, 1), MAX_PAGE);
-  const rows = args.before
-    ? db.all<ConversationRow>(
-        `SELECT * FROM conversations WHERE deleted_at IS NULL
-           AND (updated_at < ? OR (updated_at = ? AND conversation_id < ?))
-         ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
-        args.before.updatedAt,
-        args.before.updatedAt,
-        args.before.conversationId,
-        limit + 1,
-      )
-    : db.all<ConversationRow>(
-        `SELECT * FROM conversations WHERE deleted_at IS NULL
-         ORDER BY updated_at DESC, conversation_id DESC LIMIT ?`,
-        limit + 1,
-      );
-  return {
-    conversations: rows.slice(0, limit).map((row) => summary(row, ownerId)),
-    hasMore: rows.length > limit,
-  };
 };
 
 // ── Owner events from the orchestrator ────────────────────────────────────
@@ -453,16 +351,6 @@ export const conversationsDomain = {
     parse: empty(),
     handler: (ctx: OwnerContext) => ownerIdentity(ctx),
   },
-  "conversations.create": {
-    scope: "owner",
-    parse: object({
-      clientCreateId: string({ max: 128 }),
-      requestedConversationId: optional(string({ max: 64 })),
-      title: optional(string({ max: 2_000 })),
-      execution: optional(executionParser),
-    }),
-    handler: createConversation,
-  },
   "conversations.bootstrap": {
     scope: "owner",
     parse: object({
@@ -479,14 +367,6 @@ export const conversationsDomain = {
         conversationId: resolveMainConversation(ctx, args.preferConversationId),
       };
     },
-  },
-  "conversations.page": {
-    scope: "owner",
-    parse: object({
-      before: optional(object({ updatedAt: number({ int: true, min: 0 }), conversationId: string({ max: 64 }) })),
-      limit: optional(number({ int: true, min: 1, max: MAX_PAGE })),
-    }),
-    handler: (ctx: OwnerContext, args: ConversationCalls["conversations.page"]["args"]) => page(ctx.db, ctx.ownerId, args),
   },
   },
   views: {

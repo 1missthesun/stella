@@ -232,13 +232,34 @@ export const serveRendererSource = (options: {
     body: Buffer.from(error instanceof Error ? error.message : String(error)),
   });
 
-  partitionSession.protocol.handle(RENDERER_SCHEME, async (request) => {
-    const response = await answer(request.url).catch(failure);
-    return new Response(response.body as Uint8Array<ArrayBuffer>, {
-      status: response.status,
-      headers: { "content-type": response.contentType, ...NO_CACHE },
+  const sessionProtocol = partitionSession.protocol;
+  const buffered = typeof sessionProtocol.registerBufferProtocol === "function";
+  if (buffered) {
+    sessionProtocol.registerBufferProtocol(RENDERER_SCHEME, (request, callback) => {
+      void answer(request.url)
+        .catch(failure)
+        .then((response) => {
+          const [mimeType, ...parameters] = response.contentType.split(";");
+          const charset = parameters.map((part) => part.trim()).find((part) => part.startsWith("charset="));
+          const body = response.body;
+          callback({
+            statusCode: response.status,
+            mimeType: mimeType!.trim(),
+            ...(charset ? { charset: charset.slice("charset=".length) } : {}),
+            headers: NO_CACHE,
+            data: Buffer.isBuffer(body) ? body : Buffer.from(body.buffer, body.byteOffset, body.byteLength),
+          });
+        });
     });
-  });
+  } else {
+    sessionProtocol.handle(RENDERER_SCHEME, async (request) => {
+      const response = await answer(request.url).catch(failure);
+      return new Response(response.body as Uint8Array<ArrayBuffer>, {
+        status: response.status,
+        headers: { "content-type": response.contentType, ...NO_CACHE },
+      });
+    });
+  }
   return {
     applyChanges: async (paths) => {
       const result = await source.apply(paths);
@@ -257,7 +278,8 @@ export const serveRendererSource = (options: {
       return { mode: result.mode };
     },
     dispose: () => {
-      partitionSession.protocol.unhandle(RENDERER_SCHEME);
+      if (buffered) sessionProtocol.unregisterProtocol(RENDERER_SCHEME);
+      else sessionProtocol.unhandle(RENDERER_SCHEME);
       source.dispose();
     },
   };

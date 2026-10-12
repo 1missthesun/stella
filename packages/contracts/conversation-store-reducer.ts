@@ -25,6 +25,8 @@ export type LiveTurn = {
   turnId: string;
   /** The tool currently running, for the working label. */
   toolName: string | null;
+  /** That tool's call id, which seeds its working label the same on every device. */
+  toolCallId: string | null;
   toolLabel: string | null;
 };
 
@@ -95,14 +97,16 @@ export const olderWouldExceedRetainedLimit = (
 
 export const liveTurnFromReady = (
   live: LiveTurnSnapshot | null,
-): LiveTurn | null =>
-  live
-    ? {
-        turnId: live.turnId,
-        toolName: live.tools.at(-1)?.name ?? null,
-        toolLabel: live.tools.at(-1)?.label ?? null,
-      }
-    : null;
+): LiveTurn | null => {
+  if (!live) return null;
+  const running = [...live.tools].reverse().find((tool) => tool.phase === "start");
+  return {
+    turnId: live.turnId,
+    toolName: running?.name ?? null,
+    toolCallId: running?.toolCallId ?? null,
+    toolLabel: running?.label ?? null,
+  };
+};
 
 /**
  * Applies an advisory `tool` frame. A tool frame can outrun the turn's
@@ -113,6 +117,7 @@ export const liveTurnWithTool = (
   live: LiveTurn | null,
   tool: {
     turnId: string;
+    toolCallId: string;
     name: string;
     label?: string;
     phase: "start" | "end";
@@ -121,10 +126,14 @@ export const liveTurnWithTool = (
   const current =
     live && live.turnId === tool.turnId
       ? live
-      : { turnId: tool.turnId, toolName: null, toolLabel: null };
+      : { turnId: tool.turnId, toolName: null, toolCallId: null, toolLabel: null };
+  if (tool.phase === "end" && current.toolCallId && current.toolCallId !== tool.toolCallId) {
+    return current;
+  }
   return {
     ...current,
     toolName: tool.phase === "start" ? tool.name : null,
+    toolCallId: tool.phase === "start" ? tool.toolCallId : null,
     toolLabel: tool.phase === "start" ? (tool.label ?? null) : null,
   };
 };
@@ -145,7 +154,7 @@ export const liveTurnAfterRecords = (
     if (record.kind !== "turn") continue;
     if (record.phase === "started") {
       if (next?.turnId !== record.turnId) {
-        next = { turnId: record.turnId, toolName: null, toolLabel: null };
+        next = { turnId: record.turnId, toolName: null, toolCallId: null, toolLabel: null };
       }
     } else if (next?.turnId === record.turnId) {
       next = null;

@@ -126,6 +126,75 @@ export const parseLocalTurnRenewal = (
   };
 };
 
+export const LOCAL_TURN_TOOLS_MAX = 32;
+const LOCAL_TOOL_CALL_ID_MAX_CHARS = 256;
+const LOCAL_TOOL_NAME_MAX_CHARS = 128;
+
+export type ParsedLocalTurnTools = {
+  deviceId: string;
+  localTurnId: string;
+  leaseToken: string;
+  tools: Array<{
+    toolCallId: string;
+    name: string;
+    phase: "start" | "end";
+    isError?: boolean;
+  }>;
+};
+
+/**
+ * The tools a computer's running turn started or finished, for the other
+ * devices' working indicators. Advisory and lossy: it carries no transcript.
+ */
+export const parseLocalTurnTools = (
+  value: unknown,
+): ParsedLocalTurnTools | null => {
+  if (!value || typeof value !== "object") return null;
+  const candidate = value as Record<string, unknown>;
+  const deviceId =
+    typeof candidate.deviceId === "string" ? candidate.deviceId.trim() : "";
+  const localId =
+    typeof candidate.localTurnId === "string"
+      ? candidate.localTurnId.trim()
+      : "";
+  const leaseToken =
+    typeof candidate.leaseToken === "string" ? candidate.leaseToken.trim() : "";
+  if (
+    !LOCAL_DEVICE_ID_PATTERN.test(deviceId) ||
+    !LOCAL_TURN_ID_PATTERN.test(localId) ||
+    !LOCAL_LEASE_TOKEN_PATTERN.test(leaseToken) ||
+    !Array.isArray(candidate.tools) ||
+    candidate.tools.length === 0 ||
+    candidate.tools.length > LOCAL_TURN_TOOLS_MAX
+  ) {
+    return null;
+  }
+  const tools: ParsedLocalTurnTools["tools"] = [];
+  for (const entry of candidate.tools) {
+    if (!entry || typeof entry !== "object") return null;
+    const tool = entry as Record<string, unknown>;
+    const toolCallId =
+      typeof tool.toolCallId === "string" ? tool.toolCallId : "";
+    const name = typeof tool.name === "string" ? tool.name.trim() : "";
+    if (
+      !toolCallId ||
+      toolCallId.length > LOCAL_TOOL_CALL_ID_MAX_CHARS ||
+      !name ||
+      name.length > LOCAL_TOOL_NAME_MAX_CHARS ||
+      (tool.phase !== "start" && tool.phase !== "end")
+    ) {
+      return null;
+    }
+    tools.push({
+      toolCallId,
+      name,
+      phase: tool.phase,
+      ...(tool.phase === "end" ? { isError: tool.isError === true } : {}),
+    });
+  }
+  return { deviceId, localTurnId: localId, leaseToken, tools };
+};
+
 export const classifyLocalClientMessageReplay = (
   receipt: LocalClientMessageReceipt | undefined,
   candidate: {

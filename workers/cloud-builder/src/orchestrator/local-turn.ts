@@ -46,6 +46,7 @@ import {
   parseLocalFinishRecords,
   parseLocalTerminalPhase,
   parseLocalTurnRenewal,
+  parseLocalTurnTools,
 } from "../local-turn-protocol.js";
 import type {
   ChatTurnRequest,
@@ -59,6 +60,7 @@ import {
   LOCAL_TURN_FINISH_MAX_ROWS,
   LOCAL_TURN_FINISH_MAX_BYTES,
   LOCAL_TURN_LEASE_KEY,
+  LIVE_TOOL_LIMIT,
   localTurnReceiptKey,
   localClientMessageKey,
 } from "./constants.js";
@@ -1218,6 +1220,54 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
         503,
       );
     }
+  }
+
+  /**
+   * A computer's running turn started or finished tools. Nothing is journaled:
+   * the frames only keep the other devices' working indicators as current as
+   * the computer's own, the way a cloud turn's tools reach them. Its lease is
+   * the credential, and a lease that is not the running turn's is ignored.
+   */
+  protected async handleLocalTurnTool(request: Request): Promise<Response> {
+    const parsed = parseLocalTurnTools(await request.json().catch(() => null));
+    if (!parsed) {
+      return json({ code: "bad_request", message: "Malformed request." }, 400);
+    }
+    const caller = this.localTurnCaller(request);
+    if (caller instanceof Response) return caller;
+    const turnId = makeLocalTurnId(parsed.deviceId, parsed.localTurnId);
+    const lease =
+      await this.ctx.storage.get<LocalTurnLease>(LOCAL_TURN_LEASE_KEY);
+    if (
+      lease?.turnId !== turnId ||
+      lease.leaseToken !== parsed.leaseToken ||
+      lease.ownerId !== caller.ownerId ||
+      lease.finishFingerprint ||
+      this.live?.turnId !== turnId
+    ) {
+      return json({ accepted: false });
+    }
+    const live = this.live;
+    for (const tool of parsed.tools) {
+      if (tool.phase === "start") {
+        live.tools.push({
+          toolCallId: tool.toolCallId,
+          name: tool.name,
+          phase: "start",
+        });
+        if (live.tools.length > LIVE_TOOL_LIMIT) live.tools.shift();
+      } else {
+        const entry = live.tools.find(
+          (known) => known.toolCallId === tool.toolCallId,
+        );
+        if (entry) {
+          entry.phase = "end";
+          entry.isError = tool.isError === true;
+        }
+      }
+      this.hub.broadcastTool({ turnId, ...tool });
+    }
+    return json({ accepted: true });
   }
 
   protected async handleLocalTurnFinish(request: Request): Promise<Response> {

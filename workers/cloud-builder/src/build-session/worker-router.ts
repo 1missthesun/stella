@@ -1233,7 +1233,7 @@ app.post(
   jsonBody(CLOUD_BUILDER_BODY_LIMITS.conversationAppend),
   (c) => forwardToConversation(c.req.raw, c.env, c.req.param("id"), "/journal", c.var.caller),
 );
-const localTurn = (operation: "begin" | "finish", maxBytes: number) => {
+const localTurn = (operation: "begin" | "finish" | "tool", maxBytes: number) => {
   app.post(`/conversations/:id/local-turns/${operation}`, async (c) => {
     const timingStartedAt = performance.now();
     const auth = await authenticateConversationCaller(
@@ -1267,6 +1267,7 @@ const localTurn = (operation: "begin" | "finish", maxBytes: number) => {
 };
 localTurn("begin", CLOUD_BUILDER_BODY_LIMITS.localTurnBegin);
 localTurn("finish", CLOUD_BUILDER_BODY_LIMITS.localTurnFinish);
+localTurn("tool", CLOUD_BUILDER_BODY_LIMITS.tinyControl);
 
 app.all("/cloud-home/:rest{.*}", userAuth(), async (c, next) => {
   const response = await handleUserCloudHomeRoute({

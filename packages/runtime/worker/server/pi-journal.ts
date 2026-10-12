@@ -23,6 +23,7 @@ import {
 } from "@stella/contracts/turn-plane/turn-start";
 
 const READ_TIMEOUT_MS = 30_000;
+const TOOL_FRAME_TIMEOUT_MS = 10_000;
 const RELAY_ATTACHMENT_MAX_BYTES = 20 * 1024 * 1024;
 const RELAY_UPLOAD_TIMEOUT_MS = 5 * 60_000;
 
@@ -130,6 +131,7 @@ export const cloudJournalFor = (
   // A conversation kept on this computer has no journal.
   if (conversationId.startsWith("local_")) return undefined;
   const deviceId = session.config.deviceId;
+  let toolFrames: Promise<void> = Promise.resolve();
   const runner = () => {
     const current = session.runnerCell.get();
     if (!current) throw new Error("Stella's runtime is restarting.");
@@ -292,6 +294,24 @@ export const cloudJournalFor = (
       }
       relayUploads.delete(clientMsgId);
       await response.body?.cancel().catch(() => undefined);
+    },
+    tools: (update) => {
+      toolFrames = toolFrames
+        .then(async () => {
+          const auth = runner().getStellaSiteAuth();
+          if (!auth) return;
+          const response = await fetch(
+            `${auth.baseUrl.replace(/\/+$/, "")}/conversations/${encodeURIComponent(conversationId)}/local-turns/tool`,
+            {
+              method: "POST",
+              headers: { authorization: `Bearer ${auth.authToken}`, "content-type": "application/json" },
+              body: JSON.stringify({ deviceId, ...update }),
+              signal: AbortSignal.timeout(TOOL_FRAME_TIMEOUT_MS),
+            },
+          );
+          await response.body?.cancel().catch(() => undefined);
+        })
+        .catch(() => undefined);
     },
     appendVoice: async (said) => {
       await runner().cloudJournal.append({

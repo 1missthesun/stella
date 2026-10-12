@@ -78,7 +78,9 @@ export function canonicalWorkingState(args: {
         ...journal,
         // The prior answer is visible, but a later prompt is already waiting.
         answerLanded: journal.answerLanded && !args.hasQueuedSend,
-        ...((!journal.answerLanded || args.hasQueuedSend) && live?.toolName ? { toolName: live.toolName } : {}),
+        ...((!journal.answerLanded || args.hasQueuedSend) && live?.toolName
+          ? { toolName: live.toolName, toolCallId: live.toolCallId ?? undefined }
+          : {}),
         ...((!journal.answerLanded || args.hasQueuedSend) && live?.toolLabel ? { statusText: live.toolLabel } : {}),
         ...(deviceTool ? { toolName: deviceTool,
           toolCallId: args.localIndicator.toolCallId,

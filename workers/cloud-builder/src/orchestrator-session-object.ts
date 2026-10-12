@@ -480,6 +480,9 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (url.pathname === "/local-turns/finish") {
       return this.handleLocalTurnFinish(request);
     }
+    if (url.pathname === "/local-turns/tool") {
+      return this.handleLocalTurnTool(request);
+    }
     if (url.pathname === "/journal") return this.handleJournalAppend(request);
     if (url.pathname === "/slack/bind") return this.handleSlackBind(request);
     if (url.pathname === "/slack/stop") return this.handleSlackStop(request);

@@ -16,7 +16,7 @@ const ALLOWED_HEADERS = new Set([
 ]);
 
 const isBrowserRoute = (path: string): boolean =>
-  /^\/conversations\/[^/]+\/(turns|history|socket|journal|local-turns\/(begin|finish))$/u.test(
+  /^\/conversations\/[^/]+\/(turns|history|socket|journal|local-turns\/(begin|finish|tool))$/u.test(
     path,
   ) ||
   /^\/owners\/me\/(devices|dispatches|apps)(\/|$)/u.test(path) ||

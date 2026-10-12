@@ -124,6 +124,12 @@ export type DesktopJournal = {
     phase: "completed" | "failed" | "canceled";
     notice?: string;
   }): Promise<void>;
+  /**
+   * Tools an open turn started or finished, so every other device's working
+   * indicator follows this computer's run as it goes. Lossy: never throws,
+   * never waits, journals nothing.
+   */
+  tools?(update: { localTurnId: string; leaseToken: string; tools: JournalTool[] }): void;
   /** What a voice call said, outside any turn. */
   appendVoice(append: { appendId: string; role: "user" | "assistant"; payloadJson: string; hidden: boolean }): Promise<void>;
   /**
@@ -133,6 +139,23 @@ export type DesktopJournal = {
    * places it where Stella runs or answers it. Resolves once the cloud took it.
    */
   relay?(message: RelayedMessage): Promise<void>;
+};
+
+export type JournalTool = { toolCallId: string; name: string; phase: "start" | "end"; isError?: boolean };
+
+/** The tool calls an assistant entry starts, or the one a tool result ends. */
+const toolsOf = (message: Message): JournalTool[] => {
+  if (message.role === "toolResult") {
+    return message.toolCallId && message.toolName
+      ? [{ toolCallId: message.toolCallId, name: message.toolName, phase: "end", isError: message.isError === true }]
+      : [];
+  }
+  if (message.role !== "assistant") return [];
+  return message.content.flatMap((block) =>
+    block.type === "toolCall" && block.id && block.name
+      ? [{ toolCallId: block.id, name: block.name, phase: "start" as const }]
+      : [],
+  );
 };
 
 export type RelayedMessage = {
@@ -698,6 +721,10 @@ export async function journalMirror(args: {
                 : undefined;
             } else if (open && (entry.kind === "pi.assistant" || entry.kind === "pi.tool-result")) {
               open = { ...open, entries: [...open.entries, entry.id] };
+              const tools = toolsOf(message);
+              if (tools.length > 0 && !lost.has(open.localTurnId) && !ending.has(open.localTurnId)) {
+                journal.tools?.({ localTurnId: open.localTurnId, leaseToken: open.leaseToken, tools });
+              }
             }
           }
           mirrored = entry.id;

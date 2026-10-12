@@ -41,6 +41,7 @@ import {
   canvasUrlForLocalFile,
   MAX_CANVAS_HTML_BYTES,
   registerCanvasHtml,
+  setCanvasDocumentAssetReader,
 } from "../source/canvas-protocol.js";
 import {
   linkedPathsGrant,
@@ -140,6 +141,13 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ".gif": "image/gif",
   ".svg": "image/svg+xml",
   ".avif": "image/avif",
+  ".ico": "image/x-icon",
+  ".bmp": "image/bmp",
+  // Fonts
+  ".woff": "font/woff",
+  ".woff2": "font/woff2",
+  ".ttf": "font/ttf",
+  ".otf": "font/otf",
   // Audio
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
@@ -1032,9 +1040,23 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
         read.bytes.byteOffset,
         read.bytes.byteLength,
       );
-      return { url: registerCanvasHtml(bytes.toString("utf8")) };
+      return { url: registerCanvasHtml(bytes.toString("utf8"), filePath) };
     },
   );
+
+  // The relative assets of a canvas document kept on another device: read
+  // through the same lane as the document (live from the computer that has
+  // it, else the copy it put in Drive), under that computer's grant.
+  setCanvasDocumentAssetReader(async (filePath, range, maxBytes) => {
+    const payload = range
+      ? { filePath, offset: range.offset, length: range.length }
+      : { filePath, maxBytes };
+    const read = await readDisplayFile(payload, { remote: false }).catch(
+      () => readDisplayFile(payload, { remote: false }),
+    );
+    if (read.missing) return null;
+    return { bytes: read.bytes, sizeBytes: read.sizeBytes, mimeType: read.mimeType };
+  });
 
   handleIpc(
     IPC_DISPLAY_CANVAS_HTML_URL,

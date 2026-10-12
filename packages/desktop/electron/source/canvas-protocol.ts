@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { app, session } from "electron";
+import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import { injectCanvasBridge } from "./canvas-bridge.js";
 
 /**
@@ -22,8 +23,10 @@ import { injectCanvasBridge } from "./canvas-bridge.js";
  *   from disk per request. The token stands for the document's own folder,
  *   so its relative images, styles and scripts load, and nothing outside
  *   that folder does.
- * - `memory/<id>`: HTML the renderer registered (a cloud canvas, or a file
- *   kept on another device), under a random id.
+ * - `memory/<id>`: HTML the renderer registered (a cloud canvas), under a
+ *   random id. A document kept on another device is `memory/<id>/<name>`, so
+ *   its relative assets resolve under the id and are read on request from
+ *   wherever that document's folder is reachable, held to that folder.
  */
 export const CANVAS_SCHEME = "stella-canvas";
 const DIRECTORY_HOST = "dir";
@@ -39,6 +42,11 @@ const MAX_REGISTERED_CANVASES = 32;
 const MAX_REGISTERED_BYTES = 64 * 1024 * 1024;
 const MAX_DOCUMENT_DIRECTORIES = 256;
 const MAX_CANVAS_ASSET_BYTES = 256 * 1024 * 1024;
+/**
+ * The most a whole (unranged) read of an asset kept on another device may
+ * be: an image, stylesheet or script. Video and audio are read in ranges.
+ */
+const MAX_REMOTE_ASSET_BYTES = 32 * 1024 * 1024;
 
 const ASSET_TYPES: Record<string, string> = {
   ".png": "image/png",
@@ -56,6 +64,8 @@ const ASSET_TYPES: Record<string, string> = {
   ".json": "application/json",
   ".woff": "font/woff",
   ".woff2": "font/woff2",
+  ".m4v": "video/mp4",
+  ".flac": "audio/flac",
   ".ttf": "font/ttf",
   ".otf": "font/otf",
   ".mp4": "video/mp4",
@@ -120,7 +130,10 @@ export const isCanvasUrl = (url: string): boolean =>
   url.startsWith(`${CANVAS_SCHEME}:`);
 
 // Insertion order is recency: a lookup re-inserts, eviction takes the first.
-const registered = new Map<string, { html: string; bytes: number; digest: string }>();
+const registered = new Map<
+  string,
+  { html: string; bytes: number; digest: string; documentPath: string | null }
+>();
 const idByDigest = new Map<string, string>();
 let registeredBytes = 0;
 
@@ -132,21 +145,41 @@ const touchRegistered = (id: string) => {
   return entry;
 };
 
-/** Hold `html` in memory and return the `stella-canvas://` URL that serves it. */
-export const registerCanvasHtml = (html: string): string => {
+const documentNameOf = (documentPath: string) =>
+  documentPath.split(/[\\/]/u).pop() || "index.html";
+
+const memoryUrl = (id: string, documentPath: string | null) =>
+  documentPath
+    ? `${CANVAS_SCHEME}://${MEMORY_HOST}/${id}/${encodeURIComponent(documentNameOf(documentPath))}`
+    : `${CANVAS_SCHEME}://${MEMORY_HOST}/${id}`;
+
+/**
+ * Hold `html` in memory and return the `stella-canvas://` URL that serves it.
+ * With `documentPath` (a document kept on another device), the URL stands for
+ * that document's folder too: its relative assets are read on request through
+ * the reader `setCanvasDocumentAssetReader` installs, held to that folder.
+ */
+export const registerCanvasHtml = (
+  html: string,
+  documentPath: string | null = null,
+): string => {
   const bytes = Buffer.byteLength(html, "utf8");
   if (bytes > MAX_CANVAS_HTML_BYTES) {
     throw new Error(
       `Canvas too large to display (${bytes} bytes, limit ${MAX_CANVAS_HTML_BYTES}).`,
     );
   }
-  const digest = createHash("sha256").update(html).digest("hex");
+  const digest = createHash("sha256")
+    .update(html)
+    .update("\0")
+    .update(documentPath ?? "")
+    .digest("hex");
   const existing = idByDigest.get(digest);
   if (existing && touchRegistered(existing)) {
-    return `${CANVAS_SCHEME}://${MEMORY_HOST}/${existing}`;
+    return memoryUrl(existing, documentPath);
   }
   const id = randomBytes(18).toString("base64url");
-  registered.set(id, { html, bytes, digest });
+  registered.set(id, { html, bytes, digest, documentPath });
   idByDigest.set(digest, id);
   registeredBytes += bytes;
   for (const [oldestId, oldest] of registered) {
@@ -161,7 +194,28 @@ export const registerCanvasHtml = (html: string): string => {
     idByDigest.delete(oldest.digest);
     registeredBytes -= oldest.bytes;
   }
-  return `${CANVAS_SCHEME}://${MEMORY_HOST}/${id}`;
+  return memoryUrl(id, documentPath);
+};
+
+export type CanvasDocumentAssetRead = {
+  bytes: Uint8Array;
+  sizeBytes: number;
+  mimeType: string;
+};
+
+export type CanvasDocumentAssetReader = (
+  filePath: string,
+  range: { offset: number; length: number } | null,
+  maxBytes: number,
+) => Promise<CanvasDocumentAssetRead | null>;
+
+let documentAssetReader: CanvasDocumentAssetReader | null = null;
+
+/** How a registered document's relative assets are read (wherever they live). */
+export const setCanvasDocumentAssetReader = (
+  reader: CanvasDocumentAssetReader | null,
+) => {
+  documentAssetReader = reader;
 };
 
 const realpathOrNull = async (target: string) => {
@@ -218,7 +272,32 @@ export const canvasUrlForLocalFile = async (
 
 type CanvasDocument =
   | { kind: "html"; html: string }
-  | { kind: "file"; file: string; size: number };
+  | { kind: "file"; file: string; size: number }
+  | { kind: "asset"; documentPath: string; assetPath: string };
+
+/**
+ * The path `segments` name inside a registered document's folder, written in
+ * the document's own separator style, or null when it is not an asset there.
+ */
+const documentAssetPath = (
+  documentPath: string,
+  segments: string[],
+): string | null => {
+  if (
+    segments.length === 0 ||
+    segments.some(
+      (segment) =>
+        !segment || segment.startsWith(".") || /[\\/\0]/u.test(segment),
+    )
+  ) {
+    return null;
+  }
+  const slash = Math.max(documentPath.lastIndexOf("/"), documentPath.lastIndexOf("\\"));
+  if (slash < 0) return null;
+  const separator = documentPath[slash]!;
+  const assetPath = documentPath.slice(0, slash + 1) + segments.join(separator);
+  return isDocumentFolderAsset(documentPath, assetPath) ? assetPath : null;
+};
 
 /**
  * A file inside a registered document folder. Hidden files and folders are
@@ -257,17 +336,27 @@ const readCanvasDocument = async (url: string): Promise<CanvasDocument | null> =
   } catch {
     return null;
   }
-  if (parsed.host === MEMORY_HOST) {
-    const html = touchRegistered(parsed.pathname.slice(1))?.html;
-    return html === undefined ? null : { kind: "html", html };
-  }
-  if (parsed.host !== DIRECTORY_HOST) return null;
   let segments: string[];
   try {
     segments = parsed.pathname.split("/").slice(1).map(decodeURIComponent);
   } catch {
     return null;
   }
+  if (parsed.host === MEMORY_HOST) {
+    const [id, ...rest] = segments;
+    const entry = id ? touchRegistered(id) : null;
+    if (!entry) return null;
+    if (rest.length === 0) return { kind: "html", html: entry.html };
+    if (!entry.documentPath) return null;
+    if (rest.length === 1 && rest[0] === documentNameOf(entry.documentPath)) {
+      return { kind: "html", html: entry.html };
+    }
+    const assetPath = documentAssetPath(entry.documentPath, rest);
+    return assetPath
+      ? { kind: "asset", documentPath: entry.documentPath, assetPath }
+      : null;
+  }
+  if (parsed.host !== DIRECTORY_HOST) return null;
   const [token, ...rest] = segments;
   if (!token) return null;
   const resolved = await resolveDirectoryFile(token, rest);
@@ -291,6 +380,55 @@ const assetResponse = (file: string, size: number) => {
   });
 };
 
+const parseRange = (header: string | null) => {
+  const match = header ? /^bytes=(\d+)-(\d*)$/u.exec(header.trim()) : null;
+  if (!match) return null;
+  const offset = Number(match[1]);
+  const end = match[2] ? Number(match[2]) : null;
+  if (!Number.isSafeInteger(offset) || (end !== null && end < offset)) return null;
+  return {
+    offset,
+    length: end === null ? MAX_CANVAS_ASSET_BYTES : end - offset + 1,
+  };
+};
+
+const documentAssetResponse = async (
+  assetPath: string,
+  rangeHeader: string | null,
+) => {
+  const reader = documentAssetReader;
+  if (!reader) return canvasResponse(404, "Not found");
+  const range = parseRange(rangeHeader);
+  const read = await reader(assetPath, range, MAX_REMOTE_ASSET_BYTES).catch(
+    () => null,
+  );
+  if (!read) return canvasResponse(404, "Not found");
+  const extension = /\.[a-z0-9]+$/iu.exec(assetPath)?.[0]?.toLowerCase() ?? "";
+  const contentType =
+    ASSET_TYPES[extension] ?? (read.mimeType || "application/octet-stream");
+  const body = new Blob([read.bytes as Uint8Array<ArrayBuffer>]).stream();
+  if (!range) {
+    if (read.bytes.byteLength < read.sizeBytes) {
+      return canvasResponse(413, "Too large to show here");
+    }
+    return canvasResponse(200, body, contentType, {
+      "content-length": String(read.bytes.byteLength),
+      "accept-ranges": "bytes",
+    });
+  }
+  if (range.offset >= read.sizeBytes) {
+    return canvasResponse(416, "Range not satisfiable", "text/plain; charset=utf-8", {
+      "content-range": `bytes */${read.sizeBytes}`,
+    });
+  }
+  const last = range.offset + read.bytes.byteLength - 1;
+  return canvasResponse(206, body, contentType, {
+    "content-length": String(read.bytes.byteLength),
+    "content-range": `bytes ${range.offset}-${last}/${read.sizeBytes}`,
+    "accept-ranges": "bytes",
+  });
+};
+
 /** Serve canvases on a session partition (each renderer partition needs it). */
 export const serveCanvasProtocol = (partition: string) => {
   const partitionSession = session.fromPartition(partition);
@@ -300,6 +438,12 @@ export const serveCanvasProtocol = (partition: string) => {
     const document = await readCanvasDocument(request.url);
     if (document === null) return canvasResponse(404, "Not found");
     if (document.kind === "file") return assetResponse(document.file, document.size);
+    if (document.kind === "asset") {
+      return await documentAssetResponse(
+        document.assetPath,
+        request.headers.get("range"),
+      );
+    }
     return canvasResponse(
       200,
       injectCanvasBridge(document.html),

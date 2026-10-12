@@ -1,6 +1,6 @@
 /**
  * On the website a canvas renders from its text (`srcDoc`), with no folder
- * behind it, so its relative images, stylesheets and scripts are read from
+ * behind it, so its relative images, video, audio, stylesheets and scripts are read from
  * their Drive copies (the desktop copies them beside the document) and
  * embedded before it shows.
  */
@@ -21,17 +21,34 @@ const IMAGE_TYPES: Record<string, string> = {
   svg: "image/svg+xml",
 };
 
-const imageTypeFor = (filePath: string, reported: string) => {
-  if (reported.startsWith("image/")) return reported;
+const MEDIA_TYPES: Record<string, string> = {
+  mp4: "video/mp4",
+  m4v: "video/mp4",
+  webm: "video/webm",
+  mov: "video/quicktime",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  m4a: "audio/mp4",
+  flac: "audio/flac",
+};
+
+const assetTypeFor = (
+  filePath: string,
+  reported: string,
+  kind: "image" | "media",
+) => {
+  const prefixes = kind === "image" ? ["image/"] : ["video/", "audio/"];
+  if (prefixes.some((prefix) => reported.startsWith(prefix))) return reported;
   const extension = /\.([a-z0-9]+)$/iu.exec(filePath)?.[1]?.toLowerCase() ?? "";
-  return IMAGE_TYPES[extension] ?? null;
+  return (kind === "image" ? IMAGE_TYPES : MEDIA_TYPES)[extension] ?? null;
 };
 
 const dataUrlOf = (bytes: Uint8Array, type: string) =>
   new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error ?? new Error("Couldn't read image."));
+    reader.onerror = () => reject(reader.error ?? new Error("Couldn't read file."));
     reader.readAsDataURL(new Blob([bytes as Uint8Array<ArrayBuffer>], { type }));
   });
 
@@ -47,7 +64,7 @@ const embedFromDeviceCopies = (
       const copy = await readDeviceFileCopy(path, MAX_ASSET_BYTES);
       if (!copy || copy.truncated || signal.aborted) return null;
       if (kind === "text") return decoder.decode(copy.bytes);
-      const type = imageTypeFor(path, copy.mimeType);
+      const type = assetTypeFor(path, copy.mimeType, kind);
       return type ? await dataUrlOf(copy.bytes, type) : null;
     },
     signal,

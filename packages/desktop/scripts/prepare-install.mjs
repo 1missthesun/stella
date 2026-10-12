@@ -16,7 +16,7 @@
 //
 // Usage: bun packages/desktop/scripts/prepare-install.mjs [--force]
 
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -63,24 +63,42 @@ const env = { ...process.env };
 delete env.STELLA_SKIP_BROWSER_HYDRATE;
 delete env.STELLA_SKIP_OFFICE_HYDRATE;
 
-const failed = [];
-for (const [name, script, ...args] of steps) {
-  const startedAt = Date.now();
-  const result = spawnSync(process.execPath, [script, ...args], {
-    cwd: repoRoot,
-    env,
-    stdio: "inherit",
+// The steps write to separate places and mostly wait on the network, so
+// they run side by side; each one's output is printed whole when it ends.
+const runStep = ([name, script, ...args]) =>
+  new Promise((resolve) => {
+    const startedAt = Date.now();
+    const child = spawn(process.execPath, [script, ...args], {
+      cwd: repoRoot,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const out = [];
+    const err = [];
+    child.stdout.on("data", (chunk) => out.push(chunk));
+    child.stderr.on("data", (chunk) => err.push(chunk));
+    let ended = false;
+    const done = (error, status) => {
+      if (ended) return;
+      ended = true;
+      process.stdout.write(Buffer.concat(out));
+      process.stderr.write(Buffer.concat(err));
+      const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
+      if (error || status !== 0) {
+        console.error(
+          `[prepare-install] ${name} failed after ${seconds}s: ${error?.message ?? `exit ${status}`}`,
+        );
+        resolve(name);
+      } else {
+        console.log(`[prepare-install] ${name} ready (${seconds}s)`);
+        resolve(null);
+      }
+    };
+    child.once("error", (error) => done(error, null));
+    child.once("close", (status) => done(null, status));
   });
-  const seconds = ((Date.now() - startedAt) / 1000).toFixed(1);
-  if (result.error || result.status !== 0) {
-    failed.push(name);
-    console.error(
-      `[prepare-install] ${name} failed after ${seconds}s: ${result.error?.message ?? `exit ${result.status}`}`,
-    );
-  } else {
-    console.log(`[prepare-install] ${name} ready (${seconds}s)`);
-  }
-}
+
+const failed = (await Promise.all(steps.map(runStep))).filter(Boolean);
 
 if (failed.length > 0) {
   console.error(`[prepare-install] incomplete: ${failed.join(", ")}`);

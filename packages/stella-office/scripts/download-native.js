@@ -144,7 +144,10 @@ const alreadyInstalled = async ({
     return false;
   }
   const actualSha = await sha256File(targetPath);
-  return actualSha === expectedSha && actualSha === manifest.sha256;
+  return (
+    (expectedSha === undefined || actualSha === expectedSha) &&
+    actualSha === manifest.sha256
+  );
 };
 
 const main = async () => {
@@ -158,6 +161,21 @@ const main = async () => {
   const downloadUrl = `${releaseDir}/${assetName}`;
 
   ensureBinDir();
+  // The manifest's hash was checked against this version's SHA256SUMS when
+  // the binary was installed, so a binary that still has it needs no fetch.
+  if (
+    await alreadyInstalled({
+      force: args.force,
+      version,
+      assetName,
+      targetPath,
+      expectedSha: undefined,
+    })
+  ) {
+    finalizeBundledBinary(targetPath);
+    console.log(`stella-office ${version} already present: ${targetPath}`);
+    return;
+  }
   const checksumText = await (await fetchWithRetries(checksumUrl)).text();
   const checksums = parseChecksums(checksumText);
   const expectedSha = checksums.get(assetName);

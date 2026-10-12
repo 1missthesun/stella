@@ -21,8 +21,6 @@
 
 export type DpopAlgorithm = "ed25519" | "es256";
 
-export const DPOP_ALGORITHMS: readonly DpopAlgorithm[] = ["ed25519", "es256"];
-
 /** Relay requests: signature, raw public key, timestamp, algorithm. */
 export const GATEWAY_DPOP_HEADER = "x-stella-dpop" as const;
 export const GATEWAY_DPOP_KEY_HEADER = "x-stella-dpop-key" as const;
@@ -151,30 +149,6 @@ export const importDpopPublicKey = async (
   ]);
 };
 
-export const exportRawPublicKey = async (publicKey: CryptoKey): Promise<Uint8Array> =>
-  new Uint8Array((await crypto.subtle.exportKey("raw", publicKey)) as ArrayBuffer);
-
-/** Generate a device key pair; prefers Ed25519 and falls back to P-256. */
-export const generateDpopKeyPair = async (): Promise<{
-  alg: DpopAlgorithm;
-  keyPair: CryptoKeyPair;
-}> => {
-  try {
-    const keyPair = (await crypto.subtle.generateKey({ name: "Ed25519" }, false, [
-      "sign",
-      "verify",
-    ])) as unknown as CryptoKeyPair;
-    return { alg: "ed25519", keyPair };
-  } catch {
-    const keyPair = (await crypto.subtle.generateKey(
-      { name: "ECDSA", namedCurve: "P-256" },
-      false,
-      ["sign", "verify"],
-    )) as CryptoKeyPair;
-    return { alg: "es256", keyPair };
-  }
-};
-
 export const signDpopInput = async (
   alg: DpopAlgorithm,
   privateKey: CryptoKey,
@@ -290,56 +264,6 @@ export const DEVICE_SIGNING_PROBE_INPUT = "stella-device-key-probe" as const;
 export const isDelegatedDeviceSigningInput = (input: string): boolean =>
   input === DEVICE_SIGNING_PROBE_INPUT ||
   DPOP_SIGNING_INPUT_PREFIXES.some((prefix) => input.startsWith(prefix));
-
-/** Client-side: produce the proof headers for one relay request. */
-export const dpopHeaders = async (args: {
-  alg: DpopAlgorithm;
-  privateKey: CryptoKey;
-  rawPublicKey: Uint8Array;
-  method: string;
-  pathname: string;
-  jti: string;
-  requestId: string;
-  now: number;
-}): Promise<Record<string, string>> => ({
-  [GATEWAY_DPOP_HEADER]: await signDpopInput(
-    args.alg,
-    args.privateKey,
-    dpopSigningInput({
-      method: args.method,
-      pathname: args.pathname,
-      jti: args.jti,
-      requestId: args.requestId,
-      timestamp: args.now,
-    }),
-  ),
-  [GATEWAY_DPOP_KEY_HEADER]: base64UrlEncode(args.rawPublicKey),
-  [GATEWAY_DPOP_TS_HEADER]: String(args.now),
-  [GATEWAY_DPOP_ALG_HEADER]: args.alg,
-});
-
-/** Client-side: the device key proof for the session-capability exchange. */
-export const deviceKeyProofForExchange = async (args: {
-  alg: DpopAlgorithm;
-  privateKey: CryptoKey;
-  rawPublicKey: Uint8Array;
-  ownerId: string;
-  gatewayOrigin: string;
-  now: number;
-}): Promise<GatewayDeviceKeyProof> => ({
-  alg: args.alg,
-  publicKey: base64UrlEncode(args.rawPublicKey),
-  signature: await signDpopInput(
-    args.alg,
-    args.privateKey,
-    deviceExchangeSigningInput({
-      ownerId: args.ownerId,
-      gatewayOrigin: args.gatewayOrigin,
-      timestamp: args.now,
-    }),
-  ),
-  timestamp: args.now,
-});
 
 /** Gateway-side: verify an exchange proof and return the `dpk` to mint. */
 export const verifyDeviceKeyProof = async (args: {

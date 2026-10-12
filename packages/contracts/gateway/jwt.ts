@@ -306,35 +306,3 @@ export const verifyCapability = async (
   return { ok: true, claims, kid };
 };
 
-/** Generates a fresh P-256 pair as PKCS8 PEM + public JWK, for ops scripts. */
-export const generateCapabilityKeyPair = async (): Promise<{
-  privateKeyPem: string;
-  publicJwk: JsonWebKey;
-}> => {
-  // Casts: DOM and workers-types declare these overloads with different
-  // union returns; the algorithm fixes the concrete shapes.
-  const pair = (await crypto.subtle.generateKey(ECDSA_P256, true, [
-    "sign",
-    "verify",
-  ])) as CryptoKeyPair;
-  const pkcs8 = new Uint8Array(
-    (await crypto.subtle.exportKey("pkcs8", pair.privateKey)) as ArrayBuffer,
-  );
-  const jwk = (await crypto.subtle.exportKey(
-    "jwk",
-    pair.publicKey,
-  )) as JsonWebKey;
-  const body = base64UrlEncode(pkcs8).replace(/-/g, "+").replace(/_/g, "/");
-  const padded = body + "=".repeat((4 - (body.length % 4)) % 4);
-  const lines = padded.match(/.{1,64}/g) ?? [];
-  const privateKeyPem = `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
-  const publicJwk: JsonWebKey = {
-    kty: jwk.kty,
-    crv: jwk.crv,
-    x: jwk.x,
-    y: jwk.y,
-    alg: GATEWAY_CAPABILITY_ALGORITHM,
-    use: "sig",
-  };
-  return { privateKeyPem, publicJwk };
-};

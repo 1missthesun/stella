@@ -18,7 +18,7 @@ export type AgentMessageDelivery = {
   note?: string;
 };
 
-export { AGENT_PAUSED_ERROR_CODE, AGENT_PAUSED_REASON } from "../agent-status.js";
+export { AGENT_PAUSED_REASON } from "../agent-status.js";
 
 /**
  * The status an attempt ends in, from the outcome its runtime reported: a
@@ -355,15 +355,6 @@ export type ComputerThreadRecord = {
   result: string | null;
   error: string | null;
 };
-
-/** Why `computerThreads.start` refused, in `BackendError.reason`. */
-export type ComputerThreadStartRejection =
-  | "conversation_not_found"
-  | "thread_identity_conflict"
-  | "attempt_replay_conflict"
-  | "attempt_stale"
-  | "attempt_not_next"
-  | "initial_attempt_invalid";
 
 export type AgentThreadViews = {
   "agentThreads.recent": { args: { limit?: number }; result: AgentThreadSummary[] };

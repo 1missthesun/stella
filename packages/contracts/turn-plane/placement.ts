@@ -71,13 +71,6 @@ export type DeviceRemoteExecution =
 export const SELECTED_DEVICE_NEEDS_CONSENT =
   "SELECTED_DEVICE_NEEDS_CONSENT" as const;
 
-export const DEVICE_REMOTE_EXECUTION_STATES: readonly DeviceRemoteExecution[] = [
-  "unconfigured",
-  "asking",
-  "enabled",
-  "declined",
-];
-
 export type DeviceDestination = {
   deviceId: string;
   label?: string;

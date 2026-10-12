@@ -103,12 +103,6 @@ export const AGENT_RUNTIME_ENGINES: readonly AgentRuntimeEngine[] = [
   "codex_cli",
 ];
 
-const AGENT_RUNTIME_ENGINE_LABELS: Record<AgentRuntimeEngine, string> = {
-  default: "Stella",
-  claude_code_local: "Claude Code",
-  codex_cli: "Codex",
-};
-
 /**
  * Per-spawn engine selection carried by spawn_agent's optional `model`
  * parameter. `stella` and plain model references explicitly select `default`
@@ -133,6 +127,3 @@ export const isAgentRuntimeEngine = (
 export const coerceAgentRuntimeEngine = (value: unknown): AgentRuntimeEngine =>
   isAgentRuntimeEngine(value) ? value : DEFAULT_AGENT_RUNTIME_ENGINE;
 
-export const getAgentRuntimeEngineLabel = (
-  engine: AgentRuntimeEngine,
-): string => AGENT_RUNTIME_ENGINE_LABELS[engine];

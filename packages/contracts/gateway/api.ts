@@ -22,8 +22,6 @@
 
 import type { GatewayDeviceKeyProof } from "./dpop.js";
 
-export const GATEWAY_API_VERSION = 1 as const;
-
 /** Requires descriptor validation; older deployments reject this route before inference. */
 export const GATEWAY_VALIDATED_RELAY_PREFIX = "/v2/relay" as const;
 export const GATEWAY_RELAY_PREFIX = "/v1/relay" as const;
@@ -88,13 +86,6 @@ export type GatewayProtocol =
   | "openai-completions"
   | "google-generative-ai";
 
-export const GATEWAY_PROTOCOLS: readonly GatewayProtocol[] = [
-  "anthropic-messages",
-  "openai-responses",
-  "openai-completions",
-  "google-generative-ai",
-];
-
 export type GatewayProvider =
   | "anthropic"
   | "openai"
@@ -104,17 +95,6 @@ export type GatewayProvider =
   | "xai"
   | "openrouter"
   | "meta";
-
-export const GATEWAY_PROVIDERS: readonly GatewayProvider[] = [
-  "anthropic",
-  "openai",
-  "google",
-  "fireworks",
-  "deepseek",
-  "xai",
-  "openrouter",
-  "meta",
-];
 
 /** `POST /v1/models/resolve` request. */
 export type GatewayResolveRequest = {
@@ -389,8 +369,3 @@ export const GATEWAY_UPSTREAM_MAX_DURATION_MS = 45 * 60 * 1000;
 export const gatewayRelayBaseUrl = (gatewayOrigin: string): string =>
   `${gatewayOrigin.replace(/\/+$/, "")}${GATEWAY_RELAY_PREFIX}`;
 
-export const isGatewayRelayBaseUrl = (baseUrl: string): boolean =>
-  /\/v1\/relay(?:\/|$)/i.test(baseUrl);
-
-export const gatewayOriginFromRelayBaseUrl = (baseUrl: string): string =>
-  baseUrl.replace(/\/v1\/relay(?:\/.*)?$/i, "").replace(/\/+$/, "");

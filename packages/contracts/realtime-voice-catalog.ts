@@ -169,5 +169,3 @@ export function getRealtimeVoiceCatalog(
   return GPT_LIVE_VOICES;
 }
 
-export const isGptLiveVoice = (voice: string): boolean =>
-  GPT_LIVE_VOICES.some((entry) => entry.id === voice);

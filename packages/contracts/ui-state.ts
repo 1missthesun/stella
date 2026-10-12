@@ -20,13 +20,6 @@ export const UI_STATE_DEV_EVENT = "stella:ui-state-changed";
 /** Vite dev-server HTTP write endpoint for browser dev tabs. */
 export const UI_STATE_DEV_ENDPOINT = "/__stella/ui-state";
 
-export type UiStateDevWriteRequest = {
-  /** Random per-tab id so a writer can ignore its own WS broadcast echo. */
-  clientId?: string;
-  changes?: UiStateChanges;
-  clear?: boolean;
-};
-
 export type UiStateDevChangedEvent = {
   /** Originating dev-tab client id; null for external (file watcher) changes. */
   clientId: string | null;

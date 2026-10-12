@@ -68,35 +68,6 @@ export type ScheduleRow = {
   updatedAt: number;
 };
 
-/** What the cloud Schedule tool sends through `schedules.tool`. */
-export type ScheduleToolRequest =
-  | { action: "list" }
-  | {
-      action: "create";
-      requestId: string;
-      kind?: ScheduleKind;
-      prompt: string;
-      schedule: LocalCronSchedule;
-      description?: string;
-      conversationId?: string;
-      route?: ScheduleRoute;
-      script?: string;
-      once?: boolean;
-    }
-  | {
-      action: "update";
-      requestId: string;
-      scheduleId: string;
-      prompt?: string;
-      schedule?: LocalCronSchedule;
-      description?: string;
-      status?: "active" | "paused";
-      route?: ScheduleRoute;
-      script?: string;
-      once?: boolean;
-    }
-  | { action: "remove"; requestId: string; scheduleId: string };
-
 /** Every action answers with the owner's rows after it. */
 export type ScheduleToolResult = {
   ok: boolean;

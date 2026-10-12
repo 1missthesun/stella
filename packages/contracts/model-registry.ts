@@ -14,10 +14,6 @@ export function loadModelRegistry(): Promise<ModelRegistry> {
   return registryLoad;
 }
 
-export function isModelRegistryLoaded(): boolean {
-  return loadedRegistry !== undefined;
-}
-
 export function getLoadedModelRegistry(): ModelRegistry {
   if (loadedRegistry) return loadedRegistry;
   throw new Error(

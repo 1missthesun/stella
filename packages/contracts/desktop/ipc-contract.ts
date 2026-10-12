@@ -410,23 +410,6 @@ export type CapturedScreenshot = {
   height: number;
 };
 
-export type VisionScreenshot = CapturedScreenshot & {
-  displayId: number;
-  screenNumber: number;
-  label: string;
-  isPrimaryFocus: boolean;
-  coordinateSpace: {
-    x: number;
-    y: number;
-    logicalWidth: number;
-    logicalHeight: number;
-    sourceWidth: number;
-    sourceHeight: number;
-    targetWidth: number;
-    targetHeight: number;
-  };
-};
-
 export type RegionCaptureResult = {
   screenshot: CapturedScreenshot | null;
   window: {
@@ -434,13 +417,6 @@ export type RegionCaptureResult = {
     title: string;
     bounds: IpcRect;
   } | null;
-};
-
-export type ScreenGuideAnnotation = {
-  id: string;
-  label: string;
-  x: number;
-  y: number;
 };
 
 export type WindowHighlightTone = "default" | "subtle";
@@ -557,21 +533,6 @@ export type DictationToggle = {
   source?: "companion";
 };
 
-export type OneShotCompletionRequest = {
-  agentType: string;
-  systemPrompt?: string;
-  userText: string;
-  maxOutputTokens?: number;
-  temperature?: number;
-  fallbackAgentTypes?: string[];
-  model?: string;
-  reasoningEffort?: "none" | ReasoningEffortLevel;
-  utility?: boolean;
-  sessionKey?: string;
-  closeSession?: boolean;
-  sessionIdleTtlMs?: number;
-};
-
 export type RuntimeAvailabilitySnapshot = {
   connected: boolean;
   ready: boolean;
@@ -647,14 +608,6 @@ export type LocalLlmOAuthProviderSummary = {
   label: string;
 };
 
-export type TechnicalUserSignal =
-  | "claude-app"
-  | "chatgpt-app"
-  | "cursor-app"
-  | "claude-cli"
-  | "opencode-cli"
-  | "pi-cli";
-
 export type ConnectorCredentialRequest = {
   requestId: string;
   tokenKey: string;
@@ -702,8 +655,6 @@ export type BrowserFetchInit = {
   headers?: Record<string, string>;
   body?: string;
 };
-
-export type BrowserFetchRequest = { url: string; init?: BrowserFetchInit };
 
 export type AppWindowCapture = {
   capture: {

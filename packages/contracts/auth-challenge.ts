@@ -14,12 +14,6 @@
 
 export const AUTH_CAPTCHA_HEADER = "x-captcha-response" as const;
 
-/** Better Auth endpoint suffixes (after the `/api/auth` base) that require a token. */
-export const AUTH_CAPTCHA_ENDPOINTS = [
-  "/sign-in/anonymous",
-  "/sign-in/magic-link",
-] as const;
-
 /** Hosted challenge page on the Stella site; Electron and mobile load it in a window. */
 export const AUTH_CHALLENGE_PAGE_PATH = "/challenge" as const;
 
@@ -35,5 +29,3 @@ export const AUTH_CHALLENGE_DEEP_LINK_HOST = "turnstile" as const;
 export const AUTH_CHALLENGE_TOKEN_PARAM = "token" as const;
 export const AUTH_CHALLENGE_STATE_PARAM = "state" as const;
 
-/** Turnstile tokens are single-use and expire five minutes after issuance. */
-export const AUTH_CHALLENGE_TOKEN_TTL_MS = 5 * 60_000;

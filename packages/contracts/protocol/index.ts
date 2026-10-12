@@ -1,8 +1,5 @@
 import type {
   AgentHealth,
-  LocalCronJobRecord,
-  LocalHeartbeatConfigRecord,
-  ScheduledConversationEvent,
 } from "@stella/contracts";
 import type {
   AgentRunFinishOutcome,
@@ -10,20 +7,9 @@ import type {
 } from "@stella/contracts/agent-runtime";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
-import type {
-  RuntimeListModelsRequest,
-  RuntimeModelCatalogModel,
-  RuntimeModelCatalogSnapshot,
-} from "@stella/contracts/model-catalog";
 
 export type {
   AgentHealth,
-  LocalCronJobRecord,
-  LocalHeartbeatConfigRecord,
-  ScheduledConversationEvent,
-  RuntimeListModelsRequest,
-  RuntimeModelCatalogModel,
-  RuntimeModelCatalogSnapshot,
 };
 
 export const STELLA_RUNTIME_PROTOCOL_VERSION = "v1";
@@ -246,10 +232,6 @@ export type HostLlmCredentialsResult =
 export type RuntimeAuthRefreshSource =
   "heartbeat" | "subscription" | "register" | "stella_provider" | "connector";
 
-export type HostRuntimeAuthRefreshParams = {
-  source: RuntimeAuthRefreshSource;
-};
-
 export type HostRuntimeAuthRefreshResult = {
   authenticated: boolean;
   token: string | null;
@@ -257,24 +239,6 @@ export type HostRuntimeAuthRefreshResult = {
 };
 
 import type { ChatContext } from "@stella/contracts";
-
-export type RuntimeHealthSnapshot = {
-  ready: boolean;
-  hostPid: number;
-  workerPid: number | null;
-  workerRunning?: boolean;
-  workerGeneration: number;
-  deviceId: string | null;
-  activeRunId: string | null;
-  activeAgentCount: number;
-  /**
-   * True when the host detected that the connected worker is running stale
-   * runtime code (build-stamp mismatch on reattach) but deferred the restart
-   * because work is in flight.
-   * The worker restarts automatically at the first quiescent moment.
-   */
-  pendingWorkerRestart?: boolean;
-};
 
 export type RuntimeAttachmentRef = {
   url: string;
@@ -358,19 +322,6 @@ export type RuntimeChatPayload = {
     | { mode: "device"; deviceId: string };
 };
 
-export type RuntimeVoiceTranscriptPayload = {
-  conversationId: string;
-  /** Stable renderer-generated identity for durable cloud append retries. */
-  eventId: string;
-  /** Captured once with eventId so retries serialize the identical journal row. */
-  timestamp: number;
-  role: "user" | "assistant";
-  text: string;
-  uiVisibility?: "visible" | "hidden";
-  /** Present only on the visible end-of-session summary message. */
-  voiceSession?: { durationMs: number };
-};
-
 export type RuntimeVoiceChatPayload = {
   requestId: string;
   conversationId: string;
@@ -384,10 +335,6 @@ export type RuntimeVoiceToolMetadata = {
   parameters: Record<string, unknown>;
 };
 
-export type RuntimeVoiceOrchestratorConfigRequest = {
-  conversationId: string;
-};
-
 export type RuntimeVoiceHistoryItem = {
   role: string;
   content: string;
@@ -399,14 +346,6 @@ export type RuntimeVoiceOrchestratorConfig = {
   instructions: string;
   tools: RuntimeVoiceToolMetadata[];
   history?: RuntimeVoiceHistoryItem[];
-};
-
-export type RuntimeVoiceToolCallPayload = {
-  requestId: string;
-  conversationId: string;
-  callId: string;
-  name: string;
-  args: Record<string, unknown>;
 };
 
 export type RuntimeVoiceToolCallResult = {
@@ -584,22 +523,6 @@ export type RuntimePlacementAutomationCancellationRequest = {
   reason?: string;
 };
 
-export type RuntimeLocalAgentSnapshot = {
-  id: string;
-  status: TaskLifecycleStatus;
-  description: string;
-  startedAt: number;
-  completedAt: number | null;
-  result?: string;
-  error?: string;
-  recentActivity?: string[];
-  messages?: Array<{
-    from: "orchestrator" | "subagent";
-    text: string;
-    timestamp: number;
-  }>;
-};
-
 export type RuntimeAgentEventPayload = {
   type: string;
   runId: string;
@@ -650,16 +573,6 @@ export type RuntimeAgentEventPayload = {
   replyRefs?: ReplyRef[];
 };
 
-export type RuntimeVoiceAgentEventPayload = {
-  requestId: string;
-  event: RuntimeAgentEventPayload;
-};
-
-export type RunResumeEventsResult = {
-  events: RuntimeAgentEventPayload[];
-  exhausted: boolean;
-};
-
 export type RuntimeConversationActiveRunSnapshot = {
   runId: string;
   conversationId: string;
@@ -680,55 +593,8 @@ export type RuntimeConversationTaskSnapshot = {
   error?: string;
 };
 
-export type RuntimeConversationResumeResult = {
-  activeRun: RuntimeConversationActiveRunSnapshot | null;
-  events: RuntimeAgentEventPayload[];
-  tasks: RuntimeConversationTaskSnapshot[];
-};
-
-export type RuntimeWebSearchResult = {
-  text: string;
-  results: Array<{
-    title: string;
-    url: string;
-    snippet: string;
-    image?: string;
-    favicon?: string;
-  }>;
-};
-
 export type HostDeviceIdentity = {
   deviceId: string;
   publicKey: string;
 };
 
-export type HostHeartbeatSignature = {
-  publicKey: string;
-  signature: string;
-};
-
-/**
- * The host display update bridge accepts structured payloads that the renderer
- * maps to the workspace panel tab manager.
- *
- * Structured payloads use the same `DisplayPayload` shape defined in
- * `desktop/src/shared/contracts/display-payload.ts`. We avoid importing it
- * here so the runtime protocol stays free of desktop-only types — the
- * renderer is the single source of truth for the union and validates the
- * payload shape before routing it to the panel.
- */
-export type HostDisplayUpdateParams = { payload: unknown };
-
-export type RuntimeScheduleApi = {
-  listCronJobs: () => Promise<LocalCronJobRecord[]>;
-  listHeartbeats: () => Promise<LocalHeartbeatConfigRecord[]>;
-  listConversationEvents: (args: {
-    conversationId: string;
-    maxItems?: number;
-  }) => Promise<ScheduledConversationEvent[]>;
-};
-
-export type RuntimeHealthApi = {
-  healthCheck: () => Promise<AgentHealth | null>;
-  getActiveRun: () => Promise<RuntimeActiveRun | null>;
-};

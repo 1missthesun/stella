@@ -27,11 +27,6 @@ export const APP_INTEGRITY_NONCE_TTL_MS = 5 * 60_000;
 
 export type AppIntegrityPurpose = "anonymous-sign-in" | "magic-link";
 
-export const APP_INTEGRITY_PURPOSES: readonly AppIntegrityPurpose[] = [
-  "anonymous-sign-in",
-  "magic-link",
-];
-
 export const isAppIntegrityPurpose = (value: unknown): value is AppIntegrityPurpose =>
   value === "anonymous-sign-in" || value === "magic-link";
 

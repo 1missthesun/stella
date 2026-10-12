@@ -413,8 +413,3 @@ export type LocalChatAgentReport = {
   completedAt?: number;
 };
 
-export type LocalChatToolEventPage = {
-  events: EventRecord[];
-  nextCursor?: LocalChatTimelineCursor;
-  hasMore: boolean;
-};

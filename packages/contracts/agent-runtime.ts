@@ -119,25 +119,11 @@ const BUILTIN_AGENT_DEFINITIONS = [
 ] as const satisfies readonly AgentDefinition[];
 
 type BuiltInAgentDefinition = (typeof BUILTIN_AGENT_DEFINITIONS)[number];
-type LocalCliAgentId = Extract<
-  BuiltInAgentDefinition,
-  { usesLocalCliRuntime: true }
->["id"];
-type BundledCoreAgentId = Extract<
-  BuiltInAgentDefinition,
-  { bundledCore: true }
->["id"];
 
 export const BUILTIN_AGENT_DEFINITION_BY_ID = Object.freeze(
   Object.fromEntries(
     BUILTIN_AGENT_DEFINITIONS.map((entry) => [entry.id, entry]),
   ) as Record<AgentId, BuiltInAgentDefinition>,
-);
-
-export const BUNDLED_CORE_AGENT_IDS = Object.freeze(
-  BUILTIN_AGENT_DEFINITIONS.filter((entry) => entry.bundledCore).map(
-    (entry) => entry.id,
-  ) as BundledCoreAgentId[],
 );
 
 export const ORCHESTRATOR_RESERVED_BUILTIN_AGENT_IDS = Object.freeze(
@@ -153,35 +139,6 @@ const ORCHESTRATOR_RESERVED_BUILTIN_AGENT_ID_SET = new Set<string>(
 export const isOrchestratorReservedBuiltinAgentId = (
   agentId: string,
 ): boolean => ORCHESTRATOR_RESERVED_BUILTIN_AGENT_ID_SET.has(agentId);
-
-/**
- * Agent types that existed in earlier versions and no longer do, mapped to
- * what a persisted row of that type should read as now.
- *
- * Applied when loading `runtime_agents` rows, so a thread written by an older
- * install degrades into an ordinary thread rather than an unknown type: it
- * keeps its history, still appears in Activity (the feed admits only known
- * types), renders its subagents as a normal parent/child hierarchy, and runs
- * with a real toolset if the user resumes it. The stored value is left alone —
- * this is a read-time reinterpretation, not a migration that rewrites rows.
- */
-const RETIRED_AGENT_TYPE_REPLACEMENTS: Readonly<Record<string, AgentId>> =
-  Object.freeze({
-    // Removed with the Manager agent; its threads were ordinary coordination
-    // threads whose children are plain General subagents.
-    manager: AGENT_IDS.GENERAL,
-    // Removed with the scheduling rework: the orchestrator owns direct
-    // schedule tools now, so the plain-language schedule specialist is gone.
-    // Its threads were ordinary one-shot workers.
-    schedule: AGENT_IDS.GENERAL,
-    // Automatic memory consolidation is retired. Historical Dream rows remain
-    // available as ordinary General history without exposing Dream as a
-    // resumable built-in agent.
-    dream: AGENT_IDS.GENERAL,
-  });
-
-export const normalizeRetiredAgentType = (agentType: string): string =>
-  RETIRED_AGENT_TYPE_REPLACEMENTS[agentType] ?? agentType;
 
 export const MODEL_SETTINGS_AGENTS = Object.freeze(
   BUILTIN_AGENT_DEFINITIONS.filter(
@@ -199,31 +156,15 @@ export const MODEL_SETTINGS_AGENTS = Object.freeze(
     })),
 );
 
-const LOCAL_CLI_AGENT_ID_SET = new Set<string>(
-  BUILTIN_AGENT_DEFINITIONS.filter((entry) => entry.usesLocalCliRuntime).map(
-    (entry) => entry.id,
-  ),
-);
-
 export const getAgentDefinition = (
   agentType: string,
 ): AgentDefinition | undefined =>
   BUILTIN_AGENT_DEFINITION_BY_ID[agentType as AgentId] as AgentDefinition;
 
-export const getAgentActivityLabel = (agentType: string): string | null =>
-  getAgentDefinition(agentType)?.activityLabel ?? null;
-
 export const getLocalCliWorkingDirectory = (
   agentType: string,
 ): LocalCliWorkingDirectory | null =>
   getAgentDefinition(agentType)?.localCliWorkingDirectory ?? null;
-
-export const isLocalCliAgentId = (
-  agentType: string,
-): agentType is LocalCliAgentId => LOCAL_CLI_AGENT_ID_SET.has(agentType);
-
-export const isOrchestratorAgentType = (agentType: string): boolean =>
-  getAgentDefinition(agentType)?.promptRole === "orchestrator";
 
 /** Resolve declarative capabilities for an agent. */
 export const getAgentCapabilities = (agentType: string): AgentCapabilities =>
@@ -276,18 +217,6 @@ export const isAgentRecorderSeq = (seq: unknown): seq is number =>
   Number.isFinite(seq) &&
   seq > 0 &&
   seq < AGENT_RECORDER_SEQ_CEILING;
-
-export const nextAgentRecorderSeqCursor = (
-  previous: number,
-  event: { seq?: number; sourceSeq?: number },
-): number => {
-  const candidate = isAgentRecorderSeq(event.sourceSeq)
-    ? event.sourceSeq
-    : isAgentRecorderSeq(event.seq)
-      ? event.seq
-      : previous;
-  return candidate > previous ? candidate : previous;
-};
 
 // Per-agent lifecycle (subset of AGENT_STREAM_EVENT_TYPES). Tracks one
 // subagent task from spawn to terminal state.
@@ -366,19 +295,6 @@ export const isTerminalTaskLifecycleStatus = (
   status === "error" ||
   status === "canceled" ||
   status === "paused";
-
-export const shouldIgnoreTerminalTaskFeedEvent = (args: {
-  currentStatus?: TaskLifecycleStatus;
-  eventType: TaskLifecycleFeedEventType;
-}): boolean => {
-  if (!isTerminalTaskLifecycleStatus(args.currentStatus)) {
-    return false;
-  }
-  return (
-    args.eventType !== AGENT_STREAM_EVENT_TYPES.AGENT_STARTED &&
-    !isTaskLifecycleTerminalType(args.eventType)
-  );
-};
 
 // Outcome of a single run (RUN_FINISHED). Mirrors the terminal subset of
 // TaskLifecycleStatus.

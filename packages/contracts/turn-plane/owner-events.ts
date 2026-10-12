@@ -141,8 +141,6 @@ export type OwnerEvent =
   | ThreadSpawnedEvent
   | ThreadCompletedEvent;
 
-export type OwnerEventKind = OwnerEvent["kind"];
-
 /**
  * The turn events the owner's object reads: terminal states, browser waits
  * (`waiting_for_user`) and produced files. Streaming events stay in the

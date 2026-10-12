@@ -36,14 +36,3 @@ export type RuntimeClientAttachParams = {
   disableLocalScheduler?: boolean;
 };
 
-export type RuntimeClientAttachResult = {
-  pid: number;
-  /** False when this client joined a host an earlier client started. */
-  hostCreated: boolean;
-};
-
-export type RuntimeClientCallParams = { method: string; args: unknown[] };
-
-export type RuntimeClientHostHandlerParams = { name: string; args: unknown[] };
-
-export type RuntimeClientEventParams = { name: string; payload: unknown };

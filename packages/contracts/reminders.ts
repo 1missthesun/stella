@@ -15,7 +15,6 @@ export const REMINDER_ACTION_SNOOZE = "reminder.snooze";
 /** What a push's Snooze and the default in-app Snooze wait. */
 export const REMINDER_DEFAULT_SNOOZE_MINUTES = 10;
 export const REMINDER_MAX_SNOOZE_MINUTES = 7 * 24 * 60;
-export const REMINDER_TEXT_MAX_CHARS = 4_000;
 /** A delivery this much later than it was due says when it was due. */
 export const REMINDER_LATE_MS = 10 * 60_000;
 

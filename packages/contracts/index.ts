@@ -158,12 +158,6 @@ export type BrowserData = {
   searchQueries?: SearchQuery[];
 };
 
-export type BrowserDataResult = {
-  data: BrowserData | null;
-  formatted: string | null;
-  error?: string;
-};
-
 export type PreferredBrowserProfile = {
   browser: BrowserType | null;
   profile: string | null;
@@ -191,13 +185,6 @@ export type ShellAnalysis = {
   topCommands: CommandFrequency[];
   projectPaths: string[];
   toolsUsed: string[];
-};
-
-export type DiscoveredApp = {
-  name: string;
-  executablePath: string;
-  source: "running" | "recent";
-  lastUsed?: number;
 };
 
 export type AllUserSignals = {
@@ -233,9 +220,6 @@ export type LocalLlmCredentialSummary = {
 };
 
 export type {
-  LocalCronSchedule,
-  LocalCronPayload,
-  LocalHeartbeatActiveHours,
   LocalCronJobRecord,
   LocalHeartbeatConfigRecord,
   ScheduledConversationEvent,

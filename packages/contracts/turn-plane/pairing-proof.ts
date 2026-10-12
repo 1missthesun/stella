@@ -149,13 +149,6 @@ export const hmacSha256Hex = async (
   );
 };
 
-/**
- * The verifiable half of a pairing secret. The phone and the backend both store
- * only this; the raw secret never leaves the pairing exchange.
- */
-export const deriveMobilePairingKey = (pairSecret: string): Promise<string> =>
-  sha256Hex(pairSecret);
-
 /** Length-checked first, then constant time over the compared bytes. */
 export const constantTimeEqualHex = (a: string, b: string): boolean => {
   if (a.length !== b.length) return false;
@@ -177,30 +170,6 @@ export type MobilePairingProofFields = {
   proof: string;
   issuedAt: number;
   mobilePublicKey?: string;
-};
-
-export const signMobilePairingProof = async (
-  input: Omit<MobilePairingProofFields, "proof" | "issuedAt"> & {
-    pairingKey: string;
-    issuedAt?: number;
-  },
-): Promise<{ issuedAt: number; proof: string }> => {
-  const issuedAt = input.issuedAt ?? Date.now();
-  return {
-    issuedAt,
-    proof: await hmacSha256Hex(
-      input.pairingKey,
-      buildMobilePairingProofMessage({
-        desktopDeviceId: input.desktopDeviceId,
-        mobileDeviceId: input.mobileDeviceId,
-        challenge: input.challenge,
-        ...(input.mobilePublicKey !== undefined
-          ? { mobilePublicKey: input.mobilePublicKey }
-          : {}),
-        issuedAt,
-      }),
-    ),
-  };
 };
 
 /** The headers a signed proof travels in, ready to spread into a fetch init. */
@@ -407,6 +376,3 @@ export const canonicalDispatchPayloadJson = (
     ...(payload.handoff === true ? { handoff: true } : {}),
   });
 
-/** Lowercase hex sha256 of `canonicalDispatchPayloadJson`. */
-export const dispatchPayloadHash = (payload: DispatchPayload): Promise<string> =>
-  sha256Hex(canonicalDispatchPayloadJson(payload));

@@ -15,7 +15,6 @@
 import type { TaskLifecycleStatus } from "./agent-runtime.js";
 import {
   agentStatusOf,
-  isLiveAgentStatus,
   type AgentStatus,
 } from "./agent-status.js";
 import type { AgentThreadSummary } from "./backend/agent-threads.js";
@@ -140,51 +139,6 @@ export const buildAgentLedger = (args: {
     }
   }
   return { ready: args.ready, agents };
-};
-
-/** The ledger's row for an agent; null when it has none; undefined while it has not answered. */
-export const ledgerAgent = (
-  ledger: AgentLedger,
-  agentId: string,
-): LedgerAgent | null | undefined => ledger.agents.get(agentId);
-
-/** An agent's status: the ledger's when it has a row, else the journal's. */
-export const ledgerAgentStatus = (
-  ledger: AgentLedger,
-  agentId: string,
-  fallback?: TaskLifecycleStatus,
-): TaskLifecycleStatus | undefined => {
-  const row = ledger.agents.get(agentId);
-  return row ? agentTaskStatus(row.status) : fallback;
-};
-
-/** Every agent the ledger shows working, once each, oldest first. */
-export const ledgerRunningAgents = (ledger: AgentLedger): LedgerAgent[] => {
-  const seen = new Set<string>();
-  const running: LedgerAgent[] = [];
-  for (const row of ledger.agents.values()) {
-    if (!row || seen.has(row.agentId) || !isLiveAgentStatus(row.status))
-      continue;
-    seen.add(row.agentId);
-    running.push(row);
-  }
-  return running.sort(
-    (a, b) =>
-      a.createdAtMs - b.createdAtMs || a.agentId.localeCompare(b.agentId),
-  );
-};
-
-/**
- * Whether an agent still counts as running once the ledger has spoken. Its
- * row decides when it has one. Without a row the journal's word stands: an
- * agent from before ledger rows, or one the ledger has not answered for yet.
- */
-export const ledgerKeepsRunning = (
-  ledger: AgentLedger,
-  agentId: string,
-): boolean => {
-  const row = ledger.agents.get(agentId);
-  return row ? isLiveAgentStatus(row.status) : true;
 };
 
 /**

@@ -90,10 +90,6 @@ export const minimumPlanForCapability = (
     hasCapability(audience, capability),
   ) ?? null;
 
-export const isCapability = (value: unknown): value is Capability =>
-  typeof value === "string" &&
-  (CAPABILITIES as readonly string[]).includes(value);
-
 /**
  * The backend's richer audience notion (`agent/model.ts`), which splits
  * paying users into "within budget" and "over budget" halves.

@@ -260,18 +260,3 @@ export type ScheduleToolDetails = {
   }
 }
 
-export type LocalAutomationRunResult =
-  | {
-      status: 'ok'
-      finalText: string
-    }
-  | {
-      status: 'busy'
-      finalText: ''
-      error: string
-    }
-  | {
-      status: 'error'
-      finalText: ''
-      error: string
-    }

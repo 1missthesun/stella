@@ -3,10 +3,7 @@
  * Separate file to avoid circular imports between
  * use-streaming-chat.ts and use-resume-agent-run.ts.
  */
-export type {
-  AgentResponseTarget,
-  AgentStreamEvent,
-} from "@stella/contracts/agent-stream";
+export type { AgentResponseTarget } from "@stella/contracts/agent-stream";
 
 import type { AgentResponseTarget } from "@stella/contracts/agent-stream";
 import type { ReplyRef } from "@stella/contracts/reply-refs";

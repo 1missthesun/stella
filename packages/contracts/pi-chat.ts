@@ -13,12 +13,6 @@ import type { AgentStatus } from "./agent-status.js";
  */
 
 /**
- * Whether the desktop's chat runs on pi-durable: unless the user's engine is
- * Claude Code, whose turns keep their own path.
- */
-export const desktopPiChatEnabled = (engine: string | undefined): boolean => engine !== "claude_code_local";
-
-/**
  * Stella's marks on a part of a user message. Providers read only a part's
  * `type`, `text` and `data`, so the model never sees them.
  */

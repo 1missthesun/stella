@@ -87,17 +87,6 @@ export const CLOSE_FRAME_TOO_LARGE = 4413;
 export const CLOSE_RATE_LIMITED = 4429;
 export const CLOSE_TOO_MANY_SOCKETS = 4503;
 
-export type SocketCloseCode =
-  | typeof CLOSE_BAD_REQUEST
-  | typeof CLOSE_UNAUTHENTICATED
-  | typeof CLOSE_FORBIDDEN
-  | typeof CLOSE_NOT_FOUND
-  | typeof CLOSE_PROTOCOL_VERSION
-  | typeof CLOSE_DELETED
-  | typeof CLOSE_FRAME_TOO_LARGE
-  | typeof CLOSE_RATE_LIMITED
-  | typeof CLOSE_TOO_MANY_SOCKETS;
-
 /**
  * Closes the client must never retry. `4401` is retryable exactly once — a
  * fresh token may fix it — and becomes terminal when the retry also fails.
@@ -285,11 +274,6 @@ export type ServerFrame =
       retryable: boolean;
       ref?: string;
     };
-
-export type ClientFrame =
-  | { type: "auth"; token: string }
-  | { type: "backfill"; requestId: string; fromSeq: number; toSeq: number }
-  | { type: "cancel"; turnId: string };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === "object" && value !== null

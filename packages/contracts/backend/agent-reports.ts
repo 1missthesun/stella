@@ -40,10 +40,6 @@ export const parseAgentReportId = (
 
 export type AgentReportOutcome = Exclude<AgentAttemptOutcome, "paused">;
 
-export type AgentReportRequester =
-  | { kind: "agent"; threadId: string }
-  | { kind: "conversation"; conversationId: string };
-
 export type DeviceAgentReport = {
   reportId: string;
   kind: "report" | "note";

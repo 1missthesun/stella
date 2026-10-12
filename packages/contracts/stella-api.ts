@@ -14,13 +14,6 @@ export const STELLA_DEFAULT_UPSTREAM_MODEL = "openai/gpt-6-luna";
 export const STELLA_DEEPSEEK_V4_FLASH_UPSTREAM_MODEL =
   "deepseek/deepseek-v4.1-flash";
 
-/** True for every routed spelling of the DeepSeek V4 Flash family. */
-export const isDeepSeekV4FlashModel = (
-  modelId: string | null | undefined,
-): boolean =>
-  typeof modelId === "string" &&
-  /deepseek-v4(?:\.1)?-flash/i.test(modelId);
-
 export const STELLA_RELAY_PROVIDERS = [
   "anthropic",
   "openai",
@@ -52,19 +45,6 @@ export const readConfiguredBackendUrl = (
   return normalized.length > 0 ? normalized : null;
 };
 
-const stellaUrlFromSiteUrl = (siteUrl: string, path: string): string =>
-  `${normalizeStellaSiteUrl(siteUrl)}${path}`;
-
-export const stellaApiBaseUrlFromSiteUrl = (siteUrl: string): string =>
-  stellaUrlFromSiteUrl(siteUrl, STELLA_API_BASE_PATH);
-
-type ChatContentPart =
-  | { type?: string; text?: string }
-  | {
-      type: "image_url";
-      image_url: { url: string; detail?: "auto" | "low" | "high" };
-    };
-
 type ChatToolCall = {
   id: string;
   type: "function";
@@ -72,18 +52,6 @@ type ChatToolCall = {
     name: string;
     arguments: string;
   };
-};
-
-export type ChatMessage = {
-  role: "system" | "user" | "assistant" | "developer" | "tool";
-  content: string | ChatContentPart[] | null;
-  reasoning_content?: string;
-  reasoning?: string;
-  reasoning_text?: string;
-  reasoning_signature?: string;
-  tool_calls?: ChatToolCall[];
-  tool_call_id?: string;
-  name?: string;
 };
 
 export type ChatCompletionResponse = {
@@ -128,18 +96,3 @@ export type ChatCompletionResponse = {
   };
 };
 
-export function extractChatText(response: ChatCompletionResponse): string {
-  const content = response.choices?.[0]?.message?.content;
-  if (typeof content === "string") {
-    return content.trim();
-  }
-  if (Array.isArray(content)) {
-    return content
-      .filter((part) => part?.type === "text" && typeof part.text === "string")
-      .map((part) => part.text!.trim())
-      .filter(Boolean)
-      .join("\n")
-      .trim();
-  }
-  return "";
-}

@@ -33,10 +33,6 @@ export type UserAskUrgencyName = (typeof USER_ASK_URGENCY_NAMES)[number];
 export const USER_ASK_MIN_URGENCY: UserAskUrgencyLevel = 1;
 export const USER_ASK_MAX_URGENCY: UserAskUrgencyLevel = 4;
 
-export const urgencyNameFromLevel = (
-  level: UserAskUrgencyLevel,
-): UserAskUrgencyName => USER_ASK_URGENCY_NAMES[level - 1]!;
-
 export const urgencyLevelFromName = (
   name: string,
 ): UserAskUrgencyLevel | null => {
@@ -193,8 +189,6 @@ export type UserAskAnswerFieldValue =
 
 export const USER_ASK_RESPONSE_KINDS = ["option", "text", "skipped"] as const;
 
-export type UserAskResponseKind = (typeof USER_ASK_RESPONSE_KINDS)[number];
-
 export type UserAskQuestionResponse =
   | Readonly<{ questionId: string; kind: "option"; choiceId: string }>
   | Readonly<{ questionId: string; kind: "text"; text: string }>
@@ -215,8 +209,6 @@ export type UserAskAnswer =
       fields: readonly UserAskAnswerFieldValue[];
       answeredOnDeviceId?: string;
     }>;
-
-export type UserAskDecision = "answer" | "cancel";
 
 export type UserAskResolution =
   | Readonly<{

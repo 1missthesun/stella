@@ -1,11 +1,3 @@
-import type {
-  AgentIdLike,
-  AgentRunFinishOutcome,
-  AgentStreamEventType,
-  TaskToolActivity,
-} from "./agent-runtime.js";
-import type { ReplyRef } from "./reply-refs.js";
-
 export type AgentResponseTarget =
   | { type: "user_turn" }
   | { type: "agent_turn"; agentId: string }
@@ -15,60 +7,3 @@ export type AgentResponseTarget =
       terminalState: "completed" | "failed" | "canceled";
     };
 
-export type AgentStreamEvent = {
-  type: AgentStreamEventType;
-  runId: string;
-  seq: number;
-  /** Runtime-recorder sequence retained when the main process re-sequences IPC. */
-  sourceSeq?: number;
-  /** Monotonic durable attempt for an agent thread; fences stale lifecycle. */
-  attemptGeneration?: number;
-  conversationId?: string;
-  requestId?: string;
-  userMessageId?: string;
-  uiVisibility?: "visible" | "hidden";
-  rootRunId?: string;
-  chunk?: string;
-  statusState?:
-    | "running"
-    | "compacting"
-    | "engine-compacting"
-    | "provider-retry"
-    | "model-fallback";
-  toolCallId?: string;
-  toolName?: string;
-  args?: Record<string, unknown>;
-  resultPreview?: string;
-  /** Absent only on historical tool-end events. */
-  isError?: boolean;
-  details?: unknown;
-  error?: string;
-  fatal?: boolean;
-  finalText?: string;
-  persisted?: boolean;
-  agentId?: string;
-  agentType?: AgentIdLike;
-  description?: string;
-  parentAgentId?: string;
-  result?: string;
-  statusText?: string;
-  toolActivity?: TaskToolActivity;
-  outcome?: AgentRunFinishOutcome;
-  reason?: string;
-  replacedByRunId?: string;
-  responseTarget?: AgentResponseTarget;
-  /** Canonical SQLite row persisted for an `ASSISTANT_MESSAGE` boundary. */
-  assistantMessageEventId?: string;
-  /** Canonical text for the finalized message; provider deltas are optimistic. */
-  assistantMessageText?: string;
-  /**
-   * On an `ASSISTANT_MESSAGE` boundary: true when the message that just
-   * finalized ends with a tool call, i.e. it is an interim/preamble message
-   * rather than the run's final answer. The renderer keeps the working
-   * indicator up (instead of handing off to the painted preamble text)
-   * across the gap between this message and the tool it precedes.
-   */
-  followedByToolCall?: boolean;
-  /** Resolved citations for an `ASSISTANT_MESSAGE` boundary (`reply-refs`). */
-  replyRefs?: ReplyRef[];
-};

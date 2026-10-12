@@ -167,12 +167,3 @@ export const titleNamesThread = (title: string, threadId: string): boolean => {
   return b.startsWith(`${a}-`) && /^[a-z0-9]{6}$/.test(b.slice(a.length + 1));
 };
 
-/** Reply count for a message known by any of the given ids. */
-export const replyCountFor = (
-  counts: ReplyCounts,
-  ids: readonly (string | undefined)[],
-): number => {
-  let total = 0;
-  for (const id of ids) if (id) total += counts.messages[id] ?? 0;
-  return total;
-};

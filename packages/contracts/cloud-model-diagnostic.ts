@@ -1,14 +1,8 @@
-export const CLOUD_MODEL_PROXY_DIAGNOSTIC_HEADER =
-  "x-stella-local-model-diagnostic";
-
 export const CLOUD_MODEL_PROXY_DIAGNOSTIC_CODES = [
   "model_proxy_reject",
   "model_broker_closed",
   "model_broker_transport",
 ] as const;
-
-export type CloudModelProxyDiagnosticCode =
-  (typeof CLOUD_MODEL_PROXY_DIAGNOSTIC_CODES)[number];
 
 export const CLOUD_MODEL_DIAGNOSTIC_SENTINELS = {
   model_loopback_connect:

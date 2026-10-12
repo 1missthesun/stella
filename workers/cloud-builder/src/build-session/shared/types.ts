@@ -77,11 +77,6 @@ export type TurnRequest = {
     sessionId: string;
     endpoint: string;
   };
-  /** Trusted outer-router facts for the agent-only signed preview proxy. */
-  previewRoute?: {
-    buildSessionName: string;
-    baseUrl: string;
-  };
   /** Worker-issued lease. Callers cannot choose this value. */
   ownerPurgeGeneration?: string;
   ownerPurgeLeaseId?: string;

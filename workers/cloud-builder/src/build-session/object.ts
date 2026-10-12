@@ -99,7 +99,6 @@ import {
 import {
   builderFallbackTranscriptKey,
   HEADER_BUILD_SESSION_NAME,
-  HEADER_PREVIEW_BASE_URL,
   HEADER_TURN_BROKER_ENDPOINT,
   json,
   turnDispatchIdentity,
@@ -793,12 +792,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     if (url.pathname === "/turn-broker") {
       return await this.handleTurnBroker(request);
     }
-    if (
-      url.pathname === "/vite-preview" ||
-      url.pathname.startsWith("/vite-preview/")
-    ) {
-      return json({ error: "Not found." }, 404);
-    }
     if (request.method !== "POST") {
       return json({ error: "Method not allowed." }, 405);
     }
@@ -865,7 +858,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     // body-shaped values first so a service caller cannot choose where the
     // sandbox sends its capability or which BuildSession identity it claims.
     delete turn.turnBrokerRoute;
-    delete turn.previewRoute;
     delete turn.gateAdmittedByCaller;
     // Set by the dispatcher, which admitted the owner gate itself before
     // dispatching and releases it if this call fails. Trusted because only a
@@ -890,8 +882,6 @@ export class BuildSessionObject extends DurableObject<Env> {
       request.headers.get(HEADER_BUILD_SESSION_NAME)?.trim() ?? "";
     const brokerEndpoint =
       request.headers.get(HEADER_TURN_BROKER_ENDPOINT)?.trim() ?? "";
-    const previewBaseUrl =
-      request.headers.get(HEADER_PREVIEW_BASE_URL)?.trim() ?? "";
     if (turn?.kind === "agent" && (brokerSessionId || brokerEndpoint)) {
       try {
         const endpoint = new URL(brokerEndpoint);
@@ -918,32 +908,6 @@ export class BuildSessionObject extends DurableObject<Env> {
         };
       } catch {
         return json({ error: "Trusted turn broker route is required." }, 400);
-      }
-    }
-    if (turn?.kind !== "agent" && (brokerSessionId || previewBaseUrl)) {
-      try {
-        const base = new URL(previewBaseUrl);
-        const localHttp =
-          base.protocol === "http:" &&
-          (base.hostname === "127.0.0.1" || base.hostname === "localhost");
-        if (
-          !brokerSessionId ||
-          (base.protocol !== "https:" && !localHttp) ||
-          base.username ||
-          base.password ||
-          base.search ||
-          base.hash ||
-          base.pathname !==
-            `/internal/previews/${encodeURIComponent(brokerSessionId)}/`
-        ) {
-          throw new Error("invalid preview route");
-        }
-        turn.previewRoute = {
-          buildSessionName: brokerSessionId,
-          baseUrl: base.toString(),
-        };
-      } catch {
-        return json({ error: "Trusted preview route is required." }, 400);
       }
     }
     const dispatchOwnerGeneration = normalizeOwnerGeneration(

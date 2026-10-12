@@ -509,6 +509,10 @@ export const buildClaudeChildEnv = (options: {
     // No telemetry, error reporting or update check: nothing the turn needs
     // goes out before its first model request.
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+    // claude.ai's own connectors are never this turn's tools
+    // (`--strict-mcp-config`), and with blocking MCP connections their fetch
+    // held every start for about half a second.
+    ENABLE_CLAUDEAI_MCP_SERVERS: "false",
   };
   // Nothing may point the CLI at another endpoint or another credential.
   delete childEnv.ANTHROPIC_BASE_URL;

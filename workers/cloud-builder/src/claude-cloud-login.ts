@@ -354,8 +354,10 @@ export const restoreClaudeCloudLogins = async (
   ownerId: string,
   container?: SandboxHandle,
 ): Promise<boolean> => {
+  const started = Date.now();
   const url = await loginBackupUrl(env, ownerId, "GET");
   if (!url) return false;
+  const signedAt = Date.now();
   // What the container is about to fetch, so a copy it already has, or a
   // backup that does not exist, costs no download. An unreadable head
   // fetches as before.
@@ -365,12 +367,24 @@ export const restoreClaudeCloudLogins = async (
     (object) => (object ? object.etag.replace(/"/gu, "") : "absent"),
     () => undefined,
   );
+  const headAt = Date.now();
   const result = await runScript(env, ownerId, ["restore"], {
     url,
     timeoutMs: 120_000,
     ...(stored ? { extraEnv: { ETAG: stored } } : {}),
     ...(container ? { container } : {}),
   });
+  console.log(
+    JSON.stringify({
+      level: "info",
+      event: "claude_cloud_login_restore_timing",
+      backup: stored === undefined ? "unknown" : stored === "absent" ? "absent" : "present",
+      outcome: !result.ok ? "failed" : result.current === true ? "current" : result.restored === true ? "restored" : "kept",
+      signMs: signedAt - started,
+      headMs: headAt - signedAt,
+      scriptMs: Date.now() - headAt,
+    }),
+  );
   if (!result.ok) {
     console.error(
       JSON.stringify({ level: "error", event: "claude_cloud_login_restore_failed", message: result.error }),

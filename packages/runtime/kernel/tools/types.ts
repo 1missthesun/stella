@@ -481,7 +481,6 @@ export type ToolHostOptions = {
    * Desktop hop for the orchestrator's `switch_destination` tool: flip the
    * app's execution target and continue the conversation there.
    */
-  switchExecutionDestination?: import("./defs/switch-destination.js").ExecutionDestinationSwitcher;
 };
 
 export type ScheduleToolApi = {

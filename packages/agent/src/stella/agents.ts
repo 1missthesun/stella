@@ -14,8 +14,10 @@
  * restarts.
  *
  * The tools are Stella's own descriptors: `spawn_agent`, `send_message`,
- * `agent_status`, `pause_agent`, and `switch_destination` where the host can
- * move a conversation's tools (`StellaAgentsHost.execution`).
+ * `agent_status`, `pause_agent`, and, for Stella in a conversation whose
+ * brain can move, `switch_destination` (`StellaAgentsHost.execution`). An
+ * agent placed on another computer or in the cloud runs there as a whole
+ * (`StellaAgentsHost.remote`); nothing here runs another host's tools.
  */
 import type { Context } from "@earendil-works/chord";
 import { Type, type AssistantMessage, type ModelThinkingLevel, type TextContent } from "@earendil-works/pi-ai";
@@ -43,7 +45,6 @@ import {
   buildAgentDirectoryResult,
   formatAgentMessage,
   STELLA_MESSAGE_TARGET,
-  toolsOfflineText,
   type AgentDirectoryAgentRow,
   type AgentDirectorySessionRow,
   type AgentMessageSender,
@@ -57,7 +58,7 @@ import {
   type AgentStatus,
 } from "@stella/contracts/agent-status";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
-import { engineExtensionChange } from "../engine/selection.ts";
+import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
 import { switchDestinationTool, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
@@ -67,6 +68,7 @@ import {
   parseSpawnDestination,
   placementOf,
   placementRecord,
+  samePlacement,
   StellaPlacementDoc,
   type SpawnDestination,
   type StellaPlacement,
@@ -317,7 +319,10 @@ export type RemoteAgentHost = {
    * Start it there. Its thread id there names it everywhere. Once per `key`.
    * `model` is the one its caller asked for, which the host there runs it on.
    */
-  start(args: { key: string; description: string; prompt: string; model?: string }, context: Context): Promise<{ threadId: string }>;
+  start(
+    args: { key: string; description: string; prompt: string; model?: string },
+    context: Context,
+  ): Promise<{ threadId: string; waiting?: boolean }>;
   /** Another message for it: steers it there, starts its next run, or is held for its offline computer. Once per `key`. */
   message(args: { key: string; threadId: string; message: string }, context: Context): Promise<AgentMessageDelivery | void>;
   /** Its status there, as one line. */
@@ -407,10 +412,8 @@ export type StellaAgentsHost = {
    */
   directoryProblem?(directory: string): Promise<string | undefined>;
   /**
-   * Where a conversation's tools can run apart from the conversation: an
-   * agent started with a device destination keeps its brain here and runs
-   * its tools there, and `switch_destination` moves them. Absent, an
-   * agent's tools run where it does.
+   * Where Stella can move herself (`switch_destination`), and how the
+   * owner's computers stand, for agents that run on one of them.
    */
   execution?: StellaExecutionHost;
 };
@@ -686,6 +689,10 @@ const controlNote = (starter: boolean) => ({
 });
 
 export function stellaAgents(host: StellaAgentsHost) {
+  const moveBrain = host.execution?.moveBrain;
+  const switchDestination = moveBrain
+    ? switchDestinationTool({ ...host.execution, moveBrain }, host.rootPlacement)
+    : undefined;
   const Reporter = defineTask<ReporterInput, ReporterState, null>({
     name: "stella.agent-reporter",
     version: 1,
@@ -961,6 +968,18 @@ export function stellaAgents(host: StellaAgentsHost) {
   };
 
   /**
+   * The model an agent on another computer runs on when its caller names
+   * none: Claude Code, with the caller's model and effort, when the caller
+   * runs on it; otherwise that computer's own configured model.
+   */
+  const sameEngine = (caller: RunsOn): string | undefined => {
+    if (!onClaudeCode(caller.model)) return undefined;
+    const modelId = caller.model?.modelId.trim();
+    const effort = caller.thinkingLevel && caller.thinkingLevel !== "off" && caller.thinkingLevel !== "minimal" ? `:${caller.thinkingLevel}` : "";
+    return `${CLAUDE_CODE_PROVIDER_ID}${modelId && modelId !== "default" ? `/${modelId}` : ""}${effort}`;
+  };
+
+  /**
    * What an agent its caller named `requested` for runs on, checked by the
    * host. Without a host check, another Stella alias runs for a caller on
    * Stella's models (a turn on the user's own model or plan is admitted for
@@ -983,9 +1002,6 @@ export function stellaAgents(host: StellaAgentsHost) {
         : `Agents here run on this conversation's own model, so "${requested}" can't run here. Omit model to use it.`,
     );
   };
-
-  const callerPlacement = async (api: ToolExecutionApi, context: Context): Promise<StellaPlacement> =>
-    placementOf(await api.snapshot(StellaPlacementDoc, api.conversationId, context)) ?? host.rootPlacement;
 
   /**
    * Create an agent under `parentConversationId` and its first reporter,
@@ -1035,7 +1051,9 @@ export function stellaAgents(host: StellaAgentsHost) {
       // (it copied the starter's selection); one at the depth limit cannot
       // start agents.
       extensions: { ...agentToolSelection, ...engineExtensionChange(runsOn.model) },
-      tools: depth >= MAX_AGENT_DEPTH ? { remove: [spawnAgent, pauseAgent] } : null,
+      tools: {
+        remove: [...(depth >= MAX_AGENT_DEPTH ? [spawnAgent, pauseAgent] : []), ...(switchDestination ? [switchDestination] : [])],
+      },
     });
     const role = await tx.doc(StellaAgentDoc, child.id);
     role.agentType = "general";
@@ -1089,19 +1107,13 @@ export function stellaAgents(host: StellaAgentsHost) {
       destination: Type.Optional(
         Type.String({
           description:
-            'Where the agent runs: "cloud", or a device_id from the connected devices list. Omit to run it where your tools run. With a device_id the agent stays with you and only its tools (shell and files) run on that computer, which must be online. An agent\'s agent always stays with it, so for one "cloud" also moves only its tools.',
-        }),
-      ),
-      whole_agent: Type.Optional(
-        Type.Boolean({
-          description:
-            "With a device_id destination: run the whole agent on that computer, on its own Stella there, for work that needs more than its shell and files (its Stella skills and apps, the user's signed-in browser, the app's preview, changing Stella itself). It waits for an offline computer to come back. Only Stella can do this.",
+            'Where the agent runs: "cloud", or a device_id from the connected devices list. Omit to run it where you run. Stella only: the agent runs entirely there, on that computer\'s own Stella with its own files, browser, apps and sign-ins (Claude Code there too), and waits up to an hour for a computer that is offline. An agent\'s own agents always run where it runs.',
         }),
       ),
       directory: Type.Optional(
         Type.String({
           description:
-            "Absolute path of the directory the agent starts in, such as the project the work is about, where its tools run (so not with destination). Its AGENTS.md, when there is one, is added to the agent's context. The agent can still work anywhere. Omit it to start the agent in a fresh folder of its own.",
+            "Absolute path of the directory the agent starts in, such as the project the work is about, on the computer you run on (so not with destination). Its AGENTS.md, when there is one, is added to the agent's context. The agent can still work anywhere. Omit it to start the agent in a fresh folder of its own.",
         }),
       ),
     }),
@@ -1111,31 +1123,38 @@ export function stellaAgents(host: StellaAgentsHost) {
       const caller = await roleOf(api, api.conversationId, context);
       const depth = caller.depth + 1;
       if (depth > MAX_AGENT_DEPTH) throw new Error("This agent is at the nesting limit and cannot start agents of its own.");
-      const destination = parseSpawnDestination(args.destination, args.whole_agent);
+      const orchestrator = caller.agentType === "orchestrator";
+      const destination = parseSpawnDestination(args.destination);
       const directory = args.directory?.trim() || undefined;
       if (directory && !isAbsolutePath(directory)) {
         throw new Error(`directory must be an absolute path; got "${directory}".`);
       }
-      const placed = host.place(destination, await callerPlacement(api, context));
+      const placed = host.place(destination, host.rootPlacement);
       if ("error" in placed) throw new Error(placed.error);
-      let placement: StellaPlacement = placed;
-      // Another computer's or the cloud's tools start in their own home.
-      if (directory && placed.kind !== "local") {
+      const placement: StellaPlacement = placed;
+      const here = samePlacement(placement, host.rootPlacement);
+      // An agent's agents run where it runs, so their reports climb the chain.
+      if (!orchestrator && !here) {
         throw new Error(
-          "directory works only for an agent whose tools run where you are. Leave it out, and name the directory in the prompt instead.",
+          `Your agents run where you run (${describePlacement(host.rootPlacement)}). Leave out destination, or ask Stella with send_message to "stella" to start an agent on ${describePlacement(placement)}.`,
+        );
+      }
+      if (directory && !here) {
+        throw new Error(
+          "directory works only for an agent that runs where you are. Leave it out, and name the directory in the prompt instead.",
         );
       }
       const problem = directory ? await host.directoryProblem?.(directory) : undefined;
       if (problem) throw new Error(problem);
       const callerAgent = await api.agent(context);
+      const placedRemote = here ? undefined : host.remote?.(placement);
+      if (!here && !placedRemote) throw new Error(`Agents can't start on ${describePlacement(placement)} from here.`);
       const named = args.model?.trim();
-      const requested = named && named !== "default" ? named : host.defaultAgentModel?.(callerAgent);
+      const explicit = named && named !== "default" ? named : undefined;
+      // On another computer it runs on Stella's engine, as it would here: Claude Code when she runs on it.
+      const requested =
+        explicit ?? (placedRemote && placement.kind === "device" ? sameEngine(callerAgent) : host.defaultAgentModel?.(callerAgent));
       const description = args.description.trim() || "agent";
-      // An agent's agent stays with it, its tools where it asked or where its
-      // caller's run (the cloud, a computer), so its report climbs the chain
-      // like any other. Only a whole agent leaves, and only Stella starts one.
-      const whole = caller.agentType === "orchestrator" || (destination.kind === "device" && destination.whole === true);
-      const placedRemote = whole ? host.remote?.(placement) : undefined;
       const choice = requested
         ? await chooseAgentModel(requested, callerAgent, placedRemote ? placement : undefined, context)
         : undefined;
@@ -1148,30 +1167,15 @@ export function stellaAgents(host: StellaAgentsHost) {
       const engine = choice && "engine" in choice ? choice.engine : undefined;
       const engineHost = engine ? host.engine?.(engine) : undefined;
       if (engine && !engineHost) throw new Error(`"${requested}" runs on ${engine}, which this host cannot start agents on.`);
-      if (engineHost && placement.kind === "device") {
-        const omitModel = named && named !== "default" && host.defaultAgentModel?.(callerAgent) === undefined;
-        throw new Error(
-          `An agent on "${requested}" runs as a whole where that engine runs, so its tools can't run on ${describePlacement(placement)}. ${
-            omitModel ? "Leave out model to start an agent whose tools run there, or pass" : "Pass"
-          } whole_agent to run the agent on that computer's own Stella.`,
-        );
-      }
       const remote = engineHost ?? placedRemote;
       if (remote) {
         // Its report comes back to the orchestrator only.
-        if (caller.agentType !== "orchestrator") {
-          throw new Error(
-            engine
-              ? `Only Stella can start an agent on "${requested}". Omit model to run this agent on yours.`
-              : "Only Stella can start a whole agent somewhere else. Leave out whole_agent: the agent then stays with you and runs its tools there.",
-          );
-        }
+        if (!orchestrator) throw new Error(`Only Stella can start an agent on "${requested}". Omit model to run this agent on yours.`);
         const callKey = String(api.taskId);
         const prior = (await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.calls[callKey];
-        const threadId =
-          prior?.threadId ??
-          (
-            await remote.start(
+        const started = prior
+          ? { threadId: prior.threadId }
+          : await remote.start(
               {
                 key: `spawn:${callKey}`,
                 description,
@@ -1179,8 +1183,8 @@ export function stellaAgents(host: StellaAgentsHost) {
                 ...(requested ? { model: requested } : {}),
               },
               context,
-            )
-          ).threadId;
+            );
+        const threadId = started.threadId;
         await api.commit(async (tx) => {
           const state = await tx.doc(StellaAgentsDoc, api.conversationId);
           if (state.calls[callKey]) return;
@@ -1196,22 +1200,29 @@ export function stellaAgents(host: StellaAgentsHost) {
           state.calls[callKey] = { threadId, reporter: -1 };
         }, context);
         await api.details({ thread_id: threadId }, context);
+        const where =
+          placement.kind === "device"
+            ? await host.execution
+                ?.standing?.(placement.deviceId, context)
+                .then((standing) => (standing ? { ...placement, label: standing.name } : placement))
+                .catch(() => placement)
+            : placement;
         return {
           content: [
             {
               type: "text",
-              text: `${prior ? "Already started" : "Started"} ${threadId} (${describePlacement(placement)}). thread_id: ${threadId}. Its report arrives in [Agent completed].`,
+              text: [
+                `${prior ? "Already started" : "Started"} ${threadId} (${describePlacement(where ?? placement)}). thread_id: ${threadId}. Its report arrives in [Agent completed].`,
+                "waiting" in started && started.waiting
+                  ? `${describePlacement(where ?? placement)} can't take it yet (offline, not ready, or waiting for the user to allow work from other devices there), so it starts once it can, waiting up to an hour. Tell the user.`
+                  : "",
+              ]
+                .filter(Boolean)
+                .join("\n"),
             },
           ],
           details: { thread_id: threadId },
         };
-      }
-      // An agent here whose tools run elsewhere: that place must take them now.
-      const started = (await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.calls[String(api.taskId)];
-      if (!started && placement.kind !== host.rootPlacement.kind && host.execution) {
-        const prepared = await host.execution.prepare(placement, context);
-        if ("error" in prepared) throw new Error(prepared.error);
-        placement = prepared.placement;
       }
       const startedBy = senderOf(
         caller,
@@ -1344,7 +1355,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         );
         state.calls[String(api.taskId)] = { threadId, reporter };
       }, context);
-      return deliveredResult({ threadId, delivered: running ? "steered" : "resumed", ...(await toolsOfflineNote(known, context)) });
+      return deliveredResult({ threadId, delivered: running ? "steered" : "resumed" });
     },
   });
 
@@ -1366,13 +1377,12 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (agent.engine) return host.engine?.(agent.engine);
     const placement = placementOf(agent.placement);
     if (!placement) return undefined;
-    return host.remote?.(placement.kind === "device" ? { ...placement, whole: true } : placement);
+    return host.remote?.(placement);
   };
 
   /**
-   * The owner's computer an agent's placement names, as the device list has
-   * it now: where a whole agent runs, or where an agent here runs its tools.
-   * `seen` keeps one lookup per computer within a call.
+   * The owner's computer a remote agent runs on, as the device list has it
+   * now. `seen` keeps one lookup per computer within a call.
    */
   const computerOf = async (
     agent: AgentRecord,
@@ -1387,13 +1397,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       seen.set(deviceId, standing);
     }
     return await standing;
-  };
-
-  /** For a message to an agent here whose tools run on an offline computer: what it can and can't do now. */
-  const toolsOfflineNote = async (agent: AgentRecord, context: Context): Promise<{ note?: string }> => {
-    if (agent.remote) return {};
-    const computer = await computerOf(agent, context);
-    return computer && !computer.online ? { note: `${toolsOfflineText(computer.name, computer.lastSeenAt)}.` } : {};
   };
 
   const agentDetails = async (
@@ -1516,21 +1519,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           : {}),
       };
     }
-    const here = describePlacement(host.rootPlacement);
-    const computer = await computerOf(record, context, seen);
-    const tools =
-      record.placement.kind === host.rootPlacement.kind
-        ? undefined
-        : record.placement.kind === "cloud"
-          ? "in the cloud"
-          : `on ${computer?.name ?? placed}`;
-    const located = {
-      ...row,
-      where: tools ? `${here}, its tools ${tools}` : here,
-      ...(computer && !computer.online
-        ? { offline: { tools: computer.name, ...(computer.lastSeenAt !== undefined ? { lastSeenAt: computer.lastSeenAt } : {}) } }
-        : {}),
-    };
+    const located = { ...row, where: describePlacement(host.rootPlacement) };
     const id = record.conversationId as ConversationId;
     const live = await api.snapshot(LiveDoc, id, context);
     const recent = await api.commit(async (tx) => (await tx.scanEntries({ conversationId: id, order: "descending" }, 10)).items, context);
@@ -1638,7 +1627,6 @@ export function stellaAgents(host: StellaAgentsHost) {
       return deliveredResult({
         threadId,
         delivered: running ? "steered" : "resumed",
-        ...(await toolsOfflineNote(target.record, context)),
       });
     }
     const delivery = await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context);
@@ -2162,7 +2150,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       sendMessage,
       agentStatus,
       pauseAgent,
-      ...(host.execution ? [switchDestinationTool(host.execution, host.rootPlacement)] : []),
+      ...(switchDestination ? [switchDestination] : []),
     ],
   });
   return {

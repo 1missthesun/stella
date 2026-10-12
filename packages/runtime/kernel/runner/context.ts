@@ -288,6 +288,31 @@ export const createRunnerContext = ({
       );
       return { threadId: started.threadId };
     },
+    startOnDevice: async ({ conversationId, requestId, description, prompt, targetDeviceId, model }) => {
+      if (!backend.client() || !isCloudSignedIn()) {
+        throw new Error("Sign in to Stella to run agents on your other computers.");
+      }
+      const ownerGeneration = await getCloudOwnerGeneration();
+      const started = await raceWithTimeoutError(
+        backend.require().call("agentThreads.spawnFromDesktop", {
+          ownerGeneration,
+          clientMsgId: requestId,
+          conversationId,
+          description,
+          prompt,
+          originDeviceId: deviceId,
+          originConversationId: conversationId,
+          targetDeviceId,
+          ...(model ? { model } : {}),
+        }),
+        AGENT_SPAWN_TIMEOUT_MS,
+        () =>
+          new Error(
+            "Stella's cloud did not accept the agent within 30s. Check the running agents before retrying so the same work does not start twice.",
+          ),
+      );
+      return { threadId: started.threadId, waitingForDevice: started.waitingForDevice === true };
+    },
     message: async ({ conversationId, threadId, requestId, message }) => {
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to message agents running in the cloud.");

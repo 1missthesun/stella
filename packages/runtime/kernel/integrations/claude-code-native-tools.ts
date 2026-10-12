@@ -12,15 +12,10 @@
  * gets a native shell, file writer or search (its `code` covers the rest).
  * Workers get the full file and shell set.
  *
- * Built-ins run where the CLI runs. While a session's file and shell tools
- * are set to run elsewhere (another of the owner's computers, or a cloud
- * container), every built-in is off and Stella's own Read/Write/Edit/Bash/
- * Grep come back over MCP, where the host routes them there
- * (`@stella/agent/host/remote-tools`), with a served Grep and Glob that run
- * there as the device Grep (`CLAUDE_CODE_SERVED_SEARCH_TOOLS`). Back where
- * the CLI runs, the built-ins return: the fast path whenever tools are local.
+ * Built-ins run where the CLI runs, which is where the session runs: an
+ * agent on another computer runs there as a whole, with that computer's CLI
+ * and its built-ins. Stella's tools come over MCP beside them.
  */
-import { isDeviceToolName } from "@stella/contracts/turn-plane/device-tools";
 
 export type ClaudeCodeNativeToolRole = "orchestrator" | "worker";
 
@@ -139,9 +134,8 @@ export const isClaudeCodeNativeToolName = (toolName: string): boolean =>
   !toolName.startsWith("mcp__");
 
 /**
- * A session's built-ins and Stella MCP tools for where its file and shell
- * tools run: native where the CLI runs, Stella's routed ones (`toolsAway`)
- * anywhere else.
+ * A session's built-ins and Stella MCP tools: the role's built-ins, unless
+ * the host runs the CLI with none (`builtinsOff`).
  */
 export const resolveClaudeCodeToolSet = <
   T extends { name: string },
@@ -149,109 +143,13 @@ export const resolveClaudeCodeToolSet = <
   role: ClaudeCodeNativeToolRole;
   toolsAllowlist?: readonly string[];
   catalog: readonly T[];
-  toolsAway: boolean;
+  builtinsOff: boolean;
 }): { nativeTools: readonly string[]; tools: T[] } => {
-  const nativeTools = args.toolsAway
+  const nativeTools = args.builtinsOff
     ? []
     : resolveClaudeCodeNativeTools(args.role, args.toolsAllowlist);
   return {
     nativeTools,
     tools: withoutToolsReplacedByNative(args.catalog, nativeTools, args.role),
-  };
-};
-
-/** Stella tools that run where a session's file and shell tools run, wherever that is. */
-export const isClaudeCodeEnvironmentToolName = (toolName: string): boolean =>
-  isDeviceToolName(toolName);
-
-const GLOB_CHARACTERS = /[*?[\]{}]/u;
-
-/**
- * Claude Code's Grep and Glob as Stella serves them while a session's tools
- * run elsewhere: the same names and the arguments the built-ins take, run
- * there as the device `Grep` (a Glob is a file listing: every file whose
- * path matches, by ripgrep's globs).
- */
-export const CLAUDE_CODE_SERVED_SEARCH_TOOLS = [
-  {
-    name: "Grep",
-    description:
-      "Search file contents with ripgrep where your file and shell tools run. output_mode files_with_matches (default) lists matching files, content shows matching lines with line numbers, count counts matches per file. Filter files with glob (e.g. \"*.ts\") or type (e.g. \"py\").",
-    parameters: {
-      type: "object",
-      properties: {
-        pattern: { type: "string", description: "The regular expression to search for." },
-        path: { type: "string", description: "File or directory to search in; defaults to the working directory there." },
-        glob: { type: "string", description: "Only search files matching this glob." },
-        type: { type: "string", description: "Only search files of this ripgrep type." },
-        output_mode: { type: "string", enum: ["content", "files_with_matches", "count"] },
-        "-i": { type: "boolean", description: "Case insensitive search." },
-        "-C": { type: "number", description: "Lines of context around each match (output_mode content)." },
-        head_limit: { type: "number", description: "Most matches per file to report." },
-      },
-      required: ["pattern"],
-      additionalProperties: false,
-    },
-  },
-  {
-    name: "Glob",
-    description:
-      "Find files by path pattern where your file and shell tools run, such as \"**/*.ts\" or \"src/**/*.tsx\". A pattern without a slash matches file names at any depth. Ignored, hidden and empty files are left out.",
-    parameters: {
-      type: "object",
-      properties: {
-        pattern: { type: "string", description: "The glob pattern to match file paths against." },
-        path: { type: "string", description: "Directory to search in; defaults to the working directory there." },
-      },
-      required: ["pattern"],
-      additionalProperties: false,
-    },
-  },
-] as const satisfies readonly { name: string; description: string; parameters: Record<string, unknown> }[];
-
-export type ClaudeCodeServedSearchToolName = (typeof CLAUDE_CODE_SERVED_SEARCH_TOOLS)[number]["name"];
-
-export const isClaudeCodeServedSearchToolName = (toolName: string): toolName is ClaudeCodeServedSearchToolName =>
-  CLAUDE_CODE_SERVED_SEARCH_TOOLS.some((tool) => tool.name === toolName);
-
-const text = (value: unknown): string | undefined => (typeof value === "string" && value.trim() ? value : undefined);
-
-/** A glob's fixed leading directories, searched as the path, and the rest as ripgrep's glob. */
-const splitGlob = (pattern: string, base: string | undefined): { path?: string; glob: string } => {
-  const segments = pattern.replace(/\\/gu, "/").split("/");
-  const fixed: string[] = [];
-  while (segments.length > 1 && !GLOB_CHARACTERS.test(segments[0]!)) fixed.push(segments.shift()!);
-  const glob = segments.join("/");
-  if (fixed.length === 0) return { ...(base ? { path: base } : {}), glob };
-  const prefix = fixed.join("/") || "/";
-  const path = base && !prefix.startsWith("/") && !/^[A-Za-z]:$/u.test(fixed[0]!) ? `${base.replace(/[\\/]+$/u, "")}/${prefix}` : prefix;
-  return { path, glob };
-};
-
-/** A served Grep or Glob call as the device `Grep` takes it. */
-export const claudeCodeServedSearchCall = (
-  toolName: ClaudeCodeServedSearchToolName,
-  args: Record<string, unknown>,
-): { toolName: "Grep"; params: Record<string, unknown> } => {
-  if (toolName === "Glob") {
-    const { path, glob } = splitGlob(text(args.pattern) ?? "**/*", text(args.path));
-    return {
-      toolName: "Grep",
-      params: { pattern: "", glob, output_mode: "files_with_matches", ...(path ? { path } : {}) },
-    };
-  }
-  const contextLines = args["-C"] ?? args.context;
-  return {
-    toolName: "Grep",
-    params: {
-      pattern: typeof args.pattern === "string" ? args.pattern : "",
-      ...(text(args.path) ? { path: args.path } : {}),
-      ...(text(args.glob) ? { glob: args.glob } : {}),
-      ...(text(args.type) ? { type: args.type } : {}),
-      ...(text(args.output_mode) ? { output_mode: args.output_mode } : {}),
-      ...(args["-i"] === true || args.case_insensitive === true ? { case_insensitive: true } : {}),
-      ...(typeof contextLines === "number" && contextLines > 0 ? { context_lines: contextLines } : {}),
-      ...(typeof args.head_limit === "number" && args.head_limit > 0 ? { max_results: args.head_limit } : {}),
-    },
   };
 };

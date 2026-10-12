@@ -3,10 +3,6 @@ import type {
   DeviceRequestDeviceFrame,
   DeviceRequestServerFrame,
 } from "./device-requests.js";
-import type {
-  DeviceToolDeviceFrame,
-  DeviceToolServerFrame,
-} from "./device-tools.js";
 
 /**
  * Execution placement on the owner gate.
@@ -170,7 +166,9 @@ export type ExecutionCapability =
   | "computer-use"
   | "local-files"
   | "local-apps"
-  | "attachments";
+  | "attachments"
+  /** Claude Code is signed in there, so agents on Claude Code can run there. */
+  | "claude-code";
 
 export const CLOUD_CAPABILITIES: readonly ExecutionCapability[] = [
   "chat",
@@ -471,8 +469,7 @@ export type DevicePresenceServerFrame =
     }
   | { type: "pong"; serverTimeMs: number }
   | { type: "error"; code: string; message: string; retryable: boolean }
-  | DeviceRequestServerFrame
-  | DeviceToolServerFrame;
+  | DeviceRequestServerFrame;
 
 /** Device -> server. Every frame after `proof` is bound to the proven session. */
 export type DevicePresenceDeviceFrame =
@@ -532,8 +529,7 @@ export type DevicePresenceDeviceFrame =
       errorMessage?: string;
     }
   | { type: "ping" }
-  | DeviceRequestDeviceFrame
-  | DeviceToolDeviceFrame;
+  | DeviceRequestDeviceFrame;
 
 export const DEVICE_PRESENCE_PROOF_PREFIX = "stella-device-presence" as const;
 

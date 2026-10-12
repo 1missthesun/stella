@@ -18,11 +18,6 @@ import {
   claudeSessionSyncSink,
   setClaudeSessionSyncSink,
 } from "./integrations/claude-code-session-sync-sink.js";
-import {
-  claudeCodeToolEnvironments,
-  createClaudeCodeToolEnvironments,
-  setClaudeCodeToolEnvironments,
-} from "./integrations/claude-code-tool-environment.js";
 import { getClaudeCodeConfig } from "./storage/local-llm-credential-access.js";
 import { resolveAgentWorkingDirectory } from "./agent-runtime/shared.js";
 import { loadGoogleWorkspaceTools } from "./google-workspace/load-google-workspace-tools.js";
@@ -232,18 +227,6 @@ export const createStellaHostRunner = (
     },
   });
   setClaudeSessionSyncSink(claudeSessionSync);
-  const claudeCodeTools = createClaudeCodeToolEnvironments({
-    deviceId: context.deviceId,
-    stellaDataDir: context.stellaDataDir,
-    auth: () => {
-      const baseUrl = context.state.backendUrl?.trim();
-      const authToken = context.state.authToken?.trim();
-      return baseUrl && authToken ? { baseUrl, authToken } : null;
-    },
-    report: (error) =>
-      console.warn("[claude-code-tools] a remote tool environment failed.", error),
-  });
-  setClaudeCodeToolEnvironments(claudeCodeTools);
   resumeClaudeSessionSync = claudeSessionSync.resume;
   claudeSessionSync.resume();
   context.brainLeases.onChange(() => claudeSessionSync.wake());
@@ -321,10 +304,6 @@ export const createStellaHostRunner = (
       if (claudeSessionSyncSink() === claudeSessionSync) {
         setClaudeSessionSyncSink(null);
       }
-      if (claudeCodeToolEnvironments() === claudeCodeTools) {
-        setClaudeCodeToolEnvironments(null);
-      }
-      await claudeCodeTools.close();
     },
   });
 

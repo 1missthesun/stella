@@ -1,11 +1,10 @@
 /**
  * Agents on the desktop: they run on this computer, their tools in a
  * NodeExecutionEnv per working directory. In a conversation stored in the
- * cloud, an agent placed in the cloud runs there as a whole, in the
+ * cloud, Stella's agent placed in the cloud runs there as a whole, in the
  * conversation's object, so it keeps working while this computer sleeps
- * (`cloud`); one placed on another of the owner's computers stays here with
- * only its tools there (`execution`), as does any conversation whose tools
- * `switch_destination` moved.
+ * (`cloud`), and one placed on another of the owner's computers runs there
+ * as a whole, on that computer's own Stella (`devices`).
  */
 import { mkdir, stat } from "node:fs/promises";
 import { hostname } from "node:os";
@@ -20,6 +19,8 @@ export function desktopAgentsHost(
   options: {
     deviceId?: string;
     cloud?: RemoteAgentHost;
+    /** Stella's agents on another of the owner's computers, run there as a whole. */
+    devices?: (deviceId: string) => RemoteAgentHost | undefined;
     agentReported?: StellaAgentsHost["agentReported"];
     agentPaused?: StellaAgentsHost["agentPaused"];
     beginAgentRun?: StellaAgentsHost["beginAgentRun"];
@@ -35,7 +36,7 @@ export function desktopAgentsHost(
     directory?: StellaAgentsHost["directory"];
     /** The Stella data directory (`~/.stella`): new agents start in a folder of their own under it. */
     dataDir?: string;
-    /** Where a conversation's tools can run away from this computer. */
+    /** Where Stella can move herself, and how the owner's computers stand. */
     execution?: StellaAgentsHost["execution"];
   } = {},
 ): StellaAgentsHost {
@@ -71,16 +72,11 @@ export function desktopAgentsHost(
           ? { kind: "cloud" }
           : { error: "Cloud agents run in conversations stored in the cloud; this one is kept on this computer." };
       }
-      if (destination.kind === "device" && !destination.whole && options.execution && !options.execution.localOnly) {
-        return { kind: "device", deviceId: destination.deviceId };
-      }
-      return {
-        error: destination.whole
-          ? `This computer cannot start a whole agent on device ${destination.deviceId}. Leave out whole_agent: the agent then stays here and runs its tools there.`
-          : `This chat is stored only on this computer, so its agents can only run here.`,
-      };
+      if (options.devices) return { kind: "device", deviceId: destination.deviceId };
+      return { error: "This chat is stored only on this computer, so its agents can only run here." };
     },
-    remote: (placement) => (placement.kind === "cloud" ? options.cloud : undefined),
+    remote: (placement) =>
+      placement.kind === "cloud" ? options.cloud : placement.kind === "device" ? options.devices?.(placement.deviceId) : undefined,
   };
 }
 
@@ -129,8 +125,6 @@ export function desktopEnvironments(
     /** End every command the agents have running here, with everything it started. */
     terminateCommands,
     env: async ({ conversationId, cwd }: EnvTarget, _context: Context) => {
-      // A conversation whose tools run elsewhere reaches them through its
-      // tools (`desktopCoding`); its prompt still reads this one.
       const directory = cwd ?? defaultCwd;
       const key = shellEnv ? `${conversationId}\0${directory}` : directory;
       let env = envs.get(key);

@@ -1,50 +1,31 @@
 /**
- * Where a conversation's tools run: this computer, another of the user's
- * computers, or a cloud container. It is per-conversation state; the host's
- * `HarnessOptions.env` (or, in the cloud, the attached tools) reads it to
- * run the conversation's file and shell tools there. The conversation
- * itself, its brain, stays on the host that holds it wherever its tools run:
- * `switch_destination` changes this and nothing else.
+ * Where a conversation runs: this computer, another of the user's
+ * computers, or the cloud. Every conversation's work runs on the host that
+ * holds it; an agent placed elsewhere runs there as a whole
+ * (`StellaAgentsHost.remote`), and its record here names where.
  */
 import { defineDoc } from "@earendil-works/pi-durable";
 
-/** What an agent is told about a computer its tools run on. */
+/** What is known of a computer an agent runs on. */
 export type DevicePlacementInfo = {
   /** The computer's name, as the user's device list shows it. */
   label?: string;
-  /** `~` there, and a shell command's working directory when none is given. */
-  home?: string;
-  hostname?: string;
-  platform?: string;
 };
 
 export type StellaPlacement =
   | { kind: "local" }
   | { kind: "cloud" }
-  | ({
-      kind: "device";
-      deviceId: string;
-      /**
-       * Run the agent there as a whole, on that computer's own Stella
-       * (`StellaAgentsHost.remote`), rather than keeping it here with only its
-       * tools there. Only `spawn_agent` asks for it; no conversation here is
-       * ever placed so.
-       */
-      whole?: true;
-    } & DevicePlacementInfo);
+  | ({ kind: "device"; deviceId: string } & DevicePlacementInfo);
 
 /** Where a `spawn_agent` call asked its agent to run. */
-export type SpawnDestination =
-  | { kind: "here" }
-  | { kind: "cloud" }
-  | { kind: "device"; deviceId: string; whole?: true };
+export type SpawnDestination = { kind: "here" } | { kind: "cloud" } | { kind: "device"; deviceId: string };
 
 /** Blank means where the caller runs; any other value names a device. */
-export const parseSpawnDestination = (value: unknown, whole?: unknown): SpawnDestination => {
+export const parseSpawnDestination = (value: unknown): SpawnDestination => {
   const text = typeof value === "string" ? value.trim() : "";
   if (!text) return { kind: "here" };
   if (text.toLowerCase() === "cloud") return { kind: "cloud" };
-  return { kind: "device", deviceId: text, ...(whole === true ? { whole: true as const } : {}) };
+  return { kind: "device", deviceId: text };
 };
 
 export const StellaPlacementDoc = defineDoc<{ kind: "local" | "cloud" | "device"; deviceId?: string } & DevicePlacementInfo>({
@@ -56,29 +37,23 @@ export const StellaPlacementDoc = defineDoc<{ kind: "local" | "cloud" | "device"
   initial: () => ({ kind: "local" }),
 });
 
-const INFO_FIELDS = ["label", "home", "hostname", "platform"] as const;
-
 export const placementOf = (
   value: ({ kind: string; deviceId?: string } & DevicePlacementInfo) | undefined,
 ): StellaPlacement | undefined => {
   if (!value) return undefined;
   if (value.kind === "cloud") return { kind: "cloud" };
   if (value.kind === "device" && value.deviceId) {
-    const placement: StellaPlacement = { kind: "device", deviceId: value.deviceId };
-    for (const field of INFO_FIELDS) if (typeof value[field] === "string" && value[field]) placement[field] = value[field];
-    return placement;
+    return { kind: "device", deviceId: value.deviceId, ...(typeof value.label === "string" && value.label ? { label: value.label } : {}) };
   }
   if (value.kind === "local") return { kind: "local" };
   return undefined;
 };
 
-/** A placement as the placement doc holds it: where tools run, and what is known of that computer. */
-export const placementRecord = (placement: StellaPlacement): { kind: StellaPlacement["kind"]; deviceId?: string } & DevicePlacementInfo => {
-  if (placement.kind !== "device") return { kind: placement.kind };
-  const record: { kind: "device"; deviceId: string } & DevicePlacementInfo = { kind: "device", deviceId: placement.deviceId };
-  for (const field of INFO_FIELDS) if (placement[field]) record[field] = placement[field];
-  return record;
-};
+/** A placement as the placement doc holds it. */
+export const placementRecord = (placement: StellaPlacement): { kind: StellaPlacement["kind"]; deviceId?: string } & DevicePlacementInfo =>
+  placement.kind !== "device"
+    ? { kind: placement.kind }
+    : { kind: "device", deviceId: placement.deviceId, ...(placement.label ? { label: placement.label } : {}) };
 
 export const describePlacement = (placement: StellaPlacement): string =>
   placement.kind === "cloud"

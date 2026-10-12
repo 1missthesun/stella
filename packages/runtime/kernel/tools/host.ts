@@ -222,7 +222,6 @@ export const createToolHost = ({
   useSecureValue,
   requestBrowserExtensionConnect,
   requestConnectorConnection,
-  switchExecutionDestination,
   scheduleApi,
   extensionTools,
   webSearch,
@@ -508,7 +507,6 @@ export const createToolHost = ({
       ? { requestBrowserExtensionConnect }
       : {}),
     ...(requestConnectorConnection ? { requestConnectorConnection } : {}),
-    ...(switchExecutionDestination ? { switchExecutionDestination } : {}),
     scheduleApi,
     extensionTools,
     webSearch,

@@ -41,7 +41,7 @@ export const STELLA_HARNESS_TOOL_NAMES: ReadonlySet<string> = new Set([
   "multi_tool_use_parallel",
   "NoResponse",
   "node_repl",
-  // The harness has its own, which moves where a conversation's tools run.
+  // The harness has its own, which moves Stella herself.
   "switch_destination",
 ]);
 

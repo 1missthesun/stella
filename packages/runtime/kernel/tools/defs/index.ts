@@ -43,7 +43,6 @@ import {
 import { createScheduleManageTools } from "./schedule-manage.js";
 import { createScriptDraftTool } from "./script-draft.js";
 import { createConnectorStatusTool } from "./connector-status.js";
-import { createSwitchDestinationTool } from "./switch-destination.js";
 import { createWebTool } from "./web.js";
 import { writeTool } from "./write.js";
 import { createWriteStdinTool } from "./write-stdin.js";
@@ -151,16 +150,6 @@ export const buildBuiltinTools = (
     createMapTool({
       ...(options.getCloudBackendAuth
         ? { getCloudBackendAuth: options.getCloudBackendAuth }
-        : {}),
-    }),
-  );
-  tools.push(
-    createSwitchDestinationTool({
-      ...(options.getCloudBackendAuth
-        ? { getCloudBackendAuth: options.getCloudBackendAuth }
-        : {}),
-      ...(options.switchExecutionDestination
-        ? { switchExecutionDestination: options.switchExecutionDestination }
         : {}),
     }),
   );

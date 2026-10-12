@@ -177,8 +177,6 @@ export const METHOD_NAMES = {
   /** The pi-durable chat (`@stella/contracts/pi-chat`): submit, abort, watch. */
   INTERNAL_WORKER_PI_CHAT: "internal.worker.piChat",
   /** A cloud agent's tool call the owner gate relayed to this computer (`@stella/contracts/turn-plane/device-tools`). */
-  INTERNAL_WORKER_RUN_DEVICE_TOOL: "internal.worker.runDeviceTool",
-  INTERNAL_WORKER_CANCEL_DEVICE_TOOL: "internal.worker.cancelDeviceTool",
   INTERNAL_WORKER_WEB_SEARCH: "internal.worker.webSearch",
   INTERNAL_WORKER_VOICE_PERSIST_TRANSCRIPT:
     "internal.worker.voice.persistTranscript",

@@ -1313,9 +1313,15 @@ export function useChatScrollManagement({
         lastViewportHeight = height;
         if (shrunkBy <= 0) return;
         const maxScroll = Math.max(0, attached.scrollHeight - height);
-        const gapBeforeShrink = maxScroll - attached.scrollTop - shrunkBy;
-        if (gapBeforeShrink > 2) return;
-        attached.scrollTop = maxScroll;
+        const gapBeforeShrink = Math.max(
+          0,
+          maxScroll - attached.scrollTop - shrunkBy,
+        );
+        if (gapBeforeShrink > SCROLL_BUTTON_THRESHOLD) return;
+        attached.scrollTop = Math.min(
+          maxScroll,
+          attached.scrollTop + shrunkBy,
+        );
       });
       viewportResizeObserver.observe(node);
 

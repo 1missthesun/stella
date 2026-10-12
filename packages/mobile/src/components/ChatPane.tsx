@@ -63,6 +63,7 @@ import {
   type ChatDraftStore,
 } from "../lib/chat-draft-store";
 import Reanimated, {
+  runOnJS,
   useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
@@ -613,10 +614,20 @@ export function ChatPane({
   // it, once the keyboard reaches it: it is lifted by the keyboard height
   // minus that band.
   const keyboardHeightNow = useSharedValue(0);
+  const listAtBottom = useSharedValue(1);
+  const listRidesKeyboard = useSharedValue(1);
+  const [listLiftedWithKeyboard, setListLiftedWithKeyboard] = useState(true);
   useKeyboardHandler(
     {
       onStart: (e) => {
         "worklet";
+        if (keyboardHeightNow.value < 1 && e.height > 0) {
+          const rides = listAtBottom.value;
+          if (rides !== listRidesKeyboard.value) {
+            listRidesKeyboard.value = rides;
+            runOnJS(setListLiftedWithKeyboard)(rides === 1);
+          }
+        }
         if (e.duration === 0) keyboardHeightNow.value = e.height;
       },
       onMove: (e) => {
@@ -641,7 +652,9 @@ export function ChatPane({
     transform: [{ translateY: -keyboardLift.value }],
   }));
   const listKeyboardStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -keyboardLift.value }],
+    transform: [
+      { translateY: -keyboardLift.value * listRidesKeyboard.value },
+    ],
   }));
   const keyboardExtra = Math.max(0, keyboardHeight - bottomInset);
 
@@ -657,7 +670,8 @@ export function ChatPane({
   );
   // The list runs under the composer, so its reserved inset is exactly the
   // overlay; the chat tail supplies the gap between the last row and it.
-  const listBottomInsetPx = footerHeight;
+  const listBottomInsetPx =
+    footerHeight + (listLiftedWithKeyboard ? 0 : keyboardExtra);
   useEffect(() => {
     onFooterHeightChange?.(footerHeight);
   }, [footerHeight, onFooterHeightChange]);
@@ -805,6 +819,10 @@ export function ChatPane({
     lastMessage?.id ?? null,
     topInset,
   );
+
+  useEffect(() => {
+    listAtBottom.value = scroll.awayFromBottom ? 0 : 1;
+  }, [listAtBottom, scroll.awayFromBottom]);
 
   const [unread, setUnread] = useState(false);
   const prevLenRef = useRef(0);
@@ -2165,7 +2183,7 @@ export function ChatPane({
             {!historyLoading && !empty ? (
               <Reanimated.View
                 pointerEvents="box-none"
-                style={[StyleSheet.absoluteFill, listKeyboardStyle]}
+                style={[StyleSheet.absoluteFill, composerKeyboardStyle]}
               >
                 <ScrollToBottomFab
                   visible={scroll.awayFromBottom}

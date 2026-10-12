@@ -31,57 +31,11 @@ export const DEFAULT_TOKEN_PRICE_CATALOG: TokenPriceCatalog = {
   models: {},
 };
 
-export const parsePositiveNumber = (
-  value: unknown,
-  fallback: number,
-): number => {
-  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) {
-    return fallback;
-  }
-  return value;
-};
-
-export const normalizeTokenPriceConfig = (
-  value: unknown,
-  fallback: TokenPriceConfig,
-): TokenPriceConfig => {
-  if (!value || typeof value !== "object") {
-    return fallback;
-  }
-
-  const record = value as Record<string, unknown>;
-  return {
-    inputPerMillionUsd: parsePositiveNumber(
-      record.inputPerMillionUsd,
-      fallback.inputPerMillionUsd,
-    ),
-    outputPerMillionUsd: parsePositiveNumber(
-      record.outputPerMillionUsd,
-      fallback.outputPerMillionUsd,
-    ),
-    cacheReadPerMillionUsd: parsePositiveNumber(
-      record.cacheReadPerMillionUsd,
-      fallback.cacheReadPerMillionUsd ?? 0,
-    ),
-    cacheWritePerMillionUsd: parsePositiveNumber(
-      record.cacheWritePerMillionUsd,
-      fallback.cacheWritePerMillionUsd ?? 0,
-    ),
-    reasoningPerMillionUsd: parsePositiveNumber(
-      record.reasoningPerMillionUsd,
-      fallback.reasoningPerMillionUsd ?? fallback.outputPerMillionUsd,
-    ),
-  };
-};
-
 export const centsToMicroCents = (cents: number) =>
   Math.round(cents * MICRO_CENTS_PER_CENT);
 
 export const dollarsToMicroCents = (dollars: number) =>
   centsToMicroCents(dollars * CENTS_PER_DOLLAR);
-
-export const microCentsToDollars = (microCents: number) =>
-  microCents / (MICRO_CENTS_PER_CENT * CENTS_PER_DOLLAR);
 
 /**
  * Price one managed completion.

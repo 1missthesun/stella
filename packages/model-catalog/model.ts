@@ -8,23 +8,15 @@
  */
 import { AGENT_IDS } from "./agent-constants";
 import {
-  getManagedGatewayConfig,
   type ManagedGatewayProvider,
   type ManagedProtocol,
 } from "./managed-gateway";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
-export { getManagedGatewayConfig } from "./managed-gateway";
 export type {
   ManagedGatewayProvider,
   ManagedProtocol,
 } from "./managed-gateway";
-export {
-  MANAGED_MODEL_AUDIENCES,
-  type ManagedModelAudience,
-} from "@stella/contracts/gateway/capability";
-
-// Legacy default for older call sites that still assume one gateway.
-export const MANAGED_GATEWAY = getManagedGatewayConfig("openrouter");
+export type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 
 type JSONValue =
   | string
@@ -64,8 +56,8 @@ export const getManagedReasoningEffort = (
     : undefined;
 };
 
-// `MANAGED_MODEL_AUDIENCES` / `ManagedModelAudience` are owned by
-// `@stella/contracts/gateway/capability` and re-exported above.
+// `ManagedModelAudience` is owned by `@stella/contracts/gateway/capability`
+// and re-exported above.
 
 export const MODEL_MODES = [
   "standard",
@@ -517,23 +509,6 @@ export const AUDIENCE_AGENT_MODELS: Record<
 export const AGENT_MODELS = AUDIENCE_AGENT_MODELS.free;
 export const DEFAULT_MODEL = AGENT_MODELS[AGENT_IDS.OFFLINE_RESPONDER];
 
-export const resolveManagedModelAudience = (args: {
-  plan: "free" | "go" | "pro";
-  isAnonymous?: boolean;
-  downgraded?: boolean;
-}): ManagedModelAudience => {
-  if (args.isAnonymous) {
-    return "anonymous";
-  }
-  if (args.plan === "free") {
-    return "free";
-  }
-  if (args.downgraded) {
-    return `${args.plan}_fallback` as ManagedModelAudience;
-  }
-  return args.plan;
-};
-
 export function getModeConfig(
   mode: ModelMode,
   audience: ManagedModelAudience = "free",
@@ -551,10 +526,6 @@ export function getModelConfig(
     AUDIENCE_AGENT_MODELS[audience]?.[agentType] ?? AGENT_MODELS[agentType];
   if (!config) throw new Error(`No model config for agent type: ${agentType}`);
   return config;
-}
-
-export function hasModelConfig(agentType: string): boolean {
-  return Object.prototype.hasOwnProperty.call(AGENT_MODELS, agentType);
 }
 
 export function isModelMode(value: string): value is ModelMode {

@@ -1,6 +1,6 @@
 ---
 name: stella-browser
-description: Control Stella-owned browser tabs through the persistent code runtime and its frozen browser API. Use for navigation, page interaction, semantic locators, state inspection, new-tab flows, and browser screenshots.
+description: Control Stella-owned browser tabs through the persistent code runtime and its frozen browser API. Use for navigation, page interaction, semantic locators, state inspection, new-tab flows, and browser screenshots. The user's Browser panel never switches to your tab by itself: when the user asked to see a page, call `tab.show()` on it.
 ---
 
 # Stella Browser
@@ -130,6 +130,17 @@ await reportPage.getByRole("heading", { name: "Report" }).waitFor();
 
 `expectNewTab()` succeeds only when exactly one newly adopted owned tab appears. Its default timeout is 10 seconds and its maximum is 60 seconds. The same method is available as `page.expectNewTab()`.
 
+## Showing a Tab to the User
+
+Your tabs appear in the user's Browser panel, but the panel never switches to them on its own: opening a tab or navigating does not take the user away from what they are viewing. When the user wants to see the page (they asked you to open something for them, to show them something, or to take over a sign-in), bring the tab forward yourself:
+
+```js
+await tab.goto("https://example.com");
+await tab.show();
+```
+
+Call `show()` once the page is worth looking at, not on every step, and not for tabs you only use for research or background work.
+
 ## Finalize Owned Tabs
 
 Mark a retained tab as soon as its final disposition is known. Automatic close-tabs turn cleanup preserves marked tabs and closes unmarked task-owned tabs:
@@ -177,6 +188,7 @@ For a new task, call `tabs.new()` once and then navigate that handle with `tab.g
 | `back({ timeout? })`, `forward({ timeout? })`, `reload({ timeout? })` | History navigation.                      |
 | `close()`                                                             | Close this tab.                          |
 | `markHandoff()`, `markDeliverable()`                                  | Retain during automatic turn cleanup.    |
+| `show()`                                                              | Bring this tab forward in the panel.     |
 | `url()`, `title()`                                                    | Cheapest page identity reads.            |
 | `snapshot(options?)`                                                  | Structural observation.                  |
 | `axSnapshot({ mode?, interactive?, compact?, maxDepth?, selector? })`   | AX tree, incremental; not in cloud sessions. |

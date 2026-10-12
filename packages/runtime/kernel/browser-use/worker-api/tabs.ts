@@ -149,6 +149,7 @@ const TAB_PUBLIC_API = Object.freeze([
   "close",
   "markDeliverable",
   "markHandoff",
+  "show",
   "url",
   "title",
   "snapshot",
@@ -608,6 +609,10 @@ export const createTabs = (
         tabId: this.id,
         status: "deliverable",
       });
+    }
+
+    async show(): Promise<unknown> {
+      return await this.run("bringtofront", { tabId: this.id });
     }
 
     async markHandoff(): Promise<unknown> {

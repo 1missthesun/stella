@@ -15,6 +15,8 @@ export type ManagedTab = {
   faviconUrl?: string;
   faviconLoadId: number;
   loading: boolean;
+  agentActive?: boolean;
+  agentIdleTimer?: ReturnType<typeof setTimeout>;
   /** A `stella-preview://` tab: the app's own UI from a draft worktree. */
   preview?: { name: string; dispose: () => void };
 };
@@ -48,6 +50,7 @@ const tabState = (tab: ManagedTab): BrowserViewTabState => {
     loading: tab.loading,
     canGoBack: history.canGoBack(),
     canGoForward: history.canGoForward(),
+    ...(tab.agentActive ? { agentActive: true } : {}),
   };
 };
 
@@ -202,7 +205,6 @@ export class BrowserTabRegistry {
 
   private shouldActivateOwner(ownerId: string, requested?: boolean) {
     if (requested) return true;
-    if (this.scopedOwnerId === null) return true;
     if (typeof this.scopedOwnerId === "string") {
       return this.scopedOwnerId === ownerId;
     }

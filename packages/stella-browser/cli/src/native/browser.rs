@@ -1429,8 +1429,21 @@ impl BrowserManager {
         Ok(())
     }
 
+    /// An explicit request to show the active tab to the user. Unlike the
+    /// `Page.bringToFront` a tab switch sends, `Target.activateTarget` is sent
+    /// only here, so a host such as Stella's in-app browser can treat it as
+    /// the agent asking to bring its tab forward.
     pub async fn bring_to_front(&self) -> Result<(), String> {
         let session_id = self.active_session_id()?;
+        if let Some(page) = self.pages.get(self.active_page_index) {
+            self.client
+                .send_command(
+                    "Target.activateTarget",
+                    Some(json!({ "targetId": page.target_id })),
+                    None,
+                )
+                .await?;
+        }
         self.client
             .send_command("Page.bringToFront", None, Some(session_id))
             .await?;

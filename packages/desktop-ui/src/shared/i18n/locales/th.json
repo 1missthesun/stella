@@ -257,10 +257,6 @@
       },
       "voiceSession": {
         "label": "คุยกับ Stella แล้ว"
-      },
-      "webSearchResults": {
-        "caption": "ผลลัพธ์จากเว็บ",
-        "listLabel": "ผลการค้นหาบนเว็บ"
       }
     },
     "media": {

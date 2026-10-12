@@ -262,10 +262,6 @@
       },
       "voiceSession": {
         "label": "Beszélgetés a Stellával"
-      },
-      "webSearchResults": {
-        "caption": "Találatok a webről",
-        "listLabel": "Webes keresési találatok"
       }
     },
     "media": {

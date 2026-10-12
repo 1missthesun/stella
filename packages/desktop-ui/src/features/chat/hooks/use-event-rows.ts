@@ -31,7 +31,6 @@ import {
   type BackgroundTaskLifecycleIndex,
 } from "@/features/chat/lib/background-task-lifecycle";
 import type { AgentCompletionSection } from "@/features/chat/lib/agent-completion";
-import { deriveTurnWebSearchResults } from "@/features/chat/lib/derive-turn-web-search";
 import { deriveTurnMapArtifacts } from "@/features/chat/lib/derive-turn-map-artifacts";
 import { deriveTurnAskRecords } from "@/features/chat/lib/derive-turn-ask-records";
 import { filterMessagesForUiDisplay } from "@/features/chat/lib/message-display";
@@ -340,7 +339,6 @@ export const assistantRowHasNonBackgroundContent = (
   Boolean(row.resourcePayload) ||
   (row.linkedFiles?.length ?? 0) > 0 ||
   (row.inlineImagePayloads?.length ?? 0) > 0 ||
-  (row.webSearchResults?.length ?? 0) > 0 ||
   (row.mapArtifacts?.length ?? 0) > 0 ||
   (row.sourceDiffPayloads?.length ?? 0) > 0 ||
   Boolean(row.voiceSession) ||
@@ -861,7 +859,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           { developerResourcesEnabled: developerResourcePreviewsEnabled },
         );
         const inlineImagePayloads = deriveTurnInlineImagePayloads(ownToolEvents);
-        const webSearchResults = deriveTurnWebSearchResults(toolEvents);
         const mapArtifacts = deriveTurnMapArtifacts(toolEvents);
         const askRecords = deriveTurnAskRecords(toolEvents);
         const sourceDiffPayloads = collectTurnSourceDiffPayloads(ownToolEvents, {
@@ -905,7 +902,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
           ...(linkedFiles.length > 0 ? { linkedFiles } : {}),
           ...(resourcePayload ? { resourcePayload } : {}),
           ...(inlineImagePayloads.length > 0 ? { inlineImagePayloads } : {}),
-          ...(webSearchResults.length > 0 ? { webSearchResults } : {}),
           ...(mapArtifacts.length > 0 ? { mapArtifacts } : {}),
           ...(askRecords.length > 0 ? { askRecords } : {}),
           ...(sourceDiffPayloads.length > 0 ? { sourceDiffPayloads } : {}),

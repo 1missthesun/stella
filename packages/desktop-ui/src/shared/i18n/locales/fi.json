@@ -262,10 +262,6 @@
       },
       "voiceSession": {
         "label": "Puhuit Stellan kanssa"
-      },
-      "webSearchResults": {
-        "caption": "Tuloksia verkosta",
-        "listLabel": "Verkkohaun tulokset"
       }
     },
     "media": {

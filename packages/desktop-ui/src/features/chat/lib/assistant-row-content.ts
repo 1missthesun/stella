@@ -38,7 +38,6 @@ export const assistantRowHasOwnContent = (
   Boolean(row.resourcePayload) ||
   (row.linkedFiles?.length ?? 0) > 0 ||
   (row.inlineImagePayloads?.length ?? 0) > 0 ||
-  (row.webSearchResults?.length ?? 0) > 0 ||
   (row.mapArtifacts?.length ?? 0) > 0 ||
   (row.askRecords?.length ?? 0) > 0 ||
   (row.sourceDiffPayloads?.length ?? 0) > 0 ||

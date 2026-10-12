@@ -310,20 +310,6 @@ const agentCompletionEqual = (
   return true;
 };
 
-const webSearchResultsEqual = (
-  a: AssistantRowViewModel["webSearchResults"],
-  b: AssistantRowViewModel["webSearchResults"],
-): boolean => {
-  if (a === b) return true;
-  if (!a || !b) return (a?.length ?? 0) === (b?.length ?? 0);
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i].url !== b[i].url) return false;
-    if (a[i].image !== b[i].image) return false;
-  }
-  return true;
-};
-
 const askRecordsEqual = (
   a: AssistantRowViewModel["askRecords"],
   b: AssistantRowViewModel["askRecords"],
@@ -434,7 +420,6 @@ const assistantRowEqual = (
   linkedFilesKey(a.linkedFiles) === linkedFilesKey(b.linkedFiles) &&
   sourceDiffPayloadsEqual(a.inlineImagePayloads, b.inlineImagePayloads) &&
   sourceDiffPayloadsEqual(a.sourceDiffPayloads, b.sourceDiffPayloads) &&
-  webSearchResultsEqual(a.webSearchResults, b.webSearchResults) &&
   mapArtifactsEqual(a.mapArtifacts, b.mapArtifacts) &&
   askRecordsEqual(a.askRecords, b.askRecords) &&
   backgroundWorkEqual(a.backgroundWork, b.backgroundWork) &&

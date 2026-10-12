@@ -272,10 +272,6 @@
       },
       "voiceSession": {
         "label": "Rozmowa ze Stellą"
-      },
-      "webSearchResults": {
-        "caption": "Wyniki z sieci",
-        "listLabel": "Wyniki wyszukiwania w sieci"
       }
     },
     "media": {

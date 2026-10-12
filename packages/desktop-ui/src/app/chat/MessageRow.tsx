@@ -47,7 +47,6 @@ import { Markdown } from "@/app/chat/Markdown";
 import { SourceDiffEndResource } from "@/app/chat/SourceDiffEndResource";
 import { localFilePathForPayload } from "@/features/workspace-display/path-to-viewer";
 import { InlineGeneratedImageStrip } from "@/app/chat/InlineGeneratedImageCard";
-import { WebSearchResultsStrip } from "@/app/chat/WebSearchResultsStrip";
 import { MapRouteCards } from "@/app/chat/MapRouteCard";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
 import { OfficePreviewCard } from "@/app/chat/OfficePreviewCard";
@@ -641,7 +640,6 @@ export const AssistantMessageRow = memo(
     useReplyHandoffArrival(rowRef, Boolean(row.justArrived), !row.isIntraTurn);
     const text = row.text;
     const hasText = text.trim().length > 0;
-    const hasWebSearchResults = (row.webSearchResults?.length ?? 0) > 0;
     const hasMapArtifacts = (row.mapArtifacts?.length ?? 0) > 0;
     const hasVoiceSession = Boolean(row.voiceSession);
     const labelIds = row.agentLabelIds ?? [];
@@ -868,9 +866,6 @@ export const AssistantMessageRow = memo(
           {row.agentCompletion?.sections.map((section) => (
             <AgentUpdateCard key={`update:${section.agentId}`} agentId={section.agentId} />
           ))}
-          {hasWebSearchResults && row.webSearchResults && (
-            <WebSearchResultsStrip results={row.webSearchResults} />
-          )}
           {hasMapArtifacts && row.mapArtifacts && (
             <MapRouteCards cards={row.mapArtifacts} />
           )}

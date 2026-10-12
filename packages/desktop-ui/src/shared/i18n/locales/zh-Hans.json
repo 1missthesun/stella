@@ -257,10 +257,6 @@
       },
       "voiceSession": {
         "label": "与 Stella 通话"
-      },
-      "webSearchResults": {
-        "caption": "来自网络的结果",
-        "listLabel": "网络搜索结果"
       }
     },
     "media": {

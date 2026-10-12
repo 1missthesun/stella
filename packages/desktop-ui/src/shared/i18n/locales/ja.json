@@ -257,10 +257,6 @@
       },
       "voiceSession": {
         "label": "Stella と会話しました"
-      },
-      "webSearchResults": {
-        "caption": "ウェブからの結果",
-        "listLabel": "ウェブ検索の結果"
       }
     },
     "media": {

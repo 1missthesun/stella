@@ -262,10 +262,6 @@
       },
       "voiceSession": {
         "label": "Mit Stella gesprochen"
-      },
-      "webSearchResults": {
-        "caption": "Ergebnisse aus dem Web",
-        "listLabel": "Websuchergebnisse"
       }
     },
     "media": {

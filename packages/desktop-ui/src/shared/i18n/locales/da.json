@@ -262,10 +262,6 @@
       },
       "voiceSession": {
         "label": "Talte med Stella"
-      },
-      "webSearchResults": {
-        "caption": "Resultater fra nettet",
-        "listLabel": "Websøgeresultater"
       }
     },
     "media": {

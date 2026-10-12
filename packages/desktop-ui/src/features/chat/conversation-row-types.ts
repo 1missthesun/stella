@@ -5,7 +5,6 @@ import type {
 } from "@/features/chat/lib/event-transforms";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
 import type { AgentResponseTarget } from "@/features/chat/streaming/streaming-types";
-import type { WebSearchImageHit } from "@/features/chat/lib/derive-turn-web-search";
 import type { TaskToolActivity } from "@stella/contracts/agent-runtime";
 import type { TurnMapArtifact } from "@/features/chat/lib/derive-turn-map-artifacts";
 import type { PastedTextDescriptor } from "@/features/chat/lib/paste-context";
@@ -128,12 +127,6 @@ export type AssistantRowViewModel = {
   resourcePayload?: DisplayPayload;
   /** Orchestrator image_gen inline cards — one group per tool call. */
   inlineImagePayloads?: DisplayPayload[];
-  /**
-   * "Results from the web" image strip — thumbnails from the turn's most
-   * recent `web` search (Claude-style). Only image-bearing hits, capped to
-   * a single row. See `deriveTurnWebSearchResults`.
-   */
-  webSearchResults?: WebSearchImageHit[];
   /**
    * Inline interactive map cards from this turn's `map` tool calls (the
    * shared `map-route` artifact rendered via the hosted stella.sh embed).

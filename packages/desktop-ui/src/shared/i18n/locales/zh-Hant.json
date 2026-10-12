@@ -257,10 +257,6 @@
       },
       "voiceSession": {
         "label": "與 Stella 通話"
-      },
-      "webSearchResults": {
-        "caption": "來自網路的結果",
-        "listLabel": "網路搜尋結果"
       }
     },
     "media": {

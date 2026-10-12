@@ -257,10 +257,6 @@
       },
       "voiceSession": {
         "label": "Stella와 대화함"
-      },
-      "webSearchResults": {
-        "caption": "웹에서 찾은 결과",
-        "listLabel": "웹 검색 결과"
       }
     },
     "media": {

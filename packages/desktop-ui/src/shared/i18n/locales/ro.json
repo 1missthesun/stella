@@ -267,10 +267,6 @@
       },
       "voiceSession": {
         "label": "Ai vorbit cu Stella"
-      },
-      "webSearchResults": {
-        "caption": "Rezultate de pe web",
-        "listLabel": "Rezultate ale căutării pe web"
       }
     },
     "media": {

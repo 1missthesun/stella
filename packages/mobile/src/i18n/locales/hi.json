@@ -262,10 +262,6 @@
       },
       "voiceSession": {
         "label": "Stella से बात की"
-      },
-      "webSearchResults": {
-        "caption": "वेब से परिणाम",
-        "listLabel": "वेब खोज परिणाम"
       }
     },
     "media": {

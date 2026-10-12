@@ -257,10 +257,6 @@
       },
       "voiceSession": {
         "label": "Berbicara dengan Stella"
-      },
-      "webSearchResults": {
-        "caption": "Hasil dari web",
-        "listLabel": "Hasil pencarian web"
       }
     },
     "media": {

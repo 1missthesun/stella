@@ -262,10 +262,6 @@
       },
       "voiceSession": {
         "label": "Μιλήσατε με τη Stella"
-      },
-      "webSearchResults": {
-        "caption": "Αποτελέσματα από τον ιστό",
-        "listLabel": "Αποτελέσματα αναζήτησης στον ιστό"
       }
     },
     "media": {

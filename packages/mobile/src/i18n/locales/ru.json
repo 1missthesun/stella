@@ -272,10 +272,6 @@
       },
       "voiceSession": {
         "label": "Разговор со Stella"
-      },
-      "webSearchResults": {
-        "caption": "Результаты из интернета",
-        "listLabel": "Результаты веб-поиска"
       }
     },
     "media": {

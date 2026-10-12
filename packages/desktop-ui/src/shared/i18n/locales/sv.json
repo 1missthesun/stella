@@ -262,10 +262,6 @@
       },
       "voiceSession": {
         "label": "Pratade med Stella"
-      },
-      "webSearchResults": {
-        "caption": "Resultat från webben",
-        "listLabel": "Sökresultat från webben"
       }
     },
     "media": {

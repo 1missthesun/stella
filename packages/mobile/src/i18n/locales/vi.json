@@ -257,10 +257,6 @@
       },
       "voiceSession": {
         "label": "Đã trò chuyện với Stella"
-      },
-      "webSearchResults": {
-        "caption": "Kết quả từ web",
-        "listLabel": "Kết quả tìm kiếm trên web"
       }
     },
     "media": {

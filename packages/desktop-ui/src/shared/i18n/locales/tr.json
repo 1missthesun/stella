@@ -262,10 +262,6 @@
       },
       "voiceSession": {
         "label": "Stella ile konuşuldu"
-      },
-      "webSearchResults": {
-        "caption": "Web'den sonuçlar",
-        "listLabel": "Web arama sonuçları"
       }
     },
     "media": {

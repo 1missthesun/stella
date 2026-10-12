@@ -90,11 +90,28 @@ const session = await (
   })
 ).json();
 const ownerId = session.ownerId;
+const JWT_REFRESH_AFTER_MS = 10 * 60_000;
+let jwt = session.token;
+let jwtMintedAt = Date.now();
+const refreshJwt = async () => {
+  const response = await fetch(`${builderUrl}/api/auth/token`, { headers: { authorization: `Bearer ${session.sessionToken}` } });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body?.token) throw new Error(`Could not refresh the test account's JWT: HTTP ${response.status}.`);
+  jwt = body.token;
+  jwtMintedAt = Date.now();
+};
+const authedFetch = async (url, init = {}) => {
+  if (Date.now() - jwtMintedAt > JWT_REFRESH_AFTER_MS) await refreshJwt();
+  const send = () => fetch(url, { ...init, headers: { ...init.headers, authorization: `Bearer ${jwt}` } });
+  const response = await send();
+  if (response.status !== 401) return response;
+  await refreshJwt();
+  return send();
+};
 const conversationId = flag("--conversation", randomUUID());
-const started = await fetch(`${builderUrl}/conversations/${conversationId}/turns`, {
+const started = await authedFetch(`${builderUrl}/conversations/${conversationId}/turns`, {
   method: "POST",
   headers: {
-    authorization: `Bearer ${session.token}`,
     "content-type": "application/json",
   },
   body: JSON.stringify({
@@ -119,7 +136,7 @@ if (watchPi) {
   pi = { state: emptyPiChat(), frames: 0, piMessageText, piUserHidden };
   const socket = new WebSocket(
     `${builderUrl.replace(/^http/, "ws")}/conversations/${conversationId}/socket?protocol=1&pi=1`,
-    ["stella.v1", `stella.token.${session.token}`],
+    ["stella.v1", `stella.token.${jwt}`],
   );
   pi.socket = socket;
   const brief = (entry) => ({
@@ -158,9 +175,7 @@ const deadline = Date.now() + waitSeconds * 1000;
 let printed = -1;
 let promptAt = -1;
 while (Date.now() < deadline) {
-  const response = await fetch(`${builderUrl}/conversations/${conversationId}/history`, {
-    headers: { authorization: `Bearer ${session.token}` },
-  });
+  const response = await authedFetch(`${builderUrl}/conversations/${conversationId}/history`);
   const body = await response.json().catch(() => null);
   const messages = Array.isArray(body?.history) ? body.history.map((entry) => JSON.parse(entry)) : [];
   if (promptAt < 0) {

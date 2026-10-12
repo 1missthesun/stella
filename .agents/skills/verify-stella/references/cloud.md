@@ -53,6 +53,11 @@ teardown) is faster to drive headless:
   so the code never enters chat. A code pasted into an ordinary ask card or
   message leaks; don't ask that way. It spends the user's Claude quota, so
   only for claims that need a real cloud Claude Code turn.
+- A test account's API JWT lasts 15 minutes. `cloud-turn.mjs` renews it from
+  the session before then and on a 401, and `backend-call.mjs` mints one per
+  call. A hand-rolled `curl` loop that starts failing with 401 "Your sign-in
+  expired" or "Sign in to send messages." needs a fresh JWT (TESTING.md, "Test
+  accounts"); the account is still signed in.
 - `cloud-turn.mjs` creates a new conversation per run unless you pass
   `--conversation`. The phone shows only the account's main conversation, so
   a headless turn's agents never appear on iOS.

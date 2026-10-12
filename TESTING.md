@@ -72,6 +72,20 @@ curl -sS -X POST \
 The dev deployment has `STELLA_TEST_ACCOUNTS=1`; production never does. The
 route accepts only addresses ending in `@test.stella.local`.
 
+Of the credentials it returns, only `token` runs out in practice. It is the
+JWT for API calls and conversation sockets, and it expires 15 minutes after
+minting. After that calls get HTTP 401, for example `{"error":"Your sign-in
+expired. Sign in again to continue."}` from `/conversations/<id>/history` and
+`{"error":{"code":"unauthorized","message":"Sign in to send messages."}}` from
+`/turns`. That means the JWT expired, not that the account was signed out. Get a fresh one from the session
+(`curl -H "Authorization: Bearer $SESSION_TOKEN" "$STELLA_BACKEND_URL/api/auth/token"`
+returns `{"token"}`), or mint again with the same email. `sessionToken` is the
+session a client keeps and renews while in use. `oneTimeToken` is single-use
+for 3 minutes (iOS sign-in only). The verify tools already handle this:
+`control-stella.mjs` gives the app the session, and the app renews its own
+JWT; `cloud-turn.mjs` renews before 15 minutes and on a 401; `backend-call.mjs`
+mints per call.
+
 The iOS dev build signs into a test account through the same route:
 
 ```sh

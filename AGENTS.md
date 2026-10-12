@@ -33,9 +33,10 @@ without asking.
   go to dev: deploying dev needs no go-ahead, but only from a tree that
   contains origin/master (`deploy:dev` refuses anything else), and you say so
   in your report. Prod only when asked.
-- **Some pushes publish to prod.** A master push touching
-  `packages/stella-browser/{cli,scripts,package.json}` or `packages/native/`
-  publishes a new binary to every install. Get the go-ahead first.
+- **Some pushes publish to prod.** A master push touching `packages/native/`
+  publishes new native helpers to every install; get the go-ahead first.
+  stella-browser pushes go to a dev channel; prod moves only through
+  `promote-stella-browser.yml` (DEPLOY.md).
 - **Shared machine resources.** The user's Chrome extension pairs with one
   Stella at a time: verify with `--browser-extension`, never
   `--browser-bridge shared` without asking. Linux test windows go to a
@@ -82,7 +83,10 @@ Launch Electron with a signed-in Pro test account:
 For other clients, use
 `curl -sS -X POST -H "Authorization: Bearer $STELLA_ADMIN_API_SECRET" -H "Content-Type: application/json" -d '{"email":"agent-manual@test.stella.local","plan":"pro","usageMode":"unlimited"}' "$STELLA_BACKEND_URL/api/admin/test-accounts/session"`.
 The dev backend has `STELLA_TEST_ACCOUNTS=1`; production never does. Test
-emails must end in `@test.stella.local`.
+emails must end in `@test.stella.local`. The response's `token` (a JWT) expires
+after 15 minutes; a 401 "Your sign-in expired" or "Sign in to …" after that is
+the JWT, not a signed-out account. Renew it with `GET /api/auth/token` and the
+`sessionToken` (TESTING.md, "Test accounts").
 
 Build and setup steps are not scripted beyond CI; do them as needed. Desktop
 verification is documented in `TESTING.md` and driven through

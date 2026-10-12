@@ -1,6 +1,6 @@
 /**
  * Small atomic read-modify-write helper for JSON state files
- * (connector connect-preferences, reminder-window state, …).
+ * (connector state, …).
  *
  * Guarantees:
  *  - per-file serialization within this process: concurrent updates are

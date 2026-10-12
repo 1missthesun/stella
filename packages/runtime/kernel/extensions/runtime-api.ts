@@ -2,7 +2,6 @@ import { agentHasCapability } from "@stella/contracts/agent-runtime";
 import { wrapSystemReminder } from "@stella/contracts/system-reminders";
 
 import { loadHomeAgentsWithMetadata } from "../agents/agents.js";
-import { getConnectorDecline } from "../connectors/connect-preferences.js";
 import { getNativeConnectorConnectionState } from "../connectors/connection-status.js";
 import {
   getConnectorKeywordIndex,
@@ -38,9 +37,6 @@ export const createExtensionRuntimeApi = (options: {
     },
     getConnectionState(entry: NativeConnectorCatalogEntry) {
       return getNativeConnectorConnectionState(options.stellaDataDir, entry);
-    },
-    getDecline(connectorId: string) {
-      return getConnectorDecline(options.stellaDataDir, connectorId);
     },
   },
 });

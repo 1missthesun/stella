@@ -26,7 +26,6 @@ import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
 import {
   resolveCloudConnectorEntry,
   type CloudConnectorCatalogEntry,
-  type CloudConnectorDeclines,
   type CloudConnectorDirectory,
 } from "./cloud-connect-client.js";
 
@@ -54,7 +53,6 @@ export type CloudConnectorConnectionRequester = (
 
 export type CloudConnectorStatusToolOptions = Readonly<{
   directory: CloudConnectorDirectory;
-  declines?: CloudConnectorDeclines;
   requestConnection?: CloudConnectorConnectionRequester;
 }>;
 
@@ -134,13 +132,6 @@ export const createCloudConnectorStatusTool = (
       );
     }
 
-    if (await options.declines?.isDeclined(entry.id)) {
-      return text(
-        `The user previously declined connecting ${entry.name}, so no connect card was shown. If it comes up, mention once — concisely — that they can connect ${entry.name} from the Store whenever they like, then proceed by other means (agents fall back to the browser). Do not offer again.`,
-        { id: entry.id, status: "declined", reason: "declined_previously" },
-      );
-    }
-
     if (!options.requestConnection) {
       return text(
         `${entry.name} exists in the catalog and cannot be connected from here (its connect flow isn't available in this session). It is not ready to use; proceed via the browser/computer fallback or the Store.`,
@@ -170,9 +161,8 @@ export const createCloudConnectorStatusTool = (
       );
     }
     if (outcome.reason === "declined") {
-      await options.declines?.recordDecline(entry.id).catch(() => undefined);
       return text(
-        `The user declined connecting ${entry.name}. Tell them once — concisely — that they can always connect it from the Store later, then proceed with the task by other means (the executing agent can use the browser). Do not offer ${entry.name} again.`,
+        `The user declined connecting ${entry.name}. Tell them once — concisely — that they can always connect it from the Store later, then proceed with the task by other means (the executing agent can use the browser). Do not offer ${entry.name} again unless the user asks to connect it.`,
         { id: entry.id, status: "declined" },
       );
     }

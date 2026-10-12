@@ -1097,7 +1097,6 @@ export type DetailedDiscoveryMatch = {
   description: string;
   enabled: boolean;
   connected: boolean;
-  declined: boolean;
   next: string;
   catalogSource?: NativeCatalogSource;
   provider?: NativeConnectorCatalogEntry["provider"];
@@ -1157,11 +1156,9 @@ export const discoverConnectorsDetailed = async (
       }
       const next = connected
         ? `Ready. Inspect actions: await connect.actions("${match.id}").`
-        : match.declined
-          ? "The user previously declined connecting this in chat. Do not offer it again; they can enable it in the Store."
-          : match.kind === "native"
-            ? `Not connected. Connect offers are handled by the orchestrator's connector_status tool (inline connect card) or the Store — do not initiate one from here unless the user explicitly asked this turn. Proceed via the browser/computer fallback meanwhile.`
-            : `Configured but not authorized. Calling it pops the auth dialog: await connect.actions("${match.id}").`;
+        : match.kind === "native"
+          ? `Not connected. Connect offers are handled by the orchestrator's connector_status tool (inline connect card) or the Store — do not initiate one from here unless the user explicitly asked this turn. Proceed via the browser/computer fallback meanwhile.`
+          : `Configured but not authorized. Calling it pops the auth dialog: await connect.actions("${match.id}").`;
       return {
         id: match.id,
         name: match.name,
@@ -1181,7 +1178,6 @@ export const discoverConnectorsDetailed = async (
               executable: nativeReadiness?.executable ?? false,
             }
           : {}),
-        declined: match.declined,
         next,
       };
     }),

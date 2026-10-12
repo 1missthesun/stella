@@ -77,7 +77,6 @@ import { createCloudWebTool } from "../cloud-web-tool.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import { sha256Hex } from "../hash.js";
 import {
-  type CloudConnectorDeclines,
   CloudConnectorDirectory,
   createCloudConnectClient,
 } from "../cloud-connect-client.js";
@@ -1987,7 +1986,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           },
         run: (args) => ownerInternal("integrations.run", args),
       },
-      declines: this.connectorDeclines(),
     });
     const code = await createCloudCodeAgentTool({
       loader: this.env.LOADER,
@@ -2067,7 +2065,6 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   }
 
   // Implemented further up the chain.
-  protected abstract connectorDeclines(): CloudConnectorDeclines;
   protected abstract handleTurnStart(
     request: Request,
     handoff?: {

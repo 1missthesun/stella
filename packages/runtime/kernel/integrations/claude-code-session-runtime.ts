@@ -168,8 +168,8 @@ export type ClaudeCodeTurnRequest = {
   onIntermediateResult?(result: ClaudeCodeStepResult): void;
   /**
    * Asked as each step ends: the tool set the session runs with now, when it
-   * changed while the step ran (its file and shell tools moved to another
-   * computer or back), with what the agent reads as it carries on. The CLI
+   * changed while the step ran (tools were added or removed), with what the
+   * agent reads as it carries on. The CLI
    * restarts on the new set with --resume and the same turn goes on; the
    * step's own answer reaches the host as an intermediate reply.
    */
@@ -3457,8 +3457,8 @@ class ClaudeCodeSessionRuntime {
    * End a step at a tool boundary instead of with its answer: the CLI is
    * stopped before it reads the results it waits on, and the step resolves
    * with no answer of its own, so the turn goes on with the step
-   * `toolSetAfterStep` names. Its file and shell tools moved, and the CLI
-   * must not take one more call with the built-ins it started with.
+   * `toolSetAfterStep` names. Its tools changed, and the CLI must not take
+   * one more call with the set it started with.
    */
   endPendingStep(
     session: ClaudeCodeSession,

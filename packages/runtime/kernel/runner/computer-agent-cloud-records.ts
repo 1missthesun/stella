@@ -271,7 +271,7 @@ export const resolveJwtOwnerScope = (
  * computer while their conversation is cloud-owned.
  *
  * Every mutation is admitted to the runtime's operational SQLite outbox
- * before network I/O. The ordered drain survives worker restarts and retries
+ * before network I/O. The drain, in order for each agent, survives worker restarts and retries
  * on auth/config/connectivity recovery. The backend independently fences each
  * transition by attemptGeneration, so an acknowledged response lost locally
  * or a late old-generation retry is idempotent.
@@ -431,11 +431,25 @@ export const createComputerAgentCloudRecords = (
         scheduleDrain(NO_AUTH_RETRY_MS);
         return;
       }
-      const entry = options.store.listComputerAgentCloudOutbox(
-        ownerScope,
-        1,
-      )[0];
-      if (!entry) return;
+      // Each agent's records go in order, but one agent's record waiting on
+      // a retry never holds up another agent's.
+      const lanes = new Set<string>();
+      const heads = options.store
+        .listComputerAgentCloudOutbox(ownerScope)
+        .filter((candidate) => {
+          if (lanes.has(candidate.threadId)) return false;
+          lanes.add(candidate.threadId);
+          return true;
+        });
+      if (heads.length === 0) return;
+      const now = Date.now();
+      const entry = heads.find((head) => head.nextAttemptAt <= now);
+      if (!entry) {
+        scheduleDrain(
+          Math.min(...heads.map((head) => head.nextAttemptAt)) - now,
+        );
+        return;
+      }
       const authority = options.store.getComputerAgentCloudThreadAuthority(
         entry.threadId,
       );
@@ -467,11 +481,6 @@ export const createComputerAgentCloudRecords = (
           options.store.deleteComputerAgentCloudOutbox(entry.id);
         }
         continue;
-      }
-      const now = Date.now();
-      if (entry.nextAttemptAt > now) {
-        scheduleDrain(entry.nextAttemptAt - now);
-        return;
       }
       try {
         await deliver(entry);
@@ -568,6 +577,12 @@ export const createComputerAgentCloudRecords = (
           settleStartAdmission(entry.id, "rejected", rejected);
           continue;
         }
+        // The cloud has no agent of this computer's by that id (its start was
+        // refused, or it is another host's agent): there is nothing to end.
+        if (entry.kind !== "start" && asRecord(error)?.code === "NOT_FOUND") {
+          options.store.deleteComputerAgentCloudOutbox(entry.id);
+          continue;
+        }
         const delayMs = retryDelay(entry.attempts);
         options.store.markComputerAgentCloudOutboxRetry({
           id: entry.id,
@@ -585,8 +600,8 @@ export const createComputerAgentCloudRecords = (
             }),
           );
         }
-        scheduleDrain(currentOwnerScope() === ownerScope ? delayMs : 0);
-        return;
+        // Its next try waits; other agents' records go on.
+        continue;
       }
     }
   };

@@ -74,6 +74,7 @@ import {
 import { recordEngineCompaction } from "../stella/journal-sync.ts";
 import {
   agentRunOutcome,
+  isAnotherHostsAgent,
   noteRemoteReport,
   StellaAgentsDoc,
   type AgentDirectoryHost,
@@ -1291,7 +1292,9 @@ export function desktopChats(options: DesktopChatsOptions) {
                     return;
                   }
                   await noteAgentThread(run.threadId, conversationId);
-                  const agent = (await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context))?.agents[run.threadId];
+                  const state = await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context);
+                  if (isAnotherHostsAgent(state, run.threadId)) return;
+                  const agent = state?.agents[run.threadId];
                   agentStarted?.({
                     conversationId,
                     threadId: run.threadId,
@@ -1364,6 +1367,9 @@ export function desktopChats(options: DesktopChatsOptions) {
                 ...(agentPaused
                   ? {
                       agentPaused: async (agent) => {
+                        if (opened && isAnotherHostsAgent(await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context), agent.threadId)) {
+                          return;
+                        }
                         agentPaused({ conversationId, ...agent, attempt: await attempts(agent.threadId) });
                       },
                     }

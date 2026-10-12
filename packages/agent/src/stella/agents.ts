@@ -162,6 +162,21 @@ export const StellaAgentsDoc = defineDoc<{
   initial: () => ({ agents: {}, calls: {} }),
 });
 
+/** The call that started an agent another host placed here (`runPlacedAgent`). */
+const PLACED_CALL_PREFIX = "placed:";
+
+/**
+ * Whether an agent in this conversation is another host's: placed here by it,
+ * or started here for its orchestrator. That host's records track it, so this
+ * computer does not report it as its own.
+ */
+export const isAnotherHostsAgent = (
+  state: { agents: Record<string, AgentRecord>; calls: Record<string, { threadId: string }> } | undefined,
+  threadId: string,
+): boolean =>
+  state?.agents[threadId]?.origin !== undefined ||
+  Object.entries(state?.calls ?? {}).some(([key, call]) => call.threadId === threadId && key.startsWith(PLACED_CALL_PREFIX));
+
 /** A message on its way to an agent. */
 export type AgentRun = {
   threadId: string;
@@ -2163,7 +2178,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       (tx) =>
         createAgent(tx, {
           parentConversationId: root.id,
-          callKey: `placed:${args.agentKey}`,
+          callKey: `${PLACED_CALL_PREFIX}${args.agentKey}`,
           depth: 1,
           description: args.description.trim() || "agent",
           prompt: args.prompt,

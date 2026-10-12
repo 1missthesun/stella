@@ -20,7 +20,7 @@
 import type { Plugin, ViteDevServer } from "vite";
 import { UiStateStore } from "@stella/runtime/kernel/ui-state/store";
 import { resolveRuntimeStatePath } from "@stella/runtime/kernel/home/stella-paths";
-import { resolveDesktopStellaDataDirPath } from "@stella/desktop/electron/data-paths.js";
+import { resolveDesktopStellaDataDirPath } from "../../desktop/electron/data-paths.ts";
 import {
   UI_STATE_DEV_ENDPOINT,
   UI_STATE_DEV_EVENT,

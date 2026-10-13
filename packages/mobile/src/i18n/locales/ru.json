@@ -1467,7 +1467,11 @@
       "sensitive": "Сквозное шифрование",
       "sensitiveUnavailable": "Это устройство пока не может это зашифровать",
       "unnamedComputer": "Компьютер · {id}",
-      "waitingBadge": "Ждёт вас"
+      "waitingBadge": "Ждёт вас",
+      "remember": "Запомнить на компьютере, который спрашивает",
+      "rememberOn": "Сохранено как «{label}». Агенты будут использовать это снова, не спрашивая вас.",
+      "rememberOff": "Используется один раз, затем удаляется.",
+      "replacing": "Сохранённое значение для «{label}» не подошло. Введите правильное — оно заменит сохранённое."
     }
   },
   "onboarding": {
@@ -2415,16 +2419,23 @@
       "more": "Ещё"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Сохранённые личные значения",
+      "description": "Значения из личных запросов, которые вы решили запомнить. Они хранятся в защищённом хранилище этого компьютера, пока вы их не удалите. Агенты используют их, никогда их не читая.",
+      "empty": "На этом компьютере нет сохранённых личных значений.",
+      "saved": "Сохранено {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Не удалось переименовать значение. Попробуйте снова."
+      },
+      "lastUsed": "Последнее использование {used}",
+      "neverUsed": "Ещё не использовалось",
+      "rename": "Переименовать",
+      "renameSave": "Сохранить",
+      "renameCancel": "Отмена",
+      "renameLabel": "Название"
     }
   },
   "shell": {
@@ -2888,7 +2899,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Запомнить на этом компьютере",
+      "rememberRelayed": "Запомнить на компьютере, который спрашивает",
+      "rememberOn": "Сохранено как «{label}». Агенты будут использовать это снова, не спрашивая вас; удалить можно в любой момент в настройках.",
+      "rememberOff": "Используется один раз, затем удаляется.",
+      "replacing": "Сохранённое значение для «{label}» не подошло. Введите правильное — оно заменит сохранённое."
     }
   },
   "schedule": {

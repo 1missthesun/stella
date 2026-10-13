@@ -1443,7 +1443,11 @@
       "sensitive": "เข้ารหัสแบบต้นทางถึงปลายทาง",
       "sensitiveUnavailable": "อุปกรณ์นี้ยังเข้ารหัสไม่ได้",
       "unnamedComputer": "คอมพิวเตอร์ · {id}",
-      "waitingBadge": "กำลังรอคุณ"
+      "waitingBadge": "กำลังรอคุณ",
+      "remember": "จำไว้ในคอมพิวเตอร์ที่ขอข้อมูล",
+      "rememberOn": "บันทึกเป็น “{label}” แล้ว เอเจนต์จะใช้ซ้ำโดยไม่ถามคุณอีก",
+      "rememberOff": "ใช้ครั้งเดียวแล้วลบทิ้ง",
+      "replacing": "ค่าที่บันทึกไว้สำหรับ “{label}” ใช้ไม่ได้ ใส่ค่าที่ถูกต้อง แล้วค่านี้จะแทนที่ค่าที่บันทึกไว้"
     }
   },
   "onboarding": {
@@ -2391,16 +2395,23 @@
       "more": "เพิ่มเติม"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "ค่าส่วนตัวที่บันทึกไว้",
+      "description": "ค่าจากคำขอส่วนตัวที่คุณเลือกให้จำไว้ เก็บในที่จัดเก็บที่ปลอดภัยของคอมพิวเตอร์เครื่องนี้จนกว่าคุณจะลบ เอเจนต์ใช้ค่าเหล่านี้โดยไม่เคยอ่านเลย",
+      "empty": "ไม่มีค่าส่วนตัวที่บันทึกไว้ในคอมพิวเตอร์เครื่องนี้",
+      "saved": "บันทึกเมื่อ {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "เปลี่ยนชื่อค่านี้ไม่ได้ ลองอีกครั้ง"
+      },
+      "lastUsed": "ใช้ล่าสุด {used}",
+      "neverUsed": "ยังไม่เคยใช้",
+      "rename": "เปลี่ยนชื่อ",
+      "renameSave": "บันทึก",
+      "renameCancel": "ยกเลิก",
+      "renameLabel": "ชื่อ"
     }
   },
   "shell": {
@@ -2838,7 +2849,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "จำไว้ในคอมพิวเตอร์เครื่องนี้",
+      "rememberRelayed": "จำไว้ในคอมพิวเตอร์ที่ขอข้อมูล",
+      "rememberOn": "บันทึกเป็น “{label}” แล้ว เอเจนต์จะใช้ซ้ำโดยไม่ถามคุณอีก และคุณลบได้ทุกเมื่อในการตั้งค่า",
+      "rememberOff": "ใช้ครั้งเดียวแล้วลบทิ้ง",
+      "replacing": "ค่าที่บันทึกไว้สำหรับ “{label}” ใช้ไม่ได้ ใส่ค่าที่ถูกต้อง แล้วค่านี้จะแทนที่ค่าที่บันทึกไว้"
     }
   },
   "schedule": {

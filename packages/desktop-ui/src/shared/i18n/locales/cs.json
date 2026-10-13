@@ -1467,7 +1467,11 @@
       "sensitive": "Šifrováno end-to-end",
       "sensitiveUnavailable": "Tohle zařízení to zatím nedokáže zašifrovat",
       "unnamedComputer": "Počítač · {id}",
-      "waitingBadge": "Čeká na tebe"
+      "waitingBadge": "Čeká na tebe",
+      "remember": "Zapamatovat na počítači, který se ptal",
+      "rememberOn": "Uloženo jako „{label}“. Agenti to znovu použijí, aniž by se vás znovu ptali.",
+      "rememberOff": "Použito jednou, pak smazáno.",
+      "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou."
     }
   },
   "onboarding": {
@@ -2415,16 +2419,23 @@
       "more": "Více"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Uložené soukromé hodnoty",
+      "description": "Hodnoty ze soukromých žádostí, které jste se rozhodli zapamatovat. Jsou uložené v zabezpečeném úložišti tohoto počítače, dokud je nesmažete. Agenti je používají, aniž by je kdy četli.",
+      "empty": "Na tomto počítači nejsou uložené žádné soukromé hodnoty.",
+      "saved": "Uloženo {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Hodnotu se nepodařilo přejmenovat. Zkuste to znovu."
+      },
+      "lastUsed": "Naposledy použito {used}",
+      "neverUsed": "Zatím nepoužito",
+      "rename": "Přejmenovat",
+      "renameSave": "Uložit",
+      "renameCancel": "Zrušit",
+      "renameLabel": "Název"
     }
   },
   "shell": {
@@ -2888,7 +2899,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Zapamatovat na tomto počítači",
+      "rememberRelayed": "Zapamatovat na počítači, který se ptal",
+      "rememberOn": "Uloženo jako „{label}“. Agenti to znovu použijí, aniž by se vás znovu ptali; kdykoli to můžete smazat v Nastavení.",
+      "rememberOff": "Použito jednou, pak smazáno.",
+      "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou."
     }
   },
   "schedule": {

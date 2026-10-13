@@ -1451,7 +1451,11 @@
       "sensitive": "Krypterat hela vägen",
       "sensitiveUnavailable": "Den här enheten kan inte kryptera det än",
       "unnamedComputer": "Dator · {id}",
-      "waitingBadge": "Väntar på dig"
+      "waitingBadge": "Väntar på dig",
+      "remember": "Kom ihåg på datorn som frågade",
+      "rememberOn": "Sparat som ”{label}”. Agenter återanvänder det utan att fråga dig igen.",
+      "rememberOff": "Används en gång och raderas sedan.",
+      "replacing": "Det sparade värdet för ”{label}” fungerade inte. Ange det rätta; det ersätter det sparade."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "Mer"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Sparade privata värden",
+      "description": "Värden från privata förfrågningar som du valde att komma ihåg. De förvaras i den här datorns säkra lagring tills du raderar dem. Agenter använder dem utan att någonsin läsa dem.",
+      "empty": "Inga privata värden är sparade på den här datorn.",
+      "saved": "Sparat {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Det gick inte att byta namn på värdet. Försök igen."
+      },
+      "lastUsed": "Senast använt {used}",
+      "neverUsed": "Inte använt än",
+      "rename": "Byt namn",
+      "renameSave": "Spara",
+      "renameCancel": "Avbryt",
+      "renameLabel": "Namn"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Kom ihåg på den här datorn",
+      "rememberRelayed": "Kom ihåg på datorn som frågade",
+      "rememberOn": "Sparat som ”{label}”. Agenter återanvänder det utan att fråga dig igen; du kan radera det när som helst i Inställningar.",
+      "rememberOff": "Används en gång och raderas sedan.",
+      "replacing": "Det sparade värdet för ”{label}” fungerade inte. Ange det rätta; det ersätter det sparade."
     }
   },
   "schedule": {

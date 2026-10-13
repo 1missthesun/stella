@@ -1,8 +1,15 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { UserAskStoredSecureValue } from "@stella/contracts/user-ask";
 import { Button } from "@/ui/button";
+import { TextField } from "@/ui/text-field";
 import { useT } from "@/shared/i18n";
 import { getElectronApi } from "@/platform/electron/electron";
+
+const formatWhen = (at: number) =>
+  new Date(at).toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
 
 export function SecureValuesCard() {
   const t = useT();
@@ -11,6 +18,9 @@ export function SecureValuesCard() {
   );
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<{ id: string; label: string } | null>(
+    null,
+  );
 
   const load = useCallback(async () => {
     const bridge = getElectronApi()?.userAsk;
@@ -44,6 +54,35 @@ export function SecureValuesCard() {
     [load, t],
   );
 
+  const rename = useCallback(
+    async (event: FormEvent) => {
+      event.preventDefault();
+      const bridge = getElectronApi()?.userAsk;
+      if (!bridge?.secureValuesRename || !renaming) return;
+      const label = renaming.label.trim();
+      if (!label) return;
+      setBusy(renaming.id);
+      setError(null);
+      try {
+        const result = await bridge.secureValuesRename({
+          id: renaming.id,
+          label,
+        });
+        if (result?.ok === false) {
+          setError(t("settings.secureValues.errors.rename"));
+          return;
+        }
+        setRenaming(null);
+        await load();
+      } catch {
+        setError(t("settings.secureValues.errors.rename"));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [load, renaming, t],
+  );
+
   return (
     <div className="settings-card" data-testid="secure-values-card">
       <div className="settings-card-header">
@@ -57,32 +96,103 @@ export function SecureValuesCard() {
       {values.length === 0 ? (
         <p className="settings-card-desc">{t("settings.secureValues.empty")}</p>
       ) : null}
-      {values.map((value) => (
-        <div className="settings-row" key={value.id}>
-          <div className="settings-row-info">
-            <div className="settings-row-label">
-              {value.label || value.fieldId}
+      {values.map((value) => {
+        const editing = renaming?.id === value.id;
+        const details = [
+          value.account,
+          value.fieldLabels.join(", "),
+          t("settings.secureValues.saved", {
+            saved: formatWhen(value.updatedAt),
+          }),
+          value.lastUsedAt
+            ? t("settings.secureValues.lastUsed", {
+                used: formatWhen(value.lastUsedAt),
+              })
+            : t("settings.secureValues.neverUsed"),
+        ].filter(Boolean);
+        return (
+          <div
+            className="settings-row"
+            key={value.id}
+            data-testid="secure-value-row"
+          >
+            <div className="settings-row-info">
+              {editing ? (
+                <form onSubmit={(event) => void rename(event)}
+                >
+                  <TextField
+                    label={t("settings.secureValues.renameLabel")}
+                    hideLabel
+                    aria-label={t("settings.secureValues.renameLabel")}
+                    value={renaming.label}
+                    maxLength={120}
+                    autoFocus
+                    disabled={busy !== null}
+                    onChange={(event) =>
+                      setRenaming({ id: value.id, label: event.target.value })
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") setRenaming(null);
+                    }}
+                  />
+                </form>
+              ) : (
+                <div className="settings-row-label">{value.label}</div>
+              )}
+              <div className="settings-row-sublabel">
+                {details.join(" · ")}
+              </div>
             </div>
-            <div className="settings-card-desc">
-              {t("settings.secureValues.saved", {
-                saved: new Date(value.createdAt).toLocaleString(),
-                expires: new Date(value.expiresAt).toLocaleString(),
-              })}
+            <div className="settings-row-control">
+              {editing ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="pill-btn"
+                    disabled={busy !== null}
+                    onClick={() => setRenaming(null)}
+                  >
+                    {t("settings.secureValues.renameCancel")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="pill-btn"
+                    disabled={busy !== null || !renaming.label.trim()}
+                    onClick={(event) => void rename(event)}
+                  >
+                    {t("settings.secureValues.renameSave")}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="pill-btn"
+                    disabled={busy !== null}
+                    onClick={() =>
+                      setRenaming({ id: value.id, label: value.label })
+                    }
+                  >
+                    {t("settings.secureValues.rename")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="pill-btn pill-btn--danger"
+                    disabled={busy !== null}
+                    onClick={() => void remove({ id: value.id })}
+                  >
+                    {t("settings.secureValues.delete")}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
-          <div className="settings-row-control">
-            <Button
-              type="button"
-              variant="ghost"
-              className="pill-btn pill-btn--danger"
-              disabled={busy !== null}
-              onClick={() => void remove({ id: value.id })}
-            >
-              {t("settings.secureValues.delete")}
-            </Button>
-          </div>
-        </div>
-      ))}
+        );
+      })}
       {values.length > 1 ? (
         <div className="settings-row">
           <div className="settings-row-info" />

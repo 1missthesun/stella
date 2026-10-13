@@ -5,7 +5,8 @@ import type {
   UserAskField,
   UserAskSecureInputDetail,
 } from "@stella/contracts/user-ask";
-import { AlertCircle, Clock, Eye, Lock } from "@/ui/icons";
+import { userAskOffersRemember } from "@stella/contracts/user-ask";
+import { AlertCircle, Clock, Eye, KeyRound, Lock } from "@/ui/icons";
 import { Button } from "@/ui/button";
 import { Select } from "@/ui/select";
 import { TextField } from "@/ui/text-field";
@@ -146,11 +147,16 @@ function UserAskSecureInputBody({
   detail: UserAskSecureInputDetail;
   relayed: boolean;
   busy: boolean;
-  onAnswerFields: (fields: readonly UserAskAnswerFieldValue[]) => void;
+  onAnswerFields: (
+    fields: readonly UserAskAnswerFieldValue[],
+    remember: boolean | undefined,
+  ) => void;
   onDecline: (reason: string) => void;
 }) {
   const t = useT();
   const [values, setValues] = useState<Record<string, string>>({});
+  const offersRemember = userAskOffersRemember(detail);
+  const [remember, setRemember] = useState(true);
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
   const [missing, setMissing] = useState<string | null>(null);
@@ -179,11 +185,18 @@ function UserAskSecureInputBody({
             value: entry.value,
           }),
         ),
+      offersRemember ? remember : undefined,
     );
   };
 
   return (
     <form className="user-ask__body" onSubmit={submit}>
+      {detail.save?.replacing ? (
+        <p className="user-ask__replacing" role="note">
+          <KeyRound size={12} aria-hidden="true" />
+          {t("userAsk.secureInput.replacing", { label: detail.save.label })}
+        </p>
+      ) : null}
       <div className="user-ask__fields">
         {detail.fields.map((field) => (
           <UserAskFieldRow
@@ -197,6 +210,32 @@ function UserAskSecureInputBody({
           />
         ))}
       </div>
+      {offersRemember ? (
+        <label className="user-ask__remember">
+          <input
+            type="checkbox"
+            checked={remember}
+            disabled={busy}
+            onChange={(event) => setRemember(event.target.checked)}
+          />
+          <span className="user-ask__remember-text">
+            <span className="user-ask__remember-label">
+              {t(
+                relayed
+                  ? "userAsk.secureInput.rememberRelayed"
+                  : "userAsk.secureInput.remember",
+              )}
+            </span>
+            <span className="user-ask__remember-hint">
+              {remember
+                ? t("userAsk.secureInput.rememberOn", {
+                    label: detail.save?.label ?? "",
+                  })
+                : t("userAsk.secureInput.rememberOff")}
+            </span>
+          </span>
+        </label>
+      ) : null}
       <div className="user-ask__notes">
         {anySensitive ? (
           <p className="user-ask__footnote user-ask__footnote--private">
@@ -304,7 +343,10 @@ export function UserAskSecureInputCard({
   const [error, setError] = useState<string | null>(null);
 
   const send = useCallback(
-    async (fields: readonly UserAskAnswerFieldValue[]) => {
+    async (
+      fields: readonly UserAskAnswerFieldValue[],
+      remember: boolean | undefined,
+    ) => {
       if (busy) return;
       setBusy(true);
       setError(null);
@@ -313,6 +355,7 @@ export function UserAskSecureInputCard({
         revision: ask.revision,
         kind: "fields",
         fields,
+        ...(remember === undefined ? {} : { remember }),
       });
       if (!ok) {
         setError(t("userAsk.errors.answer"));
@@ -347,7 +390,7 @@ export function UserAskSecureInputCard({
         detail={detail}
         relayed={ask.relayed === true}
         busy={busy}
-        onAnswerFields={(fields) => void send(fields)}
+        onAnswerFields={(fields, remember) => void send(fields, remember)}
         onDecline={(reason) => void decline(reason)}
       />
       {error ? (

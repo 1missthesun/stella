@@ -1483,7 +1483,11 @@
       "sensitive": "مشفّر من الطرف إلى الطرف",
       "sensitiveUnavailable": "لا يمكن لهذا الجهاز تشفيره بعد",
       "unnamedComputer": "كمبيوتر · {id}",
-      "waitingBadge": "في انتظارك"
+      "waitingBadge": "في انتظارك",
+      "remember": "تذكّر على الكمبيوتر الذي طلبه",
+      "rememberOn": "حُفظ باسم «{label}». يعيد الوكلاء استخدامه دون أن يسألوك مرة أخرى.",
+      "rememberOff": "يُستخدم مرة واحدة ثم يُحذف.",
+      "replacing": "لم تنجح القيمة المحفوظة لـ«{label}». أدخل القيمة الصحيحة؛ وستحل محل المحفوظة."
     }
   },
   "onboarding": {
@@ -2431,16 +2435,23 @@
       "more": "المزيد"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "القيم الخاصة المحفوظة",
+      "description": "قيم من طلبات خاصة اخترت تذكّرها، محفوظة في المخزن الآمن لهذا الكمبيوتر حتى تحذفها. يستخدمها الوكلاء دون أن يقرؤوها أبدًا.",
+      "empty": "لا توجد قيم خاصة محفوظة على هذا الكمبيوتر.",
+      "saved": "حُفظت {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "تعذّرت إعادة تسمية هذه القيمة. حاول مرة أخرى."
+      },
+      "lastUsed": "آخر استخدام {used}",
+      "neverUsed": "لم تُستخدم بعد",
+      "rename": "إعادة التسمية",
+      "renameSave": "حفظ",
+      "renameCancel": "إلغاء",
+      "renameLabel": "الاسم"
     }
   },
   "shell": {
@@ -2920,7 +2931,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "تذكّر على هذا الكمبيوتر",
+      "rememberRelayed": "تذكّر على الكمبيوتر الذي طلبه",
+      "rememberOn": "حُفظ باسم «{label}». يعيد الوكلاء استخدامه دون أن يسألوك مرة أخرى؛ ويمكنك حذفه في أي وقت من الإعدادات.",
+      "rememberOff": "يُستخدم مرة واحدة ثم يُحذف.",
+      "replacing": "لم تنجح القيمة المحفوظة لـ«{label}». أدخل القيمة الصحيحة؛ وستحل محل المحفوظة."
     }
   },
   "schedule": {

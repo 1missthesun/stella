@@ -1443,7 +1443,11 @@
       "sensitive": "端對端加密",
       "sensitiveUnavailable": "此裝置暫時無法加密",
       "unnamedComputer": "電腦 · {id}",
-      "waitingBadge": "正在等你"
+      "waitingBadge": "正在等你",
+      "remember": "在提問的那台電腦上記住",
+      "rememberOn": "已儲存為「{label}」。代理程式之後會直接重複使用，不再詢問你。",
+      "rememberOff": "僅使用一次，然後刪除。",
+      "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。"
     }
   },
   "onboarding": {
@@ -2391,16 +2395,23 @@
       "more": "更多"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "已儲存的私密值",
+      "description": "你在私密請求中選擇記住的值，保存在這台電腦的安全儲存區中，直到你刪除為止。代理程式會使用它們，但從不讀取。",
+      "empty": "這台電腦上沒有儲存私密值。",
+      "saved": "儲存於 {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "無法重新命名該值，請再試一次。"
+      },
+      "lastUsed": "上次使用 {used}",
+      "neverUsed": "尚未使用",
+      "rename": "重新命名",
+      "renameSave": "儲存",
+      "renameCancel": "取消",
+      "renameLabel": "名稱"
     }
   },
   "shell": {
@@ -2838,7 +2849,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "在這台電腦上記住",
+      "rememberRelayed": "在提問的那台電腦上記住",
+      "rememberOn": "已儲存為「{label}」。代理程式之後會直接重複使用，不再詢問你；你可以隨時在設定中刪除。",
+      "rememberOff": "僅使用一次，然後刪除。",
+      "replacing": "為「{label}」儲存的值無效。請輸入正確的值，它會取代已儲存的值。"
     }
   },
   "schedule": {

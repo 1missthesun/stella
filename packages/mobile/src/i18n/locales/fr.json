@@ -1459,7 +1459,11 @@
       "sensitive": "Chiffré de bout en bout",
       "sensitiveUnavailable": "Cet appareil ne peut pas encore le chiffrer",
       "unnamedComputer": "Ordinateur · {id}",
-      "waitingBadge": "Attend ta réponse"
+      "waitingBadge": "Attend ta réponse",
+      "remember": "Mémoriser sur l’ordinateur qui l’a demandé",
+      "rememberOn": "Enregistré sous « {label} ». Les agents le réutilisent sans vous le redemander.",
+      "rememberOff": "Utilisé une fois, puis supprimé.",
+      "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée."
     }
   },
   "onboarding": {
@@ -2407,16 +2411,23 @@
       "more": "Plus"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Valeurs privées enregistrées",
+      "description": "Les valeurs de demandes privées que vous avez choisi de mémoriser, conservées dans le stockage sécurisé de cet ordinateur jusqu’à ce que vous les supprimiez. Les agents les utilisent sans jamais les lire.",
+      "empty": "Aucune valeur privée n’est enregistrée sur cet ordinateur.",
+      "saved": "Enregistrée {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Impossible de renommer cette valeur. Réessayez."
+      },
+      "lastUsed": "Dernière utilisation {used}",
+      "neverUsed": "Pas encore utilisée",
+      "rename": "Renommer",
+      "renameSave": "Enregistrer",
+      "renameCancel": "Annuler",
+      "renameLabel": "Nom"
     }
   },
   "shell": {
@@ -2872,7 +2883,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Mémoriser sur cet ordinateur",
+      "rememberRelayed": "Mémoriser sur l’ordinateur qui l’a demandé",
+      "rememberOn": "Enregistré sous « {label} ». Les agents le réutilisent sans vous le redemander ; supprimez-le quand vous voulez dans les Réglages.",
+      "rememberOff": "Utilisé une fois, puis supprimé.",
+      "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée."
     }
   },
   "schedule": {

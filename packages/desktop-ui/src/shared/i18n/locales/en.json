@@ -1451,7 +1451,11 @@
       "sensitive": "Encrypted end to end",
       "sensitiveUnavailable": "This device can't encrypt it yet",
       "unnamedComputer": "Computer · {id}",
-      "waitingBadge": "Waiting on you"
+      "waitingBadge": "Waiting on you",
+      "remember": "Remember on the computer that asked",
+      "rememberOn": "Saved as “{label}”. Agents reuse it without asking you again.",
+      "rememberOff": "Used once, then deleted.",
+      "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "More"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Saved private values",
+      "description": "Values you chose to remember from private requests, kept in this computer’s secure store until you delete them. Agents use them without ever reading them.",
+      "empty": "No private values are saved on this computer.",
+      "saved": "Saved {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Couldn’t rename that value. Try again."
+      },
+      "lastUsed": "Last used {used}",
+      "neverUsed": "Not used yet",
+      "rename": "Rename",
+      "renameSave": "Save",
+      "renameCancel": "Cancel",
+      "renameLabel": "Name"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Remember on this computer",
+      "rememberRelayed": "Remember on the computer that asked",
+      "rememberOn": "Saved as “{label}”. Agents reuse it without asking you again; delete it any time in Settings.",
+      "rememberOff": "Used once, then deleted.",
+      "replacing": "The saved value for “{label}” didn’t work. Enter the right one; it replaces the saved one."
     }
   },
   "schedule": {

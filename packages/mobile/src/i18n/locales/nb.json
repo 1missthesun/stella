@@ -1451,7 +1451,11 @@
       "sensitive": "Ende-til-ende-kryptert",
       "sensitiveUnavailable": "Denne enheten kan ikke kryptere det ennå",
       "unnamedComputer": "Datamaskin · {id}",
-      "waitingBadge": "Venter på deg"
+      "waitingBadge": "Venter på deg",
+      "remember": "Husk på datamaskinen som spurte",
+      "rememberOn": "Lagret som «{label}». Agenter bruker den igjen uten å spørre deg på nytt.",
+      "rememberOff": "Brukt én gang og deretter slettet.",
+      "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "Mer"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Lagrede private verdier",
+      "description": "Verdier fra private forespørsler som du valgte å huske. De oppbevares i den sikre lagringen på denne datamaskinen til du sletter dem. Agenter bruker dem uten noen gang å lese dem.",
+      "empty": "Ingen private verdier er lagret på denne datamaskinen.",
+      "saved": "Lagret {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Kunne ikke gi verdien nytt navn. Prøv igjen."
+      },
+      "lastUsed": "Sist brukt {used}",
+      "neverUsed": "Ikke brukt ennå",
+      "rename": "Gi nytt navn",
+      "renameSave": "Lagre",
+      "renameCancel": "Avbryt",
+      "renameLabel": "Navn"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Husk på denne datamaskinen",
+      "rememberRelayed": "Husk på datamaskinen som spurte",
+      "rememberOn": "Lagret som «{label}». Agenter bruker den igjen uten å spørre deg på nytt; du kan slette den når som helst i Innstillinger.",
+      "rememberOff": "Brukt én gang og deretter slettet.",
+      "replacing": "Den lagrede verdien for «{label}» fungerte ikke. Skriv inn den riktige; den erstatter den lagrede."
     }
   },
   "schedule": {

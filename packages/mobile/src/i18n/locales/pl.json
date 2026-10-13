@@ -1467,7 +1467,11 @@
       "sensitive": "Szyfrowane end-to-end",
       "sensitiveUnavailable": "To urządzenie nie potrafi tego jeszcze zaszyfrować",
       "unnamedComputer": "Komputer · {id}",
-      "waitingBadge": "Czeka na ciebie"
+      "waitingBadge": "Czeka na ciebie",
+      "remember": "Zapamiętaj na komputerze, który pytał",
+      "rememberOn": "Zapisano jako „{label}”. Agenci użyją tego ponownie bez pytania.",
+      "rememberOff": "Użyto raz, a potem usunięto.",
+      "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną."
     }
   },
   "onboarding": {
@@ -2415,16 +2419,23 @@
       "more": "Więcej"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Zapisane wartości prywatne",
+      "description": "Wartości z prywatnych próśb, które postanowiłeś zapamiętać. Są przechowywane w bezpiecznym magazynie tego komputera, dopóki ich nie usuniesz. Agenci używają ich, nigdy ich nie odczytując.",
+      "empty": "Na tym komputerze nie ma zapisanych wartości prywatnych.",
+      "saved": "Zapisano {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Nie udało się zmienić nazwy tej wartości. Spróbuj ponownie."
+      },
+      "lastUsed": "Ostatnio użyto {used}",
+      "neverUsed": "Jeszcze nieużyta",
+      "rename": "Zmień nazwę",
+      "renameSave": "Zapisz",
+      "renameCancel": "Anuluj",
+      "renameLabel": "Nazwa"
     }
   },
   "shell": {
@@ -2888,7 +2899,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Zapamiętaj na tym komputerze",
+      "rememberRelayed": "Zapamiętaj na komputerze, który pytał",
+      "rememberOn": "Zapisano jako „{label}”. Agenci użyją tego ponownie bez pytania; możesz to w każdej chwili usunąć w Ustawieniach.",
+      "rememberOff": "Użyto raz, a potem usunięto.",
+      "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną."
     }
   },
   "schedule": {

@@ -1451,7 +1451,11 @@
       "sensitive": "Salattu päästä päähän",
       "sensitiveUnavailable": "Tämä laite ei voi vielä salata sitä",
       "unnamedComputer": "Tietokone · {id}",
-      "waitingBadge": "Odottaa sinua"
+      "waitingBadge": "Odottaa sinua",
+      "remember": "Muista kysyneellä tietokoneella",
+      "rememberOn": "Tallennettu nimellä ”{label}”. Agentit käyttävät sitä uudelleen kysymättä sinulta.",
+      "rememberOff": "Käytetään kerran ja poistetaan sitten.",
+      "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "Lisää"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Tallennetut yksityiset arvot",
+      "description": "Yksityisten pyyntöjen arvot, jotka valitsit muistettaviksi. Ne säilytetään tämän tietokoneen suojatussa tallennustilassa, kunnes poistat ne. Agentit käyttävät niitä lukematta niitä koskaan.",
+      "empty": "Tällä tietokoneella ei ole tallennettuja yksityisiä arvoja.",
+      "saved": "Tallennettu {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Arvon nimeäminen uudelleen epäonnistui. Yritä uudelleen."
+      },
+      "lastUsed": "Viimeksi käytetty {used}",
+      "neverUsed": "Ei vielä käytetty",
+      "rename": "Nimeä uudelleen",
+      "renameSave": "Tallenna",
+      "renameCancel": "Peruuta",
+      "renameLabel": "Nimi"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Muista tällä tietokoneella",
+      "rememberRelayed": "Muista kysyneellä tietokoneella",
+      "rememberOn": "Tallennettu nimellä ”{label}”. Agentit käyttävät sitä uudelleen kysymättä sinulta; voit poistaa sen milloin tahansa asetuksista.",
+      "rememberOff": "Käytetään kerran ja poistetaan sitten.",
+      "replacing": "Kohteen ”{label}” tallennettu arvo ei toiminut. Anna oikea arvo; se korvaa tallennetun."
     }
   },
   "schedule": {

@@ -1443,7 +1443,11 @@
       "sensitive": "Mã hóa đầu cuối",
       "sensitiveUnavailable": "Thiết bị này chưa thể mã hóa nội dung đó",
       "unnamedComputer": "Máy tính · {id}",
-      "waitingBadge": "Đang chờ bạn"
+      "waitingBadge": "Đang chờ bạn",
+      "remember": "Ghi nhớ trên máy tính đã hỏi",
+      "rememberOn": "Đã lưu thành “{label}”. Các tác tử sẽ dùng lại mà không hỏi lại bạn.",
+      "rememberOff": "Dùng một lần rồi xóa.",
+      "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu."
     }
   },
   "onboarding": {
@@ -2391,16 +2395,23 @@
       "more": "Thêm"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Giá trị riêng tư đã lưu",
+      "description": "Các giá trị từ yêu cầu riêng tư mà bạn chọn ghi nhớ, được giữ trong kho bảo mật của máy tính này cho đến khi bạn xóa. Các tác tử dùng chúng mà không bao giờ đọc chúng.",
+      "empty": "Không có giá trị riêng tư nào được lưu trên máy tính này.",
+      "saved": "Đã lưu {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Không đổi tên được giá trị đó. Hãy thử lại."
+      },
+      "lastUsed": "Dùng lần cuối {used}",
+      "neverUsed": "Chưa dùng",
+      "rename": "Đổi tên",
+      "renameSave": "Lưu",
+      "renameCancel": "Hủy",
+      "renameLabel": "Tên"
     }
   },
   "shell": {
@@ -2838,7 +2849,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Ghi nhớ trên máy tính này",
+      "rememberRelayed": "Ghi nhớ trên máy tính đã hỏi",
+      "rememberOn": "Đã lưu thành “{label}”. Các tác tử sẽ dùng lại mà không hỏi lại bạn; bạn có thể xóa bất cứ lúc nào trong Cài đặt.",
+      "rememberOff": "Dùng một lần rồi xóa.",
+      "replacing": "Giá trị đã lưu cho “{label}” không dùng được. Hãy nhập giá trị đúng; nó sẽ thay thế giá trị đã lưu."
     }
   },
   "schedule": {

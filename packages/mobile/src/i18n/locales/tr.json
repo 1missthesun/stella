@@ -1451,7 +1451,11 @@
       "sensitive": "Uçtan uca şifreli",
       "sensitiveUnavailable": "Bu cihaz bunu henüz şifreleyemiyor",
       "unnamedComputer": "Bilgisayar · {id}",
-      "waitingBadge": "Seni bekliyor"
+      "waitingBadge": "Seni bekliyor",
+      "remember": "Soran bilgisayarda hatırla",
+      "rememberOn": "“{label}” olarak kaydedildi. Ajanlar size tekrar sormadan yeniden kullanır.",
+      "rememberOff": "Bir kez kullanılır, sonra silinir.",
+      "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "Daha fazla"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Kayıtlı gizli değerler",
+      "description": "Gizli isteklerden hatırlanmasını seçtiğiniz değerler; siz silene kadar bu bilgisayarın güvenli deposunda saklanır. Ajanlar bunları hiç okumadan kullanır.",
+      "empty": "Bu bilgisayarda kayıtlı gizli değer yok.",
+      "saved": "Kaydedildi: {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Bu değer yeniden adlandırılamadı. Tekrar deneyin."
+      },
+      "lastUsed": "Son kullanım: {used}",
+      "neverUsed": "Henüz kullanılmadı",
+      "rename": "Yeniden adlandır",
+      "renameSave": "Kaydet",
+      "renameCancel": "İptal",
+      "renameLabel": "Ad"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Bu bilgisayarda hatırla",
+      "rememberRelayed": "Soran bilgisayarda hatırla",
+      "rememberOn": "“{label}” olarak kaydedildi. Ajanlar size tekrar sormadan yeniden kullanır; istediğiniz zaman Ayarlar’dan silebilirsiniz.",
+      "rememberOff": "Bir kez kullanılır, sonra silinir.",
+      "replacing": "“{label}” için kayıtlı değer çalışmadı. Doğrusunu girin; kayıtlı olanın yerini alır."
     }
   },
   "schedule": {

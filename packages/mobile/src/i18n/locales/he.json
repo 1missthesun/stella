@@ -1459,7 +1459,11 @@
       "sensitive": "מוצפן מקצה לקצה",
       "sensitiveUnavailable": "המכשיר הזה עוד לא יכול להצפין את זה",
       "unnamedComputer": "מחשב · {id}",
-      "waitingBadge": "ממתינה לך"
+      "waitingBadge": "ממתינה לך",
+      "remember": "לזכור במחשב ששאל",
+      "rememberOn": "נשמר בשם “{label}”. סוכנים ישתמשו בו שוב בלי לשאול אותך.",
+      "rememberOff": "בשימוש פעם אחת ואז נמחק.",
+      "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור."
     }
   },
   "onboarding": {
@@ -2407,16 +2411,23 @@
       "more": "עוד"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "ערכים פרטיים שמורים",
+      "description": "ערכים מבקשות פרטיות שבחרת לזכור, שמורים באחסון המאובטח של המחשב הזה עד שתמחק אותם. סוכנים משתמשים בהם בלי לקרוא אותם אף פעם.",
+      "empty": "אין ערכים פרטיים שמורים במחשב הזה.",
+      "saved": "נשמר {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "לא ניתן לשנות את שם הערך. נסה שוב."
+      },
+      "lastUsed": "שימוש אחרון {used}",
+      "neverUsed": "עדיין לא בשימוש",
+      "rename": "שינוי שם",
+      "renameSave": "שמירה",
+      "renameCancel": "ביטול",
+      "renameLabel": "שם"
     }
   },
   "shell": {
@@ -2872,7 +2883,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "לזכור במחשב הזה",
+      "rememberRelayed": "לזכור במחשב ששאל",
+      "rememberOn": "נשמר בשם “{label}”. סוכנים ישתמשו בו שוב בלי לשאול אותך; אפשר למחוק אותו בכל עת בהגדרות.",
+      "rememberOff": "בשימוש פעם אחת ואז נמחק.",
+      "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור."
     }
   },
   "schedule": {

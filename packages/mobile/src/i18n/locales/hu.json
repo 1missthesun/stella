@@ -1451,7 +1451,11 @@
       "sensitive": "Végpontok közti titkosítás",
       "sensitiveUnavailable": "Ez a készülék még nem tudja titkosítani",
       "unnamedComputer": "Számítógép · {id}",
-      "waitingBadge": "Rád vár"
+      "waitingBadge": "Rád vár",
+      "remember": "Megjegyzés a kérdező számítógépen",
+      "rememberOn": "Mentve „{label}” néven. Az ügynökök újra felhasználják anélkül, hogy újra megkérdeznének.",
+      "rememberOff": "Egyszer használva, majd törölve.",
+      "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "Továbbiak"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Mentett privát értékek",
+      "description": "Privát kérésekből származó értékek, amelyeket megjegyeztetni választottál. A számítógép biztonságos tárolójában maradnak, amíg nem törlöd őket. Az ügynökök úgy használják őket, hogy sosem olvassák el.",
+      "empty": "Ezen a számítógépen nincs mentett privát érték.",
+      "saved": "Mentve: {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Nem sikerült átnevezni az értéket. Próbáld újra."
+      },
+      "lastUsed": "Utoljára használva: {used}",
+      "neverUsed": "Még nem használt",
+      "rename": "Átnevezés",
+      "renameSave": "Mentés",
+      "renameCancel": "Mégse",
+      "renameLabel": "Név"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Megjegyzés ezen a számítógépen",
+      "rememberRelayed": "Megjegyzés a kérdező számítógépen",
+      "rememberOn": "Mentve „{label}” néven. Az ügynökök újra felhasználják anélkül, hogy újra megkérdeznének; bármikor törölheted a Beállításokban.",
+      "rememberOff": "Egyszer használva, majd törölve.",
+      "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet."
     }
   },
   "schedule": {

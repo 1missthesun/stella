@@ -1451,7 +1451,11 @@
       "sensitive": "Krypteret hele vejen",
       "sensitiveUnavailable": "Denne enhed kan ikke kryptere det endnu",
       "unnamedComputer": "Computer · {id}",
-      "waitingBadge": "Venter på dig"
+      "waitingBadge": "Venter på dig",
+      "remember": "Husk på den computer, der spurgte",
+      "rememberOn": "Gemt som “{label}”. Agenter genbruger den uden at spørge dig igen.",
+      "rememberOff": "Brugt én gang og derefter slettet.",
+      "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "Mere"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Gemte private værdier",
+      "description": "Værdier fra private anmodninger, som du valgte at huske. De opbevares i denne computers sikre lager, indtil du sletter dem. Agenter bruger dem uden nogensinde at læse dem.",
+      "empty": "Der er ingen private værdier gemt på denne computer.",
+      "saved": "Gemt {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Værdien kunne ikke omdøbes. Prøv igen."
+      },
+      "lastUsed": "Sidst brugt {used}",
+      "neverUsed": "Ikke brugt endnu",
+      "rename": "Omdøb",
+      "renameSave": "Gem",
+      "renameCancel": "Annuller",
+      "renameLabel": "Navn"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Husk på denne computer",
+      "rememberRelayed": "Husk på den computer, der spurgte",
+      "rememberOn": "Gemt som “{label}”. Agenter genbruger den uden at spørge dig igen; du kan slette den når som helst under Indstillinger.",
+      "rememberOff": "Brugt én gang og derefter slettet.",
+      "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte."
     }
   },
   "schedule": {

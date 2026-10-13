@@ -1443,7 +1443,11 @@
       "sensitive": "Terenkripsi ujung ke ujung",
       "sensitiveUnavailable": "Perangkat ini belum bisa mengenkripsinya",
       "unnamedComputer": "Komputer · {id}",
-      "waitingBadge": "Menunggumu"
+      "waitingBadge": "Menunggumu",
+      "remember": "Ingat di komputer yang meminta",
+      "rememberOn": "Disimpan sebagai “{label}”. Agen akan memakainya lagi tanpa bertanya kepada Anda.",
+      "rememberOff": "Dipakai sekali, lalu dihapus.",
+      "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan."
     }
   },
   "onboarding": {
@@ -2391,16 +2395,23 @@
       "more": "Lainnya"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Nilai pribadi tersimpan",
+      "description": "Nilai dari permintaan pribadi yang Anda pilih untuk diingat, disimpan di penyimpanan aman komputer ini sampai Anda menghapusnya. Agen memakainya tanpa pernah membacanya.",
+      "empty": "Tidak ada nilai pribadi yang tersimpan di komputer ini.",
+      "saved": "Disimpan {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Tidak dapat mengganti nama nilai itu. Coba lagi."
+      },
+      "lastUsed": "Terakhir dipakai {used}",
+      "neverUsed": "Belum pernah dipakai",
+      "rename": "Ganti nama",
+      "renameSave": "Simpan",
+      "renameCancel": "Batal",
+      "renameLabel": "Nama"
     }
   },
   "shell": {
@@ -2838,7 +2849,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Ingat di komputer ini",
+      "rememberRelayed": "Ingat di komputer yang meminta",
+      "rememberOn": "Disimpan sebagai “{label}”. Agen akan memakainya lagi tanpa bertanya kepada Anda; hapus kapan saja di Pengaturan.",
+      "rememberOff": "Dipakai sekali, lalu dihapus.",
+      "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan."
     }
   },
   "schedule": {

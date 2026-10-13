@@ -1459,7 +1459,11 @@
       "sensitive": "Cifrado ponta a ponta",
       "sensitiveUnavailable": "Este dispositivo ainda não consegue cifrar isto",
       "unnamedComputer": "Computador · {id}",
-      "waitingBadge": "Está à tua espera"
+      "waitingBadge": "Está à tua espera",
+      "remember": "Memorizar no computador que pediu",
+      "rememberOn": "Guardado como “{label}”. Os agentes reutilizam-no sem voltar a perguntar.",
+      "rememberOff": "Usado uma vez e depois apagado.",
+      "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado."
     }
   },
   "onboarding": {
@@ -2407,16 +2411,23 @@
       "more": "Mais"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Valores privados guardados",
+      "description": "Valores de pedidos privados que escolheu memorizar, guardados no armazenamento seguro deste computador até os apagar. Os agentes usam-nos sem nunca os ler.",
+      "empty": "Não há valores privados guardados neste computador.",
+      "saved": "Guardado {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Não foi possível mudar o nome desse valor. Tente novamente."
+      },
+      "lastUsed": "Último uso {used}",
+      "neverUsed": "Ainda não usado",
+      "rename": "Mudar o nome",
+      "renameSave": "Guardar",
+      "renameCancel": "Cancelar",
+      "renameLabel": "Nome"
     }
   },
   "shell": {
@@ -2872,7 +2883,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Memorizar neste computador",
+      "rememberRelayed": "Memorizar no computador que pediu",
+      "rememberOn": "Guardado como “{label}”. Os agentes reutilizam-no sem voltar a perguntar; pode apagá-lo a qualquer momento nas Definições.",
+      "rememberOff": "Usado uma vez e depois apagado.",
+      "replacing": "O valor guardado para “{label}” não funcionou. Introduza o correto; substitui o que estava guardado."
     }
   },
   "schedule": {

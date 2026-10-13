@@ -1459,7 +1459,11 @@
       "sensitive": "Criptat cap-coadă",
       "sensitiveUnavailable": "Acest dispozitiv nu poate încă să cripteze asta",
       "unnamedComputer": "Calculator · {id}",
-      "waitingBadge": "Te așteaptă"
+      "waitingBadge": "Te așteaptă",
+      "remember": "Ține minte pe computerul care a cerut",
+      "rememberOn": "Salvat ca „{label}”. Agenții îl refolosesc fără să te mai întrebe.",
+      "rememberOff": "Folosit o dată, apoi șters.",
+      "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată."
     }
   },
   "onboarding": {
@@ -2407,16 +2411,23 @@
       "more": "Mai mult"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Valori private salvate",
+      "description": "Valori din cereri private pe care ai ales să le ții minte, păstrate în spațiul de stocare securizat al acestui computer până le ștergi. Agenții le folosesc fără să le citească vreodată.",
+      "empty": "Nu există valori private salvate pe acest computer.",
+      "saved": "Salvat {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Valoarea nu a putut fi redenumită. Încearcă din nou."
+      },
+      "lastUsed": "Folosit ultima dată {used}",
+      "neverUsed": "Nefolosit încă",
+      "rename": "Redenumește",
+      "renameSave": "Salvează",
+      "renameCancel": "Anulează",
+      "renameLabel": "Nume"
     }
   },
   "shell": {
@@ -2872,7 +2883,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Ține minte pe acest computer",
+      "rememberRelayed": "Ține minte pe computerul care a cerut",
+      "rememberOn": "Salvat ca „{label}”. Agenții îl refolosesc fără să te mai întrebe; îl poți șterge oricând din Setări.",
+      "rememberOff": "Folosit o dată, apoi șters.",
+      "replacing": "Valoarea salvată pentru „{label}” nu a funcționat. Introdu-o pe cea corectă; o va înlocui pe cea salvată."
     }
   },
   "schedule": {

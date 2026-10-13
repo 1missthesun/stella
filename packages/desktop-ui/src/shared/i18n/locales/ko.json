@@ -1443,7 +1443,11 @@
       "sensitive": "종단 간 암호화",
       "sensitiveUnavailable": "이 기기에서는 아직 암호화할 수 없어요",
       "unnamedComputer": "컴퓨터 · {id}",
-      "waitingBadge": "기다리고 있어요"
+      "waitingBadge": "기다리고 있어요",
+      "remember": "요청한 컴퓨터에 기억하기",
+      "rememberOn": "“{label}”(으)로 저장했어요. 에이전트가 다시 묻지 않고 재사용해요.",
+      "rememberOff": "한 번 사용한 뒤 삭제돼요.",
+      "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요."
     }
   },
   "onboarding": {
@@ -2391,16 +2395,23 @@
       "more": "더 보기"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "저장된 비공개 값",
+      "description": "비공개 요청에서 기억하기로 선택한 값으로, 삭제할 때까지 이 컴퓨터의 보안 저장소에 보관돼요. 에이전트는 값을 읽지 않고 사용해요.",
+      "empty": "이 컴퓨터에 저장된 비공개 값이 없어요.",
+      "saved": "저장: {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "값의 이름을 바꾸지 못했어요. 다시 시도해 주세요."
+      },
+      "lastUsed": "마지막 사용: {used}",
+      "neverUsed": "아직 사용 안 함",
+      "rename": "이름 바꾸기",
+      "renameSave": "저장",
+      "renameCancel": "취소",
+      "renameLabel": "이름"
     }
   },
   "shell": {
@@ -2838,7 +2849,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "이 컴퓨터에 기억하기",
+      "rememberRelayed": "요청한 컴퓨터에 기억하기",
+      "rememberOn": "“{label}”(으)로 저장했어요. 에이전트가 다시 묻지 않고 재사용해요. 설정에서 언제든지 삭제할 수 있어요.",
+      "rememberOff": "한 번 사용한 뒤 삭제돼요.",
+      "replacing": "“{label}”에 저장된 값이 작동하지 않았어요. 올바른 값을 입력하면 저장된 값을 대체해요."
     }
   },
   "schedule": {

@@ -12,6 +12,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -22,6 +23,7 @@ import type {
   UserAskAnswerFieldValue,
   UserAskSecureInputDetail,
 } from "@stella/contracts/user-ask";
+import { userAskOffersRemember } from "@stella/contracts/user-ask";
 import {
   EMPTY_USER_ASK_DRAFT,
   nextUnansweredIndex,
@@ -742,6 +744,8 @@ function SecureInputBody({
   const [values, setValues] = useState<Record<string, string>>({});
   const [revealed, setRevealed] = useState<Record<string, boolean>>({});
   const [issue, setIssue] = useState<string | null>(null);
+  const offersRemember = userAskOffersRemember(detail);
+  const [remember, setRemember] = useState(true);
 
   const sealable = canSealUserAskValue(ask.recipientKey);
   const originLabel = useUserAskOriginLabel(ask.originDeviceId);
@@ -794,6 +798,7 @@ function SecureInputBody({
           revision: ask.revision,
           kind: "fields",
           fields: payload,
+          ...(offersRemember ? { remember } : {}),
         }),
       "mobile.userAsk.answerFailed",
     );
@@ -802,6 +807,8 @@ function SecureInputBody({
     ask.recipientKey,
     ask.revision,
     detail.fields,
+    offersRemember,
+    remember,
     onAnswer,
     sealable,
     t,
@@ -840,6 +847,11 @@ function SecureInputBody({
 
   return (
     <View style={styles.body}>
+      {detail.save?.replacing ? (
+        <Text style={styles.rememberHint}>
+          {t("mobile.userAsk.replacing", { label: detail.save.label })}
+        </Text>
+      ) : null}
       {detail.fields.map((field) => {
         const value = values[field.id] ?? "";
         const show = revealed[field.id] === true;
@@ -956,6 +968,29 @@ function SecureInputBody({
           </View>
         );
       })}
+
+      {offersRemember ? (
+        <View style={styles.rememberRow}>
+          <View style={styles.rememberText}>
+            <Text style={styles.rememberLabel}>
+              {t("mobile.userAsk.remember")}
+            </Text>
+            <Text style={styles.rememberHint}>
+              {remember
+                ? t("mobile.userAsk.rememberOn", {
+                    label: detail.save?.label ?? "",
+                  })
+                : t("mobile.userAsk.rememberOff")}
+            </Text>
+          </View>
+          <Switch
+            accessibilityLabel={t("mobile.userAsk.remember")}
+            disabled={busy}
+            onValueChange={setRemember}
+            value={remember}
+          />
+        </View>
+      ) : null}
 
       {issue ? <Text style={styles.issue}>{issue}</Text> : null}
 
@@ -1403,6 +1438,26 @@ const makeStyles = (colors: Colors) =>
       height: 38,
       justifyContent: "center",
       width: 32,
+    },
+    rememberHint: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.regular,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    rememberLabel: {
+      color: colors.text,
+      fontFamily: fonts.sans.medium,
+      fontSize: 15,
+    },
+    rememberRow: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+    },
+    rememberText: {
+      flex: 1,
+      gap: 2,
     },
     sensitiveRow: {
       alignItems: "center",

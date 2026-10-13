@@ -1451,7 +1451,11 @@
       "sensitive": "एंड-टू-एंड एन्क्रिप्टेड",
       "sensitiveUnavailable": "यह डिवाइस इसे अभी एन्क्रिप्ट नहीं कर सकता",
       "unnamedComputer": "कंप्यूटर · {id}",
-      "waitingBadge": "आपका इंतज़ार है"
+      "waitingBadge": "आपका इंतज़ार है",
+      "remember": "पूछने वाले कंप्यूटर पर याद रखें",
+      "rememberOn": "“{label}” के नाम से सहेजा गया। एजेंट आपसे दोबारा पूछे बिना इसे फिर इस्तेमाल करेंगे।",
+      "rememberOff": "एक बार इस्तेमाल हुआ, फिर हटा दिया गया।",
+      "replacing": "“{label}” के लिए सहेजा गया मान काम नहीं किया। सही मान डालें; यह सहेजे गए मान की जगह ले लेगा।"
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "और"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "सहेजे गए निजी मान",
+      "description": "निजी अनुरोधों के वे मान जिन्हें आपने याद रखने के लिए चुना, इस कंप्यूटर के सुरक्षित स्टोर में तब तक रखे जाते हैं जब तक आप उन्हें हटा न दें। एजेंट उन्हें कभी पढ़े बिना इस्तेमाल करते हैं।",
+      "empty": "इस कंप्यूटर पर कोई निजी मान सहेजा नहीं गया है।",
+      "saved": "सहेजा गया {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "इस मान का नाम नहीं बदला जा सका। फिर से कोशिश करें।"
+      },
+      "lastUsed": "आख़िरी बार इस्तेमाल {used}",
+      "neverUsed": "अभी तक इस्तेमाल नहीं हुआ",
+      "rename": "नाम बदलें",
+      "renameSave": "सहेजें",
+      "renameCancel": "रद्द करें",
+      "renameLabel": "नाम"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "इस कंप्यूटर पर याद रखें",
+      "rememberRelayed": "पूछने वाले कंप्यूटर पर याद रखें",
+      "rememberOn": "“{label}” के नाम से सहेजा गया। एजेंट आपसे दोबारा पूछे बिना इसे फिर इस्तेमाल करेंगे; आप इसे कभी भी सेटिंग्स में हटा सकते हैं।",
+      "rememberOff": "एक बार इस्तेमाल हुआ, फिर हटा दिया गया।",
+      "replacing": "“{label}” के लिए सहेजा गया मान काम नहीं किया। सही मान डालें; यह सहेजे गए मान की जगह ले लेगा।"
     }
   },
   "schedule": {

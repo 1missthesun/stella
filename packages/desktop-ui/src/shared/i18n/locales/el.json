@@ -1451,7 +1451,11 @@
       "sensitive": "Κρυπτογραφημένο από άκρο σε άκρο",
       "sensitiveUnavailable": "Αυτή η συσκευή δεν μπορεί ακόμη να το κρυπτογραφήσει",
       "unnamedComputer": "Υπολογιστής · {id}",
-      "waitingBadge": "Περιμένει εσένα"
+      "waitingBadge": "Περιμένει εσένα",
+      "remember": "Απομνημόνευση στον υπολογιστή που το ζήτησε",
+      "rememberOn": "Αποθηκεύτηκε ως «{label}». Οι πράκτορες το ξαναχρησιμοποιούν χωρίς να σας ρωτήσουν ξανά.",
+      "rememberOff": "Χρησιμοποιείται μία φορά και μετά διαγράφεται.",
+      "replacing": "Η αποθηκευμένη τιμή για «{label}» δεν λειτούργησε. Εισαγάγετε τη σωστή· θα αντικαταστήσει την αποθηκευμένη."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "Περισσότερα"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Αποθηκευμένες ιδιωτικές τιμές",
+      "description": "Τιμές από ιδιωτικά αιτήματα που επιλέξατε να απομνημονευτούν, φυλαγμένες στον ασφαλή χώρο αποθήκευσης αυτού του υπολογιστή μέχρι να τις διαγράψετε. Οι πράκτορες τις χρησιμοποιούν χωρίς ποτέ να τις διαβάζουν.",
+      "empty": "Δεν υπάρχουν αποθηκευμένες ιδιωτικές τιμές σε αυτόν τον υπολογιστή.",
+      "saved": "Αποθηκεύτηκε {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Δεν ήταν δυνατή η μετονομασία της τιμής. Δοκιμάστε ξανά."
+      },
+      "lastUsed": "Τελευταία χρήση {used}",
+      "neverUsed": "Δεν έχει χρησιμοποιηθεί ακόμη",
+      "rename": "Μετονομασία",
+      "renameSave": "Αποθήκευση",
+      "renameCancel": "Ακύρωση",
+      "renameLabel": "Όνομα"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Απομνημόνευση σε αυτόν τον υπολογιστή",
+      "rememberRelayed": "Απομνημόνευση στον υπολογιστή που το ζήτησε",
+      "rememberOn": "Αποθηκεύτηκε ως «{label}». Οι πράκτορες το ξαναχρησιμοποιούν χωρίς να σας ρωτήσουν ξανά· μπορείτε να το διαγράψετε όποτε θέλετε από τις Ρυθμίσεις.",
+      "rememberOff": "Χρησιμοποιείται μία φορά και μετά διαγράφεται.",
+      "replacing": "Η αποθηκευμένη τιμή για «{label}» δεν λειτούργησε. Εισαγάγετε τη σωστή· θα αντικαταστήσει την αποθηκευμένη."
     }
   },
   "schedule": {

@@ -1443,7 +1443,11 @@
       "sensitive": "端到端加密",
       "sensitiveUnavailable": "此设备暂时无法加密",
       "unnamedComputer": "电脑 · {id}",
-      "waitingBadge": "正在等你"
+      "waitingBadge": "正在等你",
+      "remember": "在提问的那台电脑上记住",
+      "rememberOn": "已保存为「{label}」。智能体之后会直接复用，不再问你。",
+      "rememberOff": "仅使用一次，然后删除。",
+      "replacing": "为「{label}」保存的值无效。请输入正确的值，它会替换已保存的值。"
     }
   },
   "onboarding": {
@@ -2391,16 +2395,23 @@
       "more": "更多"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "已保存的私密值",
+      "description": "你在私密请求中选择记住的值，保存在这台电脑的安全存储中，直到你删除为止。智能体使用它们，但从不读取。",
+      "empty": "这台电脑上没有保存私密值。",
+      "saved": "保存于 {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "无法重命名该值，请重试。"
+      },
+      "lastUsed": "上次使用 {used}",
+      "neverUsed": "尚未使用",
+      "rename": "重命名",
+      "renameSave": "保存",
+      "renameCancel": "取消",
+      "renameLabel": "名称"
     }
   },
   "shell": {
@@ -2838,7 +2849,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "在这台电脑上记住",
+      "rememberRelayed": "在提问的那台电脑上记住",
+      "rememberOn": "已保存为「{label}」。智能体之后会直接复用，不再问你；你可以随时在设置中删除。",
+      "rememberOff": "仅使用一次，然后删除。",
+      "replacing": "为「{label}」保存的值无效。请输入正确的值，它会替换已保存的值。"
     }
   },
   "schedule": {

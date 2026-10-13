@@ -1451,7 +1451,11 @@
       "sensitive": "Ende-zu-Ende verschlüsselt",
       "sensitiveUnavailable": "Dieses Gerät kann das noch nicht verschlüsseln",
       "unnamedComputer": "Computer · {id}",
-      "waitingBadge": "Wartet auf dich"
+      "waitingBadge": "Wartet auf dich",
+      "remember": "Auf dem anfragenden Computer merken",
+      "rememberOn": "Gespeichert als „{label}“. Agenten verwenden den Wert wieder, ohne dich erneut zu fragen.",
+      "rememberOff": "Einmal verwendet, dann gelöscht.",
+      "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten."
     }
   },
   "onboarding": {
@@ -2399,16 +2403,23 @@
       "more": "Mehr"
     },
     "secureValues": {
-      "title": "Private values on this computer",
-      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
-      "empty": "No private values are stored.",
-      "saved": "Saved {saved} · deleted automatically {expires}",
+      "title": "Gespeicherte private Werte",
+      "description": "Werte aus privaten Anfragen, die du dir merken lassen wolltest. Sie bleiben im sicheren Speicher dieses Computers, bis du sie löschst. Agenten verwenden sie, ohne sie je zu lesen.",
+      "empty": "Auf diesem Computer sind keine privaten Werte gespeichert.",
+      "saved": "Gespeichert {saved}",
       "delete": "Delete",
       "deleteAll": "Delete all",
       "errors": {
         "load": "Couldn’t load stored values.",
-        "delete": "Couldn’t delete that value. Try again."
-      }
+        "delete": "Couldn’t delete that value. Try again.",
+        "rename": "Der Wert konnte nicht umbenannt werden. Versuch es noch einmal."
+      },
+      "lastUsed": "Zuletzt verwendet {used}",
+      "neverUsed": "Noch nicht verwendet",
+      "rename": "Umbenennen",
+      "renameSave": "Speichern",
+      "renameCancel": "Abbrechen",
+      "renameLabel": "Name"
     }
   },
   "shell": {
@@ -2856,7 +2867,12 @@
       "declineReason": "Reason for declining",
       "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
       "declineBack": "Back",
-      "declineConfirm": "Decline request"
+      "declineConfirm": "Decline request",
+      "remember": "Auf diesem Computer merken",
+      "rememberRelayed": "Auf dem anfragenden Computer merken",
+      "rememberOn": "Gespeichert als „{label}“. Agenten verwenden den Wert wieder, ohne dich erneut zu fragen; du kannst ihn jederzeit in den Einstellungen löschen.",
+      "rememberOff": "Einmal verwendet, dann gelöscht.",
+      "replacing": "Der gespeicherte Wert für „{label}“ hat nicht funktioniert. Gib den richtigen ein; er ersetzt den gespeicherten."
     }
   },
   "schedule": {

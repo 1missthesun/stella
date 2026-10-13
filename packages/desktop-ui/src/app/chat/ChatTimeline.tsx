@@ -73,6 +73,7 @@ import {
 } from "@/features/chat/lib/chat-timeline-items";
 import { timestampHeaders } from "@/features/chat/lib/message-time-labels";
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
+import { shownAgentLabelIds } from "@/features/chat/lib/assistant-row-content";
 import type { AgentModelConfigsByThread } from "@/features/chat/hooks/use-agent-model-configs";
 import { LoaderCircle } from "@/ui/icons";
 import { notifyChatContentGrowth } from "@/shell/chat-scroll-follow";
@@ -215,7 +216,7 @@ const hasReplyPreview = (row: EventRowViewModel): boolean =>
   row.kind === "assistant" &&
   Boolean(
     row.replyRefs?.some((ref) => ref.kind === "message") ||
-      row.agentLabelIds?.length,
+      shownAgentLabelIds(row).length,
   );
 
 const gapAfterRow = (

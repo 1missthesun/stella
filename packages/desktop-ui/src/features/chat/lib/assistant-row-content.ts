@@ -4,6 +4,16 @@ import type {
 } from "@/features/chat/conversation-row-types";
 
 /**
+ * Agent pills (the task cards quoted above a reply when Stella starts,
+ * continues or relays an agent, with their connector line). Hidden for now;
+ * flipping this back restores them. The rows still carry `agentLabelIds`.
+ */
+export const SHOW_AGENT_CARDS = false;
+
+export const shownAgentLabelIds = (row: AssistantRowViewModel): string[] =>
+  SHOW_AGENT_CARDS ? (row.agentLabelIds ?? []) : [];
+
+/**
  * Whether an assistant row paints ANYTHING on screen.
  *
  * Single source of truth shared by:
@@ -23,7 +33,7 @@ import type {
 export const assistantRowHasVisibleContent = (
   row: AssistantRowViewModel,
 ): boolean =>
-  assistantRowHasOwnContent(row) || (row.agentLabelIds?.length ?? 0) > 0;
+  assistantRowHasOwnContent(row) || shownAgentLabelIds(row).length > 0;
 
 /**
  * Content a row paints apart from its agent pill. Spawn and completion rows

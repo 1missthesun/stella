@@ -87,7 +87,10 @@ import {
 } from "@/app/chat/ComposerContextChips";
 import { useT } from "@/shared/i18n";
 import { eventRowEqual } from "@/features/chat/lib/row-equality";
-import { assistantRowHasVisibleContent } from "@/features/chat/lib/assistant-row-content";
+import {
+  assistantRowHasVisibleContent,
+  shownAgentLabelIds,
+} from "@/features/chat/lib/assistant-row-content";
 import type {
   AssistantRowViewModel,
   UserRowViewModel,
@@ -642,7 +645,7 @@ export const AssistantMessageRow = memo(
     const hasText = text.trim().length > 0;
     const hasMapArtifacts = (row.mapArtifacts?.length ?? 0) > 0;
     const hasVoiceSession = Boolean(row.voiceSession);
-    const labelIds = row.agentLabelIds ?? [];
+    const labelIds = shownAgentLabelIds(row);
     const pillCompletions = [
       ...new Map(
         (row.agentCompletion?.sections ?? [])

@@ -119,10 +119,12 @@ import { stellaFileChatArtifact } from "../lib/stella-file-links";
 import { useCatchUpIndicatorVisible } from "../lib/catch-up-indicator";
 import { ChatHistoryPaging } from "../lib/chat-history-paging";
 import {
+  isStandInArtifactRow,
   markPrependedMessagesSeen,
   shouldAnimateMessageEntry,
   visibleChatMessages,
 } from "../lib/message-row-identity";
+import { SHOW_AGENT_CARDS } from "../lib/agent-cards";
 import { RealtimeVoiceOverlay } from "./RealtimeVoiceOverlay";
 import {
   getVoiceEnabled,
@@ -733,8 +735,13 @@ export function ChatPane({
     [messages, replyContexts, onOpenArtifact],
   );
   const quoteCarry = useMemo(
-    () => carryCompletionQuotes(visibleMessages),
-    [visibleMessages],
+    () =>
+      carryCompletionQuotes(
+        SHOW_AGENT_CARDS
+          ? visibleMessages
+          : messages.filter((message) => !isStandInArtifactRow(message)),
+      ),
+    [messages, visibleMessages],
   );
   const { questions: openQuestionAsks, secureInput: openSecureAsk } =
     useConversationUserAsks(conversationId);
@@ -1826,7 +1833,7 @@ export function ChatPane({
             receiptLabel={receipt?.id === item.id ? receipt.label : null}
             carriedQuotes={quoteCarry.carried.get(item.id)}
             quotesForwarded={quoteCarry.forwarded.has(item.id)}
-            hideAgentChips={hiddenAgentChipIds.has(item.id)}
+            hideAgentChips={!SHOW_AGENT_CARDS || hiddenAgentChipIds.has(item.id)}
           />
         </MessageEntry>
       );

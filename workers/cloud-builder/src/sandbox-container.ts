@@ -1150,13 +1150,17 @@ export class Sandbox extends DurableObject<Env> {
       typeof content === "string" && encoding === "base64"
         ? base64ToBytes(content)
         : content;
+    const parent = path.slice(0, path.lastIndexOf("/")) || "/";
+    // A stream can be read once, and a failed write may already have taken
+    // it: its folder is made first, so the one write gets every byte.
+    if (typeof bytes !== "string" && !(bytes instanceof Uint8Array)) {
+      await this.#fs.mkdir(parent, { recursive: true });
+    }
     try {
       await this.#fs.writeFile(path, bytes);
     } catch (error) {
-      // 0.12 created missing parents. The destination opens before a stream
-      // is read, so a stream body is still unread when this retries.
+      // 0.12 created missing parents.
       if (!SandboxFileError.is(error) || error.code !== "ENOENT") throw error;
-      const parent = path.slice(0, path.lastIndexOf("/")) || "/";
       await this.#fs.mkdir(parent, { recursive: true });
       await this.#fs.writeFile(path, bytes);
     }

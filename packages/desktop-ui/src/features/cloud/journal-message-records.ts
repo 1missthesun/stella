@@ -322,6 +322,7 @@ const textPayload = (
   text: string,
   userMessageId?: string,
   replyRefs?: ReplyRef[],
+  followedByToolCall?: boolean,
 ): Record<string, unknown> => {
   const voiceSession = asRecord(record.payload.voiceSession);
   const reminder = asRecord(record.payload.reminder);
@@ -332,8 +333,13 @@ const textPayload = (
     ...(displayContext ? { context: displayContext } : {}),
     ...(voiceSession ? { voiceSession } : {}),
     ...(reminder ? { reminder } : {}),
-    ...(replyRefs && replyRefs.length > 0
-      ? { runtime: { replyRefs } }
+    ...((replyRefs && replyRefs.length > 0) || followedByToolCall
+      ? {
+          runtime: {
+            ...(replyRefs && replyRefs.length > 0 ? { replyRefs } : {}),
+            ...(followedByToolCall ? { followedByToolCall: true } : {}),
+          },
+        }
       : {}),
   };
   return {
@@ -505,6 +511,10 @@ export const journalRecordsToMessageRecords = (
         // The trailing `refs` fence is model-facing (it stays in the journal
         // so the model sees its own citations); the user sees chips instead.
         const { text, refs } = splitMessageReplyRefs(record.payload);
+        // Text written before a tool call is a preamble, not the turn's answer.
+        const followedByToolCall =
+          record.payload.followedByToolCall === true ||
+          contentBlocks(record.payload).some((block) => block.type === "toolCall");
         if (text) {
           events.push({
             _id: `cloud:${turnId}:message:${record.seq}`,
@@ -521,6 +531,7 @@ export const journalRecordsToMessageRecords = (
                 agentTitles,
                 messageId: messageEventId,
               }),
+              followedByToolCall,
             ),
           });
         }

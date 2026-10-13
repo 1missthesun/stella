@@ -105,6 +105,14 @@ export function InlineWorkingIndicator({
   const handoffController = useReplyHandoffController();
   const renderShellRef = useRef(renderShell);
   renderShellRef.current = renderShell;
+  // A reply that took the indicator's line keeps it: the indicator does not
+  // come back under that reply while the same stretch of work winds down
+  // (the run-end signal can trail the reply). Starting a new tool, the run
+  // going idle, or a new user message lets it show again.
+  const [replyHeld, setReplyHeld] = useState(false);
+  const heldToolIdRef = useRef<string | undefined>(undefined);
+  const runningToolIdRef = useRef(runningToolId);
+  runningToolIdRef.current = runningToolId;
 
   useEffect(() => {
     if (!handoffController) return;
@@ -118,7 +126,10 @@ export function InlineWorkingIndicator({
         setRenderShell(false);
         setLeaving(false);
         setEntering(false);
+        heldToolIdRef.current = runningToolIdRef.current;
+        setReplyHeld(true);
       },
+      release: () => setReplyHeld(false),
       exit: () => {
         if (!renderShellRef.current || exitTimerRef.current !== null) return;
         setLeaving(true);
@@ -130,6 +141,12 @@ export function InlineWorkingIndicator({
       },
     });
   }, [handoffController]);
+  useEffect(() => {
+    if (!replyHeld) return;
+    if (!active || (runningToolId && runningToolId !== heldToolIdRef.current)) {
+      setReplyHeld(false);
+    }
+  }, [active, replyHeld, runningToolId]);
   const activatedAtRef = useRef<number | null>(null);
   const wasActiveRef = useRef(false);
   const showingThinking = active && !runningTool;
@@ -179,6 +196,10 @@ export function InlineWorkingIndicator({
       }
       wasActiveRef.current = true;
       setLeaving(false);
+      if (replyHeld) {
+        clearShowTimer();
+        return;
+      }
       if (renderShell || showTimerRef.current !== null) return;
       showTimerRef.current = window.setTimeout(() => {
         showTimerRef.current = null;
@@ -229,7 +250,14 @@ export function InlineWorkingIndicator({
     return () => {
       clearTimer();
     };
-  }, [active, renderShell, exitImmediately, handoff, handoffController]);
+  }, [
+    active,
+    renderShell,
+    replyHeld,
+    exitImmediately,
+    handoff,
+    handoffController,
+  ]);
 
   useEffect(
     () => () => {

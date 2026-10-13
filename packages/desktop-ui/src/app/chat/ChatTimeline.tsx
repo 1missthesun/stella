@@ -415,6 +415,19 @@ export const ChatTimeline = memo(function ChatTimeline({
     const frame = requestAnimationFrame(() => notifyChatContentGrowth());
     return () => cancelAnimationFrame(frame);
   }, [tailItemId]);
+  // A message the user sends after a reply starts new work, which the
+  // indicator may show for again.
+  const tailUserRowId = useMemo(() => {
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      if (row?.kind === "assistant") return null;
+      if (row?.kind === "user") return row.id;
+    }
+    return null;
+  }, [rows]);
+  useEffect(() => {
+    if (tailUserRowId) replyHandoffController.userMessageSent();
+  }, [replyHandoffController, tailUserRowId]);
   const renderedMessageRowCount = listItems.reduce(
     (count, item) => count + (item.type === "message" ? 1 : 0),
     0,

@@ -13,6 +13,19 @@ import {
 import { handleTurnStateOwnerRoute } from "./turn-state-owner-routes.js";
 import { json } from "./http/response.js";
 
+
+/** JSON with object keys sorted, so equal records compare equal whatever order built them. */
+const canonicalJson = (value: unknown): string =>
+  JSON.stringify(value, (_key, item: unknown) =>
+    item && typeof item === "object" && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.entries(item as Record<string, unknown>).sort(([a], [b]) =>
+            a < b ? -1 : a > b ? 1 : 0,
+          ),
+        )
+      : item,
+  );
+
 export const HEADER_OWNER_FENCE_ID = "x-stella-owner-fence-id";
 export const OWNER_FENCE_LEASE_TTL_MS = 30 * 60_000;
 
@@ -537,7 +550,7 @@ class DurableObjectOwnerFenceHost implements OwnerFenceHost {
       }
       // The owner gate runs this on every alarm; rewriting an unchanged
       // record cost a row write each time.
-      if (JSON.stringify(mirror.active) === JSON.stringify(fence.active)) {
+      if (canonicalJson(mirror.active) === canonicalJson(fence.active ?? {})) {
         return;
       }
       fence.active = mirror.active;

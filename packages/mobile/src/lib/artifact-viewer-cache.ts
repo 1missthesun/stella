@@ -2,7 +2,8 @@ import type { ArtifactMediaFile } from "./artifact-media-file";
 
 /**
  * Files the viewer has already loaded this session, so reopening one shows it
- * at once instead of fetching it again. Bounded by entry count and by the
+ * at once while the viewer rereads it in the background (files change in
+ * place; an entry is only a first paint, never the truth). Bounded by entry count and by the
  * bytes of the cache files it owns; evicted entries delete their files.
  */
 
@@ -16,6 +17,7 @@ type Entry<T> = {
   fileBytes: number;
   textChars: number;
   expiresAt: number | null;
+  revision: string | null;
 };
 
 const entries = new Map<string, Entry<unknown>>();
@@ -56,7 +58,7 @@ const trim = () => {
 export function cachedViewerEntry<T>(
   key: string | null,
   stillValid: (value: T) => boolean = () => true,
-): { value: T } | null {
+): { value: T; revision: string | null } | null {
   if (!key) return null;
   const entry = entries.get(key) as Entry<T> | undefined;
   if (!entry) return null;
@@ -69,7 +71,7 @@ export function cachedViewerEntry<T>(
   }
   entries.delete(key);
   entries.set(key, entry);
-  return { value: entry.value };
+  return { value: entry.value, revision: entry.revision };
 }
 
 /**
@@ -84,6 +86,8 @@ export function storeViewerEntry<T>(
     fileBytes?: number;
     textChars?: number;
     expiresAt?: number | null;
+    /** What the viewer compares on reread when the value alone can't tell. */
+    revision?: string | null;
   } = {},
 ): boolean {
   const fileBytes = options.file ? Math.max(0, options.fileBytes ?? 0) : 0;
@@ -98,6 +102,7 @@ export function storeViewerEntry<T>(
     fileBytes,
     textChars,
     expiresAt: options.expiresAt ?? null,
+    revision: options.revision ?? null,
   });
   trim();
   return entries.has(key);

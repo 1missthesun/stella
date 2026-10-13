@@ -419,8 +419,6 @@ const imageBase64 = async (uri: string): Promise<string> => {
   return await new File(await sharedImageFile(uri)).base64();
 };
 
-const withoutQuery = (value: string): string => value.split(/[?#]/)[0] ?? value;
-
 const viewerCacheKey = (
   artifact: ChatArtifact,
   preferDeviceId: string | null,
@@ -432,9 +430,9 @@ const viewerCacheKey = (
   else if (payload.kind === "office") target = `office:${payload.previewRef.sessionId}`;
   else if (payload.kind === "pdf" && payload.localUri) target = payload.localUri;
   else if (payload.kind === "media" && payload.asset.kind === "text") return null;
-  else if (payload.kind === "source-diff") {
-    target = `${payload.filePath}#${payload.patch?.length ?? 0}`;
-  } else target = artifactPrimaryFilePath(payload);
+  // A diff that carries its patch is already in memory; nothing to cache.
+  else if (payload.kind === "source-diff" && payload.patch) return null;
+  else target = artifactPrimaryFilePath(payload);
   if (!target) return null;
   if (target.startsWith("data:")) target = `data:${artifact.id}:${target.length}`;
   const subKind = payload.kind === "media" ? payload.asset.kind : "";
@@ -442,7 +440,7 @@ const viewerCacheKey = (
     artifact.conversationId,
     payload.kind,
     subKind,
-    withoutQuery(target),
+    target,
     preferDeviceId ?? "",
     theme,
   ].join("|");
@@ -465,6 +463,24 @@ const loadedStillThere = (loaded: LoadedArtifact): boolean => {
   } catch {
     return false;
   }
+};
+
+/**
+ * Whether a reread shows the same thing as the cached load, so the viewer
+ * keeps what is on screen instead of re-rendering it. Text and documents
+ * compare by content; files and links by their revision (a URI, or the size
+ * and modification time of a file the viewer wrote).
+ */
+const sameLoad = (
+  cached: { value: LoadedArtifact; revision: string | null },
+  next: LoadedArtifact,
+  nextRevision: string | null,
+): boolean => {
+  const value = cached.value;
+  if (value.kind !== next.kind) return false;
+  if ("html" in value && "html" in next) return value.html === next.html;
+  if ("text" in value && "text" in next) return value.text === next.text;
+  return cached.revision !== null && cached.revision === nextRevision;
 };
 
 const fileSize = (uri: string): number => {
@@ -827,8 +843,10 @@ export function ArtifactViewerContent({
     }
   }, [canvas, canvasShare, copy, loaded, localPdf, shareFile, sharing]);
 
+  // A cached load paints at once, but the file may have changed since (an
+  // agent rewrites the same path), so the viewer always rereads it and swaps
+  // the new content in only when it differs.
   useEffect(() => {
-    if (cachedEntry) return;
     const settled = resultRef.current;
     if (settled?.loaded && cacheKey !== null && settled.key === cacheKey) return;
     let cancelled = false;
@@ -837,6 +855,8 @@ export function ArtifactViewerContent({
     // cache takes them over when it keeps the load; otherwise they live only
     // as long as this artifact is on screen.
     let materialized: ArtifactMediaFile | null = null;
+    // The modification time of the computer file this load read, when known.
+    let sourceModifiedAt: number | null = null;
 
     const materialize = (
       bytes: Uint8Array,
@@ -958,6 +978,8 @@ export function ArtifactViewerContent({
             ? new Error("This file is no longer available.")
             : caught;
         });
+        sourceModifiedAt =
+          source.kind === "device" ? (source.stat?.modifiedAt ?? null) : null;
         if (linkedSourceIsFolder(source)) {
           return {
             kind: "folder" as const,
@@ -1180,13 +1202,25 @@ export function ArtifactViewerContent({
     void load()
       .then((next: LoadedArtifact) => {
         if (cancelled) return;
+        const uri = loadedUri(next);
+        const fileBytes = materialized ? fileSize(materialized.uri) : 0;
+        const revision = materialized
+          ? `file:${fileBytes}:${sourceModifiedAt ?? ""}`
+          : uri;
+        if (cachedEntry && sameLoad(cachedEntry, next, revision)) {
+          // Unchanged: keep the cached load (and its file) on screen.
+          materialized?.remove();
+          materialized = null;
+          setResult({ artifact, key: cacheKey, loaded: cachedEntry.value, error: null });
+          return;
+        }
         if (cacheKey !== null && next.kind !== "folder") {
-          const uri = loadedUri(next);
           const owned = storeViewerEntry(cacheKey, next, {
             file: materialized,
-            fileBytes: materialized ? fileSize(materialized.uri) : 0,
+            fileBytes,
             textChars: loadedTextChars(next),
             expiresAt: uri && /^https?:/i.test(uri) ? cloudDriveUrlExpiry(uri) : null,
+            revision,
           });
           if (owned) materialized = null;
         }
@@ -1194,6 +1228,8 @@ export function ArtifactViewerContent({
       })
       .catch((caught: unknown) => {
         if (cancelled) return;
+        // A failed reread (computer offline, say) keeps the cached load.
+        if (cachedEntry) return;
         setResult({
           artifact,
           key: cacheKey,

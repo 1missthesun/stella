@@ -473,13 +473,26 @@ const runHomeEnvironment = (run) => {
   };
 };
 
-const seedDataDir = (dataDir) => {
+/**
+ * A run that borrows Claude Code exists to drive real Claude Code turns,
+ * which spend the user's own Claude quota: start it on the Claude Code
+ * engine with Haiku, not the account's best model.
+ */
+const VERIFY_CLAUDE_CODE_MODEL = "haiku";
+
+const seedDataDir = (dataDir, { claudeCode = false } = {}) => {
   mkdirSync(dataDir, { recursive: true });
   writeJson(path.join(dataDir, "ui-state.json"), {
     "stella-onboarding-complete": "true",
   });
   writeJson(path.join(dataDir, "preferences.json"), {
     onboardingCompleted: true,
+    ...(claudeCode
+      ? {
+          agentRuntimeEngine: "claude_code_local",
+          claudeCodeModel: VERIFY_CLAUDE_CODE_MODEL,
+        }
+      : {}),
   });
 };
 
@@ -981,7 +994,7 @@ const cmdLaunch = async (options) => {
     "electron-user-data",
   );
   mkdirSync(userDataDir, { recursive: true });
-  seedDataDir(dataDir);
+  seedDataDir(dataDir, { claudeCode: Boolean(claudeLogin) });
   const providerHomes = {
     CLAUDE_CONFIG_DIR: path.join(runDir, "provider-homes", "claude"),
     CODEX_HOME: path.join(runDir, "provider-homes", "codex"),

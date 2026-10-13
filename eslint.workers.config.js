@@ -8,7 +8,7 @@ export default tseslint.config({
     "workers/device-code-fixture/src/**/*.ts",
     "workers/model-gateway/src/**/*.ts",
     "workers/canvas-share/src/**/*.ts",
-    "workers/preview-host/src/**/*.ts",
+    "workers/sites-host/src/**/*.ts",
   ],
   languageOptions: {
     parser: tseslint.parser,

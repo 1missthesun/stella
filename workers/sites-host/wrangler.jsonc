@@ -1,0 +1,52 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Stella sites: the public origin of sites agents publish (Slack previews
+  // today). Every request goes to cloud-builder's SitesHost entrypoint, which
+  // checks the link, its expiry and the workspace's access setting, and serves
+  // the files from R2. Nothing else is reachable here.
+  //
+  // The stellasites.app zone has one proxied wildcard record
+  // (`*.stellasites.app`, AAAA 100::), covered by the free Universal SSL
+  // certificate. dev serves `https://<id>-dev.stellasites.app/`, production
+  // `https://<id>.stellasites.app/`; cloud-builder's SITES_HOST must match the
+  // route. Dev ids end in `-dev`, which no production id can, so the more
+  // specific dev route never shadows a production site.
+  "name": "stella-v2-sites-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-22",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "*-dev.stellasites.app/*", "zone_name": "stellasites.app" }],
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },
+    "traces": { "enabled": false },
+  },
+  "services": [
+    {
+      "binding": "SITES",
+      "service": "stella-v2-cloud-builder-dev",
+      "entrypoint": "SitesHost",
+    },
+  ],
+  "env": {
+    "production": {
+      "name": "stella-v2-sites-prod",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "*.stellasites.app/*", "zone_name": "stellasites.app" }],
+      "observability": {
+        "enabled": true,
+        "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },
+        "traces": { "enabled": false },
+      },
+      "services": [
+        {
+          "binding": "SITES",
+          "service": "stella-v2-cloud-builder-prod",
+          "entrypoint": "SitesHost",
+        },
+      ],
+    },
+  },
+}

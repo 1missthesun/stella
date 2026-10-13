@@ -87,8 +87,10 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
   `slack-previews/<id>/` and returns a fresh link with a 128-bit random id.
   Limits: 100 MB and 5,000 files per preview (25 MB per file), and live
   previews per workspace up to the owner's plan (free 250 MB, Go 1 GB, Pro
-  5 GB, at most 500 links). The `workers/preview-host` Worker serves them on
-  their own origin through cloud-builder's `SlackPreviewHost` entrypoint,
+  5 GB, at most 500 links). The `workers/sites-host` Worker serves each on
+  its own origin, `https://<id>.stellasites.app/` (`<id>-dev` on dev; the
+  domain is on the Public Suffix List), through cloud-builder's `SitesHost`
+  entrypoint,
   with SPA fallback to `index.html` (or the site's `404.html`), content types
   stored at upload, a CSP, and no Stella cookies. The owner sets access and
   expiry on stella.sh/slack (`slack_preview_settings`): members only (the
@@ -116,7 +118,7 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
    `OAUTH_STATE_SECRET` must also be set.
 3. Apply the D1 migrations (`migrations/0009_slack.sql`, `0010_slack_workspace.sql`,
    `0011_slack_workspace_settings.sql`, `0013_slack_github.sql`,
-   `0014_slack_previews.sql`) and deploy cloud-builder, then `workers/preview-host`.
+   `0014_slack_previews.sql`) and deploy cloud-builder, then `workers/sites-host`.
 4. In the app's Event Subscriptions, retry verification of the request URL.
 5. Install into a workspace from stella.sh/slack, or by opening
    `<auth>/api/slack/install`.

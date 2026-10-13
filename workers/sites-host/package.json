@@ -1,5 +1,5 @@
 {
-  "name": "@stella/preview-host",
+  "name": "@stella/sites-host",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,8 +7,8 @@
     "deploy:dev": "wrangler deploy --config wrangler.jsonc --env=\"\" --strict",
     "deploy:production": "wrangler deploy --config wrangler.jsonc --env production --strict",
     "typecheck": "tsc --noEmit && bun run types:check",
-    "types": "wrangler types worker-configuration.d.ts --config wrangler.jsonc --env-interface PreviewHostBindings",
-    "types:check": "wrangler types worker-configuration.d.ts --config wrangler.jsonc --env-interface PreviewHostBindings --check",
+    "types": "wrangler types worker-configuration.d.ts --config wrangler.jsonc --env-interface SitesHostBindings",
+    "types:check": "wrangler types worker-configuration.d.ts --config wrangler.jsonc --env-interface SitesHostBindings --check",
     "build:dry-run": "wrangler deploy --dry-run --env=\"\""
   },
   "devDependencies": {

@@ -108,12 +108,12 @@
     // sign in and come back with a grant (its `/canvas/open` page). Written
     // into each canvas object, since every environment shares canvas-share.
     "CANVAS_OWNER_SITE_URL": "https://stella-website-dev.fromyou.workers.dev",
-    // Stella previews for Slack (src/slack/previews.ts), served by
-    // workers/preview-host. With SLACK_PREVIEW_HOST_SUFFIX each preview is
-    // https://<id>.<suffix>/ on its own origin; without it every preview
-    // shares SLACK_PREVIEW_ORIGIN (dev, until a wildcard domain exists).
-    "SLACK_PREVIEW_HOST_SUFFIX": "",
-    "SLACK_PREVIEW_ORIGIN": "https://stella-v2-preview-host-dev.fromyou.workers.dev",
+    // Stella sites (src/slack/previews.ts), served by workers/sites-host on
+    // its route. SITES_HOST is that route's host, `*` being the site id; with
+    // it empty, every site shares SITES_SHARED_ORIGIN (self-hosting without a
+    // wildcard domain).
+    "SITES_HOST": "*-dev.stellasites.app",
+    "SITES_SHARED_ORIGIN": "",
     // Magic-link sender; its domain is enabled for Email Sending.
     "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
   },
@@ -716,10 +716,8 @@
         "R2_BACKUP_BUCKET": "stella-v2-app-builds-prod",
         "CANVAS_SHARE_BASE_URL": "https://stellashare.app",
         "CANVAS_OWNER_SITE_URL": "https://stella.sh",
-        // Empty until *.stellashare.app routes to stella-v2-preview-host-prod
-        // (workers/preview-host/README.md); then "stellashare.app".
-        "SLACK_PREVIEW_HOST_SUFFIX": "",
-        "SLACK_PREVIEW_ORIGIN": "",
+        "SITES_HOST": "*.stellasites.app",
+        "SITES_SHARED_ORIGIN": "",
         "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
       },
       "secrets": {

@@ -11,7 +11,7 @@ export { OrchestratorSession };
 export { OwnerGate };
 export { BillingControl } from "./billing/control.js";
 export { WorldStore } from "./world-store.js";
-export { SlackPreviewHost } from "./slack/previews.js";
+export { SitesHost } from "./slack/previews.js";
 
 /**
  * Every sandbox, of either size and either workload, is one object in this

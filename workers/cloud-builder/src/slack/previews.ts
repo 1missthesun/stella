@@ -10,11 +10,12 @@
  * guessed, and each upload gets a new one.
  *
  * Sites are served on their own origin, never stella.sh or an app origin:
- * the `preview-host` Worker forwards every request to `SlackPreviewHost`
- * below over a service binding. With `SLACK_PREVIEW_HOST_SUFFIX` each preview
- * is `https://<id>.<suffix>/`; without it (dev on workers.dev) all previews
- * share `SLACK_PREVIEW_ORIGIN`, and `/__stella/open/<id>` picks the one a
- * browser sees through a cookie.
+ * the `sites-host` Worker forwards every request to `SitesHost` below over a
+ * service binding. `SITES_HOST` is the host pattern (`*.stellasites.app` in
+ * production, `*-dev.stellasites.app` on dev), so each site is its own origin,
+ * and stellasites.app is on the Public Suffix List, so each is its own site
+ * too. Without it, every site shares `SITES_SHARED_ORIGIN`, and
+ * `/__stella/open/<id>` picks the one a browser sees through a cookie.
  *
  * Access is the workspace owner's choice (`slack_preview_settings`):
  * anyone with the link, or members only. A members-only preview sends the
@@ -186,21 +187,26 @@ export const describePreviews = async (
 
 // ── Links ─────────────────────────────────────────────────────────────────
 
-const hostSuffix = (env: Cloudflare.Env): string =>
-  readVar(env, "SLACK_PREVIEW_HOST_SUFFIX").replace(/^\.+|\.+$/gu, "").toLowerCase();
+/** `SITES_HOST` is a host pattern with one `*` for the site id, e.g. `*.stellasites.app` or `*-dev.stellasites.app`. */
+const sitesHost = (env: Cloudflare.Env): { before: string; after: string } | null => {
+  const pattern = readVar(env, "SITES_HOST").trim().toLowerCase().replace(/^https?:\/\//u, "").replace(/\/.*$/u, "");
+  const parts = pattern.split("*");
+  if (parts.length !== 2 || !parts[1]?.includes(".")) return null;
+  return { before: parts[0] ?? "", after: parts[1] ?? "" };
+};
 
-const sharedOrigin = (env: Cloudflare.Env): string => readVar(env, "SLACK_PREVIEW_ORIGIN").replace(/\/+$/u, "");
+const sharedOrigin = (env: Cloudflare.Env): string => readVar(env, "SITES_SHARED_ORIGIN").replace(/\/+$/u, "");
 
 /** The preview's origin; in shared-origin mode, the one origin every preview uses. */
 const previewOrigin = (env: Cloudflare.Env, id: string): string | null => {
-  const suffix = hostSuffix(env);
-  if (suffix) return `https://${id}.${suffix}`;
+  const host = sitesHost(env);
+  if (host) return `https://${host.before}${id}${host.after}`;
   return sharedOrigin(env) || null;
 };
 
 const previewLink = (env: Cloudflare.Env, id: string): string | null => {
-  const suffix = hostSuffix(env);
-  if (suffix) return `https://${id}.${suffix}/`;
+  const host = sitesHost(env);
+  if (host) return `https://${host.before}${id}${host.after}/`;
   const origin = sharedOrigin(env);
   return origin ? `${origin}/__stella/open/${id}` : null;
 };
@@ -547,7 +553,7 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
   if (!install?.ownerId || (await teamForConversation(env, claims.conv)) !== claims.team) {
     return Response.json({ error: "This workspace no longer has Stella installed." }, { status: 403 });
   }
-  if (!hostSuffix(env) && !sharedOrigin(env)) return Response.json({ error: "Previews aren't set up on this deployment." }, { status: 503 });
+  if (!sitesHost(env) && !sharedOrigin(env)) return Response.json({ error: "Previews aren't set up on this deployment." }, { status: 503 });
   const length = Number(request.headers.get("content-length") ?? "0");
   if (length > MAX_UPLOAD_BYTES) {
     return Response.json({ error: `The upload is larger than ${formatMb(MAX_UPLOAD_BYTES)}.` }, { status: 413 });
@@ -837,7 +843,7 @@ export const handleSlackPreviewRoute = async (request: Request, env: Cloudflare.
   return null;
 };
 
-// ── Serving (through the preview-host Worker) ─────────────────────────────
+// ── Serving (through the sites-host Worker) ─────────────────────────────
 
 const PREVIEW_CSP = "base-uri 'self'; object-src 'none'; form-action 'self' https:";
 
@@ -923,9 +929,11 @@ const serveFile = async (
 /** The preview a request is for, from its host or (shared origin) the site cookie. */
 const previewIdFor = (request: Request, env: Cloudflare.Env): string | null => {
   const host = new URL(request.url).hostname.toLowerCase();
-  const suffix = hostSuffix(env);
-  if (suffix && host.endsWith(`.${suffix}`)) {
-    const label = host.slice(0, -suffix.length - 1);
+  const pattern = sitesHost(env);
+  if (pattern) {
+    const { before, after } = pattern;
+    if (host.length <= before.length + after.length || !host.startsWith(before) || !host.endsWith(after)) return null;
+    const label = host.slice(before.length, host.length - after.length);
     return ID_PATTERN.test(label) ? label : null;
   }
   const site = cookieValues(request, SITE_COOKIE).find((value) => ID_PATTERN.test(value));
@@ -945,7 +953,7 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method not allowed", { status: 405, headers: { allow: "GET, HEAD" } });
   }
-  const shared = !hostSuffix(env);
+  const shared = !sitesHost(env);
 
   if (shared && url.pathname.startsWith("/__stella/open/")) {
     const id = url.pathname.slice("/__stella/open/".length).replace(/\/+$/u, "");
@@ -994,8 +1002,8 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
   return await serveFile(request, env, preview, url.pathname, isPublic);
 };
 
-/** What the preview-host Worker calls. Unreachable from the public internet. */
-export class SlackPreviewHost extends WorkerEntrypoint<Cloudflare.Env> {
+/** What the sites-host Worker calls. Unreachable from the public internet. */
+export class SitesHost extends WorkerEntrypoint<Cloudflare.Env> {
   override async fetch(request: Request): Promise<Response> {
     try {
       return await servePreview(request, this.env);

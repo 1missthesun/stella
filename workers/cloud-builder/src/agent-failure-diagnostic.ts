@@ -16,6 +16,8 @@ export type AgentFailureDiagnosticCode =
   | "broker_response"
   | "capture_wrapper"
   | "capture_exit"
+  | "code_install"
+  | "container_start"
   | "unknown";
 
 /**
@@ -40,6 +42,15 @@ export const classifyAgentFailureDiagnostic = (
     }
   }
   const value = detail.toLowerCase();
+  if (value.includes("could not install stella's code bundle")) {
+    return "code_install";
+  }
+  if (
+    value.includes("sandbox container did not become ready") ||
+    value.includes("agent container prewarm did not settle")
+  ) {
+    return "container_start";
+  }
   if (
     /cannot read (?:properties|property) of undefined.*(?:engine|execution)/u.test(
       value,
@@ -109,4 +120,40 @@ export const classifyAgentFailureDiagnostic = (
     return "capture_exit";
   }
   return "unknown";
+};
+
+const AGENT_FAILURE_REASONS: Partial<Record<AgentFailureDiagnosticCode, string>> = {
+  code_install:
+    "its cloud workspace could not load Stella's code, which happens while a Stella update is being deployed",
+  container_start: "its cloud workspace did not start in time",
+  execution_missing: "the cloud could not tell which engine should run it",
+  tool_state_boundary: "its cloud tools could not be prepared",
+  broker_handoff: "its cloud workspace did not receive its credentials",
+  broker_response: "its cloud workspace's credentials were refused",
+  turn_input: "its cloud workspace did not receive its instructions",
+  workspace_boundary: "its cloud workspace could not be prepared",
+  privilege_probe: "its cloud workspace failed a security check",
+  conversation_history: "its conversation history could not be loaded",
+  model_resolution: "the cloud could not resolve its model",
+  capture_wrapper: "its session could not be recorded",
+  capture_exit: "its session exited unexpectedly",
+};
+
+/**
+ * The sentence a person sees for a failed cloud turn: a reason written for
+ * them from the allowlisted code, never the source text, and the turn id so
+ * the failure can be found in the logs.
+ */
+export const agentFailureMessage = (
+  code: AgentFailureDiagnosticCode,
+  turnId: string,
+): string => {
+  const reason =
+    AGENT_FAILURE_REASONS[code] ??
+    (code.startsWith("model_")
+      ? "it could not reach its model from the cloud"
+      : null);
+  return reason
+    ? `The agent stopped because ${reason}. Try again. (cloud turn ${turnId})`
+    : `The agent hit a problem in the cloud and stopped. Try again. (cloud turn ${turnId}, ${code})`;
 };

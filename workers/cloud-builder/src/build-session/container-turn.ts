@@ -5,7 +5,10 @@
  *
  * @see src/build-session/host.ts for why every call out takes `host`.
  */
-import { classifyAgentFailureDiagnostic } from "../agent-failure-diagnostic.js";
+import {
+  agentFailureMessage,
+  classifyAgentFailureDiagnostic,
+} from "../agent-failure-diagnostic.js";
 import { CloudHomeStore, gateHomeControl } from "../cloud-home-store.js";
 import type { CloudSkillCatalogSnapshot } from "../cloud-home-store.js";
 import {
@@ -1115,8 +1118,8 @@ export const runContainerAgentTurn = async (
       error instanceof AgentTurnError
         ? error.userMessage
         : devAcceptanceProbesEnabled(host.env)
-          ? `The agent hit a problem and stopped. Try again. [diagnostic: turn.${failureCode}]`
-          : "The agent hit a problem and stopped. Try again.";
+          ? `${agentFailureMessage(failureCode, turn.turnId)} [diagnostic: turn.${failureCode}]`
+          : agentFailureMessage(failureCode, turn.turnId);
     const delivered = await host.deliverTerminal(turn, {
       turnId: turn.turnId,
       attemptGeneration: turn.attemptGeneration!,
@@ -1960,8 +1963,8 @@ export const runAgentAttempt = async (
       error: oom
         ? "The agent ran out of memory and stopped. Try again with a smaller slice of the work."
         : devAcceptanceProbesEnabled(host.env)
-          ? `The agent hit a problem and stopped. Try again. [diagnostic: executor.${failureCode}]`
-          : "The agent hit a problem and stopped. Try again.",
+          ? `${agentFailureMessage(failureCode, turn.turnId)} [diagnostic: executor.${failureCode}]`
+          : agentFailureMessage(failureCode, turn.turnId),
       checkpointPolicy: oom ? "preserve_prior" : "builder_fallback",
     },
     oom,

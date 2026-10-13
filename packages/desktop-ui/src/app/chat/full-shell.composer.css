@@ -178,25 +178,8 @@
   gap: 8px;
 }
 
-/* Empty-composer dictation uses the same text and toolbar insets as typing. */
-.composer-form.expanded > .composer-dictation-inline {
-  gap: 8px;
-  padding: 0;
-}
-
-.composer-dictation-inline .composer-dictation-placeholder {
-  min-height: 36px;
-  padding: 10px 16px 2px;
-  color: var(--text-weaker);
-}
-
-.composer-dictation-inline .composer-dictation-recording-row {
-  padding: 2px 8px 6px;
-}
-
-/* Dictation row — only used when starting dictation with text already in the
- * input. The recording bar sits in its own row below the toolbar so the
- * user's typed message stays visible. */
+/* Dictation row — while dictating, the recording bar sits in its own row
+ * below the toolbar; the textarea above stays as it is. */
 .composer-dictation-row {
   display: none;
 }

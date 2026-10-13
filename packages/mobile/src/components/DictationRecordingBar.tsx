@@ -1,12 +1,10 @@
 /**
  * Mobile mirror of desktop's DictationRecordingBar
  * (`desktop/src/features/dictation/components/DictationRecordingBar.tsx`).
- * The composer keeps its expanded shape while dictating: a quiet "Listening"
- * hint holds the text area and the waveform row stays anchored underneath,
- * where the toolbar normally sits:
+ * The composer's text area stays as it is while dictating; this row sits
+ * under it, where the toolbar normally sits:
  *
- *   Listening…
- *   [+]  [waveform — flex 1]   [0:24]   [X]   [✓]   [↑]
+ *   [X]  [waveform — flex 1]   [0:24]   [✓]   [↑]
  *
  * No words appear while recording; the transcript lands in the composer once
  * dictation stops. The trailing send (↑) is optional: when `onSend` is given
@@ -50,36 +48,18 @@ type Props = {
   onConfirm: () => void;
   /** When provided, stop dictation and auto-send once the transcript lands. */
   onSend?: () => void;
-  /** Muted hint shown in the text area above the controls while recording. */
-  placeholder?: string;
-  /** Extra layout for the hint (the composer's text-area inset). */
-  placeholderStyle?: StyleProp<ViewStyle>;
 };
 
 export const DictationRecordingBar = memo(function DictationRecordingBar({
   onCancel,
   onConfirm,
   onSend,
-  placeholder,
-  placeholderStyle,
 }: Props) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   return (
     <View style={styles.recordingBar}>
-      {placeholder ? (
-        <View style={[waveStyles.placeholderBox, placeholderStyle]}>
-          <Text
-            style={[
-              waveStyles.placeholder,
-              { color: fadeHex(colors.textMuted, 0.35) },
-            ]}
-          >
-            {placeholder}
-          </Text>
-        </View>
-      ) : null}
       <View style={styles.recordingRow}>
         {/* Cancel takes the slot the composer's + occupies at rest, so the
             leading control is one place with one meaning: add something when
@@ -201,16 +181,6 @@ const DictationWaveform = memo(function DictationWaveform({
 });
 
 const waveStyles = StyleSheet.create({
-  placeholderBox: {
-    paddingHorizontal: 4,
-    paddingTop: 1,
-  },
-  placeholder: {
-    fontFamily: fonts.sans.regular,
-    fontSize: 15,
-    fontStyle: "italic",
-    lineHeight: 21,
-  },
   container: {
     flex: 1,
     height: WAVEFORM_HEIGHT,

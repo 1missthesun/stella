@@ -1,10 +1,9 @@
 /**
- * DictationRecordingBar — replaces the composer's textarea + toolbar while
- * dictation is active. No words appear while recording; the transcript lands
- * in the composer once dictation stops. The waveform and controls sit in one
- * row, under an optional "Listening" hint that holds the text area:
+ * DictationRecordingBar — the row that shows dictation is on. In-app
+ * composers keep their textarea as it is and place this row under it; no
+ * words appear while recording, and the transcript lands in the composer once
+ * dictation stops:
  *
- *   Listening…
  *   [waveform — flex 1]   [0:24]   [X]   [✓]   [↑ (optional)]
  *
  * The external overlay can hide controls because stopping the shortcut commits
@@ -13,7 +12,7 @@
  * The waveform uses one <canvas>, so meter updates do not reconcile the chat tree.
  */
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import { cn } from "@/shared/lib/utils";
 import { ArrowUp, Check, X } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
@@ -21,10 +20,6 @@ import "./dictation-recording-bar.css";
 
 type DictationRecordingBarProps = {
   className?: string;
-  /** The composer's add button, placed beside the waveform. */
-  leading?: ReactNode;
-  /** Quiet hint that holds the text area while recording. */
-  placeholder?: string;
   levels: number[];
   elapsedMs: number;
   onCancel?: () => void;
@@ -41,8 +36,6 @@ type DictationRecordingBarProps = {
 
 export function DictationRecordingBar({
   className,
-  leading,
-  placeholder,
   levels,
   elapsedMs,
   onCancel,
@@ -53,11 +46,7 @@ export function DictationRecordingBar({
   const t = useT();
   return (
     <div className={cn("composer-dictation-recording-bar", className)}>
-      {placeholder ? (
-        <div className="composer-dictation-placeholder">{placeholder}</div>
-      ) : null}
       <div className="composer-dictation-recording-row">
-        {leading}
         <DictationWaveform levels={levels} />
         <span className="composer-dictation-timer" aria-live="polite">
           {formatElapsed(elapsedMs)}

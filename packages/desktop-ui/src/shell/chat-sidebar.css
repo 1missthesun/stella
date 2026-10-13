@@ -234,9 +234,8 @@
   gap: 8px;
 }
 
-/* Dictation row — shown only when dictation starts while the input already
- * has text, so the recording bar gets its own row below the typed message
- * instead of replacing the textarea. */
+/* Dictation row — while dictating, the recording bar gets its own row below
+ * the textarea, which stays as it is. */
 .chat-sidebar-form .composer-dictation-row {
   display: none;
 }

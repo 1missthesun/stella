@@ -370,14 +370,14 @@ export const Composer = memo(function Composer({
   );
 
   const dictationCompact = compact && isListening;
-  const dictationInline = !compact && isListening && !hasText;
-  const dictationBelow = !compact && isListening && hasText;
+  // The text area stays as it is while dictating (the transcript lands there
+  // on stop); only the waveform row below it shows that dictation is on.
+  const dictationBelow = !compact && isListening;
   const isExpandedComposed =
     !compact &&
     resolveComposerExpanded({
       expanded,
       dictationBelow,
-      dictationInline,
       modelPickerPinned: Boolean(modelPicker?.pinned),
       hasAttachments: (attachments?.length ?? 0) > 0,
       hasQuotes: (quotes?.length ?? 0) > 0,
@@ -606,19 +606,6 @@ export const Composer = memo(function Composer({
           {dictationCompact ? (
             <View style={styles.dictationCompact}>
               <DictationRecordingBar
-                onCancel={onCancelDictation}
-                onConfirm={onConfirmDictation}
-                onSend={onStopAndSendVoice}
-              />
-            </View>
-          ) : dictationInline ? (
-            // Dictation into an empty composer keeps the expanded shape:
-            // a "Listening" hint takes the text area and the waveform
-            // row sits where the toolbar normally is.
-            <View style={styles.dictationInlineBlock}>
-              <DictationRecordingBar
-                placeholder={"Listening\u2026"}
-                placeholderStyle={styles.dictationInlinePlaceholder}
                 onCancel={onCancelDictation}
                 onConfirm={onConfirmDictation}
                 onSend={onStopAndSendVoice}
@@ -947,15 +934,6 @@ const makeComposerStyles = (colors: Colors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: fadeHex(colors.border, 0.5),
     },
-    // Insets so the hint lands where expanded input text sits
-    // (`inputExpanded`: 16 across, 14 down) and the waveform row where the
-    // toolbar sits, with the same resting height as an empty expanded shell.
-    dictationInlineBlock: {
-      paddingHorizontal: 12,
-      paddingTop: 13,
-      paddingBottom: 8,
-    },
-    dictationInlinePlaceholder: { minHeight: 30 },
     dictationCompact: {
       justifyContent: "center",
       minHeight: 56,

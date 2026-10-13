@@ -675,9 +675,9 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
     setMessage: setInputText,
     setChatContext,
   });
-  const hasText = inputText.trim().length > 0;
-  const dictationBelow = dictation.isRecordingVisible && hasText;
-  const dictationInline = dictation.isRecordingVisible && !hasText;
+  // The textarea stays as it is while dictating (the transcript lands there
+  // on stop); only the waveform row below it shows that dictation is on.
+  const dictationBelow = dictation.isRecordingVisible;
   const dictationOwnsControls = dictationBelow && dictation.showControls;
   const formExpanded = sidebarExpanded || dictationBelow;
 
@@ -707,114 +707,103 @@ const SidebarComposerForm = memo(function SidebarComposerForm({
         onSelectContextSuggestion={onSelectContextSuggestion}
       />
 
-      {dictationInline ? (
-        <DictationRecordingBar
-          levels={dictation.levels}
-          elapsedMs={dictation.elapsedMs}
-          onCancel={dictation.cancel}
-          onConfirm={dictation.toggle}
-          onSend={dictation.commitAndSend}
-          showControls={dictation.showControls}
+      <>
+        <ComposerTextarea
+          ref={inputRef}
+          className="chat-sidebar-input"
+          tone="default"
+          value={inputText}
+          rows={1}
+          onChange={(event) => {
+            setInputText(event.target.value);
+            requestAnimationFrame(() => {
+              updateComposerTextareaExpansion(
+                inputRef.current,
+                setSidebarExpanded,
+              );
+            });
+          }}
+          onKeyDown={(event) => {
+            if (
+              event.nativeEvent.isComposing ||
+              event.nativeEvent.keyCode === 229
+            ) {
+              return;
+            }
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              submitComposer();
+            }
+          }}
+          onPaste={(event) => {
+            handleComposerPaste(event, setChatContext);
+          }}
+          placeholder={composerState.placeholder}
         />
-      ) : (
-        <>
-          <ComposerTextarea
-            ref={inputRef}
-            className="chat-sidebar-input"
-            tone="default"
-            value={inputText}
-            rows={1}
-            onChange={(event) => {
-              setInputText(event.target.value);
-              requestAnimationFrame(() => {
-                updateComposerTextareaExpansion(
-                  inputRef.current,
-                  setSidebarExpanded,
-                );
-              });
-            }}
-            onKeyDown={(event) => {
-              if (
-                event.nativeEvent.isComposing ||
-                event.nativeEvent.keyCode === 229
-              ) {
-                return;
-              }
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                submitComposer();
-              }
-            }}
-            onPaste={(event) => {
-              handleComposerPaste(event, setChatContext);
-            }}
-            placeholder={composerState.placeholder}
-          />
 
-          <div className="composer-toolbar">
-            <div className="composer-toolbar-left">
-              <ComposerAddMenu
-                className="composer-add-button composer-add-button--toolbar"
-                title={t("shell.chatSidebar.add")}
-                setChatContext={setChatContext}
-                contextSuggestions={contextSuggestions}
-                onSelectContextSuggestion={onSelectContextSuggestion}
-              />
-            </div>
-
-            <div className="composer-toolbar-right">
-              {dictationOwnsControls ? null : (
-                <>
-                  {dictation.isTranscribing && (
-                    <DictationCancelButton onClick={dictation.cancel} />
-                  )}
-                  <MemoComposerMicButton
-                    className="composer-mic"
-                    isTranscribing={dictation.isTranscribing}
-                    disabled={dictation.isTranscribing}
-                    onClick={dictation.toggle}
-                    onPointerEnter={dictation.prewarm}
-                    onFocus={dictation.prewarm}
-                    title={
-                      dictation.error
-                        ? t("shell.chatSidebar.dictationError", {
-                            error: dictation.error,
-                          })
-                        : undefined
-                    }
-                  />
-                  {showStop && (
-                    <ComposerStopButton
-                      className="composer-stop"
-                      onClick={requestStop}
-                      title={t("shell.chatSidebar.stop")}
-                      aria-label={t("shell.chatSidebar.stop")}
-                    />
-                  )}
-                  <MemoComposerSubmitButton
-                    className="composer-submit"
-                    disabled={!canSubmitWithDictation}
-                    animated
-                  />
-                </>
-              )}
-            </div>
+        <div className="composer-toolbar">
+          <div className="composer-toolbar-left">
+            <ComposerAddMenu
+              className="composer-add-button composer-add-button--toolbar"
+              title={t("shell.chatSidebar.add")}
+              setChatContext={setChatContext}
+              contextSuggestions={contextSuggestions}
+              onSelectContextSuggestion={onSelectContextSuggestion}
+            />
           </div>
 
-          {dictationBelow && (
-            <div className="composer-dictation-row">
-              <DictationRecordingBar
-                levels={dictation.levels}
-                elapsedMs={dictation.elapsedMs}
-                onCancel={dictation.cancel}
-                onConfirm={dictation.toggle}
-                onSend={dictation.commitAndSend}
-                showControls={dictation.showControls}
-              />
-            </div>
-          )}
-        </>
-      )}
+          <div className="composer-toolbar-right">
+            {dictationOwnsControls ? null : (
+              <>
+                {dictation.isTranscribing && (
+                  <DictationCancelButton onClick={dictation.cancel} />
+                )}
+                <MemoComposerMicButton
+                  className="composer-mic"
+                  isTranscribing={dictation.isTranscribing}
+                  disabled={dictation.isTranscribing}
+                  onClick={dictation.toggle}
+                  onPointerEnter={dictation.prewarm}
+                  onFocus={dictation.prewarm}
+                  title={
+                    dictation.error
+                      ? t("shell.chatSidebar.dictationError", {
+                          error: dictation.error,
+                        })
+                      : undefined
+                  }
+                />
+                {showStop && (
+                  <ComposerStopButton
+                    className="composer-stop"
+                    onClick={requestStop}
+                    title={t("shell.chatSidebar.stop")}
+                    aria-label={t("shell.chatSidebar.stop")}
+                  />
+                )}
+                <MemoComposerSubmitButton
+                  className="composer-submit"
+                  disabled={!canSubmitWithDictation}
+                  animated
+                />
+              </>
+            )}
+          </div>
+        </div>
+
+        {dictationBelow && (
+          <div className="composer-dictation-row">
+            <DictationRecordingBar
+              levels={dictation.levels}
+              elapsedMs={dictation.elapsedMs}
+              onCancel={dictation.cancel}
+              onConfirm={dictation.toggle}
+              onSend={dictation.commitAndSend}
+              showControls={dictation.showControls}
+            />
+          </div>
+        )}
+      </>
     </form>
   );
 });

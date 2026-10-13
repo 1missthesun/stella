@@ -24,6 +24,27 @@ export type StellaAgentRole = {
    * computer, with this brief (`StellaExecutionHost.moveAgent`).
    */
   moving?: { deviceId: string; name: string; brief: string; key: string };
+  /**
+   * Its `send_message`s to the Stella its report goes to, this run, not yet
+   * settled. One goes out once the agent takes another step; one sent in its
+   * run's last step becomes part of its report instead, so a run reaches
+   * Stella once (`settleNotes` in agents.ts).
+   */
+  notes?: StellaPendingNote[];
+};
+
+/** A note to Stella waiting on the agent's next step. */
+export type StellaPendingNote = {
+  /** Its tool call, to tell whether the run went on after it. */
+  callId: string;
+  /** Exactly-once key: the tool call's task id. */
+  key: string;
+  /** What the agent wrote. */
+  message: string;
+  /** From whom, as Stella reads it. */
+  from: { threadId: string; label: string };
+  /** Stella runs on the host that started the agent, not here: it goes through the owner's agent threads. */
+  remote?: true;
 };
 
 export const StellaAgentDoc = defineDoc<StellaAgentRole>({

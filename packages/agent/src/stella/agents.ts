@@ -29,8 +29,11 @@ import {
   defineExtension,
   defineTask,
   defineTool,
+  GenerationTask,
+  hook,
   LiveDoc,
   type Conversation,
+  type ConversationHandle,
   type ConversationId,
   type EntryId,
   type Harness,
@@ -63,7 +66,7 @@ import {
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
-import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
+import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
 import { AGENT_MOVE_CLOUD, switchDestinationTool, type AgentSwitch, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
@@ -554,6 +557,9 @@ const messageText = (message: { content?: unknown } | undefined): string =>
       ? (message.content as Array<{ type?: string; text?: string }>).map((part) => (part.type === "text" ? (part.text ?? "") : "")).join("")
       : "";
 
+/** How much of an agent's latest message `agent_status` shows. */
+const LATEST_PREVIEW_CHARS = 300;
+
 const MAX_REPORT_CHARS = 30_000;
 const bounded = (text: string): string =>
   text.length <= MAX_REPORT_CHARS ? text : `${text.slice(0, MAX_REPORT_CHARS)}\n[truncated ${text.length - MAX_REPORT_CHARS} chars]`;
@@ -625,6 +631,8 @@ type ReporterState =
       paused?: true;
       /** It answered while agents it started still run: not done, so nothing reports. */
       waiting?: true;
+      /** Its notes to Stella that go out before the report (`settleNotes`). */
+      notes?: StellaPendingNote[];
     };
 
 const REPORTER_TASK = "stella.agent-reporter";
@@ -891,7 +899,12 @@ export function stellaAgents(host: StellaAgentsHost) {
             settled?.status === "done" && settled.type === "input" ? await takeMove(runtime, agentConversationId, context) : undefined;
           if (move && settled?.status === "done" && settled.type === "input") {
             const answered = settled.answer;
+            // Its notes to Stella go out now; it reports from where it moves.
+            for (const note of (await runtime.snapshot(StellaAgentDoc, agentConversationId, context))?.notes ?? []) {
+              await deliverNote(runtime.conversationId, note, context, (id) => runtime.conversation(id, context)).catch(() => false);
+            }
             await runtime.commit(async (tx) => {
+              await settleNotes(tx, agentConversationId, undefined);
               const state = await tx.doc(StellaAgentsDoc, runtime.conversationId);
               const agent = state.agents[threadId];
               if (agent && !agent.reported.includes(answered)) agent.reported.push(answered);
@@ -917,10 +930,19 @@ export function stellaAgents(host: StellaAgentsHost) {
             return;
           }
           await runtime.commit(async (tx) => {
-            const next = (report?: string, status?: AgentAttemptOutcome): { status: "running"; checkpoint: ReporterState } => ({
+            // Its notes to Stella: sent in its last step before it finished,
+            // they are part of its report; otherwise they go out before it.
+            const finished =
+              settled?.status === "done" && settled.type === "input" && !busy ? settled.answer : undefined;
+            const notes = await settleNotes(tx, agentConversationId, finished);
+            const send = (closing: boolean) => [...notes.send, ...(closing ? [] : notes.closing)];
+            const next = (report?: string, status?: AgentAttemptOutcome, closing = false): { status: "running"; checkpoint: ReporterState } => ({
               status: "running",
-              checkpoint:
-                report === undefined ? { phase: "report" } : { phase: "report", report, ...(status ? { status } : {}) },
+              checkpoint: {
+                phase: "report",
+                ...(report === undefined ? {} : { report, ...(status ? { status } : {}) }),
+                ...(send(closing).length ? { notes: send(closing) } : {}),
+              },
             });
             const state = await tx.doc(StellaAgentsDoc, runtime.conversationId);
             const agent = state.agents[threadId];
@@ -933,30 +955,35 @@ export function stellaAgents(host: StellaAgentsHost) {
             }
             if (settled.status === "unanswered") {
               // Paused: nothing to report, but it is no longer running.
-              if (settled.reason === "aborted") return { status: "running", checkpoint: { phase: "report", status: "paused", paused: true } };
+              if (settled.reason === "aborted") {
+                return { status: "running", checkpoint: { phase: "report", status: "paused", paused: true, ...(send(false).length ? { notes: send(false) } : {}) } };
+              }
               return next(failedReport({ threadId, description, error: settled.reason }), "failed");
             }
             if (settled.type !== "input" || !agent) return next();
             const answer = (await tx.entry(AssistantEntry, settled.answer))?.model?.[0] as AssistantMessage | undefined;
+            const failed = answer?.stopReason === "error";
+            const result = failed ? textOf(answer) : withClosingNotes(notes.closing.map((note) => note.message), textOf(answer));
             end = {
-              answer: textOf(answer),
-              ...(answer?.stopReason === "error" ? { error: answer.errorMessage ?? "The agent failed." } : {}),
+              answer: result,
+              ...(failed ? { error: answer?.errorMessage ?? "The agent failed." } : {}),
             };
             if (agent.reported.includes(settled.answer)) return next();
             agent.reported.push(settled.answer);
-            if (busy && answer?.stopReason !== "error") {
+            if (busy && !failed) {
               end = { ...end, waiting: true };
-              return { status: "running", checkpoint: { phase: "report", status: "completed", waiting: true } };
+              return { status: "running", checkpoint: { phase: "report", status: "completed", waiting: true, ...(send(false).length ? { notes: send(false) } : {}) } };
             }
             return next(
               completedReport({
                 threadId,
                 description,
-                result: textOf(answer),
+                result,
                 toParentAgent: self.agentType !== "orchestrator",
                 ...(reporter.input.fromUser ? { userMessage: message } : {}),
               }),
               "completed",
+              !failed,
             );
           }, context);
         } finally {
@@ -965,7 +992,10 @@ export function stellaAgents(host: StellaAgentsHost) {
         }
       },
       report: async (reporter, runtime, context) => {
-        const { report, paused, waiting } = reporter.state.checkpoint;
+        const { report, paused, waiting, notes } = reporter.state.checkpoint;
+        for (const note of notes ?? []) {
+          await deliverNote(runtime.conversationId, note, context, (id) => runtime.conversation(id, context));
+        }
         // Not done while agents it started still work: nothing reports its end.
         if (waiting) {
           await runtime.commit(() => ({ status: "terminal", outcome: { status: "completed", result: null } }), context);
@@ -1408,33 +1438,42 @@ export function stellaAgents(host: StellaAgentsHost) {
       !record.origin &&
       Object.values(state?.calls ?? {}).some((call) => call.threadId === top.threadId && call.reporter >= 0);
     const from = senderOf(self, STELLA_MESSAGE_TARGET);
-    if (root !== undefined && record !== undefined && !reportsHere && host.directory) {
-      const delivery = await host.directory.message(
-        { key: String(api.taskId), to: await host.directory.conversationId(context), text: message, from, remoteStella: true },
-        context,
-      );
-      if (delivery) return deliveredResult(delivery);
-    }
-    if (root === undefined || !reportsHere) {
+    const remote = root !== undefined && record !== undefined && !reportsHere && host.directory !== undefined;
+    if (root === undefined || (!reportsHere && !remote)) {
       throw new Error(
         "The Stella you work for runs on another host, which send_message cannot reach from here. Put what it needs in your final report.",
       );
     }
-    const note: AgentNote = {
-      rootConversationId: root,
-      threadId: self.threadId,
-      text: formatAgentMessage(from, message),
-      requestId: `agent-note:${api.taskId}`,
-    };
-    if (host.deliverNote) {
-      await host.deliverNote(note, context);
-    } else {
-      const stella = await api.conversation(root, context);
-      if (!stella) throw new Error("Stella is not reachable from here.");
-      // Read by the model, never shown: the user did not write it.
-      const hidden: TextContent & { stella: { hidden: true } } = { type: "text", text: note.text, stella: { hidden: true } };
-      await stella.submit({ type: "input", content: [hidden], whenBusy: "followUp", requestId: note.requestId }, context);
+    // Stella's own agent: its report goes to the same Stella, so the note
+    // waits for its next step, and one sent as its last step is part of its
+    // report instead (`settleNotes`): a run reaches Stella once.
+    if (self.depth === 1) {
+      const note: StellaPendingNote = { callId: api.callId, key: String(api.taskId), message, from, ...(remote ? { remote: true as const } : {}) };
+      await api.commit(async (tx) => {
+        const role = await tx.doc(StellaAgentDoc, api.conversationId);
+        if (!role.notes?.some((known) => known.key === note.key)) role.notes = [...(role.notes ?? []), note];
+        return undefined;
+      }, context);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: "Queued for Stella: it goes out once you take your next step, or as part of your final report if you finish now, so don't repeat it there.",
+          },
+        ],
+      };
     }
+    const sent = await deliverNote(root, { callId: api.callId, key: String(api.taskId), message, from, ...(remote ? { remote: true as const } : {}) }, context, (id) =>
+      api.conversation(id, context),
+    );
+    if (!sent) {
+      throw new Error(
+        remote
+          ? "The Stella you work for runs on another host, which send_message cannot reach from here. Put what it needs in your final report."
+          : "Stella is not reachable from here.",
+      );
+    }
+    if (typeof sent === "object") return deliveredResult(sent);
     return {
       content: [
         {
@@ -1445,10 +1484,116 @@ export function stellaAgents(host: StellaAgentsHost) {
     };
   };
 
+  /**
+   * A note to Stella, once per key: to this conversation's Stella (`root`),
+   * or, `remote`, to the Stella on the host that started the agent. False
+   * when it could not go (nothing reaches that Stella from here).
+   */
+  const deliverNote = async (
+    root: ConversationId,
+    note: StellaPendingNote,
+    context: Context,
+    open?: (id: ConversationId) => Promise<Pick<ConversationHandle, "submit"> | undefined>,
+  ): Promise<boolean | AgentMessageDelivery> => {
+    if (note.remote) {
+      if (!host.directory) return false;
+      const delivery = await host.directory.message(
+        { key: note.key, to: await host.directory.conversationId(context), text: note.message, from: note.from, remoteStella: true },
+        context,
+      );
+      return delivery ?? false;
+    }
+    const agentNote: AgentNote = {
+      rootConversationId: root,
+      threadId: note.from.threadId,
+      text: formatAgentMessage(note.from, note.message),
+      requestId: `agent-note:${note.key}`,
+    };
+    if (host.deliverNote) {
+      await host.deliverNote(agentNote, context);
+      return true;
+    }
+    const stella = await open?.(root);
+    if (!stella) return false;
+    // Read by the model, never shown: the user did not write it.
+    const hidden: TextContent & { stella: { hidden: true } } = { type: "text", text: agentNote.text, stella: { hidden: true } };
+    await stella.submit({ type: "input", content: [hidden], whenBusy: "followUp", requestId: agentNote.requestId }, context);
+    return true;
+  };
+
+  /** Notes this process already sent on an agent's next step; a repeat is harmless (once per key), only wasted. */
+  const notesSent = new Set<string>();
+
+  /**
+   * Once an agent's model answers with more tool calls, it went on after its
+   * notes to Stella: they go out now.
+   */
+  const notesHook = hook(GenerationTask, {
+    afterResponse: async (message, api, context) => {
+      if (message.stopReason !== "toolUse" || !message.content.some((part) => part.type === "toolCall")) return;
+      const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
+      if (!role?.notes?.length || role.parentConversationId === undefined) return;
+      for (const note of role.notes) {
+        if (notesSent.has(note.key)) continue;
+        // Without a host delivery here, its run's end sends it.
+        if (!note.remote && !host.deliverNote) continue;
+        try {
+          if (await deliverNote(role.parentConversationId as ConversationId, note, context)) notesSent.add(note.key);
+        } catch {
+          // Its run's end sends it again.
+        }
+      }
+    },
+  });
+
+  /**
+   * An agent's run ended: its notes to Stella settle. With `answer` (it
+   * finished, and its report goes up now), the ones it sent in its last step
+   * are part of that report (`closing`); the rest go out now, once per key.
+   * Clears them in `tx`.
+   */
+  const settleNotes = async (
+    tx: Tx,
+    agentConversationId: ConversationId,
+    answer: EntryId | undefined,
+  ): Promise<{ closing: StellaPendingNote[]; send: StellaPendingNote[] }> => {
+    const role = await tx.doc(StellaAgentDoc, agentConversationId);
+    const notes = role.notes ?? [];
+    if (notes.length === 0) return { closing: [], send: [] };
+    delete role.notes;
+    for (const note of notes) notesSent.delete(note.key);
+    const last = answer === undefined ? new Set<string>() : await lastStepCalls(tx, agentConversationId, answer);
+    return {
+      closing: notes.filter((note) => last.has(note.callId)),
+      send: notes.filter((note) => !last.has(note.callId)),
+    };
+  };
+
+  /** The tool calls of the last step before an answer. */
+  const lastStepCalls = async (tx: Tx, conversationId: ConversationId, answer: EntryId): Promise<Set<string>> => {
+    let cursor: Parameters<Tx["scanEntries"]>[2];
+    for (let pages = 0; pages < 20; pages += 1) {
+      const page = await tx.scanEntries({ conversationId, maxEntryId: answer, order: "descending" }, 50, cursor);
+      for (const entry of page.items) {
+        if (entry.id === answer || entry.kind !== "pi.assistant") continue;
+        const calls = ((entry.model?.[0] as AssistantMessage | undefined)?.content ?? []).flatMap((part) =>
+          part.type === "toolCall" ? [part.id] : [],
+        );
+        if (calls.length > 0) return new Set(calls);
+      }
+      cursor = page.next;
+      if (cursor === undefined) break;
+    }
+    return new Set();
+  };
+
+  /** The answer of a run that finished, with what it sent Stella as its last step first. */
+  const withClosingNotes = (closing: string[], answer: string): string => [...closing, answer].filter((part) => part.trim()).join("\n\n");
+
   const sendMessage = defineTool({
     name: "send_message",
     description:
-      'Message an agent or Stella session by thread_id, including while it is busy; it reads the message before its next step. To an agent you started, the message is an instruction: steer it, correct it, or resume it on the same thread after it finished or was paused. To anyone else (Stella, the agent that started you, teammates, other sessions) it arrives as a note from you, which they weigh against their own work and can answer with send_message. Every message reaches them as from you, with your thread_id, so they can answer. "stella" reaches the Stella you work for. A successful result means the message was delivered, not that any work finished; completion still arrives in [Agent completed]. agent_status without a thread_id lists who you can reach.',
+      'Message an agent or Stella session by thread_id, including while it is busy; it reads the message before its next step. To an agent you started, the message is an instruction: steer it, correct it, or resume it on the same thread after it finished or was paused. To anyone else (Stella, the agent that started you, teammates, other sessions) it arrives as a note from you, which they weigh against their own work and can answer with send_message. Every message reaches them as from you, with your thread_id, so they can answer. "stella" reaches the Stella you work for, for what cannot wait for your report; your result goes in your final report, not here. A successful result means the message was delivered, not that any work finished; completion still arrives in [Agent completed]. agent_status without a thread_id lists who you can reach.',
     parameters: Type.Object({
       thread_id: Type.String({ description: 'Who to message: a thread_id from agent_status, or "stella".' }),
       message: Type.String({ description: "The message. To your own agent, send only what is new or changed." }),
@@ -1550,7 +1695,8 @@ export function stellaAgents(host: StellaAgentsHost) {
     const call = message?.content.find((part) => part.type === "toolCall");
     return {
       ...(running.length ? { running_tools: running } : {}),
-      ...(text ? { latest_message: text.slice(0, 2_000) } : {}),
+      // A glance at what it is doing, never its result: that comes in its report.
+      ...(text ? { latest_message_preview: text.length > LATEST_PREVIEW_CHARS ? `${text.slice(0, LATEST_PREVIEW_CHARS)}…` : text } : {}),
       ...(call && call.type === "toolCall" ? { latest_tool_call: call.name } : {}),
       ...(agent.held?.length ? { held_messages: agent.held.length } : {}),
     };
@@ -1780,7 +1926,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const agentStatus = defineTool({
     name: "agent_status",
     description:
-      "Without thread_id: list who you can reach, one line each (thread_id · status · where, when not this computer · last active — description): subagents you started, your teammates (Stella and the other agents in this conversation), other Stella sessions on this computer, and the user's cloud sessions. With thread_id: that agent's status, where it runs, who started it, its relation to you, and its latest message and tool call. send_message reaches anyone listed: to an agent you started it is an instruction that steers it while it runs or resumes it once stopped, and its report comes back to you; to anyone else it is a note they weigh, and a report still goes to whoever started them. pause_agent pauses an agent wherever it runs; a later message resumes it. reachable: false means neither reaches that agent from here. Read-only: it never interrupts or messages anyone.",
+      "Without thread_id: list who you can reach, one line each (thread_id · status · where, when not this computer · last active — description): subagents you started, your teammates (Stella and the other agents in this conversation), other Stella sessions on this computer, and the user's cloud sessions. With thread_id: that agent's status, where it runs, who started it, its relation to you, a short preview of its latest message (not its result), and its latest tool call. Never call it repeatedly to wait for an agent: its full report arrives on its own in [Agent completed]. send_message reaches anyone listed: to an agent you started it is an instruction that steers it while it runs or resumes it once stopped, and its report comes back to you; to anyone else it is a note they weigh, and a report still goes to whoever started them. pause_agent pauses an agent wherever it runs; a later message resumes it. reachable: false means neither reaches that agent from here. Read-only: it never interrupts or messages anyone.",
     parameters: Type.Object({
       thread_id: Type.Optional(Type.String({ description: "The agent to inspect. Omit it to list everyone you can reach." })),
     }),
@@ -2250,6 +2396,15 @@ export function stellaAgents(host: StellaAgentsHost) {
       current.carried = { runKey: args.runKey, messages };
       return messages;
     }, context);
+    // Its notes to Stella settle once a run ends: the ones it sent as the
+    // last step of a run that finished are part of its answer.
+    const settle = async (answer?: EntryId): Promise<string[]> => {
+      const notes = await harness.commit((tx) => settleNotes(tx, agent.id, answer), context);
+      for (const note of notes.send) {
+        await deliverNote(root.id, note, context, (id) => harness.conversation(id, context)).catch(() => false);
+      }
+      return notes.closing.map((note) => note.message);
+    };
     let content = [...carried, args.prompt].join("\n\n");
     let requestId = `placed:${args.runKey}`;
     for (let retry = 1; ; retry += 1) {
@@ -2271,17 +2426,21 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (retry === 1) await keepWithdrawn(harness, root.id, threadId, args.runKey, settled, [...carried, args.prompt], context);
       if (args.signal?.aborted) {
         await dropMove(harness, agent.id, context);
+        await settle();
         return stoppedPlacedRun(threadId, args.signal);
       }
       // Paused here (its conversation aborted) before it answered.
       if (settled.status === "unanswered" && settled.reason === "aborted") {
         await dropMove(harness, agent.id, context);
+        await settle();
         return { threadId, status: "paused", error: AGENT_PAUSED_REASON };
       }
       if (settled.status !== "done" || settled.type !== "input") {
+        await settle();
         return { threadId, status: "error", error: settled.status === "unanswered" ? settled.reason : "The agent did not answer." };
       }
       const move = await takeMove(harness, agent.id, context);
+      if (move) await settle();
       if (move && "moved" in move) {
         await harness.commit(async (tx) => {
           const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
@@ -2300,8 +2459,11 @@ export function stellaAgents(host: StellaAgentsHost) {
       }
       const answer = await harness.commit(async (tx) => tx.entry(AssistantEntry, settled.answer), context);
       const message = answer?.model?.[0] as AssistantMessage | undefined;
-      if (message?.stopReason === "error") return { threadId, status: "error", error: message.errorMessage ?? "The agent failed." };
-      return { threadId, status: "ok", finalText: textOf(message) };
+      if (message?.stopReason === "error") {
+        await settle();
+        return { threadId, status: "error", error: message.errorMessage ?? "The agent failed." };
+      }
+      return { threadId, status: "ok", finalText: withClosingNotes(await settle(settled.answer), textOf(message)) };
     }
   };
 
@@ -2468,6 +2630,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   const extension = defineExtension({
     name: STELLA_AGENTS_EXTENSION,
     tasks: [Anchor, Reporter],
+    hooks: [notesHook],
     tools: [
       spawnAgent,
       sendMessage,

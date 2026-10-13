@@ -3,13 +3,19 @@
  * Publish the desktop app's source to an environment's upstream Artifacts
  * repo, where each owner's fork pulls updates from (v3).
  *
- *   node scripts/publish-app-source.mjs [--namespace stella-app-dev] [--ref HEAD]
+ *   node scripts/publish-app-source.mjs [--namespace stella-app-dev] [--ref HEAD] [--backend <url>]
  *
  * The published tree is the ref minus the server, the mobile app and repo
  * tooling, with `bun.lock` regenerated for the workspaces that remain so a
  * frozen install works. Each publish is one commit on upstream `main`,
  * parented on the previous publish, with the source commit in a
  * `Stella-Source:` trailer. An unchanged tree publishes nothing.
+ *
+ * Then it tells the namespace's backend (`--backend` for any other, such as a
+ * Preview bound to a test namespace), which reads upstream itself and pushes
+ * the new version to every connected desktop of that environment. Desktops
+ * don't poll: without this notice they learn of the publish only when they
+ * next connect.
  *
  * Needs a Wrangler login (or CLOUDFLARE_API_TOKEN) for the account.
  */
@@ -43,6 +49,40 @@ const option = (name, fallback) => {
 };
 const namespace = option("namespace", "stella-app-dev");
 const ref = option("ref", "HEAD");
+
+/** The backend whose desktops follow each namespace. */
+const NAMESPACE_BACKENDS = {
+  "stella-app-dev": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev",
+  "stella-app-prod": "https://stella-v2-cloud-builder-prod.fromyou.workers.dev",
+  "stella-app-acceptance": "https://stella-v2-cloud-builder-basic-nightingale-118.fromyou.workers.dev",
+};
+const backend = option("backend", NAMESPACE_BACKENDS[namespace]);
+
+/** Tell the backend's connected desktops; never fails the publish. */
+const announce = async () => {
+  if (!backend) {
+    console.log(`No backend follows ${namespace}; pass --backend <url> to tell its desktops.`);
+    return;
+  }
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(`${backend.replace(/\/+$/, "")}/api/app-source/releases`, {
+        method: "POST",
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (response.ok) {
+        const { version } = await response.json();
+        console.log(`Told ${backend}'s desktops about ${String(version).slice(0, 12)}.`);
+        return;
+      }
+      console.warn(`Release notice to ${backend} failed (${response.status}).`);
+    } catch (error) {
+      console.warn(`Release notice to ${backend} failed: ${error instanceof Error ? error.message : error}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, attempt * 2_000));
+  }
+  console.warn("Desktops will see this version when they next connect.");
+};
 
 const run = (command, commandArgs, options = {}) =>
   execFileSync(command, commandArgs, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"], ...options }).trim();
@@ -111,3 +151,6 @@ try {
 } finally {
   rmSync(workDir, { recursive: true, force: true });
 }
+
+// Also after "nothing to publish": a notice lost last time is sent again.
+await announce();

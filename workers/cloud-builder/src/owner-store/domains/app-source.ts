@@ -6,7 +6,7 @@
  * short-lived tokens minted per request.
  */
 
-import type { AppSourceCalls, AppSourceRemote } from "@stella/contracts/backend/app-source";
+import type { AppSourceCalls, AppSourceRemote, AppSourceViews } from "@stella/contracts/backend/app-source";
 import { empty, object, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -38,6 +38,18 @@ export const APP_SOURCE_WEB_RENDERER_MIGRATION = {
        tree_sha TEXT NOT NULL,
        previous_tree_sha TEXT,
        uploaded_at INTEGER NOT NULL
+     )`,
+  ],
+};
+
+/** The last push any of the owner's computers made to the fork. */
+export const APP_SOURCE_FORK_PUSH_MIGRATION = {
+  id: "app-source.3-fork-push",
+  statements: [
+    `CREATE TABLE app_source_fork_push (
+       id INTEGER PRIMARY KEY CHECK (id = 1),
+       tip TEXT NOT NULL,
+       pushed_at INTEGER NOT NULL
      )`,
   ],
 };
@@ -179,9 +191,35 @@ const recordWebRenderer = (ctx: OwnerContext, args: unknown): { retired: string 
   return { retired: retired && retired !== treeSha ? retired : null };
 };
 
+/**
+ * One row write per push; the owner's open views rerun and the other
+ * computers' `appSource.fork` subscriptions get the new value.
+ */
+const forkPushed = (
+  ctx: OwnerContext,
+  args: AppSourceCalls["appSource.forkPushed"]["args"],
+): AppSourceCalls["appSource.forkPushed"]["result"] => {
+  enforceOwnerRateLimit(ctx.db, ctx.now, "appSource.forkPushed", { count: 30, windowMs: 60_000 }, "Too many source pushes. Please wait a moment.");
+  // Strictly increasing, so two pushes in one millisecond still differ.
+  const last = ctx.db.one<{ pushed_at: number }>("SELECT pushed_at FROM app_source_fork_push WHERE id = 1");
+  const pushedAt = Math.max(ctx.now, (last?.pushed_at ?? 0) + 1);
+  ctx.db.run(
+    `INSERT INTO app_source_fork_push (id, tip, pushed_at) VALUES (1, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET tip = excluded.tip, pushed_at = excluded.pushed_at`,
+    args.tip,
+    pushedAt,
+  );
+  return { pushedAt };
+};
+
+const forkPush = (db: OwnerDbReader): AppSourceViews["appSource.fork"]["result"] => {
+  const row = db.one<{ tip: string; pushed_at: number }>("SELECT tip, pushed_at FROM app_source_fork_push WHERE id = 1");
+  return { tip: row?.tip ?? null, pushedAt: row?.pushed_at ?? null };
+};
+
 export const appSourceDomain = {
   name: "app-source",
-  migrations: [APP_SOURCE_MIGRATION, APP_SOURCE_WEB_RENDERER_MIGRATION],
+  migrations: [APP_SOURCE_MIGRATION, APP_SOURCE_WEB_RENDERER_MIGRATION, APP_SOURCE_FORK_PUSH_MIGRATION],
   internal: {
     /** The fork renderers upload under; null before the owner has one. */
     "appSource.webRendererFork": (ctx: OwnerContext) => ({ forkName: forkNameOf(ctx.db) }),
@@ -190,6 +228,7 @@ export const appSourceDomain = {
   purge: async (ctx: OwnerContext) => {
     const fork = forkNameOf(ctx.db);
     ctx.db.run("DELETE FROM web_renderer");
+    ctx.db.run("DELETE FROM app_source_fork_push");
     if (!fork) return { pending: false };
     const bucket = ctx.env.APP_BUILDS;
     const listing = await bucket.list({ prefix: webRendererPrefix(fork), limit: 1000 });
@@ -207,6 +246,19 @@ export const appSourceDomain = {
       requireAccount: true,
       parse: empty(),
       handler: (ctx: OwnerContext) => access(ctx),
+    },
+    "appSource.forkPushed": {
+      scope: "owner",
+      requireAccount: true,
+      parse: object({ tip: string({ pattern: TREE_SHA_PATTERN }) }),
+      handler: (ctx: OwnerContext, args: AppSourceCalls["appSource.forkPushed"]["args"]) => forkPushed(ctx, args),
+    },
+  },
+  views: {
+    "appSource.fork": {
+      requireAccount: true,
+      parse: empty(),
+      read: (ctx) => forkPush(ctx.db),
     },
   },
 } satisfies OwnerDomain;

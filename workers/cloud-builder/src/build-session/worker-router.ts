@@ -55,6 +55,7 @@ import { handleDictationTranscribeRoute } from "../dictation/transcribe-route.js
 import { handleIntegrationsRoute } from "../integrations/routes.js";
 import { handleProjectsRoute } from "../projects/routes.js";
 import { handleAppSourceBootstrap } from "../app-source-bootstrap.js";
+import { handleAppSourceReleases } from "../app-source-releases.js";
 import { handleWebRendererRoute } from "../web-renderer.js";
 import { handleUserCloudHomeRoute, ownerAccess } from "../cloud-home-routes.js";
 import {
@@ -1088,7 +1089,7 @@ app.all(`/owners/me/apps/:slug{${APP_SLUG}}/preview`, methodNotAllowed("Method n
 // Area routers. Each authenticates its own routes: the owner store and voice
 // check the user's JWT; media, projects, billing and integrations also take
 // signed webhooks and callbacks; admin checks STELLA_ADMIN_API_SECRET; the
-// model catalog and app-source bootstrap are public.
+// model catalog, app-source bootstrap and release channel are public.
 app.use(mount(handleBackendRoute));
 app.use(mount(handleStellaModelsRoute));
 app.use(mount(handlePreviewSessionCapabilityRoute));
@@ -1097,6 +1098,7 @@ app.use(mount(handleMapsRoute));
 app.use(mount(handleDictationTranscribeRoute));
 app.use(mount(handleProjectsRoute));
 app.use(mount(handleAppSourceBootstrap));
+app.use(mount(handleAppSourceReleases));
 app.use(
   mount((request, env, ctx) =>
     handleWebRendererRoute(request, env, (promise) => ctx.waitUntil(promise)),

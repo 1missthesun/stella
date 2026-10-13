@@ -289,6 +289,12 @@
         "name": "WORLDS",
         "class_name": "WorldStore",
       },
+      {
+        // One object: the latest published app version and every desktop's
+        // release socket (src/app-source-releases.ts).
+        "name": "APP_RELEASES",
+        "class_name": "AppReleaseChannel",
+      },
     ],
   },
   "migrations": [
@@ -339,6 +345,10 @@
       // Owner transfer is gone: Better Auth upgrades anonymous users in place.
       "tag": "v11",
       "deleted_classes": ["OwnerTransferCoordinator"],
+    },
+    {
+      "tag": "v12",
+      "new_sqlite_classes": ["AppReleaseChannel"],
     },
   ],
   // Per-agent Worker Previews (DEPLOY.md, "Previews"). Deploy them only with
@@ -510,6 +520,10 @@
           "name": "WORLDS",
           "class_name": "WorldStore",
         },
+        {
+          "name": "APP_RELEASES",
+          "class_name": "AppReleaseChannel",
+        },
       ],
     },
   },
@@ -655,6 +669,10 @@
             "name": "WORLDS",
             "class_name": "WorldStore",
           },
+          {
+            "name": "APP_RELEASES",
+            "class_name": "AppReleaseChannel",
+          },
         ],
       },
       "migrations": [
@@ -703,6 +721,10 @@
           // Owner transfer is gone: Better Auth upgrades anonymous users in place.
           "tag": "v11",
           "deleted_classes": ["OwnerTransferCoordinator"],
+        },
+        {
+          "tag": "v12",
+          "new_sqlite_classes": ["AppReleaseChannel"],
         },
       ],
     },
@@ -896,6 +918,10 @@
             "name": "WORLDS",
             "class_name": "WorldStore",
           },
+          {
+            "name": "APP_RELEASES",
+            "class_name": "AppReleaseChannel",
+          },
         ],
       },
       "migrations": [
@@ -944,6 +970,10 @@
           // Owner transfer is gone: Better Auth upgrades anonymous users in place.
           "tag": "v11",
           "deleted_classes": ["OwnerTransferCoordinator"],
+        },
+        {
+          "tag": "v12",
+          "new_sqlite_classes": ["AppReleaseChannel"],
         },
       ],
     },

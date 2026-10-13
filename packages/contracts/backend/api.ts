@@ -8,7 +8,7 @@
 import type { AgentEventViews } from "./agent-events.js";
 import type { AgentReportCalls, AgentReportViews } from "./agent-reports.js";
 import type { AgentThreadCalls, AgentThreadViews } from "./agent-threads.js";
-import type { AppSourceCalls } from "./app-source.js";
+import type { AppSourceCalls, AppSourceViews } from "./app-source.js";
 import type { BillingCalls, BillingViews } from "./billing.js";
 import type { DeviceCalls, DeviceViews } from "./devices.js";
 import type { ConversationCalls, ConversationViews } from "./conversations.js";
@@ -66,6 +66,7 @@ export type BackendCalls = SystemCalls &
   McpServerCalls &
   CatchUpCalls;
 export type BackendViews = ConversationViews &
+  AppSourceViews &
   AgentThreadViews &
   AgentEventViews &
   AgentReportViews &

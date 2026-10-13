@@ -44,6 +44,7 @@ const MAX_GENERATED_EVENTS_PER_CONVERSATION = 500
 const MAX_TIMER_DELAY_MS = 60_000
 const ACTIVE_HOURS_TIME_PATTERN = /^([01]\d|2[0-3]|24):([0-5]\d)$/
 const STATE_VERSION = 1
+const TURN_REPLIES_IN_CONVERSATION_SINCE_MS = Date.UTC(2026, 9, 11, 5)
 
 /**
  * The one module-level ManagedRuntime for the scheduler (M5 kernel pass,
@@ -334,9 +335,10 @@ const resolveHeartbeatPrompt = (params: {
 }
 
 /**
- * Fire-time prompts for orchestrator-bound triggers. The automation turn is
- * hidden; the scheduler delivers the turn's final text as the assistant
- * message + OS notification, so each prompt says so explicitly.
+ * Fire-time prompts for orchestrator-bound triggers. The automation turn's
+ * prompt is hidden and its reply is the conversation's assistant message,
+ * which the scheduler also raises as an OS notification, so each prompt says
+ * so explicitly.
  */
 const buildTaskFirePrompt = (name: string, intent: string) =>
   `Scheduled task "${name}" fired. Carry out the stored intent below now — answer directly or spawn agents as you normally would. Your final reply is delivered to the user as an assistant message and a native notification, so make it a concise user-facing report of what happened.
@@ -637,6 +639,17 @@ const sanitizeState = (
       ? (record.generatedEvents as Record<string, unknown>)
       : {}
   const generatedEvents: Record<string, ScheduledConversationEvent[]> = {}
+  const watchIds = new Set(
+    cronJobs.filter((job) => job.payload.kind === 'watch').map((job) => job.id),
+  )
+  const isCopyOfTurnReply = (event: ScheduledConversationEvent) => {
+    if (event.timestamp < TURN_REPLIES_IN_CONVERSATION_SINCE_MS) return false
+    const payload = event.payload
+    return (
+      payload.source === 'heartbeat' ||
+      (typeof payload.cronJobId === 'string' && watchIds.has(payload.cronJobId))
+    )
+  }
 
   for (const [conversationId, events] of Object.entries(
     generatedEventsRecord,
@@ -646,6 +659,7 @@ const sanitizeState = (
     }
     const validEvents = events
       .filter(isScheduledConversationEvent)
+      .filter((event) => !isCopyOfTurnReply(event))
       .map(cloneGeneratedEvent)
     if (validEvents.length > 0) {
       generatedEvents[conversationId] = sortEventsAscending(validEvents).slice(
@@ -1526,8 +1540,8 @@ export class LocalSchedulerService {
   /**
    * Task trigger: deliver the stored intent as a hidden orchestrator turn.
    * The orchestrator answers directly or spawns agents as it normally
-   * would; its final text is delivered as the assistant message + OS
-   * notification (consistent with every other cron fire).
+   * would; its reply is already the conversation's assistant message, so
+   * the scheduler only raises the OS notification for it.
    */
   private async executeCronTask(
     active: LocalCronJobRecord,
@@ -1573,12 +1587,6 @@ export class LocalSchedulerService {
     active.lastOutputPreview = finalText ? truncatePreview(finalText) : undefined
 
     if (deliver && finalText) {
-      this.appendGeneratedAssistantMessage(active.conversationId, {
-        text: finalText,
-        source: 'cron',
-        cronJobId: active.id,
-        cronJobName: active.name,
-      })
       this.fireOsNotification({
         title: active.name?.trim() || 'Stella',
         body: finalText,
@@ -1763,12 +1771,6 @@ export class LocalSchedulerService {
     active.lastOutputPreview = finalText ? truncatePreview(finalText) : undefined
 
     if (deliver && finalText) {
-      this.appendGeneratedAssistantMessage(active.conversationId, {
-        text: finalText,
-        source: 'cron',
-        cronJobId: active.id,
-        cronJobName: active.name,
-      })
       this.fireOsNotification({
         title: active.name?.trim() || 'Stella',
         body: finalText,
@@ -1836,12 +1838,6 @@ export class LocalSchedulerService {
       : undefined
 
     if (deliver && finalText) {
-      this.appendGeneratedAssistantMessage(active.conversationId, {
-        text: finalText,
-        source: 'cron',
-        cronJobId: active.id,
-        cronJobName: active.name,
-      })
       this.fireOsNotification({
         title: active.name?.trim() || 'Stella',
         body: finalText,
@@ -1958,12 +1954,6 @@ export class LocalSchedulerService {
 
     const deliver = active.deliver !== false
     if (deliver) {
-      this.appendGeneratedAssistantMessage(active.conversationId, {
-        text: finalText,
-        source: 'heartbeat',
-        heartbeatConfigId: active.id,
-        reason: 'scheduled',
-      })
       this.fireOsNotification({
         title: 'Stella check-in',
         body: finalText,

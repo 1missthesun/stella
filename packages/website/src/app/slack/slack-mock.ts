@@ -131,7 +131,7 @@ export const mockSlackApi = {
     const { repo, previews, environment, ...rest } = update;
     const now = current(mockMode());
     let next: SlackWorkspace = { ...now, ...rest, previews: { ...now.previews, ...previews } };
-    if (environment) {
+    if (environment && now.environment) {
       const { secrets, ...fields } = environment;
       const kept = now.environment.secrets.filter((secret) => !secrets?.remove?.includes(secret.id));
       const added = (secrets?.add ?? []).map((secret) => ({

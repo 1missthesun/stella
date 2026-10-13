@@ -32,7 +32,7 @@ import {
 } from "./turn-credential-broker.js";
 import { prepareSlackPreviews } from "./slack/previews.js";
 import { prepareSlackRepo } from "./slack/repo-clone.js";
-import { egressForConversation, prepareSlackEnvironment } from "./slack/environment.js";
+import { egressForConversation, prepareSlackEnvironment, slackEnvironmentsEnabled } from "./slack/environment.js";
 import { isSlackConversationId } from "./slack/conversation-id.js";
 import { startTurnExecution } from "./turn-cancellation.js";
 import { issueWorldCapability } from "./world-capability.js";
@@ -229,7 +229,7 @@ export const openPiComputeLease = async (
     const started = Date.now();
     await host.takeSlot(owner, target.sandboxId, execution.signal);
     sandbox = sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world);
-    if (isSlackConversationId(owner.conversationId)) {
+    if (isSlackConversationId(owner.conversationId) && slackEnvironmentsEnabled(host.env)) {
       const egress = await egressForConversation(host.env as Cloudflare.Env, owner.conversationId);
       const { restarted } = await sandbox.setEgress(egress);
       if (restarted) host.log("slack_container_restarted_for_network", { threadId, network: egress?.internet ? "full" : "restricted" });
@@ -272,7 +272,7 @@ export const openPiComputeLease = async (
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
     const repoDir = await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log);
     await prepareSlackPreviews(host.env, session, owner.conversationId, publicOrigin(host), host.log);
-    if (isSlackConversationId(owner.conversationId)) {
+    if (isSlackConversationId(owner.conversationId) && slackEnvironmentsEnabled(host.env)) {
       const prepared = await prepareSlackEnvironment(
         host.env as Cloudflare.Env,
         session,

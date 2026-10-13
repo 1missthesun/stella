@@ -17,7 +17,7 @@
  *   who is asking (`/slack/bind`, see `relay.ts`) before the turn starts.
  */
 
-import { environmentSummary, loadEnvironment } from "./environment.js";
+import { environmentSummary, loadEnvironment, slackEnvironmentsEnabled } from "./environment.js";
 import {
   TURN_OWNER_GENERATION_HEADER,
   TURN_PLANE_PROTOCOL,
@@ -474,7 +474,7 @@ const handleMessage = async (
   }
   const [settings, environment] = await Promise.all([
     loadWorkspaceSettings(env, install.teamId),
-    loadEnvironment(env, install.teamId),
+    slackEnvironmentsEnabled(env) ? loadEnvironment(env, install.teamId) : null,
   ]);
   const workspace: SlackWorkspaceContext = {
     teamName: install.teamName,
@@ -493,7 +493,7 @@ const handleMessage = async (
           ),
         }
       : {}),
-    environment: environmentSummary(environment),
+    ...(environment ? { environment: environmentSummary(environment) } : {}),
   };
 
   const clientMsgId = `slack:${channelId}:${ts}`.slice(0, 64);

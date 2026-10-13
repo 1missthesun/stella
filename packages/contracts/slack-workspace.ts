@@ -172,7 +172,8 @@ export type SlackWorkspace = {
   github: SlackWorkspaceGithub | null;
   repo: SlackWorkspaceRepo | null;
   previews: SlackWorkspacePreviews;
-  environment: SlackWorkspaceEnvironment;
+  /** Null where this deployment doesn't offer environments yet. */
+  environment: SlackWorkspaceEnvironment | null;
   /** Plain-language rules Stella follows in this workspace (`memories/rules.md`). */
   rules: string;
   /** Stella's workspace-wide notes (`memories/workspace.md`). */

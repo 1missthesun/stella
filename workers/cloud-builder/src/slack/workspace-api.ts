@@ -58,7 +58,13 @@ import {
   type SettingsPatch,
 } from "./settings.js";
 import { describePreviews, isPreviewTtl, savePreviewSettings } from "./previews.js";
-import { loadEnvironment, saveEnvironment, validateEnvironmentUpdate, type EnvironmentPatch } from "./environment.js";
+import {
+  loadEnvironment,
+  saveEnvironment,
+  slackEnvironmentsEnabled,
+  validateEnvironmentUpdate,
+  type EnvironmentPatch,
+} from "./environment.js";
 import { loadInstallation, type SlackInstallation } from "./store.js";
 import { rulesPath, workspaceNotesPath } from "./workspace.js";
 
@@ -165,7 +171,7 @@ const describe = async (
     github: describeGithub(settings.github),
     repo: repoView(settings),
     previews: await describePreviews(env, install.teamId, install.ownerId),
-    environment: await loadEnvironment(env, install.teamId),
+    environment: slackEnvironmentsEnabled(env) ? await loadEnvironment(env, install.teamId) : null,
     rules,
     memory,
     slackUrl: `https://app.slack.com/client/${encodeURIComponent(install.teamId)}`,
@@ -278,6 +284,7 @@ const update = async (
   }
   let environmentPatch: EnvironmentPatch | null = null;
   if (input.environment !== undefined) {
+    if (!slackEnvironmentsEnabled(env)) return fail(400, "Environments aren't available yet.");
     const checked = validateEnvironmentUpdate(input.environment, await loadEnvironment(env, teamId));
     if (!checked.ok) return fail(400, checked.message);
     environmentPatch = checked.patch;

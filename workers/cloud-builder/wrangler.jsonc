@@ -81,6 +81,10 @@
     // `@test.stella.local` users, whose magic links are logged, not sent.
     // Production and acceptance configs must omit it.
     "STELLA_TEST_ACCOUNTS": "1",
+    // Dev only until it ships: Slack workspace environments
+    // (`src/slack/environment.ts`). Unset, Slack agent containers keep the
+    // default network and the settings page hides the section.
+    "SLACK_ENVIRONMENTS": "1",
     "STELLA_DEPLOYMENT_IDENTITY": "dev:outgoing-bulldog-865",
     // Public origin of the model gateway. Durable Objects reach it through the
     // MODEL_GATEWAY service binding (the hostname only has to parse there);

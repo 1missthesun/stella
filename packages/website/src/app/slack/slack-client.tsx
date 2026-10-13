@@ -15,6 +15,7 @@ import {
   SLACK_SETUP_SCRIPT_MAX_CHARS,
   type SlackNetworkLevel,
   type SlackNetworkSecretInput,
+  type SlackWorkspaceEnvironment,
   type SlackWorkspaceEnvironmentUpdate,
   type SlackGithubInstallationChoice,
   type SlackPreviewAccess,
@@ -378,6 +379,7 @@ const hostsList = (text: string): string[] =>
 
 const environmentDiff = (w: SlackWorkspace, d: Draft): SlackWorkspaceEnvironmentUpdate | null => {
   const e = w.environment;
+  if (!e) return null;
   const update: SlackWorkspaceEnvironmentUpdate = {};
   if (d.envName.trim() !== e.name) update.name = d.envName.trim();
   if (d.network !== e.network) update.network = d.network;
@@ -404,11 +406,11 @@ const draftFrom = (w: SlackWorkspace): Draft => ({
   previewTtlDays: w.previews.ttlDays,
   rules: w.rules,
   memory: w.memory,
-  envName: w.environment.name,
-  network: w.environment.network,
-  allowedHosts: hostsText(w.environment.allowedHosts),
-  setupScript: w.environment.setupScript,
-  envVars: w.environment.envVars,
+  envName: w.environment?.name ?? "",
+  network: w.environment?.network ?? "full",
+  allowedHosts: hostsText(w.environment?.allowedHosts ?? []),
+  setupScript: w.environment?.setupScript ?? "",
+  envVars: w.environment?.envVars ?? "",
   secretsAdd: [],
   secretsRemove: [],
 });
@@ -483,7 +485,7 @@ function WorkspaceCard({
   const rulesOver = draft.rules.length > SLACK_RULES_MAX_CHARS;
   const memoryOver = draft.memory.length > SLACK_MEMORY_MAX_CHARS;
   const environmentInvalid =
-    !draft.envName.trim() ||
+    (workspace.environment !== null && !draft.envName.trim()) ||
     draft.envName.length > SLACK_ENV_NAME_MAX_CHARS ||
     draft.setupScript.length > SLACK_SETUP_SCRIPT_MAX_CHARS ||
     draft.envVars.length > SLACK_ENV_VARS_MAX_CHARS;
@@ -650,12 +652,15 @@ function WorkspaceCard({
         onWorkspace={githubChanged}
       />
 
-      <EnvironmentPanel
-        workspace={workspace}
-        options={options}
-        draft={draft}
-        set={set}
-      />
+      {workspace.environment ? (
+        <EnvironmentPanel
+          workspace={workspace}
+          environment={workspace.environment}
+          options={options}
+          draft={draft}
+          set={set}
+        />
+      ) : null}
 
       <PreviewsPanel
         workspace={workspace}
@@ -768,17 +773,18 @@ const EMPTY_SECRET: SlackNetworkSecretInput = { name: "", host: "", header: "Aut
 
 function EnvironmentPanel({
   workspace,
+  environment,
   options,
   draft,
   set,
 }: {
   workspace: SlackWorkspace;
+  environment: SlackWorkspaceEnvironment;
   options: SlackWorkspaceOptions;
   draft: Draft;
   set: <K extends keyof Draft>(key: K, value: Draft[K]) => void;
 }) {
   const headingId = `${workspace.teamId}-environment`;
-  const { environment } = workspace;
   const [adding, setAdding] = useState<SlackNetworkSecretInput | null>(null);
   const lastSetup = environment.lastSetup;
   const addingValid = Boolean(

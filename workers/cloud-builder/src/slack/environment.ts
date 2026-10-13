@@ -124,6 +124,10 @@ const POLICY_CACHE_MS = 5_000;
 
 const DEFAULT_NAME = "Default";
 
+/** Environments are on where `SLACK_ENVIRONMENTS` is "1" (dev until they ship). */
+export const slackEnvironmentsEnabled = (env: Partial<Cloudflare.Env>): boolean =>
+  (env as { SLACK_ENVIRONMENTS?: string }).SLACK_ENVIRONMENTS === "1";
+
 const d1 = (env: Cloudflare.Env): D1Database => {
   if (!env.DB) throw new Error("The DB binding is missing.");
   return env.DB;
@@ -190,6 +194,7 @@ export const loadEnvironment = async (env: Cloudflare.Env, teamId: string): Prom
 };
 
 export const deleteEnvironment = async (env: Cloudflare.Env, teamId: string): Promise<void> => {
+  if (!slackEnvironmentsEnabled(env)) return;
   await d1(env).batch([
     d1(env).prepare("DELETE FROM slack_environments WHERE team_id = ?").bind(teamId),
     d1(env).prepare("DELETE FROM slack_environment_secrets WHERE team_id = ?").bind(teamId),

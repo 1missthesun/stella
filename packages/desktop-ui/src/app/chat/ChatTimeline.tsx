@@ -641,6 +641,8 @@ export const ChatTimeline = memo(function ChatTimeline({
         data={listItems}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
+        // Rows re-render for a catch-up jump's flash only.
+        extraData={flashItemId}
         estimatedItemSize={estimatedItemSize}
         drawDistance={drawDistance}
         recycleItems={recycleItems}

@@ -133,6 +133,7 @@
 /* Saved catch-ups, oldest first, newest at the bottom: each one fills the
    scroller and snaps into place, so the history pages up and down. */
 .catch-up__pages {
+  position: relative;
   height: var(--catch-up-page-height);
   overflow-y: auto;
   overscroll-behavior: contain;

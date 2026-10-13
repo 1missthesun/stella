@@ -9,7 +9,7 @@
 
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CatchUp, CatchUpItem, CatchUpLink } from "@stella/contracts/backend/catch-ups";
-import { catchUpOffer } from "@stella/contracts/catch-up";
+import { CATCH_UP_MIN_NEW_MESSAGES, catchUpOffer } from "@stella/contracts/catch-up";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
 import { useChatMessages } from "@/context/use-chat-messages";
@@ -176,11 +176,23 @@ export const CatchUpPill = memo(function CatchUpPill({
   const view = useBackendView("catchUps.list", { conversationId });
   const catchUps = useMemo(() => view.value?.catchUps ?? [], [view.value]);
   const offerInput = useMemo(() => offerMessages(messages), [messages]);
-  const offer = useMemo(() => catchUpOffer(offerInput, catchUps), [catchUps, offerInput]);
+  const [now, setNow] = useState(() => Date.now());
+  const offer = useMemo(
+    () => catchUpOffer(offerInput, catchUps, now),
+    [catchUps, now, offerInput],
+  );
+  // The pill lingers after a summary lands; take it down when that ends.
+  useEffect(() => {
+    if (!offer.lingerUntil) return;
+    const timer = window.setTimeout(
+      () => setNow(Date.now()),
+      Math.max(0, offer.lingerUntil - Date.now()) + 50,
+    );
+    return () => window.clearTimeout(timer);
+  }, [offer.lingerUntil]);
   const pending = catchUps.some((catchUp) => catchUp.state === "pending");
   const [open, setOpen] = useState(false);
   const requestingRef = useRef(false);
-  const pagesRef = useRef<HTMLDivElement | null>(null);
 
   const request = useCallback(async () => {
     if (requestingRef.current) return;
@@ -202,7 +214,7 @@ export const CatchUpPill = memo(function CatchUpPill({
     (next: boolean) => {
       setOpen(next);
       // Only what no catch-up covers yet is worth a new one.
-      if (next && offer.count > 0 && !pending) void request();
+      if (next && offer.count >= CATCH_UP_MIN_NEW_MESSAGES && !pending) void request();
     },
     [offer.count, pending, request],
   );
@@ -215,23 +227,31 @@ export const CatchUpPill = memo(function CatchUpPill({
     [conversationId],
   );
 
-  // Newest at the bottom: open there, and follow a new page as it lands.
-  const newestId = catchUps.at(-1)?.catchUpId;
+  // Newest at the bottom: open on its first line, and follow a new page as
+  // it lands or fills in. The pages mount with the popover, after this
+  // component's own effects, so their node is tracked as state.
+  const newest = catchUps.at(-1);
+  const newestKey = newest ? `${newest.catchUpId}:${newest.state}` : "";
+  const [pagesNode, setPagesNode] = useState<HTMLDivElement | null>(null);
+  const shownKeyRef = useRef<string | null>(null);
   useLayoutEffect(() => {
-    const node = pagesRef.current;
-    if (!open || !node) return;
-    node.scrollTop = node.scrollHeight;
-  }, [open, newestId]);
+    if (!pagesNode) {
+      shownKeyRef.current = null;
+      return;
+    }
+    const page = pagesNode.lastElementChild as HTMLElement | null;
+    if (!page || shownKeyRef.current === newestKey) return;
+    pagesNode.scrollTo({
+      top: page.offsetTop,
+      behavior: shownKeyRef.current === null ? "instant" : "smooth",
+    });
+    shownKeyRef.current = newestKey;
+  }, [pagesNode, newestKey]);
 
-  // A summary that just filled in keeps its page in view.
-  const newestState = catchUps.at(-1)?.state;
-  useEffect(() => {
-    const node = pagesRef.current;
-    if (!open || !node || newestState !== "ready") return;
-    node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
-  }, [newestState, open]);
+  // A new summary appearing (from any device) restarts the linger clock.
+  useEffect(() => setNow(Date.now()), [catchUps]);
 
-  if (!offer.offer && !pending && !open) return null;
+  if (!offer.offer && !pending && !open && !offer.lingerUntil) return null;
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -240,12 +260,18 @@ export const CatchUpPill = memo(function CatchUpPill({
           type="button"
           className="catch-up-pill"
           data-open={open ? "" : undefined}
-          aria-label={t("app.chat.catchUp.pillLabel", { count: offer.count })}
+          aria-label={
+            offer.count >= CATCH_UP_MIN_NEW_MESSAGES
+              ? t("app.chat.catchUp.pillLabel", { count: offer.count })
+              : t("app.chat.catchUp.title")
+          }
           data-testid="catch-up-pill"
         >
           <LayoutList size={14} strokeWidth={2} aria-hidden="true" />
           <span className="catch-up-pill__label">{t("app.chat.catchUp.pill")}</span>
-          {offer.count > 0 ? <span className="catch-up-pill__count">{offer.count}</span> : null}
+          {offer.count >= CATCH_UP_MIN_NEW_MESSAGES ? (
+            <span className="catch-up-pill__count">{offer.count}</span>
+          ) : null}
         </button>
       </Popover.Trigger>
       <Popover.Content
@@ -268,7 +294,7 @@ export const CatchUpPill = memo(function CatchUpPill({
               <X size={14} strokeWidth={2} aria-hidden="true" />
             </button>
           </div>
-          <div className="catch-up__pages" ref={pagesRef} data-testid="catch-up-pages">
+          <div className="catch-up__pages" ref={setPagesNode} data-testid="catch-up-pages">
             {catchUps.map((catchUp, index) => (
               <CatchUpPage
                 key={catchUp.catchUpId}

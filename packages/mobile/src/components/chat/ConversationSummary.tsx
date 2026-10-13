@@ -19,7 +19,7 @@ import {
   type LayoutChangeEvent,
 } from "react-native";
 import type { CatchUp, CatchUpItem, CatchUpLink } from "@stella/contracts/backend/catch-ups";
-import { catchUpOffer } from "@stella/contracts/catch-up";
+import { CATCH_UP_MIN_NEW_MESSAGES, catchUpOffer } from "@stella/contracts/catch-up";
 import { useLocale, useT } from "../../i18n";
 import { getBackendClient, useBackendView } from "../../lib/backend";
 import { tapLight } from "../../lib/haptics";
@@ -32,8 +32,8 @@ import { FloatingPopover } from "../FloatingPopover";
 import { GlassSurface } from "../glass";
 import { Icon, type IconName } from "../Icon";
 
-const MAX_HEIGHT_RATIO = 0.58;
-const MAX_HEIGHT = 480;
+const MAX_HEIGHT_RATIO = 0.66;
+const MAX_HEIGHT = 560;
 
 /** The catch-ups of a conversation and whether one is worth offering now. */
 export function useConversationSummaries(
@@ -55,9 +55,25 @@ export function useConversationSummaries(
       ),
     [messages],
   );
-  const offer = useMemo(() => catchUpOffer(offerInput, catchUps), [catchUps, offerInput]);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => setNow(Date.now()), [catchUps]);
+  const offer = useMemo(
+    () => catchUpOffer(offerInput, catchUps, now),
+    [catchUps, now, offerInput],
+  );
+  // The pill lingers after a summary lands; take it down when that ends.
+  useEffect(() => {
+    if (!offer.lingerUntil) return;
+    const timer = setTimeout(
+      () => setNow(Date.now()),
+      Math.max(0, offer.lingerUntil - Date.now()) + 50,
+    );
+    return () => clearTimeout(timer);
+  }, [offer.lingerUntil]);
   const pending = catchUps.some((catchUp) => catchUp.state === "pending");
-  return { catchUps, offer, pending };
+  /** Whether the pill shows: a busy stretch, one being written, or a fresh one to reread. */
+  const visible = offer.offer || pending || offer.lingerUntil > 0;
+  return { catchUps, offer, pending, visible };
 }
 
 /** The pill that leads the composer. */
@@ -75,7 +91,11 @@ export function SummaryPill({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t("app.chat.catchUp.pillLabel", { count })}
+      accessibilityLabel={
+        count >= CATCH_UP_MIN_NEW_MESSAGES
+          ? t("app.chat.catchUp.pillLabel", { count })
+          : t("app.chat.catchUp.title")
+      }
       testID="summary-pill"
       hitSlop={6}
       onPress={() => {
@@ -97,7 +117,7 @@ export function SummaryPill({
           <Text style={styles.pillText} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
             {t("app.chat.catchUp.pill")}
           </Text>
-          {count > 0 ? (
+          {count >= CATCH_UP_MIN_NEW_MESSAGES ? (
             <View style={styles.pillCount}>
               <Text style={styles.pillCountText} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
                 {count}
@@ -315,13 +335,26 @@ export function SummaryPopover({
     return offsets;
   }, [catchUps, pageHeights, viewport]);
 
+  // Open on the newest page's first line, and follow a new page as it lands
+  // or fills in (once every page above it has been measured).
   const newest = catchUps.at(-1);
-  const scrollToNewest = useCallback(() => {
-    requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: false }));
-  }, []);
+  const newestKey = newest ? `${newest.catchUpId}:${newest.state}` : "";
+  const newestTop = useMemo(() => {
+    let top = 0;
+    for (const catchUp of catchUps.slice(0, -1)) {
+      const pageHeight = pageHeights[catchUp.catchUpId];
+      if (pageHeight === undefined) return null;
+      top += pageHeight;
+    }
+    return top;
+  }, [catchUps, pageHeights]);
+  const shownKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    scrollToNewest();
-  }, [newest?.catchUpId, newest?.state, scrollToNewest]);
+    if (newestTop === null || shownKeyRef.current === newestKey) return;
+    const animated = shownKeyRef.current !== null;
+    shownKeyRef.current = newestKey;
+    requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: newestTop, animated }));
+  }, [newestKey, newestTop]);
 
   return (
     <FloatingPopover
@@ -335,7 +368,6 @@ export function SummaryPopover({
           testID="summary-pages"
           style={styles.pages}
           onLayout={(event) => setViewport(Math.round(event.nativeEvent.layout.height))}
-          onContentSizeChange={scrollToNewest}
           snapToOffsets={snapOffsets}
           snapToEnd={false}
           decelerationRate="fast"
@@ -349,8 +381,9 @@ export function SummaryPopover({
               total={catchUps.length}
               minHeight={viewport}
               onJump={(link) => {
-                close();
+                // Hand the link over first: the popover may close at once.
                 onJump(link);
+                close();
               }}
               onRetry={() => void request()}
               onLayout={(event) => {

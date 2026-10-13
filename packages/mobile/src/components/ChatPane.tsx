@@ -115,6 +115,7 @@ import {
   useConversationSummaries,
 } from "./chat/ConversationSummary";
 import type { CatchUpLink } from "@stella/contracts/backend/catch-ups";
+import { CATCH_UP_MIN_NEW_MESSAGES } from "@stella/contracts/catch-up";
 import { isGuest } from "../lib/guest-mode";
 import {
   type AnchorRect,
@@ -1934,6 +1935,7 @@ export function ChatPane({
   );
   const [summaryOpen, setSummaryOpen] = useState<{ requestNew: boolean } | null>(null);
   const [summaryJump, setSummaryJump] = useState<{ link: CatchUpLink; pages: number } | null>(null);
+  const summaryJumpAfterCloseRef = useRef<CatchUpLink | null>(null);
   useEffect(() => {
     if (!summaryJump) return;
     const { link } = summaryJump;
@@ -1969,11 +1971,11 @@ export function ChatPane({
   const openSummary = useCallback(() => {
     inputRef.current?.blur();
     setSummaryOpen({
-      requestNew: summaries.offer.count > 0 && !summaries.pending,
+      requestNew:
+        summaries.offer.count >= CATCH_UP_MIN_NEW_MESSAGES && !summaries.pending,
     });
   }, [summaries.offer.count, summaries.pending]);
-  const showSummaryPill =
-    (summaries.offer.offer || summaries.pending) && !searchOpen;
+  const showSummaryPill = summaries.visible && !searchOpen;
 
   const jumpToMessage = useCallback(
     (index: number) => {
@@ -2371,8 +2373,16 @@ export function ChatPane({
             conversationId={conversationId}
             catchUps={summaries.catchUps}
             requestNew={summaryOpen.requestNew}
-            onJump={(link) => setSummaryJump({ link, pages: 0 })}
-            onClose={() => setSummaryOpen(null)}
+            onJump={(link) => {
+              summaryJumpAfterCloseRef.current = link;
+            }}
+            onClose={() => {
+              setSummaryOpen(null);
+              // Scroll once the popover is gone, as search does.
+              const link = summaryJumpAfterCloseRef.current;
+              summaryJumpAfterCloseRef.current = null;
+              if (link) setTimeout(() => setSummaryJump({ link, pages: 0 }), 60);
+            }}
             colors={colors}
           />
         ) : null}

@@ -27,20 +27,28 @@ import { PI_LATE_ANSWER_PREFIX } from "@stella/contracts/pi-chat";
 import {
   DEFAULT_USER_ASK_ESCALATION_POLICY,
   USER_ASK_BLOCKING_TTL_MS,
+  USER_ASK_EXPIRED_NOTE,
   USER_ASK_ESCALATION_STEP_MS,
+  USER_ASK_KINDS,
   USER_ASK_SCHEMA_VERSION,
   USER_ASK_SECRET_HANDLE_PREFIX,
   clampUrgency,
   clampUserAskTimeoutMs,
+  effectiveEscalationCeiling,
   isUserAskSecretHandle,
+  isWithinQuietHours,
   normalizeUserAskEscalationPolicy,
+  normalizeUserAskDeclineReason,
   normalizeUserAskQuestions,
   userAskAcceptsAnswer,
+  userAskAwaitsAnswer,
+  userAskDeclinedNote,
   userAskDefaultedResolution,
   userAskIsOpen,
   userAskQuestionsOf,
   userAskReadableAnswers,
   userAskTitleOf,
+  userAskTtlMs,
   validateUserAskResponses,
 } from "@stella/contracts/user-ask";
 import { protectValue, unprotectValue } from "@stella/runtime/kernel/shared/protected-storage";
@@ -51,10 +59,11 @@ import {
 } from "@stella/runtime/kernel/preferences/local-preferences";
 import { showStellaNotification } from "./notification-service.js";
 import { PendingRequestStore } from "./pending-request-store.js";
-import { UserAskEscalationEngine, localTimeZone } from "./user-ask-escalation.js";
+import { UserAskEscalationEngine, localTimeZone, minuteOfDayAt } from "./user-ask-escalation.js";
 import {
   createUserAskRecipientKey,
   openUserAskSealedValue,
+  sealUserAskValue,
 } from "./user-ask-seal.js";
 const SECURE_VALUES_FILE = "user-ask-secrets.json";
 const KEYCHAIN_FALLBACK_FILE = "user-ask-keychain.json";
@@ -74,7 +83,26 @@ const REMOTE_ANSWER_POLL_MS = 15_000;
 const POLICY_CACHE_MAX_AGE_MS = 30_000;
 const SECURE_VALUE_TTL_MS = USER_ASK_BLOCKING_TTL_MS;
 const secretScope = (handle) => `${SECRET_SCOPE_PREFIX}:${handle}`;
-const secureValueIsLive = (entry, now) => typeof entry?.createdAt === "number" && now - entry.createdAt < SECURE_VALUE_TTL_MS;
+const mirroredAskOf = (row) => {
+    if (!row || typeof row !== "object") {
+        return null;
+    }
+    const { title: _title, ...ask } = row;
+    if (typeof ask.askId !== "string" ||
+        !ask.askId ||
+        !USER_ASK_KINDS.includes(ask.kind) ||
+        typeof ask.conversationId !== "string" ||
+        typeof ask.revision !== "number" ||
+        typeof ask.state !== "string" ||
+        !userAskAwaitsAnswer(ask.state) ||
+        !ask.detail ||
+        typeof ask.detail !== "object" ||
+        ask.detail.kind !== ask.kind) {
+        return null;
+    }
+    return { ...ask, relayed: true };
+};
+const secureValueIsLive =(entry, now) => typeof entry?.createdAt === "number" && now - entry.createdAt < SECURE_VALUE_TTL_MS;
 const readRawSecureValueStore = (stellaAppDir) => {
     try {
         const parsed = JSON.parse(fs.readFileSync(path.join(stellaAppDir, SECURE_VALUES_FILE), "utf-8"));
@@ -283,6 +311,10 @@ export class UserAskService {
     remoteLiveAt = 0;
     claiming = new Set();
     fingerprintCache = null;
+    mirrorStarted = false;
+    mirrored = new Map();
+    mirroredNotified = new Map();
+    mirrorRefreshing = null;
     constructor(options) {
         this.options = options;
         this.escalation = new UserAskEscalationEngine({
@@ -313,7 +345,220 @@ export class UserAskService {
         return [...this.asks.values()]
             .map((record) => record.ask)
             .filter((ask) => userAskIsOpen(ask.state))
+            .concat([...this.mirrored.values()])
             .sort((left, right) => left.createdAt - right.createdAt);
+    }
+    startMirror() {
+        this.mirrorStarted = true;
+        this.startRemoteAnswerSync();
+        void this.refreshMirror();
+    }
+    noteAuthToken(token) {
+        if (!this.mirrorStarted) {
+            return;
+        }
+        if (!token) {
+            for (const askId of [...this.mirrored.keys()]) {
+                this.dropMirrored(askId, "canceled");
+            }
+            return;
+        }
+        this.startRemoteAnswerSync();
+        void this.refreshMirror();
+    }
+    async refreshMirror() {
+        if (this.mirrorRefreshing) {
+            return await this.mirrorRefreshing;
+        }
+        this.mirrorRefreshing = (async () => {
+            const response = await this.cloudRequest(CLOUD_ASKS_PATH, { method: "GET" });
+            if (!response || !response.ok) {
+                return;
+            }
+            const body = await response.json().catch(() => null);
+            if (body && Array.isArray(body.open)) {
+                this.applyMirror(body.open);
+            }
+        })().finally(() => {
+            this.mirrorRefreshing = null;
+        });
+        return await this.mirrorRefreshing;
+    }
+    applyMirror(rows) {
+        if (!this.mirrorStarted || !Array.isArray(rows)) {
+            return;
+        }
+        const deviceId = this.options.getDeviceId() ?? "";
+        const seen = new Set();
+        for (const row of rows) {
+            const ask = mirroredAskOf(row);
+            if (!ask || this.asks.has(ask.askId)) {
+                continue;
+            }
+            if (deviceId && ask.originDeviceId === deviceId) {
+                continue;
+            }
+            seen.add(ask.askId);
+            const current = this.mirrored.get(ask.askId);
+            if (current && current.revision >= ask.revision) {
+                continue;
+            }
+            this.mirrored.set(ask.askId, ask);
+            this.broadcast(current ? IPC_USER_ASK_UPDATED : IPC_USER_ASK_OPENED, ask);
+            if (!current) {
+                this.notifyMirrored(ask);
+            }
+        }
+        for (const askId of [...this.mirrored.keys()]) {
+            if (!seen.has(askId)) {
+                this.dropMirrored(askId, "answered");
+            }
+        }
+    }
+    dropMirrored(askId, state) {
+        if (!this.mirrored.delete(askId)) {
+            return;
+        }
+        clearTimeout(this.mirroredNotified.get(askId));
+        this.mirroredNotified.delete(askId);
+        this.broadcast(IPC_USER_ASK_CLOSED, { askId, state });
+    }
+    notifyMirrored(ask) {
+        if (ask.urgency < 2 || this.mirroredNotified.has(ask.askId)) {
+            return;
+        }
+        const timer = setTimeout(() => {
+            void this.showMirroredNotification(ask.askId);
+        }, USER_ASK_ESCALATION_STEP_MS);
+        timer.unref?.();
+        this.mirroredNotified.set(ask.askId, timer);
+    }
+    async showMirroredNotification(askId) {
+        if (!this.mirrored.has(askId)) {
+            return;
+        }
+        const policy = await this.resolvePolicy();
+        const ask = this.mirrored.get(askId);
+        if (!ask) {
+            return;
+        }
+        const minuteOfDay = minuteOfDayAt(Date.now(), policy.timeZone);
+        const level = effectiveEscalationCeiling(policy, ask.urgency, minuteOfDay);
+        if (level < 2) {
+            return;
+        }
+        const detail = ask.detail;
+        const who = typeof ask.agentLabel === "string" && ask.agentLabel.trim() ? ask.agentLabel.trim() : "Stella";
+        const sound = level >= 3 && policy.soundEnabled && !isWithinQuietHours(policy.quietHours, minuteOfDay);
+        showStellaNotification(this.options.notificationContext, {
+            id: `stella-user-ask-${ask.askId}-${level}`,
+            groupId: "stella-user-ask",
+            groupTitle: "Stella",
+            title: detail.kind === "question" ? `${who} needs an answer` : `${who} needs a value`,
+            body: userAskTitleOf(detail),
+            silent: !sound,
+            urgency: level >= 4 ? "critical" : "normal",
+        }, { kind: "open-window" });
+    }
+    buildMirroredAnswer(ask, payload) {
+        if (payload?.kind === "questions") {
+            return {
+                kind: "questions",
+                responses: validateUserAskResponses(ask.detail, payload.responses),
+            };
+        }
+        const detail = ask.detail;
+        if (payload?.kind !== "fields" || !Array.isArray(payload.fields) || detail.kind !== "secure_input") {
+            throw new Error("That answer does not match the ask.");
+        }
+        const fields = [];
+        for (const entry of payload.fields) {
+            const fieldId = typeof entry?.fieldId === "string" ? entry.fieldId : "";
+            const field = detail.fields.find((candidate) => candidate.id === fieldId);
+            if (!field) {
+                continue;
+            }
+            if (entry.kind === "sealed") {
+                fields.push({ fieldId, kind: "sealed", sealed: entry.sealed });
+                continue;
+            }
+            const value = typeof entry.value === "string" ? entry.value : "";
+            if (!value) {
+                continue;
+            }
+            fields.push(field.sensitive
+                ? {
+                    fieldId,
+                    kind: "sealed",
+                    sealed: sealUserAskValue({
+                        askId: ask.askId,
+                        fieldId,
+                        value,
+                        recipientKey: ask.recipientKey,
+                    }),
+                }
+                : { fieldId, kind: "plain", value });
+        }
+        return { kind: "fields", fields };
+    }
+    async postMirroredAnswer(ask, answer) {
+        const deviceId = this.options.getDeviceId() ?? "";
+        const response = await this.cloudRequest(`${CLOUD_ASKS_PATH}/${encodeURIComponent(ask.askId)}/answer`, {
+            method: "POST",
+            body: JSON.stringify({
+                ...answer,
+                askId: ask.askId,
+                revision: ask.revision,
+                ...(deviceId ? { answeredOnDeviceId: deviceId } : {}),
+            }),
+        });
+        if (!response) {
+            return { ok: false, status: 0, error: "Stella couldn't reach the cloud to send that answer." };
+        }
+        if (response.ok) {
+            return { ok: true, status: response.status };
+        }
+        const body = await response.json().catch(() => null);
+        return {
+            ok: false,
+            status: response.status,
+            error: typeof body?.error === "string" ? body.error : "That answer could not be sent.",
+        };
+    }
+    async answerMirrored(askId, payload) {
+        let ask = this.mirrored.get(askId);
+        let answer;
+        try {
+            answer = this.buildMirroredAnswer(ask, payload);
+        }
+        catch (error) {
+            return { ok: false, error: error?.message || "That answer could not be accepted." };
+        }
+        let result = await this.postMirroredAnswer(ask, answer);
+        if (!result.ok && result.status === 409) {
+            await this.refreshMirror();
+            ask = this.mirrored.get(askId);
+            if (!ask) {
+                return { ok: false, error: "That ask was already answered somewhere else." };
+            }
+            result = await this.postMirroredAnswer(ask, answer);
+        }
+        if (!result.ok) {
+            return { ok: false, error: result.error };
+        }
+        this.dropMirrored(askId, "answered");
+        return { ok: true };
+    }
+    async cancelMirrored(askId, reason) {
+        const response = await this.cloudRequest(`${CLOUD_ASKS_PATH}/${encodeURIComponent(askId)}/cancel`, {
+            method: "POST",
+            body: JSON.stringify(reason ? { reason } : {}),
+        });
+        if (!response?.ok) {
+            return { ok: false, error: "Stella couldn't reach the cloud to dismiss that ask." };
+        }
+        this.dropMirrored(askId, "canceled");
+        return { ok: true };
     }
     async askUser(request) {
         const blocking = request.blocking === true;
@@ -363,7 +608,7 @@ export class UserAskService {
             escalationLevel: 1,
             blocking,
             ...(timeoutMs === null ? {} : { deadlineAt: createdAt + timeoutMs }),
-            expiresAt: createdAt + USER_ASK_BLOCKING_TTL_MS,
+            expiresAt: createdAt + userAskTtlMs(kind),
             createdAt,
             updatedAt: createdAt,
             nextEscalationAt: createdAt + USER_ASK_ESCALATION_STEP_MS,
@@ -384,7 +629,7 @@ export class UserAskService {
         const resolution = new Promise((resolve, reject) => {
             const ttlTimer = setTimeout(() => {
                 this.expire(askId);
-            }, USER_ASK_BLOCKING_TTL_MS);
+            }, userAskTtlMs(kind));
             ttlTimer.unref?.();
             record.ttlTimer = ttlTimer;
             this.pending.set(askId, { resolve, reject, timeout: ttlTimer });
@@ -419,24 +664,29 @@ export class UserAskService {
                 outcome: "expired",
                 askId,
                 at: Date.now(),
-                note: "That ask went unanswered long enough that it expired.",
+                note: USER_ASK_EXPIRED_NOTE,
             });
         }
     }
     cancel(payload) {
         const askId = typeof payload?.askId === "string" ? payload.askId : "";
         const record = this.asks.get(askId);
+        const reason = normalizeUserAskDeclineReason(payload?.reason);
+        if (!record && this.mirrored.has(askId)) {
+            return this.cancelMirrored(askId, reason);
+        }
         if (!record) {
             return { ok: false, error: "That ask is no longer open." };
         }
         const wasPending = this.pending.has(askId);
-        this.closeRecord(askId, "canceled");
+        this.closeRecord(askId, "canceled", reason);
         if (wasPending) {
             this.pending.resolve(askId, {
-                outcome: "canceled",
+                outcome: "declined",
                 askId,
                 at: Date.now(),
-                note: "You dismissed that ask without answering.",
+                note: userAskDeclinedNote(reason),
+                ...(reason ? { reason } : {}),
             });
         }
         return { ok: true };
@@ -471,12 +721,24 @@ export class UserAskService {
     }
     cancelAll() {
         for (const askId of [...this.asks.keys()]) {
-            this.cancel({ askId });
+            const wasPending = this.pending.has(askId);
+            this.closeRecord(askId, "canceled");
+            if (wasPending) {
+                this.pending.resolve(askId, {
+                    outcome: "canceled",
+                    askId,
+                    at: Date.now(),
+                    note: "Stella was reset before the user answered.",
+                });
+            }
         }
     }
     async answer(payload) {
         const askId = typeof payload?.askId === "string" ? payload.askId : "";
         const record = this.asks.get(askId);
+        if (!record && this.mirrored.has(askId)) {
+            return await this.answerMirrored(askId, payload);
+        }
         if (!record) {
             return { ok: false, error: "That ask is no longer open." };
         }
@@ -632,6 +894,42 @@ export class UserAskService {
         const fingerprints = fingerprintSecrets(values, fingerprintParams);
         this.fingerprintCache = { key, fingerprints };
         return fingerprints;
+    }
+    listStoredSecureValues() {
+        const stellaAppDir = this.options.getStellaAppDir();
+        if (!stellaAppDir) {
+            return [];
+        }
+        return Object.entries(readSecureValueStore(stellaAppDir))
+            .map(([handle, entry]) => ({
+                id: handle,
+                label: typeof entry.label === "string" ? entry.label : "",
+                askId: typeof entry.askId === "string" ? entry.askId : "",
+                fieldId: typeof entry.fieldId === "string" ? entry.fieldId : "",
+                createdAt: entry.createdAt,
+                expiresAt: entry.createdAt + SECURE_VALUE_TTL_MS,
+            }))
+            .sort((left, right) => right.createdAt - left.createdAt);
+    }
+    deleteStoredSecureValues(payload) {
+        const stellaAppDir = this.options.getStellaAppDir();
+        if (!stellaAppDir) {
+            return { ok: false, deleted: 0 };
+        }
+        const secrets = readSecureValueStore(stellaAppDir);
+        const targets = payload?.all === true
+            ? Object.keys(secrets)
+            : typeof payload?.id === "string" && payload.id in secrets
+                ? [payload.id]
+                : [];
+        for (const handle of targets) {
+            delete secrets[handle];
+        }
+        if (targets.length > 0) {
+            writeSecureValueStore(stellaAppDir, secrets);
+            this.fingerprintCache = null;
+        }
+        return { ok: true, deleted: targets.length };
     }
     /**
      * Read a secure value once, for this computer's own use (a connector
@@ -910,10 +1208,10 @@ export class UserAskService {
             }),
         });
     }
-    async publishAskResolved(askId, state) {
+    async publishAskResolved(askId, state, reason) {
         await this.cloudRequest(`${CLOUD_ASKS_PATH}/${encodeURIComponent(askId)}/cancel`, {
             method: "POST",
-            body: JSON.stringify({ state }),
+            body: JSON.stringify({ state, ...(reason ? { reason } : {}) }),
         });
     }
     ensureBackendClient() {
@@ -937,10 +1235,11 @@ export class UserAskService {
     startRemoteAnswerSync() {
         const client = this.ensureBackendClient();
         if (client && !this.remoteWatchStop) {
-            this.remoteWatchStop = client.watch(CLOUD_OPEN_ASKS_VIEW, {}, () => {
+            this.remoteWatchStop = client.watch(CLOUD_OPEN_ASKS_VIEW, {}, (rows) => {
                 this.remoteLiveAt = Date.now();
                 this.policyCache = null;
                 void this.resolvePolicy(0);
+                this.applyMirror(rows);
                 this.claimRemoteAnswers();
             }, () => {
                 this.remoteWatchStop?.();
@@ -953,7 +1252,11 @@ export class UserAskService {
                 if (Date.now() - this.remoteLiveAt < REMOTE_ANSWER_POLL_MS) {
                     return;
                 }
+                this.startRemoteAnswerSync();
                 this.claimRemoteAnswers();
+                if (this.mirrorStarted) {
+                    void this.refreshMirror();
+                }
             }, REMOTE_ANSWER_POLL_MS);
             timer.unref?.();
             this.remotePollTimer = timer;
@@ -995,7 +1298,7 @@ export class UserAskService {
             const answer = body?.answer;
             if (!answer || typeof answer !== "object") {
                 if (body?.state === "canceled") {
-                    this.cancel({ askId });
+                    this.cancel({ askId, reason: body.reason });
                 }
                 else if (body?.state === "expired") {
                     this.expire(askId);
@@ -1030,7 +1333,7 @@ export class UserAskService {
         this.broadcast(IPC_USER_ASK_UPDATED, ask);
         return ask;
     }
-    closeRecord(askId, state) {
+    closeRecord(askId, state, reason) {
         const record = this.asks.get(askId);
         if (!record) {
             return;
@@ -1045,8 +1348,8 @@ export class UserAskService {
         record.ask = { ...record.ask, state, updatedAt: Date.now() };
         this.asks.delete(askId);
         this.broadcast(IPC_USER_ASK_CLOSED, { askId, state });
-        void this.publishAskResolved(askId, state);
-        if (this.asks.size === 0) {
+        void this.publishAskResolved(askId, state, reason);
+        if (this.asks.size === 0 && !this.mirrorStarted) {
             this.stopRemoteAnswerSync();
         }
     }

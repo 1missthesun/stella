@@ -531,9 +531,7 @@ export function useFullShellChat({
   });
   const hasMessages = displayMessages.length > 0;
   const conversationAsks = useConversationUserAsks(activeConversationId);
-  const hasOpenQuestion = conversationAsks.some(
-    (ask) => ask.detail.kind === "question",
-  );
+  const hasOpenQuestion = conversationAsks.length > 0;
   const {
     showHomeContent,
     enterChatSurfaceForInteraction,

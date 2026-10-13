@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import type { UserAsk, UserAskAnswer } from "@stella/contracts/user-ask";
+import type {
+  UserAsk,
+  UserAskAnswer,
+  UserAskAnswerFieldValue,
+} from "@stella/contracts/user-ask";
 import type { UserAskRecord } from "@stella/contracts/user-ask-deck";
 import { userAskAwaitsAnswer } from "@stella/contracts/user-ask";
 import { getElectronApi } from "@/platform/electron/electron";
+import { isWebsiteHost } from "@/platform/capabilities";
+import { backendClient, backendUrl } from "@/platform/backend/backend-client";
+import { getAuthHeaders } from "@/global/auth/services/auth-token";
+import { sealUserAskValueOnWeb } from "./web-user-ask-seal";
 
 const EMPTY_ASKS: readonly UserAsk[] = [];
 const EMPTY_RECORDS: readonly UserAskRecord[] = [];
@@ -79,8 +87,98 @@ const replaceAsks = (rows: unknown) => {
   emit();
 };
 
+const relayedRows = (rows: unknown): readonly UserAsk[] =>
+  (Array.isArray(rows) ? rows : [])
+    .filter(isUsableAsk)
+    .map((ask) => ({ ...ask, relayed: true }));
+
+const webAsksRequest = async (
+  path: string,
+  init?: { method: string; body?: unknown },
+): Promise<Response | null> => {
+  if (!backendUrl) return null;
+  try {
+    return await fetch(`${backendUrl.replace(/\/$/u, "")}/api/user-asks${path}`, {
+      method: init?.method ?? "GET",
+      headers: await getAuthHeaders({ "Content-Type": "application/json" }),
+      ...(init?.body === undefined ? {} : { body: JSON.stringify(init.body) }),
+    });
+  } catch {
+    return null;
+  }
+};
+
+const refreshWebAsks = async (): Promise<void> => {
+  const response = await webAsksRequest("");
+  if (!response?.ok) return;
+  const body = (await response.json().catch(() => null)) as {
+    open?: unknown;
+  } | null;
+  if (body && Array.isArray(body.open)) replaceAsks(relayedRows(body.open));
+};
+
+const sealWebFields = async (
+  ask: UserAsk,
+  fields: readonly UserAskAnswerFieldValue[],
+): Promise<readonly UserAskAnswerFieldValue[]> => {
+  const detail = ask.detail;
+  if (detail.kind !== "secure_input") return fields;
+  return await Promise.all(
+    fields.map(async (entry): Promise<UserAskAnswerFieldValue> => {
+      const field = detail.fields.find((candidate) => candidate.id === entry.fieldId);
+      if (entry.kind !== "plain" || !field?.sensitive) return entry;
+      return {
+        fieldId: entry.fieldId,
+        kind: "sealed",
+        sealed: await sealUserAskValueOnWeb({
+          askId: ask.askId,
+          fieldId: entry.fieldId,
+          value: entry.value,
+          recipientKey: ask.recipientKey,
+        }),
+      };
+    }),
+  );
+};
+
+const answerWebAsk = async (answer: UserAskAnswer): Promise<boolean> => {
+  const ask = openAsks.find((candidate) => candidate.askId === answer.askId);
+  if (!ask) return false;
+  let sealed: UserAskAnswer;
+  try {
+    sealed =
+      answer.kind === "fields"
+        ? { ...answer, fields: await sealWebFields(ask, answer.fields) }
+        : answer;
+  } catch {
+    return false;
+  }
+  const post = async (revision: number) =>
+    await webAsksRequest(`/${encodeURIComponent(answer.askId)}/answer`, {
+      method: "POST",
+      body: { ...sealed, revision },
+    });
+  let response = await post(ask.revision);
+  if (response?.status === 409) {
+    await refreshWebAsks();
+    const current = openAsks.find((candidate) => candidate.askId === answer.askId);
+    if (!current) return false;
+    response = await post(current.revision);
+  }
+  return response?.ok === true;
+};
+
 const attachBridge = () => {
   if (detachBridge) return;
+  if (isWebsiteHost()) {
+    detachBridge = backendClient.watch(
+      "userAsks.open",
+      {},
+      (rows) => replaceAsks(relayedRows(rows)),
+      () => undefined,
+    );
+    return;
+  }
   const bridge = userAskBridge();
   if (!bridge) return;
   const offs = [
@@ -109,6 +207,10 @@ const subscribe = (listener: () => void) => {
 const snapshot = () => openAsks;
 
 export const refreshUserAsks = async (): Promise<void> => {
+  if (isWebsiteHost()) {
+    await refreshWebAsks();
+    return;
+  }
   const bridge = userAskBridge();
   if (!bridge?.list) return;
   try {
@@ -120,6 +222,15 @@ export const refreshUserAsks = async (): Promise<void> => {
 
 export const answerUserAsk = async (answer: UserAskAnswer): Promise<boolean> => {
   if (answered.has(answer.askId)) return true;
+  if (isWebsiteHost()) {
+    answered.add(answer.askId);
+    if (!(await answerWebAsk(answer))) {
+      answered.delete(answer.askId);
+      return false;
+    }
+    dropAsk(answer.askId);
+    return true;
+  }
   const bridge = userAskBridge();
   if (!bridge?.answer) return false;
   answered.add(answer.askId);
@@ -133,6 +244,39 @@ export const answerUserAsk = async (answer: UserAskAnswer): Promise<boolean> => 
     return true;
   } catch {
     answered.delete(answer.askId);
+    return false;
+  }
+};
+
+export const declineUserAsk = async (
+  askId: string,
+  reason: string,
+): Promise<boolean> => {
+  if (answered.has(askId)) return true;
+  answered.add(askId);
+  try {
+    let ok = false;
+    if (isWebsiteHost()) {
+      const response = await webAsksRequest(
+        `/${encodeURIComponent(askId)}/cancel`,
+        { method: "POST", body: reason ? { reason } : {} },
+      );
+      ok = response?.ok === true;
+    } else {
+      const bridge = userAskBridge();
+      const result = bridge?.cancel
+        ? await bridge.cancel({ askId, ...(reason ? { reason } : {}) })
+        : null;
+      ok = result?.ok === true;
+    }
+    if (!ok) {
+      answered.delete(askId);
+      return false;
+    }
+    dropAsk(askId);
+    return true;
+  } catch {
+    answered.delete(askId);
     return false;
   }
 };

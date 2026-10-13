@@ -10,7 +10,11 @@ import { Button } from "@/ui/button";
 import { Select } from "@/ui/select";
 import { TextField } from "@/ui/text-field";
 import { useT } from "@/shared/i18n";
-import { answerUserAsk, useUserAskRemainingMs } from "./user-ask-store";
+import {
+  answerUserAsk,
+  declineUserAsk,
+  useUserAskRemainingMs,
+} from "./user-ask-store";
 import { formatRemaining } from "./format-remaining";
 import "./user-ask-card.css";
 
@@ -134,15 +138,21 @@ function UserAskFieldRow({
 
 function UserAskSecureInputBody({
   detail,
+  relayed,
   busy,
   onAnswerFields,
+  onDecline,
 }: {
   detail: UserAskSecureInputDetail;
+  relayed: boolean;
   busy: boolean;
   onAnswerFields: (fields: readonly UserAskAnswerFieldValue[]) => void;
+  onDecline: (reason: string) => void;
 }) {
   const t = useT();
   const [values, setValues] = useState<Record<string, string>>({});
+  const [declining, setDeclining] = useState(false);
+  const [reason, setReason] = useState("");
   const [missing, setMissing] = useState<string | null>(null);
 
   const anySensitive = detail.fields.some((field) => field.sensitive);
@@ -191,7 +201,11 @@ function UserAskSecureInputBody({
         {anySensitive ? (
           <p className="user-ask__footnote user-ask__footnote--private">
             <Lock size={11} aria-hidden="true" />
-            {t("userAsk.secureInput.privateNote")}
+            {t(
+              relayed
+                ? "userAsk.secureInput.relayedPrivateNote"
+                : "userAsk.secureInput.privateNote",
+            )}
           </p>
         ) : null}
         {anyShared ? (
@@ -207,17 +221,72 @@ function UserAskSecureInputBody({
           {missing}
         </p>
       ) : null}
+      {declining ? (
+        <div className="user-ask__decline">
+          <TextField
+            label={t("userAsk.secureInput.declineReason")}
+            hideLabel
+            aria-label={t("userAsk.secureInput.declineReason")}
+            placeholder={t("userAsk.secureInput.declineReasonPlaceholder")}
+            value={reason}
+            maxLength={200}
+            disabled={busy}
+            autoFocus
+            onChange={(event) => setReason(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                onDecline(reason.trim());
+              }
+            }}
+          />
+        </div>
+      ) : null}
       <div className="user-ask__actions">
-        <Button
-          type="submit"
-          variant="primary"
-          className="pill-btn pill-btn--primary"
-          disabled={busy}
-        >
-          {busy
-            ? t("userAsk.secureInput.submitting")
-            : t("userAsk.secureInput.submit")}
-        </Button>
+        {declining ? (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="pill-btn"
+              disabled={busy}
+              onClick={() => setDeclining(false)}
+            >
+              {t("userAsk.secureInput.declineBack")}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="pill-btn pill-btn--danger"
+              disabled={busy}
+              onClick={() => onDecline(reason.trim())}
+            >
+              {t("userAsk.secureInput.declineConfirm")}
+            </Button>
+          </>
+        ) : (
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="pill-btn"
+              disabled={busy}
+              onClick={() => setDeclining(true)}
+            >
+              {t("userAsk.secureInput.decline")}
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              className="pill-btn pill-btn--primary"
+              disabled={busy}
+            >
+              {busy
+                ? t("userAsk.secureInput.submitting")
+                : t("userAsk.secureInput.submit")}
+            </Button>
+          </>
+        )}
       </div>
     </form>
   );
@@ -253,6 +322,19 @@ export function UserAskSecureInputCard({
     [ask.askId, ask.revision, busy, t],
   );
 
+  const decline = useCallback(
+    async (reason: string) => {
+      if (busy) return;
+      setBusy(true);
+      setError(null);
+      if (!(await declineUserAsk(ask.askId, reason))) {
+        setError(t("userAsk.errors.decline"));
+        setBusy(false);
+      }
+    },
+    [ask.askId, busy, t],
+  );
+
   return (
     <section
       className="user-ask"
@@ -263,8 +345,10 @@ export function UserAskSecureInputCard({
       <UserAskHeader ask={ask} title={detail.purpose} detail={detail.detail} />
       <UserAskSecureInputBody
         detail={detail}
+        relayed={ask.relayed === true}
         busy={busy}
         onAnswerFields={(fields) => void send(fields)}
+        onDecline={(reason) => void decline(reason)}
       />
       {error ? (
         <p className="user-ask__error" role="alert">

@@ -22,6 +22,12 @@ const NativeAskEscalationSettings = lazy(() =>
   })),
 );
 
+const SecureValuesCard = lazy(() =>
+  import("./SecureValuesCard").then((module) => ({
+    default: module.SecureValuesCard,
+  })),
+);
+
 export function GeneralTab() {
   const t = useT();
   const { reduceMotion } = useInterfacePreferences();
@@ -70,6 +76,11 @@ export function GeneralTab() {
       {platformCapabilities.nativeSettings ? (
         <Suspense fallback={null}>
           <NativeAskEscalationSettings />
+        </Suspense>
+      ) : null}
+      {platformCapabilities.nativeSettings ? (
+        <Suspense fallback={null}>
+          <SecureValuesCard />
         </Suspense>
       ) : null}
       {platformCapabilities.nativeSettings ? (

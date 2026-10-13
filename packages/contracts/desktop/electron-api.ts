@@ -276,6 +276,8 @@ import {
   IPC_UI_STATE_KV_CLEAR,
   IPC_USER_ASK_ANSWER,
   IPC_USER_ASK_CANCEL,
+  IPC_USER_ASK_SECURE_VALUES_DELETE,
+  IPC_USER_ASK_SECURE_VALUES_LIST,
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_LIST,
   IPC_USER_ASK_OPENED,
@@ -708,6 +710,8 @@ export const createElectronApi = (
       cancel: invoker(IPC_USER_ASK_CANCEL),
       policyGet: invoker(IPC_USER_ASK_POLICY_GET),
       policySet: invoker(IPC_USER_ASK_POLICY_SET),
+      secureValuesList: invoker(IPC_USER_ASK_SECURE_VALUES_LIST),
+      secureValuesDelete: invoker(IPC_USER_ASK_SECURE_VALUES_DELETE),
     },
 
     system: {

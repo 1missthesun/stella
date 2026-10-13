@@ -321,6 +321,10 @@ export const IPC_USER_ASK_ANSWER = "userAsk:answer" as const;
 export const IPC_USER_ASK_CANCEL = "userAsk:cancel" as const;
 export const IPC_USER_ASK_POLICY_GET = "userAsk:policyGet" as const;
 export const IPC_USER_ASK_POLICY_SET = "userAsk:policySet" as const;
+export const IPC_USER_ASK_SECURE_VALUES_LIST =
+  "userAsk:secureValuesList" as const;
+export const IPC_USER_ASK_SECURE_VALUES_DELETE =
+  "userAsk:secureValuesDelete" as const;
 
 // ── Connector credentials / connect prompts ────────────────────────────────
 

@@ -1,10 +1,12 @@
 import {
+  createCipheriv,
   createDecipheriv,
   createHash,
   createPublicKey,
   diffieHellman,
   generateKeyPairSync,
   hkdfSync,
+  randomBytes,
   randomUUID,
 } from "node:crypto";
 import {
@@ -85,4 +87,64 @@ export const openUserAskSealedValue = ({ sealed, privateKey, recipientKey, askId
         throw new Error("Sealed answer is malformed.");
     }
     return plaintext.toString("utf8");
+};
+export const canSealUserAskValue = (recipientKey) => {
+    if (!recipientKey ||
+        recipientKey.algorithm !== USER_ASK_SEAL_ALGORITHM ||
+        typeof recipientKey.keyId !== "string" ||
+        !recipientKey.keyId) {
+        return false;
+    }
+    try {
+        return (fromBase64Url(recipientKey.publicKey, USER_ASK_SEAL_PUBLIC_KEY_BYTES).length ===
+            USER_ASK_SEAL_PUBLIC_KEY_BYTES);
+    }
+    catch {
+        return false;
+    }
+};
+export const sealUserAskValue = ({ askId, fieldId, value, recipientKey }) => {
+    if (!canSealUserAskValue(recipientKey)) {
+        throw new Error("This ask has no key to encrypt that value for.");
+    }
+    const plaintext = Buffer.from(String(value), "utf8");
+    if (plaintext.length === 0 ||
+        plaintext.length > USER_ASK_SEAL_MAX_PLAINTEXT_BYTES) {
+        throw new Error("That value is too large to send.");
+    }
+    const ephemeral = generateKeyPairSync("x25519");
+    const clientPublicKey = ephemeral.publicKey
+        .export({ type: "spki", format: "der" })
+        .subarray(-USER_ASK_SEAL_PUBLIC_KEY_BYTES);
+    const agreed = diffieHellman({
+        privateKey: ephemeral.privateKey,
+        publicKey: createPublicKey({
+            key: Buffer.concat([
+                SPKI_X25519_PREFIX,
+                fromBase64Url(recipientKey.publicKey, USER_ASK_SEAL_PUBLIC_KEY_BYTES),
+            ]),
+            format: "der",
+            type: "spki",
+        }),
+    });
+    const { aad, salt, info, keyLengthBytes } = userAskSealKdfInputs({
+        binding: { askId, keyId: recipientKey.keyId, fieldId },
+        sha256Hex,
+    });
+    const key = Buffer.from(hkdfSync("sha256", agreed, salt, info, keyLengthBytes));
+    const iv = randomBytes(USER_ASK_SEAL_IV_BYTES);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    cipher.setAAD(Buffer.from(aad));
+    const ciphertext = Buffer.concat([
+        cipher.update(plaintext),
+        cipher.final(),
+        cipher.getAuthTag(),
+    ]);
+    return {
+        algorithm: USER_ASK_SEAL_ALGORITHM,
+        keyId: recipientKey.keyId,
+        clientPublicKey: toBase64Url(clientPublicKey),
+        iv: toBase64Url(iv),
+        ciphertext: toBase64Url(ciphertext),
+    };
 };

@@ -79,6 +79,8 @@ import {
   IPC_USER_ASK_LIST,
   IPC_USER_ASK_POLICY_GET,
   IPC_USER_ASK_POLICY_SET,
+  IPC_USER_ASK_SECURE_VALUES_DELETE,
+  IPC_USER_ASK_SECURE_VALUES_LIST,
   IPC_DEVICE_GET_ID,
   IPC_HOST_CONFIGURE_RUNTIME,
   IPC_HOST_SET_CLOUD_SYNC,
@@ -551,6 +553,18 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted ask policy update.");
         }
         return await options.setUserAskPolicy(payload);
+    });
+    handleIpc(IPC_USER_ASK_SECURE_VALUES_LIST, (event) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_SECURE_VALUES_LIST)) {
+            throw new Error("Blocked untrusted secure value list request.");
+        }
+        return options.listStoredSecureValues();
+    });
+    handleIpc(IPC_USER_ASK_SECURE_VALUES_DELETE, (event, payload) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_SECURE_VALUES_DELETE)) {
+            throw new Error("Blocked untrusted secure value deletion.");
+        }
+        return options.deleteStoredSecureValues(payload);
     });
     handleIpc(IPC_CONNECTOR_CONNECT_RESPOND, (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CONNECTOR_CONNECT_RESPOND)) {

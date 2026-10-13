@@ -2405,6 +2405,18 @@
     },
     "nav": {
       "more": "Altro"
+    },
+    "secureValues": {
+      "title": "Private values on this computer",
+      "description": "Values you typed into a private request are kept here, encrypted, so an agent can use them without reading them. Each one is deleted automatically 24 hours after it was given.",
+      "empty": "No private values are stored.",
+      "saved": "Saved {saved} · deleted automatically {expires}",
+      "delete": "Delete",
+      "deleteAll": "Delete all",
+      "errors": {
+        "load": "Couldn’t load stored values.",
+        "delete": "Couldn’t delete that value. Try again."
+      }
     }
   },
   "shell": {
@@ -2827,7 +2839,8 @@
       "remaining": "Restano {time}"
     },
     "errors": {
-      "answer": "That didn't go through. Try again."
+      "answer": "That didn't go through. Try again.",
+      "decline": "Couldn’t decline that. Try again."
     },
     "eyebrow": {
       "secureInput": "Stella needs a value from you"
@@ -2849,11 +2862,17 @@
       "optional": "optional",
       "privateBadge": "Private — Stella never sees it",
       "privateNote": "Private values stay on this device. Stella uses them without ever reading them.",
+      "relayedPrivateNote": "Private values are encrypted on this device so only the computer that asked can read them. Stella uses them without ever reading them.",
       "required": "Fill in {label} first.",
       "sharedBadge": "Shared with Stella",
       "sharedNote": "Shared values are sent to Stella as plain text.",
       "submit": "Send securely",
-      "submitting": "Sending…"
+      "submitting": "Sending…",
+      "decline": "Decline",
+      "declineReason": "Reason for declining",
+      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
+      "declineBack": "Back",
+      "declineConfirm": "Decline request"
     }
   },
   "schedule": {

@@ -45,9 +45,7 @@ function App() {
             <TelemetryPreferenceBridge />
           ) : null}
           <CloudHomeSyncBridge />
-          {platformCapabilities.nativeBridges ? (
-            <UserAskEventsLayer />
-          ) : null}
+          <UserAskEventsLayer />
           {platformCapabilities.nativeBridges ? (
             <RemoteExecutionConsentLayer />
           ) : null}

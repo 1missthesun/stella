@@ -91,6 +91,7 @@ import type {
   UserAskAnswer,
   UserAskEscalationPolicy,
   UserAskState,
+  UserAskStoredSecureValue,
 } from "../user-ask.js";
 import type { AppSourceActionResult, AppSourceState } from "./app-source.js";
 import type { BrowserViewLayout, BrowserViewState } from "./browser-view.js";
@@ -367,6 +368,8 @@ import {
   IPC_UI_STATE_KV_SNAPSHOT,
   IPC_USER_ASK_ANSWER,
   IPC_USER_ASK_CANCEL,
+  IPC_USER_ASK_SECURE_VALUES_DELETE,
+  IPC_USER_ASK_SECURE_VALUES_LIST,
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_LIST,
   IPC_USER_ASK_OPENED,
@@ -1196,8 +1199,16 @@ export type IpcInvokeContract = {
     { ok: boolean; late?: boolean; error?: string }
   >;
   [IPC_USER_ASK_CANCEL]: Invoke<
-    [payload: { askId: string; revision?: number }],
+    [payload: { askId: string; revision?: number; reason?: string }],
     OkErrorResult
+  >;
+  [IPC_USER_ASK_SECURE_VALUES_LIST]: Invoke<
+    [],
+    readonly UserAskStoredSecureValue[]
+  >;
+  [IPC_USER_ASK_SECURE_VALUES_DELETE]: Invoke<
+    [payload: { id?: string; all?: boolean }],
+    { ok: boolean; deleted: number }
   >;
   [IPC_USER_ASK_POLICY_GET]: Invoke<[], UserAskEscalationPolicy>;
   [IPC_USER_ASK_POLICY_SET]: Invoke<

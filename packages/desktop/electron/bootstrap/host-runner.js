@@ -413,6 +413,7 @@ export const initializeStellaHostRunner = async (context) => {
         onAuthTokenChanged: (token) => {
             services.engineAccountAccess.noteAuthToken(token);
             services.memorySync.noteAuthToken(token);
+            services.userAskService.noteAuthToken(token);
         },
     }));
     await connectHostRunner(context);

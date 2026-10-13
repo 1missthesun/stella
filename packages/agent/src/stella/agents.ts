@@ -557,6 +557,10 @@ const messageText = (message: { content?: unknown } | undefined): string =>
       ? (message.content as Array<{ type?: string; text?: string }>).map((part) => (part.type === "text" ? (part.text ?? "") : "")).join("")
       : "";
 
+/** `agent_status` on a running agent the caller started: its report needs no waiting. */
+const RUNNING_STATUS_NOTE =
+  "Still running. Its report arrives on its own in [Agent completed]: end your turn now instead of waiting or checking again.";
+
 /** How much of an agent's latest message `agent_status` shows. */
 const LATEST_PREVIEW_CHARS = 300;
 
@@ -1965,9 +1969,14 @@ export function stellaAgents(host: StellaAgentsHost) {
         const ledger = found.record.remote ? (await host.directory?.list(context).catch(() => undefined))?.agents : undefined;
         const row = await directoryRow(api, found, conversationId, context, ledger);
         const reachable = !found.record.remote || remoteHostOf(found.record) !== undefined || host.directory !== undefined;
+        const entry = agentDirectoryEntry(row);
+        const mine = found.parentConversationId === api.conversationId;
         return statusResult({
-          ...agentDirectoryEntry(row),
-          relation: found.parentConversationId === api.conversationId ? "you started it" : relationOf(row, self, parentThreadId),
+          ...entry,
+          relation: mine ? "you started it" : relationOf(row, self, parentThreadId),
+          // Models waited in place (a sleep, then this again); say plainly that
+          // its report comes on its own.
+          ...(mine && entry.status === "running" ? { note: RUNNING_STATUS_NOTE } : {}),
           ...(reachable ? {} : { reachable: false }),
           ...(await agentDetails(api, threadId, found.record, context)),
         });

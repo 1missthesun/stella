@@ -89,93 +89,109 @@
 .catch-up {
   display: flex;
   flex-direction: column;
-  /* One page at a time: the scroller is exactly a page tall. */
-  --catch-up-page-height: min(26rem, 60vh);
+  /* The tallest a page gets before it scrolls inside itself. */
+  --catch-up-page-max: min(28rem, 62vh);
 }
 
 .catch-up__bar {
   display: flex;
   align-items: center;
+  gap: 8px;
   min-height: 40px;
-  padding: 8px 8px 4px 16px;
+  padding: 6px 8px 0 16px;
   box-sizing: border-box;
 }
 
-.catch-up__title {
+.catch-up__when {
   flex: 1;
-  font-size: var(--font-size-sm, 12.5px);
-  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: var(--font-size-base);
+  font-weight: var(--weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.catch-up__close {
+.catch-up__pager {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 2px;
+}
+
+.catch-up__nav {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 999px;
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--text-base);
   cursor: default;
 }
 
-.catch-up__close:hover {
-  background: var(--surface-hover, var(--surface-inset));
-  color: var(--foreground);
+.catch-up__nav:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
 }
 
-.catch-up__close:focus-visible {
-  outline: 2px solid var(--ring, var(--primary));
+.catch-up__nav:disabled {
+  color: var(--text-weaker);
+}
+
+.catch-up__nav:focus-visible {
+  outline: 2px solid var(--ring);
   outline-offset: 1px;
 }
 
-/* Saved catch-ups, oldest first, newest at the bottom: each one fills the
-   scroller and snaps into place, so the history pages up and down. */
+[dir="rtl"] .catch-up__nav .stella-icon {
+  transform: scaleX(-1);
+}
+
+.catch-up__progress {
+  min-width: 3.6em;
+  color: var(--text-weak);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* Saved summaries side by side, oldest on the left: each is as wide as the
+   popover and snaps into place, so the history pages left and right. The
+   scroller takes the height of the page in view. */
 .catch-up__pages {
-  position: relative;
-  height: var(--catch-up-page-height);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scroll-snap-type: y mandatory;
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
   scrollbar-width: none;
+  transition: height 160ms ease;
 }
 
 .catch-up__pages::-webkit-scrollbar {
   display: none;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .catch-up__pages {
+    transition: none;
+  }
+}
+
 .catch-up-page {
+  flex: 0 0 100%;
   box-sizing: border-box;
-  min-height: var(--catch-up-page-height);
-  padding: 4px 16px 16px;
+  max-height: var(--catch-up-page-max);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  padding: 8px 16px 14px;
   scroll-snap-align: start;
+  scroll-snap-stop: always;
   user-select: text;
-}
-
-.catch-up-page + .catch-up-page {
-  border-top: 1px solid color-mix(in srgb, var(--chat-assistant-bubble-text) 10%, transparent);
-  padding-top: 12px;
-}
-
-.catch-up-page__head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.catch-up-page__when {
-  flex: 1;
-  color: var(--text-strong);
-  font-size: var(--font-size-base);
-  font-weight: var(--weight-semibold);
-}
-
-.catch-up-page__count {
-  color: var(--muted-foreground);
-  font-size: var(--font-size-2xs);
-  font-variant-numeric: tabular-nums;
 }
 
 .catch-up-page__status {
@@ -236,14 +252,14 @@
 .catch-up-page__body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
 }
 
 .catch-up-section__title {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 0 0 6px;
+  margin: 0 0 4px;
   color: var(--muted-foreground);
   font-size: var(--font-size-2xs);
   font-weight: var(--weight-semibold);
@@ -258,48 +274,45 @@
 .catch-up-section__items {
   display: flex;
   flex-direction: column;
-  gap: 7px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* A line; tapping one with a source jumps to that message. */
 .catch-up-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  column-gap: 8px;
-  row-gap: 3px;
+  display: block;
+  box-sizing: border-box;
+  width: calc(100% + 12px);
+  margin: 0 -6px;
+  padding: 3px 6px;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
   color: var(--chat-assistant-bubble-text);
+  font: inherit;
   font-size: var(--font-size-base);
   line-height: 1.4;
-}
-
-.catch-up-item__links {
-  display: inline-flex;
-  gap: 4px;
-}
-
-.catch-up-link {
-  padding: 1px 7px;
-  border: none;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--chat-assistant-bubble-text) 7%, transparent);
-  color: var(--muted-foreground);
-  font: inherit;
-  font-size: var(--font-size-2xs);
-  white-space: nowrap;
+  text-align: start;
   cursor: default;
 }
 
-.catch-up-link:hover {
-  background: color-mix(in srgb, var(--chat-assistant-bubble-text) 13%, transparent);
-  color: var(--text-strong);
+button.catch-up-item:hover {
+  background: color-mix(in srgb, var(--chat-assistant-bubble-text) 7%, transparent);
 }
 
-.catch-up-link:focus-visible {
+button.catch-up-item:focus-visible {
   outline: 2px solid var(--ring, var(--primary));
-  outline-offset: 1px;
+  outline-offset: -2px;
+}
+
+/* A long pause between two lines, marked the way Messages does. */
+.catch-up-time {
+  padding: 4px 0 2px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-2xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 /* The message a catch-up link landed on, briefly. */

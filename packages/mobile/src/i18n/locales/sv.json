@@ -274,8 +274,6 @@
         "failed": "Det gick inte att skriva sammanfattningen.",
         "retry": "Försök igen",
         "empty": "Inget nytt värt att nämna.",
-        "you": "Du",
-        "stella": "Stella",
         "close": "Stäng",
         "notLoaded": "Meddelandet finns inte längre i chatten."
       }

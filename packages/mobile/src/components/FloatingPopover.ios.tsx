@@ -41,6 +41,7 @@ export function FloatingPopover({
   height,
   maxHeight,
   actions,
+  footer = true,
   children,
 }: FloatingPopoverProps) {
   const { isDark } = useTheme();
@@ -89,7 +90,7 @@ export function FloatingPopover({
   const placeBelow = below >= above;
   const room = Math.max(
     MIN_BUBBLE_HEIGHT,
-    Math.floor(Math.max(above, below) - POPOVER_FOOTER_HEIGHT),
+    Math.floor(Math.max(above, below) - (footer ? POPOVER_FOOTER_HEIGHT : 0)),
   );
   const bubbleHeight = height === undefined ? undefined : Math.min(height, room);
   const bubbleMaxHeight = Math.min(maxHeight ?? room, room);
@@ -142,11 +143,13 @@ export function FloatingPopover({
                     >
                       {typeof children === "function" ? children(close) : children}
                     </View>
-                    <PopoverFooter
-                      actions={actions}
-                      closeLabel={closeLabel}
-                      onClose={close}
-                    />
+                    {footer ? (
+                      <PopoverFooter
+                        actions={actions}
+                        closeLabel={closeLabel}
+                        onClose={close}
+                      />
+                    ) : null}
                   </View>
                 </RNHostView>
               </ZStack>

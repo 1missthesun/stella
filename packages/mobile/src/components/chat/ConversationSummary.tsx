@@ -2,9 +2,9 @@
  * "Summary": the pill above the composer once a busy stretch has gone by
  * (`catchUpOffer`, shared with desktop), and the popover it opens. Opening it
  * asks the cloud for a summary of what is new (`catchUps.request`); every
- * summary so far stays in the popover as its own page, newest at the bottom,
- * paged through up and down. A line's links jump to the messages it came
- * from. Desktop's twin is `features/catch-up/CatchUpPill.tsx`.
+ * summary so far stays in the popover as its own page, oldest on the left and
+ * newest on the right, paged sideways. Tapping a line jumps to the message it
+ * came from. Desktop's twin is `features/catch-up/CatchUpPill.tsx`.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -16,12 +16,14 @@ import {
   Text,
   View,
   useWindowDimensions,
-  type LayoutChangeEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import type { CatchUp, CatchUpItem, CatchUpLink } from "@stella/contracts/backend/catch-ups";
-import { CATCH_UP_MIN_NEW_MESSAGES, catchUpOffer } from "@stella/contracts/catch-up";
+import { CATCH_UP_MIN_NEW_MESSAGES, catchUpOffer, catchUpRows } from "@stella/contracts/catch-up";
 import { useLocale, useT } from "../../i18n";
 import { getBackendClient, useBackendView } from "../../lib/backend";
+import { useHoldDrawer } from "../../lib/drawer";
 import { tapLight } from "../../lib/haptics";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
 import type { Colors } from "../../theme/colors";
@@ -139,8 +141,14 @@ const formatWhen = (locale: string, at: number): string =>
     minute: "2-digit",
   });
 
-const formatTime = (locale: string, at: number): string =>
-  new Date(at).toLocaleTimeString(locale, { hour: "numeric", minute: "2-digit" });
+/** A separator's time: the day too when it is not the summary's own day. */
+const formatGap = (locale: string, at: number, pageAt: number): string =>
+  new Date(at).toLocaleTimeString(
+    locale,
+    new Date(at).toDateString() === new Date(pageAt).toDateString()
+      ? { hour: "numeric", minute: "2-digit" }
+      : { weekday: "short", hour: "numeric", minute: "2-digit" },
+  );
 
 const SECTION_ICONS: Record<"done" | "ongoing" | "waiting", IconName> = {
   done: "check",
@@ -148,21 +156,27 @@ const SECTION_ICONS: Record<"done" | "ongoing" | "waiting", IconName> = {
   waiting: "alert-circle",
 };
 
+/** The date row and pager above the pages. */
+const HEAD_HEIGHT = 46;
+
 function Section({
   kind,
   items,
+  pageAt,
   onJump,
   styles,
   colors,
 }: {
   kind: "done" | "ongoing" | "waiting";
   items: CatchUpItem[];
+  pageAt: number;
   onJump: (link: CatchUpLink) => void;
   styles: ReturnType<typeof makeStyles>;
   colors: Colors;
 }) {
   const t = useT();
   const locale = useLocale();
+  const rows = useMemo(() => catchUpRows(items), [items]);
   if (items.length === 0) return null;
   const tint = kind === "waiting" ? colors.accent : colors.textMuted;
   return (
@@ -173,78 +187,76 @@ function Section({
           {t(`app.chat.catchUp.${kind}`).toUpperCase()}
         </Text>
       </View>
-      {items.map((item, index) => (
-        <View key={index} style={styles.item}>
+      {rows.map((row, index) => {
+        if (row.kind === "time") {
+          return (
+            <Text
+              key={`time-${index}`}
+              style={styles.time}
+              importantForAccessibility="no"
+              accessibilityElementsHidden
+              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+            >
+              {formatGap(locale, row.at, pageAt)}
+            </Text>
+          );
+        }
+        const link = row.item.links[0];
+        const text = (
           <Text style={styles.itemText} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-            {item.text}
+            {row.item.text}
           </Text>
-          {item.links.length > 0 ? (
-            <View style={styles.links}>
-              {item.links.map((link) => (
-                <Pressable
-                  key={link.seq}
-                  accessibilityRole="link"
-                  testID="summary-link"
-                  hitSlop={4}
-                  onPress={() => onJump(link)}
-                  style={({ pressed }) => [styles.link, pressed && styles.linkPressed]}
-                >
-                  <Text style={styles.linkText} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-                    {link.role === "user" ? t("app.chat.catchUp.you") : t("app.chat.catchUp.stella")}
-                    {" · "}
-                    {formatTime(locale, link.at)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          ) : null}
-        </View>
-      ))}
+        );
+        return link ? (
+          <Pressable
+            key={index}
+            accessibilityRole="link"
+            testID="summary-link"
+            onPress={() => onJump(link)}
+            style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
+          >
+            {text}
+          </Pressable>
+        ) : (
+          <View key={index} style={styles.item}>
+            {text}
+          </View>
+        );
+      })}
     </View>
   );
 }
 
 function SummaryPage({
   catchUp,
-  index,
-  total,
-  minHeight,
+  newest,
+  width,
+  maxHeight,
   onJump,
   onRetry,
-  onLayout,
   styles,
   colors,
 }: {
   catchUp: CatchUp;
-  index: number;
-  total: number;
-  minHeight: number;
+  newest: boolean;
+  width: number;
+  maxHeight: number;
   onJump: (link: CatchUpLink) => void;
   onRetry: () => void;
-  onLayout: (event: LayoutChangeEvent) => void;
   styles: ReturnType<typeof makeStyles>;
   colors: Colors;
 }) {
   const t = useT();
-  const locale = useLocale();
   const empty =
     catchUp.done.length === 0 && catchUp.ongoing.length === 0 && catchUp.waiting.length === 0;
   return (
-    <View
-      style={[styles.page, { minHeight }, index > 0 && styles.pageDivider]}
-      onLayout={onLayout}
+    <ScrollView
+      style={{ width, maxHeight }}
+      contentContainerStyle={styles.page}
+      showsVerticalScrollIndicator={false}
+      nestedScrollEnabled
       testID="summary-page"
     >
-      <View style={styles.pageHead}>
-        <Text style={styles.pageWhen} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-          {formatWhen(locale, catchUp.createdAt)}
-        </Text>
-        {total > 1 ? (
-          <Text style={styles.pageCount} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-            {index + 1}/{total}
-          </Text>
-        ) : null}
-      </View>
       {catchUp.state === "pending" ? (
         <Text style={styles.status} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
           {t("app.chat.catchUp.loading")}
@@ -254,7 +266,7 @@ function SummaryPage({
           <Text style={styles.status} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
             {t("app.chat.catchUp.failed")}
           </Text>
-          {index === total - 1 ? (
+          {newest ? (
             <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retry}>
               <Text style={styles.retryText}>{t("app.chat.catchUp.retry")}</Text>
             </Pressable>
@@ -266,18 +278,19 @@ function SummaryPage({
         </Text>
       ) : (
         <View style={styles.sections}>
-          <Section kind="waiting" items={catchUp.waiting} onJump={onJump} styles={styles} colors={colors} />
-          <Section kind="ongoing" items={catchUp.ongoing} onJump={onJump} styles={styles} colors={colors} />
-          <Section kind="done" items={catchUp.done} onJump={onJump} styles={styles} colors={colors} />
+          <Section kind="waiting" items={catchUp.waiting} pageAt={catchUp.createdAt} onJump={onJump} styles={styles} colors={colors} />
+          <Section kind="ongoing" items={catchUp.ongoing} pageAt={catchUp.createdAt} onJump={onJump} styles={styles} colors={colors} />
+          <Section kind="done" items={catchUp.done} pageAt={catchUp.createdAt} onJump={onJump} styles={styles} colors={colors} />
         </View>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 /**
- * The saved summaries, one page per summary snapping into place, oldest at
- * the top. Opens on the newest and follows a new one as it lands.
+ * The saved summaries side by side, one page each, oldest on the left: swipe
+ * or tap the arrows to page. Opens on the newest and follows a new one as it
+ * lands. No close button: a tap outside closes it.
  */
 export function SummaryPopover({
   conversationId,
@@ -296,13 +309,18 @@ export function SummaryPopover({
   colors: Colors;
 }) {
   const t = useT();
+  const locale = useLocale();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { height: screenHeight } = useWindowDimensions();
-  const height = Math.min(MAX_HEIGHT, Math.round(screenHeight * MAX_HEIGHT_RATIO));
-  const [viewport, setViewport] = useState(height);
-  const [pageHeights, setPageHeights] = useState<Record<string, number>>({});
+  const maxHeight = Math.min(MAX_HEIGHT, Math.round(screenHeight * MAX_HEIGHT_RATIO));
+  const [pageWidth, setPageWidth] = useState(0);
+  const [index, setIndex] = useState(Math.max(0, catchUps.length - 1));
   const scrollRef = useRef<ScrollView | null>(null);
   const requestedRef = useRef(false);
+  const total = catchUps.length;
+  const shown = Math.min(index, Math.max(0, total - 1));
+  // A sideways swipe here pages the summaries, never the sidebar.
+  useHoldDrawer(true);
 
   const request = useCallback(async () => {
     try {
@@ -321,84 +339,125 @@ export function SummaryPopover({
     void request();
   }, [request, requestNew]);
 
-  // Snap points: each page's top, and for a page taller than the viewport
-  // its bottom too, so a long one can still be read to the end.
-  const snapOffsets = useMemo(() => {
-    const offsets: number[] = [];
-    let top = 0;
-    for (const catchUp of catchUps) {
-      const pageHeight = pageHeights[catchUp.catchUpId] ?? viewport;
-      offsets.push(top);
-      if (pageHeight > viewport + 1) offsets.push(top + pageHeight - viewport);
-      top += pageHeight;
-    }
-    return offsets;
-  }, [catchUps, pageHeights, viewport]);
+  const goTo = useCallback(
+    (next: number, animated = true) => {
+      const target = Math.max(0, Math.min(next, total - 1));
+      setIndex(target);
+      if (pageWidth > 0) scrollRef.current?.scrollTo({ x: target * pageWidth, animated });
+    },
+    [pageWidth, total],
+  );
 
-  // Open on the newest page's first line, and follow a new page as it lands
-  // or fills in (once every page above it has been measured).
+  // Open on the newest page, and follow a new one as it lands or fills in.
   const newest = catchUps.at(-1);
   const newestKey = newest ? `${newest.catchUpId}:${newest.state}` : "";
-  const newestTop = useMemo(() => {
-    let top = 0;
-    for (const catchUp of catchUps.slice(0, -1)) {
-      const pageHeight = pageHeights[catchUp.catchUpId];
-      if (pageHeight === undefined) return null;
-      top += pageHeight;
-    }
-    return top;
-  }, [catchUps, pageHeights]);
   const shownKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    if (newestTop === null || shownKeyRef.current === newestKey) return;
+    if (pageWidth === 0 || !newestKey || shownKeyRef.current === newestKey) return;
     const animated = shownKeyRef.current !== null;
     shownKeyRef.current = newestKey;
-    requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: newestTop, animated }));
-  }, [newestKey, newestTop]);
+    requestAnimationFrame(() => goTo(total - 1, animated));
+  }, [goTo, newestKey, pageWidth, total]);
 
+  const onScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (pageWidth === 0) return;
+      const next = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+      setIndex((current) => (current === next ? current : next));
+    },
+    [pageWidth],
+  );
+
+  const current = catchUps[shown];
   return (
     <FloatingPopover
       onClose={onClose}
       closeLabel={t("app.chat.catchUp.close")}
-      height={height}
+      maxHeight={maxHeight}
+      footer={false}
     >
       {(close) => (
-        <ScrollView
-          ref={scrollRef}
-          testID="summary-pages"
-          style={styles.pages}
-          onLayout={(event) => setViewport(Math.round(event.nativeEvent.layout.height))}
-          snapToOffsets={snapOffsets}
-          snapToEnd={false}
-          decelerationRate="fast"
-          showsVerticalScrollIndicator={false}
+        <View
+          style={styles.root}
+          onLayout={(event) => setPageWidth(Math.round(event.nativeEvent.layout.width))}
         >
-          {catchUps.map((catchUp, index) => (
-            <SummaryPage
-              key={catchUp.catchUpId}
-              catchUp={catchUp}
-              index={index}
-              total={catchUps.length}
-              minHeight={viewport}
-              onJump={(link) => {
-                // Hand the link over first: the popover may close at once.
-                onJump(link);
-                close();
-              }}
-              onRetry={() => void request()}
-              onLayout={(event) => {
-                const next = Math.round(event.nativeEvent.layout.height);
-                setPageHeights((previous) =>
-                  previous[catchUp.catchUpId] === next
-                    ? previous
-                    : { ...previous, [catchUp.catchUpId]: next },
-                );
-              }}
-              styles={styles}
-              colors={colors}
-            />
-          ))}
-        </ScrollView>
+          <View style={styles.head}>
+            <Text style={styles.when} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+              {current ? formatWhen(locale, current.createdAt) : t("app.chat.catchUp.title")}
+            </Text>
+            {total > 1 ? (
+              <View style={styles.pager}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("common.previous")}
+                  accessibilityState={{ disabled: shown === 0 }}
+                  disabled={shown === 0}
+                  hitSlop={6}
+                  onPress={() => goTo(shown - 1)}
+                  style={({ pressed }) => [styles.nav, pressed && styles.navPressed]}
+                  testID="summary-previous"
+                >
+                  <Icon
+                    name="chevron-left"
+                    size={18}
+                    color={shown === 0 ? fadeHex(colors.textMuted, 0.4) : colors.text}
+                  />
+                </Pressable>
+                <Text style={styles.progress} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+                  {t("userAsk.question.progress", { current: shown + 1, total })}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t("common.next")}
+                  accessibilityState={{ disabled: shown === total - 1 }}
+                  disabled={shown === total - 1}
+                  hitSlop={6}
+                  onPress={() => goTo(shown + 1)}
+                  style={({ pressed }) => [styles.nav, pressed && styles.navPressed]}
+                  testID="summary-next"
+                >
+                  <Icon
+                    name="chevron-right"
+                    size={18}
+                    color={shown === total - 1 ? fadeHex(colors.textMuted, 0.4) : colors.text}
+                  />
+                </Pressable>
+              </View>
+            ) : null}
+          </View>
+          {pageWidth > 0 ? (
+            <ScrollView
+              ref={scrollRef}
+              horizontal
+              pagingEnabled
+              directionalLockEnabled
+              showsHorizontalScrollIndicator={false}
+              onScroll={onScroll}
+              scrollEventThrottle={32}
+              contentOffset={{ x: shown * pageWidth, y: 0 }}
+              style={styles.pages}
+              testID="summary-pages"
+            >
+              {catchUps.map((catchUp, pageIndex) => (
+                <SummaryPage
+                  key={catchUp.catchUpId}
+                  catchUp={catchUp}
+                  newest={pageIndex === total - 1}
+                  width={pageWidth}
+                  maxHeight={maxHeight - HEAD_HEIGHT}
+                  onJump={(link) => {
+                    // Hand the link over first: the popover may close at once.
+                    onJump(link);
+                    close();
+                  }}
+                  onRetry={() => void request()}
+                  styles={styles}
+                  colors={colors}
+                />
+              ))}
+            </ScrollView>
+          ) : null}
+        </View>
       )}
     </FloatingPopover>
   );
@@ -452,25 +511,41 @@ const makeStyles = (colors: Colors) =>
       fontSize: 11,
       fontVariant: ["tabular-nums"],
     },
-    pages: { flex: 1 },
-    page: { paddingBottom: 16, paddingHorizontal: 18, paddingTop: 16 },
-    pageDivider: {
-      borderTopColor: fadeHex(colors.border, 0.7),
-      borderTopWidth: StyleSheet.hairlineWidth,
+    root: { alignSelf: "stretch", flexShrink: 1 },
+    head: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 8,
+      height: HEAD_HEIGHT,
+      paddingLeft: 18,
+      paddingRight: 10,
+      paddingTop: 6,
     },
-    pageHead: { alignItems: "baseline", flexDirection: "row", gap: 8, marginBottom: 12 },
-    pageWhen: {
+    when: {
       color: colors.text,
       flex: 1,
       fontFamily: fonts.sans.semiBold,
       fontSize: 15,
     },
-    pageCount: {
+    pager: { alignItems: "center", flexDirection: "row", gap: 2 },
+    nav: {
+      alignItems: "center",
+      borderRadius: 16,
+      height: 32,
+      justifyContent: "center",
+      width: 32,
+    },
+    navPressed: { backgroundColor: fadeHex(colors.text, 0.08) },
+    progress: {
       color: colors.textMuted,
       fontFamily: fonts.sans.regular,
-      fontSize: 12,
+      fontSize: 13,
       fontVariant: ["tabular-nums"],
+      minWidth: 44,
+      textAlign: "center",
     },
+    pages: { flexGrow: 0, flexShrink: 1 },
+    page: { paddingBottom: 14, paddingHorizontal: 18, paddingTop: 6 },
     status: { color: colors.textMuted, fontFamily: fonts.sans.regular, fontSize: 15 },
     failed: { alignItems: "flex-start", gap: 10 },
     retry: {
@@ -481,24 +556,30 @@ const makeStyles = (colors: Colors) =>
       paddingVertical: 6,
     },
     retryText: { color: colors.text, fontFamily: fonts.sans.medium, fontSize: 14 },
-    sections: { gap: 16 },
-    section: { gap: 8 },
-    sectionHead: { alignItems: "center", flexDirection: "row", gap: 6 },
+    sections: { gap: 14 },
+    section: { gap: 2 },
+    sectionHead: { alignItems: "center", flexDirection: "row", gap: 6, marginBottom: 2 },
     sectionTitle: { fontFamily: fonts.sans.semiBold, fontSize: 11, letterSpacing: 0.4 },
-    item: { gap: 4 },
+    item: {
+      borderRadius: 8,
+      marginHorizontal: -6,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+    },
+    itemPressed: { backgroundColor: fadeHex(colors.text, 0.08) },
     itemText: {
       color: colors.text,
       fontFamily: fonts.sans.regular,
       fontSize: 15,
       lineHeight: 21,
     },
-    links: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-    link: {
-      backgroundColor: fadeHex(colors.text, 0.07),
-      borderRadius: 999,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
+    time: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.regular,
+      fontSize: 11,
+      fontVariant: ["tabular-nums"],
+      paddingBottom: 1,
+      paddingTop: 4,
+      textAlign: "center",
     },
-    linkPressed: { backgroundColor: fadeHex(colors.text, 0.14) },
-    linkText: { color: colors.textMuted, fontFamily: fonts.sans.medium, fontSize: 12 },
   } as const);

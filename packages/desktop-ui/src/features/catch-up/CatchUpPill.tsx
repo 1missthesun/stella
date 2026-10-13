@@ -2,21 +2,37 @@
  * "Summary" (catch-ups inside): the pill above the composer once a busy stretch has gone by
  * (`catchUpOffer`, shared with mobile), and the popover it opens. Opening it
  * asks the cloud for a summary of what is new (`catchUps.request`); every
- * summary so far stays in the popover as its own page, newest at the bottom,
- * scrolled through one page at a time. A line's links jump to the messages
- * it came from.
+ * summary so far stays in the popover as its own page, oldest on the left and
+ * newest on the right, swiped or arrowed through one at a time. Tapping a
+ * line jumps to the message it came from.
  */
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import type { CatchUp, CatchUpItem, CatchUpLink } from "@stella/contracts/backend/catch-ups";
-import { CATCH_UP_MIN_NEW_MESSAGES, catchUpOffer } from "@stella/contracts/catch-up";
+import { CATCH_UP_MIN_NEW_MESSAGES, catchUpOffer, catchUpRows } from "@stella/contracts/catch-up";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { isUiHiddenChatMessagePayload } from "@stella/contracts/chat-event-visibility";
 import { useChatMessages } from "@/context/use-chat-messages";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendView } from "@/platform/backend/use-backend-view";
 import { useLocale, useT } from "@/shared/i18n";
-import { Check, CircleDot, CircleQuestionMark, LayoutList, X } from "@/ui/icons";
+import {
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  CircleDot,
+  CircleQuestionMark,
+  LayoutList,
+} from "@/ui/icons";
 import { Popover } from "@/ui/popover";
 import { showToast } from "@/ui/toast";
 import { requestMessageJump } from "./message-jump";
@@ -46,42 +62,29 @@ const formatWhen = (locale: string, at: number): string =>
     minute: "2-digit",
   }).format(at);
 
-const formatTime = (locale: string, at: number): string =>
-  new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" }).format(at);
-
-function LinkChip({
-  link,
-  onJump,
-}: {
-  link: CatchUpLink;
-  onJump: (link: CatchUpLink) => void;
-}) {
-  const t = useT();
-  const locale = useLocale();
-  const who = link.role === "user" ? t("app.chat.catchUp.you") : t("app.chat.catchUp.stella");
-  return (
-    <button
-      type="button"
-      className="catch-up-link"
-      data-role={link.role}
-      onClick={() => onJump(link)}
-      data-testid="catch-up-link"
-    >
-      {who} · {formatTime(locale, link.at)}
-    </button>
-  );
-}
+/** A separator's time: the day too when it is not the summary's own day. */
+const formatGap = (locale: string, at: number, pageAt: number): string =>
+  new Intl.DateTimeFormat(
+    locale,
+    new Date(at).toDateString() === new Date(pageAt).toDateString()
+      ? { hour: "numeric", minute: "2-digit" }
+      : { weekday: "short", hour: "numeric", minute: "2-digit" },
+  ).format(at);
 
 function Section({
   kind,
   items,
+  pageAt,
   onJump,
 }: {
   kind: "done" | "ongoing" | "waiting";
   items: CatchUpItem[];
+  pageAt: number;
   onJump: (link: CatchUpLink) => void;
 }) {
   const t = useT();
+  const locale = useLocale();
+  const rows = useMemo(() => catchUpRows(items), [items]);
   if (items.length === 0) return null;
   const Icon = kind === "done" ? Check : kind === "ongoing" ? CircleDot : CircleQuestionMark;
   return (
@@ -91,18 +94,28 @@ function Section({
         {t(`app.chat.catchUp.${kind}`)}
       </h3>
       <ul className="catch-up-section__items">
-        {items.map((item, index) => (
-          <li key={index} className="catch-up-item">
-            <span className="catch-up-item__text">{item.text}</span>
-            {item.links.length > 0 ? (
-              <span className="catch-up-item__links">
-                {item.links.map((link) => (
-                  <LinkChip key={link.seq} link={link} onJump={onJump} />
-                ))}
-              </span>
-            ) : null}
-          </li>
-        ))}
+        {rows.map((row, index) =>
+          row.kind === "time" ? (
+            <li key={`time-${index}`} className="catch-up-time" aria-hidden="true">
+              {formatGap(locale, row.at, pageAt)}
+            </li>
+          ) : (
+            <li key={index}>
+              {row.item.links[0] ? (
+                <button
+                  type="button"
+                  className="catch-up-item"
+                  data-testid="catch-up-link"
+                  onClick={() => onJump(row.item.links[0]!)}
+                >
+                  {row.item.text}
+                </button>
+              ) : (
+                <span className="catch-up-item">{row.item.text}</span>
+              )}
+            </li>
+          ),
+        )}
       </ul>
     </section>
   );
@@ -110,14 +123,12 @@ function Section({
 
 function CatchUpPage({
   catchUp,
-  index,
-  total,
+  newest,
   onJump,
   onRetry,
 }: {
   catchUp: CatchUp;
-  index: number;
-  total: number;
+  newest: boolean;
   onJump: (link: CatchUpLink) => void;
   onRetry: () => void;
 }) {
@@ -132,14 +143,6 @@ function CatchUpPage({
       data-testid="catch-up-page"
       aria-label={formatWhen(locale, catchUp.createdAt)}
     >
-      <header className="catch-up-page__head">
-        <span className="catch-up-page__when">{formatWhen(locale, catchUp.createdAt)}</span>
-        {total > 1 ? (
-          <span className="catch-up-page__count">
-            {index + 1}/{total}
-          </span>
-        ) : null}
-      </header>
       {catchUp.state === "pending" ? (
         <div className="catch-up-page__status catch-up-page__status--loading" role="status">
           <span className="catch-up-shimmer">{t("app.chat.catchUp.loading")}</span>
@@ -147,7 +150,7 @@ function CatchUpPage({
       ) : catchUp.state === "failed" ? (
         <div className="catch-up-page__status" role="status">
           <span>{t("app.chat.catchUp.failed")}</span>
-          {index === total - 1 ? (
+          {newest ? (
             <button type="button" className="catch-up-retry" onClick={onRetry}>
               {t("app.chat.catchUp.retry")}
             </button>
@@ -157,9 +160,9 @@ function CatchUpPage({
         <div className="catch-up-page__status">{t("app.chat.catchUp.empty")}</div>
       ) : (
         <div className="catch-up-page__body">
-          <Section kind="waiting" items={catchUp.waiting} onJump={onJump} />
-          <Section kind="ongoing" items={catchUp.ongoing} onJump={onJump} />
-          <Section kind="done" items={catchUp.done} onJump={onJump} />
+          <Section kind="waiting" items={catchUp.waiting} pageAt={catchUp.createdAt} onJump={onJump} />
+          <Section kind="ongoing" items={catchUp.ongoing} pageAt={catchUp.createdAt} onJump={onJump} />
+          <Section kind="done" items={catchUp.done} pageAt={catchUp.createdAt} onJump={onJump} />
         </div>
       )}
     </article>
@@ -172,6 +175,7 @@ export const CatchUpPill = memo(function CatchUpPill({
   conversationId: string;
 }) {
   const t = useT();
+  const locale = useLocale();
   const messages = useChatMessages();
   const view = useBackendView("catchUps.list", { conversationId });
   const catchUps = useMemo(() => view.value?.catchUps ?? [], [view.value]);
@@ -227,26 +231,71 @@ export const CatchUpPill = memo(function CatchUpPill({
     [conversationId],
   );
 
-  // Newest at the bottom: open on its first line, and follow a new page as
-  // it lands or fills in. The pages mount with the popover, after this
-  // component's own effects, so their node is tracked as state.
+  // Oldest on the left, newest on the right: open on the newest, and follow
+  // a new page as it lands or fills in. The pages mount with the popover,
+  // after this component's own effects, so their node is tracked as state.
   const newest = catchUps.at(-1);
   const newestKey = newest ? `${newest.catchUpId}:${newest.state}` : "";
   const [pagesNode, setPagesNode] = useState<HTMLDivElement | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pagesHeight, setPagesHeight] = useState<number | null>(null);
   const shownKeyRef = useRef<string | null>(null);
+  const total = catchUps.length;
+  const shown = Math.min(pageIndex, Math.max(0, total - 1));
+
+  const goTo = useCallback(
+    (next: number, behavior: ScrollBehavior = "smooth") => {
+      if (!pagesNode) return;
+      const target = Math.max(0, Math.min(next, pagesNode.children.length - 1));
+      // Chromium counts an RTL scroller's offset leftwards, below zero.
+      const sign = getComputedStyle(pagesNode).direction === "rtl" ? -1 : 1;
+      pagesNode.scrollTo({ left: sign * target * pagesNode.clientWidth, behavior });
+      setPageIndex(target);
+    },
+    [pagesNode],
+  );
+
   useLayoutEffect(() => {
     if (!pagesNode) {
       shownKeyRef.current = null;
       return;
     }
-    const page = pagesNode.lastElementChild as HTMLElement | null;
-    if (!page || shownKeyRef.current === newestKey) return;
-    pagesNode.scrollTo({
-      top: page.offsetTop,
-      behavior: shownKeyRef.current === null ? "instant" : "smooth",
-    });
+    if (!newestKey || shownKeyRef.current === newestKey) return;
+    goTo(total - 1, shownKeyRef.current === null ? "instant" : "smooth");
     shownKeyRef.current = newestKey;
-  }, [pagesNode, newestKey]);
+  }, [goTo, newestKey, pagesNode, total]);
+
+  // The page in view after a swipe or a trackpad scroll.
+  const onPagesScroll = useCallback(() => {
+    if (!pagesNode || pagesNode.clientWidth === 0) return;
+    setPageIndex(Math.round(Math.abs(pagesNode.scrollLeft) / pagesNode.clientWidth));
+  }, [pagesNode]);
+
+  // The popover is as tall as the page in view, up to its cap; a longer page
+  // scrolls inside itself.
+  useLayoutEffect(() => {
+    const page = pagesNode?.children[shown] as HTMLElement | undefined;
+    if (!page) return;
+    const measure = () => setPagesHeight(page.offsetHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(page);
+    return () => observer.disconnect();
+  }, [pagesNode, shown, catchUps]);
+
+  const onKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const rtl = pagesNode ? getComputedStyle(pagesNode).direction === "rtl" : false;
+      const step =
+        event.key === "ArrowLeft" ? (rtl ? 1 : -1) : event.key === "ArrowRight" ? (rtl ? -1 : 1) : 0;
+      if (!step) return;
+      event.preventDefault();
+      event.stopPropagation();
+      goTo(shown + step);
+    },
+    [goTo, pagesNode, shown],
+  );
 
   // A new summary appearing (from any device) restarts the linger clock.
   useEffect(() => setNow(Date.now()), [catchUps]);
@@ -281,26 +330,51 @@ export const CatchUpPill = memo(function CatchUpPill({
         collisionPadding={16}
         className="catch-up-popover"
       >
-        <div className="catch-up" data-testid="catch-up-popover">
+        <div className="catch-up" data-testid="catch-up-popover" onKeyDown={onKeyDown}>
           <div className="catch-up__bar">
-            <span className="catch-up__title">{t("app.chat.catchUp.title")}</span>
-            <button
-              type="button"
-              className="catch-up__close"
-              onClick={() => setOpen(false)}
-              aria-label={t("app.chat.catchUp.close")}
-              title={t("app.chat.catchUp.close")}
-            >
-              <X size={14} strokeWidth={2} aria-hidden="true" />
-            </button>
+            <span className="catch-up__when">
+              {catchUps[shown] ? formatWhen(locale, catchUps[shown].createdAt) : t("app.chat.catchUp.title")}
+            </span>
+            {total > 1 ? (
+              <div className="catch-up__pager">
+                <button
+                  type="button"
+                  className="catch-up__nav"
+                  aria-label={t("common.previous")}
+                  disabled={shown === 0}
+                  onClick={() => goTo(shown - 1)}
+                  data-testid="catch-up-previous"
+                >
+                  <ChevronLeft size={16} aria-hidden="true" />
+                </button>
+                <span className="catch-up__progress">
+                  {t("userAsk.question.progress", { current: shown + 1, total })}
+                </span>
+                <button
+                  type="button"
+                  className="catch-up__nav"
+                  aria-label={t("common.next")}
+                  disabled={shown === total - 1}
+                  onClick={() => goTo(shown + 1)}
+                  data-testid="catch-up-next"
+                >
+                  <ChevronRight size={16} aria-hidden="true" />
+                </button>
+              </div>
+            ) : null}
           </div>
-          <div className="catch-up__pages" ref={setPagesNode} data-testid="catch-up-pages">
+          <div
+            className="catch-up__pages"
+            ref={setPagesNode}
+            onScroll={onPagesScroll}
+            style={pagesHeight === null ? undefined : { height: pagesHeight }}
+            data-testid="catch-up-pages"
+          >
             {catchUps.map((catchUp, index) => (
               <CatchUpPage
                 key={catchUp.catchUpId}
                 catchUp={catchUp}
-                index={index}
-                total={catchUps.length}
+                newest={index === total - 1}
                 onJump={onJump}
                 onRetry={() => void request()}
               />

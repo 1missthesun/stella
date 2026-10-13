@@ -28,6 +28,7 @@ export function FloatingPopover({
   height,
   maxHeight,
   actions,
+  footer = true,
   children,
 }: FloatingPopoverProps) {
   const { width: screenWidth } = useWindowDimensions();
@@ -55,7 +56,9 @@ export function FloatingPopover({
       >
         <PopoverSurface width={width} height={height} maxHeight={maxHeight} style={styles.shadow}>
           {typeof children === "function" ? children(onClose) : children}
-          <PopoverFooter actions={actions} closeLabel={closeLabel} onClose={onClose} />
+          {footer ? (
+            <PopoverFooter actions={actions} closeLabel={closeLabel} onClose={onClose} />
+          ) : null}
         </PopoverSurface>
       </View>
     </View>

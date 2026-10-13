@@ -279,8 +279,6 @@
         "failed": "No se pudo escribir este resumen.",
         "retry": "Reintentar",
         "empty": "Nada nuevo que destacar.",
-        "you": "Tú",
-        "stella": "Stella",
         "close": "Cerrar",
         "notLoaded": "Ese mensaje ya no está en el chat."
       }

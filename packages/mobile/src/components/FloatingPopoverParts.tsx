@@ -45,6 +45,11 @@ export type FloatingPopoverProps = {
   height?: number;
   maxHeight?: number;
   actions?: readonly PopoverAction[];
+  /**
+   * Leave out the footer of glass controls (close and any actions); the
+   * popover still closes on a tap outside it.
+   */
+  footer?: boolean;
   children: ReactNode | ((close: () => void) => ReactNode);
 };
 

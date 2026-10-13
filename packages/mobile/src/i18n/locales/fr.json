@@ -279,8 +279,6 @@
         "failed": "Impossible d’écrire ce résumé.",
         "retry": "Réessayer",
         "empty": "Rien de nouveau à signaler.",
-        "you": "Vous",
-        "stella": "Stella",
         "close": "Fermer",
         "notLoaded": "Ce message n’est plus dans la conversation."
       }

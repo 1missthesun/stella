@@ -6,7 +6,7 @@
 
 import { messageText } from "./conversation-protocol.js";
 import { splitMessageReplyRefs } from "./reply-refs.js";
-import type { CatchUp } from "./backend/catch-ups.js";
+import type { CatchUp, CatchUpItem } from "./backend/catch-ups.js";
 
 /** One message a catch-up may read: the user's and Stella's, as shown. */
 export type CatchUpSourceMessage = {
@@ -131,4 +131,36 @@ export const catchUpOffer = (
     busy = times[end]! - times[end - CATCH_UP_BUSY_MESSAGES + 1]! <= CATCH_UP_BUSY_WINDOW_MS;
   }
   return { offer: busy, count: times.length, lingerUntil };
+};
+
+/** A pause between two lines worth marking with a time, as Messages does. */
+export const CATCH_UP_TIME_GAP_MS = 30 * 60_000;
+
+export type CatchUpRow =
+  | { kind: "item"; item: CatchUpItem }
+  | { kind: "time"; at: number };
+
+/**
+ * A section's lines in the order they happened, with a time between two
+ * lines only where a long pause separates them. A line goes by the first
+ * message it cites; one citing none keeps its place.
+ */
+export const catchUpRows = (items: readonly CatchUpItem[]): CatchUpRow[] => {
+  let last = 0;
+  const timed = items.map((item, index) => {
+    const at = item.links[0]?.at ?? last;
+    last = at;
+    return { item, at, index };
+  });
+  timed.sort((a, b) => a.at - b.at || a.index - b.index);
+  const rows: CatchUpRow[] = [];
+  let previous: number | null = null;
+  for (const { item, at } of timed) {
+    if (previous !== null && previous > 0 && at - previous >= CATCH_UP_TIME_GAP_MS) {
+      rows.push({ kind: "time", at });
+    }
+    rows.push({ kind: "item", item });
+    previous = at;
+  }
+  return rows;
 };

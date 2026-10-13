@@ -274,8 +274,6 @@
         "failed": "Couldn't write this summary.",
         "retry": "Try again",
         "empty": "Nothing new worth noting.",
-        "you": "You",
-        "stella": "Stella",
         "close": "Close",
         "notLoaded": "That message is no longer in the chat."
       }

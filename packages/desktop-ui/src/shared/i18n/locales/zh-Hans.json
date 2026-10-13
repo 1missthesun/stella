@@ -269,8 +269,6 @@
         "failed": "无法生成这次摘要。",
         "retry": "重试",
         "empty": "没有值得一提的新内容。",
-        "you": "你",
-        "stella": "Stella",
         "close": "关闭",
         "notLoaded": "该消息已不在对话中。"
       }

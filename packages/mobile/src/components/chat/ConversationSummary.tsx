@@ -341,11 +341,23 @@ export function SummaryPopover({
     void request();
   }, [request, requestNew]);
 
+  // The page an arrow is sliding to: scroll events on the way there must
+  // not move the count, and a quick second tap steps on from it.
+  const targetRef = useRef<number | null>(null);
+  const [positioned, setPositioned] = useState(false);
   const goTo = useCallback(
     (next: number, animated = true) => {
+      if (pageWidth === 0) return;
       const target = Math.max(0, Math.min(next, total - 1));
+      targetRef.current = animated ? target : null;
+      if (animated) {
+        // In case the slide's last scroll event lands short of the page.
+        setTimeout(() => {
+          if (targetRef.current === target) targetRef.current = null;
+        }, 700);
+      }
       setIndex(target);
-      if (pageWidth > 0) scrollRef.current?.scrollTo({ x: target * pageWidth, animated });
+      scrollRef.current?.scrollTo({ x: target * pageWidth, animated });
     },
     [pageWidth, total],
   );
@@ -358,14 +370,22 @@ export function SummaryPopover({
     if (pageWidth === 0 || !newestKey || shownKeyRef.current === newestKey) return;
     const animated = shownKeyRef.current !== null;
     shownKeyRef.current = newestKey;
-    requestAnimationFrame(() => goTo(total - 1, animated));
+    requestAnimationFrame(() => {
+      goTo(total - 1, animated);
+      setPositioned(true);
+    });
   }, [goTo, newestKey, pageWidth, total]);
 
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (pageWidth === 0) return;
-      offsetRef.current = event.nativeEvent.contentOffset.x;
-      const next = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+      const x = event.nativeEvent.contentOffset.x;
+      offsetRef.current = x;
+      if (targetRef.current !== null) {
+        if (Math.abs(x - targetRef.current * pageWidth) > 2) return;
+        targetRef.current = null;
+      }
+      const next = Math.round(x / pageWidth);
       setIndex((current) => (current === next ? current : next));
     },
     [pageWidth],
@@ -377,7 +397,7 @@ export function SummaryPopover({
   const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const settleAt = useCallback(
     (x: number) => {
-      if (pageWidth === 0) return;
+      if (pageWidth === 0 || targetRef.current !== null) return;
       const target = Math.max(0, Math.min(Math.round(x / pageWidth), total - 1));
       setIndex(target);
       if (Math.abs(x - target * pageWidth) > 1) {
@@ -386,6 +406,10 @@ export function SummaryPopover({
     },
     [pageWidth, total],
   );
+  const onDragBegin = useCallback(() => {
+    // A finger on the pages takes over from any arrow slide.
+    targetRef.current = null;
+  }, []);
   const onDragEnd = useCallback(() => {
     if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
     settleTimerRef.current = setTimeout(() => settleAt(offsetRef.current), 450);
@@ -393,6 +417,7 @@ export function SummaryPopover({
   const onMomentumEnd = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      targetRef.current = null;
       settleAt(event.nativeEvent.contentOffset.x);
     },
     [settleAt],
@@ -429,7 +454,7 @@ export function SummaryPopover({
                   accessibilityState={{ disabled: shown === 0 }}
                   disabled={shown === 0}
                   hitSlop={6}
-                  onPress={() => goTo(shown - 1)}
+                  onPress={() => goTo((targetRef.current ?? shown) - 1)}
                   style={({ pressed }) => [styles.nav, pressed && styles.navPressed]}
                   testID="summary-previous"
                 >
@@ -448,7 +473,7 @@ export function SummaryPopover({
                   accessibilityState={{ disabled: shown === total - 1 }}
                   disabled={shown === total - 1}
                   hitSlop={6}
-                  onPress={() => goTo(shown + 1)}
+                  onPress={() => goTo((targetRef.current ?? shown) + 1)}
                   style={({ pressed }) => [styles.nav, pressed && styles.navPressed]}
                   testID="summary-next"
                 >
@@ -465,7 +490,6 @@ export function SummaryPopover({
             <ScrollView
               ref={scrollRef}
               horizontal
-              pagingEnabled
               snapToInterval={pageWidth}
               snapToAlignment="start"
               decelerationRate="fast"
@@ -476,8 +500,8 @@ export function SummaryPopover({
               onScrollEndDrag={onDragEnd}
               onMomentumScrollEnd={onMomentumEnd}
               scrollEventThrottle={32}
-              contentOffset={{ x: shown * pageWidth, y: 0 }}
-              style={[styles.pages, { width: pageWidth }]}
+              onScrollBeginDrag={onDragBegin}
+              style={[styles.pages, { width: pageWidth, opacity: positioned ? 1 : 0 }]}
               contentContainerStyle={[styles.pagesRow, { width: pageWidth * total }]}
               testID="summary-pages"
             >

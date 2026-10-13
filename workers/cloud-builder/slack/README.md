@@ -78,6 +78,26 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
   preview URL in a deploy check run or status: Cloudflare Pages, Vercel,
   Netlify, …) via `/api/slack/github/agent/preview`. `slack.md` tells Stella
   to brief agents that way and post the link, falling back to a patch.
+- **Stella previews** (`previews.ts`, `stella-publish.cjs.txt`): every Slack
+  agent container gets `stella-publish` and a 12-hour publish capability (one
+  workspace, one conversation) in `/opt/stella-preview`. In a pushed clone it
+  prints the repository's own preview when there is one (`stella-preview`);
+  otherwise it builds the site and uploads the output as a gzipped tar to
+  `POST /api/slack/previews`, which stores the files in `APP_BUILDS` under
+  `slack-previews/<id>/` and returns a fresh link with a 128-bit random id.
+  Limits: 100 MB and 5,000 files per preview (25 MB per file), and live
+  previews per workspace up to the owner's plan (free 250 MB, Go 1 GB, Pro
+  5 GB, at most 500 links). The `workers/preview-host` Worker serves them on
+  their own origin through cloud-builder's `SlackPreviewHost` entrypoint,
+  with SPA fallback to `index.html` (or the site's `404.html`), content types
+  stored at upload, a CSP, and no Stella cookies. The owner sets access and
+  expiry on stella.sh/slack (`slack_preview_settings`): members only (the
+  default) sends visitors through Sign in with Slack restricted to the
+  workspace (redirect URI `<auth>/api/slack/oauth/callback/preview`, a
+  subdirectory of the registered one), then an HttpOnly `__Host-` cookie on
+  the preview origin; public opens for anyone with the link. Links expire
+  1–90 days after they're made (default 14, the current setting applies to
+  existing links); the daily cron deletes their files.
 - **Uninstalls** arrive on the App's webhook and are also noticed whenever
   GitHub refuses a token; the page then shows a reconnect state. Workspaces
   that pasted a token before this keep it (read-only) until they pick a
@@ -92,8 +112,8 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
    into `bunx wrangler secret put NAME`, `--env production` for prod).
    `OAUTH_STATE_SECRET` must also be set.
 3. Apply the D1 migrations (`migrations/0009_slack.sql`, `0010_slack_workspace.sql`,
-   `0011_slack_workspace_settings.sql`, `0013_slack_github.sql`) and deploy
-   cloud-builder.
+   `0011_slack_workspace_settings.sql`, `0013_slack_github.sql`,
+   `0014_slack_previews.sql`) and deploy cloud-builder, then `workers/preview-host`.
 4. In the app's Event Subscriptions, retry verification of the request URL.
 5. Install into a workspace from stella.sh/slack, or by opening
    `<auth>/api/slack/install`.

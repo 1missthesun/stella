@@ -565,7 +565,7 @@ const buildOptions = (env: AuthEnv) => {
       oneTimeToken({ storeToken: "hashed", expiresIn: 3, disableClientRequest: true, setOttHeaderOnNewSession: true }),
       nativeOttRedirect(),
       anonymous({ emailDomainName: "anon.stella.local", disableDeleteAnonymousUser: true }),
-      magicLink({ sendMagicLink: ({ email, url }) => sendMagicLinkEmail(env, email, url) }),
+      magicLink({ storeToken: "hashed", sendMagicLink: ({ email, url }) => sendMagicLinkEmail(env, email, url) }),
       jwt({
         jwks: { keyPairConfig: { alg: "RS256", modulusLength: 2048 } },
         jwt: {

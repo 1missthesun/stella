@@ -1010,6 +1010,7 @@
       "backLabel": "返回设置",
       "chatgptBrowserWaiting": "请在浏览器中完成 ChatGPT 登录。",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "默认",
       "claudeNote": "在此添加账号会让 Stella 的云端在 Anthropic 自己的页面上登录 Claude Code。每台电脑使用各自的 Claude Code 登录。",
       "claudeSection": "Claude",
       "claudeSyncNote": "完整的 Claude Code 会话（包括工具输出）会同步到 Stella 的云端。",

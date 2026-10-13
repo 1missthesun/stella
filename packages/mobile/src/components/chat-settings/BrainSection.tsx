@@ -243,7 +243,7 @@ export function EngineAccountRow({
         ? `${row.plan.charAt(0).toUpperCase()}${row.plan.slice(1)}`
         : undefined;
     } else if (accounts.length > 0 || engines?.claude) {
-      label = t("settings.engineAccounts.claude.automatic");
+      label = t("mobile.engineAccounts.claudeDefault");
     } else {
       label = t("mobile.engineAccounts.connectClaude");
     }

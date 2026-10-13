@@ -1018,6 +1018,7 @@
       "backLabel": "Ayarlar'a dön",
       "chatgptBrowserWaiting": "Tarayıcında ChatGPT oturum açma işlemini tamamla.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "Varsayılan",
       "claudeNote": "Buradan hesap eklemek, Stella'nın bulutunun Anthropic'in kendi sayfasında Claude Code'a oturum açmasını sağlar. Her bilgisayar kendi Claude Code oturumunu kullanır.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Araç çıktıları dahil tüm Claude Code oturumları Stella'nın bulutuna senkronize edilir.",

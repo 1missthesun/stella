@@ -1034,6 +1034,7 @@
       "backLabel": "Назад к настройкам",
       "chatgptBrowserWaiting": "Завершите вход в ChatGPT в браузере.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "По умолчанию",
       "claudeNote": "При добавлении аккаунта здесь облако Stella входит в Claude Code на собственной странице Anthropic. Каждый компьютер использует свой вход в Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Полные сессии Claude Code, включая вывод инструментов, синхронизируются с облаком Stella.",

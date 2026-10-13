@@ -1050,6 +1050,7 @@
       "backLabel": "العودة إلى الإعدادات",
       "chatgptBrowserWaiting": "أكمل تسجيل الدخول إلى ChatGPT في متصفحك.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "افتراضي",
       "claudeNote": "إضافة حساب هنا تسجّل دخول سحابة Stella إلى Claude Code عبر صفحة Anthropic نفسها. يستخدم كل كمبيوتر تسجيل دخول Claude Code الخاص به.",
       "claudeSection": "Claude",
       "claudeSyncNote": "تتم مزامنة جلسات Claude Code الكاملة، بما فيها مخرجات الأدوات، مع سحابة Stella.",

@@ -1010,6 +1010,7 @@
       "backLabel": "設定に戻る",
       "chatgptBrowserWaiting": "ブラウザで ChatGPT へのサインインを完了してください。",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "デフォルト",
       "claudeNote": "ここでアカウントを追加すると、Stella のクラウドが Anthropic 自身のページで Claude Code にサインインします。各コンピュータは独自の Claude Code のサインインを使います。",
       "claudeSection": "Claude",
       "claudeSyncNote": "ツールの出力を含む Claude Code のセッション全体が Stella のクラウドに同期されます。",

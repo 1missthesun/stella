@@ -1018,6 +1018,7 @@
       "backLabel": "Tillbaka till Inställningar",
       "chatgptBrowserWaiting": "Slutför inloggningen till ChatGPT i webbläsaren.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "Standard",
       "claudeNote": "När du lägger till ett konto här loggar Stellas moln in i Claude Code på Anthropics egen sida. Varje dator använder sin egen Claude Code-inloggning.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Hela Claude Code-sessioner, inklusive verktygsutdata, synkroniseras till Stellas moln.",

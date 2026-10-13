@@ -1026,6 +1026,7 @@
       "backLabel": "Volver a Ajustes",
       "chatgptBrowserWaiting": "Termina de iniciar sesión en ChatGPT en tu navegador.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "Predeterminado",
       "claudeNote": "Al añadir una cuenta aquí, la nube de Stella inicia sesión en Claude Code en la propia página de Anthropic. Cada ordenador usa su propia sesión de Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Las sesiones completas de Claude Code, incluidos los resultados de las herramientas, se sincronizan con la nube de Stella.",

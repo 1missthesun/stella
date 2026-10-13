@@ -1034,6 +1034,7 @@
       "backLabel": "Zpět do Nastavení",
       "chatgptBrowserWaiting": "Dokončete přihlášení do ChatGPT v prohlížeči.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "Výchozí",
       "claudeNote": "Přidáním účtu zde se cloud Stelly přihlásí do Claude Code na vlastní stránce Anthropic. Každý počítač používá své vlastní přihlášení do Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Celé relace Claude Code, včetně výstupů nástrojů, se synchronizují do cloudu Stelly.",

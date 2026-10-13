@@ -1018,6 +1018,7 @@
       "backLabel": "Zurück zu den Einstellungen",
       "chatgptBrowserWaiting": "Schließe die Anmeldung bei ChatGPT in deinem Browser ab.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "Standard",
       "claudeNote": "Wenn du hier ein Konto hinzufügst, meldet sich Stellas Cloud auf Anthropics eigener Seite bei Claude Code an. Jeder Computer nutzt seine eigene Claude-Code-Anmeldung.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Vollständige Claude-Code-Sitzungen, einschließlich Tool-Ausgaben, werden mit Stellas Cloud synchronisiert.",

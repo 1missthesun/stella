@@ -1018,6 +1018,7 @@
       "backLabel": "Back to Settings",
       "chatgptBrowserWaiting": "Finish signing in to ChatGPT in your browser.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "Default",
       "claudeNote": "Adding an account here signs Stella's cloud in to Claude Code on Anthropic's own page. Each computer uses its own Claude Code sign-in.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Full Claude Code sessions, including tool outputs, sync to Stella's cloud.",

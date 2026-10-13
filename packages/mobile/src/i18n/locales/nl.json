@@ -1018,6 +1018,7 @@
       "backLabel": "Terug naar Instellingen",
       "chatgptBrowserWaiting": "Rond het inloggen bij ChatGPT af in je browser.",
       "chatgptSection": "ChatGPT",
+      "claudeDefault": "Standaard",
       "claudeNote": "Als je hier een account toevoegt, logt Stella's cloud in bij Claude Code op de eigen pagina van Anthropic. Elke computer gebruikt zijn eigen Claude Code-aanmelding.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Volledige Claude Code-sessies, inclusief tooluitvoer, worden gesynchroniseerd met Stella's cloud.",

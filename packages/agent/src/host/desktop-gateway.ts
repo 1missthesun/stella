@@ -35,11 +35,18 @@ const errorCode = async (response: Response): Promise<unknown> => {
   }
 };
 
-/** 402 budget or 429 request-limit on this capability: one fresh exchange is allowed. */
+/**
+ * 402 budget or usage limit, or 429 request-limit on this capability: one
+ * fresh exchange is allowed (an upgrade since the capability was minted is
+ * picked up by the fresh one).
+ */
 const capabilityExhausted = async (response: Response): Promise<boolean> => {
   if (response.status !== 402 && response.status !== 429) return false;
   const code = await errorCode(response);
-  return (response.status === 402 && code === "budget_exhausted") || (response.status === 429 && code === "request_limit");
+  return (
+    (response.status === 402 && (code === "budget_exhausted" || code === "usage_limit")) ||
+    (response.status === 429 && code === "request_limit")
+  );
 };
 
 const dpopInvalid = async (response: Response): Promise<boolean> =>

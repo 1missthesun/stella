@@ -106,6 +106,7 @@ const isPermanentAutomaticAdmissionError = (error: unknown) => {
   if (
     code === "sign_in_required" ||
     code === "subscription_required" ||
+    code === "usage_limit" ||
     code === "owner_suspended"
   ) {
     return true;
@@ -922,6 +923,14 @@ export function useChatThread(opts: {
           automaticExecutionResultText(terminal),
           terminal.state === "canceled",
         );
+        // A refused send (allowance spent, plan limit) also pins the
+        // Upgrade card, as a thrown admission error does below.
+        if (terminal.state === "failed" && terminal.errorMessage) {
+          showComposerNoticeForError(
+            terminal.errorMessage,
+            canonicalConversationId,
+          );
+        }
         acknowledgeDesktopSendIds([item.dispatchId, item.userMessageId]);
         finishDispatch();
       } catch (error) {

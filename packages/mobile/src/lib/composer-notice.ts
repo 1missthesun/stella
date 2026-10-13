@@ -14,6 +14,11 @@
  */
 
 import { useSyncExternalStore } from "react";
+import {
+  STELLA_USAGE_LIMIT_DESCRIPTIONS,
+  STELLA_USAGE_LIMIT_TITLES,
+  stellaUsageLimitOf,
+} from "@stella/contracts/stella-usage-limit";
 
 export type ComposerNoticeKind = "sign-in" | "upgrade" | "limit" | "provider";
 
@@ -195,12 +200,16 @@ export function classifyComposerNotice(
     };
   }
 
-  if (includesAny(normalized, FREE_ALLOWANCE_MATCHERS)) {
+  // Stella's own usage limit, as the backend or the gateway words it. The
+  // same title and copy as desktop and web.
+  const usageLimit = includesAny(normalized, FREE_ALLOWANCE_MATCHERS)
+    ? "free_allowance"
+    : stellaUsageLimitOf(normalized);
+  if (usageLimit) {
     return {
       kind: "upgrade",
-      title: "You've used your free allowance",
-      description:
-        "The Free plan's allowance is spent. Upgrade to keep going with Stella.",
+      title: STELLA_USAGE_LIMIT_TITLES[usageLimit],
+      description: STELLA_USAGE_LIMIT_DESCRIPTIONS[usageLimit],
     };
   }
   if (includesAny(normalized, CAPABILITY_MATCHERS)) {
@@ -213,9 +222,8 @@ export function classifyComposerNotice(
   if (includesAny(normalized, PLAN_LIMIT_MATCHERS)) {
     return {
       kind: "upgrade",
-      title: "Stella needs more room",
-      description:
-        "You have reached the limit for your current plan. Upgrade to keep going, or wait until usage resets.",
+      title: STELLA_USAGE_LIMIT_TITLES.plan_limit,
+      description: STELLA_USAGE_LIMIT_DESCRIPTIONS.plan_limit,
     };
   }
   if (includesAny(normalized, MODEL_RESTRICTION_MATCHERS)) {

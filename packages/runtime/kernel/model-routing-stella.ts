@@ -374,7 +374,8 @@ const capabilityExhausted = async (response: Response): Promise<boolean> => {
     }
     const code = (error as Record<string, unknown>).code;
     return (
-      (response.status === 402 && code === "budget_exhausted") ||
+      (response.status === 402 &&
+        (code === "budget_exhausted" || code === "usage_limit")) ||
       (response.status === 429 && code === "request_limit")
     );
   } catch {

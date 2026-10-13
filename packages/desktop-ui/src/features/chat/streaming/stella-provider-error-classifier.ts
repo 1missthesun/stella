@@ -6,6 +6,7 @@ import {
   CAPABILITY_DENIED_CODE,
   type Capability,
 } from '@stella/contracts/capabilities'
+import { stellaUsageLimitOf } from '@stella/contracts/stella-usage-limit'
 
 export type StellaProviderErrorKind =
   | 'account-auth'
@@ -326,6 +327,15 @@ export const classifyStellaProviderError = (
   }
   if (normalized.includes(claudeCodeUsageLimitMatcher)) {
     return { kind: 'claude-code-usage-limit', message }
+  }
+  // Stella's own usage limit, worded by the backend or the gateway: never
+  // "try again", always the upgrade notice.
+  const usageLimit = stellaUsageLimitOf(normalized)
+  if (usageLimit === 'free_allowance') {
+    return { kind: 'free-allowance-exhausted', message }
+  }
+  if (usageLimit === 'plan_limit') {
+    return { kind: 'billing', message }
   }
   if (
     includesAny(normalized, signInRequiredMatchers) ||

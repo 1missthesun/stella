@@ -73,6 +73,7 @@ import {
 import type { SocketStatus } from "./conversation-socket";
 import { reportCloudReadiness } from "./cloud-readiness-timing";
 import { showToast } from "@/ui/toast";
+import { presentCloudUsageLimit } from "./usage-limit-notice";
 import { getExecutionTargetSnapshot } from "../execution-placement/execution-target-store";
 import { waitForCloudAttachmentUploads } from "./browser-chat-attachments";
 
@@ -610,6 +611,10 @@ export const useConversation = (
               clientMsgId,
               settled.dispatch.errorMessage || "That cloud turn failed.",
             );
+            presentCloudUsageLimit(
+              settled.dispatch.errorMessage,
+              settled.dispatch.conversationId || null,
+            );
           }
         }
       } catch (error) {
@@ -619,6 +624,10 @@ export const useConversation = (
           clientMsgId,
           friendlySendError(error),
           isAmbiguousTransportFailure(error),
+        );
+        presentCloudUsageLimit(
+          friendlySendError(error),
+          entry.conversationId ?? submission.requestedConversationId ?? null,
         );
       } finally {
         pendingPrompts.releaseDispatch(sendAuthority, clientMsgId);

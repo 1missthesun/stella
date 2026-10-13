@@ -10,6 +10,7 @@ import {
 import { journalWorkingActivity } from "@stella/contracts/journal-working-activity";
 import { journalAgents } from "@stella/contracts/agent-titles";
 import { publishJournalAgents } from "./journal-agent-store";
+import { presentLatestTurnUsageLimit } from "./usage-limit-notice";
 import {
   useCallback,
   useEffect,
@@ -397,6 +398,7 @@ export function useCloudChatBridge({
   useEffect(() => {
     if (!enabled || !journalConversationId) return;
     publishJournalAgents(journalConversationId, journalAgents(completeRecords));
+    presentLatestTurnUsageLimit(journalConversationId, completeRecords);
   }, [completeRecords, enabled, journalConversationId]);
   const activeUserIds = useMemo(
     () => activeCloudUserMessageIds(completeRecords),

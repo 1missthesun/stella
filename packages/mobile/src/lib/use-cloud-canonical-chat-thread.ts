@@ -80,6 +80,7 @@ import { mergeJournalTasks } from "./mobile-task-merge";
 import { planCloudTranscriptDisplay } from "./cloud-transcript-display";
 import { useChatAttachmentPreviews } from "./use-chat-attachment-previews";
 import { useClaudeUsageLimitNotice } from "./claude-usage-limit-notice";
+import { useStellaUsageLimitNotice } from "./stella-usage-limit-notice";
 import { reuseEqualChatMessages } from "./structural-sharing";
 import { TrailingTask } from "./trailing-task";
 import type { ChatMessage } from "../types";
@@ -624,6 +625,10 @@ export const useCloudCanonicalChatThread = (
   );
 
   useClaudeUsageLimitNotice(
+    threadId === "cloud" ? authority.conversationId : null,
+    state.records,
+  );
+  useStellaUsageLimitNotice(
     threadId === "cloud" ? authority.conversationId : null,
     state.records,
   );

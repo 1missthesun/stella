@@ -13,6 +13,10 @@ import { i18nFallback } from '@/shared/i18n/I18nProvider'
 import { showToast, type ToastOptions } from '@/ui/toast'
 import { detectLlmRouteFailureKind } from "@stella/contracts/llm-route-failure"
 import {
+  STELLA_USAGE_LIMIT_DESCRIPTIONS,
+  STELLA_USAGE_LIMIT_TITLES,
+} from '@stella/contracts/stella-usage-limit'
+import {
   presentComposerNotice,
   type ComposerNoticeKind,
 } from '@/features/chat/composer-notice-store'
@@ -230,8 +234,8 @@ export const resolveStellaProviderErrorToast = (
       // Terminal by design: the Free allowance is spent once and never
       // refreshes, so this must never read like "try again later".
       return {
-        title: t('billing.freeAllowance.exhaustedTitle'),
-        description: t('billing.freeAllowance.exhaustedDescription'),
+        title: STELLA_USAGE_LIMIT_TITLES.free_allowance,
+        description: STELLA_USAGE_LIMIT_DESCRIPTIONS.free_allowance,
         variant: 'error',
         duration: 10000,
         action: upgradeAction,
@@ -239,9 +243,8 @@ export const resolveStellaProviderErrorToast = (
       }
     case 'billing':
       return {
-        title: 'Stella needs more room',
-        description:
-          'You have reached the limit for your current plan. Upgrade to keep going, or wait until usage resets.',
+        title: STELLA_USAGE_LIMIT_TITLES.plan_limit,
+        description: STELLA_USAGE_LIMIT_DESCRIPTIONS.plan_limit,
         variant: 'error',
         duration: 8000,
         action: upgradeAction,

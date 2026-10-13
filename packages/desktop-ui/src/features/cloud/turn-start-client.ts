@@ -15,6 +15,10 @@
  */
 
 import {
+  BILLING_UNAVAILABLE_MESSAGE,
+  STELLA_USAGE_LIMIT_MESSAGES,
+} from "@stella/contracts/stella-usage-limit";
+import {
   CONVERSATION_ID_PATTERN,
   TURN_PLANE_PROTOCOL,
   TURN_TITLE_MAX_CHARS,
@@ -59,6 +63,8 @@ const FALLBACK_MESSAGES: Record<CloudTurnStartErrorCode, string> = {
     "That model isn't available for cloud turns right now. Choose another and try again.",
   sign_in_required: "Sign in to Stella to use cloud agents.",
   subscription_required: CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
+  usage_limit: STELLA_USAGE_LIMIT_MESSAGES.plan_limit,
+  billing_unavailable: BILLING_UNAVAILABLE_MESSAGE,
   owner_suspended: "This account can't use Stella's cloud right now.",
   internal: "That didn't send. Try again.",
 };

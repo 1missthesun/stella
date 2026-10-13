@@ -1562,7 +1562,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     answer: EntryId | undefined,
   ): Promise<{ closing: StellaPendingNote[]; send: StellaPendingNote[] }> => {
     const role = await tx.doc(StellaAgentDoc, agentConversationId);
-    const notes = role.notes ?? [];
+    const notes = (role.notes ?? []).map((note) => ({ ...note, from: { ...note.from } }));
     if (notes.length === 0) return { closing: [], send: [] };
     delete role.notes;
     for (const note of notes) notesSent.delete(note.key);
@@ -2406,9 +2406,11 @@ export function stellaAgents(host: StellaAgentsHost) {
       return messages;
     }, context);
     // Its notes to Stella settle once a run ends: the ones it sent as the
-    // last step of a run that finished are part of its answer.
+    // last step of a run that finished are part of its answer, unless agents
+    // it started still work: that answer is not reported, so they go out now.
     const settle = async (answer?: EntryId): Promise<string[]> => {
-      const notes = await harness.commit((tx) => settleNotes(tx, agent.id, answer), context);
+      const waiting = answer !== undefined && (await agentsBusy(busyReader(harness, context), agent.id).catch(() => false));
+      const notes = await harness.commit((tx) => settleNotes(tx, agent.id, waiting ? undefined : answer), context);
       for (const note of notes.send) {
         await deliverNote(root.id, note, context, (id) => harness.conversation(id, context)).catch(() => false);
       }

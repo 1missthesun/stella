@@ -30,7 +30,6 @@ const LIVE_STATUSES = new Set([
   "waiting_for_user",
 ]);
 const REPORTABLE = new Set<string>(["completed", "failed", "canceled"]);
-const NOT_A_REQUESTER = new Set<string>(["failed", "canceled", "paused"]);
 const REPORT_TEXT_MAX_CHARS = 30_000;
 const TREE_DEPTH_MAX = 16;
 const REPORT_DELIVERY_ATTEMPTS_MAX = 20;
@@ -165,26 +164,20 @@ const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
     .map((row) => row.thread_id);
 
 type Requester =
-  | { kind: "agent"; thread: ThreadRow }
+  | { kind: "agent"; threadId: string; thread: ThreadRow | null }
   | { kind: "conversation"; conversationId: string };
 
 const conversationOf = (thread: ThreadRow): string =>
   thread.origin_conversation_id ?? thread.conversation_id;
 
-const requesterOf = (db: OwnerDbReader, thread: ThreadRow): Requester => {
-  const seen = new Set([thread.thread_id]);
-  let parentId = thread.parent_thread_id;
-  while (parentId && !seen.has(parentId) && seen.size <= TREE_DEPTH_MAX) {
-    seen.add(parentId);
-    const parent = readThread(db, parentId);
-    if (!parent) break;
-    if (!NOT_A_REQUESTER.has(parent.status)) {
-      return { kind: "agent", thread: parent };
-    }
-    parentId = parent.parent_thread_id;
-  }
-  return { kind: "conversation", conversationId: conversationOf(thread) };
-};
+const requesterOf = (db: OwnerDbReader, thread: ThreadRow): Requester =>
+  thread.parent_thread_id && thread.parent_thread_id !== thread.thread_id
+    ? {
+        kind: "agent",
+        threadId: thread.parent_thread_id,
+        thread: readThread(db, thread.parent_thread_id),
+      }
+    : { kind: "conversation", conversationId: conversationOf(thread) };
 
 const reportText = (thread: ThreadRow, outcome: AgentReportOutcome): string => {
   if (outcome === "completed") {
@@ -279,7 +272,7 @@ export const deriveAgentReport = (
       reportId,
       requester:
         requester.kind === "agent"
-          ? { kind: "agent", threadId: requester.thread.thread_id }
+          ? { kind: "agent", threadId: requester.threadId }
           : { kind: "conversation", conversationId: requester.conversationId },
     },
     createdAt: now,
@@ -297,11 +290,13 @@ export const deriveAgentReport = (
     thread.conversation_id,
     thread.owner_generation,
     requester.kind,
+    requester.kind === "agent" ? requester.threadId : requester.conversationId,
     requester.kind === "agent"
-      ? requester.thread.thread_id
-      : requester.conversationId,
-    requester.kind === "agent" ? requester.thread.attempt_generation : null,
-    requester.kind === "agent" && LIVE_STATUSES.has(requester.thread.status)
+      ? (requester.thread?.attempt_generation ?? null)
+      : null,
+    requester.kind === "agent" &&
+      requester.thread &&
+      LIVE_STATUSES.has(requester.thread.status)
       ? 1
       : 0,
     outcome,
@@ -333,7 +328,20 @@ const deriveJobReports = (db: OwnerDb, threadId: string, now: number): void => {
   }
 };
 
-agentChangeHooks.push(deriveJobReports);
+const releaseHeldReports = (db: OwnerDb, threadId: string, now: number): void => {
+  const thread = readThread(db, threadId);
+  if (!thread || thread.status === "paused") return;
+  for (const { report_id } of db.all<{ report_id: string }>(
+    `SELECT o.report_id FROM agent_report_outbox o
+      WHERE o.requester_kind = 'agent' AND o.requester_id = ? AND o.state = 'pending'
+        AND NOT EXISTS (SELECT 1 FROM owner_jobs j WHERE j.id = 'agent-report:' || o.report_id)`,
+    threadId,
+  )) {
+    scheduleDelivery(db, report_id, now);
+  }
+};
+
+agentChangeHooks.push(deriveJobReports, releaseHeldReports);
 
 const settle = (
   ctx: OwnerContext,
@@ -396,27 +404,6 @@ const conversationExists = (
       conversationId,
     ),
   );
-
-const reroute = (
-  ctx: OwnerContext,
-  row: OutboxRow,
-  thread: ThreadRow | null,
-): OutboxRow => {
-  const conversationId = thread ? conversationOf(thread) : row.conversation_id;
-  ctx.db.run(
-    `UPDATE agent_report_outbox SET requester_kind = 'conversation', requester_id = ?,
-       requester_generation = NULL, requester_was_live = 0, updated_at = ? WHERE report_id = ?`,
-    conversationId,
-    ctx.now,
-    row.report_id,
-  );
-  return {
-    ...row,
-    requester_kind: "conversation",
-    requester_id: conversationId,
-    requester_generation: null,
-  };
-};
 
 const reportHeading = (outcome: AgentReportOutcome): string =>
   outcome === "completed"
@@ -529,24 +516,51 @@ const deliverToConversation = async (
   settle(ctx, row, "delivered", "cloud");
 };
 
-const route = async (ctx: OwnerContext, initial: OutboxRow): Promise<void> => {
-  let row = initial;
+const holdForPausedParent = (
+  ctx: OwnerContext,
+  row: OutboxRow,
+  parent: ThreadRow,
+): void => {
+  ctx.jobs.cancel(deliveryJobId(row.report_id));
+  appendAgentEvent(ctx.db, {
+    key: `report_deferred:${row.report_id}:paused:${parent.attempt_generation}`,
+    kind: "report_deferred",
+    source: "owner:report-outbox",
+    threadId: row.thread_id,
+    conversationId: row.conversation_id,
+    attemptGeneration: row.attempt_generation,
+    detail: {
+      reportId: row.report_id,
+      requester: parent.thread_id,
+      parentPaused: true,
+    },
+    createdAt: ctx.now,
+  });
+};
+
+const route = async (ctx: OwnerContext, row: OutboxRow): Promise<void> => {
   const thread =
     row.kind === "report" ? readThread(ctx.db, row.thread_id) : null;
   if (row.requester_kind === "agent") {
     const parent = readThread(ctx.db, row.requester_id);
-    if (parent && !NOT_A_REQUESTER.has(parent.status)) {
-      await deliverReportToAgent(ctx, {
-        reportId: row.report_id,
-        parentThreadId: parent.thread_id,
-        ownerGeneration: row.owner_generation ?? parent.owner_generation ?? "",
-        text: `${reportHeading(row.outcome)} ${row.description.trim() || row.thread_id} (thread ${row.thread_id})\n\n${row.text}`,
-        fromThreadId: row.thread_id,
-      });
-      settle(ctx, row, "delivered", `agent:${parent.thread_id}`);
+    if (!parent) {
+      throw new Error(
+        `${row.requester_id}, which started ${row.thread_id}, is not recorded yet.`,
+      );
+    }
+    if (parent.status === "paused") {
+      holdForPausedParent(ctx, row, parent);
       return;
     }
-    row = reroute(ctx, row, thread);
+    await deliverReportToAgent(ctx, {
+      reportId: row.report_id,
+      parentThreadId: parent.thread_id,
+      ownerGeneration: row.owner_generation ?? parent.owner_generation ?? "",
+      text: `${reportHeading(row.outcome)} ${row.description.trim() || row.thread_id} (thread ${row.thread_id})\n\n${row.text}`,
+      fromThreadId: row.thread_id,
+    });
+    settle(ctx, row, "delivered", `agent:${parent.thread_id}`);
+    return;
   }
   await deliverToConversation(ctx, row, thread);
 };

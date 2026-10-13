@@ -50,7 +50,7 @@ const displayOf = (
 ): PiUserDisplay | undefined => {
   const savedFiles = [...prepared.modelFileAttachments];
   const attachments = (payload.attachments ?? []).flatMap(
-    (attachment): NonNullable<PiUserDisplay["attachments"]> => {
+    (attachment, index): NonNullable<PiUserDisplay["attachments"]> => {
       const image =
         attachment.kind === "image" ||
         (attachment.mimeType ?? "").startsWith("image/");
@@ -59,15 +59,19 @@ const displayOf = (
         ? -1
         : savedFiles.findIndex((saved) => saved.name === attachment.name);
       const saved = savedIndex >= 0 ? savedFiles.splice(savedIndex, 1)[0] : undefined;
-      const localPath = attachment.path ?? saved?.sourcePath;
+      // A spilled image's pixels are not in the message: its saved copy is.
+      const spilled = image ? prepared.spilledImagePaths.get(index) : undefined;
+      const localPath = spilled?.filePath ?? attachment.path ?? saved?.sourcePath;
+      const mimeType = spilled?.mimeType || attachment.mimeType;
       return [
         {
           kind: image ? "image" : "file",
           ...(attachment.name ? { name: attachment.name } : {}),
-          ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+          ...(mimeType ? { mimeType } : {}),
           ...(typeof attachment.size === "number" ? { size: attachment.size } : {}),
           ...(preview ? { url: preview } : {}),
           ...(localPath ? { path: localPath } : {}),
+          ...(spilled ? { spilled: true as const } : {}),
         },
       ];
     },

@@ -166,7 +166,13 @@ export type RelayedMessage = {
   context?: { text?: string; display?: Record<string, unknown> };
 };
 
-const LOCAL_ATTACHMENT_NOTICE = /^The user attached (a file|an image): /;
+/**
+ * Notices naming attachments by their paths on this computer, which mean
+ * nothing where Stella runs: the attachments themselves go along instead. The
+ * second is the notice for images too large to go inline (spilled to disk).
+ */
+const LOCAL_ATTACHMENT_NOTICE =
+  /^The user attached (?:(?:a file|an image): |(?:an image|\d+ images) with this message\. The set was too large to inline)/;
 
 const relayedMessage = (clientMsgId: string, message: PiUserMessage): RelayedMessage | undefined => {
   const { text, display } = piUserView(message);
@@ -174,14 +180,18 @@ const relayedMessage = (clientMsgId: string, message: PiUserMessage): RelayedMes
   const images = parts.flatMap((part) =>
     part.type === "image" && part.data ? [{ mimeType: part.mimeType, data: part.data }] : [],
   );
+  // Files, and images too large to have gone inline: their bytes are only on
+  // this computer, at `path`, so they go along as files the cloud uploads.
   const files = (display?.attachments ?? []).flatMap((attachment) =>
-    attachment.kind === "file" && (attachment.path || attachment.url)
+    (attachment.kind === "file" && (attachment.path || attachment.url)) ||
+    (attachment.kind === "image" && attachment.spilled && attachment.path)
       ? [
           {
             ...(attachment.name ? { name: attachment.name } : {}),
             ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
             ...(attachment.path ? { path: attachment.path } : {}),
-            ...(attachment.url ? { url: attachment.url } : {}),
+            // A spilled image's `url` is its preview; its bytes are at `path`.
+            ...(attachment.url && !attachment.spilled ? { url: attachment.url } : {}),
           },
         ]
       : [],

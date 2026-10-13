@@ -46,6 +46,8 @@ export type PiUserDisplay = {
     size?: number;
     url?: string;
     path?: string;
+    /** An image too large to go in the message inline: its bytes are only at `path`. */
+    spilled?: true;
   }>;
   /** The context the composer sent along: app selection, activity, quoted and pasted text. */
   context?: Record<string, unknown>;

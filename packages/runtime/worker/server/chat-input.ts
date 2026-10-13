@@ -83,6 +83,13 @@ export const prepareChatInput = async (
     spilledImageAttachments = persistedImageAttachments;
     modelImageAttachments = [];
   }
+  // Where each spilled image's bytes are, by its index in the composer's
+  // attachments: the message carries no pixels for them, only these files.
+  const spilledImagePaths = new Map<number, SpilledImageAttachment>();
+  for (const [index, spilled] of spilledImageAttachments.entries()) {
+    const source = materializedImageAttachments[spilled.attachmentIndex ?? index];
+    if (source) spilledImagePaths.set(source.index, spilled);
+  }
   const { buildChatPromptMessages } = await import("../../kernel/chat-prompt-context.js");
   const {
     visibleUserPrompt,
@@ -158,6 +165,7 @@ export const prepareChatInput = async (
     modelFileAttachments,
     modelWindowScreenshotAttachment,
     spilledImageAttachments,
+    spilledImagePaths,
     totalInlineImageBytes,
     runPromptMessages,
     mergedAttachments,

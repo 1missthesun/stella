@@ -33,9 +33,10 @@ import { FolderTabContent } from "./FolderTabContent";
 import {
   addCanvasHtmlItem,
   canvasDisplayTabId,
+  type CanvasHtmlItem,
 } from "./canvas-tab/canvas-items";
 import type { DisplayTabSpec } from "@/features/workspace-display/types";
-import { kindForPath } from "@/features/workspace-display/path-to-viewer";
+import { basenameOf, kindForPath } from "@/features/workspace-display/path-to-viewer";
 import { SOURCE_DIFF_TAB_ID } from "@/features/workspace-display/source-diff-batches";
 import { registerWorkspaceDisplayPayloadAdapter } from "@/features/workspace-display/open-payload";
 import { displayTabKindForPayload } from "@/features/workspace-display/payload-kind";
@@ -295,6 +296,24 @@ const localPayloadToTabSpec = (
 
   switch (payload.kind) {
     case "canvas-html": {
+      if (payload.cloudDrivePath) {
+        // A Drive document reads through the tab's CloudFileSource; the local
+        // canvas store holds files on this machine, so it stays out of it.
+        const item: CanvasHtmlItem = {
+          id: payload.filePath,
+          filePath: payload.filePath,
+          title: title || basenameOf(payload.filePath),
+          createdAt: payload.createdAt,
+        };
+        return {
+          id: canvasDisplayTabId(payload.filePath),
+          kind: "canvas",
+          title: item.title,
+          tooltip: payload.cloudDrivePath,
+          metadata: { kind: "canvas-html", filePath: payload.filePath },
+          render: () => createElement(CanvasTabContent, { item }),
+        };
+      }
       const items = addCanvasHtmlItem(payload);
       const item = items.find((entry) => entry.filePath === payload.filePath)!;
       return rememberInFiles({

@@ -13,7 +13,7 @@
  * The whole bar renders nothing when the canvas-share context is absent, so
  * the sandboxed canvas renderer never reaches for the backend outside a provider.
  */
-import { useCallback, useState } from "react";
+import { useCallback, useContext, useState } from "react";
 import {
   Check,
   Copy,
@@ -37,11 +37,20 @@ import {
 import type { CanvasHtmlItem } from "./canvas-items";
 import { useT } from "@/shared/i18n";
 import { deviceFileMissingMessage } from "@stella/contracts/device-files";
+import {
+  DisplayFileSourceContext,
+  type DisplayFileSource,
+} from "@/shared/hooks/display-file-source";
 import "./canvas-share.css";
 
 const decoder = new TextDecoder("utf-8");
 
-const readCanvasHtml = async (filePath: string): Promise<string> => {
+const readCanvasHtml = async (
+  filePath: string,
+  source: DisplayFileSource | null,
+): Promise<string> => {
+  // A Drive document has no file on this machine: read it where the tab does.
+  if (source) return decoder.decode((await source.read(filePath)).bytes);
   const readFile = window.electronAPI?.display?.readFile;
   if (typeof readFile !== "function") {
     throw new Error("Canvas file access requires the Stella desktop app.");
@@ -115,6 +124,7 @@ type Pending = CanvasLinkVisibility | "open" | null;
 const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
   const t = useT();
   const share = useCanvasShare();
+  const fileSource = useContext(DisplayFileSourceContext);
   const canvas = canvasKeyOf(item);
   const linkView = useCanvasLink(share ? canvas : null);
   // A canvas-less item's one-off public copy has no view to watch.
@@ -136,7 +146,7 @@ const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
         } else if (canvas) {
           await share.save({
             canvas,
-            html: await readCanvasHtml(item.filePath),
+            html: await readCanvasHtml(item.filePath, fileSource),
             title: item.title,
             visibility,
           });
@@ -144,7 +154,7 @@ const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
           // Not a canvas the agent named (a shared link opened here): a
           // one-off public copy is the only link it can have.
           const result = await share.publish({
-            html: await readCanvasHtml(item.filePath),
+            html: await readCanvasHtml(item.filePath, fileSource),
             title: item.title,
           });
           setPublished({
@@ -169,7 +179,7 @@ const CanvasLinkPanel = ({ item }: { item: CanvasHtmlItem }) => {
         setPending(null);
       }
     },
-    [share, link, canvas, item.filePath, item.title, t],
+    [share, link, canvas, fileSource, item.filePath, item.title, t],
   );
 
   const onOpen = useCallback(async () => {

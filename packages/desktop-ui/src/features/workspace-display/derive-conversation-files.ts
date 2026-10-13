@@ -25,6 +25,7 @@ import {
   type DisplayTabPayload,
 } from "@stella/contracts/desktop/display-payload";
 import { buildPayloadFromBarePath } from "@/features/chat/lib/derive-turn-resource";
+import { displayPayloadForStellaFile } from "@/features/chat/lib/stella-file-links";
 
 export type ConversationFileEntry = {
   path: string;
@@ -97,7 +98,10 @@ export const cloudDriveEntry = (
   timestamp: number,
 ): ConversationFileEntry => {
   const iconPath = file.path.startsWith("/") ? file.path : `/${file.path}`;
-  const typed = buildPayloadFromBarePath(iconPath, timestamp);
+  // The same rule a chat file link uses: any drive `.html` is a canvas (a
+  // report an agent uploaded to `reports/`, not only an `outputs/` canvas),
+  // so it renders instead of falling through to a download placeholder.
+  const typed = displayPayloadForStellaFile(iconPath, timestamp);
   return {
     path: file.path,
     timestamp,

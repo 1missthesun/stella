@@ -510,7 +510,10 @@ export function desktopChats(options: DesktopChatsOptions) {
    * Where each conversation stored in the cloud has its brain, as last read,
    * and the host that takes this computer's turns for it now (null: here).
    */
-  const brains = new Map<string, { record: PiBrainRecord | null; host: PiBrainRecord | null; at: number }>();
+  const brains = new Map<
+    string,
+    { record: PiBrainRecord | null; host: PiBrainRecord | null; at: number; failed?: true }
+  >();
   /** The record's host, unless that is this computer. */
   const otherHost = (record: PiBrainRecord | null) =>
     record && !(record.host === "device" && record.deviceId === options.deviceId) ? record : null;
@@ -521,9 +524,13 @@ export function desktopChats(options: DesktopChatsOptions) {
         ? { here: false, target: { mode: "cloud" } }
         : { here: false, target: { mode: "device", deviceId: host.deviceId }, ...(host.label ? { label: host.label } : {}) };
   /** What this computer reads of where Stella runs; the app's picker hears when that changes. */
-  const rememberBrain = (conversationId: string, entry: { record: PiBrainRecord | null; host: PiBrainRecord | null }) => {
+  const rememberBrain = (
+    conversationId: string,
+    entry: { record: PiBrainRecord | null; host: PiBrainRecord | null; failed?: true },
+    readAt = Date.now(),
+  ) => {
     const before = brains.get(conversationId);
-    brains.set(conversationId, { ...entry, at: Date.now() });
+    brains.set(conversationId, { ...entry, at: readAt });
     const brain = placementOfHost(entry.host);
     if (before && JSON.stringify(placementOfHost(before.host)) === JSON.stringify(brain)) return;
     options.emit({ conversationId, events: [{ type: "brain", brain }] });
@@ -547,9 +554,15 @@ export function desktopChats(options: DesktopChatsOptions) {
       record = await brain.read();
     } catch {
       // The cloud is out of reach (offline, signed out), and so is every host it would pass a turn to.
-      rememberBrain(conversationId, { record: known?.record ?? null, host: null });
+      rememberBrain(conversationId, { record: known?.record ?? null, host: null, failed: true });
       return null;
     }
+    const host = await hostOfRecord(conversationId, record);
+    rememberBrain(conversationId, { record, host });
+    return host;
+  };
+  /** The record's holder as this computer should treat it, given which of the owner's computers are up. */
+  const hostOfRecord = async (conversationId: string, record: PiBrainRecord | null): Promise<PiBrainRecord | null> => {
     let host = otherHost(record);
     // A list that can't be read now says nothing of the holder: the record stands.
     const listed =
@@ -576,7 +589,28 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (listed && !device?.online) host = null;
       else if (!host.label && device?.label) host = { ...host, label: device.label };
     }
-    rememberBrain(conversationId, { record, host });
+    return host;
+  };
+  /** Read the record again on the next ask: the conversation's socket said it changed. */
+  const expireBrain = (conversationId: string) => {
+    const known = brains.get(conversationId);
+    if (known) brains.set(conversationId, { ...known, at: 0 });
+  };
+  /**
+   * Where Stella runs now, from the record already read and the owner's
+   * computers as the live socket pushes them, with no request. A change of
+   * record reaches this computer on the conversation socket (`op: "brain"`
+   * with `fresh`); what this catches is its holder going up or down. Reads
+   * the record only when none was read yet or the last read failed.
+   */
+  const recheckBrainHost = async (conversationId: string): Promise<PiBrainRecord | null> => {
+    const known = brains.get(conversationId);
+    if (!known || known.failed) {
+      expireBrain(conversationId);
+      return await brainHost(conversationId);
+    }
+    const host = await hostOfRecord(conversationId, known.record);
+    rememberBrain(conversationId, { record: known.record, host }, known.at);
     return host;
   };
   /** Whether this computer takes the conversation's turns, or where a send goes instead. */
@@ -1535,10 +1569,12 @@ export function desktopChats(options: DesktopChatsOptions) {
         let following = false;
         let brainReadAt = 0;
         const followCheck = setInterval(() => {
-          // Another device moving Stella shows in no turn here: while the app looks, read where she runs.
+          // Another device moving Stella shows in no turn here: the app's
+          // conversation socket says when the record changes; while the app
+          // looks, check its holder is still up against the pushed device list.
           if (opened?.watchers && mirror && Date.now() - brainReadAt >= BRAIN_WATCH_MS) {
             brainReadAt = Date.now();
-            void brainHost(conversationId).catch((error: unknown) => options.report(error));
+            void recheckBrainHost(conversationId).catch((error: unknown) => options.report(error));
           }
           if (!mirror || following || !opened) return;
           const watched =
@@ -2355,6 +2391,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         case "files":
           return linkedFiles(request.conversationId);
         case "brain":
+          if (request.fresh) expireBrain(request.conversationId);
           return brainPlacement(request.conversationId);
         case "move":
           return moveBrain(request.conversationId, request.target);

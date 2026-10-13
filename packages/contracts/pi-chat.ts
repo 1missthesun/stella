@@ -246,7 +246,12 @@ export type PiChatRequest =
    * Where the conversation's brain runs (`PiChatBrainResult`): a send for a
    * conversation whose Stella runs elsewhere is placed there.
    */
-  | { op: "brain"; conversationId: string }
+  | {
+      op: "brain";
+      conversationId: string;
+      /** The conversation's socket said the record changed: read it again rather than answer from the last read. */
+      fresh?: boolean;
+    }
   /**
    * The user moving Stella from the app's picker, as her own
    * `switch_destination` moves her: that host takes the conversation's turns

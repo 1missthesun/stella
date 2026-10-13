@@ -15,6 +15,10 @@ import {
   parseAgentActivityEntry,
   type AgentActivityEntry,
 } from "./conversation-agent-activity.js";
+import {
+  parsePiBrainRecord,
+  type PiBrainRecord,
+} from "./turn-plane/pi-brain.js";
 /**
  * The conversation socket's wire contract, shared by every client.
  *
@@ -265,6 +269,11 @@ export type ServerFrame =
       isError?: boolean;
     }
   | { type: "auth.expiring"; atMs: number }
+  /**
+   * Where the conversation's Stella runs, sent whenever its holder changes
+   * (`@stella/contracts/turn-plane/pi-brain`), so no client polls for it.
+   */
+  | { type: "brain"; record: PiBrainRecord | null }
   | {
       type: "error";
       code: string;
@@ -545,6 +554,11 @@ export const decodeServerFrame = (data: string): ServerFrame | null => {
     }
     case "auth.expiring":
       return { type: "auth.expiring", atMs: num(raw.atMs) ?? 0 };
+    case "brain":
+      if (raw.record !== null && parsePiBrainRecord(raw.record) === null) {
+        return null;
+      }
+      return { type: "brain", record: parsePiBrainRecord(raw.record) };
     case "error":
       return {
         type: "error",

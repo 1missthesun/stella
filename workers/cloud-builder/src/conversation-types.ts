@@ -420,6 +420,8 @@ export interface ConversationHub {
   agentsChanged(): void;
   /** A batch of pi-durable events for the sockets watching the pi view. Must never throw. */
   broadcastPi(events: readonly unknown[]): void;
+  /** Where the conversation's Stella runs, after its holder changed. */
+  broadcastBrain(record: import("@stella/contracts/turn-plane/pi-brain").PiBrainRecord | null): void;
   /** How many sockets watch the pi view. */
   piSocketCount(): number;
   /** A turn reached a terminal phase: drop any retained live state. */
@@ -500,6 +502,7 @@ export class NullConversationHub implements ConversationHub {
   broadcastTool(): void {}
   agentsChanged(): void {}
   broadcastPi(): void {}
+  broadcastBrain(): void {}
   piSocketCount(): number {
     return 0;
   }

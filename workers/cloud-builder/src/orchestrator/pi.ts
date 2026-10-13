@@ -1396,10 +1396,31 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     return throughSeq;
   }
 
+  /**
+   * Store the brain record, and tell the conversation's sockets when its
+   * holder changed (a move, a claim, a takeover, back home), so clients learn
+   * it from the socket they already hold instead of polling GET pi-brain. A
+   * lease renewal keeps the holder and epoch and sends nothing.
+   */
+  protected async storePiBrain(record: PiBrainRecord): Promise<void> {
+    const prior = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
+    await this.ctx.storage.put(PI_BRAIN_KEY, record);
+    if (
+      !prior ||
+      prior.epoch !== record.epoch ||
+      !samePiBrainHost(prior, record) ||
+      (prior.host === "device" &&
+        record.host === "device" &&
+        prior.label !== record.label)
+    ) {
+      this.hub.broadcastBrain(record);
+    }
+  }
+
   protected async setPiBrain(host: PiBrainHost): Promise<PiBrainRecord> {
     const prior = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
     const record = movePiBrain(prior, host, Date.now());
-    await this.ctx.storage.put(PI_BRAIN_KEY, record);
+    await this.storePiBrain(record);
     this.notePiBrainLease("moved", record);
     return record;
   }
@@ -1485,7 +1506,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       const renewed = renewPiBrainLease(record, holder.seenAt);
       if (renewed) {
         record = renewed;
-        await this.ctx.storage.put(PI_BRAIN_KEY, record);
+        await this.storePiBrain(record);
       }
     }
     const decision = decidePiBrainClaim({
@@ -1501,7 +1522,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       args.claimant.host === "device"
     ) {
       record = claimFreePiBrain(args.claimant, now);
-      await this.ctx.storage.put(PI_BRAIN_KEY, record);
+      await this.storePiBrain(record);
       this.notePiBrainLease("claimed", record, {
         ...(args.turnId ? { turnId: args.turnId } : {}),
       });
@@ -1511,14 +1532,14 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       const renewed = renewPiBrainLease(record, now);
       if (renewed) {
         record = renewed;
-        await this.ctx.storage.put(PI_BRAIN_KEY, record);
+        await this.storePiBrain(record);
       }
       return { decision, record, takenOver: false };
     }
     if (decision.kind === "takeover" && record) {
       const prior = record;
       record = takeOverPiBrain(prior, args.claimant, now);
-      await this.ctx.storage.put(PI_BRAIN_KEY, record);
+      await this.storePiBrain(record);
       this.notePiBrainLease("taken_over", record, {
         reason: decision.reason,
         ...(holder?.refusal ? { holderRefusal: holder.refusal } : {}),
@@ -1606,7 +1627,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           (await this.piBrainHolderBusy(record.deviceId));
     if (busy) return record;
     const homed = homePiBrain(record, home, Date.now());
-    await this.ctx.storage.put(PI_BRAIN_KEY, homed);
+    await this.storePiBrain(homed);
     this.notePiBrainLease("moved", homed, {
       reason: "home",
       ...(turnId ? { turnId } : {}),
@@ -1631,7 +1652,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     const record = await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY);
     if (record?.host !== "device" || record.deviceId !== deviceId) return;
     const renewed = renewPiBrainLease(record, Date.now());
-    if (renewed) await this.ctx.storage.put(PI_BRAIN_KEY, renewed);
+    if (renewed) await this.storePiBrain(renewed);
   }
 
   /**

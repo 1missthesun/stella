@@ -3,14 +3,15 @@ import type {
   PiChatBrainResult,
   PiChatMoveTarget,
 } from "@stella/contracts/pi-chat";
+import { onConversationBrainChanged } from "./conversation-brain-signal";
 
 /**
  * Others move Stella too (her own switch, another device, the cloud taking
  * her over from a computer that went away). The host says when what it reads
- * changes (a `brain` event); this reads again now and then for a move no turn
- * here has shown yet.
+ * changes (a `brain` event), and the conversation's socket says when the
+ * record changed (`onConversationBrainChanged`); this reads again on either,
+ * and when the window regains focus, rather than on a timer.
  */
-const REFRESH_MS = 15_000;
 
 const api = () =>
   typeof window === "undefined" ? undefined : window.electronAPI?.piChat;
@@ -30,15 +31,19 @@ export function useConversationBrain(conversationId: string | null) {
   } | null>(null);
   const [moving, setMoving] = useState(false);
 
-  const read = useCallback(async () => {
-    const chat = api();
-    if (!chat || !conversationId) return;
-    const brain = (await chat.request({
-      op: "brain",
-      conversationId,
-    })) as PiChatBrainResult;
-    setState({ conversationId, brain });
-  }, [conversationId]);
+  const read = useCallback(
+    async (fresh = false) => {
+      const chat = api();
+      if (!chat || !conversationId) return;
+      const brain = (await chat.request({
+        op: "brain",
+        conversationId,
+        ...(fresh ? { fresh: true } : {}),
+      })) as PiChatBrainResult;
+      setState({ conversationId, brain });
+    },
+    [conversationId],
+  );
 
   useEffect(() => {
     if (!conversationId || !api()) return;
@@ -48,7 +53,9 @@ export function useConversationBrain(conversationId: string | null) {
       }
     };
     void read().catch(() => undefined);
-    const timer = window.setInterval(refresh, REFRESH_MS);
+    const stopSignal = onConversationBrainChanged((changed) => {
+      if (changed === conversationId) void read(true).catch(() => undefined);
+    });
     window.addEventListener("focus", refresh);
     const unsubscribe = api()?.onEvents(
       ({ conversationId: changed, events }) => {
@@ -60,7 +67,7 @@ export function useConversationBrain(conversationId: string | null) {
       },
     );
     return () => {
-      window.clearInterval(timer);
+      stopSignal();
       window.removeEventListener("focus", refresh);
       unsubscribe?.();
     };
@@ -88,7 +95,7 @@ export function useConversationBrain(conversationId: string | null) {
   return {
     brain: state?.conversationId === conversationId ? state.brain : undefined,
     moving,
-    refresh: read,
+    refresh: () => read(),
     move,
   };
 }

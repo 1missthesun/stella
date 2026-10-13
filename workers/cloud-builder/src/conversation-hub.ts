@@ -75,6 +75,7 @@ import {
 } from "./conversation-types.js";
 import { READY_RUNNING_AGENTS_LIMIT, type AgentActivityEntry } from "@stella/contracts/conversation-agent-activity";
 import { sha256Hex } from "./hash.js";
+import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 
 // ---------------------------------------------------------------------------
 // Wire frames
@@ -162,6 +163,12 @@ export type DeltasDroppedFrame = {
 
 export type AuthExpiringFrame = { type: "auth.expiring"; atMs: number };
 
+/**
+ * Where this conversation's Stella runs (`@stella/contracts/turn-plane/pi-brain`),
+ * sent whenever its holder changes, so a client never has to poll for it.
+ */
+export type BrainFrame = { type: "brain"; record: PiBrainRecord | null };
+
 export type ErrorFrame = {
   type: "error";
   code: string;
@@ -189,6 +196,7 @@ export type ServerFrame =
   | ToolFrame
   | DeltasDroppedFrame
   | AuthExpiringFrame
+  | BrainFrame
   | ErrorFrame;
 
 export type ClientFrame =
@@ -907,6 +915,19 @@ class ConversationHubImpl implements ConversationHub {
       this.broadcast({ type: "agents", agents, atMs: Date.now() });
     } catch (error) {
       this.deps.log("error", "conversation_agents_frame_failed", {
+        conversationId: this.deps.conversationId(),
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  // ── The brain ────────────────────────────────────────────────────────────
+
+  broadcastBrain(record: PiBrainRecord | null): void {
+    try {
+      this.broadcast({ type: "brain", record });
+    } catch (error) {
+      this.deps.log("error", "conversation_brain_frame_failed", {
         conversationId: this.deps.conversationId(),
         message: error instanceof Error ? error.message : String(error),
       });

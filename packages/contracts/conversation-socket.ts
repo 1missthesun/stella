@@ -77,6 +77,7 @@ export type ConversationSocketEvent =
   | { type: "gap"; fromSeq: number; toSeq: number }
   | Extract<ServerFrame, { type: "tool" }>
   | Extract<ServerFrame, { type: "agents" }>
+  | Extract<ServerFrame, { type: "brain" }>
   | SocketStatusEvent;
 
 /** Connect milestones a platform may time; see `onReadiness`. */
@@ -733,6 +734,7 @@ export class ConversationSocket {
         return;
       case "tool":
       case "agents":
+      case "brain":
         this.options.onEvent(frame);
         return;
       case "auth.expiring":

@@ -13,7 +13,10 @@
     "not_found_handling": "none"
   },
   "images": { "binding": "IMAGES" },
-  "observability": { "enabled": true },
+  "observability": { "enabled": true, "redact_query_string": true },
+  "vars": {
+    "CSP_BACKEND_ORIGINS": "https://stella-v2-cloud-builder-dev.fromyou.workers.dev https://auth-dev.stella.sh"
+  },
   "env": {
     "production": {
       "name": "stella-website-prod",
@@ -27,7 +30,10 @@
         "not_found_handling": "none"
       },
       "images": { "binding": "IMAGES" },
-      "observability": { "enabled": true }
+      "observability": { "enabled": true, "redact_query_string": true },
+      "vars": {
+        "CSP_BACKEND_ORIGINS": "https://stella-v2-cloud-builder-prod.fromyou.workers.dev https://auth.stella.sh"
+      }
     }
   }
 }

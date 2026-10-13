@@ -25,6 +25,7 @@ const REVALIDATING_ASSET_CACHE =
   "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800";
 
 const nextConfig: NextConfig = {
+  poweredByHeader: false,
   experimental: {
     // Keep route and component CSS in import-order chunks instead of merging
     // unrelated route styles into the homepage's paint-blocking stylesheet.
@@ -92,23 +93,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
-        // The hosted Turnstile page hands tokens to the app that opened it;
-        // it must never be embedded by another site.
         source: "/challenge",
-        headers: [
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
-          { key: "Cache-Control", value: "no-store" },
-        ],
+        headers: [{ key: "Cache-Control", value: "no-store" }],
       },
       {
         source: "/chat",
         headers: [
-          {
-            key: "Content-Security-Policy",
-            value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://googleads.g.doubleclick.net https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://www.google-analytics.com https://www.googletagmanager.com https://www.google.com https://*.doubleclick.net https://cloudflareinsights.com; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'",
-          },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Content-Type-Options", value: "nosniff" },
         ],

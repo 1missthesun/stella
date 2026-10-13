@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { absolutizeCssUrls, createTailwindBuild, cssModule, isTailwindStylesheet, type TailwindBuild } from "./css.js";
-import { bundleDependencies, fileDigest, type DepBundle } from "./deps.js";
+import { bundleDependencies, fileDigest, prewarmDependencyBuilder, releaseDependencyBuilder, type DepBundle } from "./deps.js";
 import { envDefines, loadRendererEnv } from "./env.js";
 import {
   createModuleGraph,
@@ -174,6 +174,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
       lockfile,
       mode,
       log,
+      apart: true,
     }).then((bundle) => {
       deps = bundle;
       return bundle;
@@ -271,6 +272,9 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
   const validate = async (): Promise<{ changed: Set<string>; moved: boolean; count: number; loaded: number }> => {
     const lock = fileDigest(lockfile);
     const stored = await readGraph(lock);
+    // No graph for these packages: the first launch, or new packages. Their
+    // bundle is most likely to be rebuilt too; start its builder now.
+    if (!stored && !deps) prewarmDependencyBuilder();
     const changed = new Set<string>();
     const changedDirs = new Set<string>();
     if (stored) {
@@ -474,6 +478,7 @@ export const createRendererSource = async (options: RendererSourceOptions) => {
         rendered.clear();
         await buildDeps();
       }
+      releaseDependencyBuilder();
       if (result.moved || packs.size === 0) await planPacks();
       generation += 1;
       log(`[source] ${result.count} modules ready in ${Date.now() - startedAt}ms (${reason}, ${result.loaded} read)`);

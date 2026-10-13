@@ -133,9 +133,11 @@ export const attachedToolPathsForDirectory = (
 export const ATTACHED_TOOL_REQUEST_MAX_BYTES = 1024 * 1024;
 
 /**
- * One framed response. Large enough for the biggest image `Read` can already
- * return after base64 expansion, plus the surrounding result. Derived from the
- * existing per-image limit rather than chosen independently.
+ * One framed response. Large enough for the biggest image `Read` returns after
+ * base64 expansion, plus the surrounding result: `Read` fits every image to
+ * `READ_IMAGE_CAPS.maxBytes` (4.5MB base64, runtime kernel/shared/image-caps)
+ * on every host, so a full-size photo is downscaled before it reaches this
+ * frame instead of failing it as an invalid `authorizedImages` field.
  */
 export const ATTACHED_TOOL_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const ATTACHED_TOOL_MAX_IMAGES = 8;

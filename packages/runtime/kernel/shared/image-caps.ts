@@ -212,3 +212,108 @@ export const resolveImageCaps = (target: ImageCapTarget = {}): ImageCaps => {
 export const maxInlineImageBase64Bytes = (
   _target: ImageCapTarget = {},
 ): number => ANTHROPIC_DIRECT_MAX_IMAGE_BASE64_BYTES;
+
+// --- Read: one target on every host -------------------------------------
+
+/**
+ * The largest image file `Read` takes on any host. Anything up to this is
+ * downscaled to fit `READ_IMAGE_CAPS` rather than refused, so a user's
+ * full-size phone photo (routinely 5-12MB) is read directly instead of an
+ * agent being spawned just to shrink it.
+ */
+export const READ_IMAGE_MAX_SOURCE_BYTES = 20 * 1024 * 1024;
+
+/**
+ * What `Read` fits an image to, the same on the desktop runtime, a cloud
+ * agent's container, and the cloud orchestrator's Worker. `Read` does not know
+ * which model will see the image (a Worker turn may route anywhere), so the
+ * target fits every provider: the high-resolution Anthropic long edge (also
+ * under Gemini's 3072) and the safe byte budget under the tightest mainstream
+ * per-image cap (Bedrock/Vertex's 5MB). The send step still applies the
+ * provider-aware caps above where it knows the model (e.g. OpenAI's 2048).
+ */
+export const READ_IMAGE_CAPS: ImageCaps = {
+  maxWidth: ANTHROPIC_HIGH_RES_MAX_EDGE,
+  maxHeight: ANTHROPIC_HIGH_RES_MAX_EDGE,
+  maxBytes: SAFE_FALLBACK_MAX_BYTES,
+  jpegQuality: DEFAULT_JPEG_QUALITY,
+};
+
+/** JPEG qualities a lossy re-encode walks down, highest first, to fit a byte cap. */
+export const jpegQualitySteps = (startQuality: number): number[] =>
+  Array.from(new Set([startQuality, 90, 80, 70, 55, 40]));
+
+/** Each further pass shrinks both edges by this factor when no quality fits. */
+export const IMAGE_SHRINK_FACTOR = 0.75;
+
+/** Base64 length of `byteLength` raw bytes: what providers count. */
+export const base64EncodedLength = (byteLength: number): number =>
+  Math.ceil(byteLength / 3) * 4;
+
+/** Whether an image already fits `caps` and can be sent untouched. */
+export const imageFitsCaps = (
+  caps: ImageCaps,
+  width: number,
+  height: number,
+  byteLength: number,
+): boolean =>
+  width <= caps.maxWidth &&
+  height <= caps.maxHeight &&
+  base64EncodedLength(byteLength) < caps.maxBytes;
+
+/** The largest size within `caps`' edges that keeps the aspect ratio. */
+export const fitImageDimensions = (
+  caps: ImageCaps,
+  width: number,
+  height: number,
+): { width: number; height: number } => {
+  let targetWidth = width;
+  let targetHeight = height;
+  if (targetWidth > caps.maxWidth) {
+    targetHeight = Math.max(1, Math.round((targetHeight * caps.maxWidth) / targetWidth));
+    targetWidth = caps.maxWidth;
+  }
+  if (targetHeight > caps.maxHeight) {
+    targetWidth = Math.max(1, Math.round((targetWidth * caps.maxHeight) / targetHeight));
+    targetHeight = caps.maxHeight;
+  }
+  return { width: targetWidth, height: targetHeight };
+};
+
+/**
+ * Lossless PNG is tried before JPEG only for sources that are likely
+ * graphics (PNG, GIF): screenshots and diagrams keep crisp text when they fit.
+ * A photo (JPEG, WEBP) goes straight to JPEG; a PNG of a photo never fits.
+ */
+export const triesLosslessFirst = (sourceMimeType: string): boolean =>
+  sourceMimeType === "image/png" || sourceMimeType === "image/gif";
+
+const formatImageBytes = (bytes: number): string =>
+  bytes >= 1024 * 1024
+    ? `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+const formatName = (mimeType: string): string =>
+  (mimeType.split("/")[1] ?? mimeType).toUpperCase();
+
+/**
+ * The note a tool result carries when an image was downscaled or re-encoded
+ * on its way to the model, on every host: what it was, what the model sees,
+ * and how to map coordinates back.
+ */
+export const formatImageResizeNote = (resized: {
+  originalWidth: number;
+  originalHeight: number;
+  originalBytes: number;
+  originalMimeType: string;
+  width: number;
+  height: number;
+  bytes: number;
+  mimeType: string;
+}): string => {
+  const scaled = resized.width !== resized.originalWidth;
+  const mapping = scaled
+    ? ` Multiply coordinates by ${(resized.originalWidth / resized.width).toFixed(2)} to map to the original image.`
+    : "";
+  return `[Image ${scaled ? "resized" : "re-encoded"} to fit the model's image limits: original ${resized.originalWidth}x${resized.originalHeight} ${formatName(resized.originalMimeType)}, ${formatImageBytes(resized.originalBytes)}; shown at ${resized.width}x${resized.height} ${formatName(resized.mimeType)}, ${formatImageBytes(resized.bytes)}.${mapping}]`;
+};

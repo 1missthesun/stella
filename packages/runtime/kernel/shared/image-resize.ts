@@ -5,8 +5,10 @@
  * never carries multi-megabyte base64 blocks:
  *
  * 1. Resize to maxWidth/maxHeight (Lanczos3)
- * 2. Try both PNG and JPEG encodings, pick the first under maxBytes
- *    (PNG is lossless and tried first, so text stays crisp whenever it fits)
+ * 2. Encode, picking the first encoding under maxBytes: lossless PNG first
+ *    for PNG/GIF sources (text stays crisp whenever it fits), JPEG for photos
+ *    (the steps, shrink factor and caps are shared from ./image-caps.ts, so
+ *    the Worker's Images-binding resize walks the same ladder)
  * 3. If still too large, walk JPEG quality down (90 → 40)
  * 4. If still too large, progressively shrink dimensions toward 1x1
  *
@@ -21,8 +23,14 @@
 
 import {
   DEFAULT_JPEG_QUALITY,
+  fitImageDimensions,
+  formatImageResizeNote,
+  IMAGE_SHRINK_FACTOR,
+  imageFitsCaps,
+  jpegQualitySteps,
   SAFE_FALLBACK_MAX_BYTES,
   SAFE_FALLBACK_MAX_EDGE,
+  triesLosslessFirst,
 } from "./image-caps.js";
 import { applyExifOrientation } from "./exif-orientation.js";
 import { loadPhoton } from "./photon.js";
@@ -80,7 +88,6 @@ export const resizeImage = async (
   options?: ImageResizeOptions,
 ): Promise<ResizedImage | null> => {
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  const inputBase64Size = Math.ceil(inputBytes.byteLength / 3) * 4;
 
   const photon = await loadPhoton();
   if (!photon) {
@@ -99,11 +106,9 @@ export const resizeImage = async (
     const originalHeight = image.get_height();
     const format = mimeType.split("/")[1] ?? "png";
 
-    // Check if already within all limits (dimensions AND encoded size)
+    // Already within all limits (dimensions AND encoded size): untouched.
     if (
-      originalWidth <= opts.maxWidth &&
-      originalHeight <= opts.maxHeight &&
-      inputBase64Size < opts.maxBytes
+      imageFitsCaps(opts, originalWidth, originalHeight, inputBytes.byteLength)
     ) {
       return {
         data: Buffer.from(inputBytes).toString("base64"),
@@ -116,69 +121,57 @@ export const resizeImage = async (
       };
     }
 
-    // Calculate initial dimensions respecting max limits
-    let targetWidth = originalWidth;
-    let targetHeight = originalHeight;
+    const target = fitImageDimensions(opts, originalWidth, originalHeight);
+    const losslessFirst = triesLosslessFirst(mimeType);
+    // Try the caller's quality first (default q90), then step down only as
+    // needed to fit the byte cap; heavy JPEG compression is the classic cause
+    // of illegible text, so we start high rather than at the old q80.
+    const qualitySteps = jpegQualitySteps(opts.jpegQuality);
 
-    if (targetWidth > opts.maxWidth) {
-      targetHeight = Math.round((targetHeight * opts.maxWidth) / targetWidth);
-      targetWidth = opts.maxWidth;
-    }
-    if (targetHeight > opts.maxHeight) {
-      targetWidth = Math.round((targetWidth * opts.maxHeight) / targetHeight);
-      targetHeight = opts.maxHeight;
-    }
-
-    const tryEncodings = (
+    /** The first encoding at this size under the byte cap, encoding lazily. */
+    const firstFitting = (
       width: number,
       height: number,
-      jpegQualities: number[],
-    ): EncodedCandidate[] => {
+    ): EncodedCandidate | undefined => {
       const resized = photon.resize(
         image!,
         width,
         height,
         photon.SamplingFilter.Lanczos3,
       );
-
       try {
-        const candidates: EncodedCandidate[] = [
-          encodeCandidate(resized.get_bytes(), "image/png"),
-        ];
-        for (const quality of jpegQualities) {
-          candidates.push(
-            encodeCandidate(resized.get_bytes_jpeg(quality), "image/jpeg"),
-          );
+        if (losslessFirst) {
+          const png = encodeCandidate(resized.get_bytes(), "image/png");
+          if (png.encodedSize < opts.maxBytes) return png;
         }
-        return candidates;
+        for (const quality of qualitySteps) {
+          const jpeg = encodeCandidate(
+            resized.get_bytes_jpeg(quality),
+            "image/jpeg",
+          );
+          if (jpeg.encodedSize < opts.maxBytes) return jpeg;
+        }
+        return undefined;
       } finally {
         resized.free();
       }
     };
 
-    // Try the caller's quality first (default q90), then step down only as
-    // needed to fit the byte cap; heavy JPEG compression is the classic cause
-    // of illegible text, so we start high rather than at the old q80.
-    const qualitySteps = Array.from(
-      new Set([opts.jpegQuality, 90, 80, 70, 55, 40]),
-    );
-    let currentWidth = targetWidth;
-    let currentHeight = targetHeight;
+    let currentWidth = target.width;
+    let currentHeight = target.height;
 
     while (true) {
-      const candidates = tryEncodings(currentWidth, currentHeight, qualitySteps);
-      for (const candidate of candidates) {
-        if (candidate.encodedSize < opts.maxBytes) {
-          return {
-            data: candidate.data,
-            mimeType: candidate.mimeType,
-            originalWidth,
-            originalHeight,
-            width: currentWidth,
-            height: currentHeight,
-            wasResized: true,
-          };
-        }
+      const candidate = firstFitting(currentWidth, currentHeight);
+      if (candidate) {
+        return {
+          data: candidate.data,
+          mimeType: candidate.mimeType,
+          originalWidth,
+          originalHeight,
+          width: currentWidth,
+          height: currentHeight,
+          wasResized: true,
+        };
       }
 
       if (currentWidth === 1 && currentHeight === 1) {
@@ -186,9 +179,13 @@ export const resizeImage = async (
       }
 
       const nextWidth =
-        currentWidth === 1 ? 1 : Math.max(1, Math.floor(currentWidth * 0.75));
+        currentWidth === 1
+          ? 1
+          : Math.max(1, Math.floor(currentWidth * IMAGE_SHRINK_FACTOR));
       const nextHeight =
-        currentHeight === 1 ? 1 : Math.max(1, Math.floor(currentHeight * 0.75));
+        currentHeight === 1
+          ? 1
+          : Math.max(1, Math.floor(currentHeight * IMAGE_SHRINK_FACTOR));
       if (nextWidth === currentWidth && nextHeight === currentHeight) {
         break;
       }
@@ -208,16 +205,24 @@ export const resizeImage = async (
 };
 
 /**
- * Format a dimension note for resized images so the model can map its
- * output coordinates back to the original image space.
+ * The model-visible note for a resized image (see `formatImageResizeNote`),
+ * or undefined when it was passed through untouched.
  */
 export const formatDimensionNote = (
   result: ResizedImage,
+  original: { bytes: number; mimeType: string },
 ): string | undefined => {
   if (!result.wasResized) {
     return undefined;
   }
-
-  const scale = result.originalWidth / result.width;
-  return `[Image: original ${result.originalWidth}x${result.originalHeight}, displayed at ${result.width}x${result.height}. Multiply coordinates by ${scale.toFixed(2)} to map to original image.]`;
+  return formatImageResizeNote({
+    originalWidth: result.originalWidth,
+    originalHeight: result.originalHeight,
+    originalBytes: original.bytes,
+    originalMimeType: original.mimeType,
+    width: result.width,
+    height: result.height,
+    bytes: Buffer.byteLength(result.data, "base64"),
+    mimeType: result.mimeType,
+  });
 };

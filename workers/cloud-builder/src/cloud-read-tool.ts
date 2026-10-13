@@ -16,7 +16,9 @@
  * the cloud. The orchestrator tool protocol already carries image blocks
  * (`toolResultFromOrchestrator` turns them into authorized tool images), so
  * this reads the bytes out of the world instead of handing them to the world's
- * text-only Read.
+ * text-only Read. An image larger than the model takes is fitted to the shared
+ * `READ_IMAGE_CAPS` (cloud-image-fit.ts), as the runtime's Read does, and the
+ * result says it was resized.
  *
  * Skills stay text-only: that store hands back text and holds no binaries.
  */
@@ -33,7 +35,13 @@ import {
   detectImageMimeTypeFromBytes,
   imageMimeTypeFromPath,
 } from "@stella/runtime/kernel/shared/image-mime.js";
+import {
+  base64EncodedLength,
+  READ_IMAGE_CAPS,
+  READ_IMAGE_MAX_SOURCE_BYTES,
+} from "@stella/runtime/kernel/shared/image-caps.js";
 import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
+import { fitImageWithImagesBinding } from "./cloud-image-fit.js";
 import type {
   CloudHomeStore,
   CloudSkillCatalogSnapshot,
@@ -50,14 +58,11 @@ const DEFAULT_READ_LIMIT = 2000;
 const MAX_READ_LINES = 5000;
 
 /**
- * Decoded bytes of one image a cloud Read may inline. The refusal names this
- * number, because the readable size is a property of the session rather than
- * of the placement — a resident read of the drive returns at most 8MB, a
- * container world materializes under its own export budget, and a device has
- * the real filesystem. No prompt can state one limit truthfully, so the error
- * carries it instead.
+ * Bytes per read of an image's file: under both the world store's and the
+ * drive's per-read ceiling (8MiB each), so a photo up to the shared
+ * `READ_IMAGE_MAX_SOURCE_BYTES` is read in a few ranges.
  */
-const MAX_READ_IMAGE_BYTES = 5 * 1024 * 1024;
+const IMAGE_READ_CHUNK_BYTES = 4 * 1024 * 1024;
 
 const base64FromBytes = (bytes: Uint8Array): string => {
   let binary = "";
@@ -69,6 +74,11 @@ const base64FromBytes = (bytes: Uint8Array): string => {
 };
 
 export type CloudReadToolOptions = Readonly<{
+  /**
+   * Fits an oversized image to `READ_IMAGE_CAPS`, as the runtime's Read does
+   * with Photon. Without it an image is inlined only when it already fits.
+   */
+  images?: ImagesBinding;
   skills?: { home: CloudHomeStore; snapshot: CloudSkillCatalogSnapshot };
   world?: {
     tool(call: {
@@ -87,6 +97,27 @@ export type CloudReadToolOptions = Readonly<{
     ): Promise<Uint8Array | null>;
   };
 }>;
+
+/** A whole file through `readFile`'s bounded ranges. */
+const readWhole = async (
+  world: NonNullable<CloudReadToolOptions["world"]>,
+  path: string,
+  size: number,
+): Promise<Uint8Array | null> => {
+  if (!world.readFile) return null;
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  while (offset < size) {
+    const chunk = await world.readFile(path, {
+      offset,
+      length: Math.min(IMAGE_READ_CHUNK_BYTES, size - offset),
+    });
+    if (!chunk || chunk.length === 0) break;
+    bytes.set(chunk.subarray(0, size - offset), offset);
+    offset += chunk.length;
+  }
+  return offset === size ? bytes : null;
+};
 
 const failure = (message: string) => ({
   content: [{ type: "text" as const, text: message }],
@@ -213,12 +244,14 @@ export const createCloudReadTool = (
     if (imageMimeTypeFromPath(worldPath) && world.stat && world.readFile) {
       const entry = await world.stat(worldPath).catch(() => null);
       if (entry && entry.kind === "file") {
-        if (entry.size > MAX_READ_IMAGE_BYTES) {
+        if (entry.size > READ_IMAGE_MAX_SOURCE_BYTES) {
           return failure(
-            `That image is ${entry.size} bytes, over this session's ${MAX_READ_IMAGE_BYTES}-byte limit for reading an image into the conversation: ${worldPath}`,
+            `That image is ${entry.size} bytes, over the ${READ_IMAGE_MAX_SOURCE_BYTES}-byte limit for reading an image into the conversation: ${worldPath}`,
           );
         }
-        const bytes = await world.readFile(worldPath).catch(() => null);
+        const bytes = await readWhole(world, worldPath, entry.size).catch(
+          () => null,
+        );
         if (bytes) {
           const mimeType = detectImageMimeTypeFromBytes(bytes);
           if (!mimeType) {
@@ -226,15 +259,48 @@ export const createCloudReadTool = (
               `That file is named like an image but its bytes are not a complete PNG, JPEG, GIF, or WEBP: ${worldPath}`,
             );
           }
+          const fitted = options.images
+            ? await fitImageWithImagesBinding(
+                options.images,
+                bytes,
+                mimeType,
+                READ_IMAGE_CAPS,
+              )
+            : base64EncodedLength(bytes.length) < READ_IMAGE_CAPS.maxBytes
+              ? { bytes, mimeType, note: undefined }
+              : null;
+          if (!fitted) {
+            return failure(
+              options.images
+                ? `Image file could not be decoded: ${worldPath}`
+                : `That image is ${bytes.length} bytes, too large to show the model here: ${worldPath}`,
+            );
+          }
+          // The runtime Read's wording (packages/runtime/kernel/tools/file.ts).
+          const size =
+            "originalWidth" in fitted
+              ? ` (${fitted.originalWidth}x${fitted.originalHeight})`
+              : "";
           return {
             content: [
               {
                 type: "text",
-                text: `Image file: ${worldPath} (${mimeType}, ${bytes.length} bytes)`,
+                text: `Image file: ${worldPath}${size}${fitted.note ? `\n${fitted.note}` : ""}`,
               },
-              { type: "image", data: base64FromBytes(bytes), mimeType },
+              {
+                type: "image",
+                data: base64FromBytes(fitted.bytes),
+                mimeType: fitted.mimeType,
+              },
             ],
-            details: { path: worldPath, mimeType, sizeBytes: bytes.length },
+            details: {
+              path: worldPath,
+              mimeType: fitted.mimeType,
+              sizeBytes: fitted.bytes.length,
+              ...(fitted.note
+                ? { originalMimeType: mimeType, originalBytes: bytes.length }
+                : {}),
+            },
           };
         }
       }

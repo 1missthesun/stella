@@ -42,7 +42,9 @@ import {
   writeWorkspaceFileNoFollow,
 } from "./workspace-file-boundary.js";
 import { decodeAndValidateImage } from "./image-decode-validation.js";
-import { MAX_IMAGE_REFERENCE_BYTES } from "./image-reference-policy.js";
+import { READ_IMAGE_CAPS, READ_IMAGE_MAX_SOURCE_BYTES } from "../shared/image-caps.js";
+import type { SupportedImageMediaType } from "../shared/image-payload.js";
+import { formatDimensionNote, resizeImage } from "../shared/image-resize.js";
 import {
   applyEditsToContent,
   applyStringReplacement,
@@ -286,6 +288,67 @@ export const applyEditsToFile = async (
   });
 };
 
+/**
+ * An image `Read`, the same on every host: the bytes already read through the
+ * checked descriptor are fitted to `READ_IMAGE_CAPS` (shared with the cloud
+ * Worker's Read) and carried to the model directly, never reopened by
+ * pathname — a concurrently running tool-UID shell could otherwise swap the
+ * path after this authorized read. An oversized photo is downscaled and
+ * re-encoded rather than refused, and the result says so; only an image that
+ * cannot be decoded is refused.
+ */
+const readImageResult = async (
+  filePath: string,
+  bytes: Buffer,
+  imageMimeType: string,
+): Promise<ToolResult> => {
+  const decoded = await decodeAndValidateImage(bytes);
+  if (!decoded || decoded.mimeType !== imageMimeType) {
+    return {
+      result: `Image file could not be decoded safely: ${filePath}`,
+      details: { path: filePath, mimeType: imageMimeType },
+    };
+  }
+  const resized = await resizeImage(bytes, decoded.mimeType, READ_IMAGE_CAPS);
+  if (!resized) {
+    return {
+      result: `Image file could not be fitted to the model's image limits: ${filePath} (${decoded.width}x${decoded.height}, ${bytes.length} bytes)`,
+      details: { path: filePath, mimeType: decoded.mimeType },
+    };
+  }
+  const note = formatDimensionNote(resized, {
+    bytes: bytes.length,
+    mimeType: decoded.mimeType,
+  });
+  const data = resized.wasResized
+    ? Buffer.from(resized.data, "base64")
+    : bytes;
+  return {
+    result: `Image file: ${filePath} (${resized.originalWidth}x${resized.originalHeight})${note ? `\n${note}` : ""}`,
+    details: {
+      path: filePath,
+      mimeType: resized.mimeType,
+      width: resized.width,
+      height: resized.height,
+      ...(resized.wasResized
+        ? {
+            originalMimeType: decoded.mimeType,
+            originalWidth: resized.originalWidth,
+            originalHeight: resized.originalHeight,
+            originalBytes: bytes.length,
+          }
+        : {}),
+    },
+    [TOOL_RESULT_AUTHORIZED_IMAGES]: [
+      {
+        data,
+        mimeType: resized.mimeType as SupportedImageMediaType,
+        sourcePath: filePath,
+      },
+    ],
+  };
+};
+
 export const handleRead = async (
   args: Record<string, unknown>,
   context?: ToolContext,
@@ -297,17 +360,12 @@ export const handleRead = async (
       throw new Error(pathBlock);
     }
     // An image read is vision input, not text, and must not be bounded by the
-    // text budget. `MAX_FILE_BYTES` is 1MB while a phone screenshot is
-    // routinely 1-3MB, so bounding both the same way refused the ordinary
-    // case — the attachment never reached the image branch below, and the
-    // model was told the file was too large instead of being shown it. Bound
-    // an image by Stella's own image policy instead; the provider-aware
-    // downscale in `prepareAuthorizedToolImageBlocks` still fits the bytes to
-    // whatever the target model accepts, so nothing oversized reaches a
-    // provider. The header check below stays authoritative for what the file
-    // actually is: this only decides how many bytes may be read.
+    // text budget (`MAX_FILE_BYTES` is 1MB; a phone photo is routinely
+    // 3-12MB). An image up to the shared source limit is read and fitted to
+    // the model's limits below; the header check stays authoritative for
+    // what the file actually is: this only decides how many bytes may be read.
     const readBudget = imageMimeTypeFromPath(filePath)
-      ? MAX_IMAGE_REFERENCE_BYTES
+      ? READ_IMAGE_MAX_SOURCE_BYTES
       : MAX_FILE_BYTES;
     const scopedRoot = context?.toolWorkspaceRoot?.trim();
     const opened = scopedRoot
@@ -339,39 +397,7 @@ export const handleRead = async (
     const header = opened.bytes.subarray(0, 12);
     const imageMimeType = resolveImageMimeType(opened.path, header);
     if (imageMimeType) {
-      if (context?.toolProcessIdentity) {
-        // The generic marker is reopened later by the root agent adapter. A
-        // concurrently running tool-UID shell could swap that pathname after
-        // this authorized read, so carry the bytes already read from the
-        // checked descriptor directly to the native MCP response instead.
-        const decoded = await decodeAndValidateImage(opened.bytes);
-        if (!decoded || decoded.mimeType !== imageMimeType) {
-          return {
-            result: `Image file could not be decoded safely: ${opened.path}`,
-            details: { path: opened.path, mimeType: imageMimeType },
-          };
-        }
-        return {
-          result: `Image file: ${opened.path} (${decoded.width}x${decoded.height})`,
-          details: {
-            path: opened.path,
-            mimeType: decoded.mimeType,
-            width: decoded.width,
-            height: decoded.height,
-          },
-          [TOOL_RESULT_AUTHORIZED_IMAGES]: [
-            {
-              data: opened.bytes,
-              mimeType: decoded.mimeType,
-              sourcePath: opened.path,
-            },
-          ],
-        };
-      }
-      return {
-        result: `[stella-attach-image] inline=${imageMimeType} ${opened.path}`,
-        details: { path: opened.path, mimeType: imageMimeType },
-      };
+      return await readImageResult(opened.path, opened.bytes, imageMimeType);
     }
 
     const skillSignature = `${stat.mtimeMs}:${stat.size}`;

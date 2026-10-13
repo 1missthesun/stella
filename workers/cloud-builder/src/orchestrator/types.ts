@@ -41,6 +41,7 @@ export type Env = Pick<
       | "CAPABILITY_SIGNING_KEY"
       | "CAPABILITY_SIGNING_KID"
       | "DB"
+      | "IMAGES"
     >
   >;
 

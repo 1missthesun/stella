@@ -183,6 +183,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           ownerInternal: toolContext.ownerInternal,
         }),
         createCloudReadTool({
+          ...(this.env.IMAGES ? { images: this.env.IMAGES } : {}),
           ...(agentHome.available
             ? { skills: { home: agentHome.cloudStore(), snapshot: skillCatalog } }
             : {}),
@@ -240,6 +241,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         ownerInternal: toolContext.ownerInternal,
       }),
       createCloudReadTool({
+        ...(this.env.IMAGES ? { images: this.env.IMAGES } : {}),
         ...(agentHome.available
           ? { skills: { home: agentHome.cloudStore(), snapshot: skillCatalog } }
           : {}),

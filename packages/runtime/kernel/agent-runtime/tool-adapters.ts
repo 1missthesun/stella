@@ -610,7 +610,10 @@ export const extractAttachImageBlocks = async (
       });
       const resized = await resizeImage(buf, mimeType, caps);
       if (resized) {
-        const note = formatDimensionNote(resized);
+        const note = formatDimensionNote(resized, {
+          bytes: buf.length,
+          mimeType,
+        });
         markerReplacements.push({ full, replacement: note ?? "" });
         images.push({
           type: "image",

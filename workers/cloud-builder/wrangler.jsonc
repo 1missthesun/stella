@@ -136,6 +136,8 @@
   // (or RESEND_FROM) and its domain must be enabled for Email Sending.
   "send_email": [{ "name": "EMAIL" }],
   "ai": { "binding": "AI" },
+  // Read fits an oversized image to the model's limits (cloud-image-fit.ts).
+  "images": { "binding": "IMAGES" },
   "worker_loaders": [
     {
       "binding": "LOADER",
@@ -377,6 +379,8 @@
     ],
     "send_email": [{ "name": "EMAIL" }],
     "ai": { "binding": "AI" },
+    // Read fits an oversized image to the model's limits (cloud-image-fit.ts).
+    "images": { "binding": "IMAGES" },
     "worker_loaders": [
       {
         "binding": "LOADER",
@@ -527,6 +531,8 @@
       ],
       "send_email": [{ "name": "EMAIL" }],
       "ai": { "binding": "AI" },
+      // Read fits an oversized image to the model's limits (cloud-image-fit.ts).
+      "images": { "binding": "IMAGES" },
       "worker_loaders": [
         {
           "binding": "LOADER",
@@ -723,6 +729,8 @@
       ],
       "send_email": [{ "name": "EMAIL" }],
       "ai": { "binding": "AI" },
+      // Read fits an oversized image to the model's limits (cloud-image-fit.ts).
+      "images": { "binding": "IMAGES" },
       "worker_loaders": [
         {
           "binding": "LOADER",

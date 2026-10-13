@@ -833,8 +833,12 @@ export const useCloudCanonicalChatThread = (
     turnId: string;
     message: string;
   } | null>(null);
-  const stopRef = useRef<() => void>(() => undefined);
-  const retryStop = useCallback(() => stopRef.current(), []);
+  const stopRef = useRef<(options?: { direct?: boolean }) => void>(
+    () => undefined,
+  );
+  // Try again goes straight to the conversation: the dispatch, if any,
+  // already carries the first request.
+  const retryStop = useCallback(() => stopRef.current({ direct: true }), []);
   const sustainedOffline = useSustainedCloudOffline(state.status);
   const socketIssue = useMemo<CloudAuthorityIssue | null>(() => {
     if (state.status === "blocked") {
@@ -1038,7 +1042,7 @@ export const useCloudCanonicalChatThread = (
       current && current.turnId !== activeTurnId ? null : current,
     );
   }, [activeTurnId, clearStopWatch]);
-  const stop = useCallback(() => {
+  const stopTurnNow = useCallback((options?: { direct?: boolean }) => {
     replyHaptics.reset();
     // This phone's own queued and in-flight sends: their durable outbox
     // cancels the exact dispatch it admitted.
@@ -1077,7 +1081,7 @@ export const useCloudCanonicalChatThread = (
     const dispatchId = runningDispatchId
       ? dispatchBindings.get(runningDispatchId) ?? runningDispatchId
       : null;
-    if (!dispatchId) {
+    if (!dispatchId || options?.direct) {
       stopTurn();
       return;
     }
@@ -1131,7 +1135,8 @@ export const useCloudCanonicalChatThread = (
     runningDispatchId,
     store,
   ]);
-  stopRef.current = stop;
+  stopRef.current = stopTurnNow;
+  const stop = useCallback(() => stopTurnNow(), [stopTurnNow]);
 
   return {
     ...local,

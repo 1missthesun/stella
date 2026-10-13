@@ -96,6 +96,17 @@ const assertDirectory = async (
   }
 };
 
+/** Whether this call made the directory; false when it already existed. */
+const mkdirUnlessExists = async (directory: string): Promise<boolean> => {
+  try {
+    await mkdir(directory, { mode: 0o755 });
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") return false;
+    throw error;
+  }
+};
+
 const openLinuxParent = async (args: {
   canonicalRoot: string;
   parentParts: string[];
@@ -126,12 +137,13 @@ const openLinuxParent = async (args: {
         ) {
           throw error;
         }
-        await mkdir(nextPath, { mode: 0o755 });
+        // A concurrent write into the same new folder may create it first;
+        // that folder is opened and checked like any existing one.
+        created = await mkdirUnlessExists(nextPath);
         next = await open(
           nextPath,
           fsConstants.O_RDONLY | DIRECTORY | NO_FOLLOW,
         );
-        created = true;
       }
       handles.push(next);
       if (created && args.owner) {
@@ -159,7 +171,7 @@ const openPortableParent = async (args: {
   let current = args.canonicalRoot;
   for (const part of args.parentParts) {
     current = path.join(current, part);
-    try {
+    const assertExistingParent = async (): Promise<void> => {
       const metadata = await lstat(current);
       if (
         metadata.isSymbolicLink() ||
@@ -170,6 +182,9 @@ const openPortableParent = async (args: {
           "Workspace path contains a symbolic-link or foreign-owned parent.",
         );
       }
+    };
+    try {
+      await assertExistingParent();
     } catch (error) {
       if (
         !args.createParents ||
@@ -177,7 +192,10 @@ const openPortableParent = async (args: {
       ) {
         throw error;
       }
-      await mkdir(current, { mode: 0o755 });
+      if (!(await mkdirUnlessExists(current))) {
+        await assertExistingParent();
+        continue;
+      }
       const created = await open(
         current,
         fsConstants.O_RDONLY | DIRECTORY | NO_FOLLOW,

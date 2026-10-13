@@ -1171,6 +1171,16 @@ export const materializeDriveFiles = async (options: {
   // Parallel and bounded: the manifest is up to 100 files, and awaiting them
   // one at a time made a turn's start time the sum of the drive's downloads.
   const deadline = Date.now() + HYDRATE_BUDGET_MS;
+  // Downloads overlap; writes take turns. Files that share a folder the
+  // workspace does not have yet each create it, and a writer that finds it
+  // half-made (created as root, not yet handed to the tool user) refuses it,
+  // so overlapping writes kept one file of a new folder and skipped the rest.
+  let writes: Promise<unknown> = Promise.resolve();
+  const writeInTurn = (write: () => Promise<boolean>): Promise<boolean> => {
+    const next = writes.then(write, write);
+    writes = next.catch(() => undefined);
+    return next;
+  };
   const hydrate = async (entry: DriveSyncEntry): Promise<Hydration> => {
     if (
       !entry ||
@@ -1306,12 +1316,14 @@ export const materializeDriveFiles = async (options: {
     }
     if (
       !bytes ||
-      !(await writeContained(
-        target,
-        workspaceRoot,
-        options.owner,
-        bytes,
-        present?.stat,
+      !(await writeInTurn(() =>
+        writeContained(
+          target,
+          workspaceRoot,
+          options.owner,
+          bytes,
+          present?.stat,
+        ),
       ))
     ) {
       bytes?.fill(0);

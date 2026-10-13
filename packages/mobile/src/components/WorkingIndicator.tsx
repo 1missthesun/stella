@@ -12,6 +12,7 @@ import {
 } from "./working-indicator-status";
 import {
   getWorkingIndicatorCharacterState,
+  pickWorkingIndicatorToolPose,
   WORKING_INDICATOR_POSE_ROTATE_MS,
   type WorkingIndicatorCharacterState,
 } from "./working-indicator-character";
@@ -277,16 +278,24 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     toolName && stretchMs >= WORKING_INDICATOR_LONG_TOOL_MS
       ? computeStillStatus(toolName)
       : toolStatus;
-  const liveDisplay = useMemo(
-    () => ({
+  const liveDisplay = useMemo(() => {
+    const seed = `${toolCallId ?? reasoningSeed}:${poseEpoch}`;
+    const pose = getWorkingIndicatorCharacterState(
+      toolName,
+      seed,
+      previousPoseRef.current,
+    );
+    return {
       status: shownToolStatus || thinkingText,
       thinking: !toolStatus,
-      characterState: getWorkingIndicatorCharacterState(
-        toolName,
-        `${toolCallId ?? reasoningSeed}:${poseEpoch}`,
-        previousPoseRef.current,
-      ),
-    }),
+      // The dots stand alone. Thinking that has lasted long enough to be
+      // named shows its label beside a full pose, as a tool does.
+      characterState:
+        pose === "thinking" && thinkingText
+          ? pickWorkingIndicatorToolPose(seed, previousPoseRef.current)
+          : pose,
+    };
+  },
     [
       poseEpoch,
       reasoningSeed,
@@ -302,10 +311,11 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   // The hold covers the mark as well as the label. Without it the character
   // would flap between thinking and tool poses whenever a quick tool starts
   // and ends.
-  // Dots have no text to read: a tool can replace them immediately.
+  // Thinking has no tool label worth reading out: a tool can replace it
+  // immediately.
   const heldDisplay = useMinimumVisibleValue(
     labelledDisplay,
-    labelledDisplay.characterState === "thinking" ? 0 : STATUS_MIN_VISIBLE_MS,
+    labelledDisplay.thinking ? 0 : STATUS_MIN_VISIBLE_MS,
     (a, b) => a.status === b.status && a.characterState === b.characterState,
   );
 
@@ -317,10 +327,10 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   const display = active ? heldDisplay : frozenDisplayRef.current;
   const displayStatus = display.status;
   // With no label there is nothing to read, so the mark itself carries the
-  // state as the thinking ellipsis. A label gets the matching character pose.
+  // state as the thinking ellipsis. A label gets a full character pose.
   const hasLabel = displayStatus.length > 0;
   const characterState: WorkingIndicatorCharacterState =
-    hasLabel && !display.thinking
+    hasLabel
       ? display.characterState === "thinking"
         ? "working"
         : display.characterState

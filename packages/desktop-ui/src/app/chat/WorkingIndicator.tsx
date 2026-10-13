@@ -10,6 +10,7 @@ import {
   getWorkingIndicatorCharacterState,
   getWorkingIndicatorDisplayStatus,
   getWorkingIndicatorThinkingText,
+  pickWorkingIndicatorToolPose,
   INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS,
   WORKING_INDICATOR_COMPACTING_TEXT,
   WORKING_INDICATOR_LONG_THINKING_MS,
@@ -20,7 +21,7 @@ import {
 } from "@/features/chat/working-indicator-state";
 import "./indicators.css";
 
-const INDICATOR_MARK_SIZE_PX = 30;
+const INDICATOR_MARK_SIZE_PX = 24;
 
 /** Punches the eyes out of the mark so they read as holes, not paint. */
 const INDICATOR_EYE_COLOR = "var(--surface-base)";
@@ -120,15 +121,24 @@ export function WorkingIndicator({
   // them separately would let a stale label sit under the next activity's
   // pose for the remainder of its floor.
   const liveDisplay = useMemo(() => {
-    const characterState = getWorkingIndicatorCharacterState({
+    const seed = `${toolCallId ?? reasoningSeed ?? ""}:${poseEpoch}`;
+    const basePose = getWorkingIndicatorCharacterState({
       toolName,
       isReasoning,
-      seed: `${toolCallId ?? reasoningSeed ?? ""}:${poseEpoch}`,
+      seed,
       avoid: previousPoseRef.current,
     });
+    const reasoning = basePose === "thinking";
+    // The dots stand alone. Thinking that has lasted long enough to be named,
+    // and compaction, show their label beside a full pose, as a tool does.
+    const characterState =
+      reasoning && (thinkingText || compacting)
+        ? pickWorkingIndicatorToolPose(seed, previousPoseRef.current)
+        : basePose;
     return {
+      reasoning,
       status:
-        characterState === "thinking"
+        reasoning
           ? thinkingText
           : longTool && toolName
             ? computeStillStatus(toolName)
@@ -147,13 +157,15 @@ export function WorkingIndicator({
     reasoningSeed,
     poseEpoch,
     thinkingText,
+    compacting,
     longTool,
   ]);
   previousPoseRef.current = liveDisplay.characterState;
-  // Dots have no text to read: a tool can replace them immediately.
+  // Thinking has no tool label worth reading out: a tool can replace it
+  // immediately.
   const held = useMinimumVisibleValue(
     liveDisplay,
-    liveDisplay.characterState === "thinking" ? 0 : minimumVisibleMs,
+    liveDisplay.reasoning ? 0 : minimumVisibleMs,
     (a, b) => a.status === b.status && a.characterState === b.characterState,
   );
   // Short thinking shows as the mark alone; a stretch that lasts gets its

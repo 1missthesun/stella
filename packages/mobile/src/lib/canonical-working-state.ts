@@ -48,7 +48,9 @@ export function canonicalWorkingState(args: {
     ? args.records.find((record) =>
         record.kind === "message" && record.role === "user" &&
         ((Boolean(args.activeDispatchId) && record.clientMsgId === args.activeDispatchId) ||
-          (Boolean(args.activeSendMessageId) && record.payload.originUserMessageId === args.activeSendMessageId)))?.turnId ?? null
+          (Boolean(args.activeSendMessageId) &&
+            (record.clientMsgId === args.activeSendMessageId ||
+              record.payload.originUserMessageId === args.activeSendMessageId))))?.turnId ?? null
     : null;
   const localTerminal = Boolean(localTurnId && args.records.some((record) =>
     record.kind === "turn" && record.turnId === localTurnId &&

@@ -64,6 +64,7 @@ import {
   type AutomaticExecutionTarget,
 } from "./execution-placement";
 import { collectActivityHubArtifacts } from "./activity-hub-model";
+import { useTurnHandoff } from "./use-turn-handoff";
 import { canonicalWorkingState } from "./canonical-working-state";
 import {
   applyAgentLedger,
@@ -871,22 +872,37 @@ export const useCloudCanonicalChatThread = (
       ),
     [state.live, state.records],
   );
+  const turnRunning = useMemo(
+    () =>
+      caughtUp === false
+        ? state.activity === "running"
+        : activeCloudTurnId(state.records, state.live) !== null,
+    [caughtUp, state.activity, state.live, state.records],
+  );
+  const handoffMessageId = useTurnHandoff({
+    conversationId: authority.conversationId ?? null,
+    sentMessageId: local.activeSendMessageId ?? null,
+    sending: local.sending,
+    turnRunning,
+    records: state.records,
+  });
+  const sendMessageId = local.activeSendMessageId ?? handoffMessageId;
   const { sending, workingIndicator } = useMemo(
     () => canonicalWorkingState({
       records: state.records,
       live: state.live,
-      localSending: local.sending,
+      localSending: local.sending || handoffMessageId !== null,
       localIndicator: local.workingIndicator,
       caughtUp,
       authoritativeActivity: state.activity,
       hasQueuedSend: local.messages.some((message) =>
         message.role === "user" && message.queued && !message.stopped),
-      activeSendMessageId: local.activeSendMessageId,
-      activeDispatchId: local.activeSendMessageId
-        ? dispatchBindings.get(local.activeSendMessageId) ?? null
+      activeSendMessageId: sendMessageId,
+      activeDispatchId: sendMessageId
+        ? dispatchBindings.get(sendMessageId) ?? null
         : null,
     }),
-    [caughtUp, dispatchBindings, local.activeSendMessageId, local.sending,
+    [caughtUp, dispatchBindings, handoffMessageId, local.sending, sendMessageId,
       local.workingIndicator, local.messages, state.activity, state.live,
       state.records],
   );

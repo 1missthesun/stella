@@ -233,25 +233,57 @@ export class AutomaticExecutionWaitAbortedError extends Error {
   }
 }
 
-const waitForDelay = (delayMs: number, signal?: AbortSignal) =>
-  new Promise<void>((resolve, reject) => {
-    if (signal?.aborted) {
+export type AutomaticExecutionStatusWake = {
+  subscribe: (listener: () => void) => () => void;
+  paused: () => boolean;
+};
+
+const STATUS_POLL_FIRST_MS = 1_000;
+const STATUS_POLL_MAX_MS = 15_000;
+const STATUS_POLL_MIN_GAP_MS = 250;
+
+const waitForNextRead = (args: {
+  delayMs: number;
+  earliestAt: number;
+  signal?: AbortSignal;
+  wake?: AutomaticExecutionStatusWake;
+}) =>
+  new Promise<boolean>((resolve, reject) => {
+    if (args.signal?.aborted) {
       reject(new AutomaticExecutionWaitAbortedError());
       return;
     }
     let settled = false;
+    let woken = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let unsubscribe: (() => void) | undefined;
     const finish = (callback: () => void) => {
       if (settled) return;
       settled = true;
-      signal?.removeEventListener("abort", onAbort);
+      if (timer !== undefined) clearTimeout(timer);
+      unsubscribe?.();
+      args.signal?.removeEventListener("abort", onAbort);
       callback();
     };
-    const timer = setTimeout(() => finish(resolve), delayMs);
-    const onAbort = () => {
-      clearTimeout(timer);
-      finish(() => reject(new AutomaticExecutionWaitAbortedError()));
+    const onTimer = () => {
+      timer = undefined;
+      if (args.wake?.paused()) return;
+      finish(() => resolve(woken));
     };
-    signal?.addEventListener("abort", onAbort, { once: true });
+    const arm = (delayMs: number) => {
+      if (timer !== undefined) clearTimeout(timer);
+      timer = setTimeout(onTimer, Math.max(0, delayMs));
+    };
+    const onWake = () => {
+      if (settled) return;
+      woken = true;
+      arm(args.earliestAt - Date.now());
+    };
+    const onAbort = () =>
+      finish(() => reject(new AutomaticExecutionWaitAbortedError()));
+    args.signal?.addEventListener("abort", onAbort, { once: true });
+    unsubscribe = args.wake?.subscribe(onWake);
+    arm(args.delayMs);
   });
 
 /** Pure reconnect loop; callers inject the authenticated status reader. */
@@ -261,11 +293,16 @@ export const waitForAutomaticExecutionStatus = async <
   dispatchId: string;
   signal?: AbortSignal;
   pollIntervalMs?: number;
+  maxPollIntervalMs?: number;
+  wake?: AutomaticExecutionStatusWake;
   onUpdate?: (dispatch: T) => void;
   beforeRead?: () => Promise<void>;
   readStatus: (dispatchId: string) => Promise<T | null>;
 }): Promise<T> => {
-  const pollIntervalMs = Math.max(100, args.pollIntervalMs ?? 750);
+  const firstMs = Math.max(100, args.pollIntervalMs ?? STATUS_POLL_FIRST_MS);
+  const maxMs = Math.max(firstMs, args.maxPollIntervalMs ?? STATUS_POLL_MAX_MS);
+  let delayMs = firstMs;
+  let lastState: string | undefined;
   for (;;) {
     if (args.signal?.aborted) throw new AutomaticExecutionWaitAbortedError();
     try {
@@ -283,6 +320,10 @@ export const waitForAutomaticExecutionStatus = async <
       }
       args.onUpdate?.(dispatch);
       if (isAutomaticExecutionTerminal(dispatch)) return dispatch;
+      if (lastState !== undefined && dispatch.state !== lastState) {
+        delayMs = firstMs;
+      }
+      lastState = dispatch.state;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (
@@ -293,7 +334,13 @@ export const waitForAutomaticExecutionStatus = async <
         throw error;
       }
     }
-    await waitForDelay(pollIntervalMs, args.signal);
+    const woken = await waitForNextRead({
+      delayMs,
+      earliestAt: Date.now() + STATUS_POLL_MIN_GAP_MS,
+      signal: args.signal,
+      wake: args.wake,
+    });
+    delayMs = woken ? firstMs : Math.min(delayMs * 2, maxMs);
   }
 };
 

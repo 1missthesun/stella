@@ -18,6 +18,7 @@ import {
   waitForAutomaticExecutionStatus,
   type AutomaticExecutionAdmissionInput,
   type AutomaticExecutionKind,
+  type AutomaticExecutionStatusWake,
   type AutomaticExecutionSubject,
 } from "./execution-placement-core";
 export {
@@ -30,6 +31,7 @@ export {
   requestAutomaticExecutionCancellation,
 } from "./execution-placement-core";
 export type {
+  AutomaticExecutionStatusWake,
   AutomaticExecutionTarget,
   AutomaticExecutionTurnControl,
 } from "./execution-placement-core";
@@ -244,6 +246,7 @@ export const waitForAutomaticExecution = async (args: {
   dispatchId: string;
   signal?: AbortSignal;
   pollIntervalMs?: number;
+  wake?: AutomaticExecutionStatusWake;
   builderOrigin?: string | null;
   onUpdate?: (dispatch: AutomaticExecutionDispatch) => void;
   beforeRead?: () => Promise<void>;

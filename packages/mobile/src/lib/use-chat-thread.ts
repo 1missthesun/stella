@@ -1,6 +1,7 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AppState, LayoutAnimation } from "react-native";
+import type { TurnStatusWake } from "./turn-status-wake";
 import {
   CHAT_TRANSCRIPT_MAX_LOADED,
   subscribeChatStorageCleanup,
@@ -234,6 +235,7 @@ export type ChatTransport = {
     dispatchId: string;
     conversationId: string;
   }) => void;
+  statusWake?: TurnStatusWake;
 };
 
 /**
@@ -890,6 +892,7 @@ export function useChatThread(opts: {
         const terminal = await waitForAutomaticExecution({
           dispatchId: admitted.dispatchId,
           signal: abort.signal,
+          ...(transport.statusWake ? { wake: transport.statusWake } : {}),
           beforeRead: async () => {
             const current = activeDispatchRef.current;
             if (current?.replyId !== replyId) return;
@@ -1348,7 +1351,8 @@ export function useChatThread(opts: {
         .catch(() => {
           // The active placement observer retries from the durable intent;
           // a relaunch does the same if this process is interrupted.
-        });
+        })
+        .finally(() => transport.statusWake?.nudge());
       return;
     }
     markSending(false);
@@ -1360,6 +1364,7 @@ export function useChatThread(opts: {
     markSending,
     patchActivity,
     threadId,
+    transport.statusWake,
     updateMessages,
   ]);
 

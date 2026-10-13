@@ -65,6 +65,7 @@ import {
 } from "./execution-placement";
 import { collectActivityHubArtifacts } from "./activity-hub-model";
 import { useTurnHandoff } from "./use-turn-handoff";
+import { createTurnStatusWake } from "./turn-status-wake";
 import { canonicalWorkingState } from "./canonical-working-state";
 import {
   applyAgentLedger,
@@ -512,6 +513,33 @@ export const useCloudCanonicalChatThread = (
   const caughtUp =
     state.epoch !== null && (state.headSeq < 0 || lastSeq >= state.headSeq);
   const authorityReady = !placementIssue && state.status === "live" && caughtUp;
+  const pauseStatusInBackground = threadId !== "carplay";
+  const [statusWake] = useState(() => createTurnStatusWake());
+  useEffect(() => {
+    if (!pauseStatusInBackground) {
+      statusWake.setPaused(false);
+      return;
+    }
+    statusWake.setPaused(
+      AppState.currentState !== "active" && AppState.currentState !== "unknown",
+    );
+    const subscription = AppState.addEventListener("change", (next) => {
+      statusWake.setPaused(next !== "active" && next !== "unknown");
+    });
+    return () => subscription.remove();
+  }, [pauseStatusInBackground, statusWake]);
+  const turnSignal = useMemo(() => {
+    for (let index = state.records.length - 1; index >= 0; index -= 1) {
+      const record = state.records[index]!;
+      if (record.kind === "turn") {
+        return `${record.turnId}:${record.phase}:${state.live?.turnId ?? ""}`;
+      }
+    }
+    return `:${state.live?.turnId ?? ""}`;
+  }, [state.live?.turnId, state.records]);
+  useEffect(() => {
+    if (caughtUp) statusWake.nudge();
+  }, [caughtUp, statusWake, turnSignal]);
   const transport = useMemo<ChatTransport>(
     () => ({
       accountScope: authority.accountScope,
@@ -522,6 +550,7 @@ export const useCloudCanonicalChatThread = (
       executionTarget,
       ...(execution ? { execution } : {}),
       onAdmission,
+      statusWake,
     }),
     [
       access,
@@ -532,6 +561,7 @@ export const useCloudCanonicalChatThread = (
       authority.ownerGeneration,
       authorityReady,
       onAdmission,
+      statusWake,
     ],
   );
   const local = useChatThread({ threadId, transport });

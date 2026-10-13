@@ -61,6 +61,14 @@ const base: SlackWorkspace = {
   slackCommands: true,
   github: null,
   repo: null,
+  previews: {
+    access: "members",
+    ttlDays: 14,
+    usedBytes: 38 * 1024 * 1024,
+    quotaBytes: 5 * 1024 * 1024 * 1024,
+    live: 6,
+    maxPreviewBytes: 100 * 1024 * 1024,
+  },
   rules: "Only Priya can ask for deploys.\nKeep answers in threads.",
   memory:
     "Standup is at 9:30 in #eng.\nThe firmware release train ships every second Tuesday.",
@@ -104,8 +112,9 @@ export const mockSlackApi = {
     });
   },
   update(_teamId: string, update: SlackWorkspaceUpdate): Promise<SlackWorkspaceUpdateResponse> {
-    const { repo, ...rest } = update;
-    let next: SlackWorkspace = { ...current(mockMode()), ...rest };
+    const { repo, previews, ...rest } = update;
+    const now = current(mockMode());
+    let next: SlackWorkspace = { ...now, ...rest, previews: { ...now.previews, ...previews } };
     if (repo === null) next = { ...next, repo: null };
     else if (repo) {
       const viaGithub = Boolean(next.github && repo.fullName.startsWith(`${next.github.account}/`));

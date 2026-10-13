@@ -8,8 +8,10 @@ import {
   SLACK_GITHUB_RESULT_PARAM,
   SLACK_INSTALL_RESULT_PARAM,
   SLACK_MEMORY_MAX_CHARS,
+  SLACK_PREVIEW_TTL_DAYS_CHOICES,
   SLACK_RULES_MAX_CHARS,
   type SlackGithubInstallationChoice,
+  type SlackPreviewAccess,
   type SlackGithubRepoOption,
   type SlackInstallResult,
   type SlackWorkspace,
@@ -348,6 +350,8 @@ type Draft = {
   slackCommands: boolean;
   repoName: string;
   repoBranch: string;
+  previewAccess: SlackPreviewAccess;
+  previewTtlDays: number;
   rules: string;
   memory: string;
 };
@@ -359,6 +363,8 @@ const draftFrom = (w: SlackWorkspace): Draft => ({
   slackCommands: w.slackCommands,
   repoName: w.repo?.fullName ?? "",
   repoBranch: w.repo?.branch ?? "",
+  previewAccess: w.previews.access,
+  previewTtlDays: w.previews.ttlDays,
   rules: w.rules,
   memory: w.memory,
 });
@@ -371,6 +377,12 @@ const diff = (w: SlackWorkspace, d: Draft): SlackWorkspaceUpdate => {
   if (d.slackCommands !== w.slackCommands) update.slackCommands = d.slackCommands;
   if (d.rules !== w.rules) update.rules = d.rules;
   if (d.memory !== w.memory) update.memory = d.memory;
+  if (d.previewAccess !== w.previews.access || d.previewTtlDays !== w.previews.ttlDays) {
+    update.previews = {
+      ...(d.previewAccess !== w.previews.access ? { access: d.previewAccess } : {}),
+      ...(d.previewTtlDays !== w.previews.ttlDays ? { ttlDays: d.previewTtlDays } : {}),
+    };
+  }
   const name = d.repoName.trim();
   const branch = d.repoBranch.trim();
   if (name) {
@@ -587,6 +599,14 @@ function WorkspaceCard({
         onWorkspace={githubChanged}
       />
 
+      <PreviewsPanel
+        workspace={workspace}
+        access={draft.previewAccess}
+        ttlDays={draft.previewTtlDays}
+        onAccess={(access) => set("previewAccess", access)}
+        onTtlDays={(days) => set("previewTtlDays", days)}
+      />
+
       <section className={s.panel}>
         <div className={s.panelHead}>
           <p className={s.cardEyebrow}>Rules</p>
@@ -656,6 +676,123 @@ function WorkspaceCard({
         </div>
       </div>
     </article>
+  );
+}
+
+const formatBytes = (bytes: number): string => {
+  if (bytes >= 1024 ** 3) return `${Math.round((bytes / 1024 ** 3) * 10) / 10} GB`;
+  if (bytes >= 1024 ** 2) return `${Math.round((bytes / 1024 ** 2) * 10) / 10} MB`;
+  if (bytes > 0) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+  return "0 MB";
+};
+
+const ttlLabel = (days: number): string => (days === 1 ? "1 day" : `${days} days`);
+
+function PreviewsPanel({
+  workspace,
+  access,
+  ttlDays,
+  onAccess,
+  onTtlDays,
+}: {
+  workspace: SlackWorkspace;
+  access: SlackPreviewAccess;
+  ttlDays: number;
+  onAccess: (access: SlackPreviewAccess) => void;
+  onTtlDays: (days: number) => void;
+}) {
+  const { previews } = workspace;
+  const headingId = `${workspace.teamId}-previews`;
+  const share = previews.quotaBytes > 0 ? Math.min(1, previews.usedBytes / previews.quotaBytes) : 0;
+  const choices: Array<{ id: SlackPreviewAccess; label: string; detail: string; icon: React.ReactNode }> = [
+    {
+      id: "members",
+      label: "Workspace members",
+      detail: `Visitors sign in with Slack and must be in ${workspace.teamName}.`,
+      icon: <Lock size={15} aria-hidden="true" />,
+    },
+    {
+      id: "public",
+      label: "Anyone with the link",
+      detail: "Links can't be guessed, but anyone they're shared with can open them.",
+      icon: <Globe size={15} aria-hidden="true" />,
+    },
+  ];
+  return (
+    <section className={s.panel} aria-labelledby={headingId}>
+      <div className={s.panelHead}>
+        <p className={s.cardEyebrow} id={headingId}>
+          Previews
+        </p>
+        <p className={s.panelLede}>
+          When an agent changes a website, Stella posts a preview link in the thread: the
+          repository&apos;s own preview when it has one, otherwise a build Stella hosts for you.
+        </p>
+      </div>
+
+      <div className={s.field}>
+        <span className={s.label}>Who can open Stella&apos;s preview links</span>
+        <div className={s.engines} role="radiogroup" aria-label="Who can open preview links">
+          {choices.map((choice) => (
+            <button
+              key={choice.id}
+              type="button"
+              role="radio"
+              aria-checked={access === choice.id}
+              className={s.engine}
+              data-active={access === choice.id ? "" : undefined}
+              onClick={() => onAccess(choice.id)}
+            >
+              <span className={s.engineLabel}>
+                <span className={s.previewIcon}>{choice.icon}</span>
+                {choice.label}
+              </span>
+              <span className={s.engineDetail}>{choice.detail}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className={s.row}>
+        <label className={s.field}>
+          <span className={s.label}>Links stop working after</span>
+          <select
+            className={s.select}
+            value={ttlDays}
+            onChange={(event) => onTtlDays(Number(event.target.value))}
+          >
+            {!(SLACK_PREVIEW_TTL_DAYS_CHOICES as readonly number[]).includes(ttlDays) ? (
+              <option value={ttlDays}>{ttlLabel(ttlDays)}</option>
+            ) : null}
+            {SLACK_PREVIEW_TTL_DAYS_CHOICES.map((days) => (
+              <option key={days} value={days}>
+                {ttlLabel(days)}
+              </option>
+            ))}
+          </select>
+          <span className={s.hint}>Counted from when each link was made, including links already posted.</span>
+        </label>
+
+        <div className={s.field}>
+          <span className={s.label}>Space used</span>
+          <div
+            className={s.meter}
+            role="meter"
+            aria-label="Preview space used"
+            aria-valuemin={0}
+            aria-valuemax={previews.quotaBytes}
+            aria-valuenow={previews.usedBytes}
+          >
+            <span style={{ width: `${Math.round(share * 100)}%` }} />
+          </div>
+          <span className={s.hint}>
+            {formatBytes(previews.usedBytes)} of {formatBytes(previews.quotaBytes)} on your plan ·{" "}
+            {previews.live === 1 ? "1 live link" : `${previews.live} live links`} · up to{" "}
+            {formatBytes(previews.maxPreviewBytes)} each
+          </span>
+        </div>
+      </div>
+    </section>
   );
 }
 

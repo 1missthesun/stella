@@ -425,6 +425,29 @@
   letter-spacing: -0.03em;
 }
 
+.previewIcon {
+  display: inline-flex;
+  margin-right: 7px;
+  vertical-align: -1px;
+  color: var(--muted);
+}
+
+.meter {
+  height: 10px;
+  margin-top: 13px;
+  border-radius: 999px;
+  background: rgba(10, 10, 13, 0.08);
+  overflow: hidden;
+}
+
+.meter span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: var(--violet);
+}
+
 .engineDetail {
   font-size: 14px;
   line-height: 1.4;

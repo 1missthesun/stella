@@ -379,10 +379,10 @@ export const piChatsFor = (
           .listConversationSummaries({ limit: AGENT_DIRECTORY_SESSIONS })
           .conversations.map(({ conversationId, title, updatedAt }) => ({ conversationId, title, updatedAt })),
       agentThreads: {
-        directory: async (conversationId) => {
+        directory: async (conversationId, threadIds) => {
           const runner = session.runnerCell.get();
           if (!runner?.getStellaSiteAuth()) throw new Error("Not signed in to Stella.");
-          return await runner.agentThreads.directory(conversationId);
+          return await runner.agentThreads.directory(conversationId, threadIds);
         },
         message: async (args) => {
           const runner = session.runnerCell.get();

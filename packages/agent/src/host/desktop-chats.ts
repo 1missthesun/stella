@@ -245,7 +245,10 @@ export type DesktopChatsOptions = {
    * them. A chat kept on this computer never reaches them.
    */
   agentThreads?: {
-    directory(conversationId: string): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
+    directory(
+      conversationId: string,
+      threadIds?: string[],
+    ): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
     message(args: { messageId: string; to: string; text: string; from: AgentMessageSender }): Promise<AgentMessageDelivery>;
     stop(args: { conversationId: string; threadId: string; controlRequestId: string; requesterThreadId?: string }): Promise<AgentStopResult>;
     note(args: { noteId: string; conversationId: string; fromThreadId: string; text: string }): Promise<void>;
@@ -1051,11 +1054,24 @@ export function desktopChats(options: DesktopChatsOptions) {
       }));
     return {
       conversationId: async () => conversationId,
-      list: async () => {
+      list: async (_context, listOptions) => {
         const local = localSessions();
         if (!cloud) return { agents: [], sessions: local };
         try {
-          const remote = await within(cloud.directory(conversationId), DIRECTORY_TIMEOUT_MS, "Stella's cloud did not answer.");
+          const threadIds = listOptions?.threadIds?.length ? listOptions.threadIds : undefined;
+          // A backend from before `threadIds` refuses the field: it lists the live ones only.
+          let threadIdsRead = threadIds !== undefined;
+          const remote = await within(
+            cloud.directory(conversationId, threadIds).catch(async (error: unknown) => {
+              if (!threadIds || !/threadIds is not allowed/.test(error instanceof Error ? error.message : String(error))) {
+                throw error;
+              }
+              threadIdsRead = false;
+              return await cloud.directory(conversationId);
+            }),
+            DIRECTORY_TIMEOUT_MS,
+            "Stella's cloud did not answer.",
+          );
           // A chat here keeps the title this computer has and the cloud's place.
           const sessions = new Map(remote.sessions.map((row) => [row.conversationId, row]));
           for (const row of local) {
@@ -1072,7 +1088,11 @@ export function desktopChats(options: DesktopChatsOptions) {
                 : row,
             );
           }
-          return { agents: remote.agents, sessions: [...sessions.values()] };
+          return {
+            agents: remote.agents,
+            sessions: [...sessions.values()],
+            ...(threadIdsRead ? { threadIdsRead: true as const } : {}),
+          };
         } catch (error) {
           return {
             agents: [],

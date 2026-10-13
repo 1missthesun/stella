@@ -36,10 +36,12 @@ export type AgentDirectory = {
 export const readAgentDirectory = async (
   caller: AgentMessagingCaller,
   conversationId: string,
+  threadIds?: string[],
 ): Promise<AgentDirectory> =>
   (await caller.ownerInternal("agentThreads.directory", {
     ownerGeneration: caller.ownerGeneration,
     conversationId,
+    ...(threadIds?.length ? { threadIds } : {}),
   })) as AgentDirectory;
 
 export const sendAgentMessage = async (

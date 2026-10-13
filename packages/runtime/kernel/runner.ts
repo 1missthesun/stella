@@ -451,9 +451,11 @@ export const createStellaHostRunner = (
       },
     },
     agentThreads: {
-      directory: async (conversationId) =>
+      directory: async (conversationId, threadIds) =>
         await withinAgentControlTimeout(
-          context.backend.require().call("agentThreads.directory", { conversationId }),
+          context.backend
+            .require()
+            .call("agentThreads.directory", { conversationId, ...(threadIds?.length ? { threadIds } : {}) }),
           "Stella's cloud did not list your agents and sessions within 20s.",
         ),
       message: async (args) =>

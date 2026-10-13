@@ -1571,6 +1571,9 @@ const handoffThread = async (ctx: OwnerContext, args: HandoffArgs): Promise<Hand
 const DIRECTORY_AGENTS_RECENT = 50;
 const DIRECTORY_SESSIONS_RECENT = 20;
 const LIVE_STATUSES_SQL = "('running', 'resuming', 'waiting_for_user')";
+/** The agents a directory caller may ask about by id, and how many one query binds. */
+export const DIRECTORY_THREAD_IDS_MAX = 200;
+const DIRECTORY_THREAD_IDS_PER_QUERY = 50;
 const AGENT_MESSAGE_RECEIPT_TTL_MS = 24 * 60 * 60_000;
 
 /**
@@ -1611,9 +1614,21 @@ type DirectoryResult = AgentThreadCalls["agentThreads.directory"]["result"];
  */
 const agentDirectory = async (
   ctx: OwnerContext,
-  args: { conversationId: string },
+  args: { conversationId: string; threadIds?: string[] },
 ): Promise<DirectoryResult> => {
   const rows = new Map<string, ThreadRow>();
+  // The agents the caller holds as running elsewhere, however old: one that
+  // ended out of the recent few would otherwise read as still running there.
+  const asked = [...new Set(args.threadIds ?? [])];
+  for (let at = 0; at < asked.length; at += DIRECTORY_THREAD_IDS_PER_QUERY) {
+    const chunk = asked.slice(at, at + DIRECTORY_THREAD_IDS_PER_QUERY);
+    for (const row of ctx.db.all<ThreadRow>(
+      `SELECT * FROM agent_threads WHERE thread_id IN (${chunk.map(() => "?").join(", ")})`,
+      ...chunk,
+    )) {
+      if (!crossesSlackBoundary(ctx, args.conversationId, row.thread_id)) rows.set(row.thread_id, row);
+    }
+  }
   for (const column of ["conversation_id", "origin_conversation_id"] as const) {
     for (const row of [
       ...ctx.db.all<ThreadRow>(
@@ -3883,7 +3898,10 @@ export const agentThreadsDomain = {
   calls: {
     "agentThreads.directory": {
       scope: "owner",
-      parse: object({ conversationId: id(256) }),
+      parse: object({
+        conversationId: id(256),
+        threadIds: optional(array(id(256), { max: DIRECTORY_THREAD_IDS_MAX })),
+      }),
       handler: agentDirectory,
     },
     "agentThreads.message": {
@@ -4086,7 +4104,14 @@ export const agentThreadsDomain = {
     "agentThreads.cloudHandoff": async (ctx, raw) =>
       await moveThread(ctx, { ...cloudHandoffParser(raw), from: { kind: "cloud" } }),
     "agentThreads.directory": async (ctx, raw) =>
-      await agentDirectory(ctx, object({ ownerGeneration: generation, conversationId: id(256) })(raw)),
+      await agentDirectory(
+        ctx,
+        object({
+          ownerGeneration: generation,
+          conversationId: id(256),
+          threadIds: optional(array(id(256), { max: DIRECTORY_THREAD_IDS_MAX })),
+        })(raw),
+      ),
     "agentThreads.message": async (ctx, raw) => await messageAgent(ctx, messageParser(raw)),
     "agentThreads.stop": async (ctx, raw) => await stopAgent(ctx, stopParser(raw)),
     "agentThreads.pause": async (ctx, raw) => await legacyPauseAgent(ctx, pauseParser(raw)),

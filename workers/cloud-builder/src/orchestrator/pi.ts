@@ -377,10 +377,11 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           // What the agents reach beyond this conversation's harness: the
           // owner's agent threads and other sessions, as the loop's do.
           agentDirectory: {
-            list: async (authority) =>
+            list: async (authority, threadIds) =>
               await readAgentDirectory(
                 this.piOwnerCaller(authority),
                 authority.conversationId,
+                threadIds,
               ),
             message: async (authority, args) =>
               await sendAgentMessage(this.piOwnerCaller(authority), {

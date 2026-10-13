@@ -429,6 +429,7 @@ export type RunnerPublicApi = {
   agentThreads: {
     directory: (
       conversationId: string,
+      threadIds?: string[],
     ) => Promise<AgentThreadCalls["agentThreads.directory"]["result"]>;
     message: (
       args: Omit<AgentThreadCalls["agentThreads.message"]["args"], "ownerGeneration">,

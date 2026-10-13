@@ -486,8 +486,20 @@ export type StellaAgentsHost = {
 export type AgentDirectoryHost = {
   /** The conversation this harness is Stella for, as the other hosts name it. */
   conversationId(context: Context): Promise<string>;
-  /** Rows the harness does not hold; `unavailable` says what could not be read. */
-  list(context: Context): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[]; unavailable?: string }>;
+  /**
+   * Rows the harness does not hold, and the owner's own rows for `threadIds`
+   * (agents it holds as running elsewhere); `unavailable` says what could not be read.
+   */
+  list(
+    context: Context,
+    options?: { threadIds?: string[] },
+  ): Promise<{
+    agents: AgentDirectoryAgentRow[];
+    sessions: AgentDirectorySessionRow[];
+    unavailable?: string;
+    /** `agents` holds every one of `threadIds` the owner's agent threads know. */
+    threadIdsRead?: true;
+  }>;
   /**
    * A note for a thread this harness does not hold, once per `key`: a
    * session's Stella, or an agent elsewhere. With `remoteStella`, `to` is
@@ -759,6 +771,19 @@ const deliveredResult = (delivery: { threadId: string; outcome?: AgentMessageDel
 const statusResult = (view: Record<string, unknown>) => ({
   content: [{ type: "text" as const, text: JSON.stringify(view) }],
 });
+
+/** The owner's agent threads as `agent_status` read them, for the conversation `root`. */
+type DirectoryLedger = {
+  agents: readonly AgentDirectoryAgentRow[];
+  unavailable?: string;
+  threadIdsRead?: true;
+  root: ConversationId;
+};
+
+/** At most this many agents held elsewhere are asked about by id. */
+const DIRECTORY_THREAD_IDS_MAX = 200;
+/** A new agent's ledger row may lag its record by this much. */
+const DIRECTORY_SETTLE_MS = 2 * 60_000;
 
 /** What an agent is to the caller of `agent_status`. */
 const relationOf = (row: { threadId: string; parentThreadId?: string }, self: { threadId?: string }, parentThreadId?: string) =>
@@ -1790,7 +1815,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     agent: TreeAgent,
     conversationId: string,
     context: Context,
-    ledger?: readonly AgentDirectoryAgentRow[],
+    ledger?: DirectoryLedger,
     seen?: Map<string, Promise<DeviceStanding | undefined>>,
   ): Promise<AgentDirectoryAgentRow> => {
     const { record } = agent;
@@ -1802,7 +1827,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       description: record.description,
     };
     if (record.remote) {
-      const there = ledger?.find((entry) => entry.threadId === agent.threadId);
+      const there = ledger?.agents.find((entry) => entry.threadId === agent.threadId);
       if (there) {
         return {
           ...row,
@@ -1814,7 +1839,18 @@ export function stellaAgents(host: StellaAgentsHost) {
         };
       }
       const computer = await computerOf(record, context, seen);
-      const done = (record.answered?.length ?? 0) >= agent.given;
+      // Its report may have reached this conversation while another host
+      // held it, so this record's own count is not the last word: one the
+      // owner's agent threads list no longer runs, as each of its live
+      // agents is listed (a backend that could not be asked by id lists the
+      // live ones only; Stella's own agents are among them).
+      const notLive =
+        ledger !== undefined &&
+        !ledger.unavailable &&
+        (ledger.threadIdsRead === true ||
+          (agent.parentConversationId === ledger.root &&
+            Date.now() - (record.startedAt ?? Date.now()) > DIRECTORY_SETTLE_MS));
+      const done = notLive || (record.answered?.length ?? 0) >= agent.given;
       const status = done ? remoteOutcome(record) : "running";
       return {
         ...row,
@@ -1856,15 +1892,25 @@ export function stellaAgents(host: StellaAgentsHost) {
   const directoryStatus = async (api: ToolExecutionApi, context: Context) => {
     const { self, root, parentThreadId } = await chainOf(api, context);
     const conversationId = (await host.directory?.conversationId(context).catch(() => undefined)) ?? STELLA_MESSAGE_TARGET;
-    const elsewhere = await host.directory?.list(context).catch((error: unknown) => ({
-      agents: [],
-      sessions: [],
-      unavailable: `Agents and sessions elsewhere could not be listed right now (${error instanceof Error ? error.message : String(error)}).`,
-    }));
+    const tree = root === undefined ? [] : await agentTree(api, root, context);
+    // Asked for by id: the agents this harness holds as running elsewhere.
+    const threadIds = tree
+      .filter((agent) => agent.record.remote && (agent.record.answered?.length ?? 0) < agent.given)
+      .map((agent) => agent.threadId)
+      .slice(0, DIRECTORY_THREAD_IDS_MAX);
+    const elsewhere = await host.directory
+      ?.list(context, threadIds.length ? { threadIds } : undefined)
+      .catch((error: unknown) => ({
+        agents: [],
+        sessions: [],
+        unavailable: `Agents and sessions elsewhere could not be listed right now (${error instanceof Error ? error.message : String(error)}).`,
+      }));
+    const ledger: DirectoryLedger | undefined =
+      elsewhere && root !== undefined ? { ...elsewhere, root } : undefined;
     const rows: AgentDirectoryAgentRow[] = [];
     const seen = new Map<string, Promise<DeviceStanding | undefined>>();
-    for (const agent of root === undefined ? [] : await agentTree(api, root, context)) {
-      rows.push(await directoryRow(api, agent, conversationId, context, elsewhere?.agents, seen));
+    for (const agent of tree) {
+      rows.push(await directoryRow(api, agent, conversationId, context, ledger, seen));
     }
     const known = new Set(rows.map((row) => row.threadId));
     const listing = buildAgentDirectoryResult({
@@ -1998,7 +2044,11 @@ export function stellaAgents(host: StellaAgentsHost) {
             }
           : undefined);
       if (found) {
-        const ledger = found.record.remote ? (await host.directory?.list(context).catch(() => undefined))?.agents : undefined;
+        const listed = found.record.remote
+          ? await host.directory?.list(context, { threadIds: [threadId] }).catch(() => undefined)
+          : undefined;
+        const ledger: DirectoryLedger | undefined =
+          listed && root !== undefined ? { ...listed, root } : undefined;
         const row = await directoryRow(api, found, conversationId, context, ledger);
         const reachable = !found.record.remote || remoteHostOf(found.record) !== undefined || host.directory !== undefined;
         const entry = agentDirectoryEntry(row);

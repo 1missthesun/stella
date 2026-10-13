@@ -448,7 +448,10 @@ export type PiRuntimeOptions = {
    * a note for one of them.
    */
   agentDirectory?: {
-    list(authority: PiAuthority): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
+    list(
+      authority: PiAuthority,
+      threadIds?: string[],
+    ): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
     message(
       authority: PiAuthority,
       args: { messageId: string; to: string; text: string; from: AgentMessageSender },
@@ -1359,7 +1362,13 @@ export class PiConversationRuntime {
   #directory(threads: NonNullable<PiRuntimeOptions["agentDirectory"]>): AgentDirectoryHost {
     return {
       conversationId: async () => (await this.#agentState()).authority.conversationId,
-      list: async () => await threads.list((await this.#agentState()).authority),
+      list: async (_context, options) => {
+        const threadIds = options?.threadIds?.length ? options.threadIds : undefined;
+        return {
+          ...(await threads.list((await this.#agentState()).authority, threadIds)),
+          ...(threadIds ? { threadIdsRead: true as const } : {}),
+        };
+      },
       message: async ({ key, to, text, from }) => {
         const { authority } = await this.#agentState();
         return await threads.message(authority, {

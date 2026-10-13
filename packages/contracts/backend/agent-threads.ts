@@ -193,7 +193,11 @@ export type AgentThreadCalls = {
    * this conversation's agents (every placement) and the other conversations.
    */
   "agentThreads.directory": {
-    args: { conversationId: string };
+    /**
+     * `threadIds`: agents the caller holds as running elsewhere, listed
+     * however long ago they ended (otherwise only live ones and the newest few).
+     */
+    args: { conversationId: string; threadIds?: string[] };
     result: {
       agents: AgentDirectoryAgentRow[];
       sessions: AgentDirectorySessionRow[];

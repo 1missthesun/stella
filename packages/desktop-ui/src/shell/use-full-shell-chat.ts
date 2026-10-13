@@ -21,6 +21,7 @@ import { useStreamingChat } from "@/features/chat/hooks/use-streaming-chat";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
 import { buildActivityTasks } from "@/features/chat/lib/event-transforms";
 import { useCapturedChatContext } from "./use-captured-chat-context";
+import { useTurnHandoff } from "./use-turn-handoff";
 import { useChatScrollManagement } from "./use-chat-scroll-management";
 import { useChatHomeSurface } from "./use-chat-home-surface";
 import { useConversationUserAsks } from "@/features/user-ask/user-ask-store";
@@ -427,7 +428,15 @@ export function useFullShellChat({
   const latestCompletedTool = piChat.latestCompletedTool;
   const hasToolActivity = piChat.hasToolActivity;
   const isToolActive = piChat.isToolActive;
-  const isStreaming = piChat.isStreaming || awaitingMessageAdmission;
+  const awaitingTurnHandoff = useTurnHandoff({
+    conversationId: activeConversationId,
+    optimisticEvents: localOptimisticEvents,
+    persistedMessages,
+    awaitingAdmission: awaitingMessageAdmission,
+    turnRunning: piChat.isStreaming,
+  });
+  const isStreaming =
+    piChat.isStreaming || awaitingMessageAdmission || awaitingTurnHandoff;
   // The committed reply hands off before the terminal turn frame arrives.
   const answerLanded = !awaitingMessageAdmission && piChat.answerLanded;
   // The sent bubble pops in on the frame it first paints, so its id comes from

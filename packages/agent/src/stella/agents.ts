@@ -2433,6 +2433,17 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (state.calls[callKey]) return undefined;
       const agent = state.agents[args.threadId];
       if (!agent) throw new Error(`No agent ${args.threadId} here.`);
+      // The report of an agent it started on another host answers that
+      // agent's record in its own conversation, as Stella's own do
+      // (`deliverReport`); unanswered, the record read as running for good.
+      const reported = args.report ? /\nthread_id: (\S+)/.exec(args.message)?.[1] : undefined;
+      if (reported) {
+        await noteRemoteReport(tx, agent.conversationId as ConversationId, {
+          threadId: reported,
+          requestId: callKey,
+          text: args.message,
+        });
+      }
       const reporter = await tx.createTask(
         Reporter,
         {

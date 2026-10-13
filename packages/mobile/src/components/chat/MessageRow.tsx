@@ -1192,14 +1192,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         </View>
       ) : null}
       {hasText ? null : evidenceMedia}
-      {item.stopped ? (
-        <Text
-          style={styles.stoppedTag}
-          maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-        >
-          Stopped
-        </Text>
-      ) : null}
+      {/* A stopped reply already says so in its own bubble ("Stopped."). */}
       {item.cloudFallback ? (
         <Text
           style={styles.cloudTag}

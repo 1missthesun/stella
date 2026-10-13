@@ -61,6 +61,16 @@ export const AGENT_LOGS_COLD_MIGRATION = {
   ],
 };
 
+/**
+ * Every record wrote one more index row for its conversation, read only when
+ * a conversation is deleted. That delete now finds the conversation's agents
+ * in `agent_log_holders` and removes their records by thread.
+ */
+export const AGENT_LOGS_LEAN_INDEX_MIGRATION = {
+  id: "agent-logs.3-drop-conversation-index",
+  statements: ["DROP INDEX IF EXISTS agent_log_records_conversation"],
+};
+
 export const AGENT_LOG_ARCHIVE_JOB = "agentLogs.archive";
 export const AGENT_LOG_SEGMENT_DELETE_JOB = "agentLogs.deleteSegments";
 const AGENT_LOG_ARCHIVE_JOB_ID = "agent-logs:archive";
@@ -347,16 +357,26 @@ const read = async (ctx: OwnerContext, args: ReadArgs): Promise<AgentLogCalls["a
 
 /** Delete one conversation's agent records, with its agents. */
 export const deleteConversationAgentLogs = (db: OwnerDb, jobs: OwnerJobs, conversationId: string): void => {
-  const segments = db
-    .all<{ segment: string }>(
-      "SELECT DISTINCT segment FROM agent_log_records WHERE conversation_id = ? AND segment IS NOT NULL",
-      conversationId,
-    )
-    .map((row) => row.segment);
+  // Every append records its agent's holder first, so the holders list every
+  // thread with records in this conversation.
+  const threads = db
+    .all<{ thread_id: string }>("SELECT thread_id FROM agent_log_holders WHERE conversation_id = ?", conversationId)
+    .map((row) => row.thread_id);
+  const segments: string[] = [];
+  for (const threadId of threads) {
+    for (const row of db.all<{ segment: string }>(
+      "SELECT DISTINCT segment FROM agent_log_records WHERE thread_id = ? AND segment IS NOT NULL",
+      threadId,
+    )) {
+      segments.push(row.segment);
+    }
+  }
   for (let index = 0; index < segments.length; index += SEGMENT_DELETE_BATCH) {
     jobs.schedule(AGENT_LOG_SEGMENT_DELETE_JOB, 0, { keys: segments.slice(index, index + SEGMENT_DELETE_BATCH) });
   }
-  db.run("DELETE FROM agent_log_records WHERE conversation_id = ?", conversationId);
+  for (const threadId of threads) {
+    db.run("DELETE FROM agent_log_records WHERE thread_id = ? AND conversation_id = ?", threadId, conversationId);
+  }
   db.run("DELETE FROM agent_log_holders WHERE conversation_id = ?", conversationId);
 };
 
@@ -395,7 +415,7 @@ const cloudAppend = (ctx: OwnerContext, raw: unknown) => {
 
 export const agentLogsDomain = {
   name: "agent-logs",
-  migrations: [AGENT_LOGS_MIGRATION, AGENT_LOGS_COLD_MIGRATION],
+  migrations: [AGENT_LOGS_MIGRATION, AGENT_LOGS_COLD_MIGRATION, AGENT_LOGS_LEAN_INDEX_MIGRATION],
   jobs: {
     [AGENT_LOG_ARCHIVE_JOB]: { run: (ctx) => archiveColdRecords(ctx), maxAttempts: 10 },
     [AGENT_LOG_SEGMENT_DELETE_JOB]: {

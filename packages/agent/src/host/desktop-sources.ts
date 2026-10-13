@@ -30,9 +30,18 @@ const readOptional = async (file: string): Promise<string | undefined> => {
   }
 };
 
-type ServedPrompts = { revision: string; prompts: Map<string, string> };
+type ServedPrompts = { revision: string; prompts: Map<string, string>; checkedAt: number };
 
-/** The backend's prompt bundle, fetched once per process and refreshed in the background. */
+/** How long a fetched bundle serves before the next request revalidates it in the background. */
+const SERVED_PROMPTS_MAX_AGE_MS = 5 * 60_000;
+
+/**
+ * The backend's prompt bundle. The first request waits for it; afterwards a
+ * request finding it older than `SERVED_PROMPTS_MAX_AGE_MS` uses it as is and
+ * revalidates it in the background (`If-None-Match`), so a prompt the backend
+ * publishes reaches a long-open conversation within minutes, not at the next
+ * restart.
+ */
 function servedPrompts(backendUrl: string | undefined) {
   let current: ServedPrompts | undefined;
   let pending: Promise<void> | undefined;
@@ -40,17 +49,28 @@ function servedPrompts(backendUrl: string | undefined) {
     if (!backendUrl) return;
     try {
       const response = await fetch(`${backendUrl.replace(/\/+$/, "")}${STELLA_PROMPTS_PATH}`, {
+        headers: current ? { "if-none-match": `"${current.revision}"` } : {},
         signal: AbortSignal.timeout(5_000),
       });
+      if (response.status === 304 && current) {
+        current = { ...current, checkedAt: Date.now() };
+        return;
+      }
       if (!response.ok) return;
       const body = (await response.json()) as { revision: string; prompts: { id: string; content: string }[] };
-      current = { revision: body.revision, prompts: new Map(body.prompts.map((prompt) => [prompt.id, prompt.content])) };
+      current = {
+        revision: body.revision,
+        prompts: new Map(body.prompts.map((prompt) => [prompt.id, prompt.content])),
+        checkedAt: Date.now(),
+      };
     } catch {
-      // Offline: the bundled prompt serves until the next refresh.
+      // Offline: the bundled prompt, or the last bundle, serves until the next refresh.
     }
   };
+  const start = () => (pending ??= refresh().finally(() => (pending = undefined)));
   return async (id: string): Promise<string | undefined> => {
-    if (current === undefined) await (pending ??= refresh().finally(() => (pending = undefined)));
+    if (current === undefined) await start();
+    else if (Date.now() - current.checkedAt > SERVED_PROMPTS_MAX_AGE_MS) void start();
     return current?.prompts.get(id);
   };
 }

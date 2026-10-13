@@ -677,7 +677,15 @@ export class Sandbox extends DurableObject<Env> {
       ...from,
       instance: INSTANCE_TIERS[boot.size].instance,
       enableInternet: boot.workload !== "app-build" && (egress?.internet ?? true),
-      labels: { service: "stella-v2", workload: boot.workload, size: boot.size },
+      labels: {
+        service: "stella-v2",
+        workload: boot.workload,
+        size: boot.size,
+        // The sandbox's name (`agent-<hash>` for an agent thread or the
+        // orchestrator), so container metrics name the same container the
+        // turn logs do (their `sandbox` field).
+        ...(this.ctx.id.name ? { sandbox: this.ctx.id.name.slice(0, 16) } : {}),
+      },
     } as ContainerStartupOptions);
     this.ctx.storage.kv.put("boot", boot);
     if (egress) this.ctx.storage.kv.put(BOOTED_EGRESS_KEY, egress);

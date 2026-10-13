@@ -674,7 +674,13 @@ export const buildCloudClaudeTakeoverArgs = (options: {
     workflowKeywordTriggerEnabled: false,
     disableWorkflows: true,
   }),
-  ...(options.systemPrompt.trim() ? ["--system-prompt", options.systemPrompt] : []),
+  // Send the prompt as given on every launch. By default the CLI records a
+  // conversation's first system prompt and resends that record on every
+  // resume until compaction, so a deploy's prompt change would not reach a
+  // long-lived conversation. (The image pins a CLI that takes the flag.)
+  ...(options.systemPrompt.trim()
+    ? ["--system-prompt", options.systemPrompt, "--system-prompt-snapshot", "off"]
+    : []),
   ...(options.resume
     ? ["--resume", options.sessionId]
     : ["--session-id", options.sessionId]),

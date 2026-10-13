@@ -38,6 +38,7 @@ import {
 } from "./claude-code-tool-mcp-host.js";
 import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
 import {
+  claudeCliHasOption,
   claudeSessionProjectDir,
   resolveClaudeWorkingFolder,
   stripClaudeThinkingFromSessionFile,
@@ -2585,6 +2586,7 @@ class ClaudeCodeSessionRuntime {
     effectiveSystemPrompt: string,
     useResume: boolean,
     mcpHost: ClaudeCodeToolMcpHost | undefined,
+    cliHasSystemPromptSnapshot = false,
   ) {
     // A turn-scoped fallback override (fable exhausted its attempts) beats
     // the configured model; executeTurn clears it at every turn start.
@@ -2636,6 +2638,15 @@ class ClaudeCodeSessionRuntime {
     }
     if (effectiveSystemPrompt.trim()) {
       args.push("--system-prompt", effectiveSystemPrompt.trim());
+      // The CLI otherwise records a conversation's system prompt on its
+      // first request and sends that record on every resume until the
+      // conversation compacts, so an updated prompt (new tools, new rules)
+      // would not reach a long-lived conversation for days. Stella restarts
+      // the CLI only when the prompt it renders changes, so sending it as
+      // given costs one cache write per change.
+      if (cliHasSystemPromptSnapshot) {
+        args.push("--system-prompt-snapshot", "off");
+      }
     }
     if (modelName) {
       args.push("--model", modelName);
@@ -2805,6 +2816,9 @@ class ClaudeCodeSessionRuntime {
         Math.floor(request.autoCompactWindowTokens!),
       );
     }
+    const cliHasSystemPromptSnapshot = await claudeCliHasOption(
+      "--system-prompt-snapshot",
+    );
     const child = spawn(
       executablePath,
       this.buildClaudeCodeArgs(
@@ -2813,6 +2827,7 @@ class ClaudeCodeSessionRuntime {
         effectiveSystemPrompt,
         useResume,
         mcpHost,
+        cliHasSystemPromptSnapshot,
       ),
       {
         stdio: ["pipe", "pipe", "pipe"],

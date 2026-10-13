@@ -103,6 +103,32 @@ export const claudeCliVersion = (): Promise<string> => {
   return cachedCliVersion;
 };
 
+let cachedCliHelp: Promise<string> | null = null;
+
+/**
+ * Whether the installed CLI takes `option` (e.g. `--system-prompt-snapshot`),
+ * read once from its `--help`. An unknown option makes the CLI exit before
+ * it starts, so newer flags are passed only when this says so.
+ */
+export const claudeCliHasOption = async (option: string): Promise<boolean> => {
+  cachedCliHelp ??= new Promise<string>((resolve) => {
+    let executable: string;
+    try {
+      executable = resolveExternalCliPath("claude");
+    } catch {
+      resolve("");
+      return;
+    }
+    execFile(
+      executable,
+      ["--help"],
+      { timeout: 15_000, maxBuffer: 4 * 1024 * 1024 },
+      (error, stdout) => resolve(error ? "" : String(stdout ?? "")),
+    );
+  });
+  return (await cachedCliHelp).split(/[\s,]+/).includes(option);
+};
+
 export const compareClaudeCliVersions = (left: string, right: string): number => {
   const parse = (value: string) =>
     (/^(\d+)\.(\d+)\.(\d+)/.exec(value) ?? []).slice(1, 4).map(Number);

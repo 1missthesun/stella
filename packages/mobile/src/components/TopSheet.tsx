@@ -36,6 +36,7 @@ import {
   TOP_SHEET_HEIGHT_FRACTION,
   topSheetMaxHeight,
 } from "../lib/top-sheet-metrics";
+import { useHoldDrawer } from "../lib/drawer";
 import { useBottomObstruction } from "../lib/use-bottom-obstruction";
 import { useColors } from "../theme/theme-context";
 import { type Colors } from "../theme/colors";
@@ -171,6 +172,7 @@ export function TopSheet({
   const progress = useSharedValue(0);
   const hideDistance = useSharedValue(maxSheetHeight + SHADOW_CLEARANCE);
   const [rendered, setRendered] = useState(visible);
+  useHoldDrawer(rendered);
   const sheetHeight = useRef<number | null>(null);
   const awaitingOpen = useRef(visible);
   const shown = useRef(false);

@@ -23,6 +23,7 @@ import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import { useBottomObstruction } from "../lib/use-bottom-obstruction";
+import { useHoldDrawer } from "../lib/drawer";
 
 const SIDE_MARGIN = 8;
 const MAX_WIDTH = 760;
@@ -67,6 +68,7 @@ export function FileViewerPanel({
   const obstruction = useBottomObstruction(bottomReserve, COMPOSER_TOP_SLACK);
   const rootRef = useRef<View>(null);
   const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
+  useHoldDrawer(true);
 
   useEffect(() => {
     const handler = BackHandler.addEventListener("hardwareBackPress", () => {

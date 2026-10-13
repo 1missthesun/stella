@@ -39,6 +39,7 @@ import {
   useDrawerLive,
   useDrawerMetrics,
   useDrawerClosePan,
+  useDrawerHeld,
   useDrawerOpen,
   useDrawerOpenPan,
   useDrawerSide,
@@ -91,6 +92,7 @@ export function DrawerStage({
   const { isDark } = useTheme();
   const live = useDrawerLive();
   const open = useDrawerOpen();
+  const held = useDrawerHeld();
   const side = useDrawerSide();
   const p = drawerProgress;
   const floor = colors.background;
@@ -145,7 +147,12 @@ export function DrawerStage({
     intensity: reduce ? 0 : drawerBlur(p.value) * PAGE_BLUR,
   }));
 
-  const openPan = useDrawerOpenPan({ start: enabled, end: endEnabled, open });
+  const openPan = useDrawerOpenPan({
+    start: enabled,
+    end: endEnabled,
+    open,
+    held,
+  });
   const closePan = useDrawerClosePan(side);
   const catcher = useMemo(
     () =>

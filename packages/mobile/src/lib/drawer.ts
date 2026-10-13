@@ -1,4 +1,4 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useId, useMemo, useSyncExternalStore } from "react";
 import { Keyboard, useWindowDimensions } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
 import {
@@ -15,9 +15,19 @@ export type DrawerSide = "start" | "end";
 export const drawerProgress = makeMutable(0);
 export const drawerSign = makeMutable(1);
 
-type DrawerState = { open: boolean; live: boolean; side: DrawerSide };
+type DrawerState = {
+  open: boolean;
+  live: boolean;
+  side: DrawerSide;
+  held: boolean;
+};
 
-let state: DrawerState = { open: false, live: false, side: "start" };
+let state: DrawerState = {
+  open: false,
+  live: false,
+  side: "start",
+  held: false,
+};
 const listeners = new Set<() => void>();
 
 function setState(next: Partial<DrawerState>) {
@@ -25,7 +35,8 @@ function setState(next: Partial<DrawerState>) {
   if (
     merged.open === state.open &&
     merged.live === state.live &&
-    merged.side === state.side
+    merged.side === state.side &&
+    merged.held === state.held
   ) {
     return;
   }
@@ -43,6 +54,7 @@ function subscribe(listener: () => void) {
 const readOpen = () => state.open;
 const readLive = () => state.live;
 const readSide = () => state.side;
+const readHeld = () => state.held;
 
 export function useDrawerOpen(): boolean {
   return useSyncExternalStore(subscribe, readOpen, readOpen);
@@ -54,6 +66,29 @@ export function useDrawerLive(): boolean {
 
 export function useDrawerSide(): DrawerSide {
   return useSyncExternalStore(subscribe, readSide, readSide);
+}
+
+export function useDrawerHeld(): boolean {
+  return useSyncExternalStore(subscribe, readHeld, readHeld);
+}
+
+const holders = new Set<string>();
+
+/**
+ * Keeps the sidebars still while a sheet is up. A sideways swipe inside a
+ * sheet pages its media or scrubs its video; it never opens a sidebar.
+ */
+export function useHoldDrawer(active: boolean) {
+  const id = useId();
+  useEffect(() => {
+    if (!active) return;
+    holders.add(id);
+    setState({ held: true });
+    return () => {
+      holders.delete(id);
+      setState({ held: holders.size > 0 });
+    };
+  }, [active, id]);
 }
 
 const OPEN: WithSpringConfig = { stiffness: 340, damping: 31, mass: 1 };
@@ -290,10 +325,12 @@ export function useDrawerOpenPan({
   start,
   end,
   open,
+  held,
 }: {
   start: boolean;
   end: boolean;
   open: boolean;
+  held: boolean;
 }) {
   const { travel, endTravel } = useDrawerMetrics();
   return useMemo(() => {
@@ -301,7 +338,7 @@ export function useDrawerOpenPan({
     const offset: number | [number, number] =
       start && end ? [-12, 12] : start ? 12 : -12;
     return Gesture.Pan()
-      .enabled((start || end) && !open)
+      .enabled((start || end) && !open && !held)
       .activeOffsetX(offset)
       .failOffsetY([-14, 14])
       .onTouchesDown((_e, manager) => {
@@ -318,7 +355,7 @@ export function useDrawerOpenPan({
       })
       .onUpdate((e) => track(owner, e))
       .onFinalize((e) => release(owner, e.velocityX));
-  }, [start, end, open, travel, endTravel]);
+  }, [start, end, open, held, travel, endTravel]);
 }
 
 /**

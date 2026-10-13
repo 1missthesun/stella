@@ -169,7 +169,6 @@ export class DictationStream {
   private openSettle: ((error: Error | null) => void) | null = null;
 
   constructor(
-    private readonly onPartial?: (text: string) => void,
     /** The relay ended the session while recording (not while finishing). */
     private readonly onFailure?: (error: Error) => void,
   ) {}
@@ -330,7 +329,6 @@ export class DictationStream {
           ? frame.text
           : "";
     this.transcript = text;
-    this.onPartial?.(text);
     if (frame.final === true) this.finalTranscript = text;
   }
 

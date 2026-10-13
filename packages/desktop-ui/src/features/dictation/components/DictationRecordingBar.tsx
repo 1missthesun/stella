@@ -1,40 +1,32 @@
 /**
  * DictationRecordingBar — replaces the composer's textarea + toolbar while
- * dictation is active. The transcript grows as cumulative text wraps, up to
- * the same cap as the typed text area (`--composer-dictation-transcript-max-height`),
- * then scrolls and follows the newest words, while the waveform and controls
- * remain anchored underneath:
+ * dictation is active. No words appear while recording; the transcript lands
+ * in the composer once dictation stops. The waveform and controls sit in one
+ * row, under an optional "Listening" hint that holds the text area:
  *
- *   A live transcript that can wrap and revise
+ *   Listening…
  *   [waveform — flex 1]   [0:24]   [X]   [✓]   [↑ (optional)]
  *
  * The external overlay can hide controls because stopping the shortcut commits
  * the dictation directly. In-app composers also use that quieter treatment.
  *
- * The transcript subscribes to a leaf-level external store, and the waveform
- * uses one <canvas>, so transcript and meter updates do not reconcile the chat tree.
+ * The waveform uses one <canvas>, so meter updates do not reconcile the chat tree.
  */
 
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { cn } from "@/shared/lib/utils";
 import { ArrowUp, Check, X } from "@/ui/icons";
 import { useT } from "@/shared/i18n";
-import {
-  tokenizeDictationTranscript,
-  useDictationTranscriptPreview,
-  type DictationTranscriptPreview,
-} from "@/features/dictation/dictation-transcript-preview";
 import "./dictation-recording-bar.css";
 
 type DictationRecordingBarProps = {
   className?: string;
   /** The composer's add button, placed beside the waveform. */
   leading?: ReactNode;
-  /** Reserves the text area until the first transcript arrives. */
+  /** Quiet hint that holds the text area while recording. */
   placeholder?: string;
   levels: number[];
   elapsedMs: number;
-  transcriptPreview: DictationTranscriptPreview;
   onCancel?: () => void;
   onConfirm?: () => void;
   showControls?: boolean;
@@ -53,22 +45,17 @@ export function DictationRecordingBar({
   placeholder,
   levels,
   elapsedMs,
-  transcriptPreview,
   onCancel,
   onConfirm,
   showControls = true,
   onSend,
 }: DictationRecordingBarProps) {
   const t = useT();
-  const transcript = useDictationTranscriptPreview(transcriptPreview);
   return (
     <div className={cn("composer-dictation-recording-bar", className)}>
-      <LiveTranscript
-        placeholder={placeholder}
-        text={transcript.text}
-        revision={transcript.revision}
-        stableWordCount={transcript.stableWordCount}
-      />
+      {placeholder ? (
+        <div className="composer-dictation-placeholder">{placeholder}</div>
+      ) : null}
       <div className="composer-dictation-recording-row">
         {leading}
         <DictationWaveform levels={levels} />
@@ -132,71 +119,6 @@ export function DictationCancelButton({
     >
       <CancelIcon />
     </button>
-  );
-}
-
-const TRANSCRIPT_FOLLOW_SLACK_PX = 8;
-
-function LiveTranscript({
-  placeholder,
-  text,
-  revision,
-  stableWordCount,
-}: {
-  placeholder?: string;
-  text: string;
-  revision: number;
-  stableWordCount: number;
-}) {
-  const viewportRef = useRef<HTMLDivElement | null>(null);
-  const followRef = useRef(true);
-
-  useLayoutEffect(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) {
-      followRef.current = true;
-      return;
-    }
-    if (followRef.current) viewport.scrollTop = viewport.scrollHeight;
-  }, [text]);
-
-  if (!text) {
-    return placeholder ? (
-      <div className="composer-dictation-transcript composer-dictation-transcript--placeholder">
-        {placeholder}
-      </div>
-    ) : null;
-  }
-  const words = tokenizeDictationTranscript(text);
-  return (
-    <div
-      ref={viewportRef}
-      className="composer-dictation-transcript"
-      aria-label={text}
-      aria-live="polite"
-      onScroll={(event) => {
-        const viewport = event.currentTarget;
-        followRef.current =
-          viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <
-          TRANSCRIPT_FOLLOW_SLACK_PX;
-      }}
-    >
-      <span aria-hidden>
-        {words.map((word, index) => (
-          <span
-            className="composer-dictation-transcript-word"
-            key={
-              index < stableWordCount
-                ? `${index}:${word}`
-                : `${revision}:${index}:${word}`
-            }
-          >
-            {word}
-            {index < words.length - 1 ? " " : ""}
-          </span>
-        ))}
-      </span>
-    </div>
   );
 }
 

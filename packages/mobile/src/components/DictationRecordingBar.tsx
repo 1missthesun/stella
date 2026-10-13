@@ -1,33 +1,31 @@
 /**
  * Mobile mirror of desktop's DictationRecordingBar
  * (`desktop/src/features/dictation/components/DictationRecordingBar.tsx`).
- * The composer keeps its expanded shape while dictating: the cumulative
- * transcript fills the text area and the waveform row stays anchored
- * underneath, where the toolbar normally sits:
+ * The composer keeps its expanded shape while dictating: a quiet "Listening"
+ * hint holds the text area and the waveform row stays anchored underneath,
+ * where the toolbar normally sits:
  *
- *   A live transcript that can wrap and revise
+ *   Listening…
  *   [+]  [waveform — flex 1]   [0:24]   [X]   [✓]   [↑]
  *
- * The trailing send (↑) is optional: when `onSend` is given it stops dictation
- * and, once the transcript lands, auto-submits the message in one tap.
+ * No words appear while recording; the transcript lands in the composer once
+ * dictation stops. The trailing send (↑) is optional: when `onSend` is given
+ * it stops dictation and, once the transcript lands, auto-submits the message
+ * in one tap.
  *
- * Transcript, waveform and timer are separate leaves on external stores, so a
- * partial transcript never re-lays-out the waveform and a waveform tick never
- * re-renders the words. Word fades run on the native driver.
+ * Waveform and timer are separate leaves on external stores, so a waveform
+ * tick never re-renders the rest of the composer.
  */
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import {
-  Animated,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { useReducedMotion } from "react-native-reanimated";
 import { Icon } from "./Icon";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
@@ -37,10 +35,6 @@ import {
   useDictationMeterStartedAt,
   useDictationMeterTick,
 } from "../lib/dictation-meter";
-import {
-  tokenizeDictationTranscript,
-  useDictationTranscriptPreview,
-} from "../lib/dictation-transcript-preview";
 
 const BAR_WIDTH = 2;
 const BAR_GAP = 2;
@@ -56,45 +50,35 @@ type Props = {
   onConfirm: () => void;
   /** When provided, stop dictation and auto-send once the transcript lands. */
   onSend?: () => void;
-  /** False keeps only the control row, for the composer's compact pill. */
-  showTranscript?: boolean;
-
-  /** Muted hint shown in the transcript area until the first words arrive. */
+  /** Muted hint shown in the text area above the controls while recording. */
   placeholder?: string;
-  /** Extra layout for the transcript area (the composer's text-area inset). */
-  transcriptStyle?: StyleProp<ViewStyle>;
-  /**
-   * Tallest the transcript area grows. Past it the transcript scrolls,
-   * following the newest words, so a long dictation never pushes the
-   * composer up the screen.
-   */
-  transcriptMaxHeight: number;
+  /** Extra layout for the hint (the composer's text-area inset). */
+  placeholderStyle?: StyleProp<ViewStyle>;
 };
 
 export const DictationRecordingBar = memo(function DictationRecordingBar({
   onCancel,
   onConfirm,
   onSend,
-  showTranscript = true,
   placeholder,
-  transcriptStyle,
-  transcriptMaxHeight,
+  placeholderStyle,
 }: Props) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const reduceMotion = useReducedMotion();
 
   return (
     <View style={styles.recordingBar}>
-      {showTranscript ? (
-        <LiveTranscript
-          color={fadeHex(colors.text, 0.66)}
-          placeholder={placeholder}
-          placeholderColor={fadeHex(colors.textMuted, 0.35)}
-          reduceMotion={reduceMotion}
-          style={transcriptStyle}
-          maxHeight={transcriptMaxHeight}
-        />
+      {placeholder ? (
+        <View style={[waveStyles.placeholderBox, placeholderStyle]}>
+          <Text
+            style={[
+              waveStyles.placeholder,
+              { color: fadeHex(colors.textMuted, 0.35) },
+            ]}
+          >
+            {placeholder}
+          </Text>
+        </View>
       ) : null}
       <View style={styles.recordingRow}>
         {/* Cancel takes the slot the composer's + occupies at rest, so the
@@ -141,112 +125,6 @@ export const DictationRecordingBar = memo(function DictationRecordingBar({
         ) : null}
       </View>
     </View>
-  );
-});
-
-const LiveTranscript = memo(function LiveTranscript({
-  color,
-  placeholder,
-  placeholderColor,
-  reduceMotion,
-  style,
-  maxHeight,
-}: {
-  color: string;
-  placeholder?: string;
-  placeholderColor: string;
-  reduceMotion: boolean;
-  style?: StyleProp<ViewStyle>;
-  maxHeight: number;
-}) {
-  const { text, revision, stableWordCount } = useDictationTranscriptPreview();
-  const scrollRef = useRef<ScrollView>(null);
-  if (!text) {
-    if (!placeholder) return null;
-    return (
-      <View style={[waveStyles.transcript, style]}>
-        <Text style={[waveStyles.placeholder, { color: placeholderColor }]}>
-          {placeholder}
-        </Text>
-      </View>
-    );
-  }
-  const words = tokenizeDictationTranscript(text);
-  return (
-    <ScrollView
-      ref={scrollRef}
-      style={[waveStyles.viewport, { maxHeight }]}
-      onContentSizeChange={() =>
-        scrollRef.current?.scrollToEnd({ animated: false })
-      }
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View
-        style={[waveStyles.transcript, style]}
-        accessible
-        accessibilityLabel={text}
-        accessibilityLiveRegion="polite"
-      >
-        {words.map((word, index) => (
-          <AnimatedWord
-            key={
-              index < stableWordCount
-                ? `${index}:${word}`
-                : `${revision}:${index}:${word}`
-            }
-            color={color}
-            animate={!reduceMotion}
-            word={word}
-          />
-        ))}
-      </View>
-    </ScrollView>
-  );
-});
-
-const AnimatedWord = memo(function AnimatedWord({
-  word,
-  color,
-  animate,
-}: {
-  word: string;
-  color: string;
-  animate: boolean;
-}) {
-  const progress = useRef(new Animated.Value(animate ? 0 : 1)).current;
-
-  useEffect(() => {
-    if (!animate) return;
-    Animated.timing(progress, {
-      toValue: 1,
-      duration: 220,
-      useNativeDriver: true,
-    }).start();
-  }, [animate, progress]);
-
-  return (
-    <Animated.Text
-      style={{
-        color,
-        fontFamily: fonts.sans.regular,
-        fontSize: 15,
-        fontStyle: "italic",
-        lineHeight: 21,
-        marginRight: 4,
-        opacity: progress,
-        transform: [
-          {
-            translateY: progress.interpolate({
-              inputRange: [0, 1],
-              outputRange: [2, 0],
-            }),
-          },
-        ],
-      }}
-    >
-      {word}
-    </Animated.Text>
   );
 });
 
@@ -323,13 +201,7 @@ const DictationWaveform = memo(function DictationWaveform({
 });
 
 const waveStyles = StyleSheet.create({
-  viewport: {
-    flexGrow: 0,
-    flexShrink: 0,
-  },
-  transcript: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+  placeholderBox: {
     paddingHorizontal: 4,
     paddingTop: 1,
   },

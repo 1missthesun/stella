@@ -57,16 +57,6 @@ export const CHAT_HORIZONTAL_INSET = 12;
 const EXPAND_THRESHOLD = 30;
 /** Tallest the typed text area grows before it scrolls inside the composer. */
 const COMPOSER_INPUT_MAX_HEIGHT = 200;
-/**
- * Tallest a live dictation transcript grows in an empty composer (eight
- * transcript lines, inside the typed area's cap) before it scrolls.
- */
-const DICTATION_INLINE_MAX_HEIGHT = 168;
-/**
- * Tallest a live transcript grows under already-typed text (three lines),
- * which has its own cap above it.
- */
-const DICTATION_BELOW_MAX_HEIGHT = 63;
 /** `composerWrap`'s top padding plus its gap between the card and the shell. */
 const ASK_SLOT_CHROME = 20;
 /** A card capped shorter than this still shows a question and its first option. */
@@ -616,8 +606,6 @@ export const Composer = memo(function Composer({
           {dictationCompact ? (
             <View style={styles.dictationCompact}>
               <DictationRecordingBar
-                showTranscript={false}
-                transcriptMaxHeight={0}
                 onCancel={onCancelDictation}
                 onConfirm={onConfirmDictation}
                 onSend={onStopAndSendVoice}
@@ -625,13 +613,12 @@ export const Composer = memo(function Composer({
             </View>
           ) : dictationInline ? (
             // Dictation into an empty composer keeps the expanded shape:
-            // the live transcript takes the text area and the waveform
+            // a "Listening" hint takes the text area and the waveform
             // row sits where the toolbar normally is.
             <View style={styles.dictationInlineBlock}>
               <DictationRecordingBar
                 placeholder={"Listening\u2026"}
-                transcriptStyle={styles.dictationInlineTranscript}
-                transcriptMaxHeight={DICTATION_INLINE_MAX_HEIGHT}
+                placeholderStyle={styles.dictationInlinePlaceholder}
                 onCancel={onCancelDictation}
                 onConfirm={onConfirmDictation}
                 onSend={onStopAndSendVoice}
@@ -767,7 +754,6 @@ export const Composer = memo(function Composer({
               {dictationBelow ? (
                 <View style={styles.dictationRow}>
                   <DictationRecordingBar
-                    transcriptMaxHeight={DICTATION_BELOW_MAX_HEIGHT}
                     onCancel={onCancelDictation}
                     onConfirm={onConfirmDictation}
                     onSend={onStopAndSendVoice}
@@ -961,7 +947,7 @@ const makeComposerStyles = (colors: Colors) =>
       borderTopWidth: StyleSheet.hairlineWidth,
       borderTopColor: fadeHex(colors.border, 0.5),
     },
-    // Insets so the transcript lands where expanded input text sits
+    // Insets so the hint lands where expanded input text sits
     // (`inputExpanded`: 16 across, 14 down) and the waveform row where the
     // toolbar sits, with the same resting height as an empty expanded shell.
     dictationInlineBlock: {
@@ -969,7 +955,7 @@ const makeComposerStyles = (colors: Colors) =>
       paddingTop: 13,
       paddingBottom: 8,
     },
-    dictationInlineTranscript: { minHeight: 30 },
+    dictationInlinePlaceholder: { minHeight: 30 },
     dictationCompact: {
       justifyContent: "center",
       minHeight: 56,

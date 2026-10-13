@@ -45,7 +45,6 @@ export type DictationSessionState =
 
 type DictationCallbacks = {
   onFinalTranscript?: (text: string) => void;
-  onPartialTranscript?: (text: string) => void;
   onStateChange?: (state: DictationSessionState, error?: string) => void;
   /** Periodic 0..1 input-level tick used by the recording UI to render a
    *  scrolling waveform. Fires at ~12 Hz while listening; the value is the
@@ -437,9 +436,6 @@ export class DictationSession {
 
   private openStream(): void {
     const stream = new DictationStream(
-      (text) => {
-        if (this.stream === stream) this.callbacks.onPartialTranscript?.(text);
-      },
       (error) => {
         if (this.stream !== stream) return;
         this.streamFailure = error;

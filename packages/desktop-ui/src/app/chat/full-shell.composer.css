@@ -184,12 +184,9 @@
   padding: 0;
 }
 
-.composer-dictation-inline .composer-dictation-transcript {
+.composer-dictation-inline .composer-dictation-placeholder {
   min-height: 36px;
   padding: 10px 16px 2px;
-}
-
-.composer-dictation-inline .composer-dictation-transcript--placeholder {
   color: var(--text-weaker);
 }
 
@@ -202,7 +199,6 @@
  * user's typed message stays visible. */
 .composer-dictation-row {
   display: none;
-  --composer-dictation-transcript-max-height: calc(3lh + 1px);
 }
 
 .composer-form.expanded .composer-dictation-row {

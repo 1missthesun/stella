@@ -1,6 +1,6 @@
 /**
  * Push-to-talk dictation. Signed-in users stream 16 kHz mono PCM through
- * Stella's authenticated dictation relay and get live partials; without
+ * Stella's authenticated dictation relay (the transcript lands on stop); without
  * streaming the whole utterance is recorded locally and transcribed in one
  * authenticated request on stop.
  *
@@ -34,10 +34,6 @@ import {
   loadDictationRealtimeConfig,
 } from "./dictation-stream";
 import { DictationIngressPacer } from "./dictation-pacer";
-import {
-  resetDictationTranscriptPreview,
-  updateDictationTranscriptPreview,
-} from "./dictation-transcript-preview";
 import { tapLight, tapMedium } from "./haptics";
 import {
   startDictationMeter,
@@ -158,9 +154,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       captureRef.current?.live === live &&
       statusRef.current === "recording";
     const stream = new DictationStream(
-      (text) => {
-        updateDictationTranscriptPreview(text);
-      },
       () => {
         if (isCurrent()) void stopRecordingRef.current?.();
       },
@@ -211,7 +204,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
     // stand between the press and the recorder. The transport is chosen (and
     // the relay connected) alongside the recorder's start; whatever is
     // captured first waits in `chunks` and goes out in order.
-    resetDictationTranscriptPreview();
     const current: DictationCapture = {
       chunks: [],
       bytes: 0,
@@ -365,7 +357,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       audioSubscriptionRef.current?.remove();
       audioSubscriptionRef.current = null;
       stopDictationMeter();
-      resetDictationTranscriptPreview();
       await releaseAudioMode();
       operationInFlightRef.current = false;
       if (mountedRef.current) {
@@ -410,7 +401,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       audioSubscriptionRef.current = null;
       const capture = captureRef.current;
       stopDictationMeter();
-      resetDictationTranscriptPreview();
       await capture?.routed;
       if (captureRef.current === capture) captureRef.current = null;
       const live = capture?.live ?? null;
@@ -529,7 +519,6 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
       audioSubscriptionRef.current?.remove();
       audioSubscriptionRef.current = null;
       stopDictationMeter();
-      resetDictationTranscriptPreview();
       if (ownsRecorder) {
         void AudioStudioModule.stopRecording().catch(() => undefined);
       }

@@ -62,7 +62,6 @@ export class DictationStream {
   private rejectFinishing: ((error: Error) => void) | null = null;
 
   constructor(
-    private readonly onPartial?: (text: string) => void,
     private readonly onFailure?: (error: Error) => void,
     private readonly onFinal?: () => void,
   ) {}
@@ -192,7 +191,6 @@ export class DictationStream {
                 ? frame.text
                 : this.transcript;
           this.transcript = transcript;
-          this.onPartial?.(transcript);
           if (frame.final === true) {
             // The relay uses PUSH_TO_TALK: final ends the entire session,
             // including when the relay ended input at the allowance limit.

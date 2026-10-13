@@ -21,6 +21,7 @@
   "routes": [{ "pattern": "*-dev.stellasites.app/*", "zone_name": "stellasites.app" }],
   "vars": { "SITES_APEX": "" },
   "observability": {
+    "redact_query_string": true,
     "enabled": true,
     "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },
     "traces": { "enabled": false },
@@ -43,6 +44,7 @@
       ],
       "vars": { "SITES_APEX": "stellasites.app" },
       "observability": {
+        "redact_query_string": true,
         "enabled": true,
         "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },
         "traces": { "enabled": false },

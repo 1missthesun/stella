@@ -9,6 +9,7 @@
   "workers_dev": true,
   "preview_urls": false,
   "observability": {
+    "redact_query_string": true,
     "enabled": true,
     "issues": { "enabled": true },
     "logs": {

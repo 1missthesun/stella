@@ -350,6 +350,14 @@ computer, create one in the dashboard (Profile › API Tokens › Create Token,
 custom, that single permission on Stella's account) and save it to that file
 with mode 600; never paste it into chat.
 
+cloud-builder runs with `invocation_logs: false`: invocation logs store request
+headers verbatim, and `Sec-WebSocket-Protocol` carries socket tickets (and, from
+clients that predate tickets, the JWT). Console logs, errors and traces still
+arrive. Every Stella Worker sets `redact_query_string: true`; it is a
+script-level setting, so `PATCH .../workers/scripts/<name>/script-settings`
+changes it without a new version (the `stella-v2-apps-auth-*` Workers have no
+config in this repo and were set that way).
+
 cloud-builder and canvas-share set `observability.redact_query_string`, so
 stored logs and traces keep paths but never query strings (magic-link
 `?token=`, OAuth `?code=`/`?state=`, `?ott=`). Search by path or by the
@@ -493,7 +501,11 @@ Worker locally on a trusted origin:
 `wrangler.jsonc` holds both Workers. `worker.mjs` wraps the OpenNext worker so
 responses match Vercel: prerendered HTML gets `public, max-age=0, must-revalidate`
 instead of Next's raw `s-maxage`, and `/_next/image` is cached for a day.
-`public/_headers` sets the static-asset headers (`/_next/static`, `/chat-app`,
+It also sets every page's Content-Security-Policy and X-Frame-Options (per
+route: `/maps/embed` may be framed by the desktop renderer, `/chat` and
+`/chat-app` only by stella.sh, `/challenge` by nobody) and drops
+`X-Powered-By`; `CSP_BACKEND_ORIGINS` (a var per env) names the backend origins
+pages may call. `public/_headers` sets the static-asset headers (`/_next/static`, `/chat-app`,
 logos, mock images) that `next.config.ts` headers cannot reach on Workers. Pages
 are served from the build's static-assets cache, so there is no ISR: adding
 `revalidate` or `unstable_cache` needs the R2 incremental cache.

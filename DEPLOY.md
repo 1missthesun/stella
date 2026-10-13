@@ -486,6 +486,11 @@ applies until the user clicks Update.
    (pill within seconds); desktops don't poll, so if the notice fails, rerun
    the publish (it re-sends) or they see it at their next launch/reconnect.
    For a Preview bound to a test namespace, pass `--backend <preview URL>`.
+   **Order:** deploy the environment's backend (cloud-builder) before, or
+   together with, publishing desktop code. Desktops learn of updates only
+   through the backend's release channel (`/api/app-source/releases`, added
+   2026-10-13); desktop code published ahead of a backend without it can't
+   connect and sees new versions only at launch.
 2. **Launchers** (only when `launcher/` changed): a push only builds and
    self-tests them. Publish with `gh workflow run build-launchers.yml --ref master -f publish=true`.
    It signs and notarizes macOS (DMG + zip), signs `Stella.exe`, builds the Linux

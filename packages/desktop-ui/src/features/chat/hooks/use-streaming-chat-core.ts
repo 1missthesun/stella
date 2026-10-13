@@ -25,6 +25,8 @@ import {
 } from "./queued-user-messages";
 import { useQueuedDequeueClock } from "./use-queued-dequeue-clock";
 import { acceptedUserMessageIds } from "../lib/accepted-user-message-ids";
+import { onPiChatEvents } from "@/features/chat/pi/pi-chat-store";
+import { showToast } from "@/ui/toast";
 
 export type { QueuedUserMessage } from "./queued-user-messages";
 
@@ -232,6 +234,25 @@ export function useStreamingChatCore({
     },
     [setPendingUserMessageId],
   );
+
+  // A send placed where Stella runs that never reached the conversation, and
+  // that this computer could not answer either: the bubble stops waiting and
+  // the reason shows.
+  useEffect(() => {
+    if (!activeConversationId) return;
+    return onPiChatEvents(({ conversationId, events }) => {
+      if (conversationId !== activeConversationId) return;
+      for (const event of events) {
+        if (event.type !== "send_failed") continue;
+        clearOptimisticMessage(event.requestId);
+        showToast({
+          title: "Message not delivered",
+          description: event.message,
+          variant: "error",
+        });
+      }
+    });
+  }, [activeConversationId, clearOptimisticMessage]);
 
   const drainQueuedMessagesIfIdle = useCallback(() => {
     if (!activeConversationId) return;

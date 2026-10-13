@@ -174,7 +174,13 @@ export type PiChatEvent =
   /** Stella's turns another writer is running (the cloud, another computer), from the journal. */
   | { type: "remote_turns"; turns: PiRemoteTurn[] }
   /** Where the conversation's Stella runs changed, as the host now reads it (`op: "brain"`). */
-  | { type: "brain"; brain: PiChatBrainResult };
+  | { type: "brain"; brain: PiChatBrainResult }
+  /**
+   * A send placed where Stella runs never reached the conversation, and this
+   * computer could not answer it either: the sent message is taken back and
+   * the reason shown (`op: "sendFailed"`).
+   */
+  | { type: "send_failed"; requestId: string; message: string };
 
 /** A turn of the conversation running elsewhere, which the journal shows as started. */
 export type PiRemoteTurn = {
@@ -223,6 +229,8 @@ export type PiChatRequest =
   | { op: "agents"; conversationId: string }
   /** A turn was placed elsewhere: follow the journal closely until it shows. */
   | { op: "follow"; conversationId: string }
+  /** A placed send ended without reaching the conversation: tell the app (`send_failed`). */
+  | { op: "sendFailed"; conversationId: string; requestId: string; message: string }
   /** Stella's greeting after onboarding, as a reply in the conversation; kept on this computer. */
   | { op: "welcome"; conversationId: string; message: string }
   /** The local files Stella's replies and its agents linked (`{ paths }`): what a paired phone may open. */
@@ -459,6 +467,7 @@ const reduceOne = (state: PiChatState, event: PiChatEvent): PiChatState => {
     case "auto_retry_end":
       return { ...state, retry: undefined };
     case "task_failed":
+    case "send_failed":
       return { ...state, failure: event.message };
     case "compaction_start":
       return event.blocking ? { ...state, compacting: true } : state;

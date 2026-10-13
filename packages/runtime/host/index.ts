@@ -1496,10 +1496,14 @@ export class StellaRuntimeHost {
     }
     return uploaded;
   }
-  async startPlacedChat(payload: PlacedChatPayload, target: PlacedChatTarget) {
+  async startPlacedChat(
+    payload: PlacedChatPayload,
+    target: PlacedChatTarget,
+    onUntaken?: (status: DispatchSummary) => void,
+  ) {
     const submitting = this.placements.submitting(payload.conversationId);
     try {
-      return await this.submitPlacedChat(payload, target, submitting);
+      return await this.submitPlacedChat(payload, target, submitting, onUntaken);
     } finally {
       this.placements.submitted(submitting);
     }
@@ -1526,6 +1530,7 @@ export class StellaRuntimeHost {
     payload: PlacedChatPayload,
     target: PlacedChatTarget,
     submitting: SubmittingPlacement,
+    onUntaken?: (status: DispatchSummary) => void,
   ) {
     const enteredAt = Date.now();
     const preparationAt = performance.now();
@@ -1632,9 +1637,21 @@ export class StellaRuntimeHost {
     const onStatus = (status: DispatchSummary | null | undefined) => {
       if (!status || status.dispatchId !== dispatch.dispatchId || terminal)
         return;
-      if (["completed", "failed", "canceled"].includes(status.state)) {
+      if (isDispatchEnded(status)) {
         this.placements.ended(status.dispatchId);
         finish();
+        // Refused, or failed where it was placed: the message may never
+        // have reached the conversation. A Stop is the user's own word.
+        if (status.state === "failed" || status.state === "blocked") {
+          onUntaken?.(status);
+        }
+        return;
+      }
+      // Taken, then lost with the computer that took it: nothing follows it
+      // from here, so the sender hears it now rather than never.
+      if (status.state === "reconciliation_required") {
+        finish();
+        onUntaken?.(status);
         return;
       }
       // The placement run ends at hand-off. The conversation socket owns the
@@ -1852,6 +1869,66 @@ export class StellaRuntimeHost {
     ).catch(() => null);
     return brain && brain.here === false && brain.target ? brain.target : null;
   }
+  /**
+   * A send placed where Stella runs that ended there without being answered
+   * (refused, failed, or taken by a computer that then went away). One that
+   * was refused or failed is answered here, as a send is that could not be
+   * placed at all; the worker skips it if the conversation already has it.
+   * One a computer still holds, or that could not be answered here either,
+   * comes back to the app with the reason, never left waiting.
+   */
+  private async answerUntakenSend(
+    request: Extract<PiChatRequest, { op: "submit" }>,
+    send: PiChatSend,
+    target: PlacedChatTarget,
+    status: DispatchSummary,
+  ): Promise<void> {
+    const reason =
+      status.errorMessage?.trim() ||
+      (status.state === "blocked"
+        ? "It was not accepted where Stella runs."
+        : "It failed where Stella runs.");
+    getFileLogger()?.process("chat.placed-untaken", {
+      requestId: request.requestId,
+      dispatchId: status.dispatchId,
+      state: status.state,
+      errorCode: status.errorCode,
+      target: target.mode,
+    });
+    const tell = async (message: string) => {
+      await this.requestWorker(
+        METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
+        {
+          op: "sendFailed",
+          conversationId: request.conversationId,
+          requestId: request.requestId,
+          message,
+        },
+        { ensureWorker: true, recordActivity: false },
+      ).catch(() => undefined);
+    };
+    if (status.state === "reconciliation_required") {
+      await tell(
+        "Your message reached the computer Stella runs on, but it went offline before answering. It answers once that computer is back; send it again to have it answered now.",
+      );
+      return;
+    }
+    try {
+      await this.requestWorker(
+        METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
+        { ...request, send: { ...send, followSender: true } },
+        { ensureWorker: true, recordActivity: true },
+      );
+    } catch (error) {
+      console.warn(
+        "[pi-chat] A send where Stella runs did not take could not be answered here either.",
+        error,
+      );
+      await tell(
+        `Your message wasn't delivered: ${reason} Stella couldn't answer it on this computer either (${error instanceof Error ? error.message : String(error)}).`,
+      );
+    }
+  }
   async sendAgentInput(payload: unknown) {
     return await this.requestWorker(
       METHOD_NAMES.INTERNAL_WORKER_SEND_AGENT_INPUT,
@@ -1878,6 +1955,7 @@ export class StellaRuntimeHost {
           )
         : null;
     if (target && request.op === "submit") {
+      const submitted = request;
       const send: PiChatSend = request.send ?? {};
       try {
         const placed = await this.startPlacedChat(
@@ -1898,6 +1976,7 @@ export class StellaRuntimeHost {
             ...(send.locale ? { locale: send.locale } : {}),
           },
           target,
+          (status) => void this.answerUntakenSend(submitted, send, target, status),
         );
         void this.requestWorker(
           METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,

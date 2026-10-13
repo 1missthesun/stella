@@ -1716,6 +1716,11 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     await markActive(conversationId, true);
     await caughtUp(chat);
+    // Sent here after the host it was placed on gave it back: one that host
+    // did put in the conversation is not answered twice.
+    if (sent.followSender && (await transcriptHasPrompt(chat, requestId))) {
+      return { submissionId: null, alreadyAnswered: true };
+    }
     await afterStop(chat.harness, chat.root, context);
     const input = await withReminders(conversationId, chat, content, sent);
     const submission = await chat.root.submit(
@@ -2286,6 +2291,12 @@ export function desktopChats(options: DesktopChatsOptions) {
           return agents(request.conversationId);
         case "follow":
           await follow(request.conversationId);
+          return { ok: true };
+        case "sendFailed":
+          options.emit({
+            conversationId: request.conversationId,
+            events: [{ type: "send_failed", requestId: request.requestId, message: request.message }],
+          });
           return { ok: true };
         case "welcome":
           await welcome(request.conversationId, request.message);

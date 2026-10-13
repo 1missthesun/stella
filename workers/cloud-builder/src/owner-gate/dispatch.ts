@@ -30,6 +30,7 @@ import {
 import type { DispatchRow } from "./types.js";
 import {
   DISPATCH_RENEW_WRITE_BELOW_MS,
+  ALARM_HOT_STREAK_KEY,
   ALARM_HOT_REARM_MS,
   ALARM_HOT_STREAK_LIMIT,
   ALARM_MAX_BACKOFF_MS,
@@ -987,7 +988,15 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     if (await this.modelGrants().pendingFenceBarrier()) {
       add("grant_fence_barrier", now + 5_000);
     }
-    add("owner_store", this.ownerStore().nextDeadline());
+    // Socket deadlines the alarm just handled are not wakes: it closed every
+    // expired or stale socket it found, and a closed socket can still be
+    // listed (its peer never answered the close) with the same past deadline.
+    const handledAt = options.afterAlarm ? now : undefined;
+    const addSocket = (source: string, at: number) => {
+      if (handledAt !== undefined && at <= handledAt) return;
+      add(source, at);
+    };
+    add("owner_store", this.ownerStore().nextDeadline(handledAt));
     // A proven device going quiet needs no wake while nobody watches the
     // device list: request-time readers check staleness against
     // `presenceRow`, in-flight device calls have their own deadlines, and
@@ -998,14 +1007,14 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     for (const socket of this.sockets()) {
       const attachment = this.attachment(socket);
       if (!attachment) continue;
-      add("presence_auth", attachment.authExpiresAtMs);
+      addSocket("presence_auth", attachment.authExpiresAtMs);
       if (attachment.phase !== "connected") {
-        add(
+        addSocket(
           "presence_handshake",
           attachment.lastSeenAtMs + DEVICE_PRESENCE_STALE_AFTER_MS,
         );
       } else if (watched) {
-        add(
+        addSocket(
           "presence_stale",
           this.lastSeenAt(socket, attachment) + DEVICE_PRESENCE_STALE_AFTER_MS,
         );
@@ -1047,9 +1056,14 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       next = Math.min(next, existingAlarm);
     }
     if (options.afterAlarm) {
-      if (Number.isFinite(next) && next - now <= ALARM_HOT_REARM_MS) {
-        this.alarmHotStreak += 1;
-        const over = this.alarmHotStreak - ALARM_HOT_STREAK_LIMIT;
+      // The object hibernates between alarms, so the streak is stored; it is
+      // written only while alarms keep re-arming at once, never otherwise.
+      const stored =
+        (await this.ctx.storage.get<number>(ALARM_HOT_STREAK_KEY)) ?? 0;
+      if (Number.isFinite(next) && next - now < ALARM_HOT_REARM_MS) {
+        const streak = stored + 1;
+        await this.ctx.storage.put(ALARM_HOT_STREAK_KEY, streak);
+        const over = streak - ALARM_HOT_STREAK_LIMIT;
         if (over > 0) {
           next = Math.max(
             next,
@@ -1060,15 +1074,15 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
           if ((over & (over - 1)) === 0) {
             log("error", "owner_alarm_hot_loop", {
               ownerId: this.ownerId(),
-              streak: this.alarmHotStreak,
+              streak,
               sources: deadlines
                 .filter(([, at]) => at - now <= ALARM_HOT_REARM_MS)
                 .map(([source]) => source),
             });
           }
         }
-      } else {
-        this.alarmHotStreak = 0;
+      } else if (stored > 0) {
+        await this.ctx.storage.delete(ALARM_HOT_STREAK_KEY);
       }
     }
     if (!Number.isFinite(next)) return;

@@ -863,8 +863,13 @@ export class OwnerStore {
     return Math.min(now + backoff, expiresAtMs);
   }
 
-  /** The earliest time this store needs the alarm, or +Infinity. */
-  nextDeadline(): number {
+  /**
+   * The earliest time this store needs the alarm, or +Infinity. Socket
+   * deadlines at or before `handledAt` (an alarm that just ran `onAlarm`) are
+   * left out: that alarm closed those sockets, and one whose peer never
+   * answered the close can still be listed with the same past deadline.
+   */
+  nextDeadline(handledAt?: number): number {
     this.ensureSchema();
     let next = Number.POSITIVE_INFINITY;
     const job = this.sql
@@ -875,11 +880,11 @@ export class OwnerStore {
       const attachment = this.liveAttachment(socket);
       if (!attachment) continue;
       const { expiresAtMs } = attachment.caller;
-      if (attachment.reauthSent) {
-        next = Math.min(next, attachment.reauthRetryAtMs ?? expiresAtMs);
-      } else {
-        next = Math.min(next, expiresAtMs - LIVE_REAUTH_LEAD_MS);
-      }
+      const at = attachment.reauthSent
+        ? (attachment.reauthRetryAtMs ?? expiresAtMs)
+        : expiresAtMs - LIVE_REAUTH_LEAD_MS;
+      if (handledAt !== undefined && at <= handledAt) continue;
+      next = Math.min(next, at);
     }
     return next;
   }

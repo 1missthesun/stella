@@ -66,11 +66,36 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     } catch {
       return [];
     }
-    return sockets.filter(
-      (socket) =>
-        socket.readyState === WEBSOCKET_OPEN &&
-        this.attachment(socket)?.closedAtMs === undefined,
-    );
+    // A proven connection is live only while its device's presence row names
+    // it as connected: dropping a socket writes that row, while a socket this
+    // side closed can come back from hibernation reporting OPEN with its old
+    // attachment (the peer never answered the close). Reading the row keeps a
+    // dropped socket from being dropped, and alarmed on, again every wake.
+    const current = new Map<string, string | null>();
+    const currentConnection = (deviceId: string): string | null => {
+      if (!current.has(deviceId)) {
+        current.set(
+          deviceId,
+          this.ctx.storage.sql
+            .exec<{ connection_id: string }>(
+              `SELECT connection_id FROM device_presence WHERE device_id = ? AND connected = 1`,
+              deviceId,
+            )
+            .toArray()[0]?.connection_id ?? null,
+        );
+      }
+      return current.get(deviceId) ?? null;
+    };
+    return sockets.filter((socket) => {
+      if (socket.readyState !== WEBSOCKET_OPEN) return false;
+      const attachment = this.attachment(socket);
+      if (!attachment) return true;
+      if (attachment.closedAtMs !== undefined) return false;
+      return (
+        attachment.phase !== "connected" ||
+        currentConnection(attachment.deviceId) === attachment.connectionId
+      );
+    });
   }
 
   protected attachment(socket: WebSocket): PresenceAttachment | null {

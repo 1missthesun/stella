@@ -64,8 +64,13 @@ export const AGENT_MESSAGE_OUTCOMES: ReadonlySet<string> =
  * object cannot clear into a hot alarm loop.
  */
 export const ALARM_MIN_DELAY_MS = 1_000;
-/** An alarm that re-arms itself within this long counts toward a hot loop. */
-export const ALARM_HOT_REARM_MS = 5_000;
+/**
+ * An alarm that re-arms itself sooner than this counts toward a hot loop.
+ * Below the 5 s retry deadlines, so those never count.
+ */
+export const ALARM_HOT_REARM_MS = 2_000;
+/** Storage key of the hot-loop streak, present only while one runs. */
+export const ALARM_HOT_STREAK_KEY = "alarmHotStreak";
 /**
  * Alarm runs in a row that may each re-arm within `ALARM_HOT_REARM_MS` before
  * the re-arm backs off. Enough for legitimate catch-up (a batch of expired

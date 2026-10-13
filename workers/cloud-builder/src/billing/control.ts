@@ -209,29 +209,13 @@ export class BillingControl extends WorkerEntrypoint<Env> implements BillingCont
         const result = await ownerGateStub(this.env.OWNER_GATES, ownerId).applyGatewayUsage(events);
         const accepted = new Set(result.accepted);
         this.ctx.waitUntil(
-          (async () => {
-            // The owner's telemetry opt-out covers cloud-side reporting too.
-            // Billing itself is already settled above and is unaffected; on
-            // any doubt we report nothing.
-            try {
-              const response = (await ownerGateStub(
-                this.env.OWNER_GATES,
-                ownerId,
-              ).ownerInternal({
-                name: "preferences.telemetryEnabled",
-                args: {},
-                ownerGeneration: events[0]?.ownerGeneration ?? "",
-              })) as unknown as RpcResponse;
-              if (!response.ok || response.value !== true) return;
-            } catch {
-              return;
-            }
-            await reportCharges(
-              this.env,
-              ownerId,
-              events.filter((event) => accepted.has(event.requestId)),
-            );
-          })(),
+          // Billing itself is already settled above; only the report waits
+          // on the owner's telemetry preference.
+          reportCharges(
+            this.env,
+            { ownerId, ownerGeneration: events[0]?.ownerGeneration ?? "" },
+            events.filter((event) => accepted.has(event.requestId)),
+          ),
         );
         return result;
       }),

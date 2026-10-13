@@ -1,11 +1,16 @@
 import type { GatewayUsageEvent } from "@stella/contracts/gateway/usage";
 import type { TelemetryEventV1 } from "@stella/contracts/telemetry";
+import { ownerAllowsTelemetry, type TelemetryOwner } from "../telemetry.js";
 
 export const reportCharges = async (
-  env: { TELEMETRY?: unknown; TELEMETRY_ENVIRONMENT?: string },
-  ownerId: string,
+  env: Pick<Cloudflare.Env, "OWNER_GATES"> & {
+    TELEMETRY?: unknown;
+    TELEMETRY_ENVIRONMENT?: string;
+  },
+  owner: TelemetryOwner,
   events: GatewayUsageEvent[],
 ): Promise<void> => {
+  const { ownerId } = owner;
   const telemetry = env.TELEMETRY as
     | {
         ingestForOwner(
@@ -18,6 +23,7 @@ export const reportCharges = async (
     (event) => event.billable && event.outcome !== "failed",
   );
   if (!telemetry || charged.length === 0) return;
+  if (!(await ownerAllowsTelemetry(env, owner))) return;
   const environment =
     env.TELEMETRY_ENVIRONMENT === "production"
       ? "production"

@@ -976,7 +976,7 @@ export const runContainerAgentTurn = async (
       ok: result.ok,
       wallClockMs,
     });
-    emitCloudTurnTelemetry(host.ctx, host.env, {
+    emitCloudTurnTelemetry(host.ctx, host.env, turn, {
       type: "cloud.turn",
       workload: "agent",
       phase: result.ok ? "completed" : "failed",

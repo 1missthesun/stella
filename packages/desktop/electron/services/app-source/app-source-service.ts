@@ -1739,6 +1739,7 @@ export class AppSourceService {
     this.forkWatch?.stop();
     this.forkWatch = null;
     if (!watchFork) return;
+    this.forkPushSeen = null;
     const client = this.backendClient(watchFork);
     const stop = client.watch(
       "appSource.fork",
@@ -1773,7 +1774,14 @@ export class AppSourceService {
   /** Another computer pushed to the fork (its main or change tags). */
   private onForkPush(pushedAt: number | null) {
     if (pushedAt === null || pushedAt === this.forkPushSeen) return;
+    const first = this.forkPushSeen === null;
     this.forkPushSeen = pushedAt;
+    if (first) {
+      // The first value since launch or sign-in: whatever it says, fetch
+      // the fork once (folded into the launch sync when there is one).
+      if (!this.forkUnrelated) this.wantSync("fork");
+      return;
+    }
     if (this.forkReports > 0) {
       this.forkPushHeld = pushedAt;
       return;

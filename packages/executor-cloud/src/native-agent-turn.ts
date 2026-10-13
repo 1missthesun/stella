@@ -1050,7 +1050,27 @@ export const runCloudClaude = async (options: {
             llmCalls = reportedTurns;
           }
           if (event.is_error === true) {
-            error = resultText || "Claude Code reported an unsuccessful turn.";
+            const reported = Array.isArray(event.errors)
+              ? event.errors
+                  .map((entry) =>
+                    typeof entry === "string"
+                      ? entry
+                      : entry && typeof entry === "object" && "message" in entry
+                        ? String((entry as { message: unknown }).message)
+                        : "",
+                  )
+                  .filter((entry) => entry.trim())
+                  .join("; ")
+              : "";
+            const subtype =
+              typeof event.subtype === "string" && event.subtype !== "success"
+                ? ` (${event.subtype})`
+                : "";
+            error =
+              resultText ||
+              (reported
+                ? `Claude Code reported an unsuccessful turn${subtype}: ${reported}`
+                : `Claude Code reported an unsuccessful turn${subtype}.`);
             void serialInput(async () => endInput());
           } else if (inbox && injected.size === 0) {
             void finishInput();

@@ -28,7 +28,6 @@ function keyframes(reduced: boolean): Keyframe[] {
       transform:
         `translateY(${(-f.lift * 100).toFixed(3)}%) ` +
         `scale(${f.scaleX.toFixed(4)}, ${f.scaleY.toFixed(4)})`,
-      opacity: f.opacity,
     }));
   }
   return bounceFrames;
@@ -36,8 +35,8 @@ function keyframes(reduced: boolean): Keyframe[] {
 
 /**
  * Three plain dots running the thinking ellipsis' shared bounce
- * (`@stella/contracts/working-dots-bounce`) on WAAPI transform and opacity, so
- * they animate on the compositor. Each child is a dot; size and colour stay
+ * (`@stella/contracts/working-dots-bounce`) on a WAAPI transform, so they
+ * animate on the compositor at full opacity. Each child is a dot; size and colour stay
  * with the caller's CSS.
  */
 export function WorkingDots({

@@ -30,7 +30,6 @@ const BOUNCE_FRAMES = sampleWorkingDots();
 const BOUNCE_LIFT = BOUNCE_FRAMES.map((f) => f.lift);
 const BOUNCE_SCALE_X = BOUNCE_FRAMES.map((f) => f.scaleX);
 const BOUNCE_SCALE_Y = BOUNCE_FRAMES.map((f) => f.scaleY);
-const BOUNCE_OPACITY = BOUNCE_FRAMES.map((f) => f.opacity);
 const BOUNCE_LAST = BOUNCE_FRAMES.length - 1;
 const TWO_PI = Math.PI * 2;
 
@@ -51,7 +50,8 @@ export type DotBounce = {
  * keyframes. The curve is tabulated once on the JS thread and interpolated
  * here, so both platforms draw exactly the same hop. Before a slot's first
  * hop it holds the resting frame. Scales are about the dot's bottom edge.
- * Under reduced motion only the opacity breathes.
+ * The hop keeps the dots fully lit; under reduced motion only the opacity
+ * breathes.
  */
 export function dotBounce(
   slot: number,
@@ -76,8 +76,7 @@ export function dotBounce(
     lift: BOUNCE_LIFT[i] + (BOUNCE_LIFT[i + 1] - BOUNCE_LIFT[i]) * t,
     scaleX: BOUNCE_SCALE_X[i] + (BOUNCE_SCALE_X[i + 1] - BOUNCE_SCALE_X[i]) * t,
     scaleY: BOUNCE_SCALE_Y[i] + (BOUNCE_SCALE_Y[i + 1] - BOUNCE_SCALE_Y[i]) * t,
-    opacity:
-      BOUNCE_OPACITY[i] + (BOUNCE_OPACITY[i + 1] - BOUNCE_OPACITY[i]) * t,
+    opacity: 1,
   };
 }
 

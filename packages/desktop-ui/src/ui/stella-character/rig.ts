@@ -240,7 +240,6 @@ function bounceKeyframes(
     frames = samples.map((f, i) => ({
       offset: i / (samples.length - 1),
       transform: bounceTransform(slot, zoom, f),
-      opacity: f.opacity,
     }));
   }
   bounceKeyframeCache.set(key, frames);
@@ -763,11 +762,12 @@ export function createStellaMark(
       const keyframes = bounceKeyframes(slot, zoom, reduced);
       const delay =
         BOUNCE_ENTRY_MS + slot * WORKING_DOTS_STAGGER * WORKING_DOTS_CYCLE_MS;
-      // The fade from full to the loop's resting tone runs on the inner svg:
-      // an opacity animation still running on the wrapper when the loop
-      // starts would keep the loop off the compositor for good.
+      // Only the reduced-motion breath changes opacity. Its fade from full to
+      // the breath's first tone runs on the inner svg: an opacity animation
+      // still running on the wrapper when the loop starts would keep the loop
+      // off the compositor for good.
       const inner = el.firstElementChild;
-      if (inner) {
+      if (inner && reduced) {
         bounce.push(
           inner.animate(
             [{ opacity: 1 }, { opacity: keyframes[0].opacity as number }],

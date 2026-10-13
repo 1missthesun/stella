@@ -7,6 +7,8 @@
  * The three dots run the same loop a fixed fraction of a cycle apart, so the
  * hop reads as one wave travelling along the row.
  *
+ * The dots stay fully lit throughout: only their shape and height move.
+ *
  * Everything is a function of the loop phase alone and returns exactly the
  * resting frame at both ends, so the loop has no seam. Scales are about the
  * dot's bottom edge and keep its area: `scaleX · scaleY = 1`. Lift is in dot
@@ -24,8 +26,6 @@ export const WORKING_DOTS_STAGGER = 0.11;
 /** Peak hop, in dot diameters. */
 export const WORKING_DOTS_LIFT = 0.9;
 
-export const WORKING_DOTS_REST_OPACITY = 0.5;
-
 /** Samples per cycle when a platform tabulates the curve. */
 export const WORKING_DOTS_SAMPLES = 150;
 
@@ -35,8 +35,6 @@ const LAND = 0.47;
 const SPLAT_PEAK = 0.49;
 const SETTLE_FROM = 0.66;
 const SETTLE_TO = 0.8;
-const GLOW_RISE = 0.2;
-const GLOW_FALL_TO = 0.8;
 
 const CROUCH = 0.82;
 const LAUNCH_STRETCH = 1.22;
@@ -51,7 +49,6 @@ export type WorkingDotsFrame = {
   lift: number;
   scaleX: number;
   scaleY: number;
-  opacity: number;
 };
 
 const clamp01 = (x: number) => (x < 0 ? 0 : x > 1 ? 1 : x);
@@ -92,12 +89,6 @@ function liftAt(p: number): number {
   return 4 * WORKING_DOTS_LIFT * u * (1 - u);
 }
 
-function glowAt(p: number): number {
-  if (p < GLOW_RISE) return smoothstep(p / GLOW_RISE);
-  if (p < LAND) return 1;
-  return 1 - smoothstep((p - LAND) / (GLOW_FALL_TO - LAND));
-}
-
 /** The bounce at loop phase `p` (any real; wrapped into 0..1). */
 export function workingDotsFrame(p: number): WorkingDotsFrame {
   const phase = ((p % 1) + 1) % 1;
@@ -106,9 +97,6 @@ export function workingDotsFrame(p: number): WorkingDotsFrame {
     lift: liftAt(phase),
     scaleX: 1 / scaleY,
     scaleY,
-    opacity:
-      WORKING_DOTS_REST_OPACITY +
-      (1 - WORKING_DOTS_REST_OPACITY) * glowAt(phase),
   };
 }
 

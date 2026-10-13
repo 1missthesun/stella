@@ -252,6 +252,11 @@ export const Lightbulb = createIcon("lightbulb", <>
     <path d="M12 3.25A6.25 6.25 0 0 0 8.6 14.74c.69.45 1.15 1.2 1.15 2.02v.49h4.5v-.49c0-.82.46-1.57 1.15-2.02A6.25 6.25 0 0 0 12 3.25Z"/>
     <path d="M10.25 20.5h3.5"/>
   </>);
+export const Monitor = createIcon("monitor", <>
+    <rect x="3.75" y="4.75" width="16.5" height="11.5" rx="2"/>
+    <path d="M9 19.5h6M12 16.25v3.25"/>
+  </>);
+export const CloudIcon = createIcon("cloud", <path d="M7.25 18.25h9.5a3.75 3.75 0 0 0 .6-7.45 5.25 5.25 0 0 0-10.2-.9 4.25 4.25 0 0 0 .1 8.35Z"/>);
 export const Globe = createIcon("globe", <>
     <circle cx="12" cy="12" r="8.25"/>
     <ellipse cx="12" cy="12" rx="3.75" ry="8.25"/>

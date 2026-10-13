@@ -106,6 +106,8 @@ export function EngineAccountRowView({
   subtitle,
   places = [],
   active,
+  activeLabel,
+  leading,
   busy,
   onPick,
   items,
@@ -117,6 +119,10 @@ export function EngineAccountRowView({
   subtitle?: string;
   places?: EngineAccountPlace[];
   active: boolean;
+  /** The badge on the active row; "Active" by default. */
+  activeLabel?: string;
+  /** Drawn instead of the initials avatar. */
+  leading?: ReactNode;
   busy: boolean;
   /** Make this the active account. Absent when it cannot serve turns yet. */
   onPick?: () => void;
@@ -128,7 +134,7 @@ export function EngineAccountRowView({
   const [menuOpen, setMenuOpen] = useState(false);
   const identity = (
     <>
-      <Avatar fallback={initials} size="small" />
+      {leading ?? <Avatar fallback={initials} size="small" />}
       <div className="engine-account-identity__text">
         <div className="settings-row-label">{title}</div>
         {subtitle ? <div className="settings-row-sublabel">{subtitle}</div> : null}
@@ -160,7 +166,7 @@ export function EngineAccountRowView({
         {active ? (
           <span className="engine-account-badge">
             <Check size={14} aria-hidden />
-            {t(`${K}.active`)}
+            {activeLabel ?? t(`${K}.active`)}
           </span>
         ) : null}
         {items.length + tail.length > 0 ? (

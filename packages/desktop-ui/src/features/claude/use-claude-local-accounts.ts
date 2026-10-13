@@ -44,6 +44,8 @@ export function useClaudeLocalAccounts() {
     cliInstalled: state?.cliInstalled ?? false,
     configs,
     activeConfigId: state?.activeConfigId ?? null,
+    /** Why the active config is the one in use (`ClaudeLocalAccountsState`). */
+    activeReason: state?.activeReason,
     /** Some Claude Code login on this computer is signed in. */
     signedIn: configs.some((config) => config.loggedIn),
     /** The CLI's default config is present and signed out. */

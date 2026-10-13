@@ -10,13 +10,17 @@ import { openExternalUrl } from "@/platform/electron/open-external";
  * is pasted unless the browser didn't open ("Use a code instead"). In the
  * cloud it runs in the owner's container, which the browser can't redirect
  * to, so this window opens the page and the user pastes the code Anthropic
- * shows. A pasted code goes straight to the waiting CLI; a failed attempt is
- * started again rather than retried.
+ * shows. Another of the owner's computers works like the cloud: it runs its
+ * own `claude auth login` without opening a browser there, this window opens
+ * the page, and the pasted code goes back through Stella's cloud to that
+ * computer's CLI. A pasted code goes straight to the waiting CLI; a failed
+ * attempt is started again rather than retried.
  */
 
 export type ClaudeLoginTarget =
   | { place: "local"; configId?: string; email?: string }
-  | { place: "cloud"; email?: string };
+  | { place: "cloud"; email?: string }
+  | { place: "device"; deviceId: string; deviceName?: string; email?: string };
 
 export type ClaudeLoginFlow = {
   target: ClaudeLoginTarget;
@@ -39,6 +43,10 @@ const messageOf = (error: unknown): string | null =>
 const cancelLogin = (flow: ClaudeLoginFlow) => {
   if (flow.target.place === "local") {
     void window.electronAPI?.system?.cancelClaudeLocalLogin?.(flow.loginId).catch(() => undefined);
+  } else if (flow.target.place === "device") {
+    void cloudEnginesApi
+      .cancelClaudeDeviceLogin(flow.target.deviceId, flow.loginId)
+      .catch(() => undefined);
   } else {
     void cloudEnginesApi.cancelClaudeCloudLogin(flow.loginId).catch(() => undefined);
   }
@@ -100,6 +108,10 @@ export function useClaudeLogin({
           ...(target.email ? { email: target.email } : {}),
         });
         next = { target, ...started, pasting: false };
+      } else if (target.place === "device") {
+        const started = await cloudEnginesApi.startClaudeDeviceLogin(target.deviceId, target.email);
+        next = { target, ...started, pasting: true };
+        openExternalUrl(started.authorizeUrl);
       } else {
         const started = await cloudEnginesApi.startClaudeCloudLogin(target.email);
         next = { target, ...started, pasting: true };
@@ -129,6 +141,12 @@ export function useClaudeLogin({
         if (!finish) throw new Error();
         const config = await finish(current.loginId, trimmed);
         result = config.email ? { email: config.email } : {};
+      } else if (current.target.place === "device") {
+        result = await cloudEnginesApi.finishClaudeDeviceLogin(
+          current.target.deviceId,
+          current.loginId,
+          trimmed,
+        );
       } else {
         const done = await cloudEnginesApi.finishClaudeCloudLogin(current.loginId, trimmed);
         result = { email: done.email };

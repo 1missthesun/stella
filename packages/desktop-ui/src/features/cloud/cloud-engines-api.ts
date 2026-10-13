@@ -38,6 +38,19 @@ export const cloudEnginesApi = {
     backendClient.call("engines.finishClaudeCloudLogin", { loginId, code }),
   cancelClaudeCloudLogin: (loginId: string) =>
     backendClient.call("engines.cancelClaudeCloudLogin", { loginId }),
+  /** The Claude account every place uses; none for each place's own login. */
+  chooseClaudeAccount: (accountId: string | null) =>
+    backendClient.call("engines.chooseClaudeAccount", accountId ? { accountId } : {}),
+  /** Start Claude Code's own sign-in on another of the owner's computers. */
+  startClaudeDeviceLogin: (deviceId: string, email?: string) =>
+    backendClient.call("engines.startClaudeDeviceLogin", {
+      deviceId,
+      ...(email ? { email } : {}),
+    }),
+  finishClaudeDeviceLogin: (deviceId: string, loginId: string, code: string) =>
+    backendClient.call("engines.finishClaudeDeviceLogin", { deviceId, loginId, code }),
+  cancelClaudeDeviceLogin: (deviceId: string, loginId: string) =>
+    backendClient.call("engines.cancelClaudeDeviceLogin", { deviceId, loginId }),
   signOutClaudeCloud: (accountId: string) =>
     backendClient.call("engines.signOutClaudeCloud", { accountId }),
   setExecution: (execution: CloudExecutionSelection) =>

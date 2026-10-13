@@ -29,13 +29,21 @@ export function ClaudeLoginPrompt({ login }: { login: ClaudeLogin }) {
   if (!login.open) return null;
   const target = flow?.target ?? starting ?? failed;
   const where =
-    target?.place === "cloud" ? t(`${K}.whereCloud`) : t(`${K}.whereComputer`);
+    target?.place === "cloud"
+      ? t(`${K}.whereCloud`)
+      : target?.place === "device"
+        ? t(`${K}.whereDevice`, {
+            place: target.deviceName ?? t("settings.engineAccounts.claude.otherComputer"),
+          })
+        : t(`${K}.whereComputer`);
 
   return (
     <div className="engine-connect-prompt" role="group" aria-label={where}>
       <p className="engine-connect-prompt__hint" aria-live="polite">
         {starting ? (
           t(`${K}.starting`)
+        ) : failed && !flow ? (
+          where
         ) : approving ? (
           <>
             {where} {t(`${K}.approve`)}{" "}

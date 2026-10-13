@@ -15,6 +15,9 @@ const ALLOWED_HEADERS = new Set([
   "x-stella-voice-lease",
 ]);
 
+const isUserAsksRoute = (path: string): boolean =>
+  path === "/api/user-asks" || path.startsWith("/api/user-asks/");
+
 const isBrowserRoute = (path: string): boolean =>
   /^\/conversations\/[^/]+\/(turns|history|socket|journal|local-turns\/(begin|finish|tool))$/u.test(
     path,
@@ -26,6 +29,7 @@ const isBrowserRoute = (path: string): boolean =>
   path.startsWith("/api/media/v1/") ||
   path.startsWith("/api/voice/") ||
   path.startsWith("/api/dictation/") ||
+  isUserAsksRoute(path) ||
   path.startsWith(SLACK_WORKSPACES_PATH) ||
   path === SLACK_INSTALL_START_PATH;
 
@@ -57,6 +61,7 @@ export async function withBrowserCors(
     path.startsWith("/api/media/v1/") ||
     path.startsWith("/api/voice/") ||
   path.startsWith("/api/dictation/") ||
+  isUserAsksRoute(path) ||
   path.startsWith(SLACK_WORKSPACES_PATH) ||
   path === SLACK_INSTALL_START_PATH;
   // Packaged Electron has an opaque file origin; isolated dev runs use random

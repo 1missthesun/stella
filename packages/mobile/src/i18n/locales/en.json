@@ -1709,10 +1709,12 @@
         },
         "memory": {
           "error": "Couldn't sync. Retrying soon.",
+          "failedFiles": "Not synced: {files}",
           "heldOtherAccount": "Synced with a different Stella account.",
           "heldWiped": "Paused after cloud Memory was erased. Choose below.",
           "lastSynced": "Synced {time}",
           "merging": "Merging changes from both sides…",
+          "nextTry": "Next try {time}",
           "off": "Memory is off.",
           "refused": "Too large to sync: {files}",
           "signedOut": "Sign in to sync.",

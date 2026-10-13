@@ -1717,10 +1717,12 @@
         },
         "memory": {
           "error": "Impossibile sincronizzare in questo momento. Stella riproverà.",
+          "failedFiles": "Non sincronizzato: {files}",
           "heldOtherAccount": "La memoria di questo computer è sincronizzata con un altro account Stella, quindi resta fuori da questo.",
           "heldWiped": "In pausa. La memoria nel cloud è stata cancellata e questo computer ha ancora la memoria di prima. Scegli qui sotto cosa farne.",
           "lastSynced": "Ultima sincronizzazione: {time}.",
           "merging": "Modificata qui e nel cloud contemporaneamente. Un agente in background sta unendo le due versioni.",
+          "nextTry": "Prossimo tentativo {time}",
           "off": "La memoria è disattivata, quindi non viene sincronizzato nulla.",
           "refused": "Troppo lungo da sincronizzare, quindi resta solo su questo computer: {files}",
           "signedOut": "Accedi per mantenere la stessa memoria su questo computer e nel cloud.",

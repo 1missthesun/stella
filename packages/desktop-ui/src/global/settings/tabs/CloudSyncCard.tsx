@@ -121,6 +121,29 @@ export function CloudSyncCard() {
                 })
               : memorySyncSummary(t, memorySync)}
           </div>
+          {memorySync?.phase === "error" && memorySync.failure ? (
+            <div
+              className="settings-row-sublabel"
+              role="alert"
+              data-memory-sync-failure={memorySync.failure.step}
+            >
+              {[
+                memorySync.failure.files.length > 0
+                  ? t("settings.account.cloudHome.memory.failedFiles", {
+                      files: memorySync.failure.files.join(", "),
+                    })
+                  : null,
+                memorySync.failure.code
+                  ? `${memorySync.failure.message} (${memorySync.failure.code})`
+                  : memorySync.failure.message,
+                t("settings.account.cloudHome.memory.nextTry", {
+                  time: syncedAtLabel(locale, memorySync.failure.retryAt),
+                }),
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </div>
+          ) : null}
           {memorySync && memorySync.refused.length > 0 ? (
             <div className="settings-row-sublabel" role="alert">
               {t("settings.account.cloudHome.memory.refused", {

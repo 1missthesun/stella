@@ -1709,10 +1709,12 @@
         },
         "memory": {
           "error": "Kunne ikke synkronisere lige nu. Stella prøver igen.",
+          "failedFiles": "Ikke synkroniseret: {files}",
           "heldOtherAccount": "Denne computers hukommelse synkroniseres med en anden Stella-konto, så den holdes uden for denne.",
           "heldWiped": "Sat på pause. Hukommelsen i skyen blev slettet, og denne computer har stadig hukommelse fra før. Vælg nedenfor, hvad der skal ske med den.",
           "lastSynced": "Sidst synkroniseret {time}.",
           "merging": "Ændret her og i skyen på samme tid. En baggrundsagent fletter de to versioner.",
+          "nextTry": "Næste forsøg {time}",
           "off": "Hukommelse er slået fra, så intet synkroniseres.",
           "refused": "For lang til at synkronisere, så den bliver kun på denne computer: {files}",
           "signedOut": "Log ind for at holde hukommelsen ens på denne computer og i skyen.",

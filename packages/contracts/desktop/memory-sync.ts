@@ -14,7 +14,8 @@
  *   did), so its memory goes up only once the owner allows it, or is erased
  *   here. `other_account`: this computer's memory is kept with a different
  *   Stella account.
- * - `error`: the last pass failed; the next one retries.
+ * - `error`: the last pass failed (`failure` says where and why); files it
+ *   could still sync did, and the next pass retries with backoff.
  */
 
 export type MemorySyncPhase =
@@ -34,6 +35,15 @@ export type MemorySyncStatus = {
   merging: number;
   /** Files the cloud refused (over their size limit), relative to `~/.stella`. */
   refused: string[];
+  failure?: MemorySyncFailure;
+};
+
+export type MemorySyncFailure = {
+  step: "list" | "read" | "write" | "delete" | "local";
+  files: string[];
+  code: string | null;
+  message: string;
+  retryAt: number;
 };
 
 export type MemorySyncEraseResult = { ok: true } | { ok: false; error: string };

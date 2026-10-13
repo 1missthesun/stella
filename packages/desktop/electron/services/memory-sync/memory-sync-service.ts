@@ -15,6 +15,7 @@ import {
 import type { MemorySyncListing } from "@stella/contracts/backend/home";
 import type {
   MemorySyncEraseResult,
+  MemorySyncFailure,
   MemorySyncStatus,
 } from "@stella/contracts/desktop/memory-sync";
 import {
@@ -76,7 +77,8 @@ const SIGN_IN_DELAY_MS = 1_000;
 /** A pass that met a concurrent change runs again this soon, a few times. */
 const UNSETTLED_RETRY_MS = 5_000;
 const UNSETTLED_RETRIES = 3;
-const ERROR_RETRY_MS = 60_000;
+const ERROR_RETRY_MIN_MS = 60_000;
+const ERROR_RETRY_MAX_MS = 30 * 60_000;
 const NOT_READY_RETRY_MS = 30_000;
 /** How long a handed-off merge counts as in progress. */
 const MERGE_SHOWN_MS = 24 * 60 * 60_000;
@@ -155,6 +157,54 @@ class PassStopped extends Error {
   }
 }
 
+type FailureDetail = Omit<MemorySyncFailure, "retryAt">;
+
+class PassFailed extends Error {
+  constructor(
+    readonly failure: FailureDetail,
+    readonly retryAfterMs?: number,
+  ) {
+    super(failure.message);
+  }
+}
+
+const PASS_WIDE_CODES = new Set([
+  "UNAUTHENTICATED",
+  "FORBIDDEN",
+  "RATE_LIMITED",
+  "UNAVAILABLE",
+]);
+
+const stepOf = (kind: MemorySyncAction["kind"]): MemorySyncFailure["step"] => {
+  switch (kind) {
+    case "push":
+      return "write";
+    case "pull":
+    case "conflict":
+      return "read";
+    case "deleteCloud":
+      return "delete";
+    default:
+      return "local";
+  }
+};
+
+const failureOf = (
+  step: MemorySyncFailure["step"],
+  files: string[],
+  error: unknown,
+): FailureDetail => ({
+  step,
+  files,
+  code:
+    error instanceof BackendRequestError
+      ? error.reason ?? error.code
+      : error instanceof Error && "code" in error && typeof error.code === "string"
+        ? error.code
+        : null,
+  message: error instanceof Error ? error.message : String(error),
+});
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -190,6 +240,8 @@ export class MemorySyncService {
   private running: Promise<void> | null = null;
   private rerun = false;
   private unsettledRuns = 0;
+  private failedPasses = 0;
+  private retryNotBefore = 0;
   private lastFullPassAt = 0;
   private polled: Array<() => void> = [];
   private memoriesWatcher: FSWatcher | null = null;
@@ -211,6 +263,8 @@ export class MemorySyncService {
     const next = tokenSubject(token);
     if (next === this.subject || this.disposed) return;
     this.subject = next;
+    this.failedPasses = 0;
+    this.retryNotBefore = 0;
     if (!next) {
       this.stop();
       this.publish({ phase: "signed_out", merging: 0, refused: [] });
@@ -362,6 +416,9 @@ export class MemorySyncService {
    */
   private request(mode: "full" | "local", delayMs: number): void {
     if (this.disposed || !this.subject) return;
+    if (mode === "full") {
+      delayMs = Math.max(delayMs, this.retryNotBefore - Date.now());
+    }
     const due = Date.now() + delayMs;
     const debounce = mode === "local" && this.pendingMode === "local";
     this.pendingMode =
@@ -392,13 +449,7 @@ export class MemorySyncService {
         this.log("memory_sync.stopped", { reason: error.reason });
         this.request("full", UNSETTLED_RETRY_MS);
       })
-      .catch((error: unknown) => {
-        this.log("memory_sync.failed", {
-          message: error instanceof Error ? error.message : String(error),
-        });
-        this.publish({ phase: "error" });
-        this.request("full", ERROR_RETRY_MS);
-      })
+      .catch((error: unknown) => this.failed(error))
       .finally(() => {
         this.passSubject = null;
         this.running = null;
@@ -463,12 +514,16 @@ export class MemorySyncService {
     try {
       listing = await backend.call("memory.files.list", {});
     } catch (error) {
+      if (error instanceof PassStopped) throw error;
       const reason = error instanceof BackendRequestError ? error.reason : "";
       if (reason && STOP_REASONS.has(reason)) {
         this.publish({ phase: "off" });
         return;
       }
-      throw error;
+      throw new PassFailed(
+        failureOf("list", [], error),
+        error instanceof BackendRequestError ? error.retryAfterMs : undefined,
+      );
     }
     this.lastFullPassAt = Date.now();
 
@@ -503,9 +558,37 @@ export class MemorySyncService {
       merges,
     };
     let settled = true;
+    const failed: Array<{ path: string; error: unknown }> = [];
+    let failedStep: MemorySyncFailure["step"] | null = null;
     try {
       for (const action of actions) {
-        if (!(await this.apply(action, context))) settled = false;
+        try {
+          if (!(await this.apply(action, context))) settled = false;
+        } catch (error) {
+          if (error instanceof PassStopped) throw error;
+          const step = stepOf(action.kind);
+          const perFile =
+            step === "local" ||
+            (error instanceof BackendRequestError &&
+              !PASS_WIDE_CODES.has(error.code));
+          if (!perFile) {
+            throw new PassFailed(
+              failureOf(step, [action.path], error),
+              error instanceof BackendRequestError
+                ? error.retryAfterMs
+                : undefined,
+            );
+          }
+          failed.push({ path: action.path, error });
+          failedStep ??= step;
+          const detail = failureOf(step, [], error);
+          this.log("memory_sync.file_failed", {
+            path: action.path,
+            step,
+            code: detail.code,
+            message: detail.message,
+          });
+        }
       }
     } catch (error) {
       // Refused mid-pass (a wipe began, memory went off): keep only what
@@ -527,9 +610,21 @@ export class MemorySyncService {
       files,
       refused,
       merges: await this.handOffMerges(merges),
-      lastSyncedAt: settled ? Date.now() : state.lastSyncedAt,
+      lastSyncedAt:
+        settled && failed.length === 0 ? Date.now() : state.lastSyncedAt,
     };
     await this.saveState(state);
+    if (failed.length > 0) {
+      throw new PassFailed(
+        failureOf(
+          failedStep ?? "local",
+          failed.map((entry) => entry.path),
+          failed[0]!.error,
+        ),
+      );
+    }
+    this.failedPasses = 0;
+    this.retryNotBefore = 0;
     this.publish({
       phase: "synced",
       lastSyncedAt: state.lastSyncedAt,
@@ -543,6 +638,32 @@ export class MemorySyncService {
       this.unsettledRuns += 1;
       this.request("full", UNSETTLED_RETRY_MS);
     }
+  }
+
+  private failed(error: unknown): void {
+    const detail =
+      error instanceof PassFailed ? error.failure : failureOf("local", [], error);
+    const backoff = Math.min(
+      ERROR_RETRY_MAX_MS,
+      ERROR_RETRY_MIN_MS * 2 ** Math.min(this.failedPasses, 10),
+    );
+    const delay = Math.max(
+      backoff,
+      error instanceof PassFailed ? error.retryAfterMs ?? 0 : 0,
+    );
+    this.failedPasses += 1;
+    const retryAt = Date.now() + delay;
+    this.retryNotBefore = retryAt;
+    this.log("memory_sync.failed", {
+      step: detail.step,
+      files: detail.files.join(","),
+      code: detail.code,
+      message: detail.message,
+      attempt: this.failedPasses,
+      retryInMs: delay,
+    });
+    this.publish({ phase: "error", failure: { ...detail, retryAt } });
+    this.request("full", delay);
   }
 
   /** Whether nothing here changed since the last pass. */
@@ -758,6 +879,7 @@ export class MemorySyncService {
   private publish(patch: Partial<MemorySyncStatus>): void {
     const next: MemorySyncStatus = { ...this.status, ...patch };
     if (next.phase !== "held") delete next.heldReason;
+    if (next.phase !== "error") delete next.failure;
     if (JSON.stringify(next) === JSON.stringify(this.status)) return;
     this.status = next;
     this.options.broadcast(next);

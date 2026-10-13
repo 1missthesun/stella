@@ -1725,10 +1725,12 @@
         },
         "memory": {
           "error": "Nie udało się teraz zsynchronizować. Stella spróbuje ponownie.",
+          "failedFiles": "Niezsynchronizowane: {files}",
           "heldOtherAccount": "Pamięć tego komputera jest synchronizowana z innym kontem Stella, więc pozostaje poza tym kontem.",
           "heldWiped": "Wstrzymano. Pamięć w chmurze została wymazana, a ten komputer nadal ma pamięć sprzed tego. Wybierz poniżej, co z nią zrobić.",
           "lastSynced": "Ostatnia synchronizacja: {time}.",
           "merging": "Zmieniono tutaj i w chmurze jednocześnie. Agent w tle scala obie wersje.",
+          "nextTry": "Następna próba {time}",
           "off": "Pamięć jest wyłączona, więc nic nie jest synchronizowane.",
           "refused": "Za długie do synchronizacji, więc pozostaje tylko na tym komputerze: {files}",
           "signedOut": "Zaloguj się, aby pamięć była taka sama na tym komputerze i w chmurze.",

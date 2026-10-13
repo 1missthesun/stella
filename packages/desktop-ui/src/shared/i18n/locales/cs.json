@@ -1725,10 +1725,12 @@
         },
         "memory": {
           "error": "Synchronizace se teď nezdařila. Stella to zkusí znovu.",
+          "failedFiles": "Nesynchronizováno: {files}",
           "heldOtherAccount": "Paměť tohoto počítače se synchronizuje s jiným účtem Stella, a proto zůstává mimo tento účet.",
           "heldWiped": "Pozastaveno. Paměť v cloudu byla vymazána a tento počítač má stále paměť z doby předtím. Níže zvolte, co se s ní stane.",
           "lastSynced": "Naposledy synchronizováno {time}.",
           "merging": "Změnila se zde i v cloudu zároveň. Agent na pozadí obě verze slučuje.",
+          "nextTry": "Další pokus {time}",
           "off": "Paměť je vypnutá, takže se nic nesynchronizuje.",
           "refused": "Příliš dlouhé na synchronizaci, proto zůstává jen v tomto počítači: {files}",
           "signedOut": "Přihlaste se, aby paměť zůstala stejná v tomto počítači i v cloudu.",

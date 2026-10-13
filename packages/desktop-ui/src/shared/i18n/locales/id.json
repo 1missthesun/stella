@@ -1701,10 +1701,12 @@
         },
         "memory": {
           "error": "Tidak dapat menyinkronkan saat ini. Stella akan mencoba lagi.",
+          "failedFiles": "Belum tersinkron: {files}",
           "heldOtherAccount": "Memori komputer ini disinkronkan dengan akun Stella lain, jadi tidak masuk ke akun ini.",
           "heldWiped": "Dijeda. Memori cloud telah dihapus, dan komputer ini masih memiliki memori dari sebelumnya. Pilih di bawah apa yang terjadi padanya.",
           "lastSynced": "Terakhir disinkronkan {time}.",
           "merging": "Berubah di sini dan di cloud pada saat yang sama. Agen latar belakang sedang menggabungkan keduanya.",
+          "nextTry": "Coba lagi {time}",
           "off": "Memori nonaktif, jadi tidak ada yang disinkronkan.",
           "refused": "Terlalu panjang untuk disinkronkan, jadi hanya disimpan di komputer ini: {files}",
           "signedOut": "Masuk agar memori tetap sama di komputer ini dan di cloud.",

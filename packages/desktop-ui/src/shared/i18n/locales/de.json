@@ -1709,10 +1709,12 @@
         },
         "memory": {
           "error": "Synchronisierung gerade nicht möglich. Stella versucht es erneut.",
+          "failedFiles": "Nicht synchronisiert: {files}",
           "heldOtherAccount": "Die Erinnerungen dieses Computers werden mit einem anderen Stella-Konto synchronisiert und bleiben daher außerhalb dieses Kontos.",
           "heldWiped": "Pausiert. Die Erinnerungen in der Cloud wurden gelöscht, und dieser Computer hat noch Erinnerungen von vorher. Wähle unten, was damit geschehen soll.",
           "lastSynced": "Zuletzt synchronisiert: {time}.",
           "merging": "Hier und in der Cloud gleichzeitig geändert. Ein Agent im Hintergrund führt beide Fassungen zusammen.",
+          "nextTry": "Nächster Versuch {time}",
           "off": "Erinnerungen sind ausgeschaltet, daher wird nichts synchronisiert.",
           "refused": "Zu lang zum Synchronisieren, daher nur auf diesem Computer: {files}",
           "signedOut": "Melde dich an, damit deine Erinnerungen auf diesem Computer und in der Cloud gleich bleiben.",

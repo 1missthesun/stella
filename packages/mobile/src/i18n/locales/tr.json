@@ -1709,10 +1709,12 @@
         },
         "memory": {
           "error": "Şu anda senkronize edilemedi. Stella yeniden deneyecek.",
+          "failedFiles": "Senkronize edilmedi: {files}",
           "heldOtherAccount": "Bu bilgisayarın belleği başka bir Stella hesabıyla senkronize ediliyor, bu yüzden bu hesabın dışında kalıyor.",
           "heldWiped": "Duraklatıldı. Buluttaki bellek silindi ve bu bilgisayarda hâlâ öncesinden kalan bellek var. Buna ne olacağını aşağıdan seçin.",
           "lastSynced": "Son senkronizasyon: {time}.",
           "merging": "Burada ve bulutta aynı anda değişti. Arka plandaki bir ajan iki sürümü birleştiriyor.",
+          "nextTry": "Sonraki deneme {time}",
           "off": "Bellek kapalı, bu yüzden hiçbir şey senkronize edilmiyor.",
           "refused": "Senkronize etmek için fazla uzun, bu yüzden yalnızca bu bilgisayarda tutuluyor: {files}",
           "signedOut": "Belleğin bu bilgisayarda ve bulutta aynı kalması için oturum açın.",

@@ -1709,10 +1709,12 @@
         },
         "memory": {
           "error": "Synkronointi ei onnistunut juuri nyt. Stella yrittää uudelleen.",
+          "failedFiles": "Ei synkronoitu: {files}",
           "heldOtherAccount": "Tämän tietokoneen muisti synkronoidaan toisen Stella-tilin kanssa, joten se pysyy tämän tilin ulkopuolella.",
           "heldWiped": "Keskeytetty. Pilven muisti poistettiin, ja tällä tietokoneella on yhä aiempaa muistia. Valitse alta, mitä sille tehdään.",
           "lastSynced": "Synkronoitu viimeksi {time}.",
           "merging": "Muuttui täällä ja pilvessä samaan aikaan. Taustalla toimiva agentti yhdistää versiot.",
+          "nextTry": "Seuraava yritys {time}",
           "off": "Muisti on pois päältä, joten mitään ei synkronoida.",
           "refused": "Liian pitkä synkronoitavaksi, joten se säilyy vain tällä tietokoneella: {files}",
           "signedOut": "Kirjaudu sisään, jotta muisti pysyy samana tällä tietokoneella ja pilvessä.",

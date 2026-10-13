@@ -1701,10 +1701,12 @@
         },
         "memory": {
           "error": "暂时无法同步。Stella 会再试一次。",
+          "failedFiles": "未同步：{files}",
           "heldOtherAccount": "这台电脑的记忆与另一个 Stella 账户同步，因此不会进入此账户。",
           "heldWiped": "已暂停。云端记忆已被清除，而这台电脑上仍有之前的记忆。请在下方选择如何处理。",
           "lastSynced": "上次同步：{time}。",
           "merging": "这里和云端同时发生了更改。后台代理正在合并两个版本。",
+          "nextTry": "下次重试 {time}",
           "off": "记忆已关闭，因此不会同步任何内容。",
           "refused": "内容过长无法同步，因此仅保存在这台电脑上：{files}",
           "signedOut": "登录后，这台电脑和云端的记忆将保持一致。",

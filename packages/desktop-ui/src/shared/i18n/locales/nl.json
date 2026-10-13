@@ -1709,10 +1709,12 @@
         },
         "memory": {
           "error": "Synchroniseren lukte nu niet. Stella probeert het opnieuw.",
+          "failedFiles": "Niet gesynchroniseerd: {files}",
           "heldOtherAccount": "Het geheugen van deze computer wordt gesynchroniseerd met een ander Stella-account en blijft daarom buiten dit account.",
           "heldWiped": "Gepauzeerd. Het cloudgeheugen is gewist en deze computer heeft nog geheugen van daarvoor. Kies hieronder wat ermee gebeurt.",
           "lastSynced": "Laatst gesynchroniseerd: {time}.",
           "merging": "Hier en in de cloud tegelijk gewijzigd. Een agent op de achtergrond voegt de twee versies samen.",
+          "nextTry": "Volgende poging {time}",
           "off": "Geheugen staat uit, dus er wordt niets gesynchroniseerd.",
           "refused": "Te lang om te synchroniseren, dus alleen op deze computer bewaard: {files}",
           "signedOut": "Log in om het geheugen gelijk te houden op deze computer en in de cloud.",

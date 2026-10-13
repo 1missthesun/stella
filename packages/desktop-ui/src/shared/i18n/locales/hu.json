@@ -1709,10 +1709,12 @@
         },
         "memory": {
           "error": "A szinkronizálás most nem sikerült. A Stella újra megpróbálja.",
+          "failedFiles": "Nincs szinkronizálva: {files}",
           "heldOtherAccount": "Ennek a számítógépnek a memóriája egy másik Stella-fiókkal szinkronizálódik, ezért kimarad ebből a fiókból.",
           "heldWiped": "Szüneteltetve. A felhőbeli memória törölve lett, és ezen a számítógépen még van korábbi memória. Lent válaszd ki, mi történjen vele.",
           "lastSynced": "Utolsó szinkronizálás: {time}.",
           "merging": "Itt és a felhőben egyszerre módosult. Egy háttérben futó ügynök egyesíti a két változatot.",
+          "nextTry": "Következő próbálkozás: {time}",
           "off": "A memória ki van kapcsolva, ezért semmi sem szinkronizálódik.",
           "refused": "Túl hosszú a szinkronizáláshoz, ezért csak ezen a számítógépen marad: {files}",
           "signedOut": "Jelentkezz be, hogy a memória ugyanaz maradjon ezen a számítógépen és a felhőben.",

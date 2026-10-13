@@ -1717,10 +1717,12 @@
         },
         "memory": {
           "error": "No se pudo sincronizar ahora mismo. Stella lo volverá a intentar.",
+          "failedFiles": "Sin sincronizar: {files}",
           "heldOtherAccount": "La memoria de este ordenador se sincroniza con otra cuenta de Stella, así que queda fuera de esta.",
           "heldWiped": "En pausa. Se borró la memoria en la nube y este ordenador aún tiene memoria de antes. Elige abajo qué hacer con ella.",
           "lastSynced": "Última sincronización: {time}.",
           "merging": "Ha cambiado aquí y en la nube a la vez. Un agente en segundo plano está combinando las dos versiones.",
+          "nextTry": "Próximo intento {time}",
           "off": "La memoria está desactivada, así que no se sincroniza nada.",
           "refused": "Demasiado largo para sincronizar, así que se queda solo en este ordenador: {files}",
           "signedOut": "Inicia sesión para mantener la misma memoria en este ordenador y en la nube.",

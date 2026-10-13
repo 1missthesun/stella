@@ -1717,10 +1717,12 @@
         },
         "memory": {
           "error": "Sincronizarea nu a reușit acum. Stella va încerca din nou.",
+          "failedFiles": "Nesincronizat: {files}",
           "heldOtherAccount": "Memoria acestui computer se sincronizează cu alt cont Stella, așa că rămâne în afara acestuia.",
           "heldWiped": "Întrerupt. Memoria din cloud a fost ștearsă, iar acest computer are încă memorie de dinainte. Alege mai jos ce se întâmplă cu ea.",
           "lastSynced": "Ultima sincronizare: {time}.",
           "merging": "Modificată aici și în cloud în același timp. Un agent în fundal combină cele două versiuni.",
+          "nextTry": "Următoarea încercare {time}",
           "off": "Memoria este dezactivată, așa că nu se sincronizează nimic.",
           "refused": "Prea lung pentru sincronizare, așa că rămâne doar pe acest computer: {files}",
           "signedOut": "Conectează-te ca memoria să rămână la fel pe acest computer și în cloud.",

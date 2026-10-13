@@ -1701,10 +1701,12 @@
         },
         "memory": {
           "error": "暫時無法同步。Stella 會再試一次。",
+          "failedFiles": "未同步：{files}",
           "heldOtherAccount": "這台電腦的記憶與另一個 Stella 帳號同步，因此不會進入此帳號。",
           "heldWiped": "已暫停。雲端記憶已被清除，而這台電腦上仍有之前的記憶。請在下方選擇如何處理。",
           "lastSynced": "上次同步：{time}。",
           "merging": "這裡和雲端同時發生了變更。背景代理正在合併兩個版本。",
+          "nextTry": "下次重試 {time}",
           "off": "記憶已關閉，因此不會同步任何內容。",
           "refused": "內容過長無法同步，因此僅保存在這台電腦上：{files}",
           "signedOut": "登入後，這台電腦和雲端的記憶將保持一致。",

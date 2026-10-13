@@ -1709,10 +1709,12 @@
         },
         "memory": {
           "error": "Det gick inte att synkronisera just nu. Stella försöker igen.",
+          "failedFiles": "Inte synkroniserad: {files}",
           "heldOtherAccount": "Den här datorns minne synkroniseras med ett annat Stella-konto och hålls därför utanför det här.",
           "heldWiped": "Pausat. Minnet i molnet raderades, och den här datorn har fortfarande minne från tidigare. Välj nedan vad som ska hända med det.",
           "lastSynced": "Senast synkroniserat {time}.",
           "merging": "Ändrat här och i molnet samtidigt. En bakgrundsagent slår ihop de två versionerna.",
+          "nextTry": "Nästa försök {time}",
           "off": "Minne är avstängt, så inget synkroniseras.",
           "refused": "För långt för att synkronisera, så det finns bara på den här datorn: {files}",
           "signedOut": "Logga in för att hålla minnet likadant på den här datorn och i molnet.",

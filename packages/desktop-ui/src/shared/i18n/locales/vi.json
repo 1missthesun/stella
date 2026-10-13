@@ -1701,10 +1701,12 @@
         },
         "memory": {
           "error": "Không thể đồng bộ lúc này. Stella sẽ thử lại.",
+          "failedFiles": "Chưa đồng bộ: {files}",
           "heldOtherAccount": "Bộ nhớ của máy tính này được đồng bộ với một tài khoản Stella khác nên không nằm trong tài khoản này.",
           "heldWiped": "Đã tạm dừng. Bộ nhớ trên đám mây đã bị xóa và máy tính này vẫn còn bộ nhớ từ trước đó. Hãy chọn bên dưới cách xử lý bộ nhớ đó.",
           "lastSynced": "Đồng bộ lần cuối lúc {time}.",
           "merging": "Đã thay đổi ở đây và trên đám mây cùng lúc. Một tác tử chạy nền đang hợp nhất hai phiên bản.",
+          "nextTry": "Lần thử tiếp theo {time}",
           "off": "Bộ nhớ đang tắt nên không có gì được đồng bộ.",
           "refused": "Quá dài để đồng bộ nên chỉ được giữ trên máy tính này: {files}",
           "signedOut": "Đăng nhập để giữ bộ nhớ giống nhau trên máy tính này và trên đám mây.",

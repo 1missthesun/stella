@@ -70,10 +70,11 @@ const CLAUDE_CODE_CONTEXT_WINDOW = 100_000_000;
 const CLAUDE_CODE_MAX_TOKENS = 128_000;
 const SEEN_LIMIT = 400;
 const REBUILD_MAX_CHARS = 48_000;
-/** Recent history a fresh session replays: about a fifth of Claude's context, as a compaction keeps. */
-const REPLAY_MAX_CHARS = 160_000;
-/** A compaction summary at the head of a replay, kept whole up to this. */
+/** What opens a replayed context (a compaction summary, or the first prompt), kept whole up to this. */
 const LEAD_MAX_CHARS = 64_000;
+/** Serialized history one summarization call reads; a longer segment is folded in parts. */
+const SUMMARY_SOURCE_MAX_CHARS = 300_000;
+const SUMMARY_TOOL_RESULT_MAX_CHARS = 2_000;
 const UPDATE_MAX_MESSAGE_CHARS = 12_000;
 /** How long a new turn waits for the stopped one it replaces to end. */
 const SUPERSEDED_SETTLE_MS = 10_000;
@@ -138,6 +139,8 @@ export type ClaudeCodeTurnSpec = {
 
 export type ClaudeCodeTransport = {
   runTurn(spec: ClaudeCodeTurnSpec): Promise<{ text: string; sessionId: string }>;
+  /** One completion on a throwaway session without tools: the summary of history a replay drops. */
+  summarize?(args: { session: ClaudeCodeSessionRef; model: string; systemPrompt: string; prompt: string; signal?: AbortSignal }): Promise<string>;
   preflight?(session: ClaudeCodeSessionRef): Promise<void>;
   resume?(session: ClaudeCodeSessionRef, args: { held?: string; lastReply?: string }): Promise<{ sessionId?: string; restored?: boolean }>;
   close?(session: ClaudeCodeSessionRef): void;
@@ -147,9 +150,16 @@ export type ClaudeCodeTransport = {
  * `seen`: messages the CLI has, by key. `undelivered`: messages that reached
  * Stella's transcript but never the CLI (a stop or pause ended its step
  * before it took them in); the next turn carries them. `context`: the
- * resident context baseline the CLI was handed whole, by key.
+ * resident context baseline the CLI was handed whole, by key. `summary`: the
+ * summary of the history a replay drops, through the message keyed `through`.
  */
-export type ClaudeCodeSessionRecord = { cliSessionId?: string; seen: string[]; undelivered?: string[]; context?: string };
+export type ClaudeCodeSessionRecord = {
+  cliSessionId?: string;
+  seen: string[];
+  undelivered?: string[];
+  context?: string;
+  summary?: { through: string; text: string };
+};
 export type ClaudeCodeSessionStore = {
   read(piSessionId: string): Promise<ClaudeCodeSessionRecord | undefined>;
   write(piSessionId: string, record: ClaudeCodeSessionRecord): Promise<void>;
@@ -387,25 +397,125 @@ const userPrompt = (users: readonly Message[]): { text: string; images: ImageCon
 
 const notResident = (message: Message): boolean => residentContextKind(message) === undefined;
 
+// Pi's compaction prompt and summary format (pi-durable `harness/compaction`), which it does not export.
+const SUMMARY_PREFIX = "The conversation history before this point was compacted into the following summary:\n\n<summary>\n";
+const SUMMARY_SUFFIX = "\n</summary>";
+const SUMMARIZATION_SYSTEM_PROMPT = `You are a context summarization assistant. Your task is to read a conversation between a user and an AI assistant, then produce a structured summary following the exact format specified.
+
+Do NOT continue the conversation. Do NOT respond to any questions in the conversation. ONLY output the structured summary.`;
+const SUMMARIZATION_PROMPT = `The messages above are a conversation to summarize. Create a structured context checkpoint summary that another LLM will use to continue the work. If the conversation starts with an earlier summary, preserve its information and fold the newer messages into it.
+
+Use this EXACT format:
+
+## Goal
+[What is the user trying to accomplish? Can be multiple items if the session covers different tasks.]
+
+## Constraints & Preferences
+- [Any constraints, preferences, or requirements mentioned by user]
+- [Or "(none)" if none were mentioned]
+
+## Progress
+### Done
+- [x] [Completed tasks/changes]
+
+### In Progress
+- [ ] [Current work]
+
+### Blocked
+- [Issues preventing progress, if any]
+
+## Key Decisions
+- **[Decision]**: [Brief rationale]
+
+## Next Steps
+1. [Ordered list of what should happen next]
+
+## Critical Context
+- [Any data, examples, or references needed to continue]
+- [Or "(none)" if not applicable]
+
+Keep each section concise. Preserve exact file paths, function names, and error messages.`;
+
+const serializeForSummary = (message: Message): string => {
+  switch (message.role) {
+    case "system":
+      return "";
+    case "user": {
+      const text = textOf(message.content);
+      return text ? `[User]: ${text}` : "";
+    }
+    case "toolResult": {
+      const text = textOf(message.content);
+      return text ? `[Tool result]: ${clip(text, SUMMARY_TOOL_RESULT_MAX_CHARS)}` : "";
+    }
+    case "assistant": {
+      const parts: string[] = [];
+      const thinking = message.content.flatMap((part) => (part.type === "thinking" ? [part.thinking] : []));
+      const text = message.content.flatMap((part) => (part.type === "text" ? [part.text] : []));
+      const calls = message.content.flatMap((part) =>
+        part.type === "toolCall"
+          ? [`${part.name}(${Object.entries(part.arguments).map(([key, value]) => `${key}=${JSON.stringify(value)}`).join(", ")})`]
+          : [],
+      );
+      if (thinking.length > 0) parts.push(`[Assistant thinking]: ${thinking.join("\n")}`);
+      if (text.length > 0) parts.push(`[Assistant]: ${text.join("\n")}`);
+      if (calls.length > 0) parts.push(`[Assistant tool calls]: ${calls.join("; ")}`);
+      return parts.join("\n\n");
+    }
+  }
+};
+
 /**
- * A fresh session starts the way a compacted one does: the resident context
- * whole with every change applied, then what opens the context (the
- * compaction summary, or the conversation's first prompt) whole, then as much
- * recent history as fits. Only the middle is ever cut.
+ * How a fresh session takes the conversation: the resident context, what
+ * opens the context (`lead`: a compaction summary, or the first prompt), the
+ * middle a replay drops, and the recent history it keeps, which starts at a
+ * prompt and fits the replay's budget.
  */
-const rebuildPrompt = (messages: readonly Message[]): { text: string; images: ImageContent[] } => {
+type Replay = { resident: string; lead: Message[]; dropped: Message[]; kept: Message[]; users: Message[] };
+
+const replayOf = (messages: readonly Message[]): Replay => {
   const { start, users } = trailingUsers(messages);
   const earlier = messages.slice(0, start);
-  const resident = residentContextAsOf(earlier) ?? "";
   const rest = earlier.filter(notResident);
   const opened = rest.findIndex((message) => message.role !== "user");
   const lead = opened < 0 ? rest : rest.slice(0, opened);
-  const leadText = userPrompt(lead).text;
-  const recent = renderBounded(rest.slice(lead.length), REPLAY_MAX_CHARS);
+  const body = rest.slice(lead.length);
+  let size = 0;
+  let keptAt = body.length;
+  let lastPrompt = -1;
+  for (let index = body.length - 1; index >= 0; index -= 1) {
+    const message = body[index]!;
+    size += (renderMessage(message)?.length ?? 0) + 2;
+    if (message.role === "user" && lastPrompt < 0) lastPrompt = index;
+    if (size > REBUILD_MAX_CHARS) break;
+    if (message.role === "user" || index === 0) keptAt = index;
+  }
+  if (keptAt === body.length && lastPrompt >= 0) keptAt = lastPrompt;
+  if (keptAt === body.length) keptAt = 0;
+  return {
+    resident: residentContextAsOf(earlier) ?? "",
+    lead,
+    dropped: body.slice(0, keptAt),
+    kept: body.slice(keptAt),
+    users,
+  };
+};
+
+/**
+ * A fresh session starts the way a compacted one does: the resident context
+ * whole with every change applied, then the summary of everything the replay
+ * drops when there is one (else what opens the context, whole), then the
+ * recent history.
+ */
+const rebuildPrompt = (replay: Replay, summary: string | undefined): { text: string; images: ImageContent[] } => {
+  const { resident, lead, dropped, kept, users } = replay;
+  const leadText = summary === undefined ? userPrompt(lead).text : "";
+  const recent = renderBounded(summary === undefined ? [...dropped, ...kept] : kept, REBUILD_MAX_CHARS);
   const history = [leadText ? `[user]\n${clip(leadText, LEAD_MAX_CHARS)}` : "", recent].filter(Boolean).join("\n\n");
   const request = userPrompt(users);
   const text = [
     resident,
+    summary === undefined ? "" : `${SUMMARY_PREFIX}${summary}${SUMMARY_SUFFIX}`,
     history
       ? `<conversation_history>\nThe conversation so far, for reference; it already happened.\n\n${history}\n</conversation_history>`
       : "",
@@ -524,6 +634,76 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     if (record.undelivered?.length === 0) delete record.undelivered;
   };
 
+  const emitStatus = (ref: ClaudeCodeSessionRef, status: ClaudeCodeStatus) => {
+    for (const listener of statusListeners) {
+      try {
+        listener(ref, status);
+      } catch (error) {
+        report(error);
+      }
+    }
+  };
+
+  /**
+   * The summary of the history `replay` drops: the one stored for the same
+   * segment, else (when `generate`) a new one in pi's compaction format,
+   * folding the stored summary of an earlier segment with what was dropped
+   * since. Each segment is summarized once; undefined when nothing is dropped
+   * or no summary can be had.
+   */
+  const replaySummary = async (
+    session: Session,
+    replay: Replay,
+    model: string,
+    generate: boolean,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> => {
+    const last = replay.dropped.at(-1);
+    const through = last ? messageKey(last) : undefined;
+    if (through === undefined) return undefined;
+    const record = (session.record ??= { seen: [] });
+    const stored = record.summary;
+    if (stored?.through === through) return stored.text;
+    const summarize = options.transport.summarize;
+    if (!generate || !summarize) return undefined;
+    const from = stored ? replay.dropped.findIndex((message) => messageKey(message) === stored.through) : -1;
+    const source = (from >= 0 ? replay.dropped.slice(from + 1) : [...replay.lead, ...replay.dropped])
+      .map(serializeForSummary)
+      .filter(Boolean)
+      .map((text) => clip(text, SUMMARY_SOURCE_MAX_CHARS));
+    const parts: string[][] = [];
+    let size = 0;
+    for (const text of source) {
+      if (parts.length === 0 || size + text.length > SUMMARY_SOURCE_MAX_CHARS) {
+        parts.push([]);
+        size = 0;
+      }
+      parts.at(-1)!.push(text);
+      size += text.length + 2;
+    }
+    let running = from >= 0 ? stored!.text : undefined;
+    const ref = session.binding.session;
+    emitStatus(ref, { state: "compacting", text: "Compacting context" });
+    try {
+      for (const part of parts) {
+        const earlier = running === undefined ? [] : [`[User]: ${SUMMARY_PREFIX}${running}${SUMMARY_SUFFIX}`];
+        const prompt = `<conversation>\n${[...earlier, ...part].join("\n\n")}\n</conversation>\n\n${SUMMARIZATION_PROMPT}`;
+        const text = (await summarize({ session: ref, model, systemPrompt: SUMMARIZATION_SYSTEM_PROMPT, prompt, ...(signal ? { signal } : {}) })).trim();
+        if (!text) return undefined;
+        running = text;
+      }
+    } catch (error) {
+      if (!signal?.aborted) report(error);
+      return undefined;
+    } finally {
+      emitStatus(ref, { state: "running", text: "Working" });
+    }
+    if (running === undefined) return undefined;
+    record.summary = { through, text: running };
+    await saveRecord(session);
+    return running;
+  };
+
   /** Messages the CLI never took in: the next turn carries them. */
   const holdUndelivered = (session: Session, messages: readonly Message[]) => {
     if (messages.length === 0) return;
@@ -640,6 +820,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const startTurn = async (
     session: Session,
     request: TurnRequest,
+    signal?: AbortSignal,
   ): Promise<Turn> => {
     const binding = session.binding;
     await options.transport.preflight?.(binding.session);
@@ -688,9 +869,14 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const backgroundWake =
       !request.prompt && arrived.length > 0 && arrived.every((message) => wakes?.has(textOf(message.content).trim()) === true);
     if (backgroundWake) for (const message of arrived) wakes?.delete(textOf(message.content).trim());
-    const rebuild = rebuildPrompt(conversation);
     const steering = request.prompt && resumeSessionId;
     const delta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
+    const replay = replayOf(conversation);
+    // Only a session that really starts over summarizes what it drops; a resumed one's fallback takes a stored summary.
+    const rebuild = rebuildPrompt(
+      replay,
+      await replaySummary(session, replay, request.model.id, !steering && !delta, signal),
+    );
     const baselineAt = conversation.findLastIndex((message) => residentContextKind(message) === "baseline");
     const baseline = baselineAt >= 0 ? messageKey(conversation[baselineAt]!) : undefined;
     // A CLI resumed past the baseline (re-baselined after its own compaction, or a session that predates
@@ -946,7 +1132,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           if (turn.unsent.length > 0 && request) {
             const steer = userPrompt(turn.unsent);
             try {
-              turn = await startTurn(turn.session, { ...request, prompt: steer, steered: turn.unsent });
+              turn = await startTurn(turn.session, { ...request, prompt: steer, steered: turn.unsent }, signal);
             } catch (error) {
               fail("error", markedError(error));
               return;
@@ -1205,7 +1391,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         clearTimeout(timer);
       }
       try {
-        turn = await startTurn(session, request);
+        turn = await startTurn(session, request, streamOptions?.signal);
       } catch (error) {
         fail(markedError(error));
         return;

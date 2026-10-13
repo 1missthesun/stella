@@ -107,6 +107,10 @@ const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
           ...(typeof parsed.cliSessionId === "string" ? { cliSessionId: parsed.cliSessionId } : {}),
           seen: Array.isArray(parsed.seen) ? parsed.seen.filter((entry): entry is string => typeof entry === "string") : [],
           ...(undelivered.length > 0 ? { undelivered } : {}),
+          ...(typeof parsed.context === "string" ? { context: parsed.context } : {}),
+          ...(typeof parsed.summary?.through === "string" && typeof parsed.summary.text === "string"
+            ? { summary: { through: parsed.summary.through, text: parsed.summary.text } }
+            : {}),
         };
       } catch {
         return undefined;
@@ -302,6 +306,26 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         claudeSessionSyncSink()?.consumeRestored({ threadId: ref.sessionKey, sessionId: restored });
       }
       return { text: result.text, sessionId: result.sessionId };
+    },
+    summarize: async ({ session: ref, model, systemPrompt, prompt, signal }) => {
+      const sessionKey = `${ref.sessionKey}:summary:${randomUUID()}`;
+      try {
+        const result = await runClaudeCodeTurn({
+          sessionKey,
+          modelId: `claude-code/${model}`,
+          stellaAppDir: dataDir(),
+          prompt,
+          systemPrompt,
+          ...(cwdOf(ref) ? { cwd: cwdOf(ref) } : {}),
+          tools: [],
+          nativeTools: [],
+          ...(signal ? { abortSignal: signal } : {}),
+          executeTool: async () => ({ error: "No tools are available while summarizing." }),
+        });
+        return result.text;
+      } finally {
+        closeClaudeCodeSessionWhenIdle(sessionKey);
+      }
     },
     close: (ref) => closeClaudeCodeSessionWhenIdle(ref.sessionKey),
   };

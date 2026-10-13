@@ -9,7 +9,8 @@ Chat is Stella's primary desktop surface. Stella is one long-running conversatio
 - `chat-send` shows the user turn or a visible provider/runtime failure.
 - `chat-dictation` records with a waveform pill. When the backend reports
   `streaming: true` on `GET /api/dictation/transcribe`, signed-in users stream
-  over `/dictation/socket` and see live partial text; a socket that fails ends
+  over `/dictation/socket` (Meta); the composer shows only "Listening…", the
+  waveform and the timer until stop, never partial words. A socket that fails ends
   the session with a visible dictation error. Otherwise the whole recording is
   transcribed when stopped (managed `/api/dictation/transcribe` with
   `elevenlabs/scribe-v2`, or the user's own OpenRouter key through

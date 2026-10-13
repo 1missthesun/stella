@@ -1,5 +1,6 @@
 import type { AgentStatus } from "./agent-status.js";
 import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
+import { stellaUsageLimitText } from "./stella-usage-limit.js";
 /**
  * Stella's chat on pi-durable, as its clients see it.
  *
@@ -517,7 +518,11 @@ export const piTerminalNotice = (message: {
   message.stopReason === "error"
     ? {
         phase: "failed",
-        notice: `Stella couldn't answer: ${message.errorMessage?.replace(ENGINE_ERROR_MARK, "").trim() || "the model request failed."}`,
+        // Stella's usage limit reads as the plan's own sentence, never a
+        // raw gateway error.
+        notice:
+          stellaUsageLimitText(message.errorMessage) ??
+          `Stella couldn't answer: ${message.errorMessage?.replace(ENGINE_ERROR_MARK, "").trim() || "the model request failed."}`,
       }
     : message.stopReason === "aborted"
       ? { phase: "canceled", notice: "Stopped." }

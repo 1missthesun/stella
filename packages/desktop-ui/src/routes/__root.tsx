@@ -91,6 +91,7 @@ import {
 import { FullShellDialogs } from "@/shell/full-shell-dialogs";
 import { SettingsDialogHost } from "@/shell/SettingsDialogHost";
 import { FeedbackDialogHost } from "@/shell/FeedbackDialogHost";
+import { PlanUsageDialogHost } from "@/shell/PlanUsageDialogHost";
 import {
   STELLA_COMPOSE_TEXT_EVENT,
   type StellaComposeTextDetail,
@@ -875,6 +876,8 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
       <SettingsDialogHost />
 
       <FeedbackDialogHost />
+
+      <PlanUsageDialogHost />
 
       <Suspense fallback={null}>
         <ProviderConnectedDialog />

@@ -11,6 +11,7 @@ import {
 } from '@/global/billing/capabilities'
 import { i18nFallback } from '@/shared/i18n/I18nProvider'
 import { showToast, type ToastOptions } from '@/ui/toast'
+import { planUsageDialog } from '@/global/billing/plan-usage-dialog-store'
 import { detectLlmRouteFailureKind } from "@stella/contracts/llm-route-failure"
 import {
   STELLA_USAGE_LIMIT_DESCRIPTIONS,
@@ -49,11 +50,7 @@ const claudeLoginEmailOf = (message: string): string | undefined =>
     message,
   )?.[1]
 
-const openBilling = () => {
-  void import('@/router').then(({ router }) => {
-    void router.navigate({ to: '/billing' })
-  })
-}
+const openBilling = () => planUsageDialog.open()
 const openSignInDialog = () => {
   void import('@/router').then(({ router }) => {
     void router.navigate({

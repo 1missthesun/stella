@@ -18,6 +18,7 @@ import {
   BILLING_UNAVAILABLE_MESSAGE,
   STELLA_USAGE_LIMIT_MESSAGES,
 } from "@stella/contracts/stella-usage-limit";
+import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import {
   CONVERSATION_ID_PATTERN,
   TURN_PLANE_PROTOCOL,
@@ -69,11 +70,7 @@ const FALLBACK_MESSAGES: Record<CloudTurnStartErrorCode, string> = {
   internal: "That didn't send. Try again.",
 };
 
-const openBilling = () => {
-  void import("@/router").then(({ router }) => {
-    void router.navigate({ to: "/billing" });
-  });
-};
+const openBilling = () => planUsageDialog.open();
 
 export const notifyCloudSubscriptionRequired = (message?: string): void => {
   void import("@/ui/toast").then(({ showToast }) => {

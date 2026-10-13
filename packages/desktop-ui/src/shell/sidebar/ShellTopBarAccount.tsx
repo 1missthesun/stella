@@ -1,8 +1,7 @@
+import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import {
   Fragment,
-  lazy,
-  Suspense,
   useCallback,
   useEffect,
   useRef,
@@ -39,11 +38,6 @@ import { useSettingsMenu } from "@/shell/topbar/use-settings-menu";
 import "./topbar-nav.css";
 import "./account-dialogs.css";
 
-const PlanUsageDialog = lazy(() =>
-  import("@/global/billing/PlanUsageDialog").then((module) => ({
-    default: module.PlanUsageDialog,
-  })),
-);
 
 type BillingPlanId = "free" | "go" | "pro" | "plus" | "ultra";
 
@@ -120,7 +114,6 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
 
   const pendingSignOutRef = useRef(false);
   const [signOutConfirmOpen, setSignOutConfirmOpen] = useState(false);
-  const [planUsageOpen, setPlanUsageOpen] = useState(false);
 
   // Settings destinations are folded into this menu while signed in, so its
   // close handler has to service both handoffs: a queued Theme/Connectors
@@ -251,7 +244,7 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
                 </DropdownMenuItem>
                 {index === 0 ? (
                   <DropdownMenuItem
-                    onClick={() => setPlanUsageOpen(true)}
+                    onClick={() => planUsageDialog.open()}
                     onMouseEnter={preloadBillingScreen}
                     onFocus={preloadBillingScreen}
                   >
@@ -279,11 +272,6 @@ export const ShellTopBarAccount = ({ onSignIn }: ShellTopBarAccountProps) => {
         </DropdownMenuContent>
       </DropdownMenu>
       {settingsPopovers}
-      {planUsageOpen ? (
-        <Suspense fallback={null}>
-          <PlanUsageDialog open onOpenChange={setPlanUsageOpen} />
-        </Suspense>
-      ) : null}
       <Dialog open={signOutConfirmOpen} onOpenChange={setSignOutConfirmOpen}>
         <DialogContent
           fit

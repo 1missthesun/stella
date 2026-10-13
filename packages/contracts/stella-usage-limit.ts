@@ -75,3 +75,21 @@ export const stellaUsageLimitOf = (text: string | null | undefined): StellaUsage
   if (PLAN_LIMIT_PATTERNS.some((pattern) => normalized.includes(pattern))) return "plan_limit";
   return null;
 };
+
+/**
+ * The plain sentence for an error text that names the usage limit: the
+ * message the gateway or backend sent (it may arrive inside a raw JSON
+ * error body), else the reason's standard wording. Null when the text is
+ * about something else.
+ */
+export const stellaUsageLimitText = (text: string | null | undefined): string | null => {
+  const reason = stellaUsageLimitOf(text);
+  if (!reason) return null;
+  const quoted = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(text ?? "")?.[1];
+  if (quoted) {
+    const unquoted = quoted.replace(/\\(.)/g, "$1").trim();
+    if (stellaUsageLimitOf(unquoted)) return unquoted;
+  }
+  const plain = (text ?? "").trim();
+  return plain && !/[{}]/.test(plain) && plain.length <= 240 ? plain : STELLA_USAGE_LIMIT_MESSAGES[reason];
+};

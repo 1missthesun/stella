@@ -19,6 +19,7 @@
  * is `getRestrictionActionKind` from `./audience`, the same rule the
  * model-restriction toasts already use.
  */
+import { planUsageDialog } from "./plan-usage-dialog-store";
 import {
   hasCapability,
   minimumPlanForCapability,
@@ -188,11 +189,7 @@ export const getCapabilityRestrictionDescription = (
 
 /* ── Toast ── */
 
-const openBilling = () => {
-  void import("@/router").then(({ router }) => {
-    void router.navigate({ to: "/billing" });
-  });
-};
+const openBilling = () => planUsageDialog.open();
 
 const openSignInDialog = () => {
   void import("@/router").then(({ router }) => {

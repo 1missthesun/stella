@@ -14,7 +14,7 @@
  * either case — this is purely a UX notice.
  */
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { router } from "@/router";
+import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import {
   getModelRestrictionActionLabel,
   getModelRestrictionDescription,
@@ -110,7 +110,7 @@ export function useTierRestrictedModelToast() {
       action: {
         label: getModelRestrictionActionLabel(audience),
         onClick: () => {
-          void router.navigate({ to: "/billing" });
+          planUsageDialog.open();
         },
       },
       secondaryAction: BYOK_TOAST_ACTION,

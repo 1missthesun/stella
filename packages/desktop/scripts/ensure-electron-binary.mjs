@@ -1,6 +1,11 @@
 import { spawnSync } from "node:child_process";
 import {
+  constants as fsConstants,
+  copyFileSync,
   existsSync,
+  readdirSync,
+  readlinkSync,
+  symlinkSync,
   mkdirSync,
   promises as fsPromises,
   readFileSync,
@@ -156,6 +161,70 @@ function extractZipNatively(zipPath, distDir) {
   throw new Error(`Failed to extract Electron zip: ${lastError}`);
 }
 
+// Every worktree has its own copy of the Electron package (bun hardlinks the
+// rest from its cache, but this binary is unpacked by us). Where the disk can
+// clone files copy-on-write (btrfs, XFS, APFS), unpack each version once next
+// to its cached zip and clone that into the worktree: ~0 extra bytes per
+// worktree instead of ~280 MB. Clones are independent, so a worktree that
+// patches its dist (dev app name) never touches the shared copy. Without
+// copy-on-write nothing is shared and we unpack as before.
+function canCloneBetween(fromFile, toDir) {
+  const probe = path.join(toDir, `.clone-probe-${process.pid}`);
+  try {
+    copyFileSync(fromFile, probe, fsConstants.COPYFILE_FICLONE_FORCE);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    rmSync(probe, { force: true });
+  }
+}
+
+// fs.cpSync ignores the clone flag and copies bytes, so walk the tree.
+function cloneTree(from, to) {
+  mkdirSync(to, { recursive: true });
+  for (const entry of readdirSync(from, { withFileTypes: true })) {
+    const source = path.join(from, entry.name);
+    const target = path.join(to, entry.name);
+    if (entry.isSymbolicLink()) {
+      symlinkSync(readlinkSync(source), target);
+    } else if (entry.isDirectory()) {
+      cloneTree(source, target);
+    } else {
+      copyFileSync(source, target, fsConstants.COPYFILE_FICLONE_FORCE);
+    }
+  }
+}
+
+function cloneSharedDist(zipPath, distDir, platformPath) {
+  if (process.platform === "win32") return false;
+  const parent = path.dirname(distDir);
+  if (!canCloneBetween(zipPath, parent)) return false;
+
+  const shared = `${zipPath}.unpacked`;
+  if (!existsSync(path.join(shared, platformPath))) {
+    // Unpack aside and rename into place, so the shared copy is only ever
+    // complete; if another install got there first, keep theirs.
+    const staging = `${shared}.${process.pid}`;
+    extractZipNatively(zipPath, staging);
+    try {
+      renameSync(staging, shared);
+    } catch {
+      rmSync(staging, { force: true, recursive: true });
+    }
+    if (!existsSync(path.join(shared, platformPath))) return false;
+  }
+
+  rmSync(distDir, { force: true, recursive: true });
+  try {
+    cloneTree(shared, distDir);
+    return true;
+  } catch {
+    rmSync(distDir, { force: true, recursive: true });
+    return false;
+  }
+}
+
 export async function ensureElectronBinary() {
   if (isElectronBinaryHealthy()) {
     return;
@@ -201,7 +270,11 @@ export async function ensureElectronBinary() {
   });
 
   const distDir = path.join(electronDir, "dist");
-  extractZipNatively(zipPath, distDir);
+  if (cloneSharedDist(zipPath, distDir, platformPath)) {
+    log("Cloned the shared unpacked Electron (copy-on-write).");
+  } else {
+    extractZipNatively(zipPath, distDir);
+  }
 
   // Mirror Electron's installer: hoist the bundled type definitions out of dist.
   const srcTypeDefPath = path.join(distDir, "electron.d.ts");

@@ -37,6 +37,12 @@ export type GlassIconButtonProps = {
   style?: StyleProp<ViewStyle>;
   iconStyle?: StyleProp<AnimatedStyle<StyleProp<ViewStyle>>>;
   accessibilityHidden?: boolean;
+  /**
+   * Keep the press inside the circle: a fill clipped to the button instead of
+   * Liquid Glass's interactive lift, which swells into a pill wider than the
+   * button. For buttons set close together or against an edge (popover footers).
+   */
+  containPress?: boolean;
 };
 
 /**
@@ -58,6 +64,7 @@ export function GlassIconButton({
   style,
   iconStyle,
   accessibilityHidden = false,
+  containPress = false,
 }: GlassIconButtonProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -79,38 +86,46 @@ export function GlassIconButton({
       style={({ pressed }) => [
         { height: size, width: size },
         style,
-        pressed && styles.pressed,
+        pressed && !containPress && styles.pressed,
       ]}
     >
-      <GlassSurface
-        glass="clear"
-        interactive
-        radius={radius}
-        fallbackColor={colors.surface}
-        style={[styles.glass, { borderRadius: radius }]}
-      >
-        <View
-          pointerEvents="none"
-          style={[StyleSheet.absoluteFill, styles.ring, { borderRadius: radius }]}
-        />
-        <View style={styles.content}>
-          {loading ? (
-            <ActivityIndicator size="small" color={colors.textMuted} />
-          ) : (
-            <Animated.View style={iconStyle}>
-              <Icon
-                name={icon}
-                size={iconSize}
-                color={muted ? colors.textMuted : colors.text}
-                weight={muted ? "regular" : "semibold"}
-              />
-            </Animated.View>
-          )}
-          {dot ? (
-            <View style={[styles.dot, { backgroundColor: dot }]} />
+      {({ pressed }) => (
+        <GlassSurface
+          glass="clear"
+          interactive={!containPress}
+          radius={radius}
+          fallbackColor={colors.surface}
+          style={[styles.glass, { borderRadius: radius }]}
+        >
+          <View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.ring, { borderRadius: radius }]}
+          />
+          {containPress && pressed ? (
+            <View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, styles.pressFill, { borderRadius: radius }]}
+            />
           ) : null}
-        </View>
-      </GlassSurface>
+          <View style={styles.content}>
+            {loading ? (
+              <ActivityIndicator size="small" color={colors.textMuted} />
+            ) : (
+              <Animated.View style={iconStyle}>
+                <Icon
+                  name={icon}
+                  size={iconSize}
+                  color={muted ? colors.textMuted : colors.text}
+                  weight={muted ? "regular" : "semibold"}
+                />
+              </Animated.View>
+            )}
+            {dot ? (
+              <View style={[styles.dot, { backgroundColor: dot }]} />
+            ) : null}
+          </View>
+        </GlassSurface>
+      )}
     </Pressable>
   );
 }
@@ -118,6 +133,7 @@ export function GlassIconButton({
 const makeStyles = (colors: Colors) =>
   StyleSheet.create({
     pressed: { opacity: 0.88 },
+    pressFill: { backgroundColor: fadeHex(colors.text, 0.12) },
     glass: {
       alignItems: "center",
       flex: 1,

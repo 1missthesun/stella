@@ -188,6 +188,7 @@ function ActionButton({ action }: { action: PopoverAction }) {
       icon={confirmed ? "check" : action.icon}
       size={POPOVER_BUTTON_SIZE}
       iconSize={18}
+      containPress
       accessibilityLabel={action.accessibilityLabel}
       loading={action.loading}
       disabled={action.disabled}
@@ -226,6 +227,7 @@ export function PopoverFooter({
         icon="x"
         size={POPOVER_BUTTON_SIZE}
         iconSize={18}
+        containPress
         accessibilityLabel={closeLabel}
         onPress={onClose}
       />

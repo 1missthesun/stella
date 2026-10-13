@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
-import { ShimmerText } from "./ShimmerText";
+import { TextShimmer } from "./TextShimmer";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import { StellaMarkIndicator } from "./stella-mark/StellaMarkIndicator";
 import {
   computeStillStatus,
@@ -57,6 +58,8 @@ interface WorkingIndicatorProps {
    * instead of trailing the delivered reply (mirrors the desktop handoff).
    */
   exitImmediately?: boolean;
+  /** False while the indicator is scrolled out of view; pauses the shimmer. */
+  onScreen?: boolean;
 }
 
 function SwapText({
@@ -165,21 +168,23 @@ function SwapText({
           pointerEvents="none"
         >
           <View style={styles.shimmerWrap}>
-            <ShimmerText
-              text={previous}
-              active={false}
-              color={colors.text}
-              textStyle={styles.statusText}
-            />
+            <Text
+              style={styles.statusText}
+              numberOfLines={1}
+              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+            >
+              {previous}
+            </Text>
           </View>
         </Animated.View>
       ) : null}
       <Animated.View style={[styles.swapLayer, inStyle]}>
         <View style={styles.shimmerWrap}>
-          <ShimmerText
+          <TextShimmer
             text={current}
             active={active}
-            color={colors.text}
+            color={colors.textStrong}
+            sweepColor={colors.textWeaker}
             textStyle={styles.statusText}
           />
         </View>
@@ -234,6 +239,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   toolName,
   toolCallId,
   exitImmediately = false,
+  onScreen = true,
 }: WorkingIndicatorProps) {
   const colors = useColors();
   const styles = useMemo(() => makeStyles(colors), [colors]);
@@ -458,7 +464,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
             {hasLabel ? (
               <SwapText
                 text={displayStatus}
-                active={active}
+                active={active && onScreen}
                 colors={colors}
                 styles={styles}
               />

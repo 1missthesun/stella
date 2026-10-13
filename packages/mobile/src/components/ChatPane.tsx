@@ -1885,10 +1885,11 @@ export function ChatPane({
           status={workingIndicator?.status}
           toolName={workingIndicator?.toolName}
           toolCallId={workingIndicator?.toolCallId}
+          onScreen={!scroll.tailOffscreen}
         />
       </View>
     ),
-    [streaming, workingIndicator, styles.chatTail],
+    [streaming, workingIndicator, styles.chatTail, scroll.tailOffscreen],
   );
 
   // Search shows a separate results menu that overlays the chat (the chat

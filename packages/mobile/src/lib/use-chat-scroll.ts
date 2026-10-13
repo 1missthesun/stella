@@ -19,6 +19,8 @@ import {
 const SCROLL_NEAR_BOTTOM_BASE_PX = 96;
 /** Base distance before showing the scroll-to-bottom FAB (plus trailing slack). */
 const SCROLL_AWAY_FROM_BOTTOM_BASE_PX = 96;
+/** Past the trailing slack plus this, the chat tail row is below the viewport. */
+const SCROLL_TAIL_OFFSCREEN_BASE_PX = 64;
 /** Re-arm stream auto-follow once the user scrolls back to the true bottom. */
 const SCROLL_AT_BOTTOM_THRESHOLD = 8;
 /** Quiet window after the last gesture frame before momentum is considered done. */
@@ -92,6 +94,8 @@ export function useChatScroll(
   const listLeadingInsetRef = useRef(listLeadingInsetPx);
   listLeadingInsetRef.current = listLeadingInsetPx;
   const [awayFromBottom, setAwayFromBottom] = useState(false);
+  const [tailOffscreen, setTailOffscreen] = useState(false);
+  const tailOffscreenLimit = SCROLL_TAIL_OFFSCREEN_BASE_PX + listTrailingSlackPx;
   const nearBottomLimit = SCROLL_NEAR_BOTTOM_BASE_PX + listTrailingSlackPx;
   const atBottomLimit = SCROLL_AT_BOTTOM_THRESHOLD + listTrailingSlackPx;
   const awayFromBottomLimit =
@@ -246,10 +250,12 @@ export function useChatScroll(
       }
 
       setAwayFromBottom(hasOverflow && distFromBottom > awayFromBottomLimit);
+      setTailOffscreen(hasOverflow && distFromBottom > tailOffscreenLimit);
     },
     [
       atBottomLimit,
       awayFromBottomLimit,
+      tailOffscreenLimit,
       nearBottomLimit,
       scheduleManualScrollSettle,
       setFollowArmed,
@@ -333,8 +339,11 @@ export function useChatScroll(
       setAwayFromBottom(
         contentHeight > layoutHeight + 2 && dist > awayFromBottomLimit,
       );
+      setTailOffscreen(
+        contentHeight > layoutHeight + 2 && dist > tailOffscreenLimit,
+      );
     },
-    [awayFromBottomLimit],
+    [awayFromBottomLimit, tailOffscreenLimit],
   );
 
   const stepFollow = useCallback(() => {
@@ -685,6 +694,7 @@ export function useChatScroll(
     releaseFollow,
     nudgeAfterSend,
     awayFromBottom,
+    tailOffscreen,
     isFollowingLatest,
   };
 }

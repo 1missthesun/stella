@@ -251,7 +251,9 @@ function SummaryPage({
     catchUp.done.length === 0 && catchUp.ongoing.length === 0 && catchUp.waiting.length === 0;
   return (
     <ScrollView
-      style={{ width, maxHeight }}
+      // A ScrollView shrinks by default; in the pager's row each page must
+      // stay exactly one pager wide or paging lands between pages.
+      style={{ width, maxHeight, flexGrow: 0, flexShrink: 0 }}
       contentContainerStyle={styles.page}
       showsVerticalScrollIndicator={false}
       nestedScrollEnabled
@@ -476,6 +478,7 @@ export function SummaryPopover({
               scrollEventThrottle={32}
               contentOffset={{ x: shown * pageWidth, y: 0 }}
               style={[styles.pages, { width: pageWidth }]}
+              contentContainerStyle={[styles.pagesRow, { width: pageWidth * total }]}
               testID="summary-pages"
             >
               {catchUps.map((catchUp, pageIndex) => (
@@ -585,6 +588,7 @@ const makeStyles = (colors: Colors) =>
       textAlign: "center",
     },
     pages: { flexGrow: 0, flexShrink: 1 },
+    pagesRow: { alignItems: "flex-start", flexDirection: "row" },
     page: { paddingBottom: 14, paddingHorizontal: 18, paddingTop: 6 },
     status: { color: colors.textMuted, fontFamily: fonts.sans.regular, fontSize: 15 },
     failed: { alignItems: "flex-start", gap: 10 },

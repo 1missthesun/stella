@@ -18,8 +18,18 @@ const securityHeadersFor = (pathname: string, response: Response): Record<string
   return null;
 };
 
+const isAuthPath = (pathname: string): boolean =>
+  pathname.startsWith("/api/auth/") || pathname.startsWith("/api/slack/link");
+
 export const withSecurityHeaders = (request: Request, response: Response): Response => {
-  const changes = securityHeadersFor(new URL(request.url).pathname, response);
+  const pathname = new URL(request.url).pathname;
+  const changes = securityHeadersFor(pathname, response);
+  if (isAuthPath(pathname) && response.status !== 101 && !response.webSocket && !response.headers.has("referrer-policy")) {
+    const secured = new Response(response.body, response);
+    for (const [name, value] of Object.entries(changes ?? {})) secured.headers.set(name, value);
+    secured.headers.set("referrer-policy", "no-referrer");
+    return secured;
+  }
   if (!changes) return response;
   const secured = new Response(response.body, response);
   for (const [name, value] of Object.entries(changes)) secured.headers.set(name, value);

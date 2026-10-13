@@ -200,6 +200,9 @@ const worker = {
     ) {
       changes["X-Content-Type-Options"] = "nosniff";
     }
+    if (!response.headers.has("Referrer-Policy")) {
+      changes["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    }
     return withHeaders(response, changes, ["X-Powered-By"]);
   },
 };

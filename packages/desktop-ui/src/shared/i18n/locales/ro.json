@@ -267,6 +267,22 @@
       },
       "voiceSession": {
         "label": "Ai vorbit cu Stella"
+      },
+      "catchUp": {
+        "pill": "Rezumat",
+        "pillLabel": "Rezumă {count} mesaje noi",
+        "title": "Rezumat",
+        "done": "Gata",
+        "ongoing": "În desfășurare",
+        "waiting": "Așteaptă răspunsul tău",
+        "loading": "Se rezumă…",
+        "failed": "Rezumatul nu a putut fi scris.",
+        "retry": "Încearcă din nou",
+        "empty": "Nimic nou de menționat.",
+        "you": "Tu",
+        "stella": "Stella",
+        "close": "Închide",
+        "notLoaded": "Mesajul nu mai este în conversație."
       }
     },
     "media": {

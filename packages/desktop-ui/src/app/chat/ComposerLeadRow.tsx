@@ -13,19 +13,27 @@ import {
   AssistantReplyPeek,
   type AssistantReplyPeekProps,
 } from "@/app/chat/AssistantReplyPeek";
+import { CatchUpPill } from "@/features/catch-up/CatchUpPill";
 
 type ComposerLeadRowProps = {
   /** When present, the assistant reply peek renders flush above the row. */
   replyPeek?: AssistantReplyPeekProps | null;
+  /** The conversation whose "Catch up" pill leads the row, if any. */
+  catchUpConversationId?: string | null;
 };
 
 export const ComposerLeadRow = memo(function ComposerLeadRow({
   replyPeek,
+  catchUpConversationId,
 }: ComposerLeadRowProps) {
   return (
     <div className="composer-context-peek-anchor">
       {replyPeek ? <AssistantReplyPeek {...replyPeek} /> : null}
-      <div className="composer-context-lead-row" />
+      <div className="composer-context-lead-row">
+        {catchUpConversationId ? (
+          <CatchUpPill conversationId={catchUpConversationId} />
+        ) : null}
+      </div>
     </div>
   );
 });

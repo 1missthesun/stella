@@ -262,6 +262,22 @@
       },
       "voiceSession": {
         "label": "Met Stella gepraat"
+      },
+      "catchUp": {
+        "pill": "Samenvatting",
+        "pillLabel": "{count} nieuwe berichten samenvatten",
+        "title": "Samenvatting",
+        "done": "Klaar",
+        "ongoing": "Bezig",
+        "waiting": "Wacht op jou",
+        "loading": "Samenvatten…",
+        "failed": "Deze samenvatting kon niet worden geschreven.",
+        "retry": "Opnieuw",
+        "empty": "Niets nieuws om te melden.",
+        "you": "Jij",
+        "stella": "Stella",
+        "close": "Sluiten",
+        "notLoaded": "Dat bericht staat niet meer in de chat."
       }
     },
     "media": {

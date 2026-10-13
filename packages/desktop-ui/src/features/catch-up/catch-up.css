@@ -1,0 +1,322 @@
+/* ============================================================
+   Catch up — the pill that leads the composer after a busy stretch, and
+   the popover of saved catch-ups it opens. The pill shares the composer's
+   soft panel surface; the popover matches the report popover's fill.
+   ============================================================ */
+
+.catch-up-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 28px;
+  margin-bottom: 6px;
+  padding: 0 10px 0 9px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-surface-border);
+  background: var(--panel-surface-bg-gradient), var(--background);
+  box-shadow: var(--panel-surface-highlight);
+  color: var(--text-base);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.3;
+  cursor: default;
+  animation: catch-up-pill-in 180ms ease-out;
+  transition:
+    border-color 160ms ease,
+    color 120ms ease;
+}
+
+@keyframes catch-up-pill-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.catch-up-pill:hover,
+.catch-up-pill[data-open] {
+  border-color: var(--panel-surface-border-hover);
+  color: var(--text-strong);
+}
+
+.catch-up-pill:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.catch-up-pill .stella-icon {
+  color: var(--text-weak);
+}
+
+.catch-up-pill__label {
+  font-weight: var(--weight-medium);
+  white-space: nowrap;
+}
+
+.catch-up-pill__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--primary) 16%, transparent);
+  color: var(--text-strong);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Popover ─────────────────────────────────────────────── */
+
+[data-component="popover-content"].catch-up-popover {
+  width: min(30rem, calc(100vw - 32px));
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+  border-radius: var(--radius-3xl);
+  background-color: var(--background);
+  background-image: var(--chat-assistant-bubble-fill);
+  color: var(--chat-assistant-bubble-text);
+}
+
+.catch-up {
+  display: flex;
+  flex-direction: column;
+  /* One page at a time: the scroller is exactly a page tall. */
+  --catch-up-page-height: min(26rem, 60vh);
+}
+
+.catch-up__bar {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 8px 8px 4px 16px;
+  box-sizing: border-box;
+}
+
+.catch-up__title {
+  flex: 1;
+  font-size: var(--font-size-sm, 12.5px);
+  font-weight: 600;
+}
+
+.catch-up__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: default;
+}
+
+.catch-up__close:hover {
+  background: var(--surface-hover, var(--surface-inset));
+  color: var(--foreground);
+}
+
+.catch-up__close:focus-visible {
+  outline: 2px solid var(--ring, var(--primary));
+  outline-offset: 1px;
+}
+
+/* Saved catch-ups, oldest first, newest at the bottom: each one fills the
+   scroller and snaps into place, so the history pages up and down. */
+.catch-up__pages {
+  height: var(--catch-up-page-height);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+}
+
+.catch-up__pages::-webkit-scrollbar {
+  display: none;
+}
+
+.catch-up-page {
+  box-sizing: border-box;
+  min-height: var(--catch-up-page-height);
+  padding: 4px 16px 16px;
+  scroll-snap-align: start;
+  user-select: text;
+}
+
+.catch-up-page + .catch-up-page {
+  border-top: 1px solid color-mix(in srgb, var(--chat-assistant-bubble-text) 10%, transparent);
+  padding-top: 12px;
+}
+
+.catch-up-page__head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.catch-up-page__when {
+  flex: 1;
+  color: var(--text-strong);
+  font-size: var(--font-size-base);
+  font-weight: var(--weight-semibold);
+}
+
+.catch-up-page__count {
+  color: var(--muted-foreground);
+  font-size: var(--font-size-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.catch-up-page__status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-base);
+}
+
+.catch-up-shimmer {
+  background: linear-gradient(
+      90deg,
+      var(--muted-foreground) 0%,
+      var(--text-strong) 50%,
+      var(--muted-foreground) 100%
+    )
+    0 0 / 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: catch-up-shimmer 1.4s linear infinite;
+}
+
+@keyframes catch-up-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .catch-up-shimmer {
+    animation: none;
+    color: var(--muted-foreground);
+  }
+  .catch-up-pill {
+    animation: none;
+  }
+}
+
+.catch-up-retry {
+  padding: 5px 12px;
+  border: 1px solid var(--panel-surface-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-strong);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  cursor: default;
+}
+
+.catch-up-retry:hover {
+  border-color: var(--panel-surface-border-hover);
+}
+
+.catch-up-page__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.catch-up-section__title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  color: var(--muted-foreground);
+  font-size: var(--font-size-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.catch-up-section[data-kind="waiting"] .catch-up-section__title {
+  color: var(--primary);
+}
+
+.catch-up-section__items {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catch-up-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+  row-gap: 3px;
+  color: var(--chat-assistant-bubble-text);
+  font-size: var(--font-size-base);
+  line-height: 1.4;
+}
+
+.catch-up-item__links {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.catch-up-link {
+  padding: 1px 7px;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--chat-assistant-bubble-text) 7%, transparent);
+  color: var(--muted-foreground);
+  font: inherit;
+  font-size: var(--font-size-2xs);
+  white-space: nowrap;
+  cursor: default;
+}
+
+.catch-up-link:hover {
+  background: color-mix(in srgb, var(--chat-assistant-bubble-text) 13%, transparent);
+  color: var(--text-strong);
+}
+
+.catch-up-link:focus-visible {
+  outline: 2px solid var(--ring, var(--primary));
+  outline-offset: 1px;
+}
+
+/* The message a catch-up link landed on, briefly. */
+.chat-jump-flash {
+  position: absolute;
+  inset: -4px -10px;
+  border-radius: var(--radius-xl);
+  background: color-mix(in oklch, var(--primary) 12%, transparent);
+  pointer-events: none;
+  animation: chat-jump-flash 1.8s ease-out forwards;
+}
+
+@keyframes chat-jump-flash {
+  0%,
+  35% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}

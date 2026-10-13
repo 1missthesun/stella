@@ -267,6 +267,22 @@
       },
       "voiceSession": {
         "label": "שיחה עם Stella"
+      },
+      "catchUp": {
+        "pill": "תקציר",
+        "pillLabel": "תקציר של {count} הודעות חדשות",
+        "title": "תקציר",
+        "done": "הושלם",
+        "ongoing": "בתהליך",
+        "waiting": "ממתין לך",
+        "loading": "מסכם…",
+        "failed": "לא ניתן היה לכתוב את התקציר.",
+        "retry": "נסה שוב",
+        "empty": "אין חדש שראוי לציין.",
+        "you": "את/ה",
+        "stella": "Stella",
+        "close": "סגירה",
+        "notLoaded": "ההודעה הזו כבר לא נמצאת בצ׳אט."
       }
     },
     "media": {

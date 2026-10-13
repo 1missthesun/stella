@@ -340,6 +340,7 @@ export const ChatColumn = memo(function ChatColumn({
         onStop={composer.onStop}
         isDragOver={isDragOver}
         replyPeek={replyPeek}
+        catchUp={surface === "chat"}
         suggestionsActive={isActiveSurface}
       />
     );
@@ -438,6 +439,8 @@ export const ChatColumn = memo(function ChatColumn({
                   contentContainerStyle={FULL_CHAT_CONTENT_STYLE}
                   estimatedItemSize={140}
                   extraTail={chatTail}
+                  takesMessageJumps
+                  onLoadOlder={conversation.history.loadOlder}
                 />
               </MessageReplyContext.Provider>
 

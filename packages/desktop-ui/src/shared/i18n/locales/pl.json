@@ -272,6 +272,22 @@
       },
       "voiceSession": {
         "label": "Rozmowa ze Stellą"
+      },
+      "catchUp": {
+        "pill": "Podsumowanie",
+        "pillLabel": "Podsumuj {count} nowych wiadomości",
+        "title": "Podsumowanie",
+        "done": "Zrobione",
+        "ongoing": "W toku",
+        "waiting": "Czeka na Ciebie",
+        "loading": "Podsumowuję…",
+        "failed": "Nie udało się napisać podsumowania.",
+        "retry": "Spróbuj ponownie",
+        "empty": "Nic nowego wartego uwagi.",
+        "you": "Ty",
+        "stella": "Stella",
+        "close": "Zamknij",
+        "notLoaded": "Tej wiadomości nie ma już w czacie."
       }
     },
     "media": {

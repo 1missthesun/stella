@@ -267,6 +267,22 @@
       },
       "voiceSession": {
         "label": "Hai parlato con Stella"
+      },
+      "catchUp": {
+        "pill": "Riepilogo",
+        "pillLabel": "Riepiloga {count} nuovi messaggi",
+        "title": "Riepilogo",
+        "done": "Fatto",
+        "ongoing": "In corso",
+        "waiting": "In attesa di te",
+        "loading": "Riepilogo in corso…",
+        "failed": "Impossibile scrivere questo riepilogo.",
+        "retry": "Riprova",
+        "empty": "Niente di nuovo da segnalare.",
+        "you": "Tu",
+        "stella": "Stella",
+        "close": "Chiudi",
+        "notLoaded": "Quel messaggio non è più nella chat."
       }
     },
     "media": {

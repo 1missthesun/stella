@@ -257,6 +257,22 @@
       },
       "voiceSession": {
         "label": "Berbicara dengan Stella"
+      },
+      "catchUp": {
+        "pill": "Ringkasan",
+        "pillLabel": "Ringkas {count} pesan baru",
+        "title": "Ringkasan",
+        "done": "Selesai",
+        "ongoing": "Sedang berjalan",
+        "waiting": "Menunggu Anda",
+        "loading": "Meringkas…",
+        "failed": "Ringkasan ini gagal ditulis.",
+        "retry": "Coba lagi",
+        "empty": "Tidak ada hal baru yang penting.",
+        "you": "Anda",
+        "stella": "Stella",
+        "close": "Tutup",
+        "notLoaded": "Pesan itu sudah tidak ada di chat."
       }
     },
     "media": {

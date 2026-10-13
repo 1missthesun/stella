@@ -871,6 +871,7 @@ export function useFullShellChat({
         isLoadingOlder: isLoadingOlderMessages,
         isLoadingNewer: isLoadingNewerMessages,
         isInitialLoading: isInitialLoadingMessages,
+        loadOlder: loadOlderMessages,
       },
     }),
     [
@@ -893,6 +894,7 @@ export function useFullShellChat({
       tasks,
       loadOlderActivity,
       loadOlderFiles,
+      loadOlderMessages,
       pendingUserMessageId,
       persistedFiles,
       queuedUserMessages,

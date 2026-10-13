@@ -92,6 +92,8 @@ export type ChatColumnConversation = {
     isLoadingOlder: boolean;
     isLoadingNewer: boolean;
     isInitialLoading: boolean;
+    /** Page in older messages (a catch-up link to one not loaded yet). */
+    loadOlder?: () => boolean | void | Promise<boolean>;
   };
 };
 

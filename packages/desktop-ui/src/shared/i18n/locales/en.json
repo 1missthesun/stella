@@ -262,6 +262,22 @@
       },
       "voiceSession": {
         "label": "Talked with Stella"
+      },
+      "catchUp": {
+        "pill": "Summary",
+        "pillLabel": "Summary of {count} new messages",
+        "title": "Summary",
+        "done": "Done",
+        "ongoing": "In progress",
+        "waiting": "Waiting on you",
+        "loading": "Summarizing…",
+        "failed": "Couldn't write this summary.",
+        "retry": "Try again",
+        "empty": "Nothing new worth noting.",
+        "you": "You",
+        "stella": "Stella",
+        "close": "Close",
+        "notLoaded": "That message is no longer in the chat."
       }
     },
     "media": {

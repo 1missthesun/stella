@@ -78,6 +78,8 @@ type ComposerProps = {
   onStop: () => void;
   isDragOver?: boolean;
   replyPeek?: AssistantReplyPeekProps | null;
+  /** Shows the "Catch up" pill above the composer (the main chat only). */
+  catchUp?: boolean;
   suggestionsActive?: boolean;
 };
 
@@ -96,6 +98,7 @@ function ComposerImpl({
   onStop,
   isDragOver = false,
   replyPeek,
+  catchUp = false,
   suggestionsActive = true,
 }: ComposerProps) {
   const t = useT();
@@ -270,7 +273,10 @@ function ComposerImpl({
 
   return (
     <div className="composer">
-      <ComposerLeadRow replyPeek={replyPeek} />
+      <ComposerLeadRow
+        replyPeek={replyPeek}
+        catchUpConversationId={catchUp ? conversationId : null}
+      />
       <div
         ref={shellRef}
         className={`composer-shell${isDragOver ? " composer-shell--drag-over" : ""}`}

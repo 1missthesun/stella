@@ -60,6 +60,9 @@ type Props = {
   estimatedItemSize?: number;
   extraTail?: React.ReactNode;
   alignItemsAtEnd?: boolean;
+  /** Threaded through to `<ChatTimeline>`: catch-up links land here. */
+  takesMessageJumps?: boolean;
+  onLoadOlder?: () => boolean | void | Promise<boolean>;
 };
 
 /**
@@ -176,6 +179,8 @@ export const ConversationEvents = memo(function ConversationEvents({
   estimatedItemSize,
   extraTail,
   alignItemsAtEnd,
+  takesMessageJumps,
+  onLoadOlder,
 }: Props) {
   // Task titles from the runtime's Activity list give reply context the
   // thread behind a spawn whose journal row only recorded a description.
@@ -249,6 +254,8 @@ export const ConversationEvents = memo(function ConversationEvents({
       estimatedItemSize={estimatedItemSize}
       extraTail={extraTail}
       alignItemsAtEnd={alignItemsAtEnd}
+      takesMessageJumps={takesMessageJumps}
+      onLoadOlder={onLoadOlder}
     />
   );
 });

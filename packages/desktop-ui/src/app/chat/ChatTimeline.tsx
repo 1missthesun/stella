@@ -47,6 +47,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type RefObject,
 } from "react";
@@ -80,6 +81,12 @@ import { notifyChatContentGrowth } from "@/shell/chat-scroll-follow";
 import { UserAskRecordCard } from "@/features/user-ask/UserAskRecordCard";
 import { useConversationUserAskRecords } from "@/features/user-ask/user-ask-store";
 import { useT } from "@/shared/i18n";
+import { showToast } from "@/ui/toast";
+import {
+  finishMessageJump,
+  readMessageJump,
+  subscribeMessageJump,
+} from "@/features/catch-up/message-jump";
 
 type ChatTimelineProps = {
   rows: EventRowViewModel[];
@@ -151,7 +158,18 @@ type ChatTimelineProps = {
    * still managed by Legend.
    */
   contentContainerStyle?: CSSProperties;
+  /**
+   * This timeline takes catch-up links (`requestMessageJump`) for its
+   * conversation, paging older messages in with `onLoadOlder` when needed.
+   * Only the main chat column does.
+   */
+  takesMessageJumps?: boolean;
+  onLoadOlder?: () => boolean | void | Promise<boolean>;
 };
+
+/** Older pages a jump may load looking for its message before giving up. */
+const MESSAGE_JUMP_MAX_PAGES = 8;
+const MESSAGE_JUMP_FLASH_MS = 1_800;
 
 /* ------------------------------------------------------------------
  * Chat vertical-rhythm contract — the BETWEEN-rows half.
@@ -351,6 +369,8 @@ export const ChatTimeline = memo(function ChatTimeline({
   estimatedItemSize = 120,
   className,
   contentContainerStyle,
+  takesMessageJumps = false,
+  onLoadOlder,
 }: ChatTimelineProps) {
   const t = useT();
   const [replyHandoffController] = useState(createReplyHandoffController);
@@ -429,6 +449,65 @@ export const ChatTimeline = memo(function ChatTimeline({
   useEffect(() => {
     if (tailUserRowId) replyHandoffController.userMessageSent();
   }, [replyHandoffController, tailUserRowId]);
+  // A catch-up link: scroll its message into view and flash it, paging
+  // older history in until it shows up.
+  const messageJump = useSyncExternalStore(subscribeMessageJump, readMessageJump);
+  const [flashItemId, setFlashItemId] = useState<string | null>(null);
+  const jumpPagesRef = useRef<{ requestId: number; pages: number } | null>(null);
+  useEffect(() => {
+    if (!takesMessageJumps || !messageJump || !conversationId) return;
+    if (messageJump.conversationId !== conversationId) return;
+    const ids = new Set(messageJump.messageIds);
+    const index = listItems.findIndex(
+      (item) =>
+        item.type === "message" &&
+        (ids.has(item.id) ||
+          (item.row.kind === "assistant" &&
+            item.row.sourceMessageId !== undefined &&
+            ids.has(item.row.sourceMessageId))),
+    );
+    if (index >= 0) {
+      finishMessageJump(messageJump.requestId);
+      jumpPagesRef.current = null;
+      void listRef?.current?.scrollToIndex({
+        index,
+        animated: true,
+        viewPosition: 0.2,
+      });
+      setFlashItemId(listItems[index]!.id);
+      return;
+    }
+    if (isLoadingOlder) return;
+    const progress =
+      jumpPagesRef.current?.requestId === messageJump.requestId
+        ? jumpPagesRef.current
+        : { requestId: messageJump.requestId, pages: 0 };
+    jumpPagesRef.current = progress;
+    if (!hasOlderEvents || !onLoadOlder || progress.pages >= MESSAGE_JUMP_MAX_PAGES) {
+      finishMessageJump(messageJump.requestId);
+      jumpPagesRef.current = null;
+      showToast({ title: t("app.chat.catchUp.notLoaded") });
+      return;
+    }
+    progress.pages += 1;
+    void onLoadOlder();
+  }, [
+    conversationId,
+    hasOlderEvents,
+    isLoadingOlder,
+    listItems,
+    listRef,
+    messageJump,
+    onLoadOlder,
+    t,
+    takesMessageJumps,
+  ]);
+  useEffect(() => {
+    if (!flashItemId) return;
+    const timer = window.setTimeout(() => setFlashItemId(null), MESSAGE_JUMP_FLASH_MS);
+    return () => window.clearTimeout(timer);
+  }, [flashItemId]);
+
   const renderedMessageRowCount = listItems.reduce(
     (count, item) => count + (item.type === "message" ? 1 : 0),
     0,
@@ -463,16 +542,21 @@ export const ChatTimeline = memo(function ChatTimeline({
           )
         );
       // The divider rides inside the row's own virtualized item, so it is
-      // measured and recycled with it (mobile nests it the same way).
-      if (item.timeHeaderMs === undefined) return row;
+      // measured and recycled with it (mobile nests it the same way). The
+      // fragment keeps one shape so a jump's flash never remounts the row.
       return (
         <>
-          <ChatTimeDivider timestampMs={item.timeHeaderMs} />
+          {item.timeHeaderMs === undefined ? null : (
+            <ChatTimeDivider timestampMs={item.timeHeaderMs} />
+          )}
           {row}
+          {flashItemId === item.id ? (
+            <div className="chat-jump-flash" aria-hidden="true" />
+          ) : null}
         </>
       );
     },
-    [agentModelConfigByThread, conversationId, indicator, onCancelQueued],
+    [agentModelConfigByThread, conversationId, flashItemId, indicator, onCancelQueued],
   );
 
   const keyExtractor = useCallback((item: TimelineListItem) => item.id, []);

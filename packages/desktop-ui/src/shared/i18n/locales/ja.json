@@ -257,6 +257,22 @@
       },
       "voiceSession": {
         "label": "Stella と会話しました"
+      },
+      "catchUp": {
+        "pill": "まとめ",
+        "pillLabel": "新着 {count} 件をまとめる",
+        "title": "まとめ",
+        "done": "完了",
+        "ongoing": "進行中",
+        "waiting": "あなたの返答待ち",
+        "loading": "まとめています…",
+        "failed": "まとめを作成できませんでした。",
+        "retry": "再試行",
+        "empty": "特に新しいことはありません。",
+        "you": "あなた",
+        "stella": "Stella",
+        "close": "閉じる",
+        "notLoaded": "そのメッセージはもうチャットにありません。"
       }
     },
     "media": {

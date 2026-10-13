@@ -257,6 +257,22 @@
       },
       "voiceSession": {
         "label": "Đã trò chuyện với Stella"
+      },
+      "catchUp": {
+        "pill": "Tóm tắt",
+        "pillLabel": "Tóm tắt {count} tin nhắn mới",
+        "title": "Tóm tắt",
+        "done": "Đã xong",
+        "ongoing": "Đang thực hiện",
+        "waiting": "Đang chờ bạn",
+        "loading": "Đang tóm tắt…",
+        "failed": "Không thể viết bản tóm tắt này.",
+        "retry": "Thử lại",
+        "empty": "Không có gì mới đáng chú ý.",
+        "you": "Bạn",
+        "stella": "Stella",
+        "close": "Đóng",
+        "notLoaded": "Tin nhắn đó không còn trong cuộc trò chuyện."
       }
     },
     "media": {

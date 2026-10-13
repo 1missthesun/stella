@@ -262,6 +262,22 @@
       },
       "voiceSession": {
         "label": "Talte med Stella"
+      },
+      "catchUp": {
+        "pill": "Opsummering",
+        "pillLabel": "Opsummer {count} nye beskeder",
+        "title": "Opsummering",
+        "done": "Færdigt",
+        "ongoing": "I gang",
+        "waiting": "Venter på dig",
+        "loading": "Opsummerer…",
+        "failed": "Kunne ikke skrive opsummeringen.",
+        "retry": "Prøv igen",
+        "empty": "Intet nyt værd at nævne.",
+        "you": "Dig",
+        "stella": "Stella",
+        "close": "Luk",
+        "notLoaded": "Den besked er ikke længere i chatten."
       }
     },
     "media": {

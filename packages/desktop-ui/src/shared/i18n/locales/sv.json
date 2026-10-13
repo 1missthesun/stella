@@ -262,6 +262,22 @@
       },
       "voiceSession": {
         "label": "Pratade med Stella"
+      },
+      "catchUp": {
+        "pill": "Sammanfattning",
+        "pillLabel": "Sammanfatta {count} nya meddelanden",
+        "title": "Sammanfattning",
+        "done": "Klart",
+        "ongoing": "Pågår",
+        "waiting": "Väntar på dig",
+        "loading": "Sammanfattar…",
+        "failed": "Det gick inte att skriva sammanfattningen.",
+        "retry": "Försök igen",
+        "empty": "Inget nytt värt att nämna.",
+        "you": "Du",
+        "stella": "Stella",
+        "close": "Stäng",
+        "notLoaded": "Meddelandet finns inte längre i chatten."
       }
     },
     "media": {

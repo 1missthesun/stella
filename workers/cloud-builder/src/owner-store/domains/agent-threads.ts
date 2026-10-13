@@ -70,7 +70,12 @@ import {
 } from "@stella/contracts/backend/agent-threads";
 import { CONVERSATION_TITLE_MAX } from "@stella/contracts/backend/conversations";
 import { readMainConversationId } from "./conversations.js";
-import { agentReportId, agentReportReceipt } from "@stella/contracts/backend/agent-reports";
+import {
+  AGENT_REPORT_MAX_CHARS,
+  AGENT_REPORT_NOTE_MAX_CHARS,
+  agentReportId,
+  agentReportReceipt,
+} from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
@@ -2273,6 +2278,13 @@ const routeStop = async (
   deviceId: string | null,
 ): Promise<Routed> => {
   const { thread } = input;
+  // Waiting on the user (a question, a usage-limit hold): nothing runs, but
+  // it is not over either, so the stop ends the wait. Left waiting, it would
+  // hold back the report of the agent that started it.
+  if (thread.status === "waiting_for_user") {
+    await markWaitingThreadStopped(ctx, thread, input.source, input.commandId);
+    return { outcome: "stopped" };
+  }
   if (!ACTIVE_STATUSES.has(thread.status)) {
     return {
       outcome: "not_running",
@@ -2662,6 +2674,46 @@ const markLocalThreadStopped = async (
         thread.thread_id,
         thread.attempt_generation,
       ),
+  );
+  const stopped = readThread(ctx.db, thread.thread_id);
+  if (stopped?.status === "canceled" && stopped.attempt_generation === thread.attempt_generation) {
+    await postAgentLifecycleCard(ctx, stopped, { kind: "canceled", text: AGENT_STOPPED_REASON });
+  }
+};
+
+const markWaitingThreadStopped = async (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  source: string,
+  commandId: string,
+): Promise<void> => {
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: thread.thread_id,
+      kind: endedKind,
+      outcome: "canceled",
+      source,
+      detail: { commandId, wasWaitingForUser: true, stopped: true },
+      now: ctx.now,
+    },
+    () => {
+      ctx.db.run(
+        `UPDATE agent_turns SET status = 'canceled', updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ? AND status = 'waiting_for_user'`,
+        ctx.now,
+        thread.thread_id,
+        thread.attempt_generation,
+      );
+      ctx.db.run(
+        `UPDATE agent_threads SET status = 'canceled', error_message = ?, updated_at = ?
+          WHERE thread_id = ? AND attempt_generation = ? AND status = 'waiting_for_user'`,
+        AGENT_STOPPED_REASON,
+        ctx.now,
+        thread.thread_id,
+        thread.attempt_generation,
+      );
+    },
   );
   const stopped = readThread(ctx.db, thread.thread_id);
   if (stopped?.status === "canceled" && stopped.attempt_generation === thread.attempt_generation) {
@@ -3938,8 +3990,8 @@ export const agentThreadsDomain = {
         originDeviceId: id(256),
         attemptGeneration: number({ int: true, min: 1 }),
         status: literal("completed", "failed", "canceled", "paused"),
-        result: optional(string({ max: 30_000 })),
-        error: optional(string({ max: 10_000 })),
+        result: optional(string({ max: AGENT_REPORT_MAX_CHARS + AGENT_REPORT_NOTE_MAX_CHARS })),
+        error: optional(string({ max: AGENT_REPORT_MAX_CHARS + AGENT_REPORT_NOTE_MAX_CHARS })),
       }),
       handler: completeComputerThread,
     },

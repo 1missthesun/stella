@@ -1,3 +1,4 @@
+import { AGENT_REPORT_MAX_CHARS } from "@stella/contracts/backend/agent-reports";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
 import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
@@ -466,7 +467,7 @@ export const piChatsFor = (
             attemptGeneration: agent.attempt,
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
             ...(agent.outcome === "completed"
-              ? { status: "completed" as const, ...(agent.text ? { result: agent.text.slice(0, 30_000) } : {}) }
+              ? { status: "completed" as const, ...(agent.text ? { result: agent.text.slice(0, AGENT_REPORT_MAX_CHARS) } : {}) }
               : agent.outcome === "failed"
                 ? { status: "error" as const, error: (agent.text || "The agent failed.").slice(0, 10_000) }
                 : { status: "canceled" as const, error: (agent.text || AGENT_STOPPED_REASON).slice(0, 10_000) }),

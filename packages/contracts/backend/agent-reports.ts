@@ -7,6 +7,15 @@ export const agentReportId = (
 
 export const AGENT_REPORT_RECEIPT_MAX_CHARS = 64;
 
+/**
+ * The most of an agent's report any host carries, on every path (the agent
+ * loop, the device, the cloud ledger). A longer one is shortened with a note
+ * saying so; every limit on the way allows this plus that note.
+ */
+export const AGENT_REPORT_MAX_CHARS = 200_000;
+/** Room for the note a shortened report carries. */
+export const AGENT_REPORT_NOTE_MAX_CHARS = 1_000;
+
 const TWO_32 = 0x1_0000_0000;
 
 const fnv1a64 = (text: string): string => {

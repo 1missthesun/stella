@@ -4,6 +4,7 @@ import {
   agentReportReceipt,
   type AgentReportOutcome,
   type DeviceAgentReport,
+  AGENT_REPORT_MAX_CHARS,
 } from "@stella/contracts/backend/agent-reports";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
 import { agentChangeHooks, appendAgentEvent } from "./agent-events.js";
@@ -20,8 +21,6 @@ import type {
 
 export const AGENT_REPORT_JOB = "agentReports.deliver";
 
-const LIVE_STATUSES_SQL =
-  "('queued', 'pending', 'running', 'resuming', 'waiting_for_helpers', 'waiting_for_user')";
 const LIVE_STATUSES = new Set([
   "queued",
   "pending",
@@ -30,8 +29,21 @@ const LIVE_STATUSES = new Set([
   "waiting_for_helpers",
   "waiting_for_user",
 ]);
+/**
+ * A helper still working, which a finished agent's report waits for. One
+ * waiting on the user is not among them: the user may never answer, and its
+ * own report reaches its parent whenever it does finish.
+ */
+const WORKING_STATUSES_SQL =
+  "('queued', 'pending', 'running', 'resuming', 'waiting_for_helpers')";
 const REPORTABLE = new Set<string>(["completed", "failed", "canceled"]);
-const REPORT_TEXT_MAX_CHARS = 30_000;
+/** As the desktop bounds a report (`MAX_PARENT_AGENT_REPORT_CHARS`); longer says so. */
+const REPORT_TEXT_MAX_CHARS = AGENT_REPORT_MAX_CHARS;
+
+const boundReportText = (text: string, threadId: string): string =>
+  text.length <= REPORT_TEXT_MAX_CHARS
+    ? text
+    : `${text.slice(0, REPORT_TEXT_MAX_CHARS)}\n\n[Report shortened: ${text.length - REPORT_TEXT_MAX_CHARS} more characters are on thread_id ${threadId}.]`;
 const TREE_DEPTH_MAX = 16;
 const REPORT_DELIVERY_ATTEMPTS_MAX = 20;
 
@@ -152,7 +164,7 @@ const liveDescendants = (db: OwnerDbReader, threadId: string): string[] =>
           WHERE tree.depth < ${TREE_DEPTH_MAX}
        )
        SELECT DISTINCT t.thread_id FROM tree CROSS JOIN agent_threads t ON t.thread_id = tree.thread_id
-        WHERE t.status IN ${LIVE_STATUSES_SQL}
+        WHERE t.status IN ${WORKING_STATUSES_SQL}
            OR EXISTS (SELECT 1 FROM agent_commands c
                        WHERE c.thread_id = t.thread_id AND c.state = 'pending' AND c.kind IN ('message', 'resume'))
            OR EXISTS (SELECT 1 FROM agent_report_outbox o
@@ -195,15 +207,13 @@ const reportText = (thread: ThreadRow, outcome: AgentReportOutcome): string => {
         text = thread.result_json;
       }
     }
-    return (text.trim() || "No result was reported.").slice(
-      0,
-      REPORT_TEXT_MAX_CHARS,
-    );
+    return boundReportText(text.trim() || "No result was reported.", thread.thread_id);
   }
-  return (
+  return boundReportText(
     thread.error_message?.trim() ||
-    (outcome === "canceled" ? "The agent was stopped." : "The agent failed.")
-  ).slice(0, REPORT_TEXT_MAX_CHARS);
+      (outcome === "canceled" ? "The agent was stopped." : "The agent failed."),
+    thread.thread_id,
+  );
 };
 
 const deliveryJobId = (reportId: string): string => `agent-report:${reportId}`;

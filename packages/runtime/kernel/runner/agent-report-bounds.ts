@@ -1,6 +1,8 @@
 // Effectively "never truncate": a final report must reach the orchestrator or
 // parent intact. The marker path below only guards against pathological output.
-export const MAX_PARENT_AGENT_REPORT_CHARS = 200_000;
+import { AGENT_REPORT_MAX_CHARS } from "@stella/contracts/backend/agent-reports";
+
+export const MAX_PARENT_AGENT_REPORT_CHARS = AGENT_REPORT_MAX_CHARS;
 
 export const boundParentAgentReport = (
   value: string,

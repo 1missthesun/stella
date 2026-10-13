@@ -64,7 +64,7 @@ import {
   type AgentStatus,
 } from "@stella/contracts/agent-status";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
-import { parseAgentReportId } from "@stella/contracts/backend/agent-reports";
+import { AGENT_REPORT_MAX_CHARS, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
@@ -577,7 +577,7 @@ const STARTED_NOTE = "Its report arrives on its own as [Agent completed]; there 
 /** How much of an agent's latest message `agent_status` shows. */
 const LATEST_PREVIEW_CHARS = 300;
 
-const MAX_REPORT_CHARS = 30_000;
+const MAX_REPORT_CHARS = AGENT_REPORT_MAX_CHARS;
 const bounded = (text: string): string =>
   text.length <= MAX_REPORT_CHARS ? text : `${text.slice(0, MAX_REPORT_CHARS)}\n[truncated ${text.length - MAX_REPORT_CHARS} chars]`;
 

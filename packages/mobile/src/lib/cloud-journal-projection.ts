@@ -321,6 +321,290 @@ export const latestDestinationSwitch = (
   return latest;
 };
 
+/** Everything one turn's records project to, in order. */
+const projectTurn = (
+  turnId: string,
+  turn: readonly JournalRecord[],
+  context: {
+    conversationId?: string;
+    recordsBySeq: ReadonlyMap<number, JournalRecord>;
+    reactions: ReadonlyMap<number, { emoji: string; at: number }>;
+  },
+): ChatMessage[] => {
+  const { recordsBySeq, reactions } = context;
+  const args = { conversationId: context.conversationId };
+  const out: ChatMessage[] = [];
+  // A reminder Stella delivered: her line, on its own, with Done and Snooze.
+  const reminderRecord = turn.find(
+    (record): record is Extract<JournalRecord, { kind: "card" }> =>
+      record.kind === "card" && record.card.type === "reminder",
+  );
+  if (reminderRecord && reminderRecord.card.type === "reminder") {
+    const card = reminderRecord.card;
+    out.push({
+      id: `cloud:${turnId}:reminder:${reminderRecord.seq}`,
+      role: "assistant",
+      text: card.text,
+      createdAt: reminderRecord.createdAtMs,
+      canonicalCreatedAt: reminderRecord.createdAtMs,
+      sequence: reminderRecord.seq,
+      reminder: reminderMarkOf(card),
+    });
+    return out;
+  }
+  let userMessageId = `cloud:${turnId}:user`;
+  let turnUserRecord: JournalMessageRecord | undefined;
+  let terminal: Extract<JournalRecord, { kind: "turn" }> | undefined;
+  const toolResults = new Map<
+    string,
+    { error: boolean; payload: Record<string, unknown> }
+  >();
+  for (const record of turn) {
+    if (record.kind === "turn" && record.phase !== "started") {
+      terminal = record;
+    }
+    if (record.kind === "message" && record.role === "toolResult") {
+      const id =
+        typeof record.payload.toolCallId === "string"
+          ? record.payload.toolCallId
+          : "";
+      if (id) {
+        toolResults.set(id, {
+          error: record.payload.isError === true,
+          payload: record.payload,
+        });
+      }
+    }
+  }
+
+  for (const record of turn) {
+    if (record.kind !== "message") continue;
+    const createdAt = timestampOf(record);
+    if (record.role === "user") {
+      turnUserRecord = record;
+      userMessageId = projectedMessageId(record);
+      // A prompt with nothing to show (older desktop turns mirrored their
+      // lifecycle wake as an empty, unflagged user record) is a hidden one,
+      // and so is one an agent sent (a note stored before it was flagged).
+      const display = userDisplayContext(record.payload);
+      const hasDisplayContext =
+        display.pastedTexts.length > 0 || Boolean(display.quotedText);
+      if (
+        record.hidden ||
+        (isBlankUserRecord(record) && !hasDisplayContext) ||
+        isPiAgentText(display.displayText ?? messageText(record.payload))
+      ) {
+        continue;
+      }
+      const presentation = userAttachmentPresentation(record.payload);
+      const reaction = reactions.get(record.seq);
+      out.push({
+        id: userMessageId,
+        canonicalId: `cloud:${turnId}:message:${record.seq}`,
+        role: "user",
+        ...presentation,
+        ...(display.displayText !== undefined
+          ? { text: display.displayText }
+          : {}),
+        ...(display.pastedTexts.length > 0
+          ? { pastedTexts: display.pastedTexts }
+          : {}),
+        ...(display.quotedText ? { quotedText: display.quotedText } : {}),
+        ...(reaction ? { reaction: reaction.emoji, reactionAt: reaction.at } : {}),
+        createdAt,
+        canonicalCreatedAt: record.createdAtMs,
+        sequence: record.seq,
+      });
+      continue;
+    }
+    if (record.role !== "assistant" || record.hidden) continue;
+    const spawnedThreadIds: string[] = [];
+    const spawnedDescriptions: string[] = [];
+    const tools: ToolStep[] = toolCalls(record).flatMap((call) => {
+      const result = toolResults.get(call.id);
+      if (!result) return [];
+      if (call.name === "spawn_agent" || call.name === "send_message") {
+        const details = result.payload.details;
+        const threadId = details && typeof details === "object" && "thread_id" in details ? details.thread_id : undefined;
+        const argThreadId = call.args && "thread_id" in call.args ? call.args.thread_id : undefined;
+        for (const candidate of [threadId, argThreadId]) {
+          if (typeof candidate === "string" && candidate && !spawnedThreadIds.includes(candidate)) spawnedThreadIds.push(candidate);
+        }
+        const description = call.name === "spawn_agent" && call.args && "description" in call.args ? call.args.description : undefined;
+        if (typeof description === "string" && description.trim() && !spawnedDescriptions.includes(description.trim())) spawnedDescriptions.push(description.trim());
+      }
+      return [
+        {
+          id: call.id,
+          toolName: call.name,
+          status: result.error ? "error" : "completed",
+          ...(call.args ? { args: call.args } : {}),
+        },
+      ];
+    });
+    // The trailing `refs` fence is model-facing (see `reply-refs`); it
+    // never renders. Preserve its relationships for contextual navigation.
+    const split = splitMessageReplyRefs(record.payload);
+    const value = split.text;
+    // Desktop-executed turns persist resolved refs instead of a model fence.
+    const storedRefs = storedJournalReplyRefs(record.payload);
+    const replyRefs = storedRefs.length
+      ? storedRefs
+      : resolveJournalReplyRefs({
+          raw: split.refs,
+          recordsBySeq,
+          turnUserRecord,
+          messageId: projectedMessageId,
+        });
+    const artifacts = [
+      ...mapRouteArtifacts({
+        record,
+        conversationId: args.conversationId ?? "",
+        toolResults,
+        createdAt,
+      }),
+      ...generatedImageArtifacts({
+        record,
+        conversationId: args.conversationId ?? "",
+        toolResults,
+        terminal,
+        createdAt,
+      }),
+    ];
+    const askRecords = toolCalls(record).flatMap((call): UserAskRecord[] => {
+      if (call.name !== "ask_user") return [];
+      const result = toolResults.get(call.id);
+      if (!result || result.error) return [];
+      const content = Array.isArray(result.payload.content)
+        ? result.payload.content
+            .map((part) => asRecord(part))
+            .map((part) => (typeof part?.text === "string" ? part.text : ""))
+            .join("")
+        : undefined;
+      const parsed =
+        parseAskUserToolResult(result.payload.details) ??
+        parseAskUserToolResult(content);
+      return parsed
+        ? [{ id: `cloud:${turnId}:ask:${call.id}`, toolCallId: call.id, createdAt, ...parsed }]
+        : [];
+    });
+    if (!value && !tools.length && !artifacts.length) continue;
+    out.push({
+      id: `cloud:${turnId}:message:${record.seq}`,
+      requestId: userMessageId,
+      role: "assistant",
+      text: value,
+      ...(replyRefs.length ? { replyRefs } : {}),
+      createdAt,
+      canonicalCreatedAt: record.createdAtMs,
+      sequence: record.seq,
+      ...(tools.length ? { toolSteps: tools } : {}),
+      ...(spawnedThreadIds.length ? { spawnedThreadIds } : {}),
+      ...(spawnedDescriptions.length ? { spawnedDescriptions } : {}),
+      ...(artifacts.length ? { artifacts } : {}),
+      ...(askRecords.length ? { askRecords } : {}),
+    });
+  }
+
+  // Only what this turn's own `html` calls made rides its last reply, as
+  // on desktop. An `image_gen` image already shows as its call's inline
+  // card (`generatedImageArtifacts`), so the files card naming the same
+  // drive path never repeats it on the reply. Any other file a files card
+  // names (an agent's output, a report's links) is never attached either.
+  const ownOutputPaths = new Set<string>();
+  for (const { payload } of toolResults.values()) {
+    const toolName =
+      typeof payload.toolName === "string"
+        ? (payload.toolName.split("__").at(-1) ?? payload.toolName)
+        : "";
+    const details = asRecord(payload.details);
+    if (toolName === "html" && typeof details?.filePath === "string") {
+      ownOutputPaths.add(details.filePath);
+    }
+  }
+  const files = turn.flatMap((record) =>
+    record.kind === "card" && record.card.type === "files"
+      ? record.card.files.filter((file) => ownOutputPaths.has(file.path))
+      : [],
+  );
+  if (files.length) {
+    const createdAt = turn.at(-1)?.createdAtMs ?? 0;
+    const artifacts: ChatArtifact[] = files.map((file) =>
+      cloudFileArtifact(file, args.conversationId ?? "", createdAt),
+    );
+    const lastAssistantIndex = out.findLastIndex(
+      (message) =>
+        message.role === "assistant" && message.requestId === userMessageId,
+    );
+    if (lastAssistantIndex >= 0) {
+      const assistant = out[lastAssistantIndex]!;
+      out[lastAssistantIndex] = {
+        ...assistant,
+        artifacts: [...(assistant.artifacts ?? []), ...artifacts],
+      };
+    } else {
+      out.push({
+        id: `cloud:${turnId}:files`,
+        requestId: userMessageId,
+        role: "assistant",
+        text: "",
+        artifacts,
+        createdAt: turn.at(-1)?.createdAtMs,
+        sequence: turn.at(-1)?.seq,
+      });
+    }
+  }
+
+  const notice = journalTerminalNotice(turn);
+  if (notice) {
+    out.push({
+      id: `cloud:${turnId}:notice:${notice.seq}`,
+      requestId: userMessageId,
+      role: "assistant",
+      text: notice.notice,
+      createdAt: notice.createdAtMs,
+      canonicalCreatedAt: notice.createdAtMs,
+      sequence: notice.seq,
+      ...(notice.phase === "canceled" ? { stopped: true } : {}),
+    });
+  }
+  return out;
+};
+
+/**
+ * Each turn's projection, kept while the turn's records are the same objects.
+ * A record arriving appends to one turn, so re-projecting the whole window on
+ * every record (allocation-heavy, and linear in the transcript) collapses to
+ * the one turn that changed; untouched turns also hand back the same message
+ * objects, so nothing downstream sees them change.
+ */
+type TurnProjection = {
+  records: readonly JournalRecord[];
+  reactionsKey: string;
+  windowKey: string;
+  messages: ChatMessage[];
+};
+const turnProjections = new Map<string, Map<string, TurnProjection>>();
+const MAX_CACHED_CONVERSATIONS = 4;
+
+const sameRecords = (
+  a: readonly JournalRecord[],
+  b: readonly JournalRecord[],
+): boolean => a.length === b.length && a.every((record, i) => record === b[i]);
+
+const turnReactionsKey = (
+  turn: readonly JournalRecord[],
+  reactions: ReadonlyMap<number, { emoji: string; at: number }>,
+): string => {
+  let key = "";
+  for (const record of turn) {
+    if (record.kind !== "message" || record.role !== "user") continue;
+    const reaction = reactions.get(record.seq);
+    if (reaction) key += `${record.seq}:${reaction.emoji}:${reaction.at};`;
+  }
+  return key;
+};
+
 export const projectCloudConversationMessages = (args: {
   conversationId?: string;
   records: readonly JournalRecord[];
@@ -340,245 +624,50 @@ export const projectCloudConversationMessages = (args: {
     else byTurn.set(record.turnId, [record]);
   }
 
+  const cacheKey = args.conversationId ?? "";
+  const previous = turnProjections.get(cacheKey);
+  const next = new Map<string, TurnProjection>();
+  // Reply refs resolve against the window; a different window start (older
+  // history paged in) re-projects everything.
+  const windowKey = `${args.hasOlder === true}:${args.records[0]?.seq ?? ""}`;
   const messages: ChatMessage[] = [];
   for (const [turnId, turn] of byTurn) {
-    // A reminder Stella delivered: her line, on its own, with Done and Snooze.
-    const reminderRecord = turn.find(
-      (record): record is Extract<JournalRecord, { kind: "card" }> =>
-        record.kind === "card" && record.card.type === "reminder",
-    );
-    if (reminderRecord && reminderRecord.card.type === "reminder") {
-      const card = reminderRecord.card;
-      messages.push({
-        id: `cloud:${turnId}:reminder:${reminderRecord.seq}`,
-        role: "assistant",
-        text: card.text,
-        createdAt: reminderRecord.createdAtMs,
-        canonicalCreatedAt: reminderRecord.createdAtMs,
-        sequence: reminderRecord.seq,
-        reminder: reminderMarkOf(card),
-      });
-      continue;
-    }
-    let userMessageId = `cloud:${turnId}:user`;
-    let turnUserRecord: JournalMessageRecord | undefined;
-    let terminal: Extract<JournalRecord, { kind: "turn" }> | undefined;
-    const toolResults = new Map<
-      string,
-      { error: boolean; payload: Record<string, unknown> }
-    >();
-    for (const record of turn) {
-      if (record.kind === "turn" && record.phase !== "started") {
-        terminal = record;
-      }
-      if (record.kind === "message" && record.role === "toolResult") {
-        const id =
-          typeof record.payload.toolCallId === "string"
-            ? record.payload.toolCallId
-            : "";
-        if (id) {
-          toolResults.set(id, {
-            error: record.payload.isError === true,
-            payload: record.payload,
-          });
-        }
-      }
-    }
-
-    for (const record of turn) {
-      if (record.kind !== "message") continue;
-      const createdAt = timestampOf(record);
-      if (record.role === "user") {
-        turnUserRecord = record;
-        userMessageId = projectedMessageId(record);
-        // A prompt with nothing to show (older desktop turns mirrored their
-        // lifecycle wake as an empty, unflagged user record) is a hidden one,
-        // and so is one an agent sent (a note stored before it was flagged).
-        const display = userDisplayContext(record.payload);
-        const hasDisplayContext =
-          display.pastedTexts.length > 0 || Boolean(display.quotedText);
-        if (
-          record.hidden ||
-          (isBlankUserRecord(record) && !hasDisplayContext) ||
-          isPiAgentText(display.displayText ?? messageText(record.payload))
-        ) {
-          continue;
-        }
-        const presentation = userAttachmentPresentation(record.payload);
-        const reaction = reactions.get(record.seq);
-        messages.push({
-          id: userMessageId,
-          canonicalId: `cloud:${turnId}:message:${record.seq}`,
-          role: "user",
-          ...presentation,
-          ...(display.displayText !== undefined
-            ? { text: display.displayText }
-            : {}),
-          ...(display.pastedTexts.length > 0
-            ? { pastedTexts: display.pastedTexts }
-            : {}),
-          ...(display.quotedText ? { quotedText: display.quotedText } : {}),
-          ...(reaction ? { reaction: reaction.emoji, reactionAt: reaction.at } : {}),
-          createdAt,
-          canonicalCreatedAt: record.createdAtMs,
-          sequence: record.seq,
-        });
-        continue;
-      }
-      if (record.role !== "assistant" || record.hidden) continue;
-      const spawnedThreadIds: string[] = [];
-      const spawnedDescriptions: string[] = [];
-      const tools: ToolStep[] = toolCalls(record).flatMap((call) => {
-        const result = toolResults.get(call.id);
-        if (!result) return [];
-        if (call.name === "spawn_agent" || call.name === "send_message") {
-          const details = result.payload.details;
-          const threadId = details && typeof details === "object" && "thread_id" in details ? details.thread_id : undefined;
-          const argThreadId = call.args && "thread_id" in call.args ? call.args.thread_id : undefined;
-          for (const candidate of [threadId, argThreadId]) {
-            if (typeof candidate === "string" && candidate && !spawnedThreadIds.includes(candidate)) spawnedThreadIds.push(candidate);
-          }
-          const description = call.name === "spawn_agent" && call.args && "description" in call.args ? call.args.description : undefined;
-          if (typeof description === "string" && description.trim() && !spawnedDescriptions.includes(description.trim())) spawnedDescriptions.push(description.trim());
-        }
-        return [
-          {
-            id: call.id,
-            toolName: call.name,
-            status: result.error ? "error" : "completed",
-            ...(call.args ? { args: call.args } : {}),
-          },
-        ];
-      });
-      // The trailing `refs` fence is model-facing (see `reply-refs`); it
-      // never renders. Preserve its relationships for contextual navigation.
-      const split = splitMessageReplyRefs(record.payload);
-      const value = split.text;
-      // Desktop-executed turns persist resolved refs instead of a model fence.
-      const storedRefs = storedJournalReplyRefs(record.payload);
-      const replyRefs = storedRefs.length
-        ? storedRefs
-        : resolveJournalReplyRefs({
-            raw: split.refs,
-            recordsBySeq,
-            turnUserRecord,
-            messageId: projectedMessageId,
-          });
-      const artifacts = [
-        ...mapRouteArtifacts({
-          record,
-          conversationId: args.conversationId ?? "",
-          toolResults,
-          createdAt,
-        }),
-        ...generatedImageArtifacts({
-          record,
-          conversationId: args.conversationId ?? "",
-          toolResults,
-          terminal,
-          createdAt,
-        }),
-      ];
-      const askRecords = toolCalls(record).flatMap((call): UserAskRecord[] => {
-        if (call.name !== "ask_user") return [];
-        const result = toolResults.get(call.id);
-        if (!result || result.error) return [];
-        const content = Array.isArray(result.payload.content)
-          ? result.payload.content
-              .map((part) => asRecord(part))
-              .map((part) => (typeof part?.text === "string" ? part.text : ""))
-              .join("")
-          : undefined;
-        const parsed =
-          parseAskUserToolResult(result.payload.details) ??
-          parseAskUserToolResult(content);
-        return parsed
-          ? [{ id: `cloud:${turnId}:ask:${call.id}`, toolCallId: call.id, createdAt, ...parsed }]
-          : [];
-      });
-      if (!value && !tools.length && !artifacts.length) continue;
-      messages.push({
-        id: `cloud:${turnId}:message:${record.seq}`,
-        requestId: userMessageId,
-        role: "assistant",
-        text: value,
-        ...(replyRefs.length ? { replyRefs } : {}),
-        createdAt,
-        canonicalCreatedAt: record.createdAtMs,
-        sequence: record.seq,
-        ...(tools.length ? { toolSteps: tools } : {}),
-        ...(spawnedThreadIds.length ? { spawnedThreadIds } : {}),
-        ...(spawnedDescriptions.length ? { spawnedDescriptions } : {}),
-        ...(artifacts.length ? { artifacts } : {}),
-        ...(askRecords.length ? { askRecords } : {}),
-      });
-    }
-
-    // Only what this turn's own `html` calls made rides its last reply, as
-    // on desktop. An `image_gen` image already shows as its call's inline
-    // card (`generatedImageArtifacts`), so the files card naming the same
-    // drive path never repeats it on the reply. Any other file a files card
-    // names (an agent's output, a report's links) is never attached either.
-    const ownOutputPaths = new Set<string>();
-    for (const { payload } of toolResults.values()) {
-      const toolName =
-        typeof payload.toolName === "string"
-          ? (payload.toolName.split("__").at(-1) ?? payload.toolName)
-          : "";
-      const details = asRecord(payload.details);
-      if (toolName === "html" && typeof details?.filePath === "string") {
-        ownOutputPaths.add(details.filePath);
-      }
-    }
-    const files = turn.flatMap((record) =>
-      record.kind === "card" && record.card.type === "files"
-        ? record.card.files.filter((file) => ownOutputPaths.has(file.path))
-        : [],
-    );
-    if (files.length) {
-      const createdAt = turn.at(-1)?.createdAtMs ?? 0;
-      const artifacts: ChatArtifact[] = files.map((file) =>
-        cloudFileArtifact(file, args.conversationId ?? "", createdAt),
-      );
-      const lastAssistantIndex = messages.findLastIndex(
-        (message) =>
-          message.role === "assistant" && message.requestId === userMessageId,
-      );
-      if (lastAssistantIndex >= 0) {
-        const assistant = messages[lastAssistantIndex]!;
-        messages[lastAssistantIndex] = {
-          ...assistant,
-          artifacts: [...(assistant.artifacts ?? []), ...artifacts],
-        };
-      } else {
-        messages.push({
-          id: `cloud:${turnId}:files`,
-          requestId: userMessageId,
-          role: "assistant",
-          text: "",
-          artifacts,
-          createdAt: turn.at(-1)?.createdAtMs,
-          sequence: turn.at(-1)?.seq,
-        });
-      }
-    }
-
-    const notice = journalTerminalNotice(turn);
-    if (notice) {
-      messages.push({
-        id: `cloud:${turnId}:notice:${notice.seq}`,
-        requestId: userMessageId,
-        role: "assistant",
-        text: notice.notice,
-        createdAt: notice.createdAtMs,
-        canonicalCreatedAt: notice.createdAtMs,
-        sequence: notice.seq,
-        ...(notice.phase === "canceled" ? { stopped: true } : {}),
-      });
-    }
+    const reactionsKey = turnReactionsKey(turn, reactions);
+    const cached = previous?.get(turnId);
+    const projection =
+      cached &&
+      cached.windowKey === windowKey &&
+      cached.reactionsKey === reactionsKey &&
+      sameRecords(cached.records, turn)
+        ? cached
+        : {
+            records: turn,
+            reactionsKey,
+            windowKey,
+            messages: projectTurn(turnId, turn, {
+              conversationId: args.conversationId,
+              recordsBySeq,
+              reactions,
+            }),
+          };
+    next.set(turnId, projection);
+    messages.push(...projection.messages);
+  }
+  turnProjections.delete(cacheKey);
+  turnProjections.set(cacheKey, next);
+  while (turnProjections.size > MAX_CACHED_CONVERSATIONS) {
+    const oldest = turnProjections.keys().next().value;
+    if (oldest === undefined) break;
+    turnProjections.delete(oldest);
   }
 
-  return projectMobileLifecycle(messages, args.records, args.conversationId ?? "");
+  // The lifecycle pass attaches cards by assigning `artifacts` on the rows it
+  // is given; hand it copies so the cached turn rows stay as projected.
+  return projectMobileLifecycle(
+    messages.map((message) => ({ ...message })),
+    args.records,
+    args.conversationId ?? "",
+  );
 };
 
 export const activeCloudTurnId = (

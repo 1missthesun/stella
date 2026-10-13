@@ -1218,7 +1218,9 @@ export function stellaAgents(host: StellaAgentsHost) {
       conversationId: parentConversationId,
     });
     const child = await tx.createConversation({ ownership: { kind: "task", taskId: anchor } });
-    const threadId = args.threadId && !state.agents[args.threadId] ? args.threadId : mintAgentId(description, state.agents);
+    const arriving = known && args.adoptAs ? known : undefined;
+    const threadId =
+      arriving || (args.threadId && !state.agents[args.threadId]) ? args.threadId! : mintAgentId(description, state.agents);
     // It starts there, not confined there: its tools still take any path.
     const cwd = args.cwd ?? (placement.kind === "local" ? host.agentDirectory?.(threadId) : undefined);
     await configure(tx, child.id, {
@@ -1244,6 +1246,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     role.threadId = threadId;
     role.parentConversationId = parentConversationId;
     if (args.startedBy) role.startedBy = { threadId: args.startedBy.threadId, label: args.startedBy.label };
+    if (arriving) {
+      arriving.conversationId = child.id;
+      arriving.placedAs = args.adoptAs!;
+      arriving.moved = true;
+      delete arriving.engine;
+      runsHereAgain(arriving);
+      state.calls[args.callKey] = { threadId, reporter: -1 };
+      return { threadId, existing: false };
+    }
     state.agents[threadId] = {
       conversationId: child.id,
       description,

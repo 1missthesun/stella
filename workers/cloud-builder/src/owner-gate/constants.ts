@@ -1,6 +1,7 @@
-import type {
-  AgentMessageDeviceOutcome,
-  AgentStopDeviceOutcome,
+import {
+  DISPATCH_ACCEPTED_LEASE_MS,
+  type AgentMessageDeviceOutcome,
+  type AgentStopDeviceOutcome,
 } from "@stella/contracts/turn-plane/placement";
 
 /** Trusted headers the Worker stamps on a forwarded presence upgrade. */
@@ -73,3 +74,5 @@ export const ALARM_HOT_REARM_MS = 5_000;
 export const ALARM_HOT_STREAK_LIMIT = 10;
 /** The longest a backed-off re-arm waits. */
 export const ALARM_MAX_BACKOFF_MS = 60_000;
+/** A computer's lease renewal rewrites the dispatch only once less than this is left. */
+export const DISPATCH_RENEW_WRITE_BELOW_MS = (DISPATCH_ACCEPTED_LEASE_MS * 3) / 4;

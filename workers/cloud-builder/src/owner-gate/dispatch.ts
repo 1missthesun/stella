@@ -29,6 +29,7 @@ import {
 } from "../dispatch-policy.js";
 import type { DispatchRow } from "./types.js";
 import {
+  DISPATCH_RENEW_WRITE_BELOW_MS,
   ALARM_HOT_REARM_MS,
   ALARM_HOT_STREAK_LIMIT,
   ALARM_MAX_BACKOFF_MS,
@@ -772,17 +773,27 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
         deny("conflict", "Execution is not renewable.");
         return;
       }
+      const state =
+        row.state === "reconciliation_required"
+          ? row.started_at
+            ? "computer_running"
+            : "computer_accepted"
+          : row.state;
+      // The computer renews every 25 s. A lease with most of its time left
+      // is answered without rewriting the row, which was a large share of
+      // the owner object's writes while agents ran; it is extended once it
+      // falls below three quarters, so it never drops under a minute here.
+      if (
+        state === row.state &&
+        row.lease_expires_at !== null &&
+        row.lease_expires_at - now > DISPATCH_RENEW_WRITE_BELOW_MS
+      ) {
+        this.notifyExecutor(row);
+        return;
+      }
       await this.patchDispatch(
         row,
-        {
-          state:
-            row.state === "reconciliation_required"
-              ? row.started_at
-                ? "computer_running"
-                : "computer_accepted"
-              : row.state,
-          lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS,
-        },
+        { state, lease_expires_at: now + DISPATCH_ACCEPTED_LEASE_MS },
         now,
       );
       return;

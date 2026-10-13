@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { realpathSync } from "node:fs";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { ImageContent, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import type { AgentModelReasoningEffort } from "@stella/contracts/agent-engine";
@@ -13,6 +13,7 @@ import type {
 } from "@stella/agent/engine/claude-code";
 import { resolveAgentWorkingDirectory } from "../../kernel/agent-runtime/shared.js";
 import { getClaudeCodeRuntimeEffortLevel } from "../../kernel/integrations/claude-code-agent-runtime.js";
+import { readClaudeCodeContextWindows, readClaudeCodeResolvedModels } from "../../kernel/integrations/claude-code-resolved-models.js";
 import {
   checkClaudeCodeAuth,
   claudeCodeResumableSessionId,
@@ -23,7 +24,10 @@ import {
 import {
   claudeCliCanResume,
   claudeCliVersion,
+  claudeSessionProjectDir,
   hashClaudeReplyText,
+  resolveClaudeWorkingFolder,
+  writeFileAtomically,
 } from "../../kernel/integrations/claude-code-session-files.js";
 import { createClaudeCodeCompactionDetector } from "../../kernel/integrations/claude-code-compaction.js";
 import { claudeSessionSyncSink } from "../../kernel/integrations/claude-code-session-sync-sink.js";
@@ -107,6 +111,7 @@ const sessionStore = (dataDir: string): ClaudeCodeSessionStore => {
           ...(typeof parsed.cliSessionId === "string" ? { cliSessionId: parsed.cliSessionId } : {}),
           seen: Array.isArray(parsed.seen) ? parsed.seen.filter((entry): entry is string => typeof entry === "string") : [],
           ...(undelivered.length > 0 ? { undelivered } : {}),
+          ...(typeof parsed.context === "string" ? { context: parsed.context } : {}),
         };
       } catch {
         return undefined;
@@ -138,7 +143,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
       stellaAppDir: appDir,
       ...(ref.cwd ? { workingDirectory: ref.cwd } : {}),
     });
-  const syncs = (ref: ClaudeCodeSessionRef) => !ref.conversationId.startsWith("local_");
+  const syncs = (ref: ClaudeCodeSessionRef) => !ref.ephemeral && !ref.conversationId.startsWith("local_");
   const shellEnv = (ref: ClaudeCodeSessionRef, cwd: string): Record<string, string> =>
     runner()?.piTools.shellEnvironment({
       conversationId: ref.conversationId,
@@ -169,6 +174,19 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
     adopted.set(ref.sessionKey, restored.sessionId);
     return restored.sessionId;
   };
+
+  /** Where the signed-in Claude account keeps `sessionId`'s transcript for a CLI working in `cwd`. */
+  const transcriptPath = async (cwd: string, sessionId: string) => {
+    const configDir = (await getClaudeCodeConfig()).configDir ?? null;
+    return path.join(claudeSessionProjectDir(configDir, await resolveClaudeWorkingFolder(cwd)), `${sessionId}.jsonl`);
+  };
+
+  /** A session the CLI can resume here: the signed-in account has its transcript (another account's can't). */
+  const resumable = async (cwd: string | undefined, sessionId: string): Promise<boolean> =>
+    await access(await transcriptPath(cwd ?? process.cwd(), sessionId)).then(
+      () => true,
+      () => false,
+    );
 
   const prepareRestore = async (ref: ClaudeCodeSessionRef, cwd: string | undefined): Promise<"native" | "rebuild" | "none"> => {
     const sink = claudeSessionSyncSink();
@@ -213,7 +231,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         }
       }
       if (live) return { sessionId: live };
-      if (held) return { sessionId: held };
+      if (held && (await resumable(cwd, held))) return { sessionId: held };
       if (!syncs(ref)) return {};
       await prepareRestore(ref, cwd);
       const sessionId = await adopt(ref, cwd, lastReply);
@@ -247,6 +265,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         boundToolInactivity: false,
         allowEmptyFinal: true,
         ...(spec.quiet ? { quietFinal: true } : {}),
+        ...(spec.compact ? { vanilla: true } : {}),
         ...(ref.role === "worker" ? { autoCompactWindowTokens: CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW } : {}),
         abortSignal: spec.signal,
         holdOnUsageLimit: true,
@@ -303,6 +322,20 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
       }
       return { text: result.text, sessionId: result.sessionId };
     },
+    hydrate: async (ref, transcript) => {
+      const cwd = cwdOf(ref) ?? process.cwd();
+      await mkdir(cwd, { recursive: true });
+      const sessionId = randomUUID();
+      const text = transcript({ sessionId, cwd: await resolveClaudeWorkingFolder(cwd), version: await claudeCliVersion() });
+      await writeFileAtomically(await transcriptPath(cwd, sessionId), text);
+      closeClaudeCodeSessionWhenIdle(ref.sessionKey);
+      console.info("[claude-code-engine] hydrated a session from the conversation", {
+        sessionKey: ref.sessionKey,
+        sessionId,
+        bytes: text.length,
+      });
+      return sessionId;
+    },
     close: (ref) => closeClaudeCodeSessionWhenIdle(ref.sessionKey),
   };
 };
@@ -316,6 +349,8 @@ export const claudeCodeEngineFor = (session: OpenSession) => {
       createClaudeCodeEngine({
         transport: desktopTransport(session),
         sessions: sessionStore(session.config.get().stellaDataDirPath),
+        resolveModel: (alias) => readClaudeCodeResolvedModels(session.config.get().stellaDataDirPath)[alias],
+        reportedContextWindow: (model) => readClaudeCodeContextWindows(session.config.get().stellaDataDirPath)[model],
         report: (error) => console.error("[claude-code-engine]", error),
       }),
     );

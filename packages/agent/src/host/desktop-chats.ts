@@ -71,6 +71,7 @@ import {
   STELLA_DEFAULT_ALIAS,
   stellaModelRef,
 } from "../harness.ts";
+import { fitForHandover } from "../stella/handover.ts";
 import { recordEngineCompaction } from "../stella/journal-sync.ts";
 import {
   agentRunOutcome,
@@ -708,19 +709,16 @@ export function desktopChats(options: DesktopChatsOptions) {
         })
         .catch(() => undefined);
     });
-    // Claude Code compacts its own context; pi never does for it. Stella's
-    // summary is the conversation's compaction, which the journal sync then
-    // publishes as its checkpoint for every other host.
-    claudeCodeEngine.onCompaction((session, compaction) => {
-      if (session.threadId) return;
+    // Claude Code compacts its own context; pi never does for it. Its
+    // summary is the compaction of the conversation it ran for (Stella's, or
+    // an agent's), which the journal or agent log sync publishes for every
+    // other host and engine.
+    claudeCodeEngine.onCompaction((session, compaction, conversationId) => {
       void (async () => {
         const chat = await ready(session.conversationId);
-        await recordEngineCompaction(
-          chat.harness,
-          chat.root,
-          { ...compaction, engine: "claude-code" },
-          context,
-        );
+        const conversation = session.threadId ? await chat.harness.conversation(conversationId, context) : chat.root;
+        if (!conversation) return;
+        await recordEngineCompaction(chat.harness, conversation, { ...compaction, engine: "claude-code" }, context);
       })().catch((error: unknown) => options.report(error));
     });
     // An agent's Claude Code CLI took up a background command that finished:
@@ -1823,6 +1821,17 @@ export function desktopChats(options: DesktopChatsOptions) {
     const agent = await chat.root.agent(context);
     const thinkingLevel = options.thinkingLevel?.() ?? "off";
     const moved = agent.model?.provider !== model.provider || agent.model?.modelId !== model.modelId;
+    if (moved) {
+      // The incoming model starts from the conversation's history; the outgoing one compacts it first
+      // when that is more than the incoming window holds.
+      const window = onClaudeCode(model)
+        ? (options.claudeCodeEngine?.contextWindow(model.modelId) ?? 0)
+        : (models.getModel(model.provider, model.modelId)?.contextWindow ?? 0);
+      const fit = await fitForHandover({ harness: chat.harness, conversation: chat.root, window, context, report: options.report }).catch(
+        (error: unknown) => options.report(error),
+      );
+      if (fit) console.info("[stella-handover]", { from: agent.model, to: model, ...fit });
+    }
     if (moved || agent.thinkingLevel !== thinkingLevel) {
       await chat.root.configure(
         { model, thinkingLevel, ...(moved ? { extensions: orchestratorAgent(model).extensions } : {}) },

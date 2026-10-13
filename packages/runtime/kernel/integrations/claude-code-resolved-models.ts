@@ -143,6 +143,70 @@ export const recordClaudeCodeResolvedModel = (
   });
 };
 
+const CONTEXT_WINDOWS_FILE = "claude-code-context-windows.json";
+
+const contextWindowsPath = (stellaAppDir: string): string =>
+  path.join(stellaAppDir, CONTEXT_WINDOWS_FILE);
+
+/** The context window, in tokens, the CLI last reported for each model id (its `result` event's `modelUsage`). */
+export const readClaudeCodeContextWindows = (
+  stellaAppDir: string,
+): Record<string, number> => {
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(contextWindowsPath(stellaAppDir), "utf-8"),
+    ) as unknown;
+    if (!parsed || typeof parsed !== "object") return {};
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        (entry): entry is [string, number] =>
+          typeof entry[1] === "number" && entry[1] > 0,
+      ),
+    );
+  } catch {
+    return {};
+  }
+};
+
+/** Persist the context windows a `result` event's `modelUsage` reports. Best-effort, like the resolved models. */
+export const recordClaudeCodeContextWindows = (
+  stellaAppDir: string,
+  modelUsage: unknown,
+): Promise<void> => {
+  if (!modelUsage || typeof modelUsage !== "object") return Promise.resolve();
+  const reported = Object.entries(modelUsage).flatMap(
+    ([model, usage]): [string, number][] => {
+      const window = (usage as { contextWindow?: unknown } | null)
+        ?.contextWindow;
+      return typeof window === "number" && window > 0 ? [[model, window]] : [];
+    },
+  );
+  if (reported.length === 0) return Promise.resolve();
+  const filePath = contextWindowsPath(stellaAppDir);
+  return withFileQueue(filePath, async () => {
+    try {
+      const current = readClaudeCodeContextWindows(stellaAppDir);
+      if (reported.every(([model, window]) => current[model] === window)) {
+        return;
+      }
+      for (const [model, window] of reported) {
+        delete current[model];
+        current[model] = window;
+      }
+      await writeFileAtomic(
+        filePath,
+        JSON.stringify(
+          Object.fromEntries(Object.entries(current).slice(-32)),
+          null,
+          2,
+        ),
+      );
+    } catch {
+      // Context-window capture is best-effort; never fail a turn over it.
+    }
+  });
+};
+
 /**
  * Pretty-print a raw Anthropic model id reported by the CLI, e.g.
  * `claude-opus-4-8[1m]` -> `Opus 4.8 (1M context)` or

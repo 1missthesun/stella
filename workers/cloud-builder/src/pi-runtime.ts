@@ -128,6 +128,7 @@ import {
   type JournalMessage,
   type JournalStart,
 } from "@stella/agent/stella/journal-sync";
+import { fitForHandover } from "@stella/agent/stella/handover";
 import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-checkpoint";
 export { journalSeqOf } from "@stella/agent/stella/journal-sync";
 import type { AgentModelReasoningEffort, CloudExecutionSelection } from "@stella/contracts/agent-engine";
@@ -2024,9 +2025,21 @@ export class PiConversationRuntime {
 
   /** The root conversation is the orchestrator: the turn's model and the orchestrator's tools. */
   async configureRoot(binding: PiTurnBinding, context: Context): Promise<void> {
-    const { root } = await this.open();
+    const { harness, root } = await this.open();
     const agent = await root.agent(context);
     const model = this.#rootModel(binding.authority.execution);
+    if (agent.model && (agent.model.provider !== model.provider || agent.model.modelId !== model.modelId)) {
+      // The incoming model starts from the conversation's history; the outgoing one compacts it first
+      // when that is more than the incoming window holds.
+      const window =
+        model.provider === CLAUDE_CODE_PROVIDER_ID
+          ? (this.#claudeCode?.contextWindow(model.modelId) ?? 0)
+          : (this.#models.getModel(model.provider, model.modelId)?.contextWindow ?? 0);
+      const fit = await fitForHandover({ harness, conversation: root, window, context, report: (error) => this.#options.report(error) }).catch(
+        (error: unknown) => this.#options.report(error),
+      );
+      if (fit) this.#options.log("pi_handover", { from: `${agent.model.provider}/${agent.model.modelId}`, to: `${model.provider}/${model.modelId}`, ...fit });
+    }
     if (
       offersAgentTools(agent) ||
       agent.model?.provider !== model.provider ||

@@ -24,6 +24,7 @@ import {
   CLAUDE_CODE_MODEL_ALIASES,
   formatClaudeCodeResolvedModel,
   readClaudeCodeResolvedModels,
+  recordClaudeCodeContextWindows,
   recordClaudeCodeResolvedModel,
 } from "./claude-code-resolved-models.js";
 import {
@@ -2980,6 +2981,12 @@ class ClaudeCodeSessionRuntime {
           });
         }
         current.emitStreamDelta(parsedLine);
+      }
+      if (parsedLine.type === "result" && request.stellaAppDir) {
+        void recordClaudeCodeContextWindows(
+          request.stellaAppDir,
+          parsedLine.modelUsage,
+        );
       }
       if (parsedLine.type === "result") {
         const current = processState.pending[0];

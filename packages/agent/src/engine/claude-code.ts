@@ -31,7 +31,9 @@ import {
   ProviderDoc,
   ToolTask,
   wrapTool,
+  type ConversationId,
   type Extension,
+  type HookApi,
   type ModelRef,
   type ToolExecutionApi,
   type ToolExecutionResult,
@@ -43,7 +45,9 @@ import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/cl
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
 import { fitCodeDescriptionForClaudeCode } from "@stella/runtime/kernel/tools/code-catalog";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
-import { residentContextAsOf, residentContextKind } from "../stella/resident-context.ts";
+import { residentContextAsOf, residentContextKind, withResidentContext } from "../stella/resident-context.ts";
+import { claudeCodeTranscript, type ClaudeCodeTranscriptMeta } from "./claude-code-transcript.ts";
+import { isPiCompactionBoundary } from "../stella/handover.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
@@ -53,6 +57,9 @@ export const CLAUDE_CODE_BUILTIN_TOOLS = ["Read", "Edit", "Write", "Bash", "Grep
 const ENGINE_ONLY_TOOLS = ["Grep", "Glob"] as const;
 const WRAPPED_TOOLS = ["Read", "Edit", "Write", "Bash"] as const;
 const MCP_PREFIX = "mcp__stella__";
+
+/** A Claude Code model's context window when the CLI has not reported it: 1M for a `[1m]` id, else the smallest any has. */
+export const claudeCodeContextWindow = (model: string): number => (/\[1m\]/i.test(model) ? 1_000_000 : 200_000);
 
 export const CLAUDE_CODE_MODEL_ALIASES = [
   "default",
@@ -70,10 +77,6 @@ const CLAUDE_CODE_CONTEXT_WINDOW = 100_000_000;
 const CLAUDE_CODE_MAX_TOKENS = 128_000;
 const SEEN_LIMIT = 400;
 const REBUILD_MAX_CHARS = 48_000;
-/** Recent history a fresh session replays: about a fifth of Claude's context, as a compaction keeps. */
-const REPLAY_MAX_CHARS = 160_000;
-/** A compaction summary at the head of a replay, kept whole up to this. */
-const LEAD_MAX_CHARS = 64_000;
 const UPDATE_MAX_MESSAGE_CHARS = 12_000;
 /** How long a new turn waits for the stopped one it replaces to end. */
 const SUPERSEDED_SETTLE_MS = 10_000;
@@ -87,6 +90,8 @@ export type ClaudeCodeSessionRef = {
   role: ClaudeCodeRole;
   sessionKey: string;
   cwd?: string;
+  /** A one-off session (compacting history for a handover): never synced or resumed. */
+  ephemeral?: true;
 };
 
 export type ClaudeCodeToolSpec = { name: string; description: string; parameters: Record<string, unknown> };
@@ -134,12 +139,19 @@ export type ClaudeCodeTurnSpec = {
   backgroundWake: boolean;
   /** No message the user wrote waits for a reply: an empty answer is this turn's reply, and nothing is posted. */
   quiet: boolean;
+  /** The prompt is the CLI's own `/compact`: run it as stock Claude Code, slash commands on, none of Stella's surface. */
+  compact?: true;
 };
 
 export type ClaudeCodeTransport = {
   runTurn(spec: ClaudeCodeTurnSpec): Promise<{ text: string; sessionId: string }>;
   preflight?(session: ClaudeCodeSessionRef): Promise<void>;
   resume?(session: ClaudeCodeSessionRef, args: { held?: string; lastReply?: string }): Promise<{ sessionId?: string; restored?: boolean }>;
+  /**
+   * Write a new CLI session for `session` whose transcript `transcript`
+   * renders (Stella's history as native turns), and answer its id to resume.
+   */
+  hydrate?(session: ClaudeCodeSessionRef, transcript: (meta: ClaudeCodeTranscriptMeta) => string): Promise<string>;
   close?(session: ClaudeCodeSessionRef): void;
 };
 
@@ -159,7 +171,7 @@ type Binding = {
   session: ClaudeCodeSessionRef;
   /** The CLI keeps none of its built-ins (`ClaudeCodeEngineOptions.builtins`). */
   builtinsOff: boolean;
-  piConversationId: number;
+  piConversationId: ConversationId;
 };
 
 type QueueItem = { kind: "event"; event: Record<string, any> } | { kind: "end" };
@@ -388,21 +400,15 @@ const userPrompt = (users: readonly Message[]): { text: string; images: ImageCon
 const notResident = (message: Message): boolean => residentContextKind(message) === undefined;
 
 /**
- * A fresh session starts the way a compacted one does: the resident context
- * whole with every change applied, then what opens the context (the
- * compaction summary, or the conversation's first prompt) whole, then as much
- * recent history as fits. Only the middle is ever cut.
+ * The last resort for a CLI that can resume no session of this conversation
+ * and was handed none (`ClaudeCodeTransport.hydrate`): the resident context,
+ * then the recent history as text.
  */
 const rebuildPrompt = (messages: readonly Message[]): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(messages);
   const earlier = messages.slice(0, start);
   const resident = residentContextAsOf(earlier) ?? "";
-  const rest = earlier.filter(notResident);
-  const opened = rest.findIndex((message) => message.role !== "user");
-  const lead = opened < 0 ? rest : rest.slice(0, opened);
-  const leadText = userPrompt(lead).text;
-  const recent = renderBounded(rest.slice(lead.length), REPLAY_MAX_CHARS);
-  const history = [leadText ? `[user]\n${clip(leadText, LEAD_MAX_CHARS)}` : "", recent].filter(Boolean).join("\n\n");
+  const history = renderBounded(earlier.filter(notResident), REBUILD_MAX_CHARS);
   const request = userPrompt(users);
   const text = [
     resident,
@@ -415,6 +421,17 @@ const rebuildPrompt = (messages: readonly Message[]): { text: string; images: Im
     .join("\n\n");
   return { text, images: request.images };
 };
+
+const hydratedPrompt = (users: readonly Message[]): { text: string; images: ImageContent[] } => {
+  const request = userPrompt(users);
+  return { text: request.text || "Continue from where the conversation left off.", images: request.images };
+};
+
+/** The name the CLI knows a Stella tool by: its own built-in, or one of Stella's over MCP. */
+const cliToolName =
+  (binding: Binding) =>
+  (name: string): string =>
+    !binding.builtinsOff && (CLAUDE_CODE_BUILTIN_TOOLS as readonly string[]).includes(name) ? name : `${MCP_PREFIX}${name}`;
 
 const deltaPrompt = (delta: readonly Message[], context?: string): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(delta);
@@ -458,6 +475,10 @@ export type ClaudeCodeEngineOptions = {
    * owner's world). Default `here`: the CLI's own built-ins.
    */
   builtins?: "here" | "never";
+  /** The model id the CLI resolved an alias to, when known (`default` may be a 1M-token model). */
+  resolveModel?(alias: string): string | undefined;
+  /** The context window the CLI reported for a resolved model id, when it has run it. */
+  reportedContextWindow?(model: string): number | undefined;
   report?(error: unknown): void;
 };
 
@@ -471,7 +492,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const nativeWaiters = new Map<string, Set<(result: NativeResult) => void>>();
   const statusListeners = new Set<(session: ClaudeCodeSessionRef, status: ClaudeCodeStatus) => void>();
   const wakeListeners = new Set<(session: ClaudeCodeSessionRef, wake: { key: string; text: string }) => void>();
-  const compactionListeners = new Set<(session: ClaudeCodeSessionRef, compaction: ClaudeCodeCompaction) => void>();
+  const compactionListeners = new Set<
+    (session: ClaudeCodeSessionRef, compaction: ClaudeCodeCompaction, conversation: ConversationId) => void
+  >();
   const modelIds = new Set<string>(CLAUDE_CODE_MODEL_ALIASES);
   let providerListener: ((provider: Provider) => void) | undefined;
 
@@ -522,6 +545,103 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       if (undelivered >= 0) record.undelivered!.splice(undelivered, 1);
     }
     if (record.undelivered?.length === 0) delete record.undelivered;
+  };
+
+  const emitStatus = (ref: ClaudeCodeSessionRef, status: ClaudeCodeStatus) => {
+    for (const listener of statusListeners) {
+      try {
+        listener(ref, status);
+      } catch (error) {
+        report(error);
+      }
+    }
+  };
+
+  const bindingOf = async (
+    conversationId: string,
+    api: HookApi,
+    context: Context,
+  ): Promise<{ piSessionId: string; binding: Binding; model: string } | undefined> => {
+    const agent = await api.snapshot(AgentDoc, api.conversationId, context);
+    if (agent?.model?.provider !== CLAUDE_CODE_PROVIDER_ID) return undefined;
+    const identity = await api.snapshot(ProviderDoc, api.conversationId, context);
+    if (!identity?.sessionId) return undefined;
+    const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
+    const threadId = role?.agentType === "general" ? role.threadId : undefined;
+    return {
+      piSessionId: identity.sessionId,
+      model: agent.model.modelId,
+      binding: {
+        session: {
+          conversationId,
+          ...(threadId ? { threadId } : {}),
+          role: role?.agentType === "general" ? "worker" : "orchestrator",
+          sessionKey: threadId ? `${conversationId}:${threadId}` : conversationId,
+          ...(agent.cwd ? { cwd: agent.cwd } : {}),
+        },
+        builtinsOff: options.builtins === "never",
+        piConversationId: api.conversationId,
+      },
+    };
+  };
+
+  /**
+   * Claude Code's own compaction of `messages`: a one-off session written
+   * from them is compacted with `/compact`, and the summary it opens the
+   * compacted session with is the answer. Undefined where the host can't
+   * write a session, or there is no summary.
+   */
+  const compactWithCli = async (
+    binding: Binding,
+    model: string,
+    messages: readonly Message[],
+    instructions: string | undefined,
+    signal?: AbortSignal,
+  ): Promise<string | undefined> => {
+    const hydrate = options.transport.hydrate;
+    if (!hydrate) return undefined;
+    const ref: ClaudeCodeSessionRef = {
+      ...binding.session,
+      sessionKey: `${binding.session.sessionKey}:compact:${crypto.randomUUID()}`,
+      ephemeral: true,
+    };
+    const toolName = cliToolName(binding);
+    const sessionId = await hydrate(ref, (meta) => claudeCodeTranscript(withResidentContext(messages), meta, toolName));
+    if (!sessionId) return undefined;
+    const prompt = `/compact ${instructions ?? ""}`.trim();
+    let summary: string | undefined;
+    try {
+      await options.transport.runTurn({
+        session: ref,
+        resumeSessionId: sessionId,
+        model,
+        thinkingLevel: "off",
+        systemPrompt: "",
+        prompt,
+        images: [],
+        resumeFallbackPrompt: prompt,
+        tools: [],
+        nativeTools: [],
+        signal: signal ?? new AbortController().signal,
+        executeTool: async () => ({ content: [{ type: "text", text: "No tools run while compacting." }], isError: true }),
+        onEvent: () => {},
+        onNativeToolEnd: () => {},
+        onStatus: (status) => emitStatus(binding.session, status),
+        onSessionId: () => {},
+        onCompaction: (compaction) => {
+          summary = compaction.summary;
+        },
+        control: () => {},
+        toolSetAfterStep: () => undefined,
+        onBackgroundWake: () => {},
+        backgroundWake: false,
+        quiet: true,
+        compact: true,
+      });
+    } finally {
+      options.transport.close?.(ref);
+    }
+    return summary;
   };
 
   /** Messages the CLI never took in: the next turn carries them. */
@@ -690,7 +810,18 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     if (backgroundWake) for (const message of arrived) wakes?.delete(textOf(message.content).trim());
     const rebuild = rebuildPrompt(conversation);
     const steering = request.prompt && resumeSessionId;
-    const delta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
+    const resumedDelta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
+    // Turns another engine, or this engine on another computer, answered since the CLI last ran: it starts
+    // over from the conversation's history rather than reading them as an update.
+    // So does one whose context was compacted for it elsewhere (handed to a smaller model): its own
+    // session still holds what the compaction replaced.
+    const seenKeys = new Set(record.seen);
+    const foreign =
+      options.transport.hydrate !== undefined &&
+      resumedDelta !== undefined &&
+      (resumedDelta.some((message) => message.role === "assistant" && message.stopReason !== "aborted" && message.stopReason !== "error") ||
+        conversation.some((message) => isPiCompactionBoundary(message) && !seenKeys.has(messageKey(message) ?? "")));
+    const delta = foreign ? undefined : resumedDelta;
     const baselineAt = conversation.findLastIndex((message) => residentContextKind(message) === "baseline");
     const baseline = baselineAt >= 0 ? messageKey(conversation[baselineAt]!) : undefined;
     // A CLI resumed past the baseline (re-baselined after its own compaction, or a session that predates
@@ -706,7 +837,35 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const key = messageKey(message);
       return message.role === "user" && key !== undefined && undelivered.has(key) && !givenKeys.has(key);
     });
-    const asked = steering ? request.prompt! : delta ? deltaPrompt(delta, missed) : rebuild;
+    // A CLI with no session of this conversation resumes one written from Stella's history: every turn and
+    // tool call as it happened, after the latest compaction. The text replay is only for a host that can't.
+    const promptAt = trailingUsers(conversation).start;
+    const hydrated =
+      !steering && !delta && promptAt > 0 && options.transport.hydrate
+        ? await options.transport
+            .hydrate(binding.session, (meta) => claudeCodeTranscript(conversation.slice(0, promptAt), meta, cliToolName(binding)))
+            .catch((error: unknown) => {
+              report(error);
+              return undefined;
+            })
+        : undefined;
+    if (hydrated) {
+      record.seen = [];
+      delete record.undelivered;
+      noteSeen(session, conversation.slice(0, promptAt));
+      if (baseline !== undefined) record.context = baseline;
+      record.cliSessionId = hydrated;
+      session.cliSessionId = hydrated;
+      await saveRecord(session);
+    }
+    const asked = steering
+      ? request.prompt!
+      : delta
+        ? deltaPrompt(delta, missed)
+        : hydrated
+          ? hydratedPrompt(conversation.slice(promptAt))
+          : rebuild;
+    if (hydrated) carried.length = 0;
     const before = userPrompt(carried);
     const prompt =
       carried.length > 0
@@ -748,7 +907,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     void options.transport
       .runTurn({
         session: binding.session,
-        ...(resumeSessionId ? { resumeSessionId } : {}),
+        ...((hydrated ?? resumeSessionId) ? { resumeSessionId: hydrated ?? resumeSessionId } : {}),
         model: request.model.id,
         thinkingLevel: request.thinkingLevel,
         systemPrompt: fitted.systemPrompt,
@@ -815,7 +974,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         onCompaction: (compaction) => {
           for (const listener of compactionListeners) {
             try {
-              listener(session.binding.session, compaction);
+              listener(session.binding.session, compaction, session.binding.piConversationId);
             } catch (error) {
               report(error);
             }
@@ -1333,6 +1492,11 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       }
       return { provider: CLAUDE_CODE_PROVIDER_ID, modelId };
     },
+    /** The context window, in tokens, of the Claude Code model `model` names. */
+    contextWindow(model: string): number {
+      const resolved = options.resolveModel?.(model) ?? model;
+      return options.reportedContextWindow?.(resolved) ?? options.reportedContextWindow?.(model) ?? claudeCodeContextWindow(resolved);
+    },
     extension(conversationId: string): Extension {
       return defineExtension({
         name: CLAUDE_CODE_ENGINE_EXTENSION,
@@ -1341,30 +1505,34 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         hooks: [
           hook(GenerationTask, {
             beforeRequest: async (_request, api, context) => {
-              const agent = await api.snapshot(AgentDoc, api.conversationId, context);
-              if (agent?.model?.provider !== CLAUDE_CODE_PROVIDER_ID) return undefined;
-              const identity = await api.snapshot(ProviderDoc, api.conversationId, context);
-              if (!identity?.sessionId) return undefined;
-              const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
-              const threadId = role?.agentType === "general" ? role.threadId : undefined;
-              const binding: Binding = {
-                session: {
-                  conversationId,
-                  ...(threadId ? { threadId } : {}),
-                  role: role?.agentType === "general" ? "worker" : "orchestrator",
-                  sessionKey: threadId ? `${conversationId}:${threadId}` : conversationId,
-                  ...(agent.cwd ? { cwd: agent.cwd } : {}),
-                },
-                builtinsOff: options.builtins === "never",
-                piConversationId: api.conversationId,
-              };
-              const known = sessions.get(identity.sessionId);
-              if (known) known.binding = binding;
-              else sessions.set(identity.sessionId, { piSessionId: identity.sessionId, binding });
+              const bound = await bindingOf(conversationId, api, context);
+              if (!bound) return undefined;
+              const known = sessions.get(bound.piSessionId);
+              if (known) known.binding = bound.binding;
+              else sessions.set(bound.piSessionId, { piSessionId: bound.piSessionId, binding: bound.binding });
               return undefined;
             },
           }),
-          hook(CompactionTask, { beforeCompact: () => ({ decline: true }) }),
+          // The CLI compacts its own context, so pi never compacts for it on a threshold. A compaction asked
+          // for (handing the conversation to a model with a smaller window) is Claude Code's own `/compact`.
+          hook(CompactionTask, {
+            beforeCompact: async (compaction, api, context) => {
+              if (compaction.reason !== "manual") return { decline: true };
+              const bound = await bindingOf(conversationId, api, context);
+              if (!bound) return { decline: true };
+              const summary = await compactWithCli(
+                bound.binding,
+                bound.model,
+                compaction.messages,
+                compaction.instructions,
+                context.abortSignal,
+              ).catch((error: unknown) => {
+                report(error);
+                return undefined;
+              });
+              return summary ? { summary } : { decline: true };
+            },
+          }),
           hook(ToolTask, {
             // Only what the CLI really runs has effects: a name it called natively runs here only as its
             // own built-in, answered with what it said; a Stella tool waits for the CLI's MCP request.
@@ -1415,7 +1583,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
      * everything it had before, and the host records it as the
      * conversation's compaction (`recordEngineCompaction`).
      */
-    onCompaction(listener: (session: ClaudeCodeSessionRef, compaction: ClaudeCodeCompaction) => void): () => void {
+    onCompaction(
+      listener: (session: ClaudeCodeSessionRef, compaction: ClaudeCodeCompaction, conversation: ConversationId) => void,
+    ): () => void {
       compactionListeners.add(listener);
       return () => compactionListeners.delete(listener);
     },

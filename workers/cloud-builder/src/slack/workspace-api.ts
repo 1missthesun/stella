@@ -351,7 +351,7 @@ const githubAction = async (
   teamId: string,
   action: SlackGithubAction,
 ): Promise<Response> => {
-  if (!slackGithubConfigured(env)) return fail(503, "GitHub isn't set up for Stella for Slack on this deployment.");
+  if (!slackGithubConfigured(env)) return fail(503, "GitHub isn't set up for Stella Crew on this deployment.");
   const owned = await ownedInstallation(env, caller.ownerId, teamId);
   if (!owned) return fail(404, "That workspace isn't connected to your Stella account.");
   const settings = await loadWorkspaceSettings(env, teamId);
@@ -426,7 +426,7 @@ export const handleSlackWorkspaceApi = async (request: Request, env: Cloudflare.
   if (!isList && !isOne && !isInstall) return null;
   const verified = await requireCaller(request, env, {
     allowAnonymous: false,
-    anonymousMessage: "Sign in to your Stella account to set up Stella for Slack.",
+    anonymousMessage: "Sign in to your Stella account to set up Stella Crew.",
   });
   if (!verified.ok) return fail(rpcErrorStatus(verified.error.code), verified.error.message);
   const { caller } = verified;

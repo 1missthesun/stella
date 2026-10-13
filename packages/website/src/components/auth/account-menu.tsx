@@ -93,7 +93,7 @@ export function AccountMenu({ user }: { user: AccountMenuUser }) {
           </Link>
           <Link href="/slack" role="menuitem" className={styles.item} onClick={close}>
             <MessagesSquare size={18} aria-hidden="true" className={styles.icon} />
-            <span>Stella for Slack</span>
+            <span>Stella Crew</span>
           </Link>
         </div>
 

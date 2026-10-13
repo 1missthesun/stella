@@ -737,6 +737,7 @@
         "CANVAS_OWNER_SITE_URL": "https://stella.sh",
         "SITES_HOST": "*.stellasites.app",
         "SITES_SHARED_ORIGIN": "",
+        "SLACK_ENVIRONMENTS": "1",
         "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
         // /api/admin also needs a Cloudflare Access JWT for this app
         // (src/admin/access.ts). Unset fails closed; "off" for both is bearer-only.

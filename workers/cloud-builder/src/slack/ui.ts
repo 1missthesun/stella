@@ -93,7 +93,7 @@ export const publishHome = async (
   slackUserId: string,
 ): Promise<void> => {
   const blocks: unknown[] = [
-    { type: "header", text: { type: "plain_text", text: "Stella" } },
+    { type: "header", text: { type: "plain_text", text: "Stella Crew" } },
     {
       type: "section",
       text: {

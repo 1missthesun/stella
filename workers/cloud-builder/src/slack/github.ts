@@ -170,7 +170,7 @@ const back = (row: ConnectRow, param: string, value: string): Response => {
   return new Response(null, { status: 302, headers: { location: url.toString(), "cache-control": "no-store" } });
 };
 
-const RESTART = "Start again from the Stella for Slack page. Connect links work once and last 15 minutes.";
+const RESTART = "Start again from the Stella Crew page. Connect links work once and last 15 minutes.";
 
 /** Steps 2 and 3: GitHub's authorize callback and the App's Setup URL. */
 const callback = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
@@ -181,7 +181,7 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
   if (url.searchParams.get("setup_action") === "request" && !installationId) {
     return page(
       "Install request sent",
-      "GitHub asked an owner of that organization to approve Stella for Slack. Connect GitHub again once they have.",
+      "GitHub asked an owner of that organization to approve Stella Crew. Connect GitHub again once they have.",
     );
   }
   const state = stateToken ? await verifyOAuthState(env, stateToken) : null;
@@ -193,7 +193,7 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
   }
   try {
     if (!code) {
-      if (!installationId) return back(row, SLACK_GITHUB_ERROR_PARAM, "GitHub didn't finish installing Stella for Slack.");
+      if (!installationId) return back(row, SLACK_GITHUB_ERROR_PARAM, "GitHub didn't finish installing Stella Crew.");
       // Back from installing or reconfiguring the App: the installation id in
       // the query proves nothing, so confirm through the user again.
       return Response.redirect(githubAuthorizeUrl(env, stateToken, callbackUrl(env, request), "slack"), 302);
@@ -202,7 +202,7 @@ const callback = async (request: Request, env: Cloudflare.Env): Promise<Response
     const installations = await listUserInstallations(userToken);
     if (installations.length === 0) {
       if (state.extra?.installing === "1") {
-        return back(row, SLACK_GITHUB_ERROR_PARAM, "Stella for Slack isn't installed on any account you can reach.");
+        return back(row, SLACK_GITHUB_ERROR_PARAM, "Stella Crew isn't installed on any account you can reach.");
       }
       const installState = await signOAuthState(env, { ...state, extra: { installing: "1" } });
       return Response.redirect(githubInstallUrl(env, installState, "slack"), 302);

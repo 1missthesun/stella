@@ -1,4 +1,4 @@
-# Stella for Slack
+# Stella Crew
 
 A Slack app that gives a workspace its own shared Stella, shaped like Claude
 in Slack: people mention `@Stella` in a channel or DM her, and anyone in the
@@ -62,7 +62,7 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
   meant for her gets the reply `<no-reply/>`, which posts nothing.
 
 - **GitHub** (`github.ts`): "Connect GitHub" on the page goes through
-  Stella for Slack's own GitHub App (contents write; metadata, deployments,
+  Stella Crew's own GitHub App (contents write; metadata, deployments,
   statuses and checks read), separate from the projects App. The installer
   picks which repositories it sees; the workspace stores only the
   installation id (`slack_workspace_settings.github_*`). The page lists the

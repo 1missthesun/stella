@@ -128,7 +128,7 @@ export function SlackClient() {
 function Hero() {
   return (
     <section className={s.hero}>
-      <p className={s.eyebrow}>Stella for Slack</p>
+      <p className={s.eyebrow}>Stella Crew</p>
       <h1 className={s.title}>
         Stella, in your <em>Slack.</em>
       </h1>
@@ -178,7 +178,7 @@ function SignedOut({ installResult }: { installResult: SlackInstallResult | null
       {installResult ? <InstallBanner result={installResult} /> : null}
       <div className={`${s.card} ${s.centerCard}`}>
         <p className={s.cardEyebrow}>Step one</p>
-        <h2 className={s.cardTitle}>Sign in to set up Stella for Slack</h2>
+        <h2 className={s.cardTitle}>Sign in to set up Stella Crew</h2>
         <p className={s.muted}>
           The Stella account that adds her to a workspace owns her there. Her work in Slack runs on
           that account&apos;s plan.
@@ -296,7 +296,7 @@ function Account({
     return (
       <>
         {banner}
-        <Notice title="Not available yet">Stella for Slack isn&apos;t switched on for this server yet.</Notice>
+        <Notice title="Not available yet">Stella Crew isn&apos;t switched on for this server yet.</Notice>
       </>
     );
   }
@@ -1321,8 +1321,8 @@ function GithubPanel({
               </p>
               <p className={s.calloutText}>
                 {github.status === "suspended"
-                  ? "Someone suspended Stella for Slack on GitHub. Unsuspend it there, or reconnect with another account."
-                  : "Stella for Slack was uninstalled or its access was removed. Reconnect to keep cloning private repositories."}
+                  ? "Someone suspended Stella Crew on GitHub. Unsuspend it there, or reconnect with another account."
+                  : "Stella Crew was uninstalled or its access was removed. Reconnect to keep cloning private repositories."}
               </p>
             </div>
             <div className={s.calloutActions}>

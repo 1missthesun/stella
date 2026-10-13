@@ -7,7 +7,7 @@ import { SlackClient } from "./slack-client";
 import s from "./slack.module.css";
 
 export const metadata: Metadata = {
-  title: "Stella for Slack",
+  title: "Stella Crew",
   description:
     "Add Stella to your Slack workspace. Tag @Stella in any channel or DM her, and choose how she works for your team.",
   robots: { index: false, follow: false },

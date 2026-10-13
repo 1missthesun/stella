@@ -16,7 +16,7 @@
 import { spawnSync } from "node:child_process";
 
 const AUTH = { dev: "https://auth-dev.stella.sh", production: "https://auth.stella.sh" };
-const NAMES = { dev: "Stella for Slack (dev)", production: "Stella for Slack" };
+const NAMES = { dev: "Stella Crew (dev)", production: "Stella Crew" };
 
 const args = process.argv.slice(2);
 const command = args[0];

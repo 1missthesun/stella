@@ -1,6 +1,6 @@
 {
   "display_information": {
-    "name": "Stella",
+    "name": "Stella Crew",
     "description": "Tag Stella in Slack and she does the work.",
     "long_description": "Mention @Stella in a channel or send her a direct message. Stella works on the request with your own Stella account, posts progress in the thread, and posts results back when her background agents finish. Connect your Stella account the first time you use it.",
     "background_color": "#14141f"

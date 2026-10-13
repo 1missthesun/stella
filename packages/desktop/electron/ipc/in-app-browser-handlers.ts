@@ -64,8 +64,6 @@ const optionalStringField = z.string().optional().catch(undefined);
 
 const connectPayloadSchema = z
   .object({
-    browserType: optionalStringField,
-    profileId: optionalStringField,
     reconnect: z.boolean().optional().catch(undefined),
   })
   .catch({});
@@ -138,14 +136,7 @@ export const registerInAppBrowserHandlers = (
     const record = connectPayloadSchema.parse(payload);
     const state = record.reconnect
       ? await options.service.reconnectExtension()
-      : await options.service.connect({
-          ...(record.browserType !== undefined
-            ? { browserType: record.browserType }
-            : {}),
-          ...(record.profileId !== undefined
-            ? { profileId: record.profileId }
-            : {}),
-        });
+      : await options.service.connect();
     if (state.connection === "connected") {
       await options.ensureAgentRouting?.();
       return await options.service.getState();

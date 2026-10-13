@@ -1,6 +1,6 @@
 ---
 name: stella-browser
-description: Control Stella-owned browser tabs through the persistent code runtime and its frozen browser API. Use for navigation, page interaction, semantic locators, state inspection, new-tab flows, and browser screenshots. The user's Browser panel never switches to your tab by itself: when the user asked to see a page, call `tab.show()` on it.
+description: Control browser tabs through the persistent code runtime and its frozen browser API, in Stella's own browser or, for tasks that need the user's logins, in the user's own browser. Use for navigation, page interaction, semantic locators, state inspection, new-tab flows, and browser screenshots. The user's Browser panel never switches to your tab by itself: when the user asked to see a page, call `tab.show()` on it.
 ---
 
 # Stella Browser
@@ -8,6 +8,31 @@ description: Control Stella-owned browser tabs through the persistent code runti
 Use `code` for production browser automation. Its persistent JavaScript runtime exposes a deeply frozen `browser` object with top-level `await`. Bindings and `Tab` and `Locator` identities persist across calls, so create handles once and reuse them.
 
 Use `var` for reusable REPL bindings. Browser actions are not exposed through `Bash`; use the frozen `browser` API only.
+
+## Which Browser
+
+Pick the browser at the start of the task:
+
+- **The user's own browser**, `browser.use("external")`: when the task needs the user's accounts. Their email, GitHub, bank, shopping, social or work tools, anything they are signed in to. Your tabs open in the background of their real browser (Chrome, Brave, Edge or Arc), in a tab group labeled "Stella", signed in exactly as the user is. Nothing is copied, so a session never goes stale. It needs the Stella Browser extension.
+- **Stella's browser**, `browser.use("in-app")`, the default: everything else. Public pages, research, docs, previews, sites that need no account. It has its own profile and is signed in only where someone signed in inside it (the user in Stella's Browser panel, or a sign-in the user completed in your tab). Those logins persist across restarts.
+
+```js
+await browser.use("external"); // this task needs the user's logins
+var tab = await browser.tabs.new();
+await tab.goto("https://github.com/notifications");
+```
+
+`browser.use()` sets the browser for handles you acquire afterwards. Every `Tab` and `Locator` keeps its fixed `.backend`, so an existing handle keeps routing to the browser that created it. Use both in one task when it helps, for example public research in Stella's browser and the signed-in step in the user's.
+
+In the user's browser you are a guest in their window:
+
+- Work only in tabs you opened. Never read, use or close their other tabs.
+- Keep to one tab and reuse it. Turn cleanup closes your unmarked tabs.
+- Don't call `tab.show()` there unless the user asked to see the page: it brings their browser window to the front.
+
+When the extension is not connected, the first command in the user's browser fails with "Extension not connected" and Stella offers the user a card to connect it. If it stays unconnected, continue in Stella's browser. For a step that needs the user's account there, open its sign-in page in a Stella browser tab, `show()` it, and ask the user to sign in once in Stella's Browser panel; Stella keeps that login. Never ask for or type their password yourself. Continue once they confirm.
+
+If a site in Stella's browser turns out signed out (a sign-in page, "session expired", an auth wall) and the task needs the user's account, switch to the user's browser for that site instead of asking them to sign in.
 
 ## Production Workflow
 
@@ -139,7 +164,7 @@ await tab.goto("https://example.com");
 await tab.show();
 ```
 
-Call `show()` once the page is worth looking at, not on every step, and not for tabs you only use for research or background work.
+Call `show()` once the page is worth looking at, not on every step, and not for tabs you only use for research or background work. On a tab in the user's own browser, `show()` activates the tab and brings their browser window to the front, so call it there only when they asked to see it.
 
 ## Finalize Owned Tabs
 
@@ -180,23 +205,23 @@ For a new task, call `tabs.new()` once and then navigate that handle with `tab.g
 
 ### Tab
 
-| API                                                                   | Notes                                        |
-| --------------------------------------------------------------------- | -------------------------------------------- |
-| `id`                                                                  | Positive numeric owned-tab ID.               |
-| `playwright`                                                          | Frozen page facade, cached for this tab.     |
-| `goto(url, { waitUntil?, timeout? })`                                 | Navigate the tab.                            |
-| `back({ timeout? })`, `forward({ timeout? })`, `reload({ timeout? })` | History navigation.                          |
-| `close()`                                                             | Close this tab.                              |
-| `markHandoff()`, `markDeliverable()`                                  | Retain during automatic turn cleanup.        |
-| `show()`                                                              | Bring this tab forward in the panel.         |
-| `url()`, `title()`                                                    | Cheapest page identity reads.                |
-| `snapshot(options?)`                                                  | Structural observation.                      |
-| `axSnapshot({ mode?, interactive?, compact?, maxDepth?, selector? })` | AX tree, incremental; not in cloud sessions. |
-| `screenshot(options?)`                                                | Pixel observation.                           |
-| `press(key)`                                                          | Page-level key press to current focus.       |
-| `keyboard.type(text)`, `keyboard.press(key)`                          | Raw text insertion / key press.              |
-| `scroll(options?)`                                                    | Scroll page or element.                      |
-| `expectNewTab(action, { timeoutMs? })`                                | Capture exactly one new owned tab.           |
+| API                                                                   | Notes                                    |
+| --------------------------------------------------------------------- | ---------------------------------------- |
+| `id`                                                                  | Positive numeric owned-tab ID.           |
+| `playwright`                                                          | Frozen page facade, cached for this tab. |
+| `goto(url, { waitUntil?, timeout? })`                                 | Navigate the tab.                        |
+| `back({ timeout? })`, `forward({ timeout? })`, `reload({ timeout? })` | History navigation.                      |
+| `close()`                                                             | Close this tab.                          |
+| `markHandoff()`, `markDeliverable()`                                  | Retain during automatic turn cleanup.    |
+| `show()`                                                              | Bring this tab forward for the user.     |
+| `url()`, `title()`                                                    | Cheapest page identity reads.            |
+| `snapshot(options?)`                                                  | Structural observation.                  |
+| `axSnapshot({ mode?, interactive?, compact?, maxDepth?, selector? })`   | AX tree, incremental; not in cloud sessions. |
+| `screenshot(options?)`                                                | Pixel observation.                       |
+| `press(key)`                                                          | Page-level key press to current focus.   |
+| `keyboard.type(text)`, `keyboard.press(key)`                          | Raw text insertion / key press.          |
+| `scroll(options?)`                                                    | Scroll page or element.                  |
+| `expectNewTab(action, { timeoutMs? })`                                | Capture exactly one new owned tab.       |
 
 Snapshot options are `interactive`, `cursor`, `maxDepth` (or `depth`), `compact`, and `selector`. Screenshot options are `fullPage`, `selector`, `format` (`"png"` or `"jpeg"`), `quality` (0-100), and `annotate`. Scroll options are pixel deltas `x`/`y` (negative scrolls up/left) or `selector` + `direction` + `amount`; prefer `locator.scrollIntoViewIfNeeded()` before acting on an element.
 
@@ -243,23 +268,6 @@ evaluate(pageFunction, arg?), waitFor(options?), allTextContents()
 
 Timeouts are non-negative milliseconds and are capped at 120 seconds unless a smaller `expectNewTab()` limit applies. Locator actions retry transient not-found/not-actionable state for one shared three-second deadline, then add a bounded five-match diagnostic; unknown-outcome transport failures are never replayed. A low-level `browser.chain()` has its own overall `timeout` option capped at 240 seconds. Unknown option keys fail fast. A timeout error states whether its deadline was the caller's override or the runtime default and whether the request had already been dispatched; if dispatch occurred, treat the remote outcome as unknown and inspect state before retrying a mutating action.
 
-## Not Logged In: Try the External Browser
-
-The default in-app browser has its own session and mirrors the user's signed-in cookies from their real browser, but that copy can be incomplete — sites that keep auth in localStorage/token storage, device-bound sessions, or partitioned cookies may still read as logged out even when the real browser is signed in.
-
-When a site loads but appears NOT logged in — redirected to a sign-in page, "session expired", an auth wall, or an action that fails only for lack of auth — attempt the user's real, signed-in browser before concluding the site is inaccessible:
-
-```js
-await browser.use("external"); // select the user's real browser for newly acquired handles
-var externalTab = await browser.tabs.new("https://example.com");
-// retry the auth-gated workflow on externalTab
-await browser.use("in-app"); // old in-app handles remain bound and safe to reuse
-```
-
-Every `Tab` and `Locator` exposes its fixed `.backend`. Switching the default affects newly acquired handles only; an existing handle continues routing to the backend that created it, even after `browser.use()` changes the default. Do not expect an in-app tab to become an external tab.
-
-This is a fallback to try, not a default. Keep using the in-app browser for normal work; reach for `external` only when missing auth actually blocks the task, then switch back with `browser.use("in-app")`. External mode needs the Stella Browser extension installed and connected — if it is unavailable, report that rather than assuming the site is down. This is distinct from a transport/bridge failure (below): use `external` only for a logged-out or auth-failed site on an otherwise-working browser.
-
 ## Transport Failures
 
-Do not fall back to shell commands or a visible Chrome/Brave browser when the frozen browser API reports a bridge or transport failure. Report the exact error and park the browser-dependent step; continue only work that does not require browser access. Do not promise automatic backend recovery, retries, or stale-tab cleanup; none is part of the frozen worker API contract.
+"Extension not connected" is not a transport failure; see Which Browser above. Do not fall back to shell commands or to driving a Chrome/Brave window yourself when the frozen browser API reports a bridge or transport failure. Report the exact error and park the browser-dependent step; continue only work that does not require browser access. Do not promise automatic backend recovery, retries, or stale-tab cleanup; none is part of the frozen worker API contract.

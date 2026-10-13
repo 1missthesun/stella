@@ -69,6 +69,7 @@ export type RunnerPiTools = {
   specs: (agentType: PiToolAgentType) => PiToolSpec[];
   run: (call: PiToolCall) => Promise<AgentToolResult<unknown>>;
   shellEnvironment: (owner: { conversationId: string; agentId?: string; cwd: string }) => Record<string, string>;
+  endAgentBrowserTurn: (agentId: string) => Promise<void>;
   cliBridgeSocketPath?: string;
 };
 
@@ -115,6 +116,9 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
       },
       cwd,
     ),
+  endAgentBrowserTurn: async (agentId) => {
+    await context.toolHost.endBrowserTurn(runIdFor(agentId), "close-tabs");
+  },
   specs: (agentType) => {
     const offered = offeredTools(context, agentType);
     return offered.map((tool) => ({

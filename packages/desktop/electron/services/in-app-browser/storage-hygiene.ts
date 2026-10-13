@@ -1,11 +1,30 @@
 import { lstat, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { Session } from "electron";
-import {
-  PROFILE_IMPORT_MARKER,
-  indexedDbFolderOrigin,
-  isLoopbackOrigin,
-} from "../in-app-browser-profile.js";
+
+const PROFILE_IMPORT_MARKER = ".stella-browser-profile-import-v1.json";
+
+const isLoopbackHost = (host: string) =>
+  host === "localhost" ||
+  host.endsWith(".localhost") ||
+  host === "[::1]" ||
+  /^127(?:\.\d{1,3}){3}$/.test(host);
+
+const indexedDbFolderOrigin = (name: string): string | null => {
+  const match = /^(https?)_(.+)_(\d+)\.indexeddb\.(?:leveldb|blob)$/.exec(name);
+  if (!match) return null;
+  const [, scheme, host, port] = match;
+  const defaultPort = scheme === "https" ? "443" : "80";
+  return `${scheme}://${host}${port === "0" || port === defaultPort ? "" : `:${port}`}`;
+};
+
+const isLoopbackOrigin = (origin: string) => {
+  try {
+    return isLoopbackHost(new URL(origin).hostname);
+  } catch {
+    return false;
+  }
+};
 
 const LOOPBACK_ORIGIN_LIMIT_BYTES = 256 * 1024 * 1024;
 

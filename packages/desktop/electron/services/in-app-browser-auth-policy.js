@@ -88,30 +88,6 @@ export const AUTH_ORIGIN_HOST_SUFFIXES = [
  */
 export const AUTH_DEVICE_PERMISSIONS = new Set(["hid", "usb", "serial"]);
 
-/**
- * Cookie name prefixes / names that carry durable device trust or the rotating
- * session-binding half of a login. Once the managed browser has its OWN live
- * copy of one of these for an origin — e.g. a __Secure-* cookie Google set after
- * the managed profile completed a step-up challenge — re-seeding from the user's
- * real browser must NOT clobber it. Otherwise every app restart throws away the
- * device trust the managed profile accumulated and forces another challenge.
- */
-export const TRUST_COOKIE_NAME_PREFIXES = ["__Secure-", "__Host-"];
-export const TRUST_COOKIE_NAMES = new Set([
-  // Google auth / session cookies (the durable + rotating login halves).
-  "SID",
-  "HSID",
-  "SSID",
-  "APISID",
-  "SAPISID",
-  "SIDCC",
-  "LSID",
-  "OSID",
-  "ACCOUNT_CHOOSER",
-  "SMSV",
-  "__Secure-ENID",
-]);
-
 const urlHost = (value) => {
   try {
     return new URL(value).hostname.toLowerCase();
@@ -173,55 +149,4 @@ export const shouldAllowAuthDevice = (details) => {
     return false;
   }
   return isAuthOrigin(details.origin);
-};
-
-/**
- * True when a cookie name carries durable device trust or the session-binding
- * half of a login (see TRUST_COOKIE_* above). Used to decide which cookies get
- * the conservative preserve-vs-refresh treatment during re-seeding.
- */
-export const isTrustCriticalCookieName = (name) => {
-  if (!name) return false;
-  if (TRUST_COOKIE_NAMES.has(name)) return true;
-  return TRUST_COOKIE_NAME_PREFIXES.some((prefix) => name.startsWith(prefix));
-};
-
-// An in-app cookie counts as "live" when it is a session cookie (no expiry) or
-// its expiry is still in the future. Electron cookies.get() omits expirationDate
-// for session cookies.
-const isLiveCookie = (cookie, nowSeconds) => {
-  if (!cookie) return false;
-  if (typeof cookie.expirationDate !== "number") return true;
-  return cookie.expirationDate > nowSeconds;
-};
-
-/**
- * COOKIE PRESERVE-VS-REFRESH RULE.
- *
- * Given the managed browser's existing cookie for a name+host (`existing`, from
- * session.cookies.get) and the freshly-exported copy from the user's real
- * browser (`incoming`), decide whether to KEEP the existing one instead of
- * overwriting it.
- *
- * Rule: preserve when the managed store already holds a LIVE, trust-critical
- * cookie (device trust / session binding: __Secure-*, __Host-*, Google
- * SID/HSID/SAPISID/…). Rationale:
- *   - First-ever seed sees an empty store, so nothing is preserved and initial
- *     login is fully seamless (all cookies seed).
- *   - On later launches the accumulated trust cookies the managed profile earned
- *     survive, instead of being clobbered by a mid-rotation copy from the real
- *     browser — which is what was throwing away device trust every restart.
- *   - Ordinary (non-trust) cookies still refresh from the real browser as before,
- *     and expired/absent trust cookies are refreshed too, so a genuinely stale
- *     managed session can still be re-bootstrapped.
- */
-export const shouldPreserveExistingCookie = (
-  existing,
-  incoming,
-  nowSeconds = Date.now() / 1000,
-) => {
-  if (!existing) return false;
-  const name = incoming?.name ?? existing.name;
-  if (!isTrustCriticalCookieName(name)) return false;
-  return isLiveCookie(existing, nowSeconds);
 };

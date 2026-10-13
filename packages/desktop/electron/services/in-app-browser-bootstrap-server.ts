@@ -138,6 +138,7 @@ export type InAppBrowserBootstrapServerOptions = {
   ensureReady: (
     capability: InAppBrowserBootstrapCapability,
   ) => Promise<InAppBrowserBootstrapResult>;
+  getExtensionStatus?: () => Promise<boolean | null>;
   endpoint?: StellaInAppBrowserInitEndpoint;
   tokenPath?: string;
 };
@@ -164,6 +165,10 @@ const ensureRequestSchema = z.strictObject({
   ownerLeaseId: capabilityString,
   ownerLeaseIssuedAt: z.number().int().positive(),
   recover: z.boolean().optional(),
+});
+const extensionStatusRequestSchema = z.strictObject({
+  action: z.literal("extension_status"),
+  token: z.unknown(),
 });
 
 const sameToken = (received: unknown, expected: string) => {
@@ -355,7 +360,18 @@ export class InAppBrowserBootstrapServer {
 
   private async handleRequest(socket: Socket, line: string) {
     try {
-      const payload = ensureRequestSchema.safeParse(JSON.parse(line));
+      const parsed: unknown = JSON.parse(line);
+      const statusRequest = extensionStatusRequestSchema.safeParse(parsed);
+      if (
+        statusRequest.success &&
+        this.options.getExtensionStatus &&
+        sameToken(statusRequest.data.token, this.options.token)
+      ) {
+        const connected = await this.options.getExtensionStatus();
+        this.reply(socket, true, undefined, { connected });
+        return;
+      }
+      const payload = ensureRequestSchema.safeParse(parsed);
       if (
         !payload.success ||
         !sameToken(payload.data.token, this.options.token)
@@ -384,7 +400,7 @@ export class InAppBrowserBootstrapServer {
     socket: Socket,
     success: boolean,
     error?: string,
-    data?: InAppBrowserBootstrapResult,
+    data?: InAppBrowserBootstrapResult | { connected: boolean | null },
   ) {
     if (socket.destroyed) return;
     socket.end(

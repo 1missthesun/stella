@@ -4,8 +4,8 @@
  * service from `node_repl`.
  *
  * The extension is optional: Stella's in-app browser works without it, and the
- * extension only brings the user's real-browser logins in (and backs the
- * opt-in external backend). When legacy command output reports that the
+ * extension is how agents work in the user's own browser with their logins
+ * (the external backend). Nothing is copied between the two browsers. When legacy command output reports that the
  * extension is not connected, the exec tool asks the desktop to render an
  * inline connect card, waits for the user to connect or decline, and retries
  * the intercepted operation once on success.
@@ -252,7 +252,7 @@ export const maybeOfferBrowserExtensionConnect = async (options: {
   if (gate.inFlight) {
     return annotate(
       result,
-      "The Stella browser extension is not connected and a connect card is already open in the chat. The extension only imports the user's logins; Stella's in-app browser works without it. Continue in the in-app browser (pages open signed out), and wait for the user's response only for steps that need a site they are signed in to.",
+      "The Stella browser extension is not connected and a connect card is already open in the chat. The extension lets agents work in the user's own browser with their logins; Stella's in-app browser works without it. Continue in the in-app browser (it has only the logins made in it), and wait for the user's response only for steps that need a site they are signed in to.",
     );
   }
   if (

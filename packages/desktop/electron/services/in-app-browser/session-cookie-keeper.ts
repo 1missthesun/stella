@@ -31,6 +31,7 @@ export const keepSessionCookies = (browserSession: Session): (() => void) => {
     _cause: string,
     removed: boolean,
   ) => {
+    scheduleFlush();
     if (removed || !cookie.session || !cookie.name) return;
     const url = cookieUrl(cookie);
     if (!url) return;

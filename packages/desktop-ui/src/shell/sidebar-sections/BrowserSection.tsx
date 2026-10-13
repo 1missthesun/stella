@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import {
-  BROWSER_PROFILE_KEY,
-  BROWSER_SELECTION_KEY,
-} from "@stella/contracts/discovery";
 import type {
   BrowserViewBounds,
   BrowserViewLayout,
@@ -387,11 +383,7 @@ export function BrowserSection() {
     if (!api) return;
     setLocalError(null);
     try {
-      const next = await api.connect({
-        browserType: uiState.getItem(BROWSER_SELECTION_KEY) ?? undefined,
-        profileId: uiState.getItem(BROWSER_PROFILE_KEY) ?? undefined,
-        ...(reconnect ? { reconnect: true } : {}),
-      });
+      const next = await api.connect(reconnect ? { reconnect: true } : {});
       if (mountedRef.current && isBrowserViewState(next)) setState(next);
     } catch (error) {
       if (mountedRef.current) {

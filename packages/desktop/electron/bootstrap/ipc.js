@@ -65,6 +65,7 @@ const DEFAULT_STELLA_WEB_URL = "https://stella.sh";
 // spawns stay off the first-paint (TTI) path. Previously Windows-only; now
 // applied on all platforms.
 const POST_READY_NATIVE_DELAY_MS = 4_000;
+const EXTENSION_STATUS_SETTLE_MS = 30_000;
 const readStellaWebBaseUrl = () => {
     const raw = (process.env.STELLA_WEB_URL ??
         process.env.VITE_STELLA_WEB_URL ??
@@ -112,27 +113,6 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
                     resource.start();
                 }
             },
-            exportAllCookies: async () => {
-                const resource = state.stellaBrowserBridgeService;
-                if (!resource?.exportAllCookies) {
-                    throw new Error("Browser bridge service is not running.");
-                }
-                return await resource.exportAllCookies();
-            },
-            exportCookiesForUrls: async (urls) => {
-                const resource = state.stellaBrowserBridgeService;
-                if (!resource?.exportCookiesForUrls) {
-                    throw new Error("Browser bridge service is not running.");
-                }
-                return await resource.exportCookiesForUrls(urls);
-            },
-            subscribeCookieEvents: (onEvent) => {
-                const resource = state.stellaBrowserBridgeService;
-                if (!resource?.subscribeCookieEvents) {
-                    return () => {};
-                }
-                return resource.subscribeCookieEvents(onEvent);
-            },
             // Agents check UI drafts in the running app, which always runs from
             // source.
             openPreview: (name) => openDraftPreview({
@@ -173,14 +153,13 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             ...(capability.recover ? { recover: true } : {}),
         }, route.cdpUrl);
     };
-    // Agent routing never waits for the extension: tabs work without it, and
-    // the extension only imports logins. The connect attempt starts here so a
-    // cookie seed, when the extension is present, overlaps the routing setup.
+    let extensionStatusSettlesAt = 0;
+    // Agent routing never waits for the extension: Stella's browser uses its
+    // own profile, and the extension only gives agents the user's own browser.
     const ensureInAppBrowserReady = async (capability) => {
         if (!isStellaBrowserBridgeBinaryInstalled()) {
             throw new Error(BROWSER_BRIDGE_MISSING_ERROR);
         }
-        void state.inAppBrowserService.connect().catch(() => { });
         startStellaBrowserBridge(context);
         return await ensureInAppBrowserAgentRouting(capability);
     };
@@ -188,6 +167,20 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         state.inAppBrowserBootstrapServer = new InAppBrowserBootstrapServer({
             token: randomUUID(),
             ensureReady: ensureInAppBrowserReady,
+            getExtensionStatus: async () => {
+                if (!isStellaBrowserBridgeBinaryInstalled())
+                    return false;
+                const resource = state.stellaBrowserBridgeService;
+                if (!resource || resource.getStatus?.().state !== "connected") {
+                    extensionStatusSettlesAt = Date.now() + EXTENSION_STATUS_SETTLE_MS;
+                    startStellaBrowserBridge(context);
+                    return null;
+                }
+                const connected = await resource.getExtensionStatus();
+                if (!connected && Date.now() < extensionStatusSettlesAt)
+                    return null;
+                return connected;
+            },
         });
         void state.inAppBrowserBootstrapServer.start().catch((error) => {
             console.error("[in-app-browser] Failed to start lazy initialization server:", error);

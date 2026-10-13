@@ -9,11 +9,6 @@ import {
   type Session,
 } from "electron";
 import {
-  importBrowserProfileSnapshot,
-  resolveBrowserProfileSelection,
-  type BrowserProfileImportResult,
-} from "./in-app-browser-profile.js";
-import {
   buildInAppBrowserUserAgent,
   isAuthOrigin,
   isAuthPermission,
@@ -31,11 +26,9 @@ import type {
   BrowserViewLayout,
   BrowserViewState,
   BrowserViewUnavailableReason,
-  StellaBrowserExportedCookie,
 } from "@stella/contracts/desktop/browser-view";
 import { BROWSER_BRIDGE_MISSING_ERROR } from "../utils/register-stella-native-messaging-host.js";
 import { STELLA_BROWSER_EXTENSION_STORE_URL } from "@stella/runtime/kernel/tools/stella-browser-bridge-config";
-import { CookieMirror } from "./in-app-browser/cookie-mirror.js";
 import { trimInAppBrowserStorage } from "./in-app-browser/storage-hygiene.js";
 import { keepSessionCookies } from "./in-app-browser/session-cookie-keeper.js";
 import {
@@ -49,26 +42,6 @@ import {
   resolveOwnerId,
   type ManagedTab,
 } from "./in-app-browser/tab-registry.js";
-
-export type { StellaBrowserExportedCookie };
-
-/**
- * A single real-browser cookie change pushed in real time by the extension.
- * `removed` distinguishes a deletion from a set; `cookie` carries the same shape
- * as an exported cookie.
- */
-export type StellaBrowserCookieChange = {
-  removed?: boolean;
-  cause?: string;
-  cookie?: StellaBrowserExportedCookie;
-};
-
-/** An unsolicited event object pushed over the bridge subscription. */
-export type StellaBrowserBridgeEvent = {
-  event?: string;
-  changes?: StellaBrowserCookieChange[];
-  [key: string]: unknown;
-};
 
 export type InAppBrowserPreview = {
   view: WebContentsView;
@@ -106,33 +79,13 @@ type InAppBrowserServiceOptions = {
    * fresh handshake, so a link the daemon retired comes back.
    */
   reconnectExtension?: () => Promise<void>;
-  exportAllCookies: () => Promise<StellaBrowserExportedCookie[]>;
-  exportCookiesForUrls?: (
-    urls: string[],
-  ) => Promise<StellaBrowserExportedCookie[]>;
-  /**
-   * Subscribe to real-time cookie-change events pushed by the extension. The
-   * returned function unsubscribes. When present, this is the PRIMARY freshness
-   * mechanism; the periodic reconcile below is only a backstop for events
-   * missed while the extension's service worker was asleep or the subscription
-   * was reconnecting.
-   */
-  subscribeCookieEvents?: (
-    onEvent: (event: StellaBrowserBridgeEvent) => void,
-  ) => () => void;
   onStateChanged?: (state: BrowserViewState) => void;
   connectionTimeoutMs?: number;
   connectionPollMs?: number;
   automaticConnectionTimeoutMs?: number;
   /** Total budget for reconnect-on-demand, across retries. Defaults to 30s. */
   demandConnectionTimeoutMs?: number;
-  /** Continuous cookie-mirror cadence (ms). Defaults to 60s; floored at 5s. */
-  cookieMirrorIntervalMs?: number;
-  /** Min gap between navigation-triggered cookie reseeds (ms). Defaults to 5s. */
-  navigationReseedThrottleMs?: number;
   profilePath?: string;
-  resolveProfile?: typeof resolveBrowserProfileSelection;
-  importProfile?: typeof importBrowserProfileSnapshot;
   sessionFromPath?: typeof session.fromPath;
   createView?: (browserSession: Session) => WebContentsView;
   createDrawableHost?: () => BrowserWindow;
@@ -157,10 +110,8 @@ const AGENT_ACTIVITY_IDLE_MS = 2_500;
 const DEFAULT_CONNECTION_TIMEOUT_MS = 10_000;
 const DEFAULT_CONNECTION_POLL_MS = 250;
 // Extension wake (MV3 service worker) plus native-host/daemon spawn can take
-// several seconds on a cold start. 1.5s was too tight and routinely produced a
-// "connected extension but no seed" state; give the first automatic connect a
-// more forgiving window. Repeated getState polls also retry the seed, so this
-// is only the first-attempt budget.
+// several seconds on a cold start, so the first automatic connect gets a
+// forgiving window.
 const DEFAULT_AUTOMATIC_CONNECTION_TIMEOUT_MS = 5_000;
 // Reconnect-on-demand: when something actually asks for a web tab, a cold or
 // dead transport is a thing to repair, not to report. The daemon is restarted
@@ -173,9 +124,6 @@ const DEFAULT_DEMAND_CONNECTION_TIMEOUT_MS = 30_000;
 const DEMAND_ATTEMPT_WINDOWS_MS = [2_000, 5_000, 10_000] as const;
 // Gap between attempts, so a daemon that is still booting is not hammered.
 const DEMAND_RETRY_BACKOFF_MS = [250, 1_000, 2_000] as const;
-const LOGIN_PROBE_TIMEOUT_MS = 1_500;
-const LOGIN_SEED_WAIT_MS = 15_000;
-const INSTALLED_EXTENSION_WAIT_MS = 5_000;
 const MAX_FAVICON_BYTES = 256 * 1024;
 
 const cloneState = (state: BrowserViewState): BrowserViewState => ({
@@ -186,26 +134,6 @@ const cloneState = (state: BrowserViewState): BrowserViewState => ({
 
 const errorMessage = (error: unknown) =>
   error instanceof Error ? error.message : String(error);
-
-const settleWithin = <T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  fallback: T,
-): Promise<T> =>
-  new Promise<T>((resolve) => {
-    const timer = setTimeout(() => resolve(fallback), timeoutMs);
-    timer.unref?.();
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      () => {
-        clearTimeout(timer);
-        resolve(fallback);
-      },
-    );
-  });
 
 const normalizeWebUrl = (input: string | undefined) => {
   const raw = input?.trim() || DEFAULT_URL;
@@ -276,7 +204,6 @@ type ConnectionAttemptOptions = {
 export class InAppBrowserService {
   private readonly options: InAppBrowserServiceOptions;
   private readonly tabs = new BrowserTabRegistry();
-  private readonly cookies: CookieMirror;
   private readonly debuggerProxy: DebuggerTargetProxy;
   private readonly errorsByOwner = new Map<string, string>();
   private readonly profilePath: string;
@@ -296,7 +223,6 @@ export class InAppBrowserService {
   };
   private browserSession: Session | null = null;
   private releaseSessionCookies: (() => void) | null = null;
-  private profileImport: BrowserProfileImportResult | null = null;
   private initializePromise: Promise<void> | null = null;
   private connectPromise: Promise<BrowserViewState> | null = null;
   private visible = false;
@@ -314,17 +240,6 @@ export class InAppBrowserService {
     this.profilePath =
       options.profilePath ??
       path.join(options.stellaDataDir, "browser", "profile-v1");
-    this.cookies = new CookieMirror({
-      profilePath: this.profilePath,
-      getExtensionStatus: options.getExtensionStatus,
-      exportAllCookies: options.exportAllCookies,
-      exportCookiesForUrls: options.exportCookiesForUrls,
-      subscribeCookieEvents: options.subscribeCookieEvents,
-      awaitConnection: () => this.prepareLogins(),
-      getSeedTabContents: () => this.tabs.first()?.view.webContents,
-      cookieMirrorIntervalMs: options.cookieMirrorIntervalMs,
-      navigationReseedThrottleMs: options.navigationReseedThrottleMs,
-    });
     this.debuggerProxy = new DebuggerTargetProxy({
       tabs: this.tabs,
       getAttachedView: () => this.attachedView,
@@ -342,42 +257,14 @@ export class InAppBrowserService {
     const resolvedOwnerId =
       ownerId === undefined ? undefined : resolveOwnerId(ownerId);
     if (this.disposed) return this.snapshot(resolvedOwnerId);
-    if (this.cookies.hasSeededOnce) {
-      // A completed seed is durable profile state, not a live transport
-      // handshake. Re-probe the daemon/extension generation so the UI cannot
-      // remain green while a fresh agent call is unauthorized.
-      try {
-        if (await this.options.getExtensionStatus()) {
-          this.updateConnection("connected");
-        } else {
-          this.updateUnavailableConnection(
-            this.readConnectionFailure("extension_disconnected"),
-          );
-        }
-      } catch {
-        this.updateUnavailableConnection(
-          this.readConnectionFailure("transient_failure"),
-        );
-      }
-      return this.snapshot(resolvedOwnerId);
-    }
     const setupRequirement = this.readSetupRequirement();
     if (setupRequirement) {
       this.updateUnavailableConnection(setupRequirement);
       return this.snapshot(resolvedOwnerId);
     }
     try {
-      const extensionConnected = await this.options.getExtensionStatus();
-      // Extension presence is only the first half of connection. Do not claim
-      // readiness until profile/cookie seeding and in-app CDP routing finish.
-      if (extensionConnected) {
-        this.updateConnection("checking");
-        // Race fix: the extension is up but we have not seeded yet. Drive the
-        // seed now instead of waiting for a manual connect. Because the UI polls
-        // getState, an extension that woke up after the first automatic-connect
-        // window still gets picked up here on the next poll. connect() dedupes
-        // via connectPromise, so concurrent polls collapse to one attempt.
-        void this.connect().catch(() => {});
+      if (await this.options.getExtensionStatus()) {
+        this.updateConnection("connected");
       } else {
         this.updateUnavailableConnection(
           this.readConnectionFailure("extension_disconnected"),
@@ -393,9 +280,6 @@ export class InAppBrowserService {
 
   async requestExtensionConnect(): Promise<BrowserViewState> {
     if (this.disposed) throw new Error("The in-app browser has been closed.");
-    if (this.cookies.hasSeededOnce) {
-      return await this.getState();
-    }
     const setupRequirement = this.readSetupRequirement({ extension: false });
     if (setupRequirement) {
       this.updateUnavailableConnection(setupRequirement);
@@ -411,7 +295,7 @@ export class InAppBrowserService {
         // Daemon startup races the first status probe; poll below.
       }
       if (connected) {
-        this.updateConnection("checking");
+        this.updateConnection("connected");
         return this.snapshot();
       }
       await this.options.openExtensionStore?.();
@@ -420,7 +304,7 @@ export class InAppBrowserService {
       const pollMs =
         this.options.connectionPollMs ?? DEFAULT_CONNECTION_POLL_MS;
       if (await this.pollExtensionStatus(timeoutMs, pollMs)) {
-        this.updateConnection("checking");
+        this.updateConnection("connected");
         return this.snapshot();
       }
       this.updateUnavailableConnection(
@@ -457,15 +341,9 @@ export class InAppBrowserService {
     return this.snapshot();
   }
 
-  connect(
-    options: {
-      browserType?: string;
-      profileId?: string;
-    } = {},
-    attempt: ConnectionAttemptOptions = {},
-  ): Promise<BrowserViewState> {
+  connect(attempt: ConnectionAttemptOptions = {}): Promise<BrowserViewState> {
     if (this.connectPromise) return this.connectPromise;
-    const promise = this.connectInternal(options, attempt).finally(() => {
+    const promise = this.connectInternal(attempt).finally(() => {
       if (this.connectPromise === promise) this.connectPromise = null;
     });
     this.connectPromise = promise;
@@ -473,20 +351,15 @@ export class InAppBrowserService {
   }
 
   private async connectInternal(
-    options: {
-      browserType?: string;
-      profileId?: string;
-    },
     attempt: ConnectionAttemptOptions = {},
   ): Promise<BrowserViewState> {
-    // A completed seed used to end this method: callers got a re-probe of the
-    // extension and nothing else, so a bridge whose daemon had since exited
-    // could never be restarted. `recover` is how a caller that needs the
-    // transport now asks for the real handshake again.
-    if (this.cookies.hasSeededOnce && !attempt.recover) {
+    // An extension that is already reachable needs only a re-probe; `recover`
+    // is how a caller asks for the real handshake again, so a bridge whose
+    // daemon has since exited is restarted rather than merely re-probed.
+    if (this.state.connection === "connected" && !attempt.recover) {
       return await this.getState();
     }
-    await this.runConnectionAttempt(options, {
+    await this.runConnectionAttempt({
       timeoutMs:
         attempt.timeoutMs ??
         this.options.automaticConnectionTimeoutMs ??
@@ -496,16 +369,13 @@ export class InAppBrowserService {
   }
 
   /**
-   * One full bridge handshake: start the daemon, wait for the extension, open
-   * the in-app session, then seed (or refresh) the cookie mirror. Idempotent
-   * and reusable, so recovering a bridge that was once up takes the same path
-   * as the first connect instead of a separate half-path that could only
-   * report failure.
+   * One full bridge handshake: start the daemon and wait for the extension.
+   * Idempotent and reusable, so recovering a bridge that was once up takes the
+   * same path as the first connect.
    */
-  private async runConnectionAttempt(
-    options: { browserType?: string; profileId?: string },
-    attempt: { timeoutMs: number },
-  ): Promise<boolean> {
+  private async runConnectionAttempt(attempt: {
+    timeoutMs: number;
+  }): Promise<boolean> {
     const setupRequirement = this.readSetupRequirement();
     if (setupRequirement) {
       this.updateUnavailableConnection(setupRequirement);
@@ -523,11 +393,7 @@ export class InAppBrowserService {
         );
         return false;
       }
-      this.updateConnection("checking");
-      await this.ensureSessionInitialized(options);
-      await this.cookies.seedOrRefresh();
       this.updateConnection("connected");
-      this.cookies.start();
       return true;
     } catch (error) {
       this.updateUnavailableConnection(
@@ -541,15 +407,11 @@ export class InAppBrowserService {
    * Bring the bridge up for a caller that needs it right now, repairing a cold
    * or dead transport rather than reporting it.
    *
-   * Three things made the old path give up when it did not have to. It
-   * short-circuited on `hasSeededOnce`, so a bridge that had worked earlier and
-   * then lost its daemon was only ever re-probed, never restarted. It had a
-   * single poll window, so one unlucky window (an asleep MV3 service worker, a
-   * daemon mid-respawn) was a terminal answer. And `connect()`'s dedupe handed
-   * the caller whatever attempt happened to be in flight, including a
-   * background poll whose window opened before the extension woke up. Here the
-   * caller waits out any in-flight attempt, then drives its own attempts with
-   * backoff until the budget runs out.
+   * One poll window is not a terminal answer (an asleep MV3 service worker or
+   * a daemon mid-respawn can miss it), and `connect()`'s dedupe would hand the
+   * caller whatever attempt happened to be in flight. So the caller waits out
+   * any in-flight attempt, then drives its own attempts with backoff until the
+   * budget runs out.
    */
   private async ensureConnectionOnDemand(): Promise<boolean> {
     if (this.disposed) return false;
@@ -573,13 +435,10 @@ export class InAppBrowserService {
         DEMAND_ATTEMPT_WINDOWS_MS[
           Math.min(index, DEMAND_ATTEMPT_WINDOWS_MS.length - 1)
         ]!;
-      const state = await this.connect(
-        {},
-        {
-          timeoutMs: Math.min(windowMs, Math.max(remainingMs, 0)),
-          recover: true,
-        },
-      );
+      const state = await this.connect({
+        timeoutMs: Math.min(windowMs, Math.max(remainingMs, 0)),
+        recover: true,
+      });
       if (state.connection === "connected") return true;
       // A requirement the user has to satisfy (no bridge binary, no extension
       // installed) does not become true by retrying.
@@ -637,48 +496,10 @@ export class InAppBrowserService {
     return this.snapshot();
   }
 
-  private async prepareLogins(): Promise<void> {
-    if (this.disposed) return;
-    if (this.cookies.hasSeededOnce) {
-      if (this.state.connection !== "connected") {
-        void this.ensureConnectionOnDemand().catch(() => undefined);
-      }
-      return;
-    }
-    const extensionConnected = await settleWithin(
-      this.options.getExtensionStatus(),
-      LOGIN_PROBE_TIMEOUT_MS,
-      false,
-    );
-    if (this.disposed) return;
-    if (extensionConnected) {
-      await settleWithin(
-        this.connect().then(() => undefined),
-        LOGIN_SEED_WAIT_MS,
-        undefined,
-      );
-      return;
-    }
-    const stillChecking = this.state.connection === "checking";
-    const attempt = this.connectPromise ?? this.connect();
-    void attempt.catch(() => undefined);
-    if (
-      stillChecking &&
-      this.options.getBrowserSetupStatus?.().extensionInstalled
-    ) {
-      await settleWithin(
-        attempt.then(() => undefined),
-        INSTALLED_EXTENSION_WAIT_MS,
-        undefined,
-      );
-    }
-  }
-
   async createTab(
     options: { url?: string; ownerId?: string; activate?: boolean } = {},
   ): Promise<BrowserViewState> {
-    await this.ensureSessionInitialized({});
-    await this.prepareLogins();
+    await this.ensureSessionInitialized();
     const browserSession = this.browserSession;
     if (!browserSession) throw new Error("Browser session is unavailable.");
     const ownerId = resolveOwnerId(options.ownerId);
@@ -708,8 +529,6 @@ export class InAppBrowserService {
     const tab = this.addTab({ id, view, ownerId, activate: options.activate });
     try {
       const url = normalizeWebUrl(options.url);
-      await this.cookies.prepareGoogleNavigation(view.webContents.id, url);
-      await this.cookies.applyPendingPartitionedCookies(view.webContents);
       await view.webContents.loadURL(url);
     } catch (error) {
       if (!view.webContents.isDestroyed()) {
@@ -889,8 +708,6 @@ export class InAppBrowserService {
     if (tab.preview) throw new Error("A Stella preview tab only shows Stella.");
     this.clearOwnerError(ownerId);
     const url = normalizeWebUrl(options.url);
-    await this.cookies.prepareGoogleNavigation(tab.view.webContents.id, url);
-    await this.cookies.applyPendingPartitionedCookies(tab.view.webContents);
     await tab.view.webContents.loadURL(url);
     this.syncState();
     return this.snapshot(ownerId);
@@ -1062,7 +879,6 @@ export class InAppBrowserService {
     if (this.disposed) return;
     this.disposed = true;
     this.visible = false;
-    this.cookies.dispose();
     this.releaseSessionCookies?.();
     this.releaseSessionCookies = null;
     this.detachAttachedView();
@@ -1073,22 +889,10 @@ export class InAppBrowserService {
     this.tabs.clearOwners();
   }
 
-  private async ensureSessionInitialized(options: {
-    browserType?: string;
-    profileId?: string;
-  }) {
+  private async ensureSessionInitialized() {
     if (this.browserSession) return;
     if (this.initializePromise) return await this.initializePromise;
     const initializePromise = (async () => {
-      const resolveProfile =
-        this.options.resolveProfile ?? resolveBrowserProfileSelection;
-      const importProfile =
-        this.options.importProfile ?? importBrowserProfileSnapshot;
-      const selection = await resolveProfile(options);
-      this.profileImport = await importProfile({
-        destinationPath: this.profilePath,
-        selection,
-      });
       this.browserSession = (this.options.sessionFromPath ?? session.fromPath)(
         this.profilePath,
         { cache: true },
@@ -1118,14 +922,8 @@ export class InAppBrowserService {
       this.browserSession.setDevicePermissionHandler((details) =>
         shouldAllowAuthDevice(details),
       );
-      this.cookies.attachSession(this.browserSession);
       this.releaseSessionCookies = keepSessionCookies(this.browserSession);
       void trimInAppBrowserStorage(this.profilePath, this.browserSession);
-      this.state.profileName =
-        this.profileImport.profileName ??
-        this.profileImport.profileId ??
-        this.profileImport.browserType;
-      this.emitState();
     })().finally(() => {
       if (this.initializePromise === initializePromise) {
         this.initializePromise = null;
@@ -1199,12 +997,7 @@ export class InAppBrowserService {
       tab.loading = false;
       refresh();
     });
-    contents.on("did-navigate", () => {
-      // Reconcile-on-navigation: freshen cookies for the site just navigated to
-      // (non-blocking, throttled) before running the normal state refresh.
-      this.cookies.scheduleNavigationReseed();
-      refresh();
-    });
+    contents.on("did-navigate", refresh);
     contents.on("did-navigate-in-page", refresh);
     contents.on("page-title-updated", (_event, title) => {
       tab.title = title || "New Tab";
@@ -1244,7 +1037,6 @@ export class InAppBrowserService {
       this.setError(`Browser page stopped: ${details.reason}.`, tab.ownerId);
     });
     contents.on("destroyed", () => {
-      this.cookies.forgetContents(contents.id);
       if (this.tabs.get(tab.id) !== tab) return;
       this.debuggerProxy.forgetTab(tab.id);
       if (this.tabs.remove(tab, "last")) {
@@ -1425,9 +1217,6 @@ export class InAppBrowserService {
     const connectionError = this.currentConnectionError();
     return cloneState({
       connection: this.state.connection,
-      ...(this.state.profileName
-        ? { profileName: this.state.profileName }
-        : {}),
       visibleOwnerId: this.tabs.visibleOwnerId,
       owners: this.tabs.ownerStates(),
       tabs: this.tabs.ownerTabStates(ownerId),

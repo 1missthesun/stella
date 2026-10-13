@@ -1257,8 +1257,6 @@ export type IpcInvokeContract = {
   [IPC_BROWSER_VIEW_CONNECT]: Invoke<
     [
       payload?: {
-        browserType?: string;
-        profileId?: string;
         reconnect?: boolean;
       },
     ],

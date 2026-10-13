@@ -32,7 +32,6 @@ export type BrowserViewOwnerState = {
 
 export type BrowserViewState = {
   connection: BrowserViewConnection;
-  profileName?: string;
   visibleOwnerId: string;
   owners: BrowserViewOwnerState[];
   tabs: BrowserViewTabState[];
@@ -52,24 +51,4 @@ export type BrowserViewBounds = {
 export type BrowserViewLayout = {
   pageBounds: BrowserViewBounds;
   surfaceBounds: BrowserViewBounds;
-};
-
-/** A cookie as the Stella browser extension exports it (Chrome's cookie shape). */
-export type StellaBrowserExportedCookie = {
-  name: string;
-  value: string;
-  domain: string;
-  path: string;
-  secure: boolean;
-  httpOnly: boolean;
-  hostOnly: boolean;
-  session: boolean;
-  storeId: string;
-  sameSite: "unspecified" | "no_restriction" | "lax" | "strict";
-  expirationDate?: number;
-  partitionKey?: {
-    topLevelSite?: string;
-    hasCrossSiteAncestor?: boolean;
-  };
-  [key: string]: unknown;
 };

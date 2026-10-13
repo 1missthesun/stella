@@ -434,6 +434,9 @@ export const piChatsFor = (
       agentRunEnded: ({ conversationId, threadId, interrupted }) => {
         const runner = session.runnerCell.get();
         if (!runner) return;
+        void runner.piTools
+          .endAgentBrowserTurn(threadId)
+          .catch((error) => console.warn("[pi-chat] closing the agent's browser tabs failed", error));
         const owner = { conversationId, agentId: threadId };
         const runningSessionIds = runner.backgroundExits.runningSessions(owner);
         if (runningSessionIds.length === 0) return;

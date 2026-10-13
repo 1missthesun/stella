@@ -302,12 +302,14 @@ const BROWSER_OWNER_LIFECYCLE_ACTIONS = new Set<string>([
   "release_owner_lease",
 ]);
 // Budget for the external backend's "is an extension actually attached?"
-// preflight. It is one local round trip to the daemon, so it must be short
+// preflight. It is one local round trip to Stella, so it must be short
 // enough that paying it is never worse than the hang it prevents.
 const EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS = 2_000;
 // How long a positive answer is trusted, so a burst of commands in one turn
 // does not pay for the probe every time.
 const EXTERNAL_ATTACH_PREFLIGHT_CACHE_MS = 5_000;
+const EXTERNAL_ATTACH_GRACE_MS = 6_000;
+const EXTERNAL_ATTACH_GRACE_POLL_MS = 750;
 // These requests can be repeated after a managed daemon is replaced without
 // changing page/browser state. Mutations and arbitrary evaluation are
 // deliberately absent: the old daemon may have executed them before its
@@ -568,6 +570,75 @@ export const initializeStellaInAppBrowser: InAppBrowserInitializer = async ({
       });
     },
   );
+};
+
+export const readStellaBrowserExtensionStatus = async ({
+  env,
+  signal,
+  timeoutMs,
+}: Readonly<{
+  env: NodeJS.ProcessEnv;
+  signal?: AbortSignal;
+  timeoutMs: number;
+}>): Promise<boolean | undefined> => {
+  if (signal?.aborted) return undefined;
+  let token = "";
+  try {
+    token = readFileSync(getStellaInAppBrowserInitTokenPath(env), "utf8").trim();
+  } catch {
+    return undefined;
+  }
+  if (!token) return undefined;
+  const endpoint = getStellaInAppBrowserInitEndpoint(env);
+  return await new Promise<boolean | undefined>((resolve) => {
+    let settled = false;
+    let buffer = "";
+    const socket =
+      "path" in endpoint
+        ? createConnection({ path: endpoint.path })
+        : createConnection({ host: endpoint.host, port: endpoint.port });
+    const finish = (value: boolean | undefined) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
+      socket.removeAllListeners();
+      if (!socket.destroyed) socket.destroy();
+      resolve(value);
+    };
+    const onAbort = () => finish(undefined);
+    const timeout = setTimeout(() => finish(undefined), Math.max(1, timeoutMs));
+    signal?.addEventListener("abort", onAbort, { once: true });
+    socket.setEncoding("utf8");
+    socket.once("connect", () => {
+      socket.write(`${JSON.stringify({ action: "extension_status", token })}\n`);
+    });
+    socket.on("data", (chunk: string) => {
+      buffer += chunk;
+      if (buffer.length > 16 * 1024) {
+        finish(undefined);
+        return;
+      }
+      const newline = buffer.indexOf("\n");
+      if (newline < 0) return;
+      try {
+        const response = JSON.parse(buffer.slice(0, newline)) as {
+          success?: unknown;
+          data?: { connected?: unknown } | null;
+        };
+        const connected = response.data?.connected;
+        finish(
+          response.success === true && typeof connected === "boolean"
+            ? connected
+            : undefined,
+        );
+      } catch {
+        finish(undefined);
+      }
+    });
+    socket.once("error", () => finish(undefined));
+    socket.once("close", () => finish(undefined));
+  });
 };
 
 const validateJson = (
@@ -1333,6 +1404,15 @@ export class BrowserSession implements BrowserSessionClient {
       MAX_BROWSER_TURN_CLEANUP_TIMEOUT_MS,
     );
     const deadline = Date.now() + timeoutMs;
+    if (
+      backend === "external" &&
+      (await readStellaBrowserExtensionStatus({
+        env: this.resolveExecutionConfig().env,
+        timeoutMs: Math.min(EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS, timeoutMs),
+      })) === false
+    ) {
+      return;
+    }
     if (!this.socket || this.socket.destroyed || !this.socket.writable) {
       await this.connectOnce(undefined, deadline, timeoutMs, allowDisposed);
     }
@@ -1525,7 +1605,6 @@ export class BrowserSession implements BrowserSessionClient {
               ([key]) => key !== WORKER_BOUND_BACKEND_PARAM,
             ),
           );
-    this.activeTurnBackends.add(backend);
     let config = this.ownerRoute?.config ?? this.resolveExecutionConfig();
     const requestId = randomUUID();
     const request = {
@@ -1562,8 +1641,13 @@ export class BrowserSession implements BrowserSessionClient {
             backend === "external" &&
             !BROWSER_OWNER_LIFECYCLE_ACTIONS.has(action)
           ) {
-            await this.assertExternalBrowserAttached(signal, deadline);
+            await this.assertExternalBrowserAttached(
+              config.env,
+              signal,
+              deadline,
+            );
           }
+          this.activeTurnBackends.add(backend);
           requestDispatched = true;
           response = (await this.roundTrip(
             request,
@@ -1739,46 +1823,53 @@ export class BrowserSession implements BrowserSessionClient {
    * never turn a working setup into a refused one.
    */
   private async assertExternalBrowserAttached(
+    env: NodeJS.ProcessEnv,
     signal: AbortSignal | undefined,
     deadline: number,
   ): Promise<void> {
     if (Date.now() < this.externalAttachCheckedUntil) return;
-    const budgetMs = Math.min(
-      EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS,
-      this.remainingTime(deadline),
-    );
-    if (budgetMs <= 0) return;
-    const requestId = randomUUID();
-    let response: BrowserCommandResult;
-    try {
-      response = await this.roundTrip(
-        { id: requestId, action: "extension_status" },
-        requestId,
-        signal,
-        Date.now() + budgetMs,
-        budgetMs,
+    const graceUntil =
+      Date.now() +
+      Math.min(EXTERNAL_ATTACH_GRACE_MS, this.remainingTime(deadline) / 2);
+    let connected: boolean | undefined;
+    for (;;) {
+      const budgetMs = Math.min(
+        EXTERNAL_ATTACH_PREFLIGHT_TIMEOUT_MS,
+        this.remainingTime(deadline),
       );
-    } catch {
-      return;
+      if (budgetMs <= 0) return;
+      connected = await readStellaBrowserExtensionStatus({
+        env,
+        ...(signal ? { signal } : {}),
+        timeoutMs: budgetMs,
+      });
+      throwIfAborted(signal);
+      if (connected !== false) break;
+      if (Date.now() + EXTERNAL_ATTACH_GRACE_POLL_MS > graceUntil) break;
+      await new Promise<void>((resolve) => {
+        const timer = setTimeout(done, EXTERNAL_ATTACH_GRACE_POLL_MS);
+        function done() {
+          clearTimeout(timer);
+          signal?.removeEventListener("abort", done);
+          resolve();
+        }
+        signal?.addEventListener("abort", done, { once: true });
+      });
+      throwIfAborted(signal);
     }
-    if (!response.success) return;
-    const data = response.data as { connected?: unknown } | null | undefined;
-    if (!data || typeof data !== "object" || !("connected" in data)) return;
-    if (data.connected === true) {
+    if (connected === true) {
       this.externalAttachCheckedUntil =
         Date.now() + EXTERNAL_ATTACH_PREFLIGHT_CACHE_MS;
       return;
     }
-    if (data.connected !== false) return;
+    if (connected !== false) return;
     throw new Error(
-      "Stella's external browser backend needs the Stella browser extension " +
-        "attached to this bridge, and none is. The command was not sent, so " +
-        "nothing happened. If the extension is installed and enabled, this " +
-        "Stella instance is most likely running an isolated browser bridge " +
-        "that the extension cannot reach; run the installed Stella app, or " +
-        "start this instance with STELLA_BROWSER_BRIDGE=shared. Otherwise " +
-        "open or focus a tab in the browser where the extension is " +
-        'installed, or switch to the in-app backend with browser.use("in-app").',
+      "Extension not connected: the user's own browser is reachable only " +
+        "through the Stella Browser extension, and it is not connected to " +
+        "this Stella. Nothing was sent. Continue in Stella's browser " +
+        '(browser.use("in-app")), which has only the logins made in it; for ' +
+        "a step that needs the user's account there, leave its sign-in page " +
+        "open in a Stella browser tab and ask the user to sign in once.",
     );
   }
 

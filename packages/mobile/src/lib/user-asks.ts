@@ -126,11 +126,27 @@ const normalizeDetail = (
     fields.push(field);
   }
   if (!purpose || fields.length === 0) return null;
+  const saveSource =
+    source.save && typeof source.save === "object"
+      ? (source.save as Record<string, unknown>)
+      : null;
+  const saveLabel = saveSource ? text(saveSource.label) : "";
+  const saveAccount = saveSource ? text(saveSource.account) : "";
   return {
     kind: "secure_input",
     purpose,
     fields,
     ...(detail ? { detail } : {}),
+    ...(saveSource && saveLabel
+      ? {
+          save: {
+            service: text(saveSource.service),
+            label: saveLabel,
+            ...(saveAccount ? { account: saveAccount } : {}),
+            ...(saveSource.replacing === true ? { replacing: true } : {}),
+          },
+        }
+      : {}),
   };
 };
 

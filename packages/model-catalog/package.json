@@ -8,9 +8,13 @@
     "./*": "./*.ts"
   },
   "scripts": {
-    "typecheck": "node ../../node_modules/typescript-7/bin/tsc --noEmit"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@stella/contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "bun-types": "1.4.2",
+    "typescript": "npm:typescript@^7.0.2"
   }
 }

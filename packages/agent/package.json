@@ -8,7 +8,7 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "typecheck": "node ../../node_modules/typescript-7/bin/tsc -p tsconfig.json --pretty false --noEmit"
+    "typecheck": "tsc -p tsconfig.json --pretty false --noEmit"
   },
   "dependencies": {
     "@earendil-works/chord": "1.1.0",
@@ -16,5 +16,10 @@
     "@earendil-works/pi-durable": "1.1.0",
     "@stella/contracts": "workspace:*",
     "@stella/runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "bun-types": "1.4.2",
+    "typescript": "npm:typescript@^7.0.2"
   }
 }

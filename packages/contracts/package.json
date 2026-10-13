@@ -16,5 +16,8 @@
     "./gateway/*": "./gateway/*.ts",
     "./turn-plane/*": "./turn-plane/*.ts",
     "./*": "./*.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
   }
 }

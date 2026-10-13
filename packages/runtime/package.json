@@ -3,7 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "scripts": {},
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --pretty false --noEmit"
+  },
   "exports": {
     ".": "./index.ts",
     "./host": "./host/index.ts",
@@ -76,16 +78,36 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "1.1.0",
+    "@googleapis/calendar": "^20.1.0",
+    "@googleapis/docs": "^14.1.0",
+    "@googleapis/drive": "^26.0.2",
+    "@googleapis/gmail": "^22.0.1",
+    "@googleapis/people": "^12.0.1",
     "@modelcontextprotocol/sdk": "1.32.0",
+    "@silvia-odwyer/photon-node": "0.3.4",
+    "@sinclair/typebox": "0.34.52",
     "@stella/agent": "workspace:*",
     "@stella/contracts": "workspace:*",
+    "ajv": "^8.20.0",
+    "croner": "^10.0.1",
     "effect": "4.0.0",
+    "esbuild": "^0.28.2",
+    "gaxios": "^7.3.1",
+    "googleapis-common": "^9.1.0",
     "json5": "^2.2.3",
     "parse5": "^8.0.1",
+    "picomatch": "^4.0.7",
     "turndown": "^7.2.4",
-    "ws": "^8.22.0"
+    "ws": "^8.22.0",
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@types/turndown": "^5.0.6"
+    "@types/node": "^26.6.4",
+    "@types/picomatch": "^4.0.3",
+    "@types/turndown": "^5.0.6",
+    "@types/ws": "^8.18.2",
+    "bun-types": "1.4.2",
+    "electron": "44.5.1",
+    "typescript": "npm:typescript@^7.0.2"
   }
 }

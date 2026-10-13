@@ -35,6 +35,7 @@
     "@stella/model-catalog": "workspace:*",
     "@stella/runtime": "workspace:*",
     "better-auth": "1.7.7",
+    "croner": "^10.0.1",
     "effect": "4.0.0",
     "hono": "4.13.12",
     "jose": "^6.2.12",
@@ -43,6 +44,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261004.1",
     "bun": "1.4.2",
+    "esbuild": "^0.28.2",
     "typescript": "npm:typescript@^7.0.2",
     "wrangler": "4.147.0"
   }

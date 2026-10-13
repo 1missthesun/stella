@@ -48,7 +48,10 @@ import {
   NOTIFICATION_NAMES,
   STELLA_RUNTIME_PROTOCOL_VERSION,
 } from "@stella/contracts/protocol";
-import { DEVICE_REQUEST_CLOUD_ASKER } from "@stella/contracts/turn-plane/device-requests";
+import {
+  DEVICE_REQUEST_CLOUD_ASKER,
+  isDeviceClaudeLoginRequestMethod,
+} from "@stella/contracts/turn-plane/device-requests";
 import { createRuntimeUnavailableError } from "@stella/contracts/protocol/rpc-peer";
 import { RuntimeWorkerLifecycleController } from "./worker-lifecycle.js";
 import { buildStdioConnectionFactory } from "./stdio-connection.js";
@@ -939,6 +942,16 @@ export class StellaRuntimeHost {
               message,
             };
           }
+        }
+        if (
+          isDeviceClaudeLoginRequestMethod(request.method) &&
+          request.mobileDeviceId !== DEVICE_REQUEST_CLOUD_ASKER
+        ) {
+          return {
+            ok: false,
+            code: "forbidden",
+            message: "Only Stella's cloud starts a Claude sign-in on this computer.",
+          };
         }
         const serve = this.options.hostHandlers.serveDeviceRequest;
         if (typeof serve !== "function") {

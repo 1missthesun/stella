@@ -29,6 +29,14 @@ export type ClaudeLocalAccountsState = {
    * first signed-in one. Null while no config here is signed in.
    */
   activeConfigId: string | null;
+  /**
+   * Why the active config is the one in use: the account chosen in Stella,
+   * this computer's own Claude Code login, or another login here (the chosen
+   * account isn't signed in here, or nothing is chosen).
+   */
+  activeReason?: "selected" | "own_login" | "other_login";
+  /** The account chosen in Stella for every place, when one is. */
+  chosenEmail?: string;
 };
 
 /**

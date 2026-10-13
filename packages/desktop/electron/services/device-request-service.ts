@@ -42,6 +42,12 @@ export type DeviceRequestHandlers = {
   }) => Promise<string>;
   voiceConfig: (payload: Record<string, unknown>) => Promise<unknown>;
   voiceExecuteTool: (payload: Record<string, unknown>) => Promise<unknown>;
+  /** This computer's own `claude auth login`, finished on another device. */
+  claudeLogin?: {
+    start: (payload: Record<string, unknown>) => Promise<unknown>;
+    finish: (payload: Record<string, unknown>) => Promise<unknown>;
+    cancel: (payload: Record<string, unknown>) => Promise<unknown>;
+  };
 };
 
 export type DeviceRequestAnswer =
@@ -150,6 +156,21 @@ export const serveDeviceRequest = async (
         return json(await handlers.voiceConfig(request.params));
       case "voice.executeTool":
         return json(await handlers.voiceExecuteTool(request.params));
+      case "claude.login.start":
+      case "claude.login.finish":
+      case "claude.login.cancel": {
+        const login = handlers.claudeLogin;
+        if (!login) {
+          return { ok: false, code: "failed", message: "Claude Code sign-in isn't available on this computer." };
+        }
+        const run =
+          request.method === "claude.login.start"
+            ? login.start
+            : request.method === "claude.login.finish"
+              ? login.finish
+              : login.cancel;
+        return json(await run(request.params));
+      }
       default:
         return { ok: false, code: "bad_request", message: "Unknown request." };
     }

@@ -33,11 +33,17 @@ import type { EngineAccountAccess } from "./engine-account-access.js";
  * item per dir), so the configs never share a login.
  *
  * Local Claude turns run on the login this computer uses: the account the
- * owner chose for this computer (`engines.get`, `places[].active`) while a
- * config here is signed in to it, else Claude Code's default login, else
- * the first signed-in config. Another computer's logins never change it.
- * This computer reports which identities it holds (`engines.reportClaudeLogins`)
- * so every client can show where each account is signed in.
+ * owner chose for every place (`engines.get`, `claude.chosenAccountId`)
+ * while a config here is signed in to it, else Claude Code's default login,
+ * else the first signed-in config. The backend resolves the same rule for
+ * every place, so all clients can show what each one runs and why. This
+ * computer reports which identities it holds (`engines.reportClaudeLogins`).
+ *
+ * Another device can sign this computer in (`startRemoteLogin`): the owner
+ * holding a phone or another computer asks through Stella's cloud, this
+ * computer runs its own `claude auth login` without opening a browser here,
+ * and the code Anthropic shows on the user's device comes back the same way
+ * (`finishRemoteLogin`) straight into the waiting CLI.
  */
 
 const ACCOUNTS_DIR = "claude-accounts";
@@ -177,6 +183,8 @@ export class ClaudeLocalAccounts {
   }
 
   state(): ClaudeLocalAccountsState {
+    const active = this.activeConfig();
+    const chosenEmail = this.chosenAccount()?.email;
     return {
       cliInstalled: this.cliInstalled,
       configs: (this.configs ?? []).map(({ configId, isDefault, loggedIn, email, plan }) => ({
@@ -186,8 +194,29 @@ export class ClaudeLocalAccounts {
         ...(email ? { email } : {}),
         ...(plan ? { plan } : {}),
       })),
-      activeConfigId: this.activeConfig()?.configId ?? null,
+      activeConfigId: active?.configId ?? null,
+      ...(active ? { activeReason: this.reasonFor(active) } : {}),
+      ...(chosenEmail ? { chosenEmail } : {}),
     };
+  }
+
+  /** Another device asked this computer to start its own Claude sign-in. */
+  async startRemoteLogin(params: Record<string, unknown>): Promise<ClaudeLocalLoginStart> {
+    const email = text(params.email);
+    return await this.startLogin({ ...(email ? { email } : {}), remote: true });
+  }
+
+  /** The code Anthropic showed on the other device, for that sign-in. */
+  async finishRemoteLogin(params: Record<string, unknown>): Promise<{ email?: string }> {
+    const loginId = text(params.loginId) ?? "";
+    const code = typeof params.code === "string" ? params.code : "";
+    const config = await this.finishLogin(loginId, code);
+    return config.email ? { email: config.email } : {};
+  }
+
+  cancelRemoteLogin(params: Record<string, unknown>): null {
+    this.cancelLogin(text(params.loginId) ?? "");
+    return null;
   }
 
   /**
@@ -198,7 +227,9 @@ export class ClaudeLocalAccounts {
    * approves (`waitLogin`). The URL it prints is its fallback page, which
    * shows a code to paste instead (`finishLogin`).
    */
-  async startLogin(options: { configId?: string; email?: string } = {}): Promise<ClaudeLocalLoginStart> {
+  async startLogin(
+    options: { configId?: string; email?: string; remote?: boolean } = {},
+  ): Promise<ClaudeLocalLoginStart> {
     const executable = this.resolveCli();
     if (!executable) throw new Error("Claude Code isn't installed on this computer.");
     if (!this.configs) await this.refresh();
@@ -235,7 +266,11 @@ export class ClaudeLocalAccounts {
       executable,
       ["auth", "login", "--claudeai", ...(email ? ["--email", email] : [])],
       {
-        env: this.childEnv(executable, dir),
+        env: {
+          ...this.childEnv(executable, dir),
+          // Finished on another device: nobody is at this one's browser.
+          ...(options.remote && process.platform !== "win32" ? { BROWSER: "true" } : {}),
+        },
         stdio: ["pipe", "pipe", "pipe"],
         windowsHide: true,
       },
@@ -514,6 +549,15 @@ export class ClaudeLocalAccounts {
   }
 
   private chosenAccount(): EngineConnection | null {
+    const settings = this.options.engineAccounts.settings();
+    if (settings?.claude) {
+      const chosen = settings.claude.chosenAccountId;
+      return chosen
+        ? (settings.connections.find(
+            (connection) => connection.provider === "anthropic" && connection.accountId === chosen,
+          ) ?? null)
+        : null;
+    }
     const deviceId = this.deviceId;
     if (!deviceId) return null;
     return (
@@ -541,6 +585,12 @@ export class ClaudeLocalAccounts {
       signedIn[0] ??
       null
     );
+  }
+
+  private reasonFor(config: ConfigStatus): "selected" | "own_login" | "other_login" {
+    const wanted = lower(this.chosenAccount()?.email);
+    if (wanted && lower(config.email) === wanted) return "selected";
+    return config.isDefault ? "own_login" : "other_login";
   }
 
   private resolveForTurn(): ClaudeCodeConfigForTurn {
@@ -688,10 +738,19 @@ export class ClaudeLocalAccounts {
       }),
     );
     const reported = [...logins].map(([email, login]) => loginKey(email, login.isDefault));
-    if (recorded.size === reported.length && reported.every((key) => recorded.has(key))) {
+    const devicePlace = settings.claude?.places.find(
+      (place) => place.kind === "device" && place.deviceId === deviceId,
+    );
+    const deviceKnown =
+      !settings.claude || (devicePlace !== undefined && devicePlace.cliInstalled === this.cliInstalled);
+    if (
+      deviceKnown &&
+      recorded.size === reported.length &&
+      reported.every((key) => recorded.has(key))
+    ) {
       return;
     }
-    const key = JSON.stringify(list);
+    const key = JSON.stringify({ list, cliInstalled: this.cliInstalled });
     const now = Date.now();
     if (this.lastSent?.key === key && now - this.lastSent.at < REPORT_SETTLE_MS) return;
     if (this.lastFailed?.key === key && now - this.lastFailed.at < REPORT_RETRY_MIN_INTERVAL_MS) {
@@ -704,6 +763,7 @@ export class ClaudeLocalAccounts {
         deviceId,
         ...(deviceName ? { deviceName } : {}),
         logins: list,
+        cliInstalled: this.cliInstalled,
       });
       this.lastSent = { key, at: Date.now() };
       this.lastFailed = null;

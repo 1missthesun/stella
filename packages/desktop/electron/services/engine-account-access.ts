@@ -87,6 +87,7 @@ export class EngineAccountAccess {
     deviceId: string;
     deviceName?: string;
     logins: ClaudeLocalLogin[];
+    cliInstalled?: boolean;
   }): Promise<void> {
     const client = this.ensureClient();
     if (!client || !this.subject) throw new Error("Sign in to Stella first.");

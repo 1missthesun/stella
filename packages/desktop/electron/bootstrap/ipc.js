@@ -624,5 +624,12 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         renderOfficePreview: officePreview.renderForRequest,
         voiceConfig: voice.configForRequest,
         voiceExecuteTool: voice.executeToolForRequest,
+        claudeLogin: services.claudeLocalAccounts
+            ? {
+                start: (params) => services.claudeLocalAccounts.startRemoteLogin(params),
+                finish: (params) => services.claudeLocalAccounts.finishRemoteLogin(params),
+                cancel: (params) => services.claudeLocalAccounts.cancelRemoteLogin(params),
+            }
+            : undefined,
     };
 };

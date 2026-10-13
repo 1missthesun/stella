@@ -306,6 +306,31 @@ export const noteRemoteReport = async (
   return true;
 };
 
+/**
+ * The conversation holding the record of an agent that runs elsewhere:
+ * Stella's own (`root`), or that of one of her agents here that started it.
+ * Its reports and stops settle that record, wherever in the tree it sits.
+ */
+export const remoteAgentHome = async (
+  reader: Pick<ToolExecutionApi, "snapshot">,
+  root: ConversationId,
+  threadId: string,
+  context: Context,
+): Promise<ConversationId | undefined> => {
+  const visit = async (conversationId: ConversationId, depth: number): Promise<ConversationId | undefined> => {
+    const agents = (await reader.snapshot(StellaAgentsDoc, conversationId, context))?.agents ?? {};
+    if (agents[threadId]?.remote) return conversationId;
+    if (depth >= MAX_AGENT_DEPTH) return undefined;
+    for (const agent of Object.values(agents)) {
+      if (agent.remote || agent.conversationId < 0) continue;
+      const found = await visit(agent.conversationId as ConversationId, depth + 1);
+      if (found !== undefined) return found;
+    }
+    return undefined;
+  };
+  return await visit(root, 1);
+};
+
 /** How a remote agent's latest reported run ended, from its record. */
 const remoteOutcome = (agent: AgentRecord): AgentAttemptOutcome => agent.outcome ?? (agent.failed ? "failed" : "completed");
 

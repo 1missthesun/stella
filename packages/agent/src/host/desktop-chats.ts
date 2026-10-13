@@ -77,6 +77,7 @@ import {
   agentRunOutcome,
   isAnotherHostsAgent,
   noteRemoteReport,
+  remoteAgentHome,
   StellaAgentsDoc,
   type AgentDirectoryHost,
   type AgentModelChoice,
@@ -892,8 +893,10 @@ export function desktopChats(options: DesktopChatsOptions) {
     const settle = async (threadId: string, requestId: string, status?: "canceled") => {
       const opened = chat();
       if (!opened) return;
+      // Its record sits with whoever here started it: Stella, or one of her agents.
+      const home = (await remoteAgentHome(opened.harness, opened.root.id, threadId, context)) ?? opened.root.id;
       await opened.harness.commit(
-        (tx) => noteRemoteReport(tx, opened.root.id, { threadId, requestId, ...(status ? { status } : {}) }),
+        (tx) => noteRemoteReport(tx, home, { threadId, requestId, ...(status ? { status } : {}) }),
         context,
       );
     };
@@ -937,8 +940,10 @@ export function desktopChats(options: DesktopChatsOptions) {
     const settle = async (threadId: string, requestId: string, status?: "canceled") => {
       const opened = chat();
       if (!opened) return;
+      // Its record sits with whoever here started it: Stella, or one of her agents.
+      const home = (await remoteAgentHome(opened.harness, opened.root.id, threadId, context)) ?? opened.root.id;
       await opened.harness.commit(
-        (tx) => noteRemoteReport(tx, opened.root.id, { threadId, requestId, ...(status ? { status } : {}) }),
+        (tx) => noteRemoteReport(tx, home, { threadId, requestId, ...(status ? { status } : {}) }),
         context,
       );
     };

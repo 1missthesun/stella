@@ -12,10 +12,23 @@ import {
 import { Icon } from "./Icon";
 import { liquidGlassSupported } from "./glass";
 import { useColors, useTheme } from "../theme/theme-context";
-import type { GlassIconButtonProps } from "./GlassIconButton";
+import {
+  GlassIconButtonBase,
+  type GlassIconButtonProps,
+} from "./GlassIconButtonBase";
 
-/** Native SwiftUI glass chrome, using Stella's color scheme rather than the OS. */
-export function GlassIconButton({
+/**
+ * Native SwiftUI glass chrome, using Stella's color scheme rather than the OS.
+ * A `containPress` button takes the React Native one instead: SwiftUI's glass
+ * button style presses as a pill about 25 pt wider than its circle, which in
+ * a tight row (a popover footer) runs into its neighbour and the edge.
+ */
+export function GlassIconButton(props: GlassIconButtonProps) {
+  if (props.containPress) return <GlassIconButtonBase {...props} />;
+  return <SwiftUIGlassIconButton {...props} />;
+}
+
+function SwiftUIGlassIconButton({
   icon,
   onPress,
   accessibilityLabel: label,

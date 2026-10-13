@@ -1262,6 +1262,10 @@ app.get("/conversations/:id/pi-brain", userAuth(), (c) =>
 app.post("/conversations/:id/pi-brain", userAuth(), jsonBody(tinyControl), (c) =>
   forwardToConversation(c.req.raw, c.env, c.req.param("id"), "/pi-brain", c.var.caller),
 );
+// The user started writing a message: wake the container the reply runs in.
+app.post("/conversations/:id/prewarm", userAuth(), jsonBody(tinyControl), (c) =>
+  forwardToConversation(c.req.raw, c.env, c.req.param("id"), "/prewarm", c.var.caller),
+);
 app.post(
   "/conversations/:id/journal",
   userAuth(),

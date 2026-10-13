@@ -446,6 +446,12 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     if (url.pathname === "/pi-brain") {
       return this.handlePiBrain(request);
     }
+    if (url.pathname === "/prewarm") {
+      // Only the conversation's own owner; anyone else learns nothing.
+      const owner = request.headers.get(HEADER_OWNER);
+      if (owner && owner === this.journal.ownerId()) this.prewarmForComposer();
+      return json({ ok: true }, 202);
+    }
     if (url.pathname === AGENT_REPORT_TARGET_PATH) {
       return this.handleAgentReportTarget(request);
     }

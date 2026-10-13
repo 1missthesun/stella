@@ -17,6 +17,8 @@ import {
   useSyncExternalStore,
 } from "react";
 import { AppState } from "react-native";
+import { useChatDraftSelector } from "./chat-draft-store";
+import { postJson } from "./http";
 import { notifySuccess } from "./haptics";
 import { ReplyArrivalHaptics } from "./reply-arrival-haptics";
 import { authClient } from "./auth-client";
@@ -375,6 +377,8 @@ const STOP_UNREACHABLE_MESSAGE =
 const STOP_UNCONFIRMED_MESSAGE =
   "This reply is still running. Stella hasn’t confirmed the stop yet.";
 
+const draftHasText = (draft: string): boolean => draft.trim().length > 0;
+
 export const useCloudCanonicalChatThread = (
   authority: CloudConversationAuthority,
   options?: {
@@ -573,6 +577,19 @@ export const useCloudCanonicalChatThread = (
   );
   const local = useChatThread({ threadId, transport });
   const clientAuthorityReady = authorityReady && !local.authorityIssue;
+
+  // The user started a message: the cloud may wake the container its reply
+  // runs in, so the reply doesn't wait for a cold start. Once per draft.
+  const composing = useChatDraftSelector(local.draftStore, draftHasText);
+  useEffect(() => {
+    if (!composing) return;
+    // A hint: an older cloud answers 404, and nothing waits on it.
+    void postJson(
+      `/conversations/${encodeURIComponent(authority.conversationId)}/prewarm`,
+      {},
+      { timeoutMs: 10_000 },
+    ).catch(() => undefined);
+  }, [composing, authority.conversationId]);
 
   // A queued row restored from the durable outbox is operational state, not
   // history. Track it until admission binds the server's dispatch identity.

@@ -22,7 +22,12 @@ import {
   type FrameAnswer,
 } from "./claude-code-transport.js";
 import type { WakeReport, ChatTurnRequest } from "./types.js";
-import { LIVE_TOOL_LIMIT } from "./constants.js";
+import {
+  CONVERSATION_EXECUTION_KEY,
+  LIVE_TOOL_LIMIT,
+  LOCAL_TURN_LEASE_KEY,
+} from "./constants.js";
+import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { json, log, previewArgs } from "./support.js";
 import { OrchestratorTools } from "./tools.js";
 import { ownerGateStub } from "../rpc-release.js";
@@ -167,6 +172,40 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
           elapsedMs: Math.round(performance.now() - startedAt),
         });
       }),
+    );
+  }
+
+  /** When a composer prewarm last ran here; one per minute at most. */
+  private composerPrewarmAt = 0;
+
+  /**
+   * The user started writing a message (a `prewarm` socket frame): wake the
+   * orchestrator container now, so the reply doesn't wait for its cold
+   * start. Only when the next turn would run there: the conversation runs on
+   * Claude Code in the cloud, no computer holds it, and nothing is running
+   * (a running or queued turn already has it up). An unused prewarm stops on
+   * the prewarm idle timeout (90 s).
+   */
+  protected prewarmForComposer(): void {
+    const now = Date.now();
+    if (now - this.composerPrewarmAt < 60_000) return;
+    if (this.activeTurnId || this.turnExecutions.size > 0) return;
+    const kv = this.ctx.storage.kv;
+    if (!kv || kv.get(LOCAL_TURN_LEASE_KEY)) return;
+    if (Array.from(kv.list({ prefix: "queued:", limit: 1 })).length > 0) return;
+    const ownerId = this.journal.ownerId();
+    const conversationId = this.conversationId();
+    if (!ownerId || !conversationId) return;
+    this.composerPrewarmAt = now;
+    this.ctx.waitUntil(
+      this.ctx.storage
+        .get<CloudExecutionSelection>(CONVERSATION_EXECUTION_KEY)
+        .then((execution) => {
+          if (execution?.engine !== "anthropic") return;
+          log("info", "orchestrator_composer_prewarm", { conversationId });
+          this.prewarmCliContainer(ownerId, conversationId);
+        })
+        .catch(() => undefined),
     );
   }
 

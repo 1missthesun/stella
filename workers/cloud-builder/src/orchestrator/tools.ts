@@ -2,7 +2,7 @@ import { AgentHome } from "../agent-home.js";
 import { createWorldMemory, ownerMemoryWorld } from "../world-memory.js";
 import type { CloudSkillCatalogSnapshot } from "../cloud-home-store.js";
 import { WORLD_ROOT, worldName } from "../workspace.js";
-import { historySearchOptions, runHistoryQuery } from "../history-sql.js";
+import { HISTORY_SQL_MAX_BYTES, historySearchOptions, runHistoryQuery } from "../history-sql.js";
 import {
   type CloudCodeSourceAgentTool,
   createCloudCodeAgentTool,
@@ -293,7 +293,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         return this.journal.searchTranscript(text, historySearchOptions(options));
       },
       sql: (query: string, params: readonly SqlStorageValue[]) =>
-        runHistoryQuery(this.ctx.storage, query, params),
+        runHistoryQuery(this.ctx.storage, query, params, HISTORY_SQL_MAX_BYTES),
       read: (fromSeq: number, toSeq: number) =>
         this.archive.readRange(
           Math.max(0, fromSeq),

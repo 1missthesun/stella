@@ -3167,10 +3167,37 @@ const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60_000;
 const USAGE_LIMIT_RESET_MARGIN_MS = 30_000;
 const USAGE_LIMIT_HOLD_PREFIX = "Waiting for the Claude usage limit to reset";
 
-const usageLimitResumeAt = (limit: ClaudeUsageLimit, now: number): number =>
-  limit.resetsAt !== undefined
-    ? Math.max(now, limit.resetsAt) + USAGE_LIMIT_RESET_MARGIN_MS
-    : now + USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS;
+const USAGE_LIMIT_MIN_HOLD_MS = 5 * 60_000;
+const USAGE_LIMIT_MAX_MIN_HOLD_MS = 2 * 60 * 60_000;
+const USAGE_LIMIT_BACKOFF_WINDOW_MS = 24 * 60 * 60_000;
+
+const usageLimitResumeAt = (
+  db: OwnerDb,
+  holdKey: string,
+  limit: ClaudeUsageLimit,
+  now: number,
+): number => {
+  const previous = db.one<{ holds: number; last_hold_at: number }>(
+    "SELECT holds, last_hold_at FROM usage_limit_backoff WHERE hold_key = ?",
+    holdKey,
+  );
+  const holds =
+    previous && now - previous.last_hold_at < USAGE_LIMIT_BACKOFF_WINDOW_MS ? previous.holds + 1 : 1;
+  db.run(
+    `INSERT INTO usage_limit_backoff (hold_key, holds, last_hold_at) VALUES (?, ?, ?)
+     ON CONFLICT (hold_key) DO UPDATE SET holds = excluded.holds, last_hold_at = excluded.last_hold_at`,
+    holdKey,
+    holds,
+    now,
+  );
+  db.run("DELETE FROM usage_limit_backoff WHERE last_hold_at < ?", now - USAGE_LIMIT_BACKOFF_WINDOW_MS);
+  const minHold = Math.min(USAGE_LIMIT_MAX_MIN_HOLD_MS, USAGE_LIMIT_MIN_HOLD_MS * 2 ** (holds - 1));
+  const named =
+    limit.resetsAt !== undefined
+      ? Math.max(now, limit.resetsAt) + USAGE_LIMIT_RESET_MARGIN_MS
+      : now + USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS;
+  return Math.max(now + minHold, named);
+};
 
 const usageLimitHoldMessage = (limit: ClaudeUsageLimit): string =>
   limit.resetsAt !== undefined
@@ -3192,7 +3219,7 @@ const holdAgentForUsageLimit = (
 ): void => {
   jobs.schedule(
     USAGE_LIMIT_AGENT_JOB,
-    usageLimitResumeAt(limit, now),
+    usageLimitResumeAt(db, `agent:${thread.thread_id}`, limit, now),
     { threadId: thread.thread_id, attemptGeneration: thread.attempt_generation },
     { id: `usage-limit:agent:${thread.thread_id}` },
   );
@@ -3271,7 +3298,12 @@ const resumeAgentAfterUsageLimit = async (ctx: OwnerContext, raw: unknown): Prom
  */
 const holdConversationForUsageLimit = (ctx: OwnerContext, raw: unknown): { resumeAt: number } => {
   const args = object({ conversationId: string(), ownerGeneration: string(), resetsAt: optional(number()) })(raw);
-  const resumeAt = usageLimitResumeAt(args.resetsAt !== undefined ? { resetsAt: args.resetsAt } : {}, ctx.now);
+  const resumeAt = usageLimitResumeAt(
+    ctx.db,
+    `conversation:${args.conversationId}`,
+    args.resetsAt !== undefined ? { resetsAt: args.resetsAt } : {},
+    ctx.now,
+  );
   ctx.jobs.schedule(
     USAGE_LIMIT_CONVERSATION_JOB,
     resumeAt,
@@ -3783,6 +3815,16 @@ export const agentThreadsDomain = {
            ON agent_threads (origin_conversation_id) WHERE executor_device_id IS NOT NULL`,
         `CREATE INDEX agent_threads_executor_updated
            ON agent_threads (updated_at DESC) WHERE executor_device_id IS NOT NULL`,
+      ],
+    },
+    {
+      id: "agent-threads.12-usage-limit-backoff",
+      statements: [
+        `CREATE TABLE usage_limit_backoff (
+           hold_key TEXT PRIMARY KEY,
+           holds INTEGER NOT NULL,
+           last_hold_at INTEGER NOT NULL
+         )`,
       ],
     },
   ],

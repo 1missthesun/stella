@@ -744,6 +744,8 @@ const withClaudeSubscriptionLimitReported = (limit: ClaudeUsageLimit) => {
 const USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS = 30 * 60 * 1000;
 /** Margin past the named reset, so the first step after it is not refused again. */
 const USAGE_LIMIT_RESET_MARGIN_MS = 30 * 1000;
+const USAGE_LIMIT_MIN_HOLD_MS = 5 * 60 * 1000;
+const USAGE_LIMIT_MAX_MIN_HOLD_MS = 60 * 60 * 1000;
 const waitUntil = (until: number, signal: AbortSignal | undefined) =>
   new Promise<void>((resolve, reject) => {
     if (signal?.aborted) {
@@ -2251,6 +2253,7 @@ class ClaudeCodeSessionRuntime {
     let currentPrompt = prompt;
     let currentPromptImages = promptImages;
     const failedAttemptMcpCalls: McpCallRecord[] = [];
+    let usageLimitHolds = 0;
 
     for (;;) {
       try {
@@ -2281,7 +2284,8 @@ class ClaudeCodeSessionRuntime {
             throw withClaudeSubscriptionLimitReported(limit);
           }
           this.resetStreamingProcess(request.sessionKey, session);
-          await this.holdForUsageLimit(request, limit);
+          usageLimitHolds += 1;
+          await this.holdForUsageLimit(request, limit, usageLimitHolds);
           if (recoverable) mergeMcpCalls(failedAttemptMcpCalls, recoverable.mcpCalls);
           if (failedAttemptMcpCalls.length > 0) {
             currentPrompt = buildSideEffectReconciliationPrompt(failedAttemptMcpCalls);
@@ -2336,15 +2340,23 @@ class ClaudeCodeSessionRuntime {
   async holdForUsageLimit(
     request: ClaudeCodeTurnRequest,
     limit: ClaudeUsageLimit,
+    holds = 1,
   ) {
     const named =
       typeof limit.resetsAt === "number" && Number.isFinite(limit.resetsAt)
         ? limit.resetsAt
         : undefined;
-    const until =
+    const now = Date.now();
+    const minHold = Math.min(
+      USAGE_LIMIT_MAX_MIN_HOLD_MS,
+      USAGE_LIMIT_MIN_HOLD_MS * 2 ** Math.max(0, holds - 1),
+    );
+    const until = Math.max(
+      now + minHold,
       named !== undefined
-        ? Math.max(Date.now(), named) + USAGE_LIMIT_RESET_MARGIN_MS
-        : Date.now() + USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS;
+        ? Math.max(now, named) + USAGE_LIMIT_RESET_MARGIN_MS
+        : now + USAGE_LIMIT_UNKNOWN_RESET_HOLD_MS,
+    );
     request.onStatusChange?.({
       state: "usage-limit",
       text:

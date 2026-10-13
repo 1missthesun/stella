@@ -35,15 +35,40 @@ import { readJsonObject } from "../http/body.js";
 import { requireCaller, verifyCaller } from "../http/caller.js";
 import { ownerRegistry } from "./domains.js";
 import { RpcError, toBackendError } from "./errors.js";
-import type { OwnerRegistry } from "./registry.js";
+import type { OwnerCaller, OwnerRegistry } from "./registry.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { stageClaudeSessionChunk } from "./domains/claude-sessions.js";
 
 const MAX_RPC_BODY_BYTES = 1024 * 1024;
 
 type RouteEnv = Pick<
   Cloudflare.Env,
-  "OWNER_GATES" | "CLOUD_BUILDER_PUBLIC_URL" | "BUILDER_SERVICE_SECRET"
+  "OWNER_GATES" | "CLOUD_BUILDER_PUBLIC_URL" | "BUILDER_SERVICE_SECRET" | "CONVERSATION_ARCHIVE"
 >;
+
+const appendClaudeSessionChunk = async (
+  env: RouteEnv,
+  caller: OwnerCaller,
+  args: unknown,
+): Promise<RpcResponse> => {
+  if (caller.isAnonymous) {
+    throw new RpcError("FORBIDDEN", "Sign in with an account to use this.");
+  }
+  const staged = await stageClaudeSessionChunk(env, caller.ownerId, args);
+  const response = (await ownerGateStub(env.OWNER_GATES, caller.ownerId).claudeSessionCommit({
+    staged,
+    caller,
+  })) as RpcResponse;
+  if (!response.ok) return response;
+  const { head, retired } = response.value as {
+    head: unknown;
+    retired: string[];
+  };
+  if (retired.length > 0 && env.CONVERSATION_ARCHIVE) {
+    await env.CONVERSATION_ARCHIVE.delete(retired).catch(() => undefined);
+  }
+  return { ok: true, value: head };
+};
 
 const rpcJson = (body: RpcResponse): Response =>
   Response.json(body, {
@@ -85,6 +110,13 @@ export const handleRpc = async (
     args = await readArgs(request, def.scope === "owner" ? def.maxBodyBytes : undefined);
   } catch (error) {
     return rpcJson({ ok: false, error: toBackendError(error) });
+  }
+  if (name === "claudeSessions.append") {
+    try {
+      return rpcJson(await appendClaudeSessionChunk(env, caller, args));
+    } catch (error) {
+      return rpcJson({ ok: false, error: toBackendError(error) });
+    }
   }
   if (def.scope === "owner") {
     const response = await ownerGateStub(env.OWNER_GATES, caller.ownerId).ownerRpc({ name, args, caller });

@@ -904,13 +904,15 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     for (const deadline of Object.values(deadlines ?? {})) {
       if (typeof deadline === "number") next = Math.min(next, deadline);
     }
-    if (options.preserveExisting !== false) {
-      const existingAlarm = await this.ctx.storage.getAlarm();
-      if (existingAlarm !== null) next = Math.min(next, existingAlarm);
+    const existingAlarm = await this.ctx.storage.getAlarm();
+    if (options.preserveExisting !== false && existingAlarm !== null) {
+      next = Math.min(next, existingAlarm);
     }
     if (!Number.isFinite(next)) return;
+    const at = Math.max(now + ALARM_MIN_DELAY_MS, next);
+    if (existingAlarm === at || (existingAlarm !== null && existingAlarm > now && existingAlarm === next)) return;
     try {
-      await this.ctx.storage.setAlarm(Math.max(now + ALARM_MIN_DELAY_MS, next));
+      await this.ctx.storage.setAlarm(at);
     } catch {
       // Alarms are unavailable in some test harnesses; leases still expire on
       // the next call that reads them.

@@ -101,7 +101,7 @@ const deleteThreadRows = (db: OwnerDb, jobs: OwnerJobs, conversationId: string):
   }
   deleteConversationAgentReports(db, jobs, conversationId);
   deleteConversationAgentEvents(db, conversationId);
-  deleteConversationAgentLogs(db, conversationId);
+  deleteConversationAgentLogs(db, jobs, conversationId);
   db.run("DELETE FROM agent_threads WHERE conversation_id = ?", conversationId);
 };
 
@@ -180,6 +180,7 @@ export const purgeConversationData: PurgeDef = async (ctx) => {
     "agent_commands",
     "agent_report_outbox",
     "agent_events",
+    "usage_limit_backoff",
     "conversation_main",
   ]) {
     ctx.db.run(`DELETE FROM ${table}`);

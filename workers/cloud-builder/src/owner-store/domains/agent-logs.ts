@@ -21,7 +21,8 @@ import {
 import { array, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
-import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain } from "../registry.js";
+import type { OwnerContext, OwnerDb, OwnerDbReader, OwnerDomain, OwnerJobs } from "../registry.js";
+import { sha256Hex } from "../../hash.js";
 
 export const AGENT_LOGS_MIGRATION = {
   id: "agent-logs.1-init",
@@ -51,6 +52,118 @@ export const AGENT_LOGS_MIGRATION = {
   ],
 };
 
+export const AGENT_LOGS_COLD_MIGRATION = {
+  id: "agent-logs.2-cold-segments",
+  statements: [
+    "ALTER TABLE agent_log_records ADD COLUMN segment TEXT",
+    `CREATE INDEX agent_log_records_inline_created ON agent_log_records (created_at)
+       WHERE segment IS NULL AND role <> 'checkpoint'`,
+  ],
+};
+
+export const AGENT_LOG_ARCHIVE_JOB = "agentLogs.archive";
+export const AGENT_LOG_SEGMENT_DELETE_JOB = "agentLogs.deleteSegments";
+const AGENT_LOG_ARCHIVE_JOB_ID = "agent-logs:archive";
+const AGENT_LOG_INLINE_MS = 3 * 24 * 60 * 60_000;
+const AGENT_LOG_ARCHIVE_EVERY_MS = 6 * 60 * 60_000;
+const AGENT_LOG_ARCHIVE_CONTINUE_MS = 30_000;
+const SEGMENT_MAX_RECORDS = 200;
+const SEGMENT_MAX_BYTES = 2 * 1024 * 1024;
+const SEGMENTS_PER_PASS = 10;
+const SEGMENT_DELETE_BATCH = 500;
+
+type SegmentBody = { threadId: string; records: Array<[number, string]> };
+
+const agentLogsPrefix = async (ownerId: string): Promise<string> =>
+  `conversations/${await sha256Hex(ownerId)}/agent-logs/v1/`;
+
+const gzip = async (text: string): Promise<ArrayBuffer> =>
+  await new Response(
+    new Blob([text]).stream().pipeThrough(new CompressionStream("gzip")),
+  ).arrayBuffer();
+
+const gunzip = async (body: ReadableStream): Promise<string> =>
+  await new Response(body.pipeThrough(new DecompressionStream("gzip"))).text();
+
+const inlineMs = (ctx: OwnerContext): number => {
+  const override = Number((ctx.env as { AGENT_LOG_INLINE_MS?: string }).AGENT_LOG_INLINE_MS);
+  return Number.isFinite(override) && override > 0 ? override : AGENT_LOG_INLINE_MS;
+};
+
+const scheduleArchive = (ctx: OwnerContext, at: number): void => {
+  if (ctx.db.one("SELECT 1 AS queued FROM owner_jobs WHERE id = ?", AGENT_LOG_ARCHIVE_JOB_ID)) return;
+  ctx.jobs.schedule(AGENT_LOG_ARCHIVE_JOB, at, {}, { id: AGENT_LOG_ARCHIVE_JOB_ID });
+};
+
+const archiveColdRecords = async (ctx: OwnerContext): Promise<void> => {
+  const bucket = ctx.env.CONVERSATION_ARCHIVE;
+  if (!bucket) return;
+  const cutoff = ctx.now - inlineMs(ctx);
+  const prefix = await agentLogsPrefix(ctx.ownerId);
+  for (let pass = 0; pass < SEGMENTS_PER_PASS; pass += 1) {
+    const oldest = ctx.db.one<{ thread_id: string }>(
+      `SELECT thread_id FROM agent_log_records
+        WHERE segment IS NULL AND role <> 'checkpoint' AND created_at < ?
+        ORDER BY created_at LIMIT 1`,
+      cutoff,
+    );
+    if (!oldest) return;
+    const rows = ctx.db.all<{ seq: number; payload_json: string }>(
+      `SELECT seq, payload_json FROM agent_log_records
+        WHERE thread_id = ? AND segment IS NULL AND role <> 'checkpoint' AND created_at < ?
+        ORDER BY seq LIMIT ?`,
+      oldest.thread_id,
+      cutoff,
+      SEGMENT_MAX_RECORDS,
+    );
+    const records: Array<[number, string]> = [];
+    let bytes = 0;
+    for (const row of rows) {
+      if (records.length > 0 && bytes + row.payload_json.length > SEGMENT_MAX_BYTES) break;
+      records.push([row.seq, row.payload_json]);
+      bytes += row.payload_json.length;
+    }
+    const first = records[0]![0];
+    const last = records[records.length - 1]![0];
+    const key = `${prefix}${await sha256Hex(oldest.thread_id)}/${first}-${last}-${crypto.randomUUID().slice(0, 8)}.json.gz`;
+    await bucket.put(
+      key,
+      await gzip(JSON.stringify({ threadId: oldest.thread_id, records } satisfies SegmentBody)),
+    );
+    const placeholders = records.map(() => "?").join(", ");
+    ctx.db.run(
+      `UPDATE agent_log_records SET payload_json = '', segment = ?
+        WHERE thread_id = ? AND segment IS NULL AND seq IN (${placeholders})`,
+      key,
+      oldest.thread_id,
+      ...records.map(([seq]) => seq),
+    );
+  }
+  ctx.jobs.schedule(AGENT_LOG_ARCHIVE_JOB, ctx.now + AGENT_LOG_ARCHIVE_CONTINUE_MS, {}, {
+    id: AGENT_LOG_ARCHIVE_JOB_ID,
+  });
+};
+
+const archivedPayloads = async (
+  ctx: OwnerContext,
+  threadId: string,
+  rows: Array<{ seq: number; segment: string | null }>,
+): Promise<Map<number, string>> => {
+  const payloads = new Map<number, string>();
+  const segments = [...new Set(rows.flatMap((row) => (row.segment ? [row.segment] : [])))];
+  if (segments.length === 0) return payloads;
+  const bucket = ctx.env.CONVERSATION_ARCHIVE;
+  if (!bucket) throw new RpcError("UNAVAILABLE", "This agent's older history isn't available right now.");
+  for (const key of segments) {
+    const object = await bucket.get(key);
+    if (!object) throw new RpcError("INTERNAL", "Part of this agent's history is missing.");
+    const body = JSON.parse(await gunzip(object.body)) as SegmentBody;
+    if (body.threadId !== threadId) throw new RpcError("INTERNAL", "Part of this agent's history is missing.");
+    for (const [seq, payload] of body.records) payloads.set(seq, payload);
+  }
+  return payloads;
+};
+
 /** Response pages stay well under what one RPC answer carries. */
 const READ_PAGE_MAX_BYTES = 2 * 1024 * 1024;
 
@@ -60,6 +173,7 @@ type RecordRow = {
   role: string;
   payload_json: string;
   created_at: number;
+  segment: string | null;
 };
 
 type HolderRow = { holder: string; cwd: string | null };
@@ -169,7 +283,9 @@ const append = (ctx: OwnerContext, args: AppendArgs): AgentLogCalls["agentLogs.a
     }
     return { seqs, throughSeq: seq };
   };
-  return ctx.db.transaction ? ctx.db.transaction(write) : write();
+  const result = ctx.db.transaction ? ctx.db.transaction(write) : write();
+  scheduleArchive(ctx, ctx.now + Math.min(AGENT_LOG_ARCHIVE_EVERY_MS, inlineMs(ctx) + AGENT_LOG_ARCHIVE_CONTINUE_MS));
+  return result;
 };
 
 const asRecord = (row: RecordRow): AgentLogRecord => ({
@@ -182,7 +298,7 @@ const asRecord = (row: RecordRow): AgentLogRecord => ({
 
 type ReadArgs = AgentLogCalls["agentLogs.read"]["args"];
 
-const read = (ctx: OwnerContext, args: ReadArgs): AgentLogCalls["agentLogs.read"]["result"] => {
+const read = async (ctx: OwnerContext, args: ReadArgs): Promise<AgentLogCalls["agentLogs.read"]["result"]> => {
   const held = readHolder(ctx.db, args.threadId);
   let after = args.afterSeq;
   let checkpoint: AgentLogCalls["agentLogs.read"]["result"]["checkpoint"];
@@ -199,15 +315,23 @@ const read = (ctx: OwnerContext, args: ReadArgs): AgentLogCalls["agentLogs.read"
   }
   const limit = Math.min(args.limit ?? AGENT_LOG_READ_MAX_RECORDS, AGENT_LOG_READ_MAX_RECORDS);
   const rows = ctx.db.all<RecordRow>(
-    `SELECT seq, record_key, role, payload_json, created_at FROM agent_log_records
+    `SELECT seq, record_key, role, payload_json, created_at, segment FROM agent_log_records
       WHERE thread_id = ? AND seq > ? ORDER BY seq ASC LIMIT ?`,
     args.threadId,
     after,
     limit + 1,
   );
+  const page = rows.slice(0, limit);
+  const archived = await archivedPayloads(ctx, args.threadId, page);
+  for (const row of page) {
+    if (row.segment === null) continue;
+    const payload = archived.get(row.seq);
+    if (payload === undefined) throw new RpcError("INTERNAL", "Part of this agent's history is missing.");
+    row.payload_json = payload;
+  }
   const records: AgentLogRecord[] = [];
   let bytes = 0;
-  for (const row of rows.slice(0, limit)) {
+  for (const row of page) {
     bytes += row.payload_json.length;
     if (records.length > 0 && bytes > READ_PAGE_MAX_BYTES) break;
     records.push(asRecord(row));
@@ -222,7 +346,16 @@ const read = (ctx: OwnerContext, args: ReadArgs): AgentLogCalls["agentLogs.read"
 };
 
 /** Delete one conversation's agent records, with its agents. */
-export const deleteConversationAgentLogs = (db: OwnerDb, conversationId: string): void => {
+export const deleteConversationAgentLogs = (db: OwnerDb, jobs: OwnerJobs, conversationId: string): void => {
+  const segments = db
+    .all<{ segment: string }>(
+      "SELECT DISTINCT segment FROM agent_log_records WHERE conversation_id = ? AND segment IS NOT NULL",
+      conversationId,
+    )
+    .map((row) => row.segment);
+  for (let index = 0; index < segments.length; index += SEGMENT_DELETE_BATCH) {
+    jobs.schedule(AGENT_LOG_SEGMENT_DELETE_JOB, 0, { keys: segments.slice(index, index + SEGMENT_DELETE_BATCH) });
+  }
   db.run("DELETE FROM agent_log_records WHERE conversation_id = ?", conversationId);
   db.run("DELETE FROM agent_log_holders WHERE conversation_id = ?", conversationId);
 };
@@ -262,7 +395,20 @@ const cloudAppend = (ctx: OwnerContext, raw: unknown) => {
 
 export const agentLogsDomain = {
   name: "agent-logs",
-  migrations: [AGENT_LOGS_MIGRATION],
+  migrations: [AGENT_LOGS_MIGRATION, AGENT_LOGS_COLD_MIGRATION],
+  jobs: {
+    [AGENT_LOG_ARCHIVE_JOB]: { run: (ctx) => archiveColdRecords(ctx), maxAttempts: 10 },
+    [AGENT_LOG_SEGMENT_DELETE_JOB]: {
+      run: async (ctx, payload) => {
+        const keys = (payload as { keys?: unknown } | null)?.keys;
+        const bucket = ctx.env.CONVERSATION_ARCHIVE;
+        if (!bucket || !Array.isArray(keys)) return;
+        const owned = await agentLogsPrefix(ctx.ownerId);
+        const mine = keys.filter((key): key is string => typeof key === "string" && key.startsWith(owned));
+        if (mine.length > 0) await bucket.delete(mine);
+      },
+    },
+  },
   calls: {
     "agentLogs.append": {
       scope: "owner",
@@ -290,9 +436,13 @@ export const agentLogsDomain = {
     "agentLogs.cloudAppend": cloudAppend,
     "agentLogs.cloudRead": (ctx, raw) => read(ctx, readParser(raw)),
   },
-  purge: (ctx) => {
+  purge: async (ctx) => {
     ctx.db.run("DELETE FROM agent_log_records");
     ctx.db.run("DELETE FROM agent_log_holders");
-    return { pending: false };
+    const bucket = ctx.env.CONVERSATION_ARCHIVE;
+    if (!bucket) return { pending: false };
+    const listed = await bucket.list({ prefix: await agentLogsPrefix(ctx.ownerId), limit: 1_000 });
+    if (listed.objects.length > 0) await bucket.delete(listed.objects.map((entry) => entry.key));
+    return { pending: listed.truncated };
   },
 } satisfies OwnerDomain;

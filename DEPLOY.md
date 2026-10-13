@@ -115,9 +115,10 @@ What a Preview cannot do yet (Cloudflare limits, 2026-10):
   which rejects it as an unknown grant (logged, never retried). If desktop
   turns show no reply, `electron.log` names the refused exchange.
 - Cron Triggers, queue consumers and the `auth-dev.stella.sh` route don't run
-  on Previews. `wrangler tail` doesn't support Previews either. Logs and
-  traces are persisted at full sampling under the Preview's Observability tab
-  in the dashboard.
+  on Previews. `wrangler tail` doesn't support Previews either. Logs are
+  persisted in full and traces at 5% (dev: 1%, prod: 5%) under the
+  Preview's Observability tab in the dashboard, and `scripts/worker-logs.mjs`
+  reads them. A Preview left running keeps logging: take it `down` when done.
 - Each Preview's URL is public, like dev's. Test accounts are enabled on it.
 
 One-time setup (already done; listed for rebuilding or rotating). Create the

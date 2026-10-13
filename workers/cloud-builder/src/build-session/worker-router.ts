@@ -241,12 +241,7 @@ const authenticateConversationCaller = async (
       );
     }
     await noteOwnerIdentity(env, ticketCaller);
-    log("info", "conversation_caller_authenticated", {
-      requestId,
-      socket: wantsSocket,
-      credential: "ticket",
-      ms: Date.now() - authStartedAt,
-    });
+    logCallerAuthenticated(requestId, wantsSocket, "ticket", Date.now() - authStartedAt);
     return { ok: true, caller: { ...ticketCaller, issuer } };
   }
   const verified = await verifyUserToken(token, env);
@@ -271,13 +266,25 @@ const authenticateConversationCaller = async (
         );
   }
   await noteOwnerIdentity(env, verified.token);
-  log("info", "conversation_caller_authenticated", {
+  logCallerAuthenticated(
     requestId,
-    socket: wantsSocket,
-    credential: wantsSocket ? "legacy_token" : "bearer",
-    ms: Date.now() - authStartedAt,
-  });
+    wantsSocket,
+    wantsSocket ? "legacy_token" : "bearer",
+    Date.now() - authStartedAt,
+  );
   return { ok: true, caller: { ...verified.token, issuer } };
+};
+
+const SLOW_CALLER_AUTH_MS = 250;
+
+const logCallerAuthenticated = (
+  requestId: string,
+  socket: boolean,
+  credential: "ticket" | "legacy_token" | "bearer",
+  ms: number,
+): void => {
+  if (!socket && ms < SLOW_CALLER_AUTH_MS) return;
+  log("info", "conversation_caller_authenticated", { requestId, socket, credential, ms });
 };
 
 const refusesAnonymousNetwork = async (
@@ -966,14 +973,20 @@ const app = new Hono<RouterEnv>();
 app.use(async (c, next) => {
   const requestId = c.req.header("cf-ray") ?? crypto.randomUUID();
   c.set("requestId", requestId);
-  log("info", "request_started", {
-    requestId,
-    method: c.req.method,
-    path: c.req.path.startsWith("/workspace-apps/")
-      ? "/workspace-apps/[session]"
-      : new URL(c.req.url).pathname,
-  });
-  await next();
+  const startedAt = Date.now();
+  try {
+    await next();
+  } finally {
+    log(c.res.status >= 500 ? "error" : "info", "request", {
+      requestId,
+      method: c.req.method,
+      path: c.req.path.startsWith("/workspace-apps/")
+        ? "/workspace-apps/[session]"
+        : new URL(c.req.url).pathname,
+      status: c.res.status,
+      ms: Date.now() - startedAt,
+    });
+  }
 });
 
 // ── Public ────────────────────────────────────────────────────────────────

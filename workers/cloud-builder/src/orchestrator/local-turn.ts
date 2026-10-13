@@ -21,7 +21,7 @@ import {
   parseJournalCheckpointFirstKept,
 } from "@stella/contracts/journal-checkpoint";
 import { sha256Hex } from "../hash.js";
-import { historySearchOptions, runHistoryQuery } from "../history-sql.js";
+import { HISTORY_SQL_MAX_BYTES, historySearchOptions, runHistoryQuery } from "../history-sql.js";
 import {
   APPEND_WINDOW_MAX_BYTES,
   APPEND_WINDOW_MAX_REQUESTS,
@@ -335,7 +335,15 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
       }));
   }
 
+  private historyQueue: Promise<unknown> = Promise.resolve();
+
   protected async runHistoryOp(request: unknown): Promise<unknown> {
+    const run = this.historyQueue.then(() => this.runHistoryOpNow(request));
+    this.historyQueue = run.catch(() => undefined);
+    return await run;
+  }
+
+  private async runHistoryOpNow(request: unknown): Promise<unknown> {
     const body = (request ?? null) as {
       op?: unknown;
       query?: unknown;
@@ -363,7 +371,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
           typeof value === "number",
       );
       await this.archive.reindexArchivedSearch();
-      return runHistoryQuery(this.ctx.storage, body.query, params);
+      return runHistoryQuery(this.ctx.storage, body.query, params, HISTORY_SQL_MAX_BYTES);
     }
     if (body?.op === "read") {
       if (

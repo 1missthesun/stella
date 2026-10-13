@@ -20,6 +20,8 @@ import { readOnlyHistoryQuery } from "@stella/contracts/history-search";
 
 export { historySearchOptions } from "@stella/contracts/history-search";
 
+export const HISTORY_SQL_MAX_BYTES = 2 * 1024 * 1024;
+
 export const runHistoryQuery = (
   storage: DurableObjectStorage,
   query: string,

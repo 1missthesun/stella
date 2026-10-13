@@ -350,8 +350,117 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       };
     }
     noteCallerIdentity(db, input.caller);
+    const changes = this.sqlChanges();
     const response = await store.call(input.name, input.args, input.caller);
-    await this.scheduleAlarm(Date.now());
+    if (changes === null || this.sqlChanges() !== changes) {
+      await this.scheduleAlarm(Date.now());
+    }
+    return response;
+  }
+
+  async storageReport(): Promise<{
+    databaseBytes: number;
+    tables: Array<{ name: string; rows: number; bytes: number }>;
+    jobs: Array<{ kind: string; count: number; nextRunAt: number }>;
+    alarmAt: number | null;
+  }> {
+    this.ensureSchema();
+    this.ownerStore().ensureSchema();
+    const sql = this.ctx.storage.sql;
+    const names = sql
+      .exec<{ name: string }>(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'",
+      )
+      .toArray()
+      .map((row) => row.name);
+    let pages: Map<string, number> | null = null;
+    try {
+      pages = new Map(
+        sql
+          .exec<{ name: string; bytes: number }>(
+            "SELECT name, SUM(pgsize) AS bytes FROM dbstat GROUP BY name",
+          )
+          .toArray()
+          .map((row) => [row.name, row.bytes]),
+      );
+    } catch {
+      pages = null;
+    }
+    const quote = (name: string) => `"${name.replaceAll('"', '""')}"`;
+    const tables = names.map((name) => {
+      const rows =
+        sql.exec<{ n: number }>(`SELECT COUNT(*) AS n FROM ${quote(name)}`).one().n;
+      let bytes = pages?.get(name) ?? 0;
+      if (!pages) {
+        try {
+          const columns = sql
+            .exec<{ name: string }>("SELECT name FROM pragma_table_info(?)", name)
+            .toArray()
+            .map((row) => `COALESCE(LENGTH(${quote(row.name)}), 0)`);
+          bytes = columns.length
+            ? (sql
+                .exec<{ b: number | null }>(
+                  `SELECT SUM(${columns.join(" + ")}) AS b FROM ${quote(name)}`,
+                )
+                .one().b ?? 0)
+            : 0;
+        } catch {
+          bytes = 0;
+        }
+      }
+      return { name, rows, bytes };
+    });
+    tables.sort((a, b) => b.bytes - a.bytes);
+    const jobs = sql
+      .exec<{ kind: string; count: number; next_run_at: number }>(
+        "SELECT kind, COUNT(*) AS count, MIN(run_at) AS next_run_at FROM owner_jobs GROUP BY kind",
+      )
+      .toArray()
+      .map((row) => ({ kind: row.kind, count: row.count, nextRunAt: row.next_run_at }));
+    return {
+      databaseBytes: sql.databaseSize,
+      tables,
+      jobs,
+      alarmAt: await this.ctx.storage.getAlarm(),
+    };
+  }
+
+  private sqlChanges(): number | null {
+    try {
+      return this.ctx.storage.sql
+        .exec<{ n: number }>("SELECT total_changes() AS n")
+        .one().n;
+    } catch {
+      return null;
+    }
+  }
+
+  async claudeSessionCommit(input: {
+    staged: unknown;
+    caller: OwnerCaller;
+  }): Promise<RpcResponse> {
+    const store = this.ownerStore();
+    const { db } = store.context(input.caller);
+    if (callerSessionRevoked(db, input.caller)) {
+      return {
+        ok: false,
+        error: toBackendError(
+          new RpcError(
+            "UNAUTHENTICATED",
+            "You were signed out. Sign in again to continue.",
+          ),
+        ),
+      };
+    }
+    noteCallerIdentity(db, input.caller);
+    const changes = this.sqlChanges();
+    const response = await store.internalCall(
+      "claudeSessions.commitStaged",
+      input.staged,
+    );
+    if (changes === null || this.sqlChanges() !== changes) {
+      await this.scheduleAlarm(Date.now());
+    }
     return response;
   }
 

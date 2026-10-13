@@ -132,7 +132,8 @@ const storage = async (url: URL, env: AdminEnv): Promise<Response> => {
   if (!drive.ok) return failRpc(drive);
   const { worldName } = await import("../workspace.js");
   const world = await env.WORLDS.getByName(await worldName(ownerId)).usage();
-  return json({ ownerId, drive: drive.value, world });
+  const ownerDb = await ownerGateStub(env.OWNER_GATES, ownerId).storageReport();
+  return json({ ownerId, drive: drive.value, world, ownerDb });
 };
 
 const top = async (url: URL, env: AdminEnv): Promise<Response> => {

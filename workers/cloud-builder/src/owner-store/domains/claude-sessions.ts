@@ -73,6 +73,23 @@ export const CLAUDE_SESSIONS_MIGRATION = {
 
 const HEX_SHA256 = /^[0-9a-f]{64}$/;
 
+const threadIdArg = string({ min: 1, max: 512 });
+const sessionIdArg = string({ min: 1, max: 128 });
+
+const tagShapeOf = () => ({
+  threadId: string({ min: 1, max: 512 }),
+  conversationId: string({ min: 1, max: 512 }),
+  sessionId: sessionIdArg,
+  deviceId: string({ min: 1, max: 512 }),
+  cliVersion: string({ min: 1, max: 128 }),
+  engine: literal(...CLAUDE_SESSION_ENGINES),
+  originCwd: string({ min: 1, max: 4_096 }),
+  journalCursor: optional(string({ min: 1, max: 512 })),
+  journalSeq: optional(number({ int: true, min: -1 })),
+  leaseEpoch: optional(number({ int: true, min: 0 })),
+});
+const tagShape = tagShapeOf();
+
 type SessionRow = {
   thread_id: string;
   session_id: string;
@@ -117,7 +134,7 @@ const ownerPrefix = async (ownerId: string): Promise<string> =>
 
 const chunkObjectKey = async (
   ownerId: string,
-  args: ClaudeSessionAppendArgs,
+  args: Omit<ClaudeSessionAppendArgs, "data">,
 ): Promise<string> =>
   [
     (await ownerPrefix(ownerId)).replace(/\/$/, ""),
@@ -201,7 +218,7 @@ const upsertSession = (db: OwnerDb, now: number, tag: ClaudeSessionSyncTag): voi
   );
 };
 
-const readFile = (db: OwnerDb, args: ClaudeSessionAppendArgs): FileRow | null =>
+const readFile = (db: OwnerDb, args: Omit<ClaudeSessionAppendArgs, "data">): FileRow | null =>
   db.one<FileRow>(
     `SELECT path, generation, length, chain, chunk_count FROM claude_session_files
       WHERE thread_id = ? AND session_id = ? AND path = ?`,
@@ -224,7 +241,7 @@ type Placement =
   | { kind: "replay"; file: FileRow }
   | { kind: "conflict"; file: FileRow };
 
-const placeChunk = (db: OwnerDb, args: ClaudeSessionAppendArgs): Placement => {
+const placeChunk = (db: OwnerDb, args: Omit<ClaudeSessionAppendArgs, "data">): Placement => {
   const file = readFile(db, args);
   if (!file) {
     if (args.offset !== 0 || args.prevChain !== CLAUDE_SESSION_CHAIN_GENESIS) {
@@ -262,17 +279,40 @@ const placeChunk = (db: OwnerDb, args: ClaudeSessionAppendArgs): Placement => {
   return { kind: "conflict", file };
 };
 
-const fileCount = (db: OwnerDb, args: ClaudeSessionAppendArgs): number =>
+const fileCount = (db: OwnerDb, args: { threadId: string; sessionId: string }): number =>
   db.one<{ count: number }>(
     "SELECT COUNT(*) AS count FROM claude_session_files WHERE thread_id = ? AND session_id = ?",
     args.threadId,
     args.sessionId,
   )?.count ?? 0;
 
-const appendChunk = async (
-  ctx: OwnerContext,
-  args: ClaudeSessionAppendArgs,
-): Promise<ClaudeSessionCalls["claudeSessions.append"]["result"]> => {
+export type StagedClaudeSessionChunk = Omit<ClaudeSessionAppendArgs, "data"> & {
+  length: number;
+  objectKey: string;
+};
+
+const chunkShape = () => ({
+  ...tagShapeOf(),
+  path: string({ min: 1, max: 1_024 }),
+  generation: number({ int: true, min: 1 }),
+  offset: number({ int: true, min: 0 }),
+  prevChain: string({ min: 64, max: 64 }),
+  sha256: string({ min: 64, max: 64 }),
+  chain: string({ min: 64, max: 64 }),
+});
+
+const appendParser = object({
+  ...chunkShape(),
+  data: string({ min: 1, max: CLAUDE_SESSION_APPEND_MAX_BODY_BYTES }),
+});
+
+const stagedParser = object({
+  ...chunkShape(),
+  length: number({ int: true, min: 1, max: CLAUDE_SESSION_CHUNK_MAX_BYTES }),
+  objectKey: string({ min: 1, max: 1_024 }),
+});
+
+const assertAppendShape = (args: Omit<ClaudeSessionAppendArgs, "data">): void => {
   assertTag(args);
   if (!isClaudeSessionFilePath(args.sessionId, args.path)) {
     throw new RpcError("BAD_REQUEST", "path must be a file of this session.");
@@ -280,14 +320,16 @@ const appendChunk = async (
   if (!HEX_SHA256.test(args.sha256) || !HEX_SHA256.test(args.chain) || !HEX_SHA256.test(args.prevChain)) {
     throw new RpcError("BAD_REQUEST", "Hashes must be lowercase SHA-256 hex.");
   }
-  enforceOwnerRateLimit(
-    ctx.db,
-    ctx.now,
-    "claudeSessions.append",
-    { count: 1_200, windowMs: 60_000 },
-    "Session sync is going too fast. It will retry shortly.",
-  );
-  const bytes = decodeBase64(args.data);
+};
+
+export const stageClaudeSessionChunk = async (
+  env: { CONVERSATION_ARCHIVE?: R2Bucket },
+  ownerId: string,
+  raw: unknown,
+): Promise<StagedClaudeSessionChunk> => {
+  const { data, ...args } = appendParser(raw) as ClaudeSessionAppendArgs;
+  assertAppendShape(args);
+  const bytes = decodeBase64(data);
   if (bytes.byteLength === 0 || bytes.byteLength > CLAUDE_SESSION_CHUNK_MAX_BYTES) {
     throw new RpcError("BAD_REQUEST", "Chunk size is out of range.");
   }
@@ -297,36 +339,42 @@ const appendChunk = async (
   if ((await sha256Hex(claudeSessionChainInput(args.prevChain, args.sha256))) !== args.chain) {
     throw new RpcError("BAD_REQUEST", "Chunk chain doesn't follow its predecessor.");
   }
-  assertLease(ctx.db, args);
-  const replayed = {
-    path: args.path,
-    generation: args.generation,
-    length: args.offset + bytes.byteLength,
-    chain: args.chain,
-  };
-  const before = placeChunk(ctx.db, args);
-  if (before.kind === "replay") {
-    upsertSession(ctx.db, ctx.now, args);
-    return replayed;
-  }
-  if (before.kind === "conflict") {
-    throw new RpcError("CONFLICT", "The cloud copy of this session moved on.", {
-      reason: CLAUDE_SESSION_CONFLICT_REASON,
-    });
-  }
-  if (before.kind === "create" && fileCount(ctx.db, args) >= CLAUDE_SESSION_MAX_FILES) {
-    throw new RpcError("BAD_REQUEST", "This session has too many files to sync.");
-  }
-  const bucket = bucketOf(ctx);
-  const objectKey = await chunkObjectKey(ctx.ownerId, args);
+  const bucket = env.CONVERSATION_ARCHIVE;
+  if (!bucket) throw new RpcError("UNAVAILABLE", "Session sync isn't available right now.");
+  const objectKey = await chunkObjectKey(ownerId, args);
   await bucket.put(objectKey, bytes);
+  return { ...args, length: bytes.byteLength, objectKey };
+};
+
+type CommitResult = {
+  head: ClaudeSessionCalls["claudeSessions.append"]["result"];
+  retired: string[];
+};
+
+const commitStagedChunk = (ctx: OwnerContext, args: StagedClaudeSessionChunk): CommitResult => {
+  assertAppendShape(args);
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "claudeSessions.append",
+    { count: 1_200, windowMs: 60_000 },
+    "Session sync is going too fast. It will retry shortly.",
+  );
+  assertLease(ctx.db, args);
+  const length = args.offset + args.length;
+  const head = { path: args.path, generation: args.generation, length, chain: args.chain };
   const placement = placeChunk(ctx.db, args);
-  if (placement.kind !== before.kind) {
-    if (placement.kind !== "replay") await bucket.delete(objectKey).catch(() => undefined);
-    if (placement.kind === "replay") return replayed;
+  if (placement.kind === "replay") {
+    upsertSession(ctx.db, ctx.now, args);
+    return { head, retired: [] };
+  }
+  if (placement.kind === "conflict") {
     throw new RpcError("CONFLICT", "The cloud copy of this session moved on.", {
       reason: CLAUDE_SESSION_CONFLICT_REASON,
     });
+  }
+  if (placement.kind === "create" && fileCount(ctx.db, args) >= CLAUDE_SESSION_MAX_FILES) {
+    throw new RpcError("BAD_REQUEST", "This session has too many files to sync.");
   }
   const retired: string[] = [];
   if (placement.kind === "reset") {
@@ -349,8 +397,7 @@ const appendChunk = async (
       args.generation,
     );
   }
-  const chunkIndex =
-    placement.kind === "extend" ? placement.file.chunk_count : 0;
+  const chunkIndex = placement.kind === "extend" ? placement.file.chunk_count : 0;
   ctx.db.run(
     `INSERT INTO claude_session_chunks (
        thread_id, session_id, path, generation, chunk_index, offset, length,
@@ -362,13 +409,12 @@ const appendChunk = async (
     args.generation,
     chunkIndex,
     args.offset,
-    bytes.byteLength,
+    args.length,
     args.sha256,
     args.chain,
-    objectKey,
+    args.objectKey,
     ctx.now,
   );
-  const length = args.offset + bytes.byteLength;
   ctx.db.run(
     `INSERT INTO claude_session_files (
        thread_id, session_id, path, generation, length, chain, chunk_count, updated_at
@@ -389,10 +435,17 @@ const appendChunk = async (
     ctx.now,
   );
   upsertSession(ctx.db, ctx.now, args);
-  if (retired.length > 0) {
-    await bucket.delete(retired).catch(() => undefined);
-  }
-  return { path: args.path, generation: args.generation, length, chain: args.chain };
+  return { head, retired };
+};
+
+const appendChunk = async (
+  ctx: OwnerContext,
+  args: ClaudeSessionAppendArgs,
+): Promise<ClaudeSessionCalls["claudeSessions.append"]["result"]> => {
+  const staged = await stageClaudeSessionChunk(ctx.env, ctx.ownerId, args);
+  const { head, retired } = commitStagedChunk(ctx, staged);
+  if (retired.length > 0) await bucketOf(ctx).delete(retired).catch(() => undefined);
+  return head;
 };
 
 const tagSession = (
@@ -505,22 +558,7 @@ const purgeClaudeSessions = async (ctx: OwnerContext): Promise<{ pending: boolea
   return { pending: listed.truncated };
 };
 
-const threadIdArg = string({ min: 1, max: 512 });
-const sessionIdArg = string({ min: 1, max: 128 });
-const hashArg = string({ min: 64, max: 64 });
 
-const tagShape = {
-  threadId: threadIdArg,
-  conversationId: string({ min: 1, max: 512 }),
-  sessionId: sessionIdArg,
-  deviceId: string({ min: 1, max: 512 }),
-  cliVersion: string({ min: 1, max: 128 }),
-  engine: literal(...CLAUDE_SESSION_ENGINES),
-  originCwd: string({ min: 1, max: 4_096 }),
-  journalCursor: optional(string({ min: 1, max: 512 })),
-  journalSeq: optional(number({ int: true, min: -1 })),
-  leaseEpoch: optional(number({ int: true, min: 0 })),
-};
 
 export const claudeSessionsDomain = {
   name: "claude-sessions",
@@ -530,16 +568,7 @@ export const claudeSessionsDomain = {
       scope: "owner",
       requireAccount: true,
       maxBodyBytes: CLAUDE_SESSION_APPEND_MAX_BODY_BYTES,
-      parse: object({
-        ...tagShape,
-        path: string({ min: 1, max: 1_024 }),
-        generation: number({ int: true, min: 1 }),
-        offset: number({ int: true, min: 0 }),
-        prevChain: hashArg,
-        sha256: hashArg,
-        chain: hashArg,
-        data: string({ min: 1, max: CLAUDE_SESSION_APPEND_MAX_BODY_BYTES }),
-      }),
+      parse: appendParser,
       handler: appendChunk,
     },
     "claudeSessions.tag": {
@@ -568,6 +597,8 @@ export const claudeSessionsDomain = {
     },
   },
   internal: {
+    "claudeSessions.commitStaged": (ctx: OwnerContext, raw: unknown) =>
+      commitStagedChunk(ctx, stagedParser(raw) as StagedClaudeSessionChunk),
     // The cloud resuming a computer's synced session after it took the
     // brain over (`@stella/contracts/cloud-orchestrator-cli`).
     "claudeSessions.latestForRestore": (ctx: OwnerContext, raw: unknown) =>

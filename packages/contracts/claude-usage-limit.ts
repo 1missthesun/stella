@@ -16,12 +16,9 @@ const LIMIT_PATTERN =
 const RESET_PATTERN =
   /\bresets?\s+(?:at\s+)?(?:(?<month>[A-Za-z]{3,9})\.?\s+(?<day>\d{1,2})(?:st|nd|rd|th)?,?\s+(?:at\s+)?)?(?<hour>\d{1,2})(?::(?<minute>\d{2}))?\s*(?<meridiem>am|pm)?(?:\s*\((?<zone>[^)]+)\))?/i;
 
-/**
- * A time of day that passed moments ago is this window's reset, seen late,
- * not tomorrow's: check again shortly rather than waiting a day.
- */
-const JUST_RESET_MS = 3 * 60 * 60 * 1000;
-const JUST_RESET_RECHECK_MS = 60 * 1000;
+const JUST_RESET_MS = 10 * 60 * 1000;
+const JUST_RESET_RECHECK_MS = 5 * 60 * 1000;
+const TOMORROW_AFTER_MS = 12 * 60 * 60 * 1000;
 
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 
@@ -91,15 +88,20 @@ const wallClockReset = (message: string, now: number): number | undefined => {
     const day = Number(groups.day);
     let at = zonedEpoch(today.year, month, day, hour, minute, zone);
     if (at < now - 24 * 60 * 60 * 1000) at = zonedEpoch(today.year + 1, month, day, hour, minute, zone);
-    return at;
+    if (at > now) return at;
+    return now - at < JUST_RESET_MS ? now + JUST_RESET_RECHECK_MS : undefined;
   }
   let at = zonedEpoch(today.year, today.month, today.day, hour, minute, zone);
-  if (at <= now && now - at < JUST_RESET_MS) return now + JUST_RESET_RECHECK_MS;
-  if (at <= now) {
-    const tomorrow = zoneParts(at + 24 * 60 * 60 * 1000, zone);
-    at = zonedEpoch(tomorrow.year, tomorrow.month, tomorrow.day, hour, minute, zone);
-  }
-  return at;
+  if (at > now) return at;
+  if (now - at < JUST_RESET_MS) return now + JUST_RESET_RECHECK_MS;
+  if (now - at < TOMORROW_AFTER_MS) return undefined;
+  const tomorrow = zoneParts(at + 24 * 60 * 60 * 1000, zone);
+  return zonedEpoch(tomorrow.year, tomorrow.month, tomorrow.day, hour, minute, zone);
+};
+
+const future = (at: number, now: number): ClaudeUsageLimit => {
+  if (at > now) return { resetsAt: at };
+  return now - at < JUST_RESET_MS ? { resetsAt: now + JUST_RESET_RECHECK_MS } : {};
 };
 
 /** The limit in a CLI result or error, or null when it names none. */
@@ -107,9 +109,9 @@ export const claudeUsageLimitOf = (error: unknown, now = Date.now()): ClaudeUsag
   const message = error instanceof Error ? error.message : String(error ?? "");
   if (!LIMIT_PATTERN.test(message)) return null;
   const epoch = /\|(\d{10})\b/.exec(message)?.[1];
-  if (epoch) return { resetsAt: Number(epoch) * 1000 };
+  if (epoch) return future(Number(epoch) * 1000, now);
   const instant = /\bresets? at (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?Z)/i.exec(message)?.[1];
-  if (instant && Number.isFinite(Date.parse(instant))) return { resetsAt: Date.parse(instant) };
+  if (instant && Number.isFinite(Date.parse(instant))) return future(Date.parse(instant), now);
   const resetsAt = wallClockReset(message, now);
   return resetsAt !== undefined && Number.isFinite(resetsAt) ? { resetsAt } : {};
 };

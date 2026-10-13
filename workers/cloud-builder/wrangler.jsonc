@@ -61,7 +61,7 @@
     },
     "traces": {
       "enabled": true,
-      "head_sampling_rate": 0.05,
+      "head_sampling_rate": 0.01,
     },
   },
   "vars": {
@@ -381,7 +381,7 @@
       },
       "traces": {
         "enabled": true,
-        "head_sampling_rate": 1,
+        "head_sampling_rate": 0.05,
         "persist": true,
       },
     },

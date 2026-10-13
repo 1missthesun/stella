@@ -1,17 +1,34 @@
 import { useId, useMemo, type ReactNode } from "react";
+import { isDocumentFolderAsset } from "@stella/contracts/html-relative-assets";
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
 import { backendClient } from "@/platform/backend/backend-client";
+
+/**
+ * The Drive file a viewer's read names: the document itself, or an asset in
+ * its Drive folder (a markdown file's relative image). The viewer names files
+ * as the payload does, the drive path with a leading `/`.
+ */
+const drivePathFor = (documentPath: string, filePath: string): string => {
+  const document = `/${documentPath}`;
+  const requested = filePath.startsWith("/") ? filePath : `/${filePath}`;
+  if (requested === document) return documentPath;
+  if (isDocumentFolderAsset(document, requested)) return requested.slice(1);
+  throw new Error("This file isn’t beside the Drive document.");
+};
 
 export function CloudFileSource({ path, children }: { path: string; children: ReactNode }) {
   const id = useId();
   const source = useMemo(() => ({
     key: `drive:${id}:${path}`,
+    drivePath: path,
     async mediaUrl() {
       const { url } = await backendClient.call("drive.fileUrl", { path });
       return url;
     },
-    async read(_filePath: string, maxBytes = 32 * 1024 * 1024) {
-      const { url } = await backendClient.call("drive.fileUrl", { path });
+    async read(filePath: string, maxBytes = 32 * 1024 * 1024) {
+      const { url } = await backendClient.call("drive.fileUrl", {
+        path: drivePathFor(path, filePath),
+      });
       const response = await fetch(url, { headers: { Range: `bytes=0-${maxBytes}` } });
       if (!response.ok) throw new Error("Couldn’t load this Drive file.");
       const reader = response.body?.getReader();

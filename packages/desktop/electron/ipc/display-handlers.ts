@@ -28,6 +28,7 @@ import {
 import type { LocalChatHistoryService } from "../services/local-chat-history-service.js";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { isCloudWorkspacePath } from "@stella/contracts/cloud-world-paths";
+import { isAssetDocumentPath } from "@stella/contracts/html-relative-assets";
 import type { LocalChatEventRecord } from "@stella/runtime/kernel/storage/shared";
 import {
   MAX_DISPLAY_FILE_BYTES,
@@ -1060,9 +1061,37 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
     return { bytes: read.bytes, sizeBytes: read.sizeBytes, mimeType: read.mimeType };
   });
 
+  // The relative assets of a Drive document: read from the owner's Drive by
+  // signed URL, ranged for video and audio, held to the document's folder by
+  // the canvas protocol. The document path is the drive path with a leading
+  // `/`, so the asset's drive path is the rest.
+  setCanvasDocumentAssetReader(async (filePath, range, maxBytes) => {
+    const locator = options.deviceFileLocator;
+    const drivePath = filePath.replace(/^\/+/u, "");
+    if (!locator || !drivePath) return null;
+    const file = await locator.copyUrl(drivePath).catch(() => null);
+    if (!file) return null;
+    const limit = range ? range.length : maxBytes;
+    const offset = range?.offset ?? 0;
+    if (offset >= file.sizeBytes) {
+      return { bytes: new Uint8Array(), sizeBytes: file.sizeBytes, mimeType: file.contentType };
+    }
+    const end = Math.min(file.sizeBytes, offset + limit) - 1;
+    const response = await fetch(file.url, {
+      headers: { Range: `bytes=${offset}-${end}` },
+      signal: AbortSignal.timeout(120_000),
+    }).catch(() => null);
+    if (!response || (response.status !== 206 && response.status !== 200)) return null;
+    let bytes = new Uint8Array(await response.arrayBuffer());
+    // A server that ignored the range sent the whole file.
+    if (response.status === 200 && offset > 0) bytes = bytes.subarray(offset);
+    if (bytes.byteLength > end - offset + 1) bytes = bytes.subarray(0, end - offset + 1);
+    return { bytes, sizeBytes: file.sizeBytes, mimeType: file.contentType };
+  }, "drive");
+
   handleIpc(
     IPC_DISPLAY_CANVAS_HTML_URL,
-    (event, payload?: { html?: unknown }) => {
+    (event, payload?: { html?: unknown; drivePath?: unknown }) => {
       if (!options.assertPrivilegedSender(event, IPC_DISPLAY_CANVAS_HTML_URL)) {
         throw new Error(
           `Blocked untrusted ${IPC_DISPLAY_CANVAS_HTML_URL} request.`,
@@ -1071,6 +1100,13 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
       const html = typeof payload?.html === "string" ? payload.html : "";
       if (!html) {
         throw new Error(`${IPC_DISPLAY_CANVAS_HTML_URL} requires html.`);
+      }
+      const drivePath =
+        typeof payload?.drivePath === "string"
+          ? payload.drivePath.trim().replace(/^\/+/u, "")
+          : "";
+      if (drivePath && isAssetDocumentPath(drivePath)) {
+        return { url: registerCanvasHtml(html, `/${drivePath}`, "drive") };
       }
       return { url: registerCanvasHtml(html) };
     },

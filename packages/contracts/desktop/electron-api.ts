@@ -474,9 +474,16 @@ export const createElectronApi = (
        */
       canvasFileUrl: (filePath: string) =>
         ipc.invoke(IPC_DISPLAY_CANVAS_FILE_URL, { filePath }),
-      /** Holds `html` (a cloud canvas) in main and returns its `stella-canvas://` URL. */
-      canvasHtmlUrl: (html: string) =>
-        ipc.invoke(IPC_DISPLAY_CANVAS_HTML_URL, { html }),
+      /**
+       * Holds `html` (a cloud canvas, a Drive document) in main and returns
+       * its `stella-canvas://` URL. With `drivePath` (the document's path in
+       * the owner's Drive) its relative assets load from that Drive folder.
+       */
+      canvasHtmlUrl: (html: string, options?: { drivePath?: string }) =>
+        ipc.invoke(IPC_DISPLAY_CANVAS_HTML_URL, {
+          html,
+          ...(options?.drivePath ? { drivePath: options.drivePath } : {}),
+        }),
       listTrash: invoker(IPC_DISPLAY_TRASH_LIST),
       forceDeleteTrash: invoker(IPC_DISPLAY_TRASH_FORCE_DELETE),
     },

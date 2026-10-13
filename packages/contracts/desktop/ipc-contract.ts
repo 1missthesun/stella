@@ -805,7 +805,7 @@ export type IpcInvokeContract = {
     { url: string } | { missing: true; message?: string }
   >;
   [IPC_DISPLAY_CANVAS_HTML_URL]: Invoke<
-    [payload: { html: string }],
+    [payload: { html: string; drivePath?: string }],
     { url: string }
   >;
   [IPC_DISPLAY_TRASH_LIST]: Invoke<

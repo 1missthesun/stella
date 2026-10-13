@@ -24,9 +24,10 @@ import { injectCanvasBridge } from "./canvas-bridge.js";
  *   so its relative images, styles and scripts load, and nothing outside
  *   that folder does.
  * - `memory/<id>`: HTML the renderer registered (a cloud canvas), under a
- *   random id. A document kept on another device is `memory/<id>/<name>`, so
- *   its relative assets resolve under the id and are read on request from
- *   wherever that document's folder is reachable, held to that folder.
+ *   random id. A document kept on another device, or in the owner's Drive,
+ *   is `memory/<id>/<name>`, so its relative assets resolve under the id and
+ *   are read on request from wherever that document's folder is reachable
+ *   (that device, or Drive), held to that folder.
  */
 export const CANVAS_SCHEME = "stella-canvas";
 const DIRECTORY_HOST = "dir";
@@ -130,9 +131,18 @@ export const isCanvasUrl = (url: string): boolean =>
   url.startsWith(`${CANVAS_SCHEME}:`);
 
 // Insertion order is recency: a lookup re-inserts, eviction takes the first.
+/** Where a registered document's folder lives: another device, or Drive. */
+export type CanvasDocumentAssetSource = "device" | "drive";
+
 const registered = new Map<
   string,
-  { html: string; bytes: number; digest: string; documentPath: string | null }
+  {
+    html: string;
+    bytes: number;
+    digest: string;
+    documentPath: string | null;
+    assetSource: CanvasDocumentAssetSource;
+  }
 >();
 const idByDigest = new Map<string, string>();
 let registeredBytes = 0;
@@ -157,11 +167,14 @@ const memoryUrl = (id: string, documentPath: string | null) =>
  * Hold `html` in memory and return the `stella-canvas://` URL that serves it.
  * With `documentPath` (a document kept on another device), the URL stands for
  * that document's folder too: its relative assets are read on request through
- * the reader `setCanvasDocumentAssetReader` installs, held to that folder.
+ * the reader `setCanvasDocumentAssetReader` installs for `assetSource`, held
+ * to that folder. A Drive document's path is its drive path with a leading
+ * `/` (`/reports/x.html`), so a file at the Drive root has a folder too.
  */
 export const registerCanvasHtml = (
   html: string,
   documentPath: string | null = null,
+  assetSource: CanvasDocumentAssetSource = "device",
 ): string => {
   const bytes = Buffer.byteLength(html, "utf8");
   if (bytes > MAX_CANVAS_HTML_BYTES) {
@@ -173,13 +186,15 @@ export const registerCanvasHtml = (
     .update(html)
     .update("\0")
     .update(documentPath ?? "")
+    .update("\0")
+    .update(assetSource)
     .digest("hex");
   const existing = idByDigest.get(digest);
   if (existing && touchRegistered(existing)) {
     return memoryUrl(existing, documentPath);
   }
   const id = randomBytes(18).toString("base64url");
-  registered.set(id, { html, bytes, digest, documentPath });
+  registered.set(id, { html, bytes, digest, documentPath, assetSource });
   idByDigest.set(digest, id);
   registeredBytes += bytes;
   for (const [oldestId, oldest] of registered) {
@@ -209,13 +224,18 @@ export type CanvasDocumentAssetReader = (
   maxBytes: number,
 ) => Promise<CanvasDocumentAssetRead | null>;
 
-let documentAssetReader: CanvasDocumentAssetReader | null = null;
+const documentAssetReaders = new Map<
+  CanvasDocumentAssetSource,
+  CanvasDocumentAssetReader
+>();
 
-/** How a registered document's relative assets are read (wherever they live). */
+/** How a registered document's relative assets are read, per where they live. */
 export const setCanvasDocumentAssetReader = (
   reader: CanvasDocumentAssetReader | null,
+  source: CanvasDocumentAssetSource = "device",
 ) => {
-  documentAssetReader = reader;
+  if (reader) documentAssetReaders.set(source, reader);
+  else documentAssetReaders.delete(source);
 };
 
 const realpathOrNull = async (target: string) => {
@@ -273,7 +293,12 @@ export const canvasUrlForLocalFile = async (
 type CanvasDocument =
   | { kind: "html"; html: string }
   | { kind: "file"; file: string; size: number }
-  | { kind: "asset"; documentPath: string; assetPath: string };
+  | {
+      kind: "asset";
+      documentPath: string;
+      assetPath: string;
+      assetSource: CanvasDocumentAssetSource;
+    };
 
 /**
  * The path `segments` name inside a registered document's folder, written in
@@ -353,7 +378,12 @@ const readCanvasDocument = async (url: string): Promise<CanvasDocument | null> =
     }
     const assetPath = documentAssetPath(entry.documentPath, rest);
     return assetPath
-      ? { kind: "asset", documentPath: entry.documentPath, assetPath }
+      ? {
+          kind: "asset",
+          documentPath: entry.documentPath,
+          assetPath,
+          assetSource: entry.assetSource,
+        }
       : null;
   }
   if (parsed.host !== DIRECTORY_HOST) return null;
@@ -394,9 +424,10 @@ const parseRange = (header: string | null) => {
 
 const documentAssetResponse = async (
   assetPath: string,
+  assetSource: CanvasDocumentAssetSource,
   rangeHeader: string | null,
 ) => {
-  const reader = documentAssetReader;
+  const reader = documentAssetReaders.get(assetSource);
   if (!reader) return canvasResponse(404, "Not found");
   const range = parseRange(rangeHeader);
   const read = await reader(assetPath, range, MAX_REMOTE_ASSET_BYTES).catch(
@@ -441,6 +472,7 @@ export const serveCanvasProtocol = (partition: string) => {
     if (document.kind === "asset") {
       return await documentAssetResponse(
         document.assetPath,
+        document.assetSource,
         request.headers.get("range"),
       );
     }

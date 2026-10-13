@@ -96,12 +96,14 @@ const LocalFileCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => 
  * HTML already in hand (a cloud canvas, a Drive file): on desktop it is
  * registered with main and loaded from its `stella-canvas://` URL.
  */
-const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = false, }: {
+const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = false, drivePath, }: {
   item: CanvasHtmlItem;
   html: string;
   error: string | null;
   loading: boolean;
   limited?: boolean;
+  /** A Drive document: its relative assets load from this Drive folder. */
+  drivePath?: string;
 }) => {
     const hasCanvasOrigin = canvasUrlApi() !== null;
     const [registered, setRegistered] = useState<{
@@ -114,7 +116,7 @@ const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = fals
         if (!api || !html)
             return;
         let cancelled = false;
-        void api.canvasHtmlUrl(html).then(({ url }) => {
+        void api.canvasHtmlUrl(html, drivePath ? { drivePath } : undefined).then(({ url }) => {
             if (!cancelled)
                 setRegistered({ html, src: url, error: null });
         }, (caught: unknown) => {
@@ -124,7 +126,7 @@ const HtmlCanvasHeroFrameContent = ({ item, html, error, loading, limited = fals
         return () => {
             cancelled = true;
         };
-    }, [html]);
+    }, [html, drivePath]);
     if (!hasCanvasOrigin) {
         return <CanvasHeroFrameDocument item={item} frame={html ? { srcDoc: html } : null} error={error} loading={loading} limited={limited}/>;
     }
@@ -137,12 +139,12 @@ const BytesCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
     const { bytes, error, loading, truncated } = useDisplayFileBytes(item.filePath, "Canvas preview requires the Stella desktop app.", undefined, item.createdAt, CANVAS_HTML_MAX_BYTES);
     const html = useMemo(() => (bytes ? decoder.decode(bytes) : ""), [bytes]);
     const embedded = useEmbeddedCanvasAssets(html, item.filePath, !fileSource && !canvasUrlApi());
-    return <HtmlCanvasHeroFrameContent item={item} html={embedded.html} error={error} loading={loading || embedded.loading} limited={truncated}/>;
+    return <HtmlCanvasHeroFrameContent item={item} html={embedded.html} error={error} loading={loading || embedded.loading} limited={truncated} {...(fileSource?.drivePath ? { drivePath: fileSource.drivePath } : {})}/>;
 };
 /** Cloud canvas: the html the cloud `html` tool wrote into the owner's drive. */
 const CloudCanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
     const { html, error, loading } = useCloudDriveHtml(item.filePath, item.createdAt);
-    return <HtmlCanvasHeroFrameContent item={item} html={html ?? ""} error={error} loading={loading}/>;
+    return <HtmlCanvasHeroFrameContent item={item} html={html ?? ""} error={error} loading={loading} drivePath={item.filePath}/>;
 };
 const CanvasHeroFrameContent = ({ item }: { item: CanvasHtmlItem }) => {
     const fileSource = useContext(DisplayFileSourceContext);

@@ -2317,6 +2317,17 @@ export function desktopChats(options: DesktopChatsOptions) {
         case "follow":
           await follow(request.conversationId);
           return { ok: true };
+        case "sendMoved":
+          options.emit({
+            conversationId: request.conversationId,
+            events: [{ type: "send_moved", requestId: request.requestId, userMessageId: request.userMessageId }],
+          });
+          return { ok: true };
+        case "journaled": {
+          const chat = await open(request.conversationId);
+          await caughtUp(chat);
+          return { journaled: await transcriptHasPrompt(chat, request.requestId) };
+        }
         case "sendFailed":
           options.emit({
             conversationId: request.conversationId,

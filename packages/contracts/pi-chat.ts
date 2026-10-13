@@ -180,7 +180,9 @@ export type PiChatEvent =
    * computer could not answer it either: the sent message is taken back and
    * the reason shown (`op: "sendFailed"`).
    */
-  | { type: "send_failed"; requestId: string; message: string };
+  | { type: "send_failed"; requestId: string; message: string }
+  /** That send was placed again (in the cloud) and is journaled under `userMessageId` (`op: "sendMoved"`). */
+  | { type: "send_moved"; requestId: string; userMessageId: string };
 
 /** A turn of the conversation running elsewhere, which the journal shows as started. */
 export type PiRemoteTurn = {
@@ -231,6 +233,10 @@ export type PiChatRequest =
   | { op: "follow"; conversationId: string }
   /** A placed send ended without reaching the conversation: tell the app (`send_failed`). */
   | { op: "sendFailed"; conversationId: string; requestId: string; message: string }
+  /** That send was placed again and is journaled under `userMessageId`: tell the app (`send_moved`). */
+  | { op: "sendMoved"; conversationId: string; requestId: string; userMessageId: string }
+  /** Whether the conversation has the message sent as `requestId` (`{ journaled }`). */
+  | { op: "journaled"; conversationId: string; requestId: string }
   /** Stella's greeting after onboarding, as a reply in the conversation; kept on this computer. */
   | { op: "welcome"; conversationId: string; message: string }
   /** The local files Stella's replies and its agents linked (`{ paths }`): what a paired phone may open. */

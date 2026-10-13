@@ -162,6 +162,8 @@ type WorkerRequestOptions = {
 type PlacedChatPayload = RuntimeChatPayload & {
   /** The orchestrator moved this chat here; the prompt is its brief. */
   handoff?: boolean;
+  /** A second placement of one send (the first one ended unanswered): its own dispatch key. */
+  idempotencyKey?: string;
 };
 type PlacedChatTarget =
   | { mode: "cloud" }
@@ -1541,6 +1543,7 @@ export class StellaRuntimeHost {
       throw new Error("Cross-device execution is not ready on this computer.");
     }
     const idempotencyKey = (
+      payload.idempotencyKey?.trim() ||
       payload.userMessageEventId?.trim() ||
       payload.requestId?.trim() ||
       `desktop:${crypto.randomUUID()}`
@@ -1895,17 +1898,18 @@ export class StellaRuntimeHost {
       errorCode: status.errorCode,
       target: target.mode,
     });
+    const pi = async (body: PiChatRequest) =>
+      await this.requestWorker(METHOD_NAMES.INTERNAL_WORKER_PI_CHAT, body, {
+        ensureWorker: true,
+        recordActivity: false,
+      });
     const tell = async (message: string) => {
-      await this.requestWorker(
-        METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
-        {
-          op: "sendFailed",
-          conversationId: request.conversationId,
-          requestId: request.requestId,
-          message,
-        },
-        { ensureWorker: true, recordActivity: false },
-      ).catch(() => undefined);
+      await pi({
+        op: "sendFailed",
+        conversationId: request.conversationId,
+        requestId: request.requestId,
+        message,
+      }).catch(() => undefined);
     };
     if (status.state === "reconciliation_required") {
       await tell(
@@ -1914,18 +1918,60 @@ export class StellaRuntimeHost {
       return;
     }
     try {
-      await this.requestWorker(
-        METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
-        { ...request, send: { ...send, followSender: true } },
-        { ensureWorker: true, recordActivity: true },
+      // Where it was placed may have put it in the conversation before failing.
+      const known = (await pi({
+        op: "journaled",
+        conversationId: request.conversationId,
+        requestId: request.requestId,
+      }).catch(() => undefined)) as { journaled?: boolean } | undefined;
+      if (known?.journaled) return;
+      const here = await this.brainTarget(request.conversationId, send.storageMode);
+      if (!here) {
+        // Stella runs here now (the holder is gone): this computer answers.
+        await this.requestWorker(
+          METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
+          { ...request, send: { ...send, followSender: true } },
+          { ensureWorker: true, recordActivity: true },
+        );
+        return;
+      }
+      // The host holding Stella is up but did not answer it: the cloud
+      // answers it once without taking her over, as it does a phone's send
+      // that holder fails. The cloud journals it under its own id, which
+      // the app's pending message moves to.
+      const moved = await this.startPlacedChat(
+        {
+          conversationId: request.conversationId,
+          userPrompt: request.text,
+          requestId: request.requestId,
+          userMessageEventId: request.requestId,
+          idempotencyKey: `${request.requestId}:cloud`.slice(0, 128),
+          ...(typeof send.selectedText === "string" ? { selectedText: send.selectedText } : {}),
+          ...(send.chatContext && typeof send.chatContext === "object"
+            ? { chatContext: send.chatContext as RuntimeChatPayload["chatContext"] }
+            : {}),
+          ...(Array.isArray(send.attachments) && send.attachments.length
+            ? { attachments: send.attachments as RuntimeAttachmentRef[] }
+            : {}),
+          ...(send.locale ? { locale: send.locale } : {}),
+        },
+        { mode: "cloud" },
+        (ended) =>
+          void tell(
+            `Your message wasn't delivered: ${reason} Stella's cloud couldn't answer it either (${ended.errorMessage?.trim() || ended.state}).`,
+          ),
       );
+      await pi({
+        op: "sendMoved",
+        conversationId: request.conversationId,
+        requestId: request.requestId,
+        userMessageId: moved.userMessageId,
+      });
+      void pi({ op: "follow", conversationId: request.conversationId }).catch(() => undefined);
     } catch (error) {
-      console.warn(
-        "[pi-chat] A send where Stella runs did not take could not be answered here either.",
-        error,
-      );
+      console.warn("[pi-chat] A send where Stella runs did not take could not be answered elsewhere either.", error);
       await tell(
-        `Your message wasn't delivered: ${reason} Stella couldn't answer it on this computer either (${error instanceof Error ? error.message : String(error)}).`,
+        `Your message wasn't delivered: ${reason} It couldn't be answered elsewhere either (${error instanceof Error ? error.message : String(error)}).`,
       );
     }
   }

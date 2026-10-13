@@ -243,6 +243,13 @@ export function useStreamingChatCore({
     return onPiChatEvents(({ conversationId, events }) => {
       if (conversationId !== activeConversationId) return;
       for (const event of events) {
+        if (event.type === "send_moved") {
+          reconcileAcceptedUserMessage(event.requestId, event.userMessageId);
+          setPendingUserMessageId((current) =>
+            current === event.requestId ? event.userMessageId : current,
+          );
+          continue;
+        }
         if (event.type !== "send_failed") continue;
         clearOptimisticMessage(event.requestId);
         showToast({
@@ -252,7 +259,12 @@ export function useStreamingChatCore({
         });
       }
     });
-  }, [activeConversationId, clearOptimisticMessage]);
+  }, [
+    activeConversationId,
+    clearOptimisticMessage,
+    reconcileAcceptedUserMessage,
+    setPendingUserMessageId,
+  ]);
 
   const drainQueuedMessagesIfIdle = useCallback(() => {
     if (!activeConversationId) return;

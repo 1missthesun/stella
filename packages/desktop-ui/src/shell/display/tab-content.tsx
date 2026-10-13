@@ -290,15 +290,17 @@ const DelimitedTableView = ({
                 t("shell.display.spreadsheet.eyebrow")}
             </div>
           </div>
-          <div className="display-file-preview__actions">
-            <button type="button" onClick={handleSave}>
-              {t("shell.display.filePreview.save")}
-            </button>
-            <button type="button" onClick={handleCopy}>
-              {t("shell.display.filePreview.copy")}
-            </button>
-            {actionStatus && <span>{actionStatus}</span>}
-          </div>
+          {missing ? null : (
+            <div className="display-file-preview__actions">
+              <button type="button" onClick={handleSave}>
+                {t("shell.display.filePreview.save")}
+              </button>
+              <button type="button" onClick={handleCopy}>
+                {t("shell.display.filePreview.copy")}
+              </button>
+              {actionStatus && <span>{actionStatus}</span>}
+            </div>
+          )}
         </header>
         {error || parsed?.error ? (
           <PreviewProblem
@@ -457,15 +459,17 @@ const MarkdownView = ({
                 t("shell.display.markdown.eyebrow")}
             </div>
           </div>
-          <div className="display-file-preview__actions">
-            <button type="button" onClick={handleSave}>
-              {t("shell.display.filePreview.save")}
-            </button>
-            <button type="button" onClick={handleCopy}>
-              {t("shell.display.filePreview.copy")}
-            </button>
-            {actionStatus && <span>{actionStatus}</span>}
-          </div>
+          {missing ? null : (
+            <div className="display-file-preview__actions">
+              <button type="button" onClick={handleSave}>
+                {t("shell.display.filePreview.save")}
+              </button>
+              <button type="button" onClick={handleCopy}>
+                {t("shell.display.filePreview.copy")}
+              </button>
+              {actionStatus && <span>{actionStatus}</span>}
+            </div>
+          )}
         </header>
         <div className="display-markdown-viewer">
           {error || parsed?.error ? (

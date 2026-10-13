@@ -192,6 +192,7 @@ function PdfViewerCardContent({
         ) : null
       }
       actionStatus={actionStatus}
+      hideActions={Boolean(fileError) && fileMissing}
       onSave={handleSave}
       onCopy={handleCopy}
     >

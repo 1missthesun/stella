@@ -10,6 +10,7 @@ type FilePreviewCardShellProps = {
   titlePath: string;
   meta?: ReactNode;
   actionStatus?: string | null;
+  hideActions?: boolean;
   onSave: () => void;
   onCopy: () => void;
   children: ReactNode;
@@ -23,6 +24,7 @@ export function FilePreviewCardShell({
   titlePath,
   meta,
   actionStatus,
+  hideActions = false,
   onSave,
   onCopy,
   children,
@@ -42,27 +44,29 @@ export function FilePreviewCardShell({
           </div>
         </div>
         {meta}
-        <div className="file-preview-card__actions">
-          <button
-            type="button"
-            className="file-preview-card__action"
-            onClick={onSave}
-          >
-            {t("app.chat.filePreview.save")}
-          </button>
-          <button
-            type="button"
-            className="file-preview-card__action"
-            onClick={onCopy}
-          >
-            {t("app.chat.filePreview.copy")}
-          </button>
-          {actionStatus ? (
-            <span className="file-preview-card__action-status">
-              {actionStatus}
-            </span>
-          ) : null}
-        </div>
+        {hideActions ? null : (
+          <div className="file-preview-card__actions">
+            <button
+              type="button"
+              className="file-preview-card__action"
+              onClick={onSave}
+            >
+              {t("app.chat.filePreview.save")}
+            </button>
+            <button
+              type="button"
+              className="file-preview-card__action"
+              onClick={onCopy}
+            >
+              {t("app.chat.filePreview.copy")}
+            </button>
+            {actionStatus ? (
+              <span className="file-preview-card__action-status">
+                {actionStatus}
+              </span>
+            ) : null}
+          </div>
+        )}
       </header>
       {children}
     </section>

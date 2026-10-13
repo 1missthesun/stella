@@ -19,7 +19,7 @@ import type {
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import { STELLA_DEFAULT_MODEL } from "@stella/contracts/stella-api";
 import { listStellaCatalogModels } from "@stella/model-catalog/aliases";
-import { decryptToken, encryptToken } from "./crypto.js";
+import { decryptToken } from "./crypto.js";
 
 const d1 = (env: Cloudflare.Env): D1Database => {
   if (!env.DB) throw new Error("The DB binding is missing.");
@@ -40,10 +40,22 @@ export const ENGINE_LABELS: Record<SlackWorkspaceEngine, string> = {
   "claude-code": "Claude Code",
 };
 
+export type SlackGithubStatus = "active" | "suspended" | "revoked";
+
+export type SlackGithubConnection = {
+  installationId: string;
+  account: string;
+  accountType: string;
+  status: SlackGithubStatus;
+};
+
 export type SlackRepoSettings = {
+  teamId: string;
   fullName: string;
   branch: string;
-  token: string | null;
+  /** A token pasted before GitHub connections existed. */
+  legacyToken: string | null;
+  github: SlackGithubConnection | null;
 };
 
 export type SlackWorkspaceSettings = {
@@ -52,6 +64,7 @@ export type SlackWorkspaceSettings = {
   model: string;
   effort: ReasoningEffortLevel;
   slackCommands: boolean;
+  github: SlackGithubConnection | null;
   repo: { fullName: string; branch: string; hasToken: boolean } | null;
 };
 
@@ -64,7 +77,32 @@ type SettingsRow = {
   repo_full_name: string | null;
   repo_branch: string | null;
   repo_token_enc: string | null;
+  github_installation_id: string | null;
+  github_account: string | null;
+  github_account_type: string | null;
+  github_status: string | null;
 };
+
+const isGithubStatus = (value: unknown): value is SlackGithubStatus =>
+  value === "active" || value === "suspended" || value === "revoked";
+
+const githubFromRow = (row: Pick<
+  SettingsRow,
+  "github_installation_id" | "github_account" | "github_account_type" | "github_status"
+>): SlackGithubConnection | null =>
+  row.github_installation_id
+    ? {
+        installationId: row.github_installation_id,
+        account: row.github_account ?? "",
+        accountType: row.github_account_type ?? "",
+        status: isGithubStatus(row.github_status) ? row.github_status : "active",
+      }
+    : null;
+
+/** Whether the connection's account owns `fullName`, so the App can mint for it. */
+export const repoOwnedBy = (github: SlackGithubConnection | null, fullName: string): boolean =>
+  Boolean(github?.account) &&
+  fullName.split("/")[0]!.toLowerCase() === github!.account.toLowerCase();
 
 const defaults = (teamId: string): SlackWorkspaceSettings => ({
   teamId,
@@ -72,6 +110,7 @@ const defaults = (teamId: string): SlackWorkspaceSettings => ({
   model: STELLA_DEFAULT_MODEL,
   effort: DEFAULT_REASONING_EFFORT,
   slackCommands: true,
+  github: null,
   repo: null,
 });
 
@@ -88,6 +127,7 @@ const fromRow = (row: SettingsRow): SlackWorkspaceSettings => ({
   model: row.model || STELLA_DEFAULT_MODEL,
   effort: isEffort(row.effort) ? row.effort : DEFAULT_REASONING_EFFORT,
   slackCommands: row.slack_commands !== 0,
+  github: githubFromRow(row),
   repo: row.repo_full_name
     ? {
         fullName: row.repo_full_name,
@@ -113,7 +153,9 @@ export type SettingsPatch = {
   model?: string;
   effort?: ReasoningEffortLevel;
   slackCommands?: boolean;
-  repo?: { fullName: string; branch: string; token?: string } | null;
+  /** `dropToken` forgets a pasted token; a changed repository always does. */
+  repo?: { fullName: string; branch: string; dropToken?: boolean } | null;
+  github?: SlackGithubConnection | null;
 };
 
 export const saveWorkspaceSettings = async (
@@ -143,24 +185,23 @@ export const saveWorkspaceSettings = async (
     repoBranch = null;
     repoToken = null;
   } else if (patch.repo) {
-    if (patch.repo.fullName !== repoName) repoToken = null;
+    if (patch.repo.fullName !== repoName || patch.repo.dropToken) repoToken = null;
     repoName = patch.repo.fullName;
     repoBranch = patch.repo.branch;
-    if (patch.repo.token !== undefined) {
-      repoToken = patch.repo.token
-        ? await encryptToken(env, patch.repo.token)
-        : null;
-    }
   }
+  const github = patch.github === undefined ? current.github : patch.github;
   await d1(env)
     .prepare(
       `INSERT INTO slack_workspace_settings
-         (team_id, engine, model, effort, slack_commands, repo_full_name, repo_branch, repo_token_enc, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+         (team_id, engine, model, effort, slack_commands, repo_full_name, repo_branch, repo_token_enc,
+          github_installation_id, github_account, github_account_type, github_status, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (team_id) DO UPDATE SET
          engine = excluded.engine, model = excluded.model, effort = excluded.effort,
          slack_commands = excluded.slack_commands, repo_full_name = excluded.repo_full_name,
          repo_branch = excluded.repo_branch, repo_token_enc = excluded.repo_token_enc,
+         github_installation_id = excluded.github_installation_id, github_account = excluded.github_account,
+         github_account_type = excluded.github_account_type, github_status = excluded.github_status,
          updated_at = excluded.updated_at`,
     )
     .bind(
@@ -172,6 +213,10 @@ export const saveWorkspaceSettings = async (
       repoName,
       repoBranch,
       repoToken,
+      github?.installationId ?? null,
+      github?.account ?? null,
+      github?.accountType ?? null,
+      github?.status ?? null,
       Date.now(),
     )
     .run();
@@ -188,48 +233,56 @@ export const deleteWorkspaceSettings = async (
     .run();
 };
 
-/** The repository a Slack conversation's agents start with, token unsealed. */
+/** The repository a Slack conversation's agents start with, with how to reach it. */
 export const repoForConversation = async (
   env: Cloudflare.Env,
   conversationId: string,
 ): Promise<SlackRepoSettings | null> => {
   const row = await d1(env)
     .prepare(
-      `SELECT s.repo_full_name, s.repo_branch, s.repo_token_enc
+      `SELECT s.team_id, s.repo_full_name, s.repo_branch, s.repo_token_enc, s.github_installation_id,
+              s.github_account, s.github_account_type, s.github_status
        FROM slack_threads t JOIN slack_workspace_settings s ON s.team_id = t.team_id
        WHERE t.conversation_id = ? AND s.repo_full_name IS NOT NULL LIMIT 1`,
     )
     .bind(conversationId)
-    .first<{
-      repo_full_name: string;
-      repo_branch: string | null;
-      repo_token_enc: string | null;
-    }>();
+    .first<
+      Pick<
+        SettingsRow,
+        | "team_id"
+        | "repo_branch"
+        | "repo_token_enc"
+        | "github_installation_id"
+        | "github_account"
+        | "github_account_type"
+        | "github_status"
+      > & { repo_full_name: string }
+    >();
   if (!row) return null;
   return {
+    teamId: row.team_id,
     fullName: row.repo_full_name,
     branch: row.repo_branch ?? "",
-    token: row.repo_token_enc
+    legacyToken: row.repo_token_enc
       ? await decryptToken(env, row.repo_token_enc).catch(() => null)
       : null,
+    github: githubFromRow(row),
   };
 };
 
-/** The saved read-only token for a workspace's repository, unsealed. */
-export const savedRepoToken = async (
+/** Record what GitHub said about an installation on every workspace using it. */
+export const setGithubStatus = async (
   env: Cloudflare.Env,
-  teamId: string,
-  fullName: string,
-): Promise<string | null> => {
-  const row = await d1(env)
+  installationId: string,
+  status: SlackGithubStatus,
+): Promise<number> => {
+  const result = await d1(env)
     .prepare(
-      "SELECT repo_token_enc FROM slack_workspace_settings WHERE team_id = ? AND repo_full_name = ?",
+      "UPDATE slack_workspace_settings SET github_status = ?, updated_at = ? WHERE github_installation_id = ? AND github_status IS NOT ?",
     )
-    .bind(teamId, fullName)
-    .first<{ repo_token_enc: string | null }>();
-  return row?.repo_token_enc
-    ? await decryptToken(env, row.repo_token_enc).catch(() => null)
-    : null;
+    .bind(status, Date.now(), installationId, status)
+    .run();
+  return result.meta.changes ?? 0;
 };
 
 /** The execution a workspace's turns run on. */

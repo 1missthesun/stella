@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { ArrowUpRight, Check, GitBranch, Lock, Plus } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { AlertTriangle, ArrowUpRight, Check, GitBranch, Globe, Lock, Plus } from "lucide-react";
 import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import {
+  SLACK_GITHUB_ERROR_PARAM,
+  SLACK_GITHUB_RESULT_PARAM,
   SLACK_INSTALL_RESULT_PARAM,
   SLACK_MEMORY_MAX_CHARS,
   SLACK_RULES_MAX_CHARS,
+  type SlackGithubInstallationChoice,
+  type SlackGithubRepoOption,
   type SlackInstallResult,
   type SlackWorkspace,
   type SlackWorkspaceEngine,
@@ -17,7 +21,16 @@ import {
 import { openSignInDialog } from "@/components/auth/sign-in-dialog";
 import { authClient } from "@/lib/auth-client";
 import { isBackendConfigured } from "@/lib/backend-url";
-import { listSlackWorkspaces, startSlackInstall, updateSlackWorkspace } from "./slack-api";
+import {
+  connectGithub,
+  disconnectGithub,
+  finishGithub,
+  listGithubBranches,
+  listGithubRepos,
+  listSlackWorkspaces,
+  startSlackInstall,
+  updateSlackWorkspace,
+} from "./slack-api";
 import { readMockMode, type SlackMockMode } from "./slack-mock";
 import s from "./slack.module.css";
 
@@ -31,6 +44,14 @@ const EFFORT_LABELS: Record<ReasoningEffortLevel, string> = {
 
 const REPO_PATTERN = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 
+const normalizeRepo = (value: string): string =>
+  value
+    .trim()
+    .replace(/^https?:\/\/(?:www\.)?github\.com\//i, "")
+    .replace(/^git@github\.com:/i, "")
+    .replace(/\.git$/i, "")
+    .replace(/\/+$/, "");
+
 const installedDate = new Intl.DateTimeFormat("en-US", {
   month: "long",
   day: "numeric",
@@ -43,14 +64,27 @@ const isInstallResult = (value: string | null): value is SlackInstallResult =>
 const errorText = (error: unknown): string =>
   error instanceof Error && error.message ? error.message : "Something went wrong. Try again.";
 
-type Boot = { mock: SlackMockMode | null; result: SlackInstallResult | null };
+/** What GitHub handed back after "Connect GitHub" for one workspace. */
+type GithubReturn = { teamId: string; code: string | null; error: string | null };
+
+type Boot = { mock: SlackMockMode | null; result: SlackInstallResult | null; github: GithubReturn | null };
 
 let bootSnapshot: Boot | null = null;
 
+const RETURN_PARAMS = [SLACK_INSTALL_RESULT_PARAM, SLACK_GITHUB_RESULT_PARAM, SLACK_GITHUB_ERROR_PARAM, "team"];
+
 const readBoot = (): Boot => {
   if (!bootSnapshot) {
-    const raw = new URL(window.location.href).searchParams.get(SLACK_INSTALL_RESULT_PARAM);
-    bootSnapshot = { mock: readMockMode(), result: isInstallResult(raw) ? raw : null };
+    const params = new URL(window.location.href).searchParams;
+    const raw = params.get(SLACK_INSTALL_RESULT_PARAM);
+    const code = params.get(SLACK_GITHUB_RESULT_PARAM);
+    const error = params.get(SLACK_GITHUB_ERROR_PARAM);
+    const teamId = params.get("team");
+    bootSnapshot = {
+      mock: readMockMode(),
+      result: isInstallResult(raw) ? raw : null,
+      github: teamId && (code || error) ? { teamId, code, error } : null,
+    };
   }
   return bootSnapshot;
 };
@@ -62,17 +96,17 @@ export function SlackClient() {
 
   useEffect(() => {
     const url = new URL(window.location.href);
-    if (!url.searchParams.has(SLACK_INSTALL_RESULT_PARAM)) return;
-    url.searchParams.delete(SLACK_INSTALL_RESULT_PARAM);
+    if (!RETURN_PARAMS.some((name) => url.searchParams.has(name))) return;
+    for (const name of RETURN_PARAMS) url.searchParams.delete(name);
     window.history.replaceState(null, "", url.toString());
   }, []);
 
   let body;
   if (boot === null) body = <Loading />;
-  else if (boot.mock) body = <Account installResult={boot.result} />;
+  else if (boot.mock) body = <Account installResult={boot.result} githubReturn={boot.github} />;
   else if (!isBackendConfigured())
     body = <Notice title="Not available here">This build of the site isn&apos;t connected to Stella.</Notice>;
-  else body = <SessionGate installResult={boot.result} />;
+  else body = <SessionGate installResult={boot.result} githubReturn={boot.github} />;
 
   return (
     <>
@@ -115,12 +149,18 @@ function Notice({ title, children }: { title: string; children: React.ReactNode 
   );
 }
 
-function SessionGate({ installResult }: { installResult: SlackInstallResult | null }) {
+function SessionGate({
+  installResult,
+  githubReturn,
+}: {
+  installResult: SlackInstallResult | null;
+  githubReturn: GithubReturn | null;
+}) {
   const session = authClient.useSession();
   if (session.isPending) return <Loading />;
   const user = (session.data as { user?: { id?: string; isAnonymous?: boolean | null } } | null)?.user;
   if (!user || user.isAnonymous) return <SignedOut installResult={installResult} />;
-  return <Account key={user.id ?? "user"} installResult={installResult} />;
+  return <Account key={user.id ?? "user"} installResult={installResult} githubReturn={githubReturn} />;
 }
 
 function SignedOut({ installResult }: { installResult: SlackInstallResult | null }) {
@@ -162,7 +202,13 @@ function InstallBanner({ result }: { result: SlackInstallResult }) {
   );
 }
 
-function Account({ installResult }: { installResult: SlackInstallResult | null }) {
+function Account({
+  installResult,
+  githubReturn,
+}: {
+  installResult: SlackInstallResult | null;
+  githubReturn: GithubReturn | null;
+}) {
   const [data, setData] = useState<SlackWorkspacesResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [installing, setInstalling] = useState(false);
@@ -280,6 +326,8 @@ function Account({ installResult }: { installResult: SlackInstallResult | null }
               key={workspace.teamId}
               workspace={workspace}
               options={data.options}
+              githubAvailable={data.githubAvailable}
+              githubReturn={githubReturn?.teamId === workspace.teamId ? githubReturn : null}
               onUpdated={replaceWorkspace}
             />
           ))}
@@ -300,8 +348,6 @@ type Draft = {
   slackCommands: boolean;
   repoName: string;
   repoBranch: string;
-  repoToken: string;
-  removeToken: boolean;
   rules: string;
   memory: string;
 };
@@ -313,8 +359,6 @@ const draftFrom = (w: SlackWorkspace): Draft => ({
   slackCommands: w.slackCommands,
   repoName: w.repo?.fullName ?? "",
   repoBranch: w.repo?.branch ?? "",
-  repoToken: "",
-  removeToken: false,
   rules: w.rules,
   memory: w.memory,
 });
@@ -329,15 +373,8 @@ const diff = (w: SlackWorkspace, d: Draft): SlackWorkspaceUpdate => {
   if (d.memory !== w.memory) update.memory = d.memory;
   const name = d.repoName.trim();
   const branch = d.repoBranch.trim();
-  const token = d.repoToken.trim();
   if (name) {
-    const changed =
-      !w.repo || name !== w.repo.fullName || branch !== w.repo.branch || token !== "" || d.removeToken;
-    if (changed) {
-      update.repo = { fullName: name, branch };
-      if (token) update.repo.token = token;
-      else if (d.removeToken) update.repo.token = "";
-    }
+    if (!w.repo || name !== w.repo.fullName || branch !== w.repo.branch) update.repo = { fullName: name, branch };
   } else if (w.repo) {
     update.repo = null;
   }
@@ -347,10 +384,14 @@ const diff = (w: SlackWorkspace, d: Draft): SlackWorkspaceUpdate => {
 function WorkspaceCard({
   workspace,
   options,
+  githubAvailable,
+  githubReturn,
   onUpdated,
 }: {
   workspace: SlackWorkspace;
   options: SlackWorkspaceOptions;
+  githubAvailable: boolean;
+  githubReturn: GithubReturn | null;
   onUpdated: (workspace: SlackWorkspace) => void;
 }) {
   const [draft, setDraft] = useState<Draft>(() => draftFrom(workspace));
@@ -407,14 +448,24 @@ function WorkspaceCard({
 
   const disconnectRepo = () => {
     if (!workspace.repo) {
-      setDraft((current) => ({ ...current, repoName: "", repoBranch: "", repoToken: "", removeToken: false }));
+      setDraft((current) => ({ ...current, repoName: "", repoBranch: "" }));
       return;
     }
     if (!window.confirm(`Disconnect ${workspace.repo.fullName}? New agents in this workspace will start without it.`)) return;
     void commit({ repo: null });
   };
 
-  const tokenSaved = Boolean(workspace.repo?.hasToken) && !draft.removeToken;
+  const githubChanged = useCallback(
+    (next: SlackWorkspace) => {
+      onUpdated(next);
+      setDraft((current) => ({
+        ...current,
+        repoName: next.repo?.fullName ?? "",
+        repoBranch: next.repo?.branch ?? "",
+      }));
+    },
+    [onUpdated],
+  );
 
   return (
     <article className={s.workspace}>
@@ -519,80 +570,22 @@ function WorkspaceCard({
         </button>
       </section>
 
-      <section className={s.panel}>
-        <div className={s.panelHead}>
-          <p className={s.cardEyebrow}>
-            <GitBranch size={13} aria-hidden="true" /> GitHub repository
-          </p>
-          <p className={s.panelLede}>
-            Every agent Stella starts in this workspace begins with this repository cloned in.
-          </p>
-        </div>
-        <div className={s.row}>
-          <label className={s.field}>
-            <span className={s.label}>Repository</span>
-            <input
-              className={s.input}
-              value={draft.repoName}
-              onChange={(event) => set("repoName", event.target.value)}
-              placeholder="owner/name"
-              spellCheck={false}
-              autoComplete="off"
-              aria-invalid={repoInvalid || undefined}
-            />
-            {repoInvalid ? <span className={s.fieldError}>Use the form owner/name.</span> : null}
-          </label>
-          <label className={s.field}>
-            <span className={s.label}>Branch</span>
-            <input
-              className={s.input}
-              value={draft.repoBranch}
-              onChange={(event) => set("repoBranch", event.target.value)}
-              placeholder="Default branch"
-              spellCheck={false}
-              autoComplete="off"
-            />
-          </label>
-        </div>
-        <label className={s.field}>
-          <span className={s.label}>Access token, for private repositories</span>
-          <input
-            className={s.input}
-            type="password"
-            value={draft.repoToken}
-            onChange={(event) => set("repoToken", event.target.value)}
-            placeholder={tokenSaved ? "Token saved. Paste a new one to replace it" : "github_pat_…"}
-            spellCheck={false}
-            autoComplete="off"
-            disabled={!repoName}
-          />
-          <span className={s.hint}>
-            A fine-grained token with read-only access to Contents on this repository.
-          </span>
-        </label>
-        <div className={s.repoFoot}>
-          {tokenSaved && !draft.repoToken ? (
-            <span className={s.tokenSaved}>
-              <Lock size={13} aria-hidden="true" /> Token saved
-              <button type="button" className={s.linkButton} onClick={() => set("removeToken", true)}>
-                Remove
-              </button>
-            </span>
-          ) : draft.removeToken ? (
-            <span className={s.tokenSaved}>
-              Token will be removed
-              <button type="button" className={s.linkButton} onClick={() => set("removeToken", false)}>
-                Keep it
-              </button>
-            </span>
-          ) : null}
-          {workspace.repo || draft.repoName ? (
-            <button type="button" className={s.linkButton} onClick={disconnectRepo} disabled={saving}>
-              Disconnect repository
-            </button>
-          ) : null}
-        </div>
-      </section>
+      <GithubPanel
+        workspace={workspace}
+        available={githubAvailable}
+        githubReturn={githubReturn}
+        repoName={draft.repoName}
+        repoBranch={draft.repoBranch}
+        dirty={dirty}
+        saving={saving}
+        onRepo={(repoName, repoBranch) => {
+          setSavedAt(null);
+          setDraft((current) => ({ ...current, repoName, repoBranch }));
+        }}
+        onBranch={(branch) => set("repoBranch", branch)}
+        onDisconnectRepo={disconnectRepo}
+        onWorkspace={githubChanged}
+      />
 
       <section className={s.panel}>
         <div className={s.panelHead}>
@@ -663,6 +656,496 @@ function WorkspaceCard({
         </div>
       </div>
     </article>
+  );
+}
+
+type Loaded<T> = { key: string } & ({ value: T } | { message: string });
+
+/** The result for `key`, or loading while the latest result is for another key. */
+const loadable = <T,>(key: string | null, loaded: Loaded<T> | null) =>
+  !key
+    ? ({ state: "idle" } as const)
+    : !loaded || loaded.key !== key
+      ? ({ state: "loading" } as const)
+      : "value" in loaded
+        ? ({ state: "ready", value: loaded.value } as const)
+        : ({ state: "error", message: loaded.message } as const);
+
+function GithubPanel({
+  workspace,
+  available,
+  githubReturn,
+  repoName,
+  repoBranch,
+  dirty,
+  saving,
+  onRepo,
+  onBranch,
+  onDisconnectRepo,
+  onWorkspace,
+}: {
+  workspace: SlackWorkspace;
+  available: boolean;
+  githubReturn: GithubReturn | null;
+  repoName: string;
+  repoBranch: string;
+  dirty: boolean;
+  saving: boolean;
+  onRepo: (repoName: string, repoBranch: string) => void;
+  onBranch: (branch: string) => void;
+  onDisconnectRepo: () => void;
+  onWorkspace: (workspace: SlackWorkspace) => void;
+}) {
+  const teamId = workspace.teamId;
+  const github = workspace.github;
+  const active = github?.status === "active";
+  const [busy, setBusy] = useState<"connect" | "finish" | "disconnect" | null>(
+    githubReturn?.code ? "finish" : null,
+  );
+  const [error, setError] = useState<string | null>(githubReturn?.error ?? null);
+  const [choices, setChoices] = useState<SlackGithubInstallationChoice[] | null>(null);
+  const [reposKey, setReposKey] = useState(0);
+  const [reposLoaded, setReposLoaded] = useState<Loaded<SlackGithubRepoOption[]> | null>(null);
+  const reposFor = active ? `${teamId}:${reposKey}` : null;
+  const repos = loadable(reposFor, reposLoaded);
+  const finishing = useRef(false);
+
+  const finish = useCallback(
+    async (installationId?: string) => {
+      if (!githubReturn?.code) return;
+      setBusy("finish");
+      setError(null);
+      try {
+        const result = await finishGithub(teamId, githubReturn.code, installationId);
+        if ("choices" in result) setChoices(result.choices);
+        else {
+          setChoices(null);
+          onWorkspace(result.workspace);
+          setReposKey((key) => key + 1);
+        }
+      } catch (failure) {
+        setError(errorText(failure));
+      } finally {
+        setBusy(null);
+      }
+    },
+    [githubReturn, onWorkspace, teamId],
+  );
+
+  useEffect(() => {
+    if (!githubReturn?.code || finishing.current) return;
+    finishing.current = true;
+    void finish();
+  }, [finish, githubReturn]);
+
+  useEffect(() => {
+    if (!reposFor) return;
+    let cancelled = false;
+    listGithubRepos(teamId).then(
+      ({ repos: value }) => {
+        if (!cancelled) setReposLoaded({ key: reposFor, value });
+      },
+      (failure) => {
+        if (!cancelled) setReposLoaded({ key: reposFor, message: errorText(failure) });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [reposFor, teamId]);
+
+  const connect = async () => {
+    if (dirty && !window.confirm("Connecting GitHub leaves this page. Discard your unsaved changes?")) return;
+    setBusy("connect");
+    setError(null);
+    try {
+      const returnTo = new URL(window.location.pathname, window.location.origin);
+      const mock = new URL(window.location.href).searchParams.get("mock");
+      if (mock) returnTo.searchParams.set("mock", mock);
+      const { url } = await connectGithub(teamId, returnTo.toString());
+      window.location.assign(url);
+    } catch (failure) {
+      setError(errorText(failure));
+      setBusy(null);
+    }
+  };
+
+  const disconnect = async () => {
+    if (!github) return;
+    const repoGoes = workspace.repo?.access === "github";
+    const message = repoGoes
+      ? `Disconnect GitHub (${github.account})? ${workspace.repo!.fullName} is removed too, so new agents start without it.`
+      : `Disconnect GitHub (${github.account})?`;
+    if (!window.confirm(message)) return;
+    setBusy("disconnect");
+    setError(null);
+    try {
+      onWorkspace((await disconnectGithub(teamId)).workspace);
+    } catch (failure) {
+      setError(errorText(failure));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const repoOptions = repos.state === "ready" ? repos.value : [];
+  const chosen = repoOptions.find((repo) => repo.fullName.toLowerCase() === repoName.toLowerCase());
+
+  return (
+    <section className={s.panel}>
+      <div className={s.panelHead}>
+        <p className={s.cardEyebrow}>
+          <GitBranch size={13} aria-hidden="true" /> GitHub repository
+        </p>
+        <p className={s.panelLede}>
+          Every agent Stella starts in this workspace begins with this repository cloned in. Stella
+          only ever gets read access.
+        </p>
+      </div>
+
+      {available ? (
+        github && !active ? (
+          <div className={`${s.callout} ${s.callout_warn}`} role="status">
+            <AlertTriangle size={17} aria-hidden="true" />
+            <div className={s.calloutBody}>
+              <p className={s.calloutTitle}>
+                {github.status === "suspended"
+                  ? `GitHub access is suspended on ${github.account}`
+                  : `Stella lost access to GitHub (${github.account})`}
+              </p>
+              <p className={s.calloutText}>
+                {github.status === "suspended"
+                  ? "Someone suspended Stella for Slack on GitHub. Unsuspend it there, or reconnect with another account."
+                  : "Stella for Slack was uninstalled or its access was removed. Reconnect to keep cloning private repositories."}
+              </p>
+            </div>
+            <div className={s.calloutActions}>
+              <button type="button" className={s.primary} onClick={() => void connect()} disabled={busy !== null}>
+                {busy === "connect" ? "Opening GitHub…" : "Reconnect GitHub"}
+              </button>
+              <button type="button" className={s.linkButton} onClick={() => void disconnect()} disabled={busy !== null}>
+                Disconnect
+              </button>
+            </div>
+          </div>
+        ) : github ? (
+          <div className={s.githubBar}>
+            <span className={s.githubAccount}>
+              <GithubMark />
+              <span>
+                Connected to <strong>{github.account}</strong>
+              </span>
+            </span>
+            <span className={s.githubLinks}>
+              <a className={s.linkButton} href={github.manageUrl} target="_blank" rel="noopener noreferrer">
+                Choose repositories on GitHub
+              </a>
+              <button type="button" className={s.linkButton} onClick={() => setReposKey((key) => key + 1)} disabled={busy !== null}>
+                Refresh list
+              </button>
+              <button type="button" className={s.linkButton} onClick={() => void disconnect()} disabled={busy !== null}>
+                {busy === "disconnect" ? "Disconnecting…" : "Disconnect"}
+              </button>
+            </span>
+          </div>
+        ) : (
+          <div className={s.githubConnect}>
+            <div>
+              <p className={s.githubConnectTitle}>Connect GitHub to use private repositories</p>
+              <p className={s.hint}>
+                You choose which repositories Stella can see. She gets short-lived, read-only access when
+                an agent starts, and never a token you have to paste.
+              </p>
+            </div>
+            <button type="button" className={s.githubButton} onClick={() => void connect()} disabled={busy !== null}>
+              <GithubMark />
+              {busy === "connect" ? "Opening GitHub…" : busy === "finish" ? "Connecting…" : "Connect GitHub"}
+            </button>
+          </div>
+        )
+      ) : null}
+
+      {choices ? (
+        <div className={s.choices} role="group" aria-label="Choose a GitHub account">
+          <p className={s.label}>Which GitHub account should Stella use?</p>
+          {choices.map((choice) => (
+            <button
+              key={choice.installationId}
+              type="button"
+              className={s.choice}
+              onClick={() => void finish(choice.installationId)}
+              disabled={busy !== null}
+            >
+              <GithubMark />
+              <span className={s.choiceName}>{choice.account || `Installation ${choice.installationId}`}</span>
+              <span className={s.choiceType}>{choice.accountType === "Organization" ? "Organization" : "Personal"}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      {error ? <p className={`${s.banner} ${s.banner_error}`}>{error}</p> : null}
+
+      <div className={s.row}>
+        <div className={s.field}>
+          <span className={s.label}>Repository</span>
+          <RepoPicker
+            value={repoName}
+            repos={repoOptions}
+            loading={repos.state === "loading"}
+            connected={active}
+            onChange={(fullName) => onRepo(fullName, "")}
+          />
+          {repos.state === "error" ? <span className={s.fieldError}>{repos.message}</span> : null}
+        </div>
+        <label className={s.field}>
+          <span className={s.label}>Branch</span>
+          <BranchPicker
+            teamId={teamId}
+            repo={REPO_PATTERN.test(repoName) ? repoName : ""}
+            defaultHint={chosen?.defaultBranch ?? ""}
+            value={repoBranch}
+            onChange={onBranch}
+          />
+        </label>
+      </div>
+
+      <div className={s.repoFoot}>
+        {workspace.repo?.access === "token" && repoName === workspace.repo.fullName ? (
+          <span className={s.repoNote}>
+            <Lock size={13} aria-hidden="true" /> Uses an access token saved earlier.
+            {available ? " Connect GitHub and pick the repository again to replace it." : null}
+          </span>
+        ) : workspace.repo?.access === "public" && repoName === workspace.repo.fullName ? (
+          <span className={s.repoNote}>
+            <Globe size={13} aria-hidden="true" /> Cloned as a public repository.
+          </span>
+        ) : workspace.repo?.access === "github" && repoName === workspace.repo.fullName ? (
+          <span className={s.repoNote}>
+            <Check size={13} aria-hidden="true" /> Cloned with read-only access through GitHub.
+          </span>
+        ) : <span />}
+        {workspace.repo || repoName ? (
+          <button type="button" className={s.linkButton} onClick={onDisconnectRepo} disabled={saving}>
+            Remove repository
+          </button>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+const MAX_SHOWN = 60;
+
+function RepoPicker({
+  value,
+  repos,
+  loading,
+  connected,
+  onChange,
+}: {
+  value: string;
+  repos: SlackGithubRepoOption[];
+  loading: boolean;
+  connected: boolean;
+  onChange: (fullName: string) => void;
+}) {
+  const listId = useId();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [cursor, setCursor] = useState(0);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const typed = normalizeRepo(query);
+  const needle = typed.toLowerCase();
+  const matches = needle ? repos.filter((repo) => repo.fullName.toLowerCase().includes(needle)) : repos;
+  const shown = matches.slice(0, MAX_SHOWN);
+  const publicOption =
+    REPO_PATTERN.test(typed) && !repos.some((repo) => repo.fullName.toLowerCase() === needle) ? typed : null;
+  const items: Array<{ fullName: string; repo?: SlackGithubRepoOption }> = [
+    ...shown.map((repo) => ({ fullName: repo.fullName, repo })),
+    ...(publicOption ? [{ fullName: publicOption }] : []),
+  ];
+
+  const pick = (fullName: string) => {
+    onChange(fullName);
+    setOpen(false);
+    setQuery("");
+    inputRef.current?.blur();
+  };
+
+  const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setOpen(true);
+      setCursor((index) => Math.min(index + 1, items.length - 1));
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setCursor((index) => Math.max(index - 1, 0));
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      const item = items[cursor];
+      if (open && item) pick(item.fullName);
+    } else if (event.key === "Escape") {
+      setOpen(false);
+      setQuery("");
+    }
+  };
+
+  const placeholder = connected
+    ? loading
+      ? "Loading repositories…"
+      : "Search repositories, or type owner/name"
+    : "owner/name of a public repository";
+
+  return (
+    <div className={s.combo}>
+      <input
+        ref={inputRef}
+        className={`${s.input} ${s.comboInput}`}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={open && items[cursor] ? `${listId}-${cursor}` : undefined}
+        value={open ? query : value}
+        placeholder={value || placeholder}
+        spellCheck={false}
+        autoComplete="off"
+        onFocus={() => {
+          setOpen(true);
+          setQuery("");
+          setCursor(0);
+        }}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        onChange={(event) => {
+          setQuery(event.target.value);
+          setCursor(0);
+          setOpen(true);
+        }}
+        onKeyDown={onKeyDown}
+      />
+      {open ? (
+        <ul className={s.comboList} id={listId} role="listbox">
+          {items.map((item, index) => (
+            <li
+              key={item.fullName}
+              id={`${listId}-${index}`}
+              role="option"
+              aria-selected={index === cursor}
+              className={s.comboOption}
+              data-active={index === cursor ? "" : undefined}
+              onMouseDown={(event) => {
+                event.preventDefault();
+                pick(item.fullName);
+              }}
+              onMouseEnter={() => setCursor(index)}
+            >
+              {item.repo ? (
+                <>
+                  {item.repo.private ? <Lock size={13} aria-hidden="true" /> : <Globe size={13} aria-hidden="true" />}
+                  <span className={s.comboName}>{item.repo.fullName}</span>
+                  {item.repo.fullName === value ? <Check size={14} aria-hidden="true" className={s.comboCheck} /> : null}
+                </>
+              ) : (
+                <>
+                  <Globe size={13} aria-hidden="true" />
+                  <span className={s.comboName}>
+                    Use public repository <strong>{item.fullName}</strong>
+                  </span>
+                </>
+              )}
+            </li>
+          ))}
+          {items.length === 0 ? (
+            <li className={s.comboEmpty}>
+              {connected
+                ? loading
+                  ? "Loading repositories…"
+                  : needle
+                    ? "No repository Stella can see matches. Type owner/name for a public one."
+                    : "Stella can't see any repositories yet. Choose some on GitHub."
+                : "Type owner/name, like vercel/next.js."}
+            </li>
+          ) : matches.length > MAX_SHOWN ? (
+            <li className={s.comboEmpty}>Type to see the other {matches.length - MAX_SHOWN}.</li>
+          ) : null}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
+function BranchPicker({
+  teamId,
+  repo,
+  defaultHint,
+  value,
+  onChange,
+}: {
+  teamId: string;
+  repo: string;
+  defaultHint: string;
+  value: string;
+  onChange: (branch: string) => void;
+}) {
+  const [loaded, setLoaded] = useState<Loaded<{ branches: string[]; defaultBranch: string }> | null>(null);
+  const branches = loadable(repo || null, loaded);
+
+  useEffect(() => {
+    if (!repo) return;
+    let cancelled = false;
+    listGithubBranches(teamId, repo).then(
+      (value) => {
+        if (!cancelled) setLoaded({ key: repo, value });
+      },
+      (failure) => {
+        if (!cancelled) setLoaded({ key: repo, message: errorText(failure) });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [repo, teamId]);
+
+  const ready = branches.state === "ready" ? branches.value : null;
+  const defaultBranch = ready?.defaultBranch || defaultHint;
+  const others = (ready?.branches ?? []).filter((branch) => branch !== defaultBranch);
+
+  return (
+    <>
+      <select
+        className={s.select}
+        value={value}
+        disabled={!repo || branches.state === "loading"}
+        onChange={(event) => onChange(event.target.value)}
+      >
+        <option value="">
+          {!repo
+            ? "Pick a repository first"
+            : branches.state === "loading"
+              ? "Loading branches…"
+              : defaultBranch
+                ? `${defaultBranch} (default)`
+                : "Default branch"}
+        </option>
+        {value && !others.includes(value) ? <option value={value}>{value}</option> : null}
+        {others.map((branch) => (
+          <option key={branch} value={branch}>
+            {branch}
+          </option>
+        ))}
+      </select>
+      {branches.state === "error" ? <span className={s.fieldError}>{branches.message}</span> : null}
+    </>
+  );
+}
+
+function GithubMark() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="currentColor">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+    </svg>
   );
 }
 

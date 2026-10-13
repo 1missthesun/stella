@@ -1,20 +1,27 @@
 "use client";
 
 import type {
+  SlackGithubBranchesResponse,
+  SlackGithubConnectResponse,
+  SlackGithubFinishResponse,
+  SlackGithubReposResponse,
   SlackInstallStartResponse,
   SlackWorkspace,
+  SlackWorkspaceGithub,
   SlackWorkspaceOptions,
   SlackWorkspaceUpdate,
   SlackWorkspaceUpdateResponse,
   SlackWorkspacesResponse,
 } from "@stella/contracts/slack-workspace";
 
-export type SlackMockMode = "empty" | "connected" | "unavailable";
+export type SlackMockMode = "empty" | "connected" | "unavailable" | "github" | "revoked" | "legacy";
+
+const MODES: readonly SlackMockMode[] = ["empty", "connected", "unavailable", "github", "revoked", "legacy"];
 
 export function readMockMode(): SlackMockMode | null {
   if (process.env.NODE_ENV !== "development" || typeof window === "undefined") return null;
   const mode = new URL(window.location.href).searchParams.get("mock");
-  return mode === "empty" || mode === "connected" || mode === "unavailable" ? mode : null;
+  return (MODES as readonly (string | null)[]).includes(mode) ? (mode as SlackMockMode) : null;
 }
 
 const options: SlackWorkspaceOptions = {
@@ -36,7 +43,14 @@ const options: SlackWorkspaceOptions = {
   efforts: ["low", "medium", "high", "xhigh", "max"],
 };
 
-let workspace: SlackWorkspace = {
+const acmeGithub = (status: SlackWorkspaceGithub["status"]): SlackWorkspaceGithub => ({
+  account: "acme",
+  accountType: "Organization",
+  status,
+  manageUrl: "https://github.com/organizations/acme/settings/installations/1",
+});
+
+const base: SlackWorkspace = {
   teamId: "T0MOCK123",
   teamName: "Acme Robotics",
   homeFolder: "Slack/Acme Robotics",
@@ -45,44 +59,104 @@ let workspace: SlackWorkspace = {
   model: "stella/default",
   effort: "medium",
   slackCommands: true,
-  repo: { fullName: "acme/robot-firmware", branch: "", hasToken: true },
+  github: null,
+  repo: null,
   rules: "Only Priya can ask for deploys.\nKeep answers in threads.",
   memory:
     "Standup is at 9:30 in #eng.\nThe firmware release train ships every second Tuesday.",
   slackUrl: "https://app.slack.com/client/T0MOCK123",
 };
 
+let workspace: SlackWorkspace | null = null;
+
+const current = (mode: SlackMockMode | null): SlackWorkspace => {
+  if (workspace) return workspace;
+  workspace =
+    mode === "github"
+      ? { ...base, github: acmeGithub("active"), repo: { fullName: "acme/robot-firmware", branch: "", access: "github" } }
+      : mode === "revoked"
+        ? { ...base, github: acmeGithub("revoked"), repo: { fullName: "acme/robot-firmware", branch: "", access: "public" } }
+        : mode === "legacy"
+          ? { ...base, repo: { fullName: "acme/robot-firmware", branch: "", access: "token" } }
+          : base;
+  return workspace;
+};
+
+const mockMode = (): SlackMockMode | null => readMockMode();
+
 const wait = <T,>(value: T): Promise<T> =>
   new Promise((resolve) => setTimeout(() => resolve(value), 350));
+
+const REPOS = [
+  { fullName: "acme/robot-firmware", private: true, defaultBranch: "main" },
+  { fullName: "acme/fleet-dashboard", private: true, defaultBranch: "main" },
+  { fullName: "acme/docs", private: false, defaultBranch: "trunk" },
+  { fullName: "acme/sim", private: true, defaultBranch: "develop" },
+];
 
 export const mockSlackApi = {
   list(mode: SlackMockMode): Promise<SlackWorkspacesResponse> {
     return wait({
       available: mode !== "unavailable",
-      workspaces: mode === "connected" ? [workspace] : [],
+      githubAvailable: true,
+      workspaces: mode === "empty" || mode === "unavailable" ? [] : [current(mode)],
       options,
     });
   },
   update(_teamId: string, update: SlackWorkspaceUpdate): Promise<SlackWorkspaceUpdateResponse> {
     const { repo, ...rest } = update;
-    workspace = { ...workspace, ...rest };
-    if (repo === null) workspace = { ...workspace, repo: null };
+    let next: SlackWorkspace = { ...current(mockMode()), ...rest };
+    if (repo === null) next = { ...next, repo: null };
     else if (repo) {
-      workspace = {
-        ...workspace,
-        repo: {
-          fullName: repo.fullName,
-          branch: repo.branch ?? "",
-          hasToken: repo.token === undefined ? Boolean(workspace.repo?.hasToken) : repo.token !== "",
-        },
+      const viaGithub = Boolean(next.github && repo.fullName.startsWith(`${next.github.account}/`));
+      next = {
+        ...next,
+        repo: { fullName: repo.fullName, branch: repo.branch ?? "", access: viaGithub ? "github" : "public" },
       };
     }
-    return wait({ workspace });
+    workspace = next;
+    return wait({ workspace: next });
   },
   install(returnTo: string): Promise<SlackInstallStartResponse> {
     const url = new URL(returnTo);
     url.searchParams.set("slack", "installed");
     url.searchParams.set("mock", "connected");
     return wait({ url: url.toString() });
+  },
+  connectGithub(returnTo: string): Promise<SlackGithubConnectResponse> {
+    const url = new URL(returnTo);
+    url.searchParams.set("github", "mock-code");
+    url.searchParams.set("team", base.teamId);
+    return wait({ url: url.toString() });
+  },
+  finishGithub(installationId?: string): Promise<SlackGithubFinishResponse> {
+    if (!installationId) {
+      return wait({
+        choices: [
+          { installationId: "1", account: "acme", accountType: "Organization" },
+          { installationId: "2", account: "priya", accountType: "User" },
+        ],
+      });
+    }
+    const next = { ...current(mockMode()), github: acmeGithub("active") };
+    workspace = next;
+    return wait({ workspace: next });
+  },
+  disconnectGithub(): Promise<SlackWorkspaceUpdateResponse> {
+    const next = { ...current(mockMode()), github: null, repo: null };
+    workspace = next;
+    return wait({ workspace: next });
+  },
+  repos(): Promise<SlackGithubReposResponse> {
+    return wait({ repos: REPOS, truncated: false });
+  },
+  branches(repo: string): Promise<SlackGithubBranchesResponse> {
+    const found = REPOS.find((r) => r.fullName === repo);
+    const defaultBranch = found?.defaultBranch ?? "main";
+    return wait({
+      branches: [defaultBranch, "release/2.4", "feature/arm-calibration", "fix/watchdog"],
+      defaultBranch,
+      truncated: false,
+    });
   },
 };

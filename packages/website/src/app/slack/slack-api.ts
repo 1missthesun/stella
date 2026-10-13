@@ -3,7 +3,14 @@
 import {
   SLACK_INSTALL_START_PATH,
   SLACK_WORKSPACES_PATH,
+  slackGithubPath,
   slackWorkspacePath,
+  type SlackGithubBranchesResponse,
+  type SlackGithubConnectRequest,
+  type SlackGithubConnectResponse,
+  type SlackGithubFinishRequest,
+  type SlackGithubFinishResponse,
+  type SlackGithubReposResponse,
   type SlackInstallStartRequest,
   type SlackInstallStartResponse,
   type SlackWorkspaceUpdate,
@@ -81,4 +88,38 @@ export function startSlackInstall(returnTo: string): Promise<SlackInstallStartRe
   if (readMockMode()) return mockSlackApi.install(returnTo);
   const body: SlackInstallStartRequest = { returnTo };
   return request<SlackInstallStartResponse>(SLACK_INSTALL_START_PATH, { method: "POST", body });
+}
+
+export function connectGithub(teamId: string, returnTo: string): Promise<SlackGithubConnectResponse> {
+  if (readMockMode()) return mockSlackApi.connectGithub(returnTo);
+  const body: SlackGithubConnectRequest = { returnTo };
+  return request<SlackGithubConnectResponse>(slackGithubPath(teamId, "connect"), { method: "POST", body });
+}
+
+export function finishGithub(
+  teamId: string,
+  code: string,
+  installationId?: string,
+): Promise<SlackGithubFinishResponse> {
+  if (readMockMode()) return mockSlackApi.finishGithub(installationId);
+  const body: SlackGithubFinishRequest = { code, ...(installationId ? { installationId } : {}) };
+  return request<SlackGithubFinishResponse>(slackGithubPath(teamId, "finish"), { method: "POST", body });
+}
+
+export function disconnectGithub(teamId: string): Promise<SlackWorkspaceUpdateResponse> {
+  if (readMockMode()) return mockSlackApi.disconnectGithub();
+  return request<SlackWorkspaceUpdateResponse>(slackGithubPath(teamId, "disconnect"), { method: "POST" });
+}
+
+export function listGithubRepos(teamId: string): Promise<SlackGithubReposResponse> {
+  if (readMockMode()) return mockSlackApi.repos();
+  return request<SlackGithubReposResponse>(slackGithubPath(teamId, "repos"), { method: "GET" });
+}
+
+export function listGithubBranches(teamId: string, repo: string): Promise<SlackGithubBranchesResponse> {
+  if (readMockMode()) return mockSlackApi.branches(repo);
+  return request<SlackGithubBranchesResponse>(
+    `${slackGithubPath(teamId, "branches")}?repo=${encodeURIComponent(repo)}`,
+    { method: "GET" },
+  );
 }

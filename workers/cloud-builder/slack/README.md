@@ -38,9 +38,9 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
   engine (Stella's runtime or Claude Code on the owner's Claude login, which
   needs a plan with cloud access), model, reasoning effort, whether
   `/stella engine|model|effort` may change those from Slack, and a GitHub
-  repository (optional read-only token, sealed like the bot token) that is
-  cloned into every Slack agent's container under `/workspace/repos/<name>`
-  before it starts (`repo-clone.ts`), outside the owner's world. The page also
+  repository that is cloned into every Slack agent's container under
+  `/workspace/repos/<name>` before it starts (`repo-clone.ts`), outside the
+  owner's world. The page also
   edits `memories/rules.md`, plain-language rules she follows as
   `<workspace-rules>` (no permission system beyond that), and
   `memories/workspace.md`.
@@ -61,6 +61,18 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
   the home folder and are attached to the turn. A thread reply that isn't
   meant for her gets the reply `<no-reply/>`, which posts nothing.
 
+- **GitHub** (`github.ts`): "Connect GitHub" on the page goes through
+  Stella for Slack's own GitHub App (read-only: contents + metadata), separate
+  from the projects App. The installer picks which repositories it sees; the
+  workspace stores only the installation id
+  (`slack_workspace_settings.github_*`). The page lists the installation's
+  repositories and a repository's branches; any public repository works
+  without connecting. Each clone mints a token for that one repository with
+  `contents: read`, used once on the git command line. Uninstalls arrive on
+  the App's webhook and are also noticed whenever GitHub refuses a token; the
+  page then shows a reconnect state. Workspaces that pasted a token before
+  this keep it until they pick a repository through the connection.
+
 ## Set up an app
 
 1. Create a Slack app from `app-manifest.dev.json` (dev backend) or
@@ -70,10 +82,17 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
    into `bunx wrangler secret put NAME`, `--env production` for prod).
    `OAUTH_STATE_SECRET` must also be set.
 3. Apply the D1 migrations (`migrations/0009_slack.sql`, `0010_slack_workspace.sql`,
-   `0011_slack_workspace_settings.sql`) and deploy cloud-builder.
+   `0011_slack_workspace_settings.sql`, `0013_slack_github.sql`) and deploy
+   cloud-builder.
 4. In the app's Event Subscriptions, retry verification of the request URL.
 5. Install into a workspace from stella.sh/slack, or by opening
    `<auth>/api/slack/install`.
+6. GitHub: `node scripts/slack-github-app.mjs manifest --env dev|production`
+   prints the App manifest; POST it (form field `manifest`) to the URL it
+   names while signed in to the owning GitHub account, and create the App.
+   Then `node scripts/slack-github-app.mjs store --env … --code <code>` with
+   the `code` GitHub put on the redirect stores `SLACK_GITHUB_APP_*` and
+   `SLACK_GITHUB_WEBHOOK_SECRET` without printing them.
 
 A workspace that has both the dev and prod apps installed sends `/stella` to
 one of them only; the dev app's command is `/stella-dev` for that reason.

@@ -7,6 +7,9 @@
  *   GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY (PEM, PKCS#1 or PKCS#8),
  *   GITHUB_APP_SLUG, GITHUB_APP_CLIENT_ID, GITHUB_APP_CLIENT_SECRET,
  *   GITHUB_WEBHOOK_SECRET.
+ *
+ * Stella for Slack has its own read-only App (`app = "slack"`), configured by
+ * the same names prefixed `SLACK_` (`SLACK_GITHUB_APP_ID`, …).
  */
 
 const GITHUB_API_BASE = "https://api.github.com";
@@ -34,8 +37,16 @@ type GithubSecret =
   | "GITHUB_APP_CLIENT_SECRET"
   | "GITHUB_WEBHOOK_SECRET";
 
-export const githubSecret = (env: Cloudflare.Env, name: GithubSecret): string | undefined =>
-  (env as unknown as Partial<Record<GithubSecret, string>>)[name]?.trim() || undefined;
+/** Which of Stella's GitHub Apps: projects (read-write) or Stella for Slack (read-only). */
+export type GithubAppKind = "projects" | "slack";
+
+export const githubSecret = (
+  env: Cloudflare.Env,
+  name: GithubSecret,
+  app: GithubAppKind = "projects",
+): string | undefined =>
+  (env as unknown as Partial<Record<string, string>>)[app === "slack" ? `SLACK_${name}` : name]?.trim() ||
+  undefined;
 
 /** A failure whose message is safe to show the user. */
 export class GithubError extends Error {
@@ -45,16 +56,27 @@ export class GithubError extends Error {
   }
 }
 
+/** GitHub refused to mint for the installation: uninstalled (404) or suspended (403). */
+export class GithubInstallationGoneError extends GithubError {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "GithubInstallationGoneError";
+  }
+}
+
 const NOT_CONFIGURED = "GitHub projects aren't configured on this deployment yet.";
 
 /** Everything the connect handshake needs: minting, identity and the install URL. */
-export const githubAppConfigured = (env: Cloudflare.Env): boolean =>
+export const githubAppConfigured = (env: Cloudflare.Env, app: GithubAppKind = "projects"): boolean =>
   Boolean(
-    githubSecret(env, "GITHUB_APP_ID") &&
-      githubSecret(env, "GITHUB_APP_PRIVATE_KEY") &&
-      githubSecret(env, "GITHUB_APP_SLUG") &&
-      githubSecret(env, "GITHUB_APP_CLIENT_ID") &&
-      githubSecret(env, "GITHUB_APP_CLIENT_SECRET"),
+    githubSecret(env, "GITHUB_APP_ID", app) &&
+      githubSecret(env, "GITHUB_APP_PRIVATE_KEY", app) &&
+      githubSecret(env, "GITHUB_APP_SLUG", app) &&
+      githubSecret(env, "GITHUB_APP_CLIENT_ID", app) &&
+      githubSecret(env, "GITHUB_APP_CLIENT_SECRET", app),
   );
 
 // ── App JWT ───────────────────────────────────────────────────────────────
@@ -113,9 +135,9 @@ const pkcs8Der = (pem: string): Uint8Array => {
   return derTagged(0x30, body);
 };
 
-const appJwt = async (env: Cloudflare.Env): Promise<string> => {
-  const appId = githubSecret(env, "GITHUB_APP_ID");
-  const rawKey = githubSecret(env, "GITHUB_APP_PRIVATE_KEY");
+const appJwt = async (env: Cloudflare.Env, app: GithubAppKind = "projects"): Promise<string> => {
+  const appId = githubSecret(env, "GITHUB_APP_ID", app);
+  const rawKey = githubSecret(env, "GITHUB_APP_PRIVATE_KEY", app);
   if (!appId || !rawKey) throw new GithubError(NOT_CONFIGURED);
   // Secrets commonly carry the PEM with escaped newlines.
   const pem = rawKey.includes("\\n") ? rawKey.replaceAll("\\n", "\n") : rawKey;
@@ -159,6 +181,8 @@ const headers = (authorization: string): Record<string, string> => ({
   "x-github-api-version": "2022-11-28",
 });
 
+export const githubHeaders = (authorization: string): Record<string, string> => headers(authorization);
+
 const errorText = async (response: Response, fallback: string): Promise<string> => {
   const payload = (await response.json().catch(() => null)) as { message?: string } | null;
   return payload?.message ? `${fallback} (${payload.message})` : fallback;
@@ -172,17 +196,36 @@ const errorText = async (response: Response, fallback: string): Promise<string> 
  */
 export const mintInstallationToken = async (
   env: Cloudflare.Env,
-  args: { installationId: string; repo?: string },
+  args: {
+    installationId: string;
+    repo?: string;
+    permissions?: Record<string, "read" | "write">;
+    app?: GithubAppKind;
+  },
 ): Promise<{ token: string; expiresAt: number }> => {
   const response = await fetch(
     `${GITHUB_API_BASE}/app/installations/${encodeURIComponent(args.installationId)}/access_tokens`,
     {
       method: "POST",
-      headers: headers(`Bearer ${await appJwt(env)}`),
-      body: JSON.stringify(args.repo ? { repositories: [args.repo] } : {}),
+      headers: headers(`Bearer ${await appJwt(env, args.app)}`),
+      body: JSON.stringify({
+        ...(args.repo ? { repositories: [args.repo] } : {}),
+        ...(args.permissions ? { permissions: args.permissions } : {}),
+      }),
     },
   );
   if (!response.ok) {
+    if (response.status === 404 || response.status === 403) {
+      throw new GithubInstallationGoneError(
+        await errorText(
+          response,
+          response.status === 404
+            ? "That GitHub installation is gone. Reconnect GitHub from Settings."
+            : "That GitHub installation is suspended.",
+        ),
+        response.status,
+      );
+    }
     throw new GithubError(
       await errorText(
         response,
@@ -226,10 +269,11 @@ const accountOf = (account?: { login?: string; type?: string; id?: number }): In
 export const fetchInstallationAccount = async (
   env: Cloudflare.Env,
   installationId: string,
+  app: GithubAppKind = "projects",
 ): Promise<InstallationAccount | null> => {
   try {
     const response = await fetch(`${GITHUB_API_BASE}/app/installations/${encodeURIComponent(installationId)}`, {
-      headers: headers(`Bearer ${await appJwt(env)}`),
+      headers: headers(`Bearer ${await appJwt(env, app)}`),
     });
     if (!response.ok) return null;
     const payload = (await response.json()) as { account?: { login?: string; type?: string; id?: number } };
@@ -241,8 +285,13 @@ export const fetchInstallationAccount = async (
 
 // ── The connecting user (handshake identity leg) ──────────────────────────
 
-export const githubAuthorizeUrl = (env: Cloudflare.Env, state: string, redirectUri: string): string => {
-  const clientId = githubSecret(env, "GITHUB_APP_CLIENT_ID");
+export const githubAuthorizeUrl = (
+  env: Cloudflare.Env,
+  state: string,
+  redirectUri: string,
+  app: GithubAppKind = "projects",
+): string => {
+  const clientId = githubSecret(env, "GITHUB_APP_CLIENT_ID", app);
   if (!clientId) throw new GithubError(NOT_CONFIGURED);
   const url = new URL(`${GITHUB_WEB_BASE}/login/oauth/authorize`);
   url.searchParams.set("client_id", clientId);
@@ -251,8 +300,8 @@ export const githubAuthorizeUrl = (env: Cloudflare.Env, state: string, redirectU
   return url.toString();
 };
 
-export const githubInstallUrl = (env: Cloudflare.Env, state: string): string => {
-  const slug = githubSecret(env, "GITHUB_APP_SLUG");
+export const githubInstallUrl = (env: Cloudflare.Env, state: string, app: GithubAppKind = "projects"): string => {
+  const slug = githubSecret(env, "GITHUB_APP_SLUG", app);
   if (!slug) throw new GithubError(NOT_CONFIGURED);
   const url = new URL(`${GITHUB_WEB_BASE}/apps/${encodeURIComponent(slug)}/installations/new`);
   url.searchParams.set("state", state);
@@ -267,9 +316,10 @@ export const exchangeUserCode = async (
   env: Cloudflare.Env,
   code: string,
   redirectUri: string,
+  app: GithubAppKind = "projects",
 ): Promise<string> => {
-  const clientId = githubSecret(env, "GITHUB_APP_CLIENT_ID");
-  const clientSecret = githubSecret(env, "GITHUB_APP_CLIENT_SECRET");
+  const clientId = githubSecret(env, "GITHUB_APP_CLIENT_ID", app);
+  const clientSecret = githubSecret(env, "GITHUB_APP_CLIENT_SECRET", app);
   if (!clientId || !clientSecret) throw new GithubError(NOT_CONFIGURED);
   const response = await fetch(`${GITHUB_WEB_BASE}/login/oauth/access_token`, {
     method: "POST",
@@ -300,9 +350,10 @@ export const fetchOAuthUser = async (userToken: string): Promise<{ login: string
   return { login: payload.login, id: payload.id };
 };
 
-type UserInstallation = { id: number; account?: { login?: string; type?: string; id?: number } };
+export type UserInstallation = { id: number; account?: { login?: string; type?: string; id?: number } };
 
-const listUserInstallations = async (userToken: string): Promise<UserInstallation[]> => {
+/** The installations of the App behind `userToken` that its GitHub user can reach. */
+export const listUserInstallations = async (userToken: string): Promise<UserInstallation[]> => {
   const collected: UserInstallation[] = [];
   for (let page = 1; page <= USER_INSTALLATION_PAGES; page += 1) {
     const response = await fetch(`${GITHUB_API_BASE}/user/installations?per_page=100&page=${page}`, {

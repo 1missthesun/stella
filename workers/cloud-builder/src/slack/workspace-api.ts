@@ -6,11 +6,19 @@
  *   GET  /api/slack/workspaces            the caller's workspaces, settings and choices
  *   POST /api/slack/workspaces/:teamId    change settings, rules or notes
  *   POST /api/slack/install/start         the "Add to Slack" URL for this account
+ *   POST /api/slack/workspaces/:teamId/github/connect|finish|disconnect
+ *   GET  /api/slack/workspaces/:teamId/github/repos|branches
+ *                                         the workspace's GitHub connection (`github.ts`)
  */
 
 import { rpcErrorStatus } from "@stella/contracts/backend/protocol";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import {
+  type SlackGithubAction,
+  type SlackGithubBranchesResponse,
+  type SlackGithubFinishRequest,
+  type SlackGithubFinishResponse,
+  type SlackWorkspaceRepo,
   SLACK_INSTALL_START_PATH,
   SLACK_MEMORY_MAX_CHARS,
   SLACK_RULES_MAX_CHARS,
@@ -26,14 +34,26 @@ import { unwrapRpc } from "../owner-store/errors.js";
 import { ownerGateStub } from "../rpc-release.js";
 import { SLACK_BOT_SCOPES, SLACK_PATHS, slackConfigured, slackPublicOrigin, slackSecret } from "./config.js";
 import { signInstallState } from "./link-state.js";
+import { GithubError } from "../projects/github.js";
+import {
+  checkInstallation,
+  describeGithub,
+  finishGithubConnect,
+  listInstallationRepos,
+  listRepoBranches,
+  RepoNotFoundError,
+  slackGithubConfigured,
+  startGithubConnect,
+} from "./github.js";
 import {
   isEffort,
   loadWorkspaceSettings,
   parseBranch,
   parseRepoName,
+  repoOwnedBy,
   resolveModelChoice,
-  savedRepoToken,
   saveWorkspaceSettings,
+  type SlackWorkspaceSettings,
   workspaceOptions,
   type SettingsPatch,
 } from "./settings.js";
@@ -119,11 +139,18 @@ const describe = async (
   installedAt: number,
 ): Promise<SlackWorkspace> => {
   const ownerId = install.ownerId!;
-  const [settings, rules, memory] = await Promise.all([
+  const [loaded, rules, memory] = await Promise.all([
     loadWorkspaceSettings(env, install.teamId),
     readText(env, ownerId, rulesPath(install.homeFolder)),
     readText(env, ownerId, workspaceNotesPath(install.homeFolder)),
   ]);
+  let settings = loaded;
+  if (settings.github && slackGithubConfigured(env)) {
+    const status = await checkInstallation(env, settings.github);
+    if (status && status !== settings.github.status) {
+      settings = { ...settings, github: { ...settings.github, status } };
+    }
+  }
   return {
     teamId: install.teamId,
     teamName: install.teamName,
@@ -133,11 +160,25 @@ const describe = async (
     model: settings.model,
     effort: settings.effort,
     slackCommands: settings.slackCommands,
-    repo: settings.repo,
+    github: describeGithub(settings.github),
+    repo: repoView(settings),
     rules,
     memory,
     slackUrl: `https://app.slack.com/client/${encodeURIComponent(install.teamId)}`,
   };
+};
+
+const repoView = (settings: SlackWorkspaceSettings): SlackWorkspaceRepo | null => {
+  const repo = settings.repo;
+  if (!repo) return null;
+  const github = settings.github;
+  const access: SlackWorkspaceRepo["access"] =
+    github && github.status !== "revoked" && repoOwnedBy(github, repo.fullName)
+      ? "github"
+      : repo.hasToken
+        ? "token"
+        : "public";
+  return { fullName: repo.fullName, branch: repo.branch, access };
 };
 
 const ownedInstallation = async (
@@ -160,6 +201,7 @@ const list = async (env: Cloudflare.Env, caller: OwnerCaller): Promise<Response>
   }
   const body: SlackWorkspacesResponse = {
     available: slackConfigured(env),
+    githubAvailable: slackGithubConfigured(env),
     workspaces,
     options: workspaceOptions(audience),
   };
@@ -205,15 +247,20 @@ const update = async (
     if (!fullName) return fail(400, "Enter the repository as owner/name.");
     const branch = parseBranch(input.repo.branch);
     if (branch === null) return fail(400, "That branch name isn't valid.");
-    const token = input.repo.token === undefined ? undefined : String(input.repo.token).trim();
-    if (token && (token.length > 400 || /\s/u.test(token))) return fail(400, "That access token isn't valid.");
-    const reachable = await repoReachable(
-      fullName,
-      branch,
-      token === undefined ? await savedRepoToken(env, teamId, fullName) : token || null,
-    );
-    if (reachable) return fail(400, reachable);
-    patch.repo = { fullName, branch, ...(token !== undefined ? { token } : {}) };
+    const unchanged = current.repo?.fullName === fullName && current.repo.branch === branch;
+    let viaGithub = false;
+    if (!unchanged) {
+      try {
+        const found = await listRepoBranches(env, current.github, fullName);
+        viaGithub = found.viaGithub;
+        if (branch && !found.truncated && !found.branches.includes(branch)) {
+          return fail(400, `GitHub can't find the branch ${branch} in ${fullName}.`);
+        }
+      } catch (error) {
+        if (error instanceof RepoNotFoundError) return fail(400, error.message);
+      }
+    }
+    patch.repo = { fullName, branch, dropToken: viaGithub };
   }
   if (input.rules !== undefined && String(input.rules).length > SLACK_RULES_MAX_CHARS) {
     return fail(400, `Rules are limited to ${SLACK_RULES_MAX_CHARS} characters.`);
@@ -230,47 +277,93 @@ const update = async (
   return ok({ workspace: await describe(env, install, owned.installedAt) });
 };
 
-/** Null when GitHub shows the repository (and branch); otherwise what to tell the owner. */
-const repoReachable = async (fullName: string, branch: string, token: string | null): Promise<string | null> => {
-  const headers: Record<string, string> = {
-    accept: "application/vnd.github+json",
-    "user-agent": "stella-cloud",
-    ...(token ? { authorization: `Bearer ${token}` } : {}),
-  };
+const allowedReturnOrigins = (env: Cloudflare.Env): Set<string> =>
+  new Set([new URL(websiteUrl(env)).origin, "https://stella.sh", "http://localhost:3000"]);
+
+const readReturnTo = async (request: Request, env: Cloudflare.Env): Promise<URL | null> => {
   try {
-    const path = branch
-      ? `repos/${fullName}/branches/${encodeURIComponent(branch)}`
-      : `repos/${fullName}`;
-    const response = await fetch(`https://api.github.com/${path}`, { headers, signal: AbortSignal.timeout(8_000) });
-    if (response.ok) return null;
-    if (response.status === 401) return "GitHub didn't accept that access token.";
-    if (response.status === 404) {
-      return branch
-        ? `GitHub can't find the branch ${branch} in ${fullName}. If the repository is private, add a read-only access token.`
-        : `GitHub can't find ${fullName}. If it's private, add a read-only access token.`;
-    }
-    return null;
+    const body = (await request.json()) as { returnTo?: unknown };
+    const url = new URL(String(body.returnTo ?? ""));
+    return allowedReturnOrigins(env).has(url.origin) ? url : null;
   } catch {
     return null;
   }
 };
 
-const allowedReturnOrigins = (env: Cloudflare.Env): Set<string> =>
-  new Set([new URL(websiteUrl(env)).origin, "https://stella.sh", "http://localhost:3000"]);
+const githubFailure = (error: unknown): Response => {
+  if (error instanceof GithubError) return fail(error instanceof RepoNotFoundError ? 404 : 409, error.message);
+  console.error(
+    JSON.stringify({
+      event: "slack_github_api_failed",
+      message: error instanceof Error ? error.message : String(error),
+    }),
+  );
+  return fail(502, "GitHub didn't answer. Try again.");
+};
+
+const githubAction = async (
+  request: Request,
+  env: Cloudflare.Env,
+  caller: OwnerCaller,
+  teamId: string,
+  action: SlackGithubAction,
+): Promise<Response> => {
+  if (!slackGithubConfigured(env)) return fail(503, "GitHub isn't set up for Stella for Slack on this deployment.");
+  const owned = await ownedInstallation(env, caller.ownerId, teamId);
+  if (!owned) return fail(404, "That workspace isn't connected to your Stella account.");
+  const settings = await loadWorkspaceSettings(env, teamId);
+  const described = async () => await describe(env, owned.install, owned.installedAt);
+  try {
+    if (action === "connect" && request.method === "POST") {
+      const returnTo = await readReturnTo(request, env);
+      if (!returnTo) return fail(400, "returnTo must be a URL on the Stella website.");
+      const url = await startGithubConnect(env, request, {
+        ownerId: caller.ownerId,
+        teamId,
+        returnTo: returnTo.toString(),
+      });
+      return ok({ url });
+    }
+    if (action === "finish" && request.method === "POST") {
+      const input = (await request.json().catch(() => ({}))) as Partial<SlackGithubFinishRequest>;
+      const result = await finishGithubConnect(env, {
+        ownerId: caller.ownerId,
+        teamId,
+        code: String(input.code ?? ""),
+        ...(input.installationId ? { installationId: String(input.installationId) } : {}),
+      });
+      if (!result.ok) return fail(400, result.message);
+      if ("choices" in result) return ok({ choices: result.choices } satisfies SlackGithubFinishResponse);
+      await saveWorkspaceSettings(env, teamId, { github: result.connection });
+      return ok({ workspace: await described() } satisfies SlackGithubFinishResponse);
+    }
+    if (action === "disconnect" && request.method === "POST") {
+      const github = settings.github;
+      const dropRepo = Boolean(github && settings.repo && repoOwnedBy(github, settings.repo.fullName));
+      await saveWorkspaceSettings(env, teamId, { github: null, ...(dropRepo ? { repo: null } : {}) });
+      return ok({ workspace: await described() });
+    }
+    if (action === "repos" && request.method === "GET") {
+      if (!settings.github) return fail(409, "Connect GitHub first.");
+      return ok(await listInstallationRepos(env, settings.github));
+    }
+    if (action === "branches" && request.method === "GET") {
+      const fullName = parseRepoName(new URL(request.url).searchParams.get("repo") ?? "");
+      if (!fullName) return fail(400, "Pick a repository as owner/name.");
+      const { viaGithub: _, ...found } = await listRepoBranches(env, settings.github, fullName);
+      return ok(found satisfies SlackGithubBranchesResponse);
+    }
+  } catch (error) {
+    return githubFailure(error);
+  }
+  return fail(405, "Method not allowed.");
+};
 
 const installStart = async (request: Request, env: Cloudflare.Env, caller: OwnerCaller): Promise<Response> => {
   const clientId = slackSecret(env, "SLACK_CLIENT_ID");
   if (!clientId || !slackConfigured(env)) return fail(503, "Slack isn't set up on this deployment.");
-  let returnTo: URL;
-  try {
-    const body = (await request.json()) as { returnTo?: unknown };
-    returnTo = new URL(String(body.returnTo ?? ""));
-  } catch {
-    return fail(400, "returnTo must be a URL on the Stella website.");
-  }
-  if (!allowedReturnOrigins(env).has(returnTo.origin)) {
-    return fail(400, "returnTo must be a URL on the Stella website.");
-  }
+  const returnTo = await readReturnTo(request, env);
+  if (!returnTo) return fail(400, "returnTo must be a URL on the Stella website.");
   const url = new URL("https://slack.com/oauth/v2/authorize");
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("scope", SLACK_BOT_SCOPES.join(","));
@@ -296,10 +389,18 @@ export const handleSlackWorkspaceApi = async (request: Request, env: Cloudflare.
   const { caller } = verified;
   if (isList && request.method === "GET") return await list(env, caller);
   if (isInstall && request.method === "POST") return await installStart(request, env, caller);
-  if (isOne && request.method === "POST") {
-    const teamId = decodeURIComponent(pathname.slice(SLACK_WORKSPACES_PATH.length + 1));
+  if (isOne) {
+    const [rawTeam, section, action, ...rest] = pathname.slice(SLACK_WORKSPACES_PATH.length + 1).split("/");
+    const teamId = decodeURIComponent(rawTeam ?? "");
     if (!/^[A-Z0-9]{2,32}$/u.test(teamId)) return fail(404, "Unknown workspace.");
-    return await update(request, env, caller, teamId);
+    if (section === undefined && request.method === "POST") return await update(request, env, caller, teamId);
+    if (
+      section === "github" &&
+      rest.length === 0 &&
+      (action === "connect" || action === "finish" || action === "disconnect" || action === "repos" || action === "branches")
+    ) {
+      return await githubAction(request, env, caller, teamId, action);
+    }
   }
   return fail(405, "Method not allowed.");
 };

@@ -13,6 +13,12 @@ export const SLACK_INSTALL_START_PATH = "/api/slack/install/start";
 export const slackWorkspacePath = (teamId: string): string =>
   `${SLACK_WORKSPACES_PATH}/${encodeURIComponent(teamId)}`;
 
+export type SlackGithubAction = "connect" | "finish" | "disconnect" | "repos" | "branches";
+
+/** `slackWorkspacePath(teamId)/github/<action>`. */
+export const slackGithubPath = (teamId: string, action: SlackGithubAction): string =>
+  `${slackWorkspacePath(teamId)}/github/${action}`;
+
 /** Stella's own runtime, or Claude Code on the owner's Claude login. */
 export type SlackWorkspaceEngine = "stella" | "claude-code";
 
@@ -31,8 +37,24 @@ export type SlackWorkspaceRepo = {
   fullName: string;
   /** Empty means the repository's default branch. */
   branch: string;
-  /** A read-only access token is saved (it is never sent back). */
-  hasToken: boolean;
+  /**
+   * How agents get it: through the workspace's GitHub connection, as a
+   * public repository, or with an access token pasted before GitHub
+   * connections existed (kept until the owner picks a repository again).
+   */
+  access: "github" | "public" | "token";
+};
+
+/**
+ * The workspace's connection to GitHub through the "Stella for Slack" App.
+ * `revoked` means the App was uninstalled or lost access: reconnect.
+ */
+export type SlackWorkspaceGithub = {
+  account: string;
+  accountType: string;
+  status: "active" | "suspended" | "revoked";
+  /** github.com page where the installer picks which repositories Stella sees. */
+  manageUrl: string;
 };
 
 export type SlackWorkspace = {
@@ -46,6 +68,7 @@ export type SlackWorkspace = {
   effort: ReasoningEffortLevel;
   /** People in Slack may switch engine, model and effort with `/stella`. */
   slackCommands: boolean;
+  github: SlackWorkspaceGithub | null;
   repo: SlackWorkspaceRepo | null;
   /** Plain-language rules Stella follows in this workspace (`memories/rules.md`). */
   rules: string;
@@ -59,6 +82,8 @@ export type SlackWorkspace = {
 export type SlackWorkspacesResponse = {
   /** False when this deployment has no Slack app configured. */
   available: boolean;
+  /** False when this deployment has no GitHub App for Slack configured. */
+  githubAvailable: boolean;
   workspaces: SlackWorkspace[];
   options: SlackWorkspaceOptions;
 };
@@ -72,15 +97,15 @@ export type SlackInstallStartResponse = { url: string };
 
 /**
  * `POST slackWorkspacePath(teamId)`. Only the fields present change.
- * `repo: null` disconnects the repository; `repo.token` replaces the saved
- * token, and an empty string removes it.
+ * `repo: null` disconnects the repository. A repository is reached through
+ * the workspace's GitHub connection when it can see it, else as public.
  */
 export type SlackWorkspaceUpdate = {
   engine?: SlackWorkspaceEngine;
   model?: string;
   effort?: ReasoningEffortLevel;
   slackCommands?: boolean;
-  repo?: { fullName: string; branch?: string; token?: string } | null;
+  repo?: { fullName: string; branch?: string } | null;
   rules?: string;
   memory?: string;
 };
@@ -89,6 +114,48 @@ export type SlackWorkspaceUpdateResponse = { workspace: SlackWorkspace };
 
 export const SLACK_RULES_MAX_CHARS = 6000;
 export const SLACK_MEMORY_MAX_CHARS = 6000;
+
+/** `POST slackGithubPath(teamId, "connect")` → the GitHub URL to open. */
+export type SlackGithubConnectRequest = {
+  /** Where GitHub returns; must be on the site's origin. */
+  returnTo: string;
+};
+export type SlackGithubConnectResponse = { url: string };
+
+/** GitHub returns to `returnTo` with `?github=<code>` to finish, or `?github_error=<message>`. */
+export const SLACK_GITHUB_RESULT_PARAM = "github";
+export const SLACK_GITHUB_ERROR_PARAM = "github_error";
+
+export type SlackGithubInstallationChoice = {
+  installationId: string;
+  account: string;
+  accountType: string;
+};
+
+/**
+ * `POST slackGithubPath(teamId, "finish")`. When the GitHub user can reach
+ * several installations, the first call returns `choices`; call again with one.
+ */
+export type SlackGithubFinishRequest = { code: string; installationId?: string };
+export type SlackGithubFinishResponse =
+  | { workspace: SlackWorkspace }
+  | { choices: SlackGithubInstallationChoice[] };
+
+export type SlackGithubRepoOption = {
+  fullName: string;
+  private: boolean;
+  defaultBranch: string;
+};
+
+/** `GET slackGithubPath(teamId, "repos")`: what the connection can see. */
+export type SlackGithubReposResponse = { repos: SlackGithubRepoOption[]; truncated: boolean };
+
+/** `GET slackGithubPath(teamId, "branches")?repo=owner/name`. */
+export type SlackGithubBranchesResponse = {
+  branches: string[];
+  defaultBranch: string;
+  truncated: boolean;
+};
 
 /** After an install from the page, Slack's callback returns to `returnTo` with these. */
 export const SLACK_INSTALL_RESULT_PARAM = "slack";

@@ -12,9 +12,17 @@ export const RATE_LIMIT_MIGRATION = {
   ],
 };
 
+type RateWindow = { windowStart: number; count: number };
+
 /**
  * A fixed-window limit on one owner action. Throws `RATE_LIMITED` with the
  * wait until the window resets.
+ *
+ * The count is kept in memory (`OwnerDb.memory`) and written only when a
+ * window opens and when it fills: a row write per request was about a tenth
+ * of the owner object's writes. A filled window survives an eviction; a
+ * partly used one restarts from its stored count, which only ever allows
+ * more, never blocks early.
  */
 export const enforceOwnerRateLimit = (
   db: OwnerDb,
@@ -23,17 +31,34 @@ export const enforceOwnerRateLimit = (
   limit: { count: number; windowMs: number },
   message: string,
 ): void => {
-  const row = db.one<{ window_start: number; count: number }>(
-    "SELECT window_start, count FROM owner_rate_limits WHERE scope = ?",
-    scope,
-  );
-  if (row && now - row.window_start < limit.windowMs) {
-    if (row.count >= limit.count) {
+  const key = `rate-limit:${scope}`;
+  let window = db.memory?.get(key) as RateWindow | undefined;
+  if (!window || now - window.windowStart >= limit.windowMs) {
+    const row = db.one<{ window_start: number; count: number }>(
+      "SELECT window_start, count FROM owner_rate_limits WHERE scope = ?",
+      scope,
+    );
+    window =
+      row && now - row.window_start < limit.windowMs
+        ? { windowStart: row.window_start, count: row.count }
+        : undefined;
+  }
+  if (window) {
+    if (window.count >= limit.count) {
       throw new RpcError("RATE_LIMITED", message, {
-        retryAfterMs: row.window_start + limit.windowMs - now,
+        retryAfterMs: window.windowStart + limit.windowMs - now,
       });
     }
-    db.run("UPDATE owner_rate_limits SET count = count + 1 WHERE scope = ?", scope);
+    window.count += 1;
+    if (!db.memory || window.count >= limit.count) {
+      db.run(
+        "UPDATE owner_rate_limits SET count = ? WHERE scope = ? AND window_start = ?",
+        window.count,
+        scope,
+        window.windowStart,
+      );
+    }
+    db.memory?.set(key, window);
     return;
   }
   db.run(
@@ -42,4 +67,5 @@ export const enforceOwnerRateLimit = (
     scope,
     now,
   );
+  db.memory?.set(key, { windowStart: now, count: 1 } satisfies RateWindow);
 };

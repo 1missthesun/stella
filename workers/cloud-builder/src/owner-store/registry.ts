@@ -44,6 +44,11 @@ export type OwnerDb = OwnerDbReader & {
   /** A write. Marks the owner's views for a recompute. */
   run(query: string, ...params: SqlValue[]): void;
   transaction?<T>(fn: () => T): T;
+  /**
+   * Scratch state that lives as long as the owner object stays in memory
+   * (lost on eviction), for counts not worth a row write each time.
+   */
+  memory?: Map<string, unknown>;
 };
 
 export type OwnerJobs = {

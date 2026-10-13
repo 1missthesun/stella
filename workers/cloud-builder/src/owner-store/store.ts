@@ -192,6 +192,8 @@ export class OwnerStore {
   private readonly queryTables = new Map<string, string[]>();
   private readonly writeTables = new Map<string, string[] | null>();
   private readonly viewDeps = new Map<string, ViewDeps>();
+  /** `OwnerDb.memory`: in-memory state domains keep for this object's lifetime. */
+  private readonly memory = new Map<string, unknown>();
   /** The hash of the value each subscription last sent, by `subKey`. */
   private readonly sentHashes = new Map<string, string>();
 
@@ -254,6 +256,7 @@ export class OwnerStore {
         this.noteWrite(query);
       },
       transaction: <T>(fn: () => T): T => this.transaction(fn),
+      memory: this.memory,
     };
   }
 
@@ -330,6 +333,7 @@ export class OwnerStore {
         this.noteWrite(query);
       },
       transaction: <T>(fn: () => T): T => this.transaction(fn),
+      memory: this.memory,
     };
   }
 

@@ -28,6 +28,7 @@ const FORM_METHODS = new Set([
   "oauth.v2.access",
   "files.getUploadURLExternal",
   "users.info",
+  "users.lookupByEmail",
   "conversations.info",
   "conversations.replies",
   "conversations.history",

@@ -36,6 +36,7 @@ import {
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import type { ExecutionSession } from "../sandbox-client.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { slackTry } from "./api.js";
 import { SLACK_PATHS, slackPublicOrigin, slackSecret } from "./config.js";
 import { signToken, verifyToken, type TokenKind } from "./signed-token.js";
 import { loadInstallation } from "./store.js";
@@ -44,6 +45,7 @@ import publishScript from "./stella-publish.cjs.txt";
 
 export const SLACK_PREVIEWS_PATH = "/api/slack/previews";
 const SIGNIN_PATH = `${SLACK_PREVIEWS_PATH}/signin`;
+const SIGNIN_DM_PATH = `${SLACK_PREVIEWS_PATH}/signin/dm`;
 /** A subdirectory of the Slack app's registered redirect URL, so no app change is needed. */
 const OIDC_CALLBACK_PATH = `${SLACK_PATHS.oauthCallback}/preview`;
 const KEY_PREFIX = "slack-previews";
@@ -69,6 +71,8 @@ const SIGNIN_STATE: TokenKind = { prefix: "ss1", domain: "stella.slack-preview-s
 const GRANT: TokenKind = { prefix: "sg1", domain: "stella.slack-preview-grant.v1" };
 const VIEW: TokenKind = { prefix: "sv1", domain: "stella.slack-preview-view.v1" };
 const MEMBER: TokenKind = { prefix: "sm1", domain: "stella.slack-preview-member.v1" };
+const DM_LINK: TokenKind = { prefix: "sd1", domain: "stella.slack-preview-dm-link.v1" };
+const DM_LINK_TTL_MS = 15 * 60_000;
 
 const PUBLISH_TTL_MS = 12 * 60 * 60_000;
 const VIEW_TTL_MS = 7 * DAY_MS;
@@ -665,6 +669,10 @@ type SigninState = { p: string; r: string; n: string };
 type GrantClaims = { p: string; t: string; r: string };
 type ViewClaims = { t: string };
 type MemberClaims = { t: string; u: string };
+type DmLinkClaims = { p: string; r: string; t: string; u: string };
+
+const memberCookie = async (env: Cloudflare.Env, team: string, user: string): Promise<string> =>
+  `${MEMBER_COOKIE}=${await signToken<MemberClaims>(env, MEMBER, { t: team, u: user }, MEMBER_TTL_MS)}; Path=${SLACK_PREVIEWS_PATH}/; Max-Age=${Math.floor(MEMBER_TTL_MS / 1000)}; HttpOnly; Secure; SameSite=Lax`;
 
 const grantRedirect = async (env: Cloudflare.Env, preview: PreviewRow, path: string, extra?: HeadersInit) => {
   const origin = previewOrigin(env, preview.id);
@@ -686,8 +694,22 @@ const signin = async (request: Request, env: Cloudflare.Env): Promise<Response> 
     const member = await verifyToken<MemberClaims>(env, MEMBER, value);
     if (member?.t === preview.team_id) return await grantRedirect(env, preview, path);
   }
+  const install = await loadInstallation(env, preview.team_id);
+  if (!install) return missing();
   const clientId = slackSecret(env, "SLACK_CLIENT_ID");
-  if (!clientId) return page(503, "Sign-in isn't available", "<p>Slack sign-in isn't set up on this deployment.</p>");
+  if (url.searchParams.get("via") !== "slack" || !clientId) {
+    const viaSlack = new URL(request.url);
+    viaSlack.searchParams.set("via", "slack");
+    const team = escapeHtml(install.teamName);
+    return page(
+      200,
+      `Sign in to ${install.teamName}`,
+      `<p>This preview is for members of the ${team} Slack workspace.</p>${
+        clientId ? `<a class="button" href="${escapeHtml(viaSlack.toString())}">Sign in with Slack</a>` : ""
+      }<form method="post" action="${SIGNIN_DM_PATH}"><p style="margin-top:28px">Or get a sign-in link from Stella in a Slack DM:</p><input type="hidden" name="p" value="${preview.id}"><input type="hidden" name="r" value="${escapeHtml(path)}"><input name="email" type="email" required placeholder="Your email in ${team}" autocomplete="email" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:12px;border:1px solid #c9c7c1;font:inherit"><button class="button" type="submit" style="border:0;cursor:pointer;font:inherit">Send me a link</button></form>`,
+      { "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'" },
+    );
+  }
   const nonce = newId();
   const state = await signToken<SigninState>(env, SIGNIN_STATE, { p: preview.id, r: path, n: nonce }, 10 * 60_000);
   const authorize = new URL("https://slack.com/openid/connect/authorize");
@@ -752,10 +774,51 @@ const signinCallback = async (request: Request, env: Cloudflare.Env): Promise<Re
       "<p>You signed in to a different Slack workspace. Only members of the workspace the preview was made in can open it.</p>",
     );
   }
-  const member = await signToken<MemberClaims>(env, MEMBER, { t: team, u: user }, MEMBER_TTL_MS);
-  return await grantRedirect(env, preview, state.r, {
-    "set-cookie": `${MEMBER_COOKIE}=${member}; Path=${SLACK_PREVIEWS_PATH}/; Max-Age=${Math.floor(MEMBER_TTL_MS / 1000)}; HttpOnly; Secure; SameSite=Lax`,
+  return await grantRedirect(env, preview, state.r, { "set-cookie": await memberCookie(env, team, user) });
+};
+
+/**
+ * The fallback for people Sign in with Slack refuses (an unconfirmed email,
+ * say): the workspace's bot DMs a one-time link to the member with that
+ * email. The page never says whether the email belongs to a member.
+ */
+const sendDmLink = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const form = await request.formData().catch(() => null);
+  const preview = await loadPreview(env, String(form?.get("p") ?? ""));
+  if (!preview) return missing();
+  const install = await loadInstallation(env, preview.team_id);
+  if (!install) return missing();
+  const email = String(form?.get("email") ?? "").trim().slice(0, 254);
+  const path = safePath(String(form?.get("r") ?? "/"));
+  const sent = page(
+    200,
+    "Check Slack",
+    `<p>If ${escapeHtml(email || "that email")} belongs to a member of ${escapeHtml(install.teamName)}, Stella just sent them a sign-in link in a direct message. It works for 15 minutes.</p>`,
+  );
+  if (!/^[^@\s]+@[^@\s]+$/u.test(email)) return sent;
+  const found = await slackTry<{ ok: boolean; user?: { id: string; team_id?: string; deleted?: boolean; is_bot?: boolean } }>(
+    install.botToken,
+    "users.lookupByEmail",
+    { email },
+  );
+  const user = found?.user;
+  if (!user || user.deleted || user.is_bot) return sent;
+  const token = await signToken<DmLinkClaims>(env, DM_LINK, { p: preview.id, r: path, t: preview.team_id, u: user.id }, DM_LINK_TTL_MS);
+  const link = `${authOrigin(env, request)}${SIGNIN_DM_PATH}?t=${encodeURIComponent(token)}`;
+  await slackTry(install.botToken, "chat.postMessage", {
+    channel: user.id,
+    text: `Here's your link to open the Stella preview you asked for: <${link}|Open the preview>. It works for 15 minutes. If you didn't ask for it, ignore this message.`,
+    unfurl_links: false,
   });
+  return sent;
+};
+
+const openDmLink = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const claims = await verifyToken<DmLinkClaims>(env, DM_LINK, new URL(request.url).searchParams.get("t") ?? "");
+  if (!claims) return page(400, "That link expired", "<p>Open the preview again to get a new one.</p>");
+  const preview = await loadPreview(env, claims.p);
+  if (!preview || preview.team_id !== claims.t) return missing();
+  return await grantRedirect(env, preview, claims.r, { "set-cookie": await memberCookie(env, claims.t, claims.u) });
 };
 
 export const handleSlackPreviewRoute = async (request: Request, env: Cloudflare.Env): Promise<Response | null> => {
@@ -768,6 +831,8 @@ export const handleSlackPreviewRoute = async (request: Request, env: Cloudflare.
     }
   }
   if (pathname === SIGNIN_PATH && request.method === "GET") return await signin(request, env);
+  if (pathname === SIGNIN_DM_PATH && request.method === "POST") return await sendDmLink(request, env);
+  if (pathname === SIGNIN_DM_PATH && request.method === "GET") return await openDmLink(request, env);
   if (pathname === OIDC_CALLBACK_PATH && request.method === "GET") return await signinCallback(request, env);
   return null;
 };

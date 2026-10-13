@@ -313,6 +313,14 @@ export class AppSourceService {
   /** `appSource.fork`'s last `pushedAt`, and the ones this computer made. */
   private forkPushSeen: number | null = null;
   private readonly ownForkPushes = new Set<number>();
+  /**
+   * This computer's reports still in flight: a push announced meanwhile may
+   * be its own (the view can arrive before the call returns), so it waits.
+   */
+  private forkReports = 0;
+  private forkPushHeld: number | null = null;
+  /** Why the next sync runs, for the log. */
+  private syncReason = "launch";
   private timers: NodeJS.Timeout[] = [];
   private backend: { baseUrl: string; client: BackendClient } | null = null;
   private access: SourceAccess | null = null;
@@ -371,7 +379,7 @@ export class AppSourceService {
     // The launch sync: the fork, upstream, and a push of anything this
     // computer applied while it couldn't reach the fork.
     this.syncNotBefore = Date.now() + LAUNCH_SYNC_DELAY_MS;
-    this.wantSync();
+    this.wantSync("launch");
     this.followBackend();
     void installCheckoutGuard(this.options.stellaAppDir, this.options.log).catch(
       (error: unknown) =>
@@ -1757,22 +1765,31 @@ export class AppSourceService {
           return;
         }
         this.options.log("app-source.published", { version });
-        this.wantSync();
+        this.wantSync("published");
       })
-      .catch(() => this.wantSync());
+      .catch(() => this.wantSync("published"));
   }
 
   /** Another computer pushed to the fork (its main or change tags). */
   private onForkPush(pushedAt: number | null) {
     if (pushedAt === null || pushedAt === this.forkPushSeen) return;
     this.forkPushSeen = pushedAt;
+    if (this.forkReports > 0) {
+      this.forkPushHeld = pushedAt;
+      return;
+    }
+    this.onOthersForkPush(pushedAt);
+  }
+
+  private onOthersForkPush(pushedAt: number) {
     if (this.ownForkPushes.has(pushedAt) || this.forkUnrelated) return;
     this.options.log("app-source.fork-pushed", { pushedAt });
-    this.wantSync();
+    this.wantSync("fork");
   }
 
   /** Ask for a sync: now, or when the launch delay or a backoff ends. */
-  private wantSync() {
+  private wantSync(reason: string) {
+    if (!this.syncWanted) this.syncReason = reason;
     this.syncWanted = true;
     const wait = this.syncNotBefore - Date.now();
     if (wait <= 0) {
@@ -1806,6 +1823,7 @@ export class AppSourceService {
         return;
       }
       this.syncWanted = false;
+      this.options.log("app-source.sync", { reason: this.syncReason });
       const access = await this.sourceAccess();
       if (!access) {
         outcome = "done";
@@ -1836,13 +1854,14 @@ export class AppSourceService {
         // Retried with backoff until it works; the channel's next connect
         // or announcement asks again anyway.
         this.syncWanted = true;
+        this.syncReason = "retry";
         this.syncNotBefore =
           Date.now() + Math.min(SYNC_RETRY_MAX_MS, SYNC_RETRY_MS * 2 ** this.syncFailures);
         this.syncFailures += 1;
       }
       void this.refresh();
       // Asked again while this one ran: a newer version, or another push.
-      if (outcome !== "deferred" && this.syncWanted) this.wantSync();
+      if (outcome !== "deferred" && this.syncWanted) this.wantSync(this.syncReason);
     }
   }
 
@@ -1943,6 +1962,7 @@ export class AppSourceService {
   private reportForkPush(tip: string) {
     const baseUrl = this.options.getBackendUrl();
     if (!baseUrl || !this.options.hasConnectedAccount()) return;
+    this.forkReports += 1;
     void this.backendClient(baseUrl)
       .call("appSource.forkPushed", { tip })
       .then(({ pushedAt }) => {
@@ -1955,6 +1975,13 @@ export class AppSourceService {
         this.options.log("app-source.fork-push-report-failed", {
           message: errorMessage(error),
         });
+      })
+      .finally(() => {
+        this.forkReports -= 1;
+        const held = this.forkPushHeld;
+        if (this.forkReports > 0 || held === null) return;
+        this.forkPushHeld = null;
+        this.onOthersForkPush(held);
       });
   }
 

@@ -2630,6 +2630,7 @@
       "markdown": {
         "desktopRequired": "L’aperçu Markdown nécessite l’app Stella pour ordinateur.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Texte",
         "noContent": "Aucun contenu trouvé."
       },
       "media": {

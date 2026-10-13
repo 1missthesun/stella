@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Markdown preview requires the Stella desktop app.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Text",
         "noContent": "No content found."
       },
       "media": {

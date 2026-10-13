@@ -31,6 +31,7 @@ import {
   MARKDOWN_PREVIEW_MAX_BYTES,
   type PreviewResult,
 } from "./preview-parser";
+import { isPlainTextPath } from "@/features/workspace-display/path-to-viewer";
 import { usePreviewParser } from "./use-preview-parser";
 import { usePreviewWindow } from "./use-preview-window";
 import { PreviewEmpty, PreviewProblem } from "./preview-states";
@@ -419,6 +420,7 @@ const MarkdownView = ({
   onRetry: () => void;
 }) => {
   const t = useT();
+  const plainText = isPlainTextPath(filePath);
   const { bytes, error, loading, missing, truncated } = useDisplayFileBytes(
     filePath,
     t("shell.display.markdown.desktopRequired"),
@@ -445,7 +447,9 @@ const MarkdownView = ({
         <header className="display-file-preview__header">
           <div className="display-file-preview__title-group">
             <span className="display-file-preview__eyebrow">
-              {t("shell.display.markdown.eyebrow")}
+              {plainText
+                ? t("shell.display.markdown.textEyebrow")
+                : t("shell.display.markdown.eyebrow")}
             </span>
             <div className="display-file-preview__title" title={filePath}>
               {title ??
@@ -476,6 +480,8 @@ const MarkdownView = ({
             </div>
           ) : markdown.trim().length === 0 ? (
             <PreviewEmpty title={t("shell.display.preview.emptyTitle")} />
+          ) : plainText ? (
+            <pre className="display-text-viewer">{markdown}</pre>
           ) : (
             <Suspense fallback={null}>
               <Markdown text={markdown} documentPath={filePath} />

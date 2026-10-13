@@ -59,13 +59,15 @@ export type PeerDeviceFiles = {
     conversationId?: string | null,
   ) => Promise<DeviceFolderListing>;
   /**
-   * The online computer that has `filePath`, trying `preferred` first and
-   * then every other online computer of the owner.
+   * The online computer that has `filePath`: `preferred` (the computer that
+   * produced it) when it has it, then the computer the destination picker
+   * names, then whichever other online computer of the owner answers first.
    */
   findHolder: (
     filePath: string,
     options?: { preferred?: string | null; conversationId?: string | null },
   ) => Promise<{ computer: PeerComputer; stat: DeviceFileStat } | null>;
+  setSelectedDevice: (deviceId: string | null) => void;
 };
 
 type Deps = {
@@ -99,6 +101,7 @@ export const createPeerDeviceFiles = (deps: Deps): PeerDeviceFiles => {
   const fetchImpl = deps.fetchImpl ?? fetch;
   let devicesCache: { at: number; owner: string; value: Promise<PeerComputer[]> } | null =
     null;
+  let selectedDeviceId: string | null = null;
 
   const base = () => deps.getBackendUrl()?.trim().replace(/\/+$/, "") || null;
 
@@ -230,11 +233,8 @@ export const createPeerDeviceFiles = (deps: Deps): PeerDeviceFiles => {
     },
     findHolder: async (filePath, options = {}) => {
       const computers = await onlineComputers();
-      const ordered = [
-        ...computers.filter((computer) => computer.deviceId === options.preferred),
-        ...computers.filter((computer) => computer.deviceId !== options.preferred),
-      ];
-      const probes = ordered.map(async (computer) => {
+      if (computers.length === 0) return null;
+      const probe = async (computer: PeerComputer) => {
         const found = await request(computer.deviceId, "file.stat", {
           filePath,
           ...withConversation(options.conversationId),
@@ -243,9 +243,25 @@ export const createPeerDeviceFiles = (deps: Deps): PeerDeviceFiles => {
           .catch(() => null);
         if (!isDeviceFileStat(found)) throw new Error("absent");
         return { computer, stat: found };
-      });
-      if (probes.length === 0) return null;
-      return await Promise.any(probes).catch(() => null);
+      };
+      const ranked = [options.preferred ?? null, selectedDeviceId].filter(
+        (deviceId, index, all): deviceId is string =>
+          !!deviceId && all.indexOf(deviceId) === index,
+      );
+      const probes = new Map(computers.map((computer) => [computer.deviceId, probe(computer)]));
+      for (const pending of probes.values()) pending.catch(() => null);
+      for (const deviceId of ranked) {
+        const found = await probes.get(deviceId)?.catch(() => null);
+        if (found) return found;
+      }
+      const rest = computers
+        .filter((computer) => !ranked.includes(computer.deviceId))
+        .map((computer) => probes.get(computer.deviceId)!);
+      if (rest.length === 0) return null;
+      return await Promise.any(rest).catch(() => null);
+    },
+    setSelectedDevice: (deviceId) => {
+      selectedDeviceId = deviceId?.trim() || null;
     },
   };
 };

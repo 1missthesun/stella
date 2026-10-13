@@ -96,7 +96,7 @@ export const deviceFileMissingMessage = (
   noun: DeviceFileNoun = "file",
 ): string =>
   reason === "unshared"
-    ? `This ${noun} isn't on this computer, and no copy of it was shared to your Drive.`
+    ? `This ${noun} isn't on this computer or on any of your other computers that are online, and no copy of it is in your Drive.`
     : `File no longer available — ${fileNameOf(filePath)} was moved or deleted.`;
 
 /**
@@ -111,6 +111,15 @@ export const localPathNotFoundMessage = (
   wasOnThisComputer
     ? `${fileNameOf(filePath)} is no longer on this computer. It was moved or deleted.`
     : `${fileNameOf(filePath)} isn't on this computer. It may be on another of your computers.`;
+
+/**
+ * What an "open this path" action says about a file Stella has no viewer for
+ * that is on another of the user's computers: the OS here cannot open it.
+ */
+export const deviceFileNoPreviewMessage = (filePath: string, deviceName: string): string => {
+  const device = friendlyDeviceName(deviceName);
+  return `${fileNameOf(filePath)} is on ${device}. Stella can't preview this kind of file, so open it on ${device}.`;
+};
 
 /** What a viewer says when it can't show `filePath` from `source`. */
 export const deviceFileUnavailableMessage = (

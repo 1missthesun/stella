@@ -51,7 +51,15 @@ const storeTarget = (target: DesktopExecutionTarget): void => {
   }
 };
 
+const shareSelectedDevice = (target: DesktopExecutionTarget): void => {
+  if (typeof window === "undefined") return;
+  window.electronAPI?.display?.setSelectedDevice?.(
+    target.mode === "device" ? target.deviceId : null,
+  );
+};
+
 current = readStoredTarget();
+shareSelectedDevice(current);
 
 export const executionTargetStore = {
   getSnapshot: () => current,
@@ -64,6 +72,7 @@ export const executionTargetStore = {
     if (JSON.stringify(normalized) === JSON.stringify(current)) return;
     current = normalized;
     storeTarget(normalized);
+    shareSelectedDevice(normalized);
     for (const listener of listeners) listener();
   },
 };

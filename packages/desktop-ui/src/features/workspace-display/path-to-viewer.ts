@@ -67,6 +67,7 @@ const VIDEO_EXTS = new Set(["mp4", "webm", "mov", "m4v"]);
 const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "m4a", "flac"]);
 const MODEL3D_EXTS = new Set(["glb", "gltf", "obj", "stl"]);
 const MARKDOWN_EXTS = new Set(["md", "mdx"]);
+const PLAIN_TEXT_EXTS = new Set(["txt", "log"]);
 const DEVELOPER_RESOURCE_EXTS = new Set<string>(DEVELOPER_EXTS);
 
 const PREFERRED_RESOURCE_EXTS = new Set<string>([
@@ -125,6 +126,11 @@ export const kindForExtension = (
   if (AUDIO_EXTS.has(extension)) return "audio";
   if (MODEL3D_EXTS.has(extension)) return "model3d";
   return null;
+};
+/** A text file the markdown viewer shows as-is rather than rendering. */
+export const isPlainTextPath = (filePath: string): boolean => {
+  const extension = extensionOf(filePath);
+  return extension != null && PLAIN_TEXT_EXTS.has(extension);
 };
 export const kindForPath = (filePath: string): ViewerKind | null =>
   kindForExtension(extensionOf(filePath));

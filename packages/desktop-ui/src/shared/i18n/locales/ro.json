@@ -2630,6 +2630,7 @@
       "markdown": {
         "desktopRequired": "Previzualizarea Markdown necesită aplicația desktop Stella.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Text",
         "noContent": "Niciun conținut găsit."
       },
       "media": {

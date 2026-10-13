@@ -2606,6 +2606,7 @@
       "markdown": {
         "desktopRequired": "Markdown 預覽需要 Stella 桌面 App。",
         "eyebrow": "Markdown",
+        "textEyebrow": "文字",
         "noContent": "找不到內容。"
       },
       "media": {

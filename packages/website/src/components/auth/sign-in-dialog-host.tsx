@@ -8,20 +8,26 @@ const LazySignInDialogProvider = dynamic(() =>
   import("./sign-in-dialog").then((module) => module.SignInDialogProvider),
 );
 
+type HostMode = "idle" | "verify" | "open";
+
 /** Loads the auth dialog implementation only when a sign-in is requested. */
 export function SignInDialogHost() {
-  const [active, setActive] = useState(false);
+  const [mode, setMode] = useState<HostMode>("idle");
 
   useEffect(() => {
-    const activate = () => setActive(true);
+    const activate = () => setMode("open");
+    const verify = () =>
+      setMode((current) => (current === "idle" ? "verify" : current));
     window.addEventListener(SIGN_IN_DIALOG_EVENT, activate);
 
-    // OAuth redirects can land on any route with a one-time token. In that
-    // exceptional case, load the dialog immediately so it can verify the token.
-    if (new URL(window.location.href).searchParams.has("ott")) activate();
+    // OAuth and magic-link returns land on a route with a one-time token.
+    // Load the dialog module to verify it, but keep the dialog closed: the
+    // user has just signed in.
+    if (new URL(window.location.href).searchParams.has("ott")) verify();
 
     return () => window.removeEventListener(SIGN_IN_DIALOG_EVENT, activate);
   }, []);
 
-  return active ? <LazySignInDialogProvider initiallyOpen /> : null;
+  if (mode === "idle") return null;
+  return <LazySignInDialogProvider initiallyOpen={mode === "open"} />;
 }

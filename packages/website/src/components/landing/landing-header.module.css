@@ -107,8 +107,7 @@
 }
 
 .account :global(.site-nav__signin),
-.account :global(button),
-.account :global(a) {
+.account :global(.site-nav__trigger) {
   padding: 0;
   border: 0;
   background: none;
@@ -118,7 +117,15 @@
   cursor: pointer;
 }
 
-.account :global(.site-nav__signin):hover {
+.account :global(.site-nav__trigger) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.account :global(.site-nav__signin):hover,
+.account :global(.site-nav__trigger):hover,
+.account :global(.site-nav__trigger[aria-expanded="true"]) {
   opacity: 1;
 }
 

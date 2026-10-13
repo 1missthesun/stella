@@ -46,7 +46,11 @@ export function SignInDialogProvider({
 }) {
   const dialogRef = useRef<HTMLDialogElement | null>(null);
   const [isOpen, setIsOpen] = useState(initiallyOpen);
-  useOAuthReturnToken();
+  const close = useCallback(() => {
+    setIsOpen(false);
+  }, []);
+  useOAuthReturnToken(close);
+  useCloseWhenSignedIn(isOpen, close);
 
   const open = useCallback(() => {
     if (!isBackendConfigured()) {
@@ -54,10 +58,6 @@ export function SignInDialogProvider({
       return;
     }
     setIsOpen(true);
-  }, []);
-
-  const close = useCallback(() => {
-    setIsOpen(false);
   }, []);
 
   useEffect(() => {
@@ -122,7 +122,33 @@ export function SignInDialogProvider({
   );
 }
 
-function useOAuthReturnToken() {
+let returnTokenVerification: Promise<boolean> | null = null;
+
+function verifyReturnToken(token: string): Promise<boolean> {
+  returnTokenVerification ??= (async () => {
+    try {
+      await authClient.$fetch("/one-time-token/verify", {
+        method: "POST",
+        body: { token },
+        throw: true,
+      });
+      clearCachedToken();
+      const store = (
+        authClient as unknown as {
+          $store?: { notify: (signal: string) => void };
+        }
+      ).$store;
+      store?.notify("$sessionSignal");
+      reportGoogleAdsSignup();
+      return true;
+    } catch {
+      return false;
+    }
+  })();
+  return returnTokenVerification;
+}
+
+function useOAuthReturnToken(onSignedIn: () => void) {
   useEffect(() => {
     if (!isBackendConfigured()) return;
     const url = new URL(window.location.href);
@@ -136,33 +162,23 @@ function useOAuthReturnToken() {
       `${url.pathname}${url.search}${url.hash}`,
     );
 
-    let cancelled = false;
-    const verify = async () => {
-      try {
-        await authClient.$fetch("/one-time-token/verify", {
-          method: "POST",
-          body: { token },
-        });
-        if (cancelled) return;
-        clearCachedToken();
-        const store = (
-          authClient as unknown as {
-            $store?: { notify: (signal: string) => void };
-          }
-        ).$store;
-        store?.notify("$sessionSignal");
-        reportGoogleAdsSignup();
-      } catch {
-        if (cancelled) return;
-        openSignInDialog();
-      }
-    };
+    void verifyReturnToken(token).then((signedIn) => {
+      if (signedIn) onSignedIn();
+      else openSignInDialog();
+    });
+  }, [onSignedIn]);
+}
 
-    void verify();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+function useCloseWhenSignedIn(isOpen: boolean, close: () => void) {
+  const session = authClient.useSession();
+  const user = (
+    session.data as { user?: { isAnonymous?: boolean | null } } | null
+  )?.user;
+  const signedIn = Boolean(user) && user?.isAnonymous !== true;
+
+  useEffect(() => {
+    if (isOpen && signedIn) close();
+  }, [isOpen, signedIn, close]);
 }
 
 function DialogBody({ onClose }: { onClose: () => void }) {

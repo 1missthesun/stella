@@ -98,6 +98,10 @@ export class OrchestratorSession extends DurableObject<Env> {
     return await (await this.loadImplementation()).queryHistory(ownerId, request);
   }
 
+  async catchUpSource(ownerId: string): Promise<import("@stella/contracts/catch-up").CatchUpSource> {
+    return await (await this.loadImplementation()).catchUpSource(ownerId);
+  }
+
   async webSocketMessage(
     ws: WebSocket,
     message: string | ArrayBuffer,

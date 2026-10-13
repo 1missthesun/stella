@@ -9,6 +9,10 @@ import {
 } from "@stella/contracts/turn-plane/turn-start";
 import { HEADER_TURN_AUTH_KIND } from "./turn-start-request.js";
 import { JOURNAL_CHECKPOINT_PATH } from "@stella/contracts/journal-checkpoint";
+import {
+  catchUpMessagesFromJournal,
+  type CatchUpSource,
+} from "@stella/contracts/catch-up";
 import { HEADER_OWNER, parseSocketIdentity } from "./conversation-types.js";
 import { CLOUD_CLI_TURN_DO_PATHS } from "@stella/contracts/cloud-orchestrator-cli";
 import { parseExactTurnCancellationRequest } from "./execution-placement-turn-cancellation.js";
@@ -852,5 +856,22 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       throw new Error("history is unavailable in this session.");
     }
     return await this.runHistoryOp(request);
+  }
+
+  /**
+   * What a catch-up reads (owner store `catchUps`): the newest resident
+   * messages the user and Stella exchanged, and the agents still running.
+   */
+  async catchUpSource(ownerId: string): Promise<CatchUpSource> {
+    if (this.purged() || !ownerId || this.journal.ownerId() !== ownerId) {
+      throw new Error("This conversation is unavailable.");
+    }
+    return {
+      // Rows back from the head, tool rows included.
+      messages: catchUpMessagesFromJournal(this.journal.newest(800)),
+      running: this.journal
+        .runningAgents()
+        .map((agent) => ({ title: agent.title, startedAt: agent.createdAtMs })),
+    };
   }
 }

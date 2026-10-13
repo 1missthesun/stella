@@ -24,7 +24,7 @@ printf '%s' "$PROMPT" | env -u ANTHROPIC_API_KEY -u ANTHROPIC_AUTH_TOKEN -u CLAU
   -u ANTHROPIC_BASE_URL -u ANTHROPIC_CUSTOM_HEADERS -u CLAUDE_CODE_EFFORT_LEVEL \
   CLAUDE_CONFIG_DIR="$work/config" CLAUDE_SECURESTORAGE_CONFIG_DIR="$dir" IS_SANDBOX=1 \
   CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 ENABLE_CLAUDEAI_MCP_SERVERS=false NO_COLOR=1 \
-  timeout ${CLI_TIMEOUT_SECONDS} "$CLI" -p --model "$MODEL" --output-format json --json-schema "$SCHEMA" \
+  timeout ${CLI_TIMEOUT_SECONDS} "$CLI" -p --model "$MODEL" ${'${EFFORT:+--effort "$EFFORT"}'} --output-format json --json-schema "$SCHEMA" \
     --tools "" --strict-mcp-config --setting-sources "" --disable-slash-commands \
     --no-session-persistence --system-prompt "$SYSTEM" >"$work/out" 2>"$work/err"
 code=$?
@@ -59,6 +59,8 @@ export const runClaudeDigest = async (input: {
   prompt: string;
   schema: Record<string, unknown>;
   cli?: string;
+  /** Claude Code's `--effort`; its own default when absent. */
+  effort?: "low" | "medium" | "high";
 }): Promise<ClaudeDigestOutcome> => {
   const container = await claudeLoginContainer(input.env, input.ownerId);
   await restoreClaudeCloudLogins(input.env, input.ownerId, container);
@@ -76,6 +78,7 @@ export const runClaudeDigest = async (input: {
         SCHEMA: JSON.stringify(input.schema),
         MODEL: CLAUDE_DIGEST_MODEL,
         CLI: input.cli ?? "claude",
+        ...(input.effort ? { EFFORT: input.effort } : {}),
       },
     },
   );

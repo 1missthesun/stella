@@ -290,7 +290,9 @@ export class UserAskService {
     policyCache = null;
     remoteWatchStop = null;
     remotePollTimer = null;
-    remoteLiveAt = 0;
+    // True while the live socket is up and the open-asks view has delivered
+    // its value on it; the fallback poll runs only while this is false.
+    remoteLive = false;
     claiming = new Set();
     fingerprintCache = null;
     retainedFingerprints = EMPTY_SECRET_FINGERPRINTS;
@@ -1315,6 +1317,12 @@ export class UserAskService {
             client: new BackendClient({
                 baseUrl,
                 getToken: async () => (await this.options.getAuthToken?.()) ?? null,
+                // A reconnect re-subscribes and the view's next value marks
+                // it live again.
+                onConnectionChange: (connected) => {
+                    if (!connected)
+                        this.remoteLive = false;
+                },
             }),
         };
         return this.backend.client;
@@ -1323,7 +1331,7 @@ export class UserAskService {
         const client = this.ensureBackendClient();
         if (client && !this.remoteWatchStop) {
             this.remoteWatchStop = client.watch(CLOUD_OPEN_ASKS_VIEW, {}, (rows) => {
-                this.remoteLiveAt = Date.now();
+                this.remoteLive = true;
                 this.policyCache = null;
                 void this.resolvePolicy(0);
                 this.applyMirror(rows);
@@ -1331,12 +1339,14 @@ export class UserAskService {
             }, () => {
                 this.remoteWatchStop?.();
                 this.remoteWatchStop = null;
-                this.remoteLiveAt = 0;
+                this.remoteLive = false;
             });
         }
         if (!this.remotePollTimer) {
             const timer = setInterval(() => {
-                if (Date.now() - this.remoteLiveAt < REMOTE_ANSWER_POLL_MS) {
+                // The live view carries every change, so a quiet but
+                // connected view needs no reads.
+                if (this.remoteLive) {
                     return;
                 }
                 this.startRemoteAnswerSync();
@@ -1356,7 +1366,7 @@ export class UserAskService {
             clearInterval(this.remotePollTimer);
             this.remotePollTimer = null;
         }
-        this.remoteLiveAt = 0;
+        this.remoteLive = false;
         this.backend?.client.dispose();
         this.backend = null;
     }

@@ -13,6 +13,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { ChatContext, ChatContextFile } from "@/shared/types/electron";
 import { platformCapabilities } from "@/platform/capabilities";
 import { browserAttachmentUploads } from "@/features/cloud/browser-chat-attachments";
+import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 
 type AttachedScreenshot = {
   dataUrl: string;
@@ -134,6 +135,17 @@ async function processPathBackedImage(
   }
 }
 
+function effectiveFileType(file: File): string {
+  return attachmentContentType({ declared: file.type, name: file.name });
+}
+
+function withEffectiveType(file: File): File {
+  const type = effectiveFileType(file);
+  return type === file.type
+    ? file
+    : new File([file], file.name, { type, lastModified: file.lastModified });
+}
+
 function isAttachableImage(mimeType: string): boolean {
   return ATTACHMENT_IMAGE_MIME_TYPES.has(mimeType);
 }
@@ -151,15 +163,20 @@ async function processInputFiles(
     return { screenshots: [], files: [] };
   }
 
-  const imageFiles = accepted.filter((f) => isAttachableImage(f.type));
-  const otherFiles = accepted.filter((f) => !isAttachableImage(f.type));
+  const imageFiles = accepted.filter((f) =>
+    isAttachableImage(effectiveFileType(f)),
+  );
+  const otherFiles = accepted.filter(
+    (f) => !isAttachableImage(effectiveFileType(f)),
+  );
 
   const imageResults = await Promise.allSettled(
     imageFiles.map(async (file): Promise<AttachedScreenshot> => {
       const pathBacked = await processPathBackedImage(file);
       if (pathBacked) return pathBacked;
-      const dataUrl = await readFileAsDataUrl(file);
-      return { dataUrl, ...(await decodeImageAttachment(file, dataUrl)) };
+      const typed = withEffectiveType(file);
+      const dataUrl = await readFileAsDataUrl(typed);
+      return { dataUrl, ...(await decodeImageAttachment(typed, dataUrl)) };
     }),
   );
 
@@ -173,7 +190,7 @@ async function processInputFiles(
       return {
         name: file.name,
         size: file.size,
-        mimeType: file.type || "application/octet-stream",
+        mimeType: effectiveFileType(file),
         dataUrl,
         ...(path ? { path } : {}),
       };

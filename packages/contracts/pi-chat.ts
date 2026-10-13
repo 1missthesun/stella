@@ -1,4 +1,5 @@
 import type { AgentStatus } from "./agent-status.js";
+import { drivePathFromSignedDriveUrl } from "./attachment-content-type.js";
 /**
  * Stella's chat on pi-durable, as its clients see it.
  *
@@ -46,6 +47,7 @@ export type PiUserDisplay = {
     size?: number;
     url?: string;
     path?: string;
+    drivePath?: string;
     /** An image too large to go in the message inline: its bytes are only at `path`. */
     spilled?: true;
   }>;
@@ -584,11 +586,20 @@ export const piJournalUserMessage = (
   const hidden = piUserHidden(message);
   const images: PiContentBlock[] = [];
   const files: Array<Record<string, unknown>> = [];
+  const drivePaths: string[] = [];
   for (const attachment of display?.attachments ?? []) {
+    const drivePath = attachment.drivePath ?? drivePathFromSignedDriveUrl(attachment.url);
+    if (drivePath) {
+      if (!drivePaths.includes(drivePath)) drivePaths.push(drivePath);
+      continue;
+    }
     const match = attachment.kind === "image" ? /^data:([^;,]+);base64,(.+)$/s.exec(attachment.url ?? "") : null;
     if (match) images.push({ type: "image", mimeType: match[1]!, data: match[2]! });
     else if (attachment.kind === "file") files.push({ ...attachment, kind: "file" });
   }
+  const providerAttachments = [
+    ...new Set([...piProviderAttachmentPaths(message), ...drivePaths]),
+  ];
   return {
     hidden,
     ...(clientMsgId ? { clientMsgId } : {}),
@@ -603,9 +614,17 @@ export const piJournalUserMessage = (
           : {}),
       ...(message.voiceSession ? { voiceSession: message.voiceSession } : {}),
       ...(files.length > 0 ? { attachments: files } : {}),
+      ...(providerAttachments.length > 0 ? { providerContext: { attachments: providerAttachments } } : {}),
       ...(display?.context ? { metadata: { context: display.context } } : {}),
     },
   };
+};
+
+export const piProviderAttachmentPaths = (message: PiUserMessage): string[] => {
+  const raw = (message as { providerContext?: { attachments?: unknown } }).providerContext?.attachments;
+  return Array.isArray(raw)
+    ? raw.filter((path): path is string => typeof path === "string" && path.length > 0 && path.length <= 400)
+    : [];
 };
 
 /** What a user message shows: its unmarked text and what its marks display. */

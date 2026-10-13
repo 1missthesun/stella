@@ -54,7 +54,8 @@ const displayOf = (
       const image =
         attachment.kind === "image" ||
         (attachment.mimeType ?? "").startsWith("image/");
-      const preview = attachment.previewUrl ?? (image ? attachment.url : undefined);
+      const drivePath = attachment.drivePath?.trim() || undefined;
+      const preview = attachment.previewUrl ?? (image && !drivePath ? attachment.url : undefined);
       const savedIndex = image || attachment.path
         ? -1
         : savedFiles.findIndex((saved) => saved.name === attachment.name);
@@ -71,6 +72,7 @@ const displayOf = (
           ...(typeof attachment.size === "number" ? { size: attachment.size } : {}),
           ...(preview ? { url: preview } : {}),
           ...(localPath ? { path: localPath } : {}),
+          ...(drivePath ? { drivePath } : {}),
           ...(spilled ? { spilled: true as const } : {}),
         },
       ];

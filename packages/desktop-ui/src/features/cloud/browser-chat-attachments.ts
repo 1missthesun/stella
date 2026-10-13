@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 import { backendClient } from "@/platform/backend/backend-client";
 import { cloudAttachmentsStore } from "./cloud-composer-store";
 
@@ -61,7 +62,10 @@ export const waitForCloudAttachmentUploads = async (): Promise<void> => {
 
 const rejectReason = (file: File): string | null => {
   if (file.size <= 0) return "This file is empty.";
-  const isImage = file.type.startsWith("image/");
+  const isImage = attachmentContentType({
+    declared: file.type,
+    name: file.name,
+  }).startsWith("image/");
   if (isImage && file.size > BROWSER_IMAGE_SOURCE_MAX_BYTES) {
     return "This image is too large to resize safely in the browser.";
   }
@@ -184,7 +188,10 @@ const uploadOne = async (upload: BrowserAttachmentUpload): Promise<void> => {
   try {
     const file = await resizeOversizedBrowserImage(upload.file);
     const path = browserAttachmentDrivePath(file, upload.id);
-    const contentType = file.type || "application/octet-stream";
+    const contentType = attachmentContentType({
+      declared: file.type,
+      name: file.name,
+    });
     const preparedUpload = { ...upload, file };
     replace(upload.id, {
       file,
@@ -249,7 +256,10 @@ export const browserAttachmentUploads = {
         name: file.name,
         sizeBytes: file.size,
         path: null,
-        previewUrl: file.type.startsWith("image/")
+        previewUrl: attachmentContentType({
+          declared: file.type,
+          name: file.name,
+        }).startsWith("image/")
           ? URL.createObjectURL(file)
           : null,
         progress: 0,

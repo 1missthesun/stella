@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AppState } from "react-native";
 import type { DriveFileUrl as DrivePreview } from "@stella/contracts/backend/drive";
+import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 import type { ChatMessage } from "../types";
 import { getBackendClient } from "./backend";
 
@@ -52,7 +53,13 @@ export function useChatAttachmentPreviews(
         try {
           const preview = await getBackendClient().call("drive.fileUrl", { path });
           if (!current()) return;
-          cache.entries.set(path, preview);
+          cache.entries.set(path, {
+            ...preview,
+            contentType: attachmentContentType({
+              declared: preview.contentType,
+              name: preview.name || path,
+            }),
+          });
           setRevision((value) => value + 1);
         } catch {
           // Keep local previews and retry transient auth/network failures.

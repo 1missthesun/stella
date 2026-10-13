@@ -10,6 +10,7 @@ import { promises as fs } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { DesktopJournal, JournalReadRecord, RelayedMessage } from "@stella/agent/host/desktop-journal";
 import { BackendClient } from "@stella/contracts/backend/client";
+import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 import type { OpenSession } from "./sessions.js";
 import { JOURNAL_CHECKPOINT_PATH, type JournalCheckpointPublish } from "@stella/contracts/journal-checkpoint";
 import {
@@ -50,16 +51,18 @@ const relayFileBytes = async (
   if (dataMatch) {
     return {
       bytes: dataMatch[2] ? Buffer.from(dataMatch[3] ?? "", "base64") : Buffer.from(decodeURIComponent(dataMatch[3] ?? ""), "utf8"),
-      contentType: file.mimeType || dataMatch[1] || "application/octet-stream",
+      contentType: attachmentContentType({ declared: file.mimeType || dataMatch[1], name: file.name }),
       name: file.name || "attachment",
     };
   }
   const localPath = file.path?.trim() || (source.startsWith("file:") ? fileURLToPath(source) : "");
   if (!localPath) throw new Error("An attached file has no source on this computer.");
+  const bytes = await fs.readFile(localPath);
+  const name = file.name || localPath.split(/[\\/]/).pop() || "attachment";
   return {
-    bytes: await fs.readFile(localPath),
-    contentType: file.mimeType || "application/octet-stream",
-    name: file.name || localPath.split(/[\\/]/).pop() || "attachment",
+    bytes,
+    contentType: attachmentContentType({ declared: file.mimeType, name, bytes }),
+    name,
   };
 };
 

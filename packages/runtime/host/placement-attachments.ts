@@ -23,6 +23,7 @@
  * URL expires, so it is what the cloud journal can persist for other clients.
  */
 import type { RuntimeAttachmentRef } from "@stella/contracts/protocol";
+import { attachmentContentType } from "@stella/contracts/attachment-content-type";
 
 /** What the backend's `drive.fileUrl` returns for one path. */
 export type DriveFileResolution = {
@@ -61,7 +62,7 @@ export const resolvePlacementAttachments = async (args: {
   for (const path of args.paths) {
     try {
       const file = await args.resolve(path);
-      const contentType = file.contentType.trim().toLowerCase();
+      const contentType = attachmentContentType({ declared: file.contentType, name: file.name || file.path });
       resolved.push({
         url: file.url,
         mimeType: contentType,

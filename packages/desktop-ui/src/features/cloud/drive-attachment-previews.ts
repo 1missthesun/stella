@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import type { Attachment, MessageRecord } from "@stella/contracts/local-chat";
 import {
+  attachmentContentType,
+  isGenericContentType,
+} from "@stella/contracts/attachment-content-type";
+import {
   backendClient,
   readBackendAccountEpoch,
   subscribeBackendAccount,
@@ -68,7 +72,10 @@ const fetchPreview = async (path: string): Promise<Resolved> => {
   const response = await fetch(file.url);
   if (!response.ok) throw new Error(`drive file ${response.status}`);
   const blob = await response.blob();
-  const mimeType = file.contentType || blob.type || "application/octet-stream";
+  const mimeType = attachmentContentType({
+    declared: isGenericContentType(file.contentType) ? blob.type : file.contentType,
+    name: file.name || path,
+  });
   const typed = blob.type === mimeType ? blob : new Blob([blob], { type: mimeType });
   return {
     status: "ready",

@@ -83,14 +83,50 @@ const userAttachmentPresentation = (payload: Record<string, unknown>) => {
   // This is the exact transport suffix generated for these structured paths,
   // not a search for prose that happens to mention attachments or storage.
   const suffix = attachmentPaths.length ? withAttachmentPreamble("", attachmentPaths) : "";
+  const thumbnailUris = attachmentPaths.length ? [] : inlineImageUris(payload);
+  const documentNames = attachmentPaths.length ? [] : declaredFileNames(payload);
   return {
     text: !suffix ? text : text === suffix.trimStart() ? "" : text.endsWith(suffix) ? text.slice(0, -suffix.length) : text,
     ...(attachmentPaths.length ? {
       attachmentPaths,
       attachmentPreviews: attachmentPaths.map(path => ({ path, name: path.split("/").at(-1) ?? path })),
     } : {}),
+    ...(thumbnailUris.length ? { thumbnailUris, hasImage: true } : {}),
+    ...(documentNames.length ? { documentNames } : {}),
   };
 };
+
+const INLINE_IMAGE_MAX_BASE64 = 2 * 1024 * 1024;
+
+const inlineImageUris = (payload: Record<string, unknown>): string[] =>
+  Array.isArray(payload.content)
+    ? payload.content.flatMap((value) => {
+        const block = asRecord(value);
+        return block?.type === "image" &&
+          typeof block.data === "string" &&
+          block.data.length > 0 &&
+          block.data.length <= INLINE_IMAGE_MAX_BASE64 &&
+          typeof block.mimeType === "string" &&
+          block.mimeType.toLowerCase().startsWith("image/")
+          ? [`data:${block.mimeType};base64,${block.data}`]
+          : [];
+      })
+    : [];
+
+const declaredFileNames = (payload: Record<string, unknown>): string[] =>
+  Array.isArray(payload.attachments)
+    ? payload.attachments.flatMap((value) => {
+        const entry = asRecord(value);
+        if (entry?.kind !== "file") return [];
+        const name =
+          typeof entry.name === "string" && entry.name.trim()
+            ? entry.name.trim()
+            : typeof entry.path === "string"
+              ? entry.path.split(/[\\/]/).at(-1) ?? ""
+              : "";
+        return name ? [name] : [];
+      })
+    : [];
 
 const toolCalls = (
   record: JournalMessageRecord,

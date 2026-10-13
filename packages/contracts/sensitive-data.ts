@@ -184,3 +184,32 @@ export const sanitizeSensitiveData = (
   }
   return output;
 };
+
+const redactJsonStrings = (value: unknown): unknown => {
+  if (typeof value === "string") return redactSensitiveText(value);
+  if (Array.isArray(value)) return value.map(redactJsonStrings);
+  if (typeof value !== "object" || value === null) return value;
+  const output: Record<string, unknown> = {};
+  for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+    output[key] = redactJsonStrings(entry);
+  }
+  return output;
+};
+
+/**
+ * `redactSensitiveText` for a serialized JSON document. The text patterns
+ * run on each string value, never on the serialized form: JSON escapes a
+ * newline, so a pattern that stops at one (the Authorization header) would
+ * swallow the closing quotes and brackets and leave unparseable JSON. Keys
+ * and structure are kept exactly; only string values change. Input that is
+ * not JSON has no structure to keep and is redacted as text.
+ */
+export const redactSensitiveJson = (json: string): string => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    return redactSensitiveText(json);
+  }
+  return JSON.stringify(redactJsonStrings(parsed));
+};

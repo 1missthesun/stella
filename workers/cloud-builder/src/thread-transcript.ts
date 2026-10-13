@@ -32,7 +32,7 @@ import {
   isEncryptedJournalValue,
 } from "./journal-crypto.js";
 import { historyTokens } from "@stella/contracts/history-search";
-import { redactSensitiveText } from "@stella/contracts/sensitive-data";
+import { redactSensitiveJson } from "@stella/contracts/sensitive-data";
 
 const THREAD_SEARCH_TABLE = "thread_fts";
 
@@ -402,7 +402,7 @@ export const appendThreadMessages = (
       encode(
         sql,
         message.role === "toolResult"
-          ? redactSensitiveText(message.payloadJson)
+          ? redactSensitiveJson(message.payloadJson)
           : message.payloadJson,
       ),
       args.now,

@@ -75,7 +75,7 @@ import {
   type HistorySearchHit,
   type HistorySearchOptions,
 } from "@stella/contracts/history-search";
-import { redactSensitiveText } from "@stella/contracts/sensitive-data";
+import { redactSensitiveJson } from "@stella/contracts/sensitive-data";
 
 /**
  * A payload the activity fold can read. A spilled payload is a stub pointing at
@@ -1229,7 +1229,7 @@ export class Journal {
       // stored copy keeps none of it; the user's own messages are their
       // history and are never rewritten.
       if (columns.role === "toolResult") {
-        columns.payload_json = redactSensitiveText(columns.payload_json);
+        columns.payload_json = redactSensitiveJson(columns.payload_json);
       }
       columns.payload_json = this.encodePayload(columns.payload_json);
       if (typeof columns.bytes === "number") {

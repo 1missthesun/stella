@@ -10,7 +10,9 @@
  *   live in `owner_live_subs` so they survive hibernation. Every write names
  *   the tables it touched; a flush reruns only the subscriptions whose last
  *   read used one of them (or whose dependencies are not known yet, after a
- *   wake), and sends a value only when its hash moved. Flushes in quick
+ *   wake), and sends a value only when its hash moved. The last hash sent is
+ *   kept in memory, not written per push; after an eviction a subscription
+ *   may send its unchanged value once more. Flushes in quick
  *   succession coalesce into one.
  * - **Jobs:** `owner_jobs` are the owner's scheduled work. The owner
  *   object's single alarm fires at `nextDeadline()` and calls `onAlarm()`.
@@ -190,6 +192,8 @@ export class OwnerStore {
   private readonly queryTables = new Map<string, string[]>();
   private readonly writeTables = new Map<string, string[] | null>();
   private readonly viewDeps = new Map<string, ViewDeps>();
+  /** The hash of the value each subscription last sent, by `subKey`. */
+  private readonly sentHashes = new Map<string, string>();
 
   constructor(options: OwnerStoreOptions) {
     this.ctx = options.ctx;
@@ -644,6 +648,7 @@ export class OwnerStore {
           frame.view,
           encodeJson(frame.args),
         );
+        this.sentHashes.delete(subKey(attachment.connId, frame.id));
         this.pushSubscription(socket, attachment, {
           conn_id: attachment.connId,
           sub_id: frame.id,
@@ -660,6 +665,7 @@ export class OwnerStore {
           String(frame.id),
         );
         this.viewDeps.delete(subKey(attachment.connId, String(frame.id)));
+        this.sentHashes.delete(subKey(attachment.connId, String(frame.id)));
         return true;
       default:
         this.closeLive(socket, LIVE_CLOSE.protocol, "bad_frame");
@@ -686,6 +692,9 @@ export class OwnerStore {
     const prefix = subKey(connId, "");
     for (const key of this.viewDeps.keys()) {
       if (key.startsWith(prefix)) this.viewDeps.delete(key);
+    }
+    for (const key of this.sentHashes.keys()) {
+      if (key.startsWith(prefix)) this.sentHashes.delete(key);
     }
   }
 
@@ -808,13 +817,9 @@ export class OwnerStore {
       frame = { t: "error", id: row.sub_id, error: backendError };
       this.viewDeps.set(key, { tables: null, clock, at: now });
     }
-    if (hash === row.hash) return;
-    this.sql.exec(
-      "UPDATE owner_live_subs SET hash = ? WHERE conn_id = ? AND sub_id = ?",
-      hash,
-      row.conn_id,
-      row.sub_id,
-    );
+    // A row's own hash is what an older deploy stored; this one keeps it in memory.
+    if (hash === (this.sentHashes.get(key) ?? row.hash)) return;
+    this.sentHashes.set(key, hash);
     this.send(socket, frame);
   }
 

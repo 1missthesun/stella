@@ -7,7 +7,7 @@
 export const READ_TOOL_NAME = "Read";
 
 export const READ_TOOL_DESCRIPTION =
-  "Read a text file or inspect a local PNG, JPG, JPEG, GIF, or WEBP image. Image files are attached to the conversation as vision input.";
+  "Read a text file, or view a PNG/JPG/GIF/WEBP image.";
 
 export const READ_TOOL_PARAMETERS: Record<string, unknown> = {
   type: "object",
@@ -15,7 +15,7 @@ export const READ_TOOL_PARAMETERS: Record<string, unknown> = {
     file_path: {
       type: "string",
       description:
-        "Absolute text or image file path. Must be absolute (~ / $HOME expansion allowed); relative paths are rejected.",
+        "Absolute path (~ and $HOME allowed); relative paths are rejected.",
     },
     offset: { type: "number" },
     limit: { type: "number" },

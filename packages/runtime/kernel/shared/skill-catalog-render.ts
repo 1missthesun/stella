@@ -2,8 +2,9 @@
  * Pure renderer for the `<skills>` block the orchestrator and general
  * agents read. The device catalog (`skill-catalog.ts`) lists skills from
  * `~/.stella/skills/`; the cloud Durable Object renders the owner's mirrored
- * catalog with the same `~/.stella/skills/<id>/SKILL.md` paths so the
- * canonical prompt's "open its SKILL.md first with `Read`" holds on both.
+ * catalog with the same `~/.stella/skills/<id>/SKILL.md` paths. How to use
+ * a skill is each agent's prompt's to say: agents read it, Stella names it in
+ * a brief.
  */
 
 export type RenderedSkillCatalogEntry = {
@@ -38,13 +39,6 @@ export const renderInlineSkillCatalogBlock = (
     }
   }
 
-  lines.push("## How to use skills");
-  lines.push(
-    "- If a task matches a skill description, open its `SKILL.md` first with `Read`.",
-  );
-  lines.push(
-    `- When you finish a non-trivial reusable workflow, consider saving it as a new skill under \`${SKILLS_DISPLAY_ROOT}/\`.`,
-  );
   lines.push("</skills>");
 
   return lines.join("\n");

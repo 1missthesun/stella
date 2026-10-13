@@ -24,7 +24,7 @@ export type WebSearchCapability = (
 export const WEB_TOOL_NAME = "web";
 
 export const WEB_TOOL_DESCRIPTION =
-  "Search the live web (provide query) or fetch a known URL (provide url). Pass exactly one of query or url. Use this for facts that change over time, recent news, current documentation, or any specific page you need to read.";
+  "Search the web (query) or fetch a page as text (url); pass exactly one.";
 
 export const WEB_TOOL_PROMPT_SNIPPET = "Search the web or fetch a URL";
 

@@ -571,6 +571,9 @@ const messageText = (message: { content?: unknown } | undefined): string =>
 const RUNNING_STATUS_NOTE =
   "Still running. Its report arrives on its own in [Agent completed]: end your turn now instead of waiting or checking again.";
 
+/** `spawn_agent`'s result: the start is all there is to know until the report. */
+const STARTED_NOTE = "Its report arrives on its own as [Agent completed]; there is nothing to check before then.";
+
 /** How much of an agent's latest message `agent_status` shows. */
 const LATEST_PREVIEW_CHARS = 300;
 
@@ -1281,31 +1284,31 @@ export function stellaAgents(host: StellaAgentsHost) {
   const spawnAgent = defineTool({
     name: "spawn_agent",
     description:
-      "Start a background agent for work that needs its own owner. Continue related work with an existing agent through send_message, even when it is busy. Agents can delegate independent parts to subagents. The immediate result means work has started; completion arrives in [Agent completed].",
+      "Start a background agent. Its only context is your brief: it can't see this conversation. Returns its thread_id at once; its final report arrives later as [Agent completed].",
     parameters: Type.Object({
       description: Type.String({
-        description: "A short name for the project or area of work. It becomes the thread's name; put distinguishing words first.",
+        description: "The agent's name: its area (\"Finance\") or, for a one-off, the work. Distinguishing words first.",
       }),
       prompt: Type.String({
         description:
-          "The request and any necessary context the agent does not have. Keep simple requests short; preserve explicit constraints and leave the approach to the agent.",
+          "The brief: the request and what the agent can't know.",
       }),
       model: Type.Optional(
         Type.String({
           description:
-            "Optional model for the agent: a Stella model such as `stella/default`, a model on the user's own key or plan as `<provider>/<model>` (such as `codex/gpt-6.1-sol`), or Claude Code as `claude-code` or `claude-code/<model>`. Add `:low`, `:medium`, `:high`, `:xhigh` or `:max` to set its reasoning. Omit to use the configured model.",
+            "Omit to use the configured model. Otherwise `stella/default`, `<provider>/<model>` on the user's own key or plan (e.g. `codex/gpt-6.1-sol`), or `claude-code` / `claude-code/<model>`; append `:low`, `:medium`, `:high`, `:xhigh` or `:max` for reasoning.",
         }),
       ),
       destination: Type.Optional(
         Type.String({
           description:
-            'Where the agent runs: "cloud", or a device_id from the connected devices list. Omit to run it where you run. The agent runs entirely there, on that computer\'s own Stella with its own files, browser, apps and sign-ins (Claude Code there too), and waits up to an hour for a computer that is offline. Its reports come back to you wherever you run.',
+            'Omit to run it where you run. Otherwise "cloud" or a device_id: the agent runs entirely there, with that machine\'s files, apps, browser, sign-ins and Claude Code; an offline computer gets it within an hour. Its reports still come to you.',
         }),
       ),
       directory: Type.Optional(
         Type.String({
           description:
-            "Absolute path of the directory the agent starts in, such as the project the work is about, on the computer you run on (so not with destination). Its AGENTS.md, when there is one, is added to the agent's context. The agent can still work anywhere. Omit it to start the agent in a fresh folder of its own.",
+            "Omit to start in a fresh folder. Otherwise an absolute path on this computer to start in (not with destination); its AGENTS.md joins the agent's context.",
         }),
       ),
     }),
@@ -1406,6 +1409,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 "waiting" in started && started.waiting
                   ? waitingFor
                   : "",
+                STARTED_NOTE,
               ]
                 .filter(Boolean)
                 .join("\n"),
@@ -1438,7 +1442,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         content: [
           {
             type: "text",
-            text: `${existing ? "Already started" : "Started"} ${threadId} (${describePlacement(placement)}).`,
+            text: `${existing ? "Already started" : "Started"} ${threadId} (${describePlacement(placement)}).\n${STARTED_NOTE}`,
           },
         ],
         details: { thread_id: threadId },
@@ -1621,10 +1625,10 @@ export function stellaAgents(host: StellaAgentsHost) {
   const sendMessage = defineTool({
     name: "send_message",
     description:
-      'Message an agent or Stella session by thread_id, including while it is busy; it reads the message before its next step. To an agent you started, the message is an instruction: steer it, correct it, stop it, or resume it on the same thread after it finished or was stopped. To anyone else (Stella, the agent that started you, teammates, other sessions) it arrives as a note from you, which they weigh against their own work and can answer with send_message. Every message reaches them as from you, with your thread_id, so they can answer. "stella" reaches the Stella you work for, for what cannot wait for your report; your result goes in your final report, not here. A successful result means the message was delivered, not that any work finished; completion still arrives in [Agent completed]. agent_status without a thread_id lists who you can reach.',
+      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers or stops it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion.',
     parameters: Type.Object({
-      thread_id: Type.String({ description: 'Who to message: a thread_id from agent_status, or "stella".' }),
-      message: Type.String({ description: "The message. To your own agent, send only what is new or changed." }),
+      thread_id: Type.String({ description: 'A thread_id from agent_status, or "stella".' }),
+      message: Type.String({ description: "The message. To your own agent, only what is new." }),
     }),
     replay: "safe",
     execute: async (args, api, context) => {
@@ -1958,9 +1962,9 @@ export function stellaAgents(host: StellaAgentsHost) {
   const agentStatus = defineTool({
     name: "agent_status",
     description:
-      "Without thread_id: list who you can reach, one line each (thread_id · status · where, when not this computer · last active — description): subagents you started, your teammates (Stella and the other agents in this conversation), other Stella sessions on this computer, and the user's cloud sessions. With thread_id: that agent's status, where it runs, who started it, its relation to you, a short preview of its latest message (not its result), and its latest tool call. Never call it repeatedly to wait for an agent: its full report arrives on its own in [Agent completed]. send_message reaches anyone listed: to an agent you started it is an instruction that steers it while it runs or resumes it once stopped, and its report comes back to you; to anyone else it is a note they weigh, and a report still goes to whoever started them. stop_agent stops an agent and every agent it started, wherever they run; a later message resumes it. reachable: false means neither reaches that agent from here. Read-only: it never interrupts or messages anyone.",
+      "Read-only; for when the user asks how work is going or you need a failure's detail. Without thread_id: everyone you can reach, one line each (thread_id · status · where, when not this computer · last active — name): your agents, teammates, other Stella sessions and cloud sessions; the newest are listed, and older ones stay resumable by a thread_id from history. With thread_id: its status, where it runs, who started it, a short preview of its latest message (not its result) and its latest tool call. An agent's full report arrives on its own as [Agent completed]. reachable: false means neither send_message nor stop_agent can reach it from here.",
     parameters: Type.Object({
-      thread_id: Type.Optional(Type.String({ description: "The agent to inspect. Omit it to list everyone you can reach." })),
+      thread_id: Type.Optional(Type.String({ description: "Optional: the agent to inspect." })),
     }),
     replay: "safe",
     execute: async (args, api, context) => {
@@ -2069,9 +2073,9 @@ export function stellaAgents(host: StellaAgentsHost) {
   const stopAgent = defineTool({
     name: "stop_agent",
     description:
-      "Stop an agent by thread_id: its current run and the runs of every agent it started, at any depth, end at once, wherever they run (this computer, another computer, or the cloud). Nothing is deleted: each keeps its history, and a later send_message resumes it. This is for an agent that is stuck or does not respond. To have an agent stop normally, send_message it: it reads the message before its next step, stops itself, and tells the agents it started.",
+      "Stop a stuck or unresponsive agent at once, with every agent it started, wherever they run. Nothing is deleted; a later send_message resumes it. To have an agent stop normally, send_message it: it stops itself and tells the agents it started.",
     parameters: Type.Object({
-      thread_id: Type.String({ description: "Thread id of the agent to stop." }),
+      thread_id: Type.String({ description: "The agent's thread_id." }),
     }),
     replay: "safe",
     execute: async (args, api, context) => {

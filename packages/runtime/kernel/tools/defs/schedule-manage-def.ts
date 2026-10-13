@@ -77,7 +77,7 @@ export const SCHEDULE_ADD_TOOL_DESCRIPTOR: ScheduleToolDescriptor = {
   label: "Add schedule",
   workingText: "Adding schedule",
   description:
-    "Create a scheduled trigger. 'reminder' delivers message as written, with no AI: a phone push, an in-app notice on the desktop, and your line in the chat with Done and Snooze. 'task' is work that needs AI each time: at fire time an agent runs prompt and its result comes back to you like any finished job (deliverTo 'orchestrator' wakes you instead, for tasks that need your judgment then). 'watch' runs an AI-free check script on its schedule, in the cloud by default (script, checked once before it is saved) or on this computer when it needs something local (runsOn 'computer' with a ScriptDraft scriptPath); only a finding or a failure wakes AI, going to you or, with deliverTo 'agent', straight to an agent for an action the user already approved.",
+    "Create a reminder (message, delivered as written with no AI), a task (an agent runs prompt at each fire and reports back) or a watch (an AI-free check script on a repeating schedule, in the cloud or with runsOn 'computer' here; only a finding or failure wakes AI). Limits: repeats at least 15 minutes apart (watches 5), at most 25 schedules, and a daily budget of scheduled runs. A cloud watch script is run once before saving and the first result is returned.",
   parameters: {
     type: "object",
     properties: {

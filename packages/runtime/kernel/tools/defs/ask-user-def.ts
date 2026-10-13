@@ -23,7 +23,7 @@ export const ASK_USER_TOOL_LABEL = "Ask the user";
 export const ASK_USER_TOOL_WORKING_TEXT = "Asking";
 
 export const ASK_USER_TOOL_DESCRIPTION =
-  "Show the user a go/no-go card for a real gate, and use it rarely: every ask interrupts the user and can push to their phone. By default, decide: when one option is reasonable, take it and say what you chose so the user can redirect. Ask only for an explicit go-ahead (deploying or releasing, spending money, deleting the user's data, sending or posting as the user), for something that needs the user's hands or consent (sign-in, 2FA, an approval), or for a genuine fork where no option is defensible without the user's preference and a wrong pick would be costly to redo. Never ask about cosmetic, reversible or cheap-to-redo choices, things the user already decided or left up to you, or to confirm something already done. Ask once: a go-ahead or consent the user already gave covers the rest of that task, so never ask for the same one again. Ask open-ended or discussion questions in plain prose, not a card. Batch related questions into one ask, up to four; they appear one at a time on every device, and answering once clears it everywhere. The user picks an option, types their own answer, or skips; a skipped question comes back as skipped. Give every question a default_choice: the work continues with those defaults if nobody answers, and you adapt if an answer arrives later. Set blocking only for actions that are hard to undo (spending money, deleting things, sending as the user). Keep working on anything that does not depend on the answer.";
+  "Show the user a card with up to four multiple-choice questions. It interrupts them and can push to their phone, so it is for go-aheads (spending money, deleting their data, sending or posting as them, deploying or releasing), things that need their hands or consent (sign-in, 2FA, an approval), and real forks where a wrong guess is costly to redo; otherwise decide and say what you chose. A go-ahead already given covers the rest of that task. Open-ended questions go in plain prose, not a card. Questions appear one at a time on every device; the user picks, types an answer, or skips. Without blocking, each question proceeds with its default_choice when the timeout passes, and a later answer still reaches you; keep working on what doesn't depend on it. The chat shows the user's answers, so don't repeat them back.";
 
 export const ASK_USER_TOOL_PROMPT_SNIPPET =
   "Ask the user for a go-ahead or consent (`ask_user`) only at a real gate; otherwise decide and say what you chose. Give each question a default_choice and use a timeout unless the action is hard to undo";
@@ -35,7 +35,7 @@ export const ASK_USER_TOOL_PARAMETERS: Record<string, unknown> = {
       type: "array",
       minItems: 1,
       maxItems: USER_ASK_MAX_QUESTIONS,
-      description: `One question, or up to ${USER_ASK_MAX_QUESTIONS} related ones the user answers in a single pass.`,
+      description: `1–${USER_ASK_MAX_QUESTIONS} related questions answered in one pass.`,
       items: {
         type: "object",
         properties: {
@@ -46,18 +46,17 @@ export const ASK_USER_TOOL_PARAMETERS: Record<string, unknown> = {
           },
           question: {
             type: "string",
-            description: "One short question, plain language, no preamble.",
+            description: "One short question.",
           },
           detail: {
             type: "string",
-            description:
-              "Optional one or two lines of context shown under the question.",
+            description: "Optional context shown under it.",
           },
           options: {
             type: "array",
             minItems: USER_ASK_MIN_OPTIONS,
             maxItems: USER_ASK_MAX_OPTIONS,
-            description: `Between ${USER_ASK_MIN_OPTIONS} and ${USER_ASK_MAX_OPTIONS} concrete, tappable answers. The user can always type their own answer or skip instead.`,
+            description: `${USER_ASK_MIN_OPTIONS}–${USER_ASK_MAX_OPTIONS} answers; the user can also type or skip.`,
             items: {
               type: "object",
               properties: {
@@ -75,7 +74,7 @@ export const ASK_USER_TOOL_PARAMETERS: Record<string, unknown> = {
           default_choice: {
             type: "string",
             description:
-              "Option id to proceed with when the timer runs out. Required unless blocking is true.",
+              "Option id used when the timeout passes. Required unless blocking.",
           },
         },
         required: ["question", "options"],
@@ -85,19 +84,17 @@ export const ASK_USER_TOOL_PARAMETERS: Record<string, unknown> = {
       type: "number",
       minimum: USER_ASK_MIN_TIMEOUT_MS,
       maximum: USER_ASK_MAX_TIMEOUT_MS,
-      description:
-        "How long to wait before proceeding with the defaults, at most three minutes. Defaults to three minutes.",
+      description: "How long before the defaults apply. Default: three minutes.",
     },
     blocking: {
       type: "boolean",
-      description:
-        "Wait indefinitely with no default. Only for hard-to-undo actions: spending money, deleting things, sending as the user.",
+      description: "Wait with no default. For hard-to-undo actions only.",
     },
     urgency: {
       type: "string",
       enum: [...USER_ASK_URGENCY_NAMES],
       description:
-        "How far this ask may escalate if unanswered: chat (message only), notify (desktop notification), alert (sound plus phone push), breakthrough (push that pierces focus mode and repeats). The user's own ceiling, quiet hours, and rate limit always win.",
+        "How far it may escalate unanswered: chat, notify (desktop notification), alert (sound + phone push), breakthrough (pierces focus, repeats). The user's own limits win.",
     },
   },
   required: ["questions"],

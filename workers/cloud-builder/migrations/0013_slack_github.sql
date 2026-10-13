@@ -1,6 +1,6 @@
--- Stella for Slack: the workspace's GitHub connection through the read-only
+-- Stella for Slack: the workspace's GitHub connection through the
 -- "Stella for Slack" GitHub App. Only the installation id is kept; agents get
--- a short-lived, repo-scoped, contents:read token minted when they clone.
+-- short-lived, repo-scoped installation tokens minted per git operation.
 -- `github_status` is 'active', 'suspended' or 'revoked' (uninstalled or
 -- unreachable), which the settings page shows as a reconnect state.
 -- `repo_token_enc` (0011) stays for workspaces that pasted a token before

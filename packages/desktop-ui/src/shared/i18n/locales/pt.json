@@ -2813,7 +2813,10 @@
       "nothingNewSince": "Nada novo desde {time}",
       "minutesAgo": "há {count} min",
       "hoursAgo": "há {count} h",
-      "daysAgo": "há {count} d"
+      "daysAgo": "há {count} d",
+      "claudeLimit": "Você atingiu o limite de uso do Claude, então desta vez o modelo da Stella verificou.",
+      "claudeLimitUntil": "Você atingiu o limite de uso do Claude até {time}, então desta vez o modelo da Stella verificou.",
+      "claudeFailed": "O Claude Code não conseguiu fazer esta verificação, então o modelo da Stella fez."
     }
   },
   "sidebar": {

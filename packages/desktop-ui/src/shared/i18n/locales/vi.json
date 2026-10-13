@@ -2779,7 +2779,10 @@
       "nothingNewSince": "Không có gì mới kể từ {time}",
       "minutesAgo": "{count} phút trước",
       "hoursAgo": "{count} giờ trước",
-      "daysAgo": "{count} ngày trước"
+      "daysAgo": "{count} ngày trước",
+      "claudeLimit": "Bạn đã đạt giới hạn sử dụng Claude, nên lần này mô hình của Stella đã kiểm tra.",
+      "claudeLimitUntil": "Bạn đã đạt giới hạn sử dụng Claude đến {time}, nên lần này mô hình của Stella đã kiểm tra.",
+      "claudeFailed": "Claude Code không thể chạy lần kiểm tra này, nên mô hình của Stella đã làm thay."
     }
   },
   "sidebar": {

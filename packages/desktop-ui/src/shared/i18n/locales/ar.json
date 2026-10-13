@@ -2861,7 +2861,10 @@
       "nothingNewSince": "لا جديد منذ {time}",
       "minutesAgo": "قبل {count} د",
       "hoursAgo": "قبل {count} س",
-      "daysAgo": "قبل {count} ي"
+      "daysAgo": "قبل {count} ي",
+      "claudeLimit": "وصلت إلى حد استخدام Claude، لذا تحقق نموذج Stella هذه المرة.",
+      "claudeLimitUntil": "وصلت إلى حد استخدام Claude حتى {time}، لذا تحقق نموذج Stella هذه المرة.",
+      "claudeFailed": "تعذّر على Claude Code إجراء هذا الفحص، لذا أجراه نموذج Stella."
     }
   },
   "sidebar": {

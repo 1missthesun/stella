@@ -2813,7 +2813,10 @@
       "nothingNewSince": "Nimic nou de la {time}",
       "minutesAgo": "acum {count} min",
       "hoursAgo": "acum {count} h",
-      "daysAgo": "acum {count} z"
+      "daysAgo": "acum {count} z",
+      "claudeLimit": "Ai atins limita de utilizare Claude, așa că de data aceasta a verificat modelul Stella.",
+      "claudeLimitUntil": "Ai atins limita de utilizare Claude până la {time}, așa că de data aceasta a verificat modelul Stella.",
+      "claudeFailed": "Claude Code nu a putut face această verificare, așa că a făcut-o modelul Stella."
     }
   },
   "sidebar": {

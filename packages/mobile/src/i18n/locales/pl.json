@@ -2641,6 +2641,7 @@
       "markdown": {
         "desktopRequired": "Podgląd Markdown wymaga aplikacji desktopowej Stelli.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Tekst",
         "noContent": "Nie znaleziono treści."
       },
       "media": {
@@ -2828,7 +2829,10 @@
       "nothingNewSince": "Nic nowego od {time}",
       "minutesAgo": "{count} min temu",
       "hoursAgo": "{count} godz. temu",
-      "daysAgo": "{count} dn. temu"
+      "daysAgo": "{count} dn. temu",
+      "claudeLimit": "Osiągnięto limit użycia Claude, więc tym razem sprawdzał model Stelli.",
+      "claudeLimitUntil": "Osiągnięto limit użycia Claude do {time}, więc tym razem sprawdzał model Stelli.",
+      "claudeFailed": "Claude Code nie mógł wykonać tego sprawdzenia, więc zrobił to model Stelli."
     }
   },
   "sidebar": {

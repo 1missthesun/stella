@@ -2797,7 +2797,10 @@
       "nothingNewSince": "Inget nytt sedan {time}",
       "minutesAgo": "för {count} min sedan",
       "hoursAgo": "för {count} tim sedan",
-      "daysAgo": "för {count} d sedan"
+      "daysAgo": "för {count} d sedan",
+      "claudeLimit": "Din användningsgräns för Claude är nådd, så Stellas modell kontrollerade den här gången.",
+      "claudeLimitUntil": "Din användningsgräns för Claude är nådd till {time}, så Stellas modell kontrollerade den här gången.",
+      "claudeFailed": "Claude Code kunde inte köra den här kontrollen, så Stellas modell gjorde det."
     }
   },
   "sidebar": {

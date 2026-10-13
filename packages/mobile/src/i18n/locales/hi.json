@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Markdown पूर्वावलोकन के लिए Stella डेस्कटॉप ऐप आवश्यक है।",
         "eyebrow": "Markdown",
+        "textEyebrow": "टेक्स्ट",
         "noContent": "कोई सामग्री नहीं मिली।"
       },
       "media": {
@@ -2796,7 +2797,10 @@
       "nothingNewSince": "{time} से कुछ नया नहीं",
       "minutesAgo": "{count} मिनट पहले",
       "hoursAgo": "{count} घंटे पहले",
-      "daysAgo": "{count} दिन पहले"
+      "daysAgo": "{count} दिन पहले",
+      "claudeLimit": "आपकी Claude उपयोग सीमा पूरी हो गई है, इसलिए इस बार Stella के मॉडल ने जाँच की।",
+      "claudeLimitUntil": "आपकी Claude उपयोग सीमा {time} तक पूरी हो गई है, इसलिए इस बार Stella के मॉडल ने जाँच की।",
+      "claudeFailed": "Claude Code यह जाँच नहीं कर सका, इसलिए Stella के मॉडल ने की।"
     }
   },
   "sidebar": {

@@ -1048,7 +1048,7 @@ const signOutClaudeCloud = async (
  * container a Claude cloud turn runs on — the account the cloud uses, among
  * the logins it holds. Never a credential; the CLI reads its own.
  */
-const claudeCloudAccount = async (
+export const claudeCloudAccount = async (
   ctx: OwnerContext,
 ): Promise<{ key: string; email: string } | { missing: true; email?: string }> => {
   const accountId = claudeActiveByPlace(ctx.db).get(CLOUD_PLACE);

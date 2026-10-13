@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Markdown preview requires the Stella desktop app.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Text",
         "noContent": "No content found."
       },
       "media": {
@@ -2796,7 +2797,10 @@
       "nothingNewSince": "Nothing new since {time}",
       "minutesAgo": "{count} min ago",
       "hoursAgo": "{count} hr ago",
-      "daysAgo": "{count} d ago"
+      "daysAgo": "{count} d ago",
+      "claudeLimit": "Your Claude usage limit is reached, so Stella's model checked this time.",
+      "claudeLimitUntil": "Your Claude usage limit is reached until {time}, so Stella's model checked this time.",
+      "claudeFailed": "Claude Code couldn't run this check, so Stella's model did."
     }
   },
   "sidebar": {

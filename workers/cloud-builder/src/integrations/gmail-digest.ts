@@ -2,13 +2,14 @@ import type { Tool, ToolCall } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import type { TSchema } from "@sinclair/typebox";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
-import type { EmailDigestItem } from "@stella/contracts/backend/email-digest";
+import type { EmailDigestItem, EmailDigestNotice } from "@stella/contracts/backend/email-digest";
 import { gatewayRelayBaseUrl } from "@stella/contracts/gateway/api";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import { stellaModel, stellaProvider } from "@stella/agent/provider/stella";
 import { STELLA_DEFAULT_MODEL } from "@stella/model-catalog/aliases";
 import { mintTurnCapability } from "../capability-signer.js";
 import { piModelSpec } from "../orchestrator/support.js";
+import { runClaudeDigest } from "./claude-digest.js";
 import { composioExecute, type ComposioConfig } from "./composio.js";
 
 export const GMAIL_INTEGRATION_ID = "gmail";
@@ -133,7 +134,7 @@ export const fetchGmailSince = async (
 const REPORT_TOOL = "report_emails";
 const NOTHING_TOOL = "nothing_important";
 
-const SYSTEM_PROMPT = [
+const DIGEST_RULES = [
   "You write a very short email digest for one person.",
   "From the new emails below, keep only the ones that genuinely matter to them:",
   "a real person writing to them, anything that needs a reply, decision or action,",
@@ -141,12 +142,49 @@ const SYSTEM_PROMPT = [
   "legal, health, or news they would clearly want to know.",
   "Leave out newsletters, marketing, routine notifications and receipts that need nothing.",
   "Most runs keep few or none. Never pad.",
-  "Answer by calling exactly one tool and write nothing else.",
-  `If at least one email matters, call ${REPORT_TOOL} with those emails, ordered by importance.`,
+];
+
+const SUMMARY_RULE = [
   "Each summary is one plain line of at most 15 words saying what it is and what, if anything, is needed,",
   "without repeating the sender or subject.",
+];
+
+const SYSTEM_PROMPT = [
+  ...DIGEST_RULES,
+  "Answer by calling exactly one tool and write nothing else.",
+  `If at least one email matters, call ${REPORT_TOOL} with those emails, ordered by importance.`,
+  ...SUMMARY_RULE,
   `If none of them matters, call ${NOTHING_TOOL}.`,
 ].join("\n");
+
+const CLAUDE_SYSTEM_PROMPT = [
+  ...DIGEST_RULES,
+  "Answer only with the structured output.",
+  'If at least one email matters, set verdict to "important" and list those emails in items, ordered by importance.',
+  ...SUMMARY_RULE,
+  'If none of them matters, set verdict to "nothing_important" and leave items empty.',
+].join("\n");
+
+const CLAUDE_SCHEMA = {
+  type: "object",
+  properties: {
+    verdict: { type: "string", enum: ["important", "nothing_important"] },
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "The email's id, such as m1." },
+          summary: { type: "string", description: "One plain line, at most 15 words." },
+        },
+        required: ["id", "summary"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["verdict", "items"],
+  additionalProperties: false,
+};
 
 const DIGEST_TOOLS: Tool[] = [
   {
@@ -248,6 +286,9 @@ export const digestExecution = (
     : { engine: "stella", provider: "stella", model: STELLA_DEFAULT_MODEL, reasoningEffort: execution.reasoningEffort };
 
 export type DigestModelInput = {
+  claudeAccount?: { key: string; email: string } | null;
+  claudeHeldUntil?: number;
+  claudeCli?: string;
   env: Cloudflare.Env;
   ownerId: string;
   ownerGeneration: string;
@@ -258,7 +299,64 @@ export type DigestModelInput = {
   messages: GmailMessage[];
 };
 
-export const pickImportant = async (input: DigestModelInput): Promise<{ verdict: DigestVerdict; model: string }> => {
+const claudeVerdict = (output: unknown, messages: GmailMessage[]): DigestVerdict => {
+  if (!isRecord(output)) throw new Error("Claude Code gave no structured digest.");
+  if (output.verdict === "nothing_important") return { kind: "nothing_important" };
+  if (output.verdict !== "important") throw new Error("Claude Code gave no digest verdict.");
+  const items = itemsFrom(output.items, messages);
+  if (items.length === 0) throw new Error("Claude Code reported no email it was given.");
+  return { kind: "important", items };
+};
+
+export type DigestPick = { verdict: DigestVerdict; model: string; notice?: EmailDigestNotice };
+
+export const pickImportant = async (input: DigestModelInput): Promise<DigestPick> => {
+  if (input.execution.engine !== "anthropic") return await pickWithStella(input);
+  if (!input.claudeAccount) {
+    console.error(JSON.stringify({ event: "email_digest_claude_fallback", reason: "no_cloud_account" }));
+    return { ...(await pickWithStella(input)), notice: { kind: "claude_failed" } };
+  }
+  if (input.claudeHeldUntil !== undefined && input.claudeHeldUntil > Date.now()) {
+    return {
+      ...(await pickWithStella(input)),
+      notice: { kind: "claude_usage_limit", resetsAt: input.claudeHeldUntil },
+    };
+  }
+  let notice: EmailDigestNotice;
+  try {
+    const outcome = await runClaudeDigest({
+      env: input.env,
+      ownerId: input.ownerId,
+      account: input.claudeAccount,
+      systemPrompt: CLAUDE_SYSTEM_PROMPT,
+      prompt: promptFor(input.messages),
+      schema: CLAUDE_SCHEMA,
+      ...(input.claudeCli ? { cli: input.claudeCli } : {}),
+    });
+    if (outcome.kind === "ok") {
+      return { verdict: claudeVerdict(outcome.output, input.messages), model: outcome.model };
+    }
+    console.error(
+      JSON.stringify({ event: "email_digest_claude_fallback", reason: outcome.kind, message: outcome.message }),
+    );
+    notice =
+      outcome.kind === "usage_limit"
+        ? { kind: "claude_usage_limit", ...(outcome.resetsAt !== undefined ? { resetsAt: outcome.resetsAt } : {}) }
+        : { kind: "claude_failed" };
+  } catch (error) {
+    console.error(
+      JSON.stringify({
+        event: "email_digest_claude_fallback",
+        reason: "error",
+        message: clip(error instanceof Error ? error.message : String(error), 300),
+      }),
+    );
+    notice = { kind: "claude_failed" };
+  }
+  return { ...(await pickWithStella(input)), notice };
+};
+
+const pickWithStella = async (input: DigestModelInput): Promise<{ verdict: DigestVerdict; model: string }> => {
   const gateway = input.env.MODEL_GATEWAY;
   const origin = input.env.MODEL_GATEWAY_URL?.trim() ?? "";
   if (!gateway || !origin) throw new Error("Model gateway is not configured.");

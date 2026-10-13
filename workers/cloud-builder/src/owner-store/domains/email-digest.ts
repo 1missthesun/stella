@@ -2,6 +2,7 @@ import type {
   EmailDigest,
   EmailDigestFeed,
   EmailDigestItem,
+  EmailDigestNotice,
   EmailDigestOutcome,
 } from "@stella/contracts/backend/email-digest";
 import { ComposioHttpError, composioConfig, composioToolkitConnected } from "../../integrations/composio.js";
@@ -12,6 +13,7 @@ import {
   pickImportant,
 } from "../../integrations/gmail-digest.js";
 import { empty } from "../args.js";
+import { claudeCloudAccount } from "./engines.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 
@@ -72,6 +74,11 @@ export const EMAIL_DIGEST_WINDOW_MIGRATION = {
   ],
 };
 
+export const EMAIL_DIGEST_NOTICE_MIGRATION = {
+  id: "emailDigest.3-notice",
+  statements: ["ALTER TABLE email_digest_state ADD COLUMN notice_json TEXT"],
+};
+
 type StateRow = {
   enabled: number;
   running_since: number | null;
@@ -84,14 +91,25 @@ type StateRow = {
   window_end: number | null;
   window_count: number | null;
   page_token: string | null;
+  notice_json: string | null;
 };
 
 const stateOf = (db: OwnerDbReader): StateRow | null =>
   db.one<StateRow>(
     `SELECT enabled, running_since, last_checked_at, last_outcome, last_error, next_check_at, rate_per_hour,
-            window_since, window_end, window_count, page_token
+            window_since, window_end, window_count, page_token, notice_json
        FROM email_digest_state WHERE id = 1`,
   );
+
+const noticeOf = (json: string | null): EmailDigestNotice | undefined => {
+  if (!json) return undefined;
+  try {
+    const parsed = JSON.parse(json) as EmailDigestNotice;
+    return parsed && (parsed.kind === "claude_usage_limit" || parsed.kind === "claude_failed") ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+};
 
 const gmailSession = (db: OwnerDbReader): string | null =>
   db.one<{ session_id: string }>(
@@ -221,6 +239,42 @@ const continueWindow = (
   scheduleRun({ ...ctx, now }, now + CONTINUE_DELAY_MS);
 };
 
+const judge = async (
+  ctx: OwnerContext,
+  state: StateRow,
+  fresh: GmailMessage[],
+  cli?: string,
+): Promise<{ outcome: EmailDigestOutcome; model: string; notice?: EmailDigestNotice }> => {
+  const snapshot = await ctx.host.snapshot();
+  const claude = snapshot.execution.engine === "anthropic" ? await claudeCloudAccount(ctx) : null;
+  const held = noticeOf(state.notice_json);
+  const { verdict, model, notice } = await pickImportant({
+    claudeAccount: claude && !("missing" in claude) ? claude : null,
+    ...(held?.kind === "claude_usage_limit" && held.resetsAt !== undefined ? { claudeHeldUntil: held.resetsAt } : {}),
+    ...(cli ? { claudeCli: cli } : {}),
+    env: ctx.env,
+    ownerId: ctx.ownerId,
+    ownerGeneration: snapshot.ownerGeneration,
+    runId: crypto.randomUUID(),
+    execution: snapshot.execution,
+    audience: snapshot.allowance.audience,
+    budgetMicroCents: snapshot.allowance.budgetMicroCents,
+    messages: fresh,
+  });
+  ctx.db.run("UPDATE email_digest_state SET notice_json = ? WHERE id = 1", notice ? JSON.stringify(notice) : null);
+  const seenAt = Date.now();
+  for (const message of fresh) {
+    ctx.db.run("INSERT OR IGNORE INTO email_digest_seen (message_id, seen_at) VALUES (?, ?)", message.id, seenAt);
+  }
+  ctx.db.run("DELETE FROM email_digest_seen WHERE seen_at < ?", seenAt - SEEN_RETENTION_MS);
+  if (verdict.kind === "important") recordDigest(ctx, fresh.length, verdict.items, model);
+  return {
+    outcome: verdict.kind === "important" ? "digest" : "nothing_important",
+    model,
+    ...(notice ? { notice } : {}),
+  };
+};
+
 const runDigest = async (ctx: OwnerContext): Promise<void> => {
   const state = stateOf(ctx.db);
   if (!state || state.enabled !== 1) return;
@@ -270,31 +324,7 @@ const runDigest = async (ctx: OwnerContext): Promise<void> => {
       pageToken = page.nextPageToken;
     } while (pageToken && fresh.length < MAX_FRESH_PER_RUN && pages < MAX_PAGES_PER_RUN);
     newCount = fresh.length;
-    let outcome: EmailDigestOutcome = "nothing_new";
-    if (fresh.length > 0) {
-      const snapshot = await ctx.host.snapshot();
-      const { verdict, model } = await pickImportant({
-        env: ctx.env,
-        ownerId: ctx.ownerId,
-        ownerGeneration: snapshot.ownerGeneration,
-        runId: crypto.randomUUID(),
-        execution: snapshot.execution,
-        audience: snapshot.allowance.audience,
-        budgetMicroCents: snapshot.allowance.budgetMicroCents,
-        messages: fresh,
-      });
-      const seenAt = Date.now();
-      for (const message of fresh) {
-        ctx.db.run(
-          "INSERT OR IGNORE INTO email_digest_seen (message_id, seen_at) VALUES (?, ?)",
-          message.id,
-          seenAt,
-        );
-      }
-      ctx.db.run("DELETE FROM email_digest_seen WHERE seen_at < ?", seenAt - SEEN_RETENTION_MS);
-      if (verdict.kind === "important") recordDigest(ctx, newCount, verdict.items, model);
-      outcome = verdict.kind === "important" ? "digest" : "nothing_important";
-    }
+    const outcome: EmailDigestOutcome = fresh.length > 0 ? (await judge(ctx, state, fresh)).outcome : "nothing_new";
     if (pageToken) {
       continueWindow(ctx, { since, end: windowEnd, count: priorCount + newCount, pageToken, outcome });
       return;
@@ -335,6 +365,7 @@ const readFeed = (db: OwnerDbReader, now: number): EmailDigestFeed => {
       items: parseItems(row.items_json),
     }));
   const outcome = state?.last_outcome as EmailDigestOutcome | null | undefined;
+  const notice = noticeOf(state?.notice_json ?? null);
   return {
     status: {
       enabled: state?.enabled === 1,
@@ -343,9 +374,49 @@ const readFeed = (db: OwnerDbReader, now: number): EmailDigestFeed => {
       ...(outcome ? { lastOutcome: outcome } : {}),
       ...(state?.last_error ? { lastError: state.last_error } : {}),
       ...(state?.next_check_at != null ? { nextCheckAt: state.next_check_at } : {}),
+      ...(notice ? { notice } : {}),
     },
     digests,
   };
+};
+
+const probeMessages = (value: unknown): GmailMessage[] =>
+  (Array.isArray(value) ? value : []).slice(0, MAX_FRESH_PER_RUN).flatMap((raw, index) => {
+    if (!raw || typeof raw !== "object") return [];
+    const row = raw as Record<string, unknown>;
+    const field = (key: string) => (typeof row[key] === "string" ? (row[key] as string).slice(0, 400) : "");
+    return [
+      {
+        id: field("id") || `probe-${crypto.randomUUID()}-${index}`,
+        from: field("from") || "Unknown sender",
+        subject: field("subject") || "(no subject)",
+        snippet: field("snippet"),
+        receivedAt: Date.now(),
+        important: row.important === true,
+        starred: false,
+      },
+    ];
+  });
+
+const probe = async (ctx: OwnerContext, args: unknown) => {
+  const input = (args && typeof args === "object" ? args : {}) as Record<string, unknown>;
+  const fresh = probeMessages(input.messages);
+  if (fresh.length === 0) throw new Error("Need messages.");
+  ctx.db.run(
+    `INSERT INTO email_digest_state (id, enabled, updated_at) VALUES (1, 1, ?) ON CONFLICT (id) DO NOTHING`,
+    ctx.now,
+  );
+  const state = stateOf(ctx.db);
+  if (!state) throw new Error("No digest state.");
+  const cli = typeof input.cli === "string" && input.cli.startsWith("/tmp/") ? input.cli : undefined;
+  const judged = await judge(ctx, state, fresh, cli);
+  ctx.db.run(
+    "UPDATE email_digest_state SET last_outcome = ?, last_checked_at = ?, last_error = NULL, updated_at = ? WHERE id = 1",
+    judged.outcome,
+    Date.now(),
+    Date.now(),
+  );
+  return { ...judged, feed: readFeed(ctx.db, Date.now()) };
 };
 
 const start = async (ctx: OwnerContext): Promise<{ connected: boolean }> => {
@@ -371,7 +442,7 @@ const checkNow = async (ctx: OwnerContext): Promise<{ connected: boolean }> => {
 
 export const emailDigestDomain = {
   name: "emailDigest",
-  migrations: [EMAIL_DIGEST_MIGRATION, EMAIL_DIGEST_WINDOW_MIGRATION],
+  migrations: [EMAIL_DIGEST_MIGRATION, EMAIL_DIGEST_WINDOW_MIGRATION, EMAIL_DIGEST_NOTICE_MIGRATION],
   calls: {
     "emailDigest.start": {
       scope: "owner",
@@ -392,6 +463,9 @@ export const emailDigestDomain = {
       parse: empty(),
       read: (ctx) => readFeed(ctx.db, ctx.now),
     },
+  },
+  internal: {
+    "emailDigest.probe": probe,
   },
   jobs: {
     [RUN_JOB]: { run: (ctx) => runDigest(ctx), maxAttempts: 3 },

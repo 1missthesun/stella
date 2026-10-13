@@ -2779,7 +2779,10 @@
       "nothingNewSince": "自 {time} 以來沒有新內容",
       "minutesAgo": "{count} 分鐘前",
       "hoursAgo": "{count} 小時前",
-      "daysAgo": "{count} 天前"
+      "daysAgo": "{count} 天前",
+      "claudeLimit": "已達到 Claude 使用上限，因此這次由 Stella 的模型檢查。",
+      "claudeLimitUntil": "Claude 使用上限將持續到 {time}，因此這次由 Stella 的模型檢查。",
+      "claudeFailed": "Claude Code 無法執行這次檢查，因此由 Stella 的模型完成。"
     }
   },
   "sidebar": {

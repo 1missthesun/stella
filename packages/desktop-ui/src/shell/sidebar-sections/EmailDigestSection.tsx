@@ -235,6 +235,21 @@ export function EmailDigestSection({ active }: { active: boolean }) {
           {t("shell.emailDigest.error")}
         </div>
       ) : null}
+      {status?.notice && status.lastOutcome !== "error" && !running ? (
+        <div
+          className="email-digest__quiet"
+          data-tone="error"
+          data-testid="email-digest-notice"
+        >
+          {status.notice.kind === "claude_failed"
+            ? t("shell.emailDigest.claudeFailed")
+            : status.notice.resetsAt !== undefined && status.notice.resetsAt > now
+              ? t("shell.emailDigest.claudeLimitUntil", {
+                  time: clockTime(locale, status.notice.resetsAt, now),
+                })
+              : t("shell.emailDigest.claudeLimit")}
+        </div>
+      ) : null}
       {digests.map((digest) => (
         <DigestGroup key={digest.digestId} digest={digest} now={now} />
       ))}

@@ -247,7 +247,7 @@ const shellQuote = (value: string): string => `'${value.replaceAll("'", `'\\''`)
 type ScriptResult = { ok: true; [key: string]: unknown } | { ok: false; error: string };
 
 /** The owner's own container, where signing in and out happens. */
-const signInContainer = async (env: Cloudflare.Env, ownerId: string): Promise<SandboxHandle> =>
+export const claudeLoginContainer = async (env: Cloudflare.Env, ownerId: string): Promise<SandboxHandle> =>
   sandboxClient(
     (env as unknown as { Sandbox: DurableObjectNamespace<import("./sandbox-container.js").Sandbox> })
       .Sandbox,
@@ -268,7 +268,7 @@ const runScript = async (
     container?: SandboxHandle;
   },
 ): Promise<ScriptResult> => {
-  const sandbox = options.container ?? (await signInContainer(env, ownerId));
+  const sandbox = options.container ?? (await claudeLoginContainer(env, ownerId));
   const result = await sandbox.exec(
     ["bash", "-c", shellQuote(SCRIPT), "claude-login", ...args.map(shellQuote)].join(" "),
     {
@@ -431,7 +431,7 @@ export const claudeLoginProbe = async (
   if (action === "backup") return { ok: await backupClaudeCloudLogins(env, ownerId) };
   if (action === "restore") return { ok: await restoreClaudeCloudLogins(env, ownerId) };
   if (action === "replace") {
-    await (await signInContainer(env, ownerId)).destroy();
+    await (await claudeLoginContainer(env, ownerId)).destroy();
     return { ok: true };
   }
   if (action === "plant") {

@@ -10,6 +10,7 @@
  *   POST /api/admin/delete                      {kind: "feedback", id} | {kind: "media_job", ownerId, id}
  *   POST /api/admin/test-accounts/session       {email?, plan?, usageMode?} → a signed-in test user (dev only)
  *   POST /api/admin/test-accounts/conversation-restart  {conversationId} → restart that conversation's object (dev only)
+ *   POST /api/admin/test-accounts/email-digest-probe  {ownerId, messages, simulate?} → one digest check on given mail (dev only)
  *
  * Owners are addressed by id only.
  *
@@ -345,6 +346,45 @@ const conversationRestart = async (request: Request, env: AdminEnv): Promise<Res
   return json(await env.ORCHESTRATOR_SESSIONS.getByName(conversationId).restartForVerification());
 };
 
+const FAKE_LIMIT_CLI = "/tmp/stella-digest-fake-claude-limit";
+
+const emailDigestProbeRoute = async (request: Request, env: AdminEnv): Promise<Response> => {
+  const { testAccountsEnabled } = await import("../auth/auth.js");
+  if (!testAccountsEnabled(env)) return fail(404, "Test accounts disabled.", { env: "STELLA_TEST_ACCOUNTS" });
+  const body = await readBody(request);
+  const ownerId = ownerIdOf(body?.ownerId);
+  if (!ownerId || !Array.isArray(body?.messages)) return fail(400, "Need ownerId and messages.");
+  const fullEnv = env as unknown as Cloudflare.Env;
+  const { isTestAccountOwner } = await import("../test-claude.js");
+  if (!(await isTestAccountOwner(fullEnv, ownerId))) return fail(403, "Test accounts only.");
+  const simulateLimit = body?.simulate === "usage_limit";
+  if (simulateLimit) {
+    const { claudeLoginContainer } = await import("../claude-cloud-login.js");
+    const container = await claudeLoginContainer(fullEnv, ownerId);
+    const reset = new Date(Date.now() + 3 * 3_600_000).toISOString().slice(0, 16);
+    const fake = JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      api_error_status: 429,
+      result: `You've hit your session limit · resets at ${reset}Z`,
+    });
+    await container.exec(`printf '%s' "$FAKE" > ${FAKE_LIMIT_CLI} && chmod 700 ${FAKE_LIMIT_CLI}`, {
+      cwd: "/",
+      timeout: 30_000,
+      env: { FAKE: `#!/bin/sh\ncat >/dev/null\ncat <<'JSON'\n${fake}\nJSON\nexit 1\n` },
+    });
+  }
+  const stub = ownerGateStub(env.OWNER_GATES, ownerId);
+  const snapshot = await stub.snapshot();
+  const response = (await stub.ownerInternal({
+    name: "emailDigest.probe",
+    args: { messages: body.messages, ...(simulateLimit ? { cli: FAKE_LIMIT_CLI } : {}) },
+    ownerGeneration: snapshot.ownerGeneration,
+  })) as unknown as RpcResponse;
+  return response.ok ? json(response.value) : fail(rpcErrorStatus(response.error.code), response.error.message);
+};
+
 // ── Routing ──────────────────────────────────────────────────────────────
 
 const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, url: URL, env: AdminEnv) => Promise<Response> }> = {
@@ -358,6 +398,10 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   "/api/admin/test-accounts/conversation-restart": {
     method: "POST",
     run: (request, _url, env) => conversationRestart(request, env),
+  },
+  "/api/admin/test-accounts/email-digest-probe": {
+    method: "POST",
+    run: (request, _url, env) => emailDigestProbeRoute(request, env),
   },
   "/api/admin/test-accounts/claude-login-probe": {
     method: "POST",

@@ -2813,7 +2813,10 @@
       "nothingNewSince": "אין חדש מאז {time}",
       "minutesAgo": "לפני {count} דק׳",
       "hoursAgo": "לפני {count} שע׳",
-      "daysAgo": "לפני {count} ימים"
+      "daysAgo": "לפני {count} ימים",
+      "claudeLimit": "הגעת למגבלת השימוש ב-Claude, לכן הפעם בדק המודל של Stella.",
+      "claudeLimitUntil": "הגעת למגבלת השימוש ב-Claude עד {time}, לכן הפעם בדק המודל של Stella.",
+      "claudeFailed": "Claude Code לא הצליח לבצע את הבדיקה הזו, לכן המודל של Stella ביצע אותה."
     }
   },
   "sidebar": {

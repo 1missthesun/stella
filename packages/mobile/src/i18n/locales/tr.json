@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Markdown önizlemesi Stella masaüstü uygulamasını gerektirir.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Metin",
         "noContent": "İçerik bulunamadı."
       },
       "media": {
@@ -2796,7 +2797,10 @@
       "nothingNewSince": "{time} itibarıyla yeni bir şey yok",
       "minutesAgo": "{count} dk önce",
       "hoursAgo": "{count} sa önce",
-      "daysAgo": "{count} g önce"
+      "daysAgo": "{count} g önce",
+      "claudeLimit": "Claude kullanım sınırına ulaştın, bu yüzden bu sefer Stella'nın modeli kontrol etti.",
+      "claudeLimitUntil": "Claude kullanım sınırına {time} saatine kadar ulaştın, bu yüzden bu sefer Stella'nın modeli kontrol etti.",
+      "claudeFailed": "Claude Code bu kontrolü yapamadı, bu yüzden Stella'nın modeli yaptı."
     }
   },
   "sidebar": {

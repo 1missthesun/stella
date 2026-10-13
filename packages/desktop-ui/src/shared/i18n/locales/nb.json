@@ -2797,7 +2797,10 @@
       "nothingNewSince": "Ingenting nytt siden {time}",
       "minutesAgo": "for {count} min siden",
       "hoursAgo": "for {count} t siden",
-      "daysAgo": "for {count} d siden"
+      "daysAgo": "for {count} d siden",
+      "claudeLimit": "Du har nådd bruksgrensen for Claude, så Stellas modell sjekket denne gangen.",
+      "claudeLimitUntil": "Du har nådd bruksgrensen for Claude til {time}, så Stellas modell sjekket denne gangen.",
+      "claudeFailed": "Claude Code kunne ikke kjøre denne sjekken, så Stellas modell gjorde det."
     }
   },
   "sidebar": {

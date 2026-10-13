@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Die Markdown-Vorschau erfordert die Stella-Desktop-App.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Text",
         "noContent": "Kein Inhalt gefunden."
       },
       "media": {
@@ -2796,7 +2797,10 @@
       "nothingNewSince": "Nichts Neues seit {time}",
       "minutesAgo": "vor {count} Min.",
       "hoursAgo": "vor {count} Std.",
-      "daysAgo": "vor {count} T."
+      "daysAgo": "vor {count} T.",
+      "claudeLimit": "Dein Claude-Nutzungslimit ist erreicht, daher hat diesmal Stellas Modell geprüft.",
+      "claudeLimitUntil": "Dein Claude-Nutzungslimit ist bis {time} erreicht, daher hat diesmal Stellas Modell geprüft.",
+      "claudeFailed": "Claude Code konnte diese Prüfung nicht ausführen, daher hat Stellas Modell sie übernommen."
     }
   },
   "sidebar": {

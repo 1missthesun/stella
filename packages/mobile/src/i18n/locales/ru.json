@@ -2641,6 +2641,7 @@
       "markdown": {
         "desktopRequired": "Предпросмотр Markdown доступен в настольном приложении Stella.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Текст",
         "noContent": "Содержимое не найдено."
       },
       "media": {
@@ -2828,7 +2829,10 @@
       "nothingNewSince": "Ничего нового с {time}",
       "minutesAgo": "{count} мин назад",
       "hoursAgo": "{count} ч назад",
-      "daysAgo": "{count} д назад"
+      "daysAgo": "{count} д назад",
+      "claudeLimit": "Лимит использования Claude исчерпан, поэтому в этот раз проверяла модель Stella.",
+      "claudeLimitUntil": "Лимит использования Claude исчерпан до {time}, поэтому в этот раз проверяла модель Stella.",
+      "claudeFailed": "Claude Code не смог выполнить эту проверку, поэтому её выполнила модель Stella."
     }
   },
   "sidebar": {

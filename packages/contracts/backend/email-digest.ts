@@ -15,6 +15,10 @@ export type EmailDigest = {
 
 export type EmailDigestOutcome = "digest" | "nothing_new" | "nothing_important" | "error";
 
+export type EmailDigestNotice =
+  | { kind: "claude_usage_limit"; resetsAt?: number }
+  | { kind: "claude_failed" };
+
 export type EmailDigestStatus = {
   enabled: boolean;
   running: boolean;
@@ -22,6 +26,7 @@ export type EmailDigestStatus = {
   lastOutcome?: EmailDigestOutcome;
   lastError?: string;
   nextCheckAt?: number;
+  notice?: EmailDigestNotice;
 };
 
 export type EmailDigestFeed = {

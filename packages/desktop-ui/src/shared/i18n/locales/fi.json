@@ -2797,7 +2797,10 @@
       "nothingNewSince": "Ei mitään uutta klo {time} jälkeen",
       "minutesAgo": "{count} min sitten",
       "hoursAgo": "{count} t sitten",
-      "daysAgo": "{count} pv sitten"
+      "daysAgo": "{count} pv sitten",
+      "claudeLimit": "Claude-käyttörajasi on täynnä, joten tällä kertaa tarkisti Stellan malli.",
+      "claudeLimitUntil": "Claude-käyttörajasi on täynnä {time} asti, joten tällä kertaa tarkisti Stellan malli.",
+      "claudeFailed": "Claude Code ei voinut tehdä tätä tarkistusta, joten Stellan malli teki sen."
     }
   },
   "sidebar": {

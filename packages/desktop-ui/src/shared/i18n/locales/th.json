@@ -2779,7 +2779,10 @@
       "nothingNewSince": "ไม่มีอะไรใหม่ตั้งแต่ {time}",
       "minutesAgo": "{count} นาทีที่แล้ว",
       "hoursAgo": "{count} ชม. ที่แล้ว",
-      "daysAgo": "{count} วันที่แล้ว"
+      "daysAgo": "{count} วันที่แล้ว",
+      "claudeLimit": "คุณใช้ Claude ครบขีดจำกัดแล้ว ครั้งนี้โมเดลของ Stella จึงเป็นผู้ตรวจ",
+      "claudeLimitUntil": "คุณใช้ Claude ครบขีดจำกัดแล้วจนถึง {time} ครั้งนี้โมเดลของ Stella จึงเป็นผู้ตรวจ",
+      "claudeFailed": "Claude Code ไม่สามารถตรวจครั้งนี้ได้ โมเดลของ Stella จึงตรวจแทน"
     }
   },
   "sidebar": {

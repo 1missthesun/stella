@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "A Markdown-előnézethez a Stella asztali alkalmazás szükséges.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Szöveg",
         "noContent": "Nem található tartalom."
       },
       "media": {
@@ -2796,7 +2797,10 @@
       "nothingNewSince": "Nincs újdonság {time} óta",
       "minutesAgo": "{count} perce",
       "hoursAgo": "{count} órája",
-      "daysAgo": "{count} napja"
+      "daysAgo": "{count} napja",
+      "claudeLimit": "Elérted a Claude használati korlátját, ezért most a Stella modellje ellenőrzött.",
+      "claudeLimitUntil": "Elérted a Claude használati korlátját {time}-ig, ezért most a Stella modellje ellenőrzött.",
+      "claudeFailed": "A Claude Code nem tudta lefuttatni ezt az ellenőrzést, ezért a Stella modellje végezte el."
     }
   },
   "sidebar": {

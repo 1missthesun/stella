@@ -2606,6 +2606,7 @@
       "markdown": {
         "desktopRequired": "Pratinjau Markdown memerlukan aplikasi desktop Stella.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Teks",
         "noContent": "Tidak ada konten ditemukan."
       },
       "media": {
@@ -2778,7 +2779,10 @@
       "nothingNewSince": "Tidak ada yang baru sejak {time}",
       "minutesAgo": "{count} mnt lalu",
       "hoursAgo": "{count} jam lalu",
-      "daysAgo": "{count} hr lalu"
+      "daysAgo": "{count} hr lalu",
+      "claudeLimit": "Batas penggunaan Claude Anda tercapai, jadi kali ini model Stella yang memeriksa.",
+      "claudeLimitUntil": "Batas penggunaan Claude Anda tercapai hingga {time}, jadi kali ini model Stella yang memeriksa.",
+      "claudeFailed": "Claude Code tidak dapat menjalankan pemeriksaan ini, jadi model Stella yang melakukannya."
     }
   },
   "sidebar": {

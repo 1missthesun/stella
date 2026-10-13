@@ -247,6 +247,19 @@ export function EmailDigestPage() {
           </Text>
         </View>
       ) : null}
+      {status?.notice && status.lastOutcome !== "error" && !running ? (
+        <View style={styles.quiet} testID="mobile-email-digest-notice">
+          <Text style={styles.errorText} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+            {status.notice.kind === "claude_failed"
+              ? t("shell.emailDigest.claudeFailed")
+              : status.notice.resetsAt !== undefined && status.notice.resetsAt > now
+                ? t("shell.emailDigest.claudeLimitUntil", {
+                    time: clockTime(locale, status.notice.resetsAt, now),
+                  })
+                : t("shell.emailDigest.claudeLimit")}
+          </Text>
+        </View>
+      ) : null}
       {digests.map((digest) => (
         <DigestGroup
           key={digest.digestId}

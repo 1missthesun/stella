@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Η προεπισκόπηση Markdown απαιτεί την εφαρμογή Stella για υπολογιστή.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Κείμενο",
         "noContent": "Δεν βρέθηκε περιεχόμενο."
       },
       "media": {
@@ -2796,7 +2797,10 @@
       "nothingNewSince": "Τίποτα νέο από τις {time}",
       "minutesAgo": "πριν από {count} λ.",
       "hoursAgo": "πριν από {count} ώ.",
-      "daysAgo": "πριν από {count} ημ."
+      "daysAgo": "πριν από {count} ημ.",
+      "claudeLimit": "Έφτασες το όριο χρήσης του Claude, οπότε αυτή τη φορά έλεγξε το μοντέλο της Stella.",
+      "claudeLimitUntil": "Έφτασες το όριο χρήσης του Claude έως τις {time}, οπότε αυτή τη φορά έλεγξε το μοντέλο της Stella.",
+      "claudeFailed": "Το Claude Code δεν μπόρεσε να κάνει αυτόν τον έλεγχο, οπότε τον έκανε το μοντέλο της Stella."
     }
   },
   "sidebar": {

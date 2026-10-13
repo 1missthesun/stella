@@ -9,6 +9,7 @@ import type { WebSearchResult } from "@stella/contracts/backend/search";
 import { raceWithTimeoutError } from "./runner/cloud-effect-runtime.js";
 import { scheduleRemotePromptRevalidation } from "./prompts/remote-prompts.js";
 import { createRunnerPiTools } from "./runner/pi-tools.js";
+import { pushedDevices } from "./runner/execution-context.js";
 import { createRuntimeInitialization } from "./runner/runtime-initialization.js";
 import { createAgentReportInbox } from "./runner/agent-report-inbox.js";
 import {
@@ -363,6 +364,8 @@ export const createStellaHostRunner = (
       const authToken = context.state.authToken?.trim();
       return baseUrl && authToken ? { baseUrl, authToken } : null;
     },
+    pushedDevices: () =>
+      context.state.authToken?.trim() ? pushedDevices(context.backend.client()) : undefined,
     loadExecutionContext: async () => await context.loadExecutionContext?.(),
     killAllShells: () => context.toolHost.killAllShells(),
     piTools: createRunnerPiTools(context),

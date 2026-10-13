@@ -24,14 +24,22 @@ const LIST_TIMEOUT_MS = 15_000;
 /** The owner's computers, as the owner gate lists them, for one conversation stored in the cloud. */
 export type DesktopDevices = { devices(): Promise<DeviceDestination[]> };
 
-/** The owner's computers over HTTP with the user's sign-in; undefined for a conversation kept on this computer. */
+/**
+ * The owner's computers for a conversation stored in the cloud; undefined for
+ * one kept on this computer. The list the live socket pushes when there is
+ * one (`pushed`), else an HTTP read with the user's sign-in: a read per
+ * brain check kept the owner's object awake.
+ */
 export const httpDevices = (
   conversationId: string,
   auth: () => { baseUrl: string; authToken: string } | null | undefined,
+  pushed?: () => DeviceDestination[] | undefined,
 ): DesktopDevices | undefined => {
   if (conversationId.startsWith("local_")) return undefined;
   return {
     devices: async () => {
+      const live = pushed?.();
+      if (live) return live;
       const current = auth();
       if (!current) throw new Error("Sign in to Stella to reach your other computers.");
       const response = await fetch(`${current.baseUrl.replace(/\/+$/, "")}${DEVICES_PATH}`, {

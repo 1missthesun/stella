@@ -11,7 +11,7 @@ import {
 } from "@stella/contracts/execution-context";
 import { getImageGenerationPreferences } from "../preferences/local-preferences.js";
 import { hasAccessibleLocalLlmApiKey } from "../storage/local-llm-credential-access.js";
-import { DEVICES_PATH } from "@stella/contracts/turn-plane/placement";
+import { DEVICES_PATH, type DeviceDestination } from "@stella/contracts/turn-plane/placement";
 
 const MAX_CATALOG_BYTES = 128 * 1024;
 const FALLBACK_READ_TIMEOUT_MS = 1_000;
@@ -42,6 +42,17 @@ const holdView = <K extends ViewName>(client: BackendClient, view: K, args: View
     },
   );
   return held;
+};
+
+/**
+ * The owner's computers as `devices.list` last pushed them over the live
+ * socket, or undefined until the first push or after the view failed. Starts
+ * the subscription the first time it is asked.
+ */
+export const pushedDevices = (client: BackendClient | null): DeviceDestination[] | undefined => {
+  if (!client) return undefined;
+  const held = holdView(client, "devices.list", {});
+  return held.failed ? undefined : held.value?.devices;
 };
 
 const readCatalog = async (response: Response): Promise<unknown> => {

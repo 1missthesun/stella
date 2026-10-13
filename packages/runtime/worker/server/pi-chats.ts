@@ -424,7 +424,12 @@ export const piChatsFor = (
       journal: (conversationId) => cloudJournalFor(session, conversationId),
       cloudThreads: (conversationId) => cloudAgentThreadsFor(session, conversationId),
       deviceAgents: (conversationId) => deviceAgentThreadsFor(session, conversationId),
-      devices: (conversationId) => httpDevices(conversationId, () => session.runnerCell.get()?.getStellaSiteAuth()),
+      devices: (conversationId) =>
+        httpDevices(
+          conversationId,
+          () => session.runnerCell.get()?.getStellaSiteAuth(),
+          () => session.runnerCell.get()?.pushedDevices(),
+        ),
       brain: (conversationId) => brainFor(session, hostBus, conversationId),
       // A conversation stored in the cloud lists this computer's agents in
       // the owner's agent threads, where a paired phone shows and messages

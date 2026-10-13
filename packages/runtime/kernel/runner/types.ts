@@ -351,6 +351,8 @@ export type RunnerPublicApi = {
   stop: () => Promise<void>;
   waitUntilInitialized: () => Promise<void>;
   getStellaSiteAuth: () => { baseUrl: string; authToken: string } | null;
+  /** The owner's computers as the live socket last pushed them (`pushedDevices`); undefined until it has. */
+  pushedDevices: () => import("@stella/contracts/turn-plane/placement").DeviceDestination[] | undefined;
   /** The owner's devices and media access, as an orchestrator turn reads them (`loadDeviceExecutionContext`). */
   loadExecutionContext: () => Promise<
     import("@stella/contracts/execution-context").ExecutionContextSnapshot | undefined

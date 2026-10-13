@@ -27,7 +27,7 @@ const os = require("os");
 const path = require("path");
 const cp = require("child_process");
 
-const HELPER_DIR = "/opt/stella-preview";
+const HELPER_DIR = process.env.STELLA_PREVIEW_HELPER_DIR || "/opt/stella-preview";
 const MB = 1024 * 1024;
 
 const say = (line) => process.stderr.write(line + "\n");
@@ -95,9 +95,20 @@ const git = (args, cwd) => {
 
 const which = (name) => run("command -v " + name, process.cwd()).ok;
 
+const connectedRepo = () => {
+  try {
+    const token = fs.readFileSync("/opt/stella-slack/capability", "utf8").trim();
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return String(JSON.parse(Buffer.from(payload, "base64").toString("utf8")).repo || "").toLowerCase();
+  } catch {
+    return "";
+  }
+};
+
 const repoPreview = (root) => {
   if (!which("stella-preview")) return null;
-  if (!exists(path.join("/opt/stella-slack", "capability"))) return null;
+  const connected = connectedRepo();
+  if (!connected || connected !== githubRepo(root).toLowerCase()) return null;
   const head = git(["rev-parse", "HEAD"], root);
   if (!head) return null;
   const pushed = git(["branch", "-r", "--contains", head], root);

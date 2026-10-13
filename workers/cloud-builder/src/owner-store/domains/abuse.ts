@@ -15,8 +15,8 @@
  *   throttles the owner for a day. D1's `owner_risk` mirrors the score and
  *   status for the admin top list.
  *
- * Without `TURNSTILE_SECRET_KEY` (dev) no client can answer a challenge, so
- * challenges are skipped; sign-in requirements and suspension still apply.
+ * Without `TURNSTILE_SECRET_KEY` and `STELLA_TURNSTILE_STEP_UP=1` challenges
+ * are skipped; sign-in requirements and suspension still apply.
  */
 
 import {
@@ -573,7 +573,10 @@ export const chargeAnonymousNetworks = async (env: Cloudflare.Env, events: Gatew
 let loggedTurnstileOff = false;
 
 const turnstileSecret = (env: Cloudflare.Env): string | undefined => {
-  const raw = (env as unknown as Record<string, unknown>).TURNSTILE_SECRET_KEY;
+  const values = env as unknown as Record<string, unknown>;
+  const raw = values.TURNSTILE_SECRET_KEY;
+  const stepUp = values.STELLA_TURNSTILE_STEP_UP;
+  if (typeof stepUp !== "string" || stepUp.trim() !== "1") return undefined;
   return typeof raw === "string" && raw.trim() ? raw.trim() : undefined;
 };
 
@@ -658,7 +661,7 @@ export const admitSession = async (
   const secret = turnstileSecret(ctx.env);
   if (!secret && !loggedTurnstileOff) {
     loggedTurnstileOff = true;
-    log("info", "turnstile_disabled", { message: "TURNSTILE_SECRET_KEY unset; challenges are skipped." });
+    log("info", "turnstile_disabled", { message: "TURNSTILE_SECRET_KEY or STELLA_TURNSTILE_STEP_UP unset; challenges are skipped." });
   }
   const challengeRequired =
     enforcement.status === "challenged" ||

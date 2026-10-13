@@ -19,10 +19,9 @@
 
 // The passkey stack's tsyringe needs this evaluating ahead of it in this chunk.
 import "reflect-metadata";
-import { APP_INTEGRITY_HEADER } from "@stella/contracts/app-integrity";
 import { betterAuth, type BetterAuthOptions, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
-import { anonymous, bearer, captcha, jwt, magicLink, oneTimeToken } from "better-auth/plugins";
+import { anonymous, bearer, jwt, magicLink, oneTimeToken } from "better-auth/plugins";
 import { expo } from "@better-auth/expo";
 
 // Loaded after this module's static imports (reflect-metadata first): the
@@ -40,12 +39,8 @@ import {
   NEW_SIGN_IN_SUBJECT,
 } from "./email-templates.js";
 import { stellaHandoff, type HandoffApi } from "./handoff.js";
-import {
-  integrityErrorMessage,
-  integrityPurposeForPath,
-  turnstileSecret,
-  verifyAuthRequestProof,
-} from "./integrity.js";
+import { integrityErrorMessage, integrityPurposeForPath, verifyAuthRequestProof } from "./integrity.js";
+import { oauthStateBinding } from "./oauth-binding.js";
 import { ownerGateStub } from "../rpc-release.js";
 
 type AuthEnv = Cloudflare.Env;
@@ -81,6 +76,8 @@ export const websiteUrl = (env: unknown): string =>
 /** Dev only: test accounts exist and their magic links are logged, not sent. */
 export const testAccountsEnabled = (env: unknown): boolean => configured(env, "STELLA_TEST_ACCOUNTS") === "1";
 
+const localDevOriginsEnabled = (env: unknown): boolean => configured(env, "STELLA_LOCAL_DEV_ORIGINS") === "1";
+
 /** Browser origins allowed to call `/api/auth/*` and to be redirect targets. */
 export const trustedOrigins = (env: AuthEnv): string[] => {
   const scheme = configured(env, "STELLA_MOBILE_SCHEME") ?? "stella-mobile";
@@ -90,11 +87,9 @@ export const trustedOrigins = (env: AuthEnv): string[] => {
       authUrl(env),
       websiteUrl(env),
       DEFAULT_WEBSITE_URL,
-      // The website's dev server.
-      "http://localhost:3000",
-      // The Vite dev server, and the origin the Electron main process declares
-      // on every auth request (DESKTOP_AUTH_ORIGIN in auth-service.ts).
-      "http://localhost:57314",
+      ...(localDevOriginsEnabled(env) ? ["http://localhost:3000", "http://localhost:57314"] : []),
+      // The origin the Electron main process declares on every auth request
+      // (DESKTOP_AUTH_ORIGIN in auth-service.ts).
       "http://127.0.0.1:57314",
       "stella-app://desktop",
       // Native callbacks; platforms serialize the empty path with two or three slashes.
@@ -233,20 +228,6 @@ const parseMailbox = (value: string): string | { email: string; name: string } =
   if (!match) return value.trim();
   const name = match[1]!.trim();
   return name ? { email: match[2]!.trim(), name } : match[2]!.trim();
-};
-
-/**
- * Turnstile on anonymous sign-in for browsers. A native app sends an
- * integrity proof instead, which the before-hook verifies, so the plugin
- * stands aside for those requests.
- */
-const webCaptcha = (secretKey: string): BetterAuthPlugin => {
-  const plugin = captcha({ provider: "cloudflare-turnstile", secretKey, endpoints: ["/sign-in/anonymous"] });
-  return {
-    ...plugin,
-    onRequest: async (request, ctx) =>
-      request.headers.has(APP_INTEGRITY_HEADER) ? undefined : await plugin.onRequest!(request, ctx),
-  };
 };
 
 /**
@@ -438,7 +419,6 @@ const buildOptions = (env: AuthEnv) => {
   if (!env.DB) throw new Error("D1 is not bound.");
   const secret = required(env, "BETTER_AUTH_SECRET");
   const googleClientSecret = configured(env, "GOOGLE_CLIENT_SECRET");
-  const turnstile = turnstileSecret(env);
   const api = (): HandoffApi => (createAuth(env) as unknown as { api: HandoffApi }).api;
 
   return {
@@ -481,8 +461,9 @@ const buildOptions = (env: AuthEnv) => {
     },
     account: {
       // Desktop starts Google in the app and finishes in the system browser,
-      // and the website sends no cookies, so the state cookie never comes
-      // back. State is still checked against the verification table.
+      // and the website sends no cookies, so Better Auth's state cookie never
+      // comes back. State is checked against the verification table, and
+      // oauthStateBinding() binds it to the browser with its own cookie.
       storeStateStrategy: "database",
       skipStateCookieCheck: true,
       // An anonymous user links a provider account whose email is not its
@@ -497,12 +478,7 @@ const buildOptions = (env: AuthEnv) => {
         }
         const purpose = integrityPurposeForPath(ctx.path);
         if (!purpose || !ctx.request) return;
-        const result = await verifyAuthRequestProof({
-          env,
-          request: ctx.request,
-          purpose,
-          captchaVerified: ctx.path === "/sign-in/anonymous" && turnstile !== undefined,
-        });
+        const result = await verifyAuthRequestProof({ env, request: ctx.request, purpose });
         if (!result.ok) {
           throw new APIError(result.code === "integrity_required" ? "BAD_REQUEST" : "FORBIDDEN", {
             code: result.code,
@@ -576,6 +552,7 @@ const buildOptions = (env: AuthEnv) => {
     },
     plugins: [
       expoOAuthProxy(),
+      oauthStateBinding(),
       bearer({ requireSignature: true }),
       revokedTokenFloor(env),
       pushSignOutTeardown(env),
@@ -583,7 +560,6 @@ const buildOptions = (env: AuthEnv) => {
       nativeOttRedirect(),
       anonymous({ emailDomainName: "anon.stella.local", disableDeleteAnonymousUser: true }),
       magicLink({ sendMagicLink: ({ email, url }) => sendMagicLinkEmail(env, email, url) }),
-      ...(turnstile ? [webCaptcha(turnstile)] : []),
       jwt({
         jwks: { keyPairConfig: { alg: "RS256", modulusLength: 2048 } },
         jwt: {

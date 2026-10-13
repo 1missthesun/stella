@@ -57,7 +57,7 @@
     "issues": { "enabled": true },
     "logs": {
       "enabled": true,
-      "invocation_logs": true,
+      "invocation_logs": false,
     },
     "traces": {
       "enabled": true,
@@ -81,6 +81,7 @@
     // `@test.stella.local` users, whose magic links are logged, not sent.
     // Production and acceptance configs must omit it.
     "STELLA_TEST_ACCOUNTS": "1",
+    "STELLA_LOCAL_DEV_ORIGINS": "1",
     // Dev only until it ships: Slack workspace environments
     // (`src/slack/environment.ts`). Unset, Slack agent containers keep the
     // default network and the settings page hides the section.
@@ -356,6 +357,7 @@
       "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
       "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-dev.fromyou.workers.dev",
       "STELLA_TEST_ACCOUNTS": "1",
+      "STELLA_LOCAL_DEV_ORIGINS": "1",
       "STELLA_DEPLOYMENT_IDENTITY": "dev:outgoing-bulldog-865",
       "MODEL_GATEWAY_URL": "https://stella-v2-model-gateway-dev.fromyou.workers.dev",
       // The dev model gateway trusts this key id (its CAPABILITY_JWKS).
@@ -374,7 +376,7 @@
       "issues": { "enabled": true },
       "logs": {
         "enabled": true,
-        "invocation_logs": true,
+        "invocation_logs": false,
         "persist": true,
       },
       "traces": {
@@ -512,6 +514,7 @@
       "preview_urls": false,
       "vars": {
         "TELEMETRY_ENVIRONMENT": "development",
+        "STELLA_LOCAL_DEV_ORIGINS": "1",
         "TURN_TIMEOUT_MS": "900000",
         "SANDBOX_IDLE_TIMEOUT_MS": "600000",
         // A container only a prewarm started keeps capacity this long; the turn
@@ -705,7 +708,7 @@
         "issues": { "enabled": true },
         "logs": {
           "enabled": true,
-          "invocation_logs": true,
+          "invocation_logs": false,
         },
         "traces": {
           "enabled": true,

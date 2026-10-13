@@ -5,9 +5,12 @@
  * for an unmodified app on a real device, bound to a one-time nonce from
  * `POST /api/auth/integrity/challenge`. Web clients answer Turnstile instead.
  *
- * `STELLA_APP_INTEGRITY_MODE=off` (dev) accepts any well-formed proof for the
- * right purpose without verifying it; with no Turnstile key either, requests
- * without a proof pass too.
+ * `STELLA_APP_INTEGRITY_MODE=off` (dev, and production until App Attest and
+ * Play Integrity are configured) cannot tell a real app from a script, so it
+ * passes native requests unverified. With `TURNSTILE_SECRET_KEY` set, browser
+ * requests (website, web chat, and the desktop app, whose requests carry a
+ * browser-style origin) must still answer Turnstile; an unverified proof does
+ * not stand in for it.
  *
  * App Attest is verified with `@peculiar/x509` and WebCrypto: `node-app-attest`
  * depends on Node streams (through `cbor`) that do not load in workerd.
@@ -164,31 +167,42 @@ export const verifyTurnstile = async (env: unknown, token: string, remoteIp?: st
 
 // ── The rule ───────────────────────────────────────────────────────────────
 
+export const isBrowserBorneRequest = (request: Request): boolean => {
+  const origin = request.headers.get("origin")?.trim() ?? "";
+  if (!origin) return false;
+  if (origin === "null") return true;
+  try {
+    const { protocol } = new URL(origin);
+    return protocol === "http:" || protocol === "https:" || protocol === "stella-app:";
+  } catch {
+    return true;
+  }
+};
+
 /**
  * A request to a protected endpoint passes with a valid integrity proof or a
- * valid Turnstile answer. `captchaVerified` means the captcha plugin already
- * spent the Turnstile token (anonymous sign-in); Turnstile tokens are single
- * use, so it is not checked twice.
+ * valid Turnstile answer. Turnstile tokens are single use, so each is
+ * checked once, here.
  */
 export const verifyAuthRequestProof = async (args: {
   env: IntegrityEnv;
   request: Request;
   purpose: AppIntegrityPurpose;
-  captchaVerified?: boolean;
 }): Promise<AuthProofResult> => {
   const { env, request, purpose } = args;
   const mode = integrityMode(env);
   if (mode === "off" && !loggedOff) {
     loggedOff = true;
-    console.warn("[auth] App integrity is OFF (local development mode)");
+    console.warn("[auth] App integrity is OFF; native sign-in proofs are not verified");
   }
   const turnstileEnabled = turnstileSecret(env) !== undefined;
+  const browser = isBrowserBorneRequest(request);
+  const turnstileRequired = turnstileEnabled && browser;
   const captcha = request.headers.get(AUTH_CAPTCHA_HEADER)?.trim() ?? "";
   const integrityHeader = request.headers.get(APP_INTEGRITY_HEADER)?.trim() ?? "";
   let sawInvalidProof = false;
 
   if (turnstileEnabled && captcha) {
-    if (args.captchaVerified) return { ok: true };
     if (await verifyTurnstile(env, captcha, request.headers.get("cf-connecting-ip") ?? undefined)) {
       return { ok: true };
     }
@@ -200,7 +214,8 @@ export const verifyAuthRequestProof = async (args: {
     if (!proof || proof.purpose !== purpose) {
       sawInvalidProof = true;
     } else if (mode === "off") {
-      return { ok: true };
+      if (!turnstileRequired) return { ok: true };
+      sawInvalidProof = true;
     } else if (!(await consumeNonce(env, proof.nonce, purpose, Date.now()))) {
       sawInvalidProof = true;
     } else {
@@ -208,7 +223,8 @@ export const verifyAuthRequestProof = async (args: {
     }
   }
 
-  if (!turnstileEnabled && mode === "off") return { ok: true };
+  if (mode === "off" && !turnstileRequired && !sawInvalidProof) return { ok: true };
+  if (mode === "off" && !turnstileEnabled) return { ok: true };
   return { ok: false, code: sawInvalidProof ? "integrity_invalid" : "integrity_required" };
 };
 

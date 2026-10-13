@@ -142,6 +142,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
           description: input.description,
           threadId: input.threadId,
           ...(input.model ? { model: input.model } : {}),
+          lineage: input.lineage,
           // Same key and shape the chat placement uses, so the device's
           // `placementAttachmentPaths` reads both dispatch kinds identically.
           ...(input.attachments?.length
@@ -314,8 +315,11 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
           ownerId: deps.ownerId(),
           ownerGeneration: input.ownerGeneration,
           conversationId: input.conversationId,
-          ...(input.parentThreadId ? { parentThreadId: input.parentThreadId } : {}),
-          agentDepth: input.parentThreadId ? 1 : 0,
+          ...(input.lineage.startedBy
+            ? { parentThreadId: input.lineage.startedBy.threadId, parentLabel: input.lineage.startedBy.label }
+            : {}),
+          // The caller's depth: one above the thread's.
+          agentDepth: input.lineage.depth - 1,
         },
         attempt: {
           threadId: input.threadId,

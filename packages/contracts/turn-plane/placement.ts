@@ -1,3 +1,4 @@
+import type { AgentLineage } from "../agent-depth.js";
 import type { CloudExecutionSelection } from "../agent-engine.js";
 import type { CloudTurnContext } from "./turn-start.js";
 import type {
@@ -266,6 +267,11 @@ export type DispatchPayload = {
    * device runs the agent on it, or fails the agent saying why it can't.
    */
   model?: string;
+  /**
+   * Agent dispatches only: where the thread sits among Stella's agents (its
+   * depth and the agent that started it), so the device runs it as that.
+   */
+  lineage?: AgentLineage;
   /**
    * Chat dispatches only: the orchestrator moved itself here with
    * `switch_destination`, so the prompt is its own brief rather than a

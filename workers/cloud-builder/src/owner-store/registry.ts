@@ -15,6 +15,7 @@ import type {
   ViewName,
   ViewResult,
 } from "@stella/contracts/backend/api";
+import type { AgentLineage } from "@stella/contracts/agent-depth";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import type { MemoryPolicyChange } from "@stella/contracts/turn-plane/memory-policy";
 import type { Parser } from "./args.js";
@@ -222,8 +223,8 @@ export type AgentTurnDispatch = {
   execution: import("@stella/contracts/agent-engine").CloudExecutionSelection;
   originDeviceId?: string;
   originConversationId?: string;
-  /** The cloud agent that started the thread, which its report returns to. */
-  parentThreadId?: string;
+  /** Where the thread sits among Stella's agents, from its parent chain. */
+  lineage: AgentLineage;
 };
 
 export type DeviceAgentTurnDispatch = {
@@ -238,6 +239,8 @@ export type DeviceAgentTurnDispatch = {
   requestingDeviceId?: string;
   /** The requester's `spawn_agent` model the device runs the agent on. */
   model?: string;
+  /** Where the thread sits among Stella's agents, from its parent chain. */
+  lineage: AgentLineage;
   /**
    * Drive paths of the spawning turn's attachments. The device resolves these
    * to signed GETs and materializes them into its own attachment cache, so the

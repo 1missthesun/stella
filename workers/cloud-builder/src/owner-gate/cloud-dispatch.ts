@@ -573,6 +573,8 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
         description: request.description,
         turnId: row.dispatch_id,
         attemptGeneration: 1,
+        // A placed run is a fresh thread of Stella's own.
+        lineage: { depth: 1 },
       },
     });
     await this.releaseGate(row);

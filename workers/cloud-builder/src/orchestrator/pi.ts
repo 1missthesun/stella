@@ -735,7 +735,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         conversationId: authority.conversationId,
         parentTurnId: event.turnId,
         ...(event.parentThreadId ? { parentThreadId: event.parentThreadId } : {}),
-        agentDepth: event.parentThreadId ? 2 : 1,
+        agentDepth: event.depth,
         attemptGeneration: event.attempt,
         description: event.description,
         prompt: "",
@@ -873,6 +873,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         threadId: attempt.threadId,
         description: attempt.description,
         attemptGeneration: attempt.attemptGeneration,
+        lineage: attempt.lineage,
         authority: {
           ownerId: input.ownerId,
           ownerGeneration: input.ownerGeneration,

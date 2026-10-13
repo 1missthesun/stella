@@ -1,3 +1,4 @@
+import { MAX_AGENT_DEPTH, type AgentLineage } from "@stella/contracts/agent-depth";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
 import {
@@ -16,9 +17,8 @@ import { HEADER_GATE_ADMITTED } from "./turn-start-request.js";
 import { parseCloudExecutionSelection } from "./turn-start-request.js";
 import { sha256Hex } from "./hash.js";
 
-export const MAX_CLOUD_AGENT_DEPTH = 2;
 export const CLOUD_AGENT_DEPTH_LIMIT_ERROR =
-  "Task depth limit reached (2). Complete work in the current task instead of creating another subtask.";
+  `Task depth limit reached (${MAX_AGENT_DEPTH}). Complete work in the current task instead of creating another subtask.`;
 
 export type CloudAgentControlStatus =
   | "running"
@@ -307,7 +307,11 @@ export type CloudAgentDispatchCaller = Readonly<{
   conversationId: string;
   /** Absent for a desktop dispatch: no cloud turn sits above it. */
   parentTurnId?: string;
+  /** The agent that starts the thread; absent when Stella does. */
   parentThreadId?: string;
+  /** That agent's description, which the thread is told started it. */
+  parentLabel?: string;
+  /** The caller's own depth: the thread runs one below it. */
   agentDepth: number;
 }>;
 
@@ -384,7 +388,7 @@ export const dispatchCloudAgentTurn = async (args: {
 }): Promise<CloudAgentControlReceipt> => {
   const { dependencies, caller, attempt } = args;
   const agentDepth = caller.agentDepth + 1;
-  if (agentDepth > MAX_CLOUD_AGENT_DEPTH) {
+  if (agentDepth > MAX_AGENT_DEPTH) {
     throw new Error(CLOUD_AGENT_DEPTH_LIMIT_ERROR);
   }
   const admission = await dependencies.ownerGateAdmit({
@@ -428,6 +432,12 @@ export const dispatchCloudAgentTurn = async (args: {
         ...(attempt.originDeviceId
           ? { originDeviceId: attempt.originDeviceId }
           : {}),
+        lineage: {
+          depth: agentDepth,
+          ...(caller.parentThreadId
+            ? { startedBy: { threadId: caller.parentThreadId, label: caller.parentLabel ?? "An agent" } }
+            : {}),
+        },
       },
     };
     try {
@@ -605,6 +615,8 @@ export type PiThreadAttempt = Readonly<{
   attemptGeneration: number;
   /** A computer's dispatch: its report reaches that computer through the agent threads, not a wake here. */
   originDeviceId?: string;
+  /** Where it sits among Stella's agents, which the conversation's pi runs it as. */
+  lineage: AgentLineage;
 }>;
 
 /**

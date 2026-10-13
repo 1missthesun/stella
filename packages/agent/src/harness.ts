@@ -5,6 +5,7 @@
  */
 import type { Context } from "@earendil-works/chord";
 import type { ModelThinkingLevel, Models } from "@earendil-works/pi-ai";
+import type { AgentLineage } from "@stella/contracts/agent-depth";
 import {
   createRegistry,
   Harness,
@@ -97,6 +98,8 @@ export type OpenStellaHarness = {
       thinkingLevel?: ModelThinkingLevel;
       /** It may have run elsewhere before (it moved here): its first run takes its log first. */
       catchUp?: boolean;
+      /** Where it sits among Stella's agents; absent, it is one of Stella's own. */
+      lineage?: AgentLineage;
     },
     context: Context,
   ): Promise<{ threadId: string; existing: boolean }>;

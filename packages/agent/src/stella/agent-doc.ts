@@ -9,7 +9,7 @@ import { defineDoc } from "@earendil-works/pi-durable";
 export type StellaAgentRole = {
   /** Gateway agent type and prompt: `orchestrator` or `general`. */
   agentType: "orchestrator" | "general";
-  /** 0 for the orchestrator, 1 for its agents, 2 for theirs. */
+  /** 0 for the orchestrator, 1 for its agents, one more for each level below (`MAX_AGENT_DEPTH`). */
   depth: number;
   /** The short name the parent gave this agent. */
   description?: string;
@@ -36,5 +36,4 @@ export const StellaAgentDoc = defineDoc<StellaAgentRole>({
   initial: () => ({ agentType: "orchestrator", depth: 0 }),
 });
 
-/** Agents below the orchestrator, and below them; Stella's `maxAgentDepth`. */
-export const MAX_AGENT_DEPTH = 2;
+export { MAX_AGENT_DEPTH } from "@stella/contracts/agent-depth";

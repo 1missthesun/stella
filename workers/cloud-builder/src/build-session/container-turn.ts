@@ -1567,13 +1567,13 @@ export const runAgentAttempt = async (
     // An agent turn runs `general.md` rendered here, from this deploy's
     // bundle, for exactly the tools the executor will give this engine;
     // its `code` reads its own thread's history. The image never supplies prose.
-    const canMove = turn.agentDepth <= 1;
-    const devicesSection = canMove ? await agentDevicesSection(host.env, turn) : undefined;
+    // Any agent moves itself, at any depth; its starter is still its starter.
+    const devicesSection = await agentDevicesSection(host.env, turn);
     let roleInput: CloudCliTurnRoleInput = {
       role: "agent",
       systemPrompt: [
         renderCloudAgentPrompt("agents/general.md", {
-          names: canMove ? [...cloudGeneralToolNames(), CLOUD_AGENT_MOVE_TOOL] : cloudGeneralToolNames(),
+          names: [...cloudGeneralToolNames(), CLOUD_AGENT_MOVE_TOOL],
           history: true,
         }),
         ...(devicesSection ? [devicesSection] : []),

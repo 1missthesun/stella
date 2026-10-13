@@ -49,12 +49,6 @@ export const serveAgentMoveRequest = async (
   body: Record<string, unknown>,
 ): Promise<Response> => {
   if (turn.agentRole === "orchestrator" || !turn.threadId) return reply({ ok: false, error: "Only an agent can move itself." });
-  if (turn.agentDepth > 1) {
-    return reply({
-      ok: false,
-      error: "Another agent started you, so you run where it runs. If the work needs another computer, tell the agent that started you.",
-    });
-  }
   const destination = typeof body.destination === "string" ? body.destination.trim() : "";
   const brief = typeof body.prompt === "string" ? body.prompt.trim() : "";
   if (!destination || !brief) return reply({ ok: false, error: "Pass destination (a device_id) and your brief as prompt." });

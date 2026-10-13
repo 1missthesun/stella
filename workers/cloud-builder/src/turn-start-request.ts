@@ -7,6 +7,7 @@
 
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
+import { MAX_AGENT_DEPTH } from "@stella/contracts/agent-depth";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   orchestratorCliThreadId,
@@ -427,9 +428,9 @@ export const parseCloudAgentTurnStartRequest = (
   } else if (
     !Number.isSafeInteger(value.agentDepth) ||
     (value.agentDepth as number) < 1 ||
-    (value.agentDepth as number) > 2
+    (value.agentDepth as number) > MAX_AGENT_DEPTH
   ) {
-    return fail("agentDepth must be 1 or 2.");
+    return fail(`agentDepth must be 1 to ${MAX_AGENT_DEPTH}.`);
   }
   if (
     !Number.isSafeInteger(value.attemptGeneration) ||
@@ -499,12 +500,9 @@ export const parseCloudAgentTurnStartRequest = (
     if (!parentThreadId) return fail("parentThreadId is malformed.");
     request.parentThreadId = parentThreadId;
   }
-  if (
-    (request.agentDepth === 1 && request.parentThreadId !== undefined) ||
-    (request.agentDepth === 2 && request.parentThreadId === undefined)
-  ) {
+  if ((request.agentDepth > 1) !== (request.parentThreadId !== undefined)) {
     return fail(
-      "parentThreadId must be absent at depth 1 and present at depth 2.",
+      "parentThreadId must be absent at depth 1 and present below it.",
     );
   }
   if (value.originDeviceId !== undefined) {

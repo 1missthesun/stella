@@ -4,6 +4,7 @@ import type {
 import type {
   AgentRunFinishOutcome,
 } from "@stella/contracts/agent-runtime";
+import type { AgentLineage } from "@stella/contracts/agent-depth";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 
@@ -473,6 +474,12 @@ export type RuntimeLocalAgentRequest = {
   executionId?: string;
   /** The cloud thread this agent is, when another device placed it here. */
   remoteThreadId?: string;
+  /**
+   * Where that thread sits among Stella's agents (its depth and the agent
+   * that started it), from the owner's agent threads; absent, it is one of
+   * Stella's own.
+   */
+  lineage?: AgentLineage;
   /**
    * The requester's `spawn_agent` model selector. A selector this device
    * cannot run fails the agent with the reason.

@@ -87,6 +87,7 @@ import { agentLogSync, importAgentLog, type AgentLogTransport } from "@stella/ag
 import { agentMoveModel } from "@stella/agent/stella/agent-move-model";
 import { sha256Hex } from "./hash.js";
 import { AGENT_LOG_CLOUD_HOLDER, type AgentLogCalls } from "@stella/contracts/backend/agent-logs";
+import type { AgentLineage } from "@stella/contracts/agent-depth";
 import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import { findDeviceDestination } from "@stella/contracts/turn-plane/placement";
@@ -297,6 +298,8 @@ export type PiAgentLedgerEvent = {
   description: string;
   /** The agent that started it; absent for Stella's own. */
   parentThreadId?: string;
+  /** Its depth among Stella's agents: 1 for hers, one more for each level below. */
+  depth: number;
   /** The turn it started during or just after. */
   turnId: string;
   authority: PiAuthority;
@@ -1445,6 +1448,7 @@ export class PiConversationRuntime {
       attempt: run.attempt,
       description: run.description,
       ...(run.parentThreadId ? { parentThreadId: run.parentThreadId } : {}),
+      depth: run.depth,
       turnId,
       authority,
       ...(ended ? { ended } : {}),
@@ -2082,6 +2086,8 @@ export class PiConversationRuntime {
       threadId: string;
       description: string;
       attemptGeneration: number;
+      /** Where it sits among Stella's agents, from its parent chain in the owner's agent threads. */
+      lineage: AgentLineage;
       authority: PiAuthority;
       /** The Stella model it runs on; none on the owner's ChatGPT plan. */
       model?: StellaModelSpec;
@@ -2133,6 +2139,7 @@ export class PiConversationRuntime {
         threadId: attempt.threadId,
         catchUp: true,
         origin: { agentThread: true },
+        lineage: attempt.lineage,
         model: this.#threadModel(attempt.authority.execution, attempt.model),
         thinkingLevel: thinkingLevelFor(attempt.authority.execution.reasoningEffort),
       },

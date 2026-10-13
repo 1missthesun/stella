@@ -4,6 +4,7 @@ import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { hostname } from "node:os";
 import { AGENT_PAUSED_REASON } from "@stella/contracts/agent-status";
+import { readAgentLineage } from "@stella/contracts/agent-depth";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -954,6 +955,7 @@ export class StellaRuntimeHost {
             typeof payload.model === "string" && payload.model.trim()
               ? payload.model.trim()
               : null;
+          const lineage = readAgentLineage(payload.lineage);
           const result = await this.requestWorker<{
             status: string;
             finalText?: string;
@@ -966,6 +968,7 @@ export class StellaRuntimeHost {
               prompt,
               agentType: "general",
               ...(requestedModel ? { requestedModel } : {}),
+              ...(lineage ? { lineage } : {}),
               ...(remoteThreadId
                 ? {
                     threadId: remoteThreadId,

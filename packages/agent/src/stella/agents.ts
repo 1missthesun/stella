@@ -64,6 +64,7 @@ import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contr
 import { CLAUDE_CODE_PROVIDER_ID, engineExtensionChange, onClaudeCode } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
 import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
+import type { AgentLineage } from "@stella/contracts/agent-depth";
 import { AGENT_MOVE_CLOUD, switchDestinationTool, type AgentSwitch, type DeviceStanding, type StellaExecutionHost } from "./execution.ts";
 import { agentToolSelection } from "./host-tools.ts";
 import {
@@ -187,6 +188,8 @@ export type AgentRun = {
   runId: string;
   /** The agent that started it; absent when Stella did. */
   parentThreadId?: string;
+  /** Its depth among Stella's agents: 1 for hers, one more for each level below. */
+  depth: number;
   /** Which of the messages its starter gave it this run answers, from 1: its attempt in the owner's records. */
   attempt: number;
   description: string;
@@ -313,6 +316,8 @@ const stoppedPlacedRun = (threadId: string, signal: AbortSignal): PlacedAgentRes
 
 /** An agent another host placed here, and one run of it (`runPlacedAgent`). */
 export type PlacedAgentRun = {
+  /** Where it sits among Stella's agents; absent, it is one of Stella's own. */
+  lineage?: AgentLineage;
   /** The agent's identity at the host that placed it, the same for each of its runs. */
   agentKey: string;
   /** This run (a continued agent runs again under the same `agentKey`). */
@@ -798,6 +803,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           ...(self.agentType !== "orchestrator" && self.parentConversationId !== undefined && self.threadId
             ? { parentThreadId: self.threadId }
             : {}),
+          depth: self.depth + 1,
           attempt: attemptOf(siblings, threadId, Number(reporter.id)),
           description: siblings?.agents[threadId]?.description ?? threadId,
         };
@@ -1552,6 +1558,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       top = parent;
       root = parent.parentConversationId as ConversationId | undefined;
     }
+    // Run here for an agent on another host (placed here, or moved here): that agent started it.
+    if (parentThreadId === undefined && self.depth > 1) parentThreadId = self.startedBy?.threadId;
     return { self, root, top, ...(parentThreadId ? { parentThreadId } : {}) };
   };
 
@@ -1857,8 +1865,9 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   /**
    * Start an agent the host asked for rather than a tool call (an app-source
-   * merge, memory sync): under the orchestrator, at depth 1, reporting to it
-   * like a spawned agent. Once per `key`.
+   * merge, memory sync, an agent thread another host started): under the
+   * orchestrator, at the depth its lineage gives (1 without one), reporting
+   * to it like a spawned agent. Once per `key`.
    */
   const startAgent = async (
     harness: Harness,
@@ -1876,6 +1885,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       thinkingLevel?: ModelThinkingLevel;
       /** It may have run elsewhere before (it moved here): its first run takes its log first. */
       catchUp?: boolean;
+      /** Where it sits among Stella's agents; absent, it is one of Stella's own. */
+      lineage?: AgentLineage;
     },
     context: Context,
   ): Promise<{ threadId: string; existing: boolean }> => {
@@ -1888,7 +1899,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       const created = await createAgent(tx, {
         parentConversationId: root.id,
         callKey: `host:${args.key}`,
-        depth: 1,
+        depth: args.lineage?.depth ?? 1,
+        ...(args.lineage?.startedBy ? { startedBy: args.lineage.startedBy } : {}),
         description: args.description.trim() || "agent",
         prompt: args.prompt,
         runsOn,
@@ -2144,8 +2156,9 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   /**
    * Run an agent another host placed here (a cloud orchestrator's agent on
-   * this computer): under the orchestrator at depth 1, answering its brief
-   * to the host that placed it rather than reporting here. Once per `key`;
+   * this computer): under the orchestrator, at the depth its lineage gives
+   * (1 without one), answering its brief to the host that placed it rather
+   * than reporting here. Once per `key`;
    * settles with its answer.
    */
   /**
@@ -2179,7 +2192,8 @@ export function stellaAgents(host: StellaAgentsHost) {
         createAgent(tx, {
           parentConversationId: root.id,
           callKey: `${PLACED_CALL_PREFIX}${args.agentKey}`,
-          depth: 1,
+          depth: args.lineage?.depth ?? 1,
+          ...(args.lineage?.startedBy ? { startedBy: args.lineage.startedBy } : {}),
           description: args.description.trim() || "agent",
           prompt: args.prompt,
           runsOn,

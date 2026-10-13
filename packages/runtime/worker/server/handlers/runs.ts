@@ -146,6 +146,7 @@ export const runsHandlers: WorkerRpcHandlers = {
           agentKey,
           runKey,
           ...(payload.remoteThreadId ? { threadId: payload.remoteThreadId } : {}),
+          ...(payload.lineage ? { lineage: payload.lineage } : {}),
           description: payload.description,
           prompt: withAttachedFiles(payload.prompt, attachments),
           ...(pickedModel ? { model: pickedModel } : {}),

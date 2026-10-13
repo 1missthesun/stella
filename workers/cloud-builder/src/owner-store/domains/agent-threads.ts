@@ -65,6 +65,7 @@ import { readMainConversationId } from "./conversations.js";
 import { agentReportId, agentReportReceipt } from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
+import type { AgentLineage } from "@stella/contracts/agent-depth";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { CloudAgentLifecycleCard } from "@stella/contracts/cloud-agent-lifecycle";
 import type {
@@ -327,6 +328,23 @@ const control = (row: ThreadRow): AgentThreadControl => ({
 const readThread = (db: OwnerDbReader, threadId: string): ThreadRow | null =>
   db.one<ThreadRow>("SELECT * FROM agent_threads WHERE thread_id = ?", threadId);
 
+/**
+ * Where a thread sits among Stella's agents, from its parent chain: one level
+ * below the agent that started it, and 1 when Stella did. No move changes
+ * the chain, so whichever host runs the thread is told the same thing.
+ */
+const threadLineage = (db: OwnerDbReader, thread: ThreadRow): AgentLineage => {
+  if (!thread.parent_thread_id) return { depth: 1 };
+  const parent = readThread(db, thread.parent_thread_id);
+  let depth = 2;
+  const seen = new Set([thread.thread_id, thread.parent_thread_id]);
+  for (let id = parent?.parent_thread_id ?? null; id && !seen.has(id); id = readThread(db, id)?.parent_thread_id ?? null) {
+    seen.add(id);
+    depth += 1;
+  }
+  return { depth, startedBy: { threadId: thread.parent_thread_id, label: parent?.description || "An agent" } };
+};
+
 const PLACEMENT_ALIAS_SCAN_MAX = 500;
 
 const placementAliasThreadId = (
@@ -553,9 +571,7 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
       ...(thread.origin_conversation_id
         ? { originConversationId: thread.origin_conversation_id }
         : {}),
-      ...(thread.parent_thread_id && !thread.origin_device_id
-        ? { parentThreadId: thread.parent_thread_id }
-        : {}),
+      lineage: threadLineage(ctx.db, thread),
     });
     ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
     recordAgentChange(
@@ -723,6 +739,7 @@ const runDeviceDispatch = async (
       ...(thread.requested_model ? { model: thread.requested_model } : {}),
       ...(attachments.length > 0 ? { attachments } : {}),
       ...(job.availabilityRetries ? { requeue: job.availabilityRetries } : {}),
+      lineage: threadLineage(ctx.db, thread),
     });
     recordAgentChange(
       ctx.db,

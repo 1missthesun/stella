@@ -194,11 +194,12 @@ export type CloudAgentTurnStartRequest = {
   conversationId: string;
   threadId: string;
   /**
-   * Root-spawned agents are depth 1; their children are depth 2. An
-   * orchestrator turn is depth 0.
+   * Root-spawned agents are depth 1, and each agent's agents one deeper, up
+   * to `MAX_AGENT_DEPTH`, wherever their starter runs. An orchestrator turn
+   * is depth 0.
    */
   agentDepth: number;
-  /** The BuildSession thread that spawned this one, absent for root spawns. */
+  /** The agent that started this thread, wherever it runs; absent at depth 1. */
   parentThreadId?: string;
   /** 1 for a fresh thread; N+1 for a continuation of an existing thread. */
   attemptGeneration: number;

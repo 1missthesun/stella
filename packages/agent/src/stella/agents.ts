@@ -797,12 +797,11 @@ const statusResult = (view: Record<string, unknown>) => ({
   content: [{ type: "text" as const, text: JSON.stringify(view) }],
 });
 
-/** The owner's agent threads as `agent_status` read them, for the conversation `root`. */
+/** The owner's agent threads as `agent_status` read them. */
 type DirectoryLedger = {
   agents: readonly AgentDirectoryAgentRow[];
   unavailable?: string;
   threadIdsRead?: true;
-  root: ConversationId;
 };
 
 /** At most this many agents held elsewhere are asked about by id. */
@@ -1865,16 +1864,17 @@ export function stellaAgents(host: StellaAgentsHost) {
       }
       const computer = await computerOf(record, context, seen);
       // Its report may have reached this conversation while another host
-      // held it, so this record's own count is not the last word: one the
-      // owner's agent threads list no longer runs, as each of its live
-      // agents is listed (a backend that could not be asked by id lists the
-      // live ones only; Stella's own agents are among them).
+      // held it, so this record's own count is not the last word. A backend
+      // that could not be asked by id lists every live agent placed on a
+      // computer for this conversation, at any depth: one missing from it
+      // no longer runs. (Agents on another engine here may not be listed.)
       const notLive =
         ledger !== undefined &&
         !ledger.unavailable &&
-        (ledger.threadIdsRead === true ||
-          (agent.parentConversationId === ledger.root &&
-            Date.now() - (record.startedAt ?? Date.now()) > DIRECTORY_SETTLE_MS));
+        ledger.threadIdsRead !== true &&
+        record.placement?.kind === "device" &&
+        !record.engine &&
+        Date.now() - (record.startedAt ?? Date.now()) > DIRECTORY_SETTLE_MS;
       const done = notLive || (record.answered?.length ?? 0) >= agent.given;
       const status = done ? remoteOutcome(record) : "running";
       return {
@@ -1930,8 +1930,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         sessions: [],
         unavailable: `Agents and sessions elsewhere could not be listed right now (${error instanceof Error ? error.message : String(error)}).`,
       }));
-    const ledger: DirectoryLedger | undefined =
-      elsewhere && root !== undefined ? { ...elsewhere, root } : undefined;
+    const ledger: DirectoryLedger | undefined = elsewhere;
     const rows: AgentDirectoryAgentRow[] = [];
     const seen = new Map<string, Promise<DeviceStanding | undefined>>();
     for (const agent of tree) {
@@ -2072,8 +2071,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         const listed = found.record.remote
           ? await host.directory?.list(context, { threadIds: [threadId] }).catch(() => undefined)
           : undefined;
-        const ledger: DirectoryLedger | undefined =
-          listed && root !== undefined ? { ...listed, root } : undefined;
+        const ledger: DirectoryLedger | undefined = listed;
         const row = await directoryRow(api, found, conversationId, context, ledger);
         const reachable = !found.record.remote || remoteHostOf(found.record) !== undefined || host.directory !== undefined;
         const entry = agentDirectoryEntry(row);
@@ -2429,6 +2427,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       fromOrchestrator?: boolean;
       /** The report of an agent it started, which wakes it. */
       report?: true;
+      /** That agent's thread id, when the delivery names it. */
+      reportFrom?: string;
     },
     context: Context,
   ): Promise<void> => {
@@ -2461,7 +2461,9 @@ export function stellaAgents(host: StellaAgentsHost) {
       // The report of an agent it started on another host answers that
       // agent's record in its own conversation, as Stella's own do
       // (`deliverReport`); unanswered, the record read as running for good.
-      const reported = args.report ? /\nthread_id: (\S+)/.exec(args.message)?.[1] : undefined;
+      const reported = args.report
+        ? (args.reportFrom ?? /\nthread_id: (\S+)/.exec(args.message)?.[1])
+        : undefined;
       if (reported) {
         await noteRemoteReport(tx, agent.conversationId as ConversationId, {
           threadId: reported,

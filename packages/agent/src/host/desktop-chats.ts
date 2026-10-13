@@ -2220,14 +2220,14 @@ export function desktopChats(options: DesktopChatsOptions) {
       const record = await chat.agentStanding(threadId, context);
       if (!record) return "not_found";
       // The ledger hands an agent the reports of the agents it started under their report ids.
-      const report = parseAgentReportId(messageId) !== null;
+      const report = parseAgentReportId(messageId);
       await chat.messageAgent(
         {
           key: `device:${messageId.trim() || crypto.randomUUID()}`,
           threadId,
           message: text,
           fromOrchestrator: true,
-          ...(report ? { report: true as const } : {}),
+          ...(report ? { report: true as const, reportFrom: report.threadId } : {}),
         },
         context,
       );

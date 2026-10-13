@@ -6,6 +6,7 @@ import {
   resolveAgentModelRoute,
 } from "./runner/context.js";
 import type { WebSearchResult } from "@stella/contracts/backend/search";
+import { raceWithTimeoutError } from "./runner/cloud-effect-runtime.js";
 import { scheduleRemotePromptRevalidation } from "./prompts/remote-prompts.js";
 import { createRunnerPiTools } from "./runner/pi-tools.js";
 import { createRuntimeInitialization } from "./runner/runtime-initialization.js";
@@ -35,6 +36,11 @@ import type {
   RunnerPublicApi,
   StellaHostRunnerOptions,
 } from "./runner/types.js";
+
+const AGENT_CONTROL_TIMEOUT_MS = 20_000;
+
+const withinAgentControlTimeout = <A>(call: Promise<A>, message: string): Promise<A> =>
+  raceWithTimeoutError(call, AGENT_CONTROL_TIMEOUT_MS, () => new Error(message));
 
 export type { StellaHostRunnerOptions } from "./runner/types.js";
 
@@ -445,24 +451,39 @@ export const createStellaHostRunner = (
     },
     agentThreads: {
       directory: async (conversationId) =>
-        await context.backend.require().call("agentThreads.directory", { conversationId }),
+        await withinAgentControlTimeout(
+          context.backend.require().call("agentThreads.directory", { conversationId }),
+          "Stella's cloud did not list your agents and sessions within 20s.",
+        ),
       message: async (args) =>
         readAgentMessageDelivery(
-          await context.backend.require().call("agentThreads.message", {
-            ...args,
-            ownerGeneration: await context.cloudOwnerGeneration(),
-          }),
+          await withinAgentControlTimeout(
+            (async () =>
+              await context.backend.require().call("agentThreads.message", {
+                ...args,
+                ownerGeneration: await context.cloudOwnerGeneration(),
+              }))(),
+            "Stella's cloud did not answer within 20s, so the message may not have been delivered. Check agent_status before sending it again.",
+          ),
         ),
       pause: async (args) =>
-        await context.backend.require().call("agentThreads.pause", {
-          ...args,
-          ownerGeneration: await context.cloudOwnerGeneration(),
-        }),
+        await withinAgentControlTimeout(
+          (async () =>
+            await context.backend.require().call("agentThreads.pause", {
+              ...args,
+              ownerGeneration: await context.cloudOwnerGeneration(),
+            }))(),
+          "Stella's cloud did not answer within 20s, so the pause may not have reached the agent. Check agent_status, then try again.",
+        ),
       note: async (args) => {
-        await context.backend.require().call("agentReports.note", {
-          ...args,
-          ownerGeneration: await context.cloudOwnerGeneration(),
-        });
+        await withinAgentControlTimeout(
+          (async () =>
+            await context.backend.require().call("agentReports.note", {
+              ...args,
+              ownerGeneration: await context.cloudOwnerGeneration(),
+            }))(),
+          "Stella's cloud did not answer within 20s, so the note may not have reached Stella. Put what it needs in your final report.",
+        );
       },
       handoff: async (args) => {
         const execution =

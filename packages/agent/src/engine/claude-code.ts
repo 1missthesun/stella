@@ -521,6 +521,23 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     turn.abort.abort(new Error(reason));
   };
 
+  const deliver = (turn: Turn, toolUseId: string, outcome: ClaudeCodeToolOutcome) => {
+    const waiting = turn.waiting.get(toolUseId);
+    if (waiting) {
+      turn.waiting.delete(toolUseId);
+      waiting(outcome);
+    } else {
+      turn.early.set(toolUseId, outcome);
+    }
+  };
+
+  const builtinWaits = (turn: Turn, toolUseId: string): boolean => {
+    for (const [id, record] of calls) {
+      if (id !== toolUseId && record.turn === turn && record.native && !nativeResults.has(id)) return true;
+    }
+    return false;
+  };
+
   const reconsiderGates = (turn: Turn) => {
     for (const gate of [...turn.gates]) gate();
   };
@@ -1105,17 +1122,10 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             if (!record || record.native) continue;
             calls.delete(message.toolCallId);
             if (restarted) continue;
-            const outcome: ClaudeCodeToolOutcome = {
+            deliver(turn, message.toolCallId, {
               content: typeof message.content === "string" ? [{ type: "text", text: message.content }] : message.content,
               ...(message.isError ? { isError: true } : {}),
-            };
-            const waiting = turn.waiting.get(message.toolCallId);
-            if (waiting) {
-              turn.waiting.delete(message.toolCallId);
-              waiting(outcome);
-            } else {
-              turn.early.set(message.toolCallId, outcome);
-            }
+            });
           }
         }
       }
@@ -1318,6 +1328,17 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               }
               const refused = await cliRuns(record.turn, call.id, record.name, context);
               return refused === undefined ? undefined : { block: refused };
+            },
+            afterTool: (call, result) => {
+              const record = calls.get(call.id);
+              if (!record || record.native || record.truncated || record.turn.done) return undefined;
+              if (result.control || result.content === undefined || !builtinWaits(record.turn, call.id)) return undefined;
+              calls.delete(call.id);
+              deliver(record.turn, call.id, {
+                content: result.content.filter((part): part is TextContent | ImageContent => part.type === "text" || part.type === "image"),
+                ...(result.isError ? { isError: true } : {}),
+              });
+              return undefined;
             },
           }),
         ],

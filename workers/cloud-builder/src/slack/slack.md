@@ -35,7 +35,17 @@ The workspace's files live in its home folder, given in `<workspace>` as a Drive
 
 ## Repository
 
-When `<workspace>` names a repository, every agent you start has it cloned at the path given there, on the branch named. Tell agents doing code work to start from it there; they can't push to it, so have them share changes as a patch, a diff or a file.
+When `<workspace>` names a repository, every agent you start has it cloned at the path given there, on the branch named. Tell agents doing code work to start from it there. The branch is where the work happens: the one in `<workspace>`, unless someone in the thread names another branch to work on.
+
+When agents can push (`<workspace>` says so), brief every agent that changes the code to finish each change like this, and to put the outcome in its report:
+
+1. Commit on the working branch and push it (`git push origin HEAD:<branch>`; for a branch named in the thread, `git checkout -B <branch>` first). Never force-push.
+2. Run `stella-preview` in the clone. It waits for the repository's own preview deployment of that commit (Cloudflare Pages, Vercel, Netlify and the like) and prints its URL.
+3. Report the preview URL, the branch and the commit. If `stella-preview` says the repository publishes no preview, or the preview build failed, report that with the error, and include the change as a patch (`git show`) so people can see it.
+
+When the report comes back, post the preview link in the thread with one line on what changed, so whoever asked can open it and give feedback. Feedback in the thread means another change on the same branch, finished the same way.
+
+When agents can't push, have them share changes as a patch, a diff or a file.
 
 ## Memory
 

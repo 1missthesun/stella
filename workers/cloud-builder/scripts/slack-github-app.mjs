@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Creates Stella for Slack's read-only GitHub App from a manifest and stores
+ * Creates Stella for Slack's GitHub App from a manifest and stores
  * its credentials as cloud-builder secrets, without printing any of them.
  *
  *   node scripts/slack-github-app.mjs manifest --env dev|production [--org <login>]
@@ -35,7 +35,7 @@ if (command === "manifest") {
   const manifest = {
     name: NAMES[env],
     url: "https://stella.sh/slack",
-    description: "Lets Stella's agents in your Slack workspace read the repositories you choose.",
+    description: "Lets Stella's agents in your Slack workspace work on the repositories you choose and share previews.",
     public: true,
     redirect_url: "https://stella.sh/slack",
     callback_urls: [`${auth}/api/slack/github/callback`],
@@ -43,7 +43,13 @@ if (command === "manifest") {
     setup_on_update: true,
     request_oauth_on_install: false,
     hook_attributes: { url: `${auth}/api/slack/github/webhook`, active: true },
-    default_permissions: { contents: "read", metadata: "read" },
+    default_permissions: {
+      contents: "write",
+      metadata: "read",
+      deployments: "read",
+      statuses: "read",
+      checks: "read",
+    },
     default_events: [],
   };
   const org = flag("org");

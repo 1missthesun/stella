@@ -259,7 +259,7 @@ export const openPiComputeLease = async (
     if (!materialized.success) throw new Error("Stella could not bring this world into the agent's workspace.");
     // Materialization replaces the world root, including the drive directory the daemon expects.
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
-    await prepareSlackRepo(host.env, session, owner.conversationId, host.log);
+    await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log);
     context.assertActive();
     host.log("pi_agent_world_attached", {
       threadId,

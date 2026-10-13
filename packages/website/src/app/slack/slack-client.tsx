@@ -798,8 +798,9 @@ function GithubPanel({
           <GitBranch size={13} aria-hidden="true" /> GitHub repository
         </p>
         <p className={s.panelLede}>
-          Every agent Stella starts in this workspace begins with this repository cloned in. Stella
-          only ever gets read access.
+          Every agent Stella starts in this workspace begins with this repository cloned in, on this
+          branch. Agents commit and push their changes there and post your repository&apos;s preview
+          link in the thread.
         </p>
       </div>
 
@@ -851,10 +852,11 @@ function GithubPanel({
         ) : (
           <div className={s.githubConnect}>
             <div>
-              <p className={s.githubConnectTitle}>Connect GitHub to use private repositories</p>
+              <p className={s.githubConnectTitle}>Connect GitHub so agents can push and share previews</p>
               <p className={s.hint}>
-                You choose which repositories Stella can see. She gets short-lived, read-only access when
-                an agent starts, and never a token you have to paste.
+                You choose which repositories Stella can see. Agents get short-lived access to this one
+                repository while they work, and you never paste a token. Public repositories work
+                without connecting, read-only.
               </p>
             </div>
             <button type="button" className={s.githubButton} onClick={() => void connect()} disabled={busy !== null}>
@@ -918,11 +920,11 @@ function GithubPanel({
           </span>
         ) : workspace.repo?.access === "public" && repoName === workspace.repo.fullName ? (
           <span className={s.repoNote}>
-            <Globe size={13} aria-hidden="true" /> Cloned as a public repository.
+            <Globe size={13} aria-hidden="true" /> Cloned as a public repository. Agents can&apos;t push to it.
           </span>
         ) : workspace.repo?.access === "github" && repoName === workspace.repo.fullName ? (
           <span className={s.repoNote}>
-            <Check size={13} aria-hidden="true" /> Cloned with read-only access through GitHub.
+            <Check size={13} aria-hidden="true" /> Agents can push to this branch through GitHub.
           </span>
         ) : <span />}
         {workspace.repo || repoName ? (

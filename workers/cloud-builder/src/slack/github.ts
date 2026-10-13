@@ -1,9 +1,11 @@
 /**
  * Stella for Slack's GitHub connection, through its own read-only GitHub App
  * (`SLACK_GITHUB_APP_*` secrets, `projects/github.ts` with `app = "slack"`).
- * A workspace stores only the installation id; whenever an agent clones, a
- * token scoped to that one repository with `contents: read` is minted and
- * dropped after the clone.
+ * A workspace stores only the installation id. Tokens are minted on demand
+ * and scoped to the workspace's one repository: read-only for the page's
+ * pickers; for agents, push plus reading deployments, statuses and checks,
+ * traded per git operation for the container's repo capability
+ * (`repo-capability.ts`, `repo-clone.ts`).
  *
  * Connecting, from the owner's page on stella.sh:
  *   1. `POST …/github/connect` records a nonce (D1 `slack_github_connects`)
@@ -44,7 +46,9 @@ import {
   mintInstallationToken,
 } from "../projects/github.js";
 import { slackPublicOrigin } from "./config.js";
+import { verifySlackRepoCapability } from "./repo-capability.js";
 import {
+  loadWorkspaceSettings,
   repoOwnedBy,
   setGithubStatus,
   type SlackGithubConnection,
@@ -53,6 +57,8 @@ import {
 
 export const SLACK_GITHUB_CALLBACK_PATH = "/api/slack/github/callback";
 export const SLACK_GITHUB_WEBHOOK_PATH = "/api/slack/github/webhook";
+export const SLACK_GITHUB_AGENT_TOKEN_PATH = "/api/slack/github/agent/token";
+export const SLACK_GITHUB_AGENT_PREVIEW_PATH = "/api/slack/github/agent/preview";
 
 const STATE_KIND = "slack_github";
 const CONNECT_TTL_MS = 15 * 60_000;
@@ -60,7 +66,19 @@ const API = "https://api.github.com";
 const REPO_PAGES = 10;
 const BRANCH_PAGES = 5;
 const MAX_WEBHOOK_BYTES = 1_000_000;
-const READ_ONLY = { contents: "read", metadata: "read" } as const;
+/** What the page needs: listing repositories and branches. */
+const PICKER_ACCESS = { contents: "read", metadata: "read" } as const;
+/**
+ * What an agent gets for the workspace's one repository: push to it, and
+ * read the deployments, statuses and checks its previews report through.
+ */
+const AGENT_ACCESS = {
+  contents: "write",
+  metadata: "read",
+  deployments: "read",
+  statuses: "read",
+  checks: "read",
+} as const;
 
 const d1 = (env: Cloudflare.Env): D1Database => {
   if (!env.DB) throw new Error("The DB binding is missing.");
@@ -266,13 +284,14 @@ const minted = async (
   env: Cloudflare.Env,
   connection: SlackGithubConnection,
   repo?: string,
+  permissions: Record<string, "read" | "write"> = PICKER_ACCESS,
 ): Promise<string> => {
   try {
     return (
       await mintInstallationToken(env, {
         installationId: connection.installationId,
         app: "slack",
-        permissions: READ_ONLY,
+        permissions,
         ...(repo ? { repo } : {}),
       })
     ).token;
@@ -373,7 +392,7 @@ export const cloneToken = async (env: Cloudflare.Env, repo: SlackRepoSettings): 
   const connection = repo.github;
   if (connection && connection.status !== "revoked" && repoOwnedBy(connection, repo.fullName)) {
     try {
-      return await minted(env, connection, repo.fullName.split("/")[1]);
+      return await minted(env, connection, repo.fullName.split("/")[1], AGENT_ACCESS);
     } catch (error) {
       console.warn(
         JSON.stringify({
@@ -386,6 +405,141 @@ export const cloneToken = async (env: Cloudflare.Env, repo: SlackRepoSettings): 
     }
   }
   return repo.legacyToken;
+};
+
+// ── Agent access (repo-capability.ts) ─────────────────────────────────────
+
+export type SlackPreview =
+  | { state: "ready"; url: string; source: string }
+  | { state: "pending"; detail: string }
+  | { state: "failed"; detail: string; url?: string }
+  | { state: "none" };
+
+const PREVIEW_HOST =
+  /https:\/\/[A-Za-z0-9.-]+\.(?:pages\.dev|workers\.dev|vercel\.app|netlify\.app|onrender\.com|fly\.dev|surge\.sh|github\.io|web\.app|firebaseapp\.com|amplifyapp\.com|railway\.app|up\.railway\.app)(?:\/[^\s)|"'<>\]]*)?/gu;
+const DEPLOYISH = /pages|vercel|netlify|deploy|preview|workers|cloudflare|render|firebase|amplify|railway/iu;
+
+const previewUrls = (...texts: Array<string | null | undefined>): string[] =>
+  texts.flatMap((text) => (text ? [...text.matchAll(PREVIEW_HOST)].map((match) => match[0]!) : []));
+
+/**
+ * The preview the repository's own pipeline published for `sha`: a GitHub
+ * deployment's URL, or a preview URL in a deploy check run or status.
+ */
+export const findPreview = async (token: string, fullName: string, sha: string): Promise<SlackPreview> => {
+  let pending: string | null = null;
+  let failed: { detail: string; url?: string } | null = null;
+
+  const deployments = await get<Array<{ id: number; environment?: string }>>(
+    token,
+    `repos/${fullName}/deployments?sha=${sha}&per_page=10`,
+  );
+  for (const deployment of deployments.body ?? []) {
+    const statuses = await get<Array<{ state?: string; environment_url?: string; target_url?: string; log_url?: string }>>(
+      token,
+      `repos/${fullName}/deployments/${deployment.id}/statuses?per_page=1`,
+    );
+    const latest = statuses.body?.[0];
+    const url = latest?.environment_url || "";
+    if (latest?.state === "success" && url) {
+      return { state: "ready", url, source: `deployment ${deployment.environment ?? ""}`.trim() };
+    }
+    if (!latest || ["queued", "in_progress", "pending"].includes(latest.state ?? "")) {
+      pending ??= `deployment ${deployment.environment ?? ""} is ${latest?.state ?? "queued"}`.trim();
+    } else if (["failure", "error"].includes(latest.state ?? "")) {
+      failed ??= { detail: `deployment ${deployment.environment ?? ""} failed`.trim(), ...(latest.log_url ? { url: latest.log_url } : {}) };
+    }
+  }
+
+  const checks = await get<{
+    check_runs?: Array<{
+      name?: string;
+      status?: string;
+      conclusion?: string | null;
+      details_url?: string;
+      output?: { summary?: string | null; text?: string | null };
+      app?: { slug?: string };
+    }>;
+  }>(token, `repos/${fullName}/commits/${sha}/check-runs?per_page=50`);
+  for (const run of checks.body?.check_runs ?? []) {
+    const label = `${run.app?.slug ?? ""} ${run.name ?? ""}`;
+    const urls = previewUrls(run.output?.summary, run.output?.text, run.details_url);
+    if (!urls.length && !DEPLOYISH.test(label)) continue;
+    if (run.status === "completed" && run.conclusion === "success" && urls[0]) {
+      return { state: "ready", url: urls[0], source: run.name ?? "check run" };
+    }
+    if (run.status !== "completed") pending ??= `${run.name ?? "a check"} is ${run.status ?? "queued"}`;
+    else if (run.conclusion && !["success", "neutral", "skipped"].includes(run.conclusion)) {
+      failed ??= { detail: `${run.name ?? "a check"} ${run.conclusion}`, ...(run.details_url ? { url: run.details_url } : {}) };
+    }
+  }
+
+  const combined = await get<{ statuses?: Array<{ context?: string; state?: string; target_url?: string | null; description?: string | null }> }>(
+    token,
+    `repos/${fullName}/commits/${sha}/status`,
+  );
+  for (const status of combined.body?.statuses ?? []) {
+    const urls = previewUrls(status.target_url, status.description);
+    if (!urls.length && !DEPLOYISH.test(status.context ?? "")) continue;
+    if (status.state === "success" && urls[0]) return { state: "ready", url: urls[0], source: status.context ?? "status" };
+    if (status.state === "pending") pending ??= `${status.context ?? "a status"} is pending`;
+    else if (status.state === "failure" || status.state === "error") {
+      failed ??= { detail: `${status.context ?? "a status"} failed`, ...(status.target_url ? { url: status.target_url } : {}) };
+    }
+  }
+
+  if (pending) return { state: "pending", detail: pending };
+  if (failed) return { state: "failed", ...failed };
+  return { state: "none" };
+};
+
+/** The connection a capability may use, when the workspace still has it on that repository. */
+const agentConnection = async (
+  env: Cloudflare.Env,
+  request: Request,
+): Promise<{ connection: SlackGithubConnection; fullName: string; branch: string } | Response> => {
+  const header = request.headers.get("authorization") ?? "";
+  const claims = header.startsWith("Bearer ") ? await verifySlackRepoCapability(env, header.slice(7).trim()) : null;
+  if (!claims) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const settings = await loadWorkspaceSettings(env, claims.team);
+  const github = settings.github;
+  if (!settings.repo || settings.repo.fullName !== claims.repo || !github || !repoOwnedBy(github, claims.repo)) {
+    return Response.json({ error: "This workspace no longer gives agents this repository." }, { status: 403 });
+  }
+  if (github.status !== "active") {
+    return Response.json({ error: "GitHub access for this workspace was removed. The owner needs to reconnect it." }, { status: 403 });
+  }
+  return { connection: github, fullName: claims.repo, branch: settings.repo.branch };
+};
+
+const agentToken = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const access = await agentConnection(env, request);
+  if (access instanceof Response) return access;
+  try {
+    const token = await minted(env, access.connection, access.fullName.split("/")[1], AGENT_ACCESS);
+    return Response.json({ token }, { headers: { "cache-control": "no-store" } });
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof GithubError ? error.message : "GitHub didn't issue a token." },
+      { status: 502 },
+    );
+  }
+};
+
+const agentPreview = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const access = await agentConnection(env, request);
+  if (access instanceof Response) return access;
+  const sha = new URL(request.url).searchParams.get("sha") ?? "";
+  if (!/^[0-9a-f]{7,40}$/u.test(sha)) return Response.json({ error: "Pass the commit as ?sha=<full sha>." }, { status: 400 });
+  try {
+    const token = await minted(env, access.connection, access.fullName.split("/")[1], AGENT_ACCESS);
+    return Response.json(await findPreview(token, access.fullName, sha), { headers: { "cache-control": "no-store" } });
+  } catch (error) {
+    return Response.json(
+      { error: error instanceof GithubError ? error.message : "GitHub didn't answer." },
+      { status: 502 },
+    );
+  }
 };
 
 // ── Webhook ───────────────────────────────────────────────────────────────
@@ -445,5 +599,7 @@ export const handleSlackGithubRoute = async (request: Request, env: Cloudflare.E
   const { pathname } = new URL(request.url);
   if (pathname === SLACK_GITHUB_CALLBACK_PATH && request.method === "GET") return await callback(request, env);
   if (pathname === SLACK_GITHUB_WEBHOOK_PATH && request.method === "POST") return await webhook(request, env);
+  if (pathname === SLACK_GITHUB_AGENT_TOKEN_PATH && request.method === "POST") return await agentToken(request, env);
+  if (pathname === SLACK_GITHUB_AGENT_PREVIEW_PATH && request.method === "GET") return await agentPreview(request, env);
   return null;
 };

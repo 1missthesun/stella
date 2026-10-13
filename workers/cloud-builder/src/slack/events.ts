@@ -53,7 +53,7 @@ import {
 } from "./store.js";
 import { publishHome, sendSetupPrompt } from "./ui.js";
 import { ownerGateStub } from "../rpc-release.js";
-import { loadWorkspaceSettings, workspaceExecution } from "./settings.js";
+import { loadWorkspaceSettings, repoOwnedBy, workspaceExecution } from "./settings.js";
 import type { SlackPerson, SlackWorkspaceContext } from "./workspace.js";
 
 type SlackFile = {
@@ -484,6 +484,9 @@ const handleMessage = async (
           repo: settings.repo.branch
             ? `${settings.repo.fullName}@${settings.repo.branch}`
             : settings.repo.fullName,
+          repoPush: Boolean(
+            settings.github?.status === "active" && repoOwnedBy(settings.github, settings.repo.fullName),
+          ),
         }
       : {}),
   };

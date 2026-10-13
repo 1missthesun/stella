@@ -50,6 +50,8 @@ export type SlackWorkspaceContext = {
   participants: SlackPerson[];
   /** The GitHub repository agents start with, as `owner/name` (and `@branch`). */
   repo?: string;
+  /** Agents can push to it, through the workspace's GitHub connection. */
+  repoPush?: boolean;
 };
 
 const shortText = (value: unknown, max: number): string | null =>
@@ -98,6 +100,7 @@ export const parseSlackWorkspaceContext = (
         .slice(0, 12)
     : [];
   const repo = shortText(record.repo, 320);
+  const repoPush = record.repoPush === true;
   return {
     teamName,
     homeFolder,
@@ -105,7 +108,7 @@ export const parseSlackWorkspaceContext = (
     place,
     requester,
     participants,
-    ...(repo ? { repo } : {}),
+    ...(repo ? { repo, ...(repoPush ? { repoPush } : {}) } : {}),
   };
 };
 
@@ -231,7 +234,7 @@ export const renderSlackSystemPrompt = async (
     `Latest request from: @${context.requester.name} (${context.requester.id})`,
     `Others in this thread: ${participants}`,
     context.repo
-      ? `Repository: github.com/${context.repo} — every agent you start has it cloned at ${SLACK_REPO_ROOT}/${context.repo.split("@")[0]!.split("/")[1]}`
+      ? `Repository: github.com/${context.repo.split("@")[0]} — every agent you start has it cloned at ${SLACK_REPO_ROOT}/${context.repo.split("@")[0]!.split("/")[1]}, on branch ${context.repo.split("@")[1] ?? "(the default branch)"}. ${context.repoPush ? "Agents can commit and push to that branch." : "Agents can't push to it (no GitHub connection for it)."}`
       : "Repository: none connected",
   ].join("\n");
   return [

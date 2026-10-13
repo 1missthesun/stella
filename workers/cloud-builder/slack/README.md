@@ -62,16 +62,26 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
   meant for her gets the reply `<no-reply/>`, which posts nothing.
 
 - **GitHub** (`github.ts`): "Connect GitHub" on the page goes through
-  Stella for Slack's own GitHub App (read-only: contents + metadata), separate
-  from the projects App. The installer picks which repositories it sees; the
-  workspace stores only the installation id
-  (`slack_workspace_settings.github_*`). The page lists the installation's
-  repositories and a repository's branches; any public repository works
-  without connecting. Each clone mints a token for that one repository with
-  `contents: read`, used once on the git command line. Uninstalls arrive on
-  the App's webhook and are also noticed whenever GitHub refuses a token; the
-  page then shows a reconnect state. Workspaces that pasted a token before
-  this keep it until they pick a repository through the connection.
+  Stella for Slack's own GitHub App (contents write; metadata, deployments,
+  statuses and checks read), separate from the projects App. The installer
+  picks which repositories it sees; the workspace stores only the
+  installation id (`slack_workspace_settings.github_*`). The page lists the
+  installation's repositories and a repository's branches; any public
+  repository works read-only without connecting.
+- **Agents and previews** (`repo-clone.ts`, `repo-capability.ts`): the
+  clone's git uses `stella-git-credential`, which trades the container's
+  12-hour capability (one workspace, one repository) for a fresh installation
+  token per operation at `/api/slack/github/agent/token`; the route rechecks
+  the workspace's settings each time, so disconnecting revokes it at once.
+  Agents commit and push to the working branch, then `stella-preview` waits
+  for the repository's own preview of that commit (GitHub deployments, or a
+  preview URL in a deploy check run or status: Cloudflare Pages, Vercel,
+  Netlify, …) via `/api/slack/github/agent/preview`. `slack.md` tells Stella
+  to brief agents that way and post the link, falling back to a patch.
+- **Uninstalls** arrive on the App's webhook and are also noticed whenever
+  GitHub refuses a token; the page then shows a reconnect state. Workspaces
+  that pasted a token before this keep it (read-only) until they pick a
+  repository through the connection.
 
 ## Set up an app
 

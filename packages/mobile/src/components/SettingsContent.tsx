@@ -12,6 +12,7 @@ import { useRouter } from "expo-router";
 import { GlassToggle } from "./glass";
 import { Icon, type IconName } from "./Icon";
 import { SubscriptionSection } from "./SubscriptionSection";
+import { FeedbackSheet } from "./FeedbackSheet";
 import { UserAskEscalationSection } from "./settings/UserAskEscalationSection";
 import {
   makeSettingsStyles,
@@ -112,6 +113,7 @@ export function SettingsContent() {
   );
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => subscribeNotificationsMuted(setMutedLocal), []);
   const [voiceEnabled, setVoiceEnabledLocal] = useState(() =>
@@ -534,9 +536,19 @@ export function SettingsContent() {
           {t("mobile.settings.aboutSection")}
         </Text>
         <View style={settingsStyles.group}>
+          {isSignedIn ? (
+            <LinkRow
+              label={t("sidebar.feedback")}
+              accessibilityLabel={t("sidebar.feedback")}
+              styles={settingsStyles}
+              colors={colors}
+              onPress={() => setFeedbackOpen(true)}
+            />
+          ) : null}
           <LinkRow
             label={t("mobile.settings.termsOfService")}
             accessibilityLabel={t("mobile.settings.openTermsLabel")}
+            divided={isSignedIn}
             styles={settingsStyles}
             colors={colors}
             onPress={() => void Linking.openURL(`${env.siteUrl}/terms`)}
@@ -593,6 +605,10 @@ export function SettingsContent() {
           </Pressable>
         </View>
       ) : null}
+      <FeedbackSheet
+        visible={feedbackOpen}
+        onClose={() => setFeedbackOpen(false)}
+      />
     </ScrollView>
   );
 }

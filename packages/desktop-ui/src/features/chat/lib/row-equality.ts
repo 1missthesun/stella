@@ -246,11 +246,11 @@ const backgroundWorkEqual = (
   for (let i = 0; i < a.completedThreadIds.length; i += 1) {
     if (a.completedThreadIds[i] !== b.completedThreadIds[i]) return false;
   }
-  const aPaused = a.pausedThreadIds ?? [];
-  const bPaused = b.pausedThreadIds ?? [];
-  if (aPaused.length !== bPaused.length) return false;
-  for (let i = 0; i < aPaused.length; i += 1) {
-    if (aPaused[i] !== bPaused[i]) return false;
+  const aStopped = a.stoppedThreadIds ?? [];
+  const bStopped = b.stoppedThreadIds ?? [];
+  if (aStopped.length !== bStopped.length) return false;
+  for (let i = 0; i < aStopped.length; i += 1) {
+    if (aStopped[i] !== bStopped[i]) return false;
   }
   const aFailed = a.failedThreadIds ?? [];
   const bFailed = b.failedThreadIds ?? [];

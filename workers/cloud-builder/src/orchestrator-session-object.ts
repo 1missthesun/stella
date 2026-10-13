@@ -359,7 +359,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
 
   /**
    * Stop from Slack: the running and queued turns are canceled, and every
-   * background agent a Slack request started here is paused, so nothing
+   * background agent a Slack request started here is stopped, so nothing
    * reports back afterwards. Internal; the Worker has checked that the person
    * pressing Stop owns the conversation.
    */
@@ -390,10 +390,10 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
     }
     // Every agent running here, the request's own and any it started in
     // turn, then once more for one that was starting while the first pass ran.
-    const paused = new Set<string>();
+    const stopped = new Set<string>();
     const runtime = await this.openPiRuntime(this.piGatewayOrigin());
     const { contextFor } = await import("./pi-runtime.js");
-    const pauseRunning = async (extra: string[]): Promise<void> => {
+    const stopRunning = async (extra: string[]): Promise<void> => {
       const tree = await runtime.runningAgentTree(contextFor()).catch((error: unknown) => {
         log("error", "slack_stop_tree_failed", { message: errorMessage(error) });
         return [];
@@ -401,7 +401,7 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       for (const agent of tree.filter((entry) => entry.depth > 1)) {
         try {
           await runtime.abortAgentConversation(agent.conversationId, contextFor());
-          paused.add(agent.threadId);
+          stopped.add(agent.threadId);
         } catch (error) {
           log("error", "slack_stop_agent_failed", { threadId: agent.threadId, message: errorMessage(error) });
         }
@@ -409,18 +409,18 @@ export class OrchestratorSessionObject extends OrchestratorTurnStart {
       const topLevel = tree.filter((entry) => entry.depth === 1).map((entry) => entry.threadId);
       for (const threadId of new Set([...extra, ...topLevel])) {
         try {
-          await runtime.pauseThreadAgent(threadId, contextFor());
-          paused.add(threadId);
+          await runtime.stopThreadAgent(threadId, contextFor());
+          stopped.add(threadId);
         } catch (error) {
           log("error", "slack_stop_agent_failed", { threadId, message: errorMessage(error) });
         }
       }
     };
-    await pauseRunning(tracked);
+    await stopRunning(tracked);
     await scheduler.wait(2_000);
-    await pauseRunning([]);
-    log("info", "slack_stop", { conversationId: this.conversationId(), canceled, paused: [...paused] });
-    return json({ stopped: true, canceled, paused: [...paused] });
+    await stopRunning([]);
+    log("info", "slack_stop", { conversationId: this.conversationId(), canceled, agents: [...stopped] });
+    return json({ stopped: true, canceled, agents: [...stopped] });
   }
 
   async fetch(request: Request): Promise<Response> {

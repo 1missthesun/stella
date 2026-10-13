@@ -6,6 +6,7 @@
 import type { Context } from "@earendil-works/chord";
 import type { ModelThinkingLevel, Models } from "@earendil-works/pi-ai";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
+import type { AgentStopResult } from "@stella/contracts/backend/agent-threads";
 import {
   createRegistry,
   Harness,
@@ -105,8 +106,12 @@ export type OpenStellaHarness = {
   ): Promise<{ threadId: string; existing: boolean }>;
   /** One of the orchestrator's agents that may have run elsewhere since: its next run takes its log first. */
   markCatchUp(threadId: string, context: Context): Promise<void>;
-  /** Pause one of the orchestrator's agents, or one of theirs, by thread id. */
-  pauseAgent(threadId: string, context: Context): Promise<void>;
+  /**
+   * Stop one of the orchestrator's agents, or one of theirs, and every agent
+   * below it, by thread id; undefined when none here has that id. Answers
+   * which stopped here (`local`) and how those that run elsewhere stopped.
+   */
+  stopAgent(threadId: string, context: Context): Promise<{ local: string[]; elsewhere: AgentStopResult[] } | undefined>;
   /** Where one of the orchestrator's agents, or one of theirs, stands; undefined when none here has that id. */
   agentStanding(
     threadId: string,
@@ -114,9 +119,8 @@ export type OpenStellaHarness = {
   ): Promise<
     | {
         status: StellaAgentRecord["status"];
-        paused?: true;
-        /** Paused by its starter: reports from the agents it started wait for it. */
-        holdsReports?: true;
+        /** It was stopped, or its latest run stopped before it answered. */
+        stopped?: true;
         agentStatus: StellaAgentRecord["agentStatus"];
         attempt: number;
       }
@@ -173,7 +177,7 @@ export async function openStellaHarness(options: StellaHarnessOptions, context: 
     startAgent: (args, startContext) => agents.startAgent(harness, args, startContext),
     agentRecords: (recordsContext) => agents.agentRecords(harness, recordsContext),
     messageAgent: (args, messageContext) => agents.messageAgent(harness, args, messageContext),
-    pauseAgent: (threadId, pauseContext) => agents.pauseAgentByThread(harness, threadId, pauseContext),
+    stopAgent: (threadId, stopContext) => agents.stopAgentByThread(harness, threadId, stopContext),
     agentStanding: (threadId, standingContext) => agents.agentStanding(harness, threadId, standingContext),
     runPlacedAgent: (args, runContext) => agents.runPlacedAgent(harness, args, runContext),
     steerPlacedAgent: (args, steerContext) => agents.steerPlacedAgent(harness, args, steerContext),

@@ -27,7 +27,7 @@ import {
   HEADER_DEVICE_REQUEST_ID,
   HEADER_DEVICE_REQUEST_METHOD,
   AGENT_MESSAGE_OUTCOMES,
-  AGENT_PAUSE_OUTCOMES,
+  AGENT_STOP_OUTCOMES,
 } from "./constants.js";
 import {
   type PresenceAttachment,
@@ -337,11 +337,11 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     if (frame.type === "agent-pause.ack") {
       const commandId =
         typeof frame.commandId === "string" ? frame.commandId : "";
-      if (!commandId || !AGENT_PAUSE_OUTCOMES.has(frame.outcome)) {
+      if (!commandId || !AGENT_STOP_OUTCOMES.has(frame.outcome)) {
         this.closeSocket(socket, DEVICE_PRESENCE_CLOSE.protocol, "bad_request");
         return;
       }
-      this.localAgentPauseAcks.get(`${attachment.deviceId}:${commandId}`)?.(
+      this.localAgentStopAcks.get(`${attachment.deviceId}:${commandId}`)?.(
         frame.outcome,
       );
       return;

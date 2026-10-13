@@ -1,4 +1,4 @@
-import { readAgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
+import { readAgentMessageDelivery, readAgentStopResult } from "@stella/contracts/backend/agent-threads";
 import { loadDeviceExecutionContext, loadMediaAccess } from "./execution-context.js";
 import { resolveRuntimeSourceAsset } from "../shared/runtime-paths.js";
 import { createCloudTranscriptWriter } from "./cloud-transcript-write.js";
@@ -209,7 +209,7 @@ export const createRunnerContext = ({
     return toCloudExecutionSelection(modelConfigSnapshot);
   };
 
-  const pauseAgentThread = async ({
+  const stopAgentThread = async ({
     threadId,
     conversationId,
     requestId,
@@ -220,13 +220,13 @@ export const createRunnerContext = ({
   }) => {
     if (!backend.client() || !isCloudSignedIn()) {
       throw new Error(
-        "Sign in to Stella to pause agents running in the cloud or on your other devices.",
+        "Sign in to Stella to stop agents running in the cloud or on your other devices.",
       );
     }
     const ownerGeneration = await getCloudOwnerGeneration();
-    const sanitized = `pause:${requestId}`.replace(/[^A-Za-z0-9._:-]/g, "_");
+    const sanitized = `stop:${requestId}`.replace(/[^A-Za-z0-9._:-]/g, "_");
     return await raceWithTimeoutError(
-      backend.require().call("agentThreads.pause", {
+      backend.require().call("agentThreads.stop", {
         ownerGeneration,
         conversationId,
         threadId,
@@ -235,7 +235,7 @@ export const createRunnerContext = ({
       AGENT_MESSAGE_TIMEOUT_MS,
       () =>
         new Error(
-          "Stella's cloud did not answer, so the pause may not have reached the agent. Check agent_status, then try again.",
+          "Stella's cloud did not answer, so the stop may not have reached the agent. Check agent_status, then try again.",
         ),
     );
   };
@@ -332,9 +332,7 @@ export const createRunnerContext = ({
       );
       return readAgentMessageDelivery(delivery).outcome === "steered" ? "steered" : "resumed";
     },
-    pause: async (request) => {
-      await pauseAgentThread(request);
-    },
+    stop: async (request) => readAgentStopResult(await stopAgentThread(request)),
   };
 
   const toolHost = createToolHost({

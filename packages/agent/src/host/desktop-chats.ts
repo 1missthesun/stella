@@ -37,8 +37,8 @@ import {
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
 import type { AgentAttemptOutcome } from "@stella/contracts/agent-status";
-import { PLACED_AGENT_PAUSED } from "../stella/agents.ts";
-import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
+import { PLACED_AGENT_STOPPED } from "../stella/agents.ts";
+import type { AgentMessageDelivery, AgentStopResult } from "@stella/contracts/backend/agent-threads";
 import { agentReportReceipt, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import type { ExecutionContextSnapshot, ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
@@ -246,7 +246,7 @@ export type DesktopChatsOptions = {
   agentThreads?: {
     directory(conversationId: string): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
     message(args: { messageId: string; to: string; text: string; from: AgentMessageSender }): Promise<AgentMessageDelivery>;
-    pause(args: { conversationId: string; threadId: string; controlRequestId: string }): Promise<AgentPauseResult>;
+    stop(args: { conversationId: string; threadId: string; controlRequestId: string; requesterThreadId?: string }): Promise<AgentStopResult>;
     note(args: { noteId: string; conversationId: string; fromThreadId: string; text: string }): Promise<void>;
   };
   /**
@@ -263,9 +263,9 @@ export type DesktopChatsOptions = {
   }): void;
   /**
    * An agent another agent started finished a run: it answered, failed, or
-   * was paused before it answered. Its report goes to the agent that started
+   * was stopped before it answered. Its report goes to the agent that started
    * it; this is for the owner's records. Stella's own end in `agentReported`
-   * and `agentPaused`.
+   * and `agentStopped`.
    */
   agentRunEnded?(agent: { conversationId: string; threadId: string; interrupted: boolean }): void;
   subagentEnded?(agent: {
@@ -273,7 +273,7 @@ export type DesktopChatsOptions = {
     threadId: string;
     parentThreadId: string;
     attempt: number;
-    outcome: "completed" | "failed" | "paused";
+    outcome: AgentAttemptOutcome;
     text?: string;
   }): void;
   /**
@@ -292,8 +292,10 @@ export type DesktopChatsOptions = {
     attempt: number;
     running: boolean;
   }): void;
-  /** One of Stella's agents was paused before it answered; Stella is not told (`StellaAgentsHost.agentPaused`). */
-  agentPaused?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
+  /** Stella answered an agent's report with a visible reply, so the user hears of it (the app shows a notification). */
+  agentReportRelayed?(agent: { conversationId: string; description: string }): void;
+  /** One of Stella's agents was stopped before it answered; Stella is not told (`StellaAgentsHost.agentStopped`). */
+  agentStopped?(agent: { conversationId: string; threadId: string; description: string; attempt: number }): void;
   /**
    * For a conversation kept on this computer: the agent loops' chat log,
    * which the Claude Code engine answers from. Its turns are mirrored both
@@ -317,7 +319,8 @@ export type DesktopDeviceAgents = {
   }>;
   /** Another message for it: steers it while it runs, or starts its next run. */
   message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
-  pause(threadId: string): Promise<void>;
+  /** Stop it, and every agent it started, wherever they run. */
+  stop(threadId: string): Promise<AgentStopResult | void>;
 };
 
 /** Agents another runtime runs as a whole (`DesktopChatsOptions.cloudThreads`). */
@@ -326,7 +329,8 @@ export type DesktopEngineAgents = {
   start(args: { key: string; description: string; prompt: string; model: string; parentThreadId?: string }): Promise<{ threadId: string }>;
   /** Another message for it: steers it while it runs, or starts its next run. */
   message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
-  pause(threadId: string): Promise<void>;
+  /** Stop it, and every agent it started, wherever they run. */
+  stop(threadId: string): Promise<AgentStopResult | void>;
 };
 
 type Chat = {
@@ -336,7 +340,7 @@ type Chat = {
   startAgent: OpenStellaHarness["startAgent"];
   agentRecords: OpenStellaHarness["agentRecords"];
   messageAgent: OpenStellaHarness["messageAgent"];
-  pauseAgent: OpenStellaHarness["pauseAgent"];
+  stopAgent: OpenStellaHarness["stopAgent"];
   agentStanding: OpenStellaHarness["agentStanding"];
   runPlacedAgent: OpenStellaHarness["runPlacedAgent"];
   steerPlacedAgent: OpenStellaHarness["steerPlacedAgent"];
@@ -721,14 +725,14 @@ export function desktopChats(options: DesktopChatsOptions) {
     });
     // An agent's Claude Code CLI took up a background command that finished:
     // the agent is woken for it, as for one of Stella's own shells, unless
-    // the user paused or stopped it.
+    // the user stopped it.
     claudeCodeEngine.onBackgroundWake((session, wake) => {
       const threadId = session.threadId;
       if (!threadId) return;
       void (async () => {
         const chat = await ready(session.conversationId);
         const record = await chat.agentStanding(threadId, context);
-        if (!record || record.agentStatus === "paused" || record.agentStatus === "canceled") return;
+        if (!record || record.agentStatus === "canceled") return;
         await chat.messageAgent({ key: `claude-code-wake:${wake.key}`, threadId, message: wake.text, fromOrchestrator: true }, context);
       })().catch((error: unknown) => options.report(error));
     });
@@ -875,7 +879,7 @@ export function desktopChats(options: DesktopChatsOptions) {
 
   /**
    * A conversation's agents on another engine as its Stella reaches them: a
-   * message one takes mid-run, and a pause, settle what Stella waits for, as
+   * message one takes mid-run, and a stop, settle what Stella waits for, as
    * its reports do (`noteEngineReport`).
    */
   const engineHost = (
@@ -884,7 +888,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     chat: () => Chat | undefined,
   ): RemoteAgentHost | undefined => {
     if (!engine) return undefined;
-    const settle = async (threadId: string, requestId: string, status?: "paused") => {
+    const settle = async (threadId: string, requestId: string, status?: "canceled") => {
       const opened = chat();
       if (!opened) return;
       await opened.harness.commit(
@@ -906,16 +910,17 @@ export function desktopChats(options: DesktopChatsOptions) {
           await settle(threadId, `steered:${key}`);
         }
       },
-      pause: async (threadId) => {
-        await engine.pause(threadId);
-        await settle(threadId, `paused:${threadId}:${Date.now()}`, "paused");
+      stop: async (threadId) => {
+        const result = await engine.stop(threadId);
+        await settle(threadId, `stopped:${threadId}:${Date.now()}`, "canceled");
+        return result;
       },
     };
   };
 
   /**
    * Stella's agent on another of the owner's computers, which runs there as
-   * a whole: a message it takes mid-run, and a pause, settle what Stella
+   * a whole: a message it takes mid-run, and a stop, settle what Stella
    * waits for, as its reports do (`noteEngineReport`). One on Claude Code
    * needs that computer signed in to it.
    */
@@ -928,7 +933,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     if (!agents) return undefined;
     const device = async () =>
       (await options.devices?.(conversationId)?.devices().catch(() => undefined))?.find((entry) => entry.deviceId === deviceId);
-    const settle = async (threadId: string, requestId: string, status?: "paused") => {
+    const settle = async (threadId: string, requestId: string, status?: "canceled") => {
       const opened = chat();
       if (!opened) return;
       await opened.harness.commit(
@@ -968,9 +973,10 @@ export function desktopChats(options: DesktopChatsOptions) {
           await settle(threadId, `steered:${key}`);
         }
       },
-      pause: async (threadId) => {
-        await agents.pause(threadId);
-        await settle(threadId, `paused:${threadId}:${Date.now()}`, "paused");
+      stop: async (threadId) => {
+        const result = await agents.stop(threadId);
+        await settle(threadId, `stopped:${threadId}:${Date.now()}`, "canceled");
+        return result;
       },
     };
   };
@@ -1107,35 +1113,44 @@ export function desktopChats(options: DesktopChatsOptions) {
           "Stella's cloud did not answer, so the message may not have been delivered.",
         );
       },
-      pause: async ({ key, threadId }) => {
-        // Another chat's agent here stops here; any other agent stops where it runs.
-        if ((await pauseLocalAgent(threadId)) === "paused") {
-          return { threadId, outcome: "paused", where: "on this computer" };
+      stop: async ({ key, threadId, requesterThreadId }) => {
+        // Another chat's agent here stops here, with its agents; any other agent stops where it runs.
+        if (!requesterThreadId) {
+          const here = await stopLocalAgent(threadId);
+          if (here !== "not_found") {
+            return { threadId, outcome: "stopped", where: "on this computer", ...(here.elsewhere.length ? { descendants: here.elsewhere } : {}) };
+          }
         }
         if (!cloud) {
-          throw new Error(`No agent ${threadId} on this computer. This chat is stored only on this computer, so it can pause only agents here.`);
+          throw new Error(
+            requesterThreadId
+              ? `${threadId} is not an agent you started. You can stop only agents you started, at any depth.`
+              : `No agent ${threadId} on this computer. This chat is stored only on this computer, so it can stop only agents here.`,
+          );
         }
         const id = createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${key}`).digest("hex").slice(0, 48);
         return await within(
-          cloud.pause({ conversationId, threadId, controlRequestId: `pi-pause:${id}` }),
+          cloud.stop({ conversationId, threadId, controlRequestId: `pi-stop:${id}`, ...(requesterThreadId ? { requesterThreadId } : {}) }),
           AGENT_MESSAGE_TIMEOUT_MS,
-          "Stella's cloud did not answer, so the pause may not have reached the agent. Check agent_status.",
+          "Stella's cloud did not answer, so the stop may not have reached the agent. Check agent_status.",
         );
       },
     };
   };
 
-  /** Pause one of Stella's agents on this computer, whichever chat started it. */
-  const pauseLocalAgent = async (threadId: string): Promise<"paused" | "not_running" | "not_found"> => {
+  /**
+   * Stop one of Stella's agents on this computer, whichever chat started it,
+   * and every agent below it: those here stop here, those elsewhere where
+   * they run (`elsewhere` says how). Idle, it is recorded stopped all the same.
+   */
+  const stopLocalAgent = async (threadId: string): Promise<{ elsewhere: AgentStopResult[] } | "not_found"> => {
     const conversationId = (await threadIndex())[threadId];
     if (!conversationId) return "not_found";
     const chat = await ready(conversationId);
-    const record = await chat.agentStanding(threadId, context);
-    if (!record) return "not_found";
-    // Idle, it is paused all the same: what its agents report waits for a message that resumes it.
-    if (record.status === "running") claudeCodeEngine?.abort(conversationId, { threadId });
-    await chat.pauseAgent(threadId, context);
-    return "paused";
+    const stopped = await chat.stopAgent(threadId, context);
+    if (!stopped) return "not_found";
+    for (const local of stopped.local) claudeCodeEngine?.abort(conversationId, { threadId: local });
+    return { elsewhere: stopped.elsewhere };
   };
 
   const open = (conversationId: string): Promise<Chat> => {
@@ -1233,7 +1248,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           startAgent,
           agentRecords,
           messageAgent,
-          pauseAgent,
+          stopAgent,
           agentStanding,
           runPlacedAgent,
           steerPlacedAgent,
@@ -1253,7 +1268,7 @@ export function desktopChats(options: DesktopChatsOptions) {
               cloudStored: !conversationId.startsWith("local_"),
             }),
             agents: (() => {
-              const { agentStarted, agentReported, agentPaused, subagentEnded, agentRunEnded } = options;
+              const { agentStarted, agentReported, agentStopped, subagentEnded, agentRunEnded } = options;
               /** How many runs Stella has given one of its agents: the attempt a run is. */
               const attempts = async (threadId: string) => {
                 if (!opened) return 1;
@@ -1312,7 +1327,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                     attempt: await attempts(run.threadId),
                   });
                 },
-                // Stella's own end when their reports reach her (`agentReported`, `agentPaused`).
+                // Stella's own end when their reports reach her (`agentReported`, `agentStopped`).
                 ...(subagentEnded || agentRunEnded
                   ? {
                       endAgentRun: async (run, _context, end) => {
@@ -1336,10 +1351,12 @@ export function desktopChats(options: DesktopChatsOptions) {
                   if (await noteOnBrain(conversationId, report.requestId, report.text, report.threadId)) return;
                   // The harness is open by then: reports run once it resumes.
                   const root = await harness.conversation(report.rootConversationId, context);
-                  await root?.submit(
+                  if (!root) return;
+                  const submission = await root.submit(
                     { type: "input", content: report.text, whenBusy: "followUp", requestId: report.requestId },
                     context,
                   );
+                  relayedReport(conversationId, root, submission, report.text);
                 },
                 deliverNote: async (note, context) => {
                   if (!conversationId.startsWith("local_") && options.agentThreads) {
@@ -1374,13 +1391,13 @@ export function desktopChats(options: DesktopChatsOptions) {
                       },
                     }
                   : {}),
-                ...(agentPaused
+                ...(agentStopped
                   ? {
-                      agentPaused: async (agent) => {
+                      agentStopped: async (agent) => {
                         if (opened && isAnotherHostsAgent(await opened.harness.snapshot(StellaAgentsDoc, opened.root.id, context), agent.threadId)) {
                           return;
                         }
-                        agentPaused({ conversationId, ...agent, attempt: await attempts(agent.threadId) });
+                        agentStopped({ conversationId, ...agent, attempt: await attempts(agent.threadId) });
                       },
                     }
                   : {}),
@@ -1506,7 +1523,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           startAgent,
           agentRecords,
           messageAgent,
-          pauseAgent,
+          stopAgent,
           agentStanding,
           runPlacedAgent,
           steerPlacedAgent,
@@ -2007,6 +2024,20 @@ export function desktopChats(options: DesktopChatsOptions) {
     return items;
   };
 
+  /** Once Stella has answered a report: when her reply shows anything, the user hears the task finished. */
+  const relayedReport = (conversationId: string, root: Conversation, submission: Submission, text: string) => {
+    const relayed = options.agentReportRelayed;
+    if (!relayed) return;
+    void (async () => {
+      const settled = await submission.wait(context);
+      if (settled.status === "unanswered" || settled.type !== "input" || settled.answer === undefined) return;
+      const page = await root.entries({ minEntryId: settled.answer, maxEntryId: settled.answer }, 1, undefined, context);
+      const message = (page.items[0] as unknown as PiEntry | undefined)?.model?.[0];
+      if (message?.role !== "assistant" || !piMessageText(message).trim()) return;
+      relayed({ conversationId, description: /^description: (.*)$/m.exec(text)?.[1]?.trim() ?? "" });
+    })().catch((error: unknown) => options.report(error));
+  };
+
   /** An agent the host starts in a conversation (an app-source merge, memory sync). */
   const startAgent = async (
     conversationId: string,
@@ -2026,7 +2057,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     const chat = await open(conversationId);
     const records = await chat.agentRecords(context);
     return {
-      agents: records.map(({ placement: _placement, paused: _paused, ...agent }) => agent),
+      agents: records.map(({ placement: _placement, stopped: _stopped, ...agent }) => agent),
     };
   };
 
@@ -2100,11 +2131,11 @@ export function desktopChats(options: DesktopChatsOptions) {
   };
 
   /** Stop a run of an agent placed here, for the host that placed it; false when that run is not going here. */
-  /** Stop an agent another host placed here; `paused` when that host paused it. */
-  const cancelPlacedAgent = (agentKey: string, runKey: string, paused?: boolean): boolean => {
+  /** Stop an agent another host placed here; `stopped` when `stop_agent` stopped it, which stops the agents it started here too. */
+  const cancelPlacedAgent = (agentKey: string, runKey: string, stopped?: boolean): boolean => {
     const placed = placedRuns.get(agentKey);
     if (placed?.runKey !== runKey) return false;
-    placed.cancel.abort(paused ? PLACED_AGENT_PAUSED : undefined);
+    placed.cancel.abort(stopped ? PLACED_AGENT_STOPPED : undefined);
     return true;
   };
 
@@ -2161,11 +2192,10 @@ export function desktopChats(options: DesktopChatsOptions) {
         },
         context,
       );
-      if (report && record.holdsReports) return "queued";
       return record.status === "running" ? "steered" : "resumed";
     },
-    /** A pause for one of Stella's agents here from another host (the cloud, another computer). */
-    pauseAgent: pauseLocalAgent,
+    /** A stop for one of Stella's agents here, and its agents, from another host (the cloud, another computer). */
+    stopAgent: stopLocalAgent,
     async deliverReport(conversationId: string, report: { requestId: string; text: string }): Promise<void> {
       await noteEngineReport(conversationId, report);
       if (await noteOnBrain(conversationId, report.requestId, report.text)) return;
@@ -2184,7 +2214,11 @@ export function desktopChats(options: DesktopChatsOptions) {
         text: report.text,
         stella: { hidden: true, ...(receipt ? { clientMsgId: receipt } : {}) },
       };
-      await chat.root.submit({ type: "input", content: [hidden], whenBusy: "followUp", requestId: report.requestId }, context);
+      const submission = await chat.root.submit(
+        { type: "input", content: [hidden], whenBusy: "followUp", requestId: report.requestId },
+        context,
+      );
+      relayedReport(conversationId, chat.root, submission, report.text);
     },
     /**
      * Where one of Stella's agents on this computer stands, for settling the
@@ -2194,7 +2228,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     async agentStatus(
       threadId: string,
     ): Promise<
-      { conversationId: string; status: "running" | "completed" | "error" | "canceled" | "paused"; attempt: number } | undefined
+      { conversationId: string; status: "running" | "completed" | "error" | "canceled"; attempt: number } | undefined
     > {
       const conversationId = (await threadIndex())[threadId];
       if (!conversationId) return undefined;
@@ -2206,7 +2240,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         status:
           record.agentStatus === "failed"
             ? "error"
-            : record.agentStatus === "paused" || record.agentStatus === "canceled"
+            : record.agentStatus === "canceled"
               ? record.agentStatus
               : record.status,
         attempt: record.attempt,

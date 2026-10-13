@@ -1,4 +1,4 @@
-import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
+import { AGENT_STOP_WIRE_REASON, AGENT_STOPPED_REASON } from "@stella/contracts/agent-status";
 import {
   agentAttemptOutcomeOf,
   type AgentAttemptOutcome,
@@ -27,7 +27,7 @@ import { guardedModelFetch } from "../guarded-model-fetch.js";
 import {
   AGENT_MESSAGE_FRAMED_MAX_CHARS,
   type AgentMessagingCaller,
-  pauseAgentThread,
+  stopAgentThread,
   readAgentDirectory,
   sendAgentMessage,
 } from "../agent-messaging.js";
@@ -62,8 +62,8 @@ import {
   type CloudAgentControlReceipt,
   type PiHarnessAgentControl,
   type PiHarnessAgentControlResult,
-  type PiThreadPause,
-  type PiThreadPauseResult,
+  type PiThreadStop,
+  type PiThreadStopResult,
   type PiThreadStart,
   type PiThreadSteer,
   type PiThreadSteerResult,
@@ -320,14 +320,14 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                 },
               },
             }),
-          // A pause reports nothing to the orchestrator, which is not woken
+          // A stop reports nothing to the orchestrator, which is not woken
           // for it; the agent's cards still end, or its row would read as
           // running for good.
-          agentPaused: (event) =>
+          agentStopped: (event) =>
             this.publishPiAgentTerminal(
               event.threadId,
               event,
-              { kind: "paused", body: "Paused." },
+              { kind: "canceled", body: AGENT_STOPPED_REASON },
               event.turnId,
             ),
           agentsChanged: () => this.refreshAgentsSoon(),
@@ -386,8 +386,8 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                 ...args,
                 conversationId: authority.conversationId,
               }),
-            pause: async (authority, args) =>
-              await pauseAgentThread(this.piOwnerCaller(authority), {
+            stop: async (authority, args) =>
+              await stopAgentThread(this.piOwnerCaller(authority), {
                 ...args,
                 conversationId: authority.conversationId,
               }),
@@ -459,7 +459,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
 
   /**
    * Agents a cloud pi conversation places on the owner's devices: started,
-   * messaged and paused through the owner's agent threads, the loop's device
+   * messaged and stopped through the owner's agent threads, the loop's device
    * agents' plane. The device runs one as a whole; its report comes back as
    * the same wake turn. Control receipts are kept per thread.
    */
@@ -525,7 +525,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         await this.ctx.storage.put(receiptKey(args.threadId), next);
         return delivery;
       },
-      pause: async (args, authority, parentTurnId) => {
+      stop: async (args, authority, parentTurnId) => {
         const next = await cancelDeviceAgent(
           caller(authority, parentTurnId),
           await receipt(args.threadId),
@@ -540,7 +540,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
    * Agents a cloud pi conversation starts on a model of their own: each is
    * one of the owner's agent threads on that execution (Claude Code or Codex
    * in a container, a model on a key saved to the account, a Stella model),
-   * dispatched, messaged and paused as the loop's own cloud agents are; its
+   * dispatched, messaged and stopped as the loop's own cloud agents are; its
    * report comes back as a wake turn. Control receipts are kept per thread.
    */
   protected piThreadAgents(): import("../pi-runtime.js").PiThreadAgents {
@@ -650,17 +650,17 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           execution: prior.execution ?? authority.execution,
         });
       },
-      pause: async (args, authority, parentTurnId) => {
+      stop: async (args, authority, parentTurnId) => {
         const control = await this.requireCloudAgentControlReceipt(args.threadId, "any");
         if (!isCloudAgentControlActive(control.status) || !control.turnId) return;
-        const paused = await this.pausePiThread({
+        const stopped = await this.stopPiThread({
           ownerId: authority.ownerId,
           ownerGeneration: authority.ownerGeneration,
           threadId: control.threadId,
           turnId: control.turnId,
           attemptGeneration: control.attemptGeneration,
         });
-        if (paused !== "unknown") return;
+        if (stopped !== "unknown") return;
         const teardown = await this.env.BUILD_SESSIONS.getByName(control.threadId).fetch(
           "https://build-session/cancel",
           {
@@ -672,13 +672,13 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               turnId: control.turnId,
               attemptGeneration: control.attemptGeneration,
               cancelRequestId: await scopedId(authority, parentTurnId, "message", args.key),
-              reason: AGENT_PAUSED_REASON,
+              reason: AGENT_STOP_WIRE_REASON,
             }),
           },
         );
         await teardown.body?.cancel().catch(() => undefined);
         if (!teardown.ok && teardown.status !== 409) {
-          throw new Error(`Could not pause ${control.threadId}. Try again.`);
+          throw new Error(`Could not stop ${control.threadId}. Try again.`);
         }
       },
     };
@@ -787,11 +787,9 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     outcome: { kind: AgentAttemptOutcome; body: string },
   ): import("@stella/contracts/cloud-agent-lifecycle").CloudAgentLifecycleCard {
     const identity = { agentId: threadId, attemptGeneration: agent.attempt };
-    // A pause's card has always been the attempt's canceled card; its id stays.
-    const cardKind = outcome.kind === "paused" ? "canceled" : outcome.kind;
     return {
       type: "agent-lifecycle",
-      eventId: `pi-agent:${threadId}:${agent.attempt}:${cardKind}`,
+      eventId: `pi-agent:${threadId}:${agent.attempt}:${outcome.kind}`,
       event:
         outcome.kind === "completed"
           ? {
@@ -814,7 +812,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
    * Start one attempt of an agent thread as a pi agent here, right away: pi
    * runs it in the background whatever turn this conversation is running,
    * on the authority its dispatcher admitted. The attempt is recorded before
-   * pi has it, so a pause that arrives first stops it, and a retried
+   * pi has it, so a stop that arrives first stops it, and a retried
    * dispatch hands it over once. The owner's agent threads learn it started
    * once pi has it.
    */
@@ -852,11 +850,11 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       record = { ...record, attempts: [...record.attempts, open] };
       await this.ctx.storage.put(piThreadKey(attempt.threadId), record);
     }
-    // Paused before it started: it never starts.
+    // Stopped before it started: it never starts.
     if (open.pausing) {
       await this.settlePiThreadAttempts(record, attempt.attemptGeneration, {
         status: "canceled",
-        errorMessage: AGENT_PAUSED_REASON,
+        errorMessage: AGENT_STOPPED_REASON,
       });
       return;
     }
@@ -925,13 +923,13 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         createdAt: now,
       },
     ]);
-    // Paused while pi took it: it stops now, and settles as canceled.
+    // Stopped while pi took it: it stops now, and settles as canceled.
     if (
       handed?.attempts.find(
         (entry) => entry.attemptGeneration === attempt.attemptGeneration,
       )?.pausing
     ) {
-      await runtime.pauseThreadAgent(attempt.threadId, contextFor());
+      await runtime.stopThreadAgent(attempt.threadId, contextFor());
     }
     // Agents keep this object waking while they run.
     await this.piHeartbeat().catch(() => undefined);
@@ -960,7 +958,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   /**
    * A report of an agent thread's agent. It answers one attempt (the one
    * whose message its run took; older open attempts are answered with it).
-   * A report without text settles an attempt only when it was paused.
+   * A report without text settles an attempt only when it was stopped.
    */
   protected async deliverPiThreadReport(
     report: import("../pi-runtime.js").PiThreadReport,
@@ -985,7 +983,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     let outcome: PiThreadOutcome;
     if (report.settled) {
       if (!attempt.pausing) return;
-      outcome = { status: "canceled", errorMessage: AGENT_PAUSED_REASON };
+      outcome = { status: "canceled", errorMessage: AGENT_STOPPED_REASON };
     } else {
       const parsed = piReportOutcome(report);
       outcome =
@@ -994,9 +992,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               status: "completed",
               resultJson: JSON.stringify({ finalText: parsed.body }),
             }
-          : parsed.kind === "paused"
-            ? { status: "canceled", errorMessage: AGENT_PAUSED_REASON }
-            : {
+          : {
               status: parsed.kind,
               errorMessage:
                 parsed.body ||
@@ -1118,10 +1114,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
       threadId: next.threadId,
       turnId: latest.turnId,
       attemptGeneration: latest.attemptGeneration,
-      status: agentAttemptOutcomeOf({
-        status: terminal.status,
-        reason: terminal.errorMessage,
-      }),
+      status: agentAttemptOutcomeOf({ status: terminal.status }),
       ...(terminal.resultJson ? { resultJson: terminal.resultJson } : {}),
       ...(terminal.errorMessage ? { errorMessage: terminal.errorMessage } : {}),
       completedAt: terminal.completedAt,
@@ -1180,13 +1173,13 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   }
 
   /**
-   * Pause one exact attempt of an agent thread whose agent runs here. Its
-   * attempt settles as canceled once its run stops, or as it is handed over
-   * if pi does not have it yet.
+   * Stop one exact attempt of an agent thread whose agent runs here, and
+   * the agents it started. Its attempt settles as canceled once its run
+   * stops, or as it is handed over if pi does not have it yet.
    */
-  async pausePiThread(input: PiThreadPause): Promise<PiThreadPauseResult> {
+  async stopPiThread(input: PiThreadStop): Promise<PiThreadStopResult> {
     const decided = await this.ctx.blockConcurrencyWhile(
-      async (): Promise<PiThreadPauseResult | "pause"> => {
+      async (): Promise<PiThreadStopResult | "stop"> => {
         const record = await this.ctx.storage.get<PiThreadRecord>(
           piThreadKey(input.threadId),
         );
@@ -1225,14 +1218,14 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                 },
               ],
         } satisfies PiThreadRecord);
-        return attempt?.handedOff ? "pause" : "paused";
+        return attempt?.handedOff ? "stop" : "stopped";
       },
     );
-    if (decided !== "pause") return decided;
+    if (decided !== "stop") return decided;
     const runtime = await this.openPiRuntime(this.piGatewayOrigin());
     const { contextFor } = await import("../pi-runtime.js");
-    await runtime.pauseThreadAgent(input.threadId, contextFor());
-    return "paused";
+    await runtime.stopThreadAgent(input.threadId, contextFor());
+    return "stopped";
   }
 
   async controlPiHarnessAgent(

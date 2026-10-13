@@ -1,4 +1,3 @@
-import { AGENT_PAUSED_REASON } from "@stella/contracts/agent-status";
 import type { RuntimeStore } from "../storage/runtime-store.js";
 import type { AgentToolSnapshot } from "../tools/types.js";
 import {
@@ -11,7 +10,7 @@ const NO_AUTH_RETRY_MS = 4_000;
 const BASE_RETRY_MS = 500;
 const MAX_RETRY_MS = 60_000;
 
-type LocalTerminalStatus = "completed" | "error" | "canceled" | "paused";
+type LocalTerminalStatus = "completed" | "error" | "canceled";
 
 type ComputerAgentStartPayload = {
   conversationId: string;
@@ -104,29 +103,17 @@ const withTimeout = <T>(promise: Promise<T>): Promise<T> =>
       ),
   );
 
-/**
- * `computerThreads.complete` with an attempt's outcome. A pause goes as
- * `paused`; a backend from before the shared vocabulary refuses that status,
- * so it gets the cancel carrying the pause reason it reads as paused.
- */
+/** `computerThreads.complete` with an attempt's outcome. */
 export const completeComputerThread = async (
   call: (args: Record<string, unknown>) => Promise<unknown>,
   args: Record<string, unknown> & {
-    status: "completed" | "failed" | "canceled" | "paused";
+    status: "completed" | "failed" | "canceled";
     error?: string;
   },
-): Promise<unknown> => {
-  if (args.status !== "paused") return await call(args);
-  try {
-    return await call(args);
-  } catch (error) {
-    if (asRecord(error)?.code !== "BAD_REQUEST") throw error;
-    return await call({ ...args, status: "canceled", error: AGENT_PAUSED_REASON });
-  }
-};
+): Promise<unknown> => await call(args);
 
 const snapshotStatus = (record: Record<string, unknown>): unknown =>
-  record.agentStatus === "paused" ? "paused" : record.status;
+  record.agentStatus === "paused" ? "canceled" : record.status;
 
 const parseSnapshot = (value: unknown): AgentToolSnapshot | null => {
   const record = asRecord(value);
@@ -138,7 +125,7 @@ const parseSnapshot = (value: unknown): AgentToolSnapshot | null => {
   const completedAt = record.completedAt;
   if (
     typeof id !== "string" ||
-    !["running", "completed", "error", "canceled", "paused"].includes(
+    !["running", "completed", "error", "canceled"].includes(
       typeof status === "string" ? status : "",
     ) ||
     typeof description !== "string" ||

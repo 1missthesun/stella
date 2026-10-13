@@ -14,7 +14,7 @@
  */
 /**
  * Stella always presents as a single assistant — never expose that
- * `spawn_agent`, `send_message`, and `pause_agent` orchestrate
+ * `spawn_agent`, `send_message`, and `stop_agent` orchestrate
  * other agents under the hood. Those tools just get generic "Stella is doing
  * the work" copy.
  */
@@ -115,17 +115,13 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
     "Taking a look",
     "Getting a status read",
   ],
-  pause_agent: [
-    "Pausing",
-    "Holding up",
-    "Hitting pause",
-    "Putting a pin in it",
-    "Holding off",
-    "Taking a beat",
-    "Easing off",
-    "Slowing down",
-    "Putting it on hold",
-    "Standing by",
+  stop_agent: [
+    "Stopping",
+    "Calling a halt",
+    "Wrapping it up",
+    "Bringing it to a stop",
+    "Halting",
+    "Standing down",
   ],
 
   // ── General-agent + subagent tools ──────────────────────────────────────

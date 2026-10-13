@@ -437,8 +437,7 @@ const compactLatestText = (task: TaskItem): string => {
     case 'error':
       return 'Failed'
     case 'canceled':
-    case 'paused':
-      return 'Paused'
+      return 'Stopped'
   }
 }
 

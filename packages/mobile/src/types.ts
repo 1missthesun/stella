@@ -247,7 +247,7 @@ export type ChatMessage = {
   replyRefs?: ReplyRef[];
   reaction?: string;
   reactionAt?: number;
-  agentStates?: Record<string, "running" | "completed" | "error" | "paused">;
+  agentStates?: Record<string, "running" | "completed" | "error" | "canceled">;
   /**
    * Agent threads this row's `spawn_agent` / `send_message` calls started, from
    * the tool result details. Feeds reply context (the exchange owns the
@@ -381,7 +381,7 @@ export type MobileTask = {
   agentType?: string;
   /** Durable owning-agent edge. An unresolved first parent is the Orchestrator. */
   parentAgentId?: string;
-  status: "running" | "completed" | "error" | "canceled" | "paused";
+  status: "running" | "completed" | "error" | "canceled";
   /**
    * Set when the conversation's own journal named this agent as running, rather
    * than a fold of whatever rows this device holds. Such a row is never settled

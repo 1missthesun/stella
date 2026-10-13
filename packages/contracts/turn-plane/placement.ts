@@ -395,10 +395,13 @@ export type AgentMessageDeviceOutcome =
   | "refused";
 
 /**
- * How an `agent-pause` landed: `paused` stopped a running agent,
- * `not_running` found it idle, `not_found` found no such agent here.
+ * How an `agent-pause` (a `stop_agent`) landed: `stopped` stopped a running
+ * agent and the agents it started here, `not_running` found it idle,
+ * `not_found` found no such agent here. Builds before `stop_agent` answer
+ * `paused` for `stopped`.
  */
-export type AgentPauseDeviceOutcome =
+export type AgentStopDeviceOutcome =
+  | "stopped"
   | "paused"
   | "not_running"
   | "not_found"
@@ -458,9 +461,10 @@ export type DevicePresenceServerFrame =
     }
   | {
       /**
-       * A `pause_agent` for an agent this device runs locally, from wherever
-       * the conversation runs now. The device stops it if it is running and
-       * answers with `agent-pause.ack`. `commandId` is stable across
+       * A `stop_agent` for an agent this device runs locally, from wherever
+       * the conversation runs now (named before pause became stop). The
+       * device stops it and the agents it started here, and answers with
+       * `agent-pause.ack`. `commandId` is stable across
        * redeliveries; the device dedupes on it.
        */
       type: "agent-pause";
@@ -522,7 +526,7 @@ export type DevicePresenceDeviceFrame =
       type: "agent-pause.ack";
       commandId: string;
       threadId: string;
-      outcome: AgentPauseDeviceOutcome;
+      outcome: AgentStopDeviceOutcome;
     }
   | {
       /**

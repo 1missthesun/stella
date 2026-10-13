@@ -1,4 +1,4 @@
-import { readAgentMessageDelivery } from "@stella/contracts/backend/agent-threads";
+import { readAgentMessageDelivery, readAgentStopResult } from "@stella/contracts/backend/agent-threads";
 import {
   createRunnerContext,
   getConfiguredModel,
@@ -466,14 +466,16 @@ export const createStellaHostRunner = (
             "Stella's cloud did not answer within 20s, so the message may not have been delivered. Check agent_status before sending it again.",
           ),
         ),
-      pause: async (args) =>
-        await withinAgentControlTimeout(
-          (async () =>
-            await context.backend.require().call("agentThreads.pause", {
-              ...args,
-              ownerGeneration: await context.cloudOwnerGeneration(),
-            }))(),
-          "Stella's cloud did not answer within 20s, so the pause may not have reached the agent. Check agent_status, then try again.",
+      stop: async (args) =>
+        readAgentStopResult(
+          await withinAgentControlTimeout(
+            (async () =>
+              await context.backend.require().call("agentThreads.stop", {
+                ...args,
+                ownerGeneration: await context.cloudOwnerGeneration(),
+              }))(),
+            "Stella's cloud did not answer within 20s, so the stop may not have reached the agent. Check agent_status, then try again.",
+          ),
         ),
       note: async (args) => {
         await withinAgentControlTimeout(

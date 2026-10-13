@@ -120,6 +120,12 @@ export type ClaudeCodeTurnRequest = {
   boundToolInactivity?: boolean;
   allowEmptyFinal?: boolean;
   /**
+   * No message the user wrote waits for a reply: when the CLI asks itself
+   * for a visible answer after an empty one, the step ends there instead,
+   * with the empty answer.
+   */
+  quietFinal?: boolean;
+  /**
    * Context capacity the CLI compacts against (`CLAUDE_CODE_AUTO_COMPACT_WINDOW`).
    * The CLI clamps it to the model's own window, so a smaller model keeps
    * its default. Unset leaves the CLI's default.
@@ -500,6 +506,26 @@ const CLAUDE_CODE_COMPACTION_LOOP_MESSAGE =
  * Past the budget the turn fails to the caller with an actionable message.
  */
 const MAX_STEP_RECOVERIES_PER_TURN = 2;
+/** What the CLI asks itself when an answer ended without visible text. */
+const CLAUDE_CODE_VISIBLE_OUTPUT_NUDGE =
+  "[Your previous response had no visible output. Please continue and produce a user-visible response.]";
+export const isClaudeCodeVisibleOutputNudge = (event: ClaudeStreamEvent): boolean => {
+  if (event.type !== "user" || event.isSynthetic !== true) return false;
+  const content = asObject(event.message)?.content;
+  const text =
+    typeof content === "string"
+      ? content
+      : Array.isArray(content)
+        ? asObject(content[0])?.text
+        : undefined;
+  return typeof text === "string" && text.trim() === CLAUDE_CODE_VISIBLE_OUTPUT_NUDGE;
+};
+export const buildClaudeCodeInterruptRequest = (): string =>
+  JSON.stringify({
+    type: "control_request",
+    request_id: crypto.randomUUID(),
+    request: { subtype: "interrupt" },
+  });
 const summarizeMcpLedgerValue = (value: unknown, maxChars: number) => {
   let serialized;
   try {
@@ -2811,6 +2837,16 @@ class ClaudeCodeSessionRuntime {
       if (parsedLine.type === "user" && parsedLine.isReplay === true) {
         this.noteInjectionConsumed(session, processState, parsedLine.uuid);
         return undefined;
+      }
+      if (isClaudeCodeVisibleOutputNudge(parsedLine)) {
+        const quiet = processState.pending[0];
+        if (
+          quiet?.request.quietFinal &&
+          !processState.closed &&
+          ![...(quiet.injections?.values() ?? [])].some((entry) => !entry.consumed)
+        ) {
+          processState.child.stdin.write(`${buildClaudeCodeInterruptRequest()}\n`, () => {});
+        }
       }
       if (
         parsedLine.type === "assistant" ||

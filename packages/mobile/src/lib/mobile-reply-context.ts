@@ -7,6 +7,7 @@ import {
   type ReplyContextRow,
 } from "@stella/contracts/reply-context";
 import { journalAgents } from "@stella/contracts/agent-titles";
+import { isAgentStopReason } from "@stella/contracts/agent-status";
 import type { ChatMessage, ChatArtifact } from "../types";
 import {
   messageText,
@@ -138,8 +139,11 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
       if (artifact?.payload.kind === "agent-work") {
         artifact.payload = { ...artifact.payload, state: "done", completed: event.type === "agent-completed" ? 1 : 0, failed: event.type !== "agent-completed" };
       }
-      const paused = event.type !== "agent-completed" && event.payload.status === "paused";
-      if (!paused) {
+      // A stopped agent reports nothing, so its card has no completion.
+      const stopped =
+        event.type === "agent-canceled" &&
+        ((event.payload.status as string | undefined) === "paused" || isAgentStopReason(event.payload.error));
+      if (!stopped) {
         completions.push({
           eventId: record.card.eventId, agentId: id, turnId: record.turnId, seq: record.seq,
           createdAt: record.createdAtMs,
@@ -187,7 +191,7 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
   const wakeTitles = new Map<string, string>();
   for (const [turnId, turnRecords] of turns) {
     const wake = journalMirroredWake(turnRecords);
-    if (!wake || wake.outcome.kind === "paused") continue;
+    if (!wake || (wake.outcome.kind === "canceled" && isAgentStopReason(wake.outcome.body))) continue;
     if (wake.description) wakeTitles.set(wake.threadId, wake.description);
     const failed = wake.outcome.kind !== "completed";
     completions.push({
@@ -227,7 +231,7 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
   const stateFor = (threadId: string): MobileAgentState | undefined => {
     const status = journal.get(threadId)?.status;
     if (!status) return undefined;
-    return status === "running" || status === "completed" || status === "paused" ? status : "error";
+    return status === "running" || status === "completed" || status === "canceled" ? status : "error";
   };
   const statesFor = (refs: readonly ReplyRef[]) => {
     const states: Record<string, MobileAgentState> = {};
@@ -244,7 +248,7 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
 }
 
 /** Lifecycle state of a task as the transcript's work cards last saw it. */
-export type MobileAgentState = "running" | "completed" | "error" | "paused";
+export type MobileAgentState = "running" | "completed" | "error" | "canceled";
 
 export type MobileReplyContexts = ReplyContextProjection & {
   /** Latest known state per agent thread, for the quoted task's status glyph. */

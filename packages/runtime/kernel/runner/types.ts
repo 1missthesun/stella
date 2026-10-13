@@ -311,11 +311,12 @@ export type PiCloudAgentThreads = {
     /** `message` is already framed as the agent reads it. */
     framed?: boolean;
   }) => Promise<"steered" | "resumed">;
-  pause: (request: {
+  /** `stop_agent` for one of them: it and every agent it started stop, wherever they run. */
+  stop: (request: {
     conversationId: string;
     threadId: string;
     requestId: string;
-  }) => Promise<void>;
+  }) => Promise<AgentThreadCalls["agentThreads.stop"]["result"]>;
 };
 
 export type RunnerPublicApi = {
@@ -432,9 +433,9 @@ export type RunnerPublicApi = {
     message: (
       args: Omit<AgentThreadCalls["agentThreads.message"]["args"], "ownerGeneration">,
     ) => Promise<AgentThreadCalls["agentThreads.message"]["result"]>;
-    pause: (
-      args: Omit<AgentThreadCalls["agentThreads.pause"]["args"], "ownerGeneration">,
-    ) => Promise<AgentThreadCalls["agentThreads.pause"]["result"]>;
+    stop: (
+      args: Omit<AgentThreadCalls["agentThreads.stop"]["args"], "ownerGeneration">,
+    ) => Promise<AgentThreadCalls["agentThreads.stop"]["result"]>;
     note: (args: {
       noteId: string;
       conversationId: string;

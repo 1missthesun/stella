@@ -256,6 +256,7 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
                 parameters: tool.parameters,
               })),
               ...(adoptSession ? { adoptSession } : {}),
+              ...(spec.quiet ? { quiet: true } : {}),
             },
             signal: spec.signal,
           });

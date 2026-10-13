@@ -5,6 +5,7 @@ import {
   type AgentReportOutcome,
   type DeviceAgentReport,
 } from "@stella/contracts/backend/agent-reports";
+import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
 import { agentChangeHooks, appendAgentEvent } from "./agent-events.js";
 import { deliverReportToAgent } from "./agent-threads.js";
 import { resolveCurrentDeviceId } from "./devices.js";
@@ -230,6 +231,9 @@ export const deriveAgentReport = (
 ): void => {
   const thread = readThread(db, threadId);
   if (!thread || !REPORTABLE.has(thread.status)) return;
+  // A stopped attempt reports to no one: whoever stopped it knows, and the
+  // agent that started it was stopped with it or asked for the stop.
+  if (thread.status === "canceled" && isAgentStopReason(thread.error_message)) return;
   // Its device already took this attempt's report (`agentThreads.acknowledgeDelivery`).
   if (thread.origin_delivery_ack_at !== null) return;
   const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
@@ -328,20 +332,7 @@ const deriveJobReports = (db: OwnerDb, threadId: string, now: number): void => {
   }
 };
 
-const releaseHeldReports = (db: OwnerDb, threadId: string, now: number): void => {
-  const thread = readThread(db, threadId);
-  if (!thread || thread.status === "paused") return;
-  for (const { report_id } of db.all<{ report_id: string }>(
-    `SELECT o.report_id FROM agent_report_outbox o
-      WHERE o.requester_kind = 'agent' AND o.requester_id = ? AND o.state = 'pending'
-        AND NOT EXISTS (SELECT 1 FROM owner_jobs j WHERE j.id = 'agent-report:' || o.report_id)`,
-    threadId,
-  )) {
-    scheduleDelivery(db, report_id, now);
-  }
-};
-
-agentChangeHooks.push(deriveJobReports, releaseHeldReports);
+agentChangeHooks.push(deriveJobReports);
 
 const settle = (
   ctx: OwnerContext,
@@ -516,28 +507,6 @@ const deliverToConversation = async (
   settle(ctx, row, "delivered", "cloud");
 };
 
-const holdForPausedParent = (
-  ctx: OwnerContext,
-  row: OutboxRow,
-  parent: ThreadRow,
-): void => {
-  ctx.jobs.cancel(deliveryJobId(row.report_id));
-  appendAgentEvent(ctx.db, {
-    key: `report_deferred:${row.report_id}:paused:${parent.attempt_generation}`,
-    kind: "report_deferred",
-    source: "owner:report-outbox",
-    threadId: row.thread_id,
-    conversationId: row.conversation_id,
-    attemptGeneration: row.attempt_generation,
-    detail: {
-      reportId: row.report_id,
-      requester: parent.thread_id,
-      parentPaused: true,
-    },
-    createdAt: ctx.now,
-  });
-};
-
 const route = async (ctx: OwnerContext, row: OutboxRow): Promise<void> => {
   const thread =
     row.kind === "report" ? readThread(ctx.db, row.thread_id) : null;
@@ -547,10 +516,6 @@ const route = async (ctx: OwnerContext, row: OutboxRow): Promise<void> => {
       throw new Error(
         `${row.requester_id}, which started ${row.thread_id}, is not recorded yet.`,
       );
-    }
-    if (parent.status === "paused") {
-      holdForPausedParent(ctx, row, parent);
-      return;
     }
     await deliverReportToAgent(ctx, {
       reportId: row.report_id,
@@ -705,9 +670,29 @@ const noteParser = object({
   text: string({ min: 1, max: 40_000 }),
 });
 
+/**
+ * `stop_agent` replaced `pause_agent`: a paused agent is a stopped one (a
+ * canceled attempt with the stop's reason, which reports to no one), a held
+ * pause command is a held stop, and the reports a paused parent held go to
+ * it now, waking it, as every report does.
+ */
+export const AGENT_REPORTS_STOP_MIGRATION = {
+  id: "agent-reports.2-stop-replaces-pause",
+  statements: [
+    `UPDATE agent_threads SET status = 'canceled', error_message = '${AGENT_STOPPED_REASON}' WHERE status = 'paused'`,
+    "UPDATE agent_turns SET status = 'canceled' WHERE status = 'paused'",
+    "UPDATE agent_commands SET kind = 'stop' WHERE kind = 'pause'",
+    `INSERT INTO owner_jobs (id, kind, run_at, payload, attempts)
+       SELECT 'agent-report:' || o.report_id, '${AGENT_REPORT_JOB}', 0, json_object('reportId', o.report_id), 0
+         FROM agent_report_outbox o
+        WHERE o.requester_kind = 'agent' AND o.state = 'pending'
+          AND NOT EXISTS (SELECT 1 FROM owner_jobs j WHERE j.id = 'agent-report:' || o.report_id)`,
+  ],
+};
+
 export const agentReportsDomain = {
   name: "agent-reports",
-  migrations: [AGENT_REPORTS_MIGRATION],
+  migrations: [AGENT_REPORTS_MIGRATION, AGENT_REPORTS_STOP_MIGRATION],
   calls: {
     "agentReports.note": {
       scope: "owner",

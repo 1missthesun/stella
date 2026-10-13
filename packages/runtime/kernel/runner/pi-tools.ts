@@ -28,7 +28,7 @@ import type { RunnerContext } from "./types.js";
 const HARNESS_TOOL_NAMES = new Set([
   "spawn_agent",
   "send_message",
-  "pause_agent",
+  "stop_agent",
   "agent_status",
   "Bash",
   "exec_command",

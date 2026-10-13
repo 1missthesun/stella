@@ -135,7 +135,6 @@ const mirroredLifecycleEvents = (
             payload: {
               ...base,
               ...(outcome.body ? { error: outcome.body } : {}),
-              ...(outcome.kind === "paused" ? { status: "paused" } : {}),
             },
           };
   }

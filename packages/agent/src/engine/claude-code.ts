@@ -37,6 +37,7 @@ import {
   type ToolExecutionResult,
   type ToolRegistration,
 } from "@earendil-works/pi-durable";
+import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { createHash } from "node:crypto";
 import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/claude-code-native-tools";
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
@@ -126,6 +127,8 @@ export type ClaudeCodeTurnSpec = {
   onBackgroundWake(wake: ClaudeCodeBackgroundWake): void;
   /** This turn was woken for that query and takes it over; its prompt need not reach a CLI that already knows. */
   backgroundWake: boolean;
+  /** No message the user wrote waits for a reply: an empty answer is this turn's reply, and nothing is posted. */
+  quiet: boolean;
 };
 
 export type ClaudeCodeTransport = {
@@ -356,6 +359,16 @@ const trailingUsers = (messages: readonly Message[]): { start: number; users: Me
   return { start, users: messages.slice(start) };
 };
 
+type MarkedPart = { type: string; text?: string; stella?: { hidden?: boolean } };
+
+const userWrote = (message: Message): boolean => {
+  if (message.role !== "user" || isPiAgentInput(message as unknown as PiUserMessage)) return false;
+  if (typeof message.content === "string") return message.content.trim().length > 0;
+  return (message.content as readonly MarkedPart[]).some(
+    (part) => !part.stella?.hidden && (part.type === "image" || (part.type === "text" && Boolean(part.text?.trim()))),
+  );
+};
+
 const userPrompt = (users: readonly Message[]): { text: string; images: ImageContent[] } => ({
   text: users
     .map((message) => textOf(message.content).trim())
@@ -389,7 +402,7 @@ const deltaPrompt = (delta: readonly Message[]): { text: string; images: ImageCo
     update
       ? `<conversation_updates>\n${
           interrupted
-            ? "Your previous step was interrupted (stopped, paused, or Stella restarted). What happened since, including the results of the tool calls you made; do not repeat them:"
+            ? "Your previous step was interrupted (stopped, or Stella restarted). What happened since, including the results of the tool calls you made; do not repeat them:"
             : "What happened in this conversation since you last saw it:"
         }\n\n${update}\n</conversation_updates>`
       : "",
@@ -708,6 +721,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         nativeTools: request.nativeTools,
         signal: abort.signal,
         backgroundWake,
+        quiet: !conversation.slice(lastReplyAt + 1).some(userWrote),
         onBackgroundWake: (wake) => {
           const text = backgroundWakeText(wake);
           (session.wakes ??= new Set()).add(text.trim());

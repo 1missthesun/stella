@@ -613,6 +613,7 @@ export const runOrchestratorTurn = async (args: {
   const spec = parseCloudOrchestratorCliTurnSpec({
     systemPrompt: input.systemPrompt,
     toolCatalog: input.toolCatalog,
+    quiet: input.quiet,
   });
   if (!spec) {
     return failed(
@@ -760,6 +761,7 @@ export const runOrchestratorTurn = async (args: {
           : {}),
         claudeMcpServerConfig: mcpHost.mcpServerConfig,
         cancellation: turnCancellation,
+        ...(spec.quiet ? { quiet: true } : {}),
         onStreamEvent: (event) => {
           correlator.observeStreamEvent(event);
           if (event.type === "assistant") {

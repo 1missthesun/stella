@@ -38,7 +38,7 @@ export const parseAgentReportId = (
     : null;
 };
 
-export type AgentReportOutcome = Exclude<AgentAttemptOutcome, "paused">;
+export type AgentReportOutcome = AgentAttemptOutcome;
 
 export type DeviceAgentReport = {
   reportId: string;

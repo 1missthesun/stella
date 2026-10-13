@@ -22,7 +22,7 @@ export function desktopAgentsHost(
     /** Stella's agents on another of the owner's computers, run there as a whole. */
     devices?: (deviceId: string) => RemoteAgentHost | undefined;
     agentReported?: StellaAgentsHost["agentReported"];
-    agentPaused?: StellaAgentsHost["agentPaused"];
+    agentStopped?: StellaAgentsHost["agentStopped"];
     beginAgentRun?: StellaAgentsHost["beginAgentRun"];
     endAgentRun?: StellaAgentsHost["endAgentRun"];
     ensureModel?: StellaAgentsHost["ensureModel"];
@@ -44,7 +44,7 @@ export function desktopAgentsHost(
 ): StellaAgentsHost {
   return {
     ...(options.agentReported ? { agentReported: options.agentReported } : {}),
-    ...(options.agentPaused ? { agentPaused: options.agentPaused } : {}),
+    ...(options.agentStopped ? { agentStopped: options.agentStopped } : {}),
     ...(options.beginAgentRun ? { beginAgentRun: options.beginAgentRun } : {}),
     ...(options.endAgentRun ? { endAgentRun: options.endAgentRun } : {}),
     ...(options.ensureModel ? { ensureModel: options.ensureModel } : {}),

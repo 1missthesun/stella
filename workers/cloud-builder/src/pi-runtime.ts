@@ -109,7 +109,7 @@ import type {
   AgentDirectorySessionRow,
   AgentMessageSender,
 } from "@stella/contracts/agent-directory";
-import type { AgentMessageDelivery, AgentPauseResult } from "@stella/contracts/backend/agent-threads";
+import type { AgentMessageDelivery, AgentStopResult } from "@stella/contracts/backend/agent-threads";
 import {
   STELLA_HARNESS_TOOL_NAMES,
   type StellaToolHost,
@@ -198,8 +198,8 @@ const CAPABILITY_RENEW_MS = 60_000;
 /** How long an agent waits for one of the owner's container slots. */
 const CONTAINER_SLOT_WAIT_MS = 10 * 60_000;
 const CONTAINER_SLOT_POLL_MS = 5_000;
-/** How long a computer's pause holds its turn: the run is marked at once, then winds down on its own. */
-const ORIGIN_PAUSE_HOLD_MS = 5_000;
+/** How long a stop holds its turn: the runs are marked at once, then wind down on their own. */
+const ORIGIN_STOP_HOLD_MS = 5_000;
 /** A command without its own timeout. */
 /** Storage key of what agents need between turns. */
 const PI_AGENT_STATE_KEY = "piAgentState";
@@ -261,7 +261,8 @@ export type PiDeviceAgents = {
     authority: PiAuthority,
     parentTurnId: string,
   ): Promise<AgentMessageDelivery | undefined>;
-  pause(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
+  /** Stop it, and every agent it started, wherever they run. */
+  stop(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<AgentStopResult | void>;
 };
 
 /**
@@ -280,7 +281,8 @@ export type PiThreadAgents = {
     parentTurnId: string,
   ): Promise<{ threadId: string }>;
   message(args: { key: string; threadId: string; message: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
-  pause(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<void>;
+  /** Stop it, and every agent it started, wherever they run. */
+  stop(args: { key: string; threadId: string }, authority: PiAuthority, parentTurnId: string): Promise<AgentStopResult | void>;
 };
 
 /** The engine id of `PiThreadAgents` agents in pi's records. */
@@ -304,7 +306,7 @@ export type PiAgentLedgerEvent = {
   turnId: string;
   authority: PiAuthority;
   /** How the run ended; absent when it started. */
-  ended?: { outcome: "completed" | "failed" | "paused"; text?: string };
+  ended?: { outcome: import("@stella/contracts/agent-status").AgentAttemptOutcome; text?: string };
 };
 
 /** One of the orchestrator's agents, as its lifecycle cards name it. */
@@ -316,7 +318,7 @@ export type PiAgentInfo = {
   origin?: AgentOrigin;
   /** What its latest run saved to the owner's drive and linked in its answer. */
   files?: PiDeliveredFile[];
-  /** A message since has it working again: a report or pause of an earlier run does not end it. */
+  /** A message since has it working again: a report or stop of an earlier run does not end it. */
   running?: boolean;
 };
 
@@ -332,7 +334,7 @@ export type PiThreadReport = {
   text: string;
   /** How the run it reports ended. */
   status?: import("@stella/contracts/agent-status").AgentAttemptOutcome;
-  /** One of its messages was answered within another report, or its run was paused. */
+  /** One of its messages was answered within another report, or its run was stopped. */
   settled?: true;
   /** The attempt whose message it answers, when known. */
   attemptGeneration?: number;
@@ -424,10 +426,10 @@ export type PiRuntimeOptions = {
   /** An agent started work (a spawn or a follow-up), during or just after `turnId`. */
   agentStarted?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
   /**
-   * An agent was paused before it answered and is not running again: no
+   * An agent was stopped before it answered and is not running again: no
    * report wakes the orchestrator, but its lifecycle cards still end.
    */
-  agentPaused?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
+  agentStopped?(event: PiAgentInfo & { threadId: string; turnId: string }): void;
   /** One of Stella's own agents started or stopped running: `runningAgents` changed. */
   agentsChanged?(): void;
   /** A run of an agent here started or ended (`PiAgentLedgerEvent`). */
@@ -450,10 +452,10 @@ export type PiRuntimeOptions = {
       authority: PiAuthority,
       args: { messageId: string; to: string; text: string; from: AgentMessageSender },
     ): Promise<AgentMessageDelivery>;
-    pause(
+    stop(
       authority: PiAuthority,
-      args: { controlRequestId: string; threadId: string },
-    ): Promise<AgentPauseResult>;
+      args: { controlRequestId: string; threadId: string; requesterThreadId?: string },
+    ): Promise<AgentStopResult>;
   };
   /**
    * Stella moves herself to one of the owner's computers: the conversation's
@@ -647,7 +649,7 @@ type Opened = {
   root: Conversation;
   rootSession: string;
   refreshTools(): void;
-  agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "pauseAgent" | "agentStanding" | "markCatchUp">;
+  agents: Pick<OpenStellaHarness, "startAgent" | "messageAgent" | "stopAgent" | "agentStanding" | "markCatchUp">;
 };
 
 /** A cloud tool as the harness offers it. */
@@ -1246,10 +1248,10 @@ export class PiConversationRuntime {
         if (cardTurnId) this.#options.agentStarted?.({ threadId: run.threadId, turnId: cardTurnId, ...info });
         this.#options.agentsChanged?.();
       },
-      agentPaused: async ({ threadId }, context) => {
+      agentStopped: async ({ threadId }, context) => {
         const info = await this.#agentInfo(threadId, context);
         const turnId = this.#cardTurnId(threadId, info);
-        if (turnId) this.#options.agentPaused?.({ threadId, turnId, ...info });
+        if (turnId) this.#options.agentStopped?.({ threadId, turnId, ...info });
       },
       endAgentRun: async (run, context, end) => {
         let ended: ActiveRun | undefined;
@@ -1359,11 +1361,12 @@ export class PiConversationRuntime {
           from,
         });
       },
-      pause: async ({ key, threadId }) => {
+      stop: async ({ key, threadId, requesterThreadId }) => {
         const { authority } = await this.#agentState();
-        return await threads.pause(authority, {
-          controlRequestId: `pi-pause:${authority.conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128),
+        return await threads.stop(authority, {
+          controlRequestId: `pi-stop:${authority.conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128),
           threadId,
+          ...(requesterThreadId ? { requesterThreadId } : {}),
         });
       },
     };
@@ -1387,9 +1390,9 @@ export class PiConversationRuntime {
         const { authority, parentTurnId } = await scope();
         await threads.message(args, authority, parentTurnId);
       },
-      pause: async (threadId) => {
+      stop: async (threadId) => {
         const { authority, parentTurnId } = await scope();
-        await threads.pause({ key: `pause:${threadId}:${Date.now()}`, threadId }, authority, parentTurnId);
+        return await threads.stop({ key: `stop:${threadId}:${Date.now()}`, threadId }, authority, parentTurnId);
       },
     };
   }
@@ -1424,9 +1427,9 @@ export class PiConversationRuntime {
         const { authority, parentTurnId } = await scope();
         return await devices.message(args, authority, parentTurnId);
       },
-      pause: async (threadId) => {
+      stop: async (threadId) => {
         const { authority, parentTurnId } = await scope();
-        await devices.pause({ key: `pause:${threadId}:${Date.now()}`, threadId }, authority, parentTurnId);
+        return await devices.stop({ key: `stop:${threadId}:${Date.now()}`, threadId }, authority, parentTurnId);
       },
     };
   }
@@ -1526,7 +1529,7 @@ export class PiConversationRuntime {
     const active = await this.#agentRun(sessionId, context.abortSignal);
     const held = await this.#lease(agentConversationId, active, context);
     held.inFlight += 1;
-    // A pause or stop while the command runs takes the container's work down
+    // A stop while the command runs takes the container's work down
     // with it, unsaved, rather than waiting for the command to finish.
     const signal = context.abortSignal;
     const stop = () => {
@@ -1943,7 +1946,7 @@ export class PiConversationRuntime {
       if (kept) this.#state = kept;
       this.#setModels(kept);
       const storage = await openDurableObjectSqliteStorage(this.#options.storage);
-      const { harness, refreshTools, startAgent, messageAgent, pauseAgent, agentStanding, markCatchUp } = await openStellaHarness(
+      const { harness, refreshTools, startAgent, messageAgent, stopAgent, agentStanding, markCatchUp } = await openStellaHarness(
         {
           storage,
           models: this.#models,
@@ -1977,7 +1980,7 @@ export class PiConversationRuntime {
         root,
         rootSession,
         refreshTools,
-        agents: { startAgent, messageAgent, pauseAgent, agentStanding, markCatchUp },
+        agents: { startAgent, messageAgent, stopAgent, agentStanding, markCatchUp },
       };
     })().catch((error: unknown) => {
       this.#opening = undefined;
@@ -2263,12 +2266,12 @@ export class PiConversationRuntime {
     await (await harness.conversation(conversationId, context))?.abort(context);
   }
 
-  /** Pause an agent thread's agent: its run is marked at once, then winds down on its own. */
-  async pauseThreadAgent(threadId: string, context: Context): Promise<void> {
+  /** Stop an agent thread's agent and the agents below it: the runs are marked at once, then wind down on their own. */
+  async stopThreadAgent(threadId: string, context: Context): Promise<void> {
     const { agents } = await this.open();
-    const paused = agents.pauseAgent(threadId, context);
-    paused.catch((error: unknown) => this.#options.report(error));
-    await Promise.race([paused, waitFor(ORIGIN_PAUSE_HOLD_MS)]);
+    const stopped = agents.stopAgent(threadId, context);
+    stopped.catch((error: unknown) => this.#options.report(error));
+    await Promise.race([stopped, waitFor(ORIGIN_STOP_HOLD_MS)]);
   }
 
   async controlHarnessAgent(
@@ -2277,11 +2280,11 @@ export class PiConversationRuntime {
       ownerGeneration: string;
       threadId: string;
       commandId: string;
-      kind: "message" | "pause";
+      kind: "message" | "stop";
       text?: string;
     },
     context: Context,
-  ): Promise<"steered" | "resumed" | "paused" | "not_running" | "not_found"> {
+  ): Promise<"steered" | "resumed" | "stopped" | "not_running" | "not_found"> {
     const kept = this.#state ?? (await this.#options.storage.get<PiAgentState>(PI_AGENT_STATE_KEY));
     if (!kept || kept.authority.ownerId !== input.ownerId || kept.authority.ownerGeneration !== input.ownerGeneration) {
       return "not_found";
@@ -2290,12 +2293,12 @@ export class PiConversationRuntime {
     const standing = await agents.agentStanding(input.threadId, context);
     if (!standing) return "not_found";
     const running = standing.status === "running";
-    if (input.kind === "pause") {
+    if (input.kind === "stop") {
       if (!running) return "not_running";
-      const paused = agents.pauseAgent(input.threadId, context);
-      paused.catch((error: unknown) => this.#options.report(error));
-      await Promise.race([paused, waitFor(ORIGIN_PAUSE_HOLD_MS)]);
-      return "paused";
+      const stopped = agents.stopAgent(input.threadId, context);
+      stopped.catch((error: unknown) => this.#options.report(error));
+      await Promise.race([stopped, waitFor(ORIGIN_STOP_HOLD_MS)]);
+      return "stopped";
     }
     await agents.messageAgent(
       { key: `control:${input.commandId}`, threadId: input.threadId, message: input.text ?? "", fromOrchestrator: true },

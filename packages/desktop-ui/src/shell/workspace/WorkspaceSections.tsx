@@ -98,7 +98,7 @@ const EMPTY_FILES: ReadonlyArray<ConversationFileEntry> = [];
 const EMPTY_UPDATES: ReadonlyArray<string> = [];
 /** Agent-authored messages shown under an expanded RUNNING agent. */
 const AGENT_UPDATE_CAP = 1;
-// Terminal (done / failed / paused / canceled) agents drop out of the activity
+// Terminal (done / failed / stopped) agents drop out of the activity
 // index this long after their last activity; running agents are never hidden,
 // and a re-activation moves the row back to the running list (resetting this).
 // It used to be shared with the shell's right-workspace visibility; that

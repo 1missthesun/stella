@@ -16,7 +16,7 @@ import { DurableObject } from "cloudflare:workers";
 import { DeviceRequestRelay } from "../device-request-relay.js";
 import type {
   AgentMessageDeviceOutcome,
-  AgentPauseDeviceOutcome,
+  AgentStopDeviceOutcome,
 } from "@stella/contracts/turn-plane/placement";
 import { sha256Hex } from "@stella/contracts/turn-plane/pairing-proof";
 import { OwnerFenceStore } from "../owner-fence-store.js";
@@ -78,10 +78,10 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     string,
     (outcome: AgentMessageDeviceOutcome) => void
   >();
-  /** Local-agent pauses waiting for `agent-pause.ack`, by device and command. */
-  protected readonly localAgentPauseAcks = new Map<
+  /** Local-agent stops waiting for `agent-pause.ack`, by device and command. */
+  protected readonly localAgentStopAcks = new Map<
     string,
-    (outcome: AgentPauseDeviceOutcome) => void
+    (outcome: AgentStopDeviceOutcome) => void
   >();
   protected deviceRequestRelayState?: DeviceRequestRelay;
   protected ownerStoreState?: OwnerStore;

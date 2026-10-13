@@ -31,8 +31,8 @@ const statusLabel = (status: ReplyAgentStatus | undefined) =>
     ? "Working"
     : status === "error"
       ? "Failed"
-      : status === "paused"
-        ? "Paused"
+      : status === "canceled"
+        ? "Stopped"
         : "Done";
 
 export function ReplyPreview({
@@ -82,7 +82,7 @@ export function ReplyPreview({
                 <ActivityIndicator size="small" color={colors.textMuted} style={styles.spinner} />
               ) : (
                 <Icon
-                  name={status === "error" ? "alert-circle" : status === "paused" ? "pause" : "check"}
+                  name={status === "error" ? "alert-circle" : status === "canceled" ? "circle" : "check"}
                   size={14}
                   color={status === "error" ? colors.danger : colors.textMuted}
                 />

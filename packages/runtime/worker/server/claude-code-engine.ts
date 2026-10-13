@@ -246,6 +246,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         nativeToolCallIds: true,
         boundToolInactivity: false,
         allowEmptyFinal: true,
+        ...(spec.quiet ? { quietFinal: true } : {}),
         ...(ref.role === "worker" ? { autoCompactWindowTokens: CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW } : {}),
         abortSignal: spec.signal,
         holdOnUsageLimit: true,

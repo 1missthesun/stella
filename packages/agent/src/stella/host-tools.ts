@@ -29,7 +29,7 @@ export type StellaToolRole = "orchestrator" | "general";
 export const STELLA_HARNESS_TOOL_NAMES: ReadonlySet<string> = new Set([
   "spawn_agent",
   "send_message",
-  "pause_agent",
+  "stop_agent",
   "agent_status",
   "Bash",
   "exec_command",

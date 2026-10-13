@@ -16,7 +16,7 @@ import {
   type AgentControlCommand,
   type AgentControlResult,
   type AgentMessageDelivery,
-  type AgentPauseResult,
+  type AgentStopResult,
 } from "@stella/contracts/backend/agent-threads";
 
 /** The longest a framed message gets: the text plus its `<agent-message>` envelope. */
@@ -61,25 +61,15 @@ export const sendAgentMessage = async (
   return agentMessageDelivery(result);
 };
 
-/** `pause_agent` for an agent wherever it runs, through the owner's one control path. */
-export const pauseAgentThread = async (
+/** `stop_agent` for an agent and every agent below it, wherever they run, through the owner's agent threads. */
+export const stopAgentThread = async (
   caller: AgentMessagingCaller,
-  input: { conversationId: string; threadId: string; controlRequestId: string },
-): Promise<AgentPauseResult> => {
-  const result = await controlAgentThread(caller, {
-    conversationId: input.conversationId,
-    threadId: input.threadId,
-    commandId: input.controlRequestId,
-    command: { kind: "pause" },
-  });
-  return {
-    threadId: result.threadId,
-    outcome:
-      result.outcome === "held" || result.outcome === "not_running" ? result.outcome : "paused",
-    where: result.where ?? "in Stella's cloud",
-    ...(result.note ? { note: result.note } : {}),
-  };
-};
+  input: { conversationId: string; threadId: string; controlRequestId: string; requesterThreadId?: string },
+): Promise<AgentStopResult> =>
+  (await caller.ownerInternal("agentThreads.stop", {
+    ownerGeneration: caller.ownerGeneration,
+    ...input,
+  })) as AgentStopResult;
 
 export const controlAgentThread = async (
   caller: AgentMessagingCaller,

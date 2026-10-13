@@ -33,8 +33,7 @@ export type AgentActivityStatus =
   | "running"
   | "completed"
   | "error"
-  | "canceled"
-  | "paused";
+  | "canceled";
 
 export type AgentActivityEntry = {
   agentId: string;

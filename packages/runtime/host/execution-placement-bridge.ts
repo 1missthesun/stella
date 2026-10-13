@@ -1,7 +1,7 @@
 import {
-  AGENT_PAUSED_ERROR_CODE,
-  AGENT_PAUSED_REASON,
-  isAgentPauseReason,
+  AGENT_STOPPED_ERROR_CODE,
+  AGENT_STOPPED_REASON,
+  isAgentStopReason,
 } from "@stella/contracts/agent-status";
 import { socketCredentialProtocol } from "@stella/contracts/socket-ticket";
 import { createHash } from "node:crypto";
@@ -26,7 +26,7 @@ import {
   dispatchPath,
   executionDeviceRegistration,
   type AgentMessageDeviceOutcome,
-  type AgentPauseDeviceOutcome,
+  type AgentStopDeviceOutcome,
   type DeviceAvailability,
   type DevicePresenceDeviceFrame,
   type DevicePresenceServerFrame,
@@ -90,19 +90,21 @@ export type ExecutionPlacementDesktopSubmit = {
 export type ExecutionPlacementAvailability = DeviceAvailability;
 
 /**
- * How a gate-side cancel is recorded: a pause (the gate's cancel reason is the
- * pause reason) keeps its AGENT_PAUSED code, so the local run stops paused.
+ * How a gate-side cancel is recorded: a stop (the gate's cancel reason is a
+ * stop's) keeps its stop code, so the local run and the agents it started
+ * stop, and the attempt reports to no one.
  */
 const remoteCancellation = (
   remote: Pick<DispatchSummary, "cancelReason"> | null | undefined,
 ): { errorCode?: string; errorMessage: string } =>
-  isAgentPauseReason(remote?.cancelReason)
-    ? { errorCode: AGENT_PAUSED_ERROR_CODE, errorMessage: AGENT_PAUSED_REASON }
+  isAgentStopReason(remote?.cancelReason)
+    ? { errorCode: AGENT_STOPPED_ERROR_CODE, errorMessage: AGENT_STOPPED_REASON }
     : { errorMessage: "Canceled by the user." };
 
 export type ExecutionPlacementRunResult = {
-  /** `paused`: someone paused it before it answered; it resumes with a message. */
-  status: "ok" | "error" | "canceled" | "paused";
+  status: "ok" | "error" | "canceled";
+  /** With `canceled`: `stop_agent` stopped it before it answered; it resumes with a message. */
+  stopped?: boolean;
   finalText?: string;
   error?: string;
 };
@@ -169,8 +171,8 @@ type PlacementBridgeOptions = {
     conversationId: string;
     /** The accepted payload, for an agent thread's own local id. */
     payload?: Record<string, unknown>;
-    /** The gate withdrew it for a pause: the run stops paused, not canceled. */
-    paused?: boolean;
+    /** The gate withdrew it for a `stop_agent`: the agents it started here stop too. */
+    stopped?: boolean;
   }) => Promise<void>;
   /**
    * New input for an accepted agent run. Resolves whether the running agent
@@ -194,13 +196,14 @@ type PlacementBridgeOptions = {
     ownerGeneration: string;
   }) => Promise<AgentMessageDeviceOutcome>;
   /**
-   * A `pause_agent` for an agent this computer runs on its own (no
-   * dispatch), from wherever the conversation runs now: stop it if running.
+   * A `stop_agent` for an agent this computer runs on its own (no
+   * dispatch), from wherever the conversation runs now: stop it and the
+   * agents it started here.
    */
-  pauseLocalAgent?: (args: {
+  stopLocalAgent?: (args: {
     threadId: string;
     ownerGeneration: string;
-  }) => Promise<AgentPauseDeviceOutcome>;
+  }) => Promise<AgentStopDeviceOutcome>;
   /**
    * Something tried to dispatch work here and this computer has not agreed to
    * accept any. The host shows the question on this machine's own screen and
@@ -990,7 +993,7 @@ export class ExecutionPlacementBridge {
       await this.deliverAgentMessage(frame);
     },
     "agent-pause": async (frame) => {
-      await this.pauseLocalAgent(frame);
+      await this.stopLocalAgent(frame);
     },
     "consent.request": (frame) => {
       // Only raise the question. This computer answers when its own user
@@ -1086,27 +1089,28 @@ export class ExecutionPlacementBridge {
     this.send({ type: "agent-message.ack", messageId, threadId, outcome });
   }
 
-  /** Pause one of this computer's own agents, then report back. */
-  private async pauseLocalAgent(
+  /** Stop one of this computer's own agents and those it started, then report back. */
+  private async stopLocalAgent(
     frame: Extract<DevicePresenceServerFrame, { type: "agent-pause" }>,
   ): Promise<void> {
     const { commandId, threadId } = frame;
     if (typeof commandId !== "string" || typeof threadId !== "string") return;
-    let outcome: AgentPauseDeviceOutcome = "refused";
+    let outcome: AgentStopDeviceOutcome = "refused";
     if (
       frame.ownerGeneration === this.ownerGeneration &&
-      this.options.pauseLocalAgent
+      this.options.stopLocalAgent
     ) {
       try {
-        outcome = await this.options.pauseLocalAgent({
+        outcome = await this.options.stopLocalAgent({
           threadId,
           ownerGeneration: frame.ownerGeneration,
         });
       } catch (error) {
-        this.log("warn", "An agent pause was not applied.", error);
+        this.log("warn", "An agent stop was not applied.", error);
       }
     }
-    this.send({ type: "agent-pause.ack", commandId, threadId, outcome });
+    // Gates from before `stop_agent` read a stop's ack as `paused`.
+    this.send({ type: "agent-pause.ack", commandId, threadId, outcome: outcome === "stopped" ? "paused" : outcome });
   }
 
   private settleClaim(
@@ -1636,7 +1640,7 @@ export class ExecutionPlacementBridge {
           kind: row.kind,
           conversationId: row.conversationId,
           ...(payload ? { payload } : {}),
-          ...(row.errorCode === AGENT_PAUSED_ERROR_CODE ? { paused: true } : {}),
+          ...(row.errorCode === AGENT_STOPPED_ERROR_CODE ? { stopped: true } : {}),
         });
       } catch (error) {
         this.log(
@@ -2080,8 +2084,8 @@ export class ExecutionPlacementBridge {
         }
         return;
       }
-      const paused = result.status === "paused";
-      const canceled = result.status === "canceled" || paused;
+      const stopped = result.status === "canceled" && result.stopped === true;
+      const canceled = result.status === "canceled";
       const failed = result.status === "error";
       const resultJson =
         result.status === "ok"
@@ -2091,7 +2095,7 @@ export class ExecutionPlacementBridge {
         outcome: canceled ? "canceled" : failed ? "failed" : "completed",
         ...(resultJson ? { resultJson } : {}),
         ...(failed ? { errorCode: "LOCAL_EXECUTION_FAILED" } : {}),
-        ...(paused ? { errorCode: AGENT_PAUSED_ERROR_CODE } : {}),
+        ...(stopped ? { errorCode: AGENT_STOPPED_ERROR_CODE } : {}),
         ...((failed || canceled) && (result.error || result.finalText)
           ? { errorMessage: boundedResult(result.error || result.finalText) }
           : {}),

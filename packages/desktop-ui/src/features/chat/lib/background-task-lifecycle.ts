@@ -51,7 +51,7 @@ export type BackgroundTaskLifecycleIndex = {
 
 export type ResolvedBackgroundTaskCardLifecycle = {
   completedThreadIds: string[];
-  pausedThreadIds: string[];
+  stoppedThreadIds: string[];
   failedThreadIds: string[];
   progressTexts: Record<string, string>;
   toolActivities: Record<string, TaskToolActivity>;
@@ -399,7 +399,7 @@ export const resolveBackgroundTaskCardLifecycle = (
 ): ResolvedBackgroundTaskCardLifecycle => {
   const resolved: ResolvedBackgroundTaskCardLifecycle = {
     completedThreadIds: [],
-    pausedThreadIds: [],
+    stoppedThreadIds: [],
     failedThreadIds: [],
     progressTexts: {},
     toolActivities: {},
@@ -423,7 +423,7 @@ export const resolveBackgroundTaskCardLifecycle = (
       resolved.completedThreadIds.push(threadId);
       if (state.completion) resolved.completionSections.push(state.completion);
     } else if (state.status === "canceled") {
-      resolved.pausedThreadIds.push(threadId);
+      resolved.stoppedThreadIds.push(threadId);
     } else if (state.status === "failed") {
       resolved.failedThreadIds.push(threadId);
     }

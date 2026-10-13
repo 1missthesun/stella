@@ -246,7 +246,7 @@
         "showReport": "More",
         "statusDone": "Done",
         "statusFailed": "Failed",
-        "statusPaused": "Paused",
+        "statusStopped": "Stopped",
         "statusRunning": "Working"
       },
       "screenshotPreview": {

@@ -27,42 +27,49 @@ export const readAgentMessageDelivery = (
   return { ...rest, outcome: delivered };
 };
 
-export { AGENT_PAUSED_REASON } from "../agent-status.js";
+/** The status an attempt ends in, from the outcome its runtime reported in any host's words. */
+export const agentThreadTerminalStatus = (status: string): AgentAttemptOutcome => agentAttemptOutcomeOf({ status });
 
 /**
- * The status an attempt ends in, from the outcome its runtime reported: a
- * `paused` outcome, or a cancel an older runtime tagged as a pause.
- */
-export const agentThreadTerminalStatus = (
-  status: "completed" | "failed" | "canceled" | "paused",
-  reason?: string | null,
-): AgentAttemptOutcome => agentAttemptOutcomeOf({ status, reason });
-
-/**
- * How a `pause_agent` landed, from any of the owner's hosts:
- * - `paused`: it stopped, or is marked paused and stops the moment its
+ * How a `stop_agent` landed, from any of the owner's hosts:
+ * - `stopped`: it stopped, or is recorded stopped and stops the moment its
  *   computer next connects (`note` says so).
- * - `held`: it runs on a computer that is offline; the pause is kept and
+ * - `held`: it runs on a computer that is offline; the stop is kept and
  *   applied as soon as that computer reconnects.
  * - `not_running`: nothing was running.
+ * `stopped` lists the agents it started, at any depth, that stopped with it.
  */
-export type AgentPauseResult = {
+export type AgentStopResult = {
   threadId: string;
-  outcome: "paused" | "held" | "not_running";
+  outcome: "stopped" | "held" | "not_running";
   /** Where it runs: "in Stella's cloud", "on omarchy". */
   where: string;
   note?: string;
+  descendants?: Array<{ threadId: string; outcome: "stopped" | "held" | "not_running"; where: string }>;
 };
 
-/** What `pause_agent` tells the model about a pause the owner's agent threads made. */
-export const agentPauseText = (result: AgentPauseResult): string => {
+/** A stop result from a backend that still answered in pause words. */
+export const readAgentStopResult = (result: AgentStopResult | (Omit<AgentStopResult, "outcome"> & { outcome: string })): AgentStopResult => ({
+  ...result,
+  outcome: result.outcome === "held" || result.outcome === "not_running" ? result.outcome : "stopped",
+});
+
+/** What `stop_agent` tells the model about a stop the owner's agent threads made. */
+export const agentStopText = (raw: AgentStopResult): string => {
+  const result = readAgentStopResult(raw);
   const head =
-    result.outcome === "paused"
-      ? `Paused ${result.threadId}, which runs ${result.where}.`
+    result.outcome === "stopped"
+      ? `Stopped ${result.threadId}, which runs ${result.where}.`
       : result.outcome === "held"
-        ? `The pause for ${result.threadId}, which runs ${result.where}, is recorded.`
+        ? `The stop for ${result.threadId}, which runs ${result.where}, is recorded.`
         : `${result.threadId}, which runs ${result.where}, was not running.`;
-  return [head, result.note, result.outcome === "not_running" ? "" : "Resume it later with send_message."]
+  const below = (result.descendants ?? []).filter((agent) => agent.outcome !== "not_running");
+  return [
+    head,
+    result.note,
+    below.length ? `Stopped with it: ${below.map((agent) => `${agent.threadId} (${agent.where}${agent.outcome === "held" ? ", once it reconnects" : ""})`).join(", ")}.` : "",
+    "Each keeps its history; send_message resumes it.",
+  ]
     .filter(Boolean)
     .join(" ");
 };
@@ -70,7 +77,8 @@ export const agentPauseText = (result: AgentPauseResult): string => {
 export type AgentControlCommand =
   | { kind: "message"; text: string; from: AgentMessageSender }
   | { kind: "resume"; text?: string; from: AgentMessageSender }
-  | { kind: "pause" };
+  /** `stop_agent`; recorded as `pause` by builds before it, which the outbox still reads. */
+  | { kind: "stop" };
 
 export type AgentControlExecutor = "cloud" | "harness" | "dispatch" | "local";
 
@@ -79,7 +87,7 @@ export type AgentControlOutcome =
   | "resumed"
   | "queued"
   | "held"
-  | "paused"
+  | "stopped"
   | "not_running"
   | "running";
 
@@ -211,10 +219,24 @@ export type AgentThreadCalls = {
     result: AgentMessageDelivery;
   };
   /**
-   * `pause_agent` for any of the owner's agents, from any of the owner's
-   * hosts: it reaches the agent wherever it runs, and is held for a
-   * computer that is offline. Idempotent per `controlRequestId`.
+   * `stop_agent` for any of the owner's agents, from any of the owner's
+   * hosts: it stops the agent's run and every run below it, at any depth,
+   * wherever each runs, and is held for a computer that is offline. Nothing
+   * is deleted; a message resumes each. Idempotent per `controlRequestId`.
+   * `requesterThreadId`: the agent asking, when not Stella; it may stop only
+   * agents it started, at any depth.
    */
+  "agentThreads.stop": {
+    args: {
+      ownerGeneration: string;
+      conversationId: string;
+      threadId: string;
+      controlRequestId: string;
+      requesterThreadId?: string;
+    };
+    result: AgentStopResult;
+  };
+  /** `agentThreads.stop` under the name builds before `stop_agent` call; it answers in their words. */
   "agentThreads.pause": {
     args: {
       ownerGeneration: string;
@@ -222,7 +244,7 @@ export type AgentThreadCalls = {
       threadId: string;
       controlRequestId: string;
     };
-    result: AgentPauseResult;
+    result: Omit<AgentStopResult, "outcome"> & { outcome: "paused" | "held" | "not_running" };
   };
   "agentThreads.control": {
     args: {
@@ -239,7 +261,7 @@ export type AgentThreadCalls = {
    * `fromDeviceId`, which holds it: `targetDeviceId` (a device, or "cloud")
    * holds it from now on, takes its log after the newest seq it has, and
    * continues the same thread with `prompt`. Its later reports, messages and
-   * pauses go there. Idempotent per `handoffId`.
+   * stops go there. Idempotent per `handoffId`.
    */
   "agentThreads.handoff": {
     args: {
@@ -261,7 +283,7 @@ export type AgentThreadCalls = {
   };
   /**
    * Stop a running remote thread from any desktop of the owner, for a
-   * thread its conversation started; it is recorded paused. Idempotent per
+   * thread its conversation started; it is recorded stopped. Idempotent per
    * request id.
    */
   "agentThreads.cancel": {
@@ -306,12 +328,8 @@ export type AgentThreadCalls = {
       ownerGeneration: string;
       originDeviceId: string;
       attemptGeneration: number;
-      /**
-       * `paused` from builds with the shared vocabulary; older ones send a
-       * pause as `canceled` with `AGENT_PAUSED_REASON`, which still reads as
-       * paused.
-       */
-      status: AgentAttemptOutcome;
+      /** Builds before `stop_agent` send a stopped attempt as `paused`, which reads as `canceled`. */
+      status: AgentAttemptOutcome | "paused";
       result?: string;
       error?: string;
     };
@@ -333,7 +351,7 @@ export type AgentThreadCalls = {
   };
   /**
    * The agents the owner's records say are running on this computer, for it
-   * to settle the ones it no longer runs (after a crash, or a pause that
+   * to settle the ones it no longer runs (after a crash, or a stop that
    * never reached the cloud).
    */
   "computerThreads.running": {
@@ -344,7 +362,7 @@ export type AgentThreadCalls = {
 
 export type ComputerThreadRecord = {
   threadId: string;
-  /** In the words builds before the shared vocabulary read: a pause reads as `canceled`. */
+  /** In the words builds before the shared vocabulary read. */
   status: "running" | "completed" | "error" | "canceled";
   /** The thread's status in the shared vocabulary; absent from older backends. */
   agentStatus?: AgentStatus;

@@ -32,9 +32,9 @@ export type CloudAgentLifecycleEvent =
   | {
       type: "agent-failed" | "agent-canceled";
       /**
-       * `status` says how the attempt ended in the shared vocabulary. A pause
-       * is an `agent-canceled` card with `status: "paused"`, so a client that
-       * reads only the type still sees the agent stop.
+       * `status` says how the attempt ended in the shared vocabulary. Builds
+       * before `stop_agent` wrote `status: "paused"` on a stop's card, which
+       * reads as `canceled`.
        */
       payload: LifecycleIdentity & { error?: string; status?: AgentAttemptOutcome };
     };

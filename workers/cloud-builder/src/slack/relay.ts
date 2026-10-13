@@ -94,7 +94,7 @@ const AGENT_TOOLS = new Set([
   "spawn_agent",
   "send_message",
   "agent_status",
-  "pause_agent",
+  "stop_agent",
 ]);
 
 const errorText = (error: unknown): string =>

@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
 import { hostname } from "node:os";
-import { AGENT_PAUSED_REASON } from "@stella/contracts/agent-status";
+import { AGENT_STOP_WIRE_REASON } from "@stella/contracts/agent-status";
 import { readAgentLineage } from "@stella/contracts/agent-depth";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,7 +85,7 @@ import type {
 } from "@stella/contracts/scheduling";
 import type {
   AgentMessageDeviceOutcome,
-  AgentPauseDeviceOutcome,
+  AgentStopDeviceOutcome,
   DispatchPayload,
   DispatchSummary,
 } from "@stella/contracts/turn-plane/placement";
@@ -986,6 +986,7 @@ export class StellaRuntimeHost {
             status: string;
             finalText?: string;
             error?: string;
+            stopped?: boolean;
           }>(
             METHOD_NAMES.INTERNAL_WORKER_RUN_BLOCKING_AGENT,
             {
@@ -1022,10 +1023,11 @@ export class StellaRuntimeHost {
           if (result.status === "ok") {
             return { status: "ok", finalText: result.finalText };
           }
-          if (result.status === "canceled" || result.status === "paused") {
+          if (result.status === "canceled") {
             return {
-              status: result.status,
+              status: "canceled",
               error: result.error || "The agent was stopped.",
+              ...(result.stopped ? { stopped: true } : {}),
             };
           }
           return {
@@ -1140,11 +1142,11 @@ export class StellaRuntimeHost {
         );
         return result?.outcome ?? "refused";
       },
-      pauseLocalAgent: async ({ threadId, ownerGeneration }) => {
+      stopLocalAgent: async ({ threadId, ownerGeneration }) => {
         const result = await this.requestWorker<{
-          outcome?: AgentPauseDeviceOutcome;
+          outcome?: AgentStopDeviceOutcome;
         } | null>(
-          METHOD_NAMES.INTERNAL_WORKER_PAUSE_LOCAL_AGENT,
+          METHOD_NAMES.INTERNAL_WORKER_STOP_LOCAL_AGENT,
           { threadId, ownerGeneration },
           {
             ensureWorker: true,
@@ -1159,15 +1161,15 @@ export class StellaRuntimeHost {
         kind,
         conversationId,
         payload,
-        paused,
+        stopped,
       }) => {
         if (kind === "agent") {
           const remoteThreadId =
             typeof payload?.threadId === "string" && payload.threadId.trim()
               ? payload.threadId.trim()
               : null;
-          const reason = paused
-            ? AGENT_PAUSED_REASON
+          const reason = stopped
+            ? AGENT_STOP_WIRE_REASON
             : "Canceled by execution placement.";
           const result = remoteThreadId
             ? await this.cancelBlockingLocalAgent(

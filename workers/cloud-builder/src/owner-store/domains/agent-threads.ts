@@ -24,10 +24,18 @@ import {
   type ClaudeUsageLimit,
   type ClaudeUsageLimitCard,
 } from "@stella/contracts/claude-usage-limit";
-import { agentAttemptOutcomeOf, agentStatusOf, isLiveAgentStatus } from "@stella/contracts/agent-status";
 import {
-  AGENT_PAUSED_REASON,
+  AGENT_STOPPED_ERROR_CODE,
+  AGENT_STOP_WIRE_REASON,
+  AGENT_STOPPED_REASON,
+  agentAttemptOutcomeOf,
+  agentStatusOf,
+  isAgentStopReason,
+  isLiveAgentStatus,
+} from "@stella/contracts/agent-status";
+import {
   agentThreadTerminalStatus,
+  readAgentStopResult,
   newAgentThreadId,
   type AgentControlCommand,
   type AgentControlExecutor,
@@ -218,19 +226,30 @@ const COMMAND_RETRY_MS = 10_000;
 const commandJobId = (commandId: string): string => `devmsg:${commandId}`;
 /**
  * How long a held command waits for its computer: a message is stale after
- * an hour, while a pause holds until the computer is back, so an agent on a
+ * an hour, while a stop holds until the computer is back, so an agent on a
  * laptop that slept over the weekend still stops when it wakes.
  */
 const COMMAND_WAIT_MS: Record<AgentControlCommand["kind"], number> = {
   message: 60 * 60_000,
   resume: 60 * 60_000,
-  pause: 7 * 24 * 60 * 60_000,
+  stop: 7 * 24 * 60 * 60_000,
 };
 const COMMAND_TTL_MS = 8 * 24 * 60 * 60_000;
+/** `paused` is a stopped attempt from builds before `stop_agent`, which the migration renames. */
 const TERMINAL_STATUSES = new Set(["completed", "failed", "canceled", "paused"]);
-type TerminalStatus = "completed" | "failed" | "canceled" | "paused";
-/** What a paused attempt's journal card says. */
-const PAUSED_CARD_TEXT = "Paused.";
+type TerminalStatus = "completed" | "failed" | "canceled";
+
+/**
+ * The error an ended attempt is recorded with: a stop's (`stop_agent`, in
+ * any build's words) is `AGENT_STOPPED_REASON`, which no report is derived
+ * for, so a stopped agent never wakes the one that started it.
+ */
+const endedError = (
+  reported: { status: string; errorMessage?: string | null; errorCode?: string | null },
+): string | null =>
+  reported.status === "paused" || reported.errorCode === AGENT_STOPPED_ERROR_CODE || isAgentStopReason(reported.errorMessage)
+    ? AGENT_STOPPED_REASON
+    : (reported.errorMessage ?? null);
 const ACTIVE_STATUSES = new Set(["running", "resuming"]);
 
 /** Threads that run on one of the owner's devices for someone else. */
@@ -405,7 +424,7 @@ const CARD_REPORT_MAX_CHARS = 2_000;
  * desktop started, whose report goes to that desktop rather than waking the
  * conversation. The conversation's running-agent list (what a phone's top bar
  * counts) is folded from its journal, so without these an agent that ended
- * without a wake prompt (paused, or canceled when Stella quit) read as running
+ * without a wake prompt (stopped, or canceled when Stella quit) read as running
  * for good.
  */
 const agentLifecycleCard = (
@@ -417,9 +436,7 @@ const agentLifecycleCard = (
   const text =
     outcome.kind === "started"
       ? ""
-      : outcome.kind === "paused"
-        ? PAUSED_CARD_TEXT
-        : clip(outcome.text?.trim() ?? "", CARD_REPORT_MAX_CHARS);
+      : clip(outcome.text?.trim() ?? "", CARD_REPORT_MAX_CHARS);
   return {
     sourceTurnId: `thread:${row.thread_id}:${row.attempt_generation}`,
     card: {
@@ -795,7 +812,7 @@ const settleDeviceAttempt = async (
   const turn = readTurn(ctx.db, turnId);
   if (!turn?.thread_id || TERMINAL_STATUSES.has(turn.status)) return;
   const errorMessage =
-    status === "completed" || status === "paused"
+    status === "completed"
       ? null
       : clip(outcome.errorMessage?.trim() || `The agent ${status === "canceled" ? "was stopped" : "failed"}.`, 2_000);
   recordAgentChange(
@@ -842,17 +859,17 @@ const deviceSettled = async (ctx: OwnerContext, raw: unknown): Promise<{ settled
   if (!turn || TERMINAL_STATUSES.has(turn.status)) return { settled: false };
   const unavailable = args.state === "blocked" && DEVICE_AVAILABILITY_CODES.has(args.errorCode ?? "");
   if (unavailable && waitForAvailableDevice(ctx, turn, args.requeue ?? 0)) return { settled: false };
-  const status: TerminalStatus =
-    args.state === "blocked"
-      ? "failed"
-      : agentAttemptOutcomeOf({ status: args.state, reason: args.errorMessage, errorCode: args.errorCode });
+  const status: TerminalStatus = args.state === "blocked" ? "failed" : agentAttemptOutcomeOf({ status: args.state });
+  const stopError = status === "canceled" ? endedError({ status, errorMessage: args.errorMessage ?? null, errorCode: args.errorCode ?? null }) : null;
   await settleDeviceAttempt(
     ctx,
     args.turnId,
     status,
     {
       ...(args.resultJson ? { resultJson: args.resultJson } : {}),
-      ...(args.errorMessage
+      ...(stopError
+        ? { errorMessage: stopError }
+        : args.errorMessage
         ? { errorMessage: unavailable ? deviceWaitExpiredMessage(args.errorMessage) : args.errorMessage }
         : args.state === "blocked"
           ? { errorMessage: "The selected computer did not accept the request." }
@@ -1037,7 +1054,7 @@ const continueDeviceForCloud = async (ctx: OwnerContext, raw: unknown): Promise<
   };
 };
 
-/** A cloud requester's pause of a device thread of its conversation. */
+/** A cloud requester's stop of a device thread of its conversation, with the agents it started. */
 const cancelDeviceForCloud = async (
   ctx: OwnerContext,
   raw: unknown,
@@ -1050,9 +1067,8 @@ const cancelDeviceForCloud = async (
   })(raw);
   await assertGeneration(ctx, args.ownerGeneration);
   const thread = readCloudDeviceThread(ctx, args);
-  await controlAgent(ctx, {
+  await stopTree(ctx, {
     commandId: args.controlRequestId,
-    kind: "pause",
     thread,
     ownerGeneration: args.ownerGeneration,
     text: "",
@@ -1078,7 +1094,7 @@ const stopDeviceAttempt = async (
   if (!turn) return;
   // Settle first: the gate reports the withdrawn dispatch as canceled, and
   // that report must find this attempt already closed rather than report
-  // anything for a pause the requester asked for.
+  // anything for a stop the requester asked for.
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
   ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
   recordAgentChange(
@@ -1087,20 +1103,21 @@ const stopDeviceAttempt = async (
       threadId: thread.thread_id,
       turnId: turn.turn_id,
       kind: endedKind,
-      outcome: "paused",
+      outcome: "canceled",
       source,
-      detail: { cancelRequestId },
+      detail: { cancelRequestId, stopped: true },
       now: ctx.now,
     },
     () => {
       ctx.db.run(
-        "UPDATE agent_turns SET status = 'paused', updated_at = ? WHERE turn_id = ?",
+        "UPDATE agent_turns SET status = 'canceled', updated_at = ? WHERE turn_id = ?",
         ctx.now,
         turn.turn_id,
       );
       ctx.db.run(
-        `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
+        `UPDATE agent_threads SET status = 'canceled', error_message = ?, updated_at = ?
           WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+        AGENT_STOPPED_REASON,
         ctx.now,
         thread.thread_id,
         thread.attempt_generation,
@@ -1111,12 +1128,12 @@ const stopDeviceAttempt = async (
     await ctx.host.cancelDeviceAgentTurn({
       dispatchId: turn.dispatch_id,
       cancelRequestId,
-      reason: AGENT_PAUSED_REASON,
+      reason: AGENT_STOP_WIRE_REASON,
     });
   }
 };
 
-const recordPauseRequested = (
+const recordStopRequested = (
   ctx: OwnerContext,
   thread: ThreadRow,
   key: string,
@@ -1125,7 +1142,7 @@ const recordPauseRequested = (
 ): void => {
   recordAgentChange(
     ctx.db,
-    { threadId: thread.thread_id, kind: "pause_requested", key, source, detail, always: true, now: ctx.now },
+    { threadId: thread.thread_id, kind: "stop_requested", key, source, detail, always: true, now: ctx.now },
     () => undefined,
   );
 };
@@ -1411,7 +1428,7 @@ const CLOUD_DESTINATION = "cloud";
  * An agent's `switch_destination`, from the host that holds it once its run
  * there ended: the target (one of the owner's computers, or the cloud) holds
  * its log from now on, and the thread's next attempt runs there with the
- * agent's brief, the same thread with the same reports, messages and pauses,
+ * agent's brief, the same thread with the same reports, messages and stops,
  * now routed to the target. Idempotent per `handoffId`.
  */
 const moveThread = async (ctx: OwnerContext, args: MoveInput): Promise<HandoffResult> => {
@@ -1555,7 +1572,7 @@ const AGENT_MESSAGE_RECEIPT_TTL_MS = 24 * 60 * 60_000;
  * Where a thread's attempts run, which is where every control for it goes:
  * its BuildSession or pi agent in the cloud, the device a dispatch offered
  * it to, or the desktop whose own Stella started it there. Messages and
- * pauses both route by this, whoever sends them and wherever the
+ * stops both route by this, whoever sends them and wherever the
  * conversation runs now.
  */
 type ThreadExecutor =
@@ -1903,14 +1920,14 @@ const controlAgent = async (
   } else {
     recordCommand(ctx, input, executor.kind, deviceId);
   }
-  if (input.kind === "pause") {
-    recordPauseRequested(ctx, input.thread, `pause_requested:${input.commandId}`, input.source, {
+  if (input.kind === "stop") {
+    recordStopRequested(ctx, input.thread, `stop_requested:${input.commandId}`, input.source, {
       controlRequestId: input.commandId,
       executor: executor.kind,
       ...(deviceId ? { deviceId } : {}),
     });
   } else {
-    supersedeHeldPauses(ctx, input.thread.thread_id, input.commandId);
+    supersedeHeldStops(ctx, input.thread.thread_id, input.commandId);
   }
   let routed: Routed;
   try {
@@ -2069,13 +2086,13 @@ const holdCommand = (
     { messageId: input.commandId },
     { id: commandJobId(input.commandId) },
   );
-  if (input.kind === "pause") {
+  if (input.kind === "stop") {
     recordAgentChange(
       ctx.db,
       {
         threadId: input.thread.thread_id,
-        kind: "pause_held",
-        key: `pause_held:${input.commandId}`,
+        kind: "stop_held",
+        key: `stop_held:${input.commandId}`,
         source: input.source,
         detail: { commandId: input.commandId, deviceId, reason },
         always: true,
@@ -2088,16 +2105,16 @@ const holdCommand = (
   }
 };
 
-const supersedeHeldPauses = (ctx: OwnerContext, threadId: string, commandId: string): void => {
+const supersedeHeldStops = (ctx: OwnerContext, threadId: string, commandId: string): void => {
   for (const held of ctx.db.all<{ command_id: string }>(
-    "SELECT command_id FROM agent_commands WHERE thread_id = ? AND kind = 'pause' AND state = 'pending'",
+    "SELECT command_id FROM agent_commands WHERE thread_id = ? AND kind = 'stop' AND state = 'pending'",
     threadId,
   )) {
     ctx.jobs.cancel(commandJobId(held.command_id));
     settleCommand(ctx, held.command_id, "superseded", "superseded");
     logCommand(ctx, threadId, "command_dropped", `command_dropped:${held.command_id}`, "owner:command-outbox", {
       commandId: held.command_id,
-      command: "pause",
+      command: "stop",
       reason: "superseded",
       by: commandId,
     });
@@ -2111,7 +2128,7 @@ const routeCommand = async (
   deviceId: string | null,
 ): Promise<Routed> => {
   const { thread } = input;
-  if (input.kind === "pause") return await routePause(ctx, input, executor, deviceId);
+  if (input.kind === "stop") return await routeStop(ctx, input, executor, deviceId);
   if (input.kind === "resume" && ACTIVE_STATUSES.has(thread.status)) {
     return { outcome: "running", note: "It is already running; nothing to resume." };
   }
@@ -2249,7 +2266,7 @@ const nextAttempt = (ctx: OwnerContext, input: ControlInput): void => {
   });
 };
 
-const routePause = async (
+const routeStop = async (
   ctx: OwnerContext,
   input: ControlInput,
   executor: ThreadExecutor,
@@ -2259,25 +2276,22 @@ const routePause = async (
   if (!ACTIVE_STATUSES.has(thread.status)) {
     return {
       outcome: "not_running",
-      note:
-        thread.status === "paused"
-          ? "It was already paused."
-          : `It had already ${thread.status === "canceled" ? "stopped" : thread.status}; nothing was running.`,
+      note: `It had already ${thread.status === "canceled" || thread.status === "paused" ? "stopped" : thread.status}; nothing was running.`,
     };
   }
   switch (executor.kind) {
     case "cloud":
-      await pauseCloudAttempt(ctx, thread, input.ownerGeneration, input.commandId, input.source);
-      return { outcome: "paused" };
+      await stopCloudAttempt(ctx, thread, input.ownerGeneration, input.commandId, input.source);
+      return { outcome: "stopped" };
     case "harness": {
       const { outcome } = await ctx.host.controlHarnessAgent({
         conversationId: thread.conversation_id,
         ownerGeneration: input.ownerGeneration,
         threadId: thread.thread_id,
         commandId: input.commandId,
-        kind: "pause",
+        kind: "stop",
       });
-      if (outcome === "paused") return { outcome: "paused" };
+      if (outcome === "stopped") return { outcome: "stopped" };
       if (outcome === "not_running") {
         return { outcome: "not_running", note: "Its conversation's Stella reports it is not running now." };
       }
@@ -2285,19 +2299,20 @@ const routePause = async (
     }
     case "dispatch":
       await stopDeviceAttempt(ctx, thread, input.commandId, input.source);
-      return { outcome: "paused" };
+      return { outcome: "stopped" };
     case "local": {
       if (!deviceId) throw noComputer(thread.thread_id);
-      const sent = await ctx.host.pauseLocalAgent({
+      const sent = await ctx.host.stopLocalAgent({
         deviceId,
         threadId: thread.thread_id,
         ownerGeneration: input.ownerGeneration,
         commandId: input.commandId,
       });
       switch (sent.outcome) {
+        case "stopped":
         case "paused":
-          await markLocalThreadPaused(ctx, thread, input.source, input.commandId);
-          return { outcome: "paused" };
+          await markLocalThreadStopped(ctx, thread, input.source, input.commandId);
+          return { outcome: "stopped" };
         case "not_running":
         case "not_found":
           return {
@@ -2307,8 +2322,8 @@ const routePause = async (
         case "refused":
           throw new RpcError(
             "CONFLICT",
-            `${await deviceName(ctx, deviceId)} did not accept the pause for ${thread.thread_id}.`,
-            { reason: "pause_refused" },
+            `${await deviceName(ctx, deviceId)} did not accept the stop for ${thread.thread_id}.`,
+            { reason: "stop_refused" },
           );
         default:
           return { hold: sent.outcome };
@@ -2337,21 +2352,21 @@ const commandResult = async (
     const name = device?.name ?? "that computer";
     outcome = "held";
     note =
-      input.kind === "pause"
+      input.kind === "stop"
         ? routed.hold === "unreachable"
-          ? `${name} is offline right now, so it could not stop yet. The pause is held and applied the moment ${name} reconnects, unless you message the agent first.`
-          : `${name} did not answer in time. The pause is offered again until ${name} answers.`
+          ? `${name} is offline right now, so it could not stop yet. The stop is held and applied the moment ${name} reconnects, unless you message the agent first.`
+          : `${name} did not answer in time. The stop is offered again until ${name} answers.`
         : routed.hold === "unreachable"
           ? `${offlineName} is offline. The message waits and is delivered to ${threadId} when ${name} reconnects, if that is within an hour.`
           : `${name} did not answer in time. The message is offered to ${threadId} again until ${name} answers, for up to an hour.`;
-  } else if (input.kind !== "pause" && routed.outcome === "resumed" && routed.waitingForDevice && device && !device.online) {
+  } else if (input.kind !== "stop" && routed.outcome === "resumed" && routed.waitingForDevice && device && !device.online) {
     outcome = "held";
     note = `${offlineName} is offline. The message is held, and ${threadId}'s next run starts with it when ${device.name} reconnects.`;
   } else {
     outcome = routed.outcome;
     note = routed.note;
-    if (executor.kind === "dispatch" && input.kind === "pause" && outcome === "paused" && device && !device.online) {
-      note = `${device.name} is offline right now. The agent is recorded as paused, and it stops there the moment ${device.name} reconnects.`;
+    if (executor.kind === "dispatch" && input.kind === "stop" && outcome === "stopped" && device && !device.online) {
+      note = `${device.name} is offline right now. The agent is recorded as stopped, and it stops there the moment ${device.name} reconnects.`;
     }
   }
   return {
@@ -2506,11 +2521,11 @@ const controlRequest = async (ctx: OwnerContext, args: ControlArgs): Promise<Age
   }
   const { command } = args;
   const requested = args.threadId.trim();
-  const commandId = command.kind === "pause" ? `pause:${args.commandId}` : args.commandId;
+  const commandId = command.kind === "stop" ? `stop:${args.commandId}` : args.commandId;
   const prior = readCommand(ctx.db, commandId);
   if (prior?.result_json && prior.state !== "failed") return JSON.parse(prior.result_json) as AgentControlResult;
-  if (command.kind === "pause") {
-    const paused = await pauseAgent(ctx, {
+  if (command.kind === "stop") {
+    const stopped = await stopAgent(ctx, {
       ownerGeneration: args.ownerGeneration,
       conversationId: args.conversationId,
       threadId: requested,
@@ -2519,11 +2534,11 @@ const controlRequest = async (ctx: OwnerContext, args: ControlArgs): Promise<Age
     const recorded = readCommand(ctx.db, commandId);
     if (recorded?.result_json) return JSON.parse(recorded.result_json) as AgentControlResult;
     return {
-      threadId: paused.threadId,
-      command: "pause",
-      outcome: paused.outcome,
-      where: paused.where,
-      ...(paused.note ? { note: paused.note } : {}),
+      threadId: stopped.threadId,
+      command: "stop",
+      outcome: stopped.outcome,
+      where: stopped.where,
+      ...(stopped.note ? { note: stopped.note } : {}),
     };
   }
   const text = (command.kind === "resume" ? command.text?.trim() || RESUME_TEXT : command.text.trim());
@@ -2554,10 +2569,10 @@ const controlRequest = async (ctx: OwnerContext, args: ControlArgs): Promise<Age
   });
 };
 
-// ── Pause, from any of the owner's hosts ──────────────────────────────────
+// ── Stop, from any of the owner's hosts ───────────────────────────────────
 
-type PauseArgs = AgentThreadCalls["agentThreads.pause"]["args"];
-type PauseResult = AgentThreadCalls["agentThreads.pause"]["result"];
+type StopArgs = AgentThreadCalls["agentThreads.stop"]["args"];
+type StopResult = AgentThreadCalls["agentThreads.stop"]["result"];
 
 /** The running turn of a thread's current attempt. */
 const runningTurn = (db: OwnerDbReader, thread: ThreadRow): TurnRow | null =>
@@ -2570,9 +2585,9 @@ const runningTurn = (db: OwnerDbReader, thread: ThreadRow): TurnRow | null =>
 
 /**
  * Stop the attempt a cloud thread is on, wherever its runtime is (its pi
- * agent or its BuildSession), and record it paused.
+ * agent or its BuildSession), and record it stopped.
  */
-const pauseCloudAttempt = async (
+const stopCloudAttempt = async (
   ctx: OwnerContext,
   thread: ThreadRow,
   ownerGeneration: string,
@@ -2597,20 +2612,21 @@ const pauseCloudAttempt = async (
       threadId: thread.thread_id,
       turnId: turn.turn_id,
       kind: endedKind,
-      outcome: "paused",
+      outcome: "canceled",
       source,
-      detail: { cancelRequestId },
+      detail: { cancelRequestId, stopped: true },
       now,
     },
     () => {
       ctx.db.run(
-        "UPDATE agent_turns SET status = 'paused', updated_at = ? WHERE turn_id = ?",
+        "UPDATE agent_turns SET status = 'canceled', updated_at = ? WHERE turn_id = ?",
         now,
         turn.turn_id,
       );
       ctx.db.run(
-        `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
+        `UPDATE agent_threads SET status = 'canceled', error_message = ?, updated_at = ?
           WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+        AGENT_STOPPED_REASON,
         now,
         thread.thread_id,
         thread.attempt_generation,
@@ -2620,8 +2636,8 @@ const pauseCloudAttempt = async (
   ctx.jobs.cancel(`dispatch:${turn.turn_id}`);
 };
 
-/** A local thread its computer stopped for a pause: recorded, with its journal card. */
-const markLocalThreadPaused = async (
+/** A local thread its computer stopped for a `stop_agent`: recorded, with its journal card. */
+const markLocalThreadStopped = async (
   ctx: OwnerContext,
   thread: ThreadRow,
   source: string,
@@ -2632,23 +2648,24 @@ const markLocalThreadPaused = async (
     {
       threadId: thread.thread_id,
       kind: endedKind,
-      outcome: "paused",
+      outcome: "canceled",
       source,
-      detail: { commandId, executor: "local" },
+      detail: { commandId, executor: "local", stopped: true },
       now: ctx.now,
     },
     () =>
       ctx.db.run(
-        `UPDATE agent_threads SET status = 'paused', error_message = NULL, updated_at = ?
+        `UPDATE agent_threads SET status = 'canceled', error_message = ?, updated_at = ?
           WHERE thread_id = ? AND attempt_generation = ? AND status IN ('running', 'resuming')`,
+        AGENT_STOPPED_REASON,
         ctx.now,
         thread.thread_id,
         thread.attempt_generation,
       ),
   );
-  const paused = readThread(ctx.db, thread.thread_id);
-  if (paused?.status === "paused" && paused.attempt_generation === thread.attempt_generation) {
-    await postAgentLifecycleCard(ctx, paused, { kind: "paused" });
+  const stopped = readThread(ctx.db, thread.thread_id);
+  if (stopped?.status === "canceled" && stopped.attempt_generation === thread.attempt_generation) {
+    await postAgentLifecycleCard(ctx, stopped, { kind: "canceled", text: AGENT_STOPPED_REASON });
   }
 };
 
@@ -2670,65 +2687,147 @@ const deviceStanding = async (
   }
 };
 
+/** The threads below one, at any depth, that may still run: deepest first, so none reports to one already stopped. */
+const runningDescendants = (db: OwnerDbReader, threadId: string): ThreadRow[] =>
+  db.all<ThreadRow>(
+    `WITH RECURSIVE tree(thread_id, depth) AS (
+       SELECT thread_id, 1 FROM agent_threads WHERE parent_thread_id = ? AND thread_id <> ?
+       UNION
+       SELECT child.thread_id, tree.depth + 1 FROM agent_threads child
+         JOIN tree ON child.parent_thread_id = tree.thread_id
+        WHERE tree.depth < 16
+     )
+     SELECT t.* FROM agent_threads t
+       JOIN (SELECT thread_id, MAX(depth) AS depth FROM tree GROUP BY thread_id) below ON below.thread_id = t.thread_id
+      WHERE t.status IN ('running', 'resuming')
+      ORDER BY below.depth DESC`,
+    threadId,
+    threadId,
+  );
+
 /**
- * `pause_agent` for any agent the owner has, from any host: authorized by
- * the owner, not by which device started the agent, and routed to where
- * the agent runs through {@link controlAgent}. A computer that is offline
- * gets the pause when it reconnects; the result says which happened.
+ * A stop for a thread and every thread below it, at any depth, each routed
+ * to where it runs; deepest first. A descendant that cannot be reached now
+ * does not keep the others from stopping.
  */
-const pauseAgent = async (ctx: OwnerContext, args: PauseArgs): Promise<PauseResult> => {
-  if (!CONTROL_REQUEST_ID_PATTERN.test(args.controlRequestId)) {
-    throw new RpcError("BAD_REQUEST", "That pause request could not be sent. Try again.");
+const stopTree = async (
+  ctx: OwnerContext,
+  input: Omit<ControlInput, "kind">,
+): Promise<{ result: AgentControlResult; descendants: AgentControlResult[] }> => {
+  const descendants: AgentControlResult[] = [];
+  for (const child of runningDescendants(ctx.db, input.thread.thread_id)) {
+    try {
+      const { result } = await controlAgent(ctx, {
+        ...input,
+        kind: "stop",
+        commandId: `${input.commandId}>${child.thread_id}`,
+        thread: child,
+        detail: { ...input.detail, under: input.thread.thread_id },
+      });
+      descendants.push(result);
+    } catch (error) {
+      logCommand(ctx, child.thread_id, "command_dropped", `command_dropped:${input.commandId}>${child.thread_id}`, input.source, {
+        commandId: `${input.commandId}>${child.thread_id}`,
+        command: "stop",
+        reason: errorReason(error),
+      });
+    }
   }
-  const commandId = `pause:${args.controlRequestId}`;
-  const replay = pauseReplay(ctx.db, commandId);
+  const { result } = await controlAgent(ctx, { ...input, kind: "stop" });
+  return { result, descendants };
+};
+
+/** Whether `ancestor` started `thread`, at any depth. */
+const startedBy = (db: OwnerDbReader, thread: ThreadRow, ancestor: string): boolean => {
+  const seen = new Set([thread.thread_id]);
+  for (let id = thread.parent_thread_id; id && !seen.has(id) && seen.size < 32; id = readThread(db, id)?.parent_thread_id ?? null) {
+    if (id === ancestor) return true;
+    seen.add(id);
+  }
+  return false;
+};
+
+/**
+ * `stop_agent` for any agent the owner has, from any host: authorized by
+ * the owner, not by which device started the agent, and routed to where
+ * it and every agent below it run through {@link stopTree}. A computer that
+ * is offline gets the stop when it reconnects; the result says which
+ * happened. An agent asking (`requesterThreadId`) stops only agents it
+ * started, at any depth.
+ */
+const stopAgent = async (ctx: OwnerContext, args: StopArgs): Promise<StopResult> => {
+  if (!CONTROL_REQUEST_ID_PATTERN.test(args.controlRequestId)) {
+    throw new RpcError("BAD_REQUEST", "That stop request could not be sent. Try again.");
+  }
+  const commandId = `stop:${args.controlRequestId}`;
+  const replay = stopReplay(ctx.db, commandId) ?? stopReplay(ctx.db, `pause:${args.controlRequestId}`);
   if (replay) return replay;
   const requested = args.threadId.trim();
   await assertGeneration(ctx, args.ownerGeneration);
   enforceOwnerRateLimit(
     ctx.db,
     ctx.now,
-    "agentThreads.pause",
+    "agentThreads.stop",
     { count: 60, windowMs: 10 * 60_000 },
-    "Too many pause requests. Wait a moment and try again.",
+    "Too many stop requests. Wait a moment and try again.",
   );
   const thread = readConversationThread(ctx.db, args.conversationId, requested);
   if (!thread || (thread.owner_generation !== null && thread.owner_generation !== args.ownerGeneration)) {
     throw new RpcError(
       "NOT_FOUND",
       `No agent has the thread_id ${requested}. agent_status without a thread_id lists who you can reach.`,
-      { reason: "pause_target_not_found" },
+      { reason: "stop_target_not_found" },
     );
   }
-  const { result } = await controlAgent(ctx, {
+  if (args.requesterThreadId && !startedBy(ctx.db, thread, args.requesterThreadId)) {
+    throw new RpcError(
+      "FORBIDDEN",
+      `${requested} is not an agent you started. You can stop only agents you started, at any depth.`,
+      { reason: "stop_target_not_started_by_requester" },
+    );
+  }
+  const { result, descendants } = await stopTree(ctx, {
     commandId,
-    kind: "pause",
     thread,
     ownerGeneration: args.ownerGeneration,
     text: "",
     source: `${ctx.caller ? "client" : "cloud"}:${args.conversationId}`,
-    detail: { requester: args.conversationId },
+    detail: { requester: args.requesterThreadId ?? args.conversationId },
   });
-  return pauseResult(result);
+  return {
+    ...stopResult(result),
+    ...(descendants.length
+      ? { descendants: descendants.map((below) => { const { threadId, outcome, where } = stopResult(below); return { threadId, outcome, where }; }) }
+      : {}),
+  };
 };
 
-const pauseResult = (result: AgentControlResult): PauseResult => ({
+const stopResult = (result: AgentControlResult): StopResult => ({
   threadId: result.threadId,
-  outcome: result.outcome === "held" || result.outcome === "not_running" ? result.outcome : "paused",
+  outcome: result.outcome === "held" || result.outcome === "not_running" ? result.outcome : "stopped",
   where: result.where ?? "in Stella's cloud",
   ...(result.note ? { note: result.note } : {}),
 });
 
-const pauseReplay = (db: OwnerDbReader, commandId: string): PauseResult | null => {
+const stopReplay = (db: OwnerDbReader, commandId: string): StopResult | null => {
   const command = readCommand(db, commandId);
   if (command?.result_json && command.state !== "failed") {
-    return pauseResult(JSON.parse(command.result_json) as AgentControlResult);
+    return stopResult(JSON.parse(command.result_json) as AgentControlResult);
   }
   const receipt = db.one<{ result_json: string }>(
     "SELECT result_json FROM agent_cancel_receipts WHERE cancel_request_id = ?",
     commandId,
   );
-  return receipt ? (JSON.parse(receipt.result_json) as PauseResult) : null;
+  return receipt ? readAgentStopResult(JSON.parse(receipt.result_json) as StopResult) : null;
+};
+
+/** `agentThreads.pause`, as builds before `stop_agent` call it: a stop, answered in their words. */
+const legacyPauseAgent = async (
+  ctx: OwnerContext,
+  args: AgentThreadCalls["agentThreads.pause"]["args"],
+): Promise<AgentThreadCalls["agentThreads.pause"]["result"]> => {
+  const { descendants: _descendants, ...stopped } = await stopAgent(ctx, args);
+  return { ...stopped, outcome: stopped.outcome === "stopped" ? "paused" : stopped.outcome };
 };
 
 const conversationControls = (
@@ -2788,9 +2887,8 @@ const cancelThread = async (ctx: OwnerContext, args: CancelArgs): Promise<Cancel
   if (threadExecutor(thread).kind === "cloud" && !runningTurn(ctx.db, thread)) {
     throw threadChanged(thread.thread_id);
   }
-  await controlAgent(ctx, {
+  await stopTree(ctx, {
     commandId,
-    kind: "pause",
     thread,
     ownerGeneration: args.ownerGeneration,
     text: "",
@@ -2973,7 +3071,8 @@ const completeComputerThread = async (
   if (row.attempt_generation !== args.attemptGeneration || row.status !== "running") {
     return { updated: false, status: row.status };
   }
-  const status = agentThreadTerminalStatus(args.status, args.error);
+  const status = agentThreadTerminalStatus(args.status);
+  const error = status === "completed" ? null : endedError({ status: args.status, errorMessage: args.error ?? null });
   recordAgentChange(
     ctx.db,
     { threadId: row.thread_id, kind: endedKind, outcome: status, source: `device:${args.originDeviceId}`, now: ctx.now },
@@ -2983,14 +3082,14 @@ const completeComputerThread = async (
           WHERE thread_id = ?`,
         status,
         args.result !== undefined ? JSON.stringify({ finalText: args.result }) : null,
-        status === "paused" ? null : (args.error ?? null),
+        error,
         ctx.now,
         row.thread_id,
       ),
   );
   await postAgentLifecycleCard(ctx, row, {
     kind: status,
-    text: status === "completed" ? args.result : args.error,
+    text: status === "completed" ? args.result : error,
   });
   return { updated: true, status };
 };
@@ -3005,7 +3104,7 @@ const cancelComputerThread = async (
   if (row.attempt_generation !== args.attemptGeneration) return { canceled: false, status: row.status };
   if (row.status !== "running") return { canceled: true, status: row.status };
   const reason = args.reason?.trim() || "Canceled on this computer.";
-  const status = agentThreadTerminalStatus("canceled", reason);
+  const status = agentThreadTerminalStatus("canceled");
   recordAgentChange(
     ctx.db,
     { threadId: row.thread_id, kind: endedKind, outcome: status, source: `device:${args.originDeviceId}`, now: ctx.now },
@@ -3013,7 +3112,7 @@ const cancelComputerThread = async (
       ctx.db.run(
         "UPDATE agent_threads SET status = ?, error_message = ?, updated_at = ? WHERE thread_id = ?",
         status,
-        status === "paused" ? null : reason,
+        endedError({ status, errorMessage: reason }),
         ctx.now,
         row.thread_id,
       ),
@@ -3037,17 +3136,15 @@ const computerRecord = (row: ThreadRow): ComputerThreadRecord => {
     status:
       row.status === "failed"
         ? "error"
-        : row.status === "paused"
-          ? "canceled"
-          : row.status === "completed" || row.status === "canceled"
-            ? row.status
-            : "running",
+        : row.status === "completed" || row.status === "canceled"
+          ? row.status
+          : "running",
     description: row.description,
     attemptGeneration: row.attempt_generation,
     startedAt: row.created_at,
     completedAt: row.status === "running" ? null : row.updated_at,
     result,
-    error: row.status === "paused" ? AGENT_PAUSED_REASON : row.error_message,
+    error: row.error_message,
     ...(agentStatusOf(row.status) ? { agentStatus: agentStatusOf(row.status)! } : {}),
   };
 };
@@ -3411,13 +3508,17 @@ export const applyAgentThreadEvent = (
       const ended =
         event.status === "waiting_for_user"
           ? event.status
-          : agentThreadTerminalStatus(event.status, event.errorMessage);
+          : agentThreadTerminalStatus(event.status);
       const limit =
         ended === "failed" && jobs && threadExecutor(thread).kind === "cloud"
           ? claudeUsageLimitOf(event.errorMessage ?? "")
           : null;
       const status = limit ? "waiting_for_user" : ended;
-      const errorMessage = limit ? usageLimitHoldMessage(limit) : event.errorMessage;
+      const errorMessage = limit
+        ? usageLimitHoldMessage(limit)
+        : status === "canceled"
+          ? endedError({ status: event.status, errorMessage: event.errorMessage ?? null })
+          : event.errorMessage;
       if (limit && jobs) {
         holdAgentForUsageLimit(db, jobs, effects, { ...thread, attempt_generation: event.attemptGeneration }, limit, event.completedAt);
       }
@@ -3440,7 +3541,7 @@ export const applyAgentThreadEvent = (
             status,
             event.attemptGeneration,
             event.resultJson ?? null,
-            status === "paused" ? null : (errorMessage ?? null),
+            status === "completed" ? null : (errorMessage ?? null),
             event.completedAt,
             thread.thread_id,
           ),
@@ -3571,6 +3672,13 @@ const pauseParser = object({
   threadId: id(256),
   controlRequestId: id(),
 });
+const stopParser = object({
+  ownerGeneration: generation,
+  conversationId: id(256),
+  threadId: id(256),
+  controlRequestId: id(),
+  requesterThreadId: optional(id(256)),
+});
 
 const controlParser: Parser<ControlArgs> = (value, path = "") => {
   const base = object({
@@ -3579,13 +3687,13 @@ const controlParser: Parser<ControlArgs> = (value, path = "") => {
     threadId: id(256),
     commandId: id(),
     command: object({
-      kind: literal("message", "resume", "pause"),
+      kind: literal("message", "resume", "stop", "pause"),
       text: optional(string({ max: AGENT_MESSAGE_MAX_CHARS * 2 })),
       from: optional(senderParser),
     }),
   })(value, path);
   const { kind, text, from } = base.command;
-  if (kind === "pause") return { ...base, command: { kind } };
+  if (kind === "stop" || kind === "pause") return { ...base, command: { kind: "stop" } };
   if (!from) throw new RpcError("BAD_REQUEST", `${path || "args"}.command.from is required.`);
   if (kind === "message") {
     if (text === undefined) throw new RpcError("BAD_REQUEST", `${path || "args"}.command.text is required.`);
@@ -3651,7 +3759,7 @@ export const agentThreadsDomain = {
       ],
     },
     {
-      // The same outbox carries a `pause_agent` for an offline computer.
+      // The same outbox carries a `stop_agent` for an offline computer.
       id: "agent-threads.8-device-commands",
       statements: [
         "ALTER TABLE agent_device_messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'message'",
@@ -3690,11 +3798,17 @@ export const agentThreadsDomain = {
       parse: messageParser,
       handler: messageAgent,
     },
+    "agentThreads.stop": {
+      scope: "owner",
+      requireAccount: true,
+      parse: stopParser,
+      handler: stopAgent,
+    },
     "agentThreads.pause": {
       scope: "owner",
       requireAccount: true,
       parse: pauseParser,
-      handler: pauseAgent,
+      handler: legacyPauseAgent,
     },
     "agentThreads.control": {
       scope: "owner",
@@ -3880,7 +3994,8 @@ export const agentThreadsDomain = {
     "agentThreads.directory": async (ctx, raw) =>
       await agentDirectory(ctx, object({ ownerGeneration: generation, conversationId: id(256) })(raw)),
     "agentThreads.message": async (ctx, raw) => await messageAgent(ctx, messageParser(raw)),
-    "agentThreads.pause": async (ctx, raw) => await pauseAgent(ctx, pauseParser(raw)),
+    "agentThreads.stop": async (ctx, raw) => await stopAgent(ctx, stopParser(raw)),
+    "agentThreads.pause": async (ctx, raw) => await legacyPauseAgent(ctx, pauseParser(raw)),
     "agentThreads.flushDeviceMessages": flushDeviceCommands,
     "agentThreads.control": async (ctx, raw) => await controlRequest(ctx, controlParser(raw)),
     /**

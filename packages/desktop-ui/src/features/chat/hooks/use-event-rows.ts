@@ -1079,9 +1079,9 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         completedThreadIds: row.backgroundWork.completedThreadIds.filter(
           (id) => !removed.has(id),
         ),
-        ...(row.backgroundWork.pausedThreadIds
+        ...(row.backgroundWork.stoppedThreadIds
           ? {
-              pausedThreadIds: row.backgroundWork.pausedThreadIds.filter(
+              stoppedThreadIds: row.backgroundWork.stoppedThreadIds.filter(
                 (id) => !removed.has(id),
               ),
             }

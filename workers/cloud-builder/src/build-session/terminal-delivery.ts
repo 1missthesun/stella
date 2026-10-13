@@ -1,4 +1,4 @@
-import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
+import { isAgentStopReason } from "@stella/contracts/agent-status";
 import { agentAttemptOutcomeOf } from "@stella/contracts/agent-status";
 import { Effect } from "effect";
 import type { ThreadCompletedEvent } from "@stella/contracts/turn-plane/owner-events";
@@ -240,10 +240,7 @@ export const deliverTerminal = async (
             threadId: turn.threadId,
             turnId: turn.turnId,
             attemptGeneration: turn.attemptGeneration ?? 1,
-            status: agentAttemptOutcomeOf({
-              status: pending.kind,
-              reason: pending.threadError,
-            }),
+            status: agentAttemptOutcomeOf({ status: pending.kind }),
             ...(resultJson ? { resultJson } : {}),
             ...(errorMessage ? { errorMessage } : {}),
             completedAt,
@@ -598,7 +595,7 @@ export const expireCurrentAgentTurn = async (
 };
 
 /**
- * Placement and manual-pause cancellation share this exact boundary. A
+ * Placement and `stop_agent` cancellation share this exact boundary. A
  * request that has not reached the DO gets a durable pre-admission
  * tombstone; a current turn is acknowledged only after its sandbox is gone
  * and every in-isolate promise for that exact turn has joined.
@@ -673,7 +670,7 @@ export const cancelExactAgentTurn = async (
           pending.kind !== "canceled"
         ) {
           // The outcome is immutable, but its callback may only be waiting
-          // on a distant watchdog after an isolate/process failure. A Pause
+          // on a distant watchdog after an isolate/process failure. A stop
           // cannot replace that decision; it can safely wake its idempotent
           // delivery so the thread converges instead of appearing live.
           await host.ctx.storage.setAlarm(Date.now());
@@ -755,8 +752,7 @@ export const cancelExactAgentTurn = async (
     attemptGeneration: turn.attemptGeneration!,
     kind: "canceled" as const,
     payload: { message: "Stopped. Nothing was changed." },
-    threadError:
-      reason === AGENT_PAUSED_REASON ? reason : "The agent was stopped.",
+    threadError: isAgentStopReason(reason) ? reason : "The agent was stopped.",
     terminateSandbox: true,
   };
   if (!admission.pending) {
@@ -789,7 +785,7 @@ export const cancelExactAgentTurn = async (
     if (agentExecution) {
       await agentExecution.interrupt(
         new Error(
-          reason === AGENT_PAUSED_REASON
+          isAgentStopReason(reason)
             ? reason
             : "The agent turn was stopped.",
         ),

@@ -26,8 +26,7 @@ export type CloudAgentControlStatus =
   | "resuming"
   | "completed"
   | "failed"
-  | "canceled"
-  | "paused";
+  | "canceled";
 
 const CLOUD_AGENT_CONTROL_STATUSES: readonly CloudAgentControlStatus[] = [
   "running",
@@ -36,8 +35,15 @@ const CLOUD_AGENT_CONTROL_STATUSES: readonly CloudAgentControlStatus[] = [
   "completed",
   "failed",
   "canceled",
-  "paused",
 ];
+
+/** A receipt's status, where builds before `stop_agent` wrote a stop as `paused`. */
+const controlStatusOf = (status: unknown): CloudAgentControlStatus | null =>
+  status === "paused"
+    ? "canceled"
+    : CLOUD_AGENT_CONTROL_STATUSES.includes(status as CloudAgentControlStatus)
+      ? (status as CloudAgentControlStatus)
+      : null;
 
 export type CloudAgentControlReceipt = {
   /** Report fixed with the terminal decision, never parsed from the wake prompt. */
@@ -53,14 +59,14 @@ export type CloudAgentControlReceipt = {
   executorDeviceId?: string;
 };
 
-export type CloudAgentToolKind = "spawn_agent" | "send_message" | "pause_agent";
+export type CloudAgentToolKind = "spawn_agent" | "send_message" | "stop_agent";
 
 export type CloudAgentToolOutcome = {
   kind: CloudAgentToolKind;
   fingerprint: string;
   control: CloudAgentControlReceipt;
   disposition?:
-    | "paused"
+    | "stopped"
     | "pending"
     | "already_terminal"
     | "steered"
@@ -102,9 +108,7 @@ export const normalizeCloudAgentControlReceipt = (
     candidate.attemptGeneration! < 1 ||
     !Number.isSafeInteger(candidate.threadUpdatedAt) ||
     candidate.threadUpdatedAt! < 0 ||
-    !CLOUD_AGENT_CONTROL_STATUSES.includes(
-      candidate.status as CloudAgentControlStatus,
-    )
+    !controlStatusOf(candidate.status)
   ) {
     return null;
   }
@@ -129,7 +133,7 @@ export const normalizeCloudAgentControlReceipt = (
     threadId,
     attemptGeneration: candidate.attemptGeneration!,
     threadUpdatedAt: candidate.threadUpdatedAt!,
-    status: candidate.status as CloudAgentControlStatus,
+    status: controlStatusOf(candidate.status)!,
     ...(turnId ? { turnId } : {}),
     ...(execution ? { execution } : {}),
     ...(description ? { description } : {}),
@@ -226,7 +230,8 @@ export const readCloudAgentToolOutcome = async (args: {
   const control = normalizeCloudAgentControlReceipt(candidate.control);
   const dispositions: readonly NonNullable<
     CloudAgentToolOutcome["disposition"]
-  >[] = ["paused", "pending", "already_terminal", "steered", "resumed"];
+  >[] = ["stopped", "pending", "already_terminal", "steered", "resumed"];
+  if ((candidate.disposition as string | undefined) === "paused") candidate.disposition = "stopped";
   if (
     candidate.kind !== args.kind ||
     typeof candidate.fingerprint !== "string" ||
@@ -649,8 +654,8 @@ export type PiThreadSteerResult =
   | Readonly<{ accepted: true; turnId: string; attemptGeneration: number }>
   | Readonly<{ accepted: false; reason: "not_running" | "unknown" }>;
 
-/** Pause one exact attempt of an agent thread's pi agent (`OrchestratorSession.pausePiThread`). */
-export type PiThreadPause = Readonly<{
+/** Stop one exact attempt of an agent thread's pi agent (`OrchestratorSession.stopPiThread`). */
+export type PiThreadStop = Readonly<{
   ownerId: string;
   ownerGeneration: string;
   threadId: string;
@@ -659,25 +664,26 @@ export type PiThreadPause = Readonly<{
 }>;
 
 /**
- * `paused`: it is stopping, and its attempt settles as canceled.
+ * `stopped`: it is stopping, with the agents it started, and its attempt
+ * settles as canceled.
  * `terminal`: that attempt already settled. `changed`: another attempt is
  * the thread's now. `unknown`: no agent of that thread runs there.
  */
-export type PiThreadPauseResult = "paused" | "terminal" | "changed" | "unknown";
+export type PiThreadStopResult = "stopped" | "terminal" | "changed" | "unknown";
 
 export type PiHarnessAgentControl = Readonly<{
   ownerId: string;
   ownerGeneration: string;
   threadId: string;
   commandId: string;
-  kind: "message" | "pause";
+  kind: "message" | "stop";
   text?: string;
 }>;
 
 export type PiHarnessAgentControlResult =
   | "steered"
   | "resumed"
-  | "paused"
+  | "stopped"
   | "not_running"
   | "not_found";
 
@@ -764,17 +770,17 @@ export const cancelCloudAgentAttempt = async (args: {
   cancelRequestId: string;
   reason: string;
 }): Promise<"canceled" | "changed"> => {
-  const paused = await args.env.ORCHESTRATOR_SESSIONS.getByName(
+  const stopped = await args.env.ORCHESTRATOR_SESSIONS.getByName(
     args.conversationId,
-  ).pausePiThread({
+  ).stopPiThread({
     ownerId: args.ownerId,
     ownerGeneration: args.ownerGeneration,
     threadId: args.threadId,
     turnId: args.turnId,
     attemptGeneration: args.attemptGeneration,
   });
-  if (paused === "changed") return "changed";
-  if (paused !== "unknown") return "canceled";
+  if (stopped === "changed") return "changed";
+  if (stopped !== "unknown") return "canceled";
   const response = await args.env.BUILD_SESSIONS.getByName(args.threadId).fetch(
     "https://build-session/cancel",
     {

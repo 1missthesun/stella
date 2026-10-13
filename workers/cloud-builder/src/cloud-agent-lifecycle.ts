@@ -10,7 +10,7 @@ export const cloudAgentActivationCard = (args: {
   toolCallId: string;
 }): CloudAgentLifecycleCard | null => {
   const { outcome, parentTurnId, toolCallId } = args;
-  if (outcome.kind === "pause_agent") return null;
+  if (outcome.kind === "stop_agent") return null;
   const control = outcome.control;
   const identity = {
     agentId: control.threadId,
@@ -78,14 +78,6 @@ export const cloudAgentTerminalCard = (
               : {}),
             status: control.status,
           },
-        },
-      };
-    case "paused":
-      return {
-        ...card,
-        event: {
-          type: "agent-canceled",
-          payload: { ...payload, error: "Paused.", status: "paused" },
         },
       };
     default:

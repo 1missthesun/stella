@@ -100,16 +100,17 @@ export type OwnerHost = {
   messageLocalAgent(input: LocalAgentMessage): Promise<{
     outcome: import("@stella/contracts/turn-plane/placement").AgentMessageDeviceOutcome | "unreachable" | "timeout";
   }>;
-  /**
-   * Pause an agent a device runs locally. `unreachable` means no live
-   * socket; `timeout` that no answer came, so it may still have landed.
-   */
   askDeviceConsent(input: { deviceId: string; requestedAt: number }): void;
-  pauseLocalAgent(input: LocalAgentPause): Promise<{
-    outcome: import("@stella/contracts/turn-plane/placement").AgentPauseDeviceOutcome | "unreachable" | "timeout";
+  /**
+   * Stop an agent a device runs locally, and the agents it started there.
+   * `unreachable` means no live socket; `timeout` that no answer came, so it
+   * may still have landed.
+   */
+  stopLocalAgent(input: LocalAgentStop): Promise<{
+    outcome: import("@stella/contracts/turn-plane/placement").AgentStopDeviceOutcome | "unreachable" | "timeout";
   }>;
   controlHarnessAgent(input: HarnessAgentControl): Promise<{
-    outcome: "steered" | "resumed" | "paused" | "not_running" | "not_found";
+    outcome: "steered" | "resumed" | "stopped" | "not_running" | "not_found";
   }>;
   /** Stop a device attempt's dispatch. Idempotent per `cancelRequestId`. */
   cancelDeviceAgentTurn(input: {
@@ -183,11 +184,11 @@ export type HarnessAgentControl = {
   ownerGeneration: string;
   threadId: string;
   commandId: string;
-  kind: "message" | "pause";
+  kind: "message" | "stop";
   text?: string;
 };
 
-export type LocalAgentPause = {
+export type LocalAgentStop = {
   deviceId: string;
   threadId: string;
   ownerGeneration: string;

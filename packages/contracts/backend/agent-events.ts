@@ -10,6 +10,9 @@ export const AGENT_EVENT_KINDS = [
   "steered",
   "input_queued",
   "resume_requested",
+  "stop_requested",
+  "stop_held",
+  /** Written by builds before `stop_agent`; read in older event history only. */
   "pause_requested",
   "pause_held",
   "paused",

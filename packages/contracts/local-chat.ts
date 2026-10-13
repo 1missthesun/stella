@@ -387,7 +387,7 @@ export type LocalChatAgentReport = {
   threadId: string;
   description: string;
   agentType: string;
-  status: "running" | "completed" | "error" | "canceled" | "paused";
+  status: "running" | "completed" | "error" | "canceled";
   result?: string;
   error?: string;
   startedAt: number;

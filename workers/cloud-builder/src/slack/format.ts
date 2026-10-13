@@ -157,7 +157,7 @@ export const toolLabel = (name: string): string => {
   if (key === "spawn_agent") return "Starting a background agent";
   if (key === "send_message") return "Messaging an agent";
   if (key === "agent_status") return "Checking on agents";
-  if (key === "pause_agent") return "Pausing an agent";
+  if (key === "stop_agent") return "Stopping an agent";
   if (key.includes("web")) return "Searching the web";
   if (key === "code" || key === "bash") return "Running code";
   if (key.startsWith("drive")) return "Working with files";

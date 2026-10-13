@@ -330,7 +330,7 @@ export async function localLogMirror(args: {
     const outcome = task ? lifecycleWakeOutcome(report) : null;
     if (!task || !outcome) return undefined;
     return {
-      key: `${root.id}:${entry.id}:agent-${outcome.kind === "paused" ? "canceled" : outcome.kind}`,
+      key: `${root.id}:${entry.id}:agent-${outcome.kind}`,
       role: "lifecycle",
       type: outcome.kind === "completed" ? "agent-completed" : outcome.kind === "failed" ? "agent-failed" : "agent-canceled",
       timestamp: message.timestamp,
@@ -339,7 +339,6 @@ export async function localLogMirror(args: {
         agentId: task.threadId,
         ...(task.description ? { description: task.description } : {}),
         ...(outcome.kind === "completed" ? { result: outcome.body } : outcome.body ? { error: outcome.body } : {}),
-        ...(outcome.kind === "paused" ? { status: "paused" } : {}),
       },
     };
   };

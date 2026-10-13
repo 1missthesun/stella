@@ -1,4 +1,4 @@
-import { isAgentPauseReason } from "@stella/contracts/agent-status";
+import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
 import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -216,9 +216,7 @@ const cloudAgentThreadsFor = (
         message,
         ...(framed ? { framed } : {}),
       }),
-    pause: async (threadId) => {
-      await threads().pause({ conversationId, threadId, requestId: requestId(`pause:${threadId}:${Date.now()}`) });
-    },
+    stop: async (threadId) => await threads().stop({ conversationId, threadId, requestId: requestId(`stop:${threadId}:${Date.now()}`) }),
   };
 };
 
@@ -259,9 +257,7 @@ const deviceAgentThreadsFor = (
         message,
         ...(framed ? { framed } : {}),
       }),
-    pause: async (threadId) => {
-      await threads().pause({ conversationId, threadId, requestId: requestId(`pause:${threadId}:${Date.now()}`) });
-    },
+    stop: async (threadId) => await threads().stop({ conversationId, threadId, requestId: requestId(`stop:${threadId}:${Date.now()}`) }),
   };
 };
 
@@ -392,10 +388,10 @@ export const piChatsFor = (
           if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to message agents and sessions in the cloud.");
           return await runner.agentThreads.message(args);
         },
-        pause: async (args) => {
+        stop: async (args) => {
           const runner = session.runnerCell.get();
-          if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to pause agents running in the cloud or on your other devices.");
-          return await runner.agentThreads.pause(args);
+          if (!runner?.getStellaSiteAuth()) throw new Error("Sign in to Stella to stop agents running in the cloud or on your other devices.");
+          return await runner.agentThreads.stop(args);
         },
         note: async (args) => {
           const runner = session.runnerCell.get();
@@ -473,12 +469,12 @@ export const piChatsFor = (
               ? { status: "completed" as const, ...(agent.text ? { result: agent.text.slice(0, 30_000) } : {}) }
               : agent.outcome === "failed"
                 ? { status: "error" as const, error: (agent.text || "The agent failed.").slice(0, 10_000) }
-                : { status: "paused" as const }),
+                : { status: "canceled" as const, error: (agent.text || AGENT_STOPPED_REASON).slice(0, 10_000) }),
           });
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },
-      agentReported: (agent) => {
-        // The loop's notice for a finished task.
+      agentReportRelayed: (agent) => {
+        // The loop's notice for a finished task, once Stella has told the user.
         void hostBus
           .request(METHOD_NAMES.HOST_NOTIFICATION_SHOW, {
             title: agent.description.trim() || "Task complete",
@@ -486,6 +482,8 @@ export const piChatsFor = (
             sound: "Glass",
           })
           .catch((error) => console.debug("[pi-chat] agent notification failed", error));
+      },
+      agentReported: (agent) => {
         // A message since has it working again: that run's record stays open.
         if (agent.conversationId.startsWith("local_") || agent.running) return;
         const body = /\n(?:result|error): ([\s\S]*?)(?=\n(?:agent_state|routing|presentation): |$)/.exec(agent.report)?.[1]?.trim();
@@ -502,9 +500,9 @@ export const piChatsFor = (
           });
         })().catch((error) => console.warn("[pi-chat] computer thread completion failed", error));
       },
-      // Paused before it answered: Stella is not woken, but the agent stopped,
+      // Stopped before it answered: Stella is not woken, but the agent stopped,
       // and the phone counts what the owner's records say is running.
-      agentPaused: (agent) => {
+      agentStopped: (agent) => {
         if (agent.conversationId.startsWith("local_")) return;
         void (async () => {
           const runner = session.runnerCell.get();
@@ -512,10 +510,11 @@ export const piChatsFor = (
           await runner.computerAgents.complete({
             agentId: agent.threadId,
             attemptGeneration: agent.attempt,
-            status: "paused",
+            status: "canceled",
+            error: AGENT_STOPPED_REASON,
             ownerGeneration: await runner.cloudJournal.ownerGeneration(),
           });
-        })().catch((error) => console.warn("[pi-chat] computer thread pause failed", error));
+        })().catch((error) => console.warn("[pi-chat] computer thread stop failed", error));
       },
       // A conversation kept on this computer shares the agent loops' chat
       // log; a cloud one shares the journal.
@@ -583,7 +582,7 @@ const piAgentStanding = async (
     return undefined;
   }
   const status = await (await piChatsFor(session, hostBus)).agentStatus(threadId);
-  return status && { status: status.status, attempt: status.attempt, ...(status.status === "canceled" ? { error: "Paused." } : {}) };
+  return status && { status: status.status, attempt: status.attempt, ...(status.status === "canceled" ? { error: AGENT_STOPPED_REASON } : {}) };
 };
 
 const reconciling = new WeakMap<OpenSession, Promise<void>>();
@@ -696,11 +695,11 @@ export const piDeliverAgentMessage = async (
 ) => (await piChatsFor(session, hostBus)).deliverAgentMessage(message.threadId, message.text, message.messageId);
 
 /**
- * A pause from another host for one of this computer's pi agents;
- * `not_found` when no pi conversation here has that agent.
+ * A stop from another host for one of this computer's pi agents, and the
+ * agents below it; `not_found` when no pi conversation here has that agent.
  */
-export const piPauseAgent = async (session: OpenSession, hostBus: HostBus.Interface, threadId: string) =>
-  await (await piChatsFor(session, hostBus)).pauseAgent(threadId);
+export const piStopAgent = async (session: OpenSession, hostBus: HostBus.Interface, threadId: string) =>
+  await (await piChatsFor(session, hostBus)).stopAgent(threadId);
 
 /** An agent's `history.*` call, from its own thread in the pi conversation that holds it. */
 export const piAgentHistory = async (
@@ -759,7 +758,7 @@ export const cancelPiPlacedAgent = async (
 ): Promise<boolean> => {
   persistPiCancel(session, "agent", cancel.runKey, cancel.reason);
   const chats = await chatsBySession.get(session)?.catch(() => undefined);
-  return chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey, isAgentPauseReason(cancel.reason)) === true;
+  return chats?.cancelPlacedAgent(cancel.agentKey, cancel.runKey, isAgentStopReason(cancel.reason)) === true;
 };
 
 /**

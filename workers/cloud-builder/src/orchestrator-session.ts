@@ -7,8 +7,8 @@ import type {
 import type {
   PiHarnessAgentControl,
   PiHarnessAgentControlResult,
-  PiThreadPause,
-  PiThreadPauseResult,
+  PiThreadStop,
+  PiThreadStopResult,
   PiThreadStart,
   PiThreadSteer,
   PiThreadSteerResult,
@@ -84,8 +84,8 @@ export class OrchestratorSession extends DurableObject<Env> {
     return await (await this.loadImplementation()).steerPiThread(input);
   }
 
-  async pausePiThread(input: PiThreadPause): Promise<PiThreadPauseResult> {
-    return await (await this.loadImplementation()).pausePiThread(input);
+  async stopPiThread(input: PiThreadStop): Promise<PiThreadStopResult> {
+    return await (await this.loadImplementation()).stopPiThread(input);
   }
 
   async controlPiHarnessAgent(

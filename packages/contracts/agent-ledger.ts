@@ -79,12 +79,11 @@ export const ledgerAgentFromThread = (
 export const isTopLevelAgent = (agent: { parentAgentId?: string }): boolean =>
   !agent.parentAgentId;
 
-/** An agent's status as a task's: anything still working reads as running, and paused stays paused. */
+/** An agent's status as a task's: anything still working reads as running. */
 export const agentTaskStatus = (status: AgentStatus): TaskLifecycleStatus => {
   switch (status) {
     case "completed":
     case "canceled":
-    case "paused":
       return status;
     case "failed":
       return "error";

@@ -83,7 +83,7 @@ export const deriveLatestAgentPresentationStatus = (
 
 /**
  * A terminal owner is only visually complete once its currently-owned work
- * has settled. Running owners stay running; paused/failed owners keep their
+ * has settled. Running owners stay running; stopped/failed owners keep their
  * explicit terminal state even if a stale child row still says running.
  */
 export const deriveOwnedAgentPresentationStatus = (

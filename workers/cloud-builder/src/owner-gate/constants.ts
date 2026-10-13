@@ -1,6 +1,6 @@
 import type {
   AgentMessageDeviceOutcome,
-  AgentPauseDeviceOutcome,
+  AgentStopDeviceOutcome,
 } from "@stella/contracts/turn-plane/placement";
 
 /** Trusted headers the Worker stamps on a forwarded presence upgrade. */
@@ -40,8 +40,9 @@ export const SNAPSHOT_TTL_MS = 30_000;
 /** How long a steer waits for the device to confirm the agent took it. */
 export const STEER_ACK_TIMEOUT_MS = 10_000;
 export const LOCAL_AGENT_MESSAGE_ACK_TIMEOUT_MS = 8_000;
-export const AGENT_PAUSE_OUTCOMES: ReadonlySet<string> =
-  new Set<AgentPauseDeviceOutcome>([
+export const AGENT_STOP_OUTCOMES: ReadonlySet<string> =
+  new Set<AgentStopDeviceOutcome>([
+    "stopped",
     "paused",
     "not_running",
     "not_found",

@@ -57,6 +57,8 @@ export type CloudOrchestratorCliTurnSpec = {
   systemPrompt: string;
   toolCatalog: CloudOrchestratorToolDescriptor[];
   adoptSession?: CloudOrchestratorCliAdoptedSession;
+  /** No message the user wrote waits for a reply: an empty answer is the turn's reply. */
+  quiet?: boolean;
 };
 
 const ADOPTED_SESSION_ID = /^[A-Za-z0-9][A-Za-z0-9-]{0,127}$/;
@@ -159,6 +161,7 @@ export const parseCloudOrchestratorCliTurnSpec = (
     systemPrompt,
     toolCatalog: catalog,
     ...(adoptSession ? { adoptSession } : {}),
+    ...(value.quiet === true ? { quiet: true } : {}),
   };
 };
 

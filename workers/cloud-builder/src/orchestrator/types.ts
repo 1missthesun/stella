@@ -220,7 +220,7 @@ type PiThreadAttemptRecord = {
   attemptGeneration: number;
   /** pi has it: its agent was started or messaged under its call key. */
   handedOff?: true;
-  /** A pause was asked for: a report without text settles it as canceled. */
+  /** A stop was asked for (named before `stop_agent`): a report without text settles it as canceled. */
   pausing?: true;
   /** The decided outcome, kept while it is delivered. */
   terminal?: PiThreadOutcome & { completedAt: number };

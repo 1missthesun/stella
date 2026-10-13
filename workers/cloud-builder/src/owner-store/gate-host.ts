@@ -5,7 +5,7 @@
  * service secret; now they are object-to-object calls.
  */
 
-import { AGENT_PAUSED_REASON } from "@stella/contracts/backend/agent-threads";
+import { AGENT_STOP_WIRE_REASON } from "@stella/contracts/agent-status";
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import { PLACEMENT_PROTOCOL, type DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import {
@@ -73,8 +73,8 @@ export type GateHostDependencies = {
   steerDispatch: OwnerHost["steerDeviceAgentTurn"];
   /** The gate's message to an agent a device runs locally. */
   messageLocalAgent: OwnerHost["messageLocalAgent"];
-  /** The gate's pause of an agent a device runs locally. */
-  pauseLocalAgent: OwnerHost["pauseLocalAgent"];
+  /** The gate's stop of an agent a device runs locally. */
+  stopLocalAgent: OwnerHost["stopLocalAgent"];
   askDeviceConsent: OwnerHost["askDeviceConsent"];
   /** The gate's own dispatch cancellation. */
   cancelDispatch: (input: OwnerGateCancelInput) => Promise<OwnerGateStatusResult>;
@@ -170,7 +170,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
 
   messageLocalAgent: (input) => deps.messageLocalAgent(input),
 
-  pauseLocalAgent: (input) => deps.pauseLocalAgent(input),
+  stopLocalAgent: (input) => deps.stopLocalAgent(input),
 
   askDeviceConsent: (input) => deps.askDeviceConsent(input),
 
@@ -352,7 +352,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
       turnId: input.turnId,
       attemptGeneration: input.attemptGeneration,
       cancelRequestId: input.cancelRequestId,
-      reason: AGENT_PAUSED_REASON,
+      reason: AGENT_STOP_WIRE_REASON,
     });
   },
 

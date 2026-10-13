@@ -61,11 +61,11 @@ export type AgentDirectoryStatusValue = string | undefined | null;
 
 /**
  * Any host's status word in the shared vocabulary. A word no host writes
- * reads as paused: stopped, and resumable with a message.
+ * reads as canceled: stopped, and resumable with a message.
  */
 export const normalizeAgentDirectoryStatus = (
   status: AgentDirectoryStatusValue,
-): AgentDirectoryStatus => agentStatusOf(status) ?? "paused";
+): AgentDirectoryStatus => agentStatusOf(status) ?? "canceled";
 
 const formatAge = (timestamp: number, now: number): string => {
   const ageMs = Math.max(0, now - timestamp);

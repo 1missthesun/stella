@@ -1,5 +1,5 @@
 /**
- * The cloud agent tools' device branch: spawn, steer, pause and read an agent
+ * The cloud agent tools' device branch: spawn, steer, stop and read an agent
  * that runs on one of the owner's paired devices instead of a BuildSession.
  *
  * The owner's agent-thread ledger holds these threads and offers each attempt
@@ -36,13 +36,14 @@ const STATUSES: readonly CloudAgentControlStatus[] = [
   "completed",
   "failed",
   "canceled",
-  "paused",
 ];
 
 const receiptStatus = (status: string): CloudAgentControlStatus =>
-  STATUSES.includes(status as CloudAgentControlStatus)
-    ? (status as CloudAgentControlStatus)
-    : "failed";
+  status === "paused"
+    ? "canceled"
+    : STATUSES.includes(status as CloudAgentControlStatus)
+      ? (status as CloudAgentControlStatus)
+      : "failed";
 
 const receiptOf = (
   control: AgentThreadControl,

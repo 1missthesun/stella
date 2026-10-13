@@ -43,6 +43,7 @@ import {
   ClaudeCodeCompactionLoopError,
   claudeCodeSubscriptionLimitOf,
   getClaudeCodeStatusChangeFromStreamEvent,
+  isClaudeCodeVisibleOutputNudge,
   isRejectedThinkingSignatureError,
   MAX_COMPACTIONS_PER_TURN,
 } from "@stella/runtime/kernel/integrations/claude-code-session-runtime.js";
@@ -758,6 +759,8 @@ export const runCloudClaude = async (options: {
   cancellation?: NativeTurnCancellation;
   /** Messages for the agent while it works (an agent turn's inbox). */
   inbox?: AgentInbox;
+  /** No message the user wrote waits for a reply: the CLI's nudge for a visible answer ends the turn, empty. */
+  quiet?: boolean;
   /**
    * Run Claude in this thread's keeper, which keeps it for the next turn.
    * `reusable` is false when this turn must start a new process, and
@@ -960,6 +963,7 @@ export const runCloudClaude = async (options: {
     let initialized = resume;
     let compacting = false;
     let compactions = 0;
+    let quieted: Error | undefined;
     const onJson = (event: ClaudeStreamJsonEvent): void => {
         options.onStreamEvent?.(event);
         const type = event.type;
@@ -971,6 +975,13 @@ export const runCloudClaude = async (options: {
           if (unavailable && !cancellation.aborted) {
             error = unavailable;
             cancellation.abort(new Error(unavailable));
+          }
+          return;
+        }
+        if (options.quiet && isClaudeCodeVisibleOutputNudge(event)) {
+          if (!cancellation.aborted) {
+            quieted = new Error("The turn ended with no reply.");
+            cancellation.abort(quieted);
           }
           return;
         }
@@ -1134,10 +1145,13 @@ export const runCloudClaude = async (options: {
     if (initialized) {
       await writeFile(markerPath, `${sessionId}\n`, { mode: 0o600 });
     }
-    if (cancellation.aborted && !error) {
+    const quiet = quieted !== undefined && cancellation.reason === quieted;
+    if (quiet) {
+      finalText = "";
+    } else if (cancellation.aborted && !error) {
       error = cancellation.reason?.message || "Claude Code turn was canceled.";
     }
-    if (result.exitCode !== 0 && !error) {
+    if (result.exitCode !== 0 && !error && !quiet) {
       error =
         result.stderr.trim().slice(-4_000) ||
         `Claude Code exited with status ${result.exitCode ?? "unknown"}.`;
@@ -1266,6 +1280,7 @@ export const runNativeAgentTurn = async (options: {
   onStreamEvent?: (event: ClaudeStreamJsonEvent) => void;
   cancellation?: NativeTurnCancellation;
   inbox?: AgentInbox;
+  quiet?: boolean;
   /** This thread's Claude keeper; without one each turn starts Claude. */
   keeper?: CloudClaudeKeeperInput;
 }): Promise<NativeAgentTurnResult> => {
@@ -1343,6 +1358,7 @@ export const runNativeAgentTurn = async (options: {
       ...(options.onStreamEvent ? { onStreamEvent: options.onStreamEvent } : {}),
       ...(options.cancellation ? { cancellation: options.cancellation } : {}),
       ...(options.inbox ? { inbox: options.inbox } : {}),
+      ...(options.quiet ? { quiet: true } : {}),
       ...(keeper
         ? {
             keeper: {

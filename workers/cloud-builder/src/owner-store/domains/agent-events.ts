@@ -252,7 +252,7 @@ export const endedKind = (applied: AgentChangeApplied): AgentEventKind => {
 };
 
 export const startedKind = (applied: AgentChangeApplied): AgentEventKind =>
-  applied.threadBefore?.status === "paused" ? "resumed" : "attempt_started";
+  applied.threadBefore?.status === "canceled" || applied.threadBefore?.status === "paused" ? "resumed" : "attempt_started";
 
 export const agentChangeHooks: Array<
   (db: OwnerDb, threadId: string, now: number) => void

@@ -89,7 +89,7 @@ const WAKE_OUTCOMES: Readonly<Record<string, AgentAttemptOutcome>> = {
   "Agent canceled": "canceled",
   "Task failed": "failed",
   "Task canceled": "canceled",
-  "Subagent paused": "paused",
+  "Subagent paused": "canceled",
 };
 const WAKE_TRAILER_RE = /^(?:agent_state|presentation|routing|error):/;
 

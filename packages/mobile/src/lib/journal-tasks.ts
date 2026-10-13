@@ -342,7 +342,7 @@ const ledgerTask = (id: string, row: LedgerAgent, base?: MobileTask): MobileTask
  * The conversation's tasks with the agent ledger's word on each: an agent
  * it has a row for takes that row's status and title, whatever the journal
  * fold or the conversation's running list said, so a lost card can't leave
- * it running and a paused one reads paused. The ledger's other agents join
+ * it running and a stopped one reads stopped. The ledger's other agents join
  * the list. An agent it has no row for (one from before ledger rows) keeps
  * the journal's word, as does every agent while the ledger has not loaded.
  */

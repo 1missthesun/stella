@@ -89,7 +89,7 @@ const createPiFeed = (args: {
         outcome === "completed"
           ? agentCompletedUpdate(body)
           : agentFailedUpdate(
-              outcome === "canceled" ? "was canceled" : outcome === "paused" ? "was paused" : "failed",
+              outcome === "canceled" ? "was stopped" : "failed",
               body,
             ),
     };

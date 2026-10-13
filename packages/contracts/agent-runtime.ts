@@ -244,8 +244,7 @@ export type TaskLifecycleStatus =
   | "running"
   | "completed"
   | "error"
-  | "canceled"
-  | "paused";
+  | "canceled";
 
 /**
  * Redacted task-scoped tool state used by the Activity summary engine.
@@ -274,8 +273,8 @@ export const AGENT_RUN_FINISH_OUTCOMES = {
   CANCELED: "canceled",
 } as const satisfies Record<string, TerminalTaskLifecycleStatus>;
 
-/** How a run (not an agent) finished; a run is never paused, its agent is. */
-export type AgentRunFinishOutcome = Exclude<TerminalTaskLifecycleStatus, "paused">;
+/** How a run (not an agent) finished. */
+export type AgentRunFinishOutcome = TerminalTaskLifecycleStatus;
 
 export const TOOL_IDS = {
   NO_RESPONSE: "NoResponse",

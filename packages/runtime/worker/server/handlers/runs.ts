@@ -5,7 +5,7 @@ import {
   type RuntimeAttachmentRef,
   type RuntimeLocalAgentCancellationRequest,
   type RuntimeLocalAgentMessageRequest,
-  type RuntimeLocalAgentPauseRequest,
+  type RuntimeLocalAgentStopRequest,
   type RuntimeLocalAgentSteerRequest,
   type RuntimeLocalAgentRequest,
   type RuntimeOneShotCompletionRequest,
@@ -21,7 +21,7 @@ import {
   cancelPiPlacement,
   piChatsFor,
   piDeliverAgentMessage,
-  piPauseAgent,
+  piStopAgent,
   piPlacementCanceled,
   piPlacedChat,
 } from "../pi-chats.js";
@@ -170,7 +170,13 @@ export const runsHandlers: WorkerRpcHandlers = {
         if (result.status === "moved") return { status: "ok" as const, finalText: "", threadId: result.threadId };
         return result.status === "ok"
           ? { status: "ok" as const, finalText: result.finalText, threadId: result.threadId }
-          : { status: result.status, finalText: "" as const, error: result.error, threadId: result.threadId };
+          : {
+              status: result.status,
+              finalText: "" as const,
+              error: result.error,
+              threadId: result.threadId,
+              ...("stopped" in result && result.stopped ? { stopped: true as const } : {}),
+            };
       });
     }),
 
@@ -208,18 +214,18 @@ export const runsHandlers: WorkerRpcHandlers = {
       return { outcome };
     }),
 
-  [METHOD_NAMES.INTERNAL_WORKER_PAUSE_LOCAL_AGENT]: (params) =>
+  [METHOD_NAMES.INTERNAL_WORKER_STOP_LOCAL_AGENT]: (params) =>
     Effect.gen(function* () {
       const session = yield* WorkerSessions.sessionOrFail(
         () => new RunnerUnavailableError(),
       );
-      const payload = params as RuntimeLocalAgentPauseRequest;
+      const payload = params as RuntimeLocalAgentStopRequest;
       const threadId = String(payload.threadId ?? "");
       const hostBus = yield* HostBus.Service;
-      const outcome = yield* fromPromise(() =>
-        piPauseAgent(session, hostBus, threadId),
+      const stopped = yield* fromPromise(() =>
+        piStopAgent(session, hostBus, threadId),
       );
-      return { outcome };
+      return { outcome: stopped === "not_found" ? "not_found" : "stopped" };
     }),
 
   [METHOD_NAMES.INTERNAL_WORKER_CANCEL_BLOCKING_AGENT]: (params) =>

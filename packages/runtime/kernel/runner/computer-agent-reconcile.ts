@@ -6,7 +6,7 @@
  * them (the owner posts each attempt's start and end there), which is what a
  * paired phone counts as running. An agent this computer stopped without
  * telling them stays "running" there for good: a crash or a kill mid-run, or
- * a pause from a build that never reported one. So on every start and
+ * a stop from a build that never reported one. So on every start and
  * reconnect, each agent the records say runs here and does not is settled
  * with how it actually ended, or as interrupted when nothing here knows it.
  *
@@ -16,7 +16,7 @@
 
 /** How one agent stands on this computer. `attempt` is the newest one it started. */
 export type ComputerAgentStanding = {
-  status: "running" | "completed" | "error" | "canceled" | "paused";
+  status: "running" | "completed" | "error" | "canceled";
   attempt: number;
   /** Why it stopped short, for a canceled or failed one. */
   error?: string;
@@ -38,7 +38,7 @@ export const reconcileComputerAgents = async (args: {
   complete(input: {
     threadId: string;
     attemptGeneration: number;
-    status: "completed" | "failed" | "canceled" | "paused";
+    status: "completed" | "failed" | "canceled";
     error?: string;
   }): Promise<unknown>;
   cancel(input: { threadId: string; attemptGeneration: number; reason: string }): Promise<unknown>;
@@ -63,7 +63,7 @@ export const reconcileComputerAgents = async (args: {
         threadId: thread.threadId,
         attemptGeneration: thread.attemptGeneration,
         status: here.status === "error" ? "failed" : here.status,
-        ...(here.status !== "completed" && here.status !== "paused"
+        ...(here.status !== "completed"
           ? { error: here.error?.trim() || INTERRUPTED_AGENT_REASON }
           : {}),
       });

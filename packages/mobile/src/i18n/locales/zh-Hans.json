@@ -257,6 +257,22 @@
       },
       "voiceSession": {
         "label": "与 Stella 通话"
+      },
+      "catchUp": {
+        "pill": "摘要",
+        "pillLabel": "摘要：{count} 条新消息",
+        "title": "摘要",
+        "done": "已完成",
+        "ongoing": "进行中",
+        "waiting": "等你处理",
+        "loading": "正在整理…",
+        "failed": "无法生成这次摘要。",
+        "retry": "重试",
+        "empty": "没有值得一提的新内容。",
+        "you": "你",
+        "stella": "Stella",
+        "close": "关闭",
+        "notLoaded": "该消息已不在对话中。"
       }
     },
     "media": {

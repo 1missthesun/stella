@@ -110,6 +110,13 @@ import {
 } from "./chat/Composer";
 import { CatchUpPill, ScrollToBottomFab } from "./chat/FloatingControls";
 import {
+  SummaryPill,
+  SummaryPopover,
+  useConversationSummaries,
+} from "./chat/ConversationSummary";
+import type { CatchUpLink } from "@stella/contracts/backend/catch-ups";
+import { isGuest } from "../lib/guest-mode";
+import {
   type AnchorRect,
   type PlusMenuOption,
   PlusMenuPopover,
@@ -1917,6 +1924,57 @@ export function ChatPane({
     searchQuery,
   );
 
+  // Summaries: the pill above the composer after a busy stretch, and the
+  // links in them, which jump to the message they came from (paging older
+  // history in until it is loaded).
+  const summaries = useConversationSummaries(
+    conversationId,
+    visibleMessages,
+    Boolean(conversationId) && !isGuest(),
+  );
+  const [summaryOpen, setSummaryOpen] = useState<{ requestNew: boolean } | null>(null);
+  const [summaryJump, setSummaryJump] = useState<{ link: CatchUpLink; pages: number } | null>(null);
+  useEffect(() => {
+    if (!summaryJump) return;
+    const { link } = summaryJump;
+    const index = listMessages.findIndex(
+      (message) =>
+        message.sequence === link.seq ||
+        link.messageIds.includes(message.id) ||
+        (message.canonicalId !== undefined && link.messageIds.includes(message.canonicalId)),
+    );
+    if (index >= 0) {
+      setSummaryJump(null);
+      scroll.listRef.current?.scrollToIndex({ index, animated: true, viewOffset: topInset + 24 });
+      return;
+    }
+    if (historyPageLoading) return;
+    if (!hasOlderHistory || !onLoadOlderHistory || summaryJump.pages >= 8) {
+      setSummaryJump(null);
+      Alert.alert(t("app.chat.catchUp.notLoaded"));
+      return;
+    }
+    setSummaryJump({ link, pages: summaryJump.pages + 1 });
+    void onLoadOlderHistory();
+  }, [
+    hasOlderHistory,
+    historyPageLoading,
+    listMessages,
+    onLoadOlderHistory,
+    scroll.listRef,
+    summaryJump,
+    t,
+    topInset,
+  ]);
+  const openSummary = useCallback(() => {
+    inputRef.current?.blur();
+    setSummaryOpen({
+      requestNew: summaries.offer.count > 0 && !summaries.pending,
+    });
+  }, [summaries.offer.count, summaries.pending]);
+  const showSummaryPill =
+    (summaries.offer.offer || summaries.pending) && !searchOpen;
+
   const jumpToMessage = useCallback(
     (index: number) => {
       search.close();
@@ -2242,6 +2300,13 @@ export function ChatPane({
               </Text>
             </View>
           ) : null}
+          {showSummaryPill ? (
+            <SummaryPill
+              count={summaries.offer.count}
+              onPress={openSummary}
+              colors={colors}
+            />
+          ) : null}
           <Composer
             colors={colors}
             inputRef={inputRef}
@@ -2301,6 +2366,16 @@ export function ChatPane({
           readAloud={readAloud.enabled}
           onReadAloudChange={(next) => void readAloud.setEnabled(next)}
         />
+        {summaryOpen && conversationId ? (
+          <SummaryPopover
+            conversationId={conversationId}
+            catchUps={summaries.catchUps}
+            requestNew={summaryOpen.requestNew}
+            onJump={(link) => setSummaryJump({ link, pages: 0 })}
+            onClose={() => setSummaryOpen(null)}
+            colors={colors}
+          />
+        ) : null}
         {messageMenu && messageMenuActions.length > 0 ? (
           <MessageContextMenu
             key={messageMenu.message.id}

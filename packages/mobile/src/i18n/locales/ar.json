@@ -282,6 +282,22 @@
       },
       "voiceSession": {
         "label": "تحدّثت مع Stella"
+      },
+      "catchUp": {
+        "pill": "ملخص",
+        "pillLabel": "ملخص لـ {count} رسائل جديدة",
+        "title": "ملخص",
+        "done": "تم",
+        "ongoing": "قيد التنفيذ",
+        "waiting": "بانتظارك",
+        "loading": "جارٍ التلخيص…",
+        "failed": "تعذّرت كتابة هذا الملخص.",
+        "retry": "حاول مجددًا",
+        "empty": "لا جديد يستحق الذكر.",
+        "you": "أنت",
+        "stella": "Stella",
+        "close": "إغلاق",
+        "notLoaded": "لم تعد هذه الرسالة في المحادثة."
       }
     },
     "media": {

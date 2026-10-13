@@ -262,6 +262,22 @@
       },
       "voiceSession": {
         "label": "Mit Stella gesprochen"
+      },
+      "catchUp": {
+        "pill": "Zusammenfassung",
+        "pillLabel": "Zusammenfassung von {count} neuen Nachrichten",
+        "title": "Zusammenfassung",
+        "done": "Erledigt",
+        "ongoing": "In Arbeit",
+        "waiting": "Wartet auf dich",
+        "loading": "Fasse zusammen…",
+        "failed": "Diese Zusammenfassung konnte nicht erstellt werden.",
+        "retry": "Erneut versuchen",
+        "empty": "Nichts Neues von Bedeutung.",
+        "you": "Du",
+        "stella": "Stella",
+        "close": "Schließen",
+        "notLoaded": "Diese Nachricht ist nicht mehr im Chat."
       }
     },
     "media": {

@@ -262,6 +262,22 @@
       },
       "voiceSession": {
         "label": "Puhuit Stellan kanssa"
+      },
+      "catchUp": {
+        "pill": "Kooste",
+        "pillLabel": "Kooste {count} uudesta viestistä",
+        "title": "Kooste",
+        "done": "Valmis",
+        "ongoing": "Käynnissä",
+        "waiting": "Odottaa sinua",
+        "loading": "Koostetaan…",
+        "failed": "Koostetta ei voitu kirjoittaa.",
+        "retry": "Yritä uudelleen",
+        "empty": "Ei mitään uutta mainittavaa.",
+        "you": "Sinä",
+        "stella": "Stella",
+        "close": "Sulje",
+        "notLoaded": "Viesti ei ole enää keskustelussa."
       }
     },
     "media": {

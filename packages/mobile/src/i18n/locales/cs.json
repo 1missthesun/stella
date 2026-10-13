@@ -272,6 +272,22 @@
       },
       "voiceSession": {
         "label": "Rozhovor se Stellou"
+      },
+      "catchUp": {
+        "pill": "Shrnutí",
+        "pillLabel": "Shrnutí {count} nových zpráv",
+        "title": "Shrnutí",
+        "done": "Hotovo",
+        "ongoing": "Probíhá",
+        "waiting": "Čeká na vás",
+        "loading": "Shrnuji…",
+        "failed": "Shrnutí se nepodařilo napsat.",
+        "retry": "Zkusit znovu",
+        "empty": "Nic nového k zmínění.",
+        "you": "Vy",
+        "stella": "Stella",
+        "close": "Zavřít",
+        "notLoaded": "Tato zpráva už v chatu není."
       }
     },
     "media": {

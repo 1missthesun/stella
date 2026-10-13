@@ -267,6 +267,22 @@
       },
       "voiceSession": {
         "label": "Conversation avec Stella"
+      },
+      "catchUp": {
+        "pill": "Résumé",
+        "pillLabel": "Résumer {count} nouveaux messages",
+        "title": "Résumé",
+        "done": "Terminé",
+        "ongoing": "En cours",
+        "waiting": "En attente de vous",
+        "loading": "Résumé en cours…",
+        "failed": "Impossible d’écrire ce résumé.",
+        "retry": "Réessayer",
+        "empty": "Rien de nouveau à signaler.",
+        "you": "Vous",
+        "stella": "Stella",
+        "close": "Fermer",
+        "notLoaded": "Ce message n’est plus dans la conversation."
       }
     },
     "media": {

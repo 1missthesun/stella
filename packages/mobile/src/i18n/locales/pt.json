@@ -267,6 +267,22 @@
       },
       "voiceSession": {
         "label": "Você conversou com a Stella"
+      },
+      "catchUp": {
+        "pill": "Resumo",
+        "pillLabel": "Resumir {count} mensagens novas",
+        "title": "Resumo",
+        "done": "Concluído",
+        "ongoing": "Em andamento",
+        "waiting": "Aguardando você",
+        "loading": "Resumindo…",
+        "failed": "Não foi possível escrever este resumo.",
+        "retry": "Tentar novamente",
+        "empty": "Nada de novo a destacar.",
+        "you": "Você",
+        "stella": "Stella",
+        "close": "Fechar",
+        "notLoaded": "Essa mensagem não está mais no chat."
       }
     },
     "media": {

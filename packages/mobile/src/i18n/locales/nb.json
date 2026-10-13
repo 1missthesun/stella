@@ -262,6 +262,22 @@
       },
       "voiceSession": {
         "label": "Snakket med Stella"
+      },
+      "catchUp": {
+        "pill": "Oppsummering",
+        "pillLabel": "Oppsummer {count} nye meldinger",
+        "title": "Oppsummering",
+        "done": "Ferdig",
+        "ongoing": "Pågår",
+        "waiting": "Venter på deg",
+        "loading": "Oppsummerer…",
+        "failed": "Kunne ikke skrive oppsummeringen.",
+        "retry": "Prøv igjen",
+        "empty": "Ikke noe nytt verdt å nevne.",
+        "you": "Deg",
+        "stella": "Stella",
+        "close": "Lukk",
+        "notLoaded": "Den meldingen er ikke lenger i chatten."
       }
     },
     "media": {

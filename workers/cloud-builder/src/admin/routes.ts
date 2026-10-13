@@ -278,9 +278,15 @@ const testAccountSession = async (request: Request, env: AdminEnv): Promise<Resp
     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".charAt(byte % 52),
   ).join("");
   // Better Auth 1.7's magic-link record: a `magic-link:`-prefixed identifier
-  // (tokens are stored plain) and a typed value.
+  // holding the token's SHA-256 (base64url, no padding), because auth.ts sets
+  // magicLink({ storeToken: "hashed" }), and a typed value.
+  const tokenDigest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token)));
+  const storedToken = btoa(String.fromCharCode(...tokenDigest))
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replace(/=+$/, "");
   await context.internalAdapter.createVerificationValue({
-    identifier: `magic-link:${token}`,
+    identifier: `magic-link:${storedToken}`,
     value: JSON.stringify({ type: "magic-link", email, name: "" }),
     expiresAt: new Date(Date.now() + 5 * 60_000),
   });

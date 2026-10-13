@@ -1,7 +1,15 @@
 /* Working indicator — the character mark plus, while a tool runs, its label.
    It wears the assistant bubble's own fill and radius so thinking and tool states read as an incoming message rather
    than as separate chrome sitting under the conversation. */
+/* The indicator is a one-line reply bubble: the same padding, radius, text
+   size and line height as `.assistant-message-text`, with the mark sized to
+   that line, so it is exactly as tall and as round as the reply that takes
+   its place. */
 .working-indicator {
+  --working-indicator-line: calc(
+    var(--chat-text-size, var(--font-size-lg)) *
+      var(--chat-text-line-height, 1.5)
+  );
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -9,15 +17,15 @@
   border-radius: var(--radius-3xl);
   background: var(--chat-assistant-bubble-fill);
   border: none;
-  font-size: var(--font-size-md);
+  font-size: var(--chat-text-size, var(--font-size-lg));
+  line-height: var(--working-indicator-line);
   color: var(--chat-assistant-bubble-text, var(--text-base));
   animation: stream-fade-in 0.4s ease-out both;
 }
 
-/* Thinking has no label, so the pill closes up around the mark alone
+/* Thinking has no label, so the bubble closes up around the mark alone
    instead of leaving a gap where the status text would have gone. */
 .working-indicator[data-mode="thinking"] {
-  padding: 8px;
   gap: 0;
 }
 
@@ -110,7 +118,10 @@
    * pill so the indicator's line doesn't jitter while the label/shimmer
    * swaps. The collapse-to-nothing on idle is handled by the footer
    * wrapper's `:has(--vacated)` rule below, not here. */
-  min-height: 36px;
+  min-height: calc(
+    var(--chat-text-size, var(--font-size-lg)) *
+      var(--chat-text-line-height, 1.5) + 16px
+  );
   pointer-events: none;
 }
 
@@ -233,8 +244,8 @@
    simply 30px and the mark fills it. `overflow: visible` on the svg lets the
    rig's glow and sparkles reach past the box without widening the row. */
 .indicator-stella {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: var(--working-indicator-line, 24px);
   flex-shrink: 0;
   display: flex;
   align-items: center;

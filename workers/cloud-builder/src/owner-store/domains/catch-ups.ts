@@ -17,6 +17,7 @@ import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type {
   CatchUp,
   CatchUpItem,
+  CatchUpLink,
   CatchUpState,
 } from "@stella/contracts/backend/catch-ups";
 import type {
@@ -51,7 +52,7 @@ const FIRST_MIN_MESSAGES = 20;
 /** Messages before the new ones, for context only. */
 const CONTEXT_MESSAGES = 6;
 const CONTEXT_MESSAGE_CHARS = 400;
-const MAX_ITEMS = 6;
+const MAX_ITEMS = 5;
 const ITEM_CHARS = 160;
 const MAX_LINKS = 2;
 
@@ -126,15 +127,19 @@ const toCatchUp = (row: Row): CatchUp => ({
   ...(row.error ? { error: row.error } : {}),
 });
 
-const listFor = (db: OwnerDbReader, conversationId: string): CatchUp[] =>
-  db
+/** Oldest first. A failed one shows only while it is the newest, for its retry. */
+const listFor = (db: OwnerDbReader, conversationId: string): CatchUp[] => {
+  const rows = db
     .all<Row>(
       `SELECT * FROM catch_ups WHERE conversation_id = ? ORDER BY created_at DESC LIMIT ?`,
       conversationId,
       LISTED,
     )
-    .reverse()
+    .reverse();
+  return rows
+    .filter((row, index) => row.state !== "failed" || index === rows.length - 1)
     .map(toCatchUp);
+};
 
 const latestReady = (db: OwnerDbReader, conversationId: string): Row | null =>
   db.one<Row>(
@@ -226,14 +231,15 @@ export const selectMessages = (
 
 const SYSTEM_PROMPT = [
   "You write catch-ups for the user of Stella, a personal assistant that runs many background agents at once and relays their reports into one chat.",
-  "When a lot happens quickly the user loses track; a catch-up tells them where things stand in a few seconds.",
+  "When a lot happens quickly the user loses track; a catch-up tells them where things stand in five seconds of reading.",
   `Call ${WRITE_TOOL} once with three lists:`,
-  "- done: work that finished, things that were decided or answered.",
+  "- waiting: every question, approval or decision Stella or an agent put to the user that a later user message doesn't answer. Check each Stella message ending in a question; small questions count too.",
   "- ongoing: work still in progress (the running agents listed, and anything Stella said is under way).",
-  "- waiting: questions, approvals and decisions Stella or an agent put to the user that the user has not answered in the messages shown.",
-  "Each item is one short plain line, at most 14 words, naming the specific thing (the feature, file, person, place), with no filler or praise.",
-  "Merge related messages into one item. Leave out small talk and anything superseded. Fewer items is better; an empty list is fine.",
-  "Give each item the ids of the one or two messages that best show it (the user can tap to jump there), most useful first.",
+  "- done: outcomes worth remembering: work that finished, decisions made, answers the user will act on.",
+  `At most ${MAX_ITEMS - 1} items per list, each one plain line of at most 12 words naming the specific thing (the feature, file, person, place). No filler.`,
+  "Merge related messages into one item. Each thing goes in one list only: an open question goes in waiting and nowhere else.",
+  "Leave out small talk and throwaway one-off answers (a conversion, a joke, a poem) unless nothing else happened. Fewer items is better; an empty list is fine.",
+  "Give each item the ids of the one or two messages that best show it (m ids for new messages, the p id for a carried item), most useful first; the user taps them to jump there.",
 ].join("\n");
 
 const WRITE_TOOLS: Tool[] = [
@@ -314,10 +320,12 @@ const promptFor = (input: {
     `${id ? `[${id}] ` : ""}${message.role === "user" ? "User" : "Stella"} (${minutesAgo(message.at, input.now)}): ${clip(message.text, max)}`;
   const sections: string[] = [];
   if (input.previous) {
-    const items = (list: CatchUpItem[]) => list.map((item) => `- ${item.text}`).join("\n") || "- (none)";
+    const carried = carriedItems(input.previous);
+    const items = (list: CatchUpItem[]) =>
+      list.map((item) => `- [p${carried.indexOf(item) + 1}] ${item.text}`).join("\n") || "- (none)";
     sections.push(
       [
-        "The previous catch-up the user already read. Carry an item forward only if it is still true and not covered by the new messages:",
+        "The previous catch-up the user already read. Carry an item forward (citing its p id) only if it is still true and the new messages don't settle it:",
         `Ongoing then:\n${items(input.previous.ongoing)}`,
         `Waiting on the user then:\n${items(input.previous.waiting)}`,
       ].join("\n"),
@@ -339,31 +347,54 @@ const promptFor = (input: {
   return sections.join("\n\n");
 };
 
-const itemsFrom = (raw: unknown, fresh: CatchUpSourceMessage[]): CatchUpItem[] =>
+/** The previous catch-up's open items, which the prompt names p1, p2, … */
+const carriedItems = (previous: Body): CatchUpItem[] => [...previous.ongoing, ...previous.waiting];
+
+const itemsFrom = (
+  raw: unknown,
+  fresh: CatchUpSourceMessage[],
+  carried: CatchUpItem[],
+): CatchUpItem[] =>
   (Array.isArray(raw) ? raw : []).slice(0, MAX_ITEMS).flatMap((entry) => {
     const item = entry && typeof entry === "object" ? (entry as Record<string, unknown>) : null;
     const text = typeof item?.text === "string" ? clip(item.text, ITEM_CHARS) : "";
     if (!text) return [];
     const ids = Array.isArray(item?.ids) ? item.ids : [];
-    const seen = new Set<number>();
-    const links = ids.flatMap((id) => {
-      const index = Number(String(id).trim().replace(/^\[?m/iu, "").replace(/\]$/u, "")) - 1;
-      const message = fresh[index];
-      if (!message || seen.has(index)) return [];
-      seen.add(index);
-      return [{ role: message.role, messageIds: message.messageIds, seq: message.seq, at: message.at }];
-    });
+    const links: CatchUpLink[] = [];
+    for (const id of ids) {
+      const match = /^\[?([mp])(\d+)\]?$/iu.exec(String(id).trim());
+      if (!match) continue;
+      const index = Number(match[2]) - 1;
+      // A carried item keeps the links it had.
+      const found: CatchUpLink[] =
+        match[1]!.toLowerCase() === "p"
+          ? (carried[index]?.links ?? [])
+          : fresh[index]
+            ? [{
+                role: fresh[index]!.role,
+                messageIds: fresh[index]!.messageIds,
+                seq: fresh[index]!.seq,
+                at: fresh[index]!.at,
+              }]
+            : [];
+      for (const link of found) {
+        if (!links.some((existing) => existing.seq === link.seq)) links.push(link);
+      }
+    }
     return [{ text, links: links.slice(0, MAX_LINKS) }];
   });
 
 type SummarizeInput = Parameters<typeof promptFor>[0] & { catchUpId: string };
 type Snapshot = Awaited<ReturnType<OwnerContext["host"]["snapshot"]>>;
 
-const bodyFrom = (raw: Record<string, unknown>, fresh: CatchUpSourceMessage[]): Body => ({
-  done: itemsFrom(raw.done, fresh),
-  ongoing: itemsFrom(raw.ongoing, fresh),
-  waiting: itemsFrom(raw.waiting, fresh),
-});
+const bodyFrom = (raw: Record<string, unknown>, input: SummarizeInput): Body => {
+  const carried = input.previous ? carriedItems(input.previous) : [];
+  return {
+    done: itemsFrom(raw.done, input.fresh, carried),
+    ongoing: itemsFrom(raw.ongoing, input.fresh, carried),
+    waiting: itemsFrom(raw.waiting, input.fresh, carried),
+  };
+};
 
 /**
  * Who writes it: someone on Claude Code gets Claude Code itself (Haiku at
@@ -390,7 +421,7 @@ const summarize = async (
         });
         if (outcome.kind === "ok" && outcome.output && typeof outcome.output === "object") {
           return {
-            body: bodyFrom(outcome.output as Record<string, unknown>, input.fresh),
+            body: bodyFrom(outcome.output as Record<string, unknown>, input),
             model: outcome.model,
           };
         }
@@ -455,23 +486,47 @@ const summarizeWithStella = async (
       models: [spec],
     }),
   );
-  const answer = await models.completeSimple(
-    stellaModel(spec, relayBaseUrl),
-    {
-      systemPrompt: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: promptFor(input), timestamp: Date.now() }],
-      tools: WRITE_TOOLS,
-    },
-    { maxTokens: MAX_OUTPUT_TOKENS, signal: AbortSignal.timeout(MODEL_TIMEOUT_MS) },
-  );
-  if (answer.stopReason === "error" || answer.stopReason === "aborted") {
-    throw new Error(clip(answer.errorMessage ?? "The catch-up model call failed.", 300));
+  // The model now and then answers in prose instead of calling the tool:
+  // take a JSON object it wrote instead, or ask once more.
+  for (let attempt = 0; ; attempt += 1) {
+    const answer = await models.completeSimple(
+      stellaModel(spec, relayBaseUrl),
+      {
+        systemPrompt: SYSTEM_PROMPT,
+        messages: [{ role: "user", content: promptFor(input), timestamp: Date.now() }],
+        tools: WRITE_TOOLS,
+      },
+      { maxTokens: MAX_OUTPUT_TOKENS, signal: AbortSignal.timeout(MODEL_TIMEOUT_MS) },
+    );
+    if (answer.stopReason === "error" || answer.stopReason === "aborted") {
+      throw new Error(clip(answer.errorMessage ?? "The catch-up model call failed.", 300));
+    }
+    const call = answer.content.find(
+      (part): part is ToolCall => part.type === "toolCall" && part.name === WRITE_TOOL,
+    );
+    const written = call?.arguments ?? jsonObjectIn(
+      answer.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n"),
+    );
+    if (written) return { body: bodyFrom(written, input), model: execution.model };
+    if (attempt >= 1) throw new Error("The catch-up model wrote no catch-up.");
   }
-  const call = answer.content.find(
-    (part): part is ToolCall => part.type === "toolCall" && part.name === WRITE_TOOL,
-  );
-  if (!call) throw new Error("The catch-up model wrote no catch-up.");
-  return { body: bodyFrom(call.arguments, input.fresh), model: execution.model };
+};
+
+/** A `{done, ongoing, waiting}` object written as text, fenced or not. */
+const jsonObjectIn = (text: string): Record<string, unknown> | null => {
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start) return null;
+  try {
+    const parsed = JSON.parse(text.slice(start, end + 1)) as unknown;
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) &&
+      ["done", "ongoing", "waiting"].some((key) => key in parsed)
+      ? (parsed as Record<string, unknown>)
+      : null;
+  } catch {
+    return null;
+  }
+
 };
 
 const generate = async (ctx: OwnerContext, payload: unknown): Promise<void> => {

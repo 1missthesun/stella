@@ -91,23 +91,37 @@ export const catchUpMessagesFromJournal = (
 /** Stella's messages in this window, after the last catch-up, make a busy stretch. */
 export const CATCH_UP_BUSY_MESSAGES = 6;
 export const CATCH_UP_BUSY_WINDOW_MS = 20 * 60_000;
+/** Opening the pill asks for a new summary only when at least this many of Stella's messages are new. */
+export const CATCH_UP_MIN_NEW_MESSAGES = 3;
+/** After a summary lands the pill stays this long, so it can be read again (on any device). */
+export const CATCH_UP_LINGER_MS = 15 * 60_000;
 
 /**
  * Whether to offer a catch-up, and over how many of Stella's messages: once
  * at least `CATCH_UP_BUSY_MESSAGES` of hers arrived within
  * `CATCH_UP_BUSY_WINDOW_MS` of each other since the newest catch-up, the
  * offer stands until a catch-up covers them, however quiet it got since.
+ * `count` is Stella's messages no catch-up covers yet.
  */
 export const catchUpOffer = (
   messages: ReadonlyArray<{ role: string; at: number }>,
   catchUps: readonly CatchUp[],
-): { offer: boolean; count: number } => {
+  now: number = Date.now(),
+): {
+  offer: boolean;
+  count: number;
+  /** Until when the newest summary keeps the pill up without an offer; 0 for none. */
+  lingerUntil: number;
+} => {
   let since = 0;
+  let newestAt = 0;
   for (const catchUp of catchUps) {
     if (catchUp.state === "ready" && catchUp.throughAt !== undefined) {
       since = Math.max(since, catchUp.throughAt);
+      newestAt = Math.max(newestAt, catchUp.createdAt);
     }
   }
+  const lingerUntil = newestAt && newestAt + CATCH_UP_LINGER_MS > now ? newestAt + CATCH_UP_LINGER_MS : 0;
   const times = messages
     .filter((message) => message.role === "assistant" && message.at > since)
     .map((message) => message.at)
@@ -116,5 +130,5 @@ export const catchUpOffer = (
   for (let end = CATCH_UP_BUSY_MESSAGES - 1; end < times.length && !busy; end += 1) {
     busy = times[end]! - times[end - CATCH_UP_BUSY_MESSAGES + 1]! <= CATCH_UP_BUSY_WINDOW_MS;
   }
-  return { offer: busy, count: times.length };
+  return { offer: busy, count: times.length, lingerUntil };
 };

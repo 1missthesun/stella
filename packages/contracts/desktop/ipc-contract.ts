@@ -715,7 +715,6 @@ export type NativeIntegration = {
   oauthProviderTemplate?: boolean;
   enabled: boolean;
   enabledAt?: number;
-  skillPath?: string;
   toolCount: number;
   actionCount?: number;
 };

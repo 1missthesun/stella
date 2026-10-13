@@ -14,7 +14,7 @@
  *   same `acquireAbortLatch` bridge the agent loop uses; each caller keeps
  *   its own abort-error builder so legacy per-module messages stay
  *   byte-identical.
- * - This module is bundled into the standalone CLI binaries (stella-connect
+ * - This module is bundled into the standalone CLI binaries (their import
  *   cone already carries `effect`; the esbuild CLI bundle handles it).
  */
 

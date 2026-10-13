@@ -47,6 +47,7 @@ export type StellaPromptRenderContext = Readonly<{
 
 export const STELLA_PROMPT_FENCE_TOOLS = [
   "ask_user",
+  "code",
   "history",
   "memory",
   "request_secure_input",

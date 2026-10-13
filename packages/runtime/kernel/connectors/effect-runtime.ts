@@ -8,8 +8,7 @@
  *   rides in closures, never per-call `Effect.runPromise`.
  * - Promise facades rethrow the ORIGINAL failure via `Cause.squash`, so
  *   callers observe byte-identical error objects and messages (OAuth error
- *   strings are user-visible and matched by callers such as
- *   `stella-connect`).
+ *   strings are user-visible and matched by callers).
  * - `fetch` seams still need a real `AbortSignal`, so the seam
  *   `AbortController`s stay in their owning modules as sanctioned ratchet
  *   pins; only the timers move onto Effect fibers.

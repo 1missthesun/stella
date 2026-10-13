@@ -274,12 +274,11 @@ const BLOCKED_NODE_MODULE_RE =
 const CONNECT_METHODS = new Set<ConnectMethod>([
   "discover",
   "connectors",
-  "actions",
-  "schema",
-  "call",
   "addMcp",
   "remove",
 ]);
+
+const CONNECTOR_TOOL_NAMES_TIMEOUT_MS = 10_000;
 
 const SKY_METHODS = new Set<SkyMethod>([
   "list_apps",
@@ -370,6 +369,7 @@ type ActiveEvaluation = {
   resolve: (result: NodeReplEvaluationResult) => void;
   reject: (error: Error) => void;
   context: ToolContext;
+  connectorToolNames: ReadonlySet<string>;
   onToolResult?: (result: ToolResult) => void;
   onToolUpdate?: ToolUpdateCallback;
   onResponseMeta?: (meta: BrowserUseResponseMeta) => void;
@@ -1014,6 +1014,7 @@ class NodeReplKernel {
       if (this.closed) {
         throw new KernelTerminatedError("Kernel closed.", "closed");
       }
+      const connectorToolNames = await this.loadConnectorToolNames();
       return await this.evaluate(
         code,
         context,
@@ -1023,6 +1024,7 @@ class NodeReplKernel {
         options.onToolUpdate,
         options.onResponseMeta,
         options.onContent,
+        connectorToolNames,
       );
     };
     const task = this.tail.then(run, run);
@@ -1062,6 +1064,7 @@ class NodeReplKernel {
     onToolUpdate?: ToolUpdateCallback,
     onResponseMeta?: (meta: BrowserUseResponseMeta) => void,
     onContent?: (item: NodeReplContentItem, cursor: number) => void,
+    connectorToolNames: readonly string[] = [],
   ): Promise<NodeReplEvaluationResult> {
     if (signal?.aborted) {
       return Promise.reject(
@@ -1095,6 +1098,7 @@ class NodeReplKernel {
         resolve,
         reject,
         context,
+        connectorToolNames: new Set(connectorToolNames),
         onToolResult,
         onToolUpdate,
         onResponseMeta,
@@ -1131,7 +1135,12 @@ class NodeReplKernel {
           type: "evaluate",
           evaluationId: id,
           code,
-          toolNames: replToolNamesForContext(context),
+          toolNames: [
+            ...new Set([
+              ...replToolNamesForContext(context),
+              ...connectorToolNames,
+            ]),
+          ],
         });
       } catch (error) {
         this.terminateActive(
@@ -1381,6 +1390,75 @@ class NodeReplKernel {
     }
   }
 
+  private async loadConnectorToolNames(): Promise<string[]> {
+    const client = this.connectClient;
+    if (!client) return [];
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const entries = await Promise.race([
+        client.tools(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error("timed out")),
+            CONNECTOR_TOOL_NAMES_TIMEOUT_MS,
+          );
+        }),
+      ]);
+      return entries.map((entry) => entry.name);
+    } catch {
+      return [];
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  private connectClientFor(active: ActiveEvaluation): ReplConnectClient {
+    const shared = this.connectClient;
+    if (!shared) {
+      throw new Error("connect is not available in this session.");
+    }
+    return (
+      shared.forCaller?.(
+        {
+          conversationId: active.context.conversationId,
+          ...(active.context.agentId ? { agentId: active.context.agentId } : {}),
+          toolCallId: active.context.requestId,
+        },
+        {
+          awaitUser: (task) => this.whileAwaitingUser(active, task),
+          signal: active.controller.signal,
+        },
+      ) ?? shared
+    );
+  }
+
+  private async handleConnectorToolCall(
+    active: ActiveEvaluation,
+    message: Extract<WorkerToNodeReplParentMessage, { type: "tool-call" }>,
+  ) {
+    try {
+      const value = await this.connectClientFor(active).callTool(
+        message.toolName,
+        message.args,
+      );
+      if (serializedSize(value) > MAX_NODE_REPL_PROTOCOL_MESSAGE_BYTES) {
+        throw new Error("Tool result exceeds the code-runtime protocol limit.");
+      }
+      if (!this.closed && this.active === active) {
+        this.post({
+          type: "tool-result",
+          callId: message.callId,
+          ok: true,
+          value,
+        });
+      }
+    } catch (error) {
+      if (!this.closed && this.active === active) {
+        this.postToolError(message.callId, error);
+      }
+    }
+  }
+
   private async handleConnectCall(
     message: Extract<WorkerToNodeReplParentMessage, { type: "connect-call" }>,
   ) {
@@ -1400,22 +1478,7 @@ class NodeReplKernel {
     }
 
     try {
-      const shared = this.connectClient;
-      if (!shared) {
-        throw new Error("connect is not available in this session.");
-      }
-      const client =
-        shared.forCaller?.(
-          {
-            conversationId: active.context.conversationId,
-            ...(active.context.agentId ? { agentId: active.context.agentId } : {}),
-            toolCallId: active.context.requestId,
-          },
-          {
-            awaitUser: (task) => this.whileAwaitingUser(active, task),
-            signal: active.controller.signal,
-          },
-        ) ?? shared;
+      const client = this.connectClientFor(active);
       const value = await this.dispatchConnectCall(
         client,
         message.method,
@@ -1460,34 +1523,6 @@ class NodeReplKernel {
         return isNonEmptyString(args[0]) ? client.discover(args[0]) : invalid();
       case "connectors":
         return client.connectors();
-      case "actions": {
-        if (!isNonEmptyString(args[0])) return invalid();
-        if (args[1] !== undefined && !isPlainRecord(args[1])) return invalid();
-        const options = isPlainRecord(args[1]) ? args[1] : {};
-        return client.actions(args[0], {
-          ...(typeof options.query === "string"
-            ? { query: options.query }
-            : {}),
-          ...(typeof options.limit === "number"
-            ? { limit: options.limit }
-            : {}),
-        });
-      }
-      case "schema":
-        return isNonEmptyString(args[0]) && isNonEmptyString(args[1])
-          ? client.schema(args[0], args[1])
-          : invalid();
-      case "call": {
-        if (!isNonEmptyString(args[0]) || !isNonEmptyString(args[1])) {
-          return invalid();
-        }
-        if (args[2] !== undefined && !isPlainRecord(args[2])) return invalid();
-        return client.call(
-          args[0],
-          args[1],
-          isPlainRecord(args[2]) ? args[2] : {},
-        );
-      }
       case "addMcp":
         return isPlainRecord(args[0]) ? client.addMcp(args[0]) : invalid();
       case "remove":
@@ -1987,6 +2022,13 @@ class NodeReplKernel {
     }
 
     const allowedToolNames = new Set(active.context.allowedToolNames ?? []);
+    if (
+      active.connectorToolNames.has(message.toolName) &&
+      !allowedToolNames.has(message.toolName)
+    ) {
+      await this.handleConnectorToolCall(active, message);
+      return;
+    }
     if (
       !this.executeTool ||
       NODE_REPL_EXCLUDED_TOOL_NAMES.has(message.toolName) ||

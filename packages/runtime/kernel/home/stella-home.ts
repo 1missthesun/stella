@@ -15,6 +15,7 @@ import {
   summarizeSkillsSync,
 } from "./skills-sync.js";
 import { withHome } from "./home-runtime.js";
+import { removeGeneratedConnectorSkills } from "./generated-connector-skills.js";
 import {
   resolveRuntimeStatePath,
   resolveStellaAppDir,
@@ -108,6 +109,16 @@ export const ensureStellaDataDirSeededEffect = (
     yield* tryIO(() =>
       migrateLegacySystemSkillRoot(stellaDataDir, bundledSkillIds),
     );
+    const removedConnectorSkills = yield* tryIO(() =>
+      removeGeneratedConnectorSkills(stellaDataDir),
+    );
+    if (removedConnectorSkills.length > 0) {
+      yield* Effect.sync(() =>
+        console.log(
+          `[stella-home] removed generated connector skills: ${removedConnectorSkills.join(", ")}`,
+        ),
+      );
+    }
     const skillsSync = yield* reconcileBundledSkillsEffect(
       bundledSkillsDir,
       path.join(stellaDataDir, "skills"),

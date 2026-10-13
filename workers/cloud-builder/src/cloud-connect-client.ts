@@ -2,7 +2,8 @@
  * Host-side `connect` client for the cloud orchestrator's code sandbox.
  *
  * Same surface as the device kernel's `connect` (see
- * `connectors/connect-worker-api.ts`), backed by the Store's Composio
+ * `connectors/connect-worker-api.ts`), plus the connected integrations'
+ * actions as code tools (`connectors/connector-tools.ts`), backed by the Store's Composio
  * integrations: the global catalog in D1 and the owner object's
  * `integrations.*` internals, instead of a local catalog cache and CLI
  * bridge. Connectors belong to the account, not the device, so a service
@@ -24,6 +25,13 @@ import type {
   IntegrationActionsPage,
   IntegrationCatalogEntry,
 } from "@stella/contracts/backend/integrations";
+import {
+  buildConnectorToolEntries,
+  invalidConnectorToolArgsMessage,
+  requireConnectorTool,
+  validateConnectorToolArgs,
+  type ConnectorToolSource,
+} from "@stella/runtime/kernel/connectors/connector-tools.js";
 import type { CloudConnectClient } from "./cloud-code-tool.js";
 import { RpcError } from "./owner-store/errors.js";
 
@@ -70,12 +78,8 @@ export type CloudConnectorConnection = Readonly<{
 }>;
 
 const DISCOVER_MAX_MATCHES = 8;
-const ACTIONS_DEFAULT_LIMIT = 25;
-const ACTIONS_MAX_LIMIT = 100;
-/** The catalog's largest action page. */
 const ACTIONS_PAGE_LIMIT = 100;
-const SAFE_CONNECTOR_ID = /^[a-z0-9][a-z0-9_-]{0,127}$/u;
-const SAFE_ACTION = /^[A-Z][A-Z0-9_]{1,127}$/u;
+const ACTIONS_MAX_PAGES = 50;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -84,39 +88,6 @@ const collapseLine = (value: string | undefined, max = 140): string => {
   const collapsed = (value ?? "").replace(/\s+/gu, " ").trim();
   if (collapsed.length <= max) return collapsed;
   return `${collapsed.slice(0, max - 1)}…`;
-};
-
-/**
- * Compact one-line parameter summary for an action's input schema
- * ("required: a, b; optional: c, d, +3"), byte-identical to the device
- * client's rendering so the model reads one format.
- */
-const summarizeActionParams = (schema?: Record<string, unknown>): string => {
-  if (!schema) return "";
-  const required = Array.isArray(schema.required)
-    ? schema.required.filter(
-        (entry): entry is string => typeof entry === "string",
-      )
-    : [];
-  const propertyNames = isRecord(schema.properties)
-    ? Object.keys(schema.properties)
-    : [];
-  if (propertyNames.length === 0 && required.length === 0) return "";
-  const requiredSet = new Set(required);
-  const optional = propertyNames.filter((name) => !requiredSet.has(name));
-  const renderNames = (names: readonly string[]) =>
-    `${names.slice(0, 6).join(", ")}${names.length > 6 ? `, +${names.length - 6}` : ""}`;
-  const parts: string[] = [];
-  if (required.length > 0) parts.push(`required: ${renderNames(required)}`);
-  if (optional.length > 0) parts.push(`optional: ${renderNames(optional)}`);
-  return parts.join("; ");
-};
-
-const clampActionLimit = (limit: unknown): number => {
-  if (typeof limit !== "number" || !Number.isFinite(limit)) {
-    return ACTIONS_DEFAULT_LIMIT;
-  }
-  return Math.max(1, Math.min(ACTIONS_MAX_LIMIT, Math.floor(limit)));
 };
 
 const sourceErrorMessage = (error: unknown, fallback: string): string =>
@@ -131,6 +102,7 @@ type ActionRecord = {
   title?: string;
   description?: string;
   inputSchema?: Record<string, unknown>;
+  annotations?: Record<string, unknown>;
 };
 
 const readActionRecord = (value: unknown): ActionRecord | null => {
@@ -142,6 +114,7 @@ const readActionRecord = (value: unknown): ActionRecord | null => {
       ? { description: value.description }
       : {}),
     ...(isRecord(value.inputSchema) ? { inputSchema: value.inputSchema } : {}),
+    ...(isRecord(value.annotations) ? { annotations: value.annotations } : {}),
   };
 };
 
@@ -214,12 +187,13 @@ export const resolveCloudConnectorEntry = (
 
 /**
  * The account's connector state for one turn: the Store catalog plus the
- * owner's live connections. Both are memoized per turn; `connect.call` and
+ * owner's live connections. Both are memoized per turn; connector tools and
  * `connector_status` re-read connections after a connect card resolves.
  */
 export class CloudConnectorDirectory {
   #catalog: Promise<readonly CloudConnectorCatalogEntry[]> | undefined;
   #connections: Promise<readonly CloudConnectorConnection[]> | undefined;
+  readonly #actions = new Map<string, Promise<readonly ActionRecord[]>>();
   readonly #context: CloudConnectClientContext;
 
   constructor(context: CloudConnectClientContext) {
@@ -262,45 +236,34 @@ export class CloudConnectorDirectory {
     return connections.some((entry) => entry.id === id && entry.connected);
   }
 
-  async listActions(
-    id: string,
-    options: { query?: string; limit?: number },
-  ): Promise<{ total: number; actions: ActionRecord[] }> {
+  allActions(id: string): Promise<readonly ActionRecord[]> {
+    let actions = this.#actions.get(id);
+    if (!actions) {
+      actions = this.#loadAllActions(id);
+      this.#actions.set(id, actions);
+      actions.catch(() => this.#actions.delete(id));
+    }
+    return actions;
+  }
+
+  async #loadAllActions(id: string): Promise<readonly ActionRecord[]> {
     const actions: ActionRecord[] = [];
-    let total = 0;
     let cursor: string | null = null;
-    const wanted = clampActionLimit(options.limit);
-    do {
-      const page: IntegrationActionsPage | null = await this.#context.source
-        .actions({
-          id,
-          ...(options.query?.trim() ? { query: options.query.trim() } : {}),
-          ...(cursor ? { cursor } : {}),
-          limit: ACTIONS_PAGE_LIMIT,
-        })
+    for (let page = 0; page < ACTIONS_MAX_PAGES; page += 1) {
+      const result: IntegrationActionsPage | null = await this.#context.source
+        .actions({ id, limit: ACTIONS_PAGE_LIMIT, ...(cursor ? { cursor } : {}) })
         .catch((error: unknown) => {
           throw new Error(sourceErrorMessage(error, "Integration action catalog failed."));
         });
-      if (!page) {
-        throw new Error(
-          `Connector is not installed or known: ${id}. Search with connect.discover("<keywords>").`,
-        );
-      }
-      total = page.actionCount;
-      for (const raw of page.actions) {
+      if (!result) return actions;
+      for (const raw of result.actions) {
         const action = readActionRecord(raw);
         if (action) actions.push(action);
       }
-      cursor = page.nextCursor;
-    } while (cursor && actions.length < wanted);
-    return { total: Math.max(total, actions.length), actions };
-  }
-
-  async getAction(id: string, action: string): Promise<ActionRecord | null> {
-    const page = await this.#context.source.actions({ id, action }).catch((error: unknown) => {
-      throw new Error(sourceErrorMessage(error, "Integration action lookup failed."));
-    });
-    return page ? readActionRecord(page.actions[0]) : null;
+      cursor = result.nextCursor;
+      if (!cursor) break;
+    }
+    return actions;
   }
 
   async run(
@@ -323,46 +286,62 @@ export class CloudConnectorDirectory {
   }
 }
 
-const requireConnectorId = (id: string): string => {
-  const normalized = id.trim().toLowerCase();
-  if (!SAFE_CONNECTOR_ID.test(normalized)) {
-    throw new Error(`Connector id "${id}" is not valid.`);
-  }
-  return normalized;
-};
-
 const nextHint = (
   entry: CloudConnectorCatalogEntry,
   connected: boolean,
 ): string =>
   connected
-    ? `Ready. Inspect actions: await connect.actions("${entry.id}").`
+    ? `Ready. Its actions are tools: await tools.$search({ query: "${entry.name}" }).`
     : `Not connected. Connect offers are handled by the orchestrator's connector_status tool (inline connect card) or the Store — do not initiate one from here unless the user explicitly asked this turn. Proceed via the browser/computer fallback meanwhile.`;
+
+const connectedSources = async (
+  directory: CloudConnectorDirectory,
+): Promise<ConnectorToolSource[]> => {
+  const [catalog, connections] = await Promise.all([
+    directory.catalog(),
+    directory.connections(),
+  ]);
+  const sources = await Promise.all(
+    connections
+      .filter((connection) => connection.connected)
+      .map(async (connection): Promise<ConnectorToolSource | null> => {
+        const entry = catalog.find((candidate) => candidate.id === connection.id);
+        if (!entry) return null;
+        const actions = await directory.allActions(entry.id).catch(() => null);
+        return actions
+          ? { id: entry.id, name: entry.name, kind: "native", actions }
+          : null;
+      }),
+  );
+  return sources.filter((source): source is ConnectorToolSource => source !== null);
+};
 
 export const createCloudConnectClient = (
   directory: CloudConnectorDirectory,
-): CloudConnectClient => ({
-  discover: async (query) => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      throw new Error("connect.discover requires a non-empty query string.");
-    }
-    const [catalog, connections] = await Promise.all([
-      directory.catalog(),
-      directory.connections(),
-    ]);
-    const tokens = tokenizeConnectorQuery(trimmed);
-    const ranked = catalog
-      .map((entry) => ({ entry, score: scoreConnectorMatch(tokens, entry) }))
-      .filter(({ score }) => score > 0)
-      .sort(
-        (left, right) =>
-          right.score - left.score ||
-          left.entry.name.localeCompare(right.entry.name),
-      )
-      .slice(0, DISCOVER_MAX_MATCHES);
-    const matches = await Promise.all(
-      ranked.map(async ({ entry }) => {
+): CloudConnectClient => {
+  const tools = async (reserved?: ReadonlySet<string>) =>
+    buildConnectorToolEntries(await connectedSources(directory), reserved);
+  return {
+    discover: async (query) => {
+      const trimmed = query.trim();
+      if (!trimmed) {
+        throw new Error("connect.discover requires a non-empty query string.");
+      }
+      const [catalog, connections] = await Promise.all([
+        directory.catalog(),
+        directory.connections(),
+      ]);
+      const tokens = tokenizeConnectorQuery(trimmed);
+      const ranked = catalog
+        .map((entry) => ({ entry, score: scoreConnectorMatch(tokens, entry) }))
+        .filter(({ score }) => score > 0)
+        .sort(
+          (left, right) =>
+            right.score - left.score ||
+            left.entry.name.localeCompare(right.entry.name),
+        )
+        .slice(0, DISCOVER_MAX_MATCHES);
+      const matches = ranked.map(({ entry }) => {
         const connection = connections.find((row) => row.id === entry.id);
         const connected = connection?.connected === true;
         return {
@@ -378,109 +357,49 @@ export const createCloudConnectClient = (
           executable: connected,
           next: nextHint(entry, connected),
         };
-      }),
-    );
-    return { query: trimmed, matches };
-  },
-  connectors: async () => {
-    const [catalog, connections] = await Promise.all([
-      directory.catalog(),
-      directory.connections(),
-    ]);
-    return connections.flatMap((connection) => {
-      const entry = catalog.find((candidate) => candidate.id === connection.id);
-      if (!entry) return [];
-      return [
-        {
-          id: entry.id,
-          name: entry.name,
-          kind: "native" as const,
-          connected: connection.connected,
-          description: collapseLine(entry.description),
-        },
-      ];
-    });
-  },
-  actions: async (id, options) => {
-    const connectorId = requireConnectorId(id);
-    const listOptions = {
-      ...(typeof options.query === "string" ? { query: options.query } : {}),
-      ...(typeof options.limit === "number" ? { limit: options.limit } : {}),
-    };
-    const { total, actions } = await directory.listActions(
-      connectorId,
-      listOptions,
-    );
-    const limit = clampActionLimit(listOptions.limit);
-    const shown = actions.slice(0, limit).map((action) => ({
-      name: action.name,
-      description: collapseLine(action.description ?? action.title),
-      ...(action.inputSchema
-        ? { params: summarizeActionParams(action.inputSchema) }
-        : {}),
-    }));
-    return {
-      connector: connectorId,
-      total,
-      shown: shown.length,
-      actions: shown,
-      ...(total > shown.length
-        ? {
-            hint: `Showing ${shown.length} of ${total}. Narrow with { query } or raise { limit } (max ${ACTIONS_MAX_LIMIT}). connect.schema("${connectorId}", "<ACTION>") returns one full input schema.`,
-          }
-        : {}),
-    };
-  },
-  schema: async (id, action) => {
-    const connectorId = requireConnectorId(id);
-    const wanted = action.trim();
-    const match = await directory.getAction(connectorId, wanted);
-    if (!match) {
+      });
+      return { query: trimmed, matches };
+    },
+    connectors: async () => {
+      const [catalog, connections] = await Promise.all([
+        directory.catalog(),
+        directory.connections(),
+      ]);
+      return connections.flatMap((connection) => {
+        const entry = catalog.find((candidate) => candidate.id === connection.id);
+        if (!entry) return [];
+        return [
+          {
+            id: entry.id,
+            name: entry.name,
+            kind: "native" as const,
+            connected: connection.connected,
+            description: collapseLine(entry.description),
+          },
+        ];
+      });
+    },
+    tools,
+    callTool: async (name, args, reserved) => {
+      const entry = requireConnectorTool(await tools(reserved), name);
+      if (!isRecord(args)) {
+        throw new Error(invalidConnectorToolArgsMessage(name, "pass one plain object"));
+      }
+      const problem = validateConnectorToolArgs(entry.parameters, args);
+      if (problem) {
+        throw new Error(invalidConnectorToolArgsMessage(name, problem));
+      }
+      return await directory.run(entry.connector, entry.action, args);
+    },
+    addMcp: async () => {
       throw new Error(
-        `Unknown action ${wanted} for ${connectorId}. List actions with connect.actions("${connectorId}", { query: "<keywords>" }).`,
+        "connect.addMcp is desktop-only: custom MCP servers run on the user's computer. In the cloud, the Store integrations the account has connected are tools here.",
       );
-    }
-    return {
-      connector: connectorId,
-      name: match.name,
-      ...(match.title ? { title: match.title } : {}),
-      ...(match.description
-        ? { description: collapseLine(match.description, 500) }
-        : {}),
-      inputSchema: match.inputSchema ?? null,
-      ...(match.inputSchema
-        ? {}
-        : {
-            note: "No input schema is published; the backend validates arguments when the action runs.",
-          }),
-    };
-  },
-  call: async (id, action, args) => {
-    const connectorId = requireConnectorId(id);
-    const target = action.trim();
-    if (target.startsWith("/")) {
+    },
+    remove: async () => {
       throw new Error(
-        "REST-style paths are only available for API connectors installed on the desktop; call a named Store action here.",
+        "connect.remove is desktop-only: custom connectors live on the user's computer. Store integrations are disconnected from the Store.",
       );
-    }
-    if (!SAFE_ACTION.test(target)) {
-      throw new Error(
-        `Action "${target}" is not a valid Store action name. List actions with connect.actions("${connectorId}").`,
-      );
-    }
-    if (!isRecord(args)) {
-      throw new Error("connect.call args must be a plain object.");
-    }
-    return await directory.run(connectorId, target, args);
-  },
-  addMcp: async () => {
-    throw new Error(
-      "connect.addMcp is desktop-only: custom MCP servers run on the user's computer. In the cloud, connect reaches the Store integrations the account has connected.",
-    );
-  },
-  remove: async () => {
-    throw new Error(
-      "connect.remove is desktop-only: custom connectors live on the user's computer. Store integrations are disconnected from the Store.",
-    );
-  },
-});
+    },
+  };
+};

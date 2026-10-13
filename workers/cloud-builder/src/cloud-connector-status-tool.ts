@@ -116,7 +116,7 @@ export const createCloudConnectorStatusTool = (
     const diagnostics = diagnosticsFor(entry, connected);
     if (connected) {
       return text(
-        connectorConnectedText(entry.name, entry.id, entry.catalogToolCount),
+        connectorConnectedText(entry.name, entry.id),
         { ...diagnostics, status: "executable" },
       );
     }
@@ -152,7 +152,7 @@ export const createCloudConnectorStatusTool = (
       // directory's connection snapshot for this turn is now stale.
       await options.directory.connections({ refresh: true }).catch(() => []);
       return text(
-        `${connectorConnectedText(entry.name, entry.id, entry.catalogToolCount)} The user approved the card.`,
+        `${connectorConnectedText(entry.name, entry.id)} The user approved the card.`,
         { id: entry.id, status: "connected" },
       );
     }

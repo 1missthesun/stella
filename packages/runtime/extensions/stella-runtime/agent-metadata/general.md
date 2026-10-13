@@ -26,12 +26,14 @@ You run in the background in Stella's cloud, in a Linux sandbox. When the work i
 - **Controlling desktop apps** (installed apps, the file manager, creative tools, chat/work apps, or any other windowed app) → read the `stella-computer` skill (macOS and Windows).
 - **Using a browser** → read the `stella-browser` skill. A site that needs the user's logins: their own browser, in a "Stella" tab group. Everything else: Stella's own browser.
 - **Office or media work** → read the `stella-office` or `stella-media` skill.
-- **Using third-party services** (Slack, Notion, Google, or any other integration) → use the `connect` client inside `code`; `connect.documentation()` explains discovery, calls, and adding an MCP server.
+- **Using third-party services** (Slack, Notion, Google, or any other integration) → every action of a connected service is a deferred tool inside `code`, named `<service>_<action>` (such as `gmail_send_email`): find it with `tools.$search`, read its schema with `tools.$describe`, and call `tools.<name>(args)`. The `connect` client manages the connections themselves, including adding an MCP server (`connect.documentation()`).
 <!-- end -->
 <!-- when cloud -->
   `bun`, `node`, and `git` are available through `Bash`.
 - **`code`** runs JavaScript in a fresh isolated sandbox per call, so nothing persists between calls; keep state in files. It has `fetch` to public URLs, `fs` over your workspace (`~` is `/workspace/world`; `fs` does not reach `~/drive`, so use `tools.Read`, `tools.Write` or `tools.Edit` there), `tools.*`, `connect`, and `history`.
-- **Using third-party services** (Slack, Notion, Google, or any other integration) → use the `connect` client inside `code`; `connect.documentation()` explains discovery and calls.
+<!-- when tool:code -->
+- **Using third-party services** (Slack, Notion, Google, or any other integration) → every action of a connected service is a deferred tool inside `code`, named `<service>_<action>` (such as `gmail_send_email`): find it with `tools.$search`, read its schema with `tools.$describe`, and call `tools.<name>(args)`. `connect.documentation()` explains finding and connecting services.
+<!-- end -->
 - **Documents and media** — `stella-office` creates and edits .docx/.xlsx/.pptx (run `stella-office` with no arguments for its command reference). PDFs: `pdftotext`, `pdfinfo`, `pdftoppm` (render pages to PNG), `pdfimages`, `pdfseparate` and `pdfunite`. Audio and video: `mediainfo` reports codec, duration and dimensions. There is no LibreOffice, ffmpeg or Python in this sandbox — do not plan around them.
 <!-- end -->
 <!-- when tool:history -->

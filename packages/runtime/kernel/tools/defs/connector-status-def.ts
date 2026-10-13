@@ -27,14 +27,13 @@ export const CONNECTOR_STATUS_SEARCH_TERMS = [
 ] as const;
 
 export const CONNECTOR_STATUS_TOOL_DESCRIPTION =
-  "Check whether a Stella Store connector (Gmail, Outlook, Notion, Slack, and hundreds more) is connected, and if not, show the user an inline connect card in the chat. Deterministic — pure lookup plus the card; the card itself is the user's consent, so don't ask permission before calling. Blocks until the user connects, declines, or the card times out, then reports the outcome so you can proceed. Once it is connected, continue the original task without re-asking; agents use it inside code with `connect.actions(id)` and `connect.call(id, …)`. After a decline, tell the user once that they can connect it from the Store later and don't offer it again unless they ask; after a dismissed or unanswered card, mention once that it is in the Store and don't re-offer it for now. Either way, proceed by other means (the browser or computer).";
+  "Check whether a Stella Store connector (Gmail, Outlook, Notion, Slack, and hundreds more) is connected, and if not, show the user an inline connect card in the chat. Deterministic — pure lookup plus the card; the card itself is the user's consent, so don't ask permission before calling. Blocks until the user connects, declines, or the card times out, then reports the outcome so you can proceed. Once it is connected, continue the original task without re-asking; its actions are then tools inside code, found with `tools.$search`. After a decline, tell the user once that they can connect it from the Store later and don't offer it again unless they ask; after a dismissed or unanswered card, mention once that it is in the Store and don't re-offer it for now. Either way, proceed by other means (the browser or computer).";
 
 export const connectorConnectedText = (
   name: string,
   id: string,
-  toolCount: number,
 ): string =>
-  `${name} (\`${id}\`) connected, ${toolCount} tool${toolCount === 1 ? "" : "s"}.`;
+  `${name} (\`${id}\`) connected. Its actions are tools in code: await tools.$search({ query: "${name}" }).`;
 
 export const connectorNotConnectedText = (name: string, reason: string): string =>
   `${name} not connected: ${reason}.`;

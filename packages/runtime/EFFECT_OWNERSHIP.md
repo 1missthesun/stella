@@ -26,7 +26,7 @@ aesthetics.
 - One-shot utility spawns (`ripgrep`, `search`, `private-fs`,
   `deferred-delete-cli`, `schedule-scripts`) — per-call awaited children;
   `schedule-scripts` kills on abort/timeout. No persistent lifetime.
-- CLI entrypoints (`stella-connect`, `stella-computer`, `native-helper`)
+- CLI entrypoints (`stella-computer`, `native-helper`)
   and `connector-bridge` — sidecar-process boundary code owned by their
   own process lifetimes (`closeConnectorBridgeSessions` on the CLI side).
 - Pure async transforms (prompt building, thread memory, image

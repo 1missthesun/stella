@@ -1,6 +1,6 @@
 /**
- * Inline connect card: an agent asked (via `stella-connect
- * request-connection`) to use an integration that isn't connected yet.
+ * Inline connect card: an agent asked (via `connector_status`) to use an
+ * integration that isn't connected yet.
  * Rendered in the flow of the chat surfaces, pinned above the composer
  * while the agent's turn is blocked on the answer. Connect launches the
  * same Composio/OAuth flow as the Store (browser hand-off, no modal);

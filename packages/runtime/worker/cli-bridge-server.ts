@@ -124,6 +124,7 @@ export type CliBridgeHandlers = {
     connectorId: string;
     action?: string;
     query?: string;
+    cursor?: string;
     limit?: number;
     signal?: AbortSignal;
   }) => Promise<BackendConnectorActionsResult>;
@@ -178,6 +179,7 @@ const listBackendActionsParamsSchema = z.strictObject({
   connectorId: z.string().trim().toLowerCase().min(1),
   action: z.string().trim().min(1).optional(),
   query: z.string().trim().min(1).optional(),
+  cursor: z.string().trim().min(1).max(256).optional(),
   limit: z.number().int().min(1).max(100).optional(),
 });
 
@@ -369,11 +371,12 @@ const dispatch = async (
           "connector.listBackendActions: connectorId and valid optional filters are required",
         );
       }
-      const { connectorId, action, query, limit } = parsed.data;
+      const { connectorId, action, query, cursor, limit } = parsed.data;
       return await handlers.listBackendConnectorActions({
         connectorId,
         ...(action ? { action } : {}),
         ...(query ? { query } : {}),
+        ...(cursor ? { cursor } : {}),
         ...(limit ? { limit } : {}),
         ...(signal ? { signal } : {}),
       });

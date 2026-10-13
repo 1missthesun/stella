@@ -51,7 +51,7 @@ export const nativeConnectorAuthStatus = async (
 export type NativeConnectorConnectionState = {
   enabled: boolean;
   authStatus: NativeConnectorAuthStatus;
-  /** Enabled AND credentialed — safe to call through connect.call. */
+  /** Enabled AND credentialed — its tools can run. */
   connected: boolean;
   /** True only when this process actually verified a provider credential. */
   accountVerified: boolean;

@@ -197,7 +197,23 @@ export const HOME_MIGRATION = {
   ],
 };
 
+export const HOME_CONNECTOR_SKILL_SWEEP_MIGRATION = {
+  id: "home.2-connector-skill-sweep",
+  statements: [
+    `CREATE TABLE connector_skill_sweep (
+       id INTEGER PRIMARY KEY CHECK (id = 1),
+       swept_through INTEGER NOT NULL
+     )`,
+  ],
+};
+
+const GENERATED_CONNECTOR_SKILL_MARKERS = [
+  "<!-- stella-connect-native-skill -->",
+  "<!-- stella-connect-mcp-skill -->",
+];
+
 const HOME_TABLES = [
+  "connector_skill_sweep",
   "home_state",
   "memory_wipe",
   "skills",
@@ -1224,6 +1240,56 @@ const deleteMirroredSkill = async (
   return { skillId, status: "deleted", revision: live.revision };
 };
 
+// ── Generated connector skills ───────────────────────────────────────────
+
+const sweepGeneratedConnectorSkills = async (ctx: OwnerContext): Promise<void> => {
+  const bucket = ctx.env.AGENT_HOME;
+  if (!bucket) return;
+  const sweptThrough =
+    ctx.db.one<{ swept_through: number }>("SELECT swept_through FROM connector_skill_sweep WHERE id = 1")
+      ?.swept_through ?? -1;
+  const candidates = ctx.db.all<{ skill_id: string; version_id: string; updated_at: number }>(
+    "SELECT skill_id, version_id, updated_at FROM skills WHERE deleted_at IS NULL AND version_id IS NOT NULL AND updated_at > ?",
+    sweptThrough,
+  );
+  let through = sweptThrough;
+  const generated: string[] = [];
+  for (const skill of candidates) {
+    const file = ctx.db.one<{ r2_key: string; size_bytes: number }>(
+      "SELECT r2_key, size_bytes FROM skill_files WHERE version_id = ? AND path = 'SKILL.md'",
+      skill.version_id,
+    );
+    if (file && file.size_bytes <= SKILL_MAX_FILE_BYTES) {
+      const object = await bucket.get(file.r2_key);
+      if (!object) continue;
+      const text = await object.text();
+      if (GENERATED_CONNECTOR_SKILL_MARKERS.some((marker) => text.includes(marker))) {
+        generated.push(skill.skill_id);
+      }
+    }
+    through = Math.max(through, skill.updated_at);
+  }
+  if (generated.length > 0) {
+    const { ownerGeneration } = await ctx.host.snapshot();
+    for (const skillId of generated) {
+      ctx.db.run(
+        "UPDATE skills SET deleted_at = ?, updated_at = ? WHERE skill_id = ? AND deleted_at IS NULL",
+        ctx.now,
+        ctx.now,
+        skillId,
+      );
+    }
+    await announce(ctx, ownerGeneration, bumpContent(ctx.db, ownerGeneration));
+    through = Math.max(through, ctx.now);
+  }
+  if (through !== sweptThrough) {
+    ctx.db.run(
+      "INSERT INTO connector_skill_sweep (id, swept_through) VALUES (1, ?) ON CONFLICT(id) DO UPDATE SET swept_through = excluded.swept_through",
+      through,
+    );
+  }
+};
+
 // ── Intent sweep ──────────────────────────────────────────────────────────
 
 /** Arm the sweep for the earliest reservation that never committed. */
@@ -1295,8 +1361,14 @@ const internal: Record<string, InternalDef> = {
     generationOnly(raw);
     return { imported: await importLegacyMemory(ctx) };
   },
-  "skills.catalog": (ctx, raw) => {
+  "skills.catalog": async (ctx, raw) => {
     const args = object({ ownerGeneration: generationArg, agentType: literal("orchestrator", "general") })(raw);
+    await sweepGeneratedConnectorSkills(ctx).catch((error: unknown) => {
+      console.error(JSON.stringify({
+        event: "connector_skill_sweep_failed",
+        message: error instanceof Error ? error.message : String(error),
+      }));
+    });
     return skillCatalog(ctx.db, args.agentType);
   },
   "skills.begin": beginSkillWrite,
@@ -1313,7 +1385,7 @@ const epochRequest = object({
 
 export const homeDomain = {
   name: "home",
-  migrations: [HOME_MIGRATION],
+  migrations: [HOME_MIGRATION, HOME_CONNECTOR_SKILL_SWEEP_MIGRATION],
   calls: {
     "memory.setEnabled": {
       scope: "owner",

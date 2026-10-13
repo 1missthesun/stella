@@ -17,6 +17,7 @@ import {
   type DemotedToolCatalogEntry,
 } from "@stella/runtime/kernel/tools/code-catalog.js";
 import { sanitizeToolVisibleText } from "@stella/runtime/kernel/tools/safety.js";
+import type { ConnectorToolEntry } from "@stella/runtime/kernel/connectors/connector-tools.js";
 import {
   runMemoryRequest,
   type MemoryClient,
@@ -94,7 +95,7 @@ const CODE_EXCLUDED_TOOL_NAMES: ReadonlySet<string> = new Set([
  * orchestrator's never does.
  */
 const cloudCodeToolDescription = (browser: boolean): string =>
-  `Run JavaScript with top-level await in Stella's cloud code runtime — a fresh isolated sandbox per call. Call the immutable globals directly: connect, history, tools${browser ? ", and browser" : ""}. End with an expression to return its value; console.log lines come back in a [console] section. Bindings do not persist between calls and there is no cell_id, codeRuntime, or sky${browser ? "" : ", or browser"} in this session, so do the whole computation in one call and return a structured-cloneable value. The sandbox has no network and no secrets of its own; reach the outside world only through tools${browser ? ", connect, and browser" : " and connect"}. ${browser ? `${CLOUD_CODE_BROWSER_SENTENCE} ` : ""}tools exposes allowed Stella tools. Use tools.$list() for exact names/access expressions; non-identifier names require bracket notation such as tools[\"mcp.server/tool\"](...). Use tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete unfamiliar schema. Use Promise.all for independent calls. Nested tools retain permissions, cancellation, and route artifacts, and a failing nested call rejects with the tool's own error so you can catch it; tools requiring explicit approval are unavailable inside code and must be called directly. connect is the connector client for the user's connected services (connect.documentation() explains it): discover → actions → schema → call. ` +
+  `Run JavaScript with top-level await in Stella's cloud code runtime — a fresh isolated sandbox per call. Call the immutable globals directly: connect, history, tools${browser ? ", and browser" : ""}. End with an expression to return its value; console.log lines come back in a [console] section. Bindings do not persist between calls and there is no cell_id, codeRuntime, or sky${browser ? "" : ", or browser"} in this session, so do the whole computation in one call and return a structured-cloneable value. The sandbox has no network and no secrets of its own; reach the outside world only through tools${browser ? ", connect, and browser" : " and connect"}. ${browser ? `${CLOUD_CODE_BROWSER_SENTENCE} ` : ""}tools exposes allowed Stella tools. Use tools.$list() for exact names/access expressions; non-identifier names require bracket notation such as tools[\"mcp.server/tool\"](...). Use tools.$search({ query: \"<capability>\" }) for ranked signatures, and tools.$describe(name) for a complete unfamiliar schema. Use Promise.all for independent calls. Nested tools retain permissions, cancellation, and route artifacts, and a failing nested call rejects with the tool's own error so you can catch it; tools requiring explicit approval are unavailable inside code and must be called directly. Every action of a connected service is a tool here too, named <service>_<action> (tools.gmail_send_email) and found with tools.$search; connect manages the connections themselves (connect.documentation()). ` +
   `${CODE_TOOL_HISTORY_SENTENCE} ` +
   `One execution may make at most ${CLOUD_CODE_MAX_TOOL_CALLS} nested tool calls, with at most ${CLOUD_CODE_MAX_CONCURRENT_TOOL_CALLS} running concurrently, and runs for at most ${Math.round(CLOUD_CODE_MAX_TIMEOUT_MS / 1000)} seconds.`;
 
@@ -153,18 +154,14 @@ export type CloudCodeSourceAgentTool = AgentTool & {
 export type CloudConnectClient = Readonly<{
   discover(query: string): Promise<unknown>;
   connectors(): Promise<unknown>;
-  actions(
-    id: string,
-    options: Readonly<{ query?: string; limit?: number }>,
-  ): Promise<unknown>;
-  schema(id: string, action: string): Promise<unknown>;
-  call(
-    id: string,
-    action: string,
-    args: Readonly<Record<string, unknown>>,
-  ): Promise<unknown>;
   addMcp(options: Readonly<Record<string, unknown>>): Promise<unknown>;
   remove(id: string): Promise<unknown>;
+  tools(reserved?: ReadonlySet<string>): Promise<ConnectorToolEntry[]>;
+  callTool(
+    name: string,
+    args: Readonly<Record<string, unknown>>,
+    reserved?: ReadonlySet<string>,
+  ): Promise<unknown>;
 }>;
 
 /**
@@ -459,14 +456,11 @@ const describeIntrinsic =
     };
   };
 
-type ConnectMethod = keyof CloudConnectClient;
+type ConnectMethod = "discover" | "connectors" | "addMcp" | "remove";
 
 const CONNECT_METHODS: ReadonlySet<string> = new Set<ConnectMethod>([
   "discover",
   "connectors",
-  "actions",
-  "schema",
-  "call",
   "addMcp",
   "remove",
 ]);
@@ -497,7 +491,7 @@ const connectIntrinsic =
  * isolate's intrinsic and the turn broker, which serves the same call for the
  * container's `code`.
  */
-const invokeCloudConnect = async (
+export const invokeCloudConnect = async (
   client: CloudConnectClient,
   method: string,
   args: readonly unknown[],
@@ -510,16 +504,6 @@ const invokeCloudConnect = async (
       return await client.discover(String(args[0] ?? ""));
     case "connectors":
       return await client.connectors();
-    case "actions":
-      return await client.actions(String(args[0] ?? ""), asRecord(args[1]));
-    case "schema":
-      return await client.schema(String(args[0] ?? ""), String(args[1] ?? ""));
-    case "call":
-      return await client.call(
-        String(args[0] ?? ""),
-        String(args[1] ?? ""),
-        asRecord(args[2]),
-      );
     case "addMcp":
       return await client.addMcp(asRecord(args[0]));
     case "remove":
@@ -632,10 +616,12 @@ export const createCloudCodeAgentTool = async (
   );
   const catalog = sourceTools.map(catalogEntryForTool);
   const demoted = catalog.filter((entry) => entry.demoted !== undefined);
+  const reservedNames: ReadonlySet<string> = new Set(
+    sourceTools.map((tool) => tool.name),
+  );
+  const connect = options.connect;
   const intrinsics: Record<string, CloudCodeIntrinsic> = {
-    [CLOUD_CODE_SEARCH_INTRINSIC]: searchIntrinsic(catalog),
-    [CLOUD_CODE_DESCRIBE_INTRINSIC]: describeIntrinsic(catalog),
-    [CLOUD_CODE_CONNECT_INTRINSIC]: connectIntrinsic(options.connect),
+    [CLOUD_CODE_CONNECT_INTRINSIC]: connectIntrinsic(connect),
     [CLOUD_CODE_HISTORY_INTRINSIC]: historyIntrinsic(options.history),
     ...(options.browser
       ? {
@@ -668,6 +654,10 @@ export const createCloudCodeAgentTool = async (
       liftedMaps.set(executionId, sink);
       const screenshots: LiftedScreenshot[] = [];
       liftedScreenshots.set(executionId, screenshots);
+      const connectorTools = connect
+        ? await connect.tools(reservedNames).catch(() => [])
+        : [];
+      const liveCatalog = [...catalog, ...connectorTools];
       let result: CloudCodeExecutionResult;
       try {
         result = await executeCode({
@@ -675,7 +665,22 @@ export const createCloudCodeAgentTool = async (
           code: args.code,
           tools: prepared,
           executionId,
-          intrinsics,
+          intrinsics: {
+            ...intrinsics,
+            [CLOUD_CODE_SEARCH_INTRINSIC]: searchIntrinsic(liveCatalog),
+            [CLOUD_CODE_DESCRIBE_INTRINSIC]: describeIntrinsic(liveCatalog),
+          },
+          ...(connect && connectorTools.length > 0
+            ? {
+                dynamicTools: Object.fromEntries(
+                  connectorTools.map((entry) => [
+                    entry.name,
+                    async (input: unknown) =>
+                      await connect.callTool(entry.name, asRecord(input), reservedNames),
+                  ]),
+                ),
+              }
+            : {}),
           ...(args.timeout_ms === undefined
             ? {}
             : { timeoutMs: args.timeout_ms }),

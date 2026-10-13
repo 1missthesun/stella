@@ -35,14 +35,7 @@ export const NODE_REPL_TOOL_MEMORY_NAME = "$memory";
 export type SkyMethod = keyof SkyClient;
 export type BrowserMethod = "command" | "chain" | "use";
 /** Methods of the in-REPL `connect` client, dispatched host-side. */
-export type ConnectMethod =
-  | "discover"
-  | "connectors"
-  | "actions"
-  | "schema"
-  | "call"
-  | "addMcp"
-  | "remove";
+export type ConnectMethod = "discover" | "connectors" | "addMcp" | "remove";
 
 export type SerializedError = {
   name: string;

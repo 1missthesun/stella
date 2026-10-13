@@ -7,10 +7,10 @@ const MAX_CONNECTOR_REMINDERS = 2;
 const MCP_KEYWORD_RE = /\bmcp\b/iu;
 
 const MCP_HINT =
-  "Keyword hint: MCP was mentioned, possibly incidentally. If the user wants to manage an MCP connection, agents can use connect.addMcp(…) or connect.remove(id) through the code connect client; connect.documentation() has details.";
+  "Keyword hint: MCP was mentioned, possibly incidentally. If the user wants to manage an MCP connection, agents can use connect.addMcp(…) or connect.remove(id) inside code; an added server's actions become tools there. connect.documentation() has details.";
 
 const connectedHint = (entry: NativeConnectorCatalogEntry): string =>
-  `Keyword hint: ${entry.name} may be relevant. It is connected (integration id \`${entry.id}\`). If it fits the user's intent, agents can use it via the code connect client (await connect.call("${entry.id}", …)). The keyword match alone does not imply it should be used.`;
+  `Keyword hint: ${entry.name} may be relevant. It is connected (integration id \`${entry.id}\`). If it fits the user's intent, its actions are tools in \`code\` (await tools.$search({ query: "${entry.name} <task>" })). The keyword match alone does not imply it should be used.`;
 
 const offerHint = (entry: NativeConnectorCatalogEntry): string =>
   [

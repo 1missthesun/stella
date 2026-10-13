@@ -152,6 +152,7 @@ export const createBackendConnectorActionsBroker =
     connectorId: string;
     action?: string;
     query?: string;
+    cursor?: string;
     limit?: number;
     signal?: AbortSignal;
   }): Promise<BackendConnectorActionsResult> => {
@@ -200,6 +201,9 @@ export const createBackendConnectorActionsBroker =
     url.searchParams.set("id", connectorId);
     if (action) url.searchParams.set("action", action);
     if (!action && query) url.searchParams.set("query", query);
+    if (!action && params.cursor?.trim()) {
+      url.searchParams.set("cursor", params.cursor.trim());
+    }
     if (!action) url.searchParams.set("limit", String(limit));
 
     const requestSignal = actionRequestSignal(params.signal);

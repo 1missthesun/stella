@@ -339,6 +339,20 @@ export const createToolHost = ({
       }
       return body;
     });
+  const connectClient =
+    codeConnectClient ??
+    createReplConnectClient({
+      stellaAppDir: stateRoot,
+      ...(cliBridgeSocketPath ? { cliBridgeSocketPath } : {}),
+      reservedToolNames: () => new Set(toolCatalog.keys()),
+      onBridgeUnreachable: (message) =>
+        logError("code connect bridge unreachable", message),
+    });
+  const listConnectorTools = () =>
+    connectClient.tools().catch((error: unknown) => {
+      logError("connector tools unavailable", error);
+      return [];
+    });
   const nodeReplRegistry = new NodeReplKernelRegistry({
     browserBinPath: _stellaBrowserBinPath,
     ...(requestBrowserExtensionConnect
@@ -380,9 +394,12 @@ export const createToolHost = ({
     // connector/extension changes are visible immediately. Scope: exactly
     // the tools the calling context can invoke as `tools.<name>` in the
     // same REPL (see collectReplSearchableTools).
-    searchTools: (query, context, limit) =>
+    searchTools: async (query, context, limit) =>
       searchToolCatalog(
-        collectReplSearchableTools(toolCatalog.values(), context),
+        [
+          ...collectReplSearchableTools(toolCatalog.values(), context),
+          ...(await listConnectorTools()),
+        ],
         query,
         limit,
       ),
@@ -413,11 +430,11 @@ export const createToolHost = ({
         ? historyReadView(result)
         : result;
     },
-    describeTool: (name, context, cursor) => {
-      const tool = collectReplSearchableTools(
-        toolCatalog.values(),
-        context,
-      ).find((entry) => entry.name === name);
+    describeTool: async (name, context, cursor) => {
+      const tool =
+        collectReplSearchableTools(toolCatalog.values(), context).find(
+          (entry) => entry.name === name,
+        ) ?? (await listConnectorTools()).find((entry) => entry.name === name);
       if (!tool) {
         throw new Error(
           `Tool "${name}" is unknown or not available to describe in this context.`,
@@ -466,18 +483,7 @@ export const createToolHost = ({
           "Concatenate chunk values in cursor order, requesting each nextCursor with await tools.$describe(name, { cursor: nextCursor }), then JSON.parse the exact combined string. No schema fields were clipped.",
       };
     },
-    // In-REPL `connect` client — the only agent surface for third-party
-    // app integrations: catalog from the shared disk cache, action
-    // execution through the CLI bridge → backend connector action broker,
-    // unless the host supplies its own (the cloud container's broker).
-    connectClient:
-      codeConnectClient ??
-      createReplConnectClient({
-        stellaAppDir: stateRoot,
-        ...(cliBridgeSocketPath ? { cliBridgeSocketPath } : {}),
-        onBridgeUnreachable: (message) =>
-          logError("code connect bridge unreachable", message),
-      }),
+    connectClient,
   });
 
   if (recoverStaleSecrets) {

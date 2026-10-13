@@ -177,6 +177,7 @@ export type CloudCodeExecutionRequest = Readonly<{
   approvalGate?: CloudCodeApprovalGate;
   /** `$`-named intrinsics; every key must be in CLOUD_CODE_INTRINSIC_NAMES. */
   intrinsics?: Readonly<Record<string, CloudCodeIntrinsic>>;
+  dynamicTools?: Readonly<Record<string, CloudCodeIntrinsic>>;
   /** Host-only diagnostics. The original error is never sent to generated code. */
   onToolError?: (
     error: unknown,
@@ -653,6 +654,7 @@ const createProvider = (
   setDispatchFailure: (failure: DispatchFailure) => void,
   intrinsics: CloudCodeExecutionRequest["intrinsics"],
   clock: Pick<CodeClock, "pause" | "resume">,
+  dynamicTools?: CloudCodeExecutionRequest["dynamicTools"],
 ): ResolvedProvider => {
   const fns: Record<string, (...args: unknown[]) => Promise<unknown>> =
     Object.create(null) as Record<
@@ -690,6 +692,52 @@ const createProvider = (
         throw new Error(nestedErrorMessage(error));
       } finally {
         clock.resume();
+      }
+      if (result === undefined) return undefined;
+      const boundedResult = cloneBoundedJsonValue(result, NESTED_VALUE_LIMITS);
+      if (!boundedResult.ok) {
+        throw new Error(`${name} result exceeded the sandbox value limit.`);
+      }
+      return boundedResult.value;
+    };
+  }
+
+  const preparedNames = new Set(definitions.map((tool) => tool.rawName));
+  for (const [name, run] of Object.entries(dynamicTools ?? {})) {
+    if (name.startsWith("$") || preparedNames.has(name) || name in fns) continue;
+    fns[name] = async (...args: unknown[]): Promise<unknown> => {
+      if (signalController.signal.aborted) {
+        throw new Error("Cloud code execution was canceled.");
+      }
+      if (
+        sequence >= CLOUD_CODE_MAX_TOOL_CALLS ||
+        activeCalls >= CLOUD_CODE_MAX_CONCURRENT_TOOL_CALLS
+      ) {
+        throw new Error(
+          `One code execution may make at most ${CLOUD_CODE_MAX_TOOL_CALLS} tool calls, ${CLOUD_CODE_MAX_CONCURRENT_TOOL_CALLS} at a time.`,
+        );
+      }
+      const boundedInput = cloneBoundedJsonValue(args[0] ?? {}, NESTED_VALUE_LIMITS);
+      if (!boundedInput.ok) {
+        throw new Error(`${name} input exceeded the sandbox value limit.`);
+      }
+      sequence += 1;
+      activeCalls += 1;
+      let result: unknown;
+      clock.pause();
+      try {
+        result = await run(boundedInput.value, {
+          executionId,
+          signal: signalController.signal,
+        });
+      } catch (error) {
+        if (signalController.signal.aborted) {
+          throw new Error("Cloud code execution was canceled.");
+        }
+        throw new Error(nestedErrorMessage(error));
+      } finally {
+        clock.resume();
+        activeCalls -= 1;
       }
       if (result === undefined) return undefined;
       const boundedResult = cloneBoundedJsonValue(result, NESTED_VALUE_LIMITS);
@@ -903,6 +951,7 @@ export const executeCloudCodeWithExecutorFactory = async (
     },
     request.intrinsics,
     clock,
+    request.dynamicTools,
   );
 
   const boundedExecution = Effect.scoped(

@@ -217,7 +217,7 @@ export const createConnectorStatusTool = (
     };
     if (executable) {
       return {
-        result: `${connectorConnectedText(entry.name, entry.id, toolCount)}${state.accountVerified ? "" : " Its account link is managed by the backend and was not verified here."}`,
+        result: `${connectorConnectedText(entry.name, entry.id)}${state.accountVerified ? "" : " Its account link is managed by the backend and was not verified here."}`,
         details: { ...diagnostics, status: "executable" },
       };
     }
@@ -265,7 +265,7 @@ export const createConnectorStatusTool = (
 
     if (outcome.ok) {
       return {
-        result: `${connectorConnectedText(entry.name, entry.id, toolCount)} The user approved the card.`,
+        result: `${connectorConnectedText(entry.name, entry.id)} The user approved the card.`,
         details: { id: entry.id, status: "connected" },
       };
     }

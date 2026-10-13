@@ -69,7 +69,6 @@ type NativeConnectorStateEntry = {
   enabledAt?: number;
   updatedAt: number;
   source?: "store" | "cli";
-  skillPath?: string;
 };
 
 type NativeConnectorStateFile = {
@@ -78,7 +77,6 @@ type NativeConnectorStateFile = {
 };
 
 const STATE_FILE = "native-integrations.json";
-const GENERATED_SKILL_MARKER = "<!-- stella-connect-native-skill -->";
 const EXISTING_GOOGLE_INTEGRATION_IDS = new Set([
   "gmail",
   "google_admin",
@@ -258,8 +256,6 @@ export const buildNativeConnectorCatalog = (
 const statePath = (stellaAppDir: string) =>
   path.join(getConnectorStateRoot(stellaAppDir), STATE_FILE);
 
-const skillsRoot = (stellaAppDir: string) => path.join(stellaAppDir, "skills");
-
 const readState = async (
   stellaAppDir: string,
 ): Promise<NativeConnectorStateFile> => {
@@ -291,38 +287,6 @@ export const getNativeConnectorCatalogEntry = (
 export const getNativeConnectorOAuthConfig = (
   entry: NativeConnectorCatalogEntry,
 ) => entry.oauthConfig ?? getNativeOAuthProviderConfig(entry.id);
-
-/**
- * Compact one-line parameter summary for an action's input schema
- * ("required: a, b; optional: c, d, +3"). Shared by the generated
- * ACTIONS.md reference and the node_repl `connect.actions` listing —
- * full schemas stay on-demand via `connect.schema` / `catalog-actions`.
- */
-export const summarizeActionParams = (
-  schema?: Record<string, unknown>,
-): string => {
-  if (!schema) return "";
-  const required = Array.isArray(schema.required)
-    ? schema.required.filter(
-        (entry): entry is string => typeof entry === "string",
-      )
-    : [];
-  const propertyNames =
-    schema.properties &&
-    typeof schema.properties === "object" &&
-    !Array.isArray(schema.properties)
-      ? Object.keys(schema.properties as Record<string, unknown>)
-      : [];
-  if (propertyNames.length === 0 && required.length === 0) return "";
-  const requiredSet = new Set(required);
-  const optional = propertyNames.filter((name) => !requiredSet.has(name));
-  const renderNames = (names: readonly string[]) =>
-    `${names.slice(0, 6).join(", ")}${names.length > 6 ? `, +${names.length - 6}` : ""}`;
-  const parts: string[] = [];
-  if (required.length > 0) parts.push(`required: ${renderNames(required)}`);
-  if (optional.length > 0) parts.push(`optional: ${renderNames(optional)}`);
-  return parts.join("; ");
-};
 
 export const getNativeConnectorCatalogActions = (
   entry: NativeConnectorCatalogEntry,
@@ -370,7 +334,7 @@ export const getNativeConnectorTools = (
       {
         name: backendIntegrationRunToolName(entry.id),
         title: `Run ${entry.name} Action`,
-        description: `Run a ${entry.name} action through Stella's connected integration account. Inspect supported action names and inputs with the code connect client (connect.actions / connect.schema).`,
+        description: `Run a ${entry.name} action through Stella's connected integration account. Each action is also its own tool in code; find them with tools.$search.`,
         inputSchema: {
           type: "object",
           additionalProperties: false,
@@ -379,7 +343,7 @@ export const getNativeConnectorTools = (
             action: {
               type: "string",
               description:
-                "Action slug from the connector's action catalog (connect.actions).",
+                "Action slug from the connector's action catalog.",
             },
             arguments: {
               type: "object",
@@ -592,7 +556,6 @@ export const listNativeConnectors = async (
       ...setup,
       enabled: stored?.enabled === true,
       enabledAt: stored?.enabledAt,
-      skillPath: stored?.skillPath,
       toolCount: getNativeConnectorTools(entry).length,
       actionCount:
         entry.provider === "oauth-catalog" ||
@@ -611,111 +574,14 @@ export const isNativeConnectorEnabled = async (
   return state.integrations[id]?.enabled === true;
 };
 
-/**
- * Cap on the actions listed in a generated ACTIONS.md. The old unbounded
- * listing (every action + schema summary) produced context-bloating files
- * for Gmail-scale toolkits; the compact top-N reference points agents at
- * `connect.actions` / `connect.schema` for everything else. Existing
- * oversized ACTIONS.md files are rewritten the next time the connector is
- * enabled (Store enable or an accepted in-chat connect card).
- */
-const ACTIONS_MD_TOP_LIMIT = 30;
-
-const oneLine = (value: string | undefined, max = 140): string => {
-  const collapsed = (value ?? "").replace(/\s+/gu, " ").trim();
-  if (collapsed.length <= max) return collapsed;
-  return `${collapsed.slice(0, max - 1)}…`;
-};
-
-const writeNativeConnectorSkill = async (
+export const listEnabledNativeConnectorIds = async (
   stellaAppDir: string,
-  entry: NativeConnectorCatalogEntry,
-) => {
-  const skillDir = path.join(skillsRoot(stellaAppDir), entry.id);
-  await fs.mkdir(skillDir, { recursive: true });
-  const tools = getNativeConnectorTools(entry);
-  const catalogActions = getNativeConnectorCatalogActions(entry);
-  const toolLines = tools.length
-    ? tools
-        .map((tool) => {
-          const description = tool.description ? ` - ${tool.description}` : "";
-          return `- \`${tool.name}\`${description}`;
-        })
-        .join("\n")
-    : "- No executable tools are available yet.";
-  const topActions = catalogActions.slice(0, ACTIONS_MD_TOP_LIMIT);
-  const remainingActionCount = catalogActions.length - topActions.length;
-  const catalogActionLines =
-    topActions.length > 0
-      ? topActions
-          .map((action) => {
-            const description = oneLine(action.description ?? action.title);
-            const params = summarizeActionParams(action.inputSchema);
-            return `- ${action.name}${description ? ` — ${description}` : ""}${params ? ` (${params})` : ""}`;
-          })
-          .join("\n")
-      : "- No recovered catalog actions were available for this provider.";
-  const restLine =
-    remainingActionCount > 0
-      ? `\n\n${remainingActionCount} more actions are not listed here. Find them with \`await connect.actions("${entry.id}", { query: "<keywords>" })\` and fetch a full input schema with \`await connect.schema("${entry.id}", "<ACTION>")\` in code.`
-      : `\n\nFull input schemas: \`await connect.schema("${entry.id}", "<ACTION>")\` in code.`;
-  const catalogActionsPath = path.join(skillDir, "ACTIONS.md");
-  if (
-    entry.provider === "oauth-catalog" ||
-    entry.provider === "backend-composio"
-  ) {
-    await fs.writeFile(
-      catalogActionsPath,
-      entry.provider === "backend-composio"
-        ? `# ${entry.name} Actions (top ${topActions.length} of ${catalogActions.length})\n\nCompact Stella action reference for ${entry.name}. Execute with \`await connect.call("${entry.id}", "<ACTION>", { ... })\` in code.\n\n${catalogActionLines}${restLine}\n`
-        : `# ${entry.name} Catalog Actions (top ${topActions.length} of ${catalogActions.length})\n\nRecovered OAuth action references for choosing the right ${entry.name} API endpoint. Execute via \`await connect.call("${entry.id}", "/path", { method, query, body })\` in code.\n\n${catalogActionLines}${restLine}\n`,
-      "utf-8",
-    );
-  }
-  const body = `---
-name: ${entry.id}
-description: Use the ${entry.name} integration through Stella's connect client.
----
-${GENERATED_SKILL_MARKER}
-
-# ${entry.name}
-
-Use this skill for work that needs ${entry.name}. The integration must stay enabled in the Store; calls are refused when it is disabled.
-
-Preferred: the frozen \`connect\` client inside \`code\`:
-
-\`\`\`js
-await connect.actions("${entry.id}", { query: "<keywords>" }); // find actions (capped list)
-await connect.schema("${entry.id}", "<ACTION>");               // full input schema for one action
-await connect.call("${entry.id}", "<ACTION>", { /* args */ }); // execute; throws on refusal
-\`\`\`
-${
-  entry.provider === "backend-composio"
-    ? `
-This provider has ${entry.catalogToolCount} actions. \`ACTIONS.md\` in this skill folder lists the top ones; discover the rest with \`connect.actions\`.`
-    : entry.provider === "oauth-catalog"
-      ? `
-This provider is REST-style: \`await connect.call("${entry.id}", "/path", { method: "GET", query: {} })\` calls the API with the connected OAuth account. \`ACTIONS.md\` lists the top recovered catalog actions (${entry.catalogToolCount} total).`
-      : `
-Call the executable tools below directly, e.g. \`await connect.call("${entry.id}", "${tools[0]?.name ?? "<tool>"}", { /* args */ })\`.`
-}
-
-
-## Executable Tools
-
-${toolLines}
-`;
-  const skillPath = path.join(skillDir, "SKILL.md");
-  await fs.writeFile(skillPath, body, "utf-8");
-  return skillPath;
-};
-
-const removeGeneratedSkill = async (stellaAppDir: string, id: string) => {
-  const skillDir = path.join(skillsRoot(stellaAppDir), id);
-  const skillPath = path.join(skillDir, "SKILL.md");
-  const content = await fs.readFile(skillPath, "utf-8").catch(() => null);
-  if (!content?.includes(GENERATED_SKILL_MARKER)) return;
-  await fs.rm(skillDir, { recursive: true, force: true });
+): Promise<string[]> => {
+  const state = await readState(stellaAppDir);
+  return Object.entries(state.integrations)
+    .filter(([, entry]) => entry?.enabled === true)
+    .map(([id]) => id)
+    .sort();
 };
 
 export const enableNativeConnector = async (
@@ -764,7 +630,6 @@ export const enableNativeConnector = async (
       `${entry.name} supports OAuth, but Stella's provider setup is not ready yet.`,
     );
   }
-  const skillPath = await writeNativeConnectorSkill(stellaAppDir, entry);
   const state = await readState(stellaAppDir);
   const now = Date.now();
   state.integrations[id] = {
@@ -772,7 +637,6 @@ export const enableNativeConnector = async (
     enabledAt: state.integrations[id]?.enabledAt ?? now,
     updatedAt: now,
     source,
-    skillPath,
   };
   await writeState(stellaAppDir, state);
   // `toolCount` mirrors what `listNativeConnectors` returns so the
@@ -783,7 +647,6 @@ export const enableNativeConnector = async (
     ...entry,
     ...setup,
     enabled: true,
-    skillPath,
     toolCount: getNativeConnectorTools(entry).length,
     actionCount:
       entry.provider === "oauth-catalog"
@@ -811,7 +674,6 @@ export const disableNativeConnector = async (
     updatedAt: now,
   };
   await writeState(stellaAppDir, state);
-  await removeGeneratedSkill(stellaAppDir, id);
   return {
     ...entry,
     ...getNativeConnectorOAuthSetup(entry, options),

@@ -325,6 +325,7 @@ export const requestBackendConnectorActionsFromBridge = async ({
   connectorId,
   action,
   query,
+  cursor,
   limit,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 }: {
@@ -332,13 +333,14 @@ export const requestBackendConnectorActionsFromBridge = async ({
   connectorId: string;
   action?: string;
   query?: string;
+  cursor?: string;
   limit?: number;
   timeoutMs?: number;
 }): Promise<BackendConnectorActionsResult> => {
   const result = await sendRequest(
     socketPath,
     "connector.listBackendActions",
-    { connectorId, action, query, limit },
+    { connectorId, action, query, cursor, limit },
     timeoutMs,
   );
   if (!result || typeof result !== "object") {

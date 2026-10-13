@@ -195,6 +195,11 @@ export const USER_ASKS_REPLY_TOKEN_MIGRATION = {
   statements: [`ALTER TABLE user_asks ADD COLUMN reply_secret TEXT`],
 };
 
+export const USER_ASKS_ANSWER_REMEMBER_MIGRATION = {
+  id: "userAsks.7-answer-remember",
+  statements: [`ALTER TABLE user_ask_answers ADD COLUMN remember INTEGER`],
+};
+
 export const USER_ASKS_CLOSE_REASON_MIGRATION = {
   id: "userAsks.6-close-reason",
   statements: [`ALTER TABLE user_asks ADD COLUMN close_reason TEXT`],
@@ -236,6 +241,7 @@ type AnswerRow = {
   answered_at: number;
   answer_revision: number | null;
   responses: string | null;
+  remember?: number | null;
 };
 
 type StoredAnswer = {
@@ -394,6 +400,9 @@ const readAnswer = (db: OwnerDbReader, askId: string): StoredAnswer | null => {
           fields: row.fields
             ? (JSON.parse(row.fields) as readonly UserAskAnswerFieldValue[])
             : [],
+          ...(row.remember === 0 || row.remember === 1
+            ? { remember: row.remember === 1 }
+            : {}),
           ...answeredOnDeviceId,
         }
       : {
@@ -523,6 +532,14 @@ const secureInputDetailParser = object({
   purpose: string({ min: 1, max: 2_000 }),
   detail: optional(string({ max: 4_000 })),
   fields: array(fieldParser, { max: USER_ASK_MAX_FIELDS }),
+  save: optional(
+    object({
+      service: string({ max: 240 }),
+      account: optional(string({ max: 240 })),
+      label: string({ max: 240 }),
+      replacing: optional(boolean()),
+    }),
+  ),
 });
 
 const recipientKeyParser = object({
@@ -601,6 +618,7 @@ const answerParser: Parser<UserAskAnswer> = (value, path = "") => {
       revision: number({ int: true, min: 1 }),
       kind: literal("fields"),
       fields: array(answerFieldParser, { max: USER_ASK_MAX_FIELDS }),
+      remember: optional(boolean()),
       answeredOnDeviceId: optional(string({ max: 256 })),
     })(value, path);
   }
@@ -1146,8 +1164,8 @@ const answerAsk = (ctx: OwnerContext, askId: string, answer: UserAskAnswer) => {
   ctx.db.run(
     `INSERT INTO user_ask_answers
        (ask_id, answer_kind, choice_id, answer_text, fields, answered_on_device_id, late,
-        answered_at, answer_revision, responses)
-     VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?)`,
+        answered_at, answer_revision, responses, remember)
+     VALUES (?, ?, NULL, NULL, ?, ?, ?, ?, ?, ?, ?)`,
     askId,
     answer.kind,
     answer.kind === "fields" ? JSON.stringify(answer.fields) : null,
@@ -1156,6 +1174,11 @@ const answerAsk = (ctx: OwnerContext, askId: string, answer: UserAskAnswer) => {
     ctx.now,
     answer.revision,
     responses ? JSON.stringify(responses) : null,
+    answer.kind === "fields" && typeof answer.remember === "boolean"
+      ? answer.remember
+        ? 1
+        : 0
+      : null,
   );
   const closed = closeAsk(ctx, row, late ? "answered_late" : "answered");
   if (
@@ -1897,6 +1920,7 @@ export const userAsksDomain = {
     USER_ASKS_QUESTION_RESPONSES_MIGRATION,
     USER_ASKS_REPLY_TOKEN_MIGRATION,
     USER_ASKS_CLOSE_REASON_MIGRATION,
+    USER_ASKS_ANSWER_REMEMBER_MIGRATION,
   ],
   calls: {
     "userAsks.policy": {

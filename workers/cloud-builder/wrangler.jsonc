@@ -72,6 +72,9 @@
     // A container only a prewarm started keeps capacity this long; the turn
     // that attaches raises it to SANDBOX_IDLE_TIMEOUT_MS.
     "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
+    // The orchestrator's container stops this long after its last turn;
+    // the next turn admitted to the conversation wakes it.
+    "ORCHESTRATOR_IDLE_TIMEOUT_MS": "120000",
     // Snapshot a world container when its turn releases it and start the
     // next cold container from that snapshot. "0" always starts from the image.
     "SANDBOX_SNAPSHOTS": "1",
@@ -353,6 +356,9 @@
       "TURN_TIMEOUT_MS": "900000",
       "SANDBOX_IDLE_TIMEOUT_MS": "600000",
       "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
+      // The orchestrator's container stops this long after its last turn;
+      // the next turn admitted to the conversation wakes it.
+      "ORCHESTRATOR_IDLE_TIMEOUT_MS": "120000",
       "SANDBOX_SNAPSHOTS": "1",
       "APPS_HOST_BASE_URL": "https://stella-v2-apps-host-dev.fromyou.workers.dev",
       "TRUSTED_APPS_HOST_BASE_URL": "https://stella-v2-apps-auth-dev.fromyou.workers.dev",
@@ -520,6 +526,9 @@
         // A container only a prewarm started keeps capacity this long; the turn
         // that attaches raises it to SANDBOX_IDLE_TIMEOUT_MS.
         "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
+        // The orchestrator's container stops this long after its last turn;
+        // the next turn admitted to the conversation wakes it.
+        "ORCHESTRATOR_IDLE_TIMEOUT_MS": "120000",
         // Snapshot a world container when its turn releases it and start the
         // next cold container from that snapshot. "0" always starts from the image.
         "SANDBOX_SNAPSHOTS": "1",
@@ -723,6 +732,9 @@
         // A container only a prewarm started keeps capacity this long; the turn
         // that attaches raises it to SANDBOX_IDLE_TIMEOUT_MS.
         "SANDBOX_PREWARM_IDLE_TIMEOUT_MS": "90000",
+        // The orchestrator's container stops this long after its last turn;
+        // the next turn admitted to the conversation wakes it.
+        "ORCHESTRATOR_IDLE_TIMEOUT_MS": "120000",
         // Snapshot a world container when its turn releases it and start the
         // next cold container from that snapshot. "0" always starts from the image.
         "SANDBOX_SNAPSHOTS": "1",

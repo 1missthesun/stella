@@ -102,6 +102,18 @@ export type SandboxSessionConfig = {
   commandTimeoutMs?: number;
 };
 
+export type SandboxReleaseOptions = {
+  /** False when the turn was stopped or failed: no warm window after it. */
+  warm?: boolean;
+  /** How long it stays up after the release; defaults to the warm window. */
+  warmMs?: number;
+  /**
+   * False for a container whose disk is not the owner's setup (the
+   * orchestrator's): no snapshot and no dependency archive, only the stop.
+   */
+  snapshot?: boolean;
+};
+
 export type SandboxState = {
   status: "running" | "stopped";
   size?: SandboxInstanceSize;
@@ -796,16 +808,29 @@ export class Sandbox extends DurableObject<Env> {
    * `warm: false`: nothing is expected to follow it, so the container stops
    * right after its snapshot. The alarm does all of it, so the caller's turn
    * never waits; a call that needs the container before the stop keeps it
-   * running.
+   * running. `snapshot: false` only schedules the stop, `warmMs` after now.
    */
-  async release(options: { warm?: boolean } = {}): Promise<void> {
+  async release(options: SandboxReleaseOptions = {}): Promise<void> {
     if (!this.ctx.container?.running) return;
+    const kv = this.ctx.storage.kv;
+    const warmMs =
+      options.warm === false
+        ? 0
+        : Number.isSafeInteger(options.warmMs) && options.warmMs! >= 0
+          ? Math.min(options.warmMs!, MAX_IDLE_TIMEOUT_MS)
+          : WARM_WINDOW_MS;
+    if (options.snapshot === false) {
+      kv.delete(RELEASE_DUE_KEY);
+      kv.put(STOP_DUE_KEY, Date.now() + warmMs);
+      kv.put(STOP_PENDING_KEY, true);
+      // The alarm is re-armed exactly: an earlier stop set by a previous
+      // release must not cut this container's new window short.
+      await this.ctx.storage.setAlarm(Date.now() + warmMs);
+      return;
+    }
     const snapshotDue = Date.now() + RELEASE_DELAY_MS;
-    this.ctx.storage.kv.put(RELEASE_DUE_KEY, snapshotDue);
-    this.ctx.storage.kv.put(
-      STOP_DUE_KEY,
-      options.warm === false ? snapshotDue : snapshotDue + WARM_WINDOW_MS,
-    );
+    kv.put(RELEASE_DUE_KEY, snapshotDue);
+    kv.put(STOP_DUE_KEY, snapshotDue + warmMs);
     this.ctx.storage.kv.put(STOP_PENDING_KEY, true);
     await this.#armReleaseAlarm();
   }

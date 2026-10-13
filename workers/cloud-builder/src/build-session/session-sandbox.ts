@@ -67,6 +67,34 @@ const sandboxSleepAfterMs = (
   return Number.isSafeInteger(value) && value > 0 ? value : undefined;
 };
 
+/** Used when `ORCHESTRATOR_IDLE_TIMEOUT_MS` is unset or malformed. */
+const DEFAULT_ORCHESTRATOR_IDLE_TIMEOUT_MS = 2 * 60_000;
+
+/**
+ * How long the orchestrator's container stays up after its last turn. It
+ * holds nothing but a Claude Code session the cloud already keeps, so it
+ * sleeps soon after a turn and anything addressed to the conversation (a
+ * message, an agent's report or note, a scheduled turn) wakes it again
+ * through the admission prewarm (`orchestrator/turn-start.ts`).
+ */
+export const orchestratorSleepAfterMs = (
+  env: Pick<Env, "ORCHESTRATOR_IDLE_TIMEOUT_MS">,
+): number => {
+  const value = Number(env.ORCHESTRATOR_IDLE_TIMEOUT_MS);
+  return Number.isSafeInteger(value) && value > 0
+    ? value
+    : DEFAULT_ORCHESTRATOR_IDLE_TIMEOUT_MS;
+};
+
+/** The idle timeout every container call of this turn asks for. */
+export const turnSleepAfterMs = (
+  env: Pick<Env, "SANDBOX_IDLE_TIMEOUT_MS" | "ORCHESTRATOR_IDLE_TIMEOUT_MS">,
+  turn: Pick<TurnRequest, "agentRole"> | undefined,
+): number | undefined =>
+  turn?.agentRole === "orchestrator"
+    ? orchestratorSleepAfterMs(env)
+    : sandboxSleepAfterMs(env);
+
 /** Used when `SANDBOX_PREWARM_IDLE_TIMEOUT_MS` is unset or malformed. */
 const DEFAULT_PREWARM_IDLE_TIMEOUT_MS = 90_000;
 
@@ -330,11 +358,12 @@ export const sandbox = (
   size: InstanceSize = "large",
   workload: SandboxWorkload = "app-build",
   world?: string,
+  idleTimeoutMs: number | undefined = sandboxSleepAfterMs(host.env),
 ) =>
   sandboxHandle(
     host.env,
     { sandboxId: id, size, workload },
-    sandboxSleepAfterMs(host.env),
+    idleTimeoutMs,
     world,
   );
 
@@ -551,8 +580,14 @@ export const releaseAgentSessionResources = async (
     warm?: boolean;
   },
 ): Promise<void> => {
-  const sandbox = host.sandbox(target.sandboxId, target.size, target.workload);
   const turn = await host.ctx.storage.get<TurnRequest>("turn");
+  const sandbox = host.sandbox(
+    target.sandboxId,
+    target.size,
+    target.workload,
+    undefined,
+    turnSleepAfterMs(host.env, turn),
+  );
   // The slot goes back whether or not the container is still up: a stopped
   // or lost container holds no capacity.
   if (turn?.ownerId) {
@@ -630,10 +665,19 @@ export const releaseAgentSessionResources = async (
     "Attached daemon directory removal did not settle.",
   ).catch(() => undefined);
   await sandbox.deleteSession(target.sessionId).catch(() => undefined);
-  // The orchestrator's container serves the user's chat: it stays warm for
-  // the next message until its idle timeout, and its disk, which never
-  // installs anything, must not replace the agents' latest snapshot.
-  if (turn?.agentRole === "orchestrator") return;
+  // The orchestrator's container stays up a short while for the next
+  // message, then stops; anything addressed to the conversation wakes it.
+  // Its disk, which never installs anything, must not replace the agents'
+  // latest snapshot, so it is only stopped.
+  if (turn?.agentRole === "orchestrator") {
+    await sandbox
+      .release({
+        warmMs: orchestratorSleepAfterMs(host.env),
+        snapshot: false,
+      })
+      .catch(() => undefined);
+    return;
+  }
   // A released agent container is the warmest copy of this owner's setup:
   // the next agent container to start, this thread's or another's, resumes
   // from its filesystem. It stays up for the warm window, so the thread's

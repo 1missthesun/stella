@@ -99,7 +99,10 @@ import {
   turnBrokerCredentialsPath,
   withInfrastructureDeadline,
 } from "./shared/keys.js";
-import { acquireAgentContainerSlot } from "./session-sandbox.js";
+import {
+  acquireAgentContainerSlot,
+  turnSleepAfterMs,
+} from "./session-sandbox.js";
 import type {
   AgentExecutionMarker,
   AgentExecutorResult,
@@ -257,7 +260,13 @@ export const quiesceCurrentAgentSession = async (
     }
     return { sandboxId, size: size ?? ("large" as const) };
   });
-  const sandbox = host.sandbox(target.sandboxId, target.size, "world");
+  const sandbox = host.sandbox(
+    target.sandboxId,
+    target.size,
+    "world",
+    undefined,
+    turnSleepAfterMs(host.env, turn),
+  );
   if (!(await host.sandboxContainerRunning(sandbox))) return;
   // The container is this agent thread's own, but the SDK's
   // `killAllProcesses` ignores its session argument, so only this attempt's
@@ -447,7 +456,16 @@ export const runContainerAgentTurn = async (
   const requestStarted = performance.now();
   const turnStartedAt = Date.now();
   const ownerWorld = await worldName(turn.ownerId);
-  let sandbox = host.sandbox(sandboxId, "large", "world", ownerWorld);
+  // The orchestrator's container sleeps soon after its turn; an agent's is
+  // released by its turn and only falls back to the general timeout.
+  const idleTimeoutMs = turnSleepAfterMs(host.env, turn);
+  let sandbox = host.sandbox(
+    sandboxId,
+    "large",
+    "world",
+    ownerWorld,
+    idleTimeoutMs,
+  );
   const sessionId = agentTurnSessionId(turn.turnId);
   const daemonDirectory = attachedToolPaths({
     turnId: turn.turnId,
@@ -479,7 +497,7 @@ export const runContainerAgentTurn = async (
     prewarmed = slot.then(async () => {
       const started = performance.now();
       try {
-        const warming = host.sandbox(sandboxId, size, "world", ownerWorld);
+        const warming = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs);
         const wasRunning = await host.sandboxContainerRunning(warming);
         await withInfrastructureDeadline(
           warming.exec("true", { origin: "internal" }),
@@ -597,7 +615,7 @@ export const runContainerAgentTurn = async (
       slotWaitMs,
       ...(prewarmMs === undefined ? {} : { prewarmMs }),
     });
-    sandbox = host.sandbox(sandboxId, size, "world", ownerWorld);
+    sandbox = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs);
     let attempt = await host.runAgentAttempt({
       turn,
       execution,
@@ -673,7 +691,7 @@ export const runContainerAgentTurn = async (
         )
         .catch(() => undefined);
       execution.assertActive();
-      sandbox = host.sandbox(sandboxId, size, "world", ownerWorld);
+      sandbox = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs);
       attempt = await host.runAgentAttempt({
         turn,
         execution,

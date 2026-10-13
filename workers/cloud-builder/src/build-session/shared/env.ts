@@ -7,4 +7,9 @@ export type Env = Cloudflare.Env & {
    * never longer than `SANDBOX_IDLE_TIMEOUT_MS`.
    */
   SANDBOX_PREWARM_IDLE_TIMEOUT_MS?: string;
+  /**
+   * How long, in milliseconds, the orchestrator's container stays up after a
+   * turn before it stops. Absent or malformed falls back to 2 minutes.
+   */
+  ORCHESTRATOR_IDLE_TIMEOUT_MS?: string;
 };

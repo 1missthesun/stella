@@ -9,6 +9,7 @@
  */
 import type {
   Sandbox,
+  SandboxReleaseOptions,
   SandboxBoot,
   SandboxEgressPolicy,
   SandboxExecResult,
@@ -93,7 +94,7 @@ export interface SandboxHandle extends Omit<ExecutionSession, "id"> {
    * owner's next agent container to start from, then stop it after the warm
    * window, or right after the snapshot when `warm` is false.
    */
-  release(options?: { warm?: boolean }): Promise<void>;
+  release(options?: SandboxReleaseOptions): Promise<void>;
   /** Network rules for a Slack agent's container (`SandboxEgressPolicy`). */
   setEgress(policy: SandboxEgressPolicy | null): Promise<{ restarted: boolean }>;
 }

@@ -1378,7 +1378,6 @@ export const buildClaudeCodeNativeToolRuntimePrompt = (
     enabled.length > 0
       ? `Your Claude Code built-in tools for this session are ${enabled.join(", ")}; use them for files and ${enabled.includes("Bash") ? "shell commands" : "searches"}. Other built-ins are disabled. Use the available Stella tools for everything else and answer the user normally when finished.`
       : "Claude Code built-in tools are disabled for this session. Use the available Stella tools when needed and answer the user normally when finished.",
-    "If you successfully call NoResponse and have nothing else to say, finish without adding a user-visible response.",
     "Never mention MCP, missing Claude tools, or the raw tool protocol to the user.",
   ]
     .filter((section) => section.trim().length > 0)

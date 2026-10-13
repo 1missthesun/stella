@@ -35,7 +35,7 @@ import type {
 } from '@stella/contracts/scheduling'
 
 const DEFAULT_HEARTBEAT_PROMPT =
-  'Read the heartbeat checklist if provided. Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, call NoResponse().'
+  'Read the heartbeat checklist if provided. Follow it strictly. Do not infer or repeat old tasks from prior chats. If nothing needs attention, reply with nothing at all: an empty reply sends nothing.'
 const DEFAULT_HEARTBEAT_INTERVAL_MS = 30 * 60 * 1000
 const DUPLICATE_SUPPRESSION_MS = 24 * 60 * 60 * 1000
 const MIN_HEARTBEAT_INTERVAL_MS = 60_000

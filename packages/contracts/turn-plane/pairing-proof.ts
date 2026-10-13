@@ -360,6 +360,18 @@ export const canonicalDispatchPayloadJson = (
     ...(payload.attachments && payload.attachments.length > 0
       ? { attachments: payload.attachments }
       : {}),
+    // Pasted and quoted text sent with a chat: left out, a placed message
+    // reached the computer running it as only its typed line.
+    ...(payload.context && (payload.context.text || payload.context.display)
+      ? {
+          context: {
+            ...(payload.context.text ? { text: payload.context.text } : {}),
+            ...(payload.context.display
+              ? { display: payload.context.display }
+              : {}),
+          },
+        }
+      : {}),
     ...(payload.execution
       ? {
           execution: {

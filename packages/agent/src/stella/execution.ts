@@ -132,18 +132,18 @@ export const switchDestinationTool = (
   defineTool({
     name: SWITCH_DESTINATION_TOOL_NAME,
     description:
-      'Move yourself to another place: "cloud", or one of the user\'s computers by device_id, and carry on there with this whole conversation from your brief (prompt). Stella: that host takes this conversation\'s turns from now on and the app\'s destination picker follows, once this turn ends; for separate work there, start an agent with spawn_agent and that destination instead. An agent: you move as a whole when this turn ends, and that computer\'s own Stella (or the cloud, in a container of its own) runs you from then on, with its files, apps, browser and sign-ins (and its Claude Code, for an agent on Claude Code); your thread id, reports, messages and pauses follow you. Files in your working folder do not move: commit and push work in progress (a WIP branch is fine) before you move. End your turn right after calling it.',
+      'Move yourself, with this whole conversation, to "cloud" or one of the user\'s computers; you continue there from your brief once this turn ends, so end the turn with at most one short line. As Stella, the conversation\'s turns run there from then on and the app\'s destination picker follows. As an agent, that place\'s Stella runs you with its files, apps, browser and sign-ins; your thread id, reports and messages follow you, but your working folder\'s files stay behind: commit and push first (a WIP branch is fine).',
     parameters: Type.Object({
       destination: Type.String({
-        description: '"cloud", or a device_id from the connected devices list.',
+        description: '"cloud" or a device_id.',
       }),
       prompt: Type.String({
-        description: "Your brief to yourself, which you read there to carry on: what you were asked and what to do there next. Self-contained.",
+        description: "Your self-contained brief to read there: what you were asked and what to do next.",
       }),
       leave_files: Type.Optional(
         Type.Boolean({
           description:
-            "Agents only: move even though your working folder has uncommitted or unpushed changes, which then stay behind on this computer.",
+            "Agents: move even with uncommitted or unpushed changes, which stay behind.",
         }),
       ),
     }),

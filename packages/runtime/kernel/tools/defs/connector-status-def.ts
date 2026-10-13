@@ -27,7 +27,7 @@ export const CONNECTOR_STATUS_SEARCH_TERMS = [
 ] as const;
 
 export const CONNECTOR_STATUS_TOOL_DESCRIPTION =
-  "Check whether a Stella Store connector (Gmail, Outlook, Notion, Slack, and hundreds more) is connected, and if not, show the user an inline connect card in the chat. Deterministic — pure lookup plus the card; the card itself is the user's consent, so don't ask permission before calling. Blocks until the user connects, declines, or the card times out, then reports the outcome so you can proceed. Once it is connected, continue the original task without re-asking; its actions are then tools inside code, found with `tools.$search`. After a decline, tell the user once that they can connect it from the Store later and don't offer it again unless they ask; after a dismissed or unanswered card, mention once that it is in the Store and don't re-offer it for now. Either way, proceed by other means (the browser or computer).";
+  "Check whether a Store connector (Gmail, Outlook, Slack, Notion and hundreds more) is connected; if not, show the user a connect card, which is their consent, and wait for their choice. Once connected, its actions are tools in code (find them with tools.$search); continue the task without asking again. After a decline or a dismissed card, mention once that it's in the Store, don't offer it again unless asked, and continue another way (the browser or computer).";
 
 export const connectorConnectedText = (
   name: string,

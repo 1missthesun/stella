@@ -284,6 +284,8 @@ export class StellaRuntimeHost {
   hostAccountServicesKey: string | null = null;
   hostExecutionPlacementBridge: ExecutionPlacementBridge | null = null;
   hostExecutionPlacementSyncQueue: Promise<void> = Promise.resolve();
+  hostExecutionPlacementRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  hostExecutionPlacementRetryAttempt = 0;
   placedDispatchByRunId = new Map<string, PlacedDispatch>();
   /** What each conversation runs elsewhere, for Stop (`ConversationPlacements`). */
   placements = new ConversationPlacements();
@@ -803,7 +805,31 @@ export class StellaRuntimeHost {
     );
     return await operation;
   }
+  /**
+   * A bridge that could not start (no network at launch or on wake) is tried
+   * again with backoff, so the computer never stays offline to the cloud
+   * until the app restarts.
+   */
+  scheduleHostExecutionPlacementRetry() {
+    if (this.hostExecutionPlacementRetryTimer) return;
+    const attempt = this.hostExecutionPlacementRetryAttempt++;
+    const base = Math.min(60_000, 1_000 * 2 ** Math.min(attempt, 6));
+    const delay = base / 2 + Math.random() * (base / 2);
+    this.hostExecutionPlacementRetryTimer = setTimeout(() => {
+      this.hostExecutionPlacementRetryTimer = null;
+      void this.syncHostExecutionPlacement().catch((error) =>
+        console.warn("[execution-placement] Desktop placement bridge retry failed.", error),
+      );
+    }, delay);
+  }
+  cancelHostExecutionPlacementRetry() {
+    if (this.hostExecutionPlacementRetryTimer) {
+      clearTimeout(this.hostExecutionPlacementRetryTimer);
+      this.hostExecutionPlacementRetryTimer = null;
+    }
+  }
   async syncHostExecutionPlacementNow() {
+    this.cancelHostExecutionPlacementRetry();
     const eligible = isExecutionPlacementEligible({
       started: this.started,
       hostReady: this.hostReady,
@@ -839,6 +865,7 @@ export class StellaRuntimeHost {
       }
     }
     if (!eligible || !client || !this.hostDatabase) {
+      this.hostExecutionPlacementRetryAttempt = 0;
       return;
     }
     const bridge = createExecutionPlacementBridge({
@@ -1182,6 +1209,7 @@ export class StellaRuntimeHost {
     this.hostExecutionPlacementBridge = bridge;
     try {
       await bridge.start();
+      this.hostExecutionPlacementRetryAttempt = 0;
     } catch (error) {
       if (this.hostExecutionPlacementBridge === bridge) {
         this.hostExecutionPlacementBridge = null;
@@ -1196,9 +1224,10 @@ export class StellaRuntimeHost {
         );
       }
       console.warn(
-        "[execution-placement] Desktop placement bridge did not start.",
+        "[execution-placement] Desktop placement bridge did not start; retrying.",
         error,
       );
+      this.scheduleHostExecutionPlacementRetry();
     }
   }
   /**
@@ -2221,6 +2250,7 @@ export class StellaRuntimeHost {
     }
     this.placedDispatchByRunId.clear();
     this.placements.clear();
+    this.cancelHostExecutionPlacementRetry();
     await this.hostExecutionPlacementSyncQueue;
     await this.hostExecutionPlacementBridge?.stop();
     this.hostExecutionPlacementBridge = null;

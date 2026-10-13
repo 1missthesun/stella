@@ -403,6 +403,13 @@ import {
 // Payload types shared by several channels
 // ---------------------------------------------------------------------------
 
+/** This device's telemetry switch, as stored next to its other preferences. */
+export type DesktopTelemetryState = {
+  enabled: boolean;
+  /** Turned off here; the account still has to be written to false. */
+  accountOffPending: boolean;
+};
+
 export type IpcPoint = { x: number; y: number };
 
 export type IpcRect = { x: number; y: number; width: number; height: number };
@@ -991,10 +998,13 @@ export type IpcInvokeContract = {
     [enabled: boolean],
     { enabled: boolean }
   >;
-  [IPC_PREFERENCES_GET_TELEMETRY]: Invoke<[], boolean>;
+  [IPC_PREFERENCES_GET_TELEMETRY]: Invoke<[], DesktopTelemetryState>;
   [IPC_PREFERENCES_SET_TELEMETRY]: Invoke<
-    [enabled: boolean],
-    { enabled: boolean }
+    [
+      enabled: boolean,
+      options?: { accountOffPending?: boolean; mirrorAccount?: boolean },
+    ],
+    DesktopTelemetryState
   >;
   [IPC_PREFERENCES_GET_READ_ALOUD]: Invoke<[], boolean>;
   [IPC_PREFERENCES_SET_READ_ALOUD]: Invoke<

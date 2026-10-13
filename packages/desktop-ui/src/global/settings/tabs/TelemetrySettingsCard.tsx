@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
+import { wakeTelemetryAccountSync } from "@/features/cloud/TelemetryPreferenceBridge";
 import { useT } from "@/shared/i18n";
 import { SettingsToggleCard } from "./settings-toggle-card";
 
@@ -9,9 +10,10 @@ import { SettingsToggleCard } from "./settings-toggle-card";
  * The one telemetry switch. The account preference is authoritative when
  * signed in (it also stops cloud-side reporting); the local preference is
  * what this device's producers check before recording anything, so both are
- * always written together and the account value is mirrored locally on load.
- * A failed save never leaves this device collecting: turning on writes the
- * account first, turning off stops this device first.
+ * always written together and the account value is mirrored locally
+ * (TelemetryPreferenceBridge). A failed save never leaves this device
+ * collecting: turning on writes the account first; turning off stops this
+ * device first and keeps it off until the account write lands.
  */
 export function TelemetrySettingsCard() {
   const t = useT();
@@ -32,7 +34,7 @@ export function TelemetrySettingsCard() {
       try {
         const local =
           await window.electronAPI?.system?.getTelemetryEnabled?.();
-        if (!cancelled && typeof local === "boolean") setEnabled(local);
+        if (!cancelled && local) setEnabled(local.enabled);
       } catch {
         // The account value below still applies when signed in.
       } finally {
@@ -53,9 +55,9 @@ export function TelemetrySettingsCard() {
       return;
     }
     reconciledAccount.current = accountEnabled;
-    setEnabled(accountEnabled);
     void window.electronAPI?.system
-      ?.setTelemetryEnabled?.(accountEnabled)
+      ?.setTelemetryEnabled?.(accountEnabled, { mirrorAccount: true })
+      .then((state) => setEnabled(state.enabled))
       .catch(() => undefined);
   }, [account?.telemetryEnabled]);
 
@@ -65,8 +67,10 @@ export function TelemetrySettingsCard() {
       setEnabled(next);
       setSaving(true);
       setError(null);
-      const setLocal = async (value: boolean) => {
-        await window.electronAPI?.system?.setTelemetryEnabled?.(value);
+      const setLocal = async (value: boolean, accountOffPending = false) => {
+        await window.electronAPI?.system?.setTelemetryEnabled?.(value, {
+          accountOffPending,
+        });
       };
       const setAccount = async (value: boolean) => {
         if (!isCloudConversationReady) return;
@@ -89,14 +93,18 @@ export function TelemetrySettingsCard() {
             }
             return;
           }
-          // Off: this device stops first and stays stopped even when the
-          // account can't be updated, and the switch says so.
-          await setLocal(false);
+          // Off: this device stops first, marked pending until the account
+          // is off too, so a failed account write can't turn it back on.
+          await setLocal(false, true);
+          if (!isCloudConversationReady) return;
           try {
             await setAccount(false);
           } catch {
             setError(t("settings.telemetry.accountError"));
+            wakeTelemetryAccountSync();
+            return;
           }
+          await setLocal(false).catch(() => undefined);
         } catch {
           setEnabled(previous);
           setError(t("settings.telemetry.error"));

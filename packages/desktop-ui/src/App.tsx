@@ -7,6 +7,7 @@ import { FullShell } from "./shell/FullShell";
 import { CloudHomeSyncBridge } from "./features/cloud/CloudHomeSyncBridge";
 import { CloudMemoryPreferenceBridge } from "./features/cloud/CloudMemoryPreferenceBridge";
 import { CloudModelSelectionBridge } from "./features/cloud/CloudModelSelectionBridge";
+import { TelemetryPreferenceBridge } from "./features/cloud/TelemetryPreferenceBridge";
 import { platformCapabilities } from "./platform/capabilities";
 
 const AUTO_REPAIR_SIGNATURE_KEY = "stella:auto-repair:last-signature";
@@ -39,6 +40,9 @@ function App() {
           <CloudMemoryPreferenceBridge />
           {platformCapabilities.nativeBridges ? (
             <CloudModelSelectionBridge />
+          ) : null}
+          {platformCapabilities.nativeBridges ? (
+            <TelemetryPreferenceBridge />
           ) : null}
           <CloudHomeSyncBridge />
           {platformCapabilities.nativeBridges ? (

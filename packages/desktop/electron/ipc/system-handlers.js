@@ -8,7 +8,7 @@ import { getMainLogger } from "../observability/main-logger.js";
 import { noteAppPainted } from "../observability/app-paint.js";
 import { exportDesktopDebugLogs, getDesktopDebugPaths } from "../observability/desktop-debug-logging.js";
 import { resolveLogPaths } from "@stella/runtime/observability/log-paths";
-import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, getTelemetryEnabled, setTelemetryEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, saveLocalPreferences, setOnboardingCompleted, updateLocalModelPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
+import { getLocalModelPreferences, getOnboardingCompleted, getPreventComputerSleep, getReadAloudEnabled, setReadAloudEnabled, getSoundNotificationsEnabled, getTelemetryState, setTelemetryEnabled, loadLocalPreferences, normalizeImageGenerationPreferences, normalizeCodexServiceTier, normalizeRealtimeVoicePreferences, saveLocalPreferences, setOnboardingCompleted, updateLocalModelPreferences, } from "@stella/runtime/kernel/preferences/local-preferences";
 import { coerceAgentRuntimeEngine } from "@stella/contracts/agent-engine";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { listChatGptModels } from "@stella/contracts/chatgpt-siwc-flows";
@@ -811,28 +811,31 @@ export const registerSystemHandlers = (options) => {
         }
         const stellaAppDir = options.getStellaAppDir();
         if (!stellaAppDir)
-            return true;
-        return getTelemetryEnabled(stellaAppDir);
+            return { enabled: true, accountOffPending: false };
+        return getTelemetryState(stellaAppDir);
     });
-    handleIpc(IPC_PREFERENCES_SET_TELEMETRY, async (event, enabled) => {
+    handleIpc(IPC_PREFERENCES_SET_TELEMETRY, async (event, enabled, setOptions) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_SET_TELEMETRY)) {
             throw new Error("Blocked untrusted preferences:setTelemetry request.");
         }
         const nextEnabled = enabled === true;
         const stellaAppDir = options.getStellaAppDir();
-        if (stellaAppDir) {
-            setTelemetryEnabled(stellaAppDir, nextEnabled);
-            if (!nextEnabled) {
-                // Opting out discards what is still queued on this device;
-                // producers also re-check the preference before every send.
-                const telemetryDir = path.join(stellaAppDir, "telemetry");
-                const spoolNames = await readdir(telemetryDir).catch(() => []);
-                await Promise.all(spoolNames
-                    .filter((name) => name.endsWith(".jsonl"))
-                    .map((name) => unlink(path.join(telemetryDir, name)).catch(() => undefined)));
-            }
+        if (!stellaAppDir)
+            return { enabled: nextEnabled, accountOffPending: false };
+        const state = setTelemetryEnabled(stellaAppDir, nextEnabled, {
+            accountOffPending: setOptions?.accountOffPending === true,
+            mirrorAccount: setOptions?.mirrorAccount === true,
+        });
+        if (!state.enabled) {
+            // Opting out discards what is still queued on this device;
+            // producers also re-check the preference before every send.
+            const telemetryDir = path.join(stellaAppDir, "telemetry");
+            const spoolNames = await readdir(telemetryDir).catch(() => []);
+            await Promise.all(spoolNames
+                .filter((name) => name.endsWith(".jsonl"))
+                .map((name) => unlink(path.join(telemetryDir, name)).catch(() => undefined)));
         }
-        return { enabled: nextEnabled };
+        return state;
     });
     handleIpc(IPC_PREFERENCES_GET_READ_ALOUD, (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_PREFERENCES_GET_READ_ALOUD)) {

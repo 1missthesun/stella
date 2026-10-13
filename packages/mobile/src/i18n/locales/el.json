@@ -1902,7 +1902,7 @@
       "title": "Your data in Stella Cloud"
     },
     "telemetry": {
-      "accountError": "Η τηλεμετρία είναι απενεργοποιημένη σε αυτή τη συσκευή, αλλά δεν ήταν δυνατή η ενημέρωση του λογαριασμού σας. Δοκιμάστε ξανά.",
+      "accountError": "Η τηλεμετρία είναι απενεργοποιημένη σε αυτή τη συσκευή. Δεν ήταν ακόμη δυνατή η ενημέρωση του λογαριασμού σας· η Stella θα συνεχίσει να προσπαθεί.",
       "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
       "error": "Couldn’t change telemetry. Try again.",
       "title": "Share anonymous usage metrics"

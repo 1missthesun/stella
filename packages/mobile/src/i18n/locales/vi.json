@@ -1894,7 +1894,7 @@
       "title": "Your data in Stella Cloud"
     },
     "telemetry": {
-      "accountError": "Đã tắt đo từ xa trên thiết bị này, nhưng không thể cập nhật tài khoản của bạn. Hãy thử lại.",
+      "accountError": "Đã tắt đo từ xa trên thiết bị này. Chưa thể cập nhật tài khoản của bạn; Stella sẽ tiếp tục thử.",
       "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
       "error": "Couldn’t change telemetry. Try again.",
       "title": "Share anonymous usage metrics"

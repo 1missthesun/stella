@@ -1918,7 +1918,7 @@
       "title": "Your data in Stella Cloud"
     },
     "telemetry": {
-      "accountError": "Telemetrie je na tomto zařízení vypnutá, ale váš účet se nepodařilo aktualizovat. Zkuste to znovu.",
+      "accountError": "Telemetrie je na tomto zařízení vypnutá. Váš účet se zatím nepodařilo aktualizovat; Stella to bude zkoušet dál.",
       "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
       "error": "Couldn’t change telemetry. Try again.",
       "title": "Share anonymous usage metrics"

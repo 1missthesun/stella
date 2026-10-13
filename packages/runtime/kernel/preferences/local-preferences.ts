@@ -139,6 +139,12 @@ export type LocalPreferences = {
    */
   telemetryEnabled: boolean;
   /**
+   * Telemetry was turned off here but the account preference couldn't be
+   * written yet. While set, the account value is never mirrored onto this
+   * device; the account write to false is retried until it succeeds.
+   */
+  telemetryAccountOffPending: boolean;
+  /**
    * Reads finalized assistant messages aloud via one-shot TTS. Off by
    * default — the user opts in from a speaker toggle in the chat UI. The
    * provider is `realtimeVoice.readAloudProvider` (defaults to Gemini),
@@ -235,6 +241,7 @@ const DEFAULT_PREFERENCES: LocalPreferences = {
   soundNotificationsEnabled: true,
   dictationSoundEffectsEnabled: true,
   telemetryEnabled: true,
+  telemetryAccountOffPending: false,
   wakeWordEnabled: false,
   onboardingCompleted: false,
   wakeWordThreshold: 0.6,
@@ -343,6 +350,7 @@ const normalizeStoredPreferences = (
   soundNotificationsEnabled: parsed.soundNotificationsEnabled !== false,
   dictationSoundEffectsEnabled: parsed.dictationSoundEffectsEnabled !== false,
   telemetryEnabled: parsed.telemetryEnabled !== false,
+  telemetryAccountOffPending: parsed.telemetryAccountOffPending === true,
   wakeWordEnabled:
     typeof parsed.wakeWordEnabled === "boolean"
       ? parsed.wakeWordEnabled
@@ -729,12 +737,45 @@ export const getTelemetryEnabled = (stellaDataDir: string): boolean => {
   }
 };
 
+export type TelemetryState = {
+  enabled: boolean;
+  accountOffPending: boolean;
+};
+
+export const getTelemetryState = (stellaDataDir: string): TelemetryState => {
+  try {
+    const prefs = loadLocalPreferences(stellaDataDir);
+    return {
+      enabled: prefs.telemetryEnabled,
+      accountOffPending: prefs.telemetryAccountOffPending,
+    };
+  } catch {
+    return { enabled: true, accountOffPending: false };
+  }
+};
+
+/**
+ * Write this device's telemetry switch. `mirrorAccount` writes copy the
+ * account preference: while an off is still pending for the account an
+ * account `true` is ignored, so off on this device stays off until the user
+ * turns it on, and an account `false` settles the pending off.
+ */
 export const setTelemetryEnabled = (
   stellaDataDir: string,
   enabled: boolean,
-): void => {
+  options: { accountOffPending?: boolean; mirrorAccount?: boolean } = {},
+): TelemetryState => {
   const prefs = loadLocalPreferences(stellaDataDir);
-  saveLocalPreferences(stellaDataDir, { ...prefs, telemetryEnabled: enabled });
+  if (options.mirrorAccount && enabled && prefs.telemetryAccountOffPending) {
+    return { enabled: false, accountOffPending: true };
+  }
+  const accountOffPending = !enabled && options.accountOffPending === true;
+  saveLocalPreferences(stellaDataDir, {
+    ...prefs,
+    telemetryEnabled: enabled,
+    telemetryAccountOffPending: accountOffPending,
+  });
+  return { enabled, accountOffPending };
 };
 
 export const getDictationSoundEffectsEnabled = (

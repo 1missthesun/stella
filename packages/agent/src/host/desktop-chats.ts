@@ -141,10 +141,8 @@ const LINKED_FILE_ENTRIES = 500;
 const JOURNAL_CATCH_UP_MS = 3_000;
 /** How often an open conversation is checked for being idle again. */
 const IDLE_CHECK_MS = 30_000;
-/** How often the journal is read while a turn runs elsewhere, or while one here can be stopped from elsewhere. */
+/** How often the journal is read while a turn here can be stopped from elsewhere and no app window brings its records. */
 const FOLLOW_MS = 2_000;
-/** How long after a turn is placed elsewhere the journal is read that often, until the turn shows. */
-const FOLLOW_WINDOW_MS = 60_000;
 /** How long where a conversation's brain runs is trusted before it is read again. */
 const BRAIN_TTL_MS = 5_000;
 /** How often a watched conversation reads again where its Stella runs, for the app's picker. */
@@ -359,6 +357,11 @@ type Chat = {
   steerPlacedAgent: OpenStellaHarness["steerPlacedAgent"];
   /** For a conversation stored in the cloud: its journal mirror. */
   mirror?: JournalMirror;
+  /**
+   * The app's conversation socket saw the journal grow: import it now. One
+   * import at a time; a signal during one runs one more after it.
+   */
+  journalAdvanced?(): void;
   /** For a conversation kept on this computer: its chat log mirror. */
   localLog?: LocalLogMirror;
   /** Where Stella can move herself. */
@@ -366,9 +369,8 @@ type Chat = {
   stream?: AgentEventStream;
   watchers: number;
   idleCheck: ReturnType<typeof setInterval>;
-  /** Reads the journal closely while a turn runs elsewhere (`follow`). */
+  /** Reads the journal closely while a turn here is open and no app window watches. */
   followCheck: ReturnType<typeof setInterval>;
-  followUntil: number;
   reminderContext?: ReminderContext;
 };
 
@@ -642,9 +644,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       if (!brain) return false;
       if (!(await brain.note(host, { id: `pi-note:${id}`, text }))) return false;
     }
-    // Her answer comes back through the journal.
-    const chat = await chats.get(conversationId)?.catch(() => undefined);
-    if (chat) chat.followUntil = Date.now() + FOLLOW_WINDOW_MS;
+    // Her answer comes back through the journal, which the app's
+    // conversation socket brings here (`journalAdvanced`).
     return true;
   };
   /** The user moving Stella from the app's picker. */
@@ -1548,6 +1549,27 @@ export function desktopChats(options: DesktopChatsOptions) {
           : undefined;
         void (mirror ? mirror.standing : Promise.resolve(true)).then(settleStanding);
         void mirror?.importNow().catch((error: unknown) => options.report(error));
+        let pulling = false;
+        let pullAgain = false;
+        const journalAdvanced = mirror
+          ? () => {
+              if (pulling) {
+                pullAgain = true;
+                return;
+              }
+              pulling = true;
+              void (async () => {
+                do {
+                  pullAgain = false;
+                  await mirror.importNow();
+                } while (pullAgain);
+              })()
+                .catch((error: unknown) => options.report(error))
+                .finally(() => {
+                  pulling = false;
+                });
+            }
+          : undefined;
         const idleCheck = setInterval(() => {
           void (async () => {
             const inspection = await harness.inspect(context);
@@ -1560,9 +1582,14 @@ export function desktopChats(options: DesktopChatsOptions) {
               conversationId,
               inspection.tasks.length > 0 || inspection.submissions.length > 0 || awaitingCloud,
             );
-            // While someone looks at it, or a report is due, what the journal
-            // gained shows up here.
-            if (opened?.watchers || awaitingCloud) await mirror?.importNow();
+            // While the app looks at it, its conversation socket says when the
+            // journal grows (`journalAdvanced`). Without it, a report that is
+            // due is read for here; a turn shown running elsewhere is read
+            // again too, so one that went stale stops showing.
+            const watched = Boolean(opened?.watchers);
+            if ((!watched && awaitingCloud) || (watched && (mirror?.remoteTurns().length ?? 0) > 0)) {
+              await mirror?.importNow();
+            }
           })().catch((error: unknown) => options.report(error));
         }, IDLE_CHECK_MS);
         idleCheck.unref?.();
@@ -1577,10 +1604,10 @@ export function desktopChats(options: DesktopChatsOptions) {
             void recheckBrainHost(conversationId).catch((error: unknown) => options.report(error));
           }
           if (!mirror || following || !opened) return;
-          const watched =
-            opened.watchers > 0 && (mirror.remoteTurns().length > 0 || Date.now() < opened.followUntil);
-          // While a turn of this computer's is open, a Stop from another device ends it here.
-          if (!watched && !mirror.turnOpen()) return;
+          // While the app looks, its conversation socket brings what the
+          // journal gains (`journalAdvanced`). Otherwise, while a turn of this
+          // computer's is open, a Stop from another device must still end it here.
+          if (opened.watchers > 0 || !mirror.turnOpen()) return;
           following = true;
           void mirror
             .importNow()
@@ -1602,12 +1629,12 @@ export function desktopChats(options: DesktopChatsOptions) {
           runPlacedAgent,
           steerPlacedAgent,
           ...(mirror ? { mirror } : {}),
+          ...(journalAdvanced ? { journalAdvanced } : {}),
           ...(localLog ? { localLog } : {}),
           execution,
           watchers: 0,
           idleCheck,
           followCheck,
-          followUntil: 0,
         };
         return opened;
       })().catch((error: unknown) => {
@@ -1718,10 +1745,12 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { paths: [...new Set(texts.flatMap((text) => extractLocalFileLinkPaths(text)))] };
   };
 
-  /** A turn of this conversation was placed elsewhere: read the journal closely until it shows. */
+  /**
+   * A turn of this conversation was placed elsewhere: keep its chat open, so
+   * the records the app's conversation socket brings are imported here.
+   */
   const follow = async (conversationId: string): Promise<void> => {
-    const chat = await open(conversationId);
-    chat.followUntil = Date.now() + FOLLOW_WINDOW_MS;
+    await open(conversationId);
   };
 
   const unwatch = async (conversationId: string): Promise<void> => {
@@ -2390,6 +2419,11 @@ export function desktopChats(options: DesktopChatsOptions) {
           return { ok: true };
         case "files":
           return linkedFiles(request.conversationId);
+        case "journal": {
+          const opened = await chats.get(request.conversationId)?.catch(() => undefined);
+          opened?.journalAdvanced?.();
+          return { ok: true };
+        }
         case "brain":
           if (request.fresh) expireBrain(request.conversationId);
           return brainPlacement(request.conversationId);

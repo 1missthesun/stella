@@ -246,6 +246,11 @@ export type PiChatRequest =
    * Where the conversation's brain runs (`PiChatBrainResult`): a send for a
    * conversation whose Stella runs elsewhere is placed there.
    */
+  /**
+   * The app's conversation socket received journal records (or reconnected):
+   * the host imports what the journal gained instead of polling for it.
+   */
+  | { op: "journal"; conversationId: string }
   | {
       op: "brain";
       conversationId: string;

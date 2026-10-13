@@ -18,6 +18,7 @@
 
 import { getAuthToken } from "@/global/auth/services/auth-token";
 import { conversationBrainChanged } from "@/features/execution-placement/conversation-brain-signal";
+import { conversationJournalAdvanced } from "./journal-advanced";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
 import {
   EMPTY_JOURNAL_RECORDS as EMPTY_RECORDS,
@@ -505,8 +506,10 @@ class ConversationStore {
           live: liveTurnFromReady(event.ready.live),
         });
         this.scheduleCacheWrite();
-        // A move made while this socket was away sent its frame to nobody.
+        // A move made while this socket was away sent its frame to nobody,
+        // and what the journal gained meanwhile reached no import.
         conversationBrainChanged(this.conversationId);
+        conversationJournalAdvanced(this.conversationId);
         return;
       }
       case "brain":
@@ -514,6 +517,7 @@ class ConversationStore {
         return;
       case "records":
         this.appendRecords(event.records);
+        conversationJournalAdvanced(this.conversationId);
         return;
       case "older":
         this.prependRecords(event.records, {

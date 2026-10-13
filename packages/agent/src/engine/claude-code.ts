@@ -1334,10 +1334,15 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               if (!record || record.native || record.truncated || record.turn.done) return undefined;
               if (result.control || result.content === undefined || !builtinWaits(record.turn, call.id)) return undefined;
               calls.delete(call.id);
-              deliver(record.turn, call.id, {
-                content: result.content.filter((part): part is TextContent | ImageContent => part.type === "text" || part.type === "image"),
-                ...(result.isError ? { isError: true } : {}),
-              });
+              const content = result.content.filter((part): part is TextContent | ImageContent => part.type === "text" || part.type === "image");
+              const diagnostics = result.diagnostics ?? [];
+              if (diagnostics.length > 0) {
+                content.push({
+                  type: "text",
+                  text: `<harness>\n${diagnostics.map((diagnostic) => `[${diagnostic.severity}] ${diagnostic.message}`).join("\n")}\n</harness>`,
+                });
+              }
+              deliver(record.turn, call.id, { content, ...(result.isError ? { isError: true } : {}) });
               return undefined;
             },
           }),

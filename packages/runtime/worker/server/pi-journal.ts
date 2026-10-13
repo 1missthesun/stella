@@ -116,7 +116,14 @@ const uploadRelayed = async (auth: () => SiteAuth | null, message: RelayedMessag
 
 const relayContext = (context: RelayedMessage["context"]): CloudTurnContext | undefined => {
   if (!context) return undefined;
-  const text = context.text?.slice(0, TURN_CONTEXT_TEXT_MAX_CHARS);
+  const text = context.text?.trim() ? context.text : undefined;
+  if (text && text.length > TURN_CONTEXT_TEXT_MAX_CHARS) {
+    // Refused, not shortened: the user is told it did not go.
+    throw new Error(
+      `The pasted text is too long to send on to where Stella runs (${text.length} characters; the limit is ${TURN_CONTEXT_TEXT_MAX_CHARS}).`,
+    );
+  }
+  // Chip labels and previews only: a display too large to carry is left off.
   const display =
     context.display && JSON.stringify(context.display).length <= TURN_CONTEXT_DISPLAY_MAX_CHARS
       ? context.display
@@ -279,7 +286,8 @@ export const cloudJournalFor = (
       const body: CloudTurnStartRequest = {
         protocol: TURN_PLANE_PROTOCOL,
         clientMsgId,
-        prompt,
+        // A cloud turn needs typed text; a message of only pasted text or files reads as this.
+        prompt: prompt || (context?.text ? "(Pasted text)" : "(Attached files)"),
         ...(attachments.length ? { attachments } : {}),
         ...(context ? { context } : {}),
         lane: "chat",

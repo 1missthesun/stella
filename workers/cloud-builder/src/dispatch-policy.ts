@@ -25,6 +25,7 @@ import {
   type ExecutionSubject,
   type ExecutionTargetMode,
   PLACEMENT_PROTOCOL,
+  DISPATCH_PAYLOAD_MAX_BYTES,
 } from "@stella/contracts/turn-plane/placement";
 import { parseCloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import { parseCloudExecutionSelection } from "./turn-start-request.js";
@@ -45,7 +46,7 @@ export const MAX_IDEMPOTENCY_KEY_CHARS = 128;
 export const MAX_CONVERSATION_ID_CHARS = 256;
 export const MAX_REQUIRED_CAPABILITIES = 8;
 export const MAX_OFFERS_PER_DISPATCH = 8;
-export const MAX_DISPATCH_PAYLOAD_BYTES = 128 * 1024;
+export const MAX_DISPATCH_PAYLOAD_BYTES = DISPATCH_PAYLOAD_MAX_BYTES;
 export const MAX_DISPATCH_PROMPT_CHARS = 8_000;
 export const MAX_DISPATCH_DESCRIPTION_CHARS = 1_000;
 export const MAX_DISPATCH_ATTACHMENTS = 4;
@@ -228,9 +229,9 @@ export const parseDispatchPayload = (
   if (value.schemaVersion !== 1)
     return fail("payload.schemaVersion must be 1.");
   const prompt = typeof value.prompt === "string" ? value.prompt.trim() : "";
-  if (!prompt || prompt.length > MAX_DISPATCH_PROMPT_CHARS) {
+  if (prompt.length > MAX_DISPATCH_PROMPT_CHARS) {
     return fail(
-      `payload.prompt must be 1-${MAX_DISPATCH_PROMPT_CHARS} characters.`,
+      `payload.prompt must be at most ${MAX_DISPATCH_PROMPT_CHARS} characters.`,
     );
   }
   const conversationId = bounded(
@@ -277,6 +278,15 @@ export const parseDispatchPayload = (
     const context = parseCloudTurnContext(value.context);
     if (!context || kind !== "chat") return fail("payload.context is malformed.");
     if (context.text || context.display) payload.context = context;
+  }
+  // A chat may be only what the user pasted or attached, with nothing typed.
+  if (
+    !prompt &&
+    !(kind === "chat" && (payload.context?.text || payload.attachments?.length))
+  ) {
+    return fail(
+      `payload.prompt must be 1-${MAX_DISPATCH_PROMPT_CHARS} characters.`,
+    );
   }
   if (value.execution !== undefined && value.execution !== null) {
     const execution = parseCloudExecutionSelection(value.execution);

@@ -15,6 +15,7 @@ import { useChatStorageMode } from "@/features/chat/services/chat-storage-prefer
  * cloud. A socket verb would be a way around all of that.
  */
 
+import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import {
   useCallback,
   useEffect,
@@ -137,7 +138,7 @@ export type CloudConversationView = {
   status: SocketStatus;
   /** Optimistic prompts belonging to this conversation (or not yet placed). */
   pending: readonly PendingPrompt[];
-  send: (prompt: string) => Promise<void>;
+  send: (prompt: string, context?: CloudTurnContext) => Promise<void>;
   retrySend: (clientMsgId: string) => Promise<void>;
   dismissSend: (clientMsgId: string) => void;
   /** False when the stop could not be delivered — the caller must say so. */
@@ -658,7 +659,7 @@ export const useConversation = (
   ]);
 
   const send = useCallback(
-    async (prompt: string): Promise<void> => {
+    async (prompt: string, context?: CloudTurnContext): Promise<void> => {
       if (webShell) {
         if (preparingAttachmentSendRef.current) return;
         preparingAttachmentSendRef.current = true;
@@ -701,6 +702,7 @@ export const useConversation = (
           .slice(0, 4)
           .map((entry) => entry.path),
         attachments,
+        ...(context ? { context } : {}),
         locale: locale !== "en" ? locale : null,
         execution: selectedExecution ? { ...selectedExecution } : null,
         executionTarget: getExecutionTargetSnapshot(),

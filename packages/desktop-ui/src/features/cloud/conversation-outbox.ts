@@ -1,4 +1,5 @@
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import type { CloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
 import { isAccountProviderId } from "@stella/contracts/backend/providers";
 import { REASONING_EFFORT_LEVELS } from "@stella/contracts/reasoning-effort";
 import type { JournalRecord } from "@stella/contracts/conversation-protocol";
@@ -25,6 +26,8 @@ export type PendingCloudTurnSubmission = {
   prompt: string;
   /** Exact image paths sent with the idempotent mutation. */
   imagePaths: readonly string[];
+  /** Pasted and quoted text sent with it: read by the model, shown as chips. */
+  context?: CloudTurnContext;
   /** Immutable composer snapshot used for guarded post-success clearing. */
   attachments: readonly CloudAttachment[];
   /** Frozen reply-language hint; null preserves the API's default behavior. */

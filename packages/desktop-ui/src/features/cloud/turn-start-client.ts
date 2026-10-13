@@ -191,6 +191,7 @@ export const cloudTurnStartRequest = (
     ...(submission.imagePaths.length
       ? { attachments: [...submission.imagePaths] }
       : {}),
+    ...(submission.context ? { context: submission.context } : {}),
     source: "desktop",
     ...(title ? { title } : {}),
   };

@@ -49,6 +49,10 @@ import {
 import { log } from "./support.js";
 import { OwnerGateDispatch } from "./dispatch.js";
 
+/** A cloud turn needs typed text; a send of only pasted text or files reads as this. */
+const contextOnlyPrompt = (payload: DispatchPayload): string =>
+  payload.context?.text ? "(Pasted text)" : "(Attached files)";
+
 /**
  * The cloud branch of a dispatch: starting its cloud chat or cloud agent, and
  * retiring the handoff.
@@ -211,11 +215,14 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       ...(payload.userMessageEventId
         ? { originUserMessageId: payload.userMessageEventId }
         : {}),
-      prompt: payload.prompt,
+      prompt: payload.prompt || contextOnlyPrompt(payload),
       lane: "chat",
       source: row.ingress === "schedule" ? "schedule" : "placement",
       ...(payload.locale ? { locale: payload.locale } : {}),
       ...(payload.attachments ? { attachments: payload.attachments } : {}),
+      ...(payload.context && row.ingress !== "schedule"
+        ? { context: payload.context }
+        : {}),
       ...(payload.execution ? { execution: payload.execution } : {}),
       ...(payload.handoff || row.ingress === "schedule"
         ? { hiddenMessage: true }

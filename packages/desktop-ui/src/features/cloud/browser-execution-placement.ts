@@ -62,6 +62,7 @@ export const browserExecutionPayload = (args: {
     ...(args.submission.imagePaths.length
       ? { attachments: [...args.submission.imagePaths] }
       : {}),
+    ...(args.submission.context ? { context: args.submission.context } : {}),
     ...(execution ? { execution } : {}),
   };
 };

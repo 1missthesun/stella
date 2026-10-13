@@ -653,7 +653,15 @@ export const piPlacedChat = async (
   });
   const content = piUserContent(payload, prepared);
   const context = run.context === undefined ? null : parseCloudTurnContext(run.context);
-  if (context?.text) content.push({ type: "text", text: context.text, stella: { hidden: true } });
+  if (context?.text) {
+    // Nothing typed: the pasted text is the message, not a placeholder beside it.
+    const [first] = content;
+    const placeholderOnly =
+      content.length === 1 && first?.type === "text" && first.stella?.hidden && first.text === "(empty message)";
+    const part = { type: "text" as const, text: context.text, stella: { hidden: true as const } };
+    if (placeholderOnly) content[0] = { ...part, stella: { ...first.stella, ...part.stella } };
+    else content.push(part);
+  }
   if (context?.display) {
     const first = content[0]!;
     const display = first.stella?.display;

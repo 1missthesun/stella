@@ -46,8 +46,15 @@ export const CONVERSATION_ID_PATTERN = /^[A-Za-z0-9._-]{8,128}$/;
 export const TURN_PROMPT_MAX_CHARS = 8_000;
 export const TURN_ATTACHMENTS_MAX = 4;
 export const TURN_TITLE_MAX_CHARS = 120;
-export const TURN_CONTEXT_TEXT_MAX_CHARS = 32_000;
-export const TURN_CONTEXT_DISPLAY_MAX_CHARS = 16_000;
+/**
+ * Hidden context sent with a message (pasted text, quoted text, the active
+ * window): a long paste is ordinary, so this is sized for one, and the whole
+ * dispatch still has to fit its durable payload limit. A message over either
+ * is refused with a reason, never shortened.
+ */
+export const TURN_CONTEXT_TEXT_MAX_CHARS = 400_000;
+/** What the sent message shows of that context (chip labels and previews). */
+export const TURN_CONTEXT_DISPLAY_MAX_CHARS = 64_000;
 
 export type CloudTurnContext = {
   text?: string;

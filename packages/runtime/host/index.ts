@@ -5,6 +5,9 @@ import { createRequire } from "node:module";
 import { hostname } from "node:os";
 import { AGENT_STOP_WIRE_REASON } from "@stella/contracts/agent-status";
 import { readAgentLineage } from "@stella/contracts/agent-depth";
+import { DISPATCH_PAYLOAD_MAX_BYTES } from "@stella/contracts/turn-plane/placement";
+import { canonicalDispatchPayloadJson } from "@stella/contracts/turn-plane/pairing-proof";
+import { PlacedChatTooLargeError, placedChatContext } from "./placed-chat-context.js";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -989,7 +992,17 @@ export class StellaRuntimeHost {
       runExecution: async ({ dispatch, payload, ownerGeneration }) => {
         const prompt =
           typeof payload.prompt === "string" ? payload.prompt.trim() : "";
-        if (!prompt) {
+        // A chat can be only what the user pasted or attached.
+        const contextOnly =
+          dispatch.kind === "chat" &&
+          (Boolean(
+            payload.context &&
+              typeof payload.context === "object" &&
+              typeof (payload.context as { text?: unknown }).text === "string" &&
+              (payload.context as { text: string }).text.trim(),
+          ) ||
+            placementAttachmentPaths(payload).length > 0);
+        if (!prompt && !contextOnly) {
           return {
             status: "error",
             error: "The accepted execution payload did not contain a prompt.",
@@ -1533,16 +1546,14 @@ export class StellaRuntimeHost {
       idempotencyKey,
     );
     const attachmentsMs = Math.round(performance.now() - attachmentAt);
-    const selectedText =
-      typeof payload.selectedText === "string"
-        ? payload.selectedText.trim()
-        : "";
-    const userPrompt =
+    const prompt =
       typeof payload.userPrompt === "string" ? payload.userPrompt.trim() : "";
-    const prompt = selectedText
-      ? `${userPrompt || "Please help with this context."}\n\nSelected text:\n${selectedText}`
-      : userPrompt;
-    if (!prompt) throw new Error("A prompt is required.");
+    // Pasted and quoted text, selections, the active window: read by the
+    // model hidden and shown as the message's chips, as a send here is.
+    const context = payload.handoff === true ? undefined : placedChatContext(payload);
+    if (!prompt && !context?.text && attachments.length === 0) {
+      throw new Error("A prompt is required.");
+    }
     // Exactly the bytes the executing device (this one, another computer,
     // or the cloud) receives. The owner gate hashes and hands them over.
     const dispatchPayload: DispatchPayload = {
@@ -1553,8 +1564,15 @@ export class StellaRuntimeHost {
       userMessageEventId: payload.userMessageEventId ?? idempotencyKey,
       ...(payload.locale ? { locale: payload.locale } : {}),
       ...(attachments.length ? { attachments } : {}),
+      ...(context ? { context } : {}),
       ...(payload.handoff === true ? { handoff: true } : {}),
     };
+    const payloadBytes = Buffer.byteLength(canonicalDispatchPayloadJson(dispatchPayload), "utf8");
+    if (payloadBytes > DISPATCH_PAYLOAD_MAX_BYTES) {
+      throw new PlacedChatTooLargeError(
+        `This message is too large to send to where Stella runs (${Math.ceil(payloadBytes / 1024)} KB; the limit is ${DISPATCH_PAYLOAD_MAX_BYTES / 1024} KB). Attach the long text as a file instead.`,
+      );
+    }
     getFileLogger()?.process("chat.dispatch-prepared", {
       requestId: payload.requestId,
       originUserMessageId: payload.userMessageEventId,
@@ -1563,6 +1581,7 @@ export class StellaRuntimeHost {
       placementReadyMs,
       attachmentsMs,
       preparationMs: Math.round(performance.now() - preparationAt),
+      payloadBytes,
     });
     const dispatch = await bridge.submitDesktopExecution({
       idempotencyKey,
@@ -1869,6 +1888,9 @@ export class StellaRuntimeHost {
             userMessageEventId: request.requestId,
             ...(typeof send.selectedText === "string"
               ? { selectedText: send.selectedText }
+              : {}),
+            ...(send.chatContext && typeof send.chatContext === "object"
+              ? { chatContext: send.chatContext as RuntimeChatPayload["chatContext"] }
               : {}),
             ...(Array.isArray(send.attachments) && send.attachments.length
               ? { attachments: send.attachments as RuntimeAttachmentRef[] }

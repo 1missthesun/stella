@@ -379,6 +379,11 @@ export type DispatchError = {
 
 export const DEVICE_PRESENCE_SUBPROTOCOL = "stella.v1" as const;
 export const DEVICE_PRESENCE_PROTOCOL_VERSION = 1 as const;
+/**
+ * A dispatch payload's canonical JSON, at most: the cloud stores it and hands
+ * it to the executing device whole, so a sender checks it first and says why.
+ */
+export const DISPATCH_PAYLOAD_MAX_BYTES = 1024 * 1024;
 export const DEVICE_PRESENCE_MAX_FRAME_BYTES = 1536 * 1024;
 export const DEVICE_TERMINAL_RESULT_MAX_BYTES = 1_000_000;
 

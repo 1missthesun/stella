@@ -368,6 +368,13 @@ const useSustainedCloudOffline = (status: CloudSocketStatus): boolean => {
   return shouldShowCloudOfflineNotice(offlineWindow, status, nowMs);
 };
 
+/** How long a stopped turn may keep running before the phone says so. */
+const STOP_CONFIRM_MS = 15_000;
+const STOP_UNREACHABLE_MESSAGE =
+  "Couldn’t stop this reply. Stella isn’t connected right now.";
+const STOP_UNCONFIRMED_MESSAGE =
+  "This reply is still running. Stella hasn’t confirmed the stop yet.";
+
 export const useCloudCanonicalChatThread = (
   authority: CloudConversationAuthority,
   options?: {
@@ -809,6 +816,25 @@ export const useCloudCanonicalChatThread = (
     },
     [authority.accountScope, authority.conversationId],
   );
+  // Whole-journal scans: keyed on the journal so composer keystrokes, which
+  // re-render this hook, do not repeat them.
+  const activeTurnId = useMemo(
+    () => activeCloudTurnId(state.records, state.live),
+    [state.live, state.records],
+  );
+  const runningDispatchId = useMemo(
+    () => canonicalCloudDispatchIdForTurn(state.records, activeTurnId),
+    [activeTurnId, state.records],
+  );
+  // A Stop that did not land. It names the turn it was for, so it clears on
+  // its own once that turn ends (stopped or finished), and it never gates
+  // sending: a new message queues behind the running turn as usual.
+  const [stopIssue, setStopIssue] = useState<{
+    turnId: string;
+    message: string;
+  } | null>(null);
+  const stopRef = useRef<() => void>(() => undefined);
+  const retryStop = useCallback(() => stopRef.current(), []);
   const sustainedOffline = useSustainedCloudOffline(state.status);
   const socketIssue = useMemo<CloudAuthorityIssue | null>(() => {
     if (state.status === "blocked") {
@@ -840,6 +866,9 @@ export const useCloudCanonicalChatThread = (
   ]);
   const issue =
     placementIssue ??
+    (stopIssue && stopIssue.turnId === activeTurnId
+      ? { message: stopIssue.message, retryable: true, retry: retryStop }
+      : null) ??
     (local.authorityIssue
       ? {
           message: local.authorityIssue.message,
@@ -856,7 +885,7 @@ export const useCloudCanonicalChatThread = (
   const authorityIssue: ChatThread["authorityIssue"] = issue
     ? {
         ...issue,
-        retry: retryAuthority,
+        retry: "retry" in issue ? issue.retry : retryAuthority,
       }
     : null;
   // Once a transcript has painted for this authority it stays painted; a
@@ -892,22 +921,12 @@ export const useCloudCanonicalChatThread = (
     store.loadOlder();
   }, [store]);
   const loadNewerMessages = useCallback(async () => undefined, []);
-  // Whole-journal scans: keyed on the journal so composer keystrokes, which
-  // re-render this hook, do not repeat them.
-  const runningDispatchId = useMemo(
-    () =>
-      canonicalCloudDispatchIdForTurn(
-        state.records,
-        activeCloudTurnId(state.records, state.live),
-      ),
-    [state.live, state.records],
-  );
   const turnRunning = useMemo(
     () =>
       caughtUp === false
         ? state.activity === "running"
-        : activeCloudTurnId(state.records, state.live) !== null,
-    [caughtUp, state.activity, state.live, state.records],
+        : activeTurnId !== null,
+    [activeTurnId, caughtUp, state.activity],
   );
   const handoffMessageId = useTurnHandoff({
     conversationId: authority.conversationId ?? null,
@@ -997,18 +1016,71 @@ export const useCloudCanonicalChatThread = (
     },
     [authority.accountScope, authority.conversationId],
   );
+  // The turn the latest Stop was for, and its confirmation timer.
+  const activeTurnRef = useRef(activeTurnId);
+  activeTurnRef.current = activeTurnId;
+  const stopWatchRef = useRef<{
+    turnId: string;
+    timer: ReturnType<typeof setTimeout>;
+  } | null>(null);
+  const clearStopWatch = useCallback(() => {
+    if (stopWatchRef.current) clearTimeout(stopWatchRef.current.timer);
+    stopWatchRef.current = null;
+  }, []);
+  useEffect(() => clearStopWatch, [clearStopWatch, store]);
+  useEffect(() => {
+    // The turn a Stop was for has ended (or another took its place): there
+    // is nothing left to stop, so the notice and its timer go with it.
+    if (stopWatchRef.current && stopWatchRef.current.turnId !== activeTurnId) {
+      clearStopWatch();
+    }
+    setStopIssue((current) =>
+      current && current.turnId !== activeTurnId ? null : current,
+    );
+  }, [activeTurnId, clearStopWatch]);
   const stop = useCallback(() => {
-    // Preserve the base hook's durable queued/active cancellation path. A
-    // clean client may also be watching a DO turn whose local outbox no longer
-    // exists, so reconstruct that exact placement cancellation below.
     replyHaptics.reset();
+    // This phone's own queued and in-flight sends: their durable outbox
+    // cancels the exact dispatch it admitted.
     localStop();
-    if (!runningDispatchId) return;
+    const turnId = activeTurnId;
+    if (!turnId) return;
+    setStopIssue(null);
+    // Stop lands when the turn's terminal row reaches the journal. A turn
+    // still running well after Stop says so, with Try again.
+    const watch = () => {
+      clearStopWatch();
+      const timer = setTimeout(() => {
+        stopWatchRef.current = null;
+        if (activeTurnRef.current !== turnId) return;
+        setStopIssue({ turnId, message: STOP_UNCONFIRMED_MESSAGE });
+      }, STOP_CONFIRM_MS);
+      stopWatchRef.current = { turnId, timer };
+    };
+    // The conversation's own stop: the session that journals the turn stops
+    // it wherever it runs. A turn a computer holds is ended in the journal at
+    // once and that computer aborts it; a cloud turn is cancelled in place.
+    const stopTurn = () => {
+      if (store.cancelTurn(turnId)) {
+        watch();
+        return;
+      }
+      setStopIssue({ turnId, message: STOP_UNREACHABLE_MESSAGE });
+    };
+    // A turn admitted through placement (from this phone or any client) has
+    // a dispatch row; cancelling that row keeps placement's own bookkeeping
+    // exact. A turn started on the computer that holds the chat, or by an
+    // agent's report, has none, so it goes straight to the conversation.
     // A turn run on a computer journals this phone's own message id (the
     // dispatch's idempotency key) where a cloud turn echoes the server
     // dispatch id, so map it through this phone's admission binding first.
-    const dispatchId =
-      dispatchBindings.get(runningDispatchId) ?? runningDispatchId;
+    const dispatchId = runningDispatchId
+      ? dispatchBindings.get(runningDispatchId) ?? runningDispatchId
+      : null;
+    if (!dispatchId) {
+      stopTurn();
+      return;
+    }
     if (canonicalCancellationRef.current?.dispatchId === dispatchId) {
       return;
     }
@@ -1018,7 +1090,6 @@ export const useCloudCanonicalChatThread = (
       dispatchId,
       controller,
     };
-    setPlacementIssue(null);
     void cancelCanonicalCloudExecution({
       dispatchId,
       conversationId: authority.conversationId,
@@ -1034,26 +1105,33 @@ export const useCloudCanonicalChatThread = (
           builderOrigin: authority.socketOrigin,
         }),
     })
-      .catch(() => {
-        if (controller.signal.aborted) return;
-        setPlacementIssue({
-          message: "Stella could not stop this cloud turn. Try again.",
-          retryable: true,
-        });
-      })
+      .then(
+        () => {
+          if (!controller.signal.aborted) watch();
+        },
+        () => {
+          // No dispatch row for this turn, or placement unreachable: the
+          // conversation can still stop it.
+          if (!controller.signal.aborted) stopTurn();
+        },
+      )
       .finally(() => {
         if (canonicalCancellationRef.current?.controller === controller) {
           canonicalCancellationRef.current = null;
         }
       });
   }, [
+    activeTurnId,
     authority.conversationId,
     authority.socketOrigin,
+    clearStopWatch,
     dispatchBindings,
     localStop,
     replyHaptics,
     runningDispatchId,
+    store,
   ]);
+  stopRef.current = stop;
 
   return {
     ...local,

@@ -8,6 +8,8 @@
 import { APP_INTEGRITY_HEADER } from "@stella/contracts/app-integrity";
 import { AUTH_CAPTCHA_HEADER } from "@stella/contracts/auth-challenge";
 import { createAuth, trustedOrigins } from "./auth.js";
+import { resignLegacySessionCredentials, withMigratedBearer } from "./legacy-session-signature.js";
+import { betterAuthKeys } from "../secret-rotation.js";
 
 const ALLOWED_HEADERS = ["authorization", "content-type", AUTH_CAPTCHA_HEADER, APP_INTEGRITY_HEADER].join(", ");
 const EXPOSED_HEADERS = "set-auth-token, set-auth-jwt";
@@ -36,7 +38,9 @@ export const handleAuthRoute = async (request: Request, env: Cloudflare.Env): Pr
   }
   let response: Response;
   try {
-    response = await createAuth(env).handler(request);
+    const keys = betterAuthKeys(env);
+    const resigned = keys ? await resignLegacySessionCredentials(request, keys) : { request, bearer: null };
+    response = withMigratedBearer(request, await createAuth(env).handler(resigned.request), resigned.bearer);
   } catch (error) {
     console.error(
       JSON.stringify({ event: "auth_request_failed", message: error instanceof Error ? error.message : String(error) }),

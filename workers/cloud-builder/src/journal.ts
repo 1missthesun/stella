@@ -23,6 +23,7 @@
  *     to emit a terminal event.
  */
 
+import type { OwnerKeks } from "./secret-rotation.js";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { formatMessageRefTag } from "@stella/contracts/reply-refs";
 import { estimateTokens } from "@stella/executor-cloud/prune-history";
@@ -658,7 +659,7 @@ export class Journal {
   constructor(
     private readonly ctx: DurableObjectState,
     private readonly log: ConversationLogger,
-    private readonly kekBase64: string | null = null,
+    private readonly keks: OwnerKeks | null = null,
   ) {
     this.sql = ctx.storage.sql;
     this.transcriptSearch = new TranscriptSearchIndex(this.sql, undefined, {
@@ -682,7 +683,7 @@ export class Journal {
    */
   ensureCrypto(): JournalCrypto | null {
     if (this.crypto !== undefined) return this.crypto;
-    if (!this.kekBase64) {
+    if (!this.keks) {
       this.crypto = null;
       return null;
     }
@@ -698,14 +699,21 @@ export class Journal {
     }
     if (!row) return null;
     if (row.wrapped_dek) {
-      this.crypto = JournalCrypto.fromWrappedDek(
-        this.kekBase64,
-        row.wrapped_dek,
-      );
+      this.crypto = JournalCrypto.fromWrappedDek(this.keks, row.wrapped_dek);
+      if (this.crypto && !JournalCrypto.isCurrentWrap(this.keks, row.wrapped_dek)) {
+        const rewrapped = this.crypto.rewrap(this.keks);
+        if (rewrapped) {
+          this.sql.exec(
+            `UPDATE meta SET wrapped_dek = ? WHERE id = 0 AND wrapped_dek = ?`,
+            rewrapped,
+            row.wrapped_dek,
+          );
+        }
+      }
       return this.crypto;
     }
     const dek = JournalCrypto.randomDek();
-    const wrapped = JournalCrypto.wrapDek(this.kekBase64, dek);
+    const wrapped = JournalCrypto.wrapDek(this.keks, dek);
     if (!wrapped) {
       this.crypto = null;
       return null;
@@ -720,7 +728,7 @@ export class Journal {
       )
       .toArray()[0]?.wrapped_dek;
     this.crypto = stored
-      ? JournalCrypto.fromWrappedDek(this.kekBase64, stored)
+      ? JournalCrypto.fromWrappedDek(this.keks, stored)
       : JournalCrypto.fromDek(dek);
     return this.crypto;
   }

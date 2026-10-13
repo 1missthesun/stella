@@ -1,3 +1,4 @@
+import { ownerKeks } from "../secret-rotation.js";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
 import { isManagedModelAudience } from "@stella/contracts/gateway/capability";
 import type {
@@ -191,9 +192,7 @@ export class BuildSessionObject extends DurableObject<Env> {
     super(ctx, env);
     configureThreadTranscriptCrypto(
       ctx.storage.sql,
-      typeof (env as unknown as Record<string, unknown>).OWNER_SECRETS_KEK === "string"
-        ? ((env as unknown as Record<string, unknown>).OWNER_SECRETS_KEK as string)
-        : null,
+      ownerKeks(env),
     );
   }
 

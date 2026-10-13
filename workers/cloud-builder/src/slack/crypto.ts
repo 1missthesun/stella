@@ -4,6 +4,8 @@
  * `v1.<iv>.<ciphertext>` in base64url.
  */
 
+import { BETTER_AUTH_SECRET_V2 } from "../secret-rotation.js";
+
 const encoder = new TextEncoder();
 
 const b64url = (bytes: Uint8Array): string => {
@@ -21,10 +23,7 @@ const fromB64url = (value: string): Uint8Array => {
   return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 };
 
-const tokenKey = async (env: Cloudflare.Env): Promise<CryptoKey> => {
-  const secret = (env as unknown as Record<string, unknown>).BETTER_AUTH_SECRET;
-  if (typeof secret !== "string" || !secret)
-    throw new Error("BETTER_AUTH_SECRET is not configured.");
+const tokenKeyFrom = async (secret: string): Promise<CryptoKey> => {
   const base = await crypto.subtle.importKey(
     "raw",
     encoder.encode(secret),
@@ -46,17 +45,37 @@ const tokenKey = async (env: Cloudflare.Env): Promise<CryptoKey> => {
   );
 };
 
+const rawSecret = (env: Cloudflare.Env, name: string): string | undefined => {
+  const value = (env as unknown as Record<string, unknown>)[name];
+  return typeof value === "string" && value ? value : undefined;
+};
+
+const currentTokenKey = (env: Cloudflare.Env): { version: "v1" | "v2"; secret: string } => {
+  const next = rawSecret(env, BETTER_AUTH_SECRET_V2);
+  if (next) return { version: "v2", secret: next };
+  const legacy = rawSecret(env, "BETTER_AUTH_SECRET");
+  if (!legacy) throw new Error("BETTER_AUTH_SECRET is not configured.");
+  return { version: "v1", secret: legacy };
+};
+
+const tokenKeyFor = async (env: Cloudflare.Env, version: string): Promise<CryptoKey> => {
+  const secret = rawSecret(env, version === "v2" ? BETTER_AUTH_SECRET_V2 : "BETTER_AUTH_SECRET");
+  if (!secret) throw new Error(`${version === "v2" ? BETTER_AUTH_SECRET_V2 : "BETTER_AUTH_SECRET"} is not configured.`);
+  return await tokenKeyFrom(secret);
+};
+
 export const encryptToken = async (
   env: Cloudflare.Env,
   token: string,
 ): Promise<string> => {
+  const key = currentTokenKey(env);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const sealed = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv },
-    await tokenKey(env),
+    await tokenKeyFrom(key.secret),
     encoder.encode(token),
   );
-  return `v1.${b64url(iv)}.${b64url(new Uint8Array(sealed))}`;
+  return `${key.version}.${b64url(iv)}.${b64url(new Uint8Array(sealed))}`;
 };
 
 export const decryptToken = async (
@@ -64,15 +83,18 @@ export const decryptToken = async (
   sealed: string,
 ): Promise<string> => {
   const [version, iv, body] = sealed.split(".");
-  if (version !== "v1" || !iv || !body)
+  if ((version !== "v1" && version !== "v2") || !iv || !body)
     throw new Error("Unrecognized Slack token format.");
   const plain = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: fromB64url(iv) },
-    await tokenKey(env),
+    await tokenKeyFor(env, version),
     fromB64url(body),
   );
   return new TextDecoder().decode(plain);
 };
+
+export const isCurrentTokenVersion = (env: Cloudflare.Env, sealed: string): boolean =>
+  sealed.startsWith(`${currentTokenKey(env).version}.`);
 
 const hmacHex = async (secret: string, message: string): Promise<string> => {
   const key = await crypto.subtle.importKey(

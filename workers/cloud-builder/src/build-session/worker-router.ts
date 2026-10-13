@@ -92,7 +92,8 @@ import {
   boundedBodyStatus,
   CLOUD_BUILDER_BODY_LIMITS,
 } from "../request-ingress.js";
-import { verifyServiceBearerRequest } from "../service-bearer.js";
+import { verifyServiceBearerRequestWithAny } from "../service-bearer.js";
+import { builderServiceSecret, builderServiceSecrets } from "../secret-rotation.js";
 import { handleBillingRoute } from "../billing/routes.js";
 import { handleAdminRoute } from "../admin/routes.js";
 import { handleStellaModelsRoute } from "../catalog/models.js";
@@ -221,7 +222,7 @@ const authenticateConversationCaller = async (
   if (ticket) {
     const ticketCaller = socketScope
       ? await verifySocketTicket({
-          secret: env.BUILDER_SERVICE_SECRET,
+          secret: builderServiceSecrets(env),
           ticket,
           purpose: socketScope.purpose,
           resource: socketScope.resource,
@@ -359,7 +360,7 @@ const handleTurnStartRoute = async (
   let authKind: TurnAuthKind;
   let ownerGeneration: string | null = null;
   let tokenExpiresAtMs: number | null = null;
-  if (await verifyServiceBearerRequest(request, env.BUILDER_SERVICE_SECRET)) {
+  if (await verifyServiceBearerRequestWithAny(request, builderServiceSecrets(env))) {
     // Service-originated: a schedule fire, placement's cloud branch, an
     // agent-completion wake. It names the owner it acts for and pins the
     // generation it read; the gate refuses a stale one.
@@ -515,7 +516,7 @@ const handleDispatchSubmitRoute = async (
   const receivedAt = Date.now();
   const startedAt = performance.now();
   let caller: DispatchCaller;
-  if (await verifyServiceBearerRequest(request, env.BUILDER_SERVICE_SECRET)) {
+  if (await verifyServiceBearerRequestWithAny(request, builderServiceSecrets(env))) {
     const ownerId = request.headers.get(TURN_OWNER_ID_HEADER)?.trim() ?? "";
     const ownerGeneration = normalizeOwnerGeneration(
       request.headers.get(TURN_OWNER_GENERATION_HEADER),
@@ -757,7 +758,7 @@ const handleDispatchControlRoute = async (
   requestId: string,
 ): Promise<Response> => {
   let ownerId: string;
-  if (await verifyServiceBearerRequest(request, env.BUILDER_SERVICE_SECRET)) {
+  if (await verifyServiceBearerRequestWithAny(request, builderServiceSecrets(env))) {
     ownerId = request.headers.get(TURN_OWNER_ID_HEADER)?.trim() ?? "";
     if (!ownerId || ownerId.length > 512) {
       return dispatchErrorResponse(
@@ -939,7 +940,7 @@ const methodNotAllowed = (message = "Method not allowed.") => () =>
   json({ error: message }, 405);
 
 const serviceSecret: MiddlewareHandler<RouterEnv> = async (c, next) => {
-  if (!(await verifyServiceBearerRequest(c.req.raw, c.env.BUILDER_SERVICE_SECRET))) {
+  if (!(await verifyServiceBearerRequestWithAny(c.req.raw, builderServiceSecrets(c.env)))) {
     return json({ error: "Unauthorized." }, 401);
   }
   await next();
@@ -1201,7 +1202,7 @@ app.post(SOCKET_TICKET_PATH, userAuth(), jsonBody(1024), async (c) => {
     return json({ error: "Invalid socket ticket request." }, 400);
   }
   const issued = await issueSocketTicket({
-    secret: c.env.BUILDER_SERVICE_SECRET,
+    secret: builderServiceSecret(c.env),
     token: c.var.caller,
     purpose,
     resource,

@@ -6,8 +6,8 @@
  *   route verifies (`iss` = this worker's URL, `aud` = "stella", `sub` = the
  *   user id, which is the owner id; claims `sid`, `anon`, `idl`), and
  *   `GET /api/auth/jwks` publishes its public keys. The private keys are in
- *   D1's `jwks` table, encrypted under BETTER_AUTH_SECRET: rotating that
- *   secret means deleting those rows so new keys are minted.
+ *   D1's `jwks` table, encrypted under BETTER_AUTH_SECRET. DEPLOY.md,
+ *   "Rotating server secrets", covers BETTER_AUTH_SECRET_V2.
  * - Anonymous users, magic links (Resend), Google and Apple, one-time tokens
  *   for browser-to-app returns, and the `stellaHandoff` endpoints.
  * - Mobile integrity and web Turnstile guard anonymous sign-in and magic
@@ -43,6 +43,7 @@ import { integrityErrorMessage, integrityPurposeForPath, verifyAuthRequestProof 
 import { oauthStateBinding } from "./oauth-binding.js";
 import { ottCookieHeader } from "./ott-cookie.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { betterAuthCipherKey, betterAuthKeys } from "../secret-rotation.js";
 
 type AuthEnv = Cloudflare.Env;
 
@@ -55,12 +56,6 @@ const configured = (env: unknown, name: string): string | undefined => {
   const value = (env as Record<string, unknown>)[name];
   const trimmed = typeof value === "string" ? value.trim() : "";
   return trimmed || undefined;
-};
-
-const required = (env: unknown, name: string): string => {
-  const value = configured(env, name);
-  if (!value) throw new Error(`Missing required auth secret: ${name}`);
-  return value;
 };
 
 /** This worker's public origin remains the JWT issuer across auth-domain changes. */
@@ -426,13 +421,15 @@ const buildOptions = (env: AuthEnv) => {
   const backend = backendUrl(env);
   if (!backend) throw new Error("CLOUD_BUILDER_PUBLIC_URL is required for auth.");
   if (!env.DB) throw new Error("D1 is not bound.");
-  const secret = required(env, "BETTER_AUTH_SECRET");
+  const authKeys = betterAuthKeys(env);
+  if (!authKeys) throw new Error("Missing required auth secret: BETTER_AUTH_SECRET");
   const googleClientSecret = configured(env, "GOOGLE_CLIENT_SECRET");
   const api = (): HandoffApi => (createAuth(env) as unknown as { api: HandoffApi }).api;
 
   return {
     appName: "Stella",
-    secret,
+    secret: authKeys.previous ?? authKeys.current,
+    ...(authKeys.versioned ? { secrets: [{ version: 2, value: authKeys.current }] } : {}),
     baseURL: authUrl(env),
     basePath: "/api/auth",
     database: env.DB,
@@ -599,7 +596,14 @@ const buildOptions = (env: AuthEnv) => {
           new Set([authUrl(env), backend, websiteUrl(env)]),
         ),
       }),
-      stellaHandoff({ env, backendUrl: authUrl(env), websiteUrl: websiteUrl(env), secret, api }),
+      stellaHandoff({
+        env,
+        backendUrl: authUrl(env),
+        websiteUrl: websiteUrl(env),
+        secret: authKeys.current,
+        cipherKey: betterAuthCipherKey(authKeys),
+        api,
+      }),
     ],
   } satisfies BetterAuthOptions;
 };

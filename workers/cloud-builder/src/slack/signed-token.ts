@@ -4,6 +4,8 @@
  * The payload is JSON with an `exp` (epoch ms); expired tokens don't verify.
  */
 
+import { builderServiceSecret, builderServiceSecrets } from "../secret-rotation.js";
+
 const base64Url = (bytes: Uint8Array): string => {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -20,8 +22,7 @@ const fromBase64Url = (value: string): Uint8Array | null => {
   }
 };
 
-const hmacKey = async (env: Cloudflare.Env, usage: "sign" | "verify"): Promise<CryptoKey> => {
-  const secret = env.BUILDER_SERVICE_SECRET;
+const hmacKey = async (secret: string, usage: "sign" | "verify"): Promise<CryptoKey> => {
   if (!secret || secret.length < 32) throw new Error("BUILDER_SERVICE_SECRET is not configured.");
   return await crypto.subtle.importKey(
     "raw",
@@ -30,6 +31,16 @@ const hmacKey = async (env: Cloudflare.Env, usage: "sign" | "verify"): Promise<C
     false,
     [usage],
   );
+};
+
+const verifiedWithAny = async (env: Cloudflare.Env, signature: Uint8Array, data: Uint8Array): Promise<boolean> => {
+  const secrets = builderServiceSecrets(env);
+  for (const secret of secrets.length > 0 ? secrets : [""]) {
+    if (await crypto.subtle.verify("HMAC", await hmacKey(secret, "verify"), signature as BufferSource, data as BufferSource)) {
+      return true;
+    }
+  }
+  return false;
 };
 
 export type TokenKind = { prefix: string; domain: string };
@@ -42,7 +53,7 @@ export const signToken = async <T extends object>(
 ): Promise<string> => {
   const payload = base64Url(new TextEncoder().encode(JSON.stringify({ ...claims, exp: Date.now() + ttlMs })));
   const signature = new Uint8Array(
-    await crypto.subtle.sign("HMAC", await hmacKey(env, "sign"), new TextEncoder().encode(`${kind.domain}.${payload}`)),
+    await crypto.subtle.sign("HMAC", await hmacKey(builderServiceSecret(env), "sign"), new TextEncoder().encode(`${kind.domain}.${payload}`)),
   );
   return `${kind.prefix}.${payload}.${base64Url(signature)}`;
 };
@@ -57,9 +68,9 @@ export const verifyToken = async <T extends object>(
   const signatureBytes = fromBase64Url(signature);
   const payloadBytes = fromBase64Url(payload);
   if (!signatureBytes || !payloadBytes) return null;
-  const valid = await crypto.subtle
-    .verify("HMAC", await hmacKey(env, "verify"), signatureBytes, new TextEncoder().encode(`${kind.domain}.${payload}`))
-    .catch(() => false);
+  const valid = await verifiedWithAny(env, signatureBytes, new TextEncoder().encode(`${kind.domain}.${payload}`)).catch(
+    () => false,
+  );
   if (!valid) return null;
   try {
     const claims = JSON.parse(new TextDecoder().decode(payloadBytes)) as T & { exp?: unknown };

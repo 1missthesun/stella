@@ -130,6 +130,27 @@ const bytesToHex = (bytes: ArrayBuffer): string =>
 export const validNativeStateCheckpointMac = async (args: {
   checkpoint: NativeStateCheckpoint;
   threadId: string;
+  integrityKey: string | readonly string[];
+}): Promise<boolean> => {
+  for (const integrityKey of typeof args.integrityKey === "string"
+    ? [args.integrityKey]
+    : args.integrityKey) {
+    if (
+      await validNativeStateCheckpointMacWith({
+        checkpoint: args.checkpoint,
+        threadId: args.threadId,
+        integrityKey,
+      })
+    ) {
+      return true;
+    }
+  }
+  return false;
+};
+
+const validNativeStateCheckpointMacWith = async (args: {
+  checkpoint: NativeStateCheckpoint;
+  threadId: string;
   integrityKey: string;
 }): Promise<boolean> => {
   if (!HEX_SHA256.test(args.integrityKey) || !boundedText(args.threadId)) {

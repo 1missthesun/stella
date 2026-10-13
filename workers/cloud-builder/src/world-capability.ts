@@ -92,7 +92,7 @@ export const issueWorldCapability = async (args: {
 };
 
 export const verifyWorldCapability = async (args: {
-  secret: string;
+  secret: string | readonly string[];
   capability: string;
   worldName: string;
   now: number;
@@ -110,12 +110,20 @@ export const verifyWorldCapability = async (args: {
   const signatureBytes = decodeBase64Url(signature);
   if (!payloadBytes || !signatureBytes || signatureBytes.byteLength !== 32)
     return { ok: false };
-  const verified = await crypto.subtle.verify(
-    "HMAC",
-    await hmacKey(args.secret, "verify"),
-    signatureBytes,
-    signingInput(payload),
-  );
+  let verified = false;
+  for (const secret of typeof args.secret === "string" ? [args.secret] : args.secret) {
+    if (
+      await crypto.subtle.verify(
+        "HMAC",
+        await hmacKey(secret, "verify"),
+        signatureBytes,
+        signingInput(payload),
+      )
+    ) {
+      verified = true;
+      break;
+    }
+  }
   if (!verified) return { ok: false };
   try {
     const value = JSON.parse(

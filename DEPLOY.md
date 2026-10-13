@@ -398,13 +398,70 @@ a CSPRNG and pipe it straight in, never echoing it:
 `openssl rand -base64 48 | tr -d '\n' | env -u CLOUDFLARE_API_TOKEN bunx wrangler secret put NAME --env production`,
 then `bun run containers:check:production`. `STELLA_ADMIN_API_SECRET`,
 `OAUTH_STATE_SECRET` and `MEDIA_SIGNING_SECRET` can be rotated at any time
-(store a new admin secret in the keychain first). `BETTER_AUTH_SECRET`,
-`BUILDER_SERVICE_SECRET` and `OWNER_SECRETS_KEK` protect stored data (sessions
-and the encrypted JWKS, native-state integrity keys, encrypted provider
-credentials and journals). Rotating them needs a dual-key or re-encryption
-migration first; the plan for each is in the CASA evidence
-(`~/.stella/outputs/google-casa/evidence/4.1.3-rotation-log.md` on Rahul's Mac).
+(store a new admin secret in the keychain first).
 Last rotation: 2026-10-13 (admin, OAuth state, media signing).
+
+`BETTER_AUTH_SECRET`, `BUILDER_SERVICE_SECRET` and `OWNER_SECRETS_KEK` protect
+stored data, and Cloudflare secrets are write-only, so they rotate forward
+into a second name (`src/secret-rotation.ts`). When `NAME_V2` is set it signs
+and encrypts everything new; `NAME` stays as the previous key and is only
+used to verify and decrypt. With `NAME_V2` unset nothing changes.
+
+| Secret | With `_V2` set | Still needs the old name |
+|---|---|---|
+| `BETTER_AUTH_SECRET` | Sessions, JWKS (`$ba$2$` envelope), sign-in handoffs and Slack tokens (`v2.`) use `_V2`. `/api/auth/*` re-signs a session bearer or cookie signed with the old key before Better Auth sees it, and answers with the re-signed token in `set-auth-token`, which desktop, mobile and the website store. A session also re-signs on its daily refresh. | Bare-hex `jwks` rows and `v1.` Slack rows until the admin re-encrypt runs; session tokens not yet re-signed (any session idle 7 days has expired). |
+| `BUILDER_SERVICE_SECRET` | Service bearer, socket tickets, world capabilities, workspace-app URLs, Slack signed tokens and repo capabilities are signed with `_V2` and verified against either. Native-state integrity: the Worker and the container accept a checkpoint sealed under either key and seal the next one under `_V2`. | Capabilities issued before (12 h at most, the Slack repo capability), operator scripts that send the old bearer, native state that has not run a turn since. |
+| `OWNER_SECRETS_KEK` | Provider and engine credentials are written as `v2.` under `_V2`, and a `v1.` row is re-encrypted the next time it is used. A conversation's or thread's journal DEK is re-wrapped (`kek2.`) when that object next starts. | Every credential and journal not touched since. There is no sweep across owners, so keep the old KEK until one exists. |
+
+To rehearse on a Preview, `env -u CLOUDFLARE_API_TOKEN bun run preview -- rotation-secrets --name <name>`
+sets random `_V2` values on that Preview only; run `up` again afterwards.
+
+Steps (production, from `workers/cloud-builder`):
+
+1. Deploy the code: `env -u CLOUDFLARE_API_TOKEN bun run deploy:production`,
+   then `bun run containers:check:production`. Wait at least 25 minutes
+   (turn timeout plus sandbox idle timeout) so no container from the previous
+   image is still running: only the new image accepts native state sealed
+   under the previous key.
+2. Set the new values. The KEK must be exactly 32 bytes; the other two take
+   48:
+   ```bash
+   openssl rand -base64 48 | tr -d '\n' | env -u CLOUDFLARE_API_TOKEN bunx wrangler secret put BETTER_AUTH_SECRET_V2 --env production
+   openssl rand -base64 48 | tr -d '\n' | env -u CLOUDFLARE_API_TOKEN bunx wrangler secret put BUILDER_SERVICE_SECRET_V2 --env production
+   openssl rand -base64 32 | tr -d '\n' | env -u CLOUDFLARE_API_TOKEN bunx wrangler secret put OWNER_SECRETS_KEK_V2 --env production
+   ```
+   Set them one at a time if you want to check each on its own.
+3. Check: `bun run containers:check:production`; `curl -s https://auth.stella.sh/readyz`
+   answers `ok: true` with nothing in `invalid` (a KEK that is not 32 bytes
+   shows up there); an existing desktop or mobile session stays signed in
+   and its next `/api/auth/*` response carries `set-auth-token`;
+   `/api/auth/token` mints a JWT; a chat turn and an agent turn on an
+   existing thread both finish; a saved provider key still works. Then
+   re-encrypt what is in D1 (Access service token and admin bearer as in
+   "Production admin API"):
+   ```bash
+   curl -s -X POST -H "CF-Access-Client-Id: $STELLA_CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $STELLA_CF_ACCESS_CLIENT_SECRET" \
+     -H "Authorization: Bearer $STELLA_ADMIN_API_SECRET" https://auth.stella.sh/api/admin/secret-rotation/reencrypt
+   curl -s -H "CF-Access-Client-Id: $STELLA_CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $STELLA_CF_ACCESS_CLIENT_SECRET" \
+     -H "Authorization: Bearer $STELLA_ADMIN_API_SECRET" https://auth.stella.sh/api/admin/secret-rotation/status
+   ```
+   `status` lists how many `jwks` and Slack rows are still under the old
+   key; every `legacy` should be 0.
+4. Delete the old name only when nothing needs it:
+   - `BUILDER_SERVICE_SECRET`: after 24 hours (the longest capability is 12
+     hours) and once every operator script uses the new bearer.
+   - `BETTER_AUTH_SECRET`: 8 days after step 2, with `status` showing no
+     legacy rows. A session nobody used in that time has expired anyway.
+   - `OWNER_SECRETS_KEK`: not yet. Rows and journals nobody has opened stay
+     under it, and deleting it makes them unreadable.
+
+   Both `BUILDER_SERVICE_SECRET` and `BETTER_AUTH_SECRET` are in
+   `secrets.required` of `wrangler.jsonc`: first change those entries to the
+   `_V2` names, run `bun run types:generate` and fix what the types flag,
+   deploy, and only then run
+   `env -u CLOUDFLARE_API_TOKEN bunx wrangler secret delete NAME --env production`.
+   The next rotation after that writes a fresh value into the old name with
+   the roles swapped, which is a code change in `src/secret-rotation.ts`.
 
 ### Prompts
 

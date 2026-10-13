@@ -27,14 +27,41 @@ export const CLOUD_BUILDER_REQUIRED_FIELDS = [
 export type CloudBuilderRequiredField =
   (typeof CLOUD_BUILDER_REQUIRED_FIELDS)[number];
 
+export type CloudBuilderRotationField =
+  | "BUILDER_SERVICE_SECRET_V2"
+  | "BETTER_AUTH_SECRET_V2"
+  | "OWNER_SECRETS_KEK_V2";
+
 export type CloudBuilderReadinessInput = Partial<
-  Record<CloudBuilderRequiredField, unknown>
+  Record<CloudBuilderRequiredField | CloudBuilderRotationField, unknown>
 >;
 
 export type CloudBuilderReadiness = {
   ready: boolean;
   missing: CloudBuilderRequiredField[];
-  invalid: CloudBuilderRequiredField[];
+  invalid: Array<CloudBuilderRequiredField | CloudBuilderRotationField>;
+};
+
+const isNonEmptyString = (value: unknown): boolean =>
+  typeof value === "string" && value.trim().length > 0;
+
+const isAesKeyBase64 = (value: unknown): boolean => {
+  if (typeof value !== "string") return false;
+  try {
+    return atob(value.trim()).length === 32;
+  } catch {
+    return false;
+  }
+};
+
+const rotationValidators: Readonly<
+  Record<CloudBuilderRotationField, (value: unknown) => boolean>
+> = {
+  BUILDER_SERVICE_SECRET_V2: (value) =>
+    isValidServiceBearerSecret(value) && value.length >= 32,
+  BETTER_AUTH_SECRET_V2: (value) =>
+    isNonEmptyString(value) && (value as string).trim().length >= 32,
+  OWNER_SECRETS_KEK_V2: isAesKeyBase64,
 };
 
 const isPresent = (value: unknown): boolean =>
@@ -113,14 +140,23 @@ export const evaluateCloudBuilderReadiness = (
   input: CloudBuilderReadinessInput,
 ): CloudBuilderReadiness => {
   const missing: CloudBuilderRequiredField[] = [];
-  const invalid: CloudBuilderRequiredField[] = [];
+  const invalid: Array<CloudBuilderRequiredField | CloudBuilderRotationField> = [];
+  const serviceSecretV2 = isPresent(input.BUILDER_SERVICE_SECRET_V2);
   for (const field of CLOUD_BUILDER_REQUIRED_FIELDS) {
     const value = input[field];
+    if (field === "BUILDER_SERVICE_SECRET" && serviceSecretV2 && !isPresent(value)) {
+      continue;
+    }
     if (!isPresent(value)) {
       missing.push(field);
     } else if (!validators[field](value)) {
       invalid.push(field);
     }
+  }
+
+  for (const field of Object.keys(rotationValidators) as CloudBuilderRotationField[]) {
+    const value = input[field];
+    if (isPresent(value) && !rotationValidators[field](value)) invalid.push(field);
   }
 
   const appsHost = normalizedHttpsOrigin(input.APPS_HOST_BASE_URL);

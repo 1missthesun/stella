@@ -36,6 +36,7 @@ import {
 import type { ProviderAccessResult } from "@stella/contracts/gateway/usage";
 import { empty, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
+import { ownerKekFor, ownerKeks, type OwnerKekTag } from "../../secret-rotation.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 import { readOrDefault } from "../schema.js";
@@ -211,8 +212,6 @@ const deviceOAuth = (provider: string): OAuthAuth | undefined => {
 
 // --- Encryption (AES-256-GCM under OWNER_SECRETS_KEK) ---------------------
 
-const KEY_VERSION = "v1";
-
 type StoredCredential =
   | { type: "api_key"; key: string }
   | ({ type: "oauth" } & OAuthCredential);
@@ -226,24 +225,41 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-let keyCache: { raw: string; key: Promise<CryptoKey> } | null = null;
+const keyCache = new Map<string, Promise<CryptoKey>>();
 
-const credentialKey = (env: Cloudflare.Env): Promise<CryptoKey> => {
-  const value = (env as unknown as Record<string, unknown>).OWNER_SECRETS_KEK;
-  const raw = typeof value === "string" ? value.trim() : "";
+const importedKey = (raw: string): Promise<CryptoKey> => {
+  let key = keyCache.get(raw);
+  if (!key) {
+    key = crypto.subtle.importKey("raw", base64ToBytes(raw), { name: "AES-GCM" }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    keyCache.set(raw, key);
+  }
+  return key;
+};
+
+const currentCredentialKey = (env: Cloudflare.Env): { tag: OwnerKekTag; key: Promise<CryptoKey> } => {
+  const keks = ownerKeks(env);
+  const raw = keks ? ownerKekFor(keks, keks.current) : undefined;
+  if (!keks || !raw) {
+    throw new RpcError("UNAVAILABLE", "Provider keys aren't configured yet.", { retryable: false });
+  }
+  return { tag: keks.current, key: importedKey(raw) };
+};
+
+const credentialKeyFor = (env: Cloudflare.Env, tag: string): Promise<CryptoKey> => {
+  const keks = ownerKeks(env);
+  const raw = keks ? ownerKekFor(keks, tag) : undefined;
   if (!raw) {
     throw new RpcError("UNAVAILABLE", "Provider keys aren't configured yet.", { retryable: false });
   }
-  if (keyCache?.raw !== raw) {
-    keyCache = {
-      raw,
-      key: crypto.subtle.importKey("raw", base64ToBytes(raw), { name: "AES-GCM" }, false, [
-        "encrypt",
-        "decrypt",
-      ]),
-    };
-  }
-  return keyCache.key;
+  return importedKey(raw);
+};
+
+const isCurrentKeyVersion = (env: Cloudflare.Env, encrypted: string): boolean => {
+  const keks = ownerKeks(env);
+  return !keks || encrypted.startsWith(`${keks.current}.`);
 };
 
 /** Bound to the owner and provider, so a row copied elsewhere won't decrypt. */
@@ -251,23 +267,24 @@ const additionalData = (ownerId: string, provider: string) =>
   new TextEncoder().encode(`${ownerId}:provider-key:${provider}`);
 
 const encrypt = async (ctx: OwnerContext, provider: string, credential: StoredCredential): Promise<string> => {
+  const current = currentCredentialKey(ctx.env);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = new Uint8Array(
     await crypto.subtle.encrypt(
       { name: "AES-GCM", iv, additionalData: additionalData(ctx.ownerId, provider) },
-      await credentialKey(ctx.env),
+      await current.key,
       new TextEncoder().encode(JSON.stringify(credential)),
     ),
   );
-  return `${KEY_VERSION}.${bytesToBase64(iv)}.${bytesToBase64(ciphertext)}`;
+  return `${current.tag}.${bytesToBase64(iv)}.${bytesToBase64(ciphertext)}`;
 };
 
 const decrypt = async (ctx: OwnerContext, provider: string, encrypted: string): Promise<StoredCredential> => {
   const [version, iv, ciphertext] = encrypted.split(".");
-  if (version !== KEY_VERSION || !iv || !ciphertext) throw new Error("Unreadable provider credential.");
+  if ((version !== "v1" && version !== "v2") || !iv || !ciphertext) throw new Error("Unreadable provider credential.");
   const plaintext = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: base64ToBytes(iv), additionalData: additionalData(ctx.ownerId, provider) },
-    await credentialKey(ctx.env),
+    await credentialKeyFor(ctx.env, version),
     base64ToBytes(ciphertext),
   );
   return JSON.parse(new TextDecoder().decode(plaintext)) as StoredCredential;
@@ -384,7 +401,7 @@ const setApiKey = async (
   if (key.length < 8 || /\s/.test(key)) {
     throw new RpcError("BAD_REQUEST", "That doesn't look like an API key.", { reason: "invalid_api_key" });
   }
-  await credentialKey(ctx.env);
+  await currentCredentialKey(ctx.env).key;
   const verdict = entry.apiKey.check ? await checkKey(entry.apiKey.check, key) : null;
   if (verdict === "invalid") {
     throw new RpcError("BAD_REQUEST", `${entry.label} didn't accept that key.`, { reason: "invalid_api_key" });
@@ -669,7 +686,7 @@ const startOAuth = async (
   );
   const entry = catalogEntry(providerArg(args.provider));
   if (!entry.oauth) throw new RpcError("BAD_REQUEST", `${entry.label} connects with an API key, not a sign-in.`);
-  await credentialKey(ctx.env);
+  await currentCredentialKey(ctx.env).key;
   if (entry.id === "openrouter") return await startOpenRouter(ctx);
   const oauth = deviceOAuth(entry.id);
   if (!oauth) throw new RpcError("BAD_REQUEST", `${entry.label} sign-in isn't available here.`);
@@ -736,7 +753,7 @@ const definitiveRefreshFailure = (error: unknown): boolean =>
   );
 
 const resolveAccess = async (ctx: OwnerContext, provider: string): Promise<ProviderAccessResult> => {
-  const row = rowOf(ctx.db, provider);
+  let row = rowOf(ctx.db, provider);
   if (!row) return null;
   if (row.status === "reauth_required") return { needsSignIn: true };
   if (row.status === "invalid") return null;
@@ -746,6 +763,16 @@ const resolveAccess = async (ctx: OwnerContext, provider: string): Promise<Provi
   } catch (error) {
     if (error instanceof RpcError) throw error;
     return null;
+  }
+  if (!isCurrentKeyVersion(ctx.env, row.payload)) {
+    const payload = await encrypt(ctx, provider, stored);
+    ctx.db.run(
+      "UPDATE provider_credentials SET payload = ? WHERE provider = ? AND payload = ?",
+      payload,
+      provider,
+      row.payload,
+    );
+    row = { ...row, payload };
   }
   const baseUrls = accountProviderBaseUrls(provider);
   if (stored.type === "api_key") {

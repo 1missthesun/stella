@@ -123,6 +123,7 @@ export type AgentTurnInput = CloudCliTurnRoleInput & {
   workspaceRestored: boolean;
   /** Builder-derived HMAC key; consumed before any model/tool process exists. */
   nativeStateIntegrityKey: string;
+  nativeStatePreviousIntegrityKeys?: string[];
   rebuildNativeSession?: boolean;
   /**
    * Builder-written: another host's synced Claude Code session sits in the
@@ -754,6 +755,7 @@ export const runAgentTurn = (
                 input.history ?? [],
               ),
               stateIntegrityKey: input.nativeStateIntegrityKey,
+              previousStateIntegrityKeys: previousNativeStateIntegrityKeys(input),
               ...(input.rebuildNativeSession === true
                 ? { recoveryHistory: input.history ?? [] }
                 : {}),
@@ -1078,3 +1080,13 @@ export const runAgentTurn = (
       } satisfies AgentTurnResult;
     }),
   );
+
+export const previousNativeStateIntegrityKeys = (input: {
+  nativeStatePreviousIntegrityKeys?: unknown;
+}): string[] =>
+  Array.isArray(input.nativeStatePreviousIntegrityKeys)
+    ? input.nativeStatePreviousIntegrityKeys.filter(
+        (key): key is string =>
+          typeof key === "string" && /^[0-9a-f]{64}$/.test(key),
+      )
+    : [];

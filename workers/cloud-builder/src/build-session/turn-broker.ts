@@ -58,7 +58,7 @@ import {
   errorMessage,
   exactTurnIdentityMatches,
   log,
-  nativeStateIntegrityKeyFor,
+  nativeStateIntegrityKeysFor,
   nativeStateThreadHash,
   sessionName,
   turnStateCheckpointOperationKey,
@@ -187,7 +187,7 @@ export const resolveAgentTurnState = async (
         );
       }
       if (!candidate.nativeCheckpoint) return resolved;
-      const integrityKey = await nativeStateIntegrityKeyFor(host.env, turn);
+      const integrityKey = await nativeStateIntegrityKeysFor(host.env, turn);
       if (
         candidate.nativeCheckpoint.cursor !== canonicalHistoryCursor ||
         !(await validNativeStateCheckpointMac({
@@ -1324,7 +1324,7 @@ export const handleTurnBroker = async (
     return await failOperation(403);
   }
   if (payload.nativeCheckpoint) {
-    const integrityKey = await nativeStateIntegrityKeyFor(host.env, turn);
+    const integrityKey = await nativeStateIntegrityKeysFor(host.env, turn);
     if (
       !(await validNativeStateCheckpointMac({
         checkpoint: payload.nativeCheckpoint,

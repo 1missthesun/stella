@@ -1,6 +1,7 @@
 import { ownerAccess } from "./cloud-home-routes.js";
 import { worldName } from "./workspace.js";
 import { readBoundedRequestText } from "./bounded-body.js";
+import { builderServiceSecret, builderServiceSecrets } from "./secret-rotation.js";
 const encoder = new TextEncoder();
 const base64 = (bytes: Uint8Array) =>
   btoa(String.fromCharCode(...bytes))
@@ -36,7 +37,7 @@ export async function mintWorkspaceAppAccess(
     new Uint8Array(
       await crypto.subtle.sign(
         "HMAC",
-        await key(env.BUILDER_SERVICE_SECRET),
+        await key(builderServiceSecret(env)),
         encoder.encode(payload),
       ),
     ),
@@ -64,15 +65,21 @@ export async function serveWorkspaceApp(
     generation: string;
   };
   try {
-    if (
-      !(await crypto.subtle.verify(
-        "HMAC",
-        await key(env.BUILDER_SERVICE_SECRET),
-        decode(match[2]!),
-        encoder.encode(match[1]!),
-      ))
-    )
-      throw new Error();
+    let verified = false;
+    for (const secret of builderServiceSecrets(env)) {
+      if (
+        await crypto.subtle.verify(
+          "HMAC",
+          await key(secret),
+          decode(match[2]!),
+          encoder.encode(match[1]!),
+        )
+      ) {
+        verified = true;
+        break;
+      }
+    }
+    if (!verified) throw new Error();
     claims = JSON.parse(new TextDecoder().decode(decode(match[1]!)));
     if (
       !/^[0-9a-f]{64}:[0-9a-f]{64}$/.test(claims.world) ||

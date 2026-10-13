@@ -4,6 +4,7 @@
 // Durable Object instance, so there is no host interface: these are the
 // top-level collaborators that the worker router and a handful of class
 // methods call with an explicit `env`.
+import { builderServiceSecrets } from "../secret-rotation.js";
 import type { LegacyDirectoryBackup as DirectoryBackup } from "../sandbox-client.js";
 import { sha256Hex } from "../hash.js";
 import {
@@ -553,7 +554,7 @@ export const handleWorldRoute = async (
     | { kind: "push" },
 ): Promise<Response> => {
   const authorization = await verifyWorldCapability({
-    secret: env.BUILDER_SERVICE_SECRET,
+    secret: builderServiceSecrets(env),
     capability: worldCapabilityFromRequest(request),
     worldName: world,
     now: Date.now(),

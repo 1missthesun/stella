@@ -118,7 +118,7 @@ export const issueSocketTicket = async (args: {
 };
 
 export const verifySocketTicket = async (args: {
-  secret: string;
+  secret: string | readonly string[];
   ticket: string;
   purpose: SocketTicketPurpose;
   resource: string;
@@ -130,12 +130,20 @@ export const verifySocketTicket = async (args: {
   const signatureBytes = decodeBase64Url(signature);
   if (!payloadBytes || !signatureBytes || signatureBytes.byteLength !== 32)
     return null;
-  const verified = await crypto.subtle.verify(
-    "HMAC",
-    await hmacKey(args.secret, "verify"),
-    signatureBytes,
-    signingInput(payload),
-  );
+  let verified = false;
+  for (const secret of typeof args.secret === "string" ? [args.secret] : args.secret) {
+    if (
+      await crypto.subtle.verify(
+        "HMAC",
+        await hmacKey(secret, "verify"),
+        signatureBytes,
+        signingInput(payload),
+      )
+    ) {
+      verified = true;
+      break;
+    }
+  }
   if (!verified) return null;
   let value: Record<string, unknown>;
   try {

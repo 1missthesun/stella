@@ -20,6 +20,7 @@
  * instead of colliding with events already projected.
  */
 
+import type { OwnerKeks } from "./secret-rotation.js";
 import type { AgentHistoryRow } from "@stella/executor-cloud/agent-history";
 import {
   AGENT_HISTORY_MAX_BYTES,
@@ -103,10 +104,10 @@ const decode = (sql: SqlStorage, stored: string): string => {
  */
 export const configureThreadTranscriptCrypto = (
   sql: SqlStorage,
-  kekBase64: string | null,
+  keks: OwnerKeks | null,
 ): void => {
   if (cryptos.has(sql)) return;
-  if (!kekBase64) {
+  if (!keks) {
     cryptos.set(sql, null);
     return;
   }
@@ -119,10 +120,20 @@ export const configureThreadTranscriptCrypto = (
   let crypto: JournalCrypto | null;
   let migrated = existing?.migrated === 1;
   if (existing) {
-    crypto = JournalCrypto.fromWrappedDek(kekBase64, existing.wrapped_dek);
+    crypto = JournalCrypto.fromWrappedDek(keks, existing.wrapped_dek);
+    if (crypto && !JournalCrypto.isCurrentWrap(keks, existing.wrapped_dek)) {
+      const rewrapped = crypto.rewrap(keks);
+      if (rewrapped) {
+        sql.exec(
+          `UPDATE thread_crypto SET wrapped_dek = ? WHERE id = 1 AND wrapped_dek = ?`,
+          rewrapped,
+          existing.wrapped_dek,
+        );
+      }
+    }
   } else {
     const dek = JournalCrypto.randomDek();
-    const wrapped = JournalCrypto.wrapDek(kekBase64, dek);
+    const wrapped = JournalCrypto.wrapDek(keks, dek);
     if (!wrapped) {
       cryptos.set(sql, null);
       return;
@@ -136,7 +147,7 @@ export const configureThreadTranscriptCrypto = (
         `SELECT wrapped_dek FROM thread_crypto WHERE id = 1`,
       )
       .one().wrapped_dek;
-    crypto = JournalCrypto.fromWrappedDek(kekBase64, stored);
+    crypto = JournalCrypto.fromWrappedDek(keks, stored);
     migrated = false;
   }
   cryptos.set(sql, crypto);

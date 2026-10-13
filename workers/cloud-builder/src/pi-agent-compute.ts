@@ -13,6 +13,7 @@
  * record names the exact lease, so a lease an eviction dropped is found and
  * released when the harness opens again.
  */
+import { builderServiceSecret } from "./secret-rotation.js";
 import type { SerializedAgentToolResult } from "@stella/executor-cloud/attached-tool-protocol";
 import {
   ATTACHED_TOOL_PROTOCOL_VERSION,
@@ -255,7 +256,7 @@ export const openPiComputeLease = async (
     // then kept in step by the daemon around every command.
     const head = await host.env.WORLDS.getByName(world).head();
     const capability = await issueWorldCapability({
-      secret: host.env.BUILDER_SERVICE_SECRET,
+      secret: builderServiceSecret(host.env),
       worldName: world,
       turnId,
       attemptGeneration,
@@ -328,7 +329,7 @@ export const openPiComputeLease = async (
         origin,
         name: world,
         capability: await issueWorldCapability({
-          secret: host.env.BUILDER_SERVICE_SECRET,
+          secret: builderServiceSecret(host.env),
           worldName: world,
           turnId,
           attemptGeneration,

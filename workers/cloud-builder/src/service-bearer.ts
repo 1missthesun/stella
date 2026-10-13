@@ -124,3 +124,17 @@ export const verifyServiceBearerRequest = async (
     expectedSecret,
     options,
   );
+
+export const verifyServiceBearerRequestWithAny = async (
+  request: Request,
+  expectedSecrets: readonly string[],
+  options?: ServiceBearerVerificationOptions,
+): Promise<boolean> => {
+  const candidates = expectedSecrets.length > 0 ? expectedSecrets : [null];
+  const results = await Promise.all(
+    candidates.map((secret) =>
+      verifyServiceBearerRequest(request, secret, options),
+    ),
+  );
+  return results.some(Boolean);
+};

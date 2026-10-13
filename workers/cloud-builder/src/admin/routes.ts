@@ -11,6 +11,8 @@
  *   POST /api/admin/test-accounts/session       {email?, plan?, usageMode?} → a signed-in test user (dev only)
  *   POST /api/admin/test-accounts/conversation-restart  {conversationId} → restart that conversation's object (dev only)
  *   POST /api/admin/test-accounts/email-digest-probe  {ownerId, messages, simulate?} → one digest check on given mail (dev only)
+ *   GET  /api/admin/secret-rotation/status      D1 rows still under BETTER_AUTH_SECRET (jwks, Slack)
+ *   POST /api/admin/secret-rotation/reencrypt   re-encrypt them under BETTER_AUTH_SECRET_V2
  *
  * Owners are addressed by id only.
  *
@@ -403,6 +405,16 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
   "/api/admin/test-accounts/email-digest-probe": {
     method: "POST",
     run: (request, _url, env) => emailDigestProbeRoute(request, env),
+  },
+  "/api/admin/secret-rotation/status": {
+    method: "GET",
+    run: async (_request, _url, env) =>
+      (await import("./secret-rotation.js")).secretRotationStatus(env as unknown as Cloudflare.Env),
+  },
+  "/api/admin/secret-rotation/reencrypt": {
+    method: "POST",
+    run: async (_request, _url, env) =>
+      (await import("./secret-rotation.js")).secretRotationReencrypt(env as unknown as Cloudflare.Env),
   },
   "/api/admin/test-accounts/claude-login-probe": {
     method: "POST",

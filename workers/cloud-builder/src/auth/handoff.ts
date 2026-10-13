@@ -32,7 +32,7 @@
 import { isAppIntegrityPurpose } from "@stella/contracts/app-integrity";
 import type { BetterAuthPlugin } from "better-auth";
 import { createAuthEndpoint, getSessionFromCtx } from "better-auth/api";
-import { makeSignature, symmetricDecrypt, symmetricEncrypt } from "better-auth/crypto";
+import { makeSignature, symmetricDecrypt, symmetricEncrypt, type SecretConfig } from "better-auth/crypto";
 import { bearerCredential } from "../../../shared/bearer.js";
 import { verifyUserToken } from "../auth-jwt.js";
 import { isDisposableEmail } from "./disposable-email-domains.js";
@@ -62,6 +62,7 @@ export type HandoffConfig = {
   backendUrl: string;
   websiteUrl: string;
   secret: string;
+  cipherKey: string | SecretConfig;
   api: () => HandoffApi;
 };
 
@@ -223,7 +224,7 @@ export const stellaHandoff = (config: HandoffConfig) => {
     if (!config.env.DB) throw new Error("D1 is not bound.");
     return config.env.DB;
   };
-  const encrypt = (token: string) => symmetricEncrypt({ key: config.secret, data: token });
+  const encrypt = (token: string) => symmetricEncrypt({ key: config.cipherKey, data: token });
   const doneRedirect = () => bridgeResponse(302, `${config.websiteUrl}/auth/callback?done=true`);
 
   const linkRow = (requestId: string) =>
@@ -384,7 +385,7 @@ export const stellaHandoff = (config: HandoffConfig) => {
           .run();
         if ((deleted.meta.changes ?? 0) === 0) return fail(400, "Unable to claim sign-in");
         try {
-          const token = await symmetricDecrypt({ key: config.secret, data: row.token_enc });
+          const token = await symmetricDecrypt({ key: config.cipherKey, data: row.token_enc });
           if (!token.trim()) throw new Error("empty token");
           return reply({ token });
         } catch {

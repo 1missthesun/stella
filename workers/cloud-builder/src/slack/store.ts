@@ -1,6 +1,6 @@
 /** D1 access for the Slack tables (migrations/0009_slack.sql). */
 
-import { decryptToken, encryptToken } from "./crypto.js";
+import { decryptToken, encryptToken, isCurrentTokenVersion } from "./crypto.js";
 
 const d1 = (env: Cloudflare.Env): D1Database => {
   if (!env.DB) throw new Error("The DB binding is missing.");
@@ -111,13 +111,21 @@ export const loadInstallation = async (
       .bind(homeFolder, row.team_id)
       .run();
   }
+  const botToken = await decryptToken(env, row.bot_token_enc);
+  if (!isCurrentTokenVersion(env, row.bot_token_enc)) {
+    await d1(env)
+      .prepare("UPDATE slack_installations SET bot_token_enc = ? WHERE team_id = ? AND bot_token_enc = ?")
+      .bind(await encryptToken(env, botToken), row.team_id, row.bot_token_enc)
+      .run()
+      .catch(() => undefined);
+  }
   return {
     teamId: row.team_id,
     enterpriseId: row.enterprise_id,
     teamName: row.team_name,
     appId: row.app_id,
     botUserId: row.bot_user_id,
-    botToken: await decryptToken(env, row.bot_token_enc),
+    botToken,
     installedBy: row.installed_by,
     ownerId: row.owner_id,
     homeFolder,

@@ -215,9 +215,35 @@ const setupSecrets = () => {
   }
 };
 
-const commands = { up, down, list, url: () => console.log(previewUrl(previewName())), "setup-secrets": setupSecrets };
+const rotationSecrets = () => {
+  const name = option("name");
+  if (!name) fail("pass --name <name>: rotation secrets go on one Preview, never the base config.");
+  const secrets = {
+    BETTER_AUTH_SECRET_V2: randomBytes(48).toString("base64"),
+    BUILDER_SERVICE_SECRET_V2: randomBytes(48).toString("base64"),
+    OWNER_SECRETS_KEK_V2: randomBytes(32).toString("base64"),
+  };
+  for (const [key, value] of Object.entries(secrets)) {
+    wrangler(["preview", "secret", "put", key, "--worker-name", PREVIEW_WORKER, "--name", previewName()], {
+      input: value,
+      capture: true,
+    });
+    console.log(`preview: ${key} set (${previewName()}).`);
+  }
+};
+
+const commands = {
+  up,
+  down,
+  list,
+  url: () => console.log(previewUrl(previewName())),
+  "setup-secrets": setupSecrets,
+  "rotation-secrets": rotationSecrets,
+};
 if (!commands[command]) {
-  console.error("usage: bun run preview -- up|down|list|url [--name <name>] | setup-secrets --capability-key-file <pem>");
+  console.error(
+    "usage: bun run preview -- up|down|list|url [--name <name>] | setup-secrets --capability-key-file <pem> | rotation-secrets --name <name>",
+  );
   process.exit(2);
 }
 commands[command]();

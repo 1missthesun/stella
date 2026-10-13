@@ -30,7 +30,7 @@ import {
   errorMessage,
   exactTurnIdentityMatches,
   log,
-  nativeStateIntegrityKeyFor,
+  nativeStateIntegrityKeysFor,
   pendingAppBuildPublicationKey,
   turnStateCheckpointOperationKey,
 } from "./shared/keys.js";
@@ -756,7 +756,7 @@ export const ensureBuilderFallbackTranscript = async (
     throw new Error("Builder fallback transcript cursor was invalid.");
   }
   if (input?.nativeCheckpoint) {
-    const integrityKey = await nativeStateIntegrityKeyFor(host.env, turn);
+    const integrityKey = await nativeStateIntegrityKeysFor(host.env, turn);
     if (
       input.nativeCheckpoint.cursor !== historyCursor ||
       !(await validNativeStateCheckpointMac({

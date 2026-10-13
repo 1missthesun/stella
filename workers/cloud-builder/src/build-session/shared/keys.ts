@@ -8,6 +8,7 @@ import {
 import { HEADER_OWNER } from "../../conversation-types.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
 import { sha256Hex } from "../../hash.js";
+import { builderServiceSecret, builderServiceSecrets } from "../../secret-rotation.js";
 import { inSubshell } from "../../shell-subshell.js";
 import {
   isInstanceSize,
@@ -276,18 +277,34 @@ export const nativeTransientBackupKey = (turnId: string): string =>
 export const nativeBackupDebtKey = (workspaceKey: string): string =>
   `${workspaceKey}:native-backup-debt`;
 
-export const nativeStateIntegrityKeyFor = async (
-  env: Pick<Env, "BUILDER_SERVICE_SECRET">,
+const nativeStateIntegrityKeyWith = async (
+  secret: string,
   turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "threadId">,
 ): Promise<string> =>
   await sha256Hex(
     [
       "stella-native-state-v2",
-      env.BUILDER_SERVICE_SECRET,
+      secret,
       turn.ownerId,
       turn.ownerGeneration,
       turn.threadId,
     ].join("\u0000"),
+  );
+
+export const nativeStateIntegrityKeyFor = async (
+  env: Pick<Env, "BUILDER_SERVICE_SECRET">,
+  turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "threadId">,
+): Promise<string> =>
+  await nativeStateIntegrityKeyWith(builderServiceSecret(env), turn);
+
+export const nativeStateIntegrityKeysFor = async (
+  env: Pick<Env, "BUILDER_SERVICE_SECRET">,
+  turn: Pick<TurnRequest, "ownerId" | "ownerGeneration" | "threadId">,
+): Promise<string[]> =>
+  await Promise.all(
+    builderServiceSecrets(env).map((secret) =>
+      nativeStateIntegrityKeyWith(secret, turn),
+    ),
   );
 
 /** Names this thread's own native state root (`cloudNativeStateRoot`). */

@@ -44,6 +44,7 @@ import {
 import {
   commitTurnStateBeforeTranscript,
   createBuilderFallbackAgentTurnResult,
+  previousNativeStateIntegrityKeys,
   type AgentTurnInput,
   type AgentTurnResult,
 } from "./agent-turn.js";
@@ -796,6 +797,7 @@ export const runOrchestratorTurn = async (args: {
           input.history ?? [],
         ),
         stateIntegrityKey: input.nativeStateIntegrityKey,
+        previousStateIntegrityKeys: previousNativeStateIntegrityKeys(input),
         ...(spec.startFresh
           ? { fresh: true }
           : input.rebuildNativeSession === true

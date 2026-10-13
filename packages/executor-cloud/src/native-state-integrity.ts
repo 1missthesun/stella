@@ -497,6 +497,7 @@ export const assertNativeState = async (args: {
   sessionId: string;
   expectedCursor: string;
   integrityKey: string;
+  previousIntegrityKeys?: readonly string[];
   /** Unit tests may override the production-required root owner. */
   expectedOwner?: NativeStateOwner;
 }): Promise<NativeStateAttestation> => {
@@ -521,8 +522,8 @@ export const assertNativeState = async (args: {
     cursor: stored.cursor,
     tree: stored.tree,
   };
-  const expectedMac = attestationMac(unsigned, args.integrityKey);
-  if (!equalHexDigest(stored.mac, expectedMac)) {
+  const keys = [args.integrityKey, ...(args.previousIntegrityKeys ?? [])];
+  if (!keys.some((key) => equalHexDigest(stored.mac, attestationMac(unsigned, key)))) {
     throw new Error(
       "Native agent session state attestation is invalid; refusing to resume.",
     );

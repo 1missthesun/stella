@@ -5,6 +5,7 @@
  *
  * @see src/build-session/host.ts for why every call out takes `host`.
  */
+import { builderServiceSecret } from "../secret-rotation.js";
 import {
   agentFailureMessage,
   classifyAgentFailureDiagnostic,
@@ -98,6 +99,7 @@ import {
   json,
   log,
   nativeStateIntegrityKeyFor,
+  nativeStateIntegrityKeysFor,
   nativeStateThreadHash,
   normalizeToolWorkspaceRoot,
   sessionName,
@@ -1368,7 +1370,7 @@ export const attachAgentWorld = async (
     worldMetadataMs = phaseMs(worldMetadataStarted);
     const capabilityStarted = performance.now();
     const capability = await issueWorldCapability({
-      secret: host.env.BUILDER_SERVICE_SECRET,
+      secret: builderServiceSecret(host.env),
       worldName: name,
       turnId: turn.turnId,
       attemptGeneration: turn.attemptGeneration!,
@@ -1638,6 +1640,9 @@ export const runAgentAttempt = async (
     host.env,
     turn,
   );
+  const nativeStatePreviousIntegrityKeys = (
+    await nativeStateIntegrityKeysFor(host.env, turn)
+  ).filter((key) => key !== nativeStateIntegrityKey);
   turnExecution.assertActive();
 
   if (!turn.turnBrokerRoute) {
@@ -1763,6 +1768,9 @@ export const runAgentAttempt = async (
         prompt: turn.prompt,
         workspaceRestored: Boolean(args.turnStateWorkspaceRestore),
         nativeStateIntegrityKey,
+        ...(nativeStatePreviousIntegrityKeys.length > 0
+          ? { nativeStatePreviousIntegrityKeys }
+          : {}),
         rebuildNativeSession:
           turn.execution?.engine === "anthropic" &&
           !nativeRestored &&
@@ -1773,7 +1781,7 @@ export const runAgentAttempt = async (
           origin: host.env.CLOUD_BUILDER_PUBLIC_URL.replace(/\/+$/u, ""),
           name: await worldName(turn.ownerId),
           capability: await issueWorldCapability({
-            secret: host.env.BUILDER_SERVICE_SECRET,
+            secret: builderServiceSecret(host.env),
             worldName: await worldName(turn.ownerId),
             turnId: turn.turnId,
             attemptGeneration: turn.attemptGeneration!,

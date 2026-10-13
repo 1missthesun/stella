@@ -89,6 +89,7 @@ import {
 import { TEST_CLAUDE_EMAIL } from "../../test-claude.js";
 import { array, boolean, empty, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
+import { ownerKekFor, ownerKeks, type OwnerKekTag } from "../../secret-rotation.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 import { readOrDefault } from "../schema.js";
@@ -329,10 +330,9 @@ export const DEFAULT_EXECUTION: LegacyCloudExecutionSelection = {
 // --- Encryption (AES-256-GCM under OWNER_SECRETS_KEK) ---------------------
 
 /**
- * Ciphertexts carry the key version they were written under. Rotating means
- * adding a second key and version here; there is no re-encryption sweep.
+ * Ciphertexts carry the key version they were written under: `v1` under
+ * OWNER_SECRETS_KEK, `v2` under OWNER_SECRETS_KEK_V2.
  */
-const KEY_VERSION = "v1";
 
 type StoredEnginePayload = {
   access: string;
@@ -358,26 +358,45 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-let keyCache: { raw: string; key: Promise<CryptoKey> } | null = null;
+const keyCache = new Map<string, Promise<CryptoKey>>();
 
-const credentialKey = (env: Cloudflare.Env): Promise<CryptoKey> => {
-  const value = (env as unknown as Record<string, unknown>).OWNER_SECRETS_KEK;
-  const raw = typeof value === "string" ? value.trim() : "";
+const importedKey = (raw: string): Promise<CryptoKey> => {
+  let key = keyCache.get(raw);
+  if (!key) {
+    key = crypto.subtle.importKey("raw", base64ToBytes(raw), { name: "AES-GCM" }, false, [
+      "encrypt",
+      "decrypt",
+    ]);
+    keyCache.set(raw, key);
+  }
+  return key;
+};
+
+const currentCredentialKey = (env: Cloudflare.Env): { tag: OwnerKekTag; key: Promise<CryptoKey> } => {
+  const keks = ownerKeks(env);
+  const raw = keks ? ownerKekFor(keks, keks.current) : undefined;
+  if (!keks || !raw) {
+    throw new RpcError("UNAVAILABLE", "Engine connections aren't configured yet.", {
+      retryable: false,
+    });
+  }
+  return { tag: keks.current, key: importedKey(raw) };
+};
+
+const credentialKeyFor = (env: Cloudflare.Env, tag: string): Promise<CryptoKey> => {
+  const keks = ownerKeks(env);
+  const raw = keks ? ownerKekFor(keks, tag) : undefined;
   if (!raw) {
     throw new RpcError("UNAVAILABLE", "Engine connections aren't configured yet.", {
       retryable: false,
     });
   }
-  if (keyCache?.raw !== raw) {
-    keyCache = {
-      raw,
-      key: crypto.subtle.importKey("raw", base64ToBytes(raw), { name: "AES-GCM" }, false, [
-        "encrypt",
-        "decrypt",
-      ]),
-    };
-  }
-  return keyCache.key;
+  return importedKey(raw);
+};
+
+const isCurrentKeyVersion = (env: Cloudflare.Env, encrypted: string): boolean => {
+  const keks = ownerKeks(env);
+  return !keks || encrypted.startsWith(`${keks.current}.`);
 };
 
 /** Bound to the owner and provider, so a row copied elsewhere won't decrypt. */
@@ -389,15 +408,16 @@ const encryptPayload = async (
   provider: EngineProvider,
   payload: StoredEnginePayload,
 ): Promise<string> => {
+  const current = currentCredentialKey(ctx.env);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = new Uint8Array(
     await crypto.subtle.encrypt(
       { name: "AES-GCM", iv, additionalData: additionalData(ctx.ownerId, provider) },
-      await credentialKey(ctx.env),
+      await current.key,
       new TextEncoder().encode(JSON.stringify(payload)),
     ),
   );
-  return `${KEY_VERSION}.${bytesToBase64(iv)}.${bytesToBase64(ciphertext)}`;
+  return `${current.tag}.${bytesToBase64(iv)}.${bytesToBase64(ciphertext)}`;
 };
 
 const decryptPayload = async (
@@ -406,12 +426,12 @@ const decryptPayload = async (
   encrypted: string,
 ): Promise<StoredEnginePayload> => {
   const [version, iv, ciphertext] = encrypted.split(".");
-  if (version !== KEY_VERSION || !iv || !ciphertext) {
+  if ((version !== "v1" && version !== "v2") || !iv || !ciphertext) {
     throw new Error("Unreadable engine credential.");
   }
   const plaintext = await crypto.subtle.decrypt(
     { name: "AES-GCM", iv: base64ToBytes(iv), additionalData: additionalData(ctx.ownerId, provider) },
-    await credentialKey(ctx.env),
+    await credentialKeyFor(ctx.env, version),
     base64ToBytes(ciphertext),
   );
   return JSON.parse(new TextDecoder().decode(plaintext)) as StoredEnginePayload;
@@ -1317,7 +1337,7 @@ const startConnect = async (
     "Too many connect attempts. Try again in a few minutes.",
   );
   // Fail before the OAuth dance if the result couldn't be stored.
-  await credentialKey(ctx.env);
+  await currentCredentialKey(ctx.env).key;
   let saved: { accountId?: string; clientId: string; loginHint?: string } | undefined;
   if (!args.accountId && args.clientId) {
     const shared = ctx.db.one<{ client_id: string; email: string | null }>(
@@ -1793,7 +1813,7 @@ const resolveAccess = async (
   forceRefresh = false,
 ): Promise<EngineAccessResult> => {
   const provider = "chatgpt" as const;
-  const row = activeAccountOf(accountsOf(ctx.db, provider), providerSettings(ctx.db, provider));
+  let row = activeAccountOf(accountsOf(ctx.db, provider), providerSettings(ctx.db, provider));
   if (!row) {
     const stale = accountsOf(ctx.db, provider).find((account) => account.status === "reauth_required");
     return stale ? { needsSignIn: true, engineAccountId: stale.account_id } : null;
@@ -1804,6 +1824,16 @@ const resolveAccess = async (
   } catch (error) {
     if (error instanceof RpcError) throw error;
     return null;
+  }
+  if (!isCurrentKeyVersion(ctx.env, row.payload)) {
+    const encrypted = await encryptPayload(ctx, provider, payload);
+    ctx.db.run(
+      "UPDATE engine_accounts SET payload = ? WHERE account_id = ? AND payload = ?",
+      encrypted,
+      row.account_id,
+      row.payload,
+    );
+    row = { ...row, payload: encrypted };
   }
   const now = Date.now();
   const forced = forceRefresh && now - row.updated_at >= FORCED_REFRESH_REUSE_MS;

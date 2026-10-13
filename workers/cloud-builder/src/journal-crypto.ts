@@ -9,7 +9,8 @@
  * conversation destroys its wrapped DEK with the rest of its storage, which
  * crypto-shreds any copy that survives elsewhere.
  *
- * Encoded form: `enc1.<iv>.<tag>.<ciphertext>` (base64), AES-256-GCM.
+ * Encoded form: `enc1.<iv>.<tag>.<ciphertext>` (base64), AES-256-GCM. A DEK
+ * wrapped under OWNER_SECRETS_KEK_V2 carries a `kek2.` prefix in front.
  * Anything without the prefix is a pre-encryption plaintext row and reads
  * back unchanged, so old segments and spills keep working.
  */
@@ -22,8 +23,10 @@ import {
   createHmac,
   randomBytes,
 } from "node:crypto";
+import { ownerKekFor, type OwnerKeks } from "./secret-rotation.js";
 
 const PREFIX = "enc1.";
+const WRAPPED_V2_PREFIX = "kek2.";
 const AAD = Buffer.from("stella-journal-v1", "utf8");
 
 const bytesToBase64 = (bytes: Uint8Array): string => {
@@ -92,18 +95,32 @@ export class JournalCrypto {
     return randomBytes(32);
   }
 
-  static wrapDek(kekBase64: string, dek: Buffer): string | null {
-    const kek = keyFromBase64(kekBase64);
-    return kek ? encryptWith(kek, dek) : null;
+  static wrapDek(keks: OwnerKeks, dek: Buffer): string | null {
+    const raw = ownerKekFor(keks, keks.current);
+    const kek = raw ? keyFromBase64(raw) : null;
+    if (!kek) return null;
+    const wrapped = encryptWith(kek, dek);
+    return keks.current === "v2" ? `${WRAPPED_V2_PREFIX}${wrapped}` : wrapped;
   }
 
   static fromWrappedDek(
-    kekBase64: string,
+    keks: OwnerKeks,
     wrapped: string,
   ): JournalCrypto | null {
-    const kek = keyFromBase64(kekBase64);
-    if (!kek || !isEncryptedJournalValue(wrapped)) return null;
-    return new JournalCrypto(decryptWith(kek, wrapped));
+    const v2 = wrapped.startsWith(WRAPPED_V2_PREFIX);
+    const sealed = v2 ? wrapped.slice(WRAPPED_V2_PREFIX.length) : wrapped;
+    const raw = ownerKekFor(keks, v2 ? "v2" : "v1");
+    const kek = raw ? keyFromBase64(raw) : null;
+    if (!kek || !isEncryptedJournalValue(sealed)) return null;
+    return new JournalCrypto(decryptWith(kek, sealed));
+  }
+
+  static isCurrentWrap(keks: OwnerKeks, wrapped: string): boolean {
+    return wrapped.startsWith(WRAPPED_V2_PREFIX) === (keks.current === "v2");
+  }
+
+  rewrap(keks: OwnerKeks): string | null {
+    return JournalCrypto.wrapDek(keks, this.dek);
   }
 
   static fromDek(dek: Buffer): JournalCrypto {

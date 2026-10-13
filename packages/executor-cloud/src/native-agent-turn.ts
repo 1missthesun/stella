@@ -244,6 +244,7 @@ export const assertNativeHistoryParity = async (args: {
   threadId: string;
   expectedCursor: string;
   integrityKey: string;
+  previousIntegrityKeys?: readonly string[];
   /** Unit tests may override the production-required root owner. */
   expectedOwner?: { uid: number; gid: number };
 }): Promise<void> => {
@@ -269,6 +270,9 @@ export const assertNativeHistoryParity = async (args: {
     sessionId,
     expectedCursor: args.expectedCursor,
     integrityKey: args.integrityKey,
+    ...(args.previousIntegrityKeys?.length
+      ? { previousIntegrityKeys: args.previousIntegrityKeys }
+      : {}),
     ...(args.expectedOwner ? { expectedOwner: args.expectedOwner } : {}),
   });
 };
@@ -1365,6 +1369,7 @@ export const runNativeAgentTurn = async (options: {
   turnId: string;
   authoritativeHistoryCursor: string;
   stateIntegrityKey: string;
+  previousStateIntegrityKeys?: readonly string[];
   recoveryHistory?: AgentHistoryRow[];
   /**
    * Another host's synced session the BuildSession wrote into the root, or
@@ -1464,6 +1469,9 @@ export const runNativeAgentTurn = async (options: {
       threadId: options.threadId,
       expectedCursor: options.authoritativeHistoryCursor,
       integrityKey: options.stateIntegrityKey,
+      ...(options.previousStateIntegrityKeys?.length
+        ? { previousIntegrityKeys: options.previousStateIntegrityKeys }
+        : {}),
     });
   }
   markTurnStep("nativeParityChecked");

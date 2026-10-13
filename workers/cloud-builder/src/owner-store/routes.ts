@@ -10,6 +10,7 @@
  * `OwnerGate`).
  */
 
+import { builderServiceSecrets } from "../secret-rotation.js";
 import { SOCKET_TICKET_SUBPROTOCOL_PREFIX } from "@stella/contracts/socket-ticket";
 import { verifySocketTicket } from "../socket-ticket.js";
 import {
@@ -167,7 +168,7 @@ const verifyLiveCaller = async (
 ): ReturnType<typeof verifyCaller> => {
   if (!offer.ticket) return await verifyCaller(env, offer.token);
   const caller = await verifySocketTicket({
-    secret: env.BUILDER_SERVICE_SECRET,
+    secret: builderServiceSecrets(env),
     ticket: offer.ticket,
     purpose: "live",
     resource: "",

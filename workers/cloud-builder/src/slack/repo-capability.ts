@@ -7,6 +7,8 @@
  * repository or disconnecting GitHub revokes it at once.
  */
 
+import { builderServiceSecret, builderServiceSecrets } from "../secret-rotation.js";
+
 const PREFIX = "sr1";
 const DOMAIN = "stella.slack-repo.v1";
 export const SLACK_REPO_CAPABILITY_TTL_MS = 12 * 60 * 60_000;
@@ -29,8 +31,7 @@ const fromBase64Url = (value: string): Uint8Array | null => {
   }
 };
 
-const key = async (env: Cloudflare.Env, usage: "sign" | "verify"): Promise<CryptoKey> => {
-  const secret = env.BUILDER_SERVICE_SECRET;
+const key = async (secret: string, usage: "sign" | "verify"): Promise<CryptoKey> => {
   if (!secret || secret.length < 32) throw new Error("BUILDER_SERVICE_SECRET is not configured.");
   return await crypto.subtle.importKey(
     "raw",
@@ -39,6 +40,16 @@ const key = async (env: Cloudflare.Env, usage: "sign" | "verify"): Promise<Crypt
     false,
     [usage],
   );
+};
+
+const verifiedWithAny = async (env: Cloudflare.Env, signature: Uint8Array, data: Uint8Array): Promise<boolean> => {
+  const secrets = builderServiceSecrets(env);
+  for (const secret of secrets.length > 0 ? secrets : [""]) {
+    if (await crypto.subtle.verify("HMAC", await key(secret, "verify"), signature as BufferSource, data as BufferSource)) {
+      return true;
+    }
+  }
+  return false;
 };
 
 const input = (payload: string): Uint8Array => new TextEncoder().encode(`${DOMAIN}.${payload}`);
@@ -50,7 +61,7 @@ export const issueSlackRepoCapability = async (
   const payload = base64Url(
     new TextEncoder().encode(JSON.stringify({ ...claims, exp: Date.now() + SLACK_REPO_CAPABILITY_TTL_MS })),
   );
-  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", await key(env, "sign"), input(payload)));
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", await key(builderServiceSecret(env), "sign"), input(payload)));
   return `${PREFIX}.${payload}.${base64Url(signature)}`;
 };
 
@@ -63,9 +74,7 @@ export const verifySlackRepoCapability = async (
   const signatureBytes = fromBase64Url(signature);
   const payloadBytes = fromBase64Url(payload);
   if (!signatureBytes || !payloadBytes) return null;
-  const valid = await crypto.subtle
-    .verify("HMAC", await key(env, "verify"), signatureBytes, input(payload))
-    .catch(() => false);
+  const valid = await verifiedWithAny(env, signatureBytes, input(payload)).catch(() => false);
   if (!valid) return null;
   try {
     const claims = JSON.parse(new TextDecoder().decode(payloadBytes)) as Partial<SlackRepoClaims>;

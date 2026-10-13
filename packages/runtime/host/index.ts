@@ -48,6 +48,7 @@ import {
   NOTIFICATION_NAMES,
   STELLA_RUNTIME_PROTOCOL_VERSION,
 } from "@stella/contracts/protocol";
+import { DEVICE_REQUEST_CLOUD_ASKER } from "@stella/contracts/turn-plane/device-requests";
 import { createRuntimeUnavailableError } from "@stella/contracts/protocol/rpc-peer";
 import { RuntimeWorkerLifecycleController } from "./worker-lifecycle.js";
 import { buildStdioConnectionFactory } from "./stdio-connection.js";
@@ -906,6 +907,39 @@ export class StellaRuntimeHost {
         );
       },
       serveDeviceRequest: async (request) => {
+        if (request.method === "mcp.listTools" || request.method === "mcp.callTool") {
+          if (request.mobileDeviceId !== DEVICE_REQUEST_CLOUD_ASKER) {
+            return {
+              ok: false,
+              code: "forbidden",
+              message: "Only Stella's cloud reaches this computer's MCP servers.",
+            };
+          }
+          try {
+            const value = await this.requestWorker(
+              METHOD_NAMES.INTERNAL_WORKER_MCP_DEVICE_REQUEST,
+              { method: request.method, params: request.params },
+              { ensureWorker: true, recordActivity: true },
+            );
+            return {
+              ok: true,
+              contentType: "application/json",
+              bodyBase64: Buffer.from(JSON.stringify(value ?? null), "utf8").toString("base64"),
+            };
+          } catch (error) {
+            const message =
+              error instanceof Error && error.message.trim()
+                ? error.message.trim().slice(0, 500)
+                : "This computer could not run that MCP request.";
+            return {
+              ok: false,
+              code: /isn't on this computer|is not on this computer/u.test(message)
+                ? "not_found"
+                : "failed",
+              message,
+            };
+          }
+        }
         const serve = this.options.hostHandlers.serveDeviceRequest;
         if (typeof serve !== "function") {
           return {

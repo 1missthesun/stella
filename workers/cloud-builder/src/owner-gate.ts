@@ -250,6 +250,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       messageLocalAgent: (input) => this.messageLocalAgent(input),
       stopLocalAgent: (input) => this.stopLocalAgent(input),
       askDeviceConsent: (input) => this.askDeviceConsent(input.deviceId, input.requestedAt),
+      relayDeviceRequest: (input) => this.relayCloudDeviceRequest(input),
       devices: () => this.devices(),
       homeChanged: (ownerGeneration, revision) =>
         this.homeContextCache().changed(ownerGeneration, revision),

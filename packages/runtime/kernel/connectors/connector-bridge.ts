@@ -2,7 +2,12 @@ import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import readline from "node:readline";
 
-import { forkTimeoutFiber, guardWithAbortTimeout } from "./effect-runtime.js";
+import { forkTimeoutFiber } from "./effect-runtime.js";
+import {
+  ConnectorAuthError,
+  McpHttpSession,
+  mcpCredentialHeader,
+} from "./mcp-http-session.js";
 import { loadConnectorAccessToken } from "./oauth.js";
 import {
   removeConnectorBridgeProcessRecord,
@@ -15,25 +20,7 @@ import type {
   ConnectorToolInfo,
 } from "./types.js";
 
-/** Thrown when a connector request comes back with an HTTP auth status
- *  (401/403/407). Lets callers branch
- *  on auth failure vs. real probe errors without parsing message strings. */
-export class ConnectorAuthError extends Error {
-  readonly kind = "auth_required" as const;
-  constructor(
-    readonly status: number,
-    readonly serverDisplayName: string,
-    readonly tokenKey: string | undefined,
-    bodyPreview: string,
-  ) {
-    super(
-      `${serverDisplayName} connector request failed (${status}): ${bodyPreview.slice(0, 500)}`,
-    );
-    this.name = "ConnectorAuthError";
-  }
-}
-
-const AUTH_STATUSES = new Set([401, 403, 407]);
+export { ConnectorAuthError };
 
 type RpcMessage = {
   jsonrpc?: "2.0";
@@ -42,24 +29,6 @@ type RpcMessage = {
   params?: unknown;
   result?: unknown;
   error?: { message?: string; code?: number; data?: unknown };
-};
-
-const parseSseMessages = (text: string): RpcMessage[] => {
-  const messages: RpcMessage[] = [];
-  for (const block of text.split(/\n\n+/u)) {
-    const data = block
-      .split(/\r?\n/u)
-      .filter((line) => line.startsWith("data:"))
-      .map((line) => line.slice(5).trim())
-      .join("\n");
-    if (!data || data === "[DONE]") continue;
-    try {
-      messages.push(JSON.parse(data) as RpcMessage);
-    } catch {
-      // Ignore malformed non-RPC SSE frames.
-    }
-  }
-  return messages;
 };
 
 const resolveSecretPlaceholders = async (
@@ -102,186 +71,26 @@ const readInstructions = (result: unknown): string | undefined => {
     : undefined;
 };
 
-class HttpConnectorBridgeSession {
-  private sessionId: string | null = null;
-  private initialized = false;
-  /** From the last successful `initialize` (see {@link readInstructions}). */
-  instructions: string | undefined;
-
-  constructor(
-    private readonly stellaAppDir: string,
-    private readonly server: ConnectorCommandConfig,
-  ) {}
-
-  private async headers() {
-    const headers: Record<string, string> = {
-      accept: "application/json, text/event-stream",
-      "content-type": "application/json",
-      ...(this.server.headers ?? {}),
-    };
-    const token = await loadConnectorAccessToken(
-      this.stellaAppDir,
-      this.server.auth?.tokenKey,
-    );
-    if (token) {
-      const scheme = this.server.auth?.scheme ?? "bearer";
-      const value =
-        scheme === "raw"
-          ? token
-          : scheme === "basic"
-            ? `Basic ${token}`
-            : scheme === "oauth"
-              ? `OAuth ${token}`
-              : `Bearer ${token}`;
-      headers[this.server.auth?.headerName ?? "authorization"] = value;
-    } else if (this.server.auth?.type && this.server.auth.type !== "none") {
-      throw new ConnectorAuthError(
-        0,
-        this.server.displayName,
-        this.server.auth.tokenKey,
-        `${this.server.displayName} has no stored credential for tokenKey "${this.server.auth.tokenKey}".`,
-      );
-    }
-    if (this.sessionId) {
-      headers["mcp-session-id"] = this.sessionId;
-    }
-    return headers;
-  }
-
-  private async request(
-    method: string,
-    params?: unknown,
-    recoverSession = true,
-  ): Promise<unknown> {
-    if (!this.server.url)
-      throw new Error(`${this.server.displayName} does not have a URL.`);
-    const url = this.server.url;
-    const id = randomUUID();
-    // Seam: fetch needs a real AbortSignal for the 60s guard, so the
-    // controller stays (sanctioned ratchet pin); the timer is a scoped Effect
-    // fiber interrupted when the request settles.
-    const controller = new AbortController();
-    const response = await guardWithAbortTimeout({
-      timeoutMs: 60_000,
-      onTimeout: () => controller.abort(),
-      run: async () =>
-        await fetch(url, {
-          method: "POST",
-          headers: await this.headers(),
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            id,
-            method,
-            ...(params === undefined ? {} : { params }),
-          }),
-          signal: controller.signal,
-        }),
-      mapError: (error) =>
-        controller.signal.aborted
-          ? new Error(
-              `${this.server.displayName} timed out waiting for ${method}.`,
-            )
-          : error,
-    });
-    const responseSessionId = response.headers.get("mcp-session-id");
-    if (responseSessionId) this.sessionId = responseSessionId;
-    const text = await response.text();
-    if (!response.ok) {
-      if (
-        response.status === 404 &&
-        recoverSession &&
-        this.sessionId &&
-        method !== "initialize"
-      ) {
-        this.sessionId = null;
-        this.initialized = false;
-        await this.initialize();
-        return await this.request(method, params, false);
-      }
-      if (AUTH_STATUSES.has(response.status)) {
-        throw new ConnectorAuthError(
-          response.status,
-          this.server.displayName,
-          this.server.auth?.tokenKey,
-          text,
+class HttpConnectorBridgeSession extends McpHttpSession {
+  constructor(stellaAppDir: string, server: ConnectorCommandConfig) {
+    super(server, {
+      authHeaders: async () => {
+        const token = await loadConnectorAccessToken(
+          stellaAppDir,
+          server.auth?.tokenKey,
         );
-      }
-      throw new Error(
-        `${this.server.displayName} connector request failed (${response.status}): ${text.slice(0, 500)}`,
-      );
-    }
-    const contentType = response.headers.get("content-type") ?? "";
-    const messages = contentType.includes("text/event-stream")
-      ? parseSseMessages(text)
-      : [JSON.parse(text) as RpcMessage];
-    const message = messages.find((entry) => String(entry.id) === id);
-    if (!message) {
-      throw new Error(
-        `${this.server.displayName} did not return a response for ${method}.`,
-      );
-    }
-    if (message.error) {
-      throw new Error(message.error.message ?? `${method} failed.`);
-    }
-    return message.result;
-  }
-
-  private async notify(method: string, params?: unknown) {
-    if (!this.server.url) return;
-    const url = this.server.url;
-    // Seam controller for the 60s guard (see request()).
-    const controller = new AbortController();
-    await guardWithAbortTimeout({
-      timeoutMs: 60_000,
-      onTimeout: () => controller.abort(),
-      run: async () =>
-        await fetch(url, {
-          method: "POST",
-          headers: await this.headers(),
-          body: JSON.stringify({
-            jsonrpc: "2.0",
-            method,
-            ...(params === undefined ? {} : { params }),
-          }),
-          signal: controller.signal,
-        }),
+        if (token) return mcpCredentialHeader(token, server.auth);
+        if (server.auth?.type && server.auth.type !== "none") {
+          throw new ConnectorAuthError(
+            0,
+            server.displayName,
+            server.auth.tokenKey,
+            `${server.displayName} has no stored credential for tokenKey "${server.auth.tokenKey}".`,
+          );
+        }
+        return {};
+      },
     });
-  }
-
-  async initialize() {
-    if (this.initialized) return;
-    const result = await this.request("initialize", {
-      protocolVersion: "2025-06-18",
-      capabilities: {},
-      clientInfo: { name: "stella", version: "0" },
-    });
-    this.instructions = readInstructions(result) ?? this.instructions;
-    await this.notify("notifications/initialized");
-    this.initialized = true;
-  }
-
-  async listTools(): Promise<ConnectorToolInfo[]> {
-    await this.initialize();
-    const result = await this.request("tools/list");
-    const tools = (result as { tools?: unknown[] })?.tools;
-    return Array.isArray(tools) ? (tools as ConnectorToolInfo[]) : [];
-  }
-
-  async callTool(
-    name: string,
-    args: Record<string, unknown>,
-  ): Promise<ConnectorToolCallResult> {
-    await this.initialize();
-    const result = await this.request("tools/call", {
-      name,
-      arguments: args,
-    });
-    return result as ConnectorToolCallResult;
-  }
-
-  close() {
-    this.sessionId = null;
-    this.initialized = false;
   }
 }
 

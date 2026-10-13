@@ -21,6 +21,7 @@ import {
   createBackendConnectorActionsBroker,
 } from "../../backend-connector-action-broker.js";
 import {
+  createBackendAccountMcpBroker,
   createBackendMediaBroker,
   createBackendXApiBroker,
 } from "../../backend-session-broker.js";
@@ -157,6 +158,7 @@ export const layer = Layer.effect(
     };
     const requestMedia = createBackendMediaBroker(liveSession);
     const requestXApi = createBackendXApiBroker(liveSession);
+    const requestAccountMcp = createBackendAccountMcpBroker(liveSession);
 
     const requestHostConnectorTokenStore = async (
       request: ConnectorTokenStoreRequest,
@@ -212,6 +214,7 @@ export const layer = Layer.effect(
             listBackendConnectorActions,
             requestMedia,
             requestXApi,
+            requestAccountMcp,
             requestConnectorCredential: async (params) => {
               try {
                 return await hostBus.request<

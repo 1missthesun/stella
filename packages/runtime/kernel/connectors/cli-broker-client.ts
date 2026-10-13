@@ -546,3 +546,61 @@ export const requestDesktopPermissionFromBridge = async ({
         : "unavailable",
   };
 };
+
+/**
+ * One call to the account's MCP server registry (`mcpServers.<op>`) through
+ * the worker's live Stella session. Resolves with the call's value; throws
+ * with the backend's message (and `reason`, when it gave one).
+ */
+export class AccountMcpError extends Error {
+  constructor(
+    message: string,
+    readonly reason: string | undefined,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = "AccountMcpError";
+  }
+}
+
+export const requestAccountMcpFromBridge = async ({
+  socketPath,
+  op,
+  args,
+  timeoutMs = 150_000,
+}: {
+  socketPath: string;
+  op: "list" | "put" | "remove" | "call";
+  args: Record<string, unknown>;
+  timeoutMs?: number;
+}): Promise<unknown> => {
+  const result = (await sendRequest(
+    socketPath,
+    "connector.accountMcp",
+    { op, args },
+    timeoutMs,
+  )) as { status?: unknown; body?: unknown } | null;
+  const status = typeof result?.status === "number" ? result.status : 0;
+  const body =
+    result?.body && typeof result.body === "object"
+      ? (result.body as Record<string, unknown>)
+      : null;
+  if (body?.ok === true) return body.value;
+  const error =
+    body?.error && typeof body.error === "object"
+      ? (body.error as Record<string, unknown>)
+      : body;
+  throw new AccountMcpError(
+    typeof error?.message === "string" && error.message
+      ? error.message
+      : typeof error?.error === "string"
+        ? error.error
+        : `The account's MCP servers are unavailable (${status}).`,
+    typeof error?.reason === "string"
+      ? error.reason
+      : typeof error?.code === "string"
+        ? error.code
+        : undefined,
+    status,
+  );
+};

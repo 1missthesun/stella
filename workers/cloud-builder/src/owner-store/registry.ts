@@ -102,6 +102,22 @@ export type OwnerHost = {
   }>;
   askDeviceConsent(input: { deviceId: string; requestedAt: number }): void;
   /**
+   * Ask one of the owner's computers something over its presence socket
+   * (an MCP server it runs), answered as JSON. Nothing is stored.
+   */
+  relayDeviceRequest(input: {
+    deviceId: string;
+    method: import("@stella/contracts/turn-plane/device-requests").DeviceRequestMethod;
+    params: Record<string, unknown>;
+  }): Promise<
+    | { ok: true; value: unknown }
+    | {
+        ok: false;
+        code: import("@stella/contracts/turn-plane/device-requests").DeviceRequestErrorCode;
+        message: string;
+      }
+  >;
+  /**
    * Stop an agent a device runs locally, and the agents it started there.
    * `unreachable` means no live socket; `timeout` that no answer came, so it
    * may still have landed.

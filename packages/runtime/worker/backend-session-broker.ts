@@ -8,6 +8,11 @@ import {
   type XApiHttpResult,
   type XApiOperation,
 } from "../kernel/cli/x-api-request.js";
+import {
+  sendAccountMcpRequest,
+  type AccountMcpHttpResult,
+  type AccountMcpOperation,
+} from "../kernel/cli/account-mcp-request.js";
 import { jwtStatus } from "./backend-connector-action-broker.js";
 
 type SiteAuth = { baseUrl: string; authToken: string };
@@ -79,5 +84,19 @@ export const createBackendXApiBroker =
       options,
       "stella-x-api requires Stella sign-in. Open Stella and finish signing in, then retry.",
       (auth) => sendXApiRequest(auth, operation as XApiOperation, signal),
+    );
+  };
+
+/** The account's MCP server registry (`connector.accountMcp` on the CLI bridge). */
+export const createBackendAccountMcpBroker =
+  (options: BackendSessionBrokerOptions) =>
+  async (
+    params: AccountMcpOperation & { signal?: AbortSignal },
+  ): Promise<AccountMcpHttpResult> => {
+    const { signal, ...operation } = params;
+    return await withLiveSiteAuth(
+      options,
+      "Sign in to Stella to sync MCP servers with your account.",
+      (auth) => sendAccountMcpRequest(auth, operation, signal),
     );
   };

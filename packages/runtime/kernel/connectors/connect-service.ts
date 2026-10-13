@@ -24,6 +24,13 @@ import {
 } from "./catalog-cache.js";
 import { getNativeConnectorReadiness } from "./connection-status.js";
 import {
+  isLocalMcpUrl,
+  mcpServerReach,
+  type McpServerPut,
+  type McpServerRecord,
+} from "@stella/contracts/backend/mcp-servers";
+import {
+  requestAccountMcpFromBridge,
   requestBackendConnectorActionFromBridge,
   requestBackendConnectorActionsFromBridge,
   cancelConnectorCredentialFromBridge,
@@ -65,7 +72,11 @@ import {
   nativeOAuthApiRequestToolName,
   type NativeConnectorCatalogEntry,
 } from "./native-integrations.js";
-import type { ConnectorCommandConfig, ConnectorToolInfo } from "./types.js";
+import type {
+  ApiConnectorConfig,
+  ConnectorCommandConfig,
+  ConnectorToolInfo,
+} from "./types.js";
 import {
   API_REQUEST_ACTION,
   MCP_AUTHORIZE_ACTION,
@@ -77,6 +88,10 @@ import {
   type ConnectorToolEntry,
   type ConnectorToolSource,
 } from "./connector-tools.js";
+import {
+  parseAddMcpOptions,
+  validateMcpConnectorId,
+} from "./mcp-add-options.js";
 import { loadGoogleWorkspaceTools } from "../google-workspace/load-google-workspace-tools.js";
 
 /** Who made a connector call, so a credential card opens in their chat. */
@@ -98,6 +113,8 @@ export type ConnectClientOptions = {
   cliBridgeSocketPath?: string;
   /** Non-fatal bridge diagnostics (logged by the host). */
   onBridgeUnreachable?: (message: string) => void;
+  /** This computer's device id, which the account's MCP registry names it by. */
+  deviceId?: string;
 };
 
 /**
@@ -744,28 +761,11 @@ const rememberMcpTools = (
     };
   });
 
-/** Mirrors the old CLI's `safeId`, throwing instead of exiting. */
-export const validateMcpConnectorId = (value: string): string => {
-  const id = value.trim().toLowerCase();
-  if (
-    !id ||
-    id === "." ||
-    id === ".." ||
-    id.includes("/") ||
-    id.includes("\\") ||
-    !/^[a-z0-9._-]+$/u.test(id)
-  ) {
-    throw new Error(
-      `Invalid connector id: ${value}. Use lowercase letters, digits, ".", "_", "-".`,
-    );
-  }
-  return id;
-};
-
 export type AddMcpResult = {
   imported: ConnectorCommandConfig;
   toolCount: number;
   tools: string[];
+  where: string;
   probeDeferred?: true;
   hint?: string;
 };
@@ -773,135 +773,14 @@ export type AddMcpResult = {
 export type RemoveConnectorResult = {
   removed: { commands: number; apis: number };
   deletedTokenKeys: string[];
+  /** The account's copy: gone everywhere, or retried on the next check. */
+  account: "removed" | "pending" | "none";
 };
 
 const ADD_MCP_TOOL_NAMES_SHOWN = 30;
 
 const isStringArray = (value: unknown): value is string[] =>
   Array.isArray(value) && value.every((entry) => typeof entry === "string");
-
-const isStringRecordValue = (
-  value: unknown,
-): value is Record<string, string> =>
-  isPlainRecord(value) &&
-  Object.values(value).every((entry) => typeof entry === "string");
-
-/** Strict shape check for `connect.addMcp` options with actionable errors. */
-export const parseAddMcpOptions = (raw: Record<string, unknown>): {
-  command: ConnectorCommandConfig;
-} => {
-  if (typeof raw.id !== "string" || !raw.id.trim()) {
-    throw new Error("connect.addMcp requires an id string.");
-  }
-  const id = validateMcpConnectorId(raw.id);
-  const displayName =
-    typeof raw.name === "string" && raw.name.trim() ? raw.name.trim() : id;
-  const description =
-    typeof raw.description === "string" && raw.description.trim()
-      ? raw.description.trim()
-      : undefined;
-
-  const transport = raw.transport;
-  if (!isPlainRecord(transport)) {
-    throw new Error(
-      'connect.addMcp requires transport: { url } or { command, args?, env?, cwd? }.',
-    );
-  }
-  const url = typeof transport.url === "string" ? transport.url.trim() : "";
-  const commandName =
-    typeof transport.command === "string" ? transport.command.trim() : "";
-  if (Boolean(url) === Boolean(commandName)) {
-    throw new Error(
-      "connect.addMcp transport must have exactly one of url or command.",
-    );
-  }
-  if (url) {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new Error(`connect.addMcp transport.url is not a valid URL: ${url}`);
-    }
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      throw new Error("connect.addMcp transport.url must be http(s).");
-    }
-  }
-  if (transport.args !== undefined && !isStringArray(transport.args)) {
-    throw new Error("connect.addMcp transport.args must be an array of strings.");
-  }
-  if (transport.env !== undefined && !isStringRecordValue(transport.env)) {
-    throw new Error(
-      "connect.addMcp transport.env must be a string-to-string record.",
-    );
-  }
-  if (transport.cwd !== undefined && typeof transport.cwd !== "string") {
-    throw new Error("connect.addMcp transport.cwd must be a string.");
-  }
-
-  let auth: ConnectorCommandConfig["auth"] = { type: "none" };
-  if (raw.auth !== undefined) {
-    if (!isPlainRecord(raw.auth)) {
-      throw new Error("connect.addMcp auth must be a plain object.");
-    }
-    const authType = raw.auth.type;
-    if (authType !== "oauth" && authType !== "api_key") {
-      throw new Error('connect.addMcp auth.type must be "oauth" or "api_key".');
-    }
-    const tokenKey =
-      typeof raw.auth.tokenKey === "string" && raw.auth.tokenKey.trim()
-        ? raw.auth.tokenKey.trim()
-        : id;
-    const headerName =
-      typeof raw.auth.headerName === "string" && raw.auth.headerName.trim()
-        ? raw.auth.headerName.trim()
-        : undefined;
-    const scheme = raw.auth.scheme;
-    if (
-      scheme !== undefined &&
-      scheme !== "bearer" &&
-      scheme !== "basic" &&
-      scheme !== "oauth" &&
-      scheme !== "raw"
-    ) {
-      throw new Error(
-        'connect.addMcp auth.scheme must be "bearer" | "basic" | "oauth" | "raw".',
-      );
-    }
-    auth = {
-      type: authType,
-      tokenKey,
-      ...(headerName ? { headerName } : {}),
-      ...(scheme ? { scheme } : {}),
-    };
-  }
-
-  const command: ConnectorCommandConfig = url
-    ? {
-        id,
-        displayName,
-        ...(description ? { description } : {}),
-        transport: "streamable_http",
-        url,
-        auth,
-      }
-    : {
-        id,
-        displayName,
-        ...(description ? { description } : {}),
-        transport: "stdio",
-        command: commandName,
-        args: isStringArray(transport.args) ? transport.args : [],
-        ...(typeof transport.cwd === "string" && transport.cwd
-          ? { cwd: transport.cwd }
-          : {}),
-        ...(isStringRecordValue(transport.env) &&
-        Object.keys(transport.env).length
-          ? { env: transport.env }
-          : {}),
-        auth,
-      };
-  return { command };
-};
 
 const probeMcpConnector = async (
   options: ConnectClientOptions,
@@ -918,6 +797,7 @@ const probeMcpConnector = async (
   await rememberMcpTools(options.stellaAppDir, command.id, probe.tools).catch(
     () => undefined,
   );
+  await reportMcpTools(options, command, probe.tools, true).catch(() => undefined);
   return probe;
 };
 
@@ -973,6 +853,11 @@ export const addMcpConnector = async (
     await rememberMcpTools(stellaAppDir, command.id, probe.tools);
   }
   mcpProbeFailures.delete(mcpProbeKey(stellaAppDir, command.id));
+  const onAccount = await putOnAccount(options, command, {
+    tools: probe.tools,
+    needsAuth: probeDeferred,
+    holdsCredential: !probeDeferred,
+  });
   const toolNames = buildConnectorToolEntries(
     [
       {
@@ -988,6 +873,9 @@ export const addMcpConnector = async (
     imported: command,
     toolCount: probe.tools.length,
     tools: toolNames.slice(0, ADD_MCP_TOOL_NAMES_SHOWN),
+    where: onAccount
+      ? localWhere(command)
+      : "Saved on this computer only for now (the account couldn't be reached); it syncs to the account on the next connector check.",
     ...(probeDeferred
       ? {
           probeDeferred: true as const,
@@ -1014,21 +902,312 @@ export const removeMcpConnector = async (
       `${id} is a native Store integration. Disable it in the Store instead of connect.remove.`,
     );
   }
-  const [command, api] = await Promise.all([
+  const [command, api, listing] = await Promise.all([
     findConnectorCommand(stellaAppDir, id),
     findConnectorApi(stellaAppDir, id),
+    accountMcpListing(options),
   ]);
-  if (!command && !api) {
+  const onAccount = listing?.servers.some((server) => server.id === id) ?? false;
+  if (!command && !api && !onAccount) {
     throw new Error(
       `Connector is not installed: ${id}. List installed connectors with connect.connectors().`,
     );
   }
+  const removed = await removeLocalMcp(stellaAppDir, id);
+  let account: "removed" | "pending" | "none" = "none";
+  if (onAccount || command) {
+    const ok = await accountMcpCall(options, "remove", { id })
+      .then(() => true)
+      .catch(() => false);
+    account = ok ? "removed" : "pending";
+    await updateAccountMcpState(stellaAppDir, (state) => {
+      state.synced = state.synced.filter((entry) => entry !== id);
+      if (!ok) state.pendingRemovals.push(id);
+    }).catch(() => undefined);
+    forgetAccountListing(stellaAppDir);
+  }
+
+  return {
+    removed: {
+      commands: removed.removedCommands.length,
+      apis: removed.removedApis.length,
+    },
+    deletedTokenKeys: removed.tokenKeys,
+    account,
+  };
+};
+
+// ---------------------------------------------------------------------------
+// Account sync: every MCP server belongs to the account
+// ---------------------------------------------------------------------------
+//
+// The account's registry (`mcpServers.*`) is the source of truth while this
+// computer is signed in and online. A remote server added anywhere is copied
+// into this computer's commands; a stdio (or local-network) server stays on
+// the computer that added it, with only its name and tools on the account,
+// and other places reach it through that computer. `synced` records which
+// local servers the account has seen, so one removed elsewhere is removed
+// here too; `pendingRemovals` retries a removal the account missed.
+
+const ACCOUNT_MCP_STATE_FILE = "account-mcp.json";
+const ACCOUNT_MCP_TTL_MS = 15_000;
+const ACCOUNT_MCP_LIST_TIMEOUT_MS = 8_000;
+
+type AccountMcpState = {
+  version: 1;
+  synced: string[];
+  pendingRemovals: string[];
+};
+
+type AccountMcpDevice = {
+  deviceId: string;
+  label?: string;
+  online: boolean;
+  acceptsWork: boolean;
+};
+
+type AccountMcpListing = {
+  servers: McpServerRecord[];
+  devices: AccountMcpDevice[];
+};
+
+const accountMcpStatePath = (stellaAppDir: string) =>
+  path.join(getConnectorStateRoot(stellaAppDir), ACCOUNT_MCP_STATE_FILE);
+
+const readAccountMcpState = async (
+  stellaAppDir: string,
+): Promise<AccountMcpState> => {
+  try {
+    const parsed = JSON.parse(
+      await fs.readFile(accountMcpStatePath(stellaAppDir), "utf-8"),
+    ) as Partial<AccountMcpState>;
+    if (parsed?.version === 1) {
+      return {
+        version: 1,
+        synced: isStringArray(parsed.synced) ? parsed.synced : [],
+        pendingRemovals: isStringArray(parsed.pendingRemovals)
+          ? parsed.pendingRemovals
+          : [],
+      };
+    }
+  } catch {}
+  return { version: 1, synced: [], pendingRemovals: [] };
+};
+
+const writeAccountMcpState = async (
+  stellaAppDir: string,
+  state: AccountMcpState,
+): Promise<void> => {
+  const filePath = accountMcpStatePath(stellaAppDir);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(
+    filePath,
+    `${JSON.stringify(
+      {
+        version: 1,
+        synced: [...new Set(state.synced)].sort(),
+        pendingRemovals: [...new Set(state.pendingRemovals)].sort(),
+      },
+      null,
+      2,
+    )}\n`,
+    "utf-8",
+  );
+};
+
+const updateAccountMcpState = async (
+  stellaAppDir: string,
+  update: (state: AccountMcpState) => void,
+): Promise<void> => {
+  const state = await readAccountMcpState(stellaAppDir);
+  update(state);
+  await writeAccountMcpState(stellaAppDir, state);
+};
+
+const accountMcpSocket = (options: ConnectClientOptions) =>
+  options.cliBridgeSocketPath?.trim() || undefined;
+
+const accountMcpCall = async (
+  options: ConnectClientOptions,
+  op: "list" | "put" | "remove" | "call",
+  args: Record<string, unknown>,
+): Promise<unknown> => {
+  const socketPath = accountMcpSocket(options);
+  if (!socketPath) {
+    throw new Error("This computer can't reach the account's MCP servers right now.");
+  }
+  return await requestAccountMcpFromBridge({ socketPath, op, args });
+};
+
+const readAccountListing = (value: unknown): AccountMcpListing | null => {
+  if (!isPlainRecord(value) || !Array.isArray(value.servers)) return null;
+  return {
+    servers: value.servers.filter(
+      (entry): entry is McpServerRecord =>
+        isPlainRecord(entry) &&
+        typeof entry.id === "string" &&
+        typeof entry.name === "string" &&
+        (entry.transport === "stdio" || entry.transport === "streamable_http") &&
+        isPlainRecord(entry.auth),
+    ),
+    devices: Array.isArray(value.devices)
+      ? value.devices.filter(
+          (entry): entry is AccountMcpDevice =>
+            isPlainRecord(entry) && typeof entry.deviceId === "string",
+        )
+      : [],
+  };
+};
+
+const accountListings = new Map<
+  string,
+  { at: number; listing: Promise<AccountMcpListing | null> }
+>();
+
+const forgetAccountListing = (stellaAppDir: string) => {
+  accountListings.delete(stellaAppDir);
+};
+
+/** The account's MCP servers, or null while the account can't be reached. */
+const accountMcpListing = (
+  options: ConnectClientOptions,
+): Promise<AccountMcpListing | null> => {
+  if (!accountMcpSocket(options)) return Promise.resolve(null);
+  const cached = accountListings.get(options.stellaAppDir);
+  if (cached && Date.now() - cached.at < ACCOUNT_MCP_TTL_MS) {
+    return cached.listing;
+  }
+  const socketPath = accountMcpSocket(options)!;
+  const listing = requestAccountMcpFromBridge({
+    socketPath,
+    op: "list",
+    args: {},
+    timeoutMs: ACCOUNT_MCP_LIST_TIMEOUT_MS,
+  })
+    .then(readAccountListing)
+    .catch((error: unknown) => {
+      options.onBridgeUnreachable?.(
+        `account MCP servers unavailable: ${(error as Error)?.message ?? String(error)}`,
+      );
+      if (accountListings.get(options.stellaAppDir)?.listing === listing) {
+        accountListings.delete(options.stellaAppDir);
+      }
+      return null;
+    });
+  accountListings.set(options.stellaAppDir, { at: Date.now(), listing });
+  return listing;
+};
+
+/** Where this computer runs a server, for the account: stdio and local URLs. */
+const runsOnlyHere = (command: ConnectorCommandConfig) =>
+  command.transport === "stdio" || isLocalMcpUrl(command.url);
+
+const commandAuth = (command: ConnectorCommandConfig): McpServerPut["auth"] => ({
+  type: command.auth?.type ?? "none",
+  ...(command.auth?.tokenKey ? { tokenKey: command.auth.tokenKey } : {}),
+  ...(command.auth?.headerName ? { headerName: command.auth.headerName } : {}),
+  ...(command.auth?.scheme ? { scheme: command.auth.scheme } : {}),
+});
+
+const accountPut = (
+  options: ConnectClientOptions,
+  command: ConnectorCommandConfig,
+  extra: {
+    tools?: readonly ConnectorToolInfo[];
+    needsAuth?: boolean;
+    /** This computer holds the credential the account should route through. */
+    holdsCredential?: boolean;
+  },
+): McpServerPut => {
+  const auth = commandAuth(command);
+  const routeHere =
+    runsOnlyHere(command) || (auth.type !== "none" && extra.holdsCredential === true);
+  return {
+    id: command.id,
+    name: command.displayName,
+    ...(command.description ? { description: command.description } : {}),
+    transport: command.transport,
+    ...(command.transport === "stdio" || !command.url ? {} : { url: command.url }),
+    auth,
+    ...(routeHere && options.deviceId ? { deviceId: options.deviceId } : {}),
+    ...(extra.tools
+      ? {
+          tools: extra.tools.map((tool) => ({
+            name: tool.name,
+            ...(tool.title ? { title: tool.title } : {}),
+            ...(tool.description ? { description: tool.description } : {}),
+            ...(tool.inputSchema ? { inputSchema: tool.inputSchema } : {}),
+            ...(tool.annotations ? { annotations: tool.annotations } : {}),
+          })),
+        }
+      : {}),
+    ...(extra.needsAuth !== undefined ? { needsAuth: extra.needsAuth } : {}),
+  };
+};
+
+/** Tell the account about a server this computer added, probed or signed in to. */
+const putOnAccount = async (
+  options: ConnectClientOptions,
+  command: ConnectorCommandConfig,
+  extra: Parameters<typeof accountPut>[2],
+): Promise<boolean> => {
+  if (!accountMcpSocket(options)) return false;
+  try {
+    await accountMcpCall(options, "put", accountPut(options, command, extra));
+    await updateAccountMcpState(options.stellaAppDir, (state) => {
+      state.synced.push(command.id);
+      state.pendingRemovals = state.pendingRemovals.filter((id) => id !== command.id);
+    });
+    forgetAccountListing(options.stellaAppDir);
+    return true;
+  } catch (error) {
+    options.onBridgeUnreachable?.(
+      `account MCP sync failed for ${command.id}: ${(error as Error)?.message ?? String(error)}`,
+    );
+    return false;
+  }
+};
+
+/**
+ * A fresh tool listing from this computer. Shared with the account when it
+ * changed, or when this computer now holds the credential the cloud should
+ * route through.
+ */
+const reportMcpTools = async (
+  options: ConnectClientOptions,
+  command: ConnectorCommandConfig,
+  tools: readonly ConnectorToolInfo[],
+  holdsCredential: boolean,
+): Promise<void> => {
+  const listing = await accountMcpListing(options);
+  if (!listing) return;
+  const record = listing.servers.find((server) => server.id === command.id);
+  if (!record) return;
+  const authed = (command.auth?.type ?? "none") !== "none";
+  const wantsRoute =
+    authed && holdsCredential && !runsOnlyHere(command) && record.deviceId !== options.deviceId &&
+    (!record.deviceId || record.needsAuth || !listing.devices.some((device) => device.deviceId === record.deviceId && device.online));
+  const sameTools =
+    JSON.stringify((record.tools ?? []).map((tool) => tool.name).sort()) ===
+    JSON.stringify(tools.map((tool) => tool.name).sort());
+  if (sameTools && !wantsRoute && !(record.needsAuth && !authed)) return;
+  await putOnAccount(options, command, {
+    tools,
+    needsAuth: false,
+    holdsCredential: wantsRoute || record.deviceId === options.deviceId,
+  });
+};
+
+const removeLocalMcp = async (
+  stellaAppDir: string,
+  id: string,
+): Promise<{ removedCommands: ConnectorCommandConfig[]; removedApis: ApiConnectorConfig[]; tokenKeys: string[] }> => {
   const removed = await removeConfiguredConnector(stellaAppDir, id);
   await closeConnectorBridgeSessions(stellaAppDir, [id]);
   await updateMcpToolsCache(stellaAppDir, (cache) => {
     delete cache.connectors[id];
   }).catch(() => undefined);
-
+  mcpProbeFailures.delete(mcpProbeKey(stellaAppDir, id));
   const tokenKeys = [
     ...new Set(
       [
@@ -1038,14 +1217,249 @@ export const removeMcpConnector = async (
     ),
   ];
   await deleteConnectorAccessTokens(stellaAppDir, tokenKeys);
+  return { ...removed, tokenKeys };
+};
 
-  return {
-    removed: {
-      commands: removed.removedCommands.length,
-      apis: removed.removedApis.length,
-    },
-    deletedTokenKeys: tokenKeys,
+const recordToCommand = (record: McpServerRecord): ConnectorCommandConfig => ({
+  id: record.id,
+  displayName: record.name,
+  ...(record.description ? { description: record.description } : {}),
+  transport: "streamable_http",
+  ...(record.url ? { url: record.url } : {}),
+  auth:
+    record.auth.type === "none"
+      ? { type: "none" }
+      : {
+          type: record.auth.type,
+          tokenKey: record.auth.tokenKey ?? record.id,
+          ...(record.auth.headerName ? { headerName: record.auth.headerName } : {}),
+          ...(record.auth.scheme ? { scheme: record.auth.scheme } : {}),
+        },
+});
+
+/** A server on the account that this computer reaches through another one. */
+export type ElsewhereMcpServer = {
+  record: McpServerRecord;
+  deviceName: string;
+  online: boolean;
+  acceptsWork: boolean;
+};
+
+const reconciling = new Map<string, Promise<ElsewhereMcpServer[]>>();
+
+/**
+ * Bring this computer's MCP servers and the account's into line, and return
+ * the account's servers that run on another computer. Offline, nothing
+ * changes and nothing is returned.
+ */
+export const reconcileAccountMcp = (
+  options: ConnectClientOptions,
+): Promise<ElsewhereMcpServer[]> => {
+  const running = reconciling.get(options.stellaAppDir);
+  if (running) return running;
+  const task = (async () => {
+    const listing = await accountMcpListing(options);
+    if (!listing) return [];
+    const { stellaAppDir } = options;
+    const state = await readAccountMcpState(stellaAppDir);
+    let servers = listing.servers;
+    let changed = false;
+
+    for (const id of [...state.pendingRemovals]) {
+      try {
+        await accountMcpCall(options, "remove", { id });
+        state.pendingRemovals = state.pendingRemovals.filter((entry) => entry !== id);
+        servers = servers.filter((server) => server.id !== id);
+        changed = true;
+      } catch {}
+    }
+    const pending = new Set(state.pendingRemovals);
+    servers = servers.filter((server) => !pending.has(server.id));
+
+    const byId = new Map(servers.map((server) => [server.id, server]));
+    const local = await listConfiguredConnectorCommands(stellaAppDir);
+    const localIds = new Set(local.map((command) => command.id));
+    const synced = new Set(state.synced);
+    const mcpCache = await readMcpToolsCache(stellaAppDir);
+
+    for (const command of local) {
+      const record = byId.get(command.id);
+      if (record) {
+        const sameServer =
+          !runsOnlyHere(command) || record.deviceId === options.deviceId;
+        if (sameServer && !synced.has(command.id)) {
+          synced.add(command.id);
+          changed = true;
+        }
+        continue;
+      }
+      if (synced.has(command.id)) {
+        await removeLocalMcp(stellaAppDir, command.id);
+        localIds.delete(command.id);
+        synced.delete(command.id);
+        changed = true;
+        continue;
+      }
+      const cachedTools = mcpCache.connectors[command.id]?.tools;
+      const ok = await accountMcpCall(
+        options,
+        "put",
+        accountPut(options, command, {
+          ...(cachedTools ? { tools: cachedTools } : {}),
+          holdsCredential: Boolean(
+            cachedTools && (await connectorAuthStatus(stellaAppDir, command.auth)) === "connected",
+          ),
+        }),
+      )
+        .then(() => true)
+        .catch(() => false);
+      if (ok) {
+        synced.add(command.id);
+        changed = true;
+      }
+    }
+
+    const additions: ConnectorCommandConfig[] = [];
+    const elsewhere: ElsewhereMcpServer[] = [];
+    for (const record of servers) {
+      if (localIds.has(record.id)) continue;
+      const reach = mcpServerReach(record);
+      const onlyThere = reach.kind === "device" && reach.reason === "local";
+      if (record.transport === "streamable_http" && record.url && !onlyThere) {
+        additions.push(recordToCommand(record));
+        synced.add(record.id);
+        changed = true;
+        continue;
+      }
+      if (reach.kind === "device" && reach.deviceId === options.deviceId) {
+        if (synced.has(record.id)) {
+          await accountMcpCall(options, "remove", { id: record.id }).catch(() => undefined);
+          synced.delete(record.id);
+          changed = true;
+        }
+        continue;
+      }
+      if (reach.kind === "device") {
+        const device = listing.devices.find((entry) => entry.deviceId === reach.deviceId);
+        elsewhere.push({
+          record,
+          deviceName: device?.label ?? "another computer",
+          online: device?.online === true,
+          acceptsWork: device?.acceptsWork === true,
+        });
+      }
+    }
+    if (additions.length > 0) {
+      const current = await listConfiguredConnectorCommands(stellaAppDir);
+      const next = new Map(current.map((entry) => [entry.id, entry]));
+      for (const command of additions) next.set(command.id, command);
+      await saveConfiguredConnectorCommands(
+        stellaAppDir,
+        [...next.values()].sort((left, right) =>
+          left.displayName.localeCompare(right.displayName),
+        ),
+      );
+      await updateMcpToolsCache(stellaAppDir, (cache) => {
+        for (const command of additions) {
+          const record = byId.get(command.id);
+          if (record?.tools && record.auth.type === "none") {
+            cache.connectors[command.id] = {
+              tools: record.tools,
+              updatedAt: record.toolsUpdatedAt ?? Date.now(),
+            };
+          }
+        }
+      }).catch(() => undefined);
+    }
+    if (changed) {
+      state.synced = [...synced];
+      await writeAccountMcpState(stellaAppDir, state).catch(() => undefined);
+    }
+    return elsewhere;
+  })()
+    .catch((error: unknown) => {
+      options.onBridgeUnreachable?.(
+        `account MCP reconcile failed: ${(error as Error)?.message ?? String(error)}`,
+      );
+      return [];
+    })
+    .finally(() => {
+      reconciling.delete(options.stellaAppDir);
+    });
+  reconciling.set(options.stellaAppDir, task);
+  return task;
+};
+
+const elsewhereWhere = (server: ElsewhereMcpServer): string => {
+  const state = !server.online
+    ? "offline now"
+    : !server.acceptsWork
+      ? "online, but not accepting work from other devices"
+      : "online";
+  return server.record.transport === "stdio" || isLocalMcpUrl(server.record.url)
+    ? `Device-only: runs on ${server.deviceName} (${state}); reached through it while it is online.`
+    : `Signed in on ${server.deviceName} (${state}); reached through it while it is online.`;
+};
+
+const localWhere = (command: ConnectorCommandConfig): string =>
+  runsOnlyHere(command)
+    ? "Device-only: runs on this computer; the cloud and your other computers reach it through here while Stella is open."
+    : "Remote server on the account: works here, in the cloud, and on your other computers.";
+
+/**
+ * The cloud asks this computer to list or run one of its MCP servers' tools
+ * for an agent elsewhere on the account. No credential card opens here: the
+ * user is not at this computer's chat.
+ */
+export const serveRelayedMcpRequest = async (
+  options: ConnectClientOptions,
+  method: unknown,
+  params: unknown,
+): Promise<unknown> => {
+  const request = isPlainRecord(params) ? params : {};
+  const id = typeof request.id === "string" ? request.id.trim().toLowerCase() : "";
+  if (!id) throw new Error("An MCP request needs the server's id.");
+  const command = await findConnectorCommand(options.stellaAppDir, id);
+  if (!command) {
+    throw new Error(`${id} isn't on this computer anymore.`);
+  }
+  const relayed: ConnectClientOptions = {
+    stellaAppDir: options.stellaAppDir,
+    ...(options.deviceId ? { deviceId: options.deviceId } : {}),
+    ...(options.cliBridgeSocketPath ? { cliBridgeSocketPath: options.cliBridgeSocketPath } : {}),
   };
+  try {
+    if (method === "mcp.listTools") {
+      const probe = await withConnectorBridgeCleanup(options.stellaAppDir, command, () =>
+        probeConnectorBridgeTools(options.stellaAppDir, command),
+      );
+      await rememberMcpTools(options.stellaAppDir, command.id, probe.tools).catch(() => undefined);
+      void putOnAccount(relayed, command, {
+        tools: probe.tools,
+        needsAuth: false,
+        holdsCredential: true,
+      });
+      return { tools: probe.tools };
+    }
+    if (method === "mcp.callTool") {
+      const tool = typeof request.tool === "string" ? request.tool : "";
+      if (!tool) throw new Error("An MCP tool call needs the tool's name.");
+      const args = isPlainRecord(request.args) ? request.args : {};
+      return {
+        result: await withConnectorBridgeCleanup(options.stellaAppDir, command, () =>
+          callConnectorBridgeTool(options.stellaAppDir, command, tool, args),
+        ),
+      };
+    }
+  } catch (error) {
+    if (error instanceof ConnectorAuthError) {
+      throw new Error(
+        `${command.displayName} needs sign-in again on this computer: have an agent here call its _authorize tool.`,
+      );
+    }
+    throw error;
+  }
+  throw new Error("Unknown MCP request.");
 };
 
 // ---------------------------------------------------------------------------
@@ -1080,6 +1494,7 @@ export const discoverConnectorsDetailed = async (
   resolved: ResolvedNativeCatalog,
 ): Promise<DetailedDiscoveryMatch[]> => {
   const { stellaAppDir } = options;
+  await reconcileAccountMcp(options);
   const native = await listNativeConnectors(stellaAppDir, {}, resolved.entries);
   const enabledNativeIds = new Set(
     native.filter((entry) => entry.enabled).map((entry) => entry.id),
@@ -1161,6 +1576,10 @@ export type ConnectorSummary = {
   kind: "native" | "mcp" | "api";
   connected: boolean;
   description: string;
+  transport?: "stdio" | "streamable_http";
+  /** MCP servers: where they run, for the agent and the user. */
+  reach?: "anywhere" | "this-device" | "other-device";
+  where?: string;
 };
 
 /** Enabled/connected connectors as one-liners (REPL `connect.connectors()`). */
@@ -1169,6 +1588,7 @@ export const listEnabledConnectorSummaries = async (
   resolved: ResolvedNativeCatalog,
 ): Promise<ConnectorSummary[]> => {
   const { stellaAppDir } = options;
+  const elsewhere = await reconcileAccountMcp(options);
   const [native, commands, apis] = await Promise.all([
     listNativeConnectors(stellaAppDir, {}, resolved.entries),
     listConfiguredConnectorCommands(stellaAppDir).catch(() => []),
@@ -1198,7 +1618,22 @@ export const listEnabledConnectorSummaries = async (
       name: command.displayName,
       kind: "mcp",
       connected: authStatus === "connected" || authStatus === "unsupported",
-      description: collapseLine(command.description),
+      description: collapseLine(command.description ?? command.url),
+      transport: command.transport,
+      reach: runsOnlyHere(command) ? "this-device" : "anywhere",
+      where: localWhere(command),
+    });
+  }
+  for (const server of elsewhere) {
+    summaries.push({
+      id: server.record.id,
+      name: server.record.name,
+      kind: "mcp",
+      connected: server.online && server.acceptsWork,
+      description: collapseLine(server.record.description ?? server.record.url),
+      transport: server.record.transport,
+      reach: "other-device",
+      where: elsewhereWhere(server),
     });
   }
   for (const api of apis) {
@@ -1316,6 +1751,12 @@ const mcpToolsFor = async (
     await rememberMcpTools(options.stellaAppDir, command.id, probe.tools).catch(
       () => undefined,
     );
+    void reportMcpTools(
+      options,
+      command,
+      probe.tools,
+      (command.auth?.type ?? "none") !== "none",
+    ).catch(() => undefined);
     return { tools: probe.tools };
   } catch (error) {
     const needsAuth = error instanceof ConnectorAuthError;
@@ -1336,6 +1777,7 @@ export const listConnectorToolSources = async (
 ): Promise<ConnectorToolSource[]> => {
   const { stellaAppDir } = options;
   const socketPath = options.cliBridgeSocketPath?.trim();
+  const elsewhere = await reconcileAccountMcp(options);
   const [native, enabledIds, commands, apis, mcpCache] = await Promise.all([
     listNativeConnectors(stellaAppDir, {}, resolved.entries),
     listEnabledNativeConnectorIds(stellaAppDir),
@@ -1406,7 +1848,21 @@ export const listConnectorToolSources = async (
       },
     ],
   }));
-  return [...nativeSources, ...mcpSources, ...apiSources].filter(
+  const elsewhereSources: ConnectorToolSource[] = elsewhere.map((server) => ({
+    id: server.record.id,
+    name: server.record.name,
+    kind: "mcp",
+    actions: server.record.tools?.length
+      ? server.record.tools
+      : [
+          {
+            name: MCP_AUTHORIZE_ACTION,
+            title: `Authorize ${server.record.name}`,
+            description: `${server.record.name} runs on ${server.deviceName}; its tools appear once that computer lists them.`,
+          },
+        ],
+  }));
+  return [...nativeSources, ...mcpSources, ...elsewhereSources, ...apiSources].filter(
     (source): source is ConnectorToolSource => source !== null,
   );
 };
@@ -1570,6 +2026,27 @@ export const createReplConnectClient = (
       const problem = validateConnectorToolArgs(entry.parameters, args);
       if (problem) {
         throw new Error(invalidConnectorToolArgsMessage(name, problem));
+      }
+      if (
+        entry.kind === "mcp" &&
+        !(await findConnectorCommand(options.stellaAppDir, entry.connector))
+      ) {
+        const elsewhere = (await reconcileAccountMcp(options)).find(
+          (server) => server.record.id === entry.connector,
+        );
+        if (elsewhere) {
+          if (entry.action === MCP_AUTHORIZE_ACTION) {
+            throw new Error(
+              `${entry.connectorName} runs on ${elsewhere.deviceName}; its tools appear here once that computer lists them (open Stella there).`,
+            );
+          }
+          const value = await accountMcpCall(options, "call", {
+            id: entry.connector,
+            tool: entry.action,
+            args,
+          });
+          return isPlainRecord(value) && "result" in value ? value.result : value;
+        }
       }
       if (entry.action === MCP_AUTHORIZE_ACTION) {
         const command = await findConnectorCommand(

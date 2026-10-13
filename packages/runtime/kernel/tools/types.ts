@@ -249,6 +249,8 @@ export type ToolHostOptions = {
   stellaMediaCliPath?: string;
   stellaXApiCliPath?: string;
   cliBridgeSocketPath?: string;
+  /** This computer's device id (the account's MCP registry names it by this). */
+  deviceId?: string;
   scheduleApi?: ScheduleToolApi;
   extensionTools?: import("../extensions/types.js").ToolDefinition[];
   /**

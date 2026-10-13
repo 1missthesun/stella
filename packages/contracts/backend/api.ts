@@ -30,6 +30,7 @@ import type { UserAskCalls, UserAskViews } from "./user-asks.js";
 import type { ClaudeSessionCalls } from "./claude-sessions.js";
 import type { AgentLogCalls } from "./agent-logs.js";
 import type { EmailDigestCalls, EmailDigestViews } from "./email-digest.js";
+import type { McpServerCalls } from "./mcp-servers.js";
 
 type SystemCalls = {
   /** Round trip through the caller's owner object. */
@@ -60,7 +61,8 @@ export type BackendCalls = SystemCalls &
   UserAskCalls &
   ClaudeSessionCalls &
   AgentLogCalls &
-  EmailDigestCalls;
+  EmailDigestCalls &
+  McpServerCalls;
 export type BackendViews = ConversationViews &
   AgentThreadViews &
   AgentEventViews &

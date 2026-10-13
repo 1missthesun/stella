@@ -4,8 +4,11 @@ import {
   DeviceRequestRelay,
 } from "../device-request-relay.js";
 import {
+  DEVICE_REQUEST_CLOUD_ASKER,
   DEVICE_REQUEST_LIMITS,
   type DeviceRequestDeviceFrame,
+  type DeviceRequestErrorCode,
+  type DeviceRequestMethod,
   isDeviceRequestMethod,
 } from "@stella/contracts/turn-plane/device-requests";
 import {
@@ -405,6 +408,62 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       method,
       paramsJson,
     });
+  }
+
+  /**
+   * The cloud's own request to one of the owner's computers (an MCP server
+   * that computer runs), answered as JSON. Same relay and limits as a
+   * phone's request; nothing is stored.
+   */
+  async relayCloudDeviceRequest(input: {
+    deviceId: string;
+    method: DeviceRequestMethod;
+    params: Record<string, unknown>;
+  }): Promise<
+    | { ok: true; value: unknown }
+    | { ok: false; code: DeviceRequestErrorCode; message: string }
+  > {
+    const paramsJson = JSON.stringify(input.params);
+    if (paramsJson.length > DEVICE_REQUEST_LIMITS.paramsBytes) {
+      return { ok: false, code: "bad_request", message: "The request is too large to send to that computer." };
+    }
+    this.ensureSchema();
+    const response = await this.deviceRequestRelay().open({
+      deviceId: input.deviceId,
+      mobileDeviceId: DEVICE_REQUEST_CLOUD_ASKER,
+      requestId: `cloud:${crypto.randomUUID()}`,
+      method: input.method,
+      paramsJson,
+    });
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (error) {
+      return {
+        ok: false,
+        code: "failed",
+        message: error instanceof Error && error.message ? error.message : "The computer's answer broke off.",
+      };
+    }
+    let body: unknown = null;
+    try {
+      body = text ? JSON.parse(text) : null;
+    } catch {
+      return { ok: false, code: "failed", message: "The computer sent an answer that is not JSON." };
+    }
+    if (response.ok) return { ok: true, value: body };
+    const error =
+      body && typeof body === "object" && "error" in body
+        ? ((body as { error?: { code?: unknown; message?: unknown } }).error ?? {})
+        : {};
+    return {
+      ok: false,
+      code: typeof error.code === "string" ? (error.code as DeviceRequestErrorCode) : "failed",
+      message:
+        typeof error.message === "string" && error.message
+          ? error.message
+          : `The computer could not answer (${response.status}).`,
+    };
   }
 
   protected async dropSocket(

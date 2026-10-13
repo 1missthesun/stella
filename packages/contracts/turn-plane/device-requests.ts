@@ -34,6 +34,13 @@ export const DEVICE_REQUEST_METHODS = [
   "voice.config",
   /** A realtime voice tool call -> its result. */
   "voice.executeTool",
+  /**
+   * `{ id }` -> JSON `{ tools }`: the tools of an MCP server this computer
+   * runs or holds the credential for. Only the cloud asks this.
+   */
+  "mcp.listTools",
+  /** `{ id, tool, args }` -> JSON `{ result }`. Only the cloud asks this. */
+  "mcp.callTool",
 ] as const;
 
 export type DeviceRequestMethod = (typeof DEVICE_REQUEST_METHODS)[number];
@@ -63,7 +70,7 @@ export const DEVICE_REQUEST_LIMITS = {
 export const deviceRequestStartTimeoutMs = (
   method: DeviceRequestMethod,
 ): number =>
-  method === "voice.executeTool"
+  method === "voice.executeTool" || method === "mcp.callTool" || method === "mcp.listTools"
     ? 120_000
     : method === "officePreview.render"
       ? 45_000
@@ -91,6 +98,25 @@ export const isDeviceFileRequestMethod = (
 ): value is (typeof DEVICE_FILE_REQUEST_METHODS)[number] =>
   typeof value === "string" &&
   (DEVICE_FILE_REQUEST_METHODS as readonly string[]).includes(value);
+
+/**
+ * MCP requests the cloud relays to the computer that runs a server (or
+ * holds its credential), for an agent anywhere on the account. They never
+ * come from a phone's own request.
+ */
+export const DEVICE_MCP_REQUEST_METHODS = [
+  "mcp.listTools",
+  "mcp.callTool",
+] as const satisfies readonly DeviceRequestMethod[];
+
+export const isDeviceMcpRequestMethod = (
+  value: unknown,
+): value is (typeof DEVICE_MCP_REQUEST_METHODS)[number] =>
+  typeof value === "string" &&
+  (DEVICE_MCP_REQUEST_METHODS as readonly string[]).includes(value);
+
+/** What a relayed MCP request names as its asker. */
+export const DEVICE_REQUEST_CLOUD_ASKER = "cloud";
 
 export type DeviceRequestBody = {
   requestId: string;

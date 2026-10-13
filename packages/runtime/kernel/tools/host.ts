@@ -232,6 +232,7 @@ export const createToolHost = ({
   codeConnectClient,
   codeHistoryQuery,
   agentHistoryQuery,
+  deviceId,
 }: ToolHostOptions) => {
   const stateRoot = stellaDataDir ?? stellaAppDir;
   const toolCatalog = new Map<string, ToolMetadata>();
@@ -344,6 +345,7 @@ export const createToolHost = ({
     createReplConnectClient({
       stellaAppDir: stateRoot,
       ...(cliBridgeSocketPath ? { cliBridgeSocketPath } : {}),
+      ...(deviceId ? { deviceId } : {}),
       reservedToolNames: () => new Set(toolCatalog.keys()),
       onBridgeUnreachable: (message) =>
         logError("code connect bridge unreachable", message),

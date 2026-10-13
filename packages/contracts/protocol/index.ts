@@ -123,6 +123,7 @@ export const METHOD_NAMES = {
     "internal.worker.voice.orchestratorConfig",
   INTERNAL_WORKER_VOICE_EXECUTE_TOOL: "internal.worker.voice.executeTool",
   INTERNAL_WORKER_KILL_ALL_SHELLS: "internal.worker.killAllShells",
+  INTERNAL_WORKER_MCP_DEVICE_REQUEST: "internal.worker.mcp.deviceRequest",
   INTERNAL_WORKER_LOCAL_CHAT_GET_OR_CREATE_DEFAULT:
     "internal.worker.localChat.getOrCreateDefaultConversationId",
   INTERNAL_WORKER_LOCAL_CHAT_APPEND_EVENT:

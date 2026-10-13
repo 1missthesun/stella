@@ -9,6 +9,7 @@ import { CLOUD_AGENT_MOVE_TOOL } from "@stella/executor-cloud/cloud-agent-move-p
 import { invokeCloudConnect, type CloudConnectClient } from "../cloud-code-tool.js";
 import {
   CloudConnectorDirectory,
+  ownerMcpSource,
   createCloudConnectClient,
 } from "../cloud-connect-client.js";
 import {
@@ -54,10 +55,12 @@ const agentConnectClient = (
       })) as RpcResponse,
     );
   const conversationId = turn.conversationId ?? turn.originConversationId;
+  const slack = Boolean(conversationId && isSlackConversationId(conversationId));
   const client = createCloudConnectClient(
     new CloudConnectorDirectory({
+      ...(slack ? {} : { mcp: ownerMcpSource(ownerInternal) }),
       source:
-        conversationId && isSlackConversationId(conversationId)
+        slack
           ? SLACK_CONNECTOR_SOURCE
           : {
               catalog: () => listIntegrationCatalog(env),

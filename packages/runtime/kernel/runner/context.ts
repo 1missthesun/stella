@@ -338,6 +338,7 @@ export const createRunnerContext = ({
   const toolHost = createToolHost({
     stellaAppDir,
     stellaDataDir,
+    deviceId,
     stellaBrowserBinPath,
     stellaOfficeBinPath,
     stellaComputerCliPath,

@@ -76,6 +76,8 @@ export type GateHostDependencies = {
   /** The gate's stop of an agent a device runs locally. */
   stopLocalAgent: OwnerHost["stopLocalAgent"];
   askDeviceConsent: OwnerHost["askDeviceConsent"];
+  /** The gate's own cloud-to-computer request relay. */
+  relayDeviceRequest: OwnerHost["relayDeviceRequest"];
   /** The gate's own dispatch cancellation. */
   cancelDispatch: (input: OwnerGateCancelInput) => Promise<OwnerGateStatusResult>;
   /** The gate's devices, with live presence. */
@@ -117,6 +119,8 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
   purgeOwner: deps.purgeOwner,
 
   deviceDestinations: async () => (await deps.devices()).devices,
+
+  relayDeviceRequest: (input) => deps.relayDeviceRequest(input),
 
   async dispatchDeviceAgentTurn(input) {
     const result = await deps.submit({

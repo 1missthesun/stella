@@ -32,6 +32,11 @@ import type {
   MediaHttpResult,
   MediaOperation,
 } from "../kernel/cli/media-request.js";
+import {
+  ACCOUNT_MCP_OPS,
+  type AccountMcpHttpResult,
+  type AccountMcpOperation,
+} from "../kernel/cli/account-mcp-request.js";
 import type {
   XApiHttpResult,
   XApiOperation,
@@ -157,6 +162,10 @@ export type CliBridgeHandlers = {
   requestMedia?: (
     params: MediaOperation & { deviceId?: string; signal?: AbortSignal },
   ) => Promise<MediaHttpResult>;
+  /** The account's MCP server registry, with the worker's live Stella session. */
+  requestAccountMcp?: (
+    params: AccountMcpOperation & { signal?: AbortSignal },
+  ) => Promise<AccountMcpHttpResult>;
   /** `stella-x-api` calls made with the worker's live Stella session. */
   requestXApi?: (
     params: XApiOperation & { signal?: AbortSignal },
@@ -226,8 +235,13 @@ const xApiRequestParamsSchema = z.discriminatedUnion("op", [
   }),
 ]);
 
+const accountMcpParamsSchema = z.strictObject({
+  op: z.enum(ACCOUNT_MCP_OPS),
+  args: z.record(z.string(), z.unknown()),
+});
+
 const REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
-const MAX_REQUEST_BYTES = 64 * 1024;
+const MAX_REQUEST_BYTES = 1024 * 1024;
 
 const writeResponse = (socket: Socket, response: ResponseMessage) => {
   if (socket.destroyed) return;
@@ -433,6 +447,19 @@ const dispatch = async (
         throw new Error("media.request: a valid media operation is required");
       }
       return await handlers.requestMedia({
+        ...parsed.data,
+        ...(signal ? { signal } : {}),
+      });
+    }
+    case "connector.accountMcp": {
+      if (!handlers.requestAccountMcp) {
+        throw new Error("connector.accountMcp: unsupported");
+      }
+      const parsed = accountMcpParamsSchema.safeParse(params);
+      if (!parsed.success) {
+        throw new Error("connector.accountMcp: a valid registry operation is required");
+      }
+      return await handlers.requestAccountMcp({
         ...parsed.data,
         ...(signal ? { signal } : {}),
       });

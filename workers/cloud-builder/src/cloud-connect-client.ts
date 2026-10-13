@@ -9,8 +9,10 @@
  * bridge. Connectors belong to the account, not the device, so a service
  * connected anywhere is usable here.
  *
- * Custom MCP/API connectors (`addMcp`/`remove`) are device-local — stdio
- * processes, generated skills, on-disk credentials — and stay that way.
+ * Custom MCP servers belong to the account too (the owner object's
+ * `mcp.*` internals): `addMcp` and `remove` work here, a remote server that
+ * needs no sign-in is called directly, and one that runs on (or signed in
+ * on) a computer is reached through that computer while it is online.
  */
 
 import {
@@ -26,6 +28,11 @@ import type {
   IntegrationCatalogEntry,
 } from "@stella/contracts/backend/integrations";
 import {
+  mcpServerReach,
+  type McpServerRecord,
+} from "@stella/contracts/backend/mcp-servers";
+import {
+  MCP_AUTHORIZE_ACTION,
   buildConnectorToolEntries,
   invalidConnectorToolArgsMessage,
   requireConnectorTool,
@@ -57,8 +64,47 @@ export type CloudConnectorSource = Readonly<{
   }): Promise<unknown>;
 }>;
 
+export type CloudMcpDevice = Readonly<{
+  deviceId: string;
+  label?: string;
+  online: boolean;
+  acceptsWork: boolean;
+}>;
+
+/** The account's custom MCP servers (the owner object's `mcp.*` internals). */
+export type CloudMcpSource = Readonly<{
+  list(options: { refresh: boolean }): Promise<{
+    servers: readonly McpServerRecord[];
+    devices: readonly CloudMcpDevice[];
+  }>;
+  add(options: Record<string, unknown>): Promise<{
+    server: McpServerRecord;
+    probeDeferred?: true;
+    hint?: string;
+  }>;
+  remove(id: string): Promise<{ removed: boolean }>;
+  call(args: { id: string; tool: string; args: Record<string, unknown> }): Promise<{ result: unknown }>;
+  authorize(id: string): Promise<{ server: McpServerRecord }>;
+}>;
+
+export const ownerMcpSource = (
+  ownerInternal: (name: string, args: unknown) => Promise<unknown>,
+): CloudMcpSource => ({
+  list: async (options) =>
+    (await ownerInternal("mcp.list", options)) as Awaited<ReturnType<CloudMcpSource["list"]>>,
+  add: async (options) =>
+    (await ownerInternal("mcp.add", { options })) as Awaited<ReturnType<CloudMcpSource["add"]>>,
+  remove: async (id) =>
+    (await ownerInternal("mcp.remove", { id })) as { removed: boolean },
+  call: async (args) => (await ownerInternal("mcp.call", args)) as { result: unknown },
+  authorize: async (id) =>
+    (await ownerInternal("mcp.authorize", { id })) as { server: McpServerRecord },
+});
+
 export type CloudConnectClientContext = Readonly<{
   source: CloudConnectorSource;
+  /** Absent (Slack conversations): no custom MCP servers at all. */
+  mcp?: CloudMcpSource;
 }>;
 
 export type CloudConnectorCatalogEntry = Readonly<{
@@ -78,6 +124,7 @@ export type CloudConnectorConnection = Readonly<{
 }>;
 
 const DISCOVER_MAX_MATCHES = 8;
+const MCP_LIST_TTL_MS = 10_000;
 const ACTIONS_PAGE_LIMIT = 100;
 const ACTIONS_MAX_PAGES = 50;
 
@@ -196,8 +243,36 @@ export class CloudConnectorDirectory {
   readonly #actions = new Map<string, Promise<readonly ActionRecord[]>>();
   readonly #context: CloudConnectClientContext;
 
+  #mcp:
+    | { at: number; listing: ReturnType<CloudMcpSource["list"]> }
+    | undefined;
+
   constructor(context: CloudConnectClientContext) {
     this.#context = context;
+  }
+
+  get mcpSource(): CloudMcpSource | undefined {
+    return this.#context.mcp;
+  }
+
+  /** The account's MCP servers, re-read at most every few seconds. */
+  mcpServers(options?: { fresh?: boolean }): ReturnType<CloudMcpSource["list"]> {
+    const source = this.#context.mcp;
+    if (!source) return Promise.resolve({ servers: [], devices: [] });
+    const cached = this.#mcp;
+    if (!options?.fresh && cached && Date.now() - cached.at < MCP_LIST_TTL_MS) {
+      return cached.listing;
+    }
+    const listing = source.list({ refresh: true }).catch((error: unknown) => {
+      if (this.#mcp?.listing === listing) this.#mcp = undefined;
+      throw new Error(sourceErrorMessage(error, "Custom MCP servers are unavailable."));
+    });
+    this.#mcp = { at: Date.now(), listing };
+    return listing;
+  }
+
+  forgetMcpServers(): void {
+    this.#mcp = undefined;
   }
 
   catalog(): Promise<readonly CloudConnectorCatalogEntry[]> {
@@ -294,6 +369,82 @@ const nextHint = (
     ? `Ready. Its actions are tools: await tools.$search({ query: "${entry.name}" }).`
     : `Not connected. Connect offers are handled by the orchestrator's connector_status tool (inline connect card) or the Store — do not initiate one from here unless the user explicitly asked this turn. Proceed via the browser/computer fallback meanwhile.`;
 
+type McpListing = Awaited<ReturnType<CloudMcpSource["list"]>>;
+
+const deviceName = (listing: McpListing, deviceId: string): string =>
+  listing.devices.find((device) => device.deviceId === deviceId)?.label ?? "your computer";
+
+/** Where an MCP server is reached from, in one line an agent can act on. */
+export const mcpWhere = (record: McpServerRecord, listing: McpListing): {
+  reach: "anywhere" | "device" | "unreachable";
+  deviceId?: string;
+  deviceName?: string;
+  online?: boolean;
+  acceptsWork?: boolean;
+  where: string;
+} => {
+  const reach = mcpServerReach(record);
+  if (reach.kind === "anywhere") {
+    return { reach: "anywhere", where: "Remote server: callable from the cloud and every computer." };
+  }
+  if (reach.kind === "unreachable") {
+    return {
+      reach: "unreachable",
+      where:
+        reach.reason === "needs_sign_in"
+          ? "Needs sign-in, which happens on one of the user's computers (the cloud keeps no credentials)."
+          : "Runs on a computer that is not recorded; add it again from that computer.",
+    };
+  }
+  const device = listing.devices.find((entry) => entry.deviceId === reach.deviceId);
+  const name = deviceName(listing, reach.deviceId);
+  const state = !device
+    ? "no longer signed in"
+    : !device.online
+      ? "offline now"
+      : !device.acceptsWork
+        ? "online, but not accepting work from other devices"
+        : "online";
+  return {
+    reach: "device",
+    deviceId: reach.deviceId,
+    deviceName: name,
+    online: device?.online === true,
+    acceptsWork: device?.acceptsWork === true,
+    where:
+      reach.reason === "local"
+        ? `Device-only: runs on ${name} (${state}); reached through it while it is online.`
+        : `Signed in on ${name} (${state}); reached through it while it is online.`,
+  };
+};
+
+const mcpSource = (
+  record: McpServerRecord,
+  listing: McpListing,
+): ConnectorToolSource => {
+  const reach = mcpServerReach(record);
+  const tools = record.tools ?? [];
+  if (tools.length > 0 && !(record.needsAuth && reach.kind !== "device")) {
+    return { id: record.id, name: record.name, kind: "mcp", actions: tools };
+  }
+  const where = reach.kind === "device" ? deviceName(listing, reach.deviceId) : undefined;
+  return {
+    id: record.id,
+    name: record.name,
+    kind: "mcp",
+    actions: [
+      {
+        name: MCP_AUTHORIZE_ACTION,
+        title: `Authorize ${record.name}`,
+        description:
+          reach.kind === "device"
+            ? `List ${record.name}'s tools through ${where}, where it ${reach.reason === "local" ? "runs" : "is signed in"}; returns the tool names.`
+            : `Sign in to ${record.name} so its tools appear. Sign-in happens on one of the user's computers; from the cloud this explains how.`,
+      },
+    ],
+  };
+};
+
 const connectedSources = async (
   directory: CloudConnectorDirectory,
 ): Promise<ConnectorToolSource[]> => {
@@ -313,7 +464,42 @@ const connectedSources = async (
           : null;
       }),
   );
-  return sources.filter((source): source is ConnectorToolSource => source !== null);
+  const mcp = directory.mcpSource
+    ? await directory.mcpServers().catch(() => null)
+    : null;
+  return [
+    ...sources.filter((source): source is ConnectorToolSource => source !== null),
+    ...(mcp ? mcp.servers.map((record) => mcpSource(record, mcp)) : []),
+  ];
+};
+
+const mcpSummary = (record: McpServerRecord, listing: McpListing) => {
+  const where = mcpWhere(record, listing);
+  const usable =
+    where.reach === "anywhere"
+      ? !record.needsAuth
+      : where.reach === "device"
+        ? where.online === true && where.acceptsWork === true
+        : false;
+  return {
+    id: record.id,
+    name: record.name,
+    kind: "mcp" as const,
+    connected: usable,
+    description: collapseLine(record.description ?? record.url ?? ""),
+    transport: record.transport,
+    ...(record.url ? { url: record.url } : {}),
+    ...where,
+    toolCount: record.tools?.length ?? 0,
+  };
+};
+
+const requireMcp = (directory: CloudConnectorDirectory): CloudMcpSource => {
+  const source = directory.mcpSource;
+  if (!source) {
+    throw new Error("Custom MCP servers aren't available in this conversation.");
+  }
+  return source;
 };
 
 export const createCloudConnectClient = (
@@ -358,14 +544,40 @@ export const createCloudConnectClient = (
           next: nextHint(entry, connected),
         };
       });
-      return { query: trimmed, matches };
+      const mcp = directory.mcpSource
+        ? await directory.mcpServers().catch(() => null)
+        : null;
+      const mcpMatches = (mcp?.servers ?? [])
+        .map((record) => ({
+          record,
+          score: scoreConnectorMatch(tokens, {
+            id: record.id,
+            name: record.name,
+            description: record.description ?? "",
+          }),
+        }))
+        .filter(({ score }) => score > 0)
+        .sort((left, right) => right.score - left.score)
+        .map(({ record }) => {
+          const summary = mcpSummary(record, mcp!);
+          return {
+            ...summary,
+            enabled: true,
+            next: summary.connected
+              ? `Ready. Its actions are tools: await tools.$search({ query: "${record.name}" }).`
+              : summary.where,
+          };
+        });
+      return { query: trimmed, matches: [...mcpMatches, ...matches].slice(0, DISCOVER_MAX_MATCHES) };
     },
     connectors: async () => {
-      const [catalog, connections] = await Promise.all([
+      const [catalog, connections, mcp] = await Promise.all([
         directory.catalog(),
         directory.connections(),
+        directory.mcpSource ? directory.mcpServers().catch(() => null) : null,
       ]);
-      return connections.flatMap((connection) => {
+      const servers = mcp ? mcp.servers.map((record) => mcpSummary(record, mcp)) : [];
+      return [...servers, ...connections.flatMap((connection) => {
         const entry = catalog.find((candidate) => candidate.id === connection.id);
         if (!entry) return [];
         return [
@@ -377,7 +589,7 @@ export const createCloudConnectClient = (
             description: collapseLine(entry.description),
           },
         ];
-      });
+      })];
     },
     tools,
     callTool: async (name, args, reserved) => {
@@ -389,17 +601,83 @@ export const createCloudConnectClient = (
       if (problem) {
         throw new Error(invalidConnectorToolArgsMessage(name, problem));
       }
+      if (entry.kind === "mcp") {
+        const source = requireMcp(directory);
+        try {
+          if (entry.action === MCP_AUTHORIZE_ACTION) {
+            const { server } = await source.authorize(entry.connector);
+            directory.forgetMcpServers();
+            return {
+              authorized: true,
+              tools: buildConnectorToolEntries(
+                [{ id: server.id, name: server.name, kind: "mcp", actions: server.tools ?? [] }],
+                reserved,
+              ).map((tool) => tool.name),
+            };
+          }
+          const { result } = await source.call({
+            id: entry.connector,
+            tool: entry.action,
+            args,
+          });
+          return sanitizeSensitiveData(result);
+        } catch (error) {
+          throw new Error(sourceErrorMessage(error, `${entry.connectorName} could not run ${entry.action}.`));
+        }
+      }
       return await directory.run(entry.connector, entry.action, args);
     },
-    addMcp: async () => {
-      throw new Error(
-        "connect.addMcp is desktop-only: custom MCP servers run on the user's computer. In the cloud, the Store integrations the account has connected are tools here.",
-      );
+    addMcp: async (options) => {
+      const source = requireMcp(directory);
+      const added = await source.add({ ...options }).catch((error: unknown) => {
+        throw new Error(sourceErrorMessage(error, "connect.addMcp failed."));
+      });
+      directory.forgetMcpServers();
+      const { server } = added;
+      const toolNames = buildConnectorToolEntries(
+        [{ id: server.id, name: server.name, kind: "mcp", actions: server.tools ?? [] }],
+        undefined,
+      ).map((tool) => tool.name);
+      return {
+        imported: {
+          id: server.id,
+          displayName: server.name,
+          ...(server.description ? { description: server.description } : {}),
+          transport: server.transport,
+          ...(server.url ? { url: server.url } : {}),
+          auth: server.auth,
+        },
+        toolCount: server.tools?.length ?? 0,
+        tools: toolNames.slice(0, 30),
+        where: mcpWhere(server, { servers: [server], devices: [] }).where,
+        ...(added.probeDeferred
+          ? { probeDeferred: true as const, hint: added.hint }
+          : {
+              hint:
+                toolNames.length > 30
+                  ? `${toolNames.length} tools; find the rest with await tools.$search({ query: "${server.name}" }).`
+                  : "Saved to the account: usable from the cloud and the user's computers. Call them as tools.<name>(args); tools.$describe(name) shows each input schema.",
+            }),
+      };
     },
-    remove: async () => {
-      throw new Error(
-        "connect.remove is desktop-only: custom connectors live on the user's computer. Store integrations are disconnected from the Store.",
-      );
+    remove: async (id) => {
+      const source = requireMcp(directory);
+      const trimmed = id.trim().toLowerCase();
+      if (!trimmed) throw new Error("connect.remove requires a connector id.");
+      const catalog = await directory.catalog().catch(() => []);
+      if (catalog.some((entry) => entry.id === trimmed)) {
+        throw new Error(
+          `${trimmed} is a Store integration. Disconnect it from the Store instead of connect.remove.`,
+        );
+      }
+      const result = await source.remove(trimmed).catch((error: unknown) => {
+        throw new Error(sourceErrorMessage(error, "connect.remove failed."));
+      });
+      directory.forgetMcpServers();
+      return {
+        removed: { mcp: result.removed ? 1 : 0 },
+        note: "Removed from the account: its tools are gone here, and each computer drops its copy on its next connector check.",
+      };
     },
   };
 };

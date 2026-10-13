@@ -80,6 +80,7 @@ import { unwrapRpc } from "../owner-store/errors.js";
 import { sha256Hex } from "../hash.js";
 import {
   CloudConnectorDirectory,
+  ownerMcpSource,
   createCloudConnectClient,
 } from "../cloud-connect-client.js";
 import {
@@ -2014,6 +2015,9 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               },
             run: (args) => ownerInternal("integrations.run", args),
           },
+      ...(isSlackConversationId(authority.conversationId)
+        ? {}
+        : { mcp: ownerMcpSource(ownerInternal) }),
     });
     const code = await createCloudCodeAgentTool({
       loader: this.env.LOADER,

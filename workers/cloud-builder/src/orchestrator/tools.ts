@@ -24,6 +24,7 @@ import { worldRelativeToolPath } from "../world/path.js";
 import { createCloudScheduleTools } from "../cloud-schedule-tools.js";
 import {
   CloudConnectorDirectory,
+  ownerMcpSource,
   createCloudConnectClient,
 } from "../cloud-connect-client.js";
 import {
@@ -150,6 +151,9 @@ export abstract class OrchestratorTools extends OrchestratorPi {
           },
         run: (args) => toolContext.ownerInternal("integrations.run", args),
       },
+      ...(isSlackConversationId(turn.conversationId)
+        ? {}
+        : { mcp: ownerMcpSource(toolContext.ownerInternal) }),
     });
 
     const slack = isSlackConversationId(turn.conversationId);

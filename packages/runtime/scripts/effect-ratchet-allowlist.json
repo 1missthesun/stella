@@ -5,7 +5,7 @@
   "kernel/computer-use/kernel-worker.ts": 2,
   "kernel/computer-use/kernel.ts": 3,
   "kernel/computer-use/stella-computer-executor.ts": 1,
-  "kernel/connectors/connector-bridge.ts": 2,
+  "kernel/connectors/mcp-http-session.ts": 1,
   "kernel/connectors/oauth.ts": 1,
   "kernel/integrations/claude-code-session-runtime.ts": 6,
   "kernel/integrations/claude-code-tool-mcp-host.ts": 1,

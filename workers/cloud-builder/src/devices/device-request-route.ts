@@ -23,6 +23,7 @@ import {
   deviceRequestParamsHash,
   deviceRequesterLabel,
   isDeviceFileRequestMethod,
+  isDeviceMcpRequestMethod,
   isDeviceRequestMethod,
   type DeviceRequestBody,
 } from "@stella/contracts/turn-plane/device-requests";
@@ -83,6 +84,12 @@ export const handleDeviceRequestRoute = async (
     Array.isArray(params)
   ) {
     return deviceRequestErrorResponse("bad_request", "Malformed device request.");
+  }
+  if (isDeviceMcpRequestMethod(method)) {
+    return deviceRequestErrorResponse(
+      "forbidden",
+      "MCP servers on a computer are reached through Stella's agents, not directly.",
+    );
   }
   const paramsJson = JSON.stringify(params);
   if (paramsJson.length > DEVICE_REQUEST_LIMITS.paramsBytes) {

@@ -10,6 +10,7 @@ import { chatHandlers } from "./handlers/chat.js";
 import { runsHandlers } from "./handlers/runs.js";
 import { localChatHandlers } from "./handlers/local-chat.js";
 import { voiceHandlers } from "./handlers/voice.js";
+import { mcpHandlers } from "./handlers/mcp.js";
 import { runnerOpsHandlers } from "./handlers/runner-ops.js";
 import { discoveryHandlers } from "./handlers/discovery.js";
 import { piChatHandlers } from "./handlers/pi-chat.js";
@@ -48,6 +49,7 @@ export const createRuntimeWorkerServer = (
     ...runsHandlers,
     ...localChatHandlers,
     ...voiceHandlers,
+    ...mcpHandlers,
     ...runnerOpsHandlers,
     ...discoveryHandlers,
     ...piChatHandlers,

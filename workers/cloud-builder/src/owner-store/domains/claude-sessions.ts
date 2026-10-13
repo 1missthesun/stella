@@ -71,6 +71,20 @@ export const CLAUDE_SESSIONS_MIGRATION = {
   ],
 };
 
+/**
+ * A commit wrote its chunk, an offset index entry, the file head and the
+ * session row (with its updated_at index). The head now follows from the
+ * file's newest chunk, replays find their chunk through the primary key, and
+ * an unchanged session row is refreshed at most once a minute, so extending a
+ * file writes the chunk alone.
+ */
+export const CLAUDE_SESSIONS_LEAN_MIGRATION = {
+  id: "claude-sessions.2-lean-commit",
+  statements: ["DROP INDEX IF EXISTS idx_claude_session_chunks_offset"],
+};
+
+const SESSION_TOUCH_MS = 60_000;
+
 const HEX_SHA256 = /^[0-9a-f]{64}$/;
 
 const threadIdArg = string({ min: 1, max: 512 });
@@ -188,6 +202,27 @@ const assertLease = (db: OwnerDb, tag: ClaudeSessionSyncTag): void => {
 };
 
 const upsertSession = (db: OwnerDb, now: number, tag: ClaudeSessionSyncTag): void => {
+  const current = db.one<SessionRow>(
+    `SELECT thread_id, session_id, conversation_id, device_id, cli_version, engine,
+            origin_cwd, journal_cursor, journal_seq, lease_epoch, updated_at
+       FROM claude_sessions WHERE thread_id = ? AND session_id = ?`,
+    tag.threadId,
+    tag.sessionId,
+  );
+  if (
+    current &&
+    now - current.updated_at < SESSION_TOUCH_MS &&
+    current.conversation_id === tag.conversationId &&
+    current.device_id === tag.deviceId &&
+    current.cli_version === tag.cliVersion &&
+    current.engine === tag.engine &&
+    current.origin_cwd === tag.originCwd &&
+    (tag.journalCursor === undefined || current.journal_cursor === tag.journalCursor) &&
+    (tag.journalSeq === undefined || current.journal_seq === tag.journalSeq) &&
+    (tag.leaseEpoch === undefined || (current.lease_epoch ?? -1) >= tag.leaseEpoch)
+  ) {
+    return;
+  }
   db.run(
     `INSERT INTO claude_sessions (
        thread_id, session_id, conversation_id, device_id, cli_version, engine,
@@ -218,10 +253,26 @@ const upsertSession = (db: OwnerDb, now: number, tag: ClaudeSessionSyncTag): voi
   );
 };
 
+/**
+ * A file's head is its newest chunk in the current generation. The files row
+ * names the generation; rows from before heads were derived also carry the
+ * same length, chain and count, which the newest chunk agrees with.
+ */
+const FILE_HEAD_COLUMNS = `f.path AS path, f.generation AS generation,
+       COALESCE((SELECT c.offset + c.length FROM claude_session_chunks c
+          WHERE c.thread_id = f.thread_id AND c.session_id = f.session_id AND c.path = f.path
+            AND c.generation = f.generation ORDER BY c.chunk_index DESC LIMIT 1), f.length) AS length,
+       COALESCE((SELECT c.chain FROM claude_session_chunks c
+          WHERE c.thread_id = f.thread_id AND c.session_id = f.session_id AND c.path = f.path
+            AND c.generation = f.generation ORDER BY c.chunk_index DESC LIMIT 1), f.chain) AS chain,
+       COALESCE((SELECT c.chunk_index + 1 FROM claude_session_chunks c
+          WHERE c.thread_id = f.thread_id AND c.session_id = f.session_id AND c.path = f.path
+            AND c.generation = f.generation ORDER BY c.chunk_index DESC LIMIT 1), f.chunk_count) AS chunk_count`;
+
 const readFile = (db: OwnerDb, args: Omit<ClaudeSessionAppendArgs, "data">): FileRow | null =>
   db.one<FileRow>(
-    `SELECT path, generation, length, chain, chunk_count FROM claude_session_files
-      WHERE thread_id = ? AND session_id = ? AND path = ?`,
+    `SELECT ${FILE_HEAD_COLUMNS} FROM claude_session_files f
+      WHERE f.thread_id = ? AND f.session_id = ? AND f.path = ?`,
     args.threadId,
     args.sessionId,
     args.path,
@@ -351,6 +402,26 @@ type CommitResult = {
   retired: string[];
 };
 
+const insertChunk = (ctx: OwnerContext, args: StagedClaudeSessionChunk, chunkIndex: number): void => {
+  ctx.db.run(
+    `INSERT INTO claude_session_chunks (
+       thread_id, session_id, path, generation, chunk_index, offset, length,
+       sha256, chain, object_key, created_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    args.threadId,
+    args.sessionId,
+    args.path,
+    args.generation,
+    chunkIndex,
+    args.offset,
+    args.length,
+    args.sha256,
+    args.chain,
+    args.objectKey,
+    ctx.now,
+  );
+};
+
 const commitStagedChunk = (ctx: OwnerContext, args: StagedClaudeSessionChunk): CommitResult => {
   assertAppendShape(args);
   enforceOwnerRateLimit(
@@ -398,23 +469,12 @@ const commitStagedChunk = (ctx: OwnerContext, args: StagedClaudeSessionChunk): C
     );
   }
   const chunkIndex = placement.kind === "extend" ? placement.file.chunk_count : 0;
-  ctx.db.run(
-    `INSERT INTO claude_session_chunks (
-       thread_id, session_id, path, generation, chunk_index, offset, length,
-       sha256, chain, object_key, created_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    args.threadId,
-    args.sessionId,
-    args.path,
-    args.generation,
-    chunkIndex,
-    args.offset,
-    args.length,
-    args.sha256,
-    args.chain,
-    args.objectKey,
-    ctx.now,
-  );
+  if (placement.kind === "extend") {
+    insertChunk(ctx, args, chunkIndex);
+    upsertSession(ctx.db, ctx.now, args);
+    return { head, retired };
+  }
+  insertChunk(ctx, args, chunkIndex);
   ctx.db.run(
     `INSERT INTO claude_session_files (
        thread_id, session_id, path, generation, length, chain, chunk_count, updated_at
@@ -478,9 +538,9 @@ const latestSession = (
   );
   if (!session) return null;
   const files = ctx.db.all<FileRow>(
-    `SELECT path, generation, length, chain, chunk_count FROM claude_session_files
-      WHERE thread_id = ? AND session_id = ?
-      ORDER BY path`,
+    `SELECT ${FILE_HEAD_COLUMNS} FROM claude_session_files f
+      WHERE f.thread_id = ? AND f.session_id = ?
+      ORDER BY f.path`,
     session.thread_id,
     session.session_id,
   );
@@ -562,7 +622,7 @@ const purgeClaudeSessions = async (ctx: OwnerContext): Promise<{ pending: boolea
 
 export const claudeSessionsDomain = {
   name: "claude-sessions",
-  migrations: [CLAUDE_SESSIONS_MIGRATION],
+  migrations: [CLAUDE_SESSIONS_MIGRATION, CLAUDE_SESSIONS_LEAN_MIGRATION],
   calls: {
     "claudeSessions.append": {
       scope: "owner",

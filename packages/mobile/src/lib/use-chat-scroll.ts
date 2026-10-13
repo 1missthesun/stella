@@ -26,50 +26,28 @@ const SCROLL_AT_BOTTOM_THRESHOLD = 8;
 /** Quiet window after the last gesture frame before momentum is considered done. */
 const MANUAL_SCROLL_SETTLE_MS = 140;
 
-/** Native animation guard so stream-follow lag is not mistaken for scrollback. */
-const FOLLOW_NATIVE_ANIMATION_GUARD_MS = 320;
-const FOLLOW_HARD_SNAP_PX = 240;
+/**
+ * Auto-follow motion: one native animated scroll per new target.
+ *
+ * The list moves with `scrollToOffset({ animated: true })`, which UIKit runs on
+ * the main thread at the display's full refresh rate (120 Hz on ProMotion),
+ * independent of the JS thread. A message arriving is the JS thread's busiest
+ * moment (projection, row render, commit), so a follow that stepped the
+ * offset from JS each frame stalled exactly when the reply landed, then
+ * crawled the last pixels asymptotically. A later target (another segment, a
+ * re-measured row) just issues a new animated scroll, which UIKit retargets
+ * from wherever the content currently is.
+ *
+ * While a programmatic scroll is in flight its `onScroll` frames are ours,
+ * not the user's: they neither release follow nor flip the away-from-bottom
+ * state (which would flash the scroll-to-latest button mid-arrival). The
+ * state settles once, from the target, when the scroll ends.
+ */
+const FOLLOW_NATIVE_SCROLL_MS = 420;
+/** Farther than this many viewport heights, land directly rather than animate. */
+const FOLLOW_HARD_SNAP_VIEWPORTS = 2;
 const FOLLOW_TARGET_EPSILON_PX = 0.5;
 const FOLLOW_TOP_PEEK_PX = 56;
-
-/**
- * Auto-follow motion model — ported from desktop's "continuous spring glide".
- *
- * Streaming content grows in discrete, irregular bursts (a line / a few tokens
- * at a time). A naive "ease toward the new bottom with an animated scroll, then
- * stop" follow restarts a native ease per chunk and crawls the last few pixels
- * asymptotically, so back-to-back short bumps read as a start/stop stutter.
- *
- * Instead we drive the offset ourselves each frame from a critically-damped
- * spring whose velocity *persists* across frames and across chunk boundaries: a
- * new chunk just moves the target, and because the spring is still carrying
- * velocity from the previous chunk the motion blends into one continuous glide.
- * Acceleration scales with the gap (`stiffness · diff`), so a big burst still
- * catches up quickly while a slow trickle glides gently — no asymptotic crawl,
- * no per-chunk restart. Critical damping (`damping ≈ 2·√stiffness`) settles
- * without overshoot. The loop stays warm for `FOLLOW_STREAM_IDLE_MS` after the
- * last growth so a slow stream doesn't re-settle per line, then eases to rest.
- * Above `FOLLOW_HARD_SNAP_PX` we land directly — that far off, any glide would
- * leave the streamed text below the viewport for too many frames.
- */
-const FOLLOW_SPRING_STIFFNESS = 0.00026; // px/ms² per px of gap (~250ms settle)
-const FOLLOW_SPRING_DAMPING = 0.0322; // ≈ 2·√stiffness → critically damped
-/** Keep gliding this long after the last content growth before settling to rest. */
-const FOLLOW_STREAM_IDLE_MS = 200;
-/** Clamp per-frame dt so a JS-thread / GC pause can't fling the viewport. */
-const FOLLOW_MAX_FRAME_MS = 48;
-/** Assumed dt for the first frame of a glide (before two timestamps exist). */
-const FOLLOW_DEFAULT_FRAME_MS = 16;
-/** Minimum per-frame step so the loop never stalls on sub-pixel rounding. */
-const FOLLOW_MIN_STEP_PX = 0.5;
-/**
- * Gentle one-shot profile for the post-send nudge — a single settle into the
- * reading position with no streaming pressure, so a slow constant ease-out
- * reads better than the stream-tuned spring. If a stream chunk arrives mid-nudge
- * its (non-gentle) target update clears the gentle flag and the spring takes
- * over on the same loop instead of fighting.
- */
-const FOLLOW_GENTLE_LERP_FACTOR = 0.12;
 /**
  * How long after a send the latest user row's layout changes may re-run the
  * post-send placement. Covers the four-line clamp collapsing a long message a
@@ -106,7 +84,6 @@ export function useChatScroll(
   const [isFollowingLatest, setIsFollowingLatest] = useState(true);
   const followRearmBlockedRef = useRef(false);
   const followTargetOffsetRef = useRef<number | null>(null);
-  const followRafRef = useRef(0);
   const followAnimatingUntilMsRef = useRef(0);
   const activeAssistantHeightRef = useRef(0);
   const latestUserLayoutRef = useRef<{ id: string; height: number } | null>(
@@ -135,16 +112,12 @@ export function useChatScroll(
   const manualScrollSettleTimerRef = useRef<ReturnType<
     typeof setTimeout
   > | null>(null);
-  /** Spring velocity (px/ms) — persists across frames and chunk boundaries. */
-  const followVelRef = useRef(0);
-  /** Offset we last committed; the spring integrates from here, not laggy native. */
+  /** Offset the in-flight (or last) programmatic scroll is heading for. */
   const followCurrentRef = useRef(0);
-  /** Timestamp of the previous glide frame, for dt. 0 = first frame. */
-  const lastFrameTimeRef = useRef(0);
-  /** Timestamp of the last content growth, to keep the loop warm between lines. */
-  const lastTargetTimeRef = useRef(0);
-  /** Gentle one-shot (post-send) vs. stream spring profile. */
-  const followGentleRef = useRef(false);
+  /** Ends the in-flight programmatic scroll's ownership of `onScroll`. */
+  const followSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null,
+  );
 
   const setFollowArmed = useCallback((armed: boolean) => {
     if (followArmedRef.current === armed) return;
@@ -153,16 +126,12 @@ export function useChatScroll(
   }, []);
 
   const stopFollowLoop = useCallback(() => {
-    if (followRafRef.current) {
-      cancelAnimationFrame(followRafRef.current);
-      followRafRef.current = 0;
+    if (followSettleTimerRef.current) {
+      clearTimeout(followSettleTimerRef.current);
+      followSettleTimerRef.current = null;
     }
     followTargetOffsetRef.current = null;
     followAnimatingUntilMsRef.current = 0;
-    followVelRef.current = 0;
-    lastFrameTimeRef.current = 0;
-    lastTargetTimeRef.current = 0;
-    followGentleRef.current = false;
   }, []);
 
   useEffect(
@@ -242,13 +211,15 @@ export function useChatScroll(
         !bouncingBackFromTail &&
         pendingSendAnchorRef.current === null &&
         followTargetOffsetRef.current === null &&
-        !followRafRef.current &&
         Date.now() > followAnimatingUntilMsRef.current
       ) {
         setFollowArmed(false);
         stopFollowLoop();
       }
 
+      // A programmatic follow scroll owns these frames; it settles the
+      // away/tail state once from its target when it lands.
+      if (followTargetOffsetRef.current !== null) return;
       setAwayFromBottom(hasOverflow && distFromBottom > awayFromBottomLimit);
       setTailOffscreen(hasOverflow && distFromBottom > tailOffscreenLimit);
     },
@@ -319,18 +290,6 @@ export function useChatScroll(
     assistantLayoutBaselineRef.current = contentHeightRef.current;
   }, []);
 
-  // Drive the list to `offset` directly (no native animation) — the spring owns
-  // the motion, so each frame just commits the integrated position. We treat the
-  // committed offset as the source of truth during a glide because native
-  // `onScroll` read-back lags a frame or two behind.
-  const commitOffset = useCallback((offset: number) => {
-    followCurrentRef.current = offset;
-    metricsRef.current.offsetY = offset;
-    followAnimatingUntilMsRef.current =
-      Date.now() + FOLLOW_NATIVE_ANIMATION_GUARD_MS;
-    listRef.current?.scrollToOffset({ offset, animated: false });
-  }, []);
-
   const updateAwayFromBottom = useCallback(
     (offset: number) => {
       const { layoutHeight } = metricsRef.current;
@@ -346,103 +305,6 @@ export function useChatScroll(
     [awayFromBottomLimit, tailOffscreenLimit],
   );
 
-  const stepFollow = useCallback(() => {
-    followRafRef.current = 0;
-    if (!followArmedRef.current || followTargetOffsetRef.current === null) {
-      followTargetOffsetRef.current = null;
-      return;
-    }
-
-    const { layoutHeight } = metricsRef.current;
-    const contentHeight = contentHeightRef.current;
-    const maxOffset = Math.max(0, contentHeight - layoutHeight);
-    const target = Math.max(
-      0,
-      Math.min(maxOffset, followTargetOffsetRef.current),
-    );
-    const current = followCurrentRef.current;
-    const diff = target - current;
-    const absDiff = Math.abs(diff);
-    const now = Date.now();
-
-    // Caught up. The gentle one-shot ends here; a stream glide idles in place
-    // (velocity bled off) and stays warm so the next chunk continues without a
-    // restart — until the stream has been quiet for FOLLOW_STREAM_IDLE_MS.
-    if (absDiff < FOLLOW_MIN_STEP_PX) {
-      commitOffset(target);
-      followVelRef.current = 0;
-      lastFrameTimeRef.current = 0;
-      if (
-        followGentleRef.current ||
-        now - lastTargetTimeRef.current > FOLLOW_STREAM_IDLE_MS
-      ) {
-        followTargetOffsetRef.current = null;
-        updateAwayFromBottom(target);
-        return;
-      }
-      followRafRef.current = requestAnimationFrame(stepFollow);
-      return;
-    }
-
-    // Gentle post-send reframe: constant low-factor ease-out, no velocity carry,
-    // no hard snap — a single smooth settle.
-    if (followGentleRef.current) {
-      const lerpStep = diff * FOLLOW_GENTLE_LERP_FACTOR;
-      const stepPx =
-        Math.abs(lerpStep) >= FOLLOW_MIN_STEP_PX
-          ? lerpStep
-          : Math.sign(diff) * FOLLOW_MIN_STEP_PX;
-      commitOffset(current + stepPx);
-      updateAwayFromBottom(current + stepPx);
-      followRafRef.current = requestAnimationFrame(stepFollow);
-      return;
-    }
-
-    // Massive gap (post-tool dump, resumed conversation jumping to the latest
-    // reply) — land directly rather than glide hundreds of px with text
-    // off-screen the whole time. Stay warm so the trickle that follows glides.
-    if (absDiff > FOLLOW_HARD_SNAP_PX) {
-      commitOffset(target);
-      followVelRef.current = 0;
-      lastFrameTimeRef.current = 0;
-      if (now - lastTargetTimeRef.current > FOLLOW_STREAM_IDLE_MS) {
-        followTargetOffsetRef.current = null;
-        updateAwayFromBottom(target);
-        return;
-      }
-      followRafRef.current = requestAnimationFrame(stepFollow);
-      return;
-    }
-
-    // Critically-damped spring step. Velocity persists across frames (and across
-    // chunk boundaries via setFollowTarget), so the motion is a continuous glide
-    // rather than a per-chunk ease-out-to-stop.
-    const dt = lastFrameTimeRef.current
-      ? Math.min(
-          FOLLOW_MAX_FRAME_MS,
-          Math.max(1, now - lastFrameTimeRef.current),
-        )
-      : FOLLOW_DEFAULT_FRAME_MS;
-    lastFrameTimeRef.current = now;
-    const accel =
-      FOLLOW_SPRING_STIFFNESS * diff -
-      FOLLOW_SPRING_DAMPING * followVelRef.current;
-    // Stream-follow never runs backward, so clamp velocity ≥ 0.
-    followVelRef.current = Math.max(0, followVelRef.current + accel * dt);
-    let step = followVelRef.current * dt;
-    if (step < FOLLOW_MIN_STEP_PX) step = FOLLOW_MIN_STEP_PX;
-    if (step >= diff) {
-      // Would reach/overshoot this frame — land exactly and keep velocity
-      // consistent with the distance actually covered.
-      commitOffset(target);
-      followVelRef.current = diff / dt;
-    } else {
-      commitOffset(current + step);
-    }
-    updateAwayFromBottom(followCurrentRef.current);
-    followRafRef.current = requestAnimationFrame(stepFollow);
-  }, [commitOffset, updateAwayFromBottom]);
-
   const setFollowTarget = useCallback(
     (target: number, gentle = false) => {
       if (!followArmedRef.current) return;
@@ -451,34 +313,36 @@ export function useChatScroll(
       const contentHeight = contentHeightRef.current;
       const maxOffset = Math.max(0, contentHeight - layoutHeight);
       const clamped = Math.max(0, Math.min(maxOffset, target));
+      const inFlight = followTargetOffsetRef.current !== null;
+      const from = inFlight
+        ? followCurrentRef.current
+        : metricsRef.current.offsetY;
 
-      // Seed the spring's current offset from the real position when starting
-      // cold, so the first frame integrates from where the list actually sits.
-      if (!followRafRef.current && followTargetOffsetRef.current === null) {
-        followCurrentRef.current = metricsRef.current.offsetY;
-      }
+      // Never follow backwards on growth — that would scroll the user up
+      // against their intent. The post-send placement (gentle) opts in.
+      if (!gentle && clamped <= from + FOLLOW_TARGET_EPSILON_PX) return;
+      if (Math.abs(clamped - from) <= FOLLOW_TARGET_EPSILON_PX) return;
 
-      // Don't follow backwards during a stream glide — that would scroll the
-      // user up against their intent. The gentle post-send nudge opts in.
-      if (
-        !gentle &&
-        clamped <= followCurrentRef.current + FOLLOW_TARGET_EPSILON_PX
-      ) {
-        return;
-      }
-
-      // Switching motion profile shouldn't carry stale velocity between them.
-      if (gentle !== followGentleRef.current) followVelRef.current = 0;
-      followGentleRef.current = gentle;
+      const animated =
+        layoutHeight <= 0 ||
+        Math.abs(clamped - from) <= layoutHeight * FOLLOW_HARD_SNAP_VIEWPORTS;
+      followCurrentRef.current = clamped;
       followTargetOffsetRef.current = clamped;
-      // Mark content growth so the spring stays warm across the irregular gaps
-      // of a slow stream (gentle nudges don't extend it).
-      if (!gentle) lastTargetTimeRef.current = Date.now();
-      if (!followRafRef.current) {
-        followRafRef.current = requestAnimationFrame(stepFollow);
+      followAnimatingUntilMsRef.current = Date.now() + FOLLOW_NATIVE_SCROLL_MS;
+      listRef.current?.scrollToOffset({ offset: clamped, animated });
+      if (followSettleTimerRef.current) {
+        clearTimeout(followSettleTimerRef.current);
       }
+      followSettleTimerRef.current = setTimeout(
+        () => {
+          followSettleTimerRef.current = null;
+          followTargetOffsetRef.current = null;
+          updateAwayFromBottom(metricsRef.current.offsetY);
+        },
+        animated ? FOLLOW_NATIVE_SCROLL_MS : 0,
+      );
     },
-    [stepFollow],
+    [updateAwayFromBottom],
   );
 
   const followActiveAssistantRow = useCallback(() => {
@@ -609,7 +473,14 @@ export function useChatScroll(
         pending.userMessageId === trailingMessageIdRef.current &&
         Date.now() <= pending.staleAtMs
       ) {
-        schedulePlaceLatestTurn();
+        // This is committed post-layout geometry already: place now rather
+        // than two frames later, which on a reply's arrival is two of the
+        // JS thread's busiest frames.
+        if (placeLatestTurnRafRef.current) {
+          cancelAnimationFrame(placeLatestTurnRafRef.current);
+          placeLatestTurnRafRef.current = 0;
+        }
+        placeLatestTurn();
         return;
       }
       pendingSendAnchorRef.current = null;
@@ -636,7 +507,7 @@ export function useChatScroll(
         setFollowTarget(Math.max(0, height - metricsRef.current.layoutHeight));
       }
     },
-    [followActiveAssistantRow, schedulePlaceLatestTurn, setFollowTarget],
+    [followActiveAssistantRow, placeLatestTurn, setFollowTarget],
   );
 
   const onLatestUserLayout = useCallback(
@@ -654,10 +525,14 @@ export function useChatScroll(
         pending.placedRowHeightPx === null ||
         Math.abs(pending.placedRowHeightPx - height) > 1
       ) {
+        // Start moving now; the list's content size may still be a frame
+        // behind, so re-place from settled metrics two frames on (a changed
+        // target just retargets the native scroll).
+        placeLatestTurn();
         schedulePlaceLatestTurn();
       }
     },
-    [schedulePlaceLatestTurn],
+    [placeLatestTurn, schedulePlaceLatestTurn],
   );
 
   const nudgeAfterSend = useCallback(

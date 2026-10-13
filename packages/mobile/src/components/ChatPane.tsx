@@ -923,9 +923,11 @@ export function ChatPane({
     }
   }, [sendPinSuppressForId, streaming, lastMessage?.id]);
 
-  const [replyPinSuppressForId, setReplyPinSuppressForId] = useState<
-    string | null
-  >(null);
+  // The landed reply whose placement owns the tail, and until when. A ref
+  // rather than state: setting state from the layout effect below re-rendered
+  // the whole pane synchronously, inside the frame the reply arrived in.
+  const replyPinRef = useRef<{ id: string; untilMs: number } | null>(null);
+  const [, setReplyPinExpiry] = useState(0);
   const settledReplyIdsRef = useRef<Set<string> | null>(null);
   const settledForConversationRef = useRef(conversationId);
   if (settledForConversationRef.current !== conversationId) {
@@ -967,7 +969,10 @@ export function ChatPane({
     placedReplyIdRef.current = lastMessage.id;
     if (!shouldPlaceLatestTurn()) return;
     placeLatestTurnFor(lastMessage.id);
-    setReplyPinSuppressForId(lastMessage.id);
+    replyPinRef.current = {
+      id: lastMessage.id,
+      untilMs: Date.now() + REPLY_PLACEMENT_PIN_SUPPRESS_MS,
+    };
   }, [
     historyLoading,
     lastMessage,
@@ -976,25 +981,27 @@ export function ChatPane({
     shouldPlaceLatestTurn,
     visibleMessages,
   ]);
+  const replyPin = replyPinRef.current;
+  const replyPinned =
+    replyPin !== null &&
+    replyPin.id === lastMessage?.id &&
+    Date.now() < replyPin.untilMs;
+  // Re-render once the pin lapses so the tail pin takes the list back.
   useEffect(() => {
-    if (!replyPinSuppressForId) return;
-    if (lastMessage?.id !== replyPinSuppressForId) {
-      setReplyPinSuppressForId(null);
-      return;
-    }
+    if (!replyPinned || !replyPin) return;
     const timer = setTimeout(
-      () => setReplyPinSuppressForId(null),
-      REPLY_PLACEMENT_PIN_SUPPRESS_MS,
+      () => setReplyPinExpiry((tick) => tick + 1),
+      Math.max(0, replyPin.untilMs - Date.now()),
     );
     return () => clearTimeout(timer);
-  }, [replyPinSuppressForId, lastMessage?.id]);
+  }, [replyPin, replyPinned]);
 
   const dataChangeScrollOwner = resolveChatDataChangeScrollOwner({
     isFollowingLatest: scroll.isFollowingLatest,
     isStreaming: streaming,
     postSendPlacementPending:
       sendPinSuppressForId !== null ||
-      replyPinSuppressForId !== null ||
+      replyPinned ||
       landingReplyId !== null,
   });
   const scrollOwnerRef = useRef(dataChangeScrollOwner);

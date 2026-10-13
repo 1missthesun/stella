@@ -26,12 +26,10 @@ import {
 import { PI_LATE_ANSWER_PREFIX } from "@stella/contracts/pi-chat";
 import {
   DEFAULT_USER_ASK_ESCALATION_POLICY,
-  USER_ASK_BLOCKING_TTL_MS,
   USER_ASK_EXPIRED_NOTE,
   USER_ASK_ESCALATION_STEP_MS,
   USER_ASK_KINDS,
   USER_ASK_SCHEMA_VERSION,
-  USER_ASK_SECRET_HANDLE_PREFIX,
   clampUrgency,
   clampUserAskTimeoutMs,
   effectiveEscalationCeiling,
@@ -40,6 +38,9 @@ import {
   normalizeUserAskEscalationPolicy,
   normalizeUserAskDeclineReason,
   normalizeUserAskQuestions,
+  normalizeSavedValuePart,
+  savedValueLabel,
+  userAskFieldIsRememberable,
   userAskAcceptsAnswer,
   userAskAwaitsAnswer,
   userAskDeclinedNote,
@@ -51,7 +52,7 @@ import {
   userAskTtlMs,
   validateUserAskResponses,
 } from "@stella/contracts/user-ask";
-import { protectValue, unprotectValue } from "@stella/runtime/kernel/shared/protected-storage";
+import { protectValue } from "@stella/runtime/kernel/shared/protected-storage";
 import { writePrivateFileSync } from "@stella/runtime/kernel/shared/private-fs";
 import {
   getUserAskEscalationPolicy,
@@ -59,15 +60,14 @@ import {
 } from "@stella/runtime/kernel/preferences/local-preferences";
 import { showStellaNotification } from "./notification-service.js";
 import { PendingRequestStore } from "./pending-request-store.js";
+import { SavedSecureValues, matchSavedField } from "./saved-secure-values.js";
 import { UserAskEscalationEngine, localTimeZone, minuteOfDayAt } from "./user-ask-escalation.js";
 import {
   createUserAskRecipientKey,
   openUserAskSealedValue,
   sealUserAskValue,
 } from "./user-ask-seal.js";
-const SECURE_VALUES_FILE = "user-ask-secrets.json";
 const KEYCHAIN_FALLBACK_FILE = "user-ask-keychain.json";
-const SECRET_SCOPE_PREFIX = "user-ask-secret";
 const KEYCHAIN_SCOPE_PREFIX = "user-ask-keychain";
 const COMMAND_PLACEHOLDER = "{{secret}}";
 const COMMAND_SECRET_ENV_VAR = "STELLA_SECRET";
@@ -81,8 +81,51 @@ const CLOUD_POLICY_CALL = "userAsks.policy";
 const CLOUD_REQUEST_TIMEOUT_MS = 10_000;
 const REMOTE_ANSWER_POLL_MS = 15_000;
 const POLICY_CACHE_MAX_AGE_MS = 30_000;
-const SECURE_VALUE_TTL_MS = USER_ASK_BLOCKING_TTL_MS;
-const secretScope = (handle) => `${SECRET_SCOPE_PREFIX}:${handle}`;
+const ACCOUNT_FIELD_PATTERN = /^(user(name)?|e-?mail|login|account|handle|user ?id)$/i;
+const mergeFingerprints = (left, right) => {
+    if (right.windows.length === 0) {
+        return left;
+    }
+    const byLength = new Map();
+    for (const window of [...left.windows, ...right.windows]) {
+        const hashes = byLength.get(window.length) ?? new Set();
+        for (const hash of window.hashes) {
+            hashes.add(hash);
+        }
+        byLength.set(window.length, hashes);
+    }
+    return {
+        baseA: left.baseA,
+        baseB: left.baseB,
+        windows: [...byLength].map(([length, hashes]) => ({ length, hashes: [...hashes] })),
+    };
+};
+const normalizeSaveRequest = (input) => {
+    if (!input || typeof input !== "object") {
+        return null;
+    }
+    return {
+        service: normalizeSavedValuePart(input.service),
+        account: normalizeSavedValuePart(input.account),
+        replace: input.replace === true,
+    };
+};
+const accountFromAnswer = (fields, values) => {
+    for (const field of fields) {
+        if (field.sensitive) {
+            continue;
+        }
+        const value = values[field.id];
+        if (typeof value === "string" &&
+            value.trim() &&
+            (ACCOUNT_FIELD_PATTERN.test(field.id.replace(/_/g, " ")) ||
+                ACCOUNT_FIELD_PATTERN.test(field.label.trim()))) {
+            return normalizeSavedValuePart(value);
+        }
+    }
+    return "";
+};
+const sameAccount = (left, right) => left.trim().toLowerCase() === right.trim().toLowerCase();
 const mirroredAskOf = (row) => {
     if (!row || typeof row !== "object") {
         return null;
@@ -101,67 +144,6 @@ const mirroredAskOf = (row) => {
         return null;
     }
     return { ...ask, relayed: true };
-};
-const secureValueIsLive =(entry, now) => typeof entry?.createdAt === "number" && now - entry.createdAt < SECURE_VALUE_TTL_MS;
-const readRawSecureValueStore = (stellaAppDir) => {
-    try {
-        const parsed = JSON.parse(fs.readFileSync(path.join(stellaAppDir, SECURE_VALUES_FILE), "utf-8"));
-        if (parsed?.version === 1 && parsed.secrets && typeof parsed.secrets === "object") {
-            return parsed.secrets;
-        }
-    }
-    catch {
-        return null;
-    }
-    return null;
-};
-const readSecureValueStore = (stellaAppDir) => {
-    const raw = readRawSecureValueStore(stellaAppDir);
-    if (!raw) {
-        return {};
-    }
-    const now = Date.now();
-    const live = Object.fromEntries(Object.entries(raw).filter(([, entry]) => secureValueIsLive(entry, now)));
-    if (Object.keys(live).length !== Object.keys(raw).length) {
-        writeSecureValueStore(stellaAppDir, live);
-    }
-    return live;
-};
-const writeSecureValueStore = (stellaAppDir, secrets) => {
-    const filePath = path.join(stellaAppDir, SECURE_VALUES_FILE);
-    if (Object.keys(secrets).length === 0) {
-        fs.rmSync(filePath, { force: true });
-        return;
-    }
-    writePrivateFileSync(filePath, JSON.stringify({ version: 1, secrets }, null, 2));
-};
-const storeSecureValue = (stellaAppDir, entry) => {
-    const secrets = readSecureValueStore(stellaAppDir);
-    const handle = `${USER_ASK_SECRET_HANDLE_PREFIX}${randomUUID()}`;
-    secrets[handle] = {
-        askId: entry.askId,
-        fieldId: entry.fieldId,
-        label: entry.label,
-        valueProtected: protectValue(secretScope(handle), entry.value),
-        createdAt: Date.now(),
-    };
-    writeSecureValueStore(stellaAppDir, secrets);
-    return handle;
-};
-const deleteSecureValue = (stellaAppDir, handle) => {
-    const secrets = readSecureValueStore(stellaAppDir);
-    if (!(handle in secrets)) {
-        return;
-    }
-    delete secrets[handle];
-    writeSecureValueStore(stellaAppDir, secrets);
-};
-const resolveSecureValue = (stellaAppDir, handle) => {
-    const entry = readSecureValueStore(stellaAppDir)[handle];
-    if (!entry || typeof entry.valueProtected !== "string") {
-        return null;
-    }
-    return unprotectValue(secretScope(handle), entry.valueProtected);
 };
 const storeKeychainFallback = (stellaAppDir, target, value) => {
     const filePath = path.join(stellaAppDir, KEYCHAIN_FALLBACK_FILE);
@@ -311,12 +293,15 @@ export class UserAskService {
     remoteLiveAt = 0;
     claiming = new Set();
     fingerprintCache = null;
+    retainedFingerprints = EMPTY_SECRET_FINGERPRINTS;
+    saved;
     mirrorStarted = false;
     mirrored = new Map();
     mirroredNotified = new Map();
     mirrorRefreshing = null;
     constructor(options) {
         this.options = options;
+        this.saved = new SavedSecureValues(() => this.options.getStellaAppDir() ?? null);
         this.escalation = new UserAskEscalationEngine({
             getAsk: (askId) => this.asks.get(askId)?.ask ?? null,
             getPolicy: async () => await this.resolvePolicy(0),
@@ -499,7 +484,11 @@ export class UserAskService {
                 }
                 : { fieldId, kind: "plain", value });
         }
-        return { kind: "fields", fields };
+        return {
+            kind: "fields",
+            fields,
+            ...(typeof payload.remember === "boolean" ? { remember: payload.remember } : {}),
+        };
     }
     async postMirroredAnswer(ask, answer) {
         const deviceId = this.options.getDeviceId() ?? "";
@@ -577,6 +566,22 @@ export class UserAskService {
         });
     }
     async requestSecureInput(request) {
+        const fields = request.fields ?? [];
+        const save = normalizeSaveRequest(request.save);
+        let replaceId = "";
+        if (save?.service) {
+            const matches = await this.saved.findMatches(save.service, save.account);
+            if (save.replace) {
+                replaceId = matches[0]?.id ?? "";
+            }
+            else {
+                const reused = await this.reuseSavedValue(save, fields, matches);
+                if (reused) {
+                    return reused;
+                }
+            }
+        }
+        const label = save ? savedValueLabel(save.service, save.account) || request.purpose : "";
         return await this.open({
             request,
             blocking: true,
@@ -586,11 +591,72 @@ export class UserAskService {
                 kind: "secure_input",
                 purpose: request.purpose,
                 ...(request.detail ? { detail: request.detail } : {}),
-                fields: request.fields ?? [],
+                fields,
+                ...(save
+                    ? {
+                        save: {
+                            service: save.service,
+                            ...(save.account ? { account: save.account } : {}),
+                            label,
+                            ...(replaceId ? { replacing: true } : {}),
+                        },
+                    }
+                    : {}),
             },
+            saveContext: save ? { ...save, replaceId } : null,
         });
     }
-    async open({ request, blocking, timeoutMs, kind, detail }) {
+    async reuseSavedValue(save, fields, matches) {
+        if (matches.length === 0) {
+            return null;
+        }
+        if (matches.length > 1 && !save.account) {
+            const accounts = matches.map((entry) => entry.account || entry.label);
+            throw new Error(`Several saved values for ${save.service} are on this computer (${accounts.join(", ")}). Call request_secure_input again with account set to the one you need, or with a new account to ask for a different one.`);
+        }
+        const entry = matches[0];
+        const stored = await this.saved.readValues(entry);
+        if (!stored) {
+            return null;
+        }
+        const values = {};
+        const handles = {};
+        for (const field of fields) {
+            const savedField = matchSavedField(entry.fields, field);
+            const value = savedField ? stored[savedField.id] : undefined;
+            if (!savedField || typeof value !== "string" || savedField.sensitive !== field.sensitive) {
+                if (field.optional === true) {
+                    continue;
+                }
+                return null;
+            }
+            if (field.sensitive) {
+                if (!savedField.handle) {
+                    return null;
+                }
+                handles[field.id] = savedField.handle;
+            }
+            else {
+                values[field.id] = value;
+            }
+        }
+        await this.saved.markUsed(entry.id);
+        return {
+            outcome: "answered",
+            askId: `saved:${entry.id}`,
+            ...(Object.keys(values).length > 0 ? { values } : {}),
+            ...(Object.keys(handles).length > 0 ? { handles } : {}),
+            saved: {
+                label: entry.label,
+                ...(entry.account ? { account: entry.account } : {}),
+                reused: true,
+                remembered: true,
+                savedAt: entry.updatedAt,
+            },
+            answeredAt: Date.now(),
+        };
+    }
+    async open({ request, blocking, timeoutMs, kind, detail, saveContext = null }) {
         const askId = randomUUID();
         const createdAt = Date.now();
         const seal = kind === "secure_input" ? createUserAskRecipientKey() : null;
@@ -618,6 +684,7 @@ export class UserAskService {
         const record = {
             ask,
             seal,
+            saveContext,
             timeoutTimer: null,
             ttlTimer: null,
         };
@@ -785,9 +852,9 @@ export class UserAskService {
         if (detail.kind !== "secure_input") {
             throw new Error("That answer does not match the ask.");
         }
-        const stellaAppDir = this.options.getStellaAppDir();
         const values = {};
         const handles = {};
+        const collected = [];
         for (const entry of payload.fields) {
             const fieldId = typeof entry?.fieldId === "string" ? entry.fieldId : "";
             const field = detail.fields.find((candidate) => candidate.id === fieldId);
@@ -808,25 +875,64 @@ export class UserAskService {
             if (!value && field.optional === true) {
                 continue;
             }
+            collected.push({ field, value });
             if (!field.sensitive) {
                 values[fieldId] = value;
+            }
+        }
+        const save = record.saveContext;
+        const remember = save !== null && payload.remember !== false;
+        const keep = remember
+            ? collected.filter(({ field }) => userAskFieldIsRememberable(field))
+            : [];
+        let savedNote = null;
+        if (keep.some(({ field }) => field.sensitive)) {
+            const account = save.account || accountFromAnswer(detail.fields, values);
+            const existing = save.replaceId
+                ? save.replaceId
+                : save.service
+                    ? ((await this.saved.findMatches(save.service, "")).find((entry) => sameAccount(entry.account, account))?.id ?? "")
+                    : "";
+            const stored = await this.saved.save({
+                ...(existing ? { existingId: existing } : {}),
+                service: save.service || detail.purpose,
+                account,
+                fields: keep,
+            });
+            Object.assign(handles, stored.handles);
+            savedNote = {
+                label: stored.entry.label,
+                ...(stored.entry.account ? { account: stored.entry.account } : {}),
+                reused: false,
+                remembered: true,
+                ...(save.replaceId ? { replaced: true } : {}),
+            };
+        }
+        else if (save?.replaceId && !remember) {
+            await this.saved.remove({ id: save.replaceId });
+        }
+        for (const { field, value } of collected) {
+            if (!field.sensitive || handles[field.id]) {
                 continue;
             }
-            if (!stellaAppDir) {
-                throw new Error("This computer has no secure store for that value.");
-            }
-            handles[fieldId] = storeSecureValue(stellaAppDir, {
-                askId,
-                fieldId,
-                label: field.label,
-                value,
-            });
+            handles[field.id] = this.saved.rememberSingleUse(value, field.label);
         }
+        if (!savedNote &&
+            save &&
+            collected.some(({ field }) => field.sensitive && userAskFieldIsRememberable(field))) {
+            savedNote = {
+                label: savedValueLabel(save.service, save.account) || detail.purpose,
+                reused: false,
+                remembered: false,
+            };
+        }
+        this.fingerprintCache = null;
         return {
             outcome: "answered",
             askId,
             ...(Object.keys(values).length > 0 ? { values } : {}),
             ...(Object.keys(handles).length > 0 ? { handles } : {}),
+            ...(savedNote ? { saved: savedNote } : {}),
             answeredAt,
             ...(late ? { late: true } : {}),
         };
@@ -874,88 +980,58 @@ export class UserAskService {
             };
         }
     }
-    getSecureValueFingerprints() {
-        const stellaAppDir = this.options.getStellaAppDir();
-        if (!stellaAppDir) {
-            return EMPTY_SECRET_FINGERPRINTS;
-        }
-        const secrets = readSecureValueStore(stellaAppDir);
-        const key = Object.keys(secrets).sort().join("\n");
+    async getSecureValueFingerprints() {
+        const key = await this.saved.valuesKey();
         if (this.fingerprintCache?.key === key) {
             return this.fingerprintCache.fingerprints;
         }
-        const values = [];
-        for (const handle of Object.keys(secrets)) {
-            const value = unprotectValue(secretScope(handle), secrets[handle].valueProtected);
-            if (value) {
-                values.push(value);
-            }
-        }
-        const fingerprints = fingerprintSecrets(values, fingerprintParams);
+        const fingerprints = mergeFingerprints(fingerprintSecrets(await this.saved.readAllValues(), fingerprintParams), this.retainedFingerprints);
         this.fingerprintCache = { key, fingerprints };
         return fingerprints;
     }
-    revealSecureValueForFill(request) {
+    async resolveHandle(handle) {
+        const resolved = await this.saved.resolve(handle);
+        if (!resolved) {
+            return null;
+        }
+        if (resolved.singleUse) {
+            this.retainedFingerprints = mergeFingerprints(this.retainedFingerprints, fingerprintSecrets([resolved.value], fingerprintParams));
+            this.fingerprintCache = null;
+        }
+        return resolved.value;
+    }
+    async revealSecureValueForFill(request) {
         const handle = typeof request?.handle === "string" ? request.handle : "";
         if (!isUserAskSecretHandle(handle)) {
             return { ok: false, error: "That is not a secure value handle." };
         }
-        const stellaAppDir = this.options.getStellaAppDir();
-        const value = stellaAppDir ? resolveSecureValue(stellaAppDir, handle) : null;
+        const value = await this.resolveHandle(handle);
         if (value === null) {
-            return { ok: false, error: "That secure value is no longer on this computer." };
+            return { ok: false, error: "That secure value is no longer on this computer. Ask for it again with request_secure_input." };
         }
         return { ok: true, value };
     }
-    listStoredSecureValues() {
-        const stellaAppDir = this.options.getStellaAppDir();
-        if (!stellaAppDir) {
-            return [];
-        }
-        return Object.entries(readSecureValueStore(stellaAppDir))
-            .map(([handle, entry]) => ({
-                id: handle,
-                label: typeof entry.label === "string" ? entry.label : "",
-                askId: typeof entry.askId === "string" ? entry.askId : "",
-                fieldId: typeof entry.fieldId === "string" ? entry.fieldId : "",
-                createdAt: entry.createdAt,
-                expiresAt: entry.createdAt + SECURE_VALUE_TTL_MS,
-            }))
-            .sort((left, right) => right.createdAt - left.createdAt);
+    async listStoredSecureValues() {
+        return await this.saved.list();
     }
-    deleteStoredSecureValues(payload) {
-        const stellaAppDir = this.options.getStellaAppDir();
-        if (!stellaAppDir) {
-            return { ok: false, deleted: 0 };
-        }
-        const secrets = readSecureValueStore(stellaAppDir);
-        const targets = payload?.all === true
-            ? Object.keys(secrets)
-            : typeof payload?.id === "string" && payload.id in secrets
-                ? [payload.id]
-                : [];
-        for (const handle of targets) {
-            delete secrets[handle];
-        }
-        if (targets.length > 0) {
-            writeSecureValueStore(stellaAppDir, secrets);
-            this.fingerprintCache = null;
-        }
-        return { ok: true, deleted: targets.length };
+    async deleteStoredSecureValues(payload) {
+        const deleted = await this.saved.remove(payload ?? {});
+        this.fingerprintCache = null;
+        return { ok: true, deleted };
+    }
+    async renameStoredSecureValue(payload) {
+        const ok = await this.saved.rename(typeof payload?.id === "string" ? payload.id : "", typeof payload?.label === "string" ? payload.label : "");
+        return ok ? { ok: true } : { ok: false, error: "That saved value could not be renamed." };
     }
     /**
      * Read a secure value once, for this computer's own use (a connector
-     * key it saves itself), and forget its handle. Never returned to an
-     * agent or the runtime.
+     * key it saves itself). Never returned to an agent or the runtime.
      */
-    takeSecureValue(handle) {
-        const stellaAppDir = this.options.getStellaAppDir();
-        if (!stellaAppDir || !isUserAskSecretHandle(handle)) {
+    async takeSecureValue(handle) {
+        if (!isUserAskSecretHandle(handle)) {
             return null;
         }
-        const value = resolveSecureValue(stellaAppDir, handle);
-        deleteSecureValue(stellaAppDir, handle);
-        return value;
+        return await this.resolveHandle(handle);
     }
     async useSecureValue(request) {
         const handle = typeof request?.handle === "string" ? request.handle : "";
@@ -970,14 +1046,13 @@ export class UserAskService {
                 ok: false,
             };
         }
-        const stellaAppDir = this.options.getStellaAppDir();
-        const value = stellaAppDir ? resolveSecureValue(stellaAppDir, handle) : null;
+        const value = await this.resolveHandle(handle);
         if (value === null) {
             return {
                 handle,
                 target: target?.kind ?? "command",
                 usedAt,
-                detail: "That secure value is no longer on this computer.",
+                detail: "That secure value is no longer on this computer. Ask for it again with request_secure_input.",
                 ok: false,
             };
         }
@@ -1001,7 +1076,7 @@ export class UserAskService {
                 cwd: target.cwd,
                 secret: value,
             });
-            const output = scrubSecret(result.output, value, this.getSecureValueFingerprints()).trim();
+            const output = scrubSecret(result.output, value, await this.getSecureValueFingerprints()).trim();
             const status = result.timedOut
                 ? "timed out"
                 : result.status === null

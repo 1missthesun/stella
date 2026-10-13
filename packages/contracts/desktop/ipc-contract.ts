@@ -369,6 +369,7 @@ import {
   IPC_USER_ASK_ANSWER,
   IPC_USER_ASK_CANCEL,
   IPC_USER_ASK_SECURE_VALUES_DELETE,
+  IPC_USER_ASK_SECURE_VALUES_RENAME,
   IPC_USER_ASK_SECURE_VALUES_LIST,
   IPC_USER_ASK_CLOSED,
   IPC_USER_ASK_LIST,
@@ -1209,6 +1210,10 @@ export type IpcInvokeContract = {
   [IPC_USER_ASK_SECURE_VALUES_DELETE]: Invoke<
     [payload: { id?: string; all?: boolean }],
     { ok: boolean; deleted: number }
+  >;
+  [IPC_USER_ASK_SECURE_VALUES_RENAME]: Invoke<
+    [payload: { id: string; label: string }],
+    OkErrorResult
   >;
   [IPC_USER_ASK_POLICY_GET]: Invoke<[], UserAskEscalationPolicy>;
   [IPC_USER_ASK_POLICY_SET]: Invoke<

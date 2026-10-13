@@ -80,6 +80,7 @@ import {
   IPC_USER_ASK_POLICY_GET,
   IPC_USER_ASK_POLICY_SET,
   IPC_USER_ASK_SECURE_VALUES_DELETE,
+  IPC_USER_ASK_SECURE_VALUES_RENAME,
   IPC_USER_ASK_SECURE_VALUES_LIST,
   IPC_DEVICE_GET_ID,
   IPC_HOST_CONFIGURE_RUNTIME,
@@ -565,6 +566,12 @@ export const registerSystemHandlers = (options) => {
             throw new Error("Blocked untrusted secure value deletion.");
         }
         return options.deleteStoredSecureValues(payload);
+    });
+    handleIpc(IPC_USER_ASK_SECURE_VALUES_RENAME, (event, payload) => {
+        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_USER_ASK_SECURE_VALUES_RENAME)) {
+            throw new Error("Blocked untrusted secure value rename.");
+        }
+        return options.renameStoredSecureValue(payload);
     });
     handleIpc(IPC_CONNECTOR_CONNECT_RESPOND, (event, payload) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_CONNECTOR_CONNECT_RESPOND)) {

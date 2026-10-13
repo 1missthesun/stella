@@ -32,10 +32,17 @@ export type AskUserRequest = {
   toolCallId?: string;
 };
 
+export type SecureInputSaveRequest = {
+  service: string;
+  account?: string;
+  replace?: boolean;
+};
+
 export type SecureInputRequest = {
   purpose: string;
   detail?: string;
   fields: readonly UserAskField[];
+  save?: SecureInputSaveRequest;
   urgency: UserAskUrgencyLevel;
   conversationId?: string;
   agentId?: string;
@@ -250,11 +257,25 @@ export const handleRequestSecureInput = async (
     };
   }
   const detail = text(args.detail, 1000);
+  const service = text(args.service, 120);
+  const account = text(args.account, 120);
+  const replace = args.replace_saved === true || args.replaceSaved === true;
+  if (replace && !service) {
+    return {
+      error:
+        "replace_saved needs service (and account when you know it) so Stella knows which saved value to replace.",
+    };
+  }
   try {
     const resolution = await config.requestSecureInput({
       purpose,
       ...(detail ? { detail } : {}),
       fields,
+      save: {
+        service,
+        ...(account ? { account } : {}),
+        ...(replace ? { replace: true } : {}),
+      },
       urgency: clampUrgency(args.urgency),
       ...contextFields(context, args),
     }, signal);

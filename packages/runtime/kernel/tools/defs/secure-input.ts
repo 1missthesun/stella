@@ -26,7 +26,7 @@ export const createRequestSecureInputTool = (
   replay: "unsafe",
   awaitsUser: true,
   description:
-    "Ask the user for information through a secure card, describing exactly the fields you need this time. Non-sensitive fields (an address, a one-time code) come back as values you can read. Sensitive fields (passwords, card numbers) never reach you: you get a handle instead, which `use_secure_value` can type into a browser field, pass to a command, or store in the keychain. Mark each field sensitive yourself; the user can override it. The user may answer on another device and the value travels end-to-end encrypted to this one. Never print, echo, cat, grep or log a secret yourself, and that includes one a command creates (a CLI that prints a new token): send that output to a private file without displaying it, check it by length or prefix only, and pass the file to the command that needs it. Stella redacts values it knows about from tool output, but a secret it never collected is only caught by pattern.",
+    "Ask the user for information through a secure card, describing exactly the fields you need this time. Non-sensitive fields (an address, a one-time code) come back as values you can read. Sensitive fields (passwords, card numbers) never reach you: you get a handle instead, which `use_secure_value` can type into a browser field, pass to a command, or store in the keychain. Mark each field sensitive yourself; the user can override it. The user may answer on another device and the value travels end-to-end encrypted to this one. Always say what the value is for with `service` (the site or service, e.g. GitHub) and `account` when you know it: values the user chooses to remember are saved on this computer under that label, and a later request for the same service and account returns the saved handle at once without asking, so call this tool whenever you need a login, even one the user gave before. If a saved value turns out wrong (the login fails), call again with `replace_saved: true` to ask once for the right one, which overwrites it. Never print, echo, cat, grep or log a secret yourself, and that includes one a command creates (a CLI that prints a new token): send that output to a private file without displaying it, check it by length or prefix only, and pass the file to the command that needs it. Stella redacts values it knows about from tool output, but a secret it never collected is only caught by pattern.",
   promptSnippet:
     "Ask for information the user has to supply (`request_secure_input`) — describe the fields; sensitive ones come back as handles you use, never as values",
   parameters: {
@@ -40,6 +40,21 @@ export const createRequestSecureInputTool = (
       detail: {
         type: "string",
         description: "Optional extra context shown under the purpose.",
+      },
+      service: {
+        type: "string",
+        description:
+          'What the value is for: the site or service, e.g. "GitHub" or "github.com". Labels the saved value and finds it again next time.',
+      },
+      account: {
+        type: "string",
+        description:
+          "The account on that service (username or email) when you know it. Picks the right saved value when there are several.",
+      },
+      replace_saved: {
+        type: "boolean",
+        description:
+          "The saved value for this service and account was wrong (the login failed): ask the user once for the right one and overwrite the saved one.",
       },
       fields: {
         type: "array",
@@ -90,7 +105,7 @@ export const createRequestSecureInputTool = (
           "How far this may escalate if unanswered. The user's ceiling, quiet hours, and rate limit always win.",
       },
     },
-    required: ["purpose", "fields"],
+    required: ["purpose", "service", "fields"],
   },
   execute: (args, context, extras) =>
     handleRequestSecureInput(
@@ -115,7 +130,8 @@ export const createUseSecureValueTool = (
     properties: {
       handle: {
         type: "string",
-        description: "The handle returned by `request_secure_input`.",
+        description:
+          "The handle returned by `request_secure_input` (fresh or reused from a saved value).",
       },
       into: {
         type: "object",

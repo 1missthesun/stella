@@ -12,6 +12,7 @@ import {
   type UserAskQuestion,
   type UserAskQuestionResponse,
   type UserAskResolution,
+  type UserAskSavedValueNote,
   type UserAskUrgencyLevel,
 } from "@stella/contracts/user-ask";
 
@@ -165,6 +166,18 @@ const modelAnswers = (
     return { id: question.id, choice: response.choiceId };
   });
 
+const savedValueNote = (saved: UserAskSavedValueNote): string => {
+  if (saved.reused) {
+    return `Reused the value saved on this computer for "${saved.label}" without asking the user. If it turns out to be wrong (the login fails), call request_secure_input again with the same service and account and replace_saved: true to ask once for the right one.`;
+  }
+  if (saved.remembered) {
+    return saved.replaced
+      ? `The user gave a replacement; it overwrote the saved value for "${saved.label}".`
+      : `The user chose to remember this on this computer as "${saved.label}"; later requests with the same service and account reuse it without asking.`;
+  }
+  return "The user chose not to remember this: each private handle works once and is deleted after you use it.";
+};
+
 export const userAskResolutionResult = (
   resolution: UserAskResolution,
   questions: readonly UserAskQuestion[] = [],
@@ -173,6 +186,9 @@ export const userAskResolutionResult = (
     const shared = {
       ...(resolution.values ? { values: resolution.values } : {}),
       ...(resolution.handles ? { handles: resolution.handles } : {}),
+      ...(resolution.saved
+        ? { saved: resolution.saved, note: savedValueNote(resolution.saved) }
+        : {}),
       ...(resolution.late ? { late: true } : {}),
     };
     return {

@@ -325,6 +325,8 @@ export const IPC_USER_ASK_SECURE_VALUES_LIST =
   "userAsk:secureValuesList" as const;
 export const IPC_USER_ASK_SECURE_VALUES_DELETE =
   "userAsk:secureValuesDelete" as const;
+export const IPC_USER_ASK_SECURE_VALUES_RENAME =
+  "userAsk:secureValuesRename" as const;
 
 // ── Connector credentials / connect prompts ────────────────────────────────
 

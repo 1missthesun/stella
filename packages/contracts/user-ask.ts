@@ -84,14 +84,54 @@ export const userAskDeclinedNote = (reason: string): string =>
 export const USER_ASK_EXPIRED_NOTE =
   "Timed out: nobody answered this request, so it was closed. Continue another way, or ask again later if it is still needed.";
 
+export const SECURE_VALUE_STORE_KINDS = [
+  "keychain",
+  "secret_service",
+  "protected_file",
+] as const;
+
+export type SecureValueStoreKind = (typeof SECURE_VALUE_STORE_KINDS)[number];
+
 export type UserAskStoredSecureValue = Readonly<{
   id: string;
   label: string;
-  askId: string;
-  fieldId: string;
+  service: string;
+  account: string;
+  fieldLabels: readonly string[];
+  store: SecureValueStoreKind;
   createdAt: number;
-  expiresAt: number;
+  updatedAt: number;
+  lastUsedAt?: number;
 }>;
+
+export const USER_ASK_MAX_SAVED_LABEL = 120;
+
+export type UserAskSaveTarget = Readonly<{
+  service: string;
+  account?: string;
+  label: string;
+  replacing?: boolean;
+}>;
+
+export const normalizeSavedValuePart = (value: unknown, max = 200): string =>
+  typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, max) : "";
+
+export const savedValueLabel = (service: string, account: string): string =>
+  (account && service ? `${service} – ${account}` : service || account).slice(
+    0,
+    USER_ASK_MAX_SAVED_LABEL,
+  );
+
+export const savedValueKey = (value: string): string =>
+  value
+    .normalize("NFKC")
+    .toLowerCase()
+    .trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, "")
+    .replace(/^www\./, "")
+    .replace(/\/.*$/, "")
+    .replace(/[^\p{L}\p{N}@.+_-]+/gu, "")
+    .replace(/\.(com|org|net|io|dev|app|ai|co)$/u, "");
 
 export const USER_ASK_ESCALATION_STEP_MS = 90_000;
 
@@ -145,7 +185,18 @@ export type UserAskSecureInputDetail = Readonly<{
   purpose: string;
   detail?: string;
   fields: readonly UserAskField[];
+  save?: UserAskSaveTarget;
 }>;
+
+export const userAskFieldIsRememberable = (field: UserAskField): boolean =>
+  field.type !== "code";
+
+export const userAskOffersRemember = (detail: UserAskDetail): boolean =>
+  detail.kind === "secure_input" &&
+  detail.save !== undefined &&
+  detail.fields.some(
+    (field) => field.sensitive && userAskFieldIsRememberable(field),
+  );
 
 export type UserAskDetail = UserAskQuestionDetail | UserAskSecureInputDetail;
 
@@ -235,8 +286,18 @@ export type UserAskAnswer =
       revision: number;
       kind: "fields";
       fields: readonly UserAskAnswerFieldValue[];
+      remember?: boolean;
       answeredOnDeviceId?: string;
     }>;
+
+export type UserAskSavedValueNote = Readonly<{
+  label: string;
+  account?: string;
+  reused: boolean;
+  remembered: boolean;
+  replaced?: boolean;
+  savedAt?: number;
+}>;
 
 export type UserAskResolution =
   | Readonly<{
@@ -245,6 +306,7 @@ export type UserAskResolution =
       responses?: readonly UserAskQuestionResponse[];
       values?: Readonly<Record<string, string>>;
       handles?: Readonly<Record<string, string>>;
+      saved?: UserAskSavedValueNote;
       answeredAt: number;
       late?: boolean;
     }>

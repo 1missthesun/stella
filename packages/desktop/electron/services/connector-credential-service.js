@@ -339,7 +339,7 @@ export class ConnectorCredentialService {
         const current = this.meta.get(requestId);
         if (!current || !this.pending.has(requestId)) {
             if (resolution?.handles?.credential)
-                userAsks.takeSecureValue(resolution.handles.credential);
+                await userAsks.takeSecureValue(resolution.handles.credential);
             return;
         }
         if (resolution?.outcome !== "answered") {
@@ -349,7 +349,7 @@ export class ConnectorCredentialService {
         }
         if (current.mode === "api_key") {
             const handle = resolution.handles?.credential;
-            const value = handle ? userAsks.takeSecureValue(handle)?.trim() : "";
+            const value = handle ? (await userAsks.takeSecureValue(handle))?.trim() : "";
             const stellaAppDir = this.options.getStellaAppDir();
             if (!value || !stellaAppDir) {
                 this.finish(requestId, { ok: false, reason: value ? "unsupported" : "cancelled" });

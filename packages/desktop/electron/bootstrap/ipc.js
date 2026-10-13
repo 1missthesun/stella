@@ -298,6 +298,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
         setUserAskPolicy: (payload) => services.userAskService.setPolicy(payload),
         listStoredSecureValues: () => services.userAskService.listStoredSecureValues(),
         deleteStoredSecureValues: (payload) => services.userAskService.deleteStoredSecureValues(payload),
+        renameStoredSecureValue: (payload) => services.userAskService.renameStoredSecureValue(payload),
         respondConnectorConnect: (payload) => services.connectorConnectService.respond(payload),
         onPermissionGranted: (kind) => {
             if (kind === "accessibility") {

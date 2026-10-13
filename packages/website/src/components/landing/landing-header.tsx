@@ -65,7 +65,7 @@ export function LandingHeader({ getHref = "#get" }: { getHref?: string }) {
       <nav className={h.nav} aria-label="Primary">
         <Link href="/learn-more">Learn</Link>
         <Link href="/pricing">Pricing</Link>
-        <Link href="/slack">Slack</Link>
+        <Link href="/crew">Crew</Link>
         <span className={h.account}>
           <SiteHeaderAccount />
         </span>

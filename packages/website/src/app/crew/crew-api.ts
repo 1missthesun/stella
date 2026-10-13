@@ -19,7 +19,7 @@ import {
 } from "@stella/contracts/slack-workspace";
 import { getAuthToken } from "@/lib/auth-token";
 import { readBackendUrl } from "@/lib/backend-url";
-import { mockSlackApi, readMockMode } from "./slack-mock";
+import { mockSlackApi, readMockMode } from "./crew-mock";
 
 export class SlackApiError extends Error {
   constructor(

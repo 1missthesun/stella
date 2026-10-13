@@ -880,7 +880,7 @@ function AccountIdentity({
         {name && email ? <p className="billing-identity-email">{email}</p> : null}
       </div>
       <div className="billing-identity-actions">
-        <Link className="billing-button billing-button--ghost" href="/slack">
+        <Link className="billing-button billing-button--ghost" href="/crew">
           Stella Crew
         </Link>
         <button

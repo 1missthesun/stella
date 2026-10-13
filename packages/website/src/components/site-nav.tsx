@@ -22,7 +22,7 @@ const NAV_ENTRIES: NavEntry[] = [
       { label: "What Stella can fix", href: "/fix" },
       { label: "One chat", href: "/one-chat" },
       { label: "Voice", href: "/voice" },
-      { label: "Stella Crew", href: "/slack" },
+      { label: "Stella Crew", href: "/crew" },
       { label: "Pricing", href: "/pricing" },
     ],
   },

@@ -91,7 +91,7 @@ export function AccountMenu({ user }: { user: AccountMenuUser }) {
             <CreditCard size={18} aria-hidden="true" className={styles.icon} />
             <span>Plan &amp; billing</span>
           </Link>
-          <Link href="/slack" role="menuitem" className={styles.item} onClick={close}>
+          <Link href="/crew" role="menuitem" className={styles.item} onClick={close}>
             <MessagesSquare size={18} aria-hidden="true" className={styles.icon} />
             <span>Stella Crew</span>
           </Link>

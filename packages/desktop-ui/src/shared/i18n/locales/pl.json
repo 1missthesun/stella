@@ -1918,6 +1918,7 @@
       "title": "Your data in Stella Cloud"
     },
     "telemetry": {
+      "accountError": "Telemetria jest wyłączona na tym urządzeniu, ale nie udało się zaktualizować Twojego konta. Spróbuj ponownie.",
       "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
       "error": "Couldn’t change telemetry. Try again.",
       "title": "Share anonymous usage metrics"

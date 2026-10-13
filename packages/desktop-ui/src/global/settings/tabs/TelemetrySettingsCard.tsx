@@ -10,6 +10,8 @@ import { SettingsToggleCard } from "./settings-toggle-card";
  * signed in (it also stops cloud-side reporting); the local preference is
  * what this device's producers check before recording anything, so both are
  * always written together and the account value is mirrored locally on load.
+ * A failed save never leaves this device collecting: turning on writes the
+ * account first, turning off stops this device first.
  */
 export function TelemetrySettingsCard() {
   const t = useT();
@@ -63,14 +65,37 @@ export function TelemetrySettingsCard() {
       setEnabled(next);
       setSaving(true);
       setError(null);
+      const setLocal = async (value: boolean) => {
+        await window.electronAPI?.system?.setTelemetryEnabled?.(value);
+      };
+      const setAccount = async (value: boolean) => {
+        if (!isCloudConversationReady) return;
+        await backendClient.call("preferences.set", {
+          telemetryEnabled: value,
+        });
+        reconciledAccount.current = value;
+      };
       void (async () => {
         try {
-          await window.electronAPI?.system?.setTelemetryEnabled?.(next);
-          if (isCloudConversationReady) {
-            await backendClient.call("preferences.set", {
-              telemetryEnabled: next,
-            });
-            reconciledAccount.current = next;
+          if (next) {
+            // On: the account first, so a failed save never leaves this
+            // device collecting while the switch shows Off.
+            await setAccount(true);
+            try {
+              await setLocal(true);
+            } catch (localError) {
+              await setAccount(false).catch(() => undefined);
+              throw localError;
+            }
+            return;
+          }
+          // Off: this device stops first and stays stopped even when the
+          // account can't be updated, and the switch says so.
+          await setLocal(false);
+          try {
+            await setAccount(false);
+          } catch {
+            setError(t("settings.telemetry.accountError"));
           }
         } catch {
           setEnabled(previous);

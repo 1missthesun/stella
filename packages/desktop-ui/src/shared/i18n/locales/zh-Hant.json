@@ -1894,6 +1894,7 @@
       "title": "Your data in Stella Cloud"
     },
     "telemetry": {
+      "accountError": "此裝置上的遙測已關閉，但無法更新你的帳戶。請再試一次。",
       "description": "Anonymous usage and reliability metrics only — never your messages or files. Turning this off stops telemetry on this device and for your account in the cloud, and deletes anything still queued here. Billing records are not telemetry.",
       "error": "Couldn’t change telemetry. Try again.",
       "title": "Share anonymous usage metrics"

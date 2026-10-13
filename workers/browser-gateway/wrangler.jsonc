@@ -105,7 +105,7 @@
         "enabled": true,
         "issues": { "enabled": true },
         "logs": { "enabled": true, "head_sampling_rate": 1 },
-        "traces": { "enabled": true, "head_sampling_rate": 0.05 },
+        "traces": { "enabled": true, "head_sampling_rate": 0.01 },
       },
       "secrets": {
         "required": ["BROWSER_PROFILE_KEK_V1"],

@@ -481,7 +481,11 @@ applies until the user clicks Update.
 1. **App source** (any desktop/runtime change):
    `env -u CLOUDFLARE_API_TOKEN bun run app-source:publish -- --namespace stella-app-dev`
    (and `stella-app-prod` for prod). It publishes `HEAD` by default
-   (`--ref` to choose). An unchanged tree publishes nothing.
+   (`--ref` to choose). An unchanged tree publishes nothing. It then tells
+   that namespace's backend, which pushes the version to connected desktops
+   (pill within seconds); desktops don't poll, so if the notice fails, rerun
+   the publish (it re-sends) or they see it at their next launch/reconnect.
+   For a Preview bound to a test namespace, pass `--backend <preview URL>`.
 2. **Launchers** (only when `launcher/` changed): a push only builds and
    self-tests them. Publish with `gh workflow run build-launchers.yml --ref master -f publish=true`.
    It signs and notarizes macOS (DMG + zip), signs `Stella.exe`, builds the Linux

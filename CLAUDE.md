@@ -43,6 +43,12 @@ that we publish, plus a private fork per user.
   `packages/desktop-ui/src/features/app-source/`; publishing upstream is
   `bun run app-source:publish -- --namespace <ns>`. Fetch from Artifacts over
   git protocol v2 (its v1 fetch is broken); push over v1.
+- Desktops never poll for updates. The publish step notifies its environment's
+  backend, whose release channel (`AppReleaseChannel`,
+  `/api/app-source/releases`) pushes the version to every connected desktop
+  and sends it again on each (re)connect; pushes to a fork reach the owner's
+  other computers through the `appSource.fork` view. Desktops fetch only at
+  launch and on those signals.
 
 ## Deploying
 

@@ -164,6 +164,13 @@ export type CloudTurnStartErrorCode =
   /** Anonymous owners may not use this lane or helper; sign in to continue. */
   | "sign_in_required"
   | "subscription_required"
+  /**
+   * No room left for Stella's models (`@stella/contracts/stella-usage-limit`):
+   * the message says so, and clients offer Upgrade instead of a retry.
+   */
+  | "usage_limit"
+  /** Billing isn't configured on the server; the plan can't be read. */
+  | "billing_unavailable"
   /** The owner's enforcement status refuses service. */
   | "owner_suspended"
   | "internal";

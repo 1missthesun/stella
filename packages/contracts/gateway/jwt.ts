@@ -10,6 +10,7 @@ import {
   type GatewayCapabilityIssuer,
   type GatewayJwks,
 } from "./capability.js";
+import { isStellaUsageLimitReason } from "../stella-usage-limit.js";
 
 /**
  * Compact-JWS capability signing and verification on WebCrypto only, so the
@@ -204,6 +205,9 @@ export const validateCapabilityClaims = (
     return false;
   }
   if (value.ledgerScope !== undefined && value.ledgerScope !== "owner-relay-v2") {
+    return false;
+  }
+  if (value.usageLimit !== undefined && !isStellaUsageLimitReason(value.usageLimit)) {
     return false;
   }
   if (value.kind === "turn") {

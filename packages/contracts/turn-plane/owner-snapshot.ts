@@ -4,6 +4,7 @@ import type { OwnerEnforcement } from "../gateway/usage.js";
 import type { IdentityLevel } from "../gateway/api.js";
 import type { CloudSandboxAccess } from "../backend/billing.js";
 import type { ExecutionCapability } from "./placement.js";
+import type { StellaUsageLimit } from "../stella-usage-limit.js";
 
 /**
  * The owner snapshot is what the owner gate Durable Object admits turns
@@ -38,6 +39,17 @@ export type OwnerSnapshot = {
     budgetMicroCents: number;
     maxRequests?: number;
   };
+  /**
+   * The owner has no room left for Stella's models (free allowance spent,
+   * plan limit reached). A turn on Stella's models is refused up front with
+   * this message rather than started on a zero budget.
+   */
+  usageLimit?: StellaUsageLimit;
+  /**
+   * Billing is not configured on this server, so the owner's plan can't be
+   * read. Turns on Stella's models are refused as a server error.
+   */
+  billingUnavailable?: true;
   /**
    * Owner default execution used when a turn does not pin one, filled by the
    * gate from the owner's engines domain.

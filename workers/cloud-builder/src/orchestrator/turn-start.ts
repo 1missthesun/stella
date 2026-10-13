@@ -1,3 +1,4 @@
+import { BILLING_UNAVAILABLE_MESSAGE } from "@stella/contracts/stella-usage-limit";
 import {
   type AdmittedCloudChat,
   chatTurnFingerprintSource,
@@ -652,6 +653,34 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           executionUnavailableMessage(execution),
           false,
         );
+      }
+      // Stella's models spend the owner's allowance. With none left the turn
+      // would fail at its first model call, so it is refused here with the
+      // plan's own wording; the owner's own engines still run. A wake (an
+      // agent's report) isn't refused: its sender would only redeliver it,
+      // and the turn ends on the same usage-limit notice in the chat.
+      if (execution.engine === "stella" && lane !== "wake") {
+        if (snapshot.billingUnavailable) {
+          log("error", "turn_refused_billing_unavailable", {
+            conversationId,
+            turnId,
+            lane,
+          });
+          return await refuse(
+            "billing_unavailable",
+            BILLING_UNAVAILABLE_MESSAGE,
+            true,
+          );
+        }
+        if (snapshot.usageLimit) {
+          log("info", "turn_refused_usage_limit", {
+            conversationId,
+            turnId,
+            lane,
+            reason: snapshot.usageLimit.reason,
+          });
+          return await refuse("usage_limit", snapshot.usageLimit.message, false);
+        }
       }
 
       // Adoption. Conversation ids are client-minted UUIDs, so the first

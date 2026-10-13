@@ -1,3 +1,10 @@
+import {
+  BILLING_UNAVAILABLE_CODE,
+  BILLING_UNAVAILABLE_MESSAGE,
+  STELLA_USAGE_LIMIT_CODE,
+  STELLA_USAGE_LIMIT_MESSAGES,
+  type StellaUsageLimitReason,
+} from "@stella/contracts/stella-usage-limit";
 import type { DevicesResponse } from "@stella/contracts/turn-plane/placement";
 import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
 import { formatTurnClock } from "@stella/contracts/schedule-zone";
@@ -82,7 +89,93 @@ const isUsageLimitReply = (message: unknown): boolean => {
   );
 };
 
+/** A model-gateway refusal that is about the owner's plan, not the request. */
+type GatewayPlanRefusal = "budget_exhausted" | "usage_limit" | "tier_paused";
+
+const gatewayPlanRefusalOf = async (
+  response: Response,
+): Promise<GatewayPlanRefusal | undefined> => {
+  if (response.status !== 402 && response.status !== 429) return undefined;
+  try {
+    const body = (await response.clone().json()) as {
+      error?: { code?: unknown };
+    } | null;
+    const code = body?.error?.code;
+    return code === "budget_exhausted" ||
+      code === "usage_limit" ||
+      code === "tier_paused"
+      ? code
+      : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+/** What a turn the gateway refused on the owner's plan tells the user. */
+type PlanRefusalNotice = {
+  message: string;
+  code?: typeof STELLA_USAGE_LIMIT_CODE | typeof BILLING_UNAVAILABLE_CODE;
+  reason?: StellaUsageLimitReason;
+};
+
+const TIER_PAUSED_NOTICE =
+  "Stella's models are paused for your plan right now. Upgrade to keep going, or try again later.";
+const TURN_BUDGET_SPENT_NOTICE =
+  "This reply reached its spending limit before it finished. Send a message to continue.";
+
 export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
+  /**
+   * Why the gateway refused this turn's model call on the plan. The owner's
+   * billing decides: out of room is the usage-limit notice with Upgrade;
+   * still in room means only this turn's own budget ran out.
+   */
+  protected async planRefusalNotice(
+    turn: ChatTurnRequest,
+    refusal: GatewayPlanRefusal,
+  ): Promise<PlanRefusalNotice> {
+    const snapshot = await this.ownerGateSnapshot(turn.ownerId).catch(
+      (error: unknown) => {
+        log("error", "plan_refusal_snapshot_failed", {
+          turnId: turn.turnId,
+          message: errorMessage(error),
+        });
+        return undefined;
+      },
+    );
+    log("info", "chat_turn_plan_refused", {
+      turnId: turn.turnId,
+      conversationId: turn.conversationId,
+      refusal,
+      usageLimit: snapshot?.usageLimit?.reason ?? null,
+      billingUnavailable: snapshot?.billingUnavailable === true,
+    });
+    if (snapshot?.billingUnavailable) {
+      return { message: BILLING_UNAVAILABLE_MESSAGE, code: BILLING_UNAVAILABLE_CODE };
+    }
+    if (snapshot?.usageLimit) {
+      return {
+        message: snapshot.usageLimit.message,
+        code: STELLA_USAGE_LIMIT_CODE,
+        reason: snapshot.usageLimit.reason,
+      };
+    }
+    if (refusal === "tier_paused") {
+      return {
+        message: TIER_PAUSED_NOTICE,
+        code: STELLA_USAGE_LIMIT_CODE,
+        reason: "plan_limit",
+      };
+    }
+    if (refusal === "usage_limit") {
+      return {
+        message: STELLA_USAGE_LIMIT_MESSAGES.plan_limit,
+        code: STELLA_USAGE_LIMIT_CODE,
+        reason: "plan_limit",
+      };
+    }
+    return { message: TURN_BUDGET_SPENT_NOTICE };
+  }
+
   /**
    * A stopped turn keeps what the user sent: its prompt is journaled now if
    * the turn had not journaled it yet (Stop before admission, or while it
@@ -433,6 +526,7 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     };
     this.currentTurnCancellation = turnCancellation;
     let subscriptionLimitNotice: string | undefined;
+    let gatewayRefusal: GatewayPlanRefusal | undefined;
     try {
       // The queue boundary checked the live owner lease. The provider guard
       // checks it again with memory policy after read-only preparation.
@@ -764,6 +858,8 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
               subscriptionLimitNotice = nativeSubscriptionLimitNotice(
                 response.headers.get(GATEWAY_SUBSCRIPTION_LIMIT_HEADER),
               );
+              gatewayRefusal =
+                (await gatewayPlanRefusalOf(response)) ?? gatewayRefusal;
             }
             return activeGrant
               ? releaseOwnerModelGrantAfterBody(response, activeGrant.release)
@@ -795,18 +891,28 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     } catch (error) {
       const message = errorMessage(error);
       const contextFailure = cloudContextFailure(error);
+      // A plan refusal (allowance spent, plan limit) is never "try again":
+      // the owner's billing says why, and clients offer Upgrade on its code.
+      const planNotice =
+        !contextFailure && gatewayRefusal
+          ? await this.planRefusalNotice(turn, gatewayRefusal)
+          : undefined;
       const terminalNotice = contextFailure
         ? CLOUD_CONTEXT_NOTICE
-        : error instanceof CliTurnFailedError && error.userMessage
-          ? error.userMessage
-          : (subscriptionLimitNotice ?? TERMINAL_NOTICE.failed);
+        : planNotice
+          ? planNotice.message
+          : error instanceof CliTurnFailedError && error.userMessage
+            ? error.userMessage
+            : (subscriptionLimitNotice ?? TERMINAL_NOTICE.failed);
       const terminalPayload = contextFailure
         ? {
             message: terminalNotice,
             code: contextFailure.code,
             component: contextFailure.component,
           }
-        : { message: terminalNotice };
+        : planNotice
+          ? planNotice
+          : { message: terminalNotice };
       log("error", "chat_turn_failed", {
         turnId: turn.turnId,
         conversationId: turn.conversationId,

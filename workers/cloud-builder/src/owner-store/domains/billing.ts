@@ -27,6 +27,10 @@ import {
 } from "@stella/contracts/gateway/capability";
 import type { GatewayUsageEvent } from "@stella/contracts/gateway/usage";
 import {
+  STELLA_USAGE_LIMIT_MESSAGES,
+  type StellaUsageLimit,
+} from "@stella/contracts/stella-usage-limit";
+import {
   BillingConfigError,
   billingConfig,
   planForStripePrice,
@@ -329,6 +333,12 @@ export type BillingAccess = {
   message: string;
   /** Spend available now (windows plus credit); null when unlimited. */
   remainingMicroCents: number | null;
+  /**
+   * Set when no spend is left for Stella's models: a Free owner refused, or a
+   * paid owner past a window with no credit (its budget is then zero, so
+   * "falling back" has nothing to spend either). Retrying never helps.
+   */
+  usageLimit?: StellaUsageLimit;
 };
 
 const audienceFor = (
@@ -375,15 +385,19 @@ const accessFor = (config: BillingConfig, row: AccountRow, now: number): Billing
   }
   const retryAfterMs = Math.max(1_000, blocking.window.resetAt - now);
   if (current === "free") {
+    const message = blocking.lifetime
+      ? STELLA_USAGE_LIMIT_MESSAGES.free_allowance
+      : "Free plan usage limit reached. Upgrade to keep going, or wait until it resets.";
     return {
       ...base,
       allowed: false,
       downgraded: false,
       audience: audienceFor(current, anonymous, false),
       retryAfterMs,
-      message: blocking.lifetime
-        ? "You've used your free Stella allowance. Upgrade to keep going."
-        : "Free plan usage limit reached. Upgrade to continue.",
+      message,
+      usageLimit: blocking.lifetime
+        ? { reason: "free_allowance", message }
+        : { reason: "plan_limit", message, retryAfterMs },
     };
   }
   return {
@@ -393,6 +407,15 @@ const accessFor = (config: BillingConfig, row: AccountRow, now: number): Billing
     audience: audienceFor(current, anonymous, true),
     retryAfterMs,
     message: `${config.plans[current].label} plan managed-model limits reached. Falling back until usage resets.`,
+    ...(remaining <= 0
+      ? {
+          usageLimit: {
+            reason: "plan_limit" as const,
+            message: `${config.plans[current].label} plan usage limit reached. Upgrade or add credit to keep going, or wait until it resets.`,
+            retryAfterMs,
+          },
+        }
+      : {}),
   };
 };
 
@@ -474,6 +497,7 @@ export const turnAllowance = (ctx: { db: OwnerDbReader; env: Cloudflare.Env; now
   return {
     plan: access.plan,
     identityLevel: access.identityLevel,
+    ...(access.usageLimit ? { usageLimit: access.usageLimit } : {}),
     allowance: {
       audience: access.audience,
       budgetMicroCents: capabilityBudget(access, reservedGrants(ctx.db, ctx.now)),

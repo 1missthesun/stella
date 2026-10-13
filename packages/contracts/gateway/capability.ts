@@ -1,4 +1,5 @@
 import type { CloudExecutionSelection } from "../agent-engine.js";
+import type { StellaUsageLimitReason } from "../stella-usage-limit.js";
 
 /**
  * Model-gateway capability tokens.
@@ -100,6 +101,12 @@ export type GatewayCapabilityClaims = {
    * per-capability ledger; owner-relay-v2 capabilities account on the owner gate.
    */
   ledgerScope?: "owner-relay-v2";
+  /**
+   * Minted while the owner had no room left for Stella's models. A spent
+   * budget is then refused as `usage_limit` (with the reason's wording), not
+   * the capability's own `budget_exhausted`.
+   */
+  usageLimit?: StellaUsageLimitReason;
 };
 
 export const GATEWAY_SESSION_CAPABILITY_TTL_MS = 60 * 60 * 1000;

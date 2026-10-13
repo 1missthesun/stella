@@ -223,6 +223,11 @@ export type GatewayErrorCode =
   | "stream_unsupported"
   /** This capability's budget is spent. Clients exchange a fresh one once. */
   | "budget_exhausted"
+  /**
+   * The owner has no room left for Stella's models (free allowance spent,
+   * plan limit reached). Trying again won't help; the message says what will.
+   */
+  | "usage_limit"
   /** This capability's request count is spent. Clients exchange a fresh one once. */
   | "request_limit"
   | "rate_limited"

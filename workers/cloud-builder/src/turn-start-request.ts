@@ -326,6 +326,8 @@ export const TURN_START_ERROR_STATUS: Record<CloudTurnStartErrorCode, number> =
     owner_purged: 410,
     sign_in_required: 403,
     subscription_required: 403,
+    usage_limit: 402,
+    billing_unavailable: 503,
     owner_suspended: 403,
     execution_unavailable: 409,
     internal: 503,

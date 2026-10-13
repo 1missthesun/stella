@@ -583,6 +583,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         audience: grant.audience,
         budgetMicroCents: grant.budgetMicroCents,
         ...(maxRequests !== undefined ? { maxRequests } : {}),
+        ...(grant.usageLimit ? { usageLimit: grant.usageLimit.reason } : {}),
       },
       await capabilitySigningKey(this.env),
       { ttlMs: GATEWAY_SESSION_CAPABILITY_TTL_MS, now },
@@ -897,10 +898,13 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         billing = turnAllowance(ctx);
       } catch (error) {
         if (!(error instanceof BillingConfigError)) throw error;
-        // Unconfigured billing serves a zero allowance: turns fail closed
-        // until it is set.
-        log("error", "billing_unconfigured", { message: error.message });
-        return owned;
+        // Unconfigured billing is a server error, not an empty allowance:
+        // turns on Stella's models are refused with `billing_unavailable`.
+        log("error", "billing_unconfigured", {
+          ownerId: this.ownerId(),
+          message: error.message,
+        });
+        return { ...owned, billingUnavailable: true };
       }
       return {
         ...owned,
@@ -908,6 +912,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         cloudSandbox: cloudSandboxAccess(ctx),
         identityLevel: billing.identityLevel,
         allowance: billing.allowance,
+        ...(billing.usageLimit ? { usageLimit: billing.usageLimit } : {}),
       };
     } finally {
       store.flush();

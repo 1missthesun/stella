@@ -1,3 +1,8 @@
+import {
+  STELLA_USAGE_LIMIT_CODE,
+  STELLA_USAGE_LIMIT_MESSAGES,
+  type StellaUsageLimitReason,
+} from "@stella/contracts/stella-usage-limit";
 import { billingControl, billingGatewayConfig } from "./billing-control.js";
 import {
   GATEWAY_HEALTH_PATH,
@@ -477,12 +482,14 @@ const handleRelay = async (
   let ledgerScope: "owner-relay-v2" | "capability" | undefined;
   let turn: { turnId: string; conversationId: string } | undefined;
   let cancellationKey: string | undefined;
+  let usageLimit: StellaUsageLimitReason | undefined;
   try {
     const auth = await authenticateCapability(request, env, {
       now: deps.now(),
       allowProbe: true,
     });
     timing.mark("authenticated");
+    usageLimit = auth.claims.usageLimit;
     ledgerScope = auth.claims.ledgerScope ?? "capability";
     if (auth.claims.turn) {
       turn = {
@@ -596,6 +603,21 @@ const handleRelay = async (
     }
     return response;
   } catch (error) {
+    // A spent budget on a capability minted while the owner was out of
+    // room is the owner's usage limit, which the client must not retry.
+    if (
+      usageLimit &&
+      isGatewayError(error) &&
+      error.code === "budget_exhausted"
+    ) {
+      status = 402;
+      throw new GatewayError(
+        402,
+        STELLA_USAGE_LIMIT_CODE,
+        STELLA_USAGE_LIMIT_MESSAGES[usageLimit],
+        { retryable: false, quota: { scope: "owner" } },
+      );
+    }
     status = toGatewayError(error).status;
     throw error;
   } finally {

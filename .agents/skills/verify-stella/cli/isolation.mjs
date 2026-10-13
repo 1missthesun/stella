@@ -304,6 +304,27 @@ const readMacKeychainCredential = (service) => {
 
 const MIN_TOKEN_LIFETIME_MS = 30 * 60_000;
 
+/**
+ * Who the borrowed login is (email and organization, from the CLI's own
+ * `oauthAccount` record next to that credential), so `claude auth status`
+ * in the run names the account as it does on the host. Identity only.
+ */
+const claudeAccountIdentity = (source) => {
+  const candidates = source.startsWith("macOS keychain")
+    ? [path.join(os.homedir(), ".claude.json")]
+    : [path.join(path.dirname(source), ".claude.json"), path.join(path.dirname(path.dirname(source)), ".claude.json")];
+  for (const file of candidates) {
+    try {
+      const account = JSON.parse(readFileSync(file, "utf8"))?.oauthAccount;
+      if (account && typeof account.emailAddress === "string") {
+        const keep = ["accountUuid", "emailAddress", "organizationUuid", "organizationName", "organizationRole", "displayName"];
+        return Object.fromEntries(keep.filter((key) => account[key] !== undefined).map((key) => [key, account[key]]));
+      }
+    } catch {}
+  }
+  return null;
+};
+
 export const borrowClaudeLogin = ({ claudeConfigDir, oauthToken }) => {
   let oauth;
   let source;
@@ -348,6 +369,14 @@ export const borrowClaudeLogin = ({ claudeConfigDir, oauthToken }) => {
   const file = path.join(claudeConfigDir, ".credentials.json");
   writeFileSync(file, `${JSON.stringify({ claudeAiOauth: oauth })}\n`, { mode: 0o600 });
   chmodSync(file, 0o600);
+  const account = oauthToken ? null : claudeAccountIdentity(source);
+  if (account) {
+    writeFileSync(
+      path.join(claudeConfigDir, ".claude.json"),
+      `${JSON.stringify({ oauthAccount: account })}\n`,
+      { mode: 0o600 },
+    );
+  }
   let status = null;
   try {
     const claude = execFileSync(process.platform === "win32" ? "where" : "which", ["claude"], { encoding: "utf8" }).trim().split("\n")[0];

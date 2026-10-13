@@ -8,7 +8,7 @@
  *   POST /api/admin/owners/enforcement          {ownerId, status, reason, until?} via the gate's setOwnerEnforcement
  *   POST /api/admin/billing/plan                {ownerId, plan?, usageMode? | unlimited?, resetUsage?}
  *   POST /api/admin/delete                      {kind: "feedback", id} | {kind: "media_job", ownerId, id}
- *   POST /api/admin/test-accounts/session       {email?, plan?, usageMode?} → a signed-in test user (dev only)
+ *   POST /api/admin/test-accounts/session       {email?, plan?, usageMode?, allowance?: "spent"} → a signed-in test user (dev only)
  *   POST /api/admin/test-accounts/conversation-restart  {conversationId} → restart that conversation's object (dev only)
  *   POST /api/admin/test-accounts/email-digest-probe  {ownerId, messages, simulate?} → one digest check on given mail (dev only)
  *   GET  /api/admin/secret-rotation/status      D1 rows still under BETTER_AUTH_SECRET (jwks, Slack)
@@ -301,10 +301,13 @@ const testAccountSession = async (request: Request, env: AdminEnv): Promise<Resp
   const oneTimeToken = await auth.api.generateOneTimeToken({ headers: sessionHeaders });
 
   const ownerId = userId;
-  if (plan) {
+  // `allowance: "spent"` makes the account one that used up its allowance.
+  const spendAllowance = body.allowance === "spent";
+  if (plan || spendAllowance) {
     await ownerGateStub(env.OWNER_GATES, ownerId).setBillingPlan({
-      plan: plan as "free" | "go" | "pro",
+      ...(plan ? { plan: plan as "free" | "go" | "pro" } : {}),
       ...(usageMode ? { usageMode: usageMode as "default" | "unlimited" } : {}),
+      ...(spendAllowance ? { spendAllowance: true } : {}),
     });
   }
   console.log(JSON.stringify({ event: "admin_test_account_session", ownerId, plan: plan || "free" }));

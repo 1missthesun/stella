@@ -649,7 +649,13 @@ export const recordUsage = (
 /** Set a plan outside Stripe (test accounts, support). Resets usage on a change. */
 export const setAdminPlan = (
   ctx: OwnerContext,
-  input: { plan?: BillingPlan; usageMode?: "default" | "unlimited"; resetUsage?: boolean },
+  input: {
+    plan?: BillingPlan;
+    usageMode?: "default" | "unlimited";
+    resetUsage?: boolean;
+    /** Test accounts: spend the whole allowance, as a user who used it up. */
+    spendAllowance?: boolean;
+  },
 ): void => {
   const row = ensureAccount(ctx.db, ctx.now);
   const nextPlan = input.plan ?? plan(row);
@@ -666,9 +672,13 @@ export const setAdminPlan = (
     ...(input.resetUsage ?? (planChanged || usageMode !== row.usage_mode)
       ? resetWindows(ctx.now, anchor)
       : {}),
+    ...(input.spendAllowance ? { total_used: SPENT_ALLOWANCE_MICRO_CENTS, credit_balance: 0 } : {}),
     updated_at: ctx.now,
   });
 };
+
+/** Far past any plan's lifetime allowance ($100,000). */
+const SPENT_ALLOWANCE_MICRO_CENTS = 10_000_000_000_000;
 
 const resetWindows = (now: number, anchor: number): Partial<AccountRow> => ({
   rolling_used: 0,

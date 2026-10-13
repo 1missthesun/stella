@@ -71,11 +71,13 @@ function UserAskFieldRow({
   field,
   value,
   busy,
+  relayed,
   onValueChange,
 }: {
   field: UserAskField;
   value: string;
   busy: boolean;
+  relayed: boolean;
   onValueChange: (next: string) => void;
 }) {
   const t = useT();
@@ -84,11 +86,37 @@ function UserAskFieldRow({
     ? `${field.label} · ${t("userAsk.secureInput.optional")}`
     : field.label;
 
+  const privacyLabel = t(
+    sensitive
+      ? "userAsk.secureInput.privateBadge"
+      : "userAsk.secureInput.sharedBadge",
+  );
+
   return (
     <div className="user-ask__field" data-field-type={field.type}>
+      <div className="user-ask__field-head">
+        <span className="user-ask__field-label">{label}</span>
+        <span
+          className={`user-ask__badge${sensitive ? " user-ask__badge--private" : ""}`}
+          title={t(
+            sensitive
+              ? relayed
+                ? "userAsk.secureInput.relayedPrivateNote"
+                : "userAsk.secureInput.privateNote"
+              : "userAsk.secureInput.sharedNote",
+          )}
+        >
+          {sensitive ? (
+            <Lock size={11} aria-hidden="true" />
+          ) : (
+            <Eye size={11} aria-hidden="true" />
+          )}
+          {privacyLabel}
+        </span>
+      </div>
       {field.type === "choice" ? (
         <Select
-          label={label}
+          aria-label={label}
           value={value}
           placeholder={t("userAsk.secureInput.choosePlaceholder")}
           disabled={busy}
@@ -102,37 +130,21 @@ function UserAskFieldRow({
       ) : (
         <TextField
           label={label}
+          hideLabel
+          aria-label={label}
           description={field.hint}
           type={inputTypeForField(field)}
           inputMode={field.type === "code" ? "numeric" : undefined}
           autoComplete={field.type === "secret" ? "off" : undefined}
           spellCheck={false}
           maxLength={field.type === "code" ? 12 : undefined}
-          className={
-            field.type === "code" ? "user-ask__field-code" : undefined
-          }
+          className={field.type === "code" ? "user-ask__field-code" : undefined}
           placeholder={field.placeholder}
           value={value}
           disabled={busy}
           onChange={(event) => onValueChange(event.target.value)}
         />
       )}
-      <div className="user-ask__field-privacy">
-        <span
-          className={`user-ask__badge${sensitive ? " user-ask__badge--private" : ""}`}
-        >
-          {sensitive ? (
-            <Lock size={11} aria-hidden="true" />
-          ) : (
-            <Eye size={11} aria-hidden="true" />
-          )}
-          {t(
-            sensitive
-              ? "userAsk.secureInput.privateBadge"
-              : "userAsk.secureInput.sharedBadge",
-          )}
-        </span>
-      </div>
     </div>
   );
 }
@@ -160,9 +172,6 @@ function UserAskSecureInputBody({
   const [declining, setDeclining] = useState(false);
   const [reason, setReason] = useState("");
   const [missing, setMissing] = useState<string | null>(null);
-
-  const anySensitive = detail.fields.some((field) => field.sensitive);
-  const anyShared = detail.fields.some((field) => !field.sensitive);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -197,62 +206,22 @@ function UserAskSecureInputBody({
           {t("userAsk.secureInput.replacing", { label: detail.save.label })}
         </p>
       ) : null}
-      <div className="user-ask__fields">
+      <div
+        className="user-ask__fields"
+        data-count={detail.fields.length > 1 ? "many" : "one"}
+      >
         {detail.fields.map((field) => (
           <UserAskFieldRow
             key={field.id}
             field={field}
             busy={busy}
+            relayed={relayed}
             value={values[field.id] ?? ""}
             onValueChange={(next) =>
               setValues((current) => ({ ...current, [field.id]: next }))
             }
           />
         ))}
-      </div>
-      {offersRemember ? (
-        <label className="user-ask__remember">
-          <input
-            type="checkbox"
-            checked={remember}
-            disabled={busy}
-            onChange={(event) => setRemember(event.target.checked)}
-          />
-          <span className="user-ask__remember-text">
-            <span className="user-ask__remember-label">
-              {t(
-                relayed
-                  ? "userAsk.secureInput.rememberRelayed"
-                  : "userAsk.secureInput.remember",
-              )}
-            </span>
-            <span className="user-ask__remember-hint">
-              {remember
-                ? t("userAsk.secureInput.rememberOn", {
-                    label: detail.save?.label ?? "",
-                  })
-                : t("userAsk.secureInput.rememberOff")}
-            </span>
-          </span>
-        </label>
-      ) : null}
-      <div className="user-ask__notes">
-        {anySensitive ? (
-          <p className="user-ask__footnote user-ask__footnote--private">
-            <Lock size={11} aria-hidden="true" />
-            {t(
-              relayed
-                ? "userAsk.secureInput.relayedPrivateNote"
-                : "userAsk.secureInput.privateNote",
-            )}
-          </p>
-        ) : null}
-        {anyShared ? (
-          <p className="user-ask__footnote">
-            <Eye size={11} aria-hidden="true" />
-            {t("userAsk.secureInput.sharedNote")}
-          </p>
-        ) : null}
       </div>
       {missing ? (
         <p className="user-ask__error" role="alert">
@@ -282,50 +251,78 @@ function UserAskSecureInputBody({
         </div>
       ) : null}
       <div className="user-ask__actions">
-        {declining ? (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              className="pill-btn"
+        {offersRemember && !declining ? (
+          <label
+            className="user-ask__remember"
+            title={
+              remember
+                ? t("userAsk.secureInput.rememberOn", {
+                    label: detail.save?.label ?? "",
+                  })
+                : t("userAsk.secureInput.rememberOff")
+            }
+          >
+            <input
+              type="checkbox"
+              checked={remember}
               disabled={busy}
-              onClick={() => setDeclining(false)}
-            >
-              {t("userAsk.secureInput.declineBack")}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="pill-btn pill-btn--danger"
-              disabled={busy}
-              onClick={() => onDecline(reason.trim())}
-            >
-              {t("userAsk.secureInput.declineConfirm")}
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              type="button"
-              variant="ghost"
-              className="pill-btn"
-              disabled={busy}
-              onClick={() => setDeclining(true)}
-            >
-              {t("userAsk.secureInput.decline")}
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              className="pill-btn pill-btn--primary"
-              disabled={busy}
-            >
-              {busy
-                ? t("userAsk.secureInput.submitting")
-                : t("userAsk.secureInput.submit")}
-            </Button>
-          </>
-        )}
+              onChange={(event) => setRemember(event.target.checked)}
+            />
+            <span className="user-ask__remember-label">
+              {t(
+                relayed
+                  ? "userAsk.secureInput.rememberRelayed"
+                  : "userAsk.secureInput.remember",
+              )}
+            </span>
+          </label>
+        ) : null}
+        <div className="user-ask__buttons">
+          {declining ? (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className="pill-btn"
+                disabled={busy}
+                onClick={() => setDeclining(false)}
+              >
+                {t("userAsk.secureInput.declineBack")}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="pill-btn pill-btn--danger"
+                disabled={busy}
+                onClick={() => onDecline(reason.trim())}
+              >
+                {t("userAsk.secureInput.declineConfirm")}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="button"
+                variant="ghost"
+                className="pill-btn"
+                disabled={busy}
+                onClick={() => setDeclining(true)}
+              >
+                {t("userAsk.secureInput.decline")}
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                className="pill-btn pill-btn--primary"
+                disabled={busy}
+              >
+                {busy
+                  ? t("userAsk.secureInput.submitting")
+                  : t("userAsk.secureInput.submit")}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
     </form>
   );

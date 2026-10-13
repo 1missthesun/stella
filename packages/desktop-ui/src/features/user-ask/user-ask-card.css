@@ -458,20 +458,42 @@
 .user-ask__body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   padding-left: 44px;
 }
 
 .user-ask__fields {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px 12px;
+}
+
+.user-ask__fields[data-count="many"] {
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
 }
 
 .user-ask__field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
+  min-width: 0;
+}
+
+.user-ask__field-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.user-ask__field-label {
+  overflow: hidden;
+  color: var(--text-base);
+  font-size: var(--font-size-sm);
+  font-weight: var(--weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-ask__field-select {
@@ -487,35 +509,34 @@
   letter-spacing: 0.14em;
 }
 
-.user-ask__field-privacy {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .user-ask__badge {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   color: var(--text-weak);
   font-size: var(--font-size-sm);
+  white-space: nowrap;
+  cursor: help;
 }
 
 .user-ask__badge--private {
-  color: var(--text-strong);
+  color: var(--text-base);
 }
 
 .user-ask__remember {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: auto;
+  min-width: 0;
+  color: var(--text-base);
+  font-size: var(--font-size-sm);
   cursor: pointer;
 }
 
 .user-ask__remember input {
-  margin: 2px 0 0;
+  margin: 0;
   width: 14px;
   height: 14px;
   flex: none;
@@ -523,24 +544,10 @@
   cursor: pointer;
 }
 
-.user-ask__remember-text {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
 .user-ask__remember-label {
-  color: var(--text-strong);
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-}
-
-.user-ask__remember-hint {
-  color: var(--text-weak);
-  font-size: var(--font-size-sm);
-  line-height: 1.45;
-  text-wrap: pretty;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .user-ask__replacing {
@@ -554,33 +561,20 @@
   text-wrap: pretty;
 }
 
-.user-ask__notes {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.user-ask__footnote {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin: 0;
-  color: var(--text-weak);
-  font-size: var(--font-size-sm);
-  line-height: 1.45;
-  text-wrap: pretty;
-}
-
-.user-ask__footnote--private {
-  color: var(--text-base);
-}
-
 .user-ask__actions {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 6px;
   flex-wrap: wrap;
+}
+
+.user-ask__buttons {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .user-ask__actions .pill-btn {
@@ -619,6 +613,10 @@
     order: 3;
     width: 100%;
     margin-left: 0;
+  }
+
+  .user-ask__head .user-ask__timing--blocking {
+    display: none;
   }
 
   .user-ask-record {

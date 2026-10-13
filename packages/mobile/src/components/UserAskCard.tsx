@@ -65,7 +65,10 @@ import { useColors } from "../theme/theme-context";
 import { Icon } from "./Icon";
 import { useAskSlot } from "./chat/ask-slot";
 
-type Translate = (key: string, params?: Record<string, string | number>) => string;
+type Translate = (
+  key: string,
+  params?: Record<string, string | number>,
+) => string;
 
 const formatRemaining = (ms: number): string => {
   const total = Math.max(0, Math.round(ms / 1000));
@@ -319,7 +322,9 @@ function QuestionDeck({
       const results = await Promise.allSettled(answers.map(answerUserAsk));
       answers.forEach((answer, index) => {
         if (results[index]?.status !== "fulfilled") return;
-        const ask = entries.find((entry) => entry.ask.askId === answer.askId)?.ask;
+        const ask = entries.find(
+          (entry) => entry.ask.askId === answer.askId,
+        )?.ask;
         if (ask) {
           recordUserAskAnswer(
             ask.conversationId,
@@ -386,41 +391,40 @@ function QuestionDeck({
               draft.choiceId === question.options[optionIndex - 1]?.id;
             return (
               <Fragment key={option.id}>
-              {optionIndex > 0 ? (
-                <View
-                  style={[
-                    styles.divider,
-                    (selected || previousSelected) && styles.dividerHidden,
-                  ]}
-                />
-              ) : null}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected, disabled: busy }}
-                disabled={busy}
-                onPress={() => commit(pickUserAskOption(draft, option.id))}
-                style={({ pressed }) => [
-                  styles.option,
-                  selected && styles.optionSelected,
-                  pressed && styles.pressed,
-                  busy && styles.disabled,
-                ]}
-              >
-                
-                <View style={styles.optionCopy}>
-                  <Text style={styles.optionLabel}>{option.label}</Text>
-                  {option.hint ? (
-                    <Text style={styles.optionHint}>{option.hint}</Text>
-                  ) : null}
-                </View>
-                {selected ? (
-                  <Icon color={colors.accent} name="check" size={18} />
-                ) : option.id === question.defaultChoiceId ? (
-                  <Text style={styles.optionTag}>
-                    {t("userAsk.question.default")}
-                  </Text>
+                {optionIndex > 0 ? (
+                  <View
+                    style={[
+                      styles.divider,
+                      (selected || previousSelected) && styles.dividerHidden,
+                    ]}
+                  />
                 ) : null}
-              </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected, disabled: busy }}
+                  disabled={busy}
+                  onPress={() => commit(pickUserAskOption(draft, option.id))}
+                  style={({ pressed }) => [
+                    styles.option,
+                    selected && styles.optionSelected,
+                    pressed && styles.pressed,
+                    busy && styles.disabled,
+                  ]}
+                >
+                  <View style={styles.optionCopy}>
+                    <Text style={styles.optionLabel}>{option.label}</Text>
+                    {option.hint ? (
+                      <Text style={styles.optionHint}>{option.hint}</Text>
+                    ) : null}
+                  </View>
+                  {selected ? (
+                    <Icon color={colors.accent} name="check" size={18} />
+                  ) : option.id === question.defaultChoiceId ? (
+                    <Text style={styles.optionTag}>
+                      {t("userAsk.question.default")}
+                    </Text>
+                  ) : null}
+                </Pressable>
               </Fragment>
             );
           })}
@@ -428,7 +432,8 @@ function QuestionDeck({
             style={[
               styles.divider,
               (textChosen ||
-                draft.choiceId === question.options[question.options.length - 1]?.id) &&
+                draft.choiceId ===
+                  question.options[question.options.length - 1]?.id) &&
                 styles.dividerHidden,
             ]}
           />
@@ -536,7 +541,10 @@ function QuestionDeck({
       <View style={styles.footerActions}>
         <Pressable
           accessibilityRole="button"
-          accessibilityState={{ selected: draft.skipped === true, disabled: busy }}
+          accessibilityState={{
+            selected: draft.skipped === true,
+            disabled: busy,
+          }}
           disabled={busy}
           onPress={() => commit(skipUserAskQuestion(draft))}
           style={({ pressed }) => [
@@ -630,10 +638,7 @@ function SecureAskSurface({
 
   const decline = useCallback(() => {
     tapLight();
-    void submit(
-      () => cancelUserAsk(ask.askId),
-      "mobile.userAsk.cancelFailed",
-    );
+    void submit(() => cancelUserAsk(ask.askId), "mobile.userAsk.cancelFailed");
   }, [ask.askId, submit]);
 
   const body = (
@@ -864,6 +869,13 @@ function SecureInputBody({
                   {t("mobile.userAsk.optional")}
                 </Text>
               ) : null}
+              {sealable && field.sensitive ? (
+                <View style={styles.fieldSensitive}>
+                  <Text style={styles.sensitiveText}>
+                    {t("mobile.userAsk.sensitive")}
+                  </Text>
+                </View>
+              ) : null}
             </View>
             {field.hint ? (
               <Text style={styles.fieldHint}>{field.hint}</Text>
@@ -957,60 +969,52 @@ function SecureInputBody({
                 ) : null}
               </View>
             )}
-
-            {sealable ? (
-              <View style={styles.sensitiveRow}>
-                <Text style={styles.sensitiveText}>
-                  {t("mobile.userAsk.sensitive")}
-                </Text>
-              </View>
-            ) : null}
           </View>
         );
       })}
 
-      {offersRemember ? (
-        <View style={styles.rememberRow}>
-          <View style={styles.rememberText}>
-            <Text style={styles.rememberLabel}>
-              {t("mobile.userAsk.remember")}
-            </Text>
-            <Text style={styles.rememberHint}>
-              {remember
-                ? t("mobile.userAsk.rememberOn", {
-                    label: detail.save?.label ?? "",
-                  })
-                : t("mobile.userAsk.rememberOff")}
-            </Text>
-          </View>
-          <Switch
-            accessibilityLabel={t("mobile.userAsk.remember")}
-            disabled={busy}
-            onValueChange={setRemember}
-            value={remember}
-          />
-        </View>
-      ) : null}
-
       {issue ? <Text style={styles.issue}>{issue}</Text> : null}
 
-      <Pressable
-        accessibilityRole="button"
-        disabled={busy || missing}
-        onPress={send}
-        style={({ pressed }) => [
-          styles.primaryAction,
-          styles.primaryActionWide,
-          pressed && styles.pressed,
-          (busy || missing) && styles.disabled,
-        ]}
-      >
-        <Text style={styles.primaryActionText}>
-          {busy
-            ? t("mobile.userAsk.sending")
-            : t("mobile.userAsk.sendSecurely")}
-        </Text>
-      </Pressable>
+      <View style={styles.secureActions}>
+        {offersRemember ? (
+          <View style={styles.rememberRow}>
+            <Switch
+              accessibilityHint={
+                remember
+                  ? t("mobile.userAsk.rememberOn", {
+                      label: detail.save?.label ?? "",
+                    })
+                  : t("mobile.userAsk.rememberOff")
+              }
+              accessibilityLabel={t("mobile.userAsk.remember")}
+              disabled={busy}
+              onValueChange={setRemember}
+              style={styles.rememberSwitch}
+              value={remember}
+            />
+            <Text numberOfLines={2} style={styles.rememberLabel}>
+              {t("mobile.userAsk.remember")}
+            </Text>
+          </View>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy || missing}
+          onPress={send}
+          style={({ pressed }) => [
+            styles.primaryAction,
+            !offersRemember && styles.primaryActionWide,
+            pressed && styles.pressed,
+            (busy || missing) && styles.disabled,
+          ]}
+        >
+          <Text style={styles.primaryActionText}>
+            {busy
+              ? t("mobile.userAsk.sending")
+              : t("mobile.userAsk.sendSecurely")}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -1191,8 +1195,9 @@ const makeStyles = (colors: Colors) =>
     field: {
       backgroundColor: colors.surfaceInset,
       borderRadius: 14,
-      gap: 7,
-      padding: 12,
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
     },
     fieldHeader: {
       alignItems: "center",
@@ -1447,17 +1452,31 @@ const makeStyles = (colors: Colors) =>
     },
     rememberLabel: {
       color: colors.text,
-      fontFamily: fonts.sans.medium,
-      fontSize: 15,
+      flexShrink: 1,
+      fontFamily: fonts.sans.regular,
+      fontSize: 14,
+      lineHeight: 18,
     },
     rememberRow: {
       alignItems: "center",
-      flexDirection: "row",
-      gap: 12,
-    },
-    rememberText: {
       flex: 1,
-      gap: 2,
+      flexDirection: "row",
+      gap: 8,
+    },
+    rememberSwitch: {
+      transform: [{ scale: 0.8 }],
+    },
+    secureActions: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 10,
+      justifyContent: "flex-end",
+    },
+    fieldSensitive: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 4,
+      marginLeft: "auto",
     },
     sensitiveRow: {
       alignItems: "center",

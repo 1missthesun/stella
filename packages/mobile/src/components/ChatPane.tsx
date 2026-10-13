@@ -1954,6 +1954,9 @@ export function ChatPane({
     );
     if (index >= 0) {
       setSummaryJump(null);
+      // Reading back now: rows measuring in as the list travels must not
+      // pull it back down to the latest message.
+      scroll.releaseFollow();
       scroll.listRef.current?.scrollToIndex({ index, animated: true, viewOffset: topInset + 24 });
       return;
     }
@@ -1970,7 +1973,7 @@ export function ChatPane({
     historyPageLoading,
     listMessages,
     onLoadOlderHistory,
-    scroll.listRef,
+    scroll,
     summaryJump,
     t,
     topInset,

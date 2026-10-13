@@ -516,6 +516,10 @@ export const parseCloudAgentTurnStartRequest = (
       return fail("originConversationId is malformed.");
     request.originConversationId = originConversationId;
   }
+  if (value.workspace !== undefined) {
+    if (value.workspace !== "large") return fail("workspace is malformed.");
+    request.workspace = "large";
+  }
   if (!orchestratorRole) {
     if (request.source === "orchestrator") {
       return fail('source "orchestrator" requires agentRole "orchestrator".');

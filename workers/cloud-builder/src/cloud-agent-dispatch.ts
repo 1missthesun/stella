@@ -8,6 +8,7 @@ import {
 import {
   TURN_PLANE_PROTOCOL,
   type CloudAgentTurnSource,
+  type AgentWorkspaceSize,
   type CloudAgentTurnStartRequest,
   type CloudAgentTurnStartResponse,
 } from "@stella/contracts/turn-plane/turn-start";
@@ -333,6 +334,8 @@ export type CloudAgentDispatchAttempt = Readonly<{
   /** The desktop and local conversation that receive a desktop dispatch's result. */
   originDeviceId?: string;
   originConversationId?: string;
+  /** The spawn's `workspace`, on the thread's first attempt. */
+  workspace?: AgentWorkspaceSize;
 }>;
 
 /** A refusal that trying again cannot fix (admission said no, or the request was bad). */
@@ -490,6 +493,7 @@ export const dispatchCloudAgentTurn = async (args: {
     ...(attempt.originConversationId
       ? { originConversationId: attempt.originConversationId }
       : {}),
+    ...(attempt.workspace ? { workspace: attempt.workspace } : {}),
   };
   let response: Response;
   try {

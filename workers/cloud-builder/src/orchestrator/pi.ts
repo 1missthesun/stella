@@ -607,6 +607,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           description: args.description,
           prompt: args.prompt,
           execution: executionOf(args.model, authority),
+          ...(args.workspace ? { workspace: args.workspace } : {}),
         });
         return { threadId: control.threadId };
       },

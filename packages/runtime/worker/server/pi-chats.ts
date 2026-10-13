@@ -199,7 +199,7 @@ const cloudAgentThreadsFor = (
   };
   const requestId = (key: string) => `pi:${conversationId}:${key}`.replace(/[^A-Za-z0-9._:-]/g, "_").slice(0, 128);
   return {
-    start: async ({ key, description, prompt, model, parentThreadId }) =>
+    start: async ({ key, description, prompt, model, parentThreadId, workspace }) =>
       await threads().start({
         conversationId,
         requestId: requestId(`start:${key}`),
@@ -207,6 +207,7 @@ const cloudAgentThreadsFor = (
         prompt,
         model,
         ...(parentThreadId ? { parentThreadId } : {}),
+        ...(workspace ? { workspace } : {}),
       }),
     message: async ({ key, threadId, description, message, framed }) =>
       await threads().message({

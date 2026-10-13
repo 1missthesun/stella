@@ -291,6 +291,8 @@ export type PiCloudAgentThreads = {
     model: string;
     /** The agent that starts it, which its reports go back to; absent for Stella's own. */
     parentThreadId?: string;
+    /** `spawn_agent`'s `workspace`: the size its cloud container starts at. */
+    workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
   }) => Promise<{ threadId: string }>;
   startOnDevice: (request: {
     conversationId: string;

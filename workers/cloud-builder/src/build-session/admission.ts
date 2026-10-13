@@ -102,6 +102,7 @@ export const turnRequestFromAgentStart = (
   ...(start.originConversationId
     ? { originConversationId: start.originConversationId }
     : {}),
+  ...(start.workspace === "large" ? { workspace: "large" as const } : {}),
   ...(start.agentRole === "orchestrator" && start.orchestratorCli
     ? { agentRole: start.agentRole, orchestratorCli: start.orchestratorCli }
     : {}),

@@ -31,6 +31,7 @@ import {
 } from "@stella/executor-cloud/attached-tool-protocol";
 import { SANDBOX_EXECUTOR } from "./sandbox-code.js";
 import type { TurnExecutionContext } from "./turn-cancellation.js";
+import type { InstanceSize } from "./instance-size.js";
 
 export type AttachBoot = Readonly<{
   coldStartMs: number;
@@ -41,7 +42,7 @@ export type SandboxAttachment = Readonly<{
   /** Boot the instance the lease already names. Never mints an id. */
   boot(args: {
     sandboxId: string;
-    instanceSize: "small" | "large";
+    instanceSize: InstanceSize;
     sessionId: string;
     daemonDirectory: string;
   }): Promise<AttachBoot>;
@@ -59,13 +60,13 @@ export type SandboxAttachment = Readonly<{
   }): Promise<AttachedToolControlResponse>;
   release(args: {
     sandboxId: string;
-    instanceSize: "small" | "large";
+    instanceSize: InstanceSize;
     sessionId: string;
     daemonDirectory: string;
   }): Promise<void>;
   destroy(args: {
     sandboxId: string;
-    instanceSize: "small" | "large";
+    instanceSize: InstanceSize;
   }): Promise<void>;
 }>;
 
@@ -195,7 +196,7 @@ export type AgentSandboxAttachmentDeps = Readonly<{
    */
   attachWorld(args: {
     sandboxId: string;
-    instanceSize: "small" | "large";
+    instanceSize: InstanceSize;
     sessionId: string;
   }): Promise<
     Readonly<{
@@ -228,14 +229,14 @@ export type AgentSandboxAttachmentDeps = Readonly<{
   /** Release one turn: its session goes, and its container snapshots and stops. */
   release(args: {
     sandboxId: string;
-    instanceSize: "small" | "large";
+    instanceSize: InstanceSize;
     sessionId: string;
     daemonDirectory: string;
   }): Promise<void>;
   /** Destroy this agent's container only for OOM escalation or retirement. */
   destroy(args: {
     sandboxId: string;
-    instanceSize: "small" | "large";
+    instanceSize: InstanceSize;
   }): Promise<void>;
   emitEvent?: (kind: string, payload: unknown) => void;
 }>;

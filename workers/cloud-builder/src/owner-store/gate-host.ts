@@ -338,6 +338,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
           ...(input.originConversationId
             ? { originConversationId: input.originConversationId }
             : {}),
+          ...(input.workspace ? { workspace: input.workspace } : {}),
         },
       });
     } catch (error) {

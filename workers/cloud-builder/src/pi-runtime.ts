@@ -277,7 +277,14 @@ export type PiThreadAgents = {
   /** Throws when nothing in the cloud runs `model`. */
   check(model: string, authority: PiAuthority): void;
   start(
-    args: { key: string; description: string; prompt: string; model: string },
+    args: {
+      key: string;
+      description: string;
+      prompt: string;
+      model: string;
+      /** `spawn_agent`'s `workspace`: the size its container starts at. */
+      workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
+    },
     authority: PiAuthority,
     parentTurnId: string,
   ): Promise<{ threadId: string }>;

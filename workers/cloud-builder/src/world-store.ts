@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { WorkspaceApps } from "./workspace-apps.js";
 import { WorldSqlStore } from "./world/store.js";
 import type { StoredDependencyBackup } from "./sandbox-dependencies.js";
+import type { DiskClass } from "./instance-size.js";
 import type { WorldListingEntry, WorldToolCall } from "./world/types.js";
 
 /**
@@ -18,6 +19,14 @@ export type ContainerSnapshot = {
 
 const CONTAINER_SNAPSHOT_KEY = "containerSnapshot";
 const DEPENDENCY_BACKUP_KEY = "dependencyBackup";
+const DISK_CLASSES: readonly DiskClass[] = ["standard", "large"];
+
+/**
+ * Each disk class keeps its own latest snapshot and archive. The standard
+ * class keeps the keys every container used before there were classes.
+ */
+const slotKey = (key: string, slot: DiskClass): string =>
+  slot === "standard" ? key : `${key}:${slot}`;
 
 export class WorldStore extends DurableObject<Env> {
   private readonly world: WorldSqlStore;
@@ -159,65 +168,78 @@ export class WorldStore extends DurableObject<Env> {
 
   // ---- the owner's agent containers --------------------------------------
   //
-  // Every agent thread has a container of its own. They share one latest
-  // snapshot and one caches-and-dependencies archive, kept here beside the
-  // world they all sync: whichever container released last wrote them, and
-  // every new container starts from them. The world itself comes down by
+  // Every agent thread has a container of its own. Containers of one disk
+  // class share one latest snapshot and one caches-and-dependencies archive,
+  // kept here beside the world they all sync: whichever container of that
+  // class released last wrote them, and every new one starts from them. The world itself comes down by
   // sync either way, so a snapshot only ever saves setup, never truth.
 
-  containerSnapshot(): ContainerSnapshot | null {
+  containerSnapshot(slot: DiskClass = "standard"): ContainerSnapshot | null {
     return (
-      this.ctx.storage.kv.get<ContainerSnapshot>(CONTAINER_SNAPSHOT_KEY) ?? null
+      this.ctx.storage.kv.get<ContainerSnapshot>(
+        slotKey(CONTAINER_SNAPSHOT_KEY, slot),
+      ) ?? null
     );
   }
 
-  recordContainerSnapshot(snapshot: ContainerSnapshot): void {
-    this.ctx.storage.kv.put(CONTAINER_SNAPSHOT_KEY, snapshot);
+  recordContainerSnapshot(
+    snapshot: ContainerSnapshot,
+    slot: DiskClass = "standard",
+  ): void {
+    this.ctx.storage.kv.put(slotKey(CONTAINER_SNAPSHOT_KEY, slot), snapshot);
   }
 
   /**
-   * Forget the latest snapshot if it is the one named: by its id after a
+   * Forget a latest snapshot if it is the one named: by its id after a
    * restore from it failed, or by the container it came from when that
    * container's state is being discarded. A newer one is kept.
    */
   forgetContainerSnapshot(match: { id?: string; sandbox?: string }): void {
-    const current = this.containerSnapshot();
-    if (
-      current &&
-      ((match.id !== undefined && current.id === match.id) ||
-        (match.sandbox !== undefined && current.sandbox === match.sandbox))
-    ) {
-      this.ctx.storage.kv.delete(CONTAINER_SNAPSHOT_KEY);
+    for (const slot of DISK_CLASSES) {
+      const current = this.containerSnapshot(slot);
+      if (
+        current &&
+        ((match.id !== undefined && current.id === match.id) ||
+          (match.sandbox !== undefined && current.sandbox === match.sandbox))
+      ) {
+        this.ctx.storage.kv.delete(slotKey(CONTAINER_SNAPSHOT_KEY, slot));
+      }
     }
   }
 
-  dependencyBackup(): StoredDependencyBackup | null {
+  dependencyBackup(slot: DiskClass = "standard"): StoredDependencyBackup | null {
     return (
-      this.ctx.storage.kv.get<StoredDependencyBackup>(DEPENDENCY_BACKUP_KEY) ??
-      null
+      this.ctx.storage.kv.get<StoredDependencyBackup>(
+        slotKey(DEPENDENCY_BACKUP_KEY, slot),
+      ) ?? null
     );
   }
 
   /** Make `next` the archive new containers restore; returns the one replaced. */
   replaceDependencyBackup(
     next: StoredDependencyBackup,
+    slot: DiskClass = "standard",
   ): StoredDependencyBackup | null {
-    const previous = this.dependencyBackup();
-    this.ctx.storage.kv.put(DEPENDENCY_BACKUP_KEY, next);
+    const previous = this.dependencyBackup(slot);
+    this.ctx.storage.kv.put(slotKey(DEPENDENCY_BACKUP_KEY, slot), next);
     return previous;
   }
 
   /** Forget the archive if it is still `record`, which no longer restores. */
   forgetDependencyBackup(recordId: string): void {
-    if (this.dependencyBackup()?.record.id === recordId) {
-      this.ctx.storage.kv.delete(DEPENDENCY_BACKUP_KEY);
+    for (const slot of DISK_CLASSES) {
+      if (this.dependencyBackup(slot)?.record.id === recordId) {
+        this.ctx.storage.kv.delete(slotKey(DEPENDENCY_BACKUP_KEY, slot));
+      }
     }
   }
 
   /** Owner purge: no later container may start from either. */
   forgetContainerState(): void {
-    this.ctx.storage.kv.delete(CONTAINER_SNAPSHOT_KEY);
-    this.ctx.storage.kv.delete(DEPENDENCY_BACKUP_KEY);
+    for (const slot of DISK_CLASSES) {
+      this.ctx.storage.kv.delete(slotKey(CONTAINER_SNAPSHOT_KEY, slot));
+      this.ctx.storage.kv.delete(slotKey(DEPENDENCY_BACKUP_KEY, slot));
+    }
   }
 
   /** One agent container's own changes (`WorldSqlStore.pushChanges`). */

@@ -240,6 +240,8 @@ export type AgentTurnDispatch = {
   execution: import("@stella/contracts/agent-engine").CloudExecutionSelection;
   originDeviceId?: string;
   originConversationId?: string;
+  /** The spawn's `workspace` (`spawn_agent`), on the thread's first attempt. */
+  workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
   /** Where the thread sits among Stella's agents, from its parent chain. */
   lineage: AgentLineage;
 };

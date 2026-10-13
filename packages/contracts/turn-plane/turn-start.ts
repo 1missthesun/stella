@@ -193,6 +193,13 @@ export type CloudAgentTurnSource =
   /** The OrchestratorSession's own chat turn on the Claude Code CLI. */
   | "orchestrator";
 
+/**
+ * What a cloud agent's spawn asks of its container (`spawn_agent`
+ * `workspace`). Absent is the default container; `"large"` adds the disk a
+ * big repository's dependencies need.
+ */
+export type AgentWorkspaceSize = "large";
+
 export type CloudAgentTurnStartRequest = {
   protocol: typeof TURN_PLANE_PROTOCOL;
   kind: "agent";
@@ -228,6 +235,11 @@ export type CloudAgentTurnStartRequest = {
   parentTurnId?: string;
   originDeviceId?: string;
   originConversationId?: string;
+  /**
+   * `"large"` when the agent's spawn asked for a big workspace (`spawn_agent`
+   * `workspace`): its container gets a 20 GB disk for big-repository work.
+   */
+  workspace?: AgentWorkspaceSize;
   /**
    * Present only on the OrchestratorSession's own chat turn for an
    * `anthropic` execution (see cloud-orchestrator-cli.ts). That dispatch has

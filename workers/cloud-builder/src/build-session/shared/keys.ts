@@ -9,7 +9,11 @@ import { HEADER_OWNER } from "../../conversation-types.js";
 import type { TurnEventEvent } from "@stella/contracts/turn-plane/owner-events";
 import { sha256Hex } from "../../hash.js";
 import { inSubshell } from "../../shell-subshell.js";
-import type { InstanceSize } from "../../instance-size.js";
+import {
+  isInstanceSize,
+  largerSize,
+  type InstanceSize,
+} from "../../instance-size.js";
 import { APP_BUILD_ROOT, WORLD_ROOT } from "../../workspace.js";
 import type { OwnerGateRefusalCode } from "../../owner-gate.js";
 import { AgentTurnAuthorityLostError } from "./errors.js";
@@ -20,20 +24,36 @@ import type { TurnRequest } from "./types.js";
 export const OWNER_EVENT_DEBT_KEY = "ownerEventDebt";
 
 /**
- * Set once this agent thread's container ran out of memory. It outlives the
- * turn, so the thread's next turns start large; no other agent's container
- * is affected.
+ * Set once this agent thread's container ran out of memory (before sizes
+ * were kept as `AGENT_CONTAINER_SIZE_KEY`): its next turns start large.
  */
 export const AGENT_CONTAINER_LARGE_KEY = "agentContainerLarge";
 
-/** The size this thread's container starts at: large once it ran out of memory. */
+/**
+ * The smallest size this agent thread's container starts at from now on:
+ * what its spawn asked for (`workspace: "large"`), raised when its container
+ * ran out of memory or disk. It outlives the turn; no other agent's
+ * container is affected.
+ */
+export const AGENT_CONTAINER_SIZE_KEY = "agentContainerSize";
+
+/** `ContainerOomBaseline`: the OOM-kill count this thread's container last showed. */
+export const CONTAINER_OOM_BASELINE_KEY = "containerOomBaseline";
+
+/** The size this thread's container starts at: `initial`, or larger if the thread needed more before. */
 export const agentContainerSize = async (
   storage: Pick<DurableObjectStorage, "get">,
   initial: InstanceSize,
-): Promise<InstanceSize> =>
-  (await storage.get<boolean>(AGENT_CONTAINER_LARGE_KEY)) === true
-    ? "large"
-    : initial;
+): Promise<InstanceSize> => {
+  const [floor, legacyLarge] = await Promise.all([
+    storage.get<InstanceSize>(AGENT_CONTAINER_SIZE_KEY),
+    storage.get<boolean>(AGENT_CONTAINER_LARGE_KEY),
+  ]);
+  let size = initial;
+  if (isInstanceSize(floor)) size = largerSize(size, floor);
+  if (legacyLarge === true) size = "large";
+  return size;
+};
 
 export const OWNER_EVENT_DEBT_MAX = 200;
 

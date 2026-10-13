@@ -1,4 +1,5 @@
 import type { CloudExecutionSelection } from "../agent-engine.js";
+import type { AgentWorkspaceSize } from "../turn-plane/turn-start.js";
 import type {
   AgentDirectoryAgentRow,
   AgentDirectorySessionRow,
@@ -185,6 +186,8 @@ export type AgentThreadCalls = {
       /** Device target: the `spawn_agent` model that device runs the agent on. */
       model?: string;
       parentThreadId?: string;
+      /** Cloud target: the `spawn_agent` workspace its container gets. */
+      workspace?: AgentWorkspaceSize;
     };
     result: AgentThreadControl;
   };

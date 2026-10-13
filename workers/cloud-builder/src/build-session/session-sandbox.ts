@@ -26,7 +26,7 @@ import { sandboxClient } from "../sandbox-client.js";
 import { SANDBOX_PAGE_CACHE_WARM_COMMAND } from "../sandbox-code.js";
 import { snapshotAllowsCloudSandbox } from "../owner-gate.js";
 import { agentSandboxId, agentTurnSessionId, worldName } from "../workspace.js";
-import { initialInstanceSize } from "../instance-size.js";
+import { initialInstanceSize, isInstanceSize } from "../instance-size.js";
 import type { InstanceSize } from "../instance-size.js";
 import type {
   SandboxDestroyDebt,
@@ -170,7 +170,7 @@ export const retireSandboxInstance = async (
   const workload = body.workload;
   if (
     !RETIRE_SANDBOX_ID.test(sandboxId) ||
-    (size !== "small" && size !== "large") ||
+    !isInstanceSize(size) ||
     typeof workload !== "string" ||
     !(SANDBOX_WORKLOADS as readonly string[]).includes(workload) ||
     (isWorldSandboxId(sandboxId) && workload !== "world") ||
@@ -260,7 +260,7 @@ export const prewarmOrchestratorContainer = async (
   }
   const size = await agentContainerSize(
     host.ctx.storage,
-    initialInstanceSize({ prompt: "" }),
+    initialInstanceSize({}),
   );
   const handle = sandboxHandle(
     host.env,

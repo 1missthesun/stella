@@ -35,6 +35,7 @@ import { prepareSlackRepo } from "./slack/repo-clone.js";
 import { egressForConversation, prepareSlackEnvironment, slackEnvironmentsEnabled } from "./slack/environment.js";
 import { isSlackConversationId } from "./slack/conversation-id.js";
 import { startTurnExecution } from "./turn-cancellation.js";
+import type { InstanceSize } from "./instance-size.js";
 import { issueWorldCapability } from "./world-capability.js";
 import { worldMaterializationCommand } from "./world-materialization.js";
 import { agentSandboxId, WORLD_ROOT, worldName } from "./workspace.js";
@@ -111,7 +112,7 @@ const hex = async (value: string): Promise<string> =>
     .map((byte) => byte.toString(16).padStart(2, "0"))
     .join("");
 
-const sandboxFor = (host: PiComputeHost, sandboxId: string, size: "small" | "large", world: string): SandboxHandle => {
+const sandboxFor = (host: PiComputeHost, sandboxId: string, size: InstanceSize, world: string): SandboxHandle => {
   const namespace = host.env.Sandbox;
   if (!namespace) throw new Error("Cloud containers are not configured.");
   const idle = Number(host.env.SANDBOX_IDLE_TIMEOUT_MS);

@@ -26,6 +26,8 @@ import {
 import type { BuildSessionInternals } from "./host.js";
 import {
   AGENT_CONTAINER_LARGE_KEY,
+  AGENT_CONTAINER_SIZE_KEY,
+  CONTAINER_OOM_BASELINE_KEY,
   BACKUP_ID_PATTERN,
   OWNER_EVENT_DEBT_KEY,
   OWNER_EVENT_DEBT_MAX,
@@ -137,6 +139,8 @@ export const deleteTurnStoragePreservingExactCancellations = async (
         key !== EXACT_TURN_CANCELLATIONS_KEY &&
         key !== OWNER_EVENT_DEBT_KEY &&
         key !== AGENT_CONTAINER_LARGE_KEY &&
+        key !== AGENT_CONTAINER_SIZE_KEY &&
+        key !== CONTAINER_OOM_BASELINE_KEY &&
         !isSandboxDestroyDebtKey(key) &&
         !isBuildOwnerFenceDurabilityKey(key),
     );

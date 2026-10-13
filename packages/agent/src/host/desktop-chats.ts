@@ -331,7 +331,15 @@ export type DesktopDeviceAgents = {
 /** Agents another runtime runs as a whole (`DesktopChatsOptions.cloudThreads`). */
 export type DesktopEngineAgents = {
   /** Start one, once per `key`, on `model`; `parentThreadId` is the agent that starts it, which its reports go back to. */
-  start(args: { key: string; description: string; prompt: string; model: string; parentThreadId?: string }): Promise<{ threadId: string }>;
+  start(args: {
+    key: string;
+    description: string;
+    prompt: string;
+    model: string;
+    parentThreadId?: string;
+    /** `spawn_agent`'s `workspace`: the size its cloud container starts at. */
+    workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
+  }): Promise<{ threadId: string }>;
   /** Another message for it: steers it while it runs, or starts its next run. */
   message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
   /** Stop it, and every agent it started, wherever they run. */
@@ -906,8 +914,15 @@ export function desktopChats(options: DesktopChatsOptions) {
       return agents?.[threadId]?.description ?? threadId;
     };
     return {
-      start: async ({ key, description, prompt, model, parentThreadId }) =>
-        await engine.start({ key, description, prompt, model: model ?? defaultModel, ...(parentThreadId ? { parentThreadId } : {}) }),
+      start: async ({ key, description, prompt, model, parentThreadId, workspace }) =>
+        await engine.start({
+          key,
+          description,
+          prompt,
+          model: model ?? defaultModel,
+          ...(parentThreadId ? { parentThreadId } : {}),
+          ...(workspace ? { workspace } : {}),
+        }),
       message: async ({ key, threadId, message, framed }) => {
         const description = await descriptionOf(threadId);
         if ((await engine.message({ key, threadId, description, message, ...(framed ? { framed } : {}) })) === "steered") {

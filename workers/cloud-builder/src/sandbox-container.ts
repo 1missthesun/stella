@@ -40,8 +40,9 @@ import {
 } from "./sandbox-code.js";
 import type { Env } from "./build-session/shared/env.js";
 import type { ContainerSnapshot } from "./world-store.js";
+import { diskClass, INSTANCE_TIERS, type InstanceSize } from "./instance-size.js";
 
-export type SandboxInstanceSize = "small" | "large";
+export type SandboxInstanceSize = InstanceSize;
 
 /**
  * A Slack workspace's network rules for one agent container
@@ -60,9 +61,9 @@ export type SandboxBoot = {
   idleTimeoutMs?: number;
   /**
    * The owner's world store, for an agent container. Every agent container of
-   * an owner starts from the latest snapshot any of them took and restores
-   * the same caches and dependencies archive, both kept there; a container
-   * without one keeps neither.
+   * an owner starts from the latest snapshot any of them with the same disk
+   * class took and restores that class's caches and dependencies archive,
+   * both kept there; a container without one keeps neither.
    */
   world?: string;
 };
@@ -119,10 +120,6 @@ export type SandboxState = {
   size?: SandboxInstanceSize;
 };
 
-const INSTANCE: Record<SandboxInstanceSize, "standard-2" | "standard-4"> = {
-  small: "standard-2",
-  large: "standard-4",
-};
 
 const DEFAULT_IDLE_TIMEOUT_MS = 10 * 60_000;
 const MAX_IDLE_TIMEOUT_MS = 6 * 60 * 60_000;
@@ -489,8 +486,8 @@ export class Sandbox extends DurableObject<Env> {
   }
 
   /**
-   * Start from the latest snapshot any of the owner's agent containers took,
-   * when it was taken on the image this deploy runs, so a world projection,
+   * Start from the latest snapshot any of the owner's agent containers of
+   * this disk class took (`diskClass`), when it was taken on the image this deploy runs, so a world projection,
    * caches and installed dependencies are already on disk; the world catches
    * up by sync. A snapshot cannot cross images; any other case starts clean,
    * with the owner's caches and dependencies brought back from their archive.
@@ -506,7 +503,7 @@ export class Sandbox extends DurableObject<Env> {
     // starts this container clean rather than not at all.
     const stored =
       this.#snapshotsEnabled && world
-        ? await world.containerSnapshot().catch(() => null)
+        ? await world.containerSnapshot(diskClass(boot.size)).catch(() => null)
         : null;
     const snapshot = stored?.image === image ? stored : undefined;
     const startedAt = Date.now();
@@ -542,7 +539,9 @@ export class Sandbox extends DurableObject<Env> {
       await this.#run(["rm", "-rf", "--", PROCESS_ROOT]);
       // Its caches and dependencies are, as near as anything says, the
       // owner's latest archive: both were taken at the same release.
-      const latest = await world?.dependencyBackup().catch(() => null);
+      const latest = await world
+        ?.dependencyBackup(diskClass(boot.size))
+        .catch(() => null);
       if (latest) {
         this.ctx.storage.kv.put(DEPENDENCY_BASELINE_KEY, {
           mark: latest.mark,
@@ -550,7 +549,7 @@ export class Sandbox extends DurableObject<Env> {
         } satisfies DependencyBaseline);
       }
     } else if (boot.workload === "world" && boot.world) {
-      await this.#restoreDependencies(boot.world);
+      await this.#restoreDependencies(boot.world, boot.size);
     }
     const installed = await installing;
     if ("error" in installed) {
@@ -676,7 +675,7 @@ export class Sandbox extends DurableObject<Env> {
     const egress = this.#egress(boot);
     container.start({
       ...from,
-      instance: INSTANCE[boot.size],
+      instance: INSTANCE_TIERS[boot.size].instance,
       enableInternet: boot.workload !== "app-build" && (egress?.internet ?? true),
       labels: { service: "stella-v2", workload: boot.workload, size: boot.size },
     } as ContainerStartupOptions);
@@ -901,7 +900,7 @@ export class Sandbox extends DurableObject<Env> {
           image: info?.image ?? container.images.sandbox!,
           takenAt: Date.now(),
           sandbox: this.ctx.id.toString(),
-        } satisfies ContainerSnapshot);
+        } satisfies ContainerSnapshot, diskClass(boot!.size));
         console.log(
           JSON.stringify({
             level: "info",
@@ -913,7 +912,7 @@ export class Sandbox extends DurableObject<Env> {
         );
       }
     } finally {
-      if (boot?.world) await this.#backupDependencies(boot.world);
+      if (boot?.world) await this.#backupDependencies(boot.world, boot.size);
     }
   }
 
@@ -947,9 +946,14 @@ export class Sandbox extends DurableObject<Env> {
    * started from the image. Never fails the start: without the archive the
    * container is only slower.
    */
-  async #restoreDependencies(worldName: string): Promise<void> {
+  async #restoreDependencies(
+    worldName: string,
+    size: SandboxInstanceSize,
+  ): Promise<void> {
     const world = this.env.WORLDS.getByName(worldName);
-    const stored = await world.dependencyBackup().catch(() => null);
+    const stored = await world
+      .dependencyBackup(diskClass(size))
+      .catch(() => null);
     if (!stored) return;
     const startedAt = Date.now();
     try {
@@ -1010,7 +1014,10 @@ export class Sandbox extends DurableObject<Env> {
    * and make it the owner's archive. A skipped or failed archive keeps the
    * owner's current one; the one replaced is deleted.
    */
-  async #backupDependencies(worldName: string): Promise<void> {
+  async #backupDependencies(
+    worldName: string,
+    size: SandboxInstanceSize,
+  ): Promise<void> {
     if (this.ctx.storage.kv.get<SandboxBoot>("boot")?.workload !== "world") {
       return;
     }
@@ -1078,7 +1085,10 @@ export class Sandbox extends DurableObject<Env> {
       };
       // Last writer wins: concurrent releases each replace the one before,
       // and each deletes what it replaced, so no archive is left unnamed.
-      const replaced = await world.replaceDependencyBackup(next);
+      const replaced = await world.replaceDependencyBackup(
+        next,
+        diskClass(size),
+      );
       this.ctx.storage.kv.put(DEPENDENCY_BASELINE_KEY, {
         mark: next.mark,
         fingerprint: next.fingerprint,

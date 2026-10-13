@@ -56,6 +56,7 @@ import {
   type AgentMessageSender,
 } from "@stella/contracts/agent-directory";
 import { agentStopText, type AgentMessageDelivery, type AgentStopResult } from "@stella/contracts/backend/agent-threads";
+import type { AgentWorkspaceSize } from "@stella/contracts/turn-plane/turn-start";
 import {
   AGENT_STOPPED_REASON,
   isLiveAgentStatus,
@@ -388,7 +389,15 @@ export type RemoteAgentHost = {
    * reports go back to that agent wherever it runs.
    */
   start(
-    args: { key: string; description: string; prompt: string; model?: string; parentThreadId?: string },
+    args: {
+      key: string;
+      description: string;
+      prompt: string;
+      model?: string;
+      parentThreadId?: string;
+      /** `spawn_agent`'s `workspace`; only a cloud container uses it. */
+      workspace?: AgentWorkspaceSize;
+    },
     context: Context,
   ): Promise<{ threadId: string; waiting?: boolean }>;
   /**
@@ -1360,6 +1369,12 @@ export function stellaAgents(host: StellaAgentsHost) {
             "Omit to start in a fresh folder. Otherwise an absolute path on this computer to start in (not with destination); its AGENTS.md joins the agent's context.",
         }),
       ),
+      workspace: Type.Optional(
+        Type.Literal("large", {
+          description:
+            'Cloud agents only. A cloud agent\'s container has 3 GiB of memory and a 12 GB disk; "large" gives it a 20 GB disk, for installing or building a big repository (several GB of dependencies, like a monorepo). An agent whose container runs out of memory or disk gets a larger one for its next run.',
+        }),
+      ),
     }),
     // A rerun finds this call's spawn in `calls` and does nothing again.
     replay: "safe",
@@ -1421,6 +1436,7 @@ export function stellaAgents(host: StellaAgentsHost) {
                 prompt: args.prompt,
                 ...(requested ? { model: requested } : {}),
                 ...(!orchestrator && caller.threadId ? { parentThreadId: caller.threadId } : {}),
+                ...(args.workspace === "large" ? { workspace: "large" as const } : {}),
               },
               context,
             );

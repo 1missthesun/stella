@@ -87,7 +87,7 @@ import type {
   TurnEventEvent,
   TurnStartedEvent,
 } from "@stella/contracts/turn-plane/owner-events";
-import { TURN_ATTACHMENTS_MAX } from "@stella/contracts/turn-plane/turn-start";
+import { TURN_ATTACHMENTS_MAX, type AgentWorkspaceSize } from "@stella/contracts/turn-plane/turn-start";
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { endedKind, recordAgentChange, startedKind } from "./agent-events.js";
@@ -559,8 +559,12 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
   ) {
     return;
   }
-  const dispatchRow = ctx.db.one<{ prompt: string; attachments: string | null }>(
-    "SELECT prompt, attachments FROM agent_dispatch_prompts WHERE turn_id = ?",
+  const dispatchRow = ctx.db.one<{
+    prompt: string;
+    attachments: string | null;
+    workspace: string | null;
+  }>(
+    "SELECT prompt, attachments, workspace FROM agent_dispatch_prompts WHERE turn_id = ?",
     turn.turn_id,
   );
   const prompt = dispatchRow?.prompt ?? thread.description;
@@ -593,6 +597,7 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
       ...(thread.origin_conversation_id
         ? { originConversationId: thread.origin_conversation_id }
         : {}),
+      ...(dispatchRow?.workspace === "large" ? { workspace: "large" as const } : {}),
       lineage: threadLineage(ctx.db, thread),
     });
     ctx.db.run("DELETE FROM agent_dispatch_prompts WHERE turn_id = ?", turn.turn_id);
@@ -1200,6 +1205,8 @@ const startAttempt = (
     fingerprint: string;
     prompt: string;
     attachments?: readonly string[];
+    /** The spawn's `workspace`, for a cloud thread's first attempt. */
+    workspace?: AgentWorkspaceSize;
   },
 ): void => {
   ctx.db.run(
@@ -1218,10 +1225,11 @@ const startAttempt = (
     ctx.now,
   );
   ctx.db.run(
-    "INSERT INTO agent_dispatch_prompts (turn_id, prompt, attachments) VALUES (?, ?, ?)",
+    "INSERT INTO agent_dispatch_prompts (turn_id, prompt, attachments, workspace) VALUES (?, ?, ?, ?)",
     input.turnId,
     input.prompt,
     input.attachments?.length ? JSON.stringify([...input.attachments]) : null,
+    input.workspace ?? null,
   );
   ctx.jobs.schedule(
     "agentThreads.dispatch",
@@ -1308,6 +1316,7 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
       args.targetDeviceId ?? null,
       args.model ?? null,
       ...(args.parentThreadId ? [args.parentThreadId] : []),
+      ...(args.workspace ? [`workspace:${args.workspace}`] : []),
     ]),
   );
   const replay = replayAttempt(ctx.db, args.clientMsgId, fingerprint, args.ownerGeneration);
@@ -1410,6 +1419,7 @@ const spawnFromDesktop = async (ctx: OwnerContext, args: SpawnArgs): Promise<Age
         clientMsgId: args.clientMsgId,
         fingerprint,
         prompt: args.prompt,
+        ...(!targetDeviceId && args.workspace ? { workspace: args.workspace } : {}),
       });
       return inserted;
     },
@@ -3894,6 +3904,14 @@ export const agentThreadsDomain = {
          )`,
       ],
     },
+    {
+      // The spawn's `workspace` (`spawn_agent`): the container size the
+      // cloud thread's first attempt asks for. Same lifecycle as the prompt.
+      id: "agent-threads.13-dispatch-workspace",
+      statements: [
+        "ALTER TABLE agent_dispatch_prompts ADD COLUMN workspace TEXT",
+      ],
+    },
   ],
   calls: {
     "agentThreads.directory": {
@@ -3942,6 +3960,7 @@ export const agentThreadsDomain = {
         targetDeviceId: optional(id(256)),
         model: optional(string({ max: 256 })),
         parentThreadId: optional(id()),
+        workspace: optional(literal("large")),
       }),
       handler: spawnFromDesktop,
     },

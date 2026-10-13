@@ -19,9 +19,13 @@ import { devAcceptanceProbesEnabled } from "../dev-acceptance-probes.js";
 import { executorSessionEnvironment } from "../executor-session-env.js";
 import { cloudNativeStateRoot } from "@stella/contracts/cloud-native-state";
 import {
+  describeInstanceSize,
   initialInstanceSize,
   INSTANCE_TIERS,
+  isInstanceSize,
   isOutOfMemoryFailure,
+  sizeAfterOutOfDisk,
+  sizeAfterOutOfMemory,
 } from "../instance-size.js";
 import type { InstanceSize } from "../instance-size.js";
 import { nativeHistoryCursorFromRows } from "../native-state-checkpoint.js";
@@ -81,7 +85,8 @@ import {
   isTurnStateAuthorityError,
 } from "./shared/errors.js";
 import {
-  AGENT_CONTAINER_LARGE_KEY,
+  AGENT_CONTAINER_SIZE_KEY,
+  CONTAINER_OOM_BASELINE_KEY,
   AGENT_RECOVERY_PENDING_KEY,
   AGENT_TURN_HEARTBEAT_MS,
   AGENT_WATCHDOG_DEADLINE_KEY,
@@ -297,7 +302,7 @@ export const exactAgentExecutionMarker = async (
     !Number.isSafeInteger(marker.startedAt) ||
     marker.startedAt < 0 ||
     !marker.sandboxId ||
-    (marker.size !== "small" && marker.size !== "large")
+    !isInstanceSize(marker.size)
   ) {
     throw new Error("Agent execution recovery marker was invalid.");
   }
@@ -446,6 +451,84 @@ export const steerContainerAgent = async (
   });
 };
 
+/** Below this much free disk, a container counts as having run out. */
+const DISK_EXHAUSTED_BYTES = 1_500 * 1000 ** 2;
+
+/**
+ * The kernel's OOM-kill count since this container booted, with the boot's
+ * id, and the workspace filesystem's free and total bytes. Cloud containers are
+ * VMs, so these are the container's own.
+ */
+const CONTAINER_PRESSURE_PROBE = `boot=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null)
+oom=$(awk '$1 == "oom_kill" { print $2 }' /proc/vmstat 2>/dev/null)
+set -- $( (df -B1 --output=avail,size /workspace 2>/dev/null || df -B1 --output=avail,size /) | tail -1)
+printf '%s %s %s %s\n' "\${boot:-unknown}" "\${oom:-0}" "\${1:-0}" "\${2:-0}"`;
+
+export type ContainerOomBaseline = { bootId: string; oomKills: number };
+
+/**
+ * Whether this turn's container ran out of memory (a process the kernel
+ * killed) or disk, read while it is still up. When it did, the thread's
+ * containers start at the next larger size from now on, and the report says
+ * so; when there is no larger size, the report says the container is full.
+ */
+const containerPressure = async (
+  host: ContainerTurnHost,
+  turn: TurnRequest,
+  sandbox: ReturnType<ContainerTurnHost["sandbox"]>,
+  size: InstanceSize,
+): Promise<{ note: string; resizedTo?: InstanceSize } | undefined> => {
+  if (!(await host.sandboxContainerRunning(sandbox))) return undefined;
+  const probe = await withInfrastructureDeadline(
+    sandbox.exec(CONTAINER_PRESSURE_PROBE, { origin: "internal" }),
+    10_000,
+    "Container pressure probe did not settle.",
+  );
+  if (!probe.success) return undefined;
+  const [bootId = "", oomRaw, availRaw, totalRaw] = probe.stdout.trim().split(/\s+/u);
+  const oomKills = Number(oomRaw);
+  const availBytes = Number(availRaw);
+  const totalBytes = Number(totalRaw);
+  if (!Number.isSafeInteger(oomKills) || !Number.isFinite(availBytes)) {
+    return undefined;
+  }
+  const baseline = await host.ctx.storage.get<ContainerOomBaseline>(
+    CONTAINER_OOM_BASELINE_KEY,
+  );
+  const outOfMemory =
+    oomKills > (baseline?.bootId === bootId ? baseline.oomKills : 0);
+  await host.ctx.storage.put(CONTAINER_OOM_BASELINE_KEY, {
+    bootId,
+    oomKills,
+  } satisfies ContainerOomBaseline);
+  const outOfDisk = totalBytes > 0 && availBytes < DISK_EXHAUSTED_BYTES;
+  log("info", "agent_container_pressure", {
+    turnId: turn.turnId,
+    threadId: turn.threadId,
+    instanceType: INSTANCE_TIERS[size].instanceType,
+    oomKills,
+    availBytes,
+    totalBytes,
+    outOfMemory,
+    outOfDisk,
+  });
+  if (!outOfMemory && !outOfDisk) return undefined;
+  const ran = outOfMemory && outOfDisk ? "memory and disk" : outOfMemory ? "memory" : "disk";
+  const next = outOfMemory ? sizeAfterOutOfMemory(size) : sizeAfterOutOfDisk(size);
+  const stored = await host.ctx.storage.get<InstanceSize>(AGENT_CONTAINER_SIZE_KEY);
+  if (next && (!isInstanceSize(stored) || stored !== next)) {
+    await host.ctx.storage.put(AGENT_CONTAINER_SIZE_KEY, next);
+  }
+  return next
+    ? {
+        resizedTo: next,
+        note: `[Workspace: this agent's cloud container (${describeInstanceSize(size)}) ran out of ${ran} during this run, so a command in it was killed or failed. Its next run gets a larger one (${describeInstanceSize(next)}); message it to continue.]`,
+      }
+    : {
+        note: `[Workspace: this agent's cloud container (${describeInstanceSize(size)}) ran out of ${ran} during this run, so a command in it was killed or failed. No cloud container has more ${outOfMemory ? "memory" : "disk"}.]`,
+      };
+};
+
 export const runContainerAgentTurn = async (
   host: ContainerTurnHost,
   turn: TurnRequest,
@@ -484,11 +567,18 @@ export const runContainerAgentTurn = async (
     // The thread's container comes up while its context is prepared: the
     // slot first, then the start, which a warm container answers at once.
     // The attempt's own first call waits for a start still under way.
+    // The spawn says whether the work needs a big disk; anything the thread
+    // needed before (a spawn's ask, a container that ran out) is kept.
     const proposedSize: InstanceSize = initialInstanceSize({
-      prompt: turn.prompt,
+      workspace: turn.workspace,
     });
     let size = await agentContainerSize(host.ctx.storage, proposedSize);
-    await host.ctx.storage.put("sandboxSize", size);
+    await host.ctx.storage.put({
+      sandboxSize: size,
+      ...(turn.agentRole !== "orchestrator" && size !== "small"
+        ? { [AGENT_CONTAINER_SIZE_KEY]: size }
+        : {}),
+    });
     execution.assertActive();
     const contextStarted = performance.now();
     const slot = acquireAgentContainerSlot(host, turn, sandboxId, execution);
@@ -637,9 +727,10 @@ export const runContainerAgentTurn = async (
     // rather than checkpointed — an OOM-killed workspace is not a state
     // worth persisting — so the retry restores the same checkpoint the
     // first attempt did.
+    const sizeAfterOom = sizeAfterOutOfMemory(size);
     if (
       attempt.oom &&
-      size === "small" &&
+      sizeAfterOom &&
       (await host.ownsExactTurn(turn)) &&
       !(await host.ctx.storage.get<boolean>("terminal"))
     ) {
@@ -651,11 +742,11 @@ export const runContainerAgentTurn = async (
         "agent_oom_resize",
       );
       execution.assertActive();
-      size = "large";
+      size = sizeAfterOom;
       await host.ctx.storage.put({
         sandboxId,
         sandboxSize: size,
-        [AGENT_CONTAINER_LARGE_KEY]: true,
+        [AGENT_CONTAINER_SIZE_KEY]: size,
       });
       execution.assertActive();
       await host.assertAgentExecutionActive(turn, execution);
@@ -741,6 +832,16 @@ export const runContainerAgentTurn = async (
       });
       return;
     }
+
+    // A build or install the container could not hold doesn't fail the
+    // turn: the agent sees its command die. Say so in the report, and give
+    // the thread's next run a container that holds it.
+    const pressure =
+      turn.agentRole === "orchestrator"
+        ? undefined
+        : await containerPressure(host, turn, sandbox, size).catch(
+            () => undefined,
+          );
 
     if (result.checkpointPolicy === "builder_fallback") {
       try {
@@ -945,8 +1046,15 @@ export const runContainerAgentTurn = async (
           instanceType: INSTANCE_TIERS[size].instanceType,
         },
       };
+      if (pressure) {
+        pending.payload = {
+          ...pending.payload,
+          finalText: `${result.finalText ?? ""}\n\n${pressure.note}`.trim(),
+        };
+      }
     } else {
       let message = result.error ?? "The agent failed.";
+      if (pressure) message = `${message}\n\n${pressure.note}`;
       if (checkpointError) {
         message = `${message} Do not continue this agent until the turn is retried.`;
       }
@@ -979,6 +1087,9 @@ export const runContainerAgentTurn = async (
         workload: "world",
         sessionId,
         daemonDirectory,
+        // A container that is moving to a larger size stops now, so the
+        // thread's next turn starts at that size instead of reusing it.
+        ...(pressure?.resizedTo ? { warm: false } : {}),
       })
       .catch(() => undefined);
     // Storage is the redelivery's only memory: clear it once the terminal

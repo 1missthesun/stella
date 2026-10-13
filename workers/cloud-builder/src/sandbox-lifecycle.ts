@@ -8,7 +8,7 @@
  * accidentally reinterpret an older sandbox at a different size or workload.
  */
 
-import type { InstanceSize } from "./instance-size.js";
+import { isInstanceSize, type InstanceSize } from "./instance-size.js";
 
 export const SANDBOX_WORKLOADS = ["app-build", "world"] as const;
 
@@ -187,8 +187,6 @@ export const SANDBOX_DESTROY_RETRY_MAX_MS = 15 * 60_000;
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-const isInstanceSize = (value: unknown): value is InstanceSize =>
-  value === "small" || value === "large";
 
 export const isSandboxWorkload = (value: unknown): value is SandboxWorkload =>
   typeof value === "string" &&

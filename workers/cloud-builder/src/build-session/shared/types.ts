@@ -57,6 +57,8 @@ export type TurnRequest = {
    */
   originDeviceId?: string;
   originConversationId?: string;
+  /** The spawn's `workspace`: `"large"` starts the container `heavy`. */
+  workspace?: "large";
   preflightDelayMs?: number;
   watchdogMs?: number;
   conversationId?: string;

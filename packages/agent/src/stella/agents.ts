@@ -763,7 +763,7 @@ export function stellaAgents(host: StellaAgentsHost) {
               agent.held = [...(agent.held ?? []), message];
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }
-            const held = agent?.held ?? [];
+            const held = [...(agent?.held ?? [])];
             if (agent) {
               delete agent.held;
               delete agent.paused;
@@ -2229,8 +2229,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
       if (!current) return [];
       delete current.away;
-      if (current.carried?.runKey === args.runKey) return current.carried.messages;
-      const messages = current.held ?? [];
+      if (current.carried?.runKey === args.runKey) return [...current.carried.messages];
+      const messages = [...(current.held ?? [])];
       delete current.held;
       current.carried = { runKey: args.runKey, messages };
       return messages;

@@ -72,6 +72,7 @@ import { ArtifactViewer } from "../../src/components/ArtifactViewer";
 import { CloudBrowserInterventionCard } from "../../src/components/CloudBrowserInterventionCard";
 import { CloudConnectorConnectCard } from "../../src/components/CloudConnectorConnectCard";
 import { UserAskCard } from "../../src/components/UserAskCard";
+import { ChatIssueNotice } from "../../src/components/ChatIssueNotice";
 import { ComposerNotice } from "../../src/components/ComposerNotice";
 import { CloudBoundary } from "../../src/components/CloudBoundary";
 import type { ChatArtifact } from "../../src/types";
@@ -305,7 +306,6 @@ function ChatSurface(props: {
   const session = authClient.useSession();
   const anonymous = session.data?.user?.isAnonymous === true;
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const topInset = useShellTopInset();
   const offline = useIsOffline();
   const isFocused = useIsFocused();
   const composerModelPinned = useComposerModelPinned();
@@ -612,6 +612,16 @@ function ChatSurface(props: {
     }),
     [cloudModelSettings, composerModelPinned, t],
   );
+  // Same identity while the problem is the same, so the memoized composer
+  // below re-renders only when it changes.
+  const issue = thread.authorityIssue ?? null;
+  const chatIssue = useMemo(
+    () =>
+      issue
+        ? { message: issue.message, retryable: issue.retryable, retry: issue.retry }
+        : null,
+    [issue?.message, issue?.retryable, issue?.retry],
+  );
   // Handed to the pane's memoized composer, so it keeps one identity per chat.
   const composerIntervention = useMemo(
     () => (
@@ -623,32 +633,15 @@ function ChatSurface(props: {
             conversationId={thread.conversationId}
           />
         </CloudBoundary>
+        <ChatIssueNotice issue={chatIssue} />
         <ComposerNotice conversationId={thread.conversationId} />
       </>
     ),
-    [thread.conversationId],
+    [chatIssue, thread.conversationId],
   );
 
   return (
     <View style={styles.screen}>
-      {thread.authorityIssue ? (
-        <View style={[styles.authorityIssue, { marginTop: topInset }]}>
-          <Text style={styles.authorityIssueText}>
-            {thread.authorityIssue.message}
-          </Text>
-          {thread.authorityIssue.retryable ? (
-            <Pressable
-              accessibilityRole="button"
-              onPress={thread.authorityIssue.retry}
-              style={styles.authorityRetry}
-            >
-              <Text style={styles.authorityRetryText}>
-                {t("mobile.common.tryAgain")}
-              </Text>
-            </Pressable>
-          ) : null}
-        </View>
-      ) : null}
       <ChatPane
         messages={thread.messages}
         streaming={thread.sending}
@@ -700,7 +693,6 @@ function ChatSurface(props: {
         onOpenActivity={requestOpenSidebar}
         catchingUp={thread.catchingUp}
         onFooterHeightChange={setComposerReserve}
-        {...(thread.authorityIssue ? { topInset: 0 } : {})}
       />
       <ArtifactViewer
         visible={Boolean(selectedArtifact)}
@@ -762,36 +754,5 @@ const makeStyles = (colors: {
       color: colors.text,
       fontFamily: fonts.sans.medium,
       fontSize: 14,
-    },
-    authorityIssue: {
-      alignItems: "center",
-      backgroundColor: colors.surface,
-      borderBottomColor: colors.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      flexDirection: "row",
-      gap: 10,
-      justifyContent: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 9,
-    },
-    authorityIssueText: {
-      color: colors.textMuted,
-      flexShrink: 1,
-      fontFamily: fonts.sans.regular,
-      fontSize: 12,
-      lineHeight: 17,
-      textAlign: "center",
-    },
-    authorityRetry: {
-      borderColor: colors.border,
-      borderRadius: 14,
-      borderWidth: StyleSheet.hairlineWidth,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-    },
-    authorityRetryText: {
-      color: colors.text,
-      fontFamily: fonts.sans.medium,
-      fontSize: 12,
     },
   } as const);

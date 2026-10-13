@@ -10,8 +10,25 @@ export type StdioLaunch = {
 const CMD_META_CHARS = /([()\][%!^"`<>&|;, *?])/gu;
 
 const envValue = (env: NodeJS.ProcessEnv, name: string): string | undefined => {
-  const key = Object.keys(env).find((candidate) => candidate.toLowerCase() === name.toLowerCase());
+  const keys = Object.keys(env).filter((candidate) => candidate.toLowerCase() === name.toLowerCase());
+  const key = keys[keys.length - 1];
   return key ? env[key] : undefined;
+};
+
+export const mergeChildEnv = (
+  base: NodeJS.ProcessEnv,
+  overrides: Record<string, string>,
+  platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv => {
+  if (platform !== "win32") return { ...base, ...overrides };
+  const merged: NodeJS.ProcessEnv = { ...base };
+  for (const [key, value] of Object.entries(overrides)) {
+    for (const existing of Object.keys(merged)) {
+      if (existing.toLowerCase() === key.toLowerCase()) delete merged[existing];
+    }
+    merged[key] = value;
+  }
+  return merged;
 };
 
 const isFile = (candidate: string): boolean => {
@@ -55,12 +72,11 @@ export const resolveWindowsCommand = (
   return null;
 };
 
-const escapeCmdArgument = (value: string, doubleEscape: boolean): string => {
-  let escaped = value
+const escapeCmdArgument = (value: string): string => {
+  const quoted = `"${value
     .replace(/(\\*)"/gu, '$1$1\\"')
-    .replace(/(\\*)$/u, "$1$1");
-  escaped = `"${escaped}"`.replace(CMD_META_CHARS, "^$1");
-  return doubleEscape ? escaped.replace(CMD_META_CHARS, "^$1") : escaped;
+    .replace(/(\\*)$/u, "$1$1")}"`;
+  return quoted.replace(CMD_META_CHARS, "^$1").replace(CMD_META_CHARS, "^$1");
 };
 
 export const windowsBatchLaunch = (
@@ -68,10 +84,9 @@ export const windowsBatchLaunch = (
   args: readonly string[],
   env: NodeJS.ProcessEnv,
 ): StdioLaunch => {
-  const doubleEscape = /node_modules[\\/]\.bin[\\/][^\\/]+\.cmd$/iu.test(scriptPath);
   const commandLine = [
     path.win32.normalize(scriptPath).replace(CMD_META_CHARS, "^$1"),
-    ...args.map((arg) => escapeCmdArgument(arg, doubleEscape)),
+    ...args.map(escapeCmdArgument),
   ].join(" ");
   return {
     command: envValue(env, "ComSpec") || "cmd.exe",

@@ -14,7 +14,7 @@ import {
   stopConnectorBridgeProcess,
   writeConnectorBridgeProcessRecord,
 } from "./process-registry.js";
-import { resolveStdioLaunch } from "./stdio-launch.js";
+import { mergeChildEnv, resolveStdioLaunch } from "./stdio-launch.js";
 import type {
   ConnectorToolCallResult,
   ConnectorCommandConfig,
@@ -145,13 +145,12 @@ class StdioConnectorBridgeSession {
       process.env.STELLA_RUNTIME_WORKER_PID ?? "",
       10,
     );
-    const env = {
-      ...process.env,
+    const env = mergeChildEnv(process.env, {
       ...(await resolveSecretPlaceholders(this.stellaAppDir, this.server.env)),
       STELLA_CONNECTOR_BRIDGE: "1",
       STELLA_CONNECTOR_ID: this.server.id,
       STELLA_CONNECTOR_SESSION: bridgeSessionId,
-    };
+    });
     const launch = resolveStdioLaunch(this.server.command, this.server.args ?? [], {
       env,
       ...(this.server.cwd ? { cwd: this.server.cwd } : {}),

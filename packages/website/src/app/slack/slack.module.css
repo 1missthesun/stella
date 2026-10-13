@@ -337,6 +337,7 @@
 
 .panel {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   padding: clamp(20px, 2.6vw, 28px);
   border-radius: 24px;

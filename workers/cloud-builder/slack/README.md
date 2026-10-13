@@ -107,6 +107,30 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
   GitHub refuses a token; the page then shows a reconnect state. Workspaces
   that pasted a token before this keep it (read-only) until they pick a
   repository through the connection.
+- **Environment** (`environment.ts`, D1 `slack_environments` and
+  `slack_environment_secrets`): one per workspace, next to its repository.
+  Every Slack agent container sends all HTTP and HTTPS through
+  `SandboxEgress`, which intercepts HTTPS with the container's own trusted CA.
+  `slackEgress` then reads the workspace's current settings, cached for 5
+  seconds, and allows or refuses each request:
+  - **none:** Stella, the model API and the workspace's repository on GitHub.
+  - **limited:** also `LIMITED_HOSTS`, the owner's domains and the secrets'
+    hosts.
+  - **full:** everything.
+
+  Under none and limited the container starts without Internet access, so
+  nothing else leaves it. Changing between full and the others restarts it
+  at the next agent run.
+
+  Network secrets are sealed in D1 and only decrypted in the egress handler.
+  It sets the secret's header on HTTPS requests to its host and hands
+  redirects back rather than following them. The container only sees a
+  placeholder variable named after the secret.
+
+  The setup script runs once per container start, as `stella-tools` (never
+  root) in the repository's checkout. What it exports (PATH included) goes to
+  the agent's daemon. A failure is recorded with its log for the page, noted
+  in the thread and told to the agent.
 
 ## Set up an app
 

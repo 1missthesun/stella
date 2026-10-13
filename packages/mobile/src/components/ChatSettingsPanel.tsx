@@ -7,7 +7,13 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Icon } from "./Icon";
-import { BrainSection, ThinkingRow } from "./chat-settings/BrainSection";
+import { EngineAccountSection } from "./EngineAccountsSettings";
+import {
+  BrainSection,
+  EngineAccountRow,
+  ThinkingRow,
+  accountsEngine,
+} from "./chat-settings/BrainSection";
 import { Hairline, KIT, SectionLabel } from "./chat-settings/kit";
 import { PlaceSwitcher } from "./chat-settings/PlaceSwitcher";
 import { ProviderMark } from "./chat-settings/ProviderMark";
@@ -33,18 +39,21 @@ import { useColors } from "../theme/theme-context";
 type Route =
   | { name: "home" }
   | { name: "providers" }
+  | { name: "accounts" }
   | { name: "brain"; id: string; from: "home" | "providers" };
 
 /**
  * The chat's own settings, the sidebar on the right of the chat, opened by
  * swiping left or from the gear at the top right.
  *
- * Its first page is two switchers in the left sidebar's voice, sitting low
- * where a thumb reaches: where turns run, and which model runs them, with
- * that model's siblings listed under it. Everything else is a page deeper,
- * inside the sidebar: every provider, and each provider's own page to
- * connect it and pick its models, so the first page stays the same size
- * however many providers the account has.
+ * Its first page is two switchers in the left sidebar's voice: where turns
+ * run, and which model runs them, with that model's siblings listed under it
+ * and how hard it thinks right below them. At the foot sits the account a
+ * Claude Code or ChatGPT engine runs on, one row that opens its accounts
+ * page. Everything else is a page deeper, inside the sidebar: every
+ * provider, each provider's own page to connect it and pick its models, and
+ * the engine's accounts, so the first page stays the same size however many
+ * providers and accounts there are.
  */
 export function ChatSettingsPanel({ width }: { width: number }) {
   const colors = useColors();
@@ -81,11 +90,14 @@ export function ChatSettingsPanel({ width }: { width: number }) {
   };
 
   const settings = computer?.model?.settings;
+  const accountsFor = settings ? accountsEngine(settings) : null;
   const title = t("mobile.nav.chatSettingsLabel");
   let i = 0;
 
   const page =
-    route.name === "home" || !settings ? (
+    route.name === "home" ||
+    !settings ||
+    (route.name === "accounts" && !accountsFor) ? (
       <>
         <Rise i={i++} animated from="end">
           <View style={styles.titleRow}>
@@ -128,11 +140,21 @@ export function ChatSettingsPanel({ width }: { width: number }) {
               />
             </Rise>
 
-            <View style={styles.spacer} />
-
             {settings.supportsEffortSelection ? (
               <Rise i={i++} animated from="end">
+                <Hairline space={14} />
                 <ThinkingRow settings={settings} />
+              </Rise>
+            ) : null}
+
+            <View style={styles.spacer} />
+
+            {accountsFor ? (
+              <Rise i={i++} animated from="end">
+                <EngineAccountRow
+                  provider={accountsFor}
+                  onPress={() => go({ name: "accounts" })}
+                />
               </Rise>
             ) : null}
           </>
@@ -150,13 +172,17 @@ export function ChatSettingsPanel({ width }: { width: number }) {
           title={
             route.name === "providers"
               ? "Providers"
-              : (settings.brains.find((brain) => brain.id === route.id)
-                  ?.label ?? "")
+              : route.name === "accounts"
+                ? "Accounts"
+                : (settings.brains.find((brain) => brain.id === route.id)
+                    ?.label ?? "")
           }
           mark={
             route.name === "brain"
               ? settings.brains.find((brain) => brain.id === route.id)?.mark
-              : undefined
+              : route.name === "accounts"
+                ? (accountsFor ?? undefined)
+                : undefined
           }
           styles={styles}
         />
@@ -165,6 +191,10 @@ export function ChatSettingsPanel({ width }: { width: number }) {
             settings={settings}
             onOpenBrain={(id) => go({ name: "brain", id, from: "providers" })}
           />
+        ) : route.name === "accounts" ? (
+          accountsFor ? (
+            <EngineAccountSection provider={accountsFor} embedded="panel" />
+          ) : null
         ) : (
           <BrainPage settings={settings} brainId={route.id} />
         )}

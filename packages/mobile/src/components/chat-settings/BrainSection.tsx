@@ -6,7 +6,15 @@ import {
   Text,
   View,
 } from "react-native";
+import type {
+  EngineConnection,
+  EngineProvider,
+} from "@stella/contracts/backend/engines";
+import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
+import { useBackendView } from "../../lib/backend";
 import { tapLight } from "../../lib/haptics";
+import { CONTENT_MAX_FONT_SCALE } from "../../lib/setup-text-defaults";
+import { useT } from "../../i18n";
 import { REASONING_OPTIONS } from "../../lib/stella-model-catalog";
 import type { Brain, ModelSettings } from "../../lib/use-cloud-model-settings";
 import type { Colors } from "../../theme/colors";
@@ -14,7 +22,8 @@ import { fonts } from "../../theme/fonts";
 import { useColors } from "../../theme/theme-context";
 import { NativeMenu } from "../NativeMenu";
 import type { NativeMenuItem } from "../NativeMenu.types";
-import { EngineAccountSection } from "../EngineAccountsSettings";
+import { accountInitials } from "../EngineAccountsSettings";
+import { Icon } from "../Icon";
 import { ProviderMark } from "./ProviderMark";
 import {
   ChoiceRow,
@@ -87,11 +96,6 @@ export function BrainSection({
       : current?.kind === "provider"
         ? "Manage"
         : null;
-  const accountsFor =
-    current?.kind === "engine" && current.engine !== "stella"
-      ? current.engine
-      : null;
-
   const switchTo = (brain: Brain) => {
     if (brain.id === settings.brainId) return;
     tapLight();
@@ -153,12 +157,6 @@ export function BrainSection({
         onFallbackPress={onOpenProviders}
       />
 
-      {accountsFor ? (
-        <View style={styles.accounts}>
-          <EngineAccountSection provider={accountsFor} embedded="panel" />
-        </View>
-      ) : null}
-
       <View style={styles.models} accessibilityRole="radiogroup">
         {loadingModels ? (
           <ActivityIndicator
@@ -200,8 +198,133 @@ export function BrainSection({
 }
 
 /**
- * How hard the chosen model thinks. The sidebar keeps it at its foot, so it
- * stays put however long the model list above it is.
+ * The engine whose accounts the chat's brain runs on: Claude Code or
+ * ChatGPT. Stella and account providers have none to pick between.
+ */
+export const accountsEngine = (
+  settings: ModelSettings,
+): EngineProvider | null => {
+  const current = settings.brains.find(
+    (brain) => brain.id === settings.brainId,
+  );
+  return current?.kind === "engine" && current.engine !== "stella"
+    ? current.engine
+    : null;
+};
+
+/**
+ * The account the engine runs on, as one row at the sidebar's foot. Tapping
+ * it opens the accounts page, where they are added, chosen and managed.
+ */
+export function EngineAccountRow({
+  provider,
+  onPress,
+}: {
+  provider: EngineProvider;
+  onPress: () => void;
+}) {
+  const colors = useColors();
+  const styles = makeStyles(colors);
+  const t = useT();
+  const { value: engines } = useBackendView("engines.get", {});
+  const accounts = (engines?.connections ?? []).filter(
+    (row) => row.provider === provider,
+  );
+  let row: EngineConnection | undefined;
+  let label: string;
+  let detail: string | undefined;
+  let warn = false;
+  if (provider === "anthropic") {
+    const chosenId = engines?.claude?.chosenAccountId ?? null;
+    row = accounts.find((entry) => entry.accountId === chosenId);
+    if (row) {
+      label = row.email ?? row.label;
+      detail = row.plan
+        ? `${row.plan.charAt(0).toUpperCase()}${row.plan.slice(1)}`
+        : undefined;
+    } else if (accounts.length > 0 || engines?.claude) {
+      label = t("settings.engineAccounts.claude.automatic");
+    } else {
+      label = t("mobile.engineAccounts.connectClaude");
+    }
+  } else {
+    row = accounts.find((entry) => entry.active);
+    if (row) {
+      label = row.email ?? row.name ?? row.label;
+      warn = !isEngineConnectionUsable(row);
+      detail =
+        row.status === "signed_out"
+          ? t("mobile.engineAccounts.statusSignedOut")
+          : row.status === "reauth_required"
+            ? t("mobile.engineAccounts.statusReauth")
+            : row.planUsage === false
+              ? t("mobile.engineAccounts.statusPlanUsageOff")
+              : row.plan;
+    } else {
+      label = t("settings.engineAccounts.addChatgpt");
+    }
+  }
+  if (!engines) label = "";
+
+  return (
+    <View>
+      <SectionLabel>Account</SectionLabel>
+      <Pressable
+        onPress={() => {
+          tapLight();
+          onPress();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel={`Account: ${label}`}
+        accessibilityHint="Opens the accounts"
+        style={({ pressed }) => [styles.account, pressed && styles.pressed]}
+      >
+        <View style={styles.avatar}>
+          {row ? (
+            <Text
+              style={styles.avatarText}
+              maxFontSizeMultiplier={1}
+              numberOfLines={1}
+            >
+              {accountInitials(row)}
+            </Text>
+          ) : (
+            <ProviderMark provider={provider} size={20} />
+          )}
+        </View>
+        <View style={styles.accountText}>
+          <Text
+            style={styles.accountLabel}
+            numberOfLines={1}
+            ellipsizeMode="middle"
+            maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+          >
+            {label}
+          </Text>
+          {detail ? (
+            <Text
+              style={[styles.accountDetail, warn && styles.accountWarn]}
+              numberOfLines={1}
+              maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+            >
+              {detail}
+            </Text>
+          ) : null}
+        </View>
+        {!engines ? (
+          <ActivityIndicator size="small" color={colors.textMuted} />
+        ) : warn ? (
+          <Icon name="alert-circle" size={16} color={colors.warning} />
+        ) : (
+          <Icon name="chevron-right" size={14} color={colors.textWeaker} />
+        )}
+      </Pressable>
+    </View>
+  );
+}
+
+/**
+ * How hard the chosen model thinks: once, right under the model list.
  */
 export function ThinkingRow({ settings }: { settings: ModelSettings }) {
   const colors = useColors();
@@ -258,9 +381,45 @@ const makeStyles = (colors: Colors) =>
       alignSelf: "flex-start",
       marginVertical: 12,
     },
-    accounts: {
-      marginBottom: 4,
-      marginLeft: 42,
+    account: {
+      alignItems: "center",
+      flexDirection: "row",
+      gap: 12,
+      minHeight: 56,
+      paddingVertical: 6,
+    },
+    avatar: {
+      alignItems: "center",
+      backgroundColor: colors.surfaceInset,
+      borderRadius: 16,
+      height: 32,
+      justifyContent: "center",
+      width: 32,
+    },
+    avatarText: {
+      color: colors.text,
+      fontFamily: fonts.sans.bold,
+      fontSize: 13,
+      letterSpacing: -0.2,
+    },
+    accountText: {
+      flex: 1,
+      minWidth: 0,
+    },
+    accountLabel: {
+      color: colors.text,
+      fontFamily: fonts.sans.semiBold,
+      fontSize: 17,
+      letterSpacing: -0.3,
+    },
+    accountDetail: {
+      color: colors.textMuted,
+      fontFamily: fonts.sans.medium,
+      fontSize: 13,
+      marginTop: 1,
+    },
+    accountWarn: {
+      color: colors.warning,
     },
     efforts: {
       flexDirection: "row",

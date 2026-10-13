@@ -24,7 +24,6 @@ export type OnboardingStarter = {
 export type OnboardingSynthesisResponse = {
   coreMemory: string;
   welcomeMessage: string;
-  categoryAnalyses?: Record<string, string>;
   /** 3–5 two-to-five-word phrases describing the person, from discovery. */
   profileHighlights?: string[];
   /** 4 personalized starter prompts drawn from the core memory. */

@@ -142,35 +142,18 @@ export const startDiscoveryJob = (input: DiscoveryJobInput) => {
       const includeLocation =
         input.categories.includes("browsing_bookmarks") ||
         input.categories.includes("apps_system");
-      const [coreMemoryWrite, knowledgeWrite] = await Promise.all([
-        discovery.writeCoreMemory
-          ? discovery.writeCoreMemory(synthesis.coreMemory, { includeLocation })
-          : Promise.resolve({
-              ok: false as const,
-              error: "Core memory write IPC is unavailable.",
-            }),
-        discovery.writeKnowledge
-          ? discovery.writeKnowledge({
-              coreMemory: synthesis.coreMemory,
-              formattedSections,
-              ...(synthesis.categoryAnalyses
-                ? {
-                    categoryAnalyses: synthesis.categoryAnalyses as Partial<
-                      Record<DiscoveryCategory, string>
-                    >,
-                  }
-                : {}),
-            })
-          : Promise.resolve({
-              ok: false as const,
-              error: "Knowledge write IPC is unavailable.",
-            }),
-      ]);
+      const coreMemoryWrite = discovery.writeCoreMemory
+        ? await discovery.writeCoreMemory(synthesis.coreMemory, {
+            includeLocation,
+          })
+        : {
+            ok: false as const,
+            error: "Core memory write IPC is unavailable.",
+          };
       if (!isCurrent()) return;
-      if (!coreMemoryWrite?.ok || !knowledgeWrite?.ok) {
+      if (!coreMemoryWrite?.ok) {
         fail(jobGeneration, "Failed to save discovery memory.", {
           coreMemoryWrite,
-          knowledgeWrite,
         });
         return;
       }

@@ -32,7 +32,6 @@ export const RUNTIME_HOST_CALLS = [
   "killAllShells",
   "collectAllSignals",
   "writeCoreMemory",
-  "writeDiscoveryKnowledge",
   "detectPreferredBrowserProfile",
   "listBrowserProfiles",
   "googleWorkspaceGetAuthStatus",

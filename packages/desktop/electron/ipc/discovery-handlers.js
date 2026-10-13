@@ -1,5 +1,5 @@
 import { waitForConnectedRunner } from "./runtime-availability.js";
-import { IPC_DISCOVERY_COLLECT_ALL_SIGNALS, IPC_DISCOVERY_DETECT_PREFERRED_BROWSER, IPC_DISCOVERY_LIST_BROWSER_PROFILES, IPC_DISCOVERY_WRITE_CORE_MEMORY, IPC_DISCOVERY_WRITE_KNOWLEDGE, } from "@stella/contracts/desktop/ipc-channels";
+import { IPC_DISCOVERY_COLLECT_ALL_SIGNALS, IPC_DISCOVERY_DETECT_PREFERRED_BROWSER, IPC_DISCOVERY_LIST_BROWSER_PROFILES, IPC_DISCOVERY_WRITE_CORE_MEMORY, } from "@stella/contracts/desktop/ipc-channels";
 import {
   handleIpc,
 } from "./typed-ipc.js";
@@ -35,19 +35,6 @@ export const registerDiscoveryHandlers = (options) => {
         try {
             const runner = await waitForDiscoveryRunner(options);
             await runner.writeCoreMemory(content, { includeLocation });
-            return { ok: true };
-        }
-        catch (error) {
-            return { ok: false, error: error.message };
-        }
-    });
-    handleIpc(IPC_DISCOVERY_WRITE_KNOWLEDGE, async (event, payload) => {
-        if (!options.assertPrivilegedSender(event, IPC_DISCOVERY_WRITE_KNOWLEDGE)) {
-            throw new Error("Blocked untrusted request.");
-        }
-        try {
-            const runner = await waitForDiscoveryRunner(options);
-            await runner.writeDiscoveryKnowledge(payload);
             return { ok: true };
         }
         catch (error) {

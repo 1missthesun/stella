@@ -412,9 +412,6 @@ export class RuntimeHostAdapter {
     writeCoreMemory(content, options) {
         return this.host.writeCoreMemory(content, options);
     }
-    writeDiscoveryKnowledge(payload) {
-        return this.host.writeDiscoveryKnowledge(payload);
-    }
     detectPreferredBrowserProfile() {
         return this.host.detectPreferredBrowserProfile();
     }

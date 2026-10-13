@@ -150,9 +150,6 @@ const synthesize = async (
     }),
   );
   const usable = analyses.filter((entry) => entry.analysis.length > 0);
-  const categoryAnalyses = Object.fromEntries(
-    usable.map((entry) => [entry.category, entry.analysis]),
-  );
 
   const coreMemory = await complete(
     "synthesis",
@@ -181,7 +178,6 @@ const synthesize = async (
   return {
     coreMemory,
     welcomeMessage: welcomeMessage || DEFAULT_WELCOME_MESSAGE,
-    ...(Object.keys(categoryAnalyses).length > 0 ? { categoryAnalyses } : {}),
     ...(finale ?? {}),
   };
 };

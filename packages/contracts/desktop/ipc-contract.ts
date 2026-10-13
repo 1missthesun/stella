@@ -68,7 +68,6 @@ import type {
   DeviceFileMissingReason,
   DeviceFileSource,
 } from "../device-files.js";
-import type { DiscoveryKnowledgeSeedPayload } from "../discovery.js";
 import type { ExecutionTarget } from "../execution-placement.js";
 import type {
   EventRecord,
@@ -236,7 +235,6 @@ import {
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
   IPC_DISCOVERY_WRITE_CORE_MEMORY,
-  IPC_DISCOVERY_WRITE_KNOWLEDGE,
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
@@ -1242,10 +1240,6 @@ export type IpcInvokeContract = {
   >;
   [IPC_DISCOVERY_WRITE_CORE_MEMORY]: Invoke<
     [payload: { content: string; includeLocation: boolean }],
-    OkErrorResult
-  >;
-  [IPC_DISCOVERY_WRITE_KNOWLEDGE]: Invoke<
-    [payload: DiscoveryKnowledgeSeedPayload],
     OkErrorResult
   >;
   [IPC_DISCOVERY_COLLECT_ALL_SIGNALS]: Invoke<

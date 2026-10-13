@@ -145,7 +145,6 @@ import {
   IPC_DISCOVERY_DETECT_PREFERRED_BROWSER,
   IPC_DISCOVERY_LIST_BROWSER_PROFILES,
   IPC_DISCOVERY_WRITE_CORE_MEMORY,
-  IPC_DISCOVERY_WRITE_KNOWLEDGE,
   IPC_DISPLAY_CANVAS_FILE_URL,
   IPC_DISPLAY_CANVAS_HTML_URL,
   IPC_DISPLAY_LIST_CANVAS_HTML,
@@ -896,7 +895,6 @@ export const createElectronApi = (
           content,
           includeLocation: options?.includeLocation === true,
         }),
-      writeKnowledge: invoker(IPC_DISCOVERY_WRITE_KNOWLEDGE),
       collectAllSignals: invoker(IPC_DISCOVERY_COLLECT_ALL_SIGNALS),
     },
 

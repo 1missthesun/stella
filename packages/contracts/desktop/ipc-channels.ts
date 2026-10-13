@@ -365,8 +365,6 @@ export const IPC_DISCOVERY_LIST_BROWSER_PROFILES =
   "discovery:listBrowserProfiles" as const;
 export const IPC_DISCOVERY_WRITE_CORE_MEMORY =
   "discovery:writeCoreMemory" as const;
-export const IPC_DISCOVERY_WRITE_KNOWLEDGE =
-  "discovery:writeKnowledge" as const;
 export const IPC_DISCOVERY_COLLECT_ALL_SIGNALS =
   "discovery:collectAllSignals" as const;
 

@@ -69,7 +69,6 @@ import {
 import { isDelegatedDeviceSigningInput } from "@stella/contracts/gateway/dpop";
 import { piBrainHandoffPrompt } from "@stella/contracts/turn-plane/pi-brain";
 import type { BrowserType } from "@stella/contracts";
-import type { DiscoveryKnowledgeSeedPayload } from "@stella/contracts/discovery";
 import type {
   HostDeviceIdentity,
   RuntimeAttachmentRef,
@@ -2133,15 +2132,6 @@ export class StellaRuntimeHost {
       this.options.initializeParams.stellaDataDirPath,
       content,
       options,
-    );
-  }
-  async writeDiscoveryKnowledge(payload: DiscoveryKnowledgeSeedPayload) {
-    const { writeDiscoveryKnowledge } = await import(
-      "../discovery/life-knowledge.js"
-    );
-    await writeDiscoveryKnowledge(
-      this.options.initializeParams.stellaDataDirPath,
-      payload,
     );
   }
   async detectPreferredBrowserProfile() {

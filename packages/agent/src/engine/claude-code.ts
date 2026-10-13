@@ -43,6 +43,7 @@ import { resolveClaudeCodeToolSet } from "@stella/runtime/kernel/integrations/cl
 import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/claude-code-compaction";
 import { fitCodeDescriptionForClaudeCode } from "@stella/runtime/kernel/tools/code-catalog";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
+import { residentContextAsOf, residentContextKind } from "../stella/resident-context.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
@@ -69,6 +70,10 @@ const CLAUDE_CODE_CONTEXT_WINDOW = 100_000_000;
 const CLAUDE_CODE_MAX_TOKENS = 128_000;
 const SEEN_LIMIT = 400;
 const REBUILD_MAX_CHARS = 48_000;
+/** Recent history a fresh session replays: about a fifth of Claude's context, as a compaction keeps. */
+const REPLAY_MAX_CHARS = 160_000;
+/** A compaction summary at the head of a replay, kept whole up to this. */
+const LEAD_MAX_CHARS = 64_000;
 const UPDATE_MAX_MESSAGE_CHARS = 12_000;
 /** How long a new turn waits for the stopped one it replaces to end. */
 const SUPERSEDED_SETTLE_MS = 10_000;
@@ -141,9 +146,10 @@ export type ClaudeCodeTransport = {
 /**
  * `seen`: messages the CLI has, by key. `undelivered`: messages that reached
  * Stella's transcript but never the CLI (a stop or pause ended its step
- * before it took them in); the next turn carries them.
+ * before it took them in); the next turn carries them. `context`: the
+ * resident context baseline the CLI was handed whole, by key.
  */
-export type ClaudeCodeSessionRecord = { cliSessionId?: string; seen: string[]; undelivered?: string[] };
+export type ClaudeCodeSessionRecord = { cliSessionId?: string; seen: string[]; undelivered?: string[]; context?: string };
 export type ClaudeCodeSessionStore = {
   read(piSessionId: string): Promise<ClaudeCodeSessionRecord | undefined>;
   write(piSessionId: string, record: ClaudeCodeSessionRecord): Promise<void>;
@@ -180,6 +186,8 @@ type Turn = {
   wake?: () => void;
   callIds: Set<string>;
   prompted?: Message[];
+  /** The resident context baseline this turn's prompt handed the CLI. */
+  context?: string;
   unsent: Message[];
   waiting: Map<string, (outcome: ClaudeCodeToolOutcome) => void>;
   early: Map<string, ClaudeCodeToolOutcome>;
@@ -377,11 +385,27 @@ const userPrompt = (users: readonly Message[]): { text: string; images: ImageCon
   images: users.flatMap((message) => imagesOf(message.content)),
 });
 
+const notResident = (message: Message): boolean => residentContextKind(message) === undefined;
+
+/**
+ * A fresh session starts the way a compacted one does: the resident context
+ * whole with every change applied, then what opens the context (the
+ * compaction summary, or the conversation's first prompt) whole, then as much
+ * recent history as fits. Only the middle is ever cut.
+ */
 const rebuildPrompt = (messages: readonly Message[]): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(messages);
-  const history = renderBounded(messages.slice(0, start), REBUILD_MAX_CHARS);
+  const earlier = messages.slice(0, start);
+  const resident = residentContextAsOf(earlier) ?? "";
+  const rest = earlier.filter(notResident);
+  const opened = rest.findIndex((message) => message.role !== "user");
+  const lead = opened < 0 ? rest : rest.slice(0, opened);
+  const leadText = userPrompt(lead).text;
+  const recent = renderBounded(rest.slice(lead.length), REPLAY_MAX_CHARS);
+  const history = [leadText ? `[user]\n${clip(leadText, LEAD_MAX_CHARS)}` : "", recent].filter(Boolean).join("\n\n");
   const request = userPrompt(users);
   const text = [
+    resident,
     history
       ? `<conversation_history>\nThe conversation so far, for reference; it already happened.\n\n${history}\n</conversation_history>`
       : "",
@@ -392,13 +416,16 @@ const rebuildPrompt = (messages: readonly Message[]): { text: string; images: Im
   return { text, images: request.images };
 };
 
-const deltaPrompt = (delta: readonly Message[]): { text: string; images: ImageContent[] } => {
+const deltaPrompt = (delta: readonly Message[], context?: string): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(delta);
   const before = delta.slice(0, start);
+  const resident = context ?? userPrompt(before.filter((message) => !notResident(message))).text;
+  const rest = before.filter(notResident);
   const request = userPrompt(users);
-  const interrupted = before.some((message) => message.role === "toolResult");
-  const update = before.length > 0 ? renderBounded(before, REBUILD_MAX_CHARS) : "";
+  const interrupted = rest.some((message) => message.role === "toolResult");
+  const update = rest.length > 0 ? renderBounded(rest, REBUILD_MAX_CHARS) : "";
   const text = [
+    resident,
     update
       ? `<conversation_updates>\n${
           interrupted
@@ -642,6 +669,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const resumeSessionId = resumed.sessionId;
     if (resumeSessionId && resumed.restored) {
       record.seen = [];
+      delete record.context;
       noteSeen(session, conversation.slice(0, lastReplyAt + 1));
     }
     let seenAt = -1;
@@ -663,6 +691,14 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const rebuild = rebuildPrompt(conversation);
     const steering = request.prompt && resumeSessionId;
     const delta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
+    const baselineAt = conversation.findLastIndex((message) => residentContextKind(message) === "baseline");
+    const baseline = baselineAt >= 0 ? messageKey(conversation[baselineAt]!) : undefined;
+    // A CLI resumed past the baseline (re-baselined after its own compaction, or a session that predates
+    // `context`) never had it whole: hand it the whole context, every change applied, with this update.
+    const missed =
+      delta && baseline !== undefined && baseline !== record.context && baselineAt <= seenAt
+        ? residentContextAsOf(conversation.slice(0, conversation.length - trailingUsers(delta).users.length))
+        : undefined;
     const given = steering ? (request.steered ?? []) : (delta ?? trailingUsers(conversation).users);
     const givenKeys = new Set(given.map(messageKey));
     const undelivered = new Set(record.undelivered ?? []);
@@ -670,7 +706,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const key = messageKey(message);
       return message.role === "user" && key !== undefined && undelivered.has(key) && !givenKeys.has(key);
     });
-    const asked = steering ? request.prompt! : delta ? deltaPrompt(delta) : rebuild;
+    const asked = steering ? request.prompt! : delta ? deltaPrompt(delta, missed) : rebuild;
     const before = userPrompt(carried);
     const prompt =
       carried.length > 0
@@ -691,6 +727,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       queue: [],
       callIds: new Set(),
       prompted: conversation,
+      ...(!steering && !backgroundWake && baseline !== undefined ? { context: baseline } : {}),
       unsent: [],
       waiting: new Map(),
       early: new Map(),
@@ -704,6 +741,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       if (!turn.prompted) return;
       noteSeen(session, turn.prompted);
       turn.prompted = undefined;
+      if (turn.context !== undefined) session.record!.context = turn.context;
       void saveRecord(session);
     };
     const fitted = fitCodeDescriptionForClaudeCode(request.tools, request.systemPrompt);

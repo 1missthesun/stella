@@ -27,7 +27,7 @@
  */
 import { GenerationTask, hook } from "@earendil-works/pi-durable";
 import type { Message, ModelThinkingLevel, SystemMessage, UserMessage } from "@earendil-works/pi-ai";
-import { wrapSystemReminder } from "@stella/contracts/system-reminders";
+import { SYSTEM_REMINDER_TAG, wrapSystemReminder } from "@stella/contracts/system-reminders";
 import { CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
 import { accountProviderOfRegistryId } from "../provider/account-byok.ts";
 import { parseStellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
@@ -95,6 +95,27 @@ const changedText = (key: string, text: string, before: string | undefined, ranO
   return was && now ? `<${key}>\nChanged: your last reply ran on ${describeRunsOn(was)}; you now run on ${describeRunsOn(now)}.\n</${key}>` : text;
 };
 
+const BASELINE_HEADER = "Context about the user and where this conversation runs. A later update replaces a part of it by name.";
+const CHANGE_HEADER = "This context changed. Each part below replaces the earlier part of the same name; the rest still holds.";
+
+/**
+ * Whether a user message is resident context: the complete `baseline`, or a
+ * `change` to it. Engines that hand the model a conversation as text (Claude
+ * Code) use it to deliver the context whole.
+ */
+export const residentContextKind = (message: Message): "baseline" | "change" | undefined => {
+  if (message.role !== "user") return undefined;
+  const text =
+    typeof message.content === "string"
+      ? message.content
+      : message.content.length === 1 && message.content[0]!.type === "text"
+        ? message.content[0]!.text
+        : "";
+  if (text.startsWith(`<${SYSTEM_REMINDER_TAG}>${BASELINE_HEADER}`)) return "baseline";
+  if (text.startsWith(`<${SYSTEM_REMINDER_TAG}>${CHANGE_HEADER}`)) return "change";
+  return undefined;
+};
+
 const residentText = (
   sections: [string, string | null][],
   baseline: boolean,
@@ -106,13 +127,40 @@ const residentText = (
     .map(([key, text]) => (before ? changedText(key, text, before.get(key), ranOn) : text));
   const removed = sections.filter(([, text]) => text === null).map(([key]) => key);
   const lines = [
-    baseline
-      ? "Context about the user and where this conversation runs. A later update replaces a part of it by name."
-      : "This context changed. Each part below replaces the earlier part of the same name; the rest still holds.",
+    baseline ? BASELINE_HEADER : CHANGE_HEADER,
     ...shown,
     ...(removed.length > 0 ? [`No longer applies: ${removed.join(", ")}.`] : []),
   ];
   return wrapSystemReminder(lines.join("\n\n"));
+};
+
+/** Each resident message's whole context as of it, every change applied, rendered as a baseline. */
+const residentState = new WeakMap<Message, string>();
+
+const residentOrder = [...RESIDENT_SECTION_KEYS];
+
+const recordState = (message: Message, seen: ReadonlyMap<string, string>) => {
+  const sections = [...seen].sort(([a], [b]) => residentOrder.indexOf(a) - residentOrder.indexOf(b));
+  residentState.set(message, residentText(sections, true));
+};
+
+/**
+ * The resident context as of the end of `messages`, every change applied: one
+ * baseline to hand a model that is starting over (a fresh session, or one whose
+ * own compaction left the context behind). Undefined when there is none.
+ */
+export const residentContextAsOf = (messages: readonly Message[]): string | undefined => {
+  const last = messages.findLast((message) => residentContextKind(message) !== undefined);
+  if (last === undefined) return undefined;
+  const state = residentState.get(last);
+  if (state !== undefined) return state;
+  const at = messages.findLastIndex((message) => residentContextKind(message) === "baseline");
+  if (at < 0) return undefined;
+  return messages
+    .slice(at)
+    .filter((message) => residentContextKind(message) !== undefined)
+    .map((message) => (typeof message.content === "string" ? message.content : message.content.map((part) => (part.type === "text" ? part.text : "")).join("")))
+    .join("\n\n");
 };
 
 /**
@@ -159,6 +207,7 @@ export const withResidentContext = (messages: readonly Message[]): readonly Mess
     const user: UserMessage = { role: "user", content: residentText(sections, false, before, ranOn), timestamp: pendingTimestamp };
     out.splice(at, 0, user);
     residentMessages.add(user);
+    recordState(user, seen);
   };
   for (const message of messages) {
     if (message.role === "user" && ranOn !== undefined && ranOn !== checked && baselineSeen) {
@@ -220,6 +269,7 @@ export const withResidentContext = (messages: readonly Message[]): readonly Mess
     };
     out.splice(at, 0, user);
     residentMessages.add(user);
+    recordState(user, seen);
     baselineSeen = true;
   }
   place();

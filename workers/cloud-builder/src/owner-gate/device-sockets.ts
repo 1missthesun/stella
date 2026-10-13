@@ -41,6 +41,8 @@ import {
 import { log, trustedOwnerCaller } from "./support.js";
 import { OwnerGateBase } from "./gate-base.js";
 
+const WEBSOCKET_OPEN = 1;
+
 /**
  * Device presence sockets: frames, presence rows, device requests, and consent.
  */
@@ -111,11 +113,29 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
       : null;
   }
 
-  /** The one connected, proven socket for a device, if it has one. */
+  /**
+   * The one connected, proven socket for a device, if it has one: the open
+   * socket of the connection presence names. A replaced socket stays listed
+   * while its close waits on a peer that is gone, still marked connected, and
+   * anything sent to it is lost.
+   */
   protected connectedSocket(deviceId: string): WebSocket | null {
+    const current = this.ctx.storage.sql
+      .exec<{ connection_id: string }>(
+        `SELECT connection_id FROM device_presence WHERE device_id = ? AND connected = 1`,
+        deviceId,
+      )
+      .toArray()[0]?.connection_id;
+    if (!current) return null;
     for (const socket of this.sockets(deviceId)) {
+      if (socket.readyState !== WEBSOCKET_OPEN) continue;
       const attachment = this.attachment(socket);
-      if (attachment?.phase === "connected") return socket;
+      if (
+        attachment?.phase === "connected" &&
+        attachment.connectionId === current
+      ) {
+        return socket;
+      }
     }
     return null;
   }

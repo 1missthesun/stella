@@ -9,13 +9,19 @@
  * the CLI's own `claude auth login`, against Anthropic's own page; the code
  * Anthropic shows is pasted back into that CLI. This list keeps only
  * identities (email, plan) and, per account, the places where a Claude Code
- * login for it exists (`places`). Each place (the cloud, each computer) uses
- * its own account (`places[].active`): the one chosen for that place while
- * it holds a login for it, else its Claude Code default login, else its
- * oldest. One place's logins never change which account another uses.
+ * login for it exists (`places`). The owner makes one choice for every place
+ * (`claude.chosenAccountId`, or none for "each computer's own login"). Each
+ * place (the cloud, each computer) runs the chosen account while it holds a
+ * login for it, else its Claude Code default login, else its oldest
+ * (`places[].active`, explained per place in `claude.places`).
  *
  * - A computer reports the logins its Claude Code configs hold
  *   (`engines.reportClaudeLogins`), which adds their identities here.
+ * - Another computer signs in remotely: `engines.startClaudeDeviceLogin`
+ *   asks that computer (over its presence socket) to start its own
+ *   `claude auth login` and returns Anthropic's sign-in URL to the asking
+ *   client; `engines.finishClaudeDeviceLogin` hands the pasted code to that
+ *   CLI. Nothing is stored on the way.
  * - The cloud signs in inside the owner's container:
  *   `engines.startClaudeCloudLogin` starts `claude auth login` there and
  *   returns Anthropic's sign-in URL; `engines.finishClaudeCloudLogin` hands
@@ -90,6 +96,42 @@ export type EngineConnection = {
 };
 
 /**
+ * Why a place runs the Claude account it runs:
+ * - `selected`: the account chosen in Stella.
+ * - `own_login`: the computer's own Claude Code login (the CLI's default
+ *   config), used when nothing is chosen or the chosen account has no login
+ *   there.
+ * - `other_login`: another login the place holds (a login added in Stella on
+ *   that computer, or the cloud's), for the same reasons.
+ */
+export type ClaudeInUseReason = "selected" | "own_login" | "other_login";
+
+/** One place that runs Claude Code, and what it runs right now. */
+export type ClaudePlaceStatus = {
+  kind: "cloud" | "device";
+  /** Devices only. */
+  deviceId?: string;
+  deviceName?: string;
+  /** Devices only: whether the computer found a `claude` CLI, when it said. */
+  cliInstalled?: boolean;
+  /** The account Claude Code runs on here now; null while no login here. */
+  inUse: { accountId: string; email?: string; reason: ClaudeInUseReason } | null;
+  /** Devices only: the account the computer's own Claude Code login (`~/.claude`) is signed in to. */
+  ownLogin?: { accountId: string; email?: string };
+  /** An account is chosen and this place has no login for it. */
+  missingChosen: boolean;
+  updatedAt: number;
+};
+
+/** The owner's one Claude choice and what each place runs because of it. */
+export type ClaudeOverview = {
+  /** The account every place uses; null for each place's own login. */
+  chosenAccountId: string | null;
+  /** The cloud first (when it holds a login), then computers by name. */
+  places: ClaudePlaceStatus[];
+};
+
+/**
  * A ChatGPT registration one of the owner's hosts made: the issued client id
  * (an identifier, not a credential) and who it belongs to. Another host signs
  * in with it under its own host id.
@@ -121,6 +163,8 @@ export type EngineSettings = {
   connections: EngineConnection[];
   /** ChatGPT registrations the owner's hosts made, newest first. */
   chatGptRegistrations: ChatGptSharedRegistration[];
+  /** Claude: the one choice and each place's account. Absent from older servers. */
+  claude?: ClaudeOverview;
 };
 
 /** Whether an account can serve the cloud's turns. */
@@ -172,9 +216,43 @@ export type EngineCalls = {
   /**
    * A computer's current Claude Code logins (identities only). Adds unknown
    * identities as accounts and replaces this device's places.
+   * `cliInstalled`: whether the computer found a `claude` CLI.
    */
   "engines.reportClaudeLogins": {
-    args: { deviceId: string; deviceName?: string; logins: ClaudeLocalLogin[] };
+    args: {
+      deviceId: string;
+      deviceName?: string;
+      logins: ClaudeLocalLogin[];
+      cliInstalled?: boolean;
+    };
+    result: null;
+  };
+  /**
+   * The account every place uses (the cloud and every computer), or with no
+   * `accountId` each place's own login. A place without a login for the
+   * chosen account keeps running its own until it signs in.
+   */
+  "engines.chooseClaudeAccount": {
+    args: { accountId?: string };
+    result: null;
+  };
+  /**
+   * Ask another of the owner's computers to start its own `claude auth
+   * login` (a new Claude Code config there) and return Anthropic's sign-in
+   * URL, to open on the device the user is holding. That computer must be
+   * online and accept work from the owner's other devices.
+   */
+  "engines.startClaudeDeviceLogin": {
+    args: { deviceId: string; email?: string };
+    result: { loginId: string; authorizeUrl: string };
+  };
+  /** Hand the code Anthropic showed to that computer's waiting CLI. */
+  "engines.finishClaudeDeviceLogin": {
+    args: { deviceId: string; loginId: string; code: string };
+    result: { email?: string };
+  };
+  "engines.cancelClaudeDeviceLogin": {
+    args: { deviceId: string; loginId: string };
     result: null;
   };
   /**
@@ -217,8 +295,9 @@ export type EngineCalls = {
     result: { revoked: boolean } | null;
   };
   /**
-   * Make one account the one the cloud uses, or with `deviceId` (Claude
-   * only) the one that computer uses. The place must hold a login for it.
+   * Make one account the one in use. ChatGPT: the cloud's. Claude: the one
+   * every place uses (`engines.chooseClaudeAccount`); `deviceId` is ignored
+   * (older clients sent it for a per-computer choice).
    */
   "engines.setActiveAccount": {
     args: { provider: EngineProvider; accountId: string; deviceId?: string };

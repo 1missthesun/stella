@@ -65,6 +65,8 @@ import {
   ENGINE_PROVIDERS,
   type ChatGptSharedRegistration,
   type ClaudeLoginPlace,
+  type ClaudeOverview,
+  type ClaudePlaceStatus,
   type EngineCalls,
   type EngineConnection,
   type EngineProvider,
@@ -281,6 +283,29 @@ export const ENGINE_CLAUDE_PER_PLACE_MIGRATION = {
        JOIN engine_claude_places p ON p.account_id = s.active_account_id
        WHERE s.provider = 'anthropic'`,
     `DELETE FROM engine_provider_settings WHERE provider = 'anthropic'`,
+  ],
+};
+
+/**
+ * One Claude choice for every place: the account chosen anywhere (any
+ * computer, the phone, the web) is the one the cloud and every computer run
+ * while they hold a login for it. The latest per-place choice becomes it.
+ * Computers also say whether they have a `claude` CLI, so one with no login
+ * still shows up as a place.
+ */
+export const ENGINE_CLAUDE_ONE_CHOICE_MIGRATION = {
+  id: "engines.8-claude-one-choice",
+  statements: [
+    `INSERT INTO engine_claude_choices (place, account_id, updated_at)
+       SELECT '*', account_id, updated_at FROM engine_claude_choices
+       ORDER BY updated_at DESC LIMIT 1`,
+    `DELETE FROM engine_claude_choices WHERE place <> '*'`,
+    `CREATE TABLE engine_claude_devices (
+       place TEXT PRIMARY KEY,
+       device_name TEXT,
+       cli_installed INTEGER,
+       updated_at INTEGER NOT NULL
+     )`,
   ],
 };
 
@@ -597,11 +622,15 @@ const readConnections = (db: OwnerDbReader): EngineConnection[] => {
   });
 };
 
-const readSettings = (db: OwnerDbReader): EngineSettings => ({
-  ...readSelection(db),
-  connections: readOrDefault(() => readConnections(db), []),
-  chatGptRegistrations: readOrDefault(() => readRegistrations(db), []),
-});
+const readSettings = (db: OwnerDbReader): EngineSettings => {
+  const claude = readOrDefault<ClaudeOverview | null>(() => readClaudeOverview(db), null);
+  return {
+    ...readSelection(db),
+    connections: readOrDefault(() => readConnections(db), []),
+    chatGptRegistrations: readOrDefault(() => readRegistrations(db), []),
+    ...(claude ? { claude } : {}),
+  };
+};
 
 /**
  * The owner gate's engine fields: the engines the cloud can run, and the
@@ -761,6 +790,8 @@ const writeAccount = (
 // --- Claude: identities and where each has a Claude Code login -------------------
 
 const CLOUD_PLACE = "cloud";
+/** The `engine_claude_choices` row of the one choice every place follows. */
+const EVERY_PLACE = "*";
 const devicePlace = (deviceId: string) => `device:${deviceId}`;
 
 const claudeIdentity = (email: string): string => email.trim().toLowerCase();
@@ -820,28 +851,131 @@ type PlaceRow = {
 
 const PLACE_COLUMNS = "account_id, place, device_name, is_default, updated_at";
 
-const claudeActiveByPlace = (db: OwnerDbReader): Map<string, string> => {
-  const held = db.all<{ account_id: string; place: string; is_default: number }>(
+const chosenClaudeAccount = (db: OwnerDbReader): string | null =>
+  db.one<{ account_id: string }>(
+    `SELECT c.account_id AS account_id FROM engine_claude_choices c
+       JOIN engine_accounts a ON a.account_id = c.account_id
+       WHERE c.place = ? AND a.provider = 'anthropic'`,
+    EVERY_PLACE,
+  )?.account_id ?? null;
+
+type HeldLogin = { account_id: string; place: string; is_default: number };
+
+const heldClaudeLogins = (db: OwnerDbReader): Map<string, HeldLogin[]> => {
+  const held = db.all<HeldLogin>(
     `SELECT p.account_id AS account_id, p.place AS place, p.is_default AS is_default
      FROM engine_claude_places p JOIN engine_accounts a ON a.account_id = p.account_id
      WHERE a.provider = 'anthropic' ORDER BY a.created_at, a.rowid`,
   );
-  const chosen = new Map(
-    db
-      .all<{ place: string; account_id: string }>("SELECT place, account_id FROM engine_claude_choices")
-      .map((row) => [row.place, row.account_id] as const),
-  );
-  const byPlace = new Map<string, typeof held>();
+  const byPlace = new Map<string, HeldLogin[]>();
   for (const row of held) byPlace.set(row.place, [...(byPlace.get(row.place) ?? []), row]);
+  return byPlace;
+};
+
+/**
+ * What one place runs: the chosen account while it holds a login for it,
+ * else its Claude Code default login, else its oldest. Desktops resolve the
+ * same rule from `places[].active` (`claude-local-accounts.ts`).
+ */
+const resolveClaudePlace = (
+  rows: readonly HeldLogin[],
+  chosen: string | null,
+): { accountId: string; reason: "selected" | "own_login" | "other_login" } | null => {
+  const selected = chosen ? rows.find((row) => row.account_id === chosen) : undefined;
+  if (selected) return { accountId: selected.account_id, reason: "selected" };
+  const own = rows.find((row) => row.is_default === 1);
+  if (own) return { accountId: own.account_id, reason: "own_login" };
+  const first = rows[0];
+  return first ? { accountId: first.account_id, reason: "other_login" } : null;
+};
+
+const claudeActiveByPlace = (db: OwnerDbReader): Map<string, string> => {
+  const chosen = chosenClaudeAccount(db);
   const active = new Map<string, string>();
-  for (const [place, rows] of byPlace) {
-    const pick =
-      rows.find((row) => row.account_id === chosen.get(place)) ??
-      rows.find((row) => row.is_default === 1) ??
-      rows[0];
-    if (pick) active.set(place, pick.account_id);
+  for (const [place, rows] of heldClaudeLogins(db)) {
+    const pick = resolveClaudePlace(rows, chosen);
+    if (pick) active.set(place, pick.accountId);
   }
   return active;
+};
+
+type ClaudeDeviceRow = {
+  place: string;
+  device_name: string | null;
+  cli_installed: number | null;
+  updated_at: number;
+};
+
+/** The one choice, and for the cloud and every computer what it runs and why. */
+const readClaudeOverview = (db: OwnerDbReader): ClaudeOverview => {
+  const chosen = chosenClaudeAccount(db);
+  const held = heldClaudeLogins(db);
+  const emails = new Map(
+    db
+      .all<{ account_id: string; email: string | null }>(
+        "SELECT account_id, email FROM engine_accounts WHERE provider = 'anthropic'",
+      )
+      .map((row) => [row.account_id, row.email ?? undefined] as const),
+  );
+  const devices = new Map<string, { name?: string; cliInstalled?: boolean; updatedAt: number }>();
+  for (const row of db.all<ClaudeDeviceRow>(
+    "SELECT place, device_name, cli_installed, updated_at FROM engine_claude_devices",
+  )) {
+    devices.set(row.place, {
+      ...(row.device_name ? { name: row.device_name } : {}),
+      ...(row.cli_installed === null ? {} : { cliInstalled: row.cli_installed === 1 }),
+      updatedAt: row.updated_at,
+    });
+  }
+  for (const row of db.all<{ place: string; device_name: string | null; updated_at: number }>(
+    "SELECT place, device_name, MAX(updated_at) AS updated_at FROM engine_claude_places WHERE place <> ? GROUP BY place",
+    CLOUD_PLACE,
+  )) {
+    if (devices.has(row.place)) continue;
+    devices.set(row.place, {
+      ...(row.device_name ? { name: row.device_name } : {}),
+      updatedAt: row.updated_at,
+    });
+  }
+  const account = (accountId: string) => {
+    const email = emails.get(accountId);
+    return { accountId, ...(email ? { email } : {}) };
+  };
+  const statusOf = (place: string): Pick<ClaudePlaceStatus, "inUse" | "missingChosen" | "ownLogin"> => {
+    const rows = held.get(place) ?? [];
+    const pick = resolveClaudePlace(rows, chosen);
+    const own = rows.find((row) => row.is_default === 1);
+    return {
+      inUse: pick ? { ...account(pick.accountId), reason: pick.reason } : null,
+      ...(own ? { ownLogin: account(own.account_id) } : {}),
+      missingChosen: Boolean(chosen && !rows.some((row) => row.account_id === chosen)),
+    };
+  };
+  const cloudStatus = statusOf(CLOUD_PLACE);
+  const cloudUpdatedAt =
+    db.one<{ updated_at: number | null }>(
+      "SELECT MAX(updated_at) AS updated_at FROM engine_claude_places WHERE place = ?",
+      CLOUD_PLACE,
+    )?.updated_at ?? 0;
+  const places: ClaudePlaceStatus[] = [
+    {
+      kind: "cloud",
+      inUse: cloudStatus.inUse,
+      missingChosen: cloudStatus.missingChosen,
+      updatedAt: cloudUpdatedAt,
+    },
+    ...[...devices]
+      .map(([place, device]): ClaudePlaceStatus => ({
+        kind: "device",
+        deviceId: place.slice("device:".length),
+        ...(device.name ? { deviceName: device.name } : {}),
+        ...(device.cliInstalled === undefined ? {} : { cliInstalled: device.cliInstalled }),
+        ...statusOf(place),
+        updatedAt: device.updatedAt,
+      }))
+      .sort((a, b) => (a.deviceName ?? "").localeCompare(b.deviceName ?? "")),
+  ];
+  return { chosenAccountId: chosen, places };
 };
 
 const placesOf = (
@@ -880,6 +1014,22 @@ const reportClaudeLogins = (
   );
   const place = devicePlace(args.deviceId);
   const deviceName = text(args.deviceName, 120) ?? null;
+  const cliInstalled = args.cliInstalled === undefined ? null : args.cliInstalled ? 1 : 0;
+  const device = ctx.db.one<ClaudeDeviceRow>(
+    "SELECT place, device_name, cli_installed, updated_at FROM engine_claude_devices WHERE place = ?",
+    place,
+  );
+  if (!device || device.device_name !== deviceName || device.cli_installed !== cliInstalled) {
+    ctx.db.run(
+      `INSERT INTO engine_claude_devices (place, device_name, cli_installed, updated_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT (place) DO UPDATE SET device_name = excluded.device_name,
+         cli_installed = excluded.cli_installed, updated_at = excluded.updated_at`,
+      place,
+      deviceName,
+      cliInstalled,
+      ctx.now,
+    );
+  }
   const seen = new Set<string>();
   for (const login of args.logins) {
     const email = text(login.email);
@@ -1470,26 +1620,126 @@ const setActiveAccount = (
     writeActiveAccount(ctx, args.provider, account.account_id);
     return null;
   }
-  const place = args.deviceId ? devicePlace(args.deviceId) : CLOUD_PLACE;
-  const held = ctx.db.one(
-    "SELECT 1 AS present FROM engine_claude_places WHERE account_id = ? AND place = ?",
-    account.account_id,
-    place,
-  );
-  if (!held) {
-    throw badRequest(
-      args.deviceId
-        ? "That computer isn't signed in to this Claude account."
-        : "Sign in to this Claude account in the cloud first.",
-    );
+  writeClaudeChoice(ctx, account.account_id);
+  return null;
+};
+
+const writeClaudeChoice = (ctx: OwnerContext, accountId: string | null): void => {
+  if (!accountId) {
+    ctx.db.run("DELETE FROM engine_claude_choices WHERE place = ?", EVERY_PLACE);
+    return;
   }
   ctx.db.run(
     `INSERT INTO engine_claude_choices (place, account_id, updated_at) VALUES (?, ?, ?)
      ON CONFLICT (place) DO UPDATE SET account_id = excluded.account_id, updated_at = excluded.updated_at`,
-    place,
-    account.account_id,
+    EVERY_PLACE,
+    accountId,
     ctx.now,
   );
+};
+
+const chooseClaudeAccount = (
+  ctx: OwnerContext,
+  args: EngineCalls["engines.chooseClaudeAccount"]["args"],
+): null => {
+  if (args.accountId && !claudeAccount(ctx.db, args.accountId)) {
+    throw new RpcError("NOT_FOUND", "That account isn't connected anymore.");
+  }
+  writeClaudeChoice(ctx, args.accountId ?? null);
+  return null;
+};
+
+// --- Signing another computer in, from the device the user is holding ------------
+
+/**
+ * Ask a computer to run part of its own `claude auth login`. It must be
+ * online and accept work from the owner's other devices: a sign-in decides
+ * which Claude account its agents run on, which is no more than the work
+ * those devices may already send it.
+ */
+const relayClaudeLogin = async (
+  ctx: OwnerContext,
+  deviceId: string,
+  method: "claude.login.start" | "claude.login.finish" | "claude.login.cancel",
+  params: Record<string, unknown>,
+): Promise<unknown> => {
+  const devices = await ctx.host.deviceDestinations().catch(() => []);
+  const device = devices.find((candidate) => candidate.deviceId === deviceId);
+  const label = device?.label?.trim() || "That computer";
+  if (!device) {
+    throw new RpcError("NOT_FOUND", "That computer isn't signed in to this Stella account anymore.");
+  }
+  if (!device.online) {
+    throw new RpcError("UNAVAILABLE", `${label} is offline. Open Stella there and try again.`, {
+      retryable: true,
+      reason: "device_offline",
+    });
+  }
+  if (!device.remoteExecutionEnabled) {
+    ctx.host.askDeviceConsent({ deviceId, requestedAt: ctx.now });
+    throw new RpcError(
+      "FORBIDDEN",
+      `${label} isn't accepting work from your other devices. Stella asked there; once it's allowed, try again.`,
+      { retryable: true, reason: "device_not_enabled" },
+    );
+  }
+  const answer = await ctx.host.relayDeviceRequest({ deviceId, method, params });
+  if (answer.ok) return answer.value;
+  if (answer.code === "device_offline") {
+    throw new RpcError("UNAVAILABLE", `${label} is offline. Open Stella there and try again.`, {
+      retryable: true,
+      reason: "device_offline",
+    });
+  }
+  if (answer.code === "bad_request" && /unknown request/iu.test(answer.message)) {
+    throw badRequest(`Update Stella on ${label} to sign it in from here.`);
+  }
+  throw badRequest(answer.message);
+};
+
+const startClaudeDeviceLogin = async (
+  ctx: OwnerContext,
+  args: EngineCalls["engines.startClaudeDeviceLogin"]["args"],
+): Promise<EngineCalls["engines.startClaudeDeviceLogin"]["result"]> => {
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "engines.startClaudeDeviceLogin",
+    { count: 20, windowMs: 10 * 60_000 },
+    "Too many sign-in attempts. Try again in a few minutes.",
+  );
+  const email = text(args.email);
+  const value = (await relayClaudeLogin(ctx, args.deviceId, "claude.login.start", {
+    ...(email ? { email } : {}),
+  })) as { loginId?: unknown; authorizeUrl?: unknown } | null;
+  const loginId = typeof value?.loginId === "string" ? value.loginId : "";
+  const authorizeUrl = typeof value?.authorizeUrl === "string" ? value.authorizeUrl : "";
+  if (!loginId || !/^https:\/\//u.test(authorizeUrl)) {
+    throw new RpcError("UNAVAILABLE", "That computer didn't start the sign-in. Try again.", {
+      retryable: true,
+    });
+  }
+  return { loginId, authorizeUrl };
+};
+
+const finishClaudeDeviceLogin = async (
+  ctx: OwnerContext,
+  args: EngineCalls["engines.finishClaudeDeviceLogin"]["args"],
+): Promise<EngineCalls["engines.finishClaudeDeviceLogin"]["result"]> => {
+  const value = (await relayClaudeLogin(ctx, args.deviceId, "claude.login.finish", {
+    loginId: args.loginId,
+    code: args.code.trim(),
+  })) as { email?: unknown } | null;
+  return typeof value?.email === "string" && value.email ? { email: value.email } : {};
+};
+
+const cancelClaudeDeviceLogin = async (
+  ctx: OwnerContext,
+  args: EngineCalls["engines.cancelClaudeDeviceLogin"]["args"],
+): Promise<null> => {
+  await relayClaudeLogin(ctx, args.deviceId, "claude.login.cancel", {
+    loginId: args.loginId,
+  }).catch(() => undefined);
   return null;
 };
 
@@ -1653,6 +1903,7 @@ export const enginesDomain = {
     ENGINE_CLI_LOGINS_MIGRATION,
     ENGINE_PROVIDER_SELECTION_MIGRATION,
     ENGINE_CLAUDE_PER_PLACE_MIGRATION,
+    ENGINE_CLAUDE_ONE_CHOICE_MIGRATION,
   ],
   views: {
     "engines.get": {
@@ -1710,8 +1961,39 @@ export const enginesDomain = {
           }),
           { max: 20 },
         ),
+        cliInstalled: optional(boolean()),
       }),
       handler: reportClaudeLogins,
+    },
+    "engines.chooseClaudeAccount": {
+      scope: "owner",
+      parse: object({ accountId: optional(string({ min: 1, max: 64 })) }),
+      handler: chooseClaudeAccount,
+    },
+    "engines.startClaudeDeviceLogin": {
+      scope: "owner",
+      parse: object({
+        deviceId: string({ min: 1, max: 128 }),
+        email: optional(string({ max: 320 })),
+      }),
+      handler: startClaudeDeviceLogin,
+    },
+    "engines.finishClaudeDeviceLogin": {
+      scope: "owner",
+      parse: object({
+        deviceId: string({ min: 1, max: 128 }),
+        loginId: string({ min: 1, max: 64 }),
+        code: string({ min: 1, max: 2_048 }),
+      }),
+      handler: finishClaudeDeviceLogin,
+    },
+    "engines.cancelClaudeDeviceLogin": {
+      scope: "owner",
+      parse: object({
+        deviceId: string({ min: 1, max: 128 }),
+        loginId: string({ min: 1, max: 64 }),
+      }),
+      handler: cancelClaudeDeviceLogin,
     },
     "engines.startClaudeCloudLogin": {
       scope: "owner",
@@ -1775,6 +2057,7 @@ export const enginesDomain = {
     ctx.db.run("DELETE FROM engine_claude_places");
     ctx.db.run("DELETE FROM engine_claude_choices");
     ctx.db.run("DELETE FROM engine_claude_logins");
+    ctx.db.run("DELETE FROM engine_claude_devices");
     ctx.db.run("DELETE FROM engine_chatgpt_registrations");
     ctx.db.run("DELETE FROM engine_provider_settings");
     ctx.db.run("DELETE FROM engine_connects");

@@ -41,6 +41,16 @@ export const DEVICE_REQUEST_METHODS = [
   "mcp.listTools",
   /** `{ id, tool, args }` -> JSON `{ result }`. Only the cloud asks this. */
   "mcp.callTool",
+  /**
+   * `{ email? }` -> JSON `{ loginId, authorizeUrl }`: start this computer's
+   * own `claude auth login` for a sign-in finished on another device. Only
+   * the cloud asks this (`engines.startClaudeDeviceLogin`).
+   */
+  "claude.login.start",
+  /** `{ loginId, code }` -> JSON `{ email? }`. Only the cloud asks this. */
+  "claude.login.finish",
+  /** `{ loginId }` -> JSON `null`. Only the cloud asks this. */
+  "claude.login.cancel",
 ] as const;
 
 export type DeviceRequestMethod = (typeof DEVICE_REQUEST_METHODS)[number];
@@ -70,8 +80,13 @@ export const DEVICE_REQUEST_LIMITS = {
 export const deviceRequestStartTimeoutMs = (
   method: DeviceRequestMethod,
 ): number =>
-  method === "voice.executeTool" || method === "mcp.callTool" || method === "mcp.listTools"
+  method === "voice.executeTool" ||
+  method === "mcp.callTool" ||
+  method === "mcp.listTools" ||
+  method === "claude.login.finish"
     ? 120_000
+    : method === "claude.login.start"
+      ? 60_000
     : method === "officePreview.render"
       ? 45_000
       : 30_000;
@@ -114,6 +129,19 @@ export const isDeviceMcpRequestMethod = (
 ): value is (typeof DEVICE_MCP_REQUEST_METHODS)[number] =>
   typeof value === "string" &&
   (DEVICE_MCP_REQUEST_METHODS as readonly string[]).includes(value);
+
+/** Claude Code sign-ins the cloud relays to a computer for another device. */
+export const DEVICE_CLAUDE_LOGIN_REQUEST_METHODS = [
+  "claude.login.start",
+  "claude.login.finish",
+  "claude.login.cancel",
+] as const satisfies readonly DeviceRequestMethod[];
+
+export const isDeviceClaudeLoginRequestMethod = (
+  value: unknown,
+): value is (typeof DEVICE_CLAUDE_LOGIN_REQUEST_METHODS)[number] =>
+  typeof value === "string" &&
+  (DEVICE_CLAUDE_LOGIN_REQUEST_METHODS as readonly string[]).includes(value);
 
 /** What a relayed MCP request names as its asker. */
 export const DEVICE_REQUEST_CLOUD_ASKER = "cloud";

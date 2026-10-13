@@ -22,6 +22,7 @@ import {
   buildDeviceRequestDeviceProofMessage,
   deviceRequestParamsHash,
   deviceRequesterLabel,
+  isDeviceClaudeLoginRequestMethod,
   isDeviceFileRequestMethod,
   isDeviceMcpRequestMethod,
   isDeviceRequestMethod,
@@ -89,6 +90,12 @@ export const handleDeviceRequestRoute = async (
     return deviceRequestErrorResponse(
       "forbidden",
       "MCP servers on a computer are reached through Stella's agents, not directly.",
+    );
+  }
+  if (isDeviceClaudeLoginRequestMethod(method)) {
+    return deviceRequestErrorResponse(
+      "forbidden",
+      "Claude sign-ins on another computer go through Stella's account settings.",
     );
   }
   const paramsJson = JSON.stringify(params);

@@ -23,6 +23,7 @@ import {
   type EngineSettings,
 } from "@stella/contracts/backend/engines";
 import { CHATGPT_SIWC } from "@stella/contracts/chatgpt-siwc";
+import { ClaudeAccountsPanel } from "./ClaudeAccountsPanel";
 import { GlassIconButton } from "./GlassIconButton";
 import { Icon } from "./Icon";
 import { LineField, PrimaryButton, TextAction } from "./chat-settings/kit";
@@ -284,6 +285,12 @@ export type EngineConnectOptions = {
   clientId?: string;
   /** Claude: pre-fill Anthropic's sign-in page with this login. */
   email?: string;
+  /**
+   * Claude: sign this computer of the owner's in instead of the cloud. It
+   * runs its own `claude auth login`; the phone opens the page and sends the
+   * code back to it through Stella's cloud.
+   */
+  deviceId?: string;
 };
 
 /**
@@ -313,6 +320,9 @@ export function useEngineConnect(
   const authorizeUrl = useRef<string | null>(null);
   /** The options of the attempt in progress, for "Start again". */
   const lastOptions = useRef<EngineConnectOptions>({});
+  /** Claude: the computer the attempt in progress signs in; null for the cloud. */
+  const attemptDevice = useRef<string | null>(null);
+  const [target, setTarget] = useState<string | null>(null);
   onConnectedRef.current = onConnected;
 
   const run = async (action: () => Promise<unknown>): Promise<boolean> => {
@@ -352,6 +362,8 @@ export function useEngineConnect(
 
   const resetAttempt = () => {
     authorizeUrl.current = null;
+    attemptDevice.current = null;
+    setTarget(null);
     setConnectId(null);
     setPasted("");
     setManualEntry(false);
@@ -361,10 +373,13 @@ export function useEngineConnect(
   /** Tell the server to drop an attempt; it may already be gone. */
   const abandon = (attempt: string) => {
     const client = getBackendClient();
+    const deviceId = attemptDevice.current;
     void (
       provider === "chatgpt"
         ? client.call("engines.cancelConnect", { connectId: attempt })
-        : client.call("engines.cancelClaudeCloudLogin", { loginId: attempt })
+        : deviceId
+          ? client.call("engines.cancelClaudeDeviceLogin", { deviceId, loginId: attempt })
+          : client.call("engines.cancelClaudeCloudLogin", { loginId: attempt })
     ).catch(() => {});
   };
 
@@ -386,11 +401,18 @@ export function useEngineConnect(
         await openAuthorizePage(started.authorizeUrl);
         return;
       }
-      const started = await getBackendClient().call(
-        "engines.startClaudeCloudLogin",
-        options.email ? { email: options.email } : {},
-      );
+      const started = options.deviceId
+        ? await getBackendClient().call("engines.startClaudeDeviceLogin", {
+            deviceId: options.deviceId,
+            ...(options.email ? { email: options.email } : {}),
+          })
+        : await getBackendClient().call(
+            "engines.startClaudeCloudLogin",
+            options.email ? { email: options.email } : {},
+          );
       authorizeUrl.current = started.authorizeUrl;
+      attemptDevice.current = options.deviceId ?? null;
+      setTarget(options.deviceId ?? null);
       setConnectId(started.loginId);
       await openAuthorizePage(started.authorizeUrl);
     });
@@ -422,10 +444,19 @@ export function useEngineConnect(
     void (async () => {
       setBusy(true);
       try {
-        await getBackendClient().call("engines.finishClaudeCloudLogin", {
-          loginId: attempt,
-          code,
-        });
+        const deviceId = attemptDevice.current;
+        if (deviceId) {
+          await getBackendClient().call("engines.finishClaudeDeviceLogin", {
+            deviceId,
+            loginId: attempt,
+            code,
+          });
+        } else {
+          await getBackendClient().call("engines.finishClaudeCloudLogin", {
+            loginId: attempt,
+            code,
+          });
+        }
         resetAttempt();
         onConnectedRef.current?.();
         void announceClaudeSync(t, userIdRef.current);
@@ -507,6 +538,8 @@ export function useEngineConnect(
   return {
     busy,
     connectId,
+    /** Claude: the computer being signed in; null for the cloud. */
+    target,
     pasted,
     setPasted,
     run,
@@ -788,11 +821,30 @@ function ProviderSection({
     ]);
   };
 
+  const claudeTargetName = connect.target
+    ? (settings?.claude?.places.find(
+        (place) => place.kind === "device" && place.deviceId === connect.target,
+      )?.deviceName ?? t("settings.engineAccounts.claude.otherComputer"))
+    : null;
+
   return (
     <View style={embedded ? null : settingsStyles.section}>
       {showHeader ? (
         <Text style={settingsStyles.sectionLabel}>{t(section.titleKey)}</Text>
       ) : null}
+      {!chatgpt ? (
+        <View style={panel ? null : [settingsStyles.group, styles.claudeCard]}>
+          <ClaudeAccountsPanel
+            settings={settings}
+            busy={busy}
+            connecting={connectId !== null}
+            run={run}
+            startConnect={startConnect}
+            onRemove={remove}
+            onSignOutCloud={signOutClaudeCloud}
+          />
+        </View>
+      ) : (
       <View
         style={
           panel ? null : embedded ? styles.embeddedGroup : settingsStyles.group
@@ -999,11 +1051,7 @@ function ProviderSection({
           </Pressable>
         )}
       </View>
-      {!chatgpt && !embedded ? (
-        <Text style={[settingsStyles.rowSub, styles.sectionNote]}>
-          {t("mobile.engineAccounts.claudeNote")}
-        </Text>
-      ) : null}
+      )}
 
       {connectId ? (
         <View
@@ -1020,6 +1068,15 @@ function ProviderSection({
               something there is nothing to fill in either: Connect reads it
               on the way through, and the field only appears if that comes up
               empty or the user asks to type it. */}
+          {!chatgpt ? (
+            <Text style={settingsStyles.rowSub}>
+              {claudeTargetName
+                ? t("settings.engineAccounts.claudeLogin.whereDevice", {
+                    place: claudeTargetName,
+                  })
+                : t("settings.engineAccounts.claudeLogin.whereCloud")}
+            </Text>
+          ) : null}
           {showField ? (
             <LineField
               value={pasted}
@@ -1185,4 +1242,5 @@ const makeStyles = (colors: Colors) =>
       letterSpacing: -0.3,
     },
     flexLabel: { flex: 1 },
+    claudeCard: { paddingHorizontal: 16, paddingVertical: 8 },
   });

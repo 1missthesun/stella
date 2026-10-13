@@ -1,15 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { AlertTriangle, ArrowUpRight, Check, GitBranch, Globe, Lock, Plus } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, GitBranch, Globe, KeyRound, Lock, Plus, Undo2, X } from "lucide-react";
 import type { ReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import {
   SLACK_GITHUB_ERROR_PARAM,
   SLACK_GITHUB_RESULT_PARAM,
   SLACK_INSTALL_RESULT_PARAM,
+  SLACK_ENV_NAME_MAX_CHARS,
+  SLACK_ENV_VARS_MAX_CHARS,
   SLACK_MEMORY_MAX_CHARS,
   SLACK_PREVIEW_TTL_DAYS_CHOICES,
   SLACK_RULES_MAX_CHARS,
+  SLACK_SETUP_SCRIPT_MAX_CHARS,
+  type SlackNetworkLevel,
+  type SlackNetworkSecretInput,
+  type SlackWorkspaceEnvironmentUpdate,
   type SlackGithubInstallationChoice,
   type SlackPreviewAccess,
   type SlackGithubRepoOption,
@@ -354,6 +360,37 @@ type Draft = {
   previewTtlDays: number;
   rules: string;
   memory: string;
+  envName: string;
+  network: SlackNetworkLevel;
+  allowedHosts: string;
+  setupScript: string;
+  envVars: string;
+  secretsAdd: SlackNetworkSecretInput[];
+  secretsRemove: string[];
+};
+
+const hostsText = (hosts: string[]): string => hosts.join("\n");
+const hostsList = (text: string): string[] =>
+  text
+    .split(/[\s,]+/)
+    .map((host) => host.trim())
+    .filter(Boolean);
+
+const environmentDiff = (w: SlackWorkspace, d: Draft): SlackWorkspaceEnvironmentUpdate | null => {
+  const e = w.environment;
+  const update: SlackWorkspaceEnvironmentUpdate = {};
+  if (d.envName.trim() !== e.name) update.name = d.envName.trim();
+  if (d.network !== e.network) update.network = d.network;
+  if (hostsList(d.allowedHosts).join("\n") !== e.allowedHosts.join("\n")) update.allowedHosts = hostsList(d.allowedHosts);
+  if (d.setupScript !== e.setupScript) update.setupScript = d.setupScript;
+  if (d.envVars !== e.envVars) update.envVars = d.envVars;
+  if (d.secretsAdd.length || d.secretsRemove.length) {
+    update.secrets = {
+      ...(d.secretsAdd.length ? { add: d.secretsAdd } : {}),
+      ...(d.secretsRemove.length ? { remove: d.secretsRemove } : {}),
+    };
+  }
+  return Object.keys(update).length ? update : null;
 };
 
 const draftFrom = (w: SlackWorkspace): Draft => ({
@@ -367,6 +404,13 @@ const draftFrom = (w: SlackWorkspace): Draft => ({
   previewTtlDays: w.previews.ttlDays,
   rules: w.rules,
   memory: w.memory,
+  envName: w.environment.name,
+  network: w.environment.network,
+  allowedHosts: hostsText(w.environment.allowedHosts),
+  setupScript: w.environment.setupScript,
+  envVars: w.environment.envVars,
+  secretsAdd: [],
+  secretsRemove: [],
 });
 
 const diff = (w: SlackWorkspace, d: Draft): SlackWorkspaceUpdate => {
@@ -383,6 +427,8 @@ const diff = (w: SlackWorkspace, d: Draft): SlackWorkspaceUpdate => {
       ...(d.previewTtlDays !== w.previews.ttlDays ? { ttlDays: d.previewTtlDays } : {}),
     };
   }
+  const environment = environmentDiff(w, d);
+  if (environment) update.environment = environment;
   const name = d.repoName.trim();
   const branch = d.repoBranch.trim();
   if (name) {
@@ -436,7 +482,12 @@ function WorkspaceCard({
   const repoInvalid = repoName !== "" && !REPO_PATTERN.test(repoName);
   const rulesOver = draft.rules.length > SLACK_RULES_MAX_CHARS;
   const memoryOver = draft.memory.length > SLACK_MEMORY_MAX_CHARS;
-  const invalid = repoInvalid || rulesOver || memoryOver || !draft.model;
+  const environmentInvalid =
+    !draft.envName.trim() ||
+    draft.envName.length > SLACK_ENV_NAME_MAX_CHARS ||
+    draft.setupScript.length > SLACK_SETUP_SCRIPT_MAX_CHARS ||
+    draft.envVars.length > SLACK_ENV_VARS_MAX_CHARS;
+  const invalid = repoInvalid || rulesOver || memoryOver || environmentInvalid || !draft.model;
 
   const commit = async (patch: SlackWorkspaceUpdate) => {
     setSaving(true);
@@ -599,6 +650,13 @@ function WorkspaceCard({
         onWorkspace={githubChanged}
       />
 
+      <EnvironmentPanel
+        workspace={workspace}
+        options={options}
+        draft={draft}
+        set={set}
+      />
+
       <PreviewsPanel
         workspace={workspace}
         access={draft.previewAccess}
@@ -676,6 +734,310 @@ function WorkspaceCard({
         </div>
       </div>
     </article>
+  );
+}
+
+const NETWORK_CHOICES: Array<{ id: SlackNetworkLevel; label: string; detail: string }> = [
+  {
+    id: "none",
+    label: "None",
+    detail: "Only Stella, the model and this workspace's repository on GitHub.",
+  },
+  {
+    id: "limited",
+    label: "Limited",
+    detail: "Package registries, GitHub and common build hosts, plus the domains you add.",
+  },
+  {
+    id: "full",
+    label: "Full",
+    detail: "Any site on the Internet.",
+  },
+];
+
+const relativeTime = (at: number): string => {
+  const minutes = Math.round((Date.now() - at) / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return installedDate.format(new Date(at));
+};
+
+const EMPTY_SECRET: SlackNetworkSecretInput = { name: "", host: "", header: "Authorization", value: "" };
+
+function EnvironmentPanel({
+  workspace,
+  options,
+  draft,
+  set,
+}: {
+  workspace: SlackWorkspace;
+  options: SlackWorkspaceOptions;
+  draft: Draft;
+  set: <K extends keyof Draft>(key: K, value: Draft[K]) => void;
+}) {
+  const headingId = `${workspace.teamId}-environment`;
+  const { environment } = workspace;
+  const [adding, setAdding] = useState<SlackNetworkSecretInput | null>(null);
+  const lastSetup = environment.lastSetup;
+  const addingValid = Boolean(
+    adding && /^[A-Za-z_][A-Za-z0-9_]*$/.test(adding.name.trim()) && adding.host.trim() && adding.value.trim(),
+  );
+  const addSecret = () => {
+    if (!adding || !addingValid) return;
+    set("secretsAdd", [
+      ...draft.secretsAdd,
+      {
+        name: adding.name.trim(),
+        host: adding.host.trim(),
+        header: adding.header?.trim() || "Authorization",
+        value: adding.value,
+      },
+    ]);
+    setAdding(null);
+  };
+  const noSecrets = environment.secrets.length === 0 && draft.secretsAdd.length === 0;
+  return (
+    <section className={s.panel} aria-labelledby={headingId}>
+      <div className={s.panelHead}>
+        <p className={s.cardEyebrow} id={headingId}>
+          Environment
+        </p>
+        <p className={s.panelLede}>
+          What every agent Stella starts from this workspace runs with: its network access,
+          credentials it can use without seeing them, a setup script and variables.
+        </p>
+      </div>
+
+      <label className={s.field}>
+        <span className={s.label}>Name</span>
+        <input
+          className={s.input}
+          value={draft.envName}
+          maxLength={SLACK_ENV_NAME_MAX_CHARS}
+          aria-invalid={!draft.envName.trim() || undefined}
+          onChange={(event) => set("envName", event.target.value)}
+        />
+      </label>
+
+      <div className={s.field}>
+        <span className={s.label}>Network access</span>
+        <div className={s.engines} data-count="3" role="radiogroup" aria-label="Network access">
+          {NETWORK_CHOICES.map((choice) => (
+            <button
+              key={choice.id}
+              type="button"
+              role="radio"
+              aria-checked={draft.network === choice.id}
+              className={s.engine}
+              data-active={draft.network === choice.id ? "" : undefined}
+              onClick={() => set("network", choice.id)}
+            >
+              <span className={s.engineLabel}>{choice.label}</span>
+              <span className={s.engineDetail}>{choice.detail}</span>
+            </button>
+          ))}
+        </div>
+        <span className={s.hint}>
+          Enforced by the agent&apos;s container network, not by asking the agent. Blocked requests fail with a
+          message that names the host.
+        </span>
+      </div>
+
+      {draft.network === "limited" ? (
+        <div className={s.field}>
+          <span className={s.label}>Also allow these domains</span>
+          <textarea
+            className={`${s.textarea} ${s.mono} ${s.textareaShort}`}
+            value={draft.allowedHosts}
+            placeholder={"api.example.com\n*.internal.example.com"}
+            aria-label="Also allow these domains"
+            rows={3}
+            onChange={(event) => set("allowedHosts", event.target.value)}
+          />
+          <details className={s.details}>
+            <summary>Allowed by default ({options.limitedHosts.length} domains)</summary>
+            <p className={s.hostList}>{options.limitedHosts.join(", ")}</p>
+          </details>
+        </div>
+      ) : null}
+
+      <div className={s.field}>
+        <span className={s.label}>Network secrets</span>
+        <span className={s.hint}>
+          Let agents call APIs without seeing the secrets. Requests to the secret&apos;s host get its header set
+          on the way out; agents only see a placeholder. Values can&apos;t be viewed after saving.
+        </span>
+        <ul className={s.secretList}>
+          {noSecrets ? <li className={s.secretEmpty}>No secrets yet.</li> : null}
+          {environment.secrets.map((secret) => {
+            const removed = draft.secretsRemove.includes(secret.id);
+            return (
+              <li key={secret.id} className={s.secret} data-removed={removed ? "" : undefined}>
+                <KeyRound size={15} aria-hidden="true" />
+                <span className={s.secretName}>{secret.name}</span>
+                <span className={s.secretWhere}>
+                  {secret.header} → {secret.host}
+                </span>
+                <button
+                  type="button"
+                  className={s.iconButton}
+                  aria-label={removed ? `Keep ${secret.name}` : `Remove ${secret.name}`}
+                  onClick={() =>
+                    set(
+                      "secretsRemove",
+                      removed
+                        ? draft.secretsRemove.filter((id) => id !== secret.id)
+                        : [...draft.secretsRemove, secret.id],
+                    )
+                  }
+                >
+                  {removed ? <Undo2 size={15} aria-hidden="true" /> : <X size={15} aria-hidden="true" />}
+                </button>
+              </li>
+            );
+          })}
+          {draft.secretsAdd.map((secret, index) => (
+            <li key={`new-${secret.name}`} className={s.secret} data-new="">
+              <KeyRound size={15} aria-hidden="true" />
+              <span className={s.secretName}>{secret.name}</span>
+              <span className={s.secretWhere}>
+                {secret.header} → {secret.host} · saved when you save changes
+              </span>
+              <button
+                type="button"
+                className={s.iconButton}
+                aria-label={`Don't add ${secret.name}`}
+                onClick={() => set("secretsAdd", draft.secretsAdd.filter((_, i) => i !== index))}
+              >
+                <X size={15} aria-hidden="true" />
+              </button>
+            </li>
+          ))}
+        </ul>
+        {adding ? (
+          <div className={s.secretForm}>
+            <div className={s.row}>
+              <label className={s.field}>
+                <span className={s.label}>Name</span>
+                <input
+                  className={`${s.input} ${s.mono}`}
+                  value={adding.name}
+                  placeholder="OPENAI_API_KEY"
+                  autoComplete="off"
+                  onChange={(event) => setAdding({ ...adding, name: event.target.value.toUpperCase() })}
+                />
+              </label>
+              <label className={s.field}>
+                <span className={s.label}>Host</span>
+                <input
+                  className={`${s.input} ${s.mono}`}
+                  value={adding.host}
+                  placeholder="api.openai.com"
+                  autoComplete="off"
+                  onChange={(event) => setAdding({ ...adding, host: event.target.value })}
+                />
+              </label>
+            </div>
+            <div className={s.row}>
+              <label className={s.field}>
+                <span className={s.label}>Header</span>
+                <input
+                  className={`${s.input} ${s.mono}`}
+                  value={adding.header}
+                  placeholder="Authorization"
+                  autoComplete="off"
+                  onChange={(event) => setAdding({ ...adding, header: event.target.value })}
+                />
+              </label>
+              <label className={s.field}>
+                <span className={s.label}>Header value</span>
+                <input
+                  className={`${s.input} ${s.mono}`}
+                  type="password"
+                  value={adding.value}
+                  placeholder="Bearer sk-…"
+                  autoComplete="new-password"
+                  onChange={(event) => setAdding({ ...adding, value: event.target.value })}
+                />
+              </label>
+            </div>
+            <div className={s.secretFormActions}>
+              <button type="button" className={s.secondary} onClick={() => setAdding(null)}>
+                Cancel
+              </button>
+              <button type="button" className={s.primary} disabled={!addingValid} onClick={addSecret}>
+                Add secret
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" className={s.addSecret} onClick={() => setAdding({ ...EMPTY_SECRET })}>
+            <Plus size={15} aria-hidden="true" />
+            Add secret
+          </button>
+        )}
+      </div>
+
+      <div className={s.field}>
+        <span className={s.label}>Setup script</span>
+        <span className={s.hint}>
+          Bash that runs when an agent&apos;s container starts, before the agent, in the repository&apos;s
+          checkout, as the agent&apos;s user (not root) and under the network access above. Make it safe to run
+          again. Variables it exports, PATH included, carry over to the agent.
+        </span>
+        <textarea
+          className={`${s.textarea} ${s.mono} ${s.textareaTall}`}
+          value={draft.setupScript}
+          spellCheck={false}
+          placeholder={
+            'set -euo pipefail\n\nif ! command -v bun >/dev/null || [ "$(bun --version)" != "1.4.2" ]; then\n  curl -fsSL https://bun.sh/install | bash -s "bun-v1.4.2"\nfi\nexport PATH="$HOME/.bun/bin:$PATH"\nbun install'
+          }
+          aria-label="Setup script"
+          aria-invalid={draft.setupScript.length > SLACK_SETUP_SCRIPT_MAX_CHARS || undefined}
+          onChange={(event) => set("setupScript", event.target.value)}
+        />
+        {lastSetup ? (
+          <div className={s.setupRun} data-status={lastSetup.status}>
+            <span>
+              {lastSetup.status === "succeeded" ? (
+                <Check size={15} aria-hidden="true" />
+              ) : (
+                <AlertTriangle size={15} aria-hidden="true" />
+              )}
+              Last run {lastSetup.status === "succeeded" ? "succeeded" : "failed"}
+              {lastSetup.status === "failed" && lastSetup.exitCode !== null ? ` (exit ${lastSetup.exitCode})` : ""}{" "}
+              {relativeTime(lastSetup.at)} · {Math.max(1, Math.round(lastSetup.ms / 1000))} s
+            </span>
+            {lastSetup.log ? (
+              <details className={s.details} open={lastSetup.status === "failed"}>
+                <summary>Log</summary>
+                <pre className={s.log}>{lastSetup.log}</pre>
+              </details>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+
+      <div className={s.field}>
+        <span className={s.label}>Environment variables</span>
+        <span className={s.hint}>
+          In .env format, one KEY=value per line. Not secret: anyone using this environment can read them,
+          including people who ask Stella in Slack. Put credentials in network secrets instead.
+        </span>
+        <textarea
+          className={`${s.textarea} ${s.mono}`}
+          value={draft.envVars}
+          spellCheck={false}
+          placeholder={"NODE_ENV=development\nAPI_BASE_URL=https://staging.example.com"}
+          aria-label="Environment variables"
+          rows={5}
+          aria-invalid={draft.envVars.length > SLACK_ENV_VARS_MAX_CHARS || undefined}
+          onChange={(event) => set("envVars", event.target.value)}
+        />
+      </div>
+    </section>
   );
 }
 

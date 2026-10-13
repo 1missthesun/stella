@@ -30,6 +30,8 @@ export type SlackWorkspaceOptions = {
   engines: Array<{ id: SlackWorkspaceEngine; label: string; detail: string }>;
   models: Record<SlackWorkspaceEngine, SlackWorkspaceModelOption[]>;
   efforts: ReasoningEffortLevel[];
+  /** What `limited` network access allows besides Stella and the workspace's own hosts. */
+  limitedHosts: string[];
 };
 
 export type SlackWorkspaceRepo = {
@@ -83,6 +85,79 @@ export type SlackWorkspacePreviews = {
   maxPreviewBytes: number;
 };
 
+/**
+ * What an agent container may reach. `none`: only Stella itself (and the
+ * workspace's repository on GitHub). `limited`: also package registries,
+ * GitHub and the other hosts in `SlackWorkspaceOptions.limitedHosts`, plus
+ * the workspace's own `allowedHosts` and its secrets' hosts. `full`: the
+ * Internet. Enforced by the container's network, not by the agent.
+ */
+export type SlackNetworkLevel = "none" | "limited" | "full";
+
+export const SLACK_NETWORK_LEVELS: readonly SlackNetworkLevel[] = ["none", "limited", "full"];
+
+/**
+ * A network secret: on HTTPS requests to `host` (`*.example.com` matches any
+ * subdomain), the container's network sets `header` to the saved value. The
+ * value is write-only: never returned, never in the container.
+ */
+export type SlackNetworkSecret = {
+  id: string;
+  /** Also the name of a placeholder environment variable agents see. */
+  name: string;
+  host: string;
+  header: string;
+};
+
+export type SlackSetupRun = {
+  status: "succeeded" | "failed";
+  exitCode: number | null;
+  at: number;
+  ms: number;
+  /** The end of the script's output (stdout and stderr). */
+  log: string;
+};
+
+/**
+ * The workspace's environment: what every agent container started from
+ * Slack runs with. One per workspace, beside its repository.
+ */
+export type SlackWorkspaceEnvironment = {
+  name: string;
+  network: SlackNetworkLevel;
+  /** Extra hosts for `limited`, one per entry (`*.example.com` allowed). */
+  allowedHosts: string[];
+  secrets: SlackNetworkSecret[];
+  /** Bash, run as the agent's user when its container starts, in the repository. */
+  setupScript: string;
+  /** `.env` text. Not secret: anyone using the environment can read it. */
+  envVars: string;
+  lastSetup: SlackSetupRun | null;
+};
+
+export type SlackNetworkSecretInput = {
+  name: string;
+  host: string;
+  header?: string;
+  value: string;
+};
+
+export type SlackWorkspaceEnvironmentUpdate = {
+  name?: string;
+  network?: SlackNetworkLevel;
+  allowedHosts?: string[];
+  setupScript?: string;
+  envVars?: string;
+  secrets?: { add?: SlackNetworkSecretInput[]; remove?: string[] };
+};
+
+export const SLACK_ENV_NAME_MAX_CHARS = 60;
+export const SLACK_SETUP_SCRIPT_MAX_CHARS = 20_000;
+export const SLACK_ENV_VARS_MAX_CHARS = 20_000;
+export const SLACK_ALLOWED_HOSTS_MAX = 100;
+export const SLACK_NETWORK_SECRETS_MAX = 50;
+export const SLACK_NETWORK_SECRET_MAX_CHARS = 8_000;
+
 export type SlackWorkspace = {
   teamId: string;
   teamName: string;
@@ -97,6 +172,7 @@ export type SlackWorkspace = {
   github: SlackWorkspaceGithub | null;
   repo: SlackWorkspaceRepo | null;
   previews: SlackWorkspacePreviews;
+  environment: SlackWorkspaceEnvironment;
   /** Plain-language rules Stella follows in this workspace (`memories/rules.md`). */
   rules: string;
   /** Stella's workspace-wide notes (`memories/workspace.md`). */
@@ -134,6 +210,7 @@ export type SlackWorkspaceUpdate = {
   slackCommands?: boolean;
   repo?: { fullName: string; branch?: string } | null;
   previews?: { access?: SlackPreviewAccess; ttlDays?: number };
+  environment?: SlackWorkspaceEnvironmentUpdate;
   rules?: string;
   memory?: string;
 };

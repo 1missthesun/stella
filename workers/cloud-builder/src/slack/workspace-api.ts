@@ -58,6 +58,7 @@ import {
   type SettingsPatch,
 } from "./settings.js";
 import { describePreviews, isPreviewTtl, savePreviewSettings } from "./previews.js";
+import { loadEnvironment, saveEnvironment, validateEnvironmentUpdate, type EnvironmentPatch } from "./environment.js";
 import { loadInstallation, type SlackInstallation } from "./store.js";
 import { rulesPath, workspaceNotesPath } from "./workspace.js";
 
@@ -164,6 +165,7 @@ const describe = async (
     github: describeGithub(settings.github),
     repo: repoView(settings),
     previews: await describePreviews(env, install.teamId, install.ownerId),
+    environment: await loadEnvironment(env, install.teamId),
     rules,
     memory,
     slackUrl: `https://app.slack.com/client/${encodeURIComponent(install.teamId)}`,
@@ -274,6 +276,12 @@ const update = async (
       return fail(400, "That expiry isn't one of the choices.");
     }
   }
+  let environmentPatch: EnvironmentPatch | null = null;
+  if (input.environment !== undefined) {
+    const checked = validateEnvironmentUpdate(input.environment, await loadEnvironment(env, teamId));
+    if (!checked.ok) return fail(400, checked.message);
+    environmentPatch = checked.patch;
+  }
   if (input.rules !== undefined && String(input.rules).length > SLACK_RULES_MAX_CHARS) {
     return fail(400, `Rules are limited to ${SLACK_RULES_MAX_CHARS} characters.`);
   }
@@ -286,6 +294,16 @@ const update = async (
       ...(previews.access !== undefined ? { access: previews.access } : {}),
       ...(previews.ttlDays !== undefined ? { ttlDays: previews.ttlDays } : {}),
     });
+  }
+  if (environmentPatch && Object.keys(environmentPatch).length) {
+    await saveEnvironment(env, teamId, environmentPatch);
+    console.log(
+      JSON.stringify({
+        event: "slack_environment_changed",
+        teamId,
+        fields: Object.keys(environmentPatch),
+      }),
+    );
   }
   const { install } = owned;
   if (input.rules !== undefined) await writeText(env, caller.ownerId, rulesPath(install.homeFolder), String(input.rules));

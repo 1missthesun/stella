@@ -32,6 +32,8 @@ import {
 } from "./turn-credential-broker.js";
 import { prepareSlackPreviews } from "./slack/previews.js";
 import { prepareSlackRepo } from "./slack/repo-clone.js";
+import { egressForConversation, prepareSlackEnvironment } from "./slack/environment.js";
+import { isSlackConversationId } from "./slack/conversation-id.js";
 import { startTurnExecution } from "./turn-cancellation.js";
 import { issueWorldCapability } from "./world-capability.js";
 import { worldMaterializationCommand } from "./world-materialization.js";
@@ -219,11 +221,19 @@ export const openPiComputeLease = async (
   const expiresAt = Date.now() + CREDENTIAL_TTL_MS;
   let sandbox: SandboxHandle | undefined;
   let releaseWarm = false;
+  /** The Slack workspace environment's variables, for the daemon and every command it runs. */
+  let workspaceEnv: Record<string, string> = {};
+  let environmentNotice: string | undefined;
 
   const attachWorld = async (target: { sandboxId: string; sessionId: string }) => {
     const started = Date.now();
     await host.takeSlot(owner, target.sandboxId, execution.signal);
     sandbox = sandboxFor(host, target.sandboxId, INSTANCE_SIZE, world);
+    if (isSlackConversationId(owner.conversationId)) {
+      const egress = await egressForConversation(host.env as Cloudflare.Env, owner.conversationId);
+      const { restarted } = await sandbox.setEgress(egress);
+      if (restarted) host.log("slack_container_restarted_for_network", { threadId, network: egress?.internet ? "full" : "restricted" });
+    }
     const options = {
       id: target.sessionId,
       cwd: "/opt/stella",
@@ -260,8 +270,19 @@ export const openPiComputeLease = async (
     if (!materialized.success) throw new Error("Stella could not bring this world into the agent's workspace.");
     // Materialization replaces the world root, including the drive directory the daemon expects.
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
-    await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log);
+    const repoDir = await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log);
     await prepareSlackPreviews(host.env, session, owner.conversationId, publicOrigin(host), host.log);
+    if (isSlackConversationId(owner.conversationId)) {
+      const prepared = await prepareSlackEnvironment(
+        host.env as Cloudflare.Env,
+        session,
+        owner.conversationId,
+        repoDir ?? WORLD_ROOT,
+        host.log,
+      );
+      workspaceEnv = prepared?.env ?? {};
+      environmentNotice = prepared?.notice;
+    }
     context.assertActive();
     host.log("pi_agent_world_attached", {
       threadId,
@@ -326,7 +347,7 @@ export const openPiComputeLease = async (
       if (!sandbox) throw new Error("The agent's container has not been attached.");
       return await sandbox.startProcess(command, {
         cwd: options.cwd,
-        env: executorSessionEnvironment(),
+        env: { ...workspaceEnv, ...executorSessionEnvironment() },
         processId: options.processId,
       });
     },
@@ -351,7 +372,11 @@ export const openPiComputeLease = async (
   const ready = (async () => {
     await attachment.boot(target);
     const report = await attachment.control({ sandboxId: record.sandboxId, control: "boot_report", ...identity });
-    if (report.status === "boot_report" && report.notices.length > 0) bootNotice = report.notices.join(" ");
+    const notices = [
+      ...(environmentNotice ? [environmentNotice] : []),
+      ...(report.status === "boot_report" ? report.notices : []),
+    ];
+    if (notices.length > 0) bootNotice = notices.join(" ");
   })();
   // A caller that needs the container hears why it did not come up.
   ready.catch(() => undefined);

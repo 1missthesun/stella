@@ -394,6 +394,10 @@
   gap: 10px;
 }
 
+.engines[data-count="3"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .engine {
   display: grid;
   gap: 4px;
@@ -491,6 +495,10 @@
   border-radius: 20px;
   line-height: 1.55;
   resize: vertical;
+}
+
+.textareaShort {
+  min-height: 96px;
 }
 
 .textareaTall {
@@ -949,7 +957,8 @@
 
 @media (max-width: 680px) {
   .row,
-  .engines {
+  .engines,
+  .engines[data-count="3"] {
     grid-template-columns: minmax(0, 1fr);
   }
 
@@ -965,4 +974,159 @@
   .saveActions > * {
     flex: 1 1 0;
   }
+}
+
+.mono {
+  font-family: var(--l-mono), ui-monospace, monospace;
+  font-size: 13.5px;
+  letter-spacing: 0;
+  line-height: 1.55;
+}
+
+.details {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.hostList {
+  margin: 0.5rem 0 0;
+  line-height: 1.6;
+}
+
+.secretList {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.secretEmpty,
+.secret {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid rgba(10, 10, 13, 0.14);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.secretEmpty {
+  color: var(--muted);
+}
+
+.secret[data-new] {
+  border-style: dashed;
+}
+
+.secret[data-removed] .secretName,
+.secret[data-removed] .secretWhere {
+  text-decoration: line-through;
+  opacity: 0.55;
+}
+
+.secretName {
+  font-family: var(--l-mono), ui-monospace, monospace;
+  font-weight: 600;
+}
+
+.secretWhere {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: rgba(127, 127, 127, 0.14);
+}
+
+.addSecret {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  width: fit-content;
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgba(10, 10, 13, 0.14);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.addSecret:hover {
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.secretForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+  padding: 0.875rem;
+  border: 1px solid rgba(10, 10, 13, 0.14);
+  border-radius: 12px;
+}
+
+.secretFormActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.setupRun {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.85rem;
+}
+
+.setupRun > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.setupRun[data-status="failed"] > span {
+  color: #b42318;
+}
+
+.log {
+  max-height: 18rem;
+  overflow: auto;
+  margin: 0.5rem 0 0;
+  padding: 0.75rem;
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.1);
+  font-family: var(--l-mono), ui-monospace, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

@@ -52,6 +52,8 @@ export type SlackWorkspaceContext = {
   repo?: string;
   /** Agents can push to it, through the workspace's GitHub connection. */
   repoPush?: boolean;
+  /** One line on the workspace's environment (`environment.ts`), for the prompt. */
+  environment?: string;
 };
 
 const shortText = (value: unknown, max: number): string | null =>
@@ -101,6 +103,7 @@ export const parseSlackWorkspaceContext = (
     : [];
   const repo = shortText(record.repo, 320);
   const repoPush = record.repoPush === true;
+  const environment = shortText(record.environment, 3000);
   return {
     teamName,
     homeFolder,
@@ -109,6 +112,7 @@ export const parseSlackWorkspaceContext = (
     requester,
     participants,
     ...(repo ? { repo, ...(repoPush ? { repoPush } : {}) } : {}),
+    ...(environment ? { environment } : {}),
   };
 };
 
@@ -236,6 +240,7 @@ export const renderSlackSystemPrompt = async (
     context.repo
       ? `Repository: github.com/${context.repo.split("@")[0]} — every agent you start has it cloned at ${SLACK_REPO_ROOT}/${context.repo.split("@")[0]!.split("/")[1]}, on branch ${context.repo.split("@")[1] ?? "(the default branch)"}. ${context.repoPush ? "Agents can commit and push to that branch." : "Agents can't push to it (no GitHub connection for it)."}`
       : "Repository: none connected",
+    ...(context.environment ? [`Environment: ${context.environment}`] : []),
   ].join("\n");
   return [
     slackPrompt.trim(),

@@ -10,6 +10,7 @@
 import type {
   Sandbox,
   SandboxBoot,
+  SandboxEgressPolicy,
   SandboxExecResult,
   SandboxProcessInfo,
   SandboxProcessStatus,
@@ -93,6 +94,8 @@ export interface SandboxHandle extends Omit<ExecutionSession, "id"> {
    * window, or right after the snapshot when `warm` is false.
    */
   release(options?: { warm?: boolean }): Promise<void>;
+  /** Network rules for a Slack agent's container (`SandboxEgressPolicy`). */
+  setEgress(policy: SandboxEgressPolicy | null): Promise<{ restarted: boolean }>;
 }
 
 type Stub = DurableObjectStub<Sandbox>;
@@ -202,6 +205,7 @@ export const sandboxClient = (
     release: async (options) => {
       await stub.release(options);
     },
+    setEgress: async (policy) => await stub.setEgress(policy),
   };
 };
 

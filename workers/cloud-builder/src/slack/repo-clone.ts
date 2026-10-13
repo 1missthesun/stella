@@ -82,10 +82,10 @@ export const prepareSlackRepo = async (
   conversationId: string,
   origin: string,
   log: (event: string, fields: Record<string, unknown>) => void,
-): Promise<void> => {
-  if (!isSlackConversationId(conversationId)) return;
+): Promise<string | null> => {
+  if (!isSlackConversationId(conversationId)) return null;
   const repo = await repoForConversation(env as Cloudflare.Env, conversationId).catch(() => null);
-  if (!repo) return;
+  if (!repo) return null;
   const viaGithub = Boolean(
     repo.github && repo.github.status === "active" && repoOwnedBy(repo.github, repo.fullName),
   );
@@ -157,6 +157,7 @@ export const prepareSlackRepo = async (
         ? {}
         : { exitCode: result.exitCode, stderr: redact(String(result.stderr ?? "")) }),
     });
+    return result.success ? dir : null;
   } catch (error) {
     log("slack_repo_failed", {
       repo: repo.fullName,
@@ -164,5 +165,6 @@ export const prepareSlackRepo = async (
       ms: Date.now() - started,
       message: redact(error instanceof Error ? error.message : String(error)),
     });
+    return null;
   }
 };

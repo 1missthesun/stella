@@ -41,6 +41,7 @@ const options: SlackWorkspaceOptions = {
     ],
   },
   efforts: ["low", "medium", "high", "xhigh", "max"],
+  limitedHosts: ["github.com", "*.github.com", "registry.npmjs.org", "pypi.org", "files.pythonhosted.org", "bun.sh"],
 };
 
 const acmeGithub = (status: SlackWorkspaceGithub["status"]): SlackWorkspaceGithub => ({
@@ -68,6 +69,21 @@ const base: SlackWorkspace = {
     quotaBytes: 5 * 1024 * 1024 * 1024,
     live: 6,
     maxPreviewBytes: 100 * 1024 * 1024,
+  },
+  environment: {
+    name: "Acme firmware",
+    network: "limited",
+    allowedHosts: ["api.acme-robotics.dev"],
+    secrets: [{ id: "s1", name: "ACME_API_TOKEN", host: "api.acme-robotics.dev", header: "Authorization" }],
+    setupScript: 'set -euo pipefail\ncurl -fsSL https://bun.sh/install | bash -s "bun-v1.4.2"\nexport PATH="$HOME/.bun/bin:$PATH"',
+    envVars: "NODE_ENV=development\nFIRMWARE_TARGET=stm32",
+    lastSetup: {
+      status: "failed",
+      exitCode: 1,
+      at: Date.now() - 6 * 60_000,
+      ms: 4200,
+      log: "+ curl -fsSL https://bun.sh/install\ncurl: (22) The requested URL returned error: 403\nBlocked: this Slack workspace's environment has Limited network access, which doesn't include example.org.",
+    },
   },
   rules: "Only Priya can ask for deploys.\nKeep answers in threads.",
   memory:
@@ -112,9 +128,20 @@ export const mockSlackApi = {
     });
   },
   update(_teamId: string, update: SlackWorkspaceUpdate): Promise<SlackWorkspaceUpdateResponse> {
-    const { repo, previews, ...rest } = update;
+    const { repo, previews, environment, ...rest } = update;
     const now = current(mockMode());
     let next: SlackWorkspace = { ...now, ...rest, previews: { ...now.previews, ...previews } };
+    if (environment) {
+      const { secrets, ...fields } = environment;
+      const kept = now.environment.secrets.filter((secret) => !secrets?.remove?.includes(secret.id));
+      const added = (secrets?.add ?? []).map((secret) => ({
+        id: crypto.randomUUID(),
+        name: secret.name,
+        host: secret.host,
+        header: secret.header || "Authorization",
+      }));
+      next = { ...next, environment: { ...now.environment, ...fields, secrets: [...kept, ...added] } };
+    }
     if (repo === null) next = { ...next, repo: null };
     else if (repo) {
       const viaGithub = Boolean(next.github && repo.fullName.startsWith(`${next.github.account}/`));

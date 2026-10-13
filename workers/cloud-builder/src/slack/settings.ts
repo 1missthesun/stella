@@ -5,6 +5,7 @@
  * commands edit the first three when the owner allows it.
  */
 
+import { deleteEnvironment, LIMITED_HOSTS } from "./environment.js";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   DEFAULT_REASONING_EFFORT,
@@ -231,6 +232,7 @@ export const deleteWorkspaceSettings = async (
     .prepare("DELETE FROM slack_workspace_settings WHERE team_id = ?")
     .bind(teamId)
     .run();
+  await deleteEnvironment(env, teamId);
 };
 
 /** The repository a Slack conversation's agents start with, with how to reach it. */
@@ -338,6 +340,7 @@ export const workspaceOptions = (
     "claude-code": CLAUDE_CODE_MODELS,
   },
   efforts: [...REASONING_EFFORT_LEVELS],
+  limitedHosts: [...LIMITED_HOSTS],
 });
 
 /** A model id the engine accepts: a listed one, or any `stella/…` id for Stella. */

@@ -42,6 +42,15 @@ import type { Env } from "./build-session/shared/env.js";
 import type { ContainerSnapshot } from "./world-store.js";
 
 export type SandboxInstanceSize = "small" | "large";
+
+/**
+ * A Slack workspace's network rules for one agent container
+ * (`slack/environment.ts`). Every HTTP and HTTPS request the container sends
+ * goes through `SandboxEgress`, which reads the workspace's current
+ * environment for each one; `internet` is whether other ports reach the
+ * Internet directly, fixed when the container starts.
+ */
+export type SandboxEgressPolicy = { kind: "slack"; team: string; internet: boolean };
 export type SandboxWorkloadKind = "world" | "app-build";
 
 /** What a caller asks for when its call may need a running container. */
@@ -129,6 +138,14 @@ const RELEASE_DELAY_MS = 2_000;
 const WARM_WINDOW_MS = 45_000;
 /** The 0.12 SDK ran commands here unless a call named another directory. */
 const DEFAULT_CWD = "/workspace";
+const EGRESS_KEY = "egress";
+/** The egress policy the running container was started with. */
+const BOOTED_EGRESS_KEY = "bootedEgress";
+const CONTAINERS_CA = "/etc/cloudflare/certs/cloudflare-containers-ca.crt";
+const TRUST_CONTAINERS_CA = `for i in $(seq 1 50); do [ -s ${CONTAINERS_CA} ] && break; sleep 0.1; done
+[ -s ${CONTAINERS_CA} ] || { echo "The container has no interception CA." >&2; exit 1; }
+cp ${CONTAINERS_CA} /usr/local/share/ca-certificates/stella-egress.crt
+update-ca-certificates >/dev/null 2>&1`;
 
 /**
  * Commands no longer inherit an environment from a long-lived session shell,
@@ -254,7 +271,11 @@ const bytesToBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-type EgressProps = { containerId: string; policy: "general" | "sealed" };
+type EgressProps = {
+  containerId: string;
+  policy: "general" | "sealed" | "slack";
+  team?: string;
+};
 
 /**
  * Receives every plain-HTTP request a sandbox container sends and applies the
@@ -262,7 +283,16 @@ type EgressProps = { containerId: string; policy: "general" | "sealed" };
  */
 export class SandboxEgress extends WorkerEntrypoint<Env, EgressProps> {
   async fetch(request: Request): Promise<Response> {
-    const { containerId, policy } = this.ctx.props;
+    const { containerId, policy, team } = this.ctx.props;
+    if (policy === "slack" && team) {
+      const { slackEgress } = await import("./slack/environment.js");
+      return await slackEgress(request, this.env as unknown as Cloudflare.Env, {
+        containerId,
+        team,
+        loopback: (forwarded) => this.ctx.exports.default.fetch(forwarded),
+        general: (forwarded) => generalAgentEgress(forwarded, this.env, { containerId }),
+      });
+    }
     return policy === "sealed"
       ? await appBuildEgress(request)
       : await generalAgentEgress(request, this.env, { containerId });
@@ -353,6 +383,34 @@ export class Sandbox extends DurableObject<Env> {
     return boot?.world ? this.env.WORLDS.getByName(boot.world) : undefined;
   }
 
+  /** The Slack network rules an agent container runs under, if any. */
+  #egress(boot: SandboxBoot): SandboxEgressPolicy | null {
+    if (boot.workload !== "world") return null;
+    return this.ctx.storage.kv.get<SandboxEgressPolicy>(EGRESS_KEY) ?? null;
+  }
+
+  /**
+   * Set the network rules for this container's next start. A running
+   * container started under other rules is stopped, so the next call starts
+   * it under these; the rules themselves are read per request, so a change to
+   * them alone never restarts anything.
+   */
+  async setEgress(policy: SandboxEgressPolicy | null): Promise<{ restarted: boolean }> {
+    const kv = this.ctx.storage.kv;
+    if (policy) kv.put(EGRESS_KEY, policy);
+    else kv.delete(EGRESS_KEY);
+    if (this.#booting) await this.#booting.catch(() => undefined);
+    if (!this.ctx.container?.running) return { restarted: false };
+    const booted = kv.get<SandboxEgressPolicy>(BOOTED_EGRESS_KEY) ?? null;
+    const same =
+      booted === null
+        ? policy === null
+        : policy !== null && booted.team === policy.team && booted.internet === policy.internet;
+    if (same) return { restarted: false };
+    await this.destroy({ keepSnapshot: true });
+    return { restarted: true };
+  }
+
   async #configure(boot: SandboxBoot): Promise<void> {
     const container = this.#container;
     const policy = boot.workload === "app-build" ? "sealed" : "general";
@@ -367,11 +425,17 @@ export class Sandbox extends DurableObject<Env> {
         }),
       );
     }
-    await container.interceptAllOutboundHttp(
-      this.ctx.exports.SandboxEgress({
-        props: { containerId: this.ctx.id.toString(), policy },
-      }),
-    );
+    const egress =
+      boot.workload === "world"
+        ? (this.ctx.storage.kv.get<SandboxEgressPolicy>(BOOTED_EGRESS_KEY) ?? null)
+        : null;
+    const handler = this.ctx.exports.SandboxEgress({
+      props: egress
+        ? { containerId: this.ctx.id.toString(), policy: "slack", team: egress.team }
+        : { containerId: this.ctx.id.toString(), policy },
+    });
+    if (egress) await container.interceptOutboundHttps("*", handler);
+    await container.interceptAllOutboundHttp(handler);
     await container.setInactivityTimeout(resolvedIdleTimeoutMs(boot));
   }
 
@@ -470,6 +534,15 @@ export class Sandbox extends DurableObject<Env> {
       throw installed.error;
     }
     const { code } = installed;
+    if (this.ctx.storage.kv.get<SandboxEgressPolicy>(BOOTED_EGRESS_KEY)) {
+      const trusted = await this.#run(["bash", "-c", TRUST_CONTAINERS_CA]);
+      if (!trusted.success) {
+        await this.#container.destroy().catch(() => undefined);
+        throw new Error(
+          `The sandbox could not trust its egress certificate: ${trusted.stderr.trim().slice(-300)}`,
+        );
+      }
+    }
     console.log(
       JSON.stringify({
         level: "info",
@@ -549,13 +622,16 @@ export class Sandbox extends DurableObject<Env> {
   ): Promise<void> {
     const container = this.#container;
     const startedAt = Date.now();
+    const egress = this.#egress(boot);
     container.start({
       ...from,
       instance: INSTANCE[boot.size],
-      enableInternet: boot.workload !== "app-build",
+      enableInternet: boot.workload !== "app-build" && (egress?.internet ?? true),
       labels: { service: "stella-v2", workload: boot.workload, size: boot.size },
     } as ContainerStartupOptions);
     this.ctx.storage.kv.put("boot", boot);
+    if (egress) this.ctx.storage.kv.put(BOOTED_EGRESS_KEY, egress);
+    else this.ctx.storage.kv.delete(BOOTED_EGRESS_KEY);
     try {
       await this.#configure(boot);
       // `start()` returns before the container accepts commands.

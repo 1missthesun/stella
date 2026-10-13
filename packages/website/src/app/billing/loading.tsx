@@ -1,36 +1,32 @@
 import type { CSSProperties } from "react";
-import { SiteHeader } from "@/components/site-header";
-import "./billing.css";
+import { BillingShell } from "./billing-shell";
 
-/**
- * Route-level loading shell. Matches `BillingClient`'s outer geometry
- * (hero + account card) so the first paint is the same shape the user
- * is about to see — no blank flash, no layout jump.
- */
 export default function BillingLoading() {
   return (
-    <div className="stella-page">
-      <SiteHeader />
+    <BillingShell>
       <main className="billing-root" aria-busy="true">
         <div className="billing-shell">
           <header className="billing-hero">
-            <p className="billing-eyebrow">Billing</p>
+            <p className="billing-eyebrow">Account</p>
             <h1 className="billing-title">
-              <span
-                className="loading-text"
-                style={{ "--w": "18ch" } as CSSProperties}
-                aria-label="Loading billing"
-              />
+              Choose how much <em>Stella</em>.
             </h1>
             <p className="billing-lead">
-              <span
-                className="loading-text"
-                style={{ "--w": "42ch" } as CSSProperties}
-              />
+              Monthly plans. Change or cancel anytime. Prices in USD.
             </p>
           </header>
           <section className="billing-account" aria-label="Loading account">
-            <div className="billing-account-head">
+            <div className="billing-identity">
+              <span className="billing-avatar" aria-hidden="true" />
+              <div className="billing-identity-text">
+                <span
+                  className="loading-text"
+                  style={{ "--w": "16ch" } as CSSProperties}
+                  aria-label="Loading account"
+                />
+              </div>
+            </div>
+            <div className="billing-account-body">
               <div className="billing-account-plan">
                 <span className="billing-status-label">Current plan</span>
                 <span className="billing-status-value">
@@ -44,6 +40,6 @@ export default function BillingLoading() {
           </section>
         </div>
       </main>
-    </div>
+    </BillingShell>
   );
 }

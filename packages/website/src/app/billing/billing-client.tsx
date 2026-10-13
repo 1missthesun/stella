@@ -12,7 +12,11 @@ import {
   useSyncExternalStore,
   type CSSProperties,
 } from "react";
+import Link from "next/link";
 import { openSignInDialog } from "@/components/auth/sign-in-dialog";
+import { authClient } from "@/lib/auth-client";
+import { clearCachedToken } from "@/lib/auth-token";
+import { useDesktopBridgeAuthUser } from "@/lib/desktop-bridge-auth";
 
 type BillingPlan = "free" | "go" | "pro";
 type PaidBillingPlan = Exclude<BillingPlan, "free">;
@@ -212,7 +216,7 @@ export function BillingClient() {
       <main className="billing-root">
         <div className="billing-shell">
           <header className="billing-hero">
-            <p className="billing-eyebrow">Billing</p>
+            <p className="billing-eyebrow">Account</p>
             <h1 className="billing-title">
               Choose how much <em>Stella</em>.
             </h1>
@@ -306,6 +310,8 @@ function BillingInteractive() {
     billingStatus?.authenticated && !billingStatus.isAnonymous,
   );
   const isLoadingStatus = billingStatus === undefined;
+  const account = useAccountUser();
+  const showAccountBody = account.signedIn || hasAccount || !isLoadingStatus;
   // Once a user has any active paid plan, all plan changes (upgrade,
   // downgrade, cancel) must go through Stripe's Customer Portal — the
   // backend's createCheckoutSession throws CONFLICT for active subs.
@@ -476,14 +482,11 @@ function BillingInteractive() {
     <main className="billing-root">
       <div className="billing-shell">
         <header className="billing-hero">
-          <p className="billing-eyebrow">Billing</p>
+          <p className="billing-eyebrow">Account</p>
           <h1 className="billing-title">
             Choose how much <em>Stella</em>.
           </h1>
-          <p className="billing-lead">
-            Plans are recurring monthly. Cancel or change anytime. Prices in
-            USD.
-          </p>
+          <p className="billing-lead">Monthly plans. Change or cancel anytime. Prices in USD.</p>
         </header>
 
         {error ? (
@@ -494,74 +497,82 @@ function BillingInteractive() {
         {notice ? <p className="billing-notice">{notice}</p> : null}
 
         <section className="billing-account" aria-label="Your account">
-          <div className="billing-account-head">
-            <div className="billing-account-plan">
-              <span className="billing-status-label">Current plan</span>
-              <span className="billing-status-value">
-                {isLoadingStatus ? (
-                  <span
-                    className="loading-text"
-                    style={{ "--w": "5ch" } as CSSProperties}
-                    aria-label="Loading current plan"
-                  />
-                ) : (
-                  getPlanDisplay(currentPlan).label
-                )}
-              </span>
-              {isActivePaidSubscriber ? (
-                <span className="billing-account-renewal">{renewalLabel} · {renewalDetail}</span>
+          <AccountIdentity account={account} hasAccount={hasAccount} />
+
+          {showAccountBody ? (
+            <div className="billing-account-body">
+              <div className="billing-account-plan">
+                <span className="billing-status-label">Current plan</span>
+                <span className="billing-status-value">
+                  {isLoadingStatus ? (
+                    <span
+                      className="loading-text"
+                      style={{ "--w": "5ch" } as CSSProperties}
+                      aria-label="Loading current plan"
+                    />
+                  ) : (
+                    getPlanDisplay(currentPlan).label
+                  )}
+                </span>
+                {isActivePaidSubscriber ? (
+                  <span className="billing-account-renewal">
+                    {renewalLabel} · {renewalDetail}
+                  </span>
+                ) : null}
+              </div>
+
+              {anonymousUsagePolicy ? (
+                <div className="billing-anonymous-policy">
+                  <div className="billing-status-meter-label">
+                    <span>Anonymous preview</span>
+                  </div>
+                  <p>Sign in to continue with the Free plan.</p>
+                </div>
+              ) : usageMeter ? (
+                <div className="billing-status-meter">
+                  <div className="billing-status-meter-label">
+                    <span>Plan usage</span>
+                    <span>{formatUsagePercent(usageMeter.percent)}</span>
+                  </div>
+                  <div className="billing-meter-track">
+                    <div
+                      className="billing-meter-fill"
+                      style={{ width: `${usageMeter.percent}%` }}
+                    />
+                  </div>
+                </div>
               ) : null}
-            </div>
-            {isActivePaidSubscriber ? (
-              <div className="billing-account-actions">
-                <button
-                  type="button"
-                  className="billing-plan-cta"
-                  onClick={() => void handleOpenPortal()}
-                  disabled={openingPortal}
-                >
-                  {openingPortal ? "Opening..." : "Manage subscription"}
-                </button>
-                {billingStatus && !billingStatus.cancelAtPeriodEnd ? (
+
+              {isActivePaidSubscriber ? (
+                <div className="billing-account-actions">
                   <button
                     type="button"
-                    className="billing-link-button billing-link-button--danger"
+                    className="billing-button billing-button--primary"
                     onClick={() => void handleOpenPortal()}
                     disabled={openingPortal}
                   >
-                    Cancel
+                    {openingPortal ? "Opening..." : "Manage subscription"}
                   </button>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-
-          {anonymousUsagePolicy ? (
-            <div className="billing-anonymous-policy">
-              <div className="billing-status-meter-label">
-                <span>Anonymous preview</span>
-              </div>
-              <p>Sign in to continue with the Free plan.</p>
-            </div>
-          ) : usageMeter ? (
-            <div className="billing-account-meters">
-              <div className="billing-status-meter">
-                <div className="billing-status-meter-label">
-                  <span>Plan usage</span>
-                  <span>{formatUsagePercent(usageMeter.percent)}</span>
+                  {billingStatus && !billingStatus.cancelAtPeriodEnd ? (
+                    <button
+                      type="button"
+                      className="billing-link-button billing-link-button--danger"
+                      onClick={() => void handleOpenPortal()}
+                      disabled={openingPortal}
+                    >
+                      Cancel plan
+                    </button>
+                  ) : null}
                 </div>
-                <div className="billing-meter-track">
-                  <div
-                    className="billing-meter-fill"
-                    style={{ width: `${usageMeter.percent}%` }}
-                  />
-                </div>
-              </div>
+              ) : null}
             </div>
           ) : null}
         </section>
 
         <section className="billing-plans-section" aria-label="Plans">
+          <div className="billing-section-head billing-section-head--center">
+            <h2 className="billing-section-title">Plans</h2>
+          </div>
           <div className="billing-plans-grid">
             {VISIBLE_PLAN_ORDER.map((plan) => {
               const display = getPlanDisplay(plan);
@@ -679,7 +690,8 @@ function BillingInteractive() {
                   <button
                     type="button"
                     className={
-                      "billing-plan-cta" +
+                      "billing-button billing-plan-cta" +
+                      (isRecommended && !isCurrentPlan ? " billing-button--primary" : "") +
                       (isCurrentPlan ? " billing-plan-cta--current" : "")
                     }
                     onClick={handlePlanClick}
@@ -764,7 +776,7 @@ function BillingInteractive() {
               </label>
               <button
                 type="button"
-                className="billing-plan-cta billing-credit-cta"
+                className="billing-button billing-button--primary billing-credit-cta"
                 onClick={() => void handleStartCreditCheckout()}
                 disabled={
                   !creditOptions ||
@@ -783,5 +795,103 @@ function BillingInteractive() {
         </section>
       </div>
     </main>
+  );
+}
+
+type AccountUser = {
+  email?: string;
+  name?: string;
+  isAnonymous?: boolean | null;
+};
+
+function useAccountUser() {
+  const session = authClient.useSession();
+  const desktopUser = useDesktopBridgeAuthUser();
+  const user: AccountUser | null =
+    (session.data as { user?: AccountUser } | null | undefined)?.user ?? desktopUser;
+  const signedIn = Boolean(user) && user?.isAnonymous !== true;
+  return { user, signedIn, pending: session.isPending };
+}
+
+function AccountIdentity({
+  account,
+  hasAccount,
+}: {
+  account: ReturnType<typeof useAccountUser>;
+  hasAccount: boolean;
+}) {
+  const { user, signedIn } = account;
+  const [signingOut, setSigningOut] = useState(false);
+
+  const handleSignOut = useCallback(async () => {
+    setSigningOut(true);
+    await authClient.signOut().catch(() => undefined);
+    clearCachedToken();
+    window.location.reload();
+  }, []);
+
+  if (!signedIn || !user) {
+    if (account.pending || hasAccount) {
+      return (
+        <div className="billing-identity">
+          <span className="billing-avatar" aria-hidden="true" />
+          <div className="billing-identity-text">
+            <span
+              className="loading-text"
+              style={{ "--w": "16ch" } as CSSProperties}
+              aria-label="Loading account"
+            />
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="billing-identity">
+        <div className="billing-identity-text">
+          <p className="billing-identity-name">You&apos;re not signed in</p>
+          <p className="billing-identity-email">
+            Sign in to choose a plan, manage billing and add credit.
+          </p>
+        </div>
+        <div className="billing-identity-actions">
+          <button
+            type="button"
+            className="billing-button billing-button--primary"
+            onClick={() => openSignInDialog()}
+          >
+            Sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const name = user.name?.trim() ?? "";
+  const email = user.email?.trim() ?? "";
+  const initial = (name || email || "S").charAt(0).toUpperCase();
+
+  return (
+    <div className="billing-identity">
+      <span className="billing-avatar" aria-hidden="true">
+        {initial}
+      </span>
+      <div className="billing-identity-text">
+        <p className="billing-identity-name">{name || email}</p>
+        {name && email ? <p className="billing-identity-email">{email}</p> : null}
+      </div>
+      <div className="billing-identity-actions">
+        <Link className="billing-button billing-button--ghost" href="/slack">
+          Stella Crew
+        </Link>
+        <button
+          type="button"
+          className="billing-button billing-button--ghost"
+          onClick={() => void handleSignOut()}
+          disabled={signingOut}
+        >
+          {signingOut ? "Signing out…" : "Sign out"}
+        </button>
+      </div>
+    </div>
   );
 }

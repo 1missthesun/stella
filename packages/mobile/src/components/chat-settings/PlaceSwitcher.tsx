@@ -31,9 +31,6 @@ import {
 } from "../settings/computer-rows";
 import { ChoiceRow, KIT, SwitcherFace } from "./kit";
 
-/** Where the backend does not push presence yet, how often the panel reads it. */
-const EXECUTION_DEVICE_POLL_MS = 15_000;
-
 const STATUS_KEYS: Readonly<Record<ComputerRowStatusKind, string>> = {
   online: "mobile.settings.computer.statusOnline",
   notReady: "mobile.settings.computer.statusNotReady",
@@ -88,20 +85,22 @@ export function PlaceSwitcher({
     void refreshPaired();
   }, [refreshPaired, chatPaired]);
 
-  // Presence is pushed while the panel is open (polled where the backend
-  // does not push it yet), and only ever a read: nothing here may move a
-  // computer's consent, however often it runs.
+  // Presence is pushed while the panel is open, and only ever a read:
+  // nothing here may move a computer's consent, however often it runs. When
+  // the view errors, the list is read once over HTTP; the live socket
+  // resubscribes on its own, and its next push replaces that read.
   const canListDevices = control !== null || signedIn;
   const [refreshToken, setRefreshToken] = useState(0);
   useEffect(() => {
     if (!focused || !open || !canListDevices) return;
     let active = true;
-    let timer: ReturnType<typeof setInterval> | undefined;
+    let pushed = false;
+    let fallbackRead = false;
     const controller = new AbortController();
     const read = () => {
       void listExecutionDevices({ signal: controller.signal })
         .then((devices) => {
-          if (active) setDestinations(devices);
+          if (active && !pushed) setDestinations(devices);
         })
         .catch((error: unknown) => {
           if (controller.signal.aborted) return;
@@ -118,21 +117,19 @@ export function PlaceSwitcher({
       {},
       (value) => {
         if (!active) return;
-        if (timer !== undefined) clearInterval(timer);
-        timer = undefined;
+        pushed = true;
         setDestinations(value.devices);
       },
       () => {
-        if (!active || timer !== undefined) return;
+        if (!active || pushed || fallbackRead) return;
+        fallbackRead = true;
         read();
-        timer = setInterval(read, EXECUTION_DEVICE_POLL_MS);
       },
     );
     return () => {
       active = false;
       stop();
       controller.abort();
-      if (timer !== undefined) clearInterval(timer);
     };
   }, [focused, open, canListDevices, refreshToken]);
 

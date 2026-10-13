@@ -4,14 +4,13 @@ import { listExecutionDevices } from "@/features/cloud/placement-client";
 import { backendClient } from "@/platform/backend/backend-client";
 import { getAuthToken } from "@/global/auth/services/auth-token";
 
-/** How often the list is read where the backend does not push it yet. */
-const DEVICE_POLL_INTERVAL_MS = 15_000;
-
 /**
  * The owner's computers as the backend pushes them (`devices.list`), for as
- * long as `socketOrigin` is set. A backend without that view gets the HTTP
- * list read on a timer instead. `onDevices` gets when the read began, so a
- * caller can drop a read that started before its own write.
+ * long as `socketOrigin` is set. When the view errors, the HTTP list is read
+ * once so the picker isn't empty; the live socket resubscribes on its own and
+ * its next push replaces it. Polling here read the owner's object every 15
+ * seconds for what the socket already carries. `onDevices` gets when the read
+ * began, so a caller can drop a read that started before its own write.
  */
 export function useExecutionDeviceList(options: {
   socketOrigin: string | null;
@@ -25,7 +24,8 @@ export function useExecutionDeviceList(options: {
   useEffect(() => {
     if (!socketOrigin) return;
     let active = true;
-    let timer: number | undefined;
+    let pushed = false;
+    let fallbackRead = false;
     const read = () => {
       const startedAt = Date.now();
       void listExecutionDevices({
@@ -33,7 +33,9 @@ export function useExecutionDeviceList(options: {
         getToken: (tokenOptions) => getAuthToken(tokenOptions ?? {}),
       })
         .then((response) => {
-          if (active) callbacks.current.onDevices(response.devices, startedAt);
+          if (active && !pushed) {
+            callbacks.current.onDevices(response.devices, startedAt);
+          }
         })
         .catch(() => {
           if (active) callbacks.current.onError?.();
@@ -44,20 +46,18 @@ export function useExecutionDeviceList(options: {
       {},
       (value) => {
         if (!active) return;
-        if (timer !== undefined) window.clearInterval(timer);
-        timer = undefined;
+        pushed = true;
         callbacks.current.onDevices(value.devices, Date.now());
       },
       () => {
-        if (!active || timer !== undefined) return;
+        if (!active || pushed || fallbackRead) return;
+        fallbackRead = true;
         read();
-        timer = window.setInterval(read, DEVICE_POLL_INTERVAL_MS);
       },
     );
     return () => {
       active = false;
       stop();
-      if (timer !== undefined) window.clearInterval(timer);
     };
   }, [socketOrigin]);
 }

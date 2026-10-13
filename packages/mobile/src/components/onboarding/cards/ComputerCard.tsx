@@ -23,7 +23,7 @@ import { env } from "../../../config/env";
 import { useT } from "../../../i18n";
 import { shouldRunContinuousAnimation } from "../../../lib/continuous-animation";
 import { tapLight } from "../../../lib/haptics";
-import { listExecutionDevices } from "../../../lib/execution-placement";
+import { useBackendView } from "../../../lib/backend";
 import { useAppVisible } from "../../../lib/use-app-visible";
 import { type Colors } from "../../../theme/colors";
 import { useColors } from "../../../theme/theme-context";
@@ -49,8 +49,7 @@ const ARC_LIFT = 30;
 const ARC_Y = BASE_Y - 18;
 const HOP_MS = 2600;
 const CHIP = 18;
-/** How often the open card looks for a newly signed-in computer. */
-const DEVICE_POLL_MS = 8_000;
+const DEVICES_VIEW_ARGS = {} as const;
 
 type ComputerCardProps = {
   active: boolean;
@@ -71,25 +70,18 @@ export function ComputerCard({
     undefined,
   );
 
+  // The account's computers as the live socket pushes them, so a computer
+  // signing in shows up here the moment it does, with no polling.
+  const devicesView = useBackendView(
+    "devices.list",
+    active && !answered ? DEVICES_VIEW_ARGS : "skip",
+  );
+  const devices = devicesView.value?.devices;
   useEffect(() => {
-    if (!active || answered) return;
-    let cancelled = false;
-    const read = () => {
-      void listExecutionDevices()
-        .then((devices) => {
-          if (cancelled || devices.length === 0) return;
-          const first = devices.find((device) => device.online) ?? devices[0]!;
-          setComputerName(first.label?.trim().replace(/\.local$/i, "") || null);
-        })
-        .catch(() => undefined);
-    };
-    read();
-    const timer = setInterval(read, DEVICE_POLL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [active, answered]);
+    if (!active || answered || !devices || devices.length === 0) return;
+    const first = devices.find((device) => device.online) ?? devices[0]!;
+    setComputerName(first.label?.trim().replace(/\.local$/i, "") || null);
+  }, [active, answered, devices]);
 
   const connected = computerName !== undefined;
   const name = computerName ?? t("mobile.computer.defaultDeviceLabel");

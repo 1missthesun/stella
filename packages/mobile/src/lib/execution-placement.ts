@@ -154,10 +154,81 @@ export type ExecutionDeviceDestination = DeviceDestination;
  * owner gate. A picker that stays on screen subscribes to `devices.list`
  * instead, which the backend pushes as presence changes.
  */
+/** How long a read waits for the live list's first push before reading HTTP. */
+const HELD_DEVICES_FIRST_PUSH_MS = 3_000;
+
+type HeldDevices = {
+  devices?: ExecutionDeviceDestination[];
+  failed: boolean;
+  firstPush: Promise<void>;
+};
+let heldDevices: HeldDevices | null = null;
+
+/**
+ * The account's computers as the live socket pushes them (`devices.list`),
+ * kept subscribed once asked for, so every read after the first is free
+ * rather than a request that wakes the owner's object.
+ */
+const holdDevices = (): HeldDevices => {
+  if (heldDevices) return heldDevices;
+  let settle: () => void = () => {};
+  const held: HeldDevices = {
+    failed: false,
+    firstPush: new Promise<void>((resolve) => {
+      settle = resolve;
+    }),
+  };
+  heldDevices = held;
+  getBackendClient().watch(
+    "devices.list",
+    {},
+    (value) => {
+      held.devices = value.devices as ExecutionDeviceDestination[];
+      held.failed = false;
+      settle();
+    },
+    () => {
+      held.failed = true;
+      settle();
+    },
+  );
+  return held;
+};
+
+const pushedDevices = async (): Promise<
+  ExecutionDeviceDestination[] | undefined
+> => {
+  let held: HeldDevices;
+  try {
+    held = holdDevices();
+  } catch {
+    return undefined;
+  }
+  if (!held.devices && !held.failed) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      held.firstPush,
+      new Promise<void>((resolve) => {
+        timer = setTimeout(resolve, HELD_DEVICES_FIRST_PUSH_MS);
+      }),
+    ]);
+    if (timer !== undefined) clearTimeout(timer);
+  }
+  return held.failed ? undefined : held.devices;
+};
+
+/**
+ * The account's computers: the live list when it has arrived, otherwise an
+ * HTTP read. A caller naming its own builder origin always reads HTTP there.
+ */
 export const listExecutionDevices = async (options?: {
   signal?: AbortSignal;
   builderOrigin?: string | null;
 }): Promise<ExecutionDeviceDestination[]> => {
+  if (!options?.builderOrigin?.trim()) {
+    const pushed = await pushedDevices();
+    if (pushed) return pushed;
+  }
   const origin = await resolveExecutionBuilderOrigin(options?.builderOrigin);
   const value = await executionPlacementRequest(
     getJson(DEVICES_PATH, {

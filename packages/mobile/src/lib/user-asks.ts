@@ -33,7 +33,6 @@ import { backendOrigin, getJson, HttpRequestError, postJson } from "./http";
 import { getOrCreateMobileDeviceId } from "./phone-access";
 import { useAppVisible } from "./use-app-visible";
 
-const LIVE_BACKSTOP_POLL_MS = 120_000;
 const FALLBACK_POLL_MS = 15_000;
 const UNAVAILABLE_POLL_MS = 120_000;
 
@@ -436,18 +435,18 @@ export const useUserAskSync = (enabled: boolean) => {
     markUserAskLaneDown();
   }, [active, liveDown]);
 
+  // The live view carries every change, so a healthy socket needs no poll.
+  // Only while it is down or not yet live is the list read over HTTP.
   useEffect(() => {
     if (!active || !visible) return;
-    const liveHealthy = live && !liveDown;
-    if (!liveHealthy) void refreshUserAsks();
-    const period = liveHealthy
-      ? LIVE_BACKSTOP_POLL_MS
-      : available
-        ? FALLBACK_POLL_MS
-        : UNAVAILABLE_POLL_MS;
-    const interval = setInterval(() => {
-      void refreshUserAsks();
-    }, period);
+    if (live && !liveDown) return;
+    void refreshUserAsks();
+    const interval = setInterval(
+      () => {
+        void refreshUserAsks();
+      },
+      available ? FALLBACK_POLL_MS : UNAVAILABLE_POLL_MS,
+    );
     return () => clearInterval(interval);
   }, [active, available, live, liveDown, visible]);
 };

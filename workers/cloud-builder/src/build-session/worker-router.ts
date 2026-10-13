@@ -46,6 +46,7 @@ import { verifyUserToken } from "../auth-jwt.js";
 import { noteOwnerIdentity } from "../owner-identity.js";
 import { readBoundedRequestText } from "../bounded-body.js";
 import { withBrowserCors } from "../browser-cors.js";
+import { withSecurityHeaders } from "../http/security-headers.js";
 import { handleVoiceRoute, ownerDictationControl } from "../voice/routes.js";
 import { handleBackendRoute } from "../owner-store/routes.js";
 import { handleMediaRoute } from "../media/routes.js";
@@ -1395,7 +1396,11 @@ app.onError((error) => {
 
 export const worker = {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    return withBrowserCors(request, async () => await app.fetch(request, env, ctx), env);
+    return withBrowserCors(
+      request,
+      async () => withSecurityHeaders(request, await app.fetch(request, env, ctx)),
+      env,
+    );
   },
   async scheduled(controller, env, ctx) {
     const { runScheduled } = await import("../cron.js");

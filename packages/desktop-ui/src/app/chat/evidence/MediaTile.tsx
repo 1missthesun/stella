@@ -41,30 +41,25 @@ const openCardSource = (card: EvidenceCard) => {
   if (target) openEvidenceSource(target);
 };
 
-const TileBody = ({ card }: { card: EvidenceCard }) => {
-  if (card.kind === "audio" && card.peaks) {
-    return <WaveformTile peaks={card.peaks} durationLabel={card.subtitle} />;
-  }
-  return (
-    <>
-      {card.thumbnail ? (
-        <img
-          className="media-tile__image"
-          src={card.thumbnail}
-          alt=""
-          draggable={false}
-        />
-      ) : (
-        <span className="media-tile__image" />
-      )}
-      {card.kind === "video" && card.durationMs && card.subtitle ? (
-        <span className="media-tile__badge" aria-hidden="true">
-          {card.subtitle}
-        </span>
-      ) : null}
-    </>
-  );
-};
+const VisualBody = ({ card }: { card: EvidenceCard }) => (
+  <>
+    {card.thumbnail ? (
+      <img
+        className="media-tile__image"
+        src={card.thumbnail}
+        alt=""
+        draggable={false}
+      />
+    ) : (
+      <span className="media-tile__image" />
+    )}
+    {card.kind === "video" && card.durationMs && card.subtitle ? (
+      <span className="media-tile__badge" aria-hidden="true">
+        {card.subtitle}
+      </span>
+    ) : null}
+  </>
+);
 
 export const MediaTile = ({
   card,
@@ -72,27 +67,39 @@ export const MediaTile = ({
 }: {
   card: EvidenceCard;
   visible: boolean;
-}) => (
-  <figure
-    className="media-tile"
-    data-kind={card.kind}
-    style={{ width: `${EVIDENCE_TILE_WIDTH[card.kind]}px` }}
-  >
-    <button
-      type="button"
-      className="media-tile__frame"
-      aria-label={`Open ${card.title}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        openCardSource(card);
-      }}
+}) => {
+  const peaks = card.kind === "audio" ? card.peaks : undefined;
+  return (
+    <figure
+      className="media-tile"
+      data-kind={card.kind}
+      style={{ width: `${EVIDENCE_TILE_WIDTH[card.kind]}px` }}
     >
-      {visible ? <TileBody card={card} /> : null}
-    </button>
-    {VISUAL_KINDS.has(card.kind) ? null : (
-      <figcaption className="media-tile__caption" title={card.sourcePaths.join(", ")}>
-        {card.title}
-      </figcaption>
-    )}
-  </figure>
-);
+      <div className="media-tile__frame">
+        <button
+          type="button"
+          className="media-tile__open-area"
+          aria-label={`Open ${card.title}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            openCardSource(card);
+          }}
+        >
+          {visible && !peaks ? <VisualBody card={card} /> : null}
+        </button>
+        {visible && peaks ? (
+          <WaveformTile
+            peaks={peaks}
+            filePath={card.sourcePaths[0] ?? ""}
+            durationLabel={card.subtitle}
+          />
+        ) : null}
+      </div>
+      {VISUAL_KINDS.has(card.kind) ? null : (
+        <figcaption className="media-tile__caption" title={card.sourcePaths.join(", ")}>
+          {card.title}
+        </figcaption>
+      )}
+    </figure>
+  );
+};

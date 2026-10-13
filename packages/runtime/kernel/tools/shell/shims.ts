@@ -93,7 +93,7 @@ const buildUnixCliShimScript = (envVar: string): string =>
   ].join("\n");
 
 /** What every shim script names, and no real executable does: how a shim, this Stella's or another's, is known. */
-const SHIM_SIGNATURES = ["STELLA_REAL_GIT_BIN", "STELLA_NODE_BIN", "STELLA_PYTHON_BIN"];
+const SHIM_SIGNATURES = ["STELLA_REAL_GIT_BIN", "STELLA_NODE_BIN", "STELLA_PYTHON_BIN", "STELLA_REAL_BUN_BIN"];
 
 /** Whether `file` is one of Stella's shell shims (from any Stella install), not the program it stands for. */
 export const isStellaShellShim = (file: string): boolean => {
@@ -160,6 +160,53 @@ const buildUnixGitShimScript = (): string =>
     "",
   ].join("\n");
 
+/**
+ * `bun`, guarded for drafts: a draft whose dependencies match the app links
+ * the app's node_modules (draft-deps.ts), and an install through that link
+ * would write into the running app's packages. Before a command that
+ * installs, the link is removed, so the draft gets packages of its own.
+ */
+const buildUnixBunShimScript = (): string =>
+  [
+    "#!/bin/sh",
+    '__stella_bun="${STELLA_REAL_BUN_BIN:-}"',
+    'if [ -z "$__stella_bun" ]; then',
+    "  __stella_ifs=$IFS",
+    "  IFS=:",
+    "  for __stella_dir in $PATH; do",
+    '    case "$__stella_dir" in */shell-shims) continue ;; esac',
+    '    if [ -x "$__stella_dir/bun" ] && ! [ "$__stella_dir/bun" -ef "$0" ]; then',
+    '      __stella_bun="$__stella_dir/bun"',
+    "      break",
+    "    fi",
+    "  done",
+    "  IFS=$__stella_ifs",
+    "fi",
+    'if [ -z "$__stella_bun" ]; then __stella_bun="${STELLA_BUN_PATH:-}"; fi',
+    'if [ -z "$__stella_bun" ]; then',
+    '  echo "bun executable not found" >&2',
+    "  exit 127",
+    "fi",
+    'case "$1" in',
+    "  install|i|add|a|remove|rm|update|ci|link|unlink|patch)",
+    '    if [ -n "$STELLA_APP_DIR" ] && [ -d "$STELLA_APP_DIR/node_modules" ]; then',
+    '      __stella_here="$(pwd -P)"',
+    '      while [ -n "$__stella_here" ]; do',
+    '        if [ -L "$__stella_here/node_modules" ] && [ "$__stella_here/node_modules" -ef "$STELLA_APP_DIR/node_modules" ]; then',
+    '          rm -f "$__stella_here/node_modules"',
+    '          echo "Stella: this draft used the app\'s packages; installing its own instead." >&2',
+    "          break",
+    "        fi",
+    '        [ "$__stella_here" = "/" ] && break',
+    '        __stella_here="$(dirname -- "$__stella_here")"',
+    "      done",
+    "    fi",
+    "    ;;",
+    "esac",
+    'exec "$__stella_bun" "$@"',
+    "",
+  ].join("\n");
+
 export const ensureNodeShim = (
   secretStateRoot: string,
   options?: ShellStateOptions,
@@ -206,6 +253,9 @@ export const ensureNodeShim = (
       const gitShimPath = path.join(shimDir, "git");
       writeFileSync(gitShimPath, buildUnixGitShimScript(), "utf-8");
       unixShimPaths.push(gitShimPath);
+      const bunShimPath = path.join(shimDir, "bun");
+      writeFileSync(bunShimPath, buildUnixBunShimScript(), "utf-8");
+      unixShimPaths.push(bunShimPath);
       for (const shim of WINDOWS_CLI_SHIMS) {
         const cliPath = options?.[shim.optionKey];
         if (typeof cliPath !== "string" || !existsSync(cliPath)) continue;

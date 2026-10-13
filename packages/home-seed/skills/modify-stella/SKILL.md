@@ -21,10 +21,10 @@ Pick a short kebab-case name (letters, digits, `.`, `_`, `-`; one segment).
 ```sh
 BRANCH=$(git -C "$STELLA_APP_DIR" branch --show-current)
 git -C "$STELLA_APP_DIR" worktree add "$STELLA_DRAFTS_DIR/<name>" -b draft/<name> "$BRANCH"
-cd "$STELLA_DRAFTS_DIR/<name>" && bun install
+cd "$STELLA_DRAFTS_DIR/<name>" && bun "$STELLA_APP_DIR/packages/desktop/scripts/draft-deps.ts" .
 ```
 
-Use a real `bun install`, not a symlink to the app's `node_modules`: the preview resolves packages inside the draft. Edit only inside the draft. Typecheck from the draft root with what you touched:
+`draft-deps.ts` links the app's `node_modules` while the draft's dependencies match the app's, which takes a moment instead of a full install. If you change dependencies (`package.json`, `bun.lock`), run it again: it replaces the link with the draft's own install, so nothing you install reaches the running app's packages. Don't make the link yourself. Edit only inside the draft. Typecheck from the draft root with what you touched:
 
 - Renderer: `node node_modules/typescript-7/bin/tsc --build packages/desktop-ui`
 - Runtime: `node node_modules/typescript-7/bin/tsc -p packages/runtime/tsconfig.json --noEmit`
@@ -82,5 +82,5 @@ When that happens you get a brief, not a chat message — it already names the u
 
 1. Use the draft name from the brief, `update-<sha12>` (the first 12 characters of `git -C "$STELLA_APP_DIR" rev-parse refs/remotes/stella-upstream/main`), and start it as usual.
 2. In the draft, `git merge refs/remotes/stella-upstream/main`. Resolve every conflict keeping the user's changes: take the new version's code, then carry the user's changes over onto it so both work.
-3. `bun install`, then run all three typechecks (renderer, runtime, main/preload) and check the UI in a preview, as in "Check it", even if no conflict touched the UI.
+3. `bun "$STELLA_APP_DIR/packages/desktop/scripts/draft-deps.ts" .` (it installs the draft's own packages if the merge changed dependencies), then run all three typechecks (renderer, runtime, main/preload) and check the UI in a preview, as in "Check it", even if no conflict touched the UI.
 4. Finish as usual, but keep the merge commit: commit the merge resolution (`git commit --no-edit` after `git add`), and do not squash or rebase it.

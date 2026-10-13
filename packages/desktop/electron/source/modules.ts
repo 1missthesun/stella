@@ -126,13 +126,22 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
     return `/@fs${posix.startsWith("/") ? "" : "/"}${posix}`;
   };
 
-  /** The file a URL path names, or null when it is outside the repository. */
+  // A draft may link the app checkout's packages, which resolve to there.
+  const packagesRoot = (() => {
+    try {
+      return fs.realpathSync(path.join(repoRoot, "node_modules"));
+    } catch {
+      return null;
+    }
+  })();
+
+  /** The file a URL path names, or null when it is outside the repository and its packages. */
   const fileForUrlPath = (urlPath: string): string | null => {
     const decoded = decodeURIComponent(urlPath);
     const file = decoded.startsWith("/@fs/")
       ? path.resolve(process.platform === "win32" ? decoded.slice(5) : decoded.slice(4))
       : path.resolve(uiRoot, `.${decoded}`);
-    return isInside(repoRoot, file) ? file : null;
+    return isInside(repoRoot, file) || (packagesRoot !== null && isInside(packagesRoot, file)) ? file : null;
   };
 
   const resolveImport = (specifier: string, importer: string): ResolvedImport | null => {

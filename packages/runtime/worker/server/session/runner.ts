@@ -139,6 +139,12 @@ export const layer = Layer.effect(
         await hostBus.request(METHOD_NAMES.HOST_SECURE_VALUE_USE, payload, {
           retryOnDisconnect: true,
         }),
+      revealSecureValueForFill: async (payload) =>
+        await hostBus.request(
+          METHOD_NAMES.HOST_SECURE_VALUE_REVEAL_FOR_FILL,
+          payload,
+          { retryOnDisconnect: true },
+        ),
       requestBrowserExtensionConnect: (payload, signal) =>
         hostBus.requestConnectCard(
           METHOD_NAMES.HOST_BROWSER_EXTENSION_CONNECT_REQUEST,

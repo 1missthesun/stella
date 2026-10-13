@@ -73,6 +73,7 @@ export const createRunnerContext = ({
   askUser,
   requestSecureInput,
   useSecureValue,
+  revealSecureValueForFill,
   requestBrowserExtensionConnect,
   requestConnectorConnection,
   requestRuntimeAuthRefresh,
@@ -348,6 +349,7 @@ export const createRunnerContext = ({
     askUser,
     requestSecureInput,
     useSecureValue,
+    revealSecureValueForFill,
     ...(requestBrowserExtensionConnect
       ? { requestBrowserExtensionConnect }
       : {}),
@@ -394,6 +396,7 @@ export const createRunnerContext = ({
     askUser,
     requestSecureInput,
     useSecureValue,
+    revealSecureValueForFill,
     requestRuntimeAuthRefresh,
     requestChallengeToken,
     getDeviceSigner,

@@ -35,6 +35,7 @@ export type StellaHostRunnerOptions = {
   askUser?: import("../tools/user.js").UserToolsConfig["askUser"];
   requestSecureInput?: import("../tools/user.js").UserToolsConfig["requestSecureInput"];
   useSecureValue?: import("../tools/user.js").UserToolsConfig["useSecureValue"];
+  revealSecureValueForFill?: import("../tools/user.js").UserToolsConfig["revealSecureValueForFill"];
   /**
    * Legacy exec compatibility hop for the inline "connect the Stella browser
    * extension" chat card. Production browser actions use the persistent
@@ -178,6 +179,7 @@ export type RunnerContext = {
   askUser?: StellaHostRunnerOptions["askUser"];
   requestSecureInput?: StellaHostRunnerOptions["requestSecureInput"];
   useSecureValue?: StellaHostRunnerOptions["useSecureValue"];
+  revealSecureValueForFill?: StellaHostRunnerOptions["revealSecureValueForFill"];
   requestComputerUseAppApproval?: StellaHostRunnerOptions["requestComputerUseAppApproval"];
   requestRuntimeAuthRefresh?: StellaHostRunnerOptions["requestRuntimeAuthRefresh"];
   requestChallengeToken?: StellaHostRunnerOptions["requestChallengeToken"];

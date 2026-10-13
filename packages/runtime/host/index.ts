@@ -2468,6 +2468,18 @@ export class StellaRuntimeHost {
       },
     );
     peer.registerRequestHandler(
+      METHOD_NAMES.HOST_SECURE_VALUE_REVEAL_FOR_FILL,
+      async (params) => {
+        if (!this.options.hostHandlers.revealSecureValueForFill) {
+          return {
+            ok: false,
+            error: "This computer cannot fill stored values into a browser.",
+          };
+        }
+        return await this.options.hostHandlers.revealSecureValueForFill(params);
+      },
+    );
+    peer.registerRequestHandler(
       METHOD_NAMES.HOST_SECURE_VALUE_FINGERPRINTS,
       async () => {
         if (!this.options.hostHandlers.getSecureValueFingerprints) {

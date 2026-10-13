@@ -295,6 +295,7 @@ export type ToolHostOptions = {
   askUser?: import("./user.js").UserToolsConfig["askUser"];
   requestSecureInput?: import("./user.js").UserToolsConfig["requestSecureInput"];
   useSecureValue?: import("./user.js").UserToolsConfig["useSecureValue"];
+  revealSecureValueForFill?: import("./user.js").UserToolsConfig["revealSecureValueForFill"];
   /**
    * Optional desktop hop for `Bash`: render an inline "connect the
    * Stella browser extension" card in the chat when a stella-browser command

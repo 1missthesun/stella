@@ -133,6 +133,13 @@ export const buildBuiltinTools = (
     createUseSecureValueTool({
       requestSecureInput: options.requestSecureInput,
       useSecureValue: options.useSecureValue,
+      ...(options.revealSecureValueForFill
+        ? {
+            revealSecureValueForFill: options.revealSecureValueForFill,
+            fillSecureBrowserField: (context, target) =>
+              options.nodeReplRegistry.fillSecureBrowserField(context, target),
+          }
+        : {}),
     }),
   );
   tools.push(createWebTool({ webSearch: options.webSearch }));

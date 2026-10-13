@@ -221,6 +221,7 @@ export const createToolHost = ({
   askUser,
   requestSecureInput,
   useSecureValue,
+  revealSecureValueForFill,
   requestBrowserExtensionConnect,
   requestConnectorConnection,
   scheduleApi,
@@ -512,6 +513,7 @@ export const createToolHost = ({
     askUser,
     requestSecureInput,
     useSecureValue,
+    ...(revealSecureValueForFill ? { revealSecureValueForFill } : {}),
     ...(requestBrowserExtensionConnect
       ? { requestBrowserExtensionConnect }
       : {}),

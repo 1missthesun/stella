@@ -13,6 +13,8 @@ import type { ToolDefinition } from "../types.js";
 export type SecureInputOptions = {
   requestSecureInput?: UserToolsConfig["requestSecureInput"];
   useSecureValue?: UserToolsConfig["useSecureValue"];
+  revealSecureValueForFill?: UserToolsConfig["revealSecureValueForFill"];
+  fillSecureBrowserField?: UserToolsConfig["fillSecureBrowserField"];
 };
 
 export const createRequestSecureInputTool = (
@@ -118,7 +120,7 @@ export const createUseSecureValueTool = (
       into: {
         type: "object",
         description:
-          'Where the value goes: {"kind":"browser_field","selector":"#password","tabId":"…"}, {"kind":"command","command":"login --token {{secret}}"}, or {"kind":"keychain","service":"…","account":"…"}.',
+          'Where the value goes: {"kind":"browser_field","selector":"#password"} fills a field in the tab you are driving with the browser API (your current tab, or pass "tabId": tab.id and "backend": "in-app" or "external" for Chrome), {"kind":"command","command":"login --token {{secret}}"}, or {"kind":"keychain","service":"…","account":"…"}.',
         properties: {
           kind: {
             type: "string",
@@ -126,6 +128,7 @@ export const createUseSecureValueTool = (
           },
           selector: { type: "string" },
           tabId: { type: "string" },
+          backend: { type: "string", enum: ["in-app", "external"] },
           command: { type: "string" },
           placeholder: {
             type: "string",
@@ -142,7 +145,15 @@ export const createUseSecureValueTool = (
   },
   execute: (args, context) =>
     handleUseSecureValue(
-      { useSecureValue: options.useSecureValue },
+      {
+        useSecureValue: options.useSecureValue,
+        ...(options.revealSecureValueForFill
+          ? { revealSecureValueForFill: options.revealSecureValueForFill }
+          : {}),
+        ...(options.fillSecureBrowserField
+          ? { fillSecureBrowserField: options.fillSecureBrowserField }
+          : {}),
+      },
       args,
       context,
     ),

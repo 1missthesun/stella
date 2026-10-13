@@ -12,6 +12,13 @@ import {
   type UserAskUrgencyLevel,
 } from "@stella/contracts/user-ask";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
+import { redactSensitiveText } from "@stella/contracts/sensitive-data";
+import {
+  SECRET_REDACTION_MARK,
+  createSecretFingerprintParams,
+  fingerprintSecrets,
+  redactSecretFingerprints,
+} from "@stella/contracts/secret-redaction";
 import { prepareAskUser, userAskResolutionResult } from "./defs/ask-user-def.js";
 import type { ToolContext, ToolResult } from "./types.js";
 
@@ -54,6 +61,80 @@ export type UserToolsConfig = {
   useSecureValue?: (
     request: SecureValueUseRequest,
   ) => Promise<SecureValueUseReceipt>;
+  revealSecureValueForFill?: (request: {
+    handle: string;
+    conversationId?: string;
+    agentId?: string;
+  }) => Promise<{ ok: true; value: string } | { ok: false; error: string }>;
+  fillSecureBrowserField?: (
+    context: ToolContext,
+    target: {
+      tabId?: number;
+      selector: string;
+      value: string;
+      backend?: "in-app" | "external";
+    },
+  ) => Promise<number>;
+};
+
+const fillFingerprintParams = createSecretFingerprintParams(Math.random);
+
+const scrubFilledSecret = (message: string, secret: string): string =>
+  redactSensitiveText(
+    redactSecretFingerprints(
+      message.split(secret).join(SECRET_REDACTION_MARK),
+      fingerprintSecrets([secret], fillFingerprintParams),
+    ),
+  );
+
+const fillBrowserField = async (
+  config: UserToolsConfig,
+  handle: string,
+  target: Extract<SecureValueTarget, { kind: "browser_field" }>,
+  context: ToolContext | undefined,
+): Promise<ToolResult> => {
+  const usedAt = Date.now();
+  const receipt = (ok: boolean, detail: string): ToolResult => ({
+    result: { handle, target: "browser_field", usedAt, detail, ok },
+  });
+  if (!context) return receipt(false, "No agent session to fill a browser in.");
+  let tabId: number | undefined;
+  if (target.tabId) {
+    const parsed = Number(target.tabId);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      return receipt(
+        false,
+        "tabId must be the numeric id of a tab you opened with the browser API (tab.id). Leave it out to use your current tab.",
+      );
+    }
+    tabId = parsed;
+  }
+  const revealed = await config.revealSecureValueForFill!({
+    handle,
+    ...(context.conversationId ? { conversationId: context.conversationId } : {}),
+    ...(context.agentId ? { agentId: context.agentId } : {}),
+  });
+  if (!revealed.ok) return receipt(false, revealed.error);
+  try {
+    const filled = await config.fillSecureBrowserField!(context, {
+      ...(tabId === undefined ? {} : { tabId }),
+      selector: target.selector,
+      value: revealed.value,
+      ...(target.backend ? { backend: target.backend } : {}),
+    });
+    return receipt(
+      true,
+      `Filled the stored value into ${target.selector} in tab ${filled}.`,
+    );
+  } catch (error) {
+    return receipt(
+      false,
+      scrubFilledSecret(
+        (error as Error)?.message || "The browser field could not be filled.",
+        revealed.value,
+      ).slice(0, 2000),
+    );
+  }
 };
 
 const text = (value: unknown, max = 2000): string =>
@@ -189,8 +270,17 @@ const normalizeTarget = (input: unknown): SecureValueTarget | null => {
   if (kind === "browser_field") {
     const selector = text(source.selector, 500);
     if (!selector) return null;
-    const tabId = text(source.tabId, 128);
-    return { kind, selector, ...(tabId ? { tabId } : {}) };
+    const tabId =
+      typeof source.tabId === "number"
+        ? String(source.tabId)
+        : text(source.tabId, 128);
+    const backend = text(source.backend, 16);
+    return {
+      kind,
+      selector,
+      ...(tabId ? { tabId } : {}),
+      ...(backend === "in-app" || backend === "external" ? { backend } : {}),
+    };
   }
   if (kind === "command") {
     const command = text(source.command, 4000);
@@ -229,6 +319,13 @@ export const handleUseSecureValue = async (
       error:
         'into is required: {"kind":"browser_field","selector":"#password"}, {"kind":"command","command":"…{{secret}}…"}, or {"kind":"keychain","service":"…","account":"…"}.',
     };
+  }
+  if (
+    target.kind === "browser_field" &&
+    config.revealSecureValueForFill &&
+    config.fillSecureBrowserField
+  ) {
+    return await fillBrowserField(config, handle, target, context);
   }
   try {
     const receipt = await config.useSecureValue({

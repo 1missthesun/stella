@@ -424,7 +424,12 @@ export const SECURE_VALUE_TARGET_KINDS = [
 export type SecureValueTargetKind = (typeof SECURE_VALUE_TARGET_KINDS)[number];
 
 export type SecureValueTarget =
-  | Readonly<{ kind: "browser_field"; selector: string; tabId?: string }>
+  | Readonly<{
+      kind: "browser_field";
+      selector: string;
+      tabId?: string;
+      backend?: "in-app" | "external";
+    }>
   | Readonly<{
       kind: "command";
       command: string;

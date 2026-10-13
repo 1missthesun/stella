@@ -64,6 +64,7 @@ export const METHOD_NAMES = {
   HOST_SECURE_INPUT_REQUEST: "host.secureInput.request",
   HOST_SECURE_VALUE_USE: "host.secureValue.use",
   HOST_SECURE_VALUE_FINGERPRINTS: "host.secureValue.fingerprints",
+  HOST_SECURE_VALUE_REVEAL_FOR_FILL: "host.secureValue.revealForFill",
   HOST_LLM_CREDENTIALS_REQUEST: "host.llmCredentials.request",
   HOST_CONNECTOR_CREDENTIAL_REQUEST: "host.connectorCredential.request",
   HOST_CONNECTOR_TOKEN_STORE_REQUEST: "host.connectorTokenStore.request",

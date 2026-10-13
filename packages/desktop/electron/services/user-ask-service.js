@@ -895,6 +895,18 @@ export class UserAskService {
         this.fingerprintCache = { key, fingerprints };
         return fingerprints;
     }
+    revealSecureValueForFill(request) {
+        const handle = typeof request?.handle === "string" ? request.handle : "";
+        if (!isUserAskSecretHandle(handle)) {
+            return { ok: false, error: "That is not a secure value handle." };
+        }
+        const stellaAppDir = this.options.getStellaAppDir();
+        const value = stellaAppDir ? resolveSecureValue(stellaAppDir, handle) : null;
+        if (value === null) {
+            return { ok: false, error: "That secure value is no longer on this computer." };
+        }
+        return { ok: true, value };
+    }
     listStoredSecureValues() {
         const stellaAppDir = this.options.getStellaAppDir();
         if (!stellaAppDir) {

@@ -929,6 +929,64 @@ class NodeReplKernel {
     await this.browser.endTurn?.(turnId, behavior);
   }
 
+  async fillSecureField(
+    context: ToolContext,
+    target: Readonly<{
+      tabId?: number;
+      selector: string;
+      value: string;
+      backend?: BrowserBackend;
+    }>,
+  ): Promise<number> {
+    const turnId = context.runId ?? context.rootRunId ?? context.requestId;
+    if (turnId) {
+      try {
+        this.browser.beginTurn?.(turnId);
+      } catch {
+        // Another turn holds the session; the command below reports it.
+      }
+    }
+    const backend = target.backend ?? this.browserBackend;
+    const bound: BrowserCommandParams = { [WORKER_BOUND_BACKEND_PARAM]: backend };
+    let tabId = target.tabId;
+    if (tabId === undefined) {
+      const receipt = await this.browser.command<Record<string, unknown>>(
+        "tab_list",
+        bound,
+      );
+      const data = receipt.result.data ?? {};
+      const tabs = (Array.isArray(data.tabs) ? data.tabs : [])
+        .map((entry) => this.recordValue(entry))
+        .filter(
+          (entry): entry is Record<string, unknown> =>
+            typeof entry?.tabId === "number" &&
+            Number.isInteger(entry.tabId) &&
+            entry.tabId > 0,
+        );
+      const activeTabId =
+        typeof data.activeTabId === "number" ? data.activeTabId : undefined;
+      const chosen =
+        tabs.find((entry) => entry.tabId === activeTabId) ??
+        tabs.find((entry) => entry.active === true) ??
+        (tabs.length === 1 ? tabs[0] : undefined);
+      if (!chosen) {
+        throw new Error(
+          tabs.length === 0
+            ? `This agent has no ${backend === "external" ? "Chrome" : "Stella browser"} tab open. Open the page with the browser API first.`
+            : "This agent has several browser tabs open; pass the tab's id (tab.id) as tabId.",
+        );
+      }
+      tabId = chosen.tabId as number;
+    }
+    await this.browser.command("fill", {
+      ...bound,
+      tabId,
+      selector: target.selector,
+      value: target.value,
+    });
+    return tabId;
+  }
+
   enqueue(
     code: string,
     context: ToolContext,
@@ -2982,6 +3040,25 @@ export class NodeReplKernelRegistry {
     await Promise.all(pending);
     this.cells.clear();
     this.runningCellByOwner.clear();
+  }
+
+  async fillSecureBrowserField(
+    context: ToolContext,
+    target: Readonly<{
+      tabId?: number;
+      selector: string;
+      value: string;
+      backend?: BrowserBackend;
+    }>,
+  ): Promise<number> {
+    const id = getStellaComputerSessionId(context);
+    const kernel = id ? this.kernels.get(id) : undefined;
+    if (!kernel) {
+      throw new Error(
+        "This agent has no browser open yet. Open the page with the browser API in code first, then fill it.",
+      );
+    }
+    return await kernel.fillSecureField(context, target);
   }
 
   async endBrowserTurn(

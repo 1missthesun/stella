@@ -308,19 +308,31 @@ export class SandboxCode extends WorkerEntrypoint<Env, { sha256: string }> {
   async fetch(request: Request): Promise<Response> {
     const { sha256 } = this.ctx.props;
     const { pathname } = new URL(request.url);
-    if (request.method !== "GET" || pathname !== `/${sha256}.tar.gz`) {
+    if (
+      (request.method !== "GET" && request.method !== "HEAD") ||
+      pathname !== `/${sha256}.tar.gz`
+    ) {
       return new Response("Not found.\n", { status: 404 });
+    }
+    // A Sandbox object still running an earlier version asks for that
+    // version's bundle, but this entrypoint always runs the current one.
+    if (sha256 !== sandboxCode().sha256) {
+      return new Response(
+        `This deployment serves code bundle ${sandboxCode().sha256}, not ${sha256}.\n`,
+        { status: 410 },
+      );
     }
     const asset = await this.env.ASSETS.fetch(
       new URL(sandboxCodeAssetPath(sha256), "https://assets.invalid"),
+      { method: request.method },
     );
-    if (!asset.ok || !asset.body) {
+    if (!asset.ok || (request.method === "GET" && !asset.body)) {
       return new Response(
         `This deployment has no code bundle ${sha256} (${asset.status}).\n`,
         { status: 502 },
       );
     }
-    return new Response(asset.body, {
+    return new Response(request.method === "HEAD" ? null : asset.body, {
       headers: { "content-type": "application/octet-stream" },
     });
   }
@@ -531,6 +543,20 @@ export class Sandbox extends DurableObject<Env> {
     const installed = await installing;
     if ("error" in installed) {
       await this.#container.destroy().catch(() => undefined);
+      if (boot.workload === "world" && (await this.#codeSuperseded())) {
+        // This object runs an earlier version than the one now deployed,
+        // which no longer serves its bundle. Resetting it makes the next call
+        // (the turn's own, after its prewarm) run the current version.
+        console.log(
+          JSON.stringify({
+            level: "warn",
+            event: "sandbox_code_superseded",
+            sandbox: this.ctx.id.toString().slice(0, 12),
+            codeBundle: sandboxCode().sha256,
+          }),
+        );
+        this.ctx.abort("This sandbox's code was superseded by a deploy.");
+      }
       throw installed.error;
     }
     const { code } = installed;
@@ -580,6 +606,19 @@ export class Sandbox extends DurableObject<Env> {
    * container verifies the bytes against the hash passed here and refuses
    * anything else.
    */
+  /** Whether the deployment serving code bundles has moved past this object's. */
+  async #codeSuperseded(): Promise<boolean> {
+    const { sha256 } = sandboxCode();
+    try {
+      const response = await this.ctx.exports
+        .SandboxCode({ props: { sha256 } })
+        .fetch(new Request(sandboxCodeUrl(sha256), { method: "HEAD" }));
+      return response.status === 410;
+    } catch {
+      return false;
+    }
+  }
+
   async #installCode(boot: SandboxBoot): Promise<SandboxCodeInstall | null> {
     if (boot.workload !== "world") return null;
     const { sha256 } = sandboxCode();

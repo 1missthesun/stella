@@ -66,18 +66,19 @@ const StackBody = ({ card }: { card: EvidenceCard }) => {
   );
 };
 
-const isDriveCard = (card: EvidenceCard): boolean =>
-  Boolean(card.sourcePaths[0] && driveLinkPath(card.sourcePaths[0]));
+const openCardSource = (card: EvidenceCard) => {
+  const target = card.sourcePaths[card.sourcePaths.length - 1];
+  if (target) openEvidenceSource(target);
+};
 
 const TileBody = ({ card }: { card: EvidenceCard }) => {
-  if (card.kind === "video" && !isDriveCard(card)) {
+  if (card.kind === "video") {
     return (
       <VideoFrame
         poster={card.thumbnail}
-        filePath={card.sourcePaths[0] ?? ""}
-        mimeType={card.playbackMimeType}
-        durationMs={card.durationMs}
+        {...(card.durationMs && card.subtitle ? { durationLabel: card.subtitle } : {})}
         title={card.title}
+        onOpen={() => openCardSource(card)}
       />
     );
   }
@@ -122,18 +123,19 @@ export const MediaTile = ({
   >
     <div className="media-tile__frame">
       {visible ? <TileBody card={card} /> : null}
-      <button
-        type="button"
-        className="media-tile__open"
-        aria-label={`Open ${card.title}`}
-        onClick={(event) => {
-          event.stopPropagation();
-          const target = card.sourcePaths[card.sourcePaths.length - 1];
-          if (target) openEvidenceSource(target);
-        }}
-      >
-        <Maximize2 size={11} />
-      </button>
+      {card.kind === "video" ? null : (
+        <button
+          type="button"
+          className="media-tile__open"
+          aria-label={`Open ${card.title}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            openCardSource(card);
+          }}
+        >
+          <Maximize2 size={11} />
+        </button>
+      )}
     </div>
     {VISUAL_KINDS.has(card.kind) ? null : (
       <figcaption className="media-tile__caption" title={card.sourcePaths.join(", ")}>

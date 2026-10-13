@@ -20,9 +20,10 @@ without asking.
   included), then prove the change in the real product:
   `.agents/skills/verify-stella/SKILL.md` (desktop and iOS) and
   `.agents/skills/verify-stella/cloud-turn.mjs` (cloud turns).
-- **Your own worktree.** `git worktree add <path> -b <branch> origin/master`.
-  Other agents share the main checkout. Fetch and rebase before you push, and
-  stage only your own files.
+- **Your own worktree.** `git fetch origin && git worktree add <path> -b <branch> origin/master`.
+  Other agents share the main checkout, and it may be behind: judge what master
+  contains from origin/master or your fresh worktree, never from it. Fetch and
+  rebase before you push, and stage only your own files.
 - **Install only what your work needs:** `bun run deps <kind>` in the
   worktree. `runtime` (runtime, agent), `backend` (workers, executor,
   Previews), `desktop` (Electron app, verify-stella desktop), `mobile`,

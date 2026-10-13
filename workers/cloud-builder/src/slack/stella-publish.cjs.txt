@@ -89,7 +89,12 @@ const readJson = (p) => {
 const tail = (text, lines) => text.split("\n").slice(-lines).join("\n");
 
 const git = (args, cwd) => {
-  const result = cp.spawnSync("git", ["-c", "safe.directory=*"].concat(args), { cwd, encoding: "utf8" });
+  const result = cp.spawnSync("git", ["-c", "safe.directory=*"].concat(args), {
+    cwd,
+    encoding: "utf8",
+    timeout: 60_000,
+    env: Object.assign({}, process.env, { GIT_TERMINAL_PROMPT: "0" }),
+  });
   return result.status === 0 ? (result.stdout || "").trim() : "";
 };
 
@@ -111,7 +116,10 @@ const repoPreview = (root) => {
   if (!connected || connected !== githubRepo(root).toLowerCase()) return null;
   const head = git(["rev-parse", "HEAD"], root);
   if (!head) return null;
-  const pushed = git(["branch", "-r", "--contains", head], root);
+  const remoteTips = git(["ls-remote", "--heads", "origin"], root)
+    .split("\n")
+    .map((line) => line.split(/\s+/)[0]);
+  const pushed = remoteTips.includes(head) || git(["branch", "-r", "--contains", head], root);
   if (!pushed) {
     say("HEAD isn't pushed, so the repository has no preview of it; building one on Stella.");
     return null;

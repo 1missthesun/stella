@@ -245,7 +245,7 @@ const imagePackage = {
     // Claude's native coding-agent runtime. This exact version is part of the
     // sandbox image contract: cloud turns must not change behavior merely
     // because a registry dist-tag moved between image builds.
-    "@anthropic-ai/claude-code": "2.1.220",
+    "@anthropic-ai/claude-code": "2.1.294",
   },
 };
 

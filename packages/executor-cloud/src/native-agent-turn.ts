@@ -498,7 +498,7 @@ export const CLOUD_ORCHESTRATOR_CLI_CWD = path.join(
 /**
  * An orchestrator tool call is one held broker request (BuildSession -> DO)
  * that sends no MCP progress while the DO runs the tool, which may wait on a
- * user approval. Claude Code 2.1.220 aborts a silent HTTP MCP call after 5
+ * user approval. Claude Code aborts a silent HTTP MCP call after 5
  * minutes (`CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT` default 300000) and has a
  * ~28 h hard cap (`MCP_TOOL_TIMEOUT` default 1e8). Both are set to 30
  * minutes: the turn's broker capability (TURN_BROKER_MAX_TTL_MS) and gateway

@@ -79,6 +79,7 @@ export async function fitForHandover(args: {
   window: number;
   context: Context;
   report: (error: unknown) => void;
+  compacting?: (fit: Omit<HandoverFit, "fit" | "attempts">) => void;
 }): Promise<HandoverFit> {
   const { harness, conversation, window, context } = args;
   const budget = handoverBudget(window);
@@ -88,6 +89,7 @@ export async function fitForHandover(args: {
     return tokens <= budget;
   };
   if (!(window > 0) || (await fits())) return { fit: "fits", window, budget, tokens, attempts: 0 };
+  args.compacting?.({ window, budget, tokens });
   for (let attempt = 1; attempt <= COMPACTION_ATTEMPTS; attempt += 1) {
     try {
       const task = await conversation.compact(compactionInstructions(budget), context);

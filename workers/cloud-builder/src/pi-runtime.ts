@@ -2042,10 +2042,16 @@ export class PiConversationRuntime {
         model.provider === CLAUDE_CODE_PROVIDER_ID
           ? (this.#claudeCode?.contextWindow(model.modelId) ?? 0)
           : (this.#models.getModel(model.provider, model.modelId)?.contextWindow ?? 0);
-      const fit = await fitForHandover({ harness, conversation: root, window, context, report: (error) => this.#options.report(error) }).catch(
-        (error: unknown) => this.#options.report(error),
-      );
-      if (fit) this.#options.log("pi_handover", { from: `${agent.model.provider}/${agent.model.modelId}`, to: `${model.provider}/${model.modelId}`, ...fit });
+      const handover = { from: `${agent.model.provider}/${agent.model.modelId}`, to: `${model.provider}/${model.modelId}` };
+      const fit = await fitForHandover({
+        harness,
+        conversation: root,
+        window,
+        context,
+        report: (error) => this.#options.report(error),
+        compacting: (state) => this.#options.log("pi_handover", { ...handover, fit: "compacting", ...state }),
+      }).catch((error: unknown) => this.#options.report(error));
+      if (fit) this.#options.log("pi_handover", { ...handover, ...fit });
     }
     if (
       offersAgentTools(agent) ||

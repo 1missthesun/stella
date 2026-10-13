@@ -1110,6 +1110,18 @@ export function stellaAgents(host: StellaAgentsHost) {
   };
 
   /**
+   * An agent that moved away runs here again, in the conversation it kept
+   * here: it is no longer remote (its history reads, its subtree is walked)
+   * and it is placed where this orchestrator runs. Every host's return path
+   * goes through here (`createAgent` adopting it, `markCatchUp`).
+   */
+  const runsHereAgain = (record: AgentRecord): void => {
+    delete record.remote;
+    const placement = host.rootPlacement;
+    record.placement = { kind: placement.kind, ...(placement.kind === "device" ? { deviceId: placement.deviceId } : {}) };
+  };
+
+  /**
    * Create an agent under `parentConversationId` and its first reporter,
    * once per `callKey`: an agent conversation owned by a background anchor,
    * its role, placement and tools, and its entry in the parent's agents.
@@ -1149,6 +1161,10 @@ export function stellaAgents(host: StellaAgentsHost) {
     const known = args.adoptAs && args.threadId ? state.agents[args.threadId] : undefined;
     if (known && known.conversationId >= 0 && args.adoptAs) {
       known.placedAs = args.adoptAs;
+      // It moved away and came back: it runs here again, in its conversation
+      // here. It stays `moved`: the owner's agent threads placed it here and
+      // still reach it (`away` clears once it took what it did elsewhere).
+      runsHereAgain(known);
       return { threadId: args.threadId!, existing: true };
     }
     const anchor = await tx.createTask(Anchor, null, {
@@ -1926,9 +1942,8 @@ export function stellaAgents(host: StellaAgentsHost) {
       // It moved away and came back: it runs here again.
       if (record.moved) {
         delete record.moved;
-        delete record.remote;
         delete record.away;
-        record.placement = host.rootPlacement;
+        runsHereAgain(record);
       }
       return undefined;
     }, context);

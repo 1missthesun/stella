@@ -26,37 +26,6 @@ export const DOT_SPREAD_UNITS = 62;
 /** Side dots read a touch larger than the middle one. */
 export const SIDE_DOT_SCALE = 1.02;
 
-/** Per-slot delay of the dots' entrance, in envelope fractions. */
-export const DOT_ENTRANCE_STAGGER = 0.12;
-
-/** Number of dots in the ellipsis. */
-export const DOT_COUNT = 3;
-
-/**
- * Settle time of the star → dots morph. The envelope below is the step
- * response of a critically damped spring at ω = 14 rad/s, sampled over this
- * window (ω · t = 6.3 at t = 1).
- */
-export const MORPH_MS = 450;
-const MORPH_OMEGA_T = 14 * (MORPH_MS / 1000);
-
-/** Value of the raw step response at t = 1, so the envelope lands exactly on 1. */
-const MORPH_NORMALIZER = 1 - (1 + MORPH_OMEGA_T) * Math.exp(-MORPH_OMEGA_T);
-
-/**
- * Critically damped step response `1 − (1 + ωt)·e^(−ωt)`, normalized to reach
- * exactly 1 at `t = 1`. Driven from a LINEAR shared value so the spring shape
- * is exact rather than a bezier approximation of it — and so reversing simply
- * runs the same curve back toward rest.
- */
-export function morphEnvelope(t: number): number {
-  "worklet";
-  if (t <= 0) return 0;
-  if (t >= 1) return 1;
-  const k = MORPH_OMEGA_T * t;
-  return (1 - (1 + k) * Math.exp(-k)) / MORPH_NORMALIZER;
-}
-
 const BOUNCE_FRAMES = sampleWorkingDots();
 const BOUNCE_LIFT = BOUNCE_FRAMES.map((f) => f.lift);
 const BOUNCE_SCALE_X = BOUNCE_FRAMES.map((f) => f.scaleX);
@@ -124,83 +93,6 @@ export type ToolCharacterMotionState =
   | "searching"
   | "reading";
 
-export type ToolCharacterMotion = {
-  translateX: number;
-  translateY: number;
-  rotationDeg: number;
-  scaleX: number;
-  scaleY: number;
-};
-
-/**
- * Mobile-native versions of the desktop rig's tool poses. Working and writing
- * carry the travelling twinkle as a soft squash through the silhouette;
- * searching and reading leave room around the smaller body for orbiting marks.
- */
-export function toolCharacterMotion(
-  state: ToolCharacterMotionState,
-  timeMs: number,
-): ToolCharacterMotion {
-  "worklet";
-  // Keep this inline: the iOS worklet serializer left the same-file helper
-  // reference undefined when this pose first mounted after sending a message.
-  const breathe =
-    1 + BREATHE_AMPLITUDE * Math.sin((timeMs / BREATHE_MS) * 2 * Math.PI);
-  const bobX =
-    Math.sin(timeMs * 0.00042) * 0.45 +
-    Math.sin(timeMs * 0.001) * 0.16;
-  const bobY =
-    Math.sin(timeMs * 0.00058) * 0.36 +
-    Math.sin(timeMs * 0.0013) * 0.13;
-
-  if (state === "working" || state === "writing") {
-    const speed = state === "writing" ? 0.0026 : 0.0033;
-    const twinkle = Math.sin(timeMs * speed);
-    const strength = state === "writing" ? 0.045 : 0.06;
-    return {
-      translateX: bobX,
-      translateY: bobY,
-      rotationDeg: Math.sin(timeMs * 0.0012) * 2.6,
-      scaleX: breathe * (1 + strength * twinkle),
-      scaleY: breathe * (1 - strength * 0.62 * twinkle),
-    };
-  }
-
-  const bodyScale = state === "searching" ? 0.9 : 0.94;
-  return {
-    translateX: bobX * 0.55,
-    translateY: bobY * 0.55,
-    rotationDeg: Math.sin(timeMs * 0.0009) * 3,
-    scaleX: breathe * bodyScale,
-    scaleY: breathe * bodyScale,
-  };
-}
-
-export type OrbitMarkMotion = {
-  opacity: number;
-  rotationDeg: number;
-  scale: number;
-  translateX: number;
-  translateY: number;
-};
-
-/** One of the desktop search/read orbit's four moving sparkle marks. */
-export function orbitMarkMotion(
-  index: number,
-  timeMs: number,
-): OrbitMarkMotion {
-  "worklet";
-  const angle = timeMs * 0.0016 + (index * Math.PI * 2) / 4;
-  const depth = 0.5 + 0.5 * Math.max(0, Math.cos(angle));
-  return {
-    opacity: Math.max(0.2, Math.min(1, (Math.cos(angle) + 0.5) / 0.7)),
-    rotationDeg: ((angle * 40) / Math.PI) % 360,
-    scale: 0.62 + depth * 0.38,
-    translateX: Math.sin(angle),
-    translateY: -Math.cos(angle),
-  };
-}
-
 /**
  * Length of the linear clock ramp every periodic term reads. A common multiple
  * of the bounce cycle (1500ms) and the breathe period (4000ms), so the wrap is
@@ -235,33 +127,4 @@ export function voiceScale(energy: number, timeMs: number): number {
     breatheScale(timeMs, BREATHE_AMPLITUDE * (1 - level)) *
     (1 + VOICE_PULSE_GAIN * level)
   );
-}
-
-/** Standard ease-out-cubic. */
-export function easeOutCubic(t: number): number {
-  "worklet";
-  const clamped = t <= 0 ? 0 : t >= 1 ? 1 : t;
-  const inv = 1 - clamped;
-  return 1 - inv * inv * inv;
-}
-
-/** Standard ease-out-back — the slight overshoot on the dots' spread. */
-export function easeOutBack(t: number): number {
-  "worklet";
-  const clamped = t <= 0 ? 0 : t >= 1 ? 1 : t;
-  const c1 = 1.70158;
-  const c3 = c1 + 1;
-  const inv = clamped - 1;
-  return 1 + c3 * inv * inv * inv + c1 * inv * inv;
-}
-
-/**
- * Entrance progress of slot `i` given the morph envelope: the dots don't all
- * appear at once, they cascade by {@link DOT_ENTRANCE_STAGGER}.
- */
-export function dotEntrance(slot: number, envelope: number): number {
-  "worklet";
-  const span = 1 - DOT_ENTRANCE_STAGGER * (DOT_COUNT - 1);
-  const local = (envelope - DOT_ENTRANCE_STAGGER * slot) / span;
-  return local <= 0 ? 0 : local >= 1 ? 1 : local;
 }

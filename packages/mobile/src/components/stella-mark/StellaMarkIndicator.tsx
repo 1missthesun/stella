@@ -1,127 +1,129 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
-  Easing,
-  ReduceMotion,
-  cancelAnimation,
+  useAnimatedProps,
   useAnimatedStyle,
-  useDerivedValue,
+  useFrameCallback,
   useReducedMotion,
   useSharedValue,
-  withRepeat,
-  withTiming,
+  type FrameInfo,
   type SharedValue,
 } from "react-native-reanimated";
-import Svg, { Path } from "react-native-svg";
-import { STELLA_ORB_PATH, STELLA_STAR_PATH } from "./geometry";
+import Svg, {
+  ClipPath,
+  Defs,
+  G,
+  LinearGradient,
+  Path,
+  RadialGradient,
+  Stop,
+  type GProps,
+} from "react-native-svg";
 import {
-  middleDotScale,
-  morphShrink,
-  sideDotScale,
-  stellaMarkLayout,
-} from "./layout";
+  STELLA_MARK_CENTER,
+  STELLA_MARK_VIEWBOX,
+  STELLA_MARK_VIEWBOX_SPAN,
+  STELLA_ORB_PATH,
+} from "./geometry";
+import { stellaMarkLayout } from "./layout";
 import { MarkLayer } from "./MarkLayer";
-import { StellaFace } from "./StellaFace";
+import { DOT_SPREAD_UNITS } from "./motion";
+import {
+  createRig,
+  rigMaxZoom,
+  rigSmallness,
+  stepRig,
+  type RigDots,
+  type RigInput,
+  type RigState,
+} from "./rig";
+import { clamp, easeOutBackRaw, easeOutCubicRaw } from "./rig-math";
 import { useAppVisible } from "../../lib/use-app-visible";
 import type { WorkingIndicatorCharacterState } from "../working-indicator-character";
-import {
-  BREATHE_AMPLITUDE,
-  BREATHE_MS,
-  CLOCK_SPAN_MS,
-  MORPH_MS,
-  dotBounce,
-  dotEntrance,
-  easeOutBack,
-  easeOutCubic,
-  morphEnvelope,
-  orbitMarkMotion,
-  toolCharacterMotion,
-} from "./motion";
-
-/**
- * Stella's working/thinking indicator: the character mark itself becomes the
- * middle dot of a three-dot thinking bounce, then unfolds back into the star
- * when the run settles.
- *
- * ACTIVE while `thinking`: the star cross-fades into its fully inflated profile
- * (the orb) while shrinking to dot size, two sibling dots spread out from
- * underneath it with a staggered ease-out-back, and all three run the shared
- * squash-and-stretch hop (`@stella/contracts/working-dots-bounce`), a fixed
- * stagger apart so it reads as one wave. Tool states run the desktop-matched
- * character poses instead: working and writing reshape and bob the body, while
- * searching and reading add orbiting marks around a smaller character. The
- * face follows the same state-specific expressions and blink cadence as the
- * desktop rig. The face stays hidden in thinking mode, matching desktop.
- *
- * OTA-SAFE. Everything here is `react-native-svg` + `react-native-reanimated`,
- * both already in the bundle, so the indicator can be changed over the air —
- * unlike the SkSL shader it replaced, whose native dependency could only ship
- * in a fresh store build.
- *
- * PERFORMANCE. Two shared values drive everything: `clock` (a linear
- * millisecond ramp) and `morphT` (a linear 0..1 ramp whose critically damped
- * shape is applied in the worklet — see `motion.ts`). Every transform and
- * opacity is computed inside `useAnimatedStyle` worklets on the UI thread, on
- * plain `Animated.View`s, so no per-frame JS runs and React never re-renders
- * while the indicator animates. The clock is suspended outright while the app
- * is backgrounded, so a phone in a pocket with a run still going animates
- * nothing; under reduced motion it runs only for the dots' opacity breath.
- *
- * The geometry (`geometry.ts`) is baked from the same source as the desktop
- * rig, and its viewBox is centred on the mark's own centre, so a View-level
- * transform is exactly a shape-centre transform.
- */
 
 const DEFAULT_SIZE = 34;
+const C = STELLA_MARK_CENTER;
+const INK_FROM = C * 1.86;
+const INK_TO = C * 0.14;
+const SPARK_CANVAS = 1.6;
+const SPARK_FILL = "#be57a4";
+const DOT_STAGGER = 0.12;
+const REDUCED_SETTLE_MS = 120;
+const INK_STOPS: [string, number][] = [
+  ["#00aad8", 0],
+  ["#3493d9", 0.25],
+  ["#4878db", 0.5],
+  ["#7449c5", 0.75],
+  ["#be57a4", 1],
+];
 
-/** The morph has to finish before the clock stops, or the mark would freeze
- *  mid-transition when the work ends. */
-const STOP_GRACE_MS = 400;
+const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedG = Animated.createAnimatedComponent(G);
 
-const ORBIT_MARK_COUNT = 4;
-const ORBIT_RADIUS_X = 11.5;
-const ORBIT_RADIUS_Y = 5.5;
-const ORBIT_MARK_SIZE = 5;
+type SparkFrame = { d: string[]; o: number[] };
 
-function OrbitMark() {
-  return (
-    <Svg
-      viewBox="-1.1 -1.1 2.2 2.2"
-      width={ORBIT_MARK_SIZE}
-      height={ORBIT_MARK_SIZE}
-    >
-      <Path
-        d="M0 -1 C0.09 -0.31 0.31 -0.09 1 0 C0.31 0.09 0.09 0.31 0 1 C-0.09 0.31 -0.31 0.09 -1 0 C-0.31 -0.09 -0.09 -0.31 0 -1Z"
-        fill="#4878db"
-      />
-    </Svg>
-  );
-}
-
-function OrbitingMark({
+function SparkPath({
   index,
-  clock,
+  sparks,
 }: {
   index: number;
-  clock: SharedValue<number>;
+  sparks: SharedValue<SparkFrame>;
 }) {
-  const style = useAnimatedStyle(() => {
-    const frame = orbitMarkMotion(index, clock.value);
+  const props = useAnimatedProps(() => ({
+    d: sparks.value.d[index],
+    opacity: sparks.value.o[index],
+  }));
+  return <AnimatedPath animatedProps={props} fill={SPARK_FILL} />;
+}
+
+function useSideDotStyle(
+  dots: SharedValue<RigDots>,
+  order: number,
+  slot: number,
+  sign: number,
+  pxPerUnit: number,
+  sideDotPx: number,
+  zoomMax: number,
+) {
+  return useAnimatedStyle(() => {
+    const f = dots.value;
+    const k = clamp(
+      (f.w - order * DOT_STAGGER) / (1 - order * DOT_STAGGER),
+      0,
+      1,
+    );
+    const o = slot * 4;
+    const sx = f.hop[o + 1];
+    const sy = f.hop[o + 2];
+    if (k <= 0.004) {
+      return {
+        opacity: 0,
+        transform: [
+          { translateX: 0 },
+          { translateY: 0 },
+          { scale: 0 },
+          { scaleX: 1 },
+          { scaleY: 1 },
+        ],
+      };
+    }
+    const app = easeOutCubicRaw(k);
+    const spread = easeOutBackRaw(k);
+    const scale = (app * f.z) / zoomMax;
     return {
-      opacity: frame.opacity,
+      opacity: app * f.hop[o + 3],
       transform: [
-        { translateX: frame.translateX * ORBIT_RADIUS_X },
-        { translateY: frame.translateY * ORBIT_RADIUS_Y },
-        { rotate: `${frame.rotationDeg}deg` },
-        { scale: frame.scale },
+        { translateX: sign * DOT_SPREAD_UNITS * pxPerUnit * f.z * spread },
+        {
+          translateY:
+            -f.hop[o] * sideDotPx + (sideDotPx * scale * (1 - sy)) / 2,
+        },
+        { scale },
+        { scaleX: sx },
+        { scaleY: sy },
       ],
     };
   });
-  return (
-    <Animated.View style={[styles.orbitMark, style]}>
-      <OrbitMark />
-    </Animated.View>
-  );
 }
 
 export function StellaMarkIndicator({
@@ -130,217 +132,140 @@ export function StellaMarkIndicator({
   state = "thinking",
   faceColor,
 }: {
-  /** True while a run is in flight — the mark runs the thinking bounce. */
   active: boolean;
   size?: number;
   state?: WorkingIndicatorCharacterState;
-  /** The bubble fill, used to punch the character's eyes through the mark. */
   faceColor?: string;
 }) {
   const reduceMotion = useReducedMotion();
   const appVisible = useAppVisible();
-  // Gradient ids are per-instance: two indicators sharing an id make the second
-  // resolve against the first one's gradient.
+  const running = active && appVisible;
   const uid = useId().replace(/[^a-zA-Z0-9-]/g, "");
 
   const layout = useMemo(() => stellaMarkLayout(size), [size]);
-  const { dotPx, sideDotPx, spreadPx, zoom } = layout;
+  const { dotPx, sideDotPx, pxPerUnit } = layout;
+  const zoomMax = rigMaxZoom(size);
+  const smallness = rigSmallness(size);
 
-  /** Linear millisecond ramp; every periodic term derives from it. */
-  const clock = useSharedValue(0);
-  /** Linear 0..1 morph ramp — the spring shape is applied in the worklets. */
-  const morphT = useSharedValue(0);
-
-  // Under reduced motion only the thinking dots move at all (an opacity
-  // breath), so every other state parks the clock.
-  const wantsClock = !reduceMotion || state === "thinking";
-  const [running, setRunning] = useState(
-    () => active && appVisible && wantsClock,
+  const input: RigInput = useMemo(
+    () => ({ state, paused: !running, reduced: reduceMotion, smallness }),
+    [state, running, reduceMotion, smallness],
   );
 
-  // The clock opts out of Reanimated's reduced-motion skip: the dots' opacity
-  // breath is the one motion reduced motion keeps, and it needs the ramp.
-  useEffect(() => {
-    cancelAnimation(clock);
-    if (!running) return;
-    clock.value = 0;
-    clock.value = withRepeat(
-      withTiming(CLOCK_SPAN_MS, {
-        duration: CLOCK_SPAN_MS,
-        easing: Easing.linear,
-        reduceMotion: ReduceMotion.Never,
-      }),
-      -1,
-      false,
-      undefined,
-      ReduceMotion.Never,
-    );
-    return () => cancelAnimation(clock);
-  }, [clock, running]);
+  const [initial] = useState(() => {
+    const rig = createRig(input.state);
+    stepRig(rig, 0, input);
+    return rig.out;
+  });
+
+  const inputSV = useSharedValue<RigInput>(input);
+  const rigSV = useSharedValue<RigState | null>(null);
+  const bodyD = useSharedValue(initial.bodyD);
+  const bodyM = useSharedValue(initial.matrix);
+  const eyeL = useSharedValue(initial.eyeL);
+  const eyeR = useSharedValue(initial.eyeR);
+  const sparks = useSharedValue<SparkFrame>({
+    d: initial.sparkD,
+    o: initial.sparkO,
+  });
+  const dots = useSharedValue<RigDots>(initial.dots);
 
   useEffect(() => {
-    cancelAnimation(morphT);
-    const target = active && state === "thinking" ? 1 : 0;
-    if (reduceMotion) {
-      // No morph: the dots simply appear in place of the star.
-      morphT.value = target;
-      return;
-    }
-    morphT.value = withTiming(target, {
-      duration: MORPH_MS,
-      easing: Easing.linear,
-    });
-    return () => cancelAnimation(morphT);
-  }, [active, morphT, reduceMotion, state]);
+    inputSV.value = input;
+  }, [input, inputSV]);
 
-  // The desktop rig suspends on window blur; this is its counterpart.
+  const onFrame = useCallback(
+    (info: FrameInfo) => {
+      "worklet";
+      const current = inputSV.value;
+      let rig = rigSV.value;
+      if (rig === null) {
+        rig = createRig(current.state);
+        rigSV.value = rig;
+      }
+      stepRig(rig, info.timeSincePreviousFrame ?? 0, current);
+      const out = rig.out;
+      if (out.bodyDirty) {
+        bodyD.value = out.bodyD;
+        out.bodyDirty = false;
+      }
+      if (out.matrixDirty) {
+        bodyM.value = out.matrix;
+        out.matrixDirty = false;
+      }
+      if (out.eyesDirty) {
+        eyeL.value = out.eyeL;
+        eyeR.value = out.eyeR;
+        out.eyesDirty = false;
+      }
+      if (out.sparksDirty) {
+        sparks.value = { d: out.sparkD, o: out.sparkO };
+        out.sparksDirty = false;
+      }
+      if (out.dotsDirty) {
+        dots.value = out.dots;
+        out.dotsDirty = false;
+      }
+    },
+    [bodyD, bodyM, dots, eyeL, eyeR, inputSV, rigSV, sparks],
+  );
+  const frame = useFrameCallback(onFrame, false);
+
   useEffect(() => {
-    if (!appVisible || !wantsClock) {
-      setRunning(false);
+    if (!running) {
+      frame.setActive(false);
       return;
     }
-    if (active) {
-      setRunning(true);
-      return;
-    }
-    const timer = setTimeout(() => setRunning(false), MORPH_MS + STOP_GRACE_MS);
+    frame.setActive(true);
+    if (!reduceMotion || state === "thinking") return;
+    const timer = setTimeout(() => frame.setActive(false), REDUCED_SETTLE_MS);
     return () => clearTimeout(timer);
-  }, [active, appVisible, wantsClock]);
+  }, [frame, reduceMotion, running, state]);
 
-  /** Critically damped 0..1 morph envelope, shared by every layer below. */
-  const envelope = useDerivedValue(() => morphEnvelope(morphT.value));
+  const bodyProps = useAnimatedProps(() => ({ d: bodyD.value }));
+  const coreProps = useAnimatedProps(() => ({ d: bodyD.value }));
+  const clipProps = useAnimatedProps(() => ({ d: bodyD.value }));
+  const matrixProps = useAnimatedProps(
+    () => ({ matrix: bodyM.value }) as unknown as Partial<GProps>,
+  );
+  const eyeLProps = useAnimatedProps(() => ({ d: eyeL.value }));
+  const eyeRProps = useAnimatedProps(() => ({ d: eyeR.value }));
 
-  // The dots state carries its zoom in the pixel sizes `layout.ts` hands out,
-  // so nothing is left resampled once the morph settles. Tool states animate
-  // the body itself below and must not receive a second breathe here.
-  const stageStyle = useAnimatedStyle(() => {
-    if (state !== "thinking") {
-      return { transform: [{ scale: 1 }] };
-    }
-    const env = envelope.value;
-    const breathe =
-      1 +
-      BREATHE_AMPLITUDE *
-        Math.sin((clock.value / BREATHE_MS) * 2 * Math.PI) *
-        (1 - env);
-    return { transform: [{ scale: breathe }] };
-  });
-
-  const toolState = state === "thinking" ? "working" : state;
   const bodyStyle = useAnimatedStyle(() => {
-    if (state === "thinking" || reduceMotion) return {};
-    const frame = toolCharacterMotion(toolState, clock.value);
+    const f = dots.value;
+    const sy = f.hop[6];
+    const half = (size * f.bodyScale) / 2;
     return {
+      opacity: f.hop[7],
       transform: [
-        { translateX: frame.translateX },
-        { translateY: frame.translateY },
-        { rotate: `${frame.rotationDeg}deg` },
-        { scaleX: frame.scaleX },
-        { scaleY: frame.scaleY },
+        { translateY: -f.hop[4] * dotPx + half * (1 - sy) },
+        { scaleX: f.hop[5] },
+        { scaleY: sy },
       ],
     };
   });
-
-  // Every dot squashes about its own floor: a View scales about its centre,
-  // so each one is shifted down by the height its squash took off the bottom.
-  // The character, full size. It shrinks toward the middle dot's box and hands
-  // over to it, so the two are one shape crossing the morph rather than two.
-  const starStyle = useAnimatedStyle(() => {
-    const env = envelope.value;
-    const bounce = dotBounce(1, clock.value, reduceMotion);
-    const scale = morphShrink(env, zoom);
-    const scaleX = 1 + (bounce.scaleX - 1) * env;
-    const scaleY = 1 + (bounce.scaleY - 1) * env;
-    return {
-      opacity: (1 - env) * (1 - (1 - bounce.opacity) * env),
-      transform: [
-        {
-          translateY:
-            -bounce.lift * dotPx * env + (size * scale * (1 - scaleY)) / 2,
-        },
-        { scale },
-        { scaleX },
-        { scaleY },
-      ],
-    };
-  });
-
-  // Middle slot (index 1): the orb the character becomes, drawn at dot size.
-  const middleStyle = useAnimatedStyle(() => {
-    const env = envelope.value;
-    const bounce = dotBounce(1, clock.value, reduceMotion);
-    const scale = middleDotScale(env, layout);
-    const scaleX = 1 + (bounce.scaleX - 1) * env;
-    const scaleY = 1 + (bounce.scaleY - 1) * env;
-    return {
-      opacity: env * (1 - (1 - bounce.opacity) * env),
-      transform: [
-        {
-          translateY:
-            -bounce.lift * dotPx * env + (dotPx * scale * (1 - scaleY)) / 2,
-        },
-        { scale },
-        { scaleX },
-        { scaleY },
-      ],
-    };
-  });
-
-  const leftStyle = useAnimatedStyle(() => {
-    const env = envelope.value;
-    const bounce = dotBounce(0, clock.value, reduceMotion);
-    const entrance = dotEntrance(0, env);
-    const scale = sideDotScale(env, zoom);
-    return {
-      opacity: bounce.opacity * easeOutCubic(entrance),
-      transform: [
-        { translateX: -spreadPx * easeOutBack(entrance) },
-        {
-          translateY:
-            -bounce.lift * sideDotPx * env +
-            (sideDotPx * scale * (1 - bounce.scaleY)) / 2,
-        },
-        { scale },
-        { scaleX: bounce.scaleX },
-        { scaleY: bounce.scaleY },
-      ],
-    };
-  });
-
-  const rightStyle = useAnimatedStyle(() => {
-    const env = envelope.value;
-    const bounce = dotBounce(2, clock.value, reduceMotion);
-    const entrance = dotEntrance(2, env);
-    const scale = sideDotScale(env, zoom);
-    return {
-      opacity: bounce.opacity * easeOutCubic(entrance),
-      transform: [
-        { translateX: spreadPx * easeOutBack(entrance) },
-        {
-          translateY:
-            -bounce.lift * sideDotPx * env +
-            (sideDotPx * scale * (1 - bounce.scaleY)) / 2,
-        },
-        { scale },
-        { scaleX: bounce.scaleX },
-        { scaleY: bounce.scaleY },
-      ],
-    };
-  });
+  const leftStyle = useSideDotStyle(
+    dots,
+    0,
+    0,
+    -1,
+    pxPerUnit,
+    sideDotPx,
+    zoomMax,
+  );
+  const rightStyle = useSideDotStyle(
+    dots,
+    1,
+    2,
+    1,
+    pxPerUnit,
+    sideDotPx,
+    zoomMax,
+  );
 
   const viewport = useMemo(
     () => [styles.viewport, { width: size, height: size }],
     [size],
-  );
-  const dotBox = useMemo(
-    () => ({
-      height: dotPx,
-      left: (size - dotPx) / 2,
-      position: "absolute" as const,
-      top: (size - dotPx) / 2,
-      width: dotPx,
-    }),
-    [dotPx, size],
   );
   const sideDotBox = useMemo(
     () => ({
@@ -352,51 +277,107 @@ export function StellaMarkIndicator({
     }),
     [sideDotPx, size],
   );
+  const sparkCanvas = useMemo(() => {
+    const px = size * SPARK_CANVAS;
+    const span = STELLA_MARK_VIEWBOX_SPAN * SPARK_CANVAS;
+    const min = C - span / 2;
+    return {
+      px,
+      viewBox: `${min} ${min} ${span} ${span}`,
+      style: {
+        height: px,
+        left: (size - px) / 2,
+        position: "absolute" as const,
+        top: (size - px) / 2,
+        width: px,
+      },
+    };
+  }, [size]);
+
+  const inkId = `${uid}-ink`;
+  const coreId = `${uid}-core`;
+  const clipId = `${uid}-clip`;
 
   return (
     <View style={viewport} pointerEvents="none">
-      <Animated.View style={[styles.stage, stageStyle]}>
-        {!reduceMotion && (state === "searching" || state === "reading")
-          ? Array.from({ length: ORBIT_MARK_COUNT }, (_, index) => (
-              <OrbitingMark key={index} index={index} clock={clock} />
-            ))
-          : null}
-        <Animated.View style={[sideDotBox, leftStyle]}>
-          <MarkLayer
-            d={STELLA_ORB_PATH}
-            size={sideDotPx}
-            gradientId={`${uid}-left`}
-          />
-        </Animated.View>
-        <Animated.View style={[sideDotBox, rightStyle]}>
-          <MarkLayer
-            d={STELLA_ORB_PATH}
-            size={sideDotPx}
-            gradientId={`${uid}-right`}
-          />
-        </Animated.View>
-        <Animated.View style={[styles.layer, starStyle, bodyStyle]}>
-          <MarkLayer
-            d={STELLA_STAR_PATH}
-            size={size}
-            gradientId={`${uid}-star`}
-          />
-          {faceColor && state !== "thinking" ? (
-            <StellaFace
-              size={size}
-              color={faceColor}
-              state={state}
-              active={running && appVisible && !reduceMotion}
-            />
-          ) : null}
-        </Animated.View>
-        <Animated.View style={[dotBox, middleStyle]}>
-          <MarkLayer
-            d={STELLA_ORB_PATH}
-            size={dotPx}
-            gradientId={`${uid}-orb`}
-          />
-        </Animated.View>
+      <Animated.View style={[sideDotBox, leftStyle]}>
+        <MarkLayer
+          d={STELLA_ORB_PATH}
+          size={sideDotPx}
+          gradientId={`${uid}-left`}
+          inkFrom={INK_FROM}
+          inkTo={INK_TO}
+        />
+      </Animated.View>
+      <Animated.View style={[sideDotBox, rightStyle]}>
+        <MarkLayer
+          d={STELLA_ORB_PATH}
+          size={sideDotPx}
+          gradientId={`${uid}-right`}
+          inkFrom={INK_FROM}
+          inkTo={INK_TO}
+        />
+      </Animated.View>
+      <Svg
+        pointerEvents="none"
+        width={sparkCanvas.px}
+        height={sparkCanvas.px}
+        viewBox={sparkCanvas.viewBox}
+        style={sparkCanvas.style}
+      >
+        {[0, 1, 2, 3, 4].map((index) => (
+          <SparkPath key={index} index={index} sparks={sparks} />
+        ))}
+      </Svg>
+      <Animated.View style={[styles.layer, bodyStyle]}>
+        <Svg
+          pointerEvents="none"
+          width={size}
+          height={size}
+          viewBox={STELLA_MARK_VIEWBOX}
+          style={StyleSheet.absoluteFill}
+        >
+          <Defs>
+            <LinearGradient
+              id={inkId}
+              x1={C}
+              y1={INK_FROM}
+              x2={C}
+              y2={INK_TO}
+              gradientUnits="userSpaceOnUse"
+            >
+              {INK_STOPS.map(([color, offset]) => (
+                <Stop key={offset} offset={offset} stopColor={color} />
+              ))}
+            </LinearGradient>
+            <RadialGradient
+              id={coreId}
+              cx={C}
+              cy={C}
+              fx={C}
+              fy={C}
+              r={C * 0.92}
+              gradientUnits="userSpaceOnUse"
+            >
+              <Stop offset={0} stopColor="#ffffff" stopOpacity={0.26} />
+              <Stop offset={0.32} stopColor="#ffffff" stopOpacity={0.09} />
+              <Stop offset={1} stopColor="#ffffff" stopOpacity={0} />
+            </RadialGradient>
+            <ClipPath id={clipId}>
+              <AnimatedPath animatedProps={clipProps} />
+            </ClipPath>
+          </Defs>
+          <AnimatedG animatedProps={matrixProps}>
+            <AnimatedPath animatedProps={bodyProps} fill={`url(#${inkId})`} />
+            <AnimatedPath animatedProps={coreProps} fill={`url(#${coreId})`} />
+            {faceColor ? (
+              <G clipPath={`url(#${clipId})`}>
+                <AnimatedPath animatedProps={eyeLProps} fill={faceColor} />
+                <AnimatedPath animatedProps={eyeRProps} fill={faceColor} />
+              </G>
+            ) : null}
+          </AnimatedG>
+        </Svg>
       </Animated.View>
     </View>
   );
@@ -404,15 +385,5 @@ export function StellaMarkIndicator({
 
 const styles = StyleSheet.create({
   layer: { ...StyleSheet.absoluteFill },
-  orbitMark: {
-    height: ORBIT_MARK_SIZE,
-    left: "50%",
-    marginLeft: -ORBIT_MARK_SIZE / 2,
-    marginTop: -ORBIT_MARK_SIZE / 2,
-    position: "absolute",
-    top: "50%",
-    width: ORBIT_MARK_SIZE,
-  },
-  stage: { ...StyleSheet.absoluteFill },
   viewport: { alignItems: "center", justifyContent: "center" },
 });

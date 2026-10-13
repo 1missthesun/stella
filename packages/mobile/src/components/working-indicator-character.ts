@@ -51,13 +51,19 @@ export function pickWorkingIndicatorToolPose(
  * With a `seed`, a running tool's pose is dealt from the whole repertoire
  * instead, so a turn full of `code` calls still moves through every pose.
  */
-export function getWorkingIndicatorCharacterState(
-  toolName?: string,
-  seed?: string,
-  avoid?: WorkingIndicatorCharacterState,
-): WorkingIndicatorCharacterState {
+export function getWorkingIndicatorCharacterState({
+  toolName,
+  isReasoning,
+  seed,
+  avoid,
+}: {
+  toolName?: string;
+  isReasoning?: boolean;
+  seed?: string;
+  avoid?: WorkingIndicatorCharacterState;
+}): WorkingIndicatorCharacterState {
   const tool = toolName?.trim().toLowerCase() ?? "";
-  if (!tool) return "thinking";
+  if (!tool) return isReasoning ? "thinking" : "working";
   if (seed !== undefined) return pickWorkingIndicatorToolPose(seed, avoid);
   if (/search|web/.test(tool)) return "searching";
   if (/read|fetch/.test(tool)) return "reading";

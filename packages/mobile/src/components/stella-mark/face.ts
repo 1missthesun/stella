@@ -21,10 +21,15 @@ export const EYE_N = 32;
 export const FACE = { dx: -1.14, dy: 0.86, rx: 70.705, ry: 70.705 };
 
 /** Superellipse eye: `n` controls how square the corners read. */
-const pill = (w: number, h: number, n = 4): number[][] => {
-  const pts: number[][] = new Array(EYE_N);
-  for (let i = 0; i < EYE_N; i++) {
-    const a = (i / EYE_N) * TAU;
+const pill = (
+  count: number,
+  w: number,
+  h: number,
+  n = 4,
+): number[][] => {
+  const pts: number[][] = new Array(count);
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * TAU;
     const ca = Math.cos(a);
     const sa = Math.sin(a);
     const k = Math.pow(
@@ -36,10 +41,16 @@ const pill = (w: number, h: number, n = 4): number[][] => {
   return pts;
 };
 
-const starEye = (w: number, h: number, spikes = 5, inner = 0.44): number[][] => {
-  const pts: number[][] = new Array(EYE_N);
-  for (let i = 0; i < EYE_N; i++) {
-    const a = (i / EYE_N) * TAU;
+const starEye = (
+  count: number,
+  w: number,
+  h: number,
+  spikes = 5,
+  inner = 0.44,
+): number[][] => {
+  const pts: number[][] = new Array(count);
+  for (let i = 0; i < count; i++) {
+    const a = (i / count) * TAU;
     const phase = ((a + Math.PI / 2) * spikes) % TAU;
     const tri = Math.abs((((phase / TAU) * 2) % 2) - 1);
     const r = 1 - (1 - inner) * Math.pow(tri, 0.65);
@@ -62,18 +73,25 @@ const warp = (
   });
 };
 
-export const EYE_POSES = {
-  neutral: pill(0.6, 1.0, 4.0),
-  open: pill(0.66, 1.0, 3.4),
-  wide: warp(pill(0.8, 1.0, 3.0), { squash: 1.04 }),
-  focus: pill(0.46, 1.0, 4.8),
-  happy: warp(pill(0.74, 1.0, 4.0), { squash: 0.3, bend: 0.52 }),
-  squint: warp(pill(0.66, 1.0, 4.0), { squash: 0.46, bend: 0.14 }),
-  sleepy: warp(pill(0.62, 1.0, 4.0), { squash: 0.26, bend: -0.16 }),
-  sad: warp(pill(0.58, 1.0, 4.0), { squash: 0.66, bend: -0.3, shift: 0.06 }),
-  curious: warp(pill(0.72, 1.0, 2.6), { squash: 0.96 }),
-  star: starEye(1.02, 1.06),
-} satisfies Record<string, number[][]>;
+export const buildEyePoses = (count: number) =>
+  ({
+    neutral: pill(count, 0.6, 1.0, 4.0),
+    open: pill(count, 0.66, 1.0, 3.4),
+    wide: warp(pill(count, 0.8, 1.0, 3.0), { squash: 1.04 }),
+    focus: pill(count, 0.46, 1.0, 4.8),
+    happy: warp(pill(count, 0.74, 1.0, 4.0), { squash: 0.3, bend: 0.52 }),
+    squint: warp(pill(count, 0.66, 1.0, 4.0), { squash: 0.46, bend: 0.14 }),
+    sleepy: warp(pill(count, 0.62, 1.0, 4.0), { squash: 0.26, bend: -0.16 }),
+    sad: warp(pill(count, 0.58, 1.0, 4.0), {
+      squash: 0.66,
+      bend: -0.3,
+      shift: 0.06,
+    }),
+    curious: warp(pill(count, 0.72, 1.0, 2.6), { squash: 0.96 }),
+    star: starEye(count, 1.02, 1.06),
+  }) satisfies Record<string, number[][]>;
+
+export const EYE_POSES = buildEyePoses(EYE_N);
 
 export type EyePoseName = keyof typeof EYE_POSES;
 

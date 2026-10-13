@@ -57,7 +57,7 @@ export function voiceBodyMotion(
   "worklet";
   // The level gain and talk pulse are inlined here rather than called: the iOS
   // worklet serializer has left same-file helper references undefined on the
-  // UI thread (see the note in `toolCharacterMotion`), which takes the app down
+  // UI thread, which takes the app down
   // the first time the rig mounts.
   const clampedEnergy = !Number.isFinite(energy)
     ? 0

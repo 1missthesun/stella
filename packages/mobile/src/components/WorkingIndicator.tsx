@@ -1,8 +1,16 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Easing, StyleSheet, Text, View } from "react-native";
+import Reanimated, {
+  Easing as ReanimatedEasing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { TextShimmer } from "./TextShimmer";
 import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 import { StellaMarkIndicator } from "./stella-mark/StellaMarkIndicator";
+import { enterEase, exitEase } from "./stella-mark/rig-math";
 import {
   computeStillStatus,
   computeWorkingIndicatorStatus,
@@ -18,6 +26,7 @@ import {
   type WorkingIndicatorCharacterState,
 } from "./working-indicator-character";
 import { useMinimumVisibleValue } from "../lib/use-minimum-visible-value";
+import { useAppVisible } from "../lib/use-app-visible";
 import { useReplyHandoffController } from "./reply-handoff";
 import { type Colors } from "../theme/colors";
 import { useColors } from "../theme/theme-context";
@@ -26,11 +35,15 @@ import { fonts } from "../theme/fonts";
 const ENTER_DURATION_MS = 320;
 const ENTER_DELAY_MS = 300;
 const EXIT_HOLD_MS = 300;
-const EXIT_ANIMATION_MS = 480;
+const EXIT_ANIMATION_MS = 220;
+const EXIT_UNMOUNT_MS = 240;
 /** The assistant's message has already landed above the indicator, so the
  *  bubble has to be gone almost at once: a lingering indicator under a finished
  *  reply reads as a bug. Matches the desktop handoff. */
-const EXIT_HANDOFF_MS = 200;
+const EXIT_HANDOFF_MS = 240;
+const SHELL_ENTER = 0;
+const SHELL_EXIT = 1;
+const SHELL_HANDOFF = 2;
 const SWAP_DURATION_MS = 240;
 const STATUS_MIN_VISIBLE_MS = 2000;
 const INDICATOR_PAD_TOP = 0;
@@ -251,15 +264,16 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   // One pose per rotation window of a tool call, dealt from the whole
   // repertoire rather than read off the tool's name; a long call moves on to
   // another pose every window and never repeats the one it just left.
+  const appVisible = useAppVisible();
   const [poseEpoch, setPoseEpoch] = useState(0);
   useEffect(() => {
-    if (!active) return;
+    if (!active || !appVisible) return;
     const timer = setInterval(
       () => setPoseEpoch((epoch) => epoch + 1),
       WORKING_INDICATOR_POSE_ROTATE_MS,
     );
     return () => clearInterval(timer);
-  }, [active]);
+  }, [active, appVisible]);
   const previousPoseRef = useRef<WorkingIndicatorCharacterState | undefined>(
     undefined,
   );
@@ -286,18 +300,20 @@ export const WorkingIndicator = memo(function WorkingIndicator({
       : toolStatus;
   const liveDisplay = useMemo(() => {
     const seed = `${toolCallId ?? reasoningSeed}:${poseEpoch}`;
-    const pose = getWorkingIndicatorCharacterState(
+    const pose = getWorkingIndicatorCharacterState({
       toolName,
+      isReasoning: !toolName,
       seed,
-      previousPoseRef.current,
-    );
+      avoid: previousPoseRef.current,
+    });
+    const label = shownToolStatus || thinkingText;
     return {
-      status: shownToolStatus || thinkingText,
+      status: label,
       thinking: !toolStatus,
       // The dots stand alone. Thinking that has lasted long enough to be
       // named shows its label beside a full pose, as a tool does.
       characterState:
-        pose === "thinking" && thinkingText
+        pose === "thinking" && label
           ? pickWorkingIndicatorToolPose(seed, previousPoseRef.current)
           : pose,
     };
@@ -335,14 +351,15 @@ export const WorkingIndicator = memo(function WorkingIndicator({
   // With no label there is nothing to read, so the mark itself carries the
   // state as the thinking ellipsis. A label gets a full character pose.
   const hasLabel = displayStatus.length > 0;
-  const characterState: WorkingIndicatorCharacterState =
-    hasLabel
-      ? display.characterState === "thinking"
-        ? "working"
-        : display.characterState
-      : "thinking";
+  const characterState: WorkingIndicatorCharacterState = hasLabel
+    ? display.characterState
+    : "thinking";
   const [renderShell, setRenderShell] = useState(false);
-  const shellProgress = useRef(new Animated.Value(0)).current;
+  const [shellMode, setShellMode] = useState(SHELL_ENTER);
+  const shellT = useSharedValue(0);
+  const shellModeSV = useSharedValue(SHELL_ENTER);
+  const enteredRef = useRef(false);
+  const leavingRef = useRef(false);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderShellRef = useRef(renderShell);
@@ -362,12 +379,14 @@ export const WorkingIndicator = memo(function WorkingIndicator({
           clearTimeout(leaveTimerRef.current);
           leaveTimerRef.current = null;
         }
-        shellProgress.stopAnimation();
-        shellProgress.setValue(0);
+        cancelAnimation(shellT);
+        shellT.value = 0;
+        enteredRef.current = false;
+        leavingRef.current = false;
         setRenderShell(false);
       },
     });
-  }, [handoffController, shellProgress]);
+  }, [handoffController, shellT]);
 
   useEffect(() => {
     const clearTimers = () => {
@@ -394,31 +413,48 @@ export const WorkingIndicator = memo(function WorkingIndicator({
       if (!wasActiveRef.current) setReasoningSeed(String(Date.now()));
       wasActiveRef.current = true;
       setRenderShell(true);
-      Animated.timing(shellProgress, {
-        toValue: 1,
-        duration: ENTER_DURATION_MS,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+      if (leavingRef.current) {
+        leavingRef.current = false;
+        cancelAnimation(shellT);
+        shellModeSV.value = SHELL_ENTER;
+        shellT.value = 1;
+        setShellMode(SHELL_ENTER);
+      } else if (!enteredRef.current) {
+        enteredRef.current = true;
+        shellModeSV.value = SHELL_ENTER;
+        setShellMode(SHELL_ENTER);
+        shellT.value = 0;
+        shellT.value = withTiming(1, {
+          duration: ENTER_DURATION_MS,
+          easing: ReanimatedEasing.linear,
+        });
+      }
       return clearTimers;
     }
 
     wasActiveRef.current = false;
     if (!renderShell) return clearTimers;
 
+    const mode = exitImmediately ? SHELL_HANDOFF : SHELL_EXIT;
     const exitMs = exitImmediately ? EXIT_HANDOFF_MS : EXIT_ANIMATION_MS;
+    const unmountMs = exitImmediately ? EXIT_HANDOFF_MS : EXIT_UNMOUNT_MS;
     const startExit = () => {
       holdTimerRef.current = null;
-      Animated.timing(shellProgress, {
-        toValue: 0,
+      leavingRef.current = true;
+      cancelAnimation(shellT);
+      shellModeSV.value = mode;
+      setShellMode(mode);
+      shellT.value = 0;
+      shellT.value = withTiming(1, {
         duration: exitMs,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
+        easing: ReanimatedEasing.linear,
+      });
       leaveTimerRef.current = setTimeout(() => {
         leaveTimerRef.current = null;
+        enteredRef.current = false;
+        leavingRef.current = false;
         setRenderShell(false);
-      }, exitMs);
+      }, unmountMs);
     };
 
     // Skip the hold when the answer has landed so the indicator doesn't trail
@@ -431,12 +467,36 @@ export const WorkingIndicator = memo(function WorkingIndicator({
     }
 
     return clearTimers;
-  }, [active, exitImmediately, renderShell, shellProgress]);
+  }, [active, exitImmediately, renderShell, shellModeSV, shellT]);
 
-  const shellStyle = useMemo(
-    () => ({ opacity: shellProgress }),
-    [shellProgress],
-  );
+  const shellStyle = useAnimatedStyle(() => {
+    const t = shellT.value;
+    const mode = shellModeSV.value;
+    if (mode === SHELL_ENTER) {
+      const e = enterEase(t);
+      return {
+        opacity: e,
+        transform: [{ translateY: 4 * (1 - e) }, { scale: 0.96 + 0.04 * e }],
+      };
+    }
+    const e = exitEase(t);
+    if (mode === SHELL_EXIT) {
+      return {
+        opacity: 1 - exitEase(Math.min(t / 0.6, 1)),
+        transform: [{ translateY: -3 * e }, { scale: 1 - 0.06 * e }],
+      };
+    }
+    return {
+      opacity: 1 - e,
+      transform: [{ translateY: -5 * e }, { scale: 1 - 0.03 * e }],
+    };
+  });
+  const originStyle =
+    shellMode === SHELL_EXIT
+      ? styles.originLeftTop
+      : shellMode === SHELL_HANDOFF
+        ? styles.originLeftCenter
+        : null;
 
   const showShell = renderShell && (active || !exitImmediately);
 
@@ -446,16 +506,14 @@ export const WorkingIndicator = memo(function WorkingIndicator({
       pointerEvents="none"
     >
       {showShell ? (
-        <Animated.View style={[styles.row, shellStyle]} collapsable={false}>
+        <Reanimated.View
+          style={[styles.row, originStyle, shellStyle]}
+          collapsable={false}
+        >
           <View style={[styles.bubble, !hasLabel && styles.bubbleDots]}>
             <View style={styles.markBox}>
-              {
-                // Kept active for as long as the shell is mounted: dropping it
-                // on the exit would run the dots → star morph backwards in full
-                // view while the bubble fades out.
-              }
               <StellaMarkIndicator
-                active
+                active={active && onScreen}
                 size={INDICATOR_VIEWPORT_SIZE}
                 state={characterState}
                 faceColor={colors.card}
@@ -470,7 +528,7 @@ export const WorkingIndicator = memo(function WorkingIndicator({
               />
             ) : null}
           </View>
-        </Animated.View>
+        </Reanimated.View>
       ) : null}
     </View>
   );
@@ -516,6 +574,12 @@ const makeStyles = (colors: Colors) =>
       maxWidth: "100%",
       paddingHorizontal: 13,
       paddingVertical: BUBBLE_PAD_VERTICAL,
+    },
+    originLeftTop: {
+      transformOrigin: "left top",
+    },
+    originLeftCenter: {
+      transformOrigin: "left center",
     },
     bubbleDots: {
       paddingHorizontal: 8,

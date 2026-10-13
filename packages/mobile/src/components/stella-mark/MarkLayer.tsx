@@ -22,10 +22,14 @@ export function MarkLayer({
   d,
   size,
   gradientId,
+  inkFrom = VIEWBOX_MIN + VIEWBOX_SPAN,
+  inkTo = VIEWBOX_MIN,
 }: {
   d: string;
   size: number;
   gradientId: string;
+  inkFrom?: number;
+  inkTo?: number;
 }) {
   return (
     <Svg
@@ -39,9 +43,9 @@ export function MarkLayer({
         <LinearGradient
           id={gradientId}
           x1={STELLA_MARK_CENTER}
-          y1={VIEWBOX_MIN + VIEWBOX_SPAN}
+          y1={inkFrom}
           x2={STELLA_MARK_CENTER}
-          y2={VIEWBOX_MIN}
+          y2={inkTo}
           gradientUnits="userSpaceOnUse"
         >
           <Stop offset={0} stopColor="#00aad8" />

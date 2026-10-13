@@ -16,14 +16,17 @@
  *   claude --stream-json--> executor --> BuildSession --events--> here --> pi
  */
 import { claudeUsageLimitOf } from "@stella/contracts/claude-usage-limit";
-import type {
-  ClaudeCodeSessionRef,
-  ClaudeCodeToolOutcome,
-  ClaudeCodeTransport,
-  ClaudeCodeTurnSpec,
+import {
+  CLAUDE_CODE_SESSION_LOST,
+  type ClaudeCodeSessionRef,
+  type ClaudeCodeToolOutcome,
+  type ClaudeCodeTransport,
+  type ClaudeCodeTurnSpec,
 } from "@stella/agent/engine/claude-code";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
+  CLOUD_CLI_SESSION_LOST_MARK,
+  orchestratorCliCompactThreadId,
   orchestratorCliThreadId,
   type CloudCliAssistantMessage,
   type CloudCliTurnEventsForward,
@@ -41,6 +44,7 @@ import {
   sameCliTurnIdentity,
   type BuildSessionEnv,
 } from "../orchestrator-cli-turn.js";
+import { isSlackConversationId } from "../slack/conversation-id.js";
 
 /** The chat turn a Claude Code turn runs for. */
 export type CloudClaudeCodeTurn = {
@@ -61,14 +65,23 @@ export type CloudClaudeCodeHost = {
   nextAttempt(): Promise<number>;
   /** A session another host ran for this conversation and synced, for one that has none here. */
   adoption(turn: CloudClaudeCodeTurn): Promise<CloudOrchestratorCliAdoptedSession | null>;
+  /** Leave a session written from the journal where the BuildSession takes it (`claudeHydratedSessionKey`). */
+  stageSession(turn: CloudClaudeCodeTurn, sessionId: string, transcript: string): Promise<void>;
+  /** What the CLI last reported about its models, kept across evictions. */
+  models: { read(): Promise<CloudClaudeCodeModels | undefined>; write(models: CloudClaudeCodeModels): Promise<void> };
   sleep(ms: number, signal: AbortSignal): Promise<void>;
   log(event: string, fields: Record<string, unknown>): void;
 };
+
+/** The model each alias runs on, and each model's context window, as the CLI reported them. */
+export type CloudClaudeCodeModels = { resolved: Record<string, string>; windows: Record<string, number> };
 
 type Attempt = {
   identity: CloudCliTurnIdentity;
   turn: CloudClaudeCodeTurn;
   spec: ClaudeCodeTurnSpec;
+  /** It resumed a session another host synced. */
+  adopted: boolean;
   appliedBatchSeq: number;
   /** Tool calls by the CLI's tool_use id, with the arguments they came with. */
   calls: Map<string, { args: string; outcome: Promise<ClaudeCodeToolOutcome> }>;
@@ -101,6 +114,7 @@ const streamEventsOf = (message: CloudCliAssistantMessage): Record<string, unkno
     event({
       type: "message_start",
       message: {
+        model: message.model,
         usage: {
           input_tokens: message.usage.input,
           cache_read_input_tokens: message.usage.cacheRead,
@@ -115,6 +129,10 @@ const streamEventsOf = (message: CloudCliAssistantMessage): Record<string, unkno
       events.push(
         event({ type: "content_block_start", index, content_block: { type: "text", text: "" } }),
         event({ type: "content_block_delta", index, delta: { type: "text_delta", text: part.text } }),
+      );
+    } else if (part.type === "thinking" && part.redacted) {
+      events.push(
+        event({ type: "content_block_start", index, content_block: { type: "redacted_thinking", data: part.thinkingSignature ?? "" } }),
       );
     } else if (part.type === "thinking") {
       events.push(
@@ -167,6 +185,8 @@ export type CloudClaudeCodeTransport = ClaudeCodeTransport & {
   events(forward: CloudCliTurnEventsForward): FrameAnswer;
   /** `CLOUD_CLI_TURN_DO_PATHS.terminal`. */
   terminal(terminal: CloudCliTurnTerminal): FrameAnswer;
+  resolvedModel(alias: string): string | undefined;
+  contextWindow(model: string): number | undefined;
   /** The user-safe reason the chat turn's last Claude Code turn failed, once. */
   takeFailure(turnId: string): string | undefined;
 };
@@ -176,6 +196,24 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
   const failures = new Map<string, string>();
   /** A synced session to resume on the next dispatch, by conversation. */
   const adopting = new Map<string, CloudOrchestratorCliAdoptedSession>();
+  /** Conversations whose synced session the container could not resume: they start from the journal. */
+  const adoptionFailed = new Set<string>();
+  /** A session written from the journal for the next dispatch of a CLI session, by its key. */
+  const hydrated = new Map<string, string>();
+  let models: CloudClaudeCodeModels = { resolved: {}, windows: {} };
+  void host.models
+    .read()
+    .then((saved) => {
+      if (saved) models = { resolved: { ...saved.resolved, ...models.resolved }, windows: { ...saved.windows, ...models.windows } };
+    })
+    .catch(() => undefined);
+  const noteModels = (event: { alias?: string; resolved?: string; windows?: Record<string, number> }) => {
+    const resolved = event.alias && event.resolved ? { ...models.resolved, [event.alias]: event.resolved } : models.resolved;
+    const windows = event.windows ? { ...models.windows, ...event.windows } : models.windows;
+    if (JSON.stringify({ resolved, windows }) === JSON.stringify(models)) return;
+    models = { resolved, windows };
+    void host.models.write(models).catch(() => undefined);
+  };
 
   const settle = (attempt: Attempt, outcome: { ok: true; text: string } | { ok: false; error: Error }) => {
     if (attempt.finished) return;
@@ -207,15 +245,19 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
     const attemptGeneration = await host.nextAttempt();
     const identity: CloudCliTurnIdentity = {
       conversationId: turn.conversationId,
-      threadId: orchestratorCliThreadId(turn.conversationId),
+      threadId: spec.compact ? orchestratorCliCompactThreadId(turn.conversationId) : orchestratorCliThreadId(turn.conversationId),
       turnId: `${turn.turnId}.cc${attemptGeneration}`,
       attemptGeneration,
     };
+    const staged = hydrated.get(spec.session.sessionKey);
+    const hydrateSession = staged !== undefined && staged === spec.resumeSessionId ? staged : undefined;
+    const adoptSession = spec.compact || hydrateSession ? undefined : adopting.get(turn.conversationId);
     const result = new Promise<{ text: string; sessionId: string }>((resolve, reject) => {
       attempts.set(attemptKey(identity), {
         identity,
         turn,
         spec,
+        adopted: adoptSession !== undefined,
         appliedBatchSeq: 0,
         calls: new Map(),
         resolve,
@@ -234,7 +276,10 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
       onAbort();
       return await result;
     }
-    const adoptSession = adopting.get(turn.conversationId);
+    const startFresh = !spec.resumeSessionId && !adoptSession && !hydrateSession;
+    // Only the user's own message runs as one of the CLI's commands; in a
+    // Slack conversation it comes from whoever wrote in the channel.
+    const prompt = isSlackConversationId(turn.conversationId) && spec.prompt.startsWith("/") ? ` ${spec.prompt}` : spec.prompt;
     const started = performance.now();
     try {
       for (let busy = 0; ; busy += 1) {
@@ -246,16 +291,22 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
             audience: turn.audience,
             budgetMicroCents: turn.budgetMicroCents,
             identity,
-            execution: turn.execution,
-            prompt: spec.prompt,
+            // A `/compact` runs on the outgoing model: the one the turn moves to may not hold the history.
+            execution: spec.compact ? { ...turn.execution, model: spec.model } : turn.execution,
+            prompt,
             spec: {
-              systemPrompt: spec.systemPrompt,
-              toolCatalog: spec.tools.map((tool) => ({
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.parameters,
-              })),
+              systemPrompt: spec.compact ? "" : spec.systemPrompt,
+              toolCatalog: spec.compact
+                ? []
+                : spec.tools.map((tool) => ({
+                    name: tool.name,
+                    description: tool.description,
+                    parameters: tool.parameters,
+                  })),
               ...(adoptSession ? { adoptSession } : {}),
+              ...(hydrateSession ? { hydrateSession } : {}),
+              ...(startFresh ? { startFresh: true as const } : {}),
+              ...(spec.compact ? { compact: true as const } : {}),
               ...(spec.quiet ? { quiet: true } : {}),
             },
             signal: spec.signal,
@@ -271,13 +322,18 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
       return await result;
     }
     if (adoptSession) adopting.delete(turn.conversationId);
-    spec.onSessionId(identity.threadId);
+    if (hydrateSession) hydrated.delete(spec.session.sessionKey);
+    if (!spec.session.ephemeral) spec.onSessionId(identity.threadId);
     host.log("claude_code_attempt_dispatched", {
       turnId: turn.turnId,
       attemptGeneration,
+      threadId: identity.threadId,
       promptChars: spec.prompt.length,
       tools: spec.tools.length,
       adopted: Boolean(adoptSession),
+      hydrated: Boolean(hydrateSession),
+      startFresh,
+      compact: Boolean(spec.compact),
       dispatchMs: Math.round(performance.now() - started),
     });
     return await result;
@@ -285,13 +341,37 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
 
   const resume: NonNullable<ClaudeCodeTransport["resume"]> = async (session: ClaudeCodeSessionRef, args) => {
     if (args.held) return { sessionId: args.held };
-    if (session.role !== "orchestrator") return {};
+    if (session.role !== "orchestrator" || session.ephemeral) return {};
     const turn = await host.turn(AbortSignal.timeout(60_000));
+    if (adoptionFailed.has(turn.conversationId)) return {};
     const adoption = await host.adoption(turn).catch(() => null);
     if (!adoption) return {};
     adopting.set(turn.conversationId, adoption);
     host.log("claude_code_session_adopted", { turnId: turn.turnId, deviceId: adoption.deviceId });
     return { sessionId: adoption.sessionId, restored: true };
+  };
+
+  /**
+   * The CLI resumes a session written from the conversation's journal, as on
+   * a computer: the BuildSession puts it in the container in place of
+   * whatever session the thread had.
+   */
+  const hydrate: NonNullable<ClaudeCodeTransport["hydrate"]> = async (session, transcript) => {
+    if (session.role !== "orchestrator") {
+      throw new Error("In the cloud, Claude Code runs only Stella's own turns; her agents run in containers of their own.");
+    }
+    const turn = await host.turn(AbortSignal.timeout(60_000));
+    const sessionId = crypto.randomUUID();
+    const text = transcript({ sessionId, cwd: "/", version: "unknown" });
+    await host.stageSession(turn, sessionId, text);
+    hydrated.set(session.sessionKey, sessionId);
+    host.log("claude_code_session_hydrated", {
+      turnId: turn.turnId,
+      sessionId,
+      bytes: text.length,
+      compact: Boolean(session.ephemeral),
+    });
+    return sessionId;
   };
 
   const find = (identity: CloudCliTurnIdentity): Attempt | undefined => {
@@ -302,6 +382,12 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
   return {
     runTurn,
     resume,
+    hydrate,
+    resolvedModel: (alias) => models.resolved[alias],
+    contextWindow: (model) => models.windows[model],
+    close: (session) => {
+      hydrated.delete(session.sessionKey);
+    },
     takeFailure: (turnId) => {
       const failure = failures.get(turnId);
       failures.delete(turnId);
@@ -360,6 +446,8 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
           for (const line of streamEventsOf(event.message)) attempt.spec.onEvent(line);
         } else if (event.type === "status") {
           attempt.spec.onStatus({ state: event.state, text: event.text });
+        } else if (event.type === "models") {
+          noteModels(event);
         } else if (event.type === "compaction") {
           host.log("claude_code_compaction", { turnId: attempt.turn.turnId, summaryChars: event.summary.length });
           attempt.spec.onCompaction({
@@ -393,6 +481,12 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
         settle(attempt, { ok: true, text: terminal.finalText });
       } else if (terminal.outcome === "canceled") {
         settle(attempt, { ok: false, error: new Error("Stopped.") });
+      } else if (terminal.error?.startsWith(CLOUD_CLI_SESSION_LOST_MARK)) {
+        if (attempt.adopted) adoptionFailed.add(attempt.turn.conversationId);
+        host.log("claude_code_session_lost", { turnId: attempt.turn.turnId, detail: terminal.error.slice(0, 500) });
+        const error: Error & { code?: string } = new Error(terminal.error.slice(CLOUD_CLI_SESSION_LOST_MARK.length).trim());
+        error.code = CLAUDE_CODE_SESSION_LOST;
+        settle(attempt, { ok: false, error });
       } else {
         const reason = terminal.error?.trim() || "Claude Code could not finish this turn.";
         failures.set(attempt.turn.turnId, reason);

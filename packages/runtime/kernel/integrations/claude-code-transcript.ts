@@ -9,9 +9,13 @@
  * turn, chained by `parentUuid`. Turns alternate as the Messages API needs
  * them: the results of an assistant's tool calls open the next user turn,
  * and a call whose result was never recorded is answered as such.
+ *
+ * Thinking stays, signature and all, on the turns `keepsThinking` names: the
+ * ones the model resuming the session wrote itself, whose signatures it
+ * accepts. Any other model's thinking is left out.
  */
 import { createHash, randomUUID } from "node:crypto";
-import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
+import type { AssistantMessage, ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 
 export type ClaudeCodeTranscriptMeta = { sessionId: string; cwd: string; version: string };
 
@@ -42,7 +46,11 @@ const blocksOf = (content: string | readonly (TextContent | ImageContent)[]): Bl
       );
 
 /** `messages` as API turns: alternating, tool results first in the turn after their calls. */
-const turnsOf = (messages: readonly Message[], name: (tool: string) => string): Turn[] => {
+const turnsOf = (
+  messages: readonly Message[],
+  name: (tool: string) => string,
+  keepsThinking: (message: AssistantMessage) => boolean,
+): Turn[] => {
   const turns: Turn[] = [];
   let pending = new Set<string>();
   const userTurn = (): Turn => {
@@ -87,7 +95,17 @@ const turnsOf = (messages: readonly Message[], name: (tool: string) => string): 
       case "assistant": {
         settle();
         const blocks: Block[] = [];
+        const last = turns.at(-1);
+        const merged = last?.role === "assistant";
+        const thinking = !merged && keepsThinking(message);
         for (const part of message.content) {
+          if (part.type === "thinking" && thinking && part.thinkingSignature) {
+            blocks.push(
+              part.redacted
+                ? { type: "redacted_thinking", data: part.thinkingSignature }
+                : { type: "thinking", thinking: part.thinking, signature: part.thinkingSignature },
+            );
+          }
           if (part.type === "text" && part.text.trim()) blocks.push({ type: "text", text: part.text });
           if (part.type === "toolCall") {
             const id = toolId(part.id);
@@ -95,10 +113,9 @@ const turnsOf = (messages: readonly Message[], name: (tool: string) => string): 
             blocks.push({ type: "tool_use", id, name: name(part.name), input: part.arguments ?? {} });
           }
         }
-        if (blocks.length === 0) break;
-        const last = turns.at(-1);
-        if (last?.role === "assistant") last.content.push(...blocks);
-        else turns.push({ role: "assistant", results: [], content: blocks, model: message.model });
+        if (!blocks.some((block) => block.type !== "thinking" && block.type !== "redacted_thinking")) break;
+        if (merged) last.content.push(...blocks);
+        else turns.push({ role: "assistant", results: [], content: blocks, model: message.responseModel || message.model });
         break;
       }
     }
@@ -108,16 +125,20 @@ const turnsOf = (messages: readonly Message[], name: (tool: string) => string): 
   return turns;
 };
 
-/** The session `.jsonl` for `messages`; `toolName` gives each Stella tool the name the CLI knows it by. */
+/**
+ * The session `.jsonl` for `messages`; `toolName` gives each Stella tool the
+ * name the CLI knows it by, and `keepsThinking` which turns keep their thinking.
+ */
 export const claudeCodeTranscript = (
   messages: readonly Message[],
   meta: ClaudeCodeTranscriptMeta,
   toolNameOf: (tool: string) => string,
+  keepsThinking: (message: AssistantMessage) => boolean = () => false,
 ): string => {
   const timestamp = new Date().toISOString();
   let parentUuid: string | null = null;
   const lines: string[] = [];
-  turnsOf(messages, (tool) => toolName(toolNameOf(tool))).forEach((turn, index) => {
+  turnsOf(messages, (tool) => toolName(toolNameOf(tool)), keepsThinking).forEach((turn, index) => {
     const uuid = randomUUID();
     const content = [...turn.results, ...turn.content];
     const message =

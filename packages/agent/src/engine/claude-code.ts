@@ -46,12 +46,14 @@ import type { ClaudeCodeCompaction } from "@stella/runtime/kernel/integrations/c
 import { fitCodeDescriptionForClaudeCode } from "@stella/runtime/kernel/tools/code-catalog";
 import { StellaAgentDoc } from "../stella/agent-doc.ts";
 import { residentContextAsOf, residentContextKind, withResidentContext } from "../stella/resident-context.ts";
-import { claudeCodeTranscript, type ClaudeCodeTranscriptMeta } from "./claude-code-transcript.ts";
+import { claudeCodeTranscript, type ClaudeCodeTranscriptMeta } from "@stella/runtime/kernel/integrations/claude-code-transcript";
 import { isPiCompactionBoundary } from "../stella/handover.ts";
 import { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID } from "./selection.ts";
 
 export { CLAUDE_CODE_ENGINE_EXTENSION, CLAUDE_CODE_PROVIDER_ID, engineExtensionChange } from "./selection.ts";
 export const CLAUDE_CODE_API = "claude-code-cli";
+/** What a cloud agent's Claude Code CLI records its messages under. */
+const CLOUD_CLAUDE_CODE_API = "claude-code";
 
 export const CLAUDE_CODE_BUILTIN_TOOLS = ["Read", "Edit", "Write", "Bash", "Grep", "Glob"] as const;
 const ENGINE_ONLY_TOOLS = ["Grep", "Glob"] as const;
@@ -215,6 +217,8 @@ type Turn = {
   nextToolSet?: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
   /** Tool results the CLI's ended step never read; the next step is told them. */
   carried?: Message[];
+  /** Started again because the session it resumed was gone. */
+  relaunched?: true;
 };
 
 type TurnRequest = {
@@ -426,6 +430,37 @@ const hydratedPrompt = (users: readonly Message[]): { text: string; images: Imag
   const request = userPrompt(users);
   return { text: request.text || "Continue from where the conversation left off.", images: request.images };
 };
+
+/**
+ * Which turns keep their thinking in a session written for `alias`: Claude
+ * Code's own, on the model the alias runs now, whose signatures that model
+ * verifies. Another engine's or another model's thinking is left out.
+ */
+const thinkingOn = (messages: readonly Message[], alias: string, resolved: string | undefined) => {
+  const claudeCode = (message: AssistantMessage) =>
+    message.provider === CLAUDE_CODE_PROVIDER_ID || message.api === CLAUDE_CODE_API || message.api === CLOUD_CLAUDE_CODE_API;
+  const current =
+    resolved ??
+    messages.findLast(
+      (message): message is AssistantMessage =>
+        message.role === "assistant" && claudeCode(message) && message.model === alias && Boolean(message.responseModel),
+    )?.responseModel;
+  return (message: AssistantMessage): boolean =>
+    claudeCode(message) && (current && message.responseModel ? message.responseModel === current : message.model === alias);
+};
+
+/**
+ * The CLI runs a prompt that opens with `/` as one of its commands. Only the
+ * user's own message may do that; anything else (an agent's report, a wake,
+ * a carried update) is read as text.
+ */
+const commandSafe = (text: string, from: readonly Message[]): string =>
+  text.startsWith("/") && !(from.length > 0 && from.every(userWrote)) ? ` ${text}` : text;
+
+/** The CLI session this conversation resumed is gone where it runs: it starts again from the conversation. */
+export const CLAUDE_CODE_SESSION_LOST = "CLAUDE_CODE_SESSION_LOST";
+
+const sessionLost = (error: unknown): boolean => (error as { code?: unknown } | undefined)?.code === CLAUDE_CODE_SESSION_LOST;
 
 /** The name the CLI knows a Stella tool by: its own built-in, or one of Stella's over MCP. */
 const cliToolName =
@@ -760,6 +795,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
   const startTurn = async (
     session: Session,
     request: TurnRequest,
+    relaunched = false,
   ): Promise<Turn> => {
     const binding = session.binding;
     await options.transport.preflight?.(binding.session);
@@ -843,7 +879,14 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const hydrated =
       !steering && !delta && promptAt > 0 && options.transport.hydrate
         ? await options.transport
-            .hydrate(binding.session, (meta) => claudeCodeTranscript(conversation.slice(0, promptAt), meta, cliToolName(binding)))
+            .hydrate(binding.session, (meta) =>
+              claudeCodeTranscript(
+                conversation.slice(0, promptAt),
+                meta,
+                cliToolName(binding),
+                thinkingOn(conversation, request.model.id, options.resolveModel?.(request.model.id)),
+              ),
+            )
             .catch((error: unknown) => {
               report(error);
               return undefined;
@@ -867,10 +910,12 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
           : rebuild;
     if (hydrated) carried.length = 0;
     const before = userPrompt(carried);
-    const prompt =
+    const joined =
       carried.length > 0
         ? { text: [before.text, asked.text].filter(Boolean).join("\n\n"), images: [...before.images, ...asked.images] }
         : asked;
+    const opening = [...carried, ...(steering ? (request.steered ?? []) : trailingUsers(delta ?? conversation).users)];
+    const prompt = { ...joined, text: commandSafe(joined.text, opening) };
     const abort = new AbortController();
     let settle = () => {};
     const settled = new Promise<void>((resolve) => {
@@ -894,6 +939,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       refused: new Map(),
       gates: new Set(),
       toolSet: { tools: request.tools, nativeTools: request.nativeTools },
+      ...(relaunched ? { relaunched: true as const } : {}),
     };
     session.turn = turn;
     const answered = () => {
@@ -1096,6 +1142,31 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         }
         if (item.kind === "end") {
           const outcome = turn.outcome;
+          const lostRequest = turn.session.request;
+          if (
+            outcome &&
+            !outcome.ok &&
+            sessionLost(outcome.error) &&
+            !turn.relaunched &&
+            lostRequest &&
+            !signal?.aborted &&
+            !turn.abort.signal.aborted &&
+            output.content.length === 0
+          ) {
+            const record = (turn.session.record ??= { seen: [] });
+            turn.session.cliSessionId = undefined;
+            delete record.cliSessionId;
+            delete record.context;
+            record.seen = [];
+            await saveRecord(turn.session);
+            try {
+              turn = await startTurn(turn.session, lostRequest, true);
+            } catch (error) {
+              fail("error", markedError(error));
+              return;
+            }
+            continue;
+          }
           if (!outcome || !outcome.ok) {
             if (signal?.aborted || turn.abort.signal.aborted) fail("aborted", "Stopped.");
             else fail("error", markedError(outcome?.error));
@@ -1132,7 +1203,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
             messageStop = undefined;
             messageTools = 0;
             Object.assign(usage, { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 });
-            addUsage(asRecord(asRecord(source.message)?.usage));
+            const started = asRecord(source.message);
+            addUsage(asRecord(started?.usage));
+            if (typeof started?.model === "string" && started.model) output.responseModel = started.model;
             break;
           }
           case "content_block_start": {
@@ -1297,7 +1370,8 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
         const held = new Set(turn.unsent.map(messageKey));
         const waiting = [...turn.unsent, ...fresh.filter((message) => !held.has(messageKey(message)))];
         if (waiting.length > 0) {
-          const prompt = userPrompt(waiting);
+          const typed = userPrompt(waiting);
+          const prompt = { ...typed, text: commandSafe(typed.text, waiting) };
           const steered = turn;
           const injected =
             !restarted &&

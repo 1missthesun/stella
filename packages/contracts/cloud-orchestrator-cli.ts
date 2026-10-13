@@ -12,7 +12,8 @@
  * pi stays the single source of tools: the executor only advertises the
  * catalog it was handed and forwards every call back, where pi's own tool
  * task answers it. Identity:
- *   - threadId is `orchestratorCliThreadId(conversationId)`;
+ *   - threadId is `orchestratorCliThreadId(conversationId)`, or
+ *     `orchestratorCliCompactThreadId` for a one-off `/compact`;
  *   - turnId is the DO's chat turn id (the dispatch passes it as `turnId`);
  *   - attemptGeneration is the BuildSession attempt for that turn.
  */
@@ -23,6 +24,23 @@ export type CloudCliTurnRole = "agent" | "orchestrator";
 /** BuildSession thread that runs one conversation's orchestrator CLI turns. */
 export const orchestratorCliThreadId = (conversationId: string): string =>
   `orch:${conversationId}`;
+
+/**
+ * BuildSession thread that runs the conversation's one-off `/compact` turns
+ * (handing it to a model with a smaller window), so they never touch the
+ * orchestrator thread's own session.
+ */
+export const orchestratorCliCompactThreadId = (conversationId: string): string =>
+  `orch:${conversationId}:compact`;
+
+export const isOrchestratorCliThreadId = (conversationId: string, threadId: string): boolean =>
+  threadId === orchestratorCliThreadId(conversationId) || threadId === orchestratorCliCompactThreadId(conversationId);
+
+/**
+ * How an orchestrator CLI turn's error opens when the session the DO resumed
+ * is gone from the container: the DO starts it again from the journal.
+ */
+export const CLOUD_CLI_SESSION_LOST_MARK = "[claude-code/session-lost]";
 
 /**
  * One orchestrator tool as the DO's `createTools()` defines it. `parameters`
@@ -57,6 +75,16 @@ export type CloudOrchestratorCliTurnSpec = {
   systemPrompt: string;
   toolCatalog: CloudOrchestratorToolDescriptor[];
   adoptSession?: CloudOrchestratorCliAdoptedSession;
+  /**
+   * A session the DO wrote from the conversation's journal, left in backup
+   * storage (`claudeHydratedSessionKey`): the CLI resumes it instead of
+   * whatever session the thread had.
+   */
+  hydrateSession?: string;
+  /** The DO has no session for the CLI to resume: it starts a new one, whatever the thread had. */
+  startFresh?: true;
+  /** The prompt is the CLI's own `/compact`: stock Claude Code, no system prompt or tools of Stella's. */
+  compact?: true;
   /** No message the user wrote waits for a reply: an empty answer is the turn's reply. */
   quiet?: boolean;
 };
@@ -121,9 +149,10 @@ export const parseCloudOrchestratorCliTurnSpec = (
 ): CloudOrchestratorCliTurnSpec | null => {
   if (!isRecord(value)) return null;
   const { systemPrompt, toolCatalog } = value;
+  const compact = value.compact === true;
   if (
     typeof systemPrompt !== "string" ||
-    !systemPrompt.trim() ||
+    (!compact && !systemPrompt.trim()) ||
     systemPrompt.length > CLOUD_ORCHESTRATOR_SYSTEM_PROMPT_MAX_CHARS ||
     !Array.isArray(toolCatalog) ||
     toolCatalog.length > CLOUD_ORCHESTRATOR_TOOL_CATALOG_MAX_TOOLS
@@ -157,10 +186,17 @@ export const parseCloudOrchestratorCliTurnSpec = (
     return null;
   }
   const adoptSession = parseAdoptedSession(value.adoptSession);
+  const hydrateSession =
+    typeof value.hydrateSession === "string" && ADOPTED_SESSION_ID.test(value.hydrateSession)
+      ? value.hydrateSession
+      : undefined;
   return {
     systemPrompt,
     toolCatalog: catalog,
     ...(adoptSession ? { adoptSession } : {}),
+    ...(hydrateSession ? { hydrateSession } : {}),
+    ...(value.startFresh === true ? { startFresh: true } : {}),
+    ...(compact ? { compact: true } : {}),
     ...(value.quiet === true ? { quiet: true } : {}),
   };
 };
@@ -288,7 +324,7 @@ export type CloudCliAssistantMessage = {
   role: "assistant";
   content: Array<
     | { type: "text"; text: string }
-    | { type: "thinking"; thinking: string; thinkingSignature?: string }
+    | { type: "thinking"; thinking: string; thinkingSignature?: string; redacted?: boolean }
     | {
         type: "toolCall";
         id: string;
@@ -318,6 +354,12 @@ export type CloudOrchestratorEvent =
    * is acknowledged before the executor forwards any of those calls.
    */
   | { type: "assistant_message"; message: CloudCliAssistantMessage }
+  /**
+   * What the CLI reported about its models, as the desktop keeps it: the
+   * model `alias` runs on (`init`), and each model's context window
+   * (`result.modelUsage`).
+   */
+  | { type: "models"; alias?: string; resolved?: string; windows?: Record<string, number> }
   /** Cumulative totals for this attempt so far; the latest one wins. */
   | {
       type: "usage";

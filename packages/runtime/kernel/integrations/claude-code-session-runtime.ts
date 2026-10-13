@@ -2618,7 +2618,6 @@ class ClaudeCodeSessionRuntime {
         "--strict-mcp-config",
         "--mcp-config",
         session.mcpConfigPath,
-        "--disable-slash-commands",
         "--tools",
         [...nativeTools, "mcp__stella__*"].join(","),
         "--allowedTools",

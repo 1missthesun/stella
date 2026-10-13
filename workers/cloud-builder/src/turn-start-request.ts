@@ -10,7 +10,7 @@ import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effor
 import { MAX_AGENT_DEPTH } from "@stella/contracts/agent-depth";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
-  orchestratorCliThreadId,
+  isOrchestratorCliThreadId,
   parseCloudOrchestratorCliTurnSpec,
 } from "@stella/contracts/cloud-orchestrator-cli";
 import { isManagedModelAudience } from "@stella/contracts/gateway/capability";
@@ -537,7 +537,7 @@ export const parseCloudAgentTurnStartRequest = (
     request.turnId === undefined ||
     request.parentThreadId !== undefined ||
     request.parentTurnId !== undefined ||
-    request.threadId !== orchestratorCliThreadId(request.conversationId)
+    !isOrchestratorCliThreadId(request.conversationId, request.threadId)
   ) {
     return fail("An orchestrator turn has a malformed identity.");
   }

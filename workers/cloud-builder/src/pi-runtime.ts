@@ -491,7 +491,12 @@ export type PiRuntimeOptions = {
    * Runs one Claude Code CLI turn of the orchestrator in the conversation's
    * orchestrator container, for a turn on the `anthropic` execution.
    */
-  claudeCode?: ClaudeCodeTransport;
+  claudeCode?: ClaudeCodeTransport & {
+    /** The model the CLI resolved an alias to, as it last reported. */
+    resolvedModel?(alias: string): string | undefined;
+    /** The context window the CLI last reported for a model. */
+    contextWindow?(model: string): number | undefined;
+  };
 };
 
 /** A tool the root conversation started or finished, for clients' live view. */
@@ -724,6 +729,8 @@ export class PiConversationRuntime {
       const engine = createClaudeCodeEngine({
         transport,
         builtins: "never",
+        resolveModel: (alias) => transport.resolvedModel?.(alias),
+        reportedContextWindow: (model) => transport.contextWindow?.(model),
         sessions: {
           read: async (piSessionId) =>
             await options.storage.get<ClaudeCodeSessionRecord>(`${CLAUDE_CODE_SESSION_KEY}${piSessionId}`),

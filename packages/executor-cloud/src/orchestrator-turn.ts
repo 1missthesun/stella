@@ -19,6 +19,7 @@
 import * as Effect from "effect/Effect";
 import * as Fiber from "effect/Fiber";
 import {
+  CLOUD_CLI_SESSION_LOST_MARK,
   CLOUD_ORCHESTRATOR_BROKER_PATHS,
   parseCloudOrchestratorCliTurnSpec,
   type CloudCliAssistantMessage,
@@ -324,6 +325,24 @@ export class CliAssistantAssembler {
   readonly #compaction = createClaudeCodeCompactionDetector();
 
   observe(event: ClaudeStreamJsonEvent): void {
+    if (
+      event.type === "system" &&
+      event.subtype === "init" &&
+      typeof event.model === "string" &&
+      event.model
+    ) {
+      this.emit({ type: "models", alias: this.fallbackModel, resolved: event.model });
+    }
+    if (event.type === "result") {
+      const usage = asRecord(event.modelUsage);
+      const windows = Object.fromEntries(
+        Object.entries(usage ?? {}).flatMap(([model, entry]) => {
+          const window = numberAt(asRecord(entry)?.contextWindow);
+          return window && window > 0 ? [[model, window]] : [];
+        }),
+      );
+      if (Object.keys(windows).length > 0) this.emit({ type: "models", windows });
+    }
     const compaction = this.#compaction(event as Record<string, unknown>);
     if (compaction) {
       this.emit({
@@ -380,6 +399,16 @@ export class CliAssistantAssembler {
             ...(typeof block.signature === "string"
               ? { thinkingSignature: block.signature }
               : {}),
+          });
+        } else if (
+          block?.type === "redacted_thinking" &&
+          typeof block.data === "string"
+        ) {
+          open.content.push({
+            type: "thinking",
+            thinking: "",
+            thinkingSignature: block.data,
+            redacted: true,
           });
         } else if (
           block?.type === "tool_use" &&
@@ -614,6 +643,8 @@ export const runOrchestratorTurn = async (args: {
     systemPrompt: input.systemPrompt,
     toolCatalog: input.toolCatalog,
     quiet: input.quiet,
+    startFresh: input.startFresh,
+    compact: input.compact,
   });
   if (!spec) {
     return failed(
@@ -639,6 +670,19 @@ export const runOrchestratorTurn = async (args: {
       `authoritative orchestrator history rejected: ${asError(error).message}`,
     );
     return failed("Stella couldn't validate this chat's history. Try again.");
+  }
+  // The conversation's DO resumed a session this container no longer has.
+  // It starts one again from the conversation's journal, as a computer
+  // does, rather than this thread replaying its own rows as text.
+  if (
+    input.rebuildNativeSession === true &&
+    !input.adoptedNativeSession &&
+    !spec.startFresh &&
+    (input.history?.length ?? 0) > 0
+  ) {
+    return failed(
+      `${CLOUD_CLI_SESSION_LOST_MARK} This chat's Claude Code session is not in the cloud any more.`,
+    );
   }
 
   // The DO ending the turn (inactive / lost event stream) must kill the CLI
@@ -741,7 +785,9 @@ export const runOrchestratorTurn = async (args: {
           conversationId: input.conversationId,
         }),
         prompt: input.prompt,
-        systemPrompt: buildClaudeCodeNativeToolRuntimePrompt(spec.systemPrompt),
+        systemPrompt: spec.compact
+          ? ""
+          : buildClaudeCodeNativeToolRuntimePrompt(spec.systemPrompt),
         execution,
         claudeAccount,
         threadId: input.threadId,
@@ -750,10 +796,14 @@ export const runOrchestratorTurn = async (args: {
           input.history ?? [],
         ),
         stateIntegrityKey: input.nativeStateIntegrityKey,
-        ...(input.rebuildNativeSession === true
-          ? { recoveryHistory: input.history ?? [] }
-          : {}),
-        ...(input.rebuildNativeSession !== true && input.adoptedNativeSession
+        ...(spec.startFresh
+          ? { fresh: true }
+          : input.rebuildNativeSession === true
+            ? { recoveryHistory: input.history ?? [] }
+            : {}),
+        ...(!spec.startFresh &&
+        input.rebuildNativeSession !== true &&
+        input.adoptedNativeSession
           ? {
               adoptedSession: input.adoptedNativeSession,
               history: input.history ?? [],
@@ -792,7 +842,7 @@ export const runOrchestratorTurn = async (args: {
       await lane.flush();
       return failed(asError(runError).message);
     }
-    if (!native.error) {
+    if (!native.error && !spec.compact) {
       // The CLI must have listed the DO's catalog, or its tools were absent.
       try {
         await mcpHost.waitForClientReady(undefined, 1_000);

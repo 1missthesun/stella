@@ -21,7 +21,11 @@
  */
 
 import type { AgentHistoryRow } from "@stella/executor-cloud/agent-history";
-import { AGENT_HISTORY_MAX_ROWS } from "@stella/executor-cloud/agent-history";
+import {
+  AGENT_HISTORY_MAX_BYTES,
+  AGENT_HISTORY_MAX_ROWS,
+  AGENT_HISTORY_ROW_MAX_BYTES,
+} from "@stella/executor-cloud/agent-history";
 import {
   TranscriptSearchIndex,
   transcriptSearchDdl,
@@ -444,9 +448,9 @@ export const appendThreadMessages = (
 /**
  * The thread's history, oldest first, in the exact row shape the executor
  * already validates. Bounded to the newest
- * `AGENT_HISTORY_MAX_ROWS` rows, which is the same ceiling the old context
- * route enforced, so a long-lived thread degrades by dropping its oldest turns
- * rather than failing the whole preflight.
+ * `AGENT_HISTORY_MAX_ROWS` rows and `AGENT_HISTORY_MAX_BYTES`, the ceilings
+ * the executor validates, so a long-lived thread degrades by dropping its
+ * oldest turns rather than failing the whole preflight.
  */
 export const readThreadHistory = (
   sql: SqlStorage,
@@ -481,15 +485,23 @@ export const readThreadHistory = (
           limit,
         )
         .toArray();
-  return rows
-    .reverse()
-    .filter((row) => isRole(row.role))
-    .map((row) => ({
+  const encoder = new TextEncoder();
+  const kept: AgentHistoryRow[] = [];
+  let bytes = 0;
+  for (const row of rows) {
+    if (!isRole(row.role)) continue;
+    const payloadJson = decode(sql, row.payload_json);
+    const size = encoder.encode(payloadJson).byteLength;
+    if (size > AGENT_HISTORY_ROW_MAX_BYTES || bytes + size > AGENT_HISTORY_MAX_BYTES) break;
+    bytes += size;
+    kept.push({
       seq: row.seq,
       role: row.role as ThreadTranscriptRole,
-      payloadJson: decode(sql, row.payload_json),
+      payloadJson,
       turnId: row.turn_id,
-    }));
+    });
+  }
+  return kept.reverse();
 };
 
 /** Owner purge: the thread's private job state goes with the rest of it. */

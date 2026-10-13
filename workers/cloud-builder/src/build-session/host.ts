@@ -397,7 +397,8 @@ export interface BuildSessionInternals {
     session: ExecutionSession;
     coldContainerStartMs: number;
     restoreMs: number;
-    adoptedSession?: { sessionId: string; cliVersion: string };
+    adoptedSession?: { sessionId: string; cliVersion: string; hydrated?: true };
+    nativeRestored: boolean;
   }>;
   runAgentAttempt(args: {
     turn: TurnRequest;

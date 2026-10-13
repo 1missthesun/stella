@@ -21,7 +21,7 @@ import {
 } from "@stella/contracts/backend/claude-sessions";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import type { CloudOrchestratorCliAdoptedSession } from "@stella/contracts/cloud-orchestrator-cli";
-import { CLOUD_ADOPTED_SESSION_DIR } from "@stella/contracts/cloud-native-state";
+import { CLOUD_ADOPTED_SESSION_DIR, claudeHydratedSessionKey } from "@stella/contracts/cloud-native-state";
 import type { ExecutionSession } from "../sandbox-client.js";
 import { sha256Hex } from "../hash.js";
 import { log } from "./shared/keys.js";
@@ -105,4 +105,35 @@ export const writeAdoptedClaudeSession = async (args: {
     files: files.length,
   });
   return { sessionId, cliVersion: manifest.cliVersion };
+};
+
+/**
+ * A session the conversation's pi runtime wrote from its journal
+ * (`CloudOrchestratorCliTurnSpec.hydrateSession`), put where the executor
+ * adopts a synced one. It leaves backup storage once it is in the container.
+ */
+export const writeHydratedClaudeSession = async (args: {
+  bucket: R2Bucket;
+  ownerId: string;
+  conversationId: string;
+  sessionId: string;
+  session: ExecutionSession;
+  stateRoot: string;
+}): Promise<{ sessionId: string; cliVersion: string; hydrated: true } | undefined> => {
+  const key = claudeHydratedSessionKey(args.ownerId, args.conversationId, args.sessionId);
+  const object = await args.bucket.get(key);
+  if (!object) {
+    log("info", "claude_session_hydration_missing", { conversationId: args.conversationId, sessionId: args.sessionId });
+    return undefined;
+  }
+  const text = await object.text();
+  if (!text.trim()) return undefined;
+  await args.session.writeFile(`${args.stateRoot}/${CLOUD_ADOPTED_SESSION_DIR}/${args.sessionId}.jsonl`, text);
+  await args.bucket.delete(key).catch(() => undefined);
+  log("info", "claude_session_hydrated", {
+    conversationId: args.conversationId,
+    sessionId: args.sessionId,
+    bytes: text.length,
+  });
+  return { sessionId: args.sessionId, cliVersion: "unknown", hydrated: true };
 };

@@ -43,7 +43,7 @@ import {
 } from "../turn-credential-broker.js";
 import type { TurnBrokerRecord } from "../turn-credential-broker.js";
 import { readOrchestratorCliSpec } from "../orchestrator-cli-turn-store.js";
-import { writeAdoptedClaudeSession } from "./claude-session-adoption.js";
+import { writeAdoptedClaudeSession, writeHydratedClaudeSession } from "./claude-session-adoption.js";
 import { restoreTurnStateArchive } from "../turn-state-archive.js";
 import type {
   TurnStateCandidate,
@@ -1166,7 +1166,9 @@ export const attachAgentWorld = async (
   session: ExecutionSession;
   coldContainerStartMs: number;
   restoreMs: number;
-  adoptedSession?: { sessionId: string; cliVersion: string };
+  adoptedSession?: { sessionId: string; cliVersion: string; hydrated?: true };
+  /** The thread's own native state came back from its checkpoint. */
+  nativeRestored: boolean;
 }> => {
   const { turn, execution: turnExecution, sandbox } = args;
   const worldRoot = WORLD_ROOT;
@@ -1271,11 +1273,20 @@ export const attachAgentWorld = async (
 
   let nativeRestoreMs = 0;
   let nativeRestore: "current" | "restored" | undefined;
-  let adoptedSession: { sessionId: string; cliVersion: string } | undefined;
-  if (
-    turn.execution?.engine === "anthropic" &&
-    !args.turnStateThreadRestore?.native
-  ) {
+  let adoptedSession: { sessionId: string; cliVersion: string; hydrated?: true } | undefined;
+  const orchestratorSpec =
+    turn.agentRole === "orchestrator"
+      ? (turn.orchestratorCli ??
+        readOrchestratorCliSpec(host.ctx.storage.sql, {
+          turnId: turn.turnId,
+          attemptGeneration: turn.attemptGeneration!,
+        }))
+      : undefined;
+  // The DO handed the CLI a session written from the conversation's journal,
+  // or none to resume: whatever session the thread had stays unused.
+  const replacesSession = Boolean(orchestratorSpec?.hydrateSession || orchestratorSpec?.startFresh);
+  const nativeArchive = replacesSession ? undefined : args.turnStateThreadRestore?.native;
+  if (turn.execution?.engine === "anthropic" && !nativeArchive) {
     const stateRoot = cloudNativeStateRoot(await nativeStateThreadHash(turn));
     const clear = async () => {
       const cleared = await session.exec(`rm -rf -- ${stateRoot}`, {
@@ -1290,19 +1301,29 @@ export const attachAgentWorld = async (
       turnExecution.assertActive();
     };
     await clear();
+    const hydrateSession = orchestratorSpec?.hydrateSession;
     // Behind the log here, but another host's synced session covers it:
     // that session resumes natively instead of a rebuild.
-    const adopt =
-      turn.agentRole === "orchestrator"
-        ? (
-            turn.orchestratorCli ??
-            readOrchestratorCliSpec(host.ctx.storage.sql, {
-              turnId: turn.turnId,
-              attemptGeneration: turn.attemptGeneration!,
-            })
-          )?.adoptSession
-        : undefined;
-    if (adopt) {
+    const adopt = orchestratorSpec?.startFresh || hydrateSession ? undefined : orchestratorSpec?.adoptSession;
+    if (hydrateSession && turn.conversationId) {
+      const hydrateStarted = performance.now();
+      adoptedSession = await writeHydratedClaudeSession({
+        bucket: host.env.BACKUP_BUCKET,
+        ownerId: turn.ownerId,
+        conversationId: turn.conversationId,
+        sessionId: hydrateSession,
+        session,
+        stateRoot,
+      }).catch((error: unknown) => {
+        log("error", "claude_session_hydration_failed", {
+          turnId: turn.turnId,
+          message: errorMessage(error),
+        });
+        return undefined;
+      });
+      if (!adoptedSession) await clear();
+      nativeRestoreMs = phaseMs(hydrateStarted);
+    } else if (adopt) {
       const adoptStarted = performance.now();
       adoptedSession = await writeAdoptedClaudeSession({
         gates: host.env.OWNER_GATES,
@@ -1322,13 +1343,13 @@ export const attachAgentWorld = async (
       nativeRestoreMs = phaseMs(adoptStarted);
     }
   }
-  if (args.turnStateThreadRestore?.native) {
+  if (nativeArchive) {
     const nativeRestoreStarted = performance.now();
     turnExecution.assertActive();
     nativeRestore = await restoreTurnStateArchive({
       session,
       bucket: host.env.BACKUP_BUCKET,
-      archive: args.turnStateThreadRestore.native,
+      archive: nativeArchive,
       target: { kind: "native", threadHash: await nativeStateThreadHash(turn) },
     });
     turnExecution.assertActive();
@@ -1368,6 +1389,7 @@ export const attachAgentWorld = async (
     coldContainerStartMs,
     restoreMs,
     ...(adoptedSession ? { adoptedSession } : {}),
+    nativeRestored: nativeArchive !== undefined,
   };
 };
 
@@ -1411,7 +1433,7 @@ export const runAgentAttempt = async (
   };
   const world = await host.attachAgentWorld(args);
   setupStep("attachWorld");
-  const { session, coldContainerStartMs, restoreMs, adoptedSession } = world;
+  const { session, coldContainerStartMs, restoreMs, adoptedSession, nativeRestored } = world;
   // The ready event, the skills, the Claude logins and the attempt
   // directory below need nothing from each other; each is awaited before
   // the turn input is written.
@@ -1614,7 +1636,7 @@ export const runAgentAttempt = async (
         nativeStateIntegrityKey,
         rebuildNativeSession:
           turn.execution?.engine === "anthropic" &&
-          !args.turnStateThreadRestore?.native &&
+          !nativeRestored &&
           !adoptedSession,
         ...(adoptedSession ? { adoptedNativeSession: adoptedSession } : {}),
         turnBroker: { credentialsPath: brokerCredentialsPath },

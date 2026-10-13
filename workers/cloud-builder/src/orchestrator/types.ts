@@ -30,6 +30,7 @@ export type Env = Pick<
     Pick<
       Cloudflare.Env,
       | "AGENT_HOME"
+      | "BACKUP_BUCKET"
       | "CONVERSATION_ARCHIVE"
       | "MODEL_GATEWAY"
       | "MODEL_GATEWAY_CONTROL"

@@ -7,6 +7,7 @@ import { Effect } from "effect";
 import type { ClaudeSessionManifest } from "@stella/contracts/backend/claude-sessions";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import type { CloudOrchestratorCliAdoptedSession } from "@stella/contracts/cloud-orchestrator-cli";
+import { claudeHydratedSessionKey } from "@stella/contracts/cloud-native-state";
 import {
   parseCliTurnEventsForward,
   parseCliTurnTerminal,
@@ -15,6 +16,7 @@ import {
 } from "../orchestrator-cli-turn.js";
 import {
   createCloudClaudeCodeTransport,
+  type CloudClaudeCodeModels,
   type CloudClaudeCodeTransport,
   type CloudClaudeCodeTurn,
   type FrameAnswer,
@@ -29,6 +31,8 @@ import { ownerGateStub } from "../rpc-release.js";
 const CLAUDE_CODE_TURN_WAIT_MS = 60_000;
 /** Storage key of the conversation's latest Claude Code attempt on its orchestrator thread. */
 const CLAUDE_CODE_ATTEMPT_KEY = "claudeCodeAttempt";
+/** Storage key of what the CLI reported about its models (`CloudClaudeCodeModels`). */
+const CLAUDE_CODE_MODELS_KEY = "claudeCodeModels";
 
 /**
  * Claude Code turns, which pi runs on its Claude Code engine: the bridge to
@@ -68,6 +72,21 @@ export abstract class OrchestratorCliTurn extends OrchestratorTools {
         return next;
       },
       adoption: (turn) => this.claudeCodeAdoption(turn),
+      models: {
+        read: async () => await this.ctx.storage.get<CloudClaudeCodeModels>(CLAUDE_CODE_MODELS_KEY),
+        write: async (models) => {
+          await this.ctx.storage.put(CLAUDE_CODE_MODELS_KEY, models);
+        },
+      },
+      stageSession: async (turn, sessionId, transcript) => {
+        const bucket = this.env.BACKUP_BUCKET;
+        if (!bucket) throw new Error("This deployment has no storage for a Claude Code session.");
+        await bucket.put(
+          claudeHydratedSessionKey(turn.ownerId, turn.conversationId, sessionId),
+          transcript,
+          { httpMetadata: { contentType: "application/x-ndjson" } },
+        );
+      },
       sleep: (ms, signal) =>
         runToolEffect(sleepWithAbortEffect(ms, signal, () => new Error("aborted")).pipe(Effect.ignore)),
       log: (event, fields) => log("info", event, fields),

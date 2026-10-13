@@ -128,7 +128,7 @@ export type AgentTurnInput = CloudCliTurnRoleInput & {
    * Builder-written: another host's synced Claude Code session sits in the
    * thread's native state root to resume natively (orchestrator turns).
    */
-  adoptedNativeSession?: { sessionId: string; cliVersion: string };
+  adoptedNativeSession?: { sessionId: string; cliVersion: string; hydrated?: true };
   /** One-shot pointer to the Builder-owned, short-lived turn broker. */
   turnBroker: TurnBrokerInput;
   /** Short-lived capability for exporting and pushing this world's projection. */

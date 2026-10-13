@@ -7,6 +7,7 @@
  */
 
 import {
+  isOrchestratorCliThreadId,
   orchestratorCliThreadId,
   type CloudCliAssistantMessage,
   type CloudCliTurnEventsForward,
@@ -63,7 +64,7 @@ export const parseCliTurnIdentity = (
     !turnId ||
     !nonNegativeInteger(attemptGeneration) ||
     attemptGeneration < 1 ||
-    threadId !== orchestratorCliThreadId(conversationId)
+    !isOrchestratorCliThreadId(conversationId, threadId)
   ) {
     return null;
   }
@@ -144,6 +145,22 @@ const parseCliEvent = (value: unknown): CloudOrchestratorEvent | null => {
       return isCliAssistantMessage(value.message)
         ? { type: "assistant_message", message: value.message }
         : null;
+    case "models": {
+      const windows = isRecord(value.windows)
+        ? Object.fromEntries(
+            Object.entries(value.windows)
+              .filter(([model, window]) => model.length > 0 && model.length <= 200 && nonNegativeInteger(window))
+              .slice(0, 16),
+          )
+        : undefined;
+      const alias = boundedString(value.alias, 200);
+      const resolved = boundedString(value.resolved, 200);
+      return {
+        type: "models",
+        ...(alias && resolved ? { alias, resolved } : {}),
+        ...(windows && Object.keys(windows).length > 0 ? { windows: windows as Record<string, number> } : {}),
+      };
+    }
     case "usage":
       return nonNegativeInteger(value.inputTokens) &&
         nonNegativeInteger(value.outputTokens) &&

@@ -34,7 +34,10 @@ import {
   resolveClaudeWorkingFolder,
   stripClaudeThinkingFromSessionFile,
 } from "@stella/runtime/kernel/integrations/claude-code-session-files.js";
-import type { CloudCliTurnRole } from "@stella/contracts/cloud-orchestrator-cli";
+import {
+  CLOUD_CLI_SESSION_LOST_MARK,
+  type CloudCliTurnRole,
+} from "@stella/contracts/cloud-orchestrator-cli";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import { isolateToolProcessLaunch } from "@stella/runtime/kernel/tools/process-isolation.js";
 import type { ToolProcessIdentity } from "@stella/runtime/kernel/tools/types.js";
@@ -54,6 +57,8 @@ import {
   type AgentHistoryRow,
 } from "./agent-history.js";
 import { pruneAgentHistory } from "./prune-history.js";
+import { createNativeTranscript } from "./native-transcript.js";
+import { claudeCodeTranscript } from "@stella/runtime/kernel/integrations/claude-code-transcript.js";
 import {
   assertFreshNativeState,
   assertNativeState,
@@ -645,12 +650,12 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   ...resolveClaudeReasoningArgs(options.reasoningEffort),
   "--dangerously-skip-permissions",
   // Match the desktop's configured Claude engine takeover: Claude owns the
-  // native loop, but Stella owns its entire capability and instruction
-  // surface. Ambient MCP servers, built-ins, and slash commands stay out.
+  // native loop, but Stella owns its entire capability surface. Ambient MCP
+  // servers and built-ins stay out; the CLI's own commands (`/compact`) run
+  // as on the desktop.
   "--strict-mcp-config",
   "--mcp-config",
   options.mcpConfigPath,
-  "--disable-slash-commands",
   "--tools",
   "",
   // Stella's server is the only tool surface; allow it explicitly too, so a
@@ -665,12 +670,11 @@ export const buildCloudClaudeTakeoverArgs = (options: {
   "--settings",
   JSON.stringify({
     // Match the configured desktop engine: keyword-triggered workflows must
-    // not hijack an ordinary Stella task after slash commands are removed.
+    // not hijack an ordinary Stella task.
     workflowKeywordTriggerEnabled: false,
     disableWorkflows: true,
   }),
-  "--system-prompt",
-  options.systemPrompt,
+  ...(options.systemPrompt.trim() ? ["--system-prompt", options.systemPrompt] : []),
   ...(options.resume
     ? ["--resume", options.sessionId]
     : ["--session-id", options.sessionId]),
@@ -1245,11 +1249,30 @@ const NATIVE_SESSION_MARKER = "session-started";
  * as the session to resume. False when it can't resume here: this CLI is
  * older than the one that wrote it, or the transcript is missing.
  */
+/**
+ * A session written from the conversation's journal names no CLI: each line
+ * gets this one's version and working folder, as the CLI's own would have.
+ */
+const settleHydratedLines = async (file: string, cwd: string): Promise<void> => {
+  const version = await claudeCliVersion();
+  const lines = (await readFile(file, "utf8")).split("\n").map((line) => {
+    if (!line.trim()) return line;
+    try {
+      const entry = JSON.parse(line) as Record<string, unknown>;
+      return JSON.stringify({ ...entry, cwd, ...(version !== "unknown" ? { version } : {}) });
+    } catch {
+      return line;
+    }
+  });
+  await writeFile(file, lines.join("\n"), { mode: 0o600 });
+};
+
 const adoptSyncedSession = async (args: {
   stateRoot: string;
   cwd: string;
   sessionId: string;
   cliVersion: string;
+  hydrated?: true;
 }): Promise<boolean> => {
   const source = path.join(args.stateRoot, CLOUD_ADOPTED_SESSION_DIR);
   if (!isClaudeSessionId(args.sessionId)) return false;
@@ -1266,6 +1289,12 @@ const adoptSyncedSession = async (args: {
     if (entry !== `${args.sessionId}.jsonl` && entry !== args.sessionId) continue;
     await rename(path.join(source, entry), path.join(projectDir, entry));
   }
+  if (args.hydrated) {
+    await settleHydratedLines(
+      path.join(projectDir, `${args.sessionId}.jsonl`),
+      await resolveClaudeWorkingFolder(args.cwd),
+    );
+  }
   await rm(source, { recursive: true, force: true });
   await chmod(args.stateRoot, 0o700);
   await writeFile(
@@ -1274,6 +1303,49 @@ const adoptSyncedSession = async (args: {
     { mode: 0o600 },
   );
   return true;
+};
+
+/** How much of a thread's history a session written from it holds, in tokens. */
+const WRITTEN_SESSION_TOKEN_BUDGET = 150_000;
+
+const claudeCodeIdentity = (message: { api?: unknown; provider?: unknown; model?: unknown; responseModel?: unknown }) =>
+  message.api === "claude-code" || message.api === "claude-code-cli" || message.provider === "claude-code"
+    ? String(message.responseModel || message.model || "")
+    : undefined;
+
+/**
+ * A session the CLI resumes, written from the thread's history (an agent
+ * that moved here, or a thread whose session is gone): every turn and tool
+ * call as it happened, and the thinking of the model that runs on, rather
+ * than a replay of it all in one prompt. Undefined with nothing to write.
+ */
+const writeHistorySession = async (args: {
+  stateRoot: string;
+  cwd: string;
+  history: AgentHistoryRow[];
+}): Promise<string | undefined> => {
+  const messages = pruneAgentHistory(parseAuthoritativeAgentHistory(args.history), WRITTEN_SESSION_TOKEN_BUDGET);
+  if (messages.length === 0) return undefined;
+  const current = messages
+    .filter((message) => message.role === "assistant")
+    .map((message) => claudeCodeIdentity(message as never))
+    .findLast((identity) => identity !== undefined);
+  const sessionId = crypto.randomUUID();
+  await mkdir(args.cwd, { recursive: true, mode: 0o700 });
+  const workingFolder = await resolveClaudeWorkingFolder(args.cwd);
+  const text = claudeCodeTranscript(
+    messages as never,
+    { sessionId, cwd: workingFolder, version: await claudeCliVersion() },
+    (name) => `mcp__${CLOUD_CLAUDE_MCP_SERVER_NAME}__${name}`,
+    (message) => current !== undefined && claudeCodeIdentity(message) === current,
+  );
+  if (!text) return undefined;
+  const projectDir = claudeSessionProjectDir(args.stateRoot, workingFolder);
+  await mkdir(projectDir, { recursive: true, mode: 0o700 });
+  await writeFile(path.join(projectDir, `${sessionId}.jsonl`), text, { mode: 0o600 });
+  await chmod(args.stateRoot, 0o700);
+  await writeFile(path.join(args.stateRoot, NATIVE_SESSION_MARKER), `${sessionId}\n`, { mode: 0o600 });
+  return sessionId;
 };
 
 export const runNativeAgentTurn = async (options: {
@@ -1289,10 +1361,13 @@ export const runNativeAgentTurn = async (options: {
   stateIntegrityKey: string;
   recoveryHistory?: AgentHistoryRow[];
   /**
-   * Another host's synced session the BuildSession wrote into the root, to
-   * resume natively; `history` rebuilds instead when it can't resume here.
+   * Another host's synced session the BuildSession wrote into the root, or
+   * one written from the conversation's journal (`hydrated`), to resume
+   * natively; `history` rebuilds instead when it can't resume here.
    */
-  adoptedSession?: { sessionId: string; cliVersion: string };
+  adoptedSession?: { sessionId: string; cliVersion: string; hydrated?: true };
+  /** A new session, whatever history the thread has: the prompt carries what it needs. */
+  fresh?: true;
   history?: AgentHistoryRow[];
   /** Test-only override; production always uses the root-only image path. */
   nativeStateRoot?: string;
@@ -1323,7 +1398,7 @@ export const runNativeAgentTurn = async (options: {
   }
   let inputPrompt = options.prompt;
   const adopted =
-    options.recoveryHistory === undefined && options.adoptedSession
+    !options.fresh && options.recoveryHistory === undefined && options.adoptedSession
       ? await adoptSyncedSession({
           stateRoot,
           cwd: options.profile.cwd,
@@ -1335,21 +1410,47 @@ export const runNativeAgentTurn = async (options: {
           return false;
         })
       : false;
-  const recoveryHistory =
-    options.recoveryHistory ??
-    (options.adoptedSession && !adopted ? (options.history ?? []) : undefined);
-  if (options.adoptedSession && !adopted) {
+  // The orchestrator's history is the conversation's journal, which only its
+  // DO holds: a session it handed over that can't resume here goes back.
+  if (options.profile.role === "orchestrator" && options.adoptedSession && !adopted && !options.fresh) {
+    await rm(stateRoot, { recursive: true, force: true });
+    throw new Error(`${CLOUD_CLI_SESSION_LOST_MARK} The Claude Code session handed to the cloud could not resume here.`);
+  }
+  const recoveryHistory = options.fresh
+    ? undefined
+    : (options.recoveryHistory ??
+      (options.adoptedSession && !adopted ? (options.history ?? []) : undefined));
+  if ((options.adoptedSession && !adopted) || options.fresh) {
     await rm(stateRoot, { recursive: true, force: true });
   }
+  let writtenSession: string | undefined;
   if (adopted) {
     // Another host's session: nothing of this cloud's sealed state to check.
-  } else if (recoveryHistory !== undefined) {
-    inputPrompt = buildNativeSessionRecoveryPrompt({
-      history: recoveryHistory,
-      expectedCursor: options.authoritativeHistoryCursor,
-      prompt: options.prompt,
-    });
+  } else if (options.fresh) {
     await assertFreshNativeState(stateRoot);
+  } else if (recoveryHistory !== undefined) {
+    if (nativeHistoryCursorFromRows(recoveryHistory) !== options.authoritativeHistoryCursor) {
+      throw new Error("Native session recovery history does not match the canonical cursor.");
+    }
+    await assertFreshNativeState(stateRoot);
+    writtenSession = await writeHistorySession({
+      stateRoot,
+      cwd: options.profile.cwd,
+      history: recoveryHistory,
+    }).catch((error: unknown) => {
+      console.error(
+        `writing a session from the thread's history failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return undefined;
+    });
+    if (!writtenSession) {
+      await rm(stateRoot, { recursive: true, force: true });
+      inputPrompt = buildNativeSessionRecoveryPrompt({
+        history: recoveryHistory,
+        expectedCursor: options.authoritativeHistoryCursor,
+        prompt: options.prompt,
+      });
+    }
   } else {
     await assertNativeHistoryParity({
       stateRoot,
@@ -1363,9 +1464,14 @@ export const runNativeAgentTurn = async (options: {
   // A kept process holds the session as this thread's last sealed state
   // left it; only a root the parity check accepted as that state may
   // continue in it. Recovery and adoption rewrite the session first.
-  const reusable = !adopted && recoveryHistory === undefined;
+  const reusable = !adopted && !options.fresh && recoveryHistory === undefined;
   const sealedMac = reusable ? await sealedStateMac(stateRoot) : undefined;
   let keeper = options.keeper;
+  let record = createNativeTranscript({ prompt: options.prompt, inputPrompt, execution: options.execution });
+  const onStreamEvent = (event: ClaudeStreamJsonEvent) => {
+    record.observe(event);
+    options.onStreamEvent?.(event);
+  };
   const run = () =>
     runCloudClaude({
       profile: options.profile,
@@ -1375,7 +1481,7 @@ export const runNativeAgentTurn = async (options: {
       claudeAccount: options.claudeAccount,
       stateRoot,
       mcpServerConfig,
-      ...(options.onStreamEvent ? { onStreamEvent: options.onStreamEvent } : {}),
+      onStreamEvent,
       ...(options.cancellation ? { cancellation: options.cancellation } : {}),
       ...(options.inbox ? { inbox: options.inbox } : {}),
       ...(options.quiet ? { quiet: true } : {}),
@@ -1391,12 +1497,25 @@ export const runNativeAgentTurn = async (options: {
         : {}),
     });
   let result = await run();
+  // The orchestrator's history is the conversation's journal: a session the
+  // CLI can't find goes back to its DO, which writes it again from there.
+  if (
+    options.profile.role === "orchestrator" &&
+    result.error &&
+    /No conversation found with session ID/iu.test(result.error)
+  ) {
+    await result.kept?.discard().catch(() => undefined);
+    await rm(stateRoot, { recursive: true, force: true });
+    throw new Error(`${CLOUD_CLI_SESSION_LOST_MARK} ${result.error}`);
+  }
   // A second run of this turn starts its own process.
   keeper = undefined;
-  // Thinking signed under the other host's login may not verify here: the
-  // session goes on without its thinking blocks, as the desktop does.
+  // Thinking signed under the other host's login, or by another model, may
+  // not verify here: the session goes on without its thinking blocks, as the
+  // desktop does.
+  const carriedSession = adopted ? options.adoptedSession!.sessionId : writtenSession;
   if (
-    adopted &&
+    carriedSession &&
     result.error &&
     isRejectedThinkingSignatureError(result.error) &&
     !options.cancellation?.aborted &&
@@ -1407,20 +1526,31 @@ export const runNativeAgentTurn = async (options: {
           stateRoot,
           await resolveClaudeWorkingFolder(options.profile.cwd),
         ),
-        `${options.adoptedSession!.sessionId}.jsonl`,
+        `${carriedSession}.jsonl`,
       ),
     )) > 0
   ) {
+    record = createNativeTranscript({ prompt: options.prompt, inputPrompt, execution: options.execution });
     result = await run();
   }
-  const messages = transcript({
-    prompt: options.prompt,
-    steered: result.steered,
-    finalText: result.finalText || result.error || "",
-    execution: options.execution,
-    usage: result.usage,
-    ...(result.error ? { error: result.error } : {}),
-  });
+  const recorded =
+    options.profile.role === "agent"
+      ? record.messages({
+          finalText: result.finalText,
+          ...(result.error ? { error: result.error } : {}),
+          usage: result.usage,
+        })
+      : undefined;
+  const messages =
+    recorded ??
+    transcript({
+      prompt: options.prompt,
+      steered: result.steered,
+      finalText: result.finalText || result.error || "",
+      execution: options.execution,
+      usage: result.usage,
+      ...(result.error ? { error: result.error } : {}),
+    });
   const kept = result.kept;
   let checkpoint: Awaited<ReturnType<typeof sealNativeState>>;
   try {

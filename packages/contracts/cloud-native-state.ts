@@ -33,6 +33,15 @@ export const cloudNativeStateRoot = (threadHash: string): string => {
 export const CLOUD_ADOPTED_SESSION_DIR = ".adopted-session";
 
 /**
+ * Where in backup storage the conversation's pi runtime leaves a Claude Code
+ * session it wrote from the conversation's journal
+ * (`CloudOrchestratorCliTurnSpec.hydrateSession`), until the BuildSession
+ * puts it in the container and deletes it.
+ */
+export const claudeHydratedSessionKey = (ownerId: string, conversationId: string, sessionId: string): string =>
+  `claude-code-hydrated/v1/${encodeURIComponent(ownerId)}/${encodeURIComponent(conversationId)}/${sessionId}.jsonl`;
+
+/**
  * Root-only (0700) parent of the owner's cloud Claude Code logins, one
  * `CLAUDE_CONFIG_DIR` per account named by the hex SHA-256 of the account's
  * lowercased email. `claude auth login` writes its credential there and

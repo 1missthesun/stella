@@ -90,6 +90,7 @@ const textOf = (part: Part): string | undefined => (typeof part.text === "string
  * Another host's message in the shape this executor takes as history: the
  * fields it requires filled in, and parts it does not know turned into text,
  * so a message is never dropped (a dropped call would orphan its result).
+ * Signed thinking stays, so a session written from it keeps its reasoning.
  */
 const historyPayload = (role: "user" | "assistant" | "toolResult", payloadJson: string): string | undefined => {
   let message: Record<string, unknown>;
@@ -135,7 +136,18 @@ const historyPayload = (role: "user" | "assistant" | "toolResult", payloadJson: 
         const args = part.arguments && typeof part.arguments === "object" && !Array.isArray(part.arguments) ? part.arguments : {};
         return [{ type: "toolCall", id: part.id, name: part.name, arguments: args }];
       }
-      if (part.type === "thinking") return [];
+      if (part.type === "thinking") {
+        return typeof part.thinking === "string" && typeof part.thinkingSignature === "string" && part.thinkingSignature
+          ? [
+              {
+                type: "thinking",
+                thinking: part.thinking,
+                thinkingSignature: part.thinkingSignature,
+                ...(part.redacted === true ? { redacted: true } : {}),
+              },
+            ]
+          : [];
+      }
       return plain(part) ? [plain(part)!] : [];
     });
     const usage = message.usage as Record<string, unknown> | undefined;
@@ -149,6 +161,7 @@ const historyPayload = (role: "user" | "assistant" | "toolResult", payloadJson: 
       api: typeof message.api === "string" ? message.api : "agent-log",
       provider: typeof message.provider === "string" ? message.provider : "agent-log",
       model: typeof message.model === "string" ? message.model : "agent-log",
+      ...(typeof message.responseModel === "string" && message.responseModel ? { responseModel: message.responseModel } : {}),
       usage: complete,
       stopReason: typeof message.stopReason === "string" && STOP_REASONS.has(message.stopReason) ? message.stopReason : "stop",
       timestamp,

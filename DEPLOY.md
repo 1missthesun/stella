@@ -382,6 +382,21 @@ curl -s -H "CF-Access-Client-Id: $STELLA_CF_ACCESS_CLIENT_ID" -H "CF-Access-Clie
 
 Call prod admin only through `auth.stella.sh`, never the workers.dev host.
 
+### Rotating server secrets
+
+Policy: rotate yearly, and immediately on suspected compromise. Generate with
+a CSPRNG and pipe it straight in, never echoing it:
+`openssl rand -base64 48 | tr -d '\n' | env -u CLOUDFLARE_API_TOKEN bunx wrangler secret put NAME --env production`,
+then `bun run containers:check:production`. `STELLA_ADMIN_API_SECRET`,
+`OAUTH_STATE_SECRET` and `MEDIA_SIGNING_SECRET` can be rotated at any time
+(store a new admin secret in the keychain first). `BETTER_AUTH_SECRET`,
+`BUILDER_SERVICE_SECRET` and `OWNER_SECRETS_KEK` protect stored data (sessions
+and the encrypted JWKS, native-state integrity keys, encrypted provider
+credentials and journals). Rotating them needs a dual-key or re-encryption
+migration first; the plan for each is in the CASA evidence
+(`~/.stella/outputs/google-casa/evidence/4.1.3-rotation-log.md` on Rahul's Mac).
+Last rotation: 2026-10-13 (admin, OAuth state, media signing).
+
 ### Prompts
 
 Edit `packages/runtime/extensions/stella-runtime/{agent-metadata,prompts}/*.md`,

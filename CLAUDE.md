@@ -60,9 +60,18 @@ without asking.
   included), then prove the change in the real product:
   `.agents/skills/verify-stella/SKILL.md` (desktop and iOS) and
   `.agents/skills/verify-stella/cloud-turn.mjs` (cloud turns).
-- **Your own worktree.** `git worktree add <path> -b <branch> origin/master`,
-  then `bun install --frozen-lockfile` there. Other agents share the main
-  checkout. Fetch and rebase before you push, and stage only your own files.
+- **Your own worktree.** `git worktree add <path> -b <branch> origin/master`.
+  Other agents share the main checkout. Fetch and rebase before you push, and
+  stage only your own files.
+- **Install only what your work needs:** `bun run deps <kind>` in the
+  worktree. `runtime` (runtime, agent), `backend` (workers, executor,
+  Previews), `desktop` (Electron app, verify-stella desktop), `mobile`,
+  `website`, or `full` (CI-equivalent; `*:lint:promises`, releases). Kinds
+  combine and add to what is installed; `check:generated` needs
+  `desktop backend`. Bun hardlinks packages from its global cache, so a
+  worktree costs ~10-90 MB of real disk: don't symlink `node_modules` from
+  another checkout. Changed a `package.json`? Run `bun install
+  --lockfile-only` first.
 - **Evidence outside the worktree.** Screenshots and recordings go in
   `~/.stella/outputs/<task>/` (the verify harness's `evidenceDir`) or the
   Drive. Removing a worktree deletes what is in it.

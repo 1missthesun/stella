@@ -761,6 +761,9 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         ...(outcome === "failed"
           ? { errorMessage: (text || "The agent failed.").slice(0, 2_000) }
           : {}),
+        ...(outcome === "canceled"
+          ? { errorMessage: (text || AGENT_STOPPED_REASON).slice(0, 2_000) }
+          : {}),
         completedAt: now,
       });
     }
@@ -982,7 +985,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     }
     let outcome: PiThreadOutcome;
     if (report.settled) {
-      if (!attempt.pausing) return;
+      if (!attempt.pausing && report.status !== "canceled") return;
       outcome = { status: "canceled", errorMessage: AGENT_STOPPED_REASON };
     } else {
       const parsed = piReportOutcome(report);

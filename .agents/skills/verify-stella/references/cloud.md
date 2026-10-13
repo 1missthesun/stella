@@ -11,7 +11,7 @@ teardown) is faster to drive headless:
   `GET /conversations/:id/history` until the turn's final assistant message
   lands. Pass `--conversation <id>` (and the `--email` the first run printed)
   to keep sending into one conversation (follow-ups, `agent_status`,
-  `pause_agent` all need that). `STELLA_ADMIN_API_SECRET` comes from the
+  `stop_agent` all need that). `STELLA_ADMIN_API_SECRET` comes from the
   environment or the gitignored `workers/cloud-builder/.dev.vars`; the script
   never prints it.
 - Objective placement evidence is the owner's agent threads (the

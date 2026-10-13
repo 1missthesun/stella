@@ -22,6 +22,11 @@ import { createServer, type Server, type Socket } from "node:net";
 import path from "node:path";
 import { forkDelayed } from "./effect-runtime.js";
 import { runtimeIpcPathUsesFilesystem } from "./runtime-paths.js";
+import {
+  cliBridgeTokenMatches,
+  isUsableCliBridgeToken,
+  parseCliBridgeEndpoint,
+} from "../kernel/connectors/cli-bridge-endpoint.js";
 import type {
   AutomationDaemonSpawnParams,
   AutomationDaemonSpawnResult,
@@ -53,10 +58,13 @@ import type {
  */
 export const maxCliBridgeSocketPathBytes = 100;
 
+const maxWindowsPipeNameChars = 256;
+
 type RequestMessage = {
   id?: string | number;
   method?: string;
   params?: unknown;
+  auth?: unknown;
 };
 
 type ResponseMessage =
@@ -253,6 +261,7 @@ const handleConnection = (
   handlers: CliBridgeHandlers,
   log: (message: string, error?: unknown) => void,
   activeSockets: Set<Socket>,
+  requiredToken: string | undefined,
 ) => {
   // The AbortController stays deliberately (effect-ratchet pinned): the
   // `signal?: AbortSignal` seam in CliBridgeHandlers is the contract the
@@ -310,6 +319,13 @@ const handleConnection = (
       return;
     }
     const id = request.id ?? 0;
+    if (requiredToken && !cliBridgeTokenMatches(requiredToken, request.auth)) {
+      writeResponse(socket, {
+        id,
+        error: { message: "cli-bridge: unauthorized" },
+      });
+      return;
+    }
     const method = request.method;
     if (typeof method !== "string") {
       writeResponse(socket, {
@@ -691,22 +707,32 @@ export const startCliBridgeServer = async ({
   handlers: CliBridgeHandlers;
   log?: (message: string, error?: unknown) => void;
 }): Promise<CliBridgeServer> => {
-  const usesFilesystem = runtimeIpcPathUsesFilesystem(socketPath);
+  const endpoint = parseCliBridgeEndpoint(socketPath);
+  const listenPath = endpoint.path;
+  const usesFilesystem = runtimeIpcPathUsesFilesystem(listenPath);
+  const requiredToken = usesFilesystem ? undefined : endpoint.token;
   if (!usesFilesystem) {
-    throw new Error(
-      "cli-bridge: secure current-user named-pipe ACLs are unavailable in this runtime",
-    );
+    if (!isUsableCliBridgeToken(requiredToken)) {
+      throw new Error(
+        "cli-bridge: a named-pipe endpoint needs a per-session token",
+      );
+    }
+    if (listenPath.length > maxWindowsPipeNameChars) {
+      throw new Error(
+        `cli-bridge: pipe name "${listenPath}" exceeds ${maxWindowsPipeNameChars} characters`,
+      );
+    }
   }
-  const socketPathBytes = Buffer.byteLength(socketPath, "utf8");
-  if (socketPathBytes > maxCliBridgeSocketPathBytes) {
+  const socketPathBytes = Buffer.byteLength(listenPath, "utf8");
+  if (usesFilesystem && socketPathBytes > maxCliBridgeSocketPathBytes) {
     throw new Error(
-      `cli-bridge: socket path "${socketPath}" is ${socketPathBytes} bytes, ` +
+      `cli-bridge: socket path "${listenPath}" is ${socketPathBytes} bytes, ` +
         `exceeding the ${maxCliBridgeSocketPathBytes}-byte ceiling kept under ` +
         "the 104-byte macOS sun_path limit. The runtime IPC root is too long " +
         "to host Unix domain sockets.",
     );
   }
-  const socketDir = path.dirname(socketPath);
+  const socketDir = path.dirname(listenPath);
   if (usesFilesystem) {
     await fsPromises.mkdir(socketDir, { recursive: true, mode: 0o700 });
     const currentUid =
@@ -743,7 +769,7 @@ export const startCliBridgeServer = async ({
         "cli-bridge: socket directory is not private and owned by the current user",
       );
     }
-    const staleStat = await fsPromises.lstat(socketPath).catch((error) => {
+    const staleStat = await fsPromises.lstat(listenPath).catch((error) => {
       if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;
     });
@@ -757,7 +783,7 @@ export const startCliBridgeServer = async ({
           "cli-bridge: refusing to replace an unsafe stale socket path",
         );
       }
-      await fsPromises.unlink(socketPath);
+      await fsPromises.unlink(listenPath);
     }
   }
 
@@ -775,7 +801,7 @@ export const startCliBridgeServer = async ({
       socket.destroy();
       return;
     }
-    handleConnection(socket, handlers, log, activeSockets);
+    handleConnection(socket, handlers, log, activeSockets, requiredToken);
   });
   server.on("error", (error) => {
     log("server error", error);
@@ -792,12 +818,19 @@ export const startCliBridgeServer = async ({
     };
     server.once("error", onError);
     server.once("listening", onListening);
-    server.listen(socketPath);
+    server.listen(listenPath);
   });
 
   try {
-    await fsPromises.chmod(socketPath, 0o600);
-    const socketStat = await fsPromises.lstat(socketPath);
+    if (!usesFilesystem) {
+      acceptingRequests = true;
+      return {
+        socketPath,
+        stop: () => stopServer(server, activeSockets),
+      };
+    }
+    await fsPromises.chmod(listenPath, 0o600);
+    const socketStat = await fsPromises.lstat(listenPath);
     const currentUid =
       typeof process.getuid === "function" ? process.getuid() : null;
     if (
@@ -811,36 +844,30 @@ export const startCliBridgeServer = async ({
     acceptingRequests = true;
   } catch (error) {
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    await fsPromises.unlink(socketPath).catch(() => undefined);
-    await fsPromises.rmdir(socketDir).catch(() => undefined);
+    if (usesFilesystem) {
+      await fsPromises.unlink(listenPath).catch(() => undefined);
+      await fsPromises.rmdir(socketDir).catch(() => undefined);
+    }
     throw error;
   }
 
   return {
     socketPath,
     stop: () =>
-      new Promise<void>((resolve) => {
-        // Forcibly destroy any in-flight connections. Their handler
-        // promises will settle on the next event-loop tick (the await
-        // chain hits a destroyed socket / cancelled write) so `close()`
-        // can fire its callback. We can't politely respond — the
-        // host-side request may already be on its way back — but the
-        // CLI side handles a closed-without-response as the same
-        // "fall through to exit-2 auth_required" path it uses for any
-        // other bridge failure.
-        for (const socket of activeSockets) {
-          socket.destroy();
-        }
-        activeSockets.clear();
-        server.close(() => {
-          if (usesFilesystem) {
-            void fsPromises
-              .unlink(socketPath)
-              .catch(() => undefined)
-              .then(() => fsPromises.rmdir(socketDir).catch(() => undefined));
-          }
-          resolve();
-        });
+      stopServer(server, activeSockets).then(() => {
+        void fsPromises
+          .unlink(listenPath)
+          .catch(() => undefined)
+          .then(() => fsPromises.rmdir(socketDir).catch(() => undefined));
       }),
   };
 };
+
+const stopServer = (server: Server, activeSockets: Set<Socket>) =>
+  new Promise<void>((resolve) => {
+    for (const socket of activeSockets) {
+      socket.destroy();
+    }
+    activeSockets.clear();
+    server.close(() => resolve());
+  });

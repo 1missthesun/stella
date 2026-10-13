@@ -18,6 +18,7 @@ import { connect, type Socket } from "node:net";
 import { z } from "zod";
 
 import { forkTimeoutFiber } from "./effect-runtime.js";
+import { parseCliBridgeEndpoint } from "./cli-bridge-endpoint.js";
 import type { ConnectorTokenPayload } from "./oauth.js";
 import type {
   MediaHttpResult,
@@ -124,7 +125,8 @@ const sendRequest = (
     let buffer = "";
     let settled = false;
 
-    const socket: Socket = connect(socketPath);
+    const endpoint = parseCliBridgeEndpoint(socketPath);
+    const socket: Socket = connect(endpoint.path);
     // Effect timer fiber instead of setTimeout; the cancel thunk below is
     // the old clearTimeout.
     const cancelTimeout = forkTimeoutFiber(timeoutMs, () => {
@@ -144,7 +146,14 @@ const sendRequest = (
 
     socket.setEncoding("utf-8");
     socket.on("connect", () => {
-      socket.write(`${JSON.stringify({ id, method, params })}\n`);
+      socket.write(
+        `${JSON.stringify({
+          id,
+          method,
+          params,
+          ...(endpoint.token ? { auth: endpoint.token } : {}),
+        })}\n`,
+      );
     });
     socket.on("data", (chunk: string) => {
       if (settled) return;

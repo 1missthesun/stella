@@ -384,11 +384,7 @@ export const callBackendNativeIntegration = async (
 ): Promise<unknown> => {
   const socketPath = options.cliBridgeSocketPath?.trim();
   if (!socketPath) {
-    throw new Error(
-      process.platform === "win32"
-        ? "Secure connector action brokering is unavailable on Windows."
-        : "The Stella connector action broker is unavailable.",
-    );
+    throw new Error("The Stella connector action broker is unavailable.");
   }
   const result: BackendConnectorActionResult =
     await requestBackendConnectorActionFromBridge({

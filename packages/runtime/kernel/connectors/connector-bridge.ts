@@ -14,6 +14,7 @@ import {
   stopConnectorBridgeProcess,
   writeConnectorBridgeProcessRecord,
 } from "./process-registry.js";
+import { resolveStdioLaunch } from "./stdio-launch.js";
 import type {
   ConnectorToolCallResult,
   ConnectorCommandConfig,
@@ -144,18 +145,24 @@ class StdioConnectorBridgeSession {
       process.env.STELLA_RUNTIME_WORKER_PID ?? "",
       10,
     );
-    this.child = spawn(this.server.command, this.server.args ?? [], {
+    const env = {
+      ...process.env,
+      ...(await resolveSecretPlaceholders(this.stellaAppDir, this.server.env)),
+      STELLA_CONNECTOR_BRIDGE: "1",
+      STELLA_CONNECTOR_ID: this.server.id,
+      STELLA_CONNECTOR_SESSION: bridgeSessionId,
+    };
+    const launch = resolveStdioLaunch(this.server.command, this.server.args ?? [], {
+      env,
+      ...(this.server.cwd ? { cwd: this.server.cwd } : {}),
+    });
+    this.child = spawn(launch.command, launch.args, {
       cwd: this.server.cwd,
-      env: {
-        ...process.env,
-        ...(await resolveSecretPlaceholders(this.stellaAppDir, this.server.env)),
-        STELLA_CONNECTOR_BRIDGE: "1",
-        STELLA_CONNECTOR_ID: this.server.id,
-        STELLA_CONNECTOR_SESSION: bridgeSessionId,
-      },
+      env,
       stdio: ["pipe", "pipe", "pipe"],
       windowsHide: true,
       detached: process.platform !== "win32",
+      ...(launch.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {}),
     });
     const child = this.child;
     this.processRecordPromise = child.pid

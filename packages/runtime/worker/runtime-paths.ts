@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { formatCliBridgeEndpoint } from "../kernel/connectors/cli-bridge-endpoint.js";
 
 /**
  * Per-stellaAppDir resolution of the on-disk worker lifecycle artifacts.
@@ -131,7 +132,7 @@ const windowsNamedPipePath = (name: string, rootHash: string): string =>
 
 export const createSecureCliBridgeEndpoint = (
   paths: Pick<RuntimePaths, "ipcDir" | "rootHash">,
-  options?: { platform?: NodeJS.Platform; nonce?: string },
+  options?: { platform?: NodeJS.Platform; nonce?: string; token?: string },
 ): string => {
   const platform = options?.platform ?? process.platform;
   const nonce = (
@@ -146,7 +147,18 @@ export const createSecureCliBridgeEndpoint = (
     );
   }
   if (platform === "win32") {
-    return `\\\\.\\pipe\\stella-cli-bridge-${paths.rootHash}-${nonce}`;
+    const token = (
+      options?.token ?? crypto.randomBytes(32).toString("base64url")
+    ).replace(/[^A-Za-z0-9_-]/gu, "");
+    if (token.length < 43) {
+      throw new Error(
+        "CLI bridge token must contain at least 256 bits of entropy.",
+      );
+    }
+    return formatCliBridgeEndpoint({
+      path: `\\\\.\\pipe\\stella-cli-bridge-${paths.rootHash}-${nonce}`,
+      token,
+    });
   }
   // The nonce MUST stay its own directory component: startCliBridgeServer
   // chmods the socket's parent directory to 0700 (that per-session dir is

@@ -14,8 +14,10 @@ import {
 } from "../../cli-bridge-server.js";
 import {
   createSecureCliBridgeEndpoint,
+  isWindowsNamedPipePath,
   resolveRuntimePaths,
 } from "../../runtime-paths.js";
+import { parseCliBridgeEndpoint } from "../../../kernel/connectors/cli-bridge-endpoint.js";
 import {
   createBackendConnectorActionBroker,
   createBackendConnectorActionsBroker,
@@ -25,13 +27,13 @@ import {
   createBackendMediaBroker,
   createBackendXApiBroker,
 } from "../../backend-session-broker.js";
-import { connectorActionBrokerAvailability } from "../../required-cli-bridge.js";
 import * as HostBus from "../host-bus.js";
 import * as SessionConfig from "./config.js";
 import * as RunnerCell from "./runner-cell.js";
 
 /**
- * The UDS bridge the worker exposes for sidecar processes (the
+ * The local-IPC bridge (a Unix socket, or a token-guarded named pipe on
+ * Windows) the worker exposes for sidecar processes (the
  * `stella-computer` daemon spawn path) and the in-process node_repl
  * `connect` client that need to call back into the host without the full
  * runtime JSON-RPC protocol. Connector-capable children may launch
@@ -57,12 +59,7 @@ export const layer = Layer.effect(
     const init = config.get();
 
     const bridgePaths = resolveRuntimePaths(init.stellaAppDir);
-    const brokerAvailability = connectorActionBrokerAvailability(
-      process.platform,
-    );
-    const socketPath = brokerAvailability.supported
-      ? createSecureCliBridgeEndpoint(bridgePaths)
-      : undefined;
+    const socketPath = createSecureCliBridgeEndpoint(bridgePaths);
 
     const connectorSweep = yield* Effect.promise(() =>
       sweepStaleConnectorBridgeProcesses(init.stellaDataDirPath, {
@@ -79,13 +76,6 @@ export const layer = Layer.effect(
       console.warn(
         `[connector-bridge] Stopped ${connectorSweep.stopped} stale connector helper(s).`,
       );
-    }
-
-    if (!brokerAvailability.supported || !socketPath) {
-      console.warn(
-        `[cli-bridge] ${"reason" in brokerAvailability ? brokerAvailability.reason : "Connector action broker is unavailable."}`,
-      );
-      return { socketPath: undefined };
     }
 
     const refreshSiteAuth = async () => {
@@ -198,7 +188,7 @@ export const layer = Layer.effect(
       },
     });
 
-    const cliBridgeServer: CliBridgeServer = yield* Effect.tryPromise({
+    const startBridge = Effect.tryPromise({
       try: () =>
         startCliBridgeServer({
           socketPath,
@@ -277,6 +267,23 @@ export const layer = Layer.effect(
         }),
       catch: (error) => error as Error,
     });
+
+    const cliBridgeServer: CliBridgeServer | null = isWindowsNamedPipePath(
+      parseCliBridgeEndpoint(socketPath).path,
+    )
+      ? yield* startBridge.pipe(
+          Effect.catch((error: Error) =>
+            Effect.sync(() => {
+              console.warn(
+                "[cli-bridge] The named-pipe bridge could not start; connectors stay local:",
+                error.message,
+              );
+              return null;
+            }),
+          ),
+        )
+      : yield* startBridge;
+    if (!cliBridgeServer) return { socketPath: undefined };
 
     yield* Effect.addFinalizer(() =>
       Effect.promise(() => cliBridgeServer.stop().catch(() => undefined)),

@@ -523,13 +523,15 @@ export class WorldSqlStore implements WorldToolFileApi {
          FROM world_dirents d JOIN world_nodes n ON n.node_id = d.node_id
         WHERE d.manifest_id = ?
           AND (? = '' OR (CASE WHEN d.parent_path = '' THEN d.name ELSE d.parent_path || '/' || d.name END) = ?
-            OR (CASE WHEN d.parent_path = '' THEN d.name ELSE d.parent_path || '/' || d.name END) LIKE ?)
+            OR ((CASE WHEN d.parent_path = '' THEN d.name ELSE d.parent_path || '/' || d.name END) > ?
+              AND (CASE WHEN d.parent_path = '' THEN d.name ELSE d.parent_path || '/' || d.name END) < ?))
           AND (CASE WHEN d.parent_path = '' THEN d.name ELSE d.parent_path || '/' || d.name END) > ?
         ORDER BY path LIMIT ?`,
         manifest,
         prefix,
         prefix,
-        `${prefix}/%`,
+        `${prefix}/`,
+        `${prefix}0`,
         cursor,
         limit + 1,
       )

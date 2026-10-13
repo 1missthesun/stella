@@ -88,7 +88,7 @@ export function TextShimmer({
       false,
     );
     return () => cancelAnimation(progress);
-  }, [animating, progress, restMs, sweepMs]);
+  }, [animating, progress, restMs, sweepMs, text]);
 
   const onLayout = useCallback(
     (event: LayoutChangeEvent) => {

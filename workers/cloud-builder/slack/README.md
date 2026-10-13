@@ -95,7 +95,10 @@ thread can keep steering her. Code: `src/slack/`; its settings page is
   default) sends visitors through Sign in with Slack restricted to the
   workspace (redirect URI `<auth>/api/slack/oauth/callback/preview`, a
   subdirectory of the registered one), then an HttpOnly `__Host-` cookie on
-  the preview origin; public opens for anyone with the link. Links expire
+  the preview origin. Slack refuses that sign-in for accounts without a
+  confirmed email (`user_email_unverified`) and never returns, so the page
+  also offers a one-time link the bot DMs to the member with the email
+  entered (`users.lookupByEmail`). Public opens for anyone with the link. Links expire
   1–90 days after they're made (default 14, the current setting applies to
   existing links); the daily cron deletes their files.
 - **Uninstalls** arrive on the App's webhook and are also noticed whenever

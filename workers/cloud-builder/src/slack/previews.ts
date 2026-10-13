@@ -220,7 +220,7 @@ const escapeHtml = (value: string): string =>
 
 const page = (status: number, title: string, body: string, extra?: HeadersInit): Response =>
   new Response(
-    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>:root{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:#f7f6f3;color:#1f1f1d}main{max-width:440px;padding:32px 24px;text-align:center}h1{font-size:22px;font-weight:600;margin:0 0 8px}p{margin:0 0 12px;color:#6b6a66}a.button{display:inline-block;margin-top:12px;padding:10px 18px;border-radius:999px;background:#1f1f1d;color:#f7f6f3;text-decoration:none;font-weight:500}@media (prefers-color-scheme:dark){body{background:#161615;color:#ecebe8}p{color:#a3a29e}a.button{background:#ecebe8;color:#161615}}</style></head><body><main><h1>${escapeHtml(title)}</h1>${body}</main></body></html>`,
+    `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escapeHtml(title)}</title><style>:root{color-scheme:light dark}body{margin:0;min-height:100vh;display:grid;place-items:center;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;background:#f7f6f3;color:#1f1f1d}main{max-width:440px;padding:32px 24px;text-align:center}h1{font-size:22px;font-weight:600;margin:0 0 8px}p{margin:0 0 12px;color:#6b6a66}.button{display:inline-block;margin-top:12px;padding:10px 18px;border:0;border-radius:999px;background:#1f1f1d;color:#f7f6f3;text-decoration:none;font:inherit;font-weight:500;cursor:pointer}form{margin-top:32px;padding-top:24px;border-top:1px solid #dddbd5}input{width:100%;box-sizing:border-box;padding:10px 14px;border-radius:12px;border:1px solid #c9c7c1;background:#fff;color:inherit;font:inherit}@media (prefers-color-scheme:dark){body{background:#161615;color:#ecebe8}p{color:#a3a29e}.button{background:#ecebe8;color:#161615}form{border-color:#33332f}input{background:#20201e;border-color:#45443f}}</style></head><body><main><h1>${escapeHtml(title)}</h1>${body}</main></body></html>`,
     {
       status,
       headers: {
@@ -706,7 +706,7 @@ const signin = async (request: Request, env: Cloudflare.Env): Promise<Response> 
       `Sign in to ${install.teamName}`,
       `<p>This preview is for members of the ${team} Slack workspace.</p>${
         clientId ? `<a class="button" href="${escapeHtml(viaSlack.toString())}">Sign in with Slack</a>` : ""
-      }<form method="post" action="${SIGNIN_DM_PATH}"><p style="margin-top:28px">Or get a sign-in link from Stella in a Slack DM:</p><input type="hidden" name="p" value="${preview.id}"><input type="hidden" name="r" value="${escapeHtml(path)}"><input name="email" type="email" required placeholder="Your email in ${team}" autocomplete="email" style="width:100%;box-sizing:border-box;padding:10px 14px;border-radius:12px;border:1px solid #c9c7c1;font:inherit"><button class="button" type="submit" style="border:0;cursor:pointer;font:inherit">Send me a link</button></form>`,
+      }<form method="post" action="${SIGNIN_DM_PATH}"><p>Or get a sign-in link from Stella in a Slack DM:</p><input type="hidden" name="p" value="${preview.id}"><input type="hidden" name="r" value="${escapeHtml(path)}"><input name="email" type="email" required placeholder="Your email in ${team}" autocomplete="email"><button class="button" type="submit">Send me a link</button></form>`,
       { "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'" },
     );
   }
@@ -988,7 +988,7 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
     return page(
       401,
       `Sign in to ${install.teamName}`,
-      `<p>This preview is for members of the ${escapeHtml(install.teamName)} Slack workspace.</p><a class="button" href="${escapeHtml(target.toString())}">Sign in with Slack</a>`,
+      `<p>This preview is for members of the ${escapeHtml(install.teamName)} Slack workspace.</p><a class="button" href="${escapeHtml(target.toString())}">Sign in</a>`,
     );
   }
   return await serveFile(request, env, preview, url.pathname, isPublic);

@@ -43,7 +43,7 @@ When agents can push (`<workspace>` says so), brief every agent that changes the
 2. Run `stella-publish` in the clone. It first waits for the repository's own preview deployment of that commit (Cloudflare Pages, Vercel, Netlify and the like) and prints its URL; when the repository has none, it builds the site and publishes it as a Stella preview (below) and prints that link.
 3. Report the preview URL, the branch and the commit. If `stella-publish` says the build failed, report the error summary it printed and include the change as a patch (`git show`) so people can see it.
 
-When the report comes back, post the preview link in the thread with one line on what changed, so whoever asked can open it and give feedback. Feedback in the thread means another change on the same branch, finished the same way.
+When the report comes back, post the preview link in the thread with one line on what changed, so whoever asked can open it and give feedback. When the build failed, post the error summary and the patch instead, and offer to fix the build. Feedback in the thread means another change on the same branch, finished the same way.
 
 When agents can't push, have them share changes as a patch, a diff or a file, and still run `stella-publish` in the clone after committing locally: it builds and publishes a Stella preview of their working copy.
 
@@ -53,7 +53,7 @@ Every agent you start can publish a static website (a built web app, a page, a p
 
 - In a project: `stella-publish` in its folder. It reads `stella.preview.json` (`{"build": "...", "output": "dist"}`) when the project has one, else detects the framework (Vite, Next.js static export, Create React App, Astro, SvelteKit, Gatsby, Nuxt, Angular, VitePress, Eleventy) or a plain folder with an `index.html`, installs, builds, uploads and prints the link.
 - A folder that's already built: `stella-publish <folder>` (it needs an `index.html` at its top).
-- Exit codes: 0 printed the link; 2 the build failed (it prints the last lines of the log: report a short summary of the error and the change as a patch); 3 nothing static to publish (say why, e.g. a server-rendered app); 5 too large, or the workspace's preview space is full.
+- Exit codes: 0 printed the link; 2 the build failed: report a short summary of the error from the log it prints and the change as a patch, and don't work around the failure (no edits beyond the request, no skipped build steps) unless someone asked for a fix; 3 nothing static to publish (say why, e.g. a server-rendered app); 5 too large, or the workspace's preview space is full.
 
 Each run makes a new link; links stop working after the time the workspace's owner set on stella.sh (14 days unless changed), and the owner chooses whether anyone with the link can open them or only members of this Slack workspace (who sign in with Slack). Post the link with one line on what it shows; don't promise it lasts forever. A server, an API or a database can't be hosted this way: say so and offer a patch or files instead.
 

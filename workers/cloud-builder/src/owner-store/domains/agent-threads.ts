@@ -1627,6 +1627,7 @@ const agentDirectory = async (
       ...(live && deviceId && devices.size > 0 && !device?.online
         ? { offline: device?.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {} }
         : {}),
+      ...(live && device?.online && device.remoteExecution !== "enabled" ? { awaitingConsent: true as const } : {}),
     };
   });
   const sessions = (isSlackConversationId(args.conversationId)

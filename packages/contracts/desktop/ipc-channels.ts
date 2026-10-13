@@ -55,6 +55,9 @@ export const IPC_EXECUTION_REMOTE_REQUEST =
   "execution:remoteExecutionRequest" as const;
 export const IPC_EXECUTION_ANSWER_REMOTE_REQUEST =
   "execution:answerRemoteExecutionRequest" as const;
+/** The question still waiting for an answer, for a window that opened after it was raised. */
+export const IPC_EXECUTION_PENDING_REMOTE_REQUEST =
+  "execution:pendingRemoteExecutionRequest" as const;
 /** The orchestrator moved the chat with `switch_destination`; the picker follows. */
 export const IPC_EXECUTION_TARGET_SET = "execution:targetSet" as const;
 

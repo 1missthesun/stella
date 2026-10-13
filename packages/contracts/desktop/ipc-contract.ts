@@ -252,6 +252,7 @@ import {
   IPC_ENGINE_ACCOUNTS_CANCEL_CONNECT_CHATGPT_CLOUD,
   IPC_ENGINE_ACCOUNTS_CONNECT_CHATGPT_CLOUD,
   IPC_EXECUTION_ANSWER_REMOTE_REQUEST,
+  IPC_EXECUTION_PENDING_REMOTE_REQUEST,
   IPC_EXECUTION_REMOTE_REQUEST,
   IPC_EXECUTION_TARGET_SET,
   IPC_GLOBAL_SHORTCUTS_SET_SUSPENDED,
@@ -838,6 +839,10 @@ export type IpcInvokeContract = {
   [IPC_EXECUTION_ANSWER_REMOTE_REQUEST]: Invoke<
     [payload: { allow: boolean }],
     { allow: boolean }
+  >;
+  [IPC_EXECUTION_PENDING_REMOTE_REQUEST]: Invoke<
+    [],
+    { requestedAt: number; requesterLabel?: string } | null
   >;
   [IPC_APP_SOURCE_GET_STATE]: Invoke<[], AppSourceState | null>;
   [IPC_APP_SOURCE_APPLY]: Invoke<[name: string], AppSourceActionResult>;

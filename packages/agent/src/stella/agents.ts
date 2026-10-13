@@ -1366,21 +1366,23 @@ export function stellaAgents(host: StellaAgentsHost) {
           state.calls[callKey] = { threadId, reporter: -1 };
         }, context);
         await api.details({ thread_id: threadId }, context);
-        const where =
+        const standing =
           placement.kind === "device"
-            ? await host.execution
-                ?.standing?.(placement.deviceId, context)
-                .then((standing) => (standing ? { ...placement, label: standing.name } : placement))
-                .catch(() => placement)
-            : placement;
+            ? await host.execution?.standing?.(placement.deviceId, context).catch(() => undefined)
+            : undefined;
+        const where = standing ? { ...placement, label: standing.name } : placement;
+        const waitingFor =
+          standing?.online && standing.remoteExecution && standing.remoteExecution !== "enabled"
+            ? `${describePlacement(where)} is asking the user on its screen to allow work from other devices, so it starts once they allow it there, waiting up to an hour. Tell the user to answer that prompt on ${describePlacement(where)}.`
+            : `${describePlacement(where)} can't take it yet (offline, not ready, or waiting for the user to allow work from other devices there), so it starts once it can, waiting up to an hour. Tell the user.`;
         return {
           content: [
             {
               type: "text",
               text: [
-                `${prior ? "Already started" : "Started"} ${threadId} (${describePlacement(where ?? placement)}).`,
+                `${prior ? "Already started" : "Started"} ${threadId} (${describePlacement(where)}).`,
                 "waiting" in started && started.waiting
-                  ? `${describePlacement(where ?? placement)} can't take it yet (offline, not ready, or waiting for the user to allow work from other devices there), so it starts once it can, waiting up to an hour. Tell the user.`
+                  ? waitingFor
                   : "",
               ]
                 .filter(Boolean)
@@ -1782,6 +1784,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           where: there.where,
           updatedAt: there.updatedAt,
           ...(there.offline ? { offline: there.offline } : {}),
+          ...(there.awaitingConsent ? { awaitingConsent: true as const } : {}),
         };
       }
       const computer = await computerOf(record, context, seen);
@@ -1794,6 +1797,9 @@ export function stellaAgents(host: StellaAgentsHost) {
         updatedAt: record.startedAt ?? Date.now(),
         ...(computer && !computer.online && isLiveAgentStatus(status)
           ? { offline: computer.lastSeenAt !== undefined ? { lastSeenAt: computer.lastSeenAt } : {} }
+          : {}),
+        ...(computer?.online && computer.remoteExecution && computer.remoteExecution !== "enabled" && isLiveAgentStatus(status)
+          ? { awaitingConsent: true as const }
           : {}),
       };
     }

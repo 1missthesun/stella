@@ -34,7 +34,7 @@ import { registerUiStateKvHandlers } from "../ipc/ui-state-handlers.js";
 import { registerVoiceHandlers } from "../ipc/voice-handlers.js";
 import { registerDictationHandlers } from "../ipc/dictation-handlers.js";
 import { registerCompanionHandlers } from "../ipc/companion-handlers.js";
-import { getAllWindows, } from "./context.js";
+import { clearPendingRemoteExecutionRequest, getAllWindows, pendingRemoteExecutionRequest, } from "./context.js";
 import { startStellaBrowserBridge, } from "./aux-runtime.js";
 import { getBrowserBridgeNamespace } from "../services/stella-browser-bridge-namespace.js";
 import { isBrowserBridgeEagerStartWorthwhile, isStellaBrowserBridgeBinaryInstalled, isStellaExtensionInstalled, } from "../services/stella-browser-bridge-service.js";
@@ -334,6 +334,8 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     });
     registerRemoteExecutionConsentHandlers({
         getStellaHostRunner: lifecycle.getRunner,
+        getPendingRequest: () => pendingRemoteExecutionRequest(context),
+        clearPendingRequest: () => clearPendingRemoteExecutionRequest(context),
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     // A paired phone's file and preview requests are held to files Stella

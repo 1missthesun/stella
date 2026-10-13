@@ -11,7 +11,10 @@
  */
 
 import type { IpcMainInvokeEvent } from "electron";
-import { IPC_EXECUTION_ANSWER_REMOTE_REQUEST } from "@stella/contracts/desktop/ipc-channels";
+import {
+  IPC_EXECUTION_ANSWER_REMOTE_REQUEST,
+  IPC_EXECUTION_PENDING_REMOTE_REQUEST,
+} from "@stella/contracts/desktop/ipc-channels";
 import { handleIpc } from "./typed-ipc.js";
 
 type RemoteExecutionConsentOptions = {
@@ -20,6 +23,11 @@ type RemoteExecutionConsentOptions = {
       allow: boolean;
     }) => Promise<{ allow: boolean }>;
   } | null;
+  getPendingRequest: () => {
+    requestedAt: number;
+    requesterLabel?: string;
+  } | null;
+  clearPendingRequest: () => void;
   assertPrivilegedSender: (
     event: IpcMainInvokeEvent,
     channel: string,
@@ -52,7 +60,20 @@ export const registerRemoteExecutionConsentHandlers = (
       // Declining is as load-bearing as allowing: it is a recorded answer, and
       // losing it would leave the device looking merely un-asked and get it
       // prompted again by the next attempt.
-      return await runner.answerRemoteExecutionRequest({ allow });
+      const answered = await runner.answerRemoteExecutionRequest({ allow });
+      options.clearPendingRequest();
+      return answered;
     },
   );
+  handleIpc(IPC_EXECUTION_PENDING_REMOTE_REQUEST, async (event) => {
+    if (
+      !options.assertPrivilegedSender(
+        event,
+        IPC_EXECUTION_PENDING_REMOTE_REQUEST,
+      )
+    ) {
+      throw new Error("Blocked untrusted request.");
+    }
+    return options.getPendingRequest();
+  });
 };

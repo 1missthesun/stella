@@ -40,12 +40,22 @@ export const RemoteExecutionConsentLayer = () => {
     const remoteExecution = getElectronApi()?.remoteExecution;
     if (!remoteExecution?.onRequest) return;
     // Main sends this fire-and-forget, so the subscription has to outlive any
-    // particular surface being open; `App` mounts this layer eagerly.
-    return remoteExecution.onRequest((request) => {
+    // particular surface being open; `App` mounts this layer eagerly. A
+    // question raised before this window was listening is asked for once.
+    let received = false;
+    const unsubscribe = remoteExecution.onRequest((request) => {
+      received = true;
       setFailed(false);
       setAnswering(false);
       setPending(request);
     });
+    void remoteExecution
+      .pending?.()
+      .then((request) => {
+        if (request && !received) setPending(request);
+      })
+      .catch(() => undefined);
+    return unsubscribe;
   }, []);
 
   const answer = useCallback(async (allow: boolean) => {

@@ -77,11 +77,17 @@ export const movedAgentBrief = (from: string, brief: string, held: readonly stri
   ].join("\n\n");
 
 /** A computer's name, whether it is online, and when it was last seen. */
-export type DeviceStanding = { name: string; online: boolean; lastSeenAt?: number };
+export type DeviceStanding = {
+  name: string;
+  online: boolean;
+  lastSeenAt?: number;
+  remoteExecution?: DeviceDestination["remoteExecution"];
+};
 
 export const deviceStanding = (device: DeviceDestination): DeviceStanding => ({
   name: device.label?.trim() || device.deviceId,
   online: device.online,
+  ...(device.remoteExecution ? { remoteExecution: device.remoteExecution } : {}),
   ...(device.lastSeenAt !== undefined ? { lastSeenAt: device.lastSeenAt } : {}),
 });
 

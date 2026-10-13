@@ -36,6 +36,8 @@ export type AgentDirectoryAgentRow = {
   updatedAt: number;
   /** The computer it runs on is offline. */
   offline?: { lastSeenAt?: number };
+  /** It has not started: the computer it was sent to is asking its user to allow work from other devices. */
+  awaitingConsent?: true;
 };
 
 export type AgentDirectorySessionRow = {
@@ -108,6 +110,11 @@ const offlineText = (row: AgentDirectoryAgentRow, now: number): string | undefin
     ? `${row.where} is offline${lastSeen(row.offline.lastSeenAt, now)}, so this status may be out of date; it reports when ${row.where} reconnects`
     : undefined;
 
+const awaitingConsentText = (row: AgentDirectoryAgentRow): string | undefined =>
+  row.awaitingConsent && !row.offline
+    ? `not started yet: ${row.where} is waiting for the user to allow work from other devices on its screen, and the agent starts once they do (up to an hour after it was sent)`
+    : undefined;
+
 /** Where an agent runs, unless that is the reader's own computer. */
 const placeOf = (where: string): string[] => (where === "this computer" ? [] : [where]);
 
@@ -121,7 +128,11 @@ const rosterLine = (
 ): string =>
   [
     `- ${row.threadId}`,
-    row.offline ? `${row.status}, computer offline` : row.status,
+    row.offline
+      ? `${row.status}, computer offline`
+      : row.awaitingConsent
+        ? "waiting for consent on that computer"
+        : row.status,
     ...placeOf(row.where),
     `last active ${formatAge(row.updatedAt, now)}`,
     ...(options?.startedYou
@@ -171,6 +182,7 @@ export const renderAgentRoster = (
 /** One agent as `agent_status` with its thread_id shows it. */
 export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now()) => {
   const offline = offlineText(row, now);
+  const waiting = awaitingConsentText(row);
   return {
     thread_id: row.threadId,
     description: row.description,
@@ -179,6 +191,7 @@ export const agentDirectoryEntry = (row: AgentDirectoryAgentRow, now = Date.now(
     last_active: formatAge(row.updatedAt, now),
     started_by: row.parentThreadId ?? STELLA_MESSAGE_TARGET,
     ...(offline ? { offline } : {}),
+    ...(waiting ? { waiting } : {}),
   };
 };
 

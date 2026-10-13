@@ -8,7 +8,7 @@ import { getSoundNotificationsEnabled } from "@stella/runtime/kernel/preferences
 import { deleteConnectorAccessTokens, loadConnectorTokenPayload, saveConnectorTokenPayload, } from "@stella/runtime/kernel/connectors/oauth";
 import { ensureStellaDataDirSeeded } from "@stella/runtime/kernel/home/stella-home";
 import { createStellaHostRunner, } from "../stella-host-runner.js";
-import { broadcastLocalChatUpdated, broadcastScheduleUpdated, broadcastToWindows, } from "./context.js";
+import { broadcastLocalChatUpdated, broadcastScheduleUpdated, broadcastToWindows, pendingRemoteExecutionRequest, } from "./context.js";
 import { startOfficePreviewBridge } from "./office-preview-bridge.js";
 import { showStellaNotification } from "../services/notification-service.js";
 import { serveDeviceRequest } from "../services/device-request-service.js";
@@ -297,8 +297,28 @@ export const createHostRunnerHandlers = (context, options) => ({
     notifyRemoteExecutionRequest: (payload) => {
         // Broadcast rather than await: the question belongs on this computer's
         // screen, and the renderer answers whenever its user does through
-        // `execution:answerRemoteExecutionRequest`.
+        // `execution:answerRemoteExecutionRequest`. It is also kept here, so a
+        // window that opens or reloads later (a closed window on macOS is gone,
+        // and at launch the gate can ask before the renderer subscribes) still
+        // asks; and a window that is not in front gets a notification once.
+        const fresh = !pendingRemoteExecutionRequest(context);
+        context.state.pendingRemoteExecutionRequest = {
+            request: payload,
+            receivedAt: Date.now(),
+        };
         broadcastToWindows(context, IPC_EXECUTION_REMOTE_REQUEST, payload);
+        const windowManager = context.state.windowManager;
+        if (fresh && !(windowManager?.isWindowVisible() && windowManager.isWindowFocused())) {
+            showStellaNotification(context, {
+                id: `stella-remote-execution-${Date.now()}`,
+                groupId: "stella-remote-execution",
+                groupTitle: "Stella",
+                title: "Allow work from your other devices?",
+                body: payload?.requesterLabel
+                    ? `${payload.requesterLabel} asked to run work on this computer. Open Stella to answer.`
+                    : "Another of your devices asked to run work on this computer. Open Stella to answer.",
+            });
+        }
     },
     setExecutionTarget: (payload) => {
         broadcastToWindows(context, IPC_EXECUTION_TARGET_SET, payload);

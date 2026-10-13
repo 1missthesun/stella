@@ -27,6 +27,22 @@ export const broadcastToWindows = (context, channel, payload) => {
         window.webContents.send(channel, payload);
     });
 };
+// The gate repeats its question about every ten seconds while work waits, so
+// one it has not repeated for a while is no longer being asked.
+const PENDING_REMOTE_EXECUTION_REQUEST_TTL_MS = 2 * 60_000;
+export const pendingRemoteExecutionRequest = (context) => {
+    const pending = context.state.pendingRemoteExecutionRequest;
+    if (!pending)
+        return null;
+    if (Date.now() - pending.receivedAt > PENDING_REMOTE_EXECUTION_REQUEST_TTL_MS) {
+        context.state.pendingRemoteExecutionRequest = null;
+        return null;
+    }
+    return pending.request;
+};
+export const clearPendingRemoteExecutionRequest = (context) => {
+    context.state.pendingRemoteExecutionRequest = null;
+};
 export const broadcastLocalChatUpdated = (context, payload) => {
     broadcastToWindows(context, IPC_LOCAL_CHAT_UPDATED, payload ?? null);
 };
@@ -43,6 +59,7 @@ export const createBootstrapContext = (config) => {
         appSourceService: null,
         updateTransition: null,
         pendingUpdateHold: null,
+        pendingRemoteExecutionRequest: null,
         keepRuntimeAcrossRelaunch: false,
         deferredStartupSequence: null,
         startHostRunner: null,

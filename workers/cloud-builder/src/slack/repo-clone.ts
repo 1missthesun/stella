@@ -114,13 +114,15 @@ export const prepareSlackRepo = async (
         writeFile(PREVIEW_HELPER, PREVIEW_SCRIPT, "0755", "root:root"),
       ]
     : [`rm -rf ${HELPER_DIR}`];
+  const config = `git -c safe.directory='*' -C ${shellQuote(dir)} config`;
   const configure = capability
     ? [
-        `git -C ${shellQuote(dir)} config credential.helper ''`,
-        `git -C ${shellQuote(dir)} config --add credential.helper ${CREDENTIAL_HELPER}`,
-        `git -C ${shellQuote(dir)} config user.name ${shellQuote("Stella")}`,
-        `git -C ${shellQuote(dir)} config user.email ${shellQuote("stella@stella.sh")}`,
-        `git -C ${shellQuote(dir)} config push.default upstream`,
+        `${config} --unset-all credential.helper || true`,
+        `${config} --add credential.helper ''`,
+        `${config} --add credential.helper ${CREDENTIAL_HELPER}`,
+        `${config} user.name ${shellQuote("Stella")}`,
+        `${config} user.email ${shellQuote("stella@stella.sh")}`,
+        `${config} push.default upstream`,
       ]
     : [];
   const command = [

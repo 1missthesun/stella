@@ -132,6 +132,12 @@ export function MessageEntry({
   animate: boolean;
 }) {
   const animatedStyle = useBubblePop(animate, SENT_BUBBLE_POP);
+  // Only a row that mounted popping needs Animated. History rows re-render
+  // whenever the list's shared row inputs change (a reply landing, a turn
+  // ending); as Animated views each of those rebuilt its animated props and
+  // re-attached native animation nodes, row by row, inside the arrival frame.
+  const popped = useRef(animate).current;
+  if (!popped) return <View onLayout={onLayout}>{children}</View>;
   return (
     <Animated.View onLayout={onLayout} style={animatedStyle}>
       {children}

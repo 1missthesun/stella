@@ -9,6 +9,7 @@ import {
   Animated,
   Easing,
   StyleSheet,
+  View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -116,14 +117,16 @@ export function AssistantBubble({
     if (arrivedRef.current) handoff?.replyArrived();
   }, [handoff]);
   const pop = useBubblePop(animate, ARRIVING_BUBBLE_POP);
+  // A bubble that mounted settled never animates: keep it a plain view.
+  const Bubble = arrivedRef.current ? Animated.View : View;
   return (
-    <Animated.View style={[style, pop]}>
+    <Bubble style={arrivedRef.current ? [style, pop] : style}>
       <LinearGradient
         pointerEvents="none"
         colors={[colors.assistantBubbleFillTop, colors.assistantBubbleFillBottom]}
         style={StyleSheet.absoluteFill}
       />
       {children}
-    </Animated.View>
+    </Bubble>
   );
 }

@@ -114,6 +114,13 @@ export type ClaudeCodeTurnRequest = {
   resumeFallbackPrompt?: string;
   systemPrompt?: string;
   cwd?: string;
+  /**
+   * The CLI's `--setting-sources`: which of the user's, the project's and the
+   * local settings it loads, and with them which CLAUDE.md files (user,
+   * project, local). Unset loads all of them; `[]` loads none, while
+   * Stella's own `--settings` (its hooks) always apply.
+   */
+  settingSources?: readonly ("user" | "project" | "local")[];
   attachments?: readonly { url: string; mimeType?: string }[];
   tools: readonly ToolMetadata[];
   nativeTools?: readonly string[];
@@ -2624,6 +2631,9 @@ class ClaudeCodeSessionRuntime {
         allowedTools,
       );
     }
+    if (request.settingSources) {
+      args.push("--setting-sources", request.settingSources.join(","));
+    }
     if (effectiveSystemPrompt.trim()) {
       args.push("--system-prompt", effectiveSystemPrompt.trim());
     }
@@ -2650,6 +2660,7 @@ class ClaudeCodeSessionRuntime {
       effectiveSystemPrompt.trim(),
       request.autoCompactWindowTokens ?? null,
       request.cliBridgeSocketPath ?? "",
+      request.settingSources ?? null,
     ]);
   }
   async ensureMcpHost(

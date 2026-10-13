@@ -23,19 +23,20 @@ const isDirectory = (value: string): boolean => {
 };
 
 /**
- * Resolve the filesystem root an agent should operate from. The install root
- * remains a separate absolute path for bundled assets; it is only selected
- * here for the legacy `frontend` mode when it is a real directory. Packaged
- * Electron builds expose `app.asar` as the install root, but child-process
- * `cwd` must be a directory, so those builds fall back to the user's home.
+ * Resolve the filesystem root an agent should operate from: the folder its
+ * brief names, else its definition's default (`stella-home` is Stella's data
+ * folder, `frontend` the app checkout), else the user's home. Both defaults
+ * apply only when the folder is a real directory.
  */
 export const resolveAgentWorkingDirectory = ({
   agentType,
   stellaAppDir,
+  stellaDataDir,
   workingDirectory,
 }: {
   agentType: string;
   stellaAppDir?: string;
+  stellaDataDir?: string;
   workingDirectory?: string;
 }): string | undefined => {
   const homeDirectory = os.homedir().trim();
@@ -45,13 +46,15 @@ export const resolveAgentWorkingDirectory = ({
       expandWorkingDirectory(explicitWorkingDirectory, homeDirectory),
     );
   }
-  const normalizedStellaAppDir = stellaAppDir?.trim();
-  if (
-    getLocalCliWorkingDirectory(agentType) === "frontend" &&
-    normalizedStellaAppDir &&
-    isDirectory(normalizedStellaAppDir)
-  ) {
-    return normalizedStellaAppDir;
+  const preferred = getLocalCliWorkingDirectory(agentType);
+  const defaultDirectory =
+    preferred === "stella-home"
+      ? stellaDataDir?.trim()
+      : preferred === "frontend"
+        ? stellaAppDir?.trim()
+        : undefined;
+  if (defaultDirectory && isDirectory(defaultDirectory)) {
+    return path.resolve(defaultDirectory);
   }
   if (homeDirectory) return path.resolve(homeDirectory);
   return undefined;

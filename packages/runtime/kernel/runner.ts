@@ -394,6 +394,7 @@ export const createStellaHostRunner = (
         resolveAgentWorkingDirectory({
           agentType: AGENT_IDS.ORCHESTRATOR,
           stellaAppDir: context.stellaAppDir,
+          stellaDataDir: context.stellaDataDir,
         });
       if (!workingFolder) {
         throw new Error("No working folder to restore the session into.");

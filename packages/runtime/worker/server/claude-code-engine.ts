@@ -141,6 +141,7 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
     resolveAgentWorkingDirectory({
       agentType: ref.role === "orchestrator" ? "orchestrator" : "general",
       stellaAppDir: appDir,
+      stellaDataDir: dataDir(),
       ...(ref.cwd ? { workingDirectory: ref.cwd } : {}),
     });
   const syncs = (ref: ClaudeCodeSessionRef) => !ref.ephemeral && !ref.conversationId.startsWith("local_");
@@ -256,6 +257,9 @@ const desktopTransport = (session: OpenSession): ClaudeCodeTransport => {
         resumeFallbackPrompt: spec.resumeFallbackPrompt,
         systemPrompt: spec.systemPrompt,
         ...(cwd ? { cwd } : {}),
+        // Stella loads no CLAUDE.md, user settings or plugins: her prompt and
+        // memory are her instructions. Agents keep their folder's own.
+        ...(ref.role === "orchestrator" ? { settingSources: [] } : {}),
         ...(spec.images.length > 0
           ? { attachments: spec.images.map((image) => ({ url: `data:${image.mimeType};base64,${image.data}`, mimeType: image.mimeType })) }
           : {}),

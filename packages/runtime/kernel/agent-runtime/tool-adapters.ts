@@ -835,6 +835,7 @@ export const buildRuntimeToolContext = (
   const workingDirectory = resolveAgentWorkingDirectory({
     agentType: args.agentType,
     stellaAppDir: args.stellaAppDir,
+    stellaDataDir: args.stellaDataDir,
     workingDirectory: args.toolWorkspaceRoot ?? args.agentWorkingDirectory,
   });
   return {

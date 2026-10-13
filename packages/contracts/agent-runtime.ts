@@ -7,7 +7,12 @@ export const AGENT_IDS = {
 export type AgentId = (typeof AGENT_IDS)[keyof typeof AGENT_IDS];
 
 type AgentPromptRole = "orchestrator" | "subagent";
-type LocalCliWorkingDirectory = "home" | "frontend";
+/**
+ * Where an agent's local CLI runs when its brief names no folder:
+ * `stella-home` is Stella's data folder (`~/.stella`), `frontend` the app
+ * checkout, `home` the user's home folder.
+ */
+type LocalCliWorkingDirectory = "home" | "frontend" | "stella-home";
 type AgentModelSettings = {
   description?: string;
   order: number;
@@ -65,7 +70,9 @@ const BUILTIN_AGENT_DEFINITIONS = [
     runsAsSubagent: false,
     usesLocalCliRuntime: true,
     promptRole: "orchestrator",
-    localCliWorkingDirectory: "frontend",
+    // Stella's own folder: the orchestrator works on the user's life, not on
+    // the app's source, so nothing of the checkout is its working folder.
+    localCliWorkingDirectory: "stella-home",
     modelSettings: {
       description: "Top-level agent that delegates tasks",
       order: 0,

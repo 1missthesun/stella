@@ -49,7 +49,7 @@ export function TaskReportButton({
   conversationId: string;
   status?: "running" | "completed" | "error" | "canceled";
   liveTitle?: string;
-  /** A quiet text link that flows at the end of the reply's last paragraph. */
+  /** The "Show more" under a reply, styled like a user message's toggle. */
   inline?: boolean;
   /**
    * The report as the conversation recorded it. Agents a cloud chat runs on

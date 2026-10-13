@@ -1,8 +1,8 @@
 /**
- * The quiet "more" link at the end of a reply's text. It opens the full
- * report of the task the reply relays (or cites, once that task has
- * settled), the same popover the task quote used to open. Nothing renders
- * while no quoted task has a report yet.
+ * The "Show more" under a reply's text, placed like a user message's
+ * toggle. It opens the full report of the task the reply relays (or cites,
+ * once that task has settled), the same popover the task quote used to
+ * open. Nothing renders while no quoted task has a report yet.
  */
 import { memo } from "react";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
@@ -62,7 +62,7 @@ export const ReplyReportLinks = memo(function ReplyReportLinks({
   ];
   if (reports.length === 0) return null;
   return (
-    <span className="reply-report-links">
+    <div className="reply-report-links">
       {reports.map(({ reference, status, result }) => (
         <TaskReportButton
           key={reference.threadId}
@@ -74,6 +74,6 @@ export const ReplyReportLinks = memo(function ReplyReportLinks({
           inline
         />
       ))}
-    </span>
+    </div>
   );
 });

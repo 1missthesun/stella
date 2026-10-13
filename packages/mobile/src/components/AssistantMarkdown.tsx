@@ -8,8 +8,8 @@
  * manage. A message's text only changes if the turn's canonical row later
  * replaces it, which is a normal re-render.
  */
-import { memo, useCallback, useMemo, useRef, type ReactNode } from "react";
-import { Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { memo, useCallback, useMemo, type ReactNode } from "react";
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   Markdown,
   List,
@@ -32,9 +32,9 @@ import type { Colors } from "../theme/colors";
 import { SelectableMarkdownText, nativeMarkdownSelectionAvailable } from "./SelectableMarkdownText";
 import { AssistantMarkdownTable } from "./AssistantMarkdownTable";
 import { useT } from "../i18n";
+import { CONTENT_MAX_FONT_SCALE } from "../lib/setup-text-defaults";
 
 const BASE_FONT_SIZE = 17;
-const MORE_LINK_FONT_SIZE = 15;
 
 async function openLink(url: string): Promise<boolean> {
   try {
@@ -158,23 +158,23 @@ function buildNodeStyles(colors: Colors): NodeStyleOverrides {
   };
 }
 
-const MORE_LINK_HREF = "stella-more:";
-
-/**
- * Append the reply's "more" links to its markdown so they flow on the line of
- * the last paragraph. A reply that ends in a block (list, quote, code, table,
- * heading or rule) gets them as their own short paragraph instead, so the
- * block's syntax is never disturbed (desktop does the same).
- */
-const withMoreLinks = (text: string, count: number): string => {
-  if (count === 0) return text;
-  const links = Array.from({ length: count }, (_, index) => `[more](${MORE_LINK_HREF}${index})`).join(" · ");
-  const body = text.replace(/\s+$/, "");
-  const lastLine = body.slice(body.lastIndexOf("\n") + 1).trim();
-  const endsInBlock =
-    lastLine === "" || /^(```|~~~|\||#{1,6}\s|>|[-*+]\s|\d+[.)]\s|---|\*\*\*|___)/.test(lastLine);
-  return endsInBlock ? `${body}\n\n${links}` : `${body} ${links}`;
-};
+const moreLinkStyles = StyleSheet.create({
+  row: {
+    alignSelf: "flex-end",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: -4,
+    marginBottom: 10,
+  },
+  item: { flexDirection: "row", alignItems: "center", gap: 6 },
+  label: {
+    fontFamily: fonts.sans.medium,
+    fontSize: 13,
+    letterSpacing: -0.1,
+    lineHeight: 16,
+  },
+});
 
 const containsImage = (node: MarkdownNode): boolean => node.type === "image" || Boolean(node.children?.some(containsImage));
 
@@ -232,8 +232,9 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   onStellaFileLink?: (path: string) => void;
   onAskStella?: (text: string) => void;
   /**
-   * Quiet "more" links appended after the last paragraph, one per task whose
-   * full report this reply offers. Each opens that report.
+   * "Show more" buttons under the reply, placed like a user message's
+   * toggle, one per task whose full report this reply offers. Each opens
+   * that report.
    */
   moreLinks?: readonly {
     key: string;
@@ -242,15 +243,6 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   }[];
 }) {
   const theme = useMemo(() => buildTheme(colors), [colors]);
-  // Callers rebuild the link list every render; only its labels shape the
-  // rendered tree, and taps read the latest handlers.
-  const moreLinksRef = useRef(moreLinks);
-  moreLinksRef.current = moreLinks;
-  const moreLinksKey = moreLinks?.map((link) => `${link.key}\u0000${link.label}`).join("\n") ?? "";
-  const moreLabels = useMemo(
-    () => (moreLinksKey ? moreLinksKey.split("\n").map((entry) => entry.split("\u0000")[1] ?? "") : []),
-    [moreLinksKey],
-  );
   const nodeStyles = useMemo(() => buildNodeStyles(colors), [colors]);
   const t = useT();
   const showMoreLabel = t("app.chat.userMessage.showMore");
@@ -330,28 +322,6 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
           </View>
         ),
       } : {}),
-      link: ({ node }: CustomRendererProps) => {
-        const href = node.href ?? "";
-        if (!href.startsWith(MORE_LINK_HREF)) return undefined;
-        const index = Number(href.slice(MORE_LINK_HREF.length));
-        const label = moreLabels[index];
-        if (label === undefined) return null;
-        return (
-          <Text
-            accessibilityRole="link"
-            accessibilityLabel={label}
-            onPress={(event) =>
-              moreLinksRef.current?.[index]?.onPress({
-                x: event.nativeEvent.pageX,
-                y: event.nativeEvent.pageY,
-              })
-            }
-            style={{ color: colors.textMuted, fontFamily: fonts.sans.medium, fontSize: MORE_LINK_FONT_SIZE }}
-          >
-            {showMoreLabel}
-          </Text>
-        );
-      },
       table: ({ node, Renderer }: CustomRendererProps) => (
         <AssistantMarkdownTable
           node={node}
@@ -363,7 +333,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
         />
       ),
     }),
-    [colors, selectable, nodeStyles, onLinkPress, onAskStella, moreLabels, showMoreLabel],
+    [colors, selectable, nodeStyles, onLinkPress, onAskStella],
   );
 
   const content: ReactNode = (
@@ -377,13 +347,49 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
       selectable={selectable}
       {...(embeddedImages ? { imageOptions: EMBEDDED_IMAGE_OPTIONS } : {})}
     >
-      {withMoreLinks(text, moreLabels.length)}
+      {text}
     </Markdown>
   );
 
   return (
     <View style={fill ? containerStyle.wrapper : containerStyle.hug}>
       {content}
+      {moreLinks && moreLinks.length > 0 ? (
+        <View style={moreLinkStyles.row}>
+          {moreLinks.map((link, index) => (
+            <View key={link.key} style={moreLinkStyles.item}>
+              {index > 0 ? (
+                <Text
+                  style={[moreLinkStyles.label, { color: fadeHex(colors.text, 0.68) }]}
+                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                >
+                  {"·"}
+                </Text>
+              ) : null}
+              <Pressable
+                onPress={(event) =>
+                  link.onPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY })
+                }
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={link.label}
+              >
+                {({ pressed }) => (
+                  <Text
+                    style={[
+                      moreLinkStyles.label,
+                      { color: pressed ? colors.text : fadeHex(colors.text, 0.68) },
+                    ]}
+                    maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                  >
+                    {showMoreLabel}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 });

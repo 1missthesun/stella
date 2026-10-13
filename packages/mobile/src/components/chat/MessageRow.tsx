@@ -1033,7 +1033,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       />
     ) : null;
   // The full report of each task this reply relays (or cites, unless it is
-  // still running) opens from a quiet "more" after the reply's text, not from
+  // still running) opens from a "Show more" under the reply's text, not from
   // the quote.
   const reportRefs: AgentReplyRef[] = [
     ...relayedQuotes.map((quote) => quote.ref),

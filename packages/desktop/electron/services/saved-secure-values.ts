@@ -7,6 +7,7 @@
 // STOP and ask the user to confirm in plain language.
 import { randomUUID } from "crypto";
 import fs from "fs";
+import os from "os";
 import path from "path";
 import { spawn } from "node:child_process";
 import {
@@ -115,19 +116,38 @@ const chunkPayload = (payload: string): string[] => {
   return chunks.length > 0 ? chunks : [""];
 };
 
+let loginKeychainPath: string[] | null = null;
+
+const loginKeychain = (): string[] => {
+  if (loginKeychainPath) return loginKeychainPath;
+  try {
+    const candidate = path.join(
+      os.userInfo().homedir,
+      "Library",
+      "Keychains",
+      "login.keychain-db",
+    );
+    loginKeychainPath = fs.existsSync(candidate) ? [candidate] : [];
+  } catch {
+    loginKeychainPath = [];
+  }
+  return loginKeychainPath;
+};
+
 const macKeychain = {
   async write(id: string, label: string, payload: string, previousChunks = 0) {
     const chunks = chunkPayload(payload);
+    const keychain = loginKeychain().map(keychainQuote).join(" ");
     const lines = chunks.map(
       (chunk, index) =>
-        `add-generic-password -U -s ${keychainQuote(KEYCHAIN_SERVICE)} -a ${keychainQuote(keychainAccount(id, index))} -l ${keychainQuote(`Stella: ${label}`)} -X ${Buffer.from(chunk, "utf-8").toString("hex")}`,
+        `add-generic-password -U -s ${keychainQuote(KEYCHAIN_SERVICE)} -a ${keychainQuote(keychainAccount(id, index))} -l ${keychainQuote(`Stella: ${label}`)} -X ${Buffer.from(chunk, "utf-8").toString("hex")} ${keychain}`.trimEnd(),
     );
     const result = await runCommand("/usr/bin/security", ["-i"], `${lines.join("\n")}\n`);
     if (result.code !== 0) return null;
     for (let index = chunks.length; index < previousChunks; index += 1) {
       await runCommand(
         "/usr/bin/security",
-        ["delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", keychainAccount(id, index)],
+        ["delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", keychainAccount(id, index), ...loginKeychain()],
         "",
       );
     }
@@ -138,7 +158,7 @@ const macKeychain = {
     for (let index = 0; index < Math.max(1, chunks); index += 1) {
       const result = await runCommand(
         "/usr/bin/security",
-        ["find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", keychainAccount(id, index), "-w"],
+        ["find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", keychainAccount(id, index), "-w", ...loginKeychain()],
         "",
       );
       if (result.code !== 0) return null;
@@ -150,7 +170,7 @@ const macKeychain = {
     for (let index = 0; index < Math.max(1, chunks); index += 1) {
       await runCommand(
         "/usr/bin/security",
-        ["delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", keychainAccount(id, index)],
+        ["delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", keychainAccount(id, index), ...loginKeychain()],
         "",
       );
     }

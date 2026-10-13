@@ -76,8 +76,6 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: Shell
         <ShellTopBarPrimaryNav omitIds={OMITTED_NAV_IDS} />
       </div>
 
-      <div className="shell-topbar-full__spacer" aria-hidden="true" />
-
       <ShellTopBarActivity />
 
       <div className="shell-topbar-full__right">

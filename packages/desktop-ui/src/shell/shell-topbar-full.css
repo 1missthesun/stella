@@ -14,9 +14,21 @@
   inset: 0 0 auto 0;
   height: var(--shell-topbar-height, 38px);
   z-index: 80;
-  display: flex;
+  /* Three slots: nav, activity, right cluster. The side tracks are equal
+     shares of what the activity leaves, so the activity sits on the bar's
+     midline (padding included, which flex would not do), and each is floored
+     at its own content, so the traffic-light inset, the update pill and the
+     account are never squeezed. The activity track (up to 30rem) is the only
+     one that gives as the window narrows: once the right cluster is wider
+     than its share the mark slides left rather than truncating beside empty
+     space, then the label ellipsizes; see `shell-topbar-activity.css`. */
+  display: grid;
+  grid-template-columns:
+    minmax(max-content, 1fr)
+    minmax(0, 30rem)
+    minmax(max-content, 1fr);
   align-items: center;
-  gap: 8px;
+  column-gap: 8px;
   color: var(--text-base);
   background: transparent;
   border: none;
@@ -49,11 +61,8 @@ body[data-display-expanding="true"] .shell-topbar-full,
   transition: none;
 }
 
-/* Content-sized and never shrunk: it only holds the nav, so the spacer is the
-   one flexible drag region and the macOS traffic-light inset below always
-   survives a narrow window. */
+/* Holds only the nav; with the right cluster it is the bar's drag region. */
 .shell-topbar-full__left {
-  flex: 0 0 auto;
   min-width: 0;
   height: 100%;
   display: flex;
@@ -72,21 +81,13 @@ body[data-display-expanding="true"] .shell-topbar-full,
   padding-left: 84px;
 }
 
-.shell-topbar-full__spacer {
-  flex: 1 1 8px;
-  min-width: 8px;
-  height: 100%;
-  -webkit-app-region: drag;
-}
-
 .shell-topbar-full__right {
   height: 100%;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 4px;
-  flex: 0 0 auto;
-  flex-shrink: 0;
-  margin-left: auto;
+  min-width: 0;
   padding-right: 10px;
   -webkit-app-region: drag;
 }

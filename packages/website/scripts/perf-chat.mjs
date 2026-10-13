@@ -14,6 +14,11 @@ const REPO = path.resolve(WEBSITE, "../..");
 const PUBLIC = path.join(WEBSITE, "public");
 const HOST = "stella.sh";
 const DEV_BACKEND = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
+const cloudflareAccessHeaders = () => {
+  const id = process.env.STELLA_CF_ACCESS_CLIENT_ID?.trim();
+  const secret = process.env.STELLA_CF_ACCESS_CLIENT_SECRET?.trim();
+  return id && secret ? { "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret } : {};
+};
 const builtBackend = (dir) => {
   const html = fs.readFileSync(path.join(dir, "index.html"), "utf8");
   return /<link rel="preconnect" href="([^"]+)"/.exec(html)?.[1]?.replace(/\/+$/, "") ?? "";
@@ -123,7 +128,7 @@ const sessionToken = async () => {
   if (!secret) throw new Error("Set STELLA_ADMIN_API_SECRET (or workers/cloud-builder/.dev.vars) to mint the dev test account.");
   const response = await fetch(`${BACKEND}/api/admin/test-accounts/session`, {
     method: "POST",
-    headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${secret}`, "content-type": "application/json", ...cloudflareAccessHeaders() },
     body: JSON.stringify({ email: "perf-chat@test.stella.local", plan: "pro", usageMode: "unlimited" }),
   });
   const payload = await response.json().catch(() => null);

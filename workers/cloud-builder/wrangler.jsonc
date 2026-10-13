@@ -53,6 +53,7 @@
   "version_metadata": { "binding": "CF_VERSION_METADATA" },
   "observability": {
     "enabled": true,
+    "redact_query_string": true,
     "issues": { "enabled": true },
     "logs": {
       "enabled": true,
@@ -365,6 +366,7 @@
     },
     "observability": {
       "enabled": true,
+      "redact_query_string": true,
       "issues": { "enabled": true },
       "logs": {
         "enabled": true,
@@ -693,6 +695,19 @@
       "routes": [{ "pattern": "auth.stella.sh", "custom_domain": true }],
       "workers_dev": true,
       "preview_urls": false,
+      "observability": {
+        "enabled": true,
+        "redact_query_string": true,
+        "issues": { "enabled": true },
+        "logs": {
+          "enabled": true,
+          "invocation_logs": true,
+        },
+        "traces": {
+          "enabled": true,
+          "head_sampling_rate": 0.05,
+        },
+      },
       "vars": {
         "STELLA_AUTH_URL": "https://auth.stella.sh",
         "TELEMETRY_ENVIRONMENT": "production",
@@ -719,6 +734,10 @@
         "SITES_HOST": "*.stellasites.app",
         "SITES_SHARED_ORIGIN": "",
         "STELLA_EMAIL_FROM": "Stella <noreply@stella.sh>",
+        // /api/admin also needs a Cloudflare Access JWT for this app
+        // (src/admin/access.ts). Unset fails closed; "off" for both is bearer-only.
+        "ADMIN_ACCESS_TEAM_DOMAIN": "fromyou.cloudflareaccess.com",
+        "ADMIN_ACCESS_AUD": "fc47bb85d7a88032bd25e910c3212ca1f7049d0c2f7c4dad4b2e367b65e16614",
       },
       "secrets": {
         "required": [

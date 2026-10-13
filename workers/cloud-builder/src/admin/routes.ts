@@ -1,5 +1,6 @@
 /**
- * Operator routes, authenticated with `STELLA_ADMIN_API_SECRET` as a bearer:
+ * Operator routes, authenticated with `STELLA_ADMIN_API_SECRET` as a bearer
+ * (and, in production, a Cloudflare Access JWT; see access.ts):
  *
  *   GET  /api/admin/owners/lookup?ownerId=      snapshot identity, enforcement, billing and risk row
  *   GET  /api/admin/owners/top?limit=&status=   D1 `owner_risk` by score
@@ -24,6 +25,7 @@ import { bearerCredential } from "../../../shared/bearer.js";
 import { fail, json } from "../http/response.js";
 import { fixedWorkSha256SecretEqual } from "../service-bearer.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { adminAccessDenied } from "./access.js";
 
 type AdminEnv = Pick<Cloudflare.Env, "OWNER_GATES" | "DB" | "WORLDS" | "ORCHESTRATOR_SESSIONS">;
 
@@ -369,6 +371,8 @@ export const handleAdminRoute = async (request: Request, env: AdminEnv): Promise
   const route = ROUTES[url.pathname];
   if (!route) return null;
   if (request.method !== route.method) return fail(405, "Method not allowed.");
+  const accessDenied = await adminAccessDenied(request, env);
+  if (accessDenied) return accessDenied;
   const denied = await authorized(request, env);
   if (denied) return denied;
   try {

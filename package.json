@@ -161,10 +161,17 @@
     "vite": "8.3.2"
   },
   "overrides": {
+    "@hono/node-server": "^1.19.15",
     "axios": "^1.13.5",
     "cross-spawn": "^7.0.6",
+    "fast-uri": "^3.1.8",
+    "ip-address": "^10.7.4",
     "node-abi": "4.35.0",
-    "qs": "^6.15.0",
+    "protobufjs": "^7.6.6",
+    "proxy-addr": "^2.0.8",
+    "qs": "^6.16.0",
+    "sharp": "^0.35.5",
+    "shell-quote": "^1.12.0",
     "tar": "^7.5.10",
     "vite": "8.3.2"
   },

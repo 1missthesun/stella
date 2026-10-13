@@ -6,6 +6,12 @@ import { getOAuthProviderCatalog } from "../kernel/connectors/oauth-provider-cat
 // module). Read it once here.
 const OAUTH_PROVIDER_CATALOG = getOAuthProviderCatalog();
 
+const cloudflareAccessHeaders = () => {
+  const id = process.env.STELLA_CF_ACCESS_CLIENT_ID?.trim();
+  const secret = process.env.STELLA_CF_ACCESS_CLIENT_SECRET?.trim();
+  return id && secret ? { "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret } : {};
+};
+
 const siteUrl = (process.env.STELLA_BACKEND_URL || "").replace(/\/+$/u, "");
 const adminToken =
   process.env.STELLA_ADMIN_API_SECRET ||
@@ -206,6 +212,7 @@ for (const row of rows) {
         accept: "application/json",
         "content-type": "application/json",
         authorization: `Bearer ${adminToken}`,
+        ...cloudflareAccessHeaders(),
       },
       body: JSON.stringify(row),
     },

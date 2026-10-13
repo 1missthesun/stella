@@ -29,6 +29,11 @@ import { stellaProvider } from "./provider/stella.ts";
 import { openBunSqliteStorage } from "./storage/bun-sqlite.ts";
 
 const DEV_BACKEND = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
+const cloudflareAccessHeaders = (): Record<string, string> => {
+  const id = process.env.STELLA_CF_ACCESS_CLIENT_ID?.trim();
+  const secret = process.env.STELLA_CF_ACCESS_CLIENT_SECRET?.trim();
+  return id && secret ? { "CF-Access-Client-Id": id, "CF-Access-Client-Secret": secret } : {};
+};
 const context = BACKGROUND_CONTEXT;
 
 const { values } = parseArgs({
@@ -64,7 +69,7 @@ async function authToken(): Promise<string> {
   if (!admin) throw new Error("STELLA_ADMIN_API_SECRET is needed for --test-account.");
   const response = await fetch(`${backendUrl}/api/admin/test-accounts/session`, {
     method: "POST",
-    headers: { authorization: `Bearer ${admin}`, "content-type": "application/json" },
+    headers: { authorization: `Bearer ${admin}`, "content-type": "application/json", ...cloudflareAccessHeaders() },
     body: JSON.stringify({ email, plan: "pro", usageMode: "unlimited" }),
   });
   if (!response.ok) throw new Error(`Test account: ${response.status} ${await response.text()}`);

@@ -32,6 +32,7 @@ import { listIntegrationActions, listIntegrationCatalog, publishIntegration } fr
 import { exchangeNativeOAuthToken, listNativeOAuthProviders } from "./native-oauth.js";
 import { X_STATE_KIND, xResultPage } from "./x.js";
 import { ownerGateStub } from "../rpc-release.js";
+import { adminAccessDenied } from "../admin/access.js";
 
 const MAX_BODY_BYTES = 1024 * 1024;
 const MAX_ADMIN_BODY_BYTES = 8 * 1024 * 1024;
@@ -159,6 +160,8 @@ const run = async (request: Request, env: RouteEnv): Promise<Response> =>
   }));
 
 const adminUpsert = async (request: Request, env: RouteEnv): Promise<Response> => {
+  const accessDenied = await adminAccessDenied(request, env);
+  if (accessDenied) return accessDenied;
   const secret = (env as unknown as Record<string, unknown>).STELLA_ADMIN_API_SECRET;
   if (!(await verifyServiceBearerRequest(request, typeof secret === "string" ? secret : null))) {
     return fail(401, "Unauthorized");

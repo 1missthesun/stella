@@ -515,7 +515,7 @@ Secrets go on **cloud-builder** unless noted.
 | Maps tool | `GOOGLE_MAPS_SERVER_API_KEY` (Places API (New) + Directions); the card's interactive view also needs `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` on the **website** | Google Maps Platform | The `map` tool says maps aren't set up |
 | Captcha on anonymous web sign-in | `TURNSTILE_SECRET_KEY`; site key in `VITE_TURNSTILE_SITE_KEY` (desktop web build) and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (website) | Cloudflare Turnstile | No captcha |
 | Mobile app integrity | `APPLE_APP_ATTEST_TEAM_ID`, `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_JSON` (+ `EXPO_PUBLIC_PLAY_INTEGRITY_PROJECT_NUMBER`); `STELLA_APP_INTEGRITY_MODE` = `enforce` / `off` | Apple App Attest, Google Play Integrity | Off |
-| Admin API (test accounts, integrations catalog, billing tools) | `STELLA_ADMIN_API_SECRET`; test accounts also need var `STELLA_TEST_ACCOUNTS=1` (dev only) | none | Admin routes answer 503 |
+| Admin API (test accounts, integrations catalog, billing tools) | `STELLA_ADMIN_API_SECRET`; test accounts also need var `STELLA_TEST_ACCOUNTS=1` (dev only). In `env.production`, `ADMIN_ACCESS_TEAM_DOMAIN` and `ADMIN_ACCESS_AUD` name the Cloudflare Access application whose JWT admin also requires: set them to your own Access app, or set both to `"off"` for bearer-only | none | Admin routes answer 503 |
 | Ops relay probe | `STELLA_RELAY_PROBE_SECRET` on **model-gateway** | none | No probe |
 | Gateway alerts | `STELLA_ALERT_WEBHOOK_URL` on **model-gateway** | any webhook | No alerts |
 | Telemetry lake | sink and pipeline per `infra/telemetry/README.md`; desktop `STELLA_TELEMETRY_ENDPOINT` | Cloudflare Pipelines, R2 Data Catalog | Events are accepted and not stored |

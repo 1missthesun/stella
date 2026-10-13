@@ -350,6 +350,38 @@ computer, create one in the dashboard (Profile › API Tokens › Create Token,
 custom, that single permission on Stella's account) and save it to that file
 with mode 600; never paste it into chat.
 
+cloud-builder and canvas-share set `observability.redact_query_string`, so
+stored logs and traces keep paths but never query strings (magic-link
+`?token=`, OAuth `?code=`/`?state=`, `?ott=`). Search by path or by the
+`event` names the code logs.
+
+### Production admin API (Cloudflare Access)
+
+In production, every `/api/admin/*` route needs a Cloudflare Access JWT
+(`Cf-Access-Jwt-Assertion`) as well as the `STELLA_ADMIN_API_SECRET` bearer.
+`auth.stella.sh/api/admin` sits behind the Access application (MFA for people,
+a service token for automation). The prod workers.dev host isn't behind
+Access, so it refuses admin calls with 403. The Worker checks the JWT against
+`ADMIN_ACCESS_TEAM_DOMAIN` and `ADMIN_ACCESS_AUD` in `env.production` of
+`workers/cloud-builder/wrangler.jsonc`. If either is unset, prod admin
+answers 503. Dev and Previews are bearer-only.
+
+Scripts send the service token from `STELLA_CF_ACCESS_CLIENT_ID` and
+`STELLA_CF_ACCESS_CLIENT_SECRET` when they are set. On Rahul's Mac they are in the
+keychain (services `stella-prod-cf-access-client-id` and
+`stella-prod-cf-access-client-secret`, and the prod admin bearer under
+`stella-prod-admin-api-secret`, all with account `rahul`):
+
+```bash
+export STELLA_CF_ACCESS_CLIENT_ID="$(security find-generic-password -s stella-prod-cf-access-client-id -a rahul -w)"
+export STELLA_CF_ACCESS_CLIENT_SECRET="$(security find-generic-password -s stella-prod-cf-access-client-secret -a rahul -w)"
+export STELLA_ADMIN_API_SECRET="$(security find-generic-password -s stella-prod-admin-api-secret -a rahul -w)"
+curl -s -H "CF-Access-Client-Id: $STELLA_CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $STELLA_CF_ACCESS_CLIENT_SECRET" \
+  -H "Authorization: Bearer $STELLA_ADMIN_API_SECRET" "https://auth.stella.sh/api/admin/owners/top?limit=5"
+```
+
+Call prod admin only through `auth.stella.sh`, never the workers.dev host.
+
 ### Prompts
 
 Edit `packages/runtime/extensions/stella-runtime/{agent-metadata,prompts}/*.md`,

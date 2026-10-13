@@ -144,7 +144,7 @@ Both Workers are on `workers.dev`, so zone-level WAF, Bot Fight Mode, and rate-l
 
 ## 8. Verification after setup
 
-With the cloud-builder URL as `$BACKEND` and the admin bearer as `$ADMIN`. Admin routes take an owner id (email lookup returns with auth):
+With the cloud-builder URL as `$BACKEND` and the admin bearer as `$ADMIN`. Admin routes take an owner id (email lookup returns with auth). In production, use `https://auth.stella.sh` and also send the Cloudflare Access service token (`-H "CF-Access-Client-Id: $STELLA_CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $STELLA_CF_ACCESS_CLIENT_SECRET"`); see DEPLOY.md, "Production admin API".
 
 ```sh
 # Admin lookup

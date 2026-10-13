@@ -224,6 +224,7 @@ export const presignR2Url = async (
     key: string;
     expiresInSeconds: number;
     now?: number;
+    contentDisposition?: string;
   },
 ): Promise<string> => {
   if (
@@ -243,6 +244,9 @@ export const presignR2Url = async (
     ["X-Amz-Date", amzDate],
     ["X-Amz-Expires", String(args.expiresInSeconds)],
     ["X-Amz-SignedHeaders", "host"],
+    ...(args.contentDisposition !== undefined
+      ? ([["response-content-disposition", args.contentDisposition]] as Array<[string, string]>)
+      : []),
   ];
   const canonicalQuery = query
     .map(([name, value]) => `${encodeRfc3986(name)}=${encodeRfc3986(value)}`)

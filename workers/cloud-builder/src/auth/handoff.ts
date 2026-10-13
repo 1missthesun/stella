@@ -5,11 +5,12 @@
  *   POST /link/send               email a magic link; returns {requestId}
  *   GET  /link/status             {status: pending | completed | expired}
  *   POST /link/claim              {requestId, claimSecret} → {token}, once
- *   GET  /link/verify             magic-link landing; ?ott= exchanged here
+ *   GET  /link/verify             magic-link landing; the one-time token
+ *                                 arrives in a short-lived HttpOnly cookie
  *   POST /desktop-social/start    {claimHash} → {requestId, callbackURL, url?}
- *   GET  /desktop-social/verify   social landing; ?ott= exchanged here
+ *   GET  /desktop-social/verify   social landing; same cookie
  *   POST /browser-social/start    {returnTo} → {callbackURL, url?}
- *   GET  /browser-social/verify   social landing; ?ott= moved into a fragment
+ *   GET  /browser-social/verify   social landing; the token moves into a fragment
  *   POST /integrity/challenge     {purpose} → {nonce, expiresAt}
  *
  * The app never sees a session credential in a URL: it sends SHA-256 of a
@@ -36,6 +37,7 @@ import { bearerCredential } from "../../../shared/bearer.js";
 import { verifyUserToken } from "../auth-jwt.js";
 import { isDisposableEmail } from "./disposable-email-domains.js";
 import { issueIntegrityNonce } from "./integrity.js";
+import { readOttCookie, withClearedOttCookie } from "./ott-cookie.js";
 
 /** The slice of `auth.api` the handoffs call back into. */
 export type HandoffApi = {
@@ -393,12 +395,12 @@ export const stellaHandoff = (config: HandoffConfig) => {
 
       linkVerify: createAuthEndpoint("/link/verify", { method: "GET" }, async (ctx) => {
         const requestId = text(ctx.query?.requestId);
-        const ott = text(ctx.query?.ott);
+        const ott = readOttCookie(ctx.headers);
         if (requestId && ott) {
           const { token, userId } = await exchangeOtt(ott);
           if (token && userId) await completeLinkRequest(requestId, token, userId);
         }
-        return doneRedirect();
+        return withClearedOttCookie(doneRedirect());
       }),
 
       desktopSocialStart: createAuthEndpoint("/desktop-social/start", { method: "POST" }, async (ctx) => {
@@ -426,7 +428,7 @@ export const stellaHandoff = (config: HandoffConfig) => {
 
       desktopSocialVerify: createAuthEndpoint("/desktop-social/verify", { method: "GET" }, async (ctx) => {
         const requestId = text(ctx.query?.requestId);
-        const ott = text(ctx.query?.ott);
+        const ott = readOttCookie(ctx.headers);
         const row = REQUEST_ID_PATTERN.test(requestId) ? await linkRow(requestId) : null;
         if (row && row.status === "pending" && row.expires_at > Date.now()) {
           if (ott) {
@@ -450,7 +452,7 @@ export const stellaHandoff = (config: HandoffConfig) => {
               .run();
           }
         }
-        return doneRedirect();
+        return withClearedOttCookie(doneRedirect());
       }),
 
       browserSocialStart: createAuthEndpoint("/browser-social/start", { method: "POST" }, async (ctx) => {
@@ -476,14 +478,14 @@ export const stellaHandoff = (config: HandoffConfig) => {
         return reply({ callbackURL, ...(url ? { url } : {}) });
       }),
 
-      // The provider hook appends the one-time credential as `?ott=`. This
+      // The provider hook sets the one-time credential as a cookie. This
       // no-render route consumes it before any app shell loads and returns to
       // the registered target with the credential in a fragment, once. A
       // completed in-place link returns without one: the browser's session is
       // the same, now connected.
       browserSocialVerify: createAuthEndpoint("/browser-social/verify", { method: "GET" }, async (ctx) => {
         const requestId = text(ctx.query?.requestId);
-        const ott = text(ctx.query?.ott);
+        const ott = readOttCookie(ctx.headers);
         if (!REQUEST_ID_PATTERN.test(requestId) || (ott && !OTT_PATTERN.test(ott))) return bridgeResponse(400);
         const callbackURL = `${config.backendUrl}/api/auth/browser-social/verify?requestId=${encodeURIComponent(requestId)}`;
         if (!ott && ctx.query?.fallback !== undefined) {
@@ -509,7 +511,7 @@ export const stellaHandoff = (config: HandoffConfig) => {
         if (!ott) return bridgeResponse(302, returnTo);
         const target = new URL(returnTo);
         target.hash = new URLSearchParams({ ott }).toString();
-        return bridgeResponse(302, target.toString());
+        return withClearedOttCookie(bridgeResponse(302, target.toString()));
       }),
 
       integrityChallenge: createAuthEndpoint("/integrity/challenge", { method: "POST" }, async (ctx) => {

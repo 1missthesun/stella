@@ -23,7 +23,12 @@ export function SignInDialogHost() {
     // OAuth and magic-link returns land on a route with a one-time token.
     // Load the dialog module to verify it, but keep the dialog closed: the
     // user has just signed in.
-    if (new URL(window.location.href).searchParams.has("ott")) verify();
+    const returnUrl = new URL(window.location.href);
+    if (
+      new URLSearchParams(returnUrl.hash.replace(/^#\??/, "")).has("ott") ||
+      returnUrl.searchParams.has("ott")
+    )
+      verify();
 
     return () => window.removeEventListener(SIGN_IN_DIALOG_EVENT, activate);
   }, []);

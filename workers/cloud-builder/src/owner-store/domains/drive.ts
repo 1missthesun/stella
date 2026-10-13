@@ -341,16 +341,23 @@ const signerOf = (ctx: Pick<OwnerContext, "env">): R2Signer => {
 export const driveOwnerPrefix = async (ownerId: string): Promise<string> =>
   `drive/${await sha256Hex(ownerId)}/`;
 
+const attachmentDisposition = (name: string): string => {
+  const fallback = name.replace(/[^\x20-\x7e]|["\\]/g, "_") || "download";
+  return `attachment; filename="${fallback}"; filename*=UTF-8''${encodeURIComponent(name).replace(/['()*]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`)}`;
+};
+
 const signGet = async (
   signer: R2Signer,
   key: string,
   expiresInSeconds: number,
+  name: string,
   now?: number,
 ): Promise<string> =>
   await presignR2Url(signer, {
     method: "GET",
     key,
     expiresInSeconds,
+    contentDisposition: attachmentDisposition(name),
     ...(now !== undefined ? { now } : {}),
   });
 
@@ -708,7 +715,7 @@ const fileUrl = async (ctx: OwnerContext, args: { path: string }): Promise<Drive
     name: row.name,
     sizeBytes: row.size_bytes,
     contentType: row.content_type,
-    url: await signGet(signerOf(ctx), row.r2_key, DOWNLOAD_URL_EXPIRES_SECONDS, now),
+    url: await signGet(signerOf(ctx), row.r2_key, DOWNLOAD_URL_EXPIRES_SECONDS, row.name, now),
     expiresAt: now + DOWNLOAD_URL_EXPIRES_SECONDS * 1_000,
   };
 };
@@ -1585,7 +1592,7 @@ const turnSync = async (ctx: OwnerContext, raw: unknown): Promise<DriveSyncManif
       source: row.source,
       origin: row.origin,
       updatedAt: row.updated_at,
-      url: await signGet(signer!, row.r2_key, SYNC_URL_EXPIRES_SECONDS, now),
+      url: await signGet(signer!, row.r2_key, SYNC_URL_EXPIRES_SECONDS, row.name, now),
     });
   }
 
@@ -1660,7 +1667,7 @@ const turnAttachments = async (ctx: OwnerContext, raw: unknown) => {
       path,
       contentType: row.content_type,
       sizeBytes: row.size_bytes,
-      url: await signGet(signerOf(ctx), row.r2_key, ATTACHMENT_URL_EXPIRES_SECONDS, now),
+      url: await signGet(signerOf(ctx), row.r2_key, ATTACHMENT_URL_EXPIRES_SECONDS, row.name, now),
     });
   }
   return { attachments, skipped };
@@ -1693,7 +1700,7 @@ const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: stri
     if (!row.content_type.toLowerCase().startsWith("image/")) {
       throw invalid(`${path} is not an image (${row.content_type}).`);
     }
-    urls.push(await signGet(signerOf(ctx), row.r2_key, REFERENCE_URL_EXPIRES_SECONDS, signedAt));
+    urls.push(await signGet(signerOf(ctx), row.r2_key, REFERENCE_URL_EXPIRES_SECONDS, row.name, signedAt));
   }
   return { urls };
 };

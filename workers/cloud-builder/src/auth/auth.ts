@@ -41,6 +41,7 @@ import {
 import { stellaHandoff, type HandoffApi } from "./handoff.js";
 import { integrityErrorMessage, integrityPurposeForPath, verifyAuthRequestProof } from "./integrity.js";
 import { oauthStateBinding } from "./oauth-binding.js";
+import { ottCookieHeader } from "./ott-cookie.js";
 import { ownerGateStub } from "../rpc-release.js";
 
 type AuthEnv = Cloudflare.Env;
@@ -241,9 +242,10 @@ const expoOAuthProxy = (): BetterAuthPlugin => {
 };
 
 /**
- * Move Better Auth's short-lived `set-ott` header into the redirect URL of a
- * browser-followed callback, where a native app or the handoff routes can
- * read it. The session credential stays out of the URL. Must follow
+ * Hand Better Auth's short-lived `set-ott` header to a browser-followed
+ * callback without putting it in a query string: same-origin handoff routes
+ * read it from a short-lived HttpOnly cookie, and other origins get it in the
+ * URL fragment, which is never sent to a server. Must follow
  * `oneTimeToken()`.
  */
 const nativeOttRedirect = (): BetterAuthPlugin => ({
@@ -262,8 +264,15 @@ const nativeOttRedirect = (): BetterAuthPlugin => ({
           const redirectTo = ctx.context.responseHeaders?.get("location");
           if (!token || !redirectTo) return;
           const redirectUrl = new URL(redirectTo);
-          redirectUrl.searchParams.set("ott", token);
           ctx.context.responseHeaders?.delete("set-ott");
+          const requestOrigin = ctx.request ? new URL(ctx.request.url).origin : new URL(ctx.context.baseURL).origin;
+          if (redirectUrl.origin === requestOrigin) {
+            ctx.context.responseHeaders?.append("set-cookie", ottCookieHeader(token));
+          } else {
+            const fragment = new URLSearchParams(redirectUrl.hash.replace(/^#/, ""));
+            fragment.set("ott", token);
+            redirectUrl.hash = fragment.toString();
+          }
           throw ctx.redirect(redirectUrl.toString());
         }),
       },

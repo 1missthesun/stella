@@ -16,6 +16,7 @@
  */
 
 import { createAuth } from "../auth/auth.js";
+import { readOttCookie, withClearedOttCookie } from "../auth/ott-cookie.js";
 import { slackCall, slackTry, type SlackResponse } from "./api.js";
 import {
   SLACK_BOT_SCOPES,
@@ -576,7 +577,7 @@ const linkFinish = async (
 ): Promise<Response> => {
   const url = new URL(request.url);
   const token = url.searchParams.get("s") ?? "";
-  const ott = url.searchParams.get("ott") ?? "";
+  const ott = readOttCookie(request.headers);
   const subject = await verifyLinkToken(env, token);
   if (!subject || !ott) {
     return page(
@@ -715,7 +716,7 @@ export const handleSlackRoute = async (
     if (pathname === SLACK_PATHS.linkStart && method === "POST")
       return await linkStart(request, env);
     if (pathname === SLACK_PATHS.linkFinish && method === "GET")
-      return await linkFinish(request, env);
+      return withClearedOttCookie(await linkFinish(request, env));
     if (pathname === SLACK_PATHS.linkConfirm && method === "POST")
       return await linkConfirm(request, env);
   } catch (error) {

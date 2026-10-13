@@ -40,6 +40,7 @@ import {
   pollFal,
   submitFal,
 } from "../../media/fal.js";
+import { mediaInputTypeError, sniffMediaInputType } from "../../media/input-sniff.js";
 import { presignR2Url, r2Signer, type R2Signer } from "../../r2-presign.js";
 import { json, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -322,8 +323,10 @@ const stageSources = async (
   const stage = async (value: unknown, depth: number): Promise<unknown> => {
     if (isDataUri(value)) {
       const { mimeType, bytes } = dataUriParts(value);
+      const typeError = mediaInputTypeError(mimeType, bytes);
+      if (typeError) throw new RpcError("BAD_REQUEST", typeError);
       const key = `${jobPrefix}src-${index++}`;
-      await bucketOf(ctx).put(key, bytes, { httpMetadata: { contentType: mimeType } });
+      await bucketOf(ctx).put(key, bytes, { httpMetadata: { contentType: sniffMediaInputType(bytes)! } });
       return await signGet(signerOf(ctx), key, SOURCE_URL_SECONDS, Date.now());
     }
     if (depth > 8) return value;

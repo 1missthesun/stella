@@ -152,14 +152,17 @@ function useOAuthReturnToken(onSignedIn: () => void) {
   useEffect(() => {
     if (!isBackendConfigured()) return;
     const url = new URL(window.location.href);
-    const token = url.searchParams.get("ott");
+    const fragment = new URLSearchParams(url.hash.replace(/^#\??/, ""));
+    const token = fragment.get("ott") ?? url.searchParams.get("ott");
     if (!token || !AUTH_TOKEN_PATTERN.test(token)) return;
 
+    fragment.delete("ott");
     url.searchParams.delete("ott");
+    const remainingFragment = fragment.toString();
     window.history.replaceState(
       {},
       "",
-      `${url.pathname}${url.search}${url.hash}`,
+      `${url.pathname}${url.search}${remainingFragment ? `#${remainingFragment}` : ""}`,
     );
 
     void verifyReturnToken(token).then((signedIn) => {

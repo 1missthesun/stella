@@ -27,7 +27,7 @@ import { responseLanguageSection } from "@stella/runtime/kernel/runner/locale-pr
 import { StellaAgentDoc, type StellaAgentRole } from "./agent-doc.ts";
 import { messageIdsHook } from "./message-ids.ts";
 import { processableImagesHook } from "./processable-images.ts";
-import { residentContextHook } from "./resident-context.ts";
+import { ENGINE_MODEL_SECTION, engineModelText, residentContextHook, runsOn } from "./resident-context.ts";
 import type { StellaAgentPromptId, StellaContextSources } from "./context.ts";
 
 export const STELLA_PROMPT_EXTENSION = "stella-prompt";
@@ -156,6 +156,9 @@ export function stellaPromptExtension(sources: StellaContextSources) {
         const snapshot = await sources.executionContext(input.conversationId, context);
         return snapshot && renderExecutionDestination(snapshot);
       }),
+      section(ENGINE_MODEL_SECTION, async (input) =>
+        input.agent.model ? engineModelText(runsOn(input.agent.model.provider, input.agent.model.modelId, input.agent.thinkingLevel)) : undefined,
+      ),
       section("working-directory", async (input, context) => (sources.env === "cloud" ? undefined : workingDirectory(input, context))),
       section("agent-identity", agentIdentity),
       section("media-access", async (input, context) => {

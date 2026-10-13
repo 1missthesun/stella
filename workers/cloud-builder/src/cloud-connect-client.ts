@@ -655,8 +655,8 @@ export const createCloudConnectClient = (
           : {
               hint:
                 toolNames.length > 30
-                  ? `${toolNames.length} tools; find the rest with await tools.$search({ query: "${server.name}" }).`
-                  : "Saved to the account: usable from the cloud and the user's computers. Call them as tools.<name>(args); tools.$describe(name) shows each input schema.",
+                  ? `${toolNames.length} tools, available from the next code call; find the rest with await tools.$search({ query: "${server.name}" }).`
+                  : "Saved to the account: usable from the cloud and the user's computers. From the next code call, call them as tools.<name>(args); tools.$describe(name) shows each input schema.",
             }),
       };
     },

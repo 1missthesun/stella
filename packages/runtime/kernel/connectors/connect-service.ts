@@ -884,8 +884,8 @@ export const addMcpConnector = async (
       : {
           hint:
             toolNames.length > ADD_MCP_TOOL_NAMES_SHOWN
-              ? `${toolNames.length} tools; find the rest with await tools.$search({ query: "${command.displayName}" }).`
-              : "Call them as tools.<name>(args); tools.$describe(name) shows each input schema.",
+              ? `${toolNames.length} tools, available from the next code call; find the rest with await tools.$search({ query: "${command.displayName}" }).`
+              : "From the next code call, call them as tools.<name>(args); tools.$describe(name) shows each input schema.",
         }),
   };
 };

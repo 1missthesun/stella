@@ -18,6 +18,8 @@ import {
   clampUrgency,
   clampUserAskTimeoutMs,
   effectiveEscalationCeiling,
+  normalizeUserAskDeclineReason,
+  userAskTtlMs,
   nextEscalationLevel,
   normalizeUserAskEscalationPolicy,
   normalizeUserAskQuestions,
@@ -193,6 +195,11 @@ export const USER_ASKS_REPLY_TOKEN_MIGRATION = {
   statements: [`ALTER TABLE user_asks ADD COLUMN reply_secret TEXT`],
 };
 
+export const USER_ASKS_CLOSE_REASON_MIGRATION = {
+  id: "userAsks.6-close-reason",
+  statements: [`ALTER TABLE user_asks ADD COLUMN close_reason TEXT`],
+};
+
 type AskRow = {
   ask_id: string;
   kind: string;
@@ -213,6 +220,7 @@ type AskRow = {
   detail: string;
   recipient_key: string | null;
   reply_secret: string | null;
+  close_reason?: string | null;
   created_at: number;
   updated_at: number;
 };
@@ -968,12 +976,14 @@ const closeAsk = (
   ctx: OwnerContext,
   row: AskRow,
   state: UserAskState,
+  reason?: string,
 ): AskRow => {
   ctx.db.run(
     `UPDATE user_asks SET state = ?, revision = revision + 1, next_escalation_at = NULL,
-       updated_at = ? WHERE ask_id = ?`,
+       updated_at = ?, close_reason = ? WHERE ask_id = ?`,
     state,
     ctx.now,
+    reason || null,
     row.ask_id,
   );
   ctx.jobs.cancel(defaultJobId(row.ask_id));
@@ -1048,7 +1058,7 @@ const registerAsk = (ctx: OwnerContext, args: RegisterArgs) => {
   const urgency = clampUrgency(args.urgency ?? 1);
   const hasDefault = !blocking && userAskHasDefaults(detail);
   const deadlineAt = ctx.now + timeout;
-  const expiresAt = ctx.now + USER_ASK_BLOCKING_TTL_MS;
+  const expiresAt = ctx.now + userAskTtlMs(args.kind);
   ctx.db.run(
     `INSERT INTO user_asks
        (ask_id, kind, conversation_id, thread_id, tool_call_id, agent_label, origin_device_id,
@@ -1198,7 +1208,10 @@ const readAnswerForOriginDevice = (
     if (userAskIsOpen(row.state as UserAskState)) {
       throw new RpcError("NOT_FOUND", "That question has not been answered yet.");
     }
-    return { state: row.state as UserAskState };
+    return {
+      state: row.state as UserAskState,
+      ...(row.close_reason ? { reason: row.close_reason } : {}),
+    };
   }
   return {
     answer: stored.answer,
@@ -1208,7 +1221,7 @@ const readAnswerForOriginDevice = (
   };
 };
 
-const cancelAsk = (ctx: OwnerContext, askId: string) => {
+const cancelAsk = (ctx: OwnerContext, askId: string, reason: string) => {
   enforceOwnerRateLimit(
     ctx.db,
     ctx.now,
@@ -1221,7 +1234,7 @@ const cancelAsk = (ctx: OwnerContext, askId: string) => {
   if (!userAskIsOpen(row.state as UserAskState)) {
     return { ask: summaryOf(row), canceled: false };
   }
-  return { ask: summaryOf(closeAsk(ctx, row, "canceled")), canceled: true };
+  return { ask: summaryOf(closeAsk(ctx, row, "canceled", reason)), canceled: true };
 };
 
 const turnRegisterParser = object({
@@ -1265,6 +1278,7 @@ const readTurnAskAnswer = (ctx: OwnerContext, args: unknown) => {
     askId,
     state: row.state as UserAskState,
     revision: row.revision,
+    ...(row.close_reason ? { reason: row.close_reason } : {}),
     ...(stored
       ? {
           answer: stored.answer,
@@ -1795,7 +1809,10 @@ const route = async (
         ),
       };
     case "POST cancel":
-      return { status: 200, body: cancelAsk(ctx, input.askId) };
+      return {
+        status: 200,
+        body: cancelAsk(ctx, input.askId, normalizeUserAskDeclineReason(input.body.reason)),
+      };
     case "POST escalate":
       return {
         status: 200,
@@ -1879,6 +1896,7 @@ export const userAsksDomain = {
     USER_ASKS_ANSWER_REVISION_MIGRATION,
     USER_ASKS_QUESTION_RESPONSES_MIGRATION,
     USER_ASKS_REPLY_TOKEN_MIGRATION,
+    USER_ASKS_CLOSE_REASON_MIGRATION,
   ],
   calls: {
     "userAsks.policy": {

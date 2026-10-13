@@ -65,6 +65,33 @@ export const USER_ASK_DEFAULT_TIMEOUT_MS = 3 * 60_000;
 export const USER_ASK_MIN_TIMEOUT_MS = 30_000;
 export const USER_ASK_MAX_TIMEOUT_MS = 3 * 60_000;
 export const USER_ASK_BLOCKING_TTL_MS = 24 * 60 * 60_000;
+export const USER_ASK_SECURE_INPUT_TTL_MS = 60 * 60_000;
+export const USER_ASK_MAX_DECLINE_REASON = 200;
+
+export const userAskTtlMs = (kind: UserAskKind): number =>
+  kind === "secure_input" ? USER_ASK_SECURE_INPUT_TTL_MS : USER_ASK_BLOCKING_TTL_MS;
+
+export const normalizeUserAskDeclineReason = (value: unknown): string =>
+  typeof value === "string"
+    ? value.replace(/\s+/g, " ").trim().slice(0, USER_ASK_MAX_DECLINE_REASON)
+    : "";
+
+export const userAskDeclinedNote = (reason: string): string =>
+  reason
+    ? `The user declined this request: "${reason}". Don't ask again for the same thing; continue another way or tell the user what you need instead.`
+    : "The user declined this request. Don't ask again for the same thing; continue another way or tell the user what you need instead.";
+
+export const USER_ASK_EXPIRED_NOTE =
+  "Timed out: nobody answered this request, so it was closed. Continue another way, or ask again later if it is still needed.";
+
+export type UserAskStoredSecureValue = Readonly<{
+  id: string;
+  label: string;
+  askId: string;
+  fieldId: string;
+  createdAt: number;
+  expiresAt: number;
+}>;
 
 export const USER_ASK_ESCALATION_STEP_MS = 90_000;
 
@@ -160,6 +187,7 @@ export type UserAsk = Readonly<{
   nextEscalationAt?: number;
   detail: UserAskDetail;
   recipientKey?: UserAskRecipientKey;
+  relayed?: boolean;
 }>;
 
 export type UserAskSummary = Readonly<
@@ -228,10 +256,11 @@ export type UserAskResolution =
       note: string;
     }>
   | Readonly<{
-      outcome: "canceled" | "expired";
+      outcome: "canceled" | "expired" | "declined";
       askId: string;
       at: number;
       note: string;
+      reason?: string;
     }>;
 
 export const userAskDefaultedNote = (choiceLabels: readonly string[]): string =>

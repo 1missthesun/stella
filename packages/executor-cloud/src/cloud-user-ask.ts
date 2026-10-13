@@ -3,6 +3,9 @@ import { Effect } from "effect";
 import {
   clampUrgency,
   clampUserAskTimeoutMs,
+  normalizeUserAskDeclineReason,
+  USER_ASK_EXPIRED_NOTE,
+  userAskDeclinedNote,
   userAskDefaultedResolution,
   type UserAskAnswer,
   type UserAskDetail,
@@ -30,6 +33,7 @@ type AnswerRead = {
   askId: string;
   state: UserAskState;
   revision: number;
+  reason?: string;
   answer?: UserAskAnswer;
   late?: boolean;
   answeredAt?: number;
@@ -152,16 +156,24 @@ export const createCloudUserAskHost = (args: {
         openAsks.delete(input.askId);
         return resolution;
       }
-      if (read.state === "canceled" || read.state === "expired") {
+      if (read.state === "canceled") {
         openAsks.delete(input.askId);
+        const reason = normalizeUserAskDeclineReason(read.reason);
         return {
-          outcome: read.state,
+          outcome: "declined",
           askId: input.askId,
           at: Date.now(),
-          note:
-            read.state === "canceled"
-              ? "The user dismissed that question without answering."
-              : "That question went unanswered long enough that it expired.",
+          note: userAskDeclinedNote(reason),
+          ...(reason ? { reason } : {}),
+        };
+      }
+      if (read.state === "expired") {
+        openAsks.delete(input.askId);
+        return {
+          outcome: "expired",
+          askId: input.askId,
+          at: Date.now(),
+          note: USER_ASK_EXPIRED_NOTE,
         };
       }
     }

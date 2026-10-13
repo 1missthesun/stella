@@ -206,6 +206,10 @@ export const userAskResolutionResult = (
       },
     };
   }
-  const ended = { outcome: resolution.outcome, note: resolution.note };
+  const ended = {
+    outcome: resolution.outcome,
+    note: resolution.note,
+    ...(resolution.reason ? { reason: resolution.reason } : {}),
+  };
   return { result: ended, details: ended };
 };

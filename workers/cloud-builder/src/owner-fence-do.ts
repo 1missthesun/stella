@@ -535,6 +535,11 @@ class DurableObjectOwnerFenceHost implements OwnerFenceHost {
       if (mirror.status !== "complete") {
         throw new Error("Owner fence rollback mirror exceeded its bound.");
       }
+      // The owner gate runs this on every alarm; rewriting an unchanged
+      // record cost a row write each time.
+      if (JSON.stringify(mirror.active) === JSON.stringify(fence.active)) {
+        return;
+      }
       fence.active = mirror.active;
       await txn.put("ownerPurgeFence", fence);
     });

@@ -50,14 +50,27 @@ const WEBSOCKET_OPEN = 1;
  * Device presence sockets: frames, presence rows, device requests, and consent.
  */
 export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
+  /**
+   * Open sockets, optionally one device's. A socket this side closed stays in
+   * `getWebSockets()` until its peer answers the close, and a peer that is
+   * gone (a laptop asleep, a phone in the background) never does. Counting
+   * those made every alarm drop the same stale socket again and re-arm one
+   * second out, which kept the object awake around the clock.
+   */
   protected sockets(deviceId?: string): WebSocket[] {
+    let sockets: WebSocket[];
     try {
-      return deviceId
+      sockets = deviceId
         ? this.ctx.getWebSockets(presenceTag(deviceId))
         : this.ctx.getWebSockets();
     } catch {
       return [];
     }
+    return sockets.filter(
+      (socket) =>
+        socket.readyState === WEBSOCKET_OPEN &&
+        this.attachment(socket)?.closedAtMs === undefined,
+    );
   }
 
   protected attachment(socket: WebSocket): PresenceAttachment | null {
@@ -98,6 +111,14 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
   }
 
   protected closeSocket(socket: WebSocket, code: number, reason: string): void {
+    const attachment = this.attachment(socket);
+    if (attachment && attachment.closedAtMs === undefined) {
+      try {
+        socket.serializeAttachment({ ...attachment, closedAtMs: Date.now() });
+      } catch {
+        // Already gone.
+      }
+    }
     try {
       socket.close(code, reason);
     } catch {

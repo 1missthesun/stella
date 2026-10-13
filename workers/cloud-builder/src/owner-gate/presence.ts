@@ -25,6 +25,8 @@ export type PresenceAttachment = {
   availability?: DeviceAvailability;
   phase: "challenged" | "begun" | "connected";
   lastSeenAtMs: number;
+  /** Set when this side closed the socket; it never counts as open again. */
+  closedAtMs?: number;
 };
 
 export const presenceTag = (deviceId: string): string => `device:${deviceId}`;

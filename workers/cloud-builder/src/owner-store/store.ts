@@ -88,6 +88,20 @@ type LiveAttachment = {
   reauthAttempt?: number;
   /** When to ask again; absent while waiting for the client's first answer. */
   reauthRetryAtMs?: number;
+  /** Set when this side closed the socket; see `liveSockets`. */
+  closed?: true;
+};
+
+const WEBSOCKET_OPEN = 1;
+
+/** Marks a live socket closed by this side, so it never counts as open again. */
+const markLiveClosed = (socket: WebSocket, attachment: LiveAttachment): void => {
+  if (attachment.closed) return;
+  try {
+    socket.serializeAttachment({ ...attachment, closed: true } satisfies LiveAttachment);
+  } catch {
+    // Already gone.
+  }
 };
 
 type LiveSubRow = {
@@ -472,12 +486,25 @@ export class OwnerStore {
 
   // ── Live views ──────────────────────────────────────────────────────────
 
+  /**
+   * Open live sockets. A socket this side closed stays in `getWebSockets()`
+   * until its peer answers the close, and a peer that is gone (a laptop
+   * asleep, a phone in the background) never does. Counting those kept a
+   * past-due token deadline in `nextDeadline`, which re-armed the alarm every
+   * second and kept the object awake around the clock.
+   */
   liveSockets(): WebSocket[] {
+    let sockets: WebSocket[];
     try {
-      return this.ctx.getWebSockets(LIVE_SOCKET_TAG);
+      sockets = this.ctx.getWebSockets(LIVE_SOCKET_TAG);
     } catch {
       return [];
     }
+    return sockets.filter(
+      (socket) =>
+        socket.readyState === WEBSOCKET_OPEN &&
+        this.liveAttachment(socket)?.closed !== true,
+    );
   }
 
   isLiveSocket(socket: WebSocket): boolean {
@@ -645,6 +672,7 @@ export class OwnerStore {
     if (attachment) {
       this.ensureSchema();
       this.dropConnection(attachment.connId);
+      markLiveClosed(socket, attachment);
     }
     try {
       socket.close(1000, "");
@@ -800,7 +828,10 @@ export class OwnerStore {
 
   private closeLive(socket: WebSocket, code: number, reason: string): void {
     const attachment = this.liveAttachment(socket);
-    if (attachment) this.dropConnection(attachment.connId);
+    if (attachment) {
+      this.dropConnection(attachment.connId);
+      markLiveClosed(socket, attachment);
+    }
     try {
       socket.close(code, reason);
     } catch {

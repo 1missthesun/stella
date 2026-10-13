@@ -323,15 +323,31 @@ export class MemorySyncService {
     return { ok: true };
   }
 
-  /** Before quit: let a pending or running pass finish, briefly. */
+  /**
+   * Before quit: push memory edited here that the cloud doesn't have yet,
+   * briefly. Nothing else is worth holding quit for: a pull or a retry runs
+   * at the next launch anyway.
+   */
   async flush(timeoutMs: number): Promise<void> {
-    if (this.pendingMode && this.subject) this.kick();
+    if (!this.subject || !(await this.hasUnsyncedEdits())) return;
+    this.pendingMode ??= "local";
+    this.kick();
     const running = this.running;
     if (!running) return;
     await Promise.race([
       running.catch(() => undefined),
       new Promise((resolve) => setTimeout(resolve, timeoutMs)),
     ]);
+  }
+
+  private async hasUnsyncedEdits(): Promise<boolean> {
+    try {
+      const [state, local] = await Promise.all([this.loadState(), this.local.scan()]);
+      if (state.owner !== null && state.owner !== this.subject) return false;
+      return state.epoch === null ? local.size > 0 : !this.matchesState(state, local);
+    } catch {
+      return true;
+    }
   }
 
   dispose(): void {

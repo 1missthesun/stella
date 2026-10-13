@@ -433,6 +433,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             log: (event, data) => getMainLogger()?.process(event, data),
         });
         state.updateTransition = updateTransition;
+        state.processRuntime.registerCleanup("before-quit", "update-hold", () => updateTransition.finishHold());
         const appSourceService = new AppSourceService({
             stellaAppDir: state.stellaAppDir ?? config.stellaAppDir,
             broadcast: (next) => {

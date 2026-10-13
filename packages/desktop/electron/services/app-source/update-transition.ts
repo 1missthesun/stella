@@ -319,6 +319,7 @@ export class UpdateTransition {
   private view: WebContentsView | null = null;
   private host: BrowserWindow | null = null;
   private viewLoad: Promise<void> | null = null;
+  private holdPlaying: Promise<void> | null = null;
 
   constructor(options: UpdateTransitionOptions) {
     this.options = options;
@@ -505,18 +506,18 @@ export class UpdateTransition {
           step("played");
           this.options.log("app-source.hold", { ms: Date.now() - since, split: split.join(" | ") });
         });
+      this.holdPlaying = played;
       return {
+        // The frost finishes playing while the app shuts down
+        // (`finishHold`), not before it starts to.
         commit: async () => {
-          await Promise.all([
-            played,
-            timeout(
-              win.webContents.executeJavaScript(
-                `window.dispatchEvent(new Event(${JSON.stringify(APP_RELAUNCHING_EVENT)}))`,
-              ),
-              1_000,
-              "Telling the window",
-            ).catch(() => {}),
-          ]);
+          await timeout(
+            win.webContents.executeJavaScript(
+              `window.dispatchEvent(new Event(${JSON.stringify(APP_RELAUNCHING_EVENT)}))`,
+            ),
+            1_000,
+            "Telling the window",
+          ).catch(() => {});
           this.options.onHold?.(hold);
         },
         release: async () => {
@@ -533,6 +534,13 @@ export class UpdateTransition {
       await this.uncover(win);
       return null;
     }
+  }
+
+  /** On quit: let a relaunch's frost finish playing, briefly. */
+  async finishHold(): Promise<void> {
+    const playing = this.holdPlaying;
+    if (!playing) return;
+    await timeout(playing, 1_000, "Frosting the window").catch(() => {});
   }
 
   /** A restart left a hold for this process (cheap, synchronous). */

@@ -111,6 +111,29 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
     return { ownerId: bound };
   }
 
+  /**
+   * The owner for a read (the brain record, the history): the generation
+   * this object already holds, as reads over the conversation socket use,
+   * asking the owner gate only when it holds none. A read grants no write
+   * capability, so it needs no fresh fence, and computers poll these every
+   * few seconds: a gate snapshot each time kept the owner's object awake.
+   */
+  protected async readerOwner(
+    request: Request,
+  ): Promise<{ ownerId: string; ownerGeneration: string } | Response> {
+    const identity = parseSocketIdentity(request);
+    if (!identity) return json({ error: "Unauthorized." }, 401);
+    if (this.purged()) {
+      return json(
+        { code: "deleted", message: "This conversation was deleted." },
+        410,
+      );
+    }
+    const owner = await this.resolveOwnerForCaller(identity);
+    if (!owner) return json({ error: "Conversation not found." }, 404);
+    return { ownerId: owner.ownerId, ownerGeneration: owner.ownerGeneration };
+  }
+
   protected async localTurnOwner(
     request: Request,
     suppliedLeaseToken?: string,
@@ -187,7 +210,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
   }
 
   protected async handleCanonicalHistory(request: Request): Promise<Response> {
-    const owner = await this.localTurnOwner(request);
+    const owner = await this.readerOwner(request);
     if (owner instanceof Response) return owner;
     // No lease is acquired and no journal state is mutated. The empty
     // exclusion key cannot match a real turn id, so this is the same bounded,
@@ -261,7 +284,10 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
    * it can.
    */
   protected async handlePiBrain(request: Request): Promise<Response> {
-    const owner = await this.localTurnOwner(request);
+    const owner =
+      request.method === "GET"
+        ? await this.readerOwner(request)
+        : await this.localTurnOwner(request);
     if (owner instanceof Response) return owner;
     if (request.method === "GET") {
       return json({
@@ -288,7 +314,7 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
   }
 
   protected async handleHistoryQuery(request: Request): Promise<Response> {
-    const owner = await this.localTurnOwner(request);
+    const owner = await this.readerOwner(request);
     if (owner instanceof Response) return owner;
     const body = await request.json().catch(() => null);
     try {

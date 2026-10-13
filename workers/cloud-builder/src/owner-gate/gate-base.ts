@@ -68,6 +68,8 @@ import { withTimeout, ownerFenceRequest, log } from "./support.js";
  */
 export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
   protected schemaReady = false;
+  /** Alarm runs in a row that re-armed almost at once (`scheduleAlarm`). */
+  protected alarmHotStreak = 0;
   /** Steers waiting for their device's `steer.ack`, by dispatch and message. */
   protected readonly steerAcks = new Map<
     string,
@@ -545,6 +547,7 @@ export abstract class OwnerGateBase extends DurableObject<OwnerGateEnv> {
     options?: {
       fenceDeadline?: number | null;
       preserveExisting?: boolean;
+      afterAlarm?: boolean;
     },
   ): Promise<void>;
 }

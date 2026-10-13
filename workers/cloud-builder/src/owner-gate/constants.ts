@@ -63,3 +63,13 @@ export const AGENT_MESSAGE_OUTCOMES: ReadonlySet<string> =
  * object cannot clear into a hot alarm loop.
  */
 export const ALARM_MIN_DELAY_MS = 1_000;
+/** An alarm that re-arms itself within this long counts toward a hot loop. */
+export const ALARM_HOT_REARM_MS = 5_000;
+/**
+ * Alarm runs in a row that may each re-arm within `ALARM_HOT_REARM_MS` before
+ * the re-arm backs off. Enough for legitimate catch-up (a batch of expired
+ * leases or due jobs drained one pass at a time), never a standing loop.
+ */
+export const ALARM_HOT_STREAK_LIMIT = 10;
+/** The longest a backed-off re-arm waits. */
+export const ALARM_MAX_BACKOFF_MS = 60_000;

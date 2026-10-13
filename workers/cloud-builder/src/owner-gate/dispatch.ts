@@ -28,7 +28,12 @@ import {
   MAX_OFFERS_PER_DISPATCH,
 } from "../dispatch-policy.js";
 import type { DispatchRow } from "./types.js";
-import { ALARM_MIN_DELAY_MS } from "./constants.js";
+import {
+  ALARM_HOT_REARM_MS,
+  ALARM_HOT_STREAK_LIMIT,
+  ALARM_MAX_BACKOFF_MS,
+  ALARM_MIN_DELAY_MS,
+} from "./constants.js";
 import type { PresenceAttachment } from "./presence.js";
 import {
   OwnerGateSnapshotError,
@@ -940,21 +945,38 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
 
   // ── Alarms ────────────────────────────────────────────────────────────
 
+  /**
+   * Arm the one alarm at the earliest deadline this object holds. Every
+   * deadline comes from live state: open sockets (`sockets()` and the owner
+   * store's `liveSockets()` leave out sockets this side closed), rows, and
+   * pending retries. A deadline the alarm cannot clear would otherwise re-arm
+   * it at the floor forever, which is what kept owners awake around the
+   * clock; after `ALARM_HOT_STREAK_LIMIT` alarm runs in a row that each
+   * re-armed within `ALARM_HOT_REARM_MS`, the re-arm backs off exponentially
+   * to `ALARM_MAX_BACKOFF_MS` and the stuck deadline is logged by name.
+   */
   protected async scheduleAlarm(
     now: number,
     options: {
       fenceDeadline?: number | null;
       preserveExisting?: boolean;
+      /** Set by `alarm()` for its own re-arm, the only place a loop can form. */
+      afterAlarm?: boolean;
     } = {},
   ): Promise<void> {
     this.ensureSchema();
-    let next = options.fenceDeadline ?? Number.POSITIVE_INFINITY;
-    if (
-      (await this.memoryPolicy().pending()) ||
-      (await this.modelGrants().pendingFenceBarrier())
-    )
-      next = Math.min(next, now + 5_000);
-    next = Math.min(next, this.ownerStore().nextDeadline());
+    const deadlines: Array<[string, number]> = [];
+    const add = (source: string, at: number | null | undefined) => {
+      if (typeof at === "number" && Number.isFinite(at)) {
+        deadlines.push([source, at]);
+      }
+    };
+    add("owner_fence", options.fenceDeadline);
+    if (await this.memoryPolicy().pending()) add("memory_policy", now + 5_000);
+    if (await this.modelGrants().pendingFenceBarrier()) {
+      add("grant_fence_barrier", now + 5_000);
+    }
+    add("owner_store", this.ownerStore().nextDeadline());
     // A proven device going quiet needs no wake while nobody watches the
     // device list: request-time readers check staleness against
     // `presenceRow`, in-flight device calls have their own deadlines, and
@@ -965,15 +987,15 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     for (const socket of this.sockets()) {
       const attachment = this.attachment(socket);
       if (!attachment) continue;
-      next = Math.min(next, attachment.authExpiresAtMs);
+      add("presence_auth", attachment.authExpiresAtMs);
       if (attachment.phase !== "connected") {
-        next = Math.min(
-          next,
+        add(
+          "presence_handshake",
           attachment.lastSeenAtMs + DEVICE_PRESENCE_STALE_AFTER_MS,
         );
       } else if (watched) {
-        next = Math.min(
-          next,
+        add(
+          "presence_stale",
           this.lastSeenAt(socket, attachment) + DEVICE_PRESENCE_STALE_AFTER_MS,
         );
       }
@@ -983,7 +1005,7 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
     // accumulated. Leases are asked for per state because a range over a state
     // set cannot be answered by one seek, and scalar subqueries are used rather
     // than a compound SELECT, whose term limit this storage enforces.
-    const deadlines = this.ctx.storage.sql
+    const rows = this.ctx.storage.sql
       .exec<Record<string, number | null>>(
         `SELECT
            (SELECT MIN(offer_deadline_at) FROM dispatches
@@ -1004,12 +1026,39 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
               WHERE payload_json IS NOT NULL AND payload_expires_at IS NOT NULL) AS payload`,
       )
       .toArray()[0];
-    for (const deadline of Object.values(deadlines ?? {})) {
-      if (typeof deadline === "number") next = Math.min(next, deadline);
+    for (const [column, at] of Object.entries(rows ?? {})) {
+      add(`dispatch_${column}`, at);
     }
+    let next = Number.POSITIVE_INFINITY;
+    for (const [, at] of deadlines) next = Math.min(next, at);
     const existingAlarm = await this.ctx.storage.getAlarm();
     if (options.preserveExisting !== false && existingAlarm !== null) {
       next = Math.min(next, existingAlarm);
+    }
+    if (options.afterAlarm) {
+      if (Number.isFinite(next) && next - now <= ALARM_HOT_REARM_MS) {
+        this.alarmHotStreak += 1;
+        const over = this.alarmHotStreak - ALARM_HOT_STREAK_LIMIT;
+        if (over > 0) {
+          next = Math.max(
+            next,
+            now +
+              Math.min(ALARM_MAX_BACKOFF_MS, ALARM_MIN_DELAY_MS * 2 ** over),
+          );
+          // Once per doubling, so a stuck deadline is found without flooding logs.
+          if ((over & (over - 1)) === 0) {
+            log("error", "owner_alarm_hot_loop", {
+              ownerId: this.ownerId(),
+              streak: this.alarmHotStreak,
+              sources: deadlines
+                .filter(([, at]) => at - now <= ALARM_HOT_REARM_MS)
+                .map(([source]) => source),
+            });
+          }
+        }
+      } else {
+        this.alarmHotStreak = 0;
+      }
     }
     if (!Number.isFinite(next)) return;
     const at = Math.max(now + ALARM_MIN_DELAY_MS, next);

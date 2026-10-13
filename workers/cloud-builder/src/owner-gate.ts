@@ -2250,6 +2250,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       await this.scheduleAlarm(now, {
         fenceDeadline,
         preserveExisting: false,
+        afterAlarm: true,
       });
     }
   }

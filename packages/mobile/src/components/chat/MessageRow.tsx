@@ -1036,13 +1036,19 @@ export const ChatMessageRow = memo(function ChatMessageRow({
   // The full report of each task this reply relays (or cites, unless it is
   // still running) opens from a "Show more" under the reply's text, not from
   // the quote.
+  // An agent that relayed twice in a turn (a mid-run message, then its
+  // report) is still one report.
   const reportRefs: AgentReplyRef[] = [
-    ...relayedQuotes.map((quote) => quote.ref),
-    ...(contextRef?.kind === "agent" &&
-    !quotedThreadIds.has(contextRef.threadId) &&
-    contextStatus !== "running"
-      ? [contextRef]
-      : []),
+    ...new Map(
+      [
+        ...relayedQuotes.map((quote) => quote.ref),
+        ...(contextRef?.kind === "agent" &&
+        !quotedThreadIds.has(contextRef.threadId) &&
+        contextStatus !== "running"
+          ? [contextRef]
+          : []),
+      ].map((ref) => [ref.threadId, ref] as const),
+    ).values(),
   ];
   // One "Show more" per reply, however many reports it offers.
   const showMore =

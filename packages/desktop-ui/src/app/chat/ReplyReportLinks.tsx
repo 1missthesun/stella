@@ -39,8 +39,13 @@ export const ReplyReportLinks = memo(function ReplyReportLinks({
     [primaryLocal?.description, primary?.title],
     primaryLocal?.status,
   );
+  // One agent can relay more than once in a turn (a mid-run message, then
+  // its report); it is one report, carrying its latest relayed text.
+  const latestCompletions = [
+    ...new Map(completions.map((section) => [section.agentId, section])).values(),
+  ];
   const reports: { reference: AgentRef; status: NonNullable<typeof primaryCard.status>; result?: string }[] = [
-    ...completions.map((section) => ({
+    ...latestCompletions.map((section) => ({
       reference: {
         kind: "agent",
         threadId: section.agentId,

@@ -218,6 +218,15 @@
   overflow: visible;
 }
 
+/* Text scrolls under the close button; it keeps the popover's top fill. */
+.reply-preview-report--multiple .reply-preview-report__close:not(:hover) {
+  background-color: var(--background);
+  background-image: linear-gradient(
+    var(--chat-assistant-bubble-fill-top),
+    var(--chat-assistant-bubble-fill-top)
+  );
+}
+
 .reply-preview-report__section + .reply-preview-report__section {
   border-top: 1px solid color-mix(in srgb, var(--chat-text-color) 10%, transparent);
 }

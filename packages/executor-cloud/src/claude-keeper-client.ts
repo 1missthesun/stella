@@ -5,6 +5,8 @@ import { chmod, mkdir, readFile } from "node:fs/promises";
 import net from "node:net";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { Effect } from "effect";
+import { runToolEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import {
   CLAUDE_KEEPER_DIRECTORY,
   type ClaudeKeeperEvent,
@@ -55,19 +57,12 @@ const connect = (socketPath: string): Promise<net.Socket> =>
   });
 
 const withTimeout = <T>(promise: Promise<T>, ms: number, message: string): Promise<T> =>
-  new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), ms);
-    promise.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
+  runToolEffect(
+    Effect.raceFirst(
+      Effect.tryPromise({ try: () => promise, catch: (error) => error }),
+      Effect.sleep(ms).pipe(Effect.flatMap(() => Effect.fail(new Error(message)))),
+    ),
+  );
 
 const killKeeper = async (socketPath: string): Promise<void> => {
   const pid = Number(
@@ -266,7 +261,7 @@ export const openClaudeKeeper = async (
     while (Date.now() < deadline) {
       const socket = await connect(socketPath).catch(() => undefined);
       if (socket) return client(socket, socketPath);
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      await runToolEffect(Effect.sleep(20));
     }
     await killKeeper(socketPath);
   } catch (error) {

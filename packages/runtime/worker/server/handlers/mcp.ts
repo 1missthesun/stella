@@ -1,6 +1,5 @@
 import { Effect } from "effect";
 import { METHOD_NAMES } from "@stella/contracts/protocol";
-import { serveRelayedMcpRequest } from "../../../kernel/connectors/connect-service.js";
 import { WorkerNotInitializedError } from "../errors.js";
 import * as WorkerSessions from "../sessions.js";
 import { fromPromise, type WorkerRpcHandlers } from "../rpc.js";
@@ -21,6 +20,9 @@ export const mcpHandlers: WorkerRpcHandlers = {
         };
         const cliBridgeSocketPath =
           session.runnerCell.get()?.piTools.cliBridgeSocketPath;
+        const { serveRelayedMcpRequest } = await import(
+          "../../../kernel/connectors/connect-service.js"
+        );
         return await serveRelayedMcpRequest(
           {
             stellaAppDir: session.config.get().stellaDataDirPath,

@@ -454,7 +454,7 @@ export const initializeStellaInAppBrowser: InAppBrowserInitializer = async ({
           : createConnection({ host: endpoint.host, port: endpoint.port });
 
       const cleanup = () => {
-        clearTimeout(timeout);
+        cancelTimeout();
         signal?.removeEventListener("abort", onAbort);
         socket.removeAllListeners();
         if (!socket.destroyed) socket.destroy();
@@ -472,14 +472,12 @@ export const initializeStellaInAppBrowser: InAppBrowserInitializer = async ({
         reject(error);
       };
       const onAbort = () => fail(abortReason(signal!));
-      const timeout = setTimeout(
-        () =>
-          fail(
-            new Error(
-              `In-app browser initialization timed out after ${timeoutMs}ms.`,
-            ),
+      const cancelTimeout = forkCancelableTimeout(Math.max(1, timeoutMs), () =>
+        fail(
+          new Error(
+            `In-app browser initialization timed out after ${timeoutMs}ms.`,
           ),
-        Math.max(1, timeoutMs),
+        ),
       );
 
       signal?.addEventListener("abort", onAbort, { once: true });
@@ -600,14 +598,16 @@ export const readStellaBrowserExtensionStatus = async ({
     const finish = (value: boolean | undefined) => {
       if (settled) return;
       settled = true;
-      clearTimeout(timeout);
+      cancelTimeout();
       signal?.removeEventListener("abort", onAbort);
       socket.removeAllListeners();
       if (!socket.destroyed) socket.destroy();
       resolve(value);
     };
     const onAbort = () => finish(undefined);
-    const timeout = setTimeout(() => finish(undefined), Math.max(1, timeoutMs));
+    const cancelTimeout = forkCancelableTimeout(Math.max(1, timeoutMs), () =>
+      finish(undefined),
+    );
     signal?.addEventListener("abort", onAbort, { once: true });
     socket.setEncoding("utf8");
     socket.once("connect", () => {
@@ -1846,15 +1846,17 @@ export class BrowserSession implements BrowserSessionClient {
       throwIfAborted(signal);
       if (connected !== false) break;
       if (Date.now() + EXTERNAL_ATTACH_GRACE_POLL_MS > graceUntil) break;
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(done, EXTERNAL_ATTACH_GRACE_POLL_MS);
-        function done() {
-          clearTimeout(timer);
-          signal?.removeEventListener("abort", done);
-          resolve();
-        }
-        signal?.addEventListener("abort", done, { once: true });
-      });
+      await runBrowserUseEffect(
+        Effect.scoped(
+          Effect.gen(function* () {
+            const abortLatch = yield* acquireAbortLatch(signal);
+            yield* Effect.raceFirst(
+              Effect.sleep(EXTERNAL_ATTACH_GRACE_POLL_MS),
+              Deferred.await(abortLatch),
+            );
+          }),
+        ),
+      );
       throwIfAborted(signal);
     }
     if (connected === true) {

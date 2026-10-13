@@ -20,6 +20,8 @@ import { chmod, mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
 import path from "node:path";
+import { Effect } from "effect";
+import { forkAbortTimer, runToolEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import {
   CLAUDE_KEEPER_IDLE_MS,
   CLAUDE_KEEPER_MCP_CONFIG_PLACEHOLDER,
@@ -241,7 +243,7 @@ type Child = {
 
 let child: Child | undefined;
 let attached: net.Socket | undefined;
-let idleTimer: ReturnType<typeof setTimeout> | undefined;
+let cancelIdleTimer: (() => void) | undefined;
 
 const send = (socket: net.Socket | undefined, event: ClaudeKeeperEvent): void => {
   if (socket && !socket.destroyed) socket.write(`${JSON.stringify(event)}\n`);
@@ -362,8 +364,8 @@ const attach = async (
   socket: net.Socket,
   request: Extract<ClaudeKeeperRequest, { t: "attach" }>,
 ): Promise<void> => {
-  if (idleTimer) clearTimeout(idleTimer);
-  idleTimer = undefined;
+  cancelIdleTimer?.();
+  cancelIdleTimer = undefined;
   if (attached && attached !== socket) {
     // A newer attempt of this thread's turn supersedes whatever still holds
     // the process.
@@ -435,7 +437,7 @@ const park = async (socket: net.Socket, stateRoot: string): Promise<void> => {
   let previous = await fingerprint(stateRoot);
   let stableSince = Date.now();
   while (Date.now() < deadline && Date.now() - stableSince < 150) {
-    await new Promise((resolve) => setTimeout(resolve, 50));
+    await runToolEffect(Effect.sleep(50));
     const next = await fingerprint(stateRoot);
     if (next !== previous) {
       previous = next;
@@ -524,7 +526,7 @@ const server = net.createServer((socket) => {
     if (!current || current.exited || !current.parked || !current.released) {
       shutdown("executor left mid-turn");
     }
-    idleTimer = setTimeout(() => shutdown("idle"), CLAUDE_KEEPER_IDLE_MS);
+    cancelIdleTimer = forkAbortTimer(CLAUDE_KEEPER_IDLE_MS, () => shutdown("idle"));
   });
 });
 
@@ -542,7 +544,7 @@ await new Promise<void>((resolve, reject) => {
 });
 await chmod(socketPath, 0o600);
 await writeFile(`${socketPath}.pid`, `${process.pid}\n`, { mode: 0o600 });
-idleTimer = setTimeout(() => {
+cancelIdleTimer = forkAbortTimer(30_000, () => {
   if (!attached) shutdown("never attached");
-}, 30_000);
+});
 log("listening", { pid: process.pid });

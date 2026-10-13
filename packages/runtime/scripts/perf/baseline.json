@@ -478,9 +478,9 @@
       "ceiling": 0
     },
     "bundle.bootReachableFiles": {
-      "value": 30,
+      "value": 34,
       "kind": "count",
-      "ceiling": 33.5
+      "ceiling": 37.7
     },
     "history.1000.openMs": {
       "value": 498.98,

@@ -24,6 +24,7 @@
  */
 
 import type { TSchema } from "@sinclair/typebox";
+import { Effect } from "effect";
 import {
   READ_TOOL_DESCRIPTION,
   READ_TOOL_NAME,
@@ -31,6 +32,7 @@ import {
   READ_TOOL_REPLAY,
 } from "@stella/runtime/kernel/tools/defs/read-def.js";
 import { sanitizeToolVisibleText } from "@stella/runtime/kernel/tools/safety.js";
+import { runToolEffect } from "@stella/runtime/kernel/tools/effect-runtime.js";
 import {
   detectImageMimeTypeFromBytes,
   imageMimeTypeFromPath,
@@ -314,33 +316,31 @@ export const createCloudReadTool = (
       // Whatever happens below ends as a result: a store, the Images
       // service, or a slow read never leaves the turn waiting on this call.
       // Undefined (no such file) falls through so not-found stays one message.
-      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
-        const image = await Promise.race([
-          (async () => {
-            const entry = await world.stat!(worldPath).catch(() => null);
-            if (!entry || entry.kind !== "file") return undefined;
-            return await readImage(world, options.images, worldPath, entry.size);
-          })(),
-          new Promise<ReturnType<typeof failure>>((resolve) => {
-            timer = setTimeout(
-              () =>
-                resolve(
-                  failure(
-                    `Reading that image took longer than ${IMAGE_READ_DEADLINE_MS / 1000} seconds; try again: ${worldPath}`,
-                  ),
+        const image = await runToolEffect(
+          Effect.raceFirst(
+            Effect.tryPromise({
+              try: async () => {
+                const entry = await world.stat!(worldPath).catch(() => null);
+                if (!entry || entry.kind !== "file") return undefined;
+                return await readImage(world, options.images, worldPath, entry.size);
+              },
+              catch: (error) => error,
+            }),
+            Effect.sleep(IMAGE_READ_DEADLINE_MS).pipe(
+              Effect.map(() =>
+                failure(
+                  `Reading that image took longer than ${IMAGE_READ_DEADLINE_MS / 1000} seconds; try again: ${worldPath}`,
                 ),
-              IMAGE_READ_DEADLINE_MS,
-            );
-          }),
-        ]);
+              ),
+            ),
+          ),
+        );
         if (image) return image;
       } catch (error) {
         return failure(
           `That image could not be read${error instanceof Error && error.message ? ` (${error.message})` : ""}: ${worldPath}`,
         );
-      } finally {
-        if (timer !== undefined) clearTimeout(timer);
       }
     }
 

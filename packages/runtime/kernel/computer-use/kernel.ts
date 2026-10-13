@@ -1393,22 +1393,21 @@ class NodeReplKernel {
   private async loadConnectorToolNames(): Promise<string[]> {
     const client = this.connectClient;
     if (!client) return [];
-    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const entries = await Promise.race([
-        client.tools(),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error("timed out")),
-            CONNECTOR_TOOL_NAMES_TIMEOUT_MS,
-          );
-        }),
-      ]);
+      const entries = await runComputerUseEffect(
+        Effect.raceFirst(
+          Effect.tryPromise({
+            try: () => client.tools(),
+            catch: (error) => error,
+          }),
+          Effect.sleep(CONNECTOR_TOOL_NAMES_TIMEOUT_MS).pipe(
+            Effect.flatMap(() => Effect.fail(new Error("timed out"))),
+          ),
+        ),
+      );
       return entries.map((entry) => entry.name);
     } catch {
       return [];
-    } finally {
-      if (timer) clearTimeout(timer);
     }
   }
 
@@ -2202,20 +2201,19 @@ class NodeReplKernel {
       once: true,
     });
     if (active.controller.signal.aborted) forwardAbort();
-    const timeout = setTimeout(
+    const cancelTimeout = forkCancelableTimeout(
+      BROWSER_PRESENTATION_TIMEOUT_MS,
       () =>
         controller.abort(
           new Error(
             `Browser presentation timed out after ${BROWSER_PRESENTATION_TIMEOUT_MS}ms.`,
           ),
         ),
-      BROWSER_PRESENTATION_TIMEOUT_MS,
     );
-    timeout.unref();
     return {
       signal: controller.signal,
       dispose: () => {
-        clearTimeout(timeout);
+        cancelTimeout();
         active.controller.signal.removeEventListener("abort", forwardAbort);
       },
     };

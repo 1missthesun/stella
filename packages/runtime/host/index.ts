@@ -58,7 +58,7 @@ import { buildStdioConnectionFactory } from "./stdio-connection.js";
 import { buildInprocConnectionFactory } from "./inproc-connection.js";
 import { resolveRuntimePaths } from "../worker/runtime-paths.js";
 import { Cause, Effect, Exit, Fiber } from "effect";
-import { forkDelayed, hostRuntime } from "./effect-runtime.js";
+import { forkDelayed, hostRuntime, type HostTimerHandle } from "./effect-runtime.js";
 import {
   clearPendingWorkerRestartFlag,
   evaluateWorkerStaleness,
@@ -287,7 +287,7 @@ export class StellaRuntimeHost {
   hostAccountServicesKey: string | null = null;
   hostExecutionPlacementBridge: ExecutionPlacementBridge | null = null;
   hostExecutionPlacementSyncQueue: Promise<void> = Promise.resolve();
-  hostExecutionPlacementRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  hostExecutionPlacementRetryTimer: HostTimerHandle | null = null;
   hostExecutionPlacementRetryAttempt = 0;
   placedDispatchByRunId = new Map<string, PlacedDispatch>();
   /** What each conversation runs elsewhere, for Stop (`ConversationPlacements`). */
@@ -818,16 +818,16 @@ export class StellaRuntimeHost {
     const attempt = this.hostExecutionPlacementRetryAttempt++;
     const base = Math.min(60_000, 1_000 * 2 ** Math.min(attempt, 6));
     const delay = base / 2 + Math.random() * (base / 2);
-    this.hostExecutionPlacementRetryTimer = setTimeout(() => {
+    this.hostExecutionPlacementRetryTimer = forkDelayed(delay, () => {
       this.hostExecutionPlacementRetryTimer = null;
       void this.syncHostExecutionPlacement().catch((error) =>
         console.warn("[execution-placement] Desktop placement bridge retry failed.", error),
       );
-    }, delay);
+    });
   }
   cancelHostExecutionPlacementRetry() {
     if (this.hostExecutionPlacementRetryTimer) {
-      clearTimeout(this.hostExecutionPlacementRetryTimer);
+      this.hostExecutionPlacementRetryTimer.cancel();
       this.hostExecutionPlacementRetryTimer = null;
     }
   }

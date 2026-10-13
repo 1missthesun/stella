@@ -15,8 +15,10 @@
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { Effect } from "effect";
 
 import { callApiConnector } from "./api-client.js";
+import { runConnectorEffect, tryConnectorOp } from "./effect-runtime.js";
 import {
   resolveNativeConnectorCatalog,
   type NativeCatalogSource,
@@ -1700,22 +1702,14 @@ const backendActions = (
 };
 
 const withTimeout = <T>(task: Promise<T>, timeoutMs: number): Promise<T> =>
-  new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(
-      () => reject(new Error("timed out")),
-      timeoutMs,
-    );
-    task.then(
-      (value) => {
-        clearTimeout(timer);
-        resolve(value);
-      },
-      (error: unknown) => {
-        clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
+  runConnectorEffect(
+    Effect.raceFirst(
+      tryConnectorOp(() => task),
+      Effect.sleep(timeoutMs).pipe(
+        Effect.flatMap(() => Effect.fail(new Error("timed out"))),
+      ),
+    ),
+  );
 
 type McpToolsListing =
   | { tools: ConnectorToolInfo[] }

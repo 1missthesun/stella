@@ -992,7 +992,7 @@ function SecureInputBody({
               style={styles.rememberSwitch}
               value={remember}
             />
-            <Text numberOfLines={2} style={styles.rememberLabel}>
+            <Text style={styles.rememberLabel}>
               {t("mobile.userAsk.remember")}
             </Text>
           </View>

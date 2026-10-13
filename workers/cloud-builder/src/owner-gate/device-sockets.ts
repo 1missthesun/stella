@@ -237,6 +237,9 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         presenceSessionId: attachment.presenceSessionId,
         serverTimeMs: now,
       });
+      // Work offered to this computer while it was reconnecting reaches it
+      // now, on the session it can claim from.
+      if (attachment.availability?.ready) this.offerAgainTo(attachment, now);
       if (device!.remoteExecution === "asking") {
         this.send(socket, {
           type: "consent.request",
@@ -278,9 +281,11 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
         this.closeSocket(socket, DEVICE_PRESENCE_CLOSE.protocol, "bad_request");
         return;
       }
+      const becameReady = availability.ready && !attachment.availability?.ready;
       attachment.availability = availability;
       socket.serializeAttachment(attachment);
       this.writePresence(attachment, now, true);
+      if (becameReady) this.offerAgainTo(attachment, now);
       return;
     }
     if (frame.type === "consent") {
@@ -700,6 +705,11 @@ export abstract class OwnerGateDeviceSockets extends OwnerGateBase {
     refresh?: boolean;
     now?: number;
   }): Promise<OwnerSnapshot>;
+  /** Open offers to this device, pushed again to its current session. */
+  protected abstract offerAgainTo(
+    attachment: PresenceAttachment,
+    now: number,
+  ): void;
   protected abstract handleExecutorFrame(
     socket: WebSocket,
     attachment: PresenceAttachment,

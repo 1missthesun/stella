@@ -13,6 +13,8 @@ import {
   type DeviceRemoteExecution,
   DISPATCH_ACCEPTED_LEASE_MS,
   DISPATCH_CLAIM_LEASE_MS,
+  DISPATCH_OFFER_WINDOW_MS,
+  DISPATCH_RECONNECT_GRACE_MS,
   type DispatchError,
   type DispatchState,
   type ExecutionCapability,
@@ -268,6 +270,107 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       device.remoteExecution ??
       (device.remoteExecutionEnabled ? "enabled" : "unconfigured")
     );
+  }
+
+  /**
+   * A device that (re)connects ready gets the offers still open to it, bound
+   * to its new session. One sent to the session it had before never arrived
+   * or can no longer be claimed, so without this the work would wait out the
+   * window and fall back while the computer it was for is right here.
+   */
+  protected offerAgainTo(attachment: PresenceAttachment, now: number): void {
+    const presence = this.presenceRow(attachment.deviceId);
+    if (!presence?.connected || !presence.ready) return;
+    const rows = this.ctx.storage.sql
+      .exec<DispatchRow>(
+        `SELECT d.* FROM dispatches d
+           JOIN dispatch_offers o ON o.dispatch_id = d.dispatch_id
+          WHERE o.device_id = ? AND o.status = 'open'
+            AND d.state = 'offering' AND d.offer_deadline_at IS NOT NULL`,
+        attachment.deviceId,
+      )
+      .toArray();
+    for (const row of rows) {
+      const deadline = Math.max(
+        row.offer_deadline_at ?? 0,
+        now + DISPATCH_OFFER_WINDOW_MS,
+      );
+      if (deadline !== row.offer_deadline_at) {
+        this.ctx.storage.sql.exec(
+          `UPDATE dispatches SET offer_deadline_at = ? WHERE dispatch_id = ?`,
+          deadline,
+          row.dispatch_id,
+        );
+        row.offer_deadline_at = deadline;
+      }
+      this.openOffer(row.dispatch_id, presence, deadline, now);
+      this.pushOffer(row, attachment.deviceId, deadline);
+      log("info", "dispatch_offered_again", {
+        dispatchId: row.dispatch_id,
+        deviceId: attachment.deviceId,
+      });
+    }
+  }
+
+  /**
+   * The named computer of a dispatch when it is between connections: its
+   * presence dropped within the reconnect grace and it was eligible as it
+   * stood. Work aimed at it waits for it rather than falling back at once.
+   * A computer that is connected but not taking work is not waited for.
+   */
+  protected reconnectingDevice(args: {
+    snapshot: OwnerSnapshot;
+    deviceId: string;
+    kind: ExecutionKind;
+    requiredCapabilities: readonly ExecutionCapability[];
+    now: number;
+  }): DevicePresenceState | null {
+    const presence = this.presenceRow(args.deviceId);
+    if (!presence || presence.connected) return null;
+    const droppedAt = this.ctx.storage.sql
+      .exec<{ updated_at: number }>(
+        `SELECT updated_at FROM device_presence WHERE device_id = ?`,
+        args.deviceId,
+      )
+      .toArray()[0]?.updated_at;
+    if (!droppedAt || droppedAt + DISPATCH_RECONNECT_GRACE_MS <= args.now) {
+      return null;
+    }
+    const device = (args.snapshot.devices ?? []).find(
+      (candidate) => candidate.deviceId === args.deviceId,
+    );
+    const eligible = isEligibleDevice({
+      presence: { ...presence, connected: true, ready: true, lastSeenAt: args.now },
+      device,
+      kind: args.kind,
+      requiredCapabilities: args.requiredCapabilities,
+      now: args.now,
+      staleAfterMs: DEVICE_PRESENCE_STALE_AFTER_MS,
+    });
+    return eligible ? presence : null;
+  }
+
+  /**
+   * An offer to one named computer that lapsed while that computer had no
+   * live presence (it is reconnecting): how long to keep it open for it,
+   * or null to take the fallback now.
+   */
+  protected reconnectDeadline(row: DispatchRow, now: number): number | null {
+    if (
+      row.requested_target_mode !== "device" ||
+      !row.requested_executor_device_id
+    ) {
+      return null;
+    }
+    const until = row.created_at + DISPATCH_RECONNECT_GRACE_MS;
+    if (until <= now) return null;
+    const offered = this.openOffers(row.dispatch_id).some(
+      (offer) => offer.device_id === row.requested_executor_device_id,
+    );
+    if (!offered) return null;
+    const presence = this.presenceRow(row.requested_executor_device_id);
+    if (presence?.connected && presence.ready) return null;
+    return until;
   }
 
   protected pushOffer(
@@ -954,6 +1057,19 @@ export abstract class OwnerGateDispatch extends OwnerGateDeviceSockets {
       const leaseLapsed =
         row.lease_expires_at !== null && row.lease_expires_at <= now;
       if (offerLapsed) {
+        const waitUntil = this.reconnectDeadline(row, now);
+        if (waitUntil !== null) {
+          this.ctx.storage.sql.exec(
+            `UPDATE dispatches SET offer_deadline_at = ? WHERE dispatch_id = ?`,
+            waitUntil,
+            row.dispatch_id,
+          );
+          log("info", "dispatch_offer_awaits_reconnect", {
+            dispatchId: row.dispatch_id,
+            deviceId: row.requested_executor_device_id,
+          });
+          continue;
+        }
         await this.resolveUnaccepted(
           row,
           now,

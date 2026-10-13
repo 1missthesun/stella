@@ -237,6 +237,13 @@ export const TERMINAL_DISPATCH_STATES: readonly DispatchState[] = [
 
 /** Dispatch timings. */
 export const DISPATCH_OFFER_WINDOW_MS = 4_000;
+/**
+ * How long an offer aimed at one named computer waits for it when that
+ * computer is reconnecting (no live presence when the window lapses). It is
+ * offered again the moment it is back; past this the dispatch takes its
+ * fallback, as an unanswered offer does.
+ */
+export const DISPATCH_RECONNECT_GRACE_MS = 20_000;
 export const DISPATCH_CLAIM_LEASE_MS = 30_000;
 export const DISPATCH_ACCEPTED_LEASE_MS = 120_000;
 export const DISPATCH_PAYLOAD_TTL_MS = 900_000;

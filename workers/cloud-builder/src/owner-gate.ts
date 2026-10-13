@@ -103,6 +103,7 @@ import {
   type DevicesResponse,
   DISPATCH_ACCEPTED_LEASE_MS,
   DISPATCH_OFFER_WINDOW_MS,
+  DISPATCH_RECONNECT_GRACE_MS,
   DISPATCH_PAYLOAD_TTL_MS,
   type DispatchError,
   type DispatchState,
@@ -1644,6 +1645,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       targetMode,
     });
     let candidates: DevicePresenceState[] = [];
+    let awaitsReconnect = false;
     if (decision.kind === "offer") {
       if (
         request.ingress === "mobile" &&
@@ -1680,6 +1682,25 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         requiredCapabilities,
         now,
       });
+      // The named computer is reconnecting: the offer waits for it, and
+      // reaches it the moment it is back (`offerAgainTo`).
+      if (
+        candidates.length === 0 &&
+        targetMode === "device" &&
+        request.targetDeviceId
+      ) {
+        const reconnecting = this.reconnectingDevice({
+          snapshot,
+          deviceId: request.targetDeviceId,
+          kind: request.kind,
+          requiredCapabilities,
+          now,
+        });
+        if (reconnecting) {
+          candidates = [reconnecting];
+          awaitsReconnect = true;
+        }
+      }
     }
     /**
      * The consent state of a device this dispatch was explicitly aimed at.
@@ -1751,7 +1772,11 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       if (candidates.length > 0) {
         state = "offering";
         fallbackReason = decision.reason;
-        offerDeadlineAt = now + DISPATCH_OFFER_WINDOW_MS;
+        offerDeadlineAt =
+          now +
+          (awaitsReconnect
+            ? DISPATCH_RECONNECT_GRACE_MS
+            : DISPATCH_OFFER_WINDOW_MS);
       } else if (decision.onNoEligibleComputer === "cloud") {
         state = "cloud_committed";
         placement = "cloud";
@@ -1853,6 +1878,12 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     } else if (state === "computer_accepted" && executorDeviceId) {
       this.notifyExecutor(row);
     } else if (state === "offering" && offerDeadlineAt !== null) {
+      if (awaitsReconnect) {
+        log("info", "dispatch_offer_awaits_reconnect", {
+          dispatchId,
+          deviceId: request.targetDeviceId,
+        });
+      }
       for (const candidate of candidates) {
         this.openOffer(dispatchId, candidate, offerDeadlineAt, now);
         this.pushOffer(row, candidate.deviceId, offerDeadlineAt);

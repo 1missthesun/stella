@@ -91,6 +91,7 @@
   flex-direction: column;
   /* The tallest a page gets before it scrolls inside itself. */
   --catch-up-page-max: min(28rem, 62vh);
+  outline: none;
 }
 
 .catch-up__bar {

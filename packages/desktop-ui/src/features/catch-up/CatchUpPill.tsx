@@ -240,6 +240,9 @@ export const CatchUpPill = memo(function CatchUpPill({
   const [pageIndex, setPageIndex] = useState(0);
   const [pagesHeight, setPagesHeight] = useState<number | null>(null);
   const shownKeyRef = useRef<string | null>(null);
+  // The page a button or key is sliding to, until the scroller gets there.
+  const targetRef = useRef<number | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const total = catchUps.length;
   const shown = Math.min(pageIndex, Math.max(0, total - 1));
 
@@ -249,6 +252,7 @@ export const CatchUpPill = memo(function CatchUpPill({
       const target = Math.max(0, Math.min(next, pagesNode.children.length - 1));
       // Chromium counts an RTL scroller's offset leftwards, below zero.
       const sign = getComputedStyle(pagesNode).direction === "rtl" ? -1 : 1;
+      targetRef.current = behavior === "smooth" ? target : null;
       pagesNode.scrollTo({ left: sign * target * pagesNode.clientWidth, behavior });
       setPageIndex(target);
     },
@@ -261,14 +265,22 @@ export const CatchUpPill = memo(function CatchUpPill({
       return;
     }
     if (!newestKey || shownKeyRef.current === newestKey) return;
-    goTo(total - 1, shownKeyRef.current === null ? "instant" : "smooth");
+    const opening = shownKeyRef.current === null;
+    goTo(total - 1, opening ? "instant" : "smooth");
     shownKeyRef.current = newestKey;
+    // Take focus on open so the arrow keys page right away.
+    if (opening) rootRef.current?.focus({ preventScroll: true });
   }, [goTo, newestKey, pagesNode, total]);
 
   // The page in view after a swipe or a trackpad scroll.
   const onPagesScroll = useCallback(() => {
     if (!pagesNode || pagesNode.clientWidth === 0) return;
-    setPageIndex(Math.round(Math.abs(pagesNode.scrollLeft) / pagesNode.clientWidth));
+    const position = Math.abs(pagesNode.scrollLeft) / pagesNode.clientWidth;
+    if (targetRef.current !== null) {
+      if (Math.abs(position - targetRef.current) > 0.02) return;
+      targetRef.current = null;
+    }
+    setPageIndex(Math.round(position));
   }, [pagesNode]);
 
   // The popover is as tall as the page in view, up to its cap; a longer page
@@ -292,7 +304,7 @@ export const CatchUpPill = memo(function CatchUpPill({
       if (!step) return;
       event.preventDefault();
       event.stopPropagation();
-      goTo(shown + step);
+      goTo((targetRef.current ?? shown) + step);
     },
     [goTo, pagesNode, shown],
   );
@@ -330,7 +342,13 @@ export const CatchUpPill = memo(function CatchUpPill({
         collisionPadding={16}
         className="catch-up-popover"
       >
-        <div className="catch-up" data-testid="catch-up-popover" onKeyDown={onKeyDown}>
+        <div
+          ref={rootRef}
+          className="catch-up"
+          data-testid="catch-up-popover"
+          tabIndex={-1}
+          onKeyDown={onKeyDown}
+        >
           <div className="catch-up__bar">
             <span className="catch-up__when">
               {catchUps[shown] ? formatWhen(locale, catchUps[shown].createdAt) : t("app.chat.catchUp.title")}

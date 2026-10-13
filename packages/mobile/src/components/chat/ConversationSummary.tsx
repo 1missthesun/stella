@@ -362,10 +362,44 @@ export function SummaryPopover({
   const onScroll = useCallback(
     (event: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (pageWidth === 0) return;
+      offsetRef.current = event.nativeEvent.contentOffset.x;
       const next = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
       setIndex((current) => (current === next ? current : next));
     },
     [pageWidth],
+  );
+
+  // Land on a whole page however the swipe ended: the popover's host has
+  // been seen to leave a paged scroller resting between two pages.
+  const offsetRef = useRef(0);
+  const settleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const settleAt = useCallback(
+    (x: number) => {
+      if (pageWidth === 0) return;
+      const target = Math.max(0, Math.min(Math.round(x / pageWidth), total - 1));
+      setIndex(target);
+      if (Math.abs(x - target * pageWidth) > 1) {
+        scrollRef.current?.scrollTo({ x: target * pageWidth, animated: true });
+      }
+    },
+    [pageWidth, total],
+  );
+  const onDragEnd = useCallback(() => {
+    if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    settleTimerRef.current = setTimeout(() => settleAt(offsetRef.current), 450);
+  }, [settleAt]);
+  const onMomentumEnd = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+      settleAt(event.nativeEvent.contentOffset.x);
+    },
+    [settleAt],
+  );
+  useEffect(
+    () => () => {
+      if (settleTimerRef.current) clearTimeout(settleTimerRef.current);
+    },
+    [],
   );
 
   const current = catchUps[shown];
@@ -430,12 +464,18 @@ export function SummaryPopover({
               ref={scrollRef}
               horizontal
               pagingEnabled
+              snapToInterval={pageWidth}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              disableIntervalMomentum
               directionalLockEnabled
               showsHorizontalScrollIndicator={false}
               onScroll={onScroll}
+              onScrollEndDrag={onDragEnd}
+              onMomentumScrollEnd={onMomentumEnd}
               scrollEventThrottle={32}
               contentOffset={{ x: shown * pageWidth, y: 0 }}
-              style={styles.pages}
+              style={[styles.pages, { width: pageWidth }]}
               testID="summary-pages"
             >
               {catchUps.map((catchUp, pageIndex) => (

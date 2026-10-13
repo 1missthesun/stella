@@ -30,6 +30,7 @@ import { useStellaSendMessageBridge } from "./use-stella-send-message-bridge";
 import { useChatStore } from "@/context/chat-store-context";
 import { useCloudChatBridge } from "@/features/cloud/use-cloud-chat-bridge";
 import { usePiChat } from "@/features/chat/pi/use-pi-chat";
+import { remoteTurnRunning } from "@/features/chat/pi/remote-turn-running";
 import {
   journaledPiTurns,
   piAgentActivityEvents,
@@ -428,15 +429,34 @@ export function useFullShellChat({
   const latestCompletedTool = piChat.latestCompletedTool;
   const hasToolActivity = piChat.hasToolActivity;
   const isToolActive = piChat.isToolActive;
+  const runningElsewhere = useMemo(
+    () =>
+      remoteTurnRunning({
+        socketLive: cloudFeaturesEnabled && cloudChat.conversation.state.status === "live",
+        live: cloudChat.conversation.state.live,
+        records: cloudChat.records,
+        polled: piChat.remoteTurns,
+        ownDeviceId,
+      }),
+    [
+      cloudChat.conversation.state.live,
+      cloudChat.conversation.state.status,
+      cloudChat.records,
+      cloudFeaturesEnabled,
+      ownDeviceId,
+      piChat.remoteTurns,
+    ],
+  );
+  const turnRunning = piChat.isRunningHere || runningElsewhere;
   const awaitingTurnHandoff = useTurnHandoff({
     conversationId: activeConversationId,
     optimisticEvents: localOptimisticEvents,
     persistedMessages,
     awaitingAdmission: awaitingMessageAdmission,
-    turnRunning: piChat.isStreaming,
+    turnRunning,
   });
   const isStreaming =
-    piChat.isStreaming || awaitingMessageAdmission || awaitingTurnHandoff;
+    turnRunning || awaitingMessageAdmission || awaitingTurnHandoff;
   // The committed reply hands off before the terminal turn frame arrives.
   const answerLanded = !awaitingMessageAdmission && piChat.answerLanded;
   // The sent bubble pops in on the frame it first paints, so its id comes from

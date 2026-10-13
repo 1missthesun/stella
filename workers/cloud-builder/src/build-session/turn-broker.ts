@@ -7,6 +7,7 @@
  */
 import { sha256BytesHex } from "../hash.js";
 import { serveAgentMoveRequest } from "./agent-move.js";
+import { serveAgentCodeConnectRequest } from "./agent-connect.js";
 import {
   validNativeStateCheckpointMac,
 } from "../native-state-checkpoint.js";
@@ -1010,6 +1011,9 @@ const handleBrokerLocalRequest = async (
     if (target.kind === "agent-move") {
       return await serveAgentMoveRequest(host.ctx.storage, host.env, turn, body);
     }
+    if (target.kind === "code-connect") {
+      return await serveAgentCodeConnectRequest(host.env, turn, body);
+    }
     if (target.kind === "thread-history") {
       return serveThreadHistoryRequest(host.ctx.storage.sql, body);
     }
@@ -1216,6 +1220,7 @@ export const handleTurnBroker = async (
       claimed.target.kind === "search" ||
       claimed.target.kind === "user-ask" ||
       claimed.target.kind === "agent-move" ||
+      claimed.target.kind === "code-connect" ||
       claimed.target.kind === "orchestrator-tool" ||
       claimed.target.kind === "orchestrator-events"
     ) {

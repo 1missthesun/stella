@@ -58,6 +58,8 @@ import {
   type GeneralAgentPromptSkills,
 } from "./general-agent-prompt.js";
 import { cloudGeneralToolNames } from "./cloud-general-tools.js";
+import { createBrokerConnectClient } from "./cloud-code-services.js";
+import { CODE_TOOL_CLOUD_AGENT_DESCRIPTION } from "@stella/runtime/kernel/tools/defs/code-def.js";
 import { CLOUD_AGENT_MOVE_TOOL, cloudAgentMoveTool, runCloudAgentMove } from "./cloud-agent-move.js";
 import {
   toolStateDir,
@@ -578,6 +580,11 @@ export const runAgentTurn = (
             stellaDataDir: CLOUD_HOST_STATE,
             recoverStaleSecrets: false,
             enableShellShims: false,
+            allowCloudCode: true,
+            codeConnectClient: createBrokerConnectClient({
+              post: postJson,
+              turnId: input.turnId,
+            }),
             ...(officeBinPath ? { stellaOfficeBinPath: officeBinPath } : {}),
             askUser: userAsks.handlers.askUser,
             requestSecureInput: userAsks.handlers.requestSecureInput,
@@ -639,7 +646,12 @@ export const runAgentTurn = (
       const cloudToolMetadata = [
         ...cloudGeneralToolNames()
           .map((name) => byName.get(name))
-          .filter((tool): tool is ToolMetadata => Boolean(tool)),
+          .filter((tool): tool is ToolMetadata => Boolean(tool))
+          .map((tool) =>
+            tool.name === "code"
+              ? { ...tool, description: CODE_TOOL_CLOUD_AGENT_DESCRIPTION }
+              : tool,
+          ),
         cloudAgentMoveTool,
       ];
       const executeCloudTool = async (

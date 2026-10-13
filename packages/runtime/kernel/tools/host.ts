@@ -610,7 +610,7 @@ export const createToolHost = ({
     if (
       context.executionHost === "sandbox" &&
       (toolName === "code" || toolName === LEGACY_NODE_REPL_TOOL_NAME) &&
-      !(allowCloudCode && browserSessionFactory)
+      !allowCloudCode
     ) {
       return {
         error: `${toolName} is not available in sandbox execution.`,

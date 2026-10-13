@@ -2859,7 +2859,9 @@ export class NodeReplKernelRegistry {
         ...(this.options.memory?.available(context)
           ? { memory: this.options.memory }
           : {}),
-        deviceControl: context.agentType !== AGENT_IDS.ORCHESTRATOR,
+        deviceControl:
+          context.agentType !== AGENT_IDS.ORCHESTRATOR &&
+          context.executionHost !== "sandbox",
         connectClient: this.options.connectClient,
         toolNames: replToolNamesForContext(context),
         browserSessionId,

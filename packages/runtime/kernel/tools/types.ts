@@ -237,8 +237,8 @@ export type ToolHostOptions = {
    */
   enableShellShims?: boolean;
   /**
-   * Trusted cloud-only opt-in for the persistent code tool. It remains denied
-   * unless a private browser-session factory is supplied as well.
+   * Trusted cloud-only opt-in for the persistent code tool in sandbox
+   * execution; without it a sandbox context is refused `code`.
    */
   allowCloudCode?: boolean;
   /** Privileged browser transport injected by a cloud executor. */

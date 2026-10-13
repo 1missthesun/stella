@@ -24,6 +24,7 @@ const CLOUD_GENERAL_TOOLS = [
   "Grep",
   "ask_user",
   "request_secure_input",
+  "code",
 ] as const;
 
 export const cloudGeneralToolNames = (): readonly string[] =>

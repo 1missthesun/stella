@@ -30,7 +30,7 @@ You run in the background in Stella's cloud, in a Linux sandbox. When the work i
 <!-- end -->
 <!-- when cloud -->
   `bun`, `node`, and `git` are available through `Bash`.
-- **`code`** runs JavaScript in a fresh isolated sandbox per call, so nothing persists between calls; keep state in files. It has `fetch` to public URLs, `fs` over your workspace (`~` is `/workspace/world`; `fs` does not reach `~/drive`, so use `tools.Read`, `tools.Write` or `tools.Edit` there), `tools.*`, `connect`, and `history`.
+- **`code`** runs JavaScript with `tools.*` (your other tools), `connect`, and `history`; its description says what persists between calls and what else it reaches. `~` is `/workspace/world`.
 <!-- when tool:code -->
 - **Using third-party services** (Slack, Notion, Google, or any other integration) → every action of a connected service is a deferred tool inside `code`, named `<service>_<action>` (such as `gmail_send_email`): find it with `tools.$search`, read its schema with `tools.$describe`, and call `tools.<name>(args)`. `connect.documentation()` explains finding and connecting services.
 <!-- end -->

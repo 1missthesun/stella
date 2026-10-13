@@ -1,15 +1,15 @@
 /**
  * The "Show more" under a reply's text, placed like a user message's
- * toggle. It opens the full report of the task the reply relays (or cites,
- * once that task has settled), the same popover the task quote used to
- * open. Nothing renders while no quoted task has a report yet.
+ * toggle. One per reply, however many tasks it relays (or cites, once they
+ * have settled): it opens all of their full reports together. Nothing
+ * renders while no quoted task has a report yet.
  */
 import { memo } from "react";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { AgentCompletionSection } from "@/features/chat/lib/agent-completion";
 import { useThreadActivityRecords } from "@/features/chat/hooks/use-thread-activity-records";
 import { useAgentCard } from "@/features/cloud/use-agent-title";
-import { TaskReportButton } from "./TaskReportButton";
+import { TaskReportMore } from "./TaskReportMore";
 
 type AgentRef = Extract<ReplyRef, { kind: "agent" }>;
 
@@ -63,17 +63,15 @@ export const ReplyReportLinks = memo(function ReplyReportLinks({
   if (reports.length === 0) return null;
   return (
     <div className="reply-report-links">
-      {reports.map(({ reference, status, result }) => (
-        <TaskReportButton
-          key={reference.threadId}
-          reference={reference}
-          conversationId={conversationId}
-          status={status}
-          liveTitle={activity.get(reference.threadId)?.description ?? reference.title}
-          journalReport={result}
-          inline
-        />
-      ))}
+      <TaskReportMore
+        reports={reports.map(({ reference, status, result }) => ({
+          reference,
+          status,
+          liveTitle: activity.get(reference.threadId)?.description ?? reference.title,
+          journalReport: result,
+        }))}
+        conversationId={conversationId}
+      />
     </div>
   );
 });

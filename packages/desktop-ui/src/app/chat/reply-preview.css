@@ -191,16 +191,39 @@
 }
 
 .reply-preview-report {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
+/* The close button stays in the popover's corner; each report's title row
+   leaves room for it, so one report looks exactly like a lone report. */
 .reply-preview-report__head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 8px 8px 14px;
+  min-height: 40px;
+  padding: 8px 40px 8px 14px;
+  box-sizing: border-box;
+}
+
+/* Several reports behind one Show more: titled sections in one scroll. */
+.reply-preview-report--multiple .reply-preview-report__sections {
+  max-height: min(60vh, 32rem);
+  overflow: auto;
+}
+
+.reply-preview-report--multiple .reply-preview-report__body {
+  max-height: none;
+  overflow: visible;
+}
+
+.reply-preview-report__section + .reply-preview-report__section {
+  border-top: 1px solid color-mix(in srgb, var(--chat-text-color) 10%, transparent);
+}
+
+.reply-preview-report__section + .reply-preview-report__section .reply-preview-report__head {
+  padding-right: 14px;
 }
 
 .reply-preview-report__title {
@@ -215,6 +238,10 @@
 }
 
 .reply-preview-report__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
   display: inline-flex;
   flex: none;
   align-items: center;
@@ -300,15 +327,6 @@
 
 .task-report--inline {
   display: inline-flex;
-}
-
-.task-report--inline + .task-report--inline::before {
-  content: "·";
-  align-self: center;
-  margin: 0 0.35em;
-  font-size: var(--font-size-sm);
-  line-height: 1;
-  color: color-mix(in srgb, var(--chat-text-color) 68%, transparent);
 }
 
 .reply-report-more {

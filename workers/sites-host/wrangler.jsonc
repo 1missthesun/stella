@@ -10,13 +10,16 @@
   // certificate. dev serves `https://<id>-dev.stellasites.app/`, production
   // `https://<id>.stellasites.app/`; cloud-builder's SITES_HOST must match the
   // route. Dev ids end in `-dev`, which no production id can, so the more
-  // specific dev route never shadows a production site.
+  // specific dev route never shadows a production site. Production also
+  // serves the bare domain (SITES_APEX, a proxied apex record): a page saying
+  // what the domain is and where to report abuse.
   "name": "stella-v2-sites-dev",
   "main": "src/index.ts",
   "compatibility_date": "2026-07-22",
   "workers_dev": false,
   "preview_urls": false,
   "routes": [{ "pattern": "*-dev.stellasites.app/*", "zone_name": "stellasites.app" }],
+  "vars": { "SITES_APEX": "" },
   "observability": {
     "enabled": true,
     "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },
@@ -34,7 +37,11 @@
       "name": "stella-v2-sites-prod",
       "workers_dev": false,
       "preview_urls": false,
-      "routes": [{ "pattern": "*.stellasites.app/*", "zone_name": "stellasites.app" }],
+      "routes": [
+        { "pattern": "*.stellasites.app/*", "zone_name": "stellasites.app" },
+        { "pattern": "stellasites.app/*", "zone_name": "stellasites.app" },
+      ],
+      "vars": { "SITES_APEX": "stellasites.app" },
       "observability": {
         "enabled": true,
         "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },

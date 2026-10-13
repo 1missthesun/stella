@@ -2606,6 +2606,7 @@
       "markdown": {
         "desktopRequired": "Pratinjau Markdown memerlukan aplikasi desktop Stella.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Teks",
         "noContent": "Tidak ada konten ditemukan."
       },
       "media": {

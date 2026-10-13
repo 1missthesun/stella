@@ -2630,6 +2630,7 @@
       "markdown": {
         "desktopRequired": "התצוגה המקדימה של Markdown דורשת את אפליקציית שולחן העבודה של Stella.",
         "eyebrow": "Markdown",
+        "textEyebrow": "טקסט",
         "noContent": "לא נמצא תוכן."
       },
       "media": {

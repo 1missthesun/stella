@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Markdown पूर्वावलोकन के लिए Stella डेस्कटॉप ऐप आवश्यक है।",
         "eyebrow": "Markdown",
+        "textEyebrow": "टेक्स्ट",
         "noContent": "कोई सामग्री नहीं मिली।"
       },
       "media": {

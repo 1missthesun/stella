@@ -2606,6 +2606,7 @@
       "markdown": {
         "desktopRequired": "Xem trước Markdown cần ứng dụng Stella trên máy tính.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Văn bản",
         "noContent": "Không tìm thấy nội dung."
       },
       "media": {

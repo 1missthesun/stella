@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Markdown-esikatselu vaatii Stellan työpöytäsovelluksen.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Teksti",
         "noContent": "Sisältöä ei löytynyt."
       },
       "media": {

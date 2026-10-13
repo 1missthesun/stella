@@ -2641,6 +2641,7 @@
       "markdown": {
         "desktopRequired": "Podgląd Markdown wymaga aplikacji desktopowej Stelli.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Tekst",
         "noContent": "Nie znaleziono treści."
       },
       "media": {

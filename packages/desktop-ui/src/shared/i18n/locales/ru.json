@@ -2641,6 +2641,7 @@
       "markdown": {
         "desktopRequired": "Предпросмотр Markdown доступен в настольном приложении Stella.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Текст",
         "noContent": "Содержимое не найдено."
       },
       "media": {

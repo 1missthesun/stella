@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Forhåndsvisning af Markdown kræver Stella-computerappen.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Tekst",
         "noContent": "Intet indhold fundet."
       },
       "media": {

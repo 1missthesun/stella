@@ -10,6 +10,7 @@ import {
   extensionOf,
   fileArtifactPayloadForPath,
   isDeveloperResourceExtension,
+  isPlainTextPath,
   pickPrimaryEditedPath,
 } from "@/features/workspace-display/path-to-viewer";
 import { isToolResult, type EventRecord } from "./event-transforms";
@@ -256,6 +257,14 @@ export const buildPayloadFromBarePath = (
         createdAt,
       };
     default:
+      if (isPlainTextPath(filePath)) {
+        return {
+          kind: "markdown",
+          filePath,
+          title: basenameOf(filePath),
+          createdAt,
+        };
+      }
       if (
         options?.developerResourcesEnabled === true &&
         isDeveloperResourceExtension(extensionOf(filePath))

@@ -11,6 +11,7 @@ import {
   IPC_DISPLAY_MEDIA_SOURCE,
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
   IPC_DISPLAY_READ_FILE,
+  IPC_DISPLAY_SET_SELECTED_DEVICE,
   IPC_DISPLAY_STAT_PATH,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
@@ -72,7 +73,7 @@ import {
   type DeviceFileSourceDeps,
   type ResolvedDeviceFileSource,
 } from "../services/device-file-source.js";
-import { handleIpc } from "./typed-ipc.js";
+import { handleIpc, onIpc } from "./typed-ipc.js";
 
 type DisplayHandlersOptions = {
   getStellaAppDir: () => string | null;
@@ -100,6 +101,7 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   ".md": "text/markdown",
   ".mdx": "text/markdown",
   ".txt": "text/plain",
+  ".log": "text/plain",
   ".csv": "text/csv",
   ".tsv": "text/tab-separated-values",
   ".c": "text/plain",
@@ -1110,6 +1112,13 @@ export const registerDisplayHandlers = (options: DisplayHandlersOptions) => {
       return await statPath(payload, { remote: false });
     },
   );
+
+  onIpc(IPC_DISPLAY_SET_SELECTED_DEVICE, (event, deviceId) => {
+    if (!options.assertPrivilegedSender(event, IPC_DISPLAY_SET_SELECTED_DEVICE)) return;
+    options.peerDeviceFiles?.setSelectedDevice(
+      typeof deviceId === "string" ? deviceId : null,
+    );
+  });
 
   handleIpc(
     IPC_DISPLAY_LIST_FOLDER,

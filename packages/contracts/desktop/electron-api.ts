@@ -153,6 +153,7 @@ import {
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
   IPC_DISPLAY_OPEN_SHARE_LINK,
   IPC_DISPLAY_READ_FILE,
+  IPC_DISPLAY_SET_SELECTED_DEVICE,
   IPC_DISPLAY_STAT_PATH,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
@@ -447,6 +448,11 @@ export const createElectronApi = (
           filePath,
           conversationId: options?.conversationId,
         }),
+      /**
+       * The computer the destination picker names, which a file not on this
+       * computer is looked for on after the computer that produced it.
+       */
+      setSelectedDevice: sender(IPC_DISPLAY_SET_SELECTED_DEVICE),
       listCanvasHtml: invoker(IPC_DISPLAY_LIST_CANVAS_HTML),
       /**
        * Fetches a shared canvas (`<CANVAS_SHARE_BASE_URL>/c/<slug>`) in main,

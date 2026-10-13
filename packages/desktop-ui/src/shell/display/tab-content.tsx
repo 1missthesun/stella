@@ -31,6 +31,7 @@ import {
   MARKDOWN_PREVIEW_MAX_BYTES,
   type PreviewResult,
 } from "./preview-parser";
+import { isPlainTextPath } from "@/features/workspace-display/path-to-viewer";
 import { usePreviewParser } from "./use-preview-parser";
 import { usePreviewWindow } from "./use-preview-window";
 import { PreviewEmpty, PreviewProblem } from "./preview-states";
@@ -289,15 +290,17 @@ const DelimitedTableView = ({
                 t("shell.display.spreadsheet.eyebrow")}
             </div>
           </div>
-          <div className="display-file-preview__actions">
-            <button type="button" onClick={handleSave}>
-              {t("shell.display.filePreview.save")}
-            </button>
-            <button type="button" onClick={handleCopy}>
-              {t("shell.display.filePreview.copy")}
-            </button>
-            {actionStatus && <span>{actionStatus}</span>}
-          </div>
+          {missing ? null : (
+            <div className="display-file-preview__actions">
+              <button type="button" onClick={handleSave}>
+                {t("shell.display.filePreview.save")}
+              </button>
+              <button type="button" onClick={handleCopy}>
+                {t("shell.display.filePreview.copy")}
+              </button>
+              {actionStatus && <span>{actionStatus}</span>}
+            </div>
+          )}
         </header>
         {error || parsed?.error ? (
           <PreviewProblem
@@ -419,6 +422,7 @@ const MarkdownView = ({
   onRetry: () => void;
 }) => {
   const t = useT();
+  const plainText = isPlainTextPath(filePath);
   const { bytes, error, loading, missing, truncated } = useDisplayFileBytes(
     filePath,
     t("shell.display.markdown.desktopRequired"),
@@ -445,7 +449,9 @@ const MarkdownView = ({
         <header className="display-file-preview__header">
           <div className="display-file-preview__title-group">
             <span className="display-file-preview__eyebrow">
-              {t("shell.display.markdown.eyebrow")}
+              {plainText
+                ? t("shell.display.markdown.textEyebrow")
+                : t("shell.display.markdown.eyebrow")}
             </span>
             <div className="display-file-preview__title" title={filePath}>
               {title ??
@@ -453,15 +459,17 @@ const MarkdownView = ({
                 t("shell.display.markdown.eyebrow")}
             </div>
           </div>
-          <div className="display-file-preview__actions">
-            <button type="button" onClick={handleSave}>
-              {t("shell.display.filePreview.save")}
-            </button>
-            <button type="button" onClick={handleCopy}>
-              {t("shell.display.filePreview.copy")}
-            </button>
-            {actionStatus && <span>{actionStatus}</span>}
-          </div>
+          {missing ? null : (
+            <div className="display-file-preview__actions">
+              <button type="button" onClick={handleSave}>
+                {t("shell.display.filePreview.save")}
+              </button>
+              <button type="button" onClick={handleCopy}>
+                {t("shell.display.filePreview.copy")}
+              </button>
+              {actionStatus && <span>{actionStatus}</span>}
+            </div>
+          )}
         </header>
         <div className="display-markdown-viewer">
           {error || parsed?.error ? (
@@ -476,6 +484,8 @@ const MarkdownView = ({
             </div>
           ) : markdown.trim().length === 0 ? (
             <PreviewEmpty title={t("shell.display.preview.emptyTitle")} />
+          ) : plainText ? (
+            <pre className="display-text-viewer">{markdown}</pre>
           ) : (
             <Suspense fallback={null}>
               <Markdown text={markdown} documentPath={filePath} />

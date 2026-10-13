@@ -2663,6 +2663,7 @@
       "markdown": {
         "desktopRequired": "تتطلب معاينة Markdown تطبيق Stella لسطح المكتب.",
         "eyebrow": "Markdown",
+        "textEyebrow": "نص",
         "noContent": "لم يتم العثور على محتوى."
       },
       "media": {

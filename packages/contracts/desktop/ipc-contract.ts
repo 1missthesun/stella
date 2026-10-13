@@ -243,6 +243,7 @@ import {
   IPC_DISPLAY_OPEN_SHARED_CANVAS,
   IPC_DISPLAY_OPEN_SHARE_LINK,
   IPC_DISPLAY_READ_FILE,
+  IPC_DISPLAY_SET_SELECTED_DEVICE,
   IPC_DISPLAY_STAT_PATH,
   IPC_DISPLAY_TRASH_FORCE_DELETE,
   IPC_DISPLAY_TRASH_LIST,
@@ -1475,6 +1476,8 @@ export type IpcSendContract = {
   /** Synchronous: whether the desktop chat runs on pi-durable. */
   [IPC_UI_STATE_KV_APPLY]: [changes: Record<string, string | null>];
   [IPC_UI_STATE_KV_CLEAR]: [];
+  /** The computer the chat's destination picker names, or null. */
+  [IPC_DISPLAY_SET_SELECTED_DEVICE]: [deviceId: string | null];
   [IPC_WINDOW_MINIMIZE]: [];
   [IPC_WINDOW_MAXIMIZE]: [];
   [IPC_WINDOW_CLOSE]: [];

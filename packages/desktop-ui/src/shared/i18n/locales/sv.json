@@ -2619,6 +2619,7 @@
       "markdown": {
         "desktopRequired": "Markdown-förhandsvisning kräver Stellas skrivbordsapp.",
         "eyebrow": "Markdown",
+        "textEyebrow": "Text",
         "noContent": "Inget innehåll hittades."
       },
       "media": {

@@ -180,7 +180,11 @@ export function ClaudeAccountsPanel({
         {selected ? <View style={styles.radioDot} /> : null}
       </View>
       <View style={styles.choiceText}>
-        <Text style={[styles.choiceLabel, selected && styles.choiceChosen]} numberOfLines={1}>
+        <Text
+          style={[styles.choiceLabel, selected && styles.choiceChosen]}
+          numberOfLines={1}
+          ellipsizeMode="middle"
+        >
           {label}
         </Text>
         {detail ? (
@@ -288,13 +292,14 @@ export function ClaudeAccountsPanel({
                 {place.name}
               </Text>
               {inUse ? (
-                <Text style={styles.placeAccount} numberOfLines={2}>
-                  {inUse.email ?? ""}
+                <>
+                  <Text style={styles.placeAccount} numberOfLines={1} ellipsizeMode="middle">
+                    {inUse.email ?? ""}
+                  </Text>
                   <Text style={[styles.reason, inUse.reason === "selected" && styles.reasonChosen]}>
-                    {"  "}
                     {reasonText(place)}
                   </Text>
-                </Text>
+                </>
               ) : null}
               {statusText ? <Text style={styles.detail}>{statusText}</Text> : null}
               {showOwn ? (
@@ -445,7 +450,8 @@ const makeStyles = (colors: Colors) =>
     reason: {
       color: colors.textMuted,
       fontFamily: fonts.sans.regular,
-      fontSize: 12,
+      fontSize: 13,
+      lineHeight: 18,
     },
     reasonChosen: { color: colors.accent },
     warn: {

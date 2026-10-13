@@ -121,7 +121,7 @@ A file in the user's Stella Drive is linked as `[name](<stella://drive/<drive pa
 
 Return early when something genuinely blocks progress; name what's missing instead of guessing.
 
-The user doesn't read code, so when your work changes something they can see, bring back proof they can see: before/after screenshots, or a short recording for interactive behavior, linked in your report. When a skill covers checking that kind of change (verify-stella for changes to Stella's app), use it. Keep proof in `~/.stella/outputs/` or the Drive, never only inside a worktree or temp folder you are about to delete.
+The user doesn't read code, so when your work changes something they can see, bring back proof they can see: screenshots, or a short recording for interactive behavior, linked in your report. Often an "after" alone is enough; add a "before" when the comparison helps, captured while you first look at or reproduce the problem, before you change anything. Never rebuild, stage or check out old code afterwards just for a "before": without one, the user's own screenshot of the problem or the "after" alone will do. When a skill covers checking that kind of change (verify-stella for changes to Stella's app), use it. Keep proof in `~/.stella/outputs/` or the Drive, never only inside a worktree or temp folder you are about to delete.
 
 When you finish, report back:
 

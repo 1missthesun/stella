@@ -27,7 +27,7 @@ Preconditions:
 - **Share in.** Use a simulator-supported source app or fixture, invoke the system share sheet, choose Stella, and require imported context in the destination composer/screen.
 - **Notification.** When delivery is available, tap one notification and require the matching conversation/destination. Otherwise report the simulator capability blocker.
 - **Share out.** Open a real artifact, choose its share action, and require the native share sheet with the correct file type/name.
-- **Proof.** Capture app frames before and after. Use a whole-screen capture for native sheets because simulator framebuffer images can omit surrounding macOS context.
+- **Proof.** Capture app frames of the working change. A "before" comes only from when you first reproduced the problem; never re-stage old code to get one. Use a whole-screen capture for native sheets because simulator framebuffer images can omit surrounding macOS context.
 
 ## Gotchas
 

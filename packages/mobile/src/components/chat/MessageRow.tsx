@@ -104,7 +104,8 @@ export type MessageRowActions = {
   /** Opens the activity hub — the tap-through target for agent rows. */
   onOpenAgentActivity?: () => void;
   onOpenReply?: (ref: ReplyRef) => void;
-  onOpenReport?: (ref: AgentReplyRef, anchor?: ReportAnchor) => void;
+  /** Opens the full reports of the tasks a reply relays or cites, together. */
+  onOpenReport?: (refs: readonly AgentReplyRef[], anchor?: ReportAnchor) => void;
 };
 
 /**
@@ -1043,13 +1044,13 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       ? [contextRef]
       : []),
   ];
-  const moreLinks =
+  // One "Show more" per reply, however many reports it offers.
+  const showMore =
     onOpenReport && reportRefs.length > 0
-      ? reportRefs.map((ref) => ({
-          key: ref.threadId,
-          label: `Full report: ${replyTitle(ref)}`,
-          onPress: (anchor?: ReportAnchor) => onOpenReport(ref, anchor),
-        }))
+      ? {
+          label: `Full report: ${reportRefs.map(replyTitle).join(", ")}`,
+          onPress: (anchor?: ReportAnchor) => onOpenReport(reportRefs, anchor),
+        }
       : undefined;
   const fillAssistantBubble = boundedAssistantBubble;
   const assistantBubble = (
@@ -1065,7 +1066,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
         colors={colors}
         fill={boundedAssistantBubble}
         onStellaFileLink={onOpenStellaFile}
-        moreLinks={moreLinks}
+        showMore={showMore}
       />
       {evidenceDocuments}
     </AssistantBubble>

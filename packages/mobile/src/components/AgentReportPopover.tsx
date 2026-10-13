@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useWindowDimensions } from "react-native";
 import * as Clipboard from "expo-clipboard";
 import type { Colors } from "../theme/colors";
@@ -7,6 +7,7 @@ import type { TouchAnchor } from "../lib/touch-anchor";
 import { AgentReportContent, useAgentReport } from "./AgentReport";
 import { FloatingPopover } from "./FloatingPopover";
 import type { PopoverAction } from "./FloatingPopoverParts";
+import { replyTitle } from "./ReplyPreview";
 import type { AgentReplyRef } from "./ReplyViewer";
 
 const MAX_HEIGHT_RATIO = 0.58;
@@ -17,21 +18,42 @@ const PLACEHOLDERS = new Set([
   "Couldn’t load the report. Close and reopen it to retry.",
 ]);
 
-/** A task's full report, in the floating popover that points at its "Show more". */
+/** Loads one task's report and hands it to the popover; renders nothing. */
+function ReportLoader({
+  conversationId,
+  threadId,
+  journalReport,
+  onChange,
+}: {
+  conversationId: string;
+  threadId: string;
+  journalReport?: string;
+  onChange: (threadId: string, report: string) => void;
+}) {
+  const report = useAgentReport(conversationId, threadId, journalReport);
+  useEffect(() => onChange(threadId, report), [onChange, report, threadId]);
+  return null;
+}
+
+/**
+ * The full reports behind a reply's one "Show more", in the floating popover
+ * that points at it: one task's report, or several stacked under their
+ * titles.
+ */
 export function AgentReportPopover({
-  reference,
+  references,
   conversationId,
   colors,
-  journalReport,
+  journalReports,
   anchor,
   onClose,
   topInset = 0,
 }: {
-  reference: AgentReplyRef;
+  references: readonly AgentReplyRef[];
   conversationId: string;
   colors: Colors;
-  /** The report as the conversation recorded it, when the backend has none. */
-  journalReport?: string;
+  /** Each report as the conversation recorded it, when the backend has none. */
+  journalReports?: Readonly<Record<string, string | undefined>>;
   /** Window point of the tap that opened the report. */
   anchor: TouchAnchor | null;
   onClose: () => void;
@@ -39,34 +61,60 @@ export function AgentReportPopover({
   topInset?: number;
 }) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const report = useAgentReport(conversationId, reference.threadId, journalReport);
-  const ready = !PLACEHOLDERS.has(report);
+  const [reports, setReports] = useState<Readonly<Record<string, string>>>({});
+  const onReport = useCallback((threadId: string, report: string) => {
+    setReports((previous) =>
+      previous[threadId] === report ? previous : { ...previous, [threadId]: report },
+    );
+  }, []);
+  const sections = references.map((reference) => ({
+    reference,
+    report: reports[reference.threadId] ?? "Loading report…",
+  }));
+  const ready = sections.every((section) => !PLACEHOLDERS.has(section.report));
+  const copyText =
+    sections.length === 1
+      ? (sections[0]?.report ?? "")
+      : sections
+          .map((section) => `${replyTitle(section.reference)}\n\n${section.report}`)
+          .join("\n\n");
   const actions = useMemo<PopoverAction[]>(
     () => [
       {
         key: "copy",
         icon: "copy",
-        accessibilityLabel: "Copy report",
+        accessibilityLabel: sections.length > 1 ? "Copy reports" : "Copy report",
         disabled: !ready,
         confirm: true,
         onPress: async () => {
-          await Clipboard.setStringAsync(report);
+          await Clipboard.setStringAsync(copyText);
           notifySuccess();
         },
       },
     ],
-    [ready, report],
+    [copyText, ready, sections.length],
   );
   return (
-    <FloatingPopover
-      anchor={anchor}
-      fallbackAnchor={{ x: screenWidth / 2, y: topInset + 52 }}
-      onClose={onClose}
-      closeLabel="Close report"
-      maxHeight={Math.round(screenHeight * MAX_HEIGHT_RATIO)}
-      actions={actions}
-    >
-      <AgentReportContent reference={reference} colors={colors} report={report} />
-    </FloatingPopover>
+    <>
+      {references.map((reference) => (
+        <ReportLoader
+          key={reference.threadId}
+          conversationId={conversationId}
+          threadId={reference.threadId}
+          journalReport={journalReports?.[reference.threadId]}
+          onChange={onReport}
+        />
+      ))}
+      <FloatingPopover
+        anchor={anchor}
+        fallbackAnchor={{ x: screenWidth / 2, y: topInset + 52 }}
+        onClose={onClose}
+        closeLabel={sections.length > 1 ? "Close reports" : "Close report"}
+        maxHeight={Math.round(screenHeight * MAX_HEIGHT_RATIO)}
+        actions={actions}
+      >
+        <AgentReportContent sections={sections} colors={colors} />
+      </FloatingPopover>
+    </>
   );
 }

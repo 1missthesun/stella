@@ -796,18 +796,23 @@ export function ChatPane({
   }
   const [replyFocus, setReplyFocus] = useState<ReplyRef | null>(null);
   const [openReport, setOpenReport] = useState<{
-    ref: AgentReplyRef;
+    refs: readonly AgentReplyRef[];
     anchor: ReportAnchor | null;
   } | null>(null);
   const showReport = useCallback(
-    (ref: AgentReplyRef, anchor?: ReportAnchor) =>
-      setOpenReport({ ref, anchor: anchor ?? null }),
+    (refs: readonly AgentReplyRef[], anchor?: ReportAnchor) =>
+      setOpenReport({ refs, anchor: anchor ?? null }),
     [],
   );
   const closeReplyFocus = useCallback(() => setReplyFocus(null), []);
   const closeReport = useCallback(() => setOpenReport(null), []);
-  const openReportTask = openReport
-    ? activityTasks?.find((task) => task.id === openReport.ref.threadId)
+  const openReportJournal = openReport
+    ? Object.fromEntries(
+        openReport.refs.map((ref) => {
+          const task = activityTasks?.find((candidate) => candidate.id === ref.threadId);
+          return [ref.threadId, task?.resultText ?? task?.errorMessage];
+        }),
+      )
     : undefined;
   useEffect(() => {
     setReplyFocus(null);
@@ -2157,11 +2162,11 @@ export function ChatPane({
           )}
           {openReport && conversationId ? (
             <AgentReportPopover
-              key={openReport.ref.threadId}
-              reference={openReport.ref}
+              key={openReport.refs.map((ref) => ref.threadId).join(" ")}
+              references={openReport.refs}
               anchor={openReport.anchor}
               conversationId={conversationId}
-              journalReport={openReportTask?.resultText ?? openReportTask?.errorMessage}
+              journalReports={openReportJournal}
               colors={colors}
               onClose={closeReport}
               topInset={topInset}

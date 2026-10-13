@@ -163,11 +163,9 @@ const moreLinkStyles = StyleSheet.create({
     alignSelf: "flex-end",
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
     marginTop: -4,
     marginBottom: 10,
   },
-  item: { flexDirection: "row", alignItems: "center", gap: 6 },
   label: {
     fontFamily: fonts.sans.medium,
     fontSize: 13,
@@ -206,7 +204,7 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   embeddedImages = false,
   onStellaFileLink,
   onAskStella,
-  moreLinks,
+  showMore,
 }: {
   text: string;
   colors: Colors;
@@ -232,15 +230,13 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   onStellaFileLink?: (path: string) => void;
   onAskStella?: (text: string) => void;
   /**
-   * "Show more" buttons under the reply, placed like a user message's
-   * toggle, one per task whose full report this reply offers. Each opens
-   * that report.
+   * The reply's one "Show more", placed like a user message's toggle. It
+   * opens the full reports of every task the reply relays or cites.
    */
-  moreLinks?: readonly {
-    key: string;
+  showMore?: {
     label: string;
     onPress: (anchor?: { x: number; y: number }) => void;
-  }[];
+  };
 }) {
   const theme = useMemo(() => buildTheme(colors), [colors]);
   const nodeStyles = useMemo(() => buildNodeStyles(colors), [colors]);
@@ -354,40 +350,28 @@ export const AssistantMarkdown = memo(function AssistantMarkdown({
   return (
     <View style={fill ? containerStyle.wrapper : containerStyle.hug}>
       {content}
-      {moreLinks && moreLinks.length > 0 ? (
+      {showMore ? (
         <View style={moreLinkStyles.row}>
-          {moreLinks.map((link, index) => (
-            <View key={link.key} style={moreLinkStyles.item}>
-              {index > 0 ? (
-                <Text
-                  style={[moreLinkStyles.label, { color: fadeHex(colors.text, 0.68) }]}
-                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                >
-                  {"·"}
-                </Text>
-              ) : null}
-              <Pressable
-                onPress={(event) =>
-                  link.onPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY })
-                }
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel={link.label}
+          <Pressable
+            onPress={(event) =>
+              showMore.onPress({ x: event.nativeEvent.pageX, y: event.nativeEvent.pageY })
+            }
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={showMore.label}
+          >
+            {({ pressed }) => (
+              <Text
+                style={[
+                  moreLinkStyles.label,
+                  { color: pressed ? colors.text : fadeHex(colors.text, 0.68) },
+                ]}
+                maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
               >
-                {({ pressed }) => (
-                  <Text
-                    style={[
-                      moreLinkStyles.label,
-                      { color: pressed ? colors.text : fadeHex(colors.text, 0.68) },
-                    ]}
-                    maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                  >
-                    {showMoreLabel}
-                  </Text>
-                )}
-              </Pressable>
-            </View>
-          ))}
+                {showMoreLabel}
+              </Text>
+            )}
+          </Pressable>
         </View>
       ) : null}
     </View>

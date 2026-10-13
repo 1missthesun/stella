@@ -29,6 +29,7 @@ import {
   run,
 } from "./git.js";
 import { DRAFT_AGENTS_DIR, installCheckoutGuard } from "./checkout-guard.js";
+import { ReleaseChannel } from "./release-channel.js";
 import type { CoveredWindow, RelaunchHold } from "./update-transition.js";
 import {
   classifyUpdate,
@@ -61,6 +62,11 @@ import {
  * Applies finished drafts to the app's own checkout, undoes recent commits,
  * keeps the checkout in step with the owner's fork on Artifacts, and takes
  * updates from the published app (upstream).
+ *
+ * The service never polls the backend. It fetches at launch, when the
+ * backend's release channel says a new version was published (it says so
+ * again on every reconnect), and when the owner's `appSource.fork` view says
+ * another computer pushed to the fork.
  *
  * Git is the only bookkeeping: drafts are `draft/<name>` branches (in
  * progress while a worktree has one checked out), "recent" is first-parent
@@ -181,12 +187,16 @@ type ForkAccess = {
 /** The fork exists only for a signed-in owner; upstream is always readable. */
 type SourceAccess = { fork: ForkAccess | null; upstream: AppSourceRemote };
 
+/** Rereads local git state (drafts, worktrees); never touches the network. */
 const STATE_POLL_MS = 10_000;
 /** How long "Stella is up to date" stays in the chat after an update lands. */
 /** A merge that never arrives stops being announced after this. */
 const UPDATE_MERGE_WAIT_MS = 60 * 60_000;
-const FORK_FIRST_SYNC_DELAY_MS = 20_000;
-const FORK_SYNC_INTERVAL_MS = 30 * 60_000;
+/** The launch sync waits this long, off the startup path. */
+const LAUNCH_SYNC_DELAY_MS = 5_000;
+/** A failed sync is retried after this, doubling up to the cap. */
+const SYNC_RETRY_MS = 30_000;
+const SYNC_RETRY_MAX_MS = 10 * 60_000;
 const RECENT_COUNT = 20;
 /**
  * A history row and what Undo takes out for it: the commits in
@@ -282,12 +292,27 @@ const pushEnv = (token: string) => remoteEnv(token, "1");
 export class AppSourceService {
   private readonly options: AppSourceServiceOptions;
   private state: AppSourceState = EMPTY_STATE;
-  private published = JSON.stringify(EMPTY_STATE);
+  private publishedState = JSON.stringify(EMPTY_STATE);
   private queue: Promise<unknown> = Promise.resolve();
   private busy = false;
   private refreshing: Promise<void> | null = null;
   private refreshAgain = false;
   private syncing = false;
+  /** A sync was asked for and hasn't run yet (deferred by a draft or an action). */
+  private syncWanted = false;
+  /** No sync starts before this: the launch delay, or a failure's backoff. */
+  private syncNotBefore = 0;
+  private syncFailures = 0;
+  private syncTimer: NodeJS.Timeout | null = null;
+  /** The newest version the release channel announced. */
+  private published: string | null = null;
+  /** The announced version the last completed sync fetched for. */
+  private syncedFor: string | null = null;
+  private readonly releases: ReleaseChannel;
+  private forkWatch: { baseUrl: string; stop: () => void } | null = null;
+  /** `appSource.fork`'s last `pushedAt`, and the ones this computer made. */
+  private forkPushSeen: number | null = null;
+  private readonly ownForkPushes = new Set<number>();
   private timers: NodeJS.Timeout[] = [];
   private backend: { baseUrl: string; client: BackendClient } | null = null;
   private access: SourceAccess | null = null;
@@ -325,6 +350,10 @@ export class AppSourceService {
       log: options.log,
       onPrepared: () => void this.refresh(),
     });
+    this.releases = new ReleaseChannel({
+      onPublished: (version) => this.onPublished(version),
+      log: (event, data) => options.log(event, data ?? {}),
+    });
   }
 
   start() {
@@ -332,14 +361,18 @@ export class AppSourceService {
     app.on("browser-window-focus", this.onFocus);
     const poll = setInterval(() => {
       if (this.options.isAnyWindowVisible()) void this.refresh();
+      // Local checks only: sign-in or backend changes, and a sync a draft
+      // or an action deferred.
+      this.followBackend();
+      if (this.syncWanted && Date.now() >= this.syncNotBefore) void this.syncFork();
     }, STATE_POLL_MS);
-    const firstSync = setTimeout(
-      () => void this.syncFork(),
-      FORK_FIRST_SYNC_DELAY_MS,
-    );
-    const sync = setInterval(() => void this.syncFork(), FORK_SYNC_INTERVAL_MS);
-    for (const timer of [poll, firstSync, sync]) timer.unref?.();
-    this.timers = [poll, firstSync, sync];
+    poll.unref?.();
+    this.timers = [poll];
+    // The launch sync: the fork, upstream, and a push of anything this
+    // computer applied while it couldn't reach the fork.
+    this.syncNotBefore = Date.now() + LAUNCH_SYNC_DELAY_MS;
+    this.wantSync();
+    this.followBackend();
     void installCheckoutGuard(this.options.stellaAppDir, this.options.log).catch(
       (error: unknown) =>
         this.options.log("app-source.checkout-guard-failed", {
@@ -355,6 +388,11 @@ export class AppSourceService {
     app.removeListener("browser-window-focus", this.onFocus);
     for (const timer of this.timers) clearTimeout(timer);
     this.timers = [];
+    if (this.syncTimer) clearTimeout(this.syncTimer);
+    this.syncTimer = null;
+    this.releases.dispose();
+    this.forkWatch?.stop();
+    this.forkWatch = null;
     this.backend?.client.dispose();
   }
 
@@ -1011,8 +1049,8 @@ export class AppSourceService {
   private publish(next: AppSourceState) {
     this.state = next;
     const json = JSON.stringify(next);
-    if (json === this.published) return;
-    this.published = json;
+    if (json === this.publishedState) return;
+    this.publishedState = json;
     this.options.broadcast(next);
   }
 
@@ -1679,19 +1717,100 @@ export class AppSourceService {
     };
   }
 
-  /** Fetch the fork and upstream; push to the fork when this computer is ahead. */
+  /**
+   * Follow the backend's release channel, and the owner's fork view while
+   * signed in. Cheap and idempotent: the poll calls it to notice sign-in and
+   * backend changes.
+   */
+  private followBackend() {
+    if (this.disposed) return;
+    const baseUrl = this.options.getBackendUrl();
+    this.releases.follow(baseUrl);
+    const watchFork = baseUrl && this.options.hasConnectedAccount() ? baseUrl : null;
+    if (this.forkWatch?.baseUrl === watchFork) return;
+    this.forkWatch?.stop();
+    this.forkWatch = null;
+    if (!watchFork) return;
+    const client = this.backendClient(watchFork);
+    const stop = client.watch(
+      "appSource.fork",
+      {},
+      (value) => this.onForkPush(value.pushedAt),
+      (error) =>
+        this.options.log("app-source.fork-watch-failed", {
+          message: errorMessage(error),
+        }),
+    );
+    this.forkWatch = { baseUrl: watchFork, stop };
+  }
+
+  /** The release channel's version: on connect, and on every publish. */
+  private onPublished(version: string | null) {
+    this.published = version;
+    if (!version || version === this.syncedFor) return;
+    // A dev checkout doesn't follow upstream.
+    if (this.forkUnrelated || this.upstreamUnrelated) return;
+    void gitRaw(this.options.stellaAppDir, ["rev-parse", "--verify", "--quiet", UPSTREAM_REF])
+      .then((result) => {
+        if (result.code === 0 && result.stdout.trim() === version) {
+          this.syncedFor = version;
+          return;
+        }
+        this.options.log("app-source.published", { version });
+        this.wantSync();
+      })
+      .catch(() => this.wantSync());
+  }
+
+  /** Another computer pushed to the fork (its main or change tags). */
+  private onForkPush(pushedAt: number | null) {
+    if (pushedAt === null || pushedAt === this.forkPushSeen) return;
+    this.forkPushSeen = pushedAt;
+    if (this.ownForkPushes.has(pushedAt) || this.forkUnrelated) return;
+    this.options.log("app-source.fork-pushed", { pushedAt });
+    this.wantSync();
+  }
+
+  /** Ask for a sync: now, or when the launch delay or a backoff ends. */
+  private wantSync() {
+    this.syncWanted = true;
+    const wait = this.syncNotBefore - Date.now();
+    if (wait <= 0) {
+      void this.syncFork();
+      return;
+    }
+    if (this.syncTimer) return;
+    this.syncTimer = setTimeout(() => {
+      this.syncTimer = null;
+      if (this.syncWanted) void this.syncFork();
+    }, wait);
+    this.syncTimer.unref?.();
+  }
+
+  /**
+   * Fetch the fork and upstream; push to the fork when this computer is
+   * ahead. Runs when asked (`wantSync`), never on a timer of its own.
+   */
   async syncFork() {
     if (this.disposed || this.busy || this.syncing) return;
     this.syncing = true;
     const cwd = this.options.stellaAppDir;
+    const target = this.published;
+    let outcome: "done" | "deferred" | "failed" = "failed";
     try {
-      // A draft in progress: its base must not move under the agent.
+      // A draft in progress: its base must not move under the agent. The
+      // poll tries again once it is gone.
       const worktrees = await listWorktrees(cwd);
       if (worktrees.some((tree) => tree.branch?.startsWith(DRAFT_REF_PREFIX))) {
+        outcome = "deferred";
         return;
       }
+      this.syncWanted = false;
       const access = await this.sourceAccess();
-      if (!access) return;
+      if (!access) {
+        outcome = "done";
+        return;
+      }
       if (access.fork && !this.forkUnrelated) {
         await this.syncWithFork(cwd, access.fork).catch((error) => {
           this.options.log("app-source.fork-sync-failed", {
@@ -1703,13 +1822,27 @@ export class AppSourceService {
       if (!this.forkUnrelated && !this.upstreamUnrelated) {
         await this.fetchUpstream(cwd, access.upstream);
       }
+      outcome = "done";
     } catch (error) {
       this.options.log("app-source.sync-failed", {
         message: errorMessage(error),
       });
     } finally {
       this.syncing = false;
+      if (outcome === "done") {
+        this.syncFailures = 0;
+        this.syncedFor = target;
+      } else if (outcome === "failed") {
+        // Retried with backoff until it works; the channel's next connect
+        // or announcement asks again anyway.
+        this.syncWanted = true;
+        this.syncNotBefore =
+          Date.now() + Math.min(SYNC_RETRY_MAX_MS, SYNC_RETRY_MS * 2 ** this.syncFailures);
+        this.syncFailures += 1;
+      }
       void this.refresh();
+      // Asked again while this one ran: a newer version, or another push.
+      if (outcome !== "deferred" && this.syncWanted) this.wantSync();
     }
   }
 
@@ -1780,6 +1913,7 @@ export class AppSourceService {
     const ref = `${FORK_REF_PREFIX}${fork.branch}`;
     const head = await git(cwd, ["rev-parse", "HEAD"]);
     const forkTip = await git(cwd, ["rev-parse", "--verify", ref]);
+    let pushed = false;
     // Only fast-forwards: a diverged fork is merged by an agent, never forced.
     if (forkTip !== head && (await isAncestor(cwd, forkTip, head))) {
       await git(
@@ -1788,6 +1922,7 @@ export class AppSourceService {
         { env: pushEnv(fork.token), timeoutMs: 5 * 60_000 },
       );
       await git(cwd, ["update-ref", ref, head]);
+      pushed = true;
       const onPushed = this.options.onPushed;
       if (onPushed) {
         void Promise.resolve()
@@ -1799,11 +1934,39 @@ export class AppSourceService {
           });
       }
     }
-    await this.pushChangeTags(cwd, fork, ref);
+    if ((await this.pushChangeTags(cwd, fork, ref)) || pushed) {
+      this.reportForkPush(await git(cwd, ["rev-parse", ref]));
+    }
   }
 
-  /** Push this computer's change tags whose change the fork's main now has. */
-  private async pushChangeTags(cwd: string, fork: ForkAccess, forkRef: string) {
+  /** Tell the owner's other computers to fetch. Best-effort. */
+  private reportForkPush(tip: string) {
+    const baseUrl = this.options.getBackendUrl();
+    if (!baseUrl || !this.options.hasConnectedAccount()) return;
+    void this.backendClient(baseUrl)
+      .call("appSource.forkPushed", { tip })
+      .then(({ pushedAt }) => {
+        this.ownForkPushes.add(pushedAt);
+        if (this.ownForkPushes.size > 50) {
+          this.ownForkPushes.delete(this.ownForkPushes.values().next().value!);
+        }
+      })
+      .catch((error) => {
+        this.options.log("app-source.fork-push-report-failed", {
+          message: errorMessage(error),
+        });
+      });
+  }
+
+  /**
+   * Push this computer's change tags whose change the fork's main now has;
+   * true when it pushed any.
+   */
+  private async pushChangeTags(
+    cwd: string,
+    fork: ForkAccess,
+    forkRef: string,
+  ): Promise<boolean> {
     const format = "--format=%(refname)%00%(objectname)";
     const [own, pushed] = await Promise.all([
       git(cwd, ["for-each-ref", `--merged=${forkRef}`, format, CHANGE_TAG_PREFIX]),
@@ -1817,7 +1980,7 @@ export class AppSourceService {
       .split("\n")
       .filter((line) => line && !onFork.has(line.slice(CHANGE_TAG_PREFIX.length)))
       .map((line) => line.split("\0") as [string, string]);
-    if (tags.length === 0) return;
+    if (tags.length === 0) return false;
     await git(
       cwd,
       ["push", "--quiet", fork.remote, ...tags.map(([name]) => `+${name}:${name}`)],
@@ -1827,6 +1990,7 @@ export class AppSourceService {
       const key = name.slice(CHANGE_TAG_PREFIX.length);
       await git(cwd, ["update-ref", `${FORK_CHANGES_PREFIX}${key}`, object]);
     }
+    return true;
   }
 
   /**
@@ -1874,9 +2038,11 @@ export class AppSourceService {
     return upstream;
   }
 
-  private async accountAccess(baseUrl: string): Promise<SourceAccess> {
+  private backendClient(baseUrl: string): BackendClient {
     if (this.backend?.baseUrl !== baseUrl) {
       this.backend?.client.dispose();
+      // Its socket carried the old backend's fork view.
+      this.forkWatch = null;
       this.backend = {
         baseUrl,
         client: new BackendClient({
@@ -1885,9 +2051,14 @@ export class AppSourceService {
         }),
       };
     }
+    return this.backend.client;
+  }
+
+  private async accountAccess(baseUrl: string): Promise<SourceAccess> {
+    const client = this.backendClient(baseUrl);
     for (let attempt = 1; ; attempt += 1) {
       try {
-        const { fork, upstream } = await this.backend.client.call(
+        const { fork, upstream } = await client.call(
           "appSource.access",
           {},
         );

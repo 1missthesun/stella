@@ -57,6 +57,7 @@ import {
   workspaceOptions,
   type SettingsPatch,
 } from "./settings.js";
+import { describePreviews, isPreviewTtl, savePreviewSettings } from "./previews.js";
 import { loadInstallation, type SlackInstallation } from "./store.js";
 import { rulesPath, workspaceNotesPath } from "./workspace.js";
 
@@ -162,6 +163,7 @@ const describe = async (
     slackCommands: settings.slackCommands,
     github: describeGithub(settings.github),
     repo: repoView(settings),
+    previews: await describePreviews(env, install.teamId, install.ownerId),
     rules,
     memory,
     slackUrl: `https://app.slack.com/client/${encodeURIComponent(install.teamId)}`,
@@ -262,6 +264,16 @@ const update = async (
     }
     patch.repo = { fullName, branch, dropToken: viaGithub };
   }
+  const previews = input.previews;
+  if (previews !== undefined) {
+    if (!previews || typeof previews !== "object") return fail(400, "Unknown preview settings.");
+    if (previews.access !== undefined && previews.access !== "public" && previews.access !== "members") {
+      return fail(400, "Previews are either public or for workspace members.");
+    }
+    if (previews.ttlDays !== undefined && !isPreviewTtl(previews.ttlDays)) {
+      return fail(400, "That expiry isn't one of the choices.");
+    }
+  }
   if (input.rules !== undefined && String(input.rules).length > SLACK_RULES_MAX_CHARS) {
     return fail(400, `Rules are limited to ${SLACK_RULES_MAX_CHARS} characters.`);
   }
@@ -269,6 +281,12 @@ const update = async (
     return fail(400, `Workspace memory is limited to ${SLACK_MEMORY_MAX_CHARS} characters.`);
   }
   if (Object.keys(patch).length) await saveWorkspaceSettings(env, teamId, patch);
+  if (previews && (previews.access !== undefined || previews.ttlDays !== undefined)) {
+    await savePreviewSettings(env, teamId, {
+      ...(previews.access !== undefined ? { access: previews.access } : {}),
+      ...(previews.ttlDays !== undefined ? { ttlDays: previews.ttlDays } : {}),
+    });
+  }
   const { install } = owned;
   if (input.rules !== undefined) await writeText(env, caller.ownerId, rulesPath(install.homeFolder), String(input.rules));
   if (input.memory !== undefined) {

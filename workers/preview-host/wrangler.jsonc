@@ -1,0 +1,48 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // Stella previews for Slack: the public origin of sites agents publish.
+  // Every request goes to cloud-builder's SlackPreviewHost entrypoint, which
+  // checks the link, its expiry and the workspace's access setting, and serves
+  // the files from R2. Nothing else is reachable here.
+  //
+  // dev: one shared origin on workers.dev (`/__stella/open/<id>` links).
+  // production: `https://<id>.stellashare.app/`, once the wildcard DNS record
+  // exists (README.md); cloud-builder's SLACK_PREVIEW_HOST_SUFFIX must match.
+  "name": "stella-v2-preview-host-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-22",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },
+    "traces": { "enabled": false },
+  },
+  "services": [
+    {
+      "binding": "PREVIEWS",
+      "service": "stella-v2-cloud-builder-dev",
+      "entrypoint": "SlackPreviewHost",
+    },
+  ],
+  "env": {
+    "production": {
+      "name": "stella-v2-preview-host-prod",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "*.stellashare.app/*", "zone_name": "stellashare.app" }],
+      "observability": {
+        "enabled": true,
+        "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 1 },
+        "traces": { "enabled": false },
+      },
+      "services": [
+        {
+          "binding": "PREVIEWS",
+          "service": "stella-v2-cloud-builder-prod",
+          "entrypoint": "SlackPreviewHost",
+        },
+      ],
+    },
+  },
+}

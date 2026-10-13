@@ -57,6 +57,32 @@ export type SlackWorkspaceGithub = {
   manageUrl: string;
 };
 
+/**
+ * Who can open the workspace's Stella previews: anyone with the link, or only
+ * people who sign in with Slack as members of the workspace.
+ */
+export type SlackPreviewAccess = "public" | "members";
+
+export const SLACK_PREVIEW_ACCESS_DEFAULT: SlackPreviewAccess = "members";
+export const SLACK_PREVIEW_TTL_DAYS_CHOICES = [1, 3, 7, 14, 30, 90] as const;
+export const SLACK_PREVIEW_TTL_DAYS_DEFAULT = 14;
+
+/**
+ * Stella previews: sites agents build and host on Stella when the repository
+ * publishes no preview of its own. Each link expires `ttlDays` after it was
+ * made; changing it applies to existing links too.
+ */
+export type SlackWorkspacePreviews = {
+  access: SlackPreviewAccess;
+  ttlDays: number;
+  /** Bytes held by links that haven't expired, against the owner's plan quota. */
+  usedBytes: number;
+  quotaBytes: number;
+  live: number;
+  /** Largest single preview. */
+  maxPreviewBytes: number;
+};
+
 export type SlackWorkspace = {
   teamId: string;
   teamName: string;
@@ -70,6 +96,7 @@ export type SlackWorkspace = {
   slackCommands: boolean;
   github: SlackWorkspaceGithub | null;
   repo: SlackWorkspaceRepo | null;
+  previews: SlackWorkspacePreviews;
   /** Plain-language rules Stella follows in this workspace (`memories/rules.md`). */
   rules: string;
   /** Stella's workspace-wide notes (`memories/workspace.md`). */
@@ -106,6 +133,7 @@ export type SlackWorkspaceUpdate = {
   effort?: ReasoningEffortLevel;
   slackCommands?: boolean;
   repo?: { fullName: string; branch?: string } | null;
+  previews?: { access?: SlackPreviewAccess; ttlDays?: number };
   rules?: string;
   memory?: string;
 };

@@ -77,6 +77,9 @@
     "canvas-share:typecheck": "cd workers/canvas-share && bun run typecheck",
     "canvas-share:lint:promises": "eslint --config eslint.workers.config.js workers/canvas-share/src",
     "canvas-share:build:dry-run": "cd workers/canvas-share && bun run build:dry-run",
+    "preview-host:typecheck": "cd workers/preview-host && bun run typecheck",
+    "preview-host:lint:promises": "eslint --config eslint.workers.config.js workers/preview-host/src",
+    "preview-host:build:dry-run": "cd workers/preview-host && bun run build:dry-run",
     "check:ratchet": "node packages/runtime/scripts/check-effect-ratchet.mjs"
   },
   "dependencies": {

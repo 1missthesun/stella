@@ -51,6 +51,7 @@ import {
 import { connectBlocks, connectUrl, publishHome } from "./ui.js";
 import { handleSlackWorkspaceApi } from "./workspace-api.js";
 import { handleSlackGithubRoute } from "./github.js";
+import { handleSlackPreviewRoute } from "./previews.js";
 import {
   ENGINE_LABELS,
   isEffort,
@@ -695,6 +696,8 @@ export const handleSlackRoute = async (
   try {
     const github = await handleSlackGithubRoute(request, env);
     if (github) return github;
+    const preview = await handleSlackPreviewRoute(request, env);
+    if (preview) return preview;
     const api = await handleSlackWorkspaceApi(request, env);
     if (api) return api;
     if (pathname === SLACK_PATHS.events && method === "POST")

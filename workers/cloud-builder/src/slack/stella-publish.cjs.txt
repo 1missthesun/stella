@@ -1,0 +1,304 @@
+#!/usr/bin/env node
+"use strict";
+// stella-publish [options] [dir]
+//
+// Publishes a static site as a Stella preview and prints its link.
+//
+// With a dir: uploads that folder as it is (it needs an index.html at its top).
+// Without one, from inside a project:
+//   1. If this is the workspace's GitHub repository and HEAD is pushed, waits for the
+//      repository's own preview of that commit (stella-preview) and prints it.
+//   2. Otherwise installs dependencies, builds the project and uploads the output.
+//      The build command and output folder come from stella.preview.json
+//      ({"root": ".", "install": "...", "build": "...", "output": "dist"}) when the
+//      project has one, else from the framework (Vite, Next.js static export,
+//      Create React App, Astro, SvelteKit static, Gatsby, Nuxt generate, Angular,
+//      VitePress, Vue CLI, Eleventy) or a plain folder with an index.html.
+//
+// Options: --no-repo-preview  skip step 1
+//          --build "<cmd>"    build command    --out <dir>  output folder
+//
+// Exit 0: link printed. 2: the build failed (log tail on stderr). 3: nothing to
+// publish (no static site found). 5: refused by a size limit or the workspace's
+// quota. 1: anything else.
+
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const cp = require("child_process");
+
+const HELPER_DIR = "/opt/stella-preview";
+const MB = 1024 * 1024;
+
+const say = (line) => process.stderr.write(line + "\n");
+const fail = (code, message) => {
+  say(message);
+  process.exit(code);
+};
+
+const parseArgs = (argv) => {
+  const options = { repoPreview: true, build: null, out: null, dir: null };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--no-repo-preview") options.repoPreview = false;
+    else if (arg === "--build") options.build = argv[++i] || null;
+    else if (arg === "--out") options.out = argv[++i] || null;
+    else if (arg === "-h" || arg === "--help") {
+      say("usage: stella-publish [--no-repo-preview] [--build <cmd>] [--out <dir>] [dir]");
+      process.exit(0);
+    } else if (!options.dir) options.dir = arg;
+  }
+  return options;
+};
+
+const run = (command, cwd, opts) => {
+  const result = cp.spawnSync("bash", ["-lc", command], {
+    cwd,
+    encoding: "utf8",
+    maxBuffer: 64 * MB,
+    timeout: (opts && opts.timeoutMs) || 15 * 60_000,
+    env: Object.assign({}, process.env, { CI: "1", BROWSER: "none", FORCE_COLOR: "0" }, (opts && opts.env) || {}),
+    stdio: opts && opts.inherit ? ["ignore", "pipe", "inherit"] : ["ignore", "pipe", "pipe"],
+  });
+  return {
+    ok: result.status === 0,
+    status: result.status,
+    output: ((result.stdout || "") + (result.stderr || "")).trim(),
+    stdout: (result.stdout || "").trim(),
+    timedOut: result.error && result.error.code === "ETIMEDOUT",
+  };
+};
+
+const exists = (p) => {
+  try {
+    fs.accessSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const readJson = (p) => {
+  try {
+    return JSON.parse(fs.readFileSync(p, "utf8"));
+  } catch {
+    return null;
+  }
+};
+
+const tail = (text, lines) => text.split("\n").slice(-lines).join("\n");
+
+const git = (args, cwd) => {
+  const result = cp.spawnSync("git", ["-c", "safe.directory=*"].concat(args), { cwd, encoding: "utf8" });
+  return result.status === 0 ? (result.stdout || "").trim() : "";
+};
+
+const which = (name) => run("command -v " + name, process.cwd()).ok;
+
+const repoPreview = (root) => {
+  if (!which("stella-preview")) return null;
+  if (!exists(path.join("/opt/stella-slack", "capability"))) return null;
+  const head = git(["rev-parse", "HEAD"], root);
+  if (!head) return null;
+  const pushed = git(["branch", "-r", "--contains", head], root);
+  if (!pushed) {
+    say("HEAD isn't pushed, so the repository has no preview of it; building one on Stella.");
+    return null;
+  }
+  say("Waiting for the repository's own preview of " + head.slice(0, 12) + "...");
+  const result = cp.spawnSync("stella-preview", [head], { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
+  const url = (result.stdout || "").trim().split("\n").pop();
+  if (result.status === 0 && /^https?:\/\//.test(url || "")) return url;
+  const why = { 1: "couldn't check it", 2: "its preview build failed", 3: "it publishes no previews", 4: "its preview timed out" };
+  say("The repository's own preview isn't available (" + (why[result.status] || "exit " + result.status) + "); building one on Stella.");
+  return null;
+};
+
+const packageManager = (dir) => {
+  if (exists(path.join(dir, "bun.lock")) || exists(path.join(dir, "bun.lockb"))) return "bun";
+  if (exists(path.join(dir, "pnpm-lock.yaml"))) return "pnpm";
+  if (exists(path.join(dir, "yarn.lock"))) return "yarn";
+  return "npm";
+};
+
+const installCommand = (pm, dir) => {
+  if (pm === "bun") return "bun install";
+  if (pm === "pnpm") return which("pnpm") ? "pnpm install --no-frozen-lockfile" : "npx --yes pnpm@9 install --no-frozen-lockfile";
+  if (pm === "yarn") return which("yarn") ? "yarn install" : "npx --yes yarn@1 install";
+  return exists(path.join(dir, "package-lock.json"))
+    ? "npm ci --no-audit --no-fund || npm install --no-audit --no-fund"
+    : "npm install --no-audit --no-fund";
+};
+
+const runScript = (pm, script) => {
+  if (pm === "bun") return "bun run " + script;
+  if (pm === "pnpm") return (which("pnpm") ? "pnpm" : "npx --yes pnpm@9") + " run " + script;
+  if (pm === "yarn") return (which("yarn") ? "yarn" : "npx --yes yarn@1") + " run " + script;
+  return "npm run " + script;
+};
+
+const FRAMEWORKS = [
+  { dep: "next", name: "Next.js", outputs: ["out"] },
+  { dep: "nuxt", name: "Nuxt", outputs: [".output/public", "dist"], script: "generate" },
+  { dep: "astro", name: "Astro", outputs: ["dist"] },
+  { dep: "@sveltejs/kit", name: "SvelteKit", outputs: ["build", ".svelte-kit/output/prerendered/pages"] },
+  { dep: "gatsby", name: "Gatsby", outputs: ["public"] },
+  { dep: "@angular/core", name: "Angular", outputs: ["dist"] },
+  { dep: "vitepress", name: "VitePress", outputs: ["docs/.vitepress/dist", ".vitepress/dist"] },
+  { dep: "react-scripts", name: "Create React App", outputs: ["build"] },
+  { dep: "@vue/cli-service", name: "Vue CLI", outputs: ["dist"] },
+  { dep: "@11ty/eleventy", name: "Eleventy", outputs: ["_site"] },
+  { dep: "vite", name: "Vite", outputs: ["dist"] },
+];
+
+const GENERIC_OUTPUTS = ["dist", "build", "out", "public", "_site", "site", ".output/public", "www"];
+const STATIC_FOLDERS = [".", "public", "site", "docs", "www", "dist", "build", "_site"];
+
+const findIndex = (dir, candidates, since) => {
+  for (const candidate of candidates) {
+    const base = path.resolve(dir, candidate);
+    if (exists(path.join(base, "index.html"))) {
+      if (!since || fs.statSync(path.join(base, "index.html")).mtimeMs >= since) return base;
+    }
+    if (candidate === "dist" && exists(base)) {
+      for (const child of fs.readdirSync(base)) {
+        const nested = path.join(base, child, "browser");
+        if (exists(path.join(nested, "index.html"))) return nested;
+        if (exists(path.join(base, child, "index.html"))) return path.join(base, child);
+      }
+    }
+  }
+  return null;
+};
+
+const build = (root, options) => {
+  const config = readJson(path.join(root, "stella.preview.json")) || readJson(path.join(root, ".stella", "preview.json")) || {};
+  const dir = path.resolve(root, config.root || ".");
+  const buildCommand = options.build || config.build || null;
+  const output = options.out || config.output || null;
+  const pkg = readJson(path.join(dir, "package.json"));
+
+  if (!pkg) {
+    if (buildCommand) {
+      say("Building: " + buildCommand);
+      const built = run(buildCommand, dir);
+      if (!built.ok) fail(2, "Build failed: " + buildCommand + "\n" + tail(built.output, 80));
+    }
+    const out = output ? path.resolve(dir, output) : findIndex(dir, STATIC_FOLDERS);
+    if (!out || !exists(path.join(out, "index.html"))) {
+      fail(3, "Nothing to publish: no package.json and no index.html in " + STATIC_FOLDERS.join(", ") + ". Pass the folder to publish: stella-publish <dir>.");
+    }
+    return out;
+  }
+
+  const deps = Object.assign({}, pkg.dependencies || {}, pkg.devDependencies || {});
+  const framework = FRAMEWORKS.find((f) => deps[f.dep]) || null;
+  const pm = packageManager(dir);
+  const scripts = pkg.scripts || {};
+  const script = framework && framework.script && scripts[framework.script] ? framework.script : scripts.build ? "build" : null;
+  const command = buildCommand || (script ? runScript(pm, script) : null);
+
+  if (!command) {
+    const out = output ? path.resolve(dir, output) : findIndex(dir, STATIC_FOLDERS);
+    if (out && exists(path.join(out, "index.html"))) return out;
+    fail(3, "Nothing to publish: package.json has no build script and there's no index.html. Pass --build and --out, or add stella.preview.json.");
+  }
+
+  const install = config.install || installCommand(pm, dir);
+  say("Installing dependencies: " + install);
+  const installed = run(install, dir, { timeoutMs: 10 * 60_000 });
+  if (!installed.ok) fail(2, "Installing dependencies failed: " + install + "\n" + tail(installed.output, 80));
+
+  say("Building" + (framework ? " (" + framework.name + ")" : "") + ": " + command);
+  const started = Date.now() - 1000;
+  const built = run(command, dir);
+  if (!built.ok) {
+    fail(2, "Build failed: " + command + (built.timedOut ? " (timed out)" : "") + "\n" + tail(built.output, 80));
+  }
+  const candidates = output ? [output] : (framework ? framework.outputs : []).concat(GENERIC_OUTPUTS);
+  const out = findIndex(dir, candidates, output ? 0 : started) || findIndex(dir, candidates);
+  if (!out) {
+    if (framework && framework.dep === "next") {
+      fail(3, "This Next.js app has no static export (out/index.html). Stella previews host static sites: add output: 'export' to next.config, or use a host that runs Next.js servers.");
+    }
+    fail(3, "The build finished but no folder with an index.html was found (looked in " + candidates.join(", ") + "). Pass --out <dir> or add stella.preview.json.");
+  }
+  return out;
+};
+
+const githubRepo = (root) => {
+  const remote = git(["remote", "get-url", "origin"], root);
+  const match = /github\.com[:/]([^/]+\/[^/.]+?)(?:\.git)?$/.exec(remote);
+  return match ? match[1] : "";
+};
+
+const upload = async (dir, root) => {
+  const capability = fs.readFileSync(path.join(HELPER_DIR, "capability"), "utf8").trim();
+  const origin = fs.readFileSync(path.join(HELPER_DIR, "origin"), "utf8").trim();
+  const archive = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "stella-publish-")), "site.tar.gz");
+  const excludes = [".git", "node_modules", ".env", ".env.*", ".DS_Store", ".github", ".vscode", ".idea", "stella.preview.json"]
+    .map((pattern) => "--exclude='" + pattern + "'")
+    .join(" ");
+  const packed = run("tar -czf '" + archive + "' " + excludes + " -C '" + dir.replace(/'/g, "'\\''") + "' .", dir);
+  if (!packed.ok) fail(1, "Couldn't pack " + dir + ": " + tail(packed.output, 10));
+  const body = fs.readFileSync(archive);
+  fs.rmSync(path.dirname(archive), { recursive: true, force: true });
+  if (body.length > 95 * MB) fail(5, "The site is " + Math.round(body.length / MB) + " MB compressed; a preview can be at most 95 MB.");
+  const query = new URLSearchParams();
+  const commit = root ? git(["rev-parse", "HEAD"], root) : "";
+  const repo = root ? githubRepo(root) : "";
+  if (commit) query.set("commit", commit);
+  if (repo) query.set("repo", repo);
+  say("Uploading " + Math.round((body.length / MB) * 10) / 10 + " MB from " + dir + "...");
+  let response;
+  try {
+    response = await fetch(origin + "/api/slack/previews?" + query.toString(), {
+      method: "POST",
+      headers: { authorization: "Bearer " + capability, "content-type": "application/gzip" },
+      body,
+    });
+  } catch (error) {
+    fail(1, "Couldn't reach Stella: " + (error && error.message ? error.message : String(error)));
+  }
+  const text = await response.text();
+  let result = null;
+  try {
+    result = JSON.parse(text);
+  } catch {}
+  if (!response.ok || !result || !result.url) {
+    const message = (result && result.error) || text.slice(0, 300) || "HTTP " + response.status;
+    fail(response.status === 413 || response.status === 429 ? 5 : 1, "Stella didn't publish the preview: " + message);
+  }
+  const days = Math.round((result.expiresAt - Date.now()) / 86_400_000);
+  say(
+    "Published " + result.files + " files (" + Math.round((result.bytes / MB) * 10) / 10 + " MB). " +
+      (result.access === "public" ? "Anyone with the link can open it" : "Members of this Slack workspace can open it (they sign in with Slack)") +
+      "; it expires in " + days + " day" + (days === 1 ? "" : "s") + ".",
+  );
+  process.stdout.write(result.url + "\n");
+};
+
+const main = async () => {
+  const options = parseArgs(process.argv.slice(2));
+  if (!exists(path.join(HELPER_DIR, "capability"))) fail(1, "Stella previews aren't available in this container.");
+  const top = git(["rev-parse", "--show-toplevel"], process.cwd());
+  if (options.dir) {
+    const dir = path.resolve(options.dir);
+    if (!exists(path.join(dir, "index.html"))) fail(3, dir + " has no index.html at its top level.");
+    await upload(dir, top);
+    return;
+  }
+  const root = top || process.cwd();
+  if (options.repoPreview && top) {
+    const url = repoPreview(root);
+    if (url) {
+      say("This is the repository's own preview.");
+      process.stdout.write(url + "\n");
+      return;
+    }
+  }
+  const out = build(root, options);
+  await upload(out, top);
+};
+
+main().catch((error) => fail(1, "stella-publish failed: " + (error && error.stack ? error.stack : String(error))));

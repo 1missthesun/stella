@@ -183,6 +183,8 @@ jobs:
             script: device-code-fixture
           - name: Canvas Share worker
             script: canvas-share
+          - name: Preview Host worker
+            script: preview-host
     steps:
       - uses: actions/checkout@v4
 

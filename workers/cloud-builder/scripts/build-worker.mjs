@@ -39,7 +39,7 @@ export const buildWorker = async ({ outdir = workerBuildDirectory } = {}) => {
     format: "esm",
     target: "es2022",
     platform: "browser",
-    loader: { ".md": "text" },
+    loader: { ".md": "text", ".txt": "text" },
     plugins: [
       {
         name: "worker-wasm",

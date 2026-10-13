@@ -30,6 +30,7 @@ import {
   turnBrokerStorageKey,
   type TurnBrokerRecord,
 } from "./turn-credential-broker.js";
+import { prepareSlackPreviews } from "./slack/previews.js";
 import { prepareSlackRepo } from "./slack/repo-clone.js";
 import { startTurnExecution } from "./turn-cancellation.js";
 import { issueWorldCapability } from "./world-capability.js";
@@ -260,6 +261,7 @@ export const openPiComputeLease = async (
     // Materialization replaces the world root, including the drive directory the daemon expects.
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
     await prepareSlackRepo(host.env, session, owner.conversationId, publicOrigin(host), host.log);
+    await prepareSlackPreviews(host.env, session, owner.conversationId, publicOrigin(host), host.log);
     context.assertActive();
     host.log("pi_agent_world_attached", {
       threadId,

@@ -17,7 +17,7 @@
  * (`toolResultFromOrchestrator` turns them into authorized tool images), so
  * this reads the bytes out of the world instead of handing them to the world's
  * text-only Read. An image larger than the model takes is fitted to the shared
- * `READ_IMAGE_CAPS` (cloud-image-fit.ts), as the runtime's Read does, and the
+ * shared Read target (cloud-image-fit.ts), as the runtime's Read does, and the
  * result says it was resized.
  *
  * Skills stay text-only: that store hands back text and holds no binaries.
@@ -37,7 +37,7 @@ import {
 } from "@stella/runtime/kernel/shared/image-mime.js";
 import {
   base64EncodedLength,
-  READ_IMAGE_CAPS,
+  DURABLE_OBJECT_READ_IMAGE_CAPS,
   READ_IMAGE_MAX_SOURCE_BYTES,
 } from "@stella/runtime/kernel/shared/image-caps.js";
 import type { CloudCodeSourceAgentTool } from "./cloud-code-tool.js";
@@ -64,6 +64,9 @@ const MAX_READ_LINES = 5000;
  */
 const IMAGE_READ_CHUNK_BYTES = 4 * 1024 * 1024;
 
+/** An image Read that has not finished by then answers with a tool error. */
+const IMAGE_READ_DEADLINE_MS = 60_000;
+
 const base64FromBytes = (bytes: Uint8Array): string => {
   let binary = "";
   const chunk = 0x8000;
@@ -75,7 +78,7 @@ const base64FromBytes = (bytes: Uint8Array): string => {
 
 export type CloudReadToolOptions = Readonly<{
   /**
-   * Fits an oversized image to `READ_IMAGE_CAPS`, as the runtime's Read does
+   * Fits an oversized image to the shared Read target, as the runtime's Read does
    * with Photon. Without it an image is inlined only when it already fits.
    */
   images?: ImagesBinding;
@@ -149,6 +152,72 @@ const windowLines = (
     end,
     total: lines.length,
     more: end < lines.length,
+  };
+};
+
+/**
+ * An image Read: the whole file in bounded ranges, fitted to the Read target
+ * with the room a Durable Object row needs (the result is stored as one).
+ */
+const readImage = async (
+  world: NonNullable<CloudReadToolOptions["world"]>,
+  images: ImagesBinding | undefined,
+  worldPath: string,
+  size: number,
+) => {
+  if (size > READ_IMAGE_MAX_SOURCE_BYTES) {
+    return failure(
+      `That image is ${size} bytes, over the ${READ_IMAGE_MAX_SOURCE_BYTES}-byte limit for reading an image into the conversation: ${worldPath}`,
+    );
+  }
+  const bytes = await readWhole(world, worldPath, size);
+  if (!bytes) {
+    return failure(`That image could not be read in full: ${worldPath}`);
+  }
+  const mimeType = detectImageMimeTypeFromBytes(bytes);
+  if (!mimeType) {
+    return failure(
+      `That file is named like an image but its bytes are not a complete PNG, JPEG, GIF, or WEBP: ${worldPath}`,
+    );
+  }
+  const caps = DURABLE_OBJECT_READ_IMAGE_CAPS;
+  const fitted = images
+    ? await fitImageWithImagesBinding(images, bytes, mimeType, caps)
+    : base64EncodedLength(bytes.length) < caps.maxBytes
+      ? { bytes, mimeType, note: undefined }
+      : null;
+  if (!fitted) {
+    return failure(
+      images
+        ? `Image file could not be decoded: ${worldPath}`
+        : `That image is ${bytes.length} bytes, too large to show the model here: ${worldPath}`,
+    );
+  }
+  // The runtime Read's wording (packages/runtime/kernel/tools/file.ts).
+  const dimensions =
+    "originalWidth" in fitted
+      ? ` (${fitted.originalWidth}x${fitted.originalHeight})`
+      : "";
+  return {
+    content: [
+      {
+        type: "text" as const,
+        text: `Image file: ${worldPath}${dimensions}${fitted.note ? `\n${fitted.note}` : ""}`,
+      },
+      {
+        type: "image" as const,
+        data: base64FromBytes(fitted.bytes),
+        mimeType: fitted.mimeType,
+      },
+    ],
+    details: {
+      path: worldPath,
+      mimeType: fitted.mimeType,
+      sizeBytes: fitted.bytes.length,
+      ...(fitted.note
+        ? { originalMimeType: mimeType, originalBytes: bytes.length }
+        : {}),
+    },
   };
 };
 
@@ -242,67 +311,36 @@ export const createCloudReadTool = (
     // to a provider that will reject it.
     const world = options.world;
     if (imageMimeTypeFromPath(worldPath) && world.stat && world.readFile) {
-      const entry = await world.stat(worldPath).catch(() => null);
-      if (entry && entry.kind === "file") {
-        if (entry.size > READ_IMAGE_MAX_SOURCE_BYTES) {
-          return failure(
-            `That image is ${entry.size} bytes, over the ${READ_IMAGE_MAX_SOURCE_BYTES}-byte limit for reading an image into the conversation: ${worldPath}`,
-          );
-        }
-        const bytes = await readWhole(world, worldPath, entry.size).catch(
-          () => null,
+      // Whatever happens below ends as a result: a store, the Images
+      // service, or a slow read never leaves the turn waiting on this call.
+      // Undefined (no such file) falls through so not-found stays one message.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const image = await Promise.race([
+          (async () => {
+            const entry = await world.stat!(worldPath).catch(() => null);
+            if (!entry || entry.kind !== "file") return undefined;
+            return await readImage(world, options.images, worldPath, entry.size);
+          })(),
+          new Promise<ReturnType<typeof failure>>((resolve) => {
+            timer = setTimeout(
+              () =>
+                resolve(
+                  failure(
+                    `Reading that image took longer than ${IMAGE_READ_DEADLINE_MS / 1000} seconds; try again: ${worldPath}`,
+                  ),
+                ),
+              IMAGE_READ_DEADLINE_MS,
+            );
+          }),
+        ]);
+        if (image) return image;
+      } catch (error) {
+        return failure(
+          `That image could not be read${error instanceof Error && error.message ? ` (${error.message})` : ""}: ${worldPath}`,
         );
-        if (bytes) {
-          const mimeType = detectImageMimeTypeFromBytes(bytes);
-          if (!mimeType) {
-            return failure(
-              `That file is named like an image but its bytes are not a complete PNG, JPEG, GIF, or WEBP: ${worldPath}`,
-            );
-          }
-          const fitted = options.images
-            ? await fitImageWithImagesBinding(
-                options.images,
-                bytes,
-                mimeType,
-                READ_IMAGE_CAPS,
-              )
-            : base64EncodedLength(bytes.length) < READ_IMAGE_CAPS.maxBytes
-              ? { bytes, mimeType, note: undefined }
-              : null;
-          if (!fitted) {
-            return failure(
-              options.images
-                ? `Image file could not be decoded: ${worldPath}`
-                : `That image is ${bytes.length} bytes, too large to show the model here: ${worldPath}`,
-            );
-          }
-          // The runtime Read's wording (packages/runtime/kernel/tools/file.ts).
-          const size =
-            "originalWidth" in fitted
-              ? ` (${fitted.originalWidth}x${fitted.originalHeight})`
-              : "";
-          return {
-            content: [
-              {
-                type: "text",
-                text: `Image file: ${worldPath}${size}${fitted.note ? `\n${fitted.note}` : ""}`,
-              },
-              {
-                type: "image",
-                data: base64FromBytes(fitted.bytes),
-                mimeType: fitted.mimeType,
-              },
-            ],
-            details: {
-              path: worldPath,
-              mimeType: fitted.mimeType,
-              sizeBytes: fitted.bytes.length,
-              ...(fitted.note
-                ? { originalMimeType: mimeType, originalBytes: bytes.length }
-                : {}),
-            },
-          };
-        }
+      } finally {
+        if (timer !== undefined) clearTimeout(timer);
       }
     }
 

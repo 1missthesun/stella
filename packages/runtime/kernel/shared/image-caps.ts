@@ -239,6 +239,30 @@ export const READ_IMAGE_CAPS: ImageCaps = {
   jpegQuality: DEFAULT_JPEG_QUALITY,
 };
 
+/**
+ * The same target where the result is stored as one Durable Object SQLite
+ * row: the cloud orchestrator's Read runs in a Worker, and its result is a
+ * single pi entry (and journal row), which the platform caps at 2MB. The edge,
+ * ladder and note are unchanged; only the byte budget leaves room for the row
+ * (a 2576px photo at q90 is ~1.1MB, so most photos are unaffected).
+ */
+export const DURABLE_OBJECT_READ_IMAGE_CAPS: ImageCaps = {
+  ...READ_IMAGE_CAPS,
+  maxBytes: Math.floor(1.5 * 1024 * 1024),
+};
+
+/**
+ * Context tokens one image block costs, for budgeting a history window. An
+ * image is billed by its pixels (~width*height/750 on Anthropic), never by
+ * its base64 length; counting the base64 as text made one photo read as
+ * ~375k tokens and pushed the whole conversation out of the window. Image
+ * blocks carry no dimensions, so this is the bound for the largest image
+ * Read sends (a square at the Read long edge).
+ */
+export const IMAGE_CONTEXT_TOKEN_ESTIMATE = Math.ceil(
+  (READ_IMAGE_CAPS.maxWidth * READ_IMAGE_CAPS.maxHeight) / 750,
+);
+
 /** JPEG qualities a lossy re-encode walks down, highest first, to fit a byte cap. */
 export const jpegQualitySteps = (startQuality: number): number[] =>
   Array.from(new Set([startQuality, 90, 80, 70, 55, 40]));

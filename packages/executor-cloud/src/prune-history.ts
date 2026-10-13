@@ -19,6 +19,8 @@
  *    `pruneAgentHistory` continues to serve that path unchanged.
  */
 
+import { IMAGE_CONTEXT_TOKEN_ESTIMATE } from "@stella/runtime/kernel/shared/image-caps.js";
+
 /**
  * History budget for cloud loops using the pinned relay model
  * (contextWindow 80k, maxTokens 16,384): leaves room for the system prompt,
@@ -38,12 +40,29 @@ export const CLOUD_HISTORY_TOKEN_BUDGET = 48_000;
  * reads three small columns instead of every payload in the conversation.
  */
 export const estimateTokens = (message: unknown): number => {
-  const serialized = JSON.stringify(message);
+  // An image block is priced by its pixels, not its base64 text.
+  let images = 0;
+  const serialized = JSON.stringify(message, (_key, value: unknown) => {
+    if (
+      value !== null &&
+      typeof value === "object" &&
+      (value as { type?: unknown }).type === "image" &&
+      typeof (value as { data?: unknown }).data === "string"
+    ) {
+      images += 1;
+      return { ...(value as object), data: "" };
+    }
+    return value;
+  });
   let nonAscii = 0;
   for (let index = 0; index < serialized.length; index += 1) {
     if (serialized.charCodeAt(index) > 0x7f) nonAscii += 1;
   }
-  return Math.ceil((serialized.length - nonAscii) / 4) + nonAscii;
+  return (
+    Math.ceil((serialized.length - nonAscii) / 4) +
+    nonAscii +
+    images * IMAGE_CONTEXT_TOKEN_ESTIMATE
+  );
 };
 
 /**

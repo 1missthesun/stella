@@ -1,4 +1,4 @@
-import { useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useRef, useSyncExternalStore, type ReactNode } from "react";
 import type { AutomaticExecutionTarget } from "./execution-placement";
 import type { StoredPhoneAccess } from "./phone-access";
 import type { ModelSettings } from "./use-cloud-model-settings";
@@ -102,6 +102,26 @@ const readComputer = () => state.computer;
 
 export function useActivityHub(): ActivityHubData | null {
   return useSyncExternalStore(subscribe, readActivity, readActivity);
+}
+
+export function useActivityHubSelector<T>(
+  select: (hub: ActivityHubData | null) => T,
+  isEqual: (a: T, b: T) => boolean = Object.is,
+): T {
+  const cache = useRef<{ hub: ActivityHubData | null; value: T } | null>(null);
+  const read = useCallback(() => {
+    const hub = state.activity;
+    const cached = cache.current;
+    if (cached && cached.hub === hub) return cached.value;
+    const value = select(hub);
+    if (cached && isEqual(cached.value, value)) {
+      cache.current = { hub, value: cached.value };
+      return cached.value;
+    }
+    cache.current = { hub, value };
+    return value;
+  }, [isEqual, select]);
+  return useSyncExternalStore(subscribe, read, read);
 }
 
 export function useComputerControl(): ComputerControl | null {

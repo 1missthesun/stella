@@ -55,7 +55,7 @@ export function summaryExcerpt(result: string): string {
   return `${cut.trimEnd()}…`;
 }
 
-export function projectMobileLifecycle(messages: ChatMessage[], records: readonly JournalRecord[], conversationId: string): ChatMessage[] {
+export function projectMobileLifecycle(messages: readonly ChatMessage[], records: readonly JournalRecord[], conversationId: string): ChatMessage[] {
   const journal = journalAgents(records);
   const titles = new Map<string, string>();
   for (const [threadId, agent] of journal) if (agent.title) titles.set(threadId, agent.title);
@@ -77,8 +77,10 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     const rows = assistantsByTurn.get(turnId) ?? [];
     return rows.find(row => row.seq > seq)?.message ?? rows.at(-1)?.message;
   };
+  const attached = new Map<string, ChatMessage>();
   const attach = (message: ChatMessage, artifacts: ChatArtifact[]) => {
-    message.artifacts = [...(message.artifacts ?? []), ...artifacts];
+    const current = attached.get(message.id) ?? message;
+    attached.set(message.id, { ...current, artifacts: [...(current.artifacts ?? []), ...artifacts] });
   };
 
   const starts = new Map<string, ChatArtifact>();
@@ -210,10 +212,15 @@ export function projectMobileLifecycle(messages: ChatMessage[], records: readonl
     }
     return Object.keys(states).length ? { agentStates: states } : {};
   };
-  return messages.map(message => ({ ...message, ...(message.replyRefs ? {
-    replyRefs: message.replyRefs.map(ref => ref.kind === "agent" ? { ...ref, title: titleFor(ref) } : ref),
-    ...statesFor(message.replyRefs),
-  } : {}) }));
+  return messages.map(original => {
+    const message = attached.get(original.id) ?? original;
+    if (!message.replyRefs) return message;
+    return {
+      ...message,
+      replyRefs: message.replyRefs.map(ref => ref.kind === "agent" ? { ...ref, title: titleFor(ref) } : ref),
+      ...statesFor(message.replyRefs),
+    };
+  });
 }
 
 export type MobileAgentState = "running" | "completed" | "error" | "canceled";
@@ -263,30 +270,59 @@ export function mobileOwnedAgentIds(messages: readonly ChatMessage[]): (message:
   };
 }
 
-export function mobileReplyContexts(messages: readonly ChatMessage[]): MobileReplyContexts {
+const replyContextRows = new WeakMap<ChatMessage, ReplyContextRow>();
+
+const replyContextRow = (message: ChatMessage, ownsAgentIds: string[]): ReplyContextRow => {
+  const aliasIds = message.canonicalId ? [message.canonicalId] : undefined;
+  if (message.role === "user") return { id: message.id, role: "user", ...(aliasIds ? { aliasIds } : {}) };
+  return {
+    id: message.id,
+    role: "assistant",
+    ...(aliasIds ? { aliasIds } : {}),
+    ...(message.replyRefs ? { refs: message.replyRefs } : {}),
+    ...(message.requestId ? { answersMessageIds: [message.requestId] } : {}),
+    ...(ownsAgentIds.length ? { ownsAgentIds } : {}),
+  };
+};
+
+const spawnContextRows = new WeakMap<ChatMessage, { owned: string; row: ReplyContextRow }>();
+
+export function mobileReplyContexts(
+  messages: readonly ChatMessage[],
+  project: (rows: readonly ReplyContextRow[]) => ReplyContextProjection = projectReplyContexts,
+): MobileReplyContexts {
   const agentStates = new Map<string, MobileAgentState>();
   const latestStates = new Map<string, MobileAgentState>();
-  const ownedAgents = mobileOwnedAgentIds(messages);
+  let ownedAgents: ((message: ChatMessage) => string[]) | null = null;
   const rows: ReplyContextRow[] = messages.map(message => {
-    const aliasIds = message.canonicalId ? [message.canonicalId] : undefined;
-    if (message.role === "user") return { id: message.id, role: "user", ...(aliasIds ? { aliasIds } : {}) };
-    for (const artifact of message.artifacts ?? []) {
-      if (artifact.payload.kind !== "agent-work") continue;
-      const state: MobileAgentState = artifact.payload.state === "running" ? "running" : artifact.payload.failed ? "error" : "completed";
-      for (const id of artifact.payload.agentIds ?? []) agentStates.set(id, state);
+    if (message.role !== "user") {
+      for (const artifact of message.artifacts ?? []) {
+        if (artifact.payload.kind !== "agent-work") continue;
+        const state: MobileAgentState = artifact.payload.state === "running" ? "running" : artifact.payload.failed ? "error" : "completed";
+        for (const id of artifact.payload.agentIds ?? []) agentStates.set(id, state);
+      }
+      if (message.agentStates) {
+        for (const [id, state] of Object.entries(message.agentStates)) latestStates.set(id, state);
+      }
     }
-    for (const [id, state] of Object.entries(message.agentStates ?? {})) latestStates.set(id, state);
-    const ownsAgentIds = ownedAgents(message);
-    return {
-      id: message.id,
-      role: "assistant",
-      ...(aliasIds ? { aliasIds } : {}),
-      ...(message.replyRefs ? { refs: message.replyRefs } : {}),
-      ...(message.requestId ? { answersMessageIds: [message.requestId] } : {}),
-      ...(ownsAgentIds.length ? { ownsAgentIds } : {}),
-    };
+    if (message.role !== "user" && message.spawnedDescriptions?.length) {
+      ownedAgents ??= mobileOwnedAgentIds(messages);
+      const ownsAgentIds = ownedAgents(message);
+      const owned = ownsAgentIds.join("\n");
+      const cached = spawnContextRows.get(message);
+      if (cached?.owned === owned) return cached.row;
+      const row = replyContextRow(message, ownsAgentIds);
+      spawnContextRows.set(message, { owned, row });
+      return row;
+    }
+    let row = replyContextRows.get(message);
+    if (!row) {
+      row = replyContextRow(message, message.role === "user" ? [] : agentIdsOf(message));
+      replyContextRows.set(message, row);
+    }
+    return row;
   });
-  const projection = projectReplyContexts(rows);
+  const projection = project(rows);
   for (const [id, state] of latestStates) agentStates.set(id, state);
   return { ...projection, agentStates };
 }

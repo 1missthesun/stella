@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
 import type { ChatArtifact, ChatMessage } from "../types";
 import { agentTaskStatus } from "@stella/contracts/agent-ledger";
@@ -100,6 +100,34 @@ const titledMessage = (
   };
 };
 
+const titledMessages = new WeakMap<
+  ChatMessage,
+  { agents: ReadonlyMap<string, CloudAgent>; message: ChatMessage }
+>();
+
+const cachedTitledMessage = (
+  message: ChatMessage,
+  agents: ReadonlyMap<string, CloudAgent>,
+): ChatMessage => {
+  const cached = titledMessages.get(message);
+  if (cached?.agents === agents) return cached.message;
+  const titled = titledMessage(message, agents);
+  titledMessages.set(message, { agents, message: titled });
+  return titled;
+};
+
+const sameAgents = (
+  a: ReadonlyMap<string, CloudAgent>,
+  b: ReadonlyMap<string, CloudAgent>,
+): boolean => {
+  if (a.size !== b.size) return false;
+  for (const [id, agent] of a) {
+    const other = b.get(id);
+    if (!other || other.title !== agent.title || other.state !== agent.state) return false;
+  }
+  return true;
+};
+
 const cloudState = (status: Parameters<typeof agentTaskStatus>[0]): AgentState => {
   const state = agentTaskStatus(status);
   return state === "canceled" ? "error" : state;
@@ -111,6 +139,7 @@ export function useAgentReplyTitles(
 ): ChatMessage[] {
   const ids = useMemo(() => transcriptAgentIds(messages), [messages]);
   const ledger = useConversationAgentLedger(conversationId, ids);
+  const agentsRef = useRef<ReadonlyMap<string, CloudAgent>>(new Map());
   const agents = useMemo(() => {
     const known = new Map<string, CloudAgent>();
     if (!ledger.ready) return known;
@@ -122,10 +151,12 @@ export function useAgentReplyTitles(
         state: cloudState(row.status),
       });
     }
+    if (sameAgents(known, agentsRef.current)) return agentsRef.current;
+    agentsRef.current = known;
     return known;
   }, [ids, ledger]);
   return useMemo(
-    () => (agents.size === 0 ? messages : messages.map((message) => titledMessage(message, agents))),
+    () => (agents.size === 0 ? messages : messages.map((message) => cachedTitledMessage(message, agents))),
     [messages, agents],
   );
 }

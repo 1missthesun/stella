@@ -19,6 +19,22 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+const recordReactions = new WeakMap<
+  JournalMessageRecord,
+  readonly { sequence: number; emoji: string }[]
+>();
+
+const reactionsOf = (
+  record: JournalMessageRecord,
+): readonly { sequence: number; emoji: string }[] => {
+  let reactions = recordReactions.get(record);
+  if (!reactions) {
+    reactions = splitMessageReplyRefs(record.payload).reactions;
+    recordReactions.set(record, reactions);
+  }
+  return reactions;
+};
+
 export const journalUserReactions = (
   records: readonly JournalRecord[],
 ): Map<number, MessageReaction> => {
@@ -31,7 +47,7 @@ export const journalUserReactions = (
       continue;
     }
     if (record.role !== "assistant") continue;
-    for (const reaction of splitMessageReplyRefs(record.payload).reactions) {
+    for (const reaction of reactionsOf(record)) {
       if (!userSeqs.has(reaction.sequence)) continue;
       reactions.set(reaction.sequence, {
         emoji: reaction.emoji,
@@ -57,6 +73,18 @@ export type JournalMirroredWake = {
   outcome: { kind: AgentAttemptOutcome; body: string };
 };
 
+const wakePrompts = new WeakMap<
+  JournalMessageRecord,
+  ReturnType<typeof wakePromptOf>
+>();
+
+const cachedWakePrompt = (record: JournalMessageRecord) => {
+  if (wakePrompts.has(record)) return wakePrompts.get(record)!;
+  const prompt = wakePromptOf(record.payload, record.clientMsgId);
+  wakePrompts.set(record, prompt);
+  return prompt;
+};
+
 export const journalMirroredWake = (
   turnRecords: readonly JournalRecord[],
 ): JournalMirroredWake | null => {
@@ -71,7 +99,7 @@ export const journalMirroredWake = (
     if (record.kind !== "message" || record.role !== "user" || !record.hidden) {
       continue;
     }
-    const prompt = wakePromptOf(record.payload, record.clientMsgId);
+    const prompt = cachedWakePrompt(record);
     if (!prompt || carded.has(prompt.threadId)) continue;
     wake = {
       record,

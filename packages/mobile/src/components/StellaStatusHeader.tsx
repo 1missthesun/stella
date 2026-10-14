@@ -41,7 +41,10 @@ import {
   STATUS_PILL_SPRING,
 } from "./StatusPill.types";
 import { runningActivityIndicatorEntries } from "../lib/activity-hub-model";
-import { useActivityHub } from "../lib/main-shell-store";
+import {
+  useActivityHubSelector,
+  type ActivityHubData,
+} from "../lib/main-shell-store";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
 import { useTPlural } from "../i18n";
@@ -54,6 +57,16 @@ const SLOT_SETTLE_MS = 560;
 
 const NO_RUNNING_AGENTS: ActivityIndicatorEntry[] = [];
 
+const selectRunning = (hub: ActivityHubData | null): ActivityIndicatorEntry[] =>
+  hub?.tasks ? runningActivityIndicatorEntries(hub.tasks) : NO_RUNNING_AGENTS;
+
+const sameRunning = (
+  a: readonly ActivityIndicatorEntry[],
+  b: readonly ActivityIndicatorEntry[],
+): boolean =>
+  a.length === b.length &&
+  a.every((entry, index) => entry.id === b[index]!.id && entry.title === b[index]!.title);
+
 export function StellaStatusHeader({
   onPress,
 }: {
@@ -61,14 +74,7 @@ export function StellaStatusHeader({
 }) {
   const tPlural = useTPlural();
   const colors = useColors();
-  const hub = useActivityHub();
-  const running = useMemo(
-    () =>
-      hub?.tasks
-        ? runningActivityIndicatorEntries(hub.tasks)
-        : NO_RUNNING_AGENTS,
-    [hub?.tasks],
-  );
+  const running = useActivityHubSelector(selectRunning, sameRunning);
   const count = running.length;
   const label = selectActivityIndicatorLabel(running, (total) =>
     tPlural("app.chat.activityPill.tasksInProgress", total),

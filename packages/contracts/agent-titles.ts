@@ -101,6 +101,37 @@ export const agentNoteSender = (
   return { threadId, title };
 };
 
+const agentRecordFlags = new WeakMap<AgentTitleRecord, boolean>();
+
+const touchesAgents = (record: AgentTitleRecord): boolean => {
+  if (record.kind !== "message" || !record.payload) return record.kind === "card";
+  const cached = agentRecordFlags.get(record);
+  if (cached !== undefined) return cached;
+  const payload = record.payload;
+  let touches = false;
+  if (record.role === "assistant") {
+    touches =
+      Array.isArray(payload.content) &&
+      payload.content.some((block) => {
+        const entry = asRecord(block);
+        return (
+          entry?.type === "toolCall" &&
+          (entry.name === "spawn_agent" || entry.name === "send_message")
+        );
+      });
+  } else if (record.role === "toolResult") {
+    touches =
+      payload.toolName === "spawn_agent" ||
+      payload.toolName === "send_message" ||
+      nonEmpty(asRecord(payload.details)?.thread_id) !== undefined;
+  } else if (record.role === "user") {
+    touches =
+      wakeAgent(record) !== null || agentNoteSender(payloadText(payload)) !== null;
+  }
+  agentRecordFlags.set(record, touches);
+  return touches;
+};
+
 const lifecycleCard = (
   card: unknown,
 ): { threadId: string; title?: string; status?: TaskLifecycleStatus } | null => {
@@ -163,6 +194,7 @@ export const journalAgents = (
     if (status) agentFor(threadId).status = status;
   };
   for (const record of records) {
+    if (!touchesAgents(record)) continue;
     if (record.kind === "card") {
       const card = lifecycleCard(record.card);
       if (!card) continue;

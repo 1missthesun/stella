@@ -295,7 +295,7 @@ const projectTurn = (
   turn: readonly JournalRecord[],
   context: {
     conversationId?: string;
-    recordsBySeq: ReadonlyMap<number, JournalRecord>;
+    recordsBySeq: () => ReadonlyMap<number, JournalRecord>;
     reactions: ReadonlyMap<number, { emoji: string; at: number }>;
   },
 ): ChatMessage[] => {
@@ -411,9 +411,11 @@ const projectTurn = (
     const storedRefs = storedJournalReplyRefs(record.payload);
     const replyRefs = storedRefs.length
       ? storedRefs
-      : resolveJournalReplyRefs({
+      : split.refs.length === 0
+        ? []
+        : resolveJournalReplyRefs({
           raw: split.refs,
-          recordsBySeq,
+          recordsBySeq: recordsBySeq(),
           turnUserRecord,
           messageId: projectedMessageId,
         });
@@ -530,7 +532,7 @@ const projectTurn = (
 type TurnProjection = {
   records: readonly JournalRecord[];
   reactionsKey: string;
-  windowKey: string;
+  windowKey: string | null;
   messages: ChatMessage[];
 };
 const turnProjections = new Map<string, Map<string, TurnProjection>>();
@@ -564,7 +566,9 @@ export const projectCloudConversationMessages = (args: {
     args.hasOlder === true,
     { dropCardOnly: true },
   );
-  const recordsBySeq = new Map(args.records.map(record => [record.seq, record]));
+  let bySeq: Map<number, JournalRecord> | null = null;
+  const recordsBySeq = () =>
+    (bySeq ??= new Map(args.records.map(record => [record.seq, record])));
   const reactions = journalUserReactions(args.records);
   const byTurn = new Map<string, JournalRecord[]>();
   for (const record of records) {
@@ -581,22 +585,31 @@ export const projectCloudConversationMessages = (args: {
   for (const [turnId, turn] of byTurn) {
     const reactionsKey = turnReactionsKey(turn, reactions);
     const cached = previous?.get(turnId);
-    const projection =
+    let projection: TurnProjection;
+    if (
       cached &&
-      cached.windowKey === windowKey &&
+      (cached.windowKey === null || cached.windowKey === windowKey) &&
       cached.reactionsKey === reactionsKey &&
       sameRecords(cached.records, turn)
-        ? cached
-        : {
-            records: turn,
-            reactionsKey,
-            windowKey,
-            messages: projectTurn(turnId, turn, {
-              conversationId: args.conversationId,
-              recordsBySeq,
-              reactions,
-            }),
-          };
+    ) {
+      projection = cached;
+    } else {
+      let readWindow = false;
+      const messages = projectTurn(turnId, turn, {
+        conversationId: args.conversationId,
+        recordsBySeq: () => {
+          readWindow = true;
+          return recordsBySeq();
+        },
+        reactions,
+      });
+      projection = {
+        records: turn,
+        reactionsKey,
+        windowKey: readWindow ? windowKey : null,
+        messages,
+      };
+    }
     next.set(turnId, projection);
     messages.push(...projection.messages);
   }
@@ -609,7 +622,7 @@ export const projectCloudConversationMessages = (args: {
   }
 
   return projectMobileLifecycle(
-    messages.map((message) => ({ ...message })),
+    messages,
     args.records,
     args.conversationId ?? "",
   );

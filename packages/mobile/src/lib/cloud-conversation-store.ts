@@ -45,6 +45,17 @@ export type ConversationState = ConversationViewState & {
 const EMPTY_AGENTS: readonly AgentActivityEntry[] = [];
 
 const EMIT_COALESCE_MS = 16;
+const TURN_END_HOLD_MS = 120;
+
+const awaitsTurnEnd = (
+  record: JournalRecord | undefined,
+  liveTurnId: string | null,
+): record is JournalRecord =>
+  record?.kind === "message" &&
+  record.role === "assistant" &&
+  !record.hidden &&
+  record.turnId === liveTurnId &&
+  record.payload.stopReason !== "toolUse";
 
 const initialState = (conversationId: string): ConversationState => ({
   ...initialConversationViewState(conversationId),
@@ -77,6 +88,7 @@ class ConversationStore {
   private hydrateRequested = false;
   private emitTimer: ReturnType<typeof setTimeout> | null = null;
   private lastEmitMs = 0;
+  private turnEndHold: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     conversationId: string,
@@ -253,7 +265,14 @@ class ConversationStore {
     this.socket.start();
   }
 
+  private releaseTurnEndHold(): void {
+    if (!this.turnEndHold) return;
+    clearTimeout(this.turnEndHold);
+    this.turnEndHold = null;
+  }
+
   private teardown(): void {
+    this.releaseTurnEndHold();
     this.socket?.stop();
     this.socket = null;
     if (this.olderTimer) clearTimeout(this.olderTimer);
@@ -262,7 +281,7 @@ class ConversationStore {
   }
 
   private emit(): void {
-    if (this.emitTimer) return;
+    if (this.emitTimer || this.turnEndHold) return;
     const sinceLast = Date.now() - this.lastEmitMs;
     if (sinceLast >= EMIT_COALESCE_MS) {
       this.notify();
@@ -368,12 +387,26 @@ class ConversationStore {
   private appendRecords(incoming: readonly JournalRecord[]): void {
     const appended = appendJournalRecords(this.state, incoming);
     if (!appended) return;
-    this.patch({
+    const heldTurnId = this.turnEndHold ? this.state.live?.turnId ?? null : null;
+    const live = liveTurnAfterRecords(this.state.live, appended.fresh);
+    if (heldTurnId !== null && live?.turnId !== heldTurnId) {
+      this.releaseTurnEndHold();
+    }
+    this.state = {
+      ...this.state,
       records: appended.records,
       hasOlder: appended.hasOlder,
-      live: liveTurnAfterRecords(this.state.live, appended.fresh),
+      live,
       headSeq: appended.headSeq,
-    });
+    };
+    if (!this.turnEndHold && awaitsTurnEnd(appended.fresh.at(-1), live?.turnId ?? null)) {
+      this.turnEndHold = setTimeout(() => {
+        this.turnEndHold = null;
+        this.emit();
+      }, TURN_END_HOLD_MS);
+      return;
+    }
+    this.emit();
   }
 
   private prependRecords(

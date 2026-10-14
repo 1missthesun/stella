@@ -92,6 +92,8 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
   const captureRef = useRef<DictationCapture | null>(null);
   const audioSubscriptionRef = useRef<EventSubscription | null>(null);
   const stopRecordingRef = useRef<(() => Promise<string | null>) | null>(null);
+  const onTranscriptRef = useRef(options.onTranscript);
+  onTranscriptRef.current = options.onTranscript;
 
   const safeSetStatus = useCallback((next: DictationStatus) => {
     statusRef.current = next;
@@ -405,7 +407,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
           text = await transcribeDictationWav(wav);
         }
         if (text && !cancelledRef.current && mountedRef.current) {
-          options.onTranscript(text);
+          onTranscriptRef.current(text);
           return text;
         }
         return null;
@@ -426,7 +428,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         operationInFlightRef.current = false;
       }
     },
-    [discardCapture, releaseAudioMode, safeSetStatus, options],
+    [discardCapture, releaseAudioMode, safeSetStatus],
   );
 
   const stop = useCallback(() => finalize(true), [finalize]);

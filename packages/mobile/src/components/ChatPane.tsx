@@ -5,6 +5,7 @@ import {
   projectAgentLabels,
   type AgentLabelRow,
 } from "@stella/contracts/agent-labels";
+import { createReplyContextProjector } from "@stella/contracts/reply-context";
 import { ReplyViewer, type AgentReplyRef } from "./ReplyViewer";
 import { AgentReportPopover } from "./AgentReportPopover";
 import type { ReportAnchor } from "./AgentReport";
@@ -91,11 +92,10 @@ import {
   INLINE_ASK_RECORD_PREFIX,
   type ChatRowEnv,
 } from "./chat/ChatListRow";
-import { consolidateRowArtifacts } from "../lib/agent-artifact-consolidation";
 import {
   ASSISTANT_ROW_PAD_VERTICAL,
   ChatMessageRow,
-  rowCompletionQuotes,
+  messageCompletionQuotes,
   MessageEntry,
   carryCompletionQuotes,
   makeMessageRowStyles,
@@ -385,6 +385,35 @@ const withInlineAskRecords = (
 
 const REPLY_PLACEMENT_PIN_SUPPRESS_MS = 1500;
 
+const agentLabelRows = new WeakMap<
+  ChatMessage,
+  { context: ReplyRef | undefined; row: AgentLabelRow }
+>();
+
+const agentLabelRow = (
+  message: ChatMessage,
+  context: ReplyRef | undefined,
+): AgentLabelRow => {
+  const cached = agentLabelRows.get(message);
+  if (cached && cached.context === context) return cached.row;
+  let row: AgentLabelRow;
+  if (message.role !== "assistant") {
+    row = { id: message.id, role: "user" };
+  } else {
+    const agentIds = messageCompletionQuotes(message).map(
+      (quote) => quote.ref.threadId,
+    );
+    if (context?.kind === "agent") agentIds.push(context.threadId);
+    row = {
+      id: message.id,
+      role: "assistant",
+      ...(agentIds.length ? { agentIds } : {}),
+    };
+  }
+  agentLabelRows.set(message, { context, row });
+  return row;
+};
+
 export function ChatPane({
   messages: projectedMessages,
   streaming,
@@ -525,9 +554,10 @@ export function ChatPane({
 
   const assistantTextLenRef = useRef(0);
   const assistantIdRef = useRef<string | null>(null);
+  const [projectReplyContextRows] = useState(createReplyContextProjector);
   const replyContexts = useMemo(
-    () => mobileReplyContexts(messages),
-    [messages],
+    () => mobileReplyContexts(messages, projectReplyContextRows),
+    [messages, projectReplyContextRows],
   );
   const visibleMessages = useMemo(
     () =>
@@ -554,15 +584,9 @@ export function ChatPane({
     [sessionAskRecords, visibleMessages],
   );
   const hiddenAgentChipIds = useMemo(() => {
-    const rows: AgentLabelRow[] = listMessages.map((message) => {
-      if (message.role !== "assistant") return { id: message.id, role: "user" };
-      const context = replyContexts.contexts.get(message.id);
-      const agentIds = rowCompletionQuotes(
-        consolidateRowArtifacts(message.artifacts ?? [], message.tasks ?? []).agentWork,
-      ).map((quote) => quote.ref.threadId);
-      if (context?.kind === "agent") agentIds.push(context.threadId);
-      return { id: message.id, role: "assistant", ...(agentIds.length ? { agentIds } : {}) };
-    });
+    const rows = listMessages.map((message) =>
+      agentLabelRow(message, replyContexts.contexts.get(message.id)),
+    );
     const labeled = projectAgentLabels(rows, agentIdCanonicalizer(agentIdsOf(rows)));
     const hidden = new Set<string>();
     for (const row of rows) {

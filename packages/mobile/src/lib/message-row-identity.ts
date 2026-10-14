@@ -1,5 +1,5 @@
 import type { ChatMessage } from "../types";
-import { consolidateRowArtifacts } from "./agent-artifact-consolidation";
+import { messageRowArtifacts } from "./agent-artifact-consolidation";
 import { scheduleReceiptText } from "./schedule-receipt-summary";
 import { SHOW_AGENT_CARDS } from "./agent-cards";
 
@@ -14,13 +14,24 @@ export const isStandInArtifactRow = (
       (message.canonicalId?.endsWith(suffix) ?? false),
   );
 
+const textPresence = new WeakMap<ChatMessage, boolean>();
+
+export const messageHasText = (message: ChatMessage): boolean => {
+  let present = textPresence.get(message);
+  if (present === undefined) {
+    present = (message.text ?? "").trim().length > 0;
+    textPresence.set(message, present);
+  }
+  return present;
+};
+
 export const visibleChatMessages = (
   messages: ChatMessage[],
   options: { contextMessageIds?: ReadonlyMap<string, { kind: string }>; canOpenArtifacts?: boolean } = {},
 ): ChatMessage[] => {
   const isHidden = (message: ChatMessage): boolean => {
     if (isStandInArtifactRow(message)) return true;
-    if (message.role === "user" || message.text.trim() || message.stopped || message.cloudFallback) return false;
+    if (message.role === "user" || messageHasText(message) || message.stopped || message.cloudFallback) return false;
     if ((message.askRecords?.length ?? 0) > 0) return false;
     const context = options.contextMessageIds?.get(message.id);
     if (context && (SHOW_AGENT_CARDS || context.kind !== "agent")) return false;
@@ -28,7 +39,7 @@ export const visibleChatMessages = (
       step.toolName.toLowerCase() === "schedule" && step.status !== "error" &&
       Boolean(scheduleReceiptText({ resultPreview: step.resultPreview })),
     )) return false;
-    const { agentWork, maps, looseFiles } = consolidateRowArtifacts(message.artifacts ?? [], message.tasks ?? []);
+    const { agentWork, maps, looseFiles } = messageRowArtifacts(message);
     if (maps.length || looseFiles.some(artifact =>
       options.canOpenArtifacts !== false ||
       (artifact.payload.kind === "media" && artifact.payload.asset.kind === "image"),

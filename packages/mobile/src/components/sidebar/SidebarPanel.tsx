@@ -7,7 +7,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useT } from "../../i18n";
 import { authClient } from "../../lib/auth-client";
 import type { MainTabId } from "../../lib/last-main-tab";
-import { useActivityHub } from "../../lib/main-shell-store";
+import {
+  useActivityHubSelector,
+  type ActivityHubData,
+} from "../../lib/main-shell-store";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import type { Colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
@@ -25,6 +28,7 @@ const BRAND_ROW = 44;
 
 export const SIDEBAR_BRAND_CENTER = BRAND_TOP + BRAND_ROW / 2;
 const PLACES_FROM_TOP = [...SIDEBAR_PLACES].reverse();
+const selectFileCount = (hub: ActivityHubData | null) => hub?.artifacts.length ?? 0;
 
 export function SidebarPanel({
   width,
@@ -42,12 +46,11 @@ export function SidebarPanel({
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const session = authClient.useSession();
-  const hub = useActivityHub();
+  const fileCount = useActivityHubSelector(selectFileCount);
   const user = session.data?.user;
   const name = user?.name?.trim() ?? "";
   const image = user?.image ?? null;
   const accountLabel = t("mobile.nav.account");
-  const fileCount = hub?.artifacts.length ?? 0;
   const metas: Partial<Record<MainTabId, string>> = {
     files: fileCount > 0 ? String(fileCount) : undefined,
   };

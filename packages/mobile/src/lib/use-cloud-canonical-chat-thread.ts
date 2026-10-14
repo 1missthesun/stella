@@ -528,7 +528,7 @@ export const useCloudCanonicalChatThread = (
         ? [message.id]
         : [],
     );
-    if (!activeIds.length) return;
+    if (!activeIds.some((id) => !dispatchBindings.has(id))) return;
     setDispatchBindings((current) => {
       let changed = false;
       const next = new Map(current);
@@ -539,7 +539,7 @@ export const useCloudCanonicalChatThread = (
       }
       return changed ? next : current;
     });
-  }, [local.messages, local.sending]);
+  }, [dispatchBindings, local.messages, local.sending]);
 
   const destinationSwitch = useMemo(
     () => latestDestinationSwitch(state.records),
@@ -933,10 +933,8 @@ export const useCloudCanonicalChatThread = (
     if (stopWatchRef.current && stopWatchRef.current.turnId !== activeTurnId) {
       clearStopWatch();
     }
-    setStopIssue((current) =>
-      current && current.turnId !== activeTurnId ? null : current,
-    );
-  }, [activeTurnId, clearStopWatch]);
+    if (stopIssue && stopIssue.turnId !== activeTurnId) setStopIssue(null);
+  }, [activeTurnId, clearStopWatch, stopIssue]);
   const stopTurnNow = useCallback((options?: { direct?: boolean }) => {
     replyHaptics.reset();
     localStop();

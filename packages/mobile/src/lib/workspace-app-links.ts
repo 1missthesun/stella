@@ -16,6 +16,7 @@ let fetchedAt = 0;
 let inflight: Promise<void> | null = null;
 let pendingOpen: string | null = null;
 const listeners = new Set<() => void>();
+let mountedAppCards = 0;
 
 const notify = () => {
   for (const listener of listeners) listener();
@@ -67,6 +68,12 @@ export function useWorkspaceApp(slug: string): WorkspaceApp | null | undefined {
   const app = snapshot.apps?.find((entry) => entry.slug === slug);
   const known = app !== undefined;
   useEffect(() => {
+    mountedAppCards += 1;
+    return () => {
+      mountedAppCards -= 1;
+    };
+  }, []);
+  useEffect(() => {
     if (!known || Date.now() - fetchedAt > REFRESH_AFTER_MS)
       void refreshWorkspaceApps();
   }, [slug, known]);
@@ -82,7 +89,7 @@ export function useWorkspaceApp(slug: string): WorkspaceApp | null | undefined {
 }
 
 export function refreshLinkedWorkspaceApps() {
-  if (listeners.size > 0) void refreshWorkspaceApps();
+  if (mountedAppCards > 0) void refreshWorkspaceApps();
 }
 
 export function requestOpenApp(slug: string) {

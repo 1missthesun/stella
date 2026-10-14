@@ -205,10 +205,7 @@ function useStretchElapsedMs(stretch: string | null): number {
   } | null>(null);
   const [, setTick] = useState(0);
   useEffect(() => {
-    if (stretch === null) {
-      setStarted(null);
-      return;
-    }
+    if (stretch === null) return;
     setStarted({ stretch, at: Date.now() });
     const timers = STRETCH_MARKS_MS.map((ms) =>
       setTimeout(() => setTick((tick) => tick + 1), ms),

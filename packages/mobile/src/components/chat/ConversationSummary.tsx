@@ -29,6 +29,8 @@ import { Icon, type IconName } from "../Icon";
 const MAX_HEIGHT_RATIO = 0.66;
 const MAX_HEIGHT = 560;
 
+const NO_OFFER_INPUT: { role: ChatMessage["role"]; at: number }[] = [];
+
 export function useConversationSummaries(
   conversationId: string | null,
   messages: readonly ChatMessage[],
@@ -41,12 +43,14 @@ export function useConversationSummaries(
   const catchUps = useMemo(() => view.value?.catchUps ?? [], [view.value]);
   const offerInput = useMemo(
     () =>
-      messages.flatMap((message) =>
-        message.text.trim()
-          ? [{ role: message.role, at: message.canonicalCreatedAt ?? message.createdAt ?? 0 }]
-          : [],
-      ),
-    [messages],
+      enabled
+        ? messages.flatMap((message) =>
+            message.text.trim()
+              ? [{ role: message.role, at: message.canonicalCreatedAt ?? message.createdAt ?? 0 }]
+              : [],
+          )
+        : NO_OFFER_INPUT,
+    [enabled, messages],
   );
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => setNow(Date.now()), [catchUps]);

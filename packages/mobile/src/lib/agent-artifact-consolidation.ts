@@ -273,6 +273,29 @@ const expandInlineAgentWork = (
   return expanded;
 };
 
+const EMPTY_ROW_ARTIFACTS: ConsolidatedRowArtifacts = {
+  agentWork: [],
+  maps: [],
+  agentFiles: [],
+  looseFiles: [],
+  agentWorkSettled: false,
+};
+
+const rowArtifactsByMessage = new WeakMap<object, ConsolidatedRowArtifacts>();
+
+export const messageRowArtifacts = (message: {
+  artifacts?: readonly ChatArtifact[];
+  tasks?: readonly MobileTask[];
+}): ConsolidatedRowArtifacts => {
+  if (!message.artifacts?.length) return EMPTY_ROW_ARTIFACTS;
+  let consolidated = rowArtifactsByMessage.get(message);
+  if (!consolidated) {
+    consolidated = consolidateRowArtifacts(message.artifacts, message.tasks ?? []);
+    rowArtifactsByMessage.set(message, consolidated);
+  }
+  return consolidated;
+};
+
 export const consolidateRowArtifacts = (
   artifacts: readonly ChatArtifact[],
   tasks: readonly MobileTask[] = [],

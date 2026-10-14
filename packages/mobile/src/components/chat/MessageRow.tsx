@@ -61,8 +61,14 @@ import {
   useCloudDriveFileUri,
 } from "../../lib/use-cloud-drive-file-uri";
 import { scheduleReceiptText } from "../../lib/schedule-receipt-summary";
-import { isStandInArtifactRow } from "../../lib/message-row-identity";
-import { consolidateRowArtifacts } from "../../lib/agent-artifact-consolidation";
+import {
+  isStandInArtifactRow,
+  messageHasText,
+} from "../../lib/message-row-identity";
+import {
+  consolidateRowArtifacts,
+  messageRowArtifacts,
+} from "../../lib/agent-artifact-consolidation";
 import type { StoredPhoneAccess } from "../../lib/phone-access";
 import {
   bytesToDataUri,
@@ -461,6 +467,19 @@ export type CompletionQuote = {
   ref: AgentReplyRef;
 };
 
+const completionQuotesByMessage = new WeakMap<ChatMessage, CompletionQuote[]>();
+const NO_COMPLETION_QUOTES: CompletionQuote[] = [];
+
+export const messageCompletionQuotes = (message: ChatMessage): CompletionQuote[] => {
+  if (!message.artifacts?.length) return NO_COMPLETION_QUOTES;
+  let quotes = completionQuotesByMessage.get(message);
+  if (!quotes) {
+    quotes = rowCompletionQuotes(messageRowArtifacts(message).agentWork);
+    completionQuotesByMessage.set(message, quotes);
+  }
+  return quotes;
+};
+
 export const rowCompletionQuotes = (
   agentWork: ReturnType<typeof consolidateRowArtifacts>["agentWork"],
 ): CompletionQuote[] =>
@@ -506,27 +525,25 @@ export const carryCompletionQuotes = (
 } => {
   const carried = new Map<string, CompletionQuote[]>();
   const forwarded = new Set<string>();
-  let pending: { ids: string[]; quotes: CompletionQuote[] } = {
+  const empty: { ids: string[]; quotes: CompletionQuote[] } = {
     ids: [],
     quotes: [],
   };
+  let pending = empty;
   for (const message of messages) {
     if (message.role !== "assistant") {
-      pending = { ids: [], quotes: [] };
+      pending = empty;
       continue;
     }
-    if ((message.text ?? "").trim().length > 0) {
+    if (messageHasText(message)) {
       if (pending.quotes.length > 0) {
         carried.set(message.id, pending.quotes);
         for (const id of pending.ids) forwarded.add(id);
       }
-      pending = { ids: [], quotes: [] };
+      pending = empty;
       continue;
     }
-    const quotes = rowCompletionQuotes(
-      consolidateRowArtifacts(message.artifacts ?? [], message.tasks ?? [])
-        .agentWork,
-    );
+    const quotes = messageCompletionQuotes(message);
     if (quotes.length > 0) {
       pending = {
         ids: [...pending.ids, message.id],
@@ -632,10 +649,7 @@ export const ChatMessageRow = memo(function ChatMessageRow({
     });
   };
 
-  const consolidated = useMemo(
-    () => consolidateRowArtifacts(item.artifacts ?? [], item.tasks ?? []),
-    [item.artifacts, item.tasks],
-  );
+  const consolidated = messageRowArtifacts(item);
   const completionQuotes = useMemo(
     () => rowCompletionQuotes(consolidated.agentWork),
     [consolidated.agentWork],

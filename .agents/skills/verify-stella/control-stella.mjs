@@ -475,6 +475,18 @@ const ensureRunHome = (run) => {
   return homeDir;
 };
 
+// macOS caps Unix socket paths at 104 bytes and the runtime anchors the
+// computer-use sockets at $HOME/.stella, so HOME is a short link to the home.
+const shortRunHome = (run) => {
+  if (process.platform !== "darwin") return run.homeDir;
+  const tempRoot = path.join(harnessTempRoot(), `stella-verify-${run.runId}`);
+  mkdirSync(tempRoot, { recursive: true, mode: 0o700 });
+  const link = path.join(tempRoot, "home");
+  rmSync(link, { force: true });
+  symlinkSync(run.homeDir, link, "dir");
+  return link;
+};
+
 const runHomeEnvironment = (run) => {
   if (!run.homeDir) return {};
   const shared = (relative) => {
@@ -485,7 +497,7 @@ const runHomeEnvironment = (run) => {
   const miseData = shared(".local/share/mise");
   const miseConfig = shared(".config/mise/config.toml");
   return {
-    HOME: run.homeDir,
+    HOME: shortRunHome(run),
     ...(bunCache ? { BUN_INSTALL_CACHE_DIR: bunCache } : {}),
     ...(miseData ? { MISE_DATA_DIR: miseData } : {}),
     ...(miseConfig ? { MISE_GLOBAL_CONFIG_FILE: miseConfig } : {}),

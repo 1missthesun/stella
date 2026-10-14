@@ -61,7 +61,16 @@ const evidenceRoot = () => {
   const outputs = path.join(os.homedir(), ".stella", "outputs");
   return existsSync(outputs) ? path.join(outputs, "verify-stella") : path.join(skillRoot, "artifacts");
 };
-const READY_SELECTOR = ".shell-topbar-full";
+/**
+ * The shell is up: the chat's top bar, or, with no account or on first run,
+ * onboarding, the sign-in screen or a self-hosted server's pairing screen.
+ */
+const READY_SELECTOR = [
+  ".shell-topbar-full",
+  '[data-window-mode="onboarding"] .full-body > *',
+  '[data-testid="sign-in-screen"]',
+  '[data-testid="self-host-pair-screen"]',
+].join(", ");
 const SETTLE_IGNORED_SELECTOR = 'svg[aria-hidden="true"]';
 const HOST_HEALTH_EXPRESSION = String.raw`
 (async () => {
@@ -661,7 +670,7 @@ const doctorReport = async (run) => {
       );
       if (!report.shellReady) {
         report.errors.push(
-          `Shell top bar ${READY_SELECTOR} is missing. Onboarding may still be covering the app.`,
+          `The shell (${READY_SELECTOR}) is missing.`,
         );
       }
     } catch (error) {

@@ -4,7 +4,6 @@ import {
   refreshAuthSession,
 } from "@/global/auth/services/auth-session";
 import { writeBrowserSessionToken } from "@/global/auth/services/auth-storage";
-import { getAuthToken } from "@/global/auth/services/auth-token";
 import { backendUrl } from "@/platform/backend/backend-url";
 import { platformCapabilities } from "@/platform/capabilities";
 import { captchaHeaders } from "@/platform/auth/challenge-token";
@@ -60,16 +59,12 @@ const readBrowserSocialBridgeCallback = (
 
 export const startBrowserGoogleSignIn = async () => {
   const siteUrl = backendUrl || null;
-  const authorization = await getBrowserOwnerAuthorization();
-  if (!siteUrl || !authorization) {
-    throw new Error("Browser account ownership could not be verified.");
+  if (!siteUrl) {
+    throw new Error("Stella's sign-in service is not configured.");
   }
   const response = await fetch(`${siteUrl}/api/auth/browser-social/start`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: authorization,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       returnTo: getBrowserSocialCallbackUrl(window.location),
     }),
@@ -90,52 +85,25 @@ export const startBrowserGoogleSignIn = async () => {
   });
 };
 
-/**
- * Mint a fresh owner token immediately before beginning an account link. A
- * cached or missing token could bind the request to the wrong anonymous owner,
- * so callers must fail closed when this returns null.
- */
-export const getBrowserOwnerAuthorization = async (): Promise<
-  string | null
-> => {
-  const token = (await getAuthToken({ forceRefresh: true }))?.trim();
-  return token ? `Bearer ${token}` : null;
-};
-
 export type MagicLinkSendRequest = {
   headers: Record<string, string>;
-  body: {
-    email: string;
-    requireAnonymousOwner?: true;
-  };
+  body: { email: string };
 };
 
 /**
- * Every shell binds the send to the current anonymous owner and refuses to
- * issue an unowned link. `getAuthToken` obtains Electron authority through
- * host IPC and browser authority through Better Auth, so the backend receives
- * the same proof without moving session cookies across either boundary.
+ * A magic-link send carries only the email and the Turnstile proof: the link
+ * signs in whoever opens it, and the shell that asked claims the session.
  */
-export const buildMagicLinkSendRequest = async (
+export const buildMagicLinkSendRequest = (
   email: string,
   turnstileToken?: string,
-): Promise<MagicLinkSendRequest | null> => {
-  const headers: Record<string, string> = {
+): MagicLinkSendRequest => ({
+  headers: {
     "Content-Type": "application/json",
-  };
-  const authorization = await getBrowserOwnerAuthorization();
-  if (!authorization) {
-    return null;
-  }
-  return {
-    headers: {
-      ...headers,
-      ...captchaHeaders(turnstileToken),
-      Authorization: authorization,
-    },
-    body: { email, requireAnonymousOwner: true },
-  };
-};
+    ...captchaHeaders(turnstileToken),
+  },
+  body: { email },
+});
 
 const readConnectedAccountOwnerId = (): string | null => {
   const data = getAuthSessionSnapshot().data as

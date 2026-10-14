@@ -110,15 +110,7 @@ function useMagicLinkAuthState(): MagicLinkAuthState {
     try {
       const backendUrl = requireBackendUrl();
       const turnstileToken = await getPlatformChallengeToken();
-      const sendRequest = await buildMagicLinkSendRequest(
-        targetEmail,
-        turnstileToken,
-      );
-      if (!sendRequest) {
-        // Do not start an unbound sign-in. The backend must be able to prove
-        // which anonymous owner is being upgraded before it emails a link.
-        throw new MagicLinkKeyError("global.auth.signInIncomplete");
-      }
+      const sendRequest = buildMagicLinkSendRequest(targetEmail, turnstileToken);
       // Held in memory for this attempt only; the server stores just the hash
       // and returns nothing usable from /link/status.
       const claimSecret = generateClaimSecret();

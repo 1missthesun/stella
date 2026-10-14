@@ -643,6 +643,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       const keys = [
         ...this.journal.allSegmentKeys(),
         ...this.journal.allSpillKeys(),
+        ...this.archive.piEntryArchiveKeys(),
       ].filter((key) => !enqueued.has(key));
       for (const key of keys) enqueued.add(key);
       this.journal.enqueuePurge(keys, now);

@@ -200,6 +200,7 @@ export abstract class OrchestratorSessionCore extends DurableObject<Env> {
           ? stored.throughSeq
           : undefined;
       },
+      ctx.storage,
     );
     this.index = new ConversationIndex(
       this.journal,

@@ -1,9 +1,11 @@
 use serde_json::{json, Value};
 use std::env;
 
-pub struct ProviderSession {
-    pub provider: String,
-    pub session_id: String,
+pub enum ProviderSession {
+    Browserbase { session_id: String },
+    Browserless { stop_url: String },
+    BrowserUse { session_id: String },
+    Kernel { session_id: String },
 }
 
 pub async fn connect_provider(
@@ -23,13 +25,13 @@ pub async fn connect_provider(
 
 pub async fn close_provider_session(session: &ProviderSession) {
     let client = reqwest::Client::new();
-    match session.provider.as_str() {
-        "browserbase" => {
+    match session {
+        ProviderSession::Browserbase { session_id } => {
             if let Ok(api_key) = env::var("BROWSERBASE_API_KEY") {
                 let _ = client
                     .post(format!(
                         "https://api.browserbase.com/v1/sessions/{}",
-                        session.session_id
+                        session_id
                     ))
                     .header("Content-Type", "application/json")
                     .header("X-BB-API-Key", &api_key)
@@ -38,12 +40,12 @@ pub async fn close_provider_session(session: &ProviderSession) {
                     .await;
             }
         }
-        "browser-use" => {
+        ProviderSession::BrowserUse { session_id } => {
             if let Ok(api_key) = env::var("BROWSER_USE_API_KEY") {
                 let _ = client
                     .patch(format!(
                         "https://api.browser-use.com/api/v2/browsers/{}",
-                        session.session_id
+                        session_id
                     ))
                     .header("X-Browser-Use-API-Key", &api_key)
                     .header("Content-Type", "application/json")
@@ -52,11 +54,10 @@ pub async fn close_provider_session(session: &ProviderSession) {
                     .await;
             }
         }
-        "browserless" => {
-            // session_id holds the stop URL for browserless
-            let _ = client.delete(&session.session_id).send().await;
+        ProviderSession::Browserless { stop_url } => {
+            let _ = client.delete(stop_url).send().await;
         }
-        "kernel" => {
+        ProviderSession::Kernel { session_id } => {
             if let Ok(api_key) = env::var("KERNEL_API_KEY") {
                 let endpoint = env::var("KERNEL_ENDPOINT")
                     .unwrap_or_else(|_| "https://api.onkernel.com".to_string());
@@ -64,14 +65,13 @@ pub async fn close_provider_session(session: &ProviderSession) {
                     .delete(format!(
                         "{}/browsers/{}",
                         endpoint.trim_end_matches('/'),
-                        session.session_id
+                        session_id
                     ))
                     .header("Authorization", format!("Bearer {}", api_key))
                     .send()
                     .await;
             }
         }
-        _ => {}
     }
 }
 
@@ -116,13 +116,7 @@ async fn connect_browserbase() -> Result<(String, Option<ProviderSession>), Stri
         .map(String::from)
         .ok_or_else(|| "Browserbase response missing connectUrl".to_string())?;
 
-    Ok((
-        ws_url,
-        Some(ProviderSession {
-            provider: "browserbase".to_string(),
-            session_id,
-        }),
-    ))
+    Ok((ws_url, Some(ProviderSession::Browserbase { session_id })))
 }
 
 async fn connect_browserless() -> Result<(String, Option<ProviderSession>), String> {
@@ -196,14 +190,7 @@ async fn connect_browserless() -> Result<(String, Option<ProviderSession>), Stri
         .map(String::from)
         .ok_or_else(|| "Browserless response missing 'stop' URL".to_string())?;
 
-    Ok((
-        connect_url,
-        Some(ProviderSession {
-            provider: "browserless".to_string(),
-            // Store the stop URL as the session_id for cleanup
-            session_id: stop_url,
-        }),
-    ))
+    Ok((connect_url, Some(ProviderSession::Browserless { stop_url })))
 }
 
 async fn connect_browser_use() -> Result<(String, Option<ProviderSession>), String> {
@@ -250,13 +237,7 @@ async fn connect_browser_use() -> Result<(String, Option<ProviderSession>), Stri
         .map(String::from)
         .ok_or_else(|| "Browser Use response missing cdp_url or cdpUrl".to_string())?;
 
-    Ok((
-        ws_url,
-        Some(ProviderSession {
-            provider: "browser-use".to_string(),
-            session_id,
-        }),
-    ))
+    Ok((ws_url, Some(ProviderSession::BrowserUse { session_id })))
 }
 
 async fn connect_kernel() -> Result<(String, Option<ProviderSession>), String> {
@@ -339,11 +320,5 @@ async fn connect_kernel() -> Result<(String, Option<ProviderSession>), String> {
                 .to_string()
         })?;
 
-    Ok((
-        ws_url,
-        Some(ProviderSession {
-            provider: "kernel".to_string(),
-            session_id,
-        }),
-    ))
+    Ok((ws_url, Some(ProviderSession::Kernel { session_id })))
 }

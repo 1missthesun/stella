@@ -79,9 +79,7 @@ export function useOwnerIdentity(
       canceled = true;
       if (retryTimer) clearTimeout(retryTimer);
     };
-    // The hint only matters to the first request for a key.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountKey, attempt]);
+  }, [accountKey, attempt, preferConversationId]);
 
   const current =
     state.key === accountKey

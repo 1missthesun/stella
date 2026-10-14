@@ -30,10 +30,12 @@ export function useBackendView<K extends ViewName>(
   options: { keepPreviousValue?: boolean } = {},
 ): BackendViewState<ViewResult<K>> {
   const epoch = useBackendAccountEpoch();
-  const key = args === "skip" ? null : `${view}\u0000${stableStringify(args)}`;
-  // `args` is captured by key, so an inline object literal doesn't resubscribe.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const stableArgs = useMemo(() => args, [key]);
+  const argsJson = args === "skip" ? null : stableStringify(args);
+  const stableArgs = useMemo(
+    (): ViewArgs<K> | "skip" =>
+      argsJson === null ? "skip" : (JSON.parse(argsJson) as ViewArgs<K>),
+    [argsJson],
+  );
   const [state, setState] = useState<BackendViewState<ViewResult<K>>>(LOADING);
   const subscribedEpoch = useRef(epoch);
   const keepPreviousValue = options.keepPreviousValue === true;

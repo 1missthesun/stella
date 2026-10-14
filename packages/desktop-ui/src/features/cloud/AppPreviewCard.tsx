@@ -17,17 +17,19 @@ export const AppPreviewCard = memo(function AppPreviewCard({
 }) {
   const app = useLinkedCloudApp(slug);
   const [preview, setPreview] = useState<string | null>(null);
+  const appSlug = app?.slug;
+  const revision = app?.revision;
   useEffect(() => {
     setPreview(null);
-    if (!app) return;
+    if (appSlug === undefined || revision === undefined) return;
     let cancelled = false;
-    void loadCloudAppPreview(app).then((url) => {
+    void loadCloudAppPreview(appSlug, revision).then((url) => {
       if (!cancelled) setPreview(url);
     });
     return () => {
       cancelled = true;
     };
-  }, [app?.slug, app?.revision]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [appSlug, revision]);
   if (app === null) return null;
   const open = () => openCloudAppPanel({ appId: slug });
   const icon = app?.icon ? (

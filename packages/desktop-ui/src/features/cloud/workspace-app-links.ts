@@ -66,14 +66,17 @@ export function useLinkedCloudApp(
 
 const previews = new Map<string, Promise<string | null>>();
 
-export function loadCloudAppPreview(app: WorkspaceApp): Promise<string | null> {
-  const key = `${app.slug}:${app.revision}`;
+export function loadCloudAppPreview(
+  slug: string,
+  revision: string,
+): Promise<string | null> {
+  const key = `${slug}:${revision}`;
   let pending = previews.get(key);
   if (!pending) {
     pending = (async () => {
       if (!backendUrl) return null;
       const response = await fetch(
-        `${backendUrl}/owners/me/apps/${encodeURIComponent(app.slug)}/preview?v=${encodeURIComponent(app.revision)}`,
+        `${backendUrl}/owners/me/apps/${encodeURIComponent(slug)}/preview?v=${encodeURIComponent(revision)}`,
         {
           headers: await getAuthHeaders(),
           signal: AbortSignal.timeout(60_000),

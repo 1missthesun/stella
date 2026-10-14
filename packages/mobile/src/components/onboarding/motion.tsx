@@ -21,26 +21,30 @@ import Animated, {
   type WithSpringConfig,
 } from "react-native-reanimated";
 
-/**
- * Critically damped: settles into place without overshoot. Cards, rows, chips.
- * Damping is 2*sqrt(stiffness * mass), so raising stiffness means raising this
- * to match; drop it below that and the spring starts to wobble again.
- */
-export const SPRING_SOFT: WithSpringConfig = {
-  damping: 26,
-  stiffness: 170,
-  mass: 1,
-};
+const criticalDamping = (stiffness: number, mass = 1) =>
+  2 * Math.sqrt(stiffness * mass);
 
-export const SPRING_SNAPPY: WithSpringConfig = {
-  damping: 31,
-  stiffness: 340,
-  mass: 0.7,
+const criticallyDampedSpring = (
+  stiffness: number,
+  mass = 1,
+): WithSpringConfig => ({
+  damping: criticalDamping(stiffness, mass),
+  stiffness,
+  mass,
+});
+
+export const SPRING_SOFT = criticallyDampedSpring(170);
+
+export const SPRING_SNAPPY = criticallyDampedSpring(340, 0.7);
+
+const POP_SPRING = {
+  ...criticallyDampedSpring(260),
+  reduceMotion: ReduceMotion.System,
 };
 
 export const cardEntering = (delay = 0) =>
   FadeInDown.springify()
-    .damping(25)
+    .damping(criticalDamping(150))
     .stiffness(150)
     .mass(1)
     .withInitialValues({ opacity: 0, transform: [{ translateY: 18 }] })
@@ -49,7 +53,7 @@ export const cardEntering = (delay = 0) =>
 
 export const rowEntering = (index: number, base = 0) =>
   FadeInDown.springify()
-    .damping(28)
+    .damping(criticalDamping(200))
     .stiffness(200)
     .withInitialValues({ opacity: 0, transform: [{ translateY: 10 }] })
     .delay(base + index * 55)
@@ -63,7 +67,7 @@ export const fadeExiting = (duration = 160) =>
 
 export const threadEntering = (delay = 0) =>
   FadeInDown.springify()
-    .damping(30)
+    .damping(criticalDamping(210))
     .stiffness(210)
     .mass(1)
     .withInitialValues({ opacity: 0, transform: [{ translateY: 8 }] })
@@ -74,12 +78,7 @@ export const popEntering =
   (fromScale: number, fromY = 0, delay = 0) =>
   () => {
     "worklet";
-    const spring = {
-      damping: 32,
-      stiffness: 260,
-      mass: 1,
-      reduceMotion: ReduceMotion.System,
-    };
+    const spring = POP_SPRING;
     return {
       initialValues: {
         opacity: 0,
@@ -99,7 +98,7 @@ export const popEntering =
   };
 
 export const springLayout = LinearTransition.springify()
-  .damping(28)
+  .damping(criticalDamping(190))
   .stiffness(190)
   .reduceMotion(ReduceMotion.System);
 

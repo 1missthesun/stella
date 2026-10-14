@@ -3,6 +3,7 @@ import type { Context } from "@earendil-works/chord";
 import type { Api, Model, ModelThinkingLevel } from "@earendil-works/pi-ai";
 import { createModels } from "@earendil-works/pi-ai/models";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
+import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
 import {
   AssistantEntry,
@@ -1275,9 +1276,10 @@ export class PiConversationRuntime {
     for (;;) {
       const slot = await ownerGateStub(this.#options.env.OWNER_GATES, owner.ownerId).acquireAgentContainer({ sandboxId });
       if (slot.ok) return;
+      if (slot.limit === 0) throw new Error(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
       if (Date.now() >= deadline) {
         throw new Error(
-          `Your cloud is already running ${slot.limit} agents' workspaces, its limit. This agent waited ${CONTAINER_SLOT_WAIT_MS / 60_000} minutes for one of them to finish.`,
+          `Your plan runs ${slot.limit} cloud agents at once, and that many are busy. This agent waited ${CONTAINER_SLOT_WAIT_MS / 60_000} minutes for one of them to finish.`,
         );
       }
       await waitFor(CONTAINER_SLOT_POLL_MS, signal);

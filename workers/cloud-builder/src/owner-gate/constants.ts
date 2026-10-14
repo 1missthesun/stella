@@ -12,7 +12,6 @@ export const HEADER_DEVICE_REQUEST_ID = "x-stella-device-request-id";
 export const HEADER_DEVICE_REQUEST_METHOD = "x-stella-device-request-method";
 
 export const OWNER_GATE_RUNNING_GRACE_MS = 60_000;
-export const OWNER_AGENT_CONTAINER_LIMIT = 6;
 export const DISPATCH_CLOUD_RETRY_DELAY_MS = 1_000;
 export const DISPATCH_CLOUD_MAX_ATTEMPTS = 2;
 export const DEFAULT_TURN_TIMEOUT_MS = 900_000;

@@ -1,4 +1,5 @@
 import { Effect } from "effect";
+import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import {
   attachedToolPaths,
   attachedToolPathsForDirectory,
@@ -101,12 +102,14 @@ export const sandboxHandle = (
   target: SandboxTarget,
   idleTimeoutMs: number | undefined = sandboxSleepAfterMs(env),
   world?: string,
+  owner?: string,
 ) =>
   sandboxClient(env.Sandbox, target.sandboxId, {
     size: target.size,
     workload: target.workload,
     ...(idleTimeoutMs === undefined ? {} : { idleTimeoutMs }),
     ...(world ? { world } : {}),
+    ...(owner ? { owner } : {}),
   });
 
 const RETIRE_SANDBOX_ID =
@@ -214,6 +217,7 @@ export const prewarmOrchestratorContainer = async (
     },
     sandboxPrewarmSleepAfterMs(host.env),
     await worldName(ownerId),
+    ownerId,
   );
   if (await host.sandboxContainerRunning(handle)) {
     return json({ prewarmed: true, alreadyRunning: true });
@@ -269,6 +273,9 @@ export const acquireAgentContainerSlot = async (
       });
       return;
     }
+    if (slot.limit === 0) {
+      throw new AgentTurnError(CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE);
+    }
     if (!queued) {
       queued = true;
       log("info", "agent_container_queued", {
@@ -280,7 +287,7 @@ export const acquireAgentContainerSlot = async (
     }
     if (Date.now() >= deadline) {
       throw new AgentTurnError(
-        `Your cloud is already running ${slot.limit} agents' workspaces, its limit. This agent waited ${AGENT_CONTAINER_WAIT_MS / 60_000} minutes for one of them to finish. Try again once one is done.`,
+        `Your plan runs ${slot.limit} cloud agents at once, and that many are busy. This agent waited ${AGENT_CONTAINER_WAIT_MS / 60_000} minutes for one of them to finish. Try again once one is done, or upgrade to run more at once.`,
       );
     }
     await execution.cancellation.sleep(AGENT_CONTAINER_POLL_MS);
@@ -294,12 +301,14 @@ export const sandbox = (
   workload: SandboxWorkload = "app-build",
   world?: string,
   idleTimeoutMs: number | undefined = sandboxSleepAfterMs(host.env),
+  owner?: string,
 ) =>
   sandboxHandle(
     host.env,
     { sandboxId: id, size, workload },
     idleTimeoutMs,
     world,
+    owner,
   );
 
 /**

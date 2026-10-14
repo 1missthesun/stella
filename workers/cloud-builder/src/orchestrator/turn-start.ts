@@ -606,6 +606,15 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
           false,
         );
       }
+      if (execution.engine === "anthropic" && lane !== "wake" && snapshot.usageLimit) {
+        log("info", "turn_refused_usage_limit", {
+          conversationId,
+          turnId,
+          lane,
+          reason: snapshot.usageLimit.reason,
+        });
+        return await refuse("usage_limit", snapshot.usageLimit.message, false);
+      }
       if (!snapshotAllowsExecution(snapshot, execution)) {
         return await refuse(
           "execution_unavailable",

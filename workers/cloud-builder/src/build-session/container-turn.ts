@@ -1,3 +1,4 @@
+import { containerBudgetMessage } from "../container-meter.js";
 import { builderServiceSecret } from "../secret-rotation.js";
 import {
   agentFailureMessage,
@@ -540,6 +541,7 @@ export const runContainerAgentTurn = async (
     "world",
     ownerWorld,
     idleTimeoutMs,
+    turn.ownerId,
   );
   const sessionId = agentTurnSessionId(turn.turnId);
   const daemonDirectory = attachedToolPaths({
@@ -573,7 +575,7 @@ export const runContainerAgentTurn = async (
     prewarmed = slot.then(async () => {
       const started = performance.now();
       try {
-        const warming = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs);
+        const warming = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs, turn.ownerId);
         const wasRunning = await host.sandboxContainerRunning(warming);
         await withInfrastructureDeadline(
           warming.exec("true"),
@@ -681,7 +683,7 @@ export const runContainerAgentTurn = async (
       slotWaitMs,
       ...(prewarmMs === undefined ? {} : { prewarmMs }),
     });
-    sandbox = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs);
+    sandbox = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs, turn.ownerId);
     let attempt = await host.runAgentAttempt({
       turn,
       execution,
@@ -754,7 +756,7 @@ export const runContainerAgentTurn = async (
         )
         .catch(() => undefined);
       execution.assertActive();
-      sandbox = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs);
+      sandbox = host.sandbox(sandboxId, size, "world", ownerWorld, idleTimeoutMs, turn.ownerId);
       attempt = await host.runAgentAttempt({
         turn,
         execution,
@@ -1177,9 +1179,10 @@ export const runContainerAgentTurn = async (
     const friendly =
       error instanceof AgentTurnError
         ? error.userMessage
-        : devAcceptanceProbesEnabled(host.env)
+        : containerBudgetMessage(error) ??
+          (devAcceptanceProbesEnabled(host.env)
           ? `${agentFailureMessage(failureCode, turn.turnId)} [diagnostic: turn.${failureCode}]`
-          : agentFailureMessage(failureCode, turn.turnId);
+          : agentFailureMessage(failureCode, turn.turnId));
     const delivered = await host.deliverTerminal(turn, {
       turnId: turn.turnId,
       attemptGeneration: turn.attemptGeneration!,

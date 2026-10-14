@@ -52,21 +52,25 @@ import {
   type BillingPlan,
   CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
 } from "@stella/contracts/backend/billing";
+import { PLAN_CATALOG } from "@stella/contracts/billing-plans";
 import {
   applyGatewayUsage,
   applyStripeEvent,
   billingAccess,
   type BillingAccess,
   billingPaying,
+  billingPlan,
   closeStripeCustomer,
   stopStripeRenewal,
   cloudSandboxAccess,
   recordBillingIdentity,
+  releaseSpend,
   reserveSessionGrant,
   reserveSpend,
   reservationHeld,
-  releaseSpend,
   setAdminPlan,
+  settleSpend,
+  type SpendReservation,
   turnAllowance,
   type UsageBatchResult,
 } from "./owner-store/domains/billing.js";
@@ -154,7 +158,6 @@ import type {
 import {
   HEADER_PRESENCE_DEVICE_ID,
   OWNER_GATE_RUNNING_GRACE_MS,
-  OWNER_AGENT_CONTAINER_LIMIT,
   SNAPSHOT_TTL_MS,
   STEER_ACK_TIMEOUT_MS,
   LOCAL_AGENT_MESSAGE_ACK_TIMEOUT_MS,
@@ -636,6 +639,33 @@ export class OwnerGate extends OwnerGateCloudDispatch {
 
   async billingAccess(): Promise<BillingAccess> {
     return billingAccess(this.ownerStore().context(null));
+  }
+
+  async reserveSpend(
+    input: Parameters<typeof reserveSpend>[1] & { requireCloudSandbox?: boolean },
+  ): Promise<SpendReservation & { cloudSandbox: boolean }> {
+    const { requireCloudSandbox, ...reservation } = input;
+    return await this.billingWrite((ctx) => {
+      const cloudSandbox = cloudSandboxAccess(ctx).enabled;
+      if (requireCloudSandbox && !cloudSandbox) {
+        return {
+          ...billingAccess(ctx),
+          reserved: false,
+          reservedMicroCents: 0,
+          cloudSandbox,
+          message: CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
+        };
+      }
+      return { ...reserveSpend(ctx, reservation), cloudSandbox };
+    });
+  }
+
+  async settleSpend(input: Parameters<typeof settleSpend>[1]): Promise<{ charged: boolean }> {
+    return await this.billingWrite((ctx) => settleSpend(ctx, input));
+  }
+
+  async releaseSpend(id: string): Promise<void> {
+    await this.billingWrite((ctx) => releaseSpend(ctx, id));
   }
 
   async setBillingPlan(input: {
@@ -1144,8 +1174,10 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const running = sql
       .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM agent_containers`)
       .one().count;
-    if (!held && running >= OWNER_AGENT_CONTAINER_LIMIT) {
-      return { ok: false, running, limit: OWNER_AGENT_CONTAINER_LIMIT };
+    const limit =
+      PLAN_CATALOG[billingPlan(this.ownerStore().context(null, now)).plan].limits.cloudAgentsAtOnce;
+    if (!held && running >= limit) {
+      return { ok: false, running, limit };
     }
     sql.exec(
       `INSERT INTO agent_containers (sandbox_id, acquired_at) VALUES (?, ?)
@@ -1156,7 +1188,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     return {
       ok: true,
       running: held ? running : running + 1,
-      limit: OWNER_AGENT_CONTAINER_LIMIT,
+      limit,
     };
   }
 

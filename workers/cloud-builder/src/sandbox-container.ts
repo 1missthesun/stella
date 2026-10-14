@@ -33,6 +33,20 @@ import {
 import type { Env } from "./build-session/shared/env.js";
 import type { ContainerSnapshot } from "./world-store.js";
 import { diskClass, INSTANCE_TIERS, type InstanceSize } from "./instance-size.js";
+import {
+  CPU_READ_COMMAND,
+  METER_SETTLE_EVERY_MS,
+  METER_TICK_MS,
+  containerBudgetError,
+  containerHold,
+  meterInterval,
+  meterReservationId,
+  parseCpuUsec,
+  refusalMessage,
+  type ContainerMeter,
+} from "./container-meter.js";
+import { ownerGateStub } from "./rpc-release.js";
+import type { CostOutcome } from "@stella/contracts/billing-tariffs";
 
 export type SandboxInstanceSize = InstanceSize;
 
@@ -49,6 +63,8 @@ export type SandboxBoot = {
   workload: SandboxWorkloadKind;
   idleTimeoutMs?: number;
   world?: string;
+  // The owner whose budget pays for the container's running time.
+  owner?: string;
 };
 
 export type SandboxExecRequest = {
@@ -104,6 +120,13 @@ const READY_DEADLINE_MS = 120_000;
 const SESSION_PREFIX = "session:";
 const PROCESS_ROOT = "/run/stella-processes";
 const WORLD_KEY = "world";
+const OWNER_KEY = "billTo";
+const METER_KEY = "meter";
+const METER_CLOSING_KEY = "meterClosing";
+const METER_DUE_KEY = "meterDueAt";
+const LAST_ACTIVE_KEY = "lastActiveAt";
+const BUDGET_STOP_KEY = "budgetStop";
+const LAST_ACTIVE_WRITE_EVERY_MS = 15_000;
 const RELEASE_DUE_KEY = "releaseDueAt";
 const STOP_PENDING_KEY = "stopPending";
 const DEPENDENCY_BASELINE_KEY = "dependencyBaseline";
@@ -310,9 +333,14 @@ export class Sandbox extends DurableObject<Env> {
   #stopping: Promise<void> | null = null;
   #files?: Files;
   #dependencies?: { world: string; backups: DirectoryBackup };
+  #inflight = 0;
+  #lastActiveAt: number;
+  #lastActiveWritten = 0;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
+    const lastActive = ctx.storage.kv.get<number>(LAST_ACTIVE_KEY);
+    this.#lastActiveAt = lastActive === undefined ? Date.now() : lastActive + LAST_ACTIVE_WRITE_EVERY_MS;
     if (ctx.container?.running) {
       const boot = ctx.storage.kv.get<SandboxBoot>("boot");
       if (boot) {
@@ -358,22 +386,24 @@ export class Sandbox extends DurableObject<Env> {
   }
 
   async setEgress(policy: SandboxEgressPolicy | null): Promise<{ restarted: boolean }> {
-    const kv = this.ctx.storage.kv;
-    if (policy) kv.put(EGRESS_KEY, policy);
-    else kv.delete(EGRESS_KEY);
-    if (this.#booting) await this.#booting.catch(() => undefined);
-    if (!this.ctx.container?.running) return { restarted: false };
-    const booted = kv.get<SandboxEgressPolicy>(BOOTED_EGRESS_KEY) ?? null;
-    const same =
-      booted === null
-        ? policy === null
-        : policy !== null &&
-          booted.team === policy.team &&
-          (booted.repo ?? "") === (policy.repo ?? "") &&
-          booted.internet === policy.internet;
-    if (same) return { restarted: false };
-    await this.destroy({ keepSnapshot: true });
-    return { restarted: true };
+    return await this.#active(async () => {
+      const kv = this.ctx.storage.kv;
+      if (policy) kv.put(EGRESS_KEY, policy);
+      else kv.delete(EGRESS_KEY);
+      if (this.#booting) await this.#booting.catch(() => undefined);
+      if (!this.ctx.container?.running) return { restarted: false };
+      const booted = kv.get<SandboxEgressPolicy>(BOOTED_EGRESS_KEY) ?? null;
+      const same =
+        booted === null
+          ? policy === null
+          : policy !== null &&
+            booted.team === policy.team &&
+            (booted.repo ?? "") === (policy.repo ?? "") &&
+            booted.internet === policy.internet;
+      if (same) return { restarted: false };
+      await this.destroy({ keepSnapshot: true });
+      return { restarted: true };
+    });
   }
 
   async #configure(boot: SandboxBoot): Promise<void> {
@@ -650,20 +680,32 @@ export class Sandbox extends DurableObject<Env> {
     }
     const sandbox = this.ctx.id.toString();
     const world = this.#withWorld(boot);
-    this.#booting = admitContainerStart(this.env, sandbox)
-      .then(() =>
-        this.#start(world).catch(async (error: unknown) => {
-          await settleContainer(this.env, sandbox).catch(() => undefined);
-          throw error;
-        }),
-      )
-      .finally(() => {
-        this.#booting = null;
-      });
+    this.#booting = (async () => {
+      await this.#openMeter(world);
+      try {
+        await admitContainerStart(this.env, sandbox);
+        await this.#start(world);
+      } catch (error) {
+        await settleContainer(this.env, sandbox).catch(() => undefined);
+        await this.#closeMeter(Date.now(), undefined, "failed");
+        throw error;
+      }
+      await this.#meterBaseline().catch(() => undefined);
+    })().finally(() => {
+      this.#booting = null;
+    });
     await this.#booting;
   }
 
-  #withWorld(boot: SandboxBoot): SandboxBoot {
+  #withWorld(input: SandboxBoot): SandboxBoot {
+    const kv = this.ctx.storage.kv;
+    let boot = input;
+    if (boot.owner) {
+      if (kv.get<string>(OWNER_KEY) !== boot.owner) kv.put(OWNER_KEY, boot.owner);
+    } else {
+      const owner = kv.get<string>(OWNER_KEY);
+      if (owner) boot = { ...boot, owner };
+    }
     if (boot.world) {
       if (this.ctx.storage.kv.get<string>(WORLD_KEY) !== boot.world) {
         this.ctx.storage.kv.put(WORLD_KEY, boot.world);
@@ -692,14 +734,18 @@ export class Sandbox extends DurableObject<Env> {
   }
 
   async state(): Promise<SandboxState> {
-    if (!this.ctx.container?.running) return { status: "stopped" };
-    const boot = this.ctx.storage.kv.get<SandboxBoot>("boot");
-    return { status: "running", ...(boot ? { size: boot.size } : {}) };
+    return await this.#active(async () => {
+      if (!this.ctx.container?.running) return { status: "stopped" };
+      const boot = this.ctx.storage.kv.get<SandboxBoot>("boot");
+      return { status: "running", ...(boot ? { size: boot.size } : {}) };
+    });
   }
 
   async ensure(boot: SandboxBoot): Promise<SandboxState> {
-    await this.#ensure(boot);
-    return await this.state();
+    return await this.#active(async () => {
+      await this.#ensure(boot);
+      return await this.state();
+    });
   }
 
   /**
@@ -720,7 +766,11 @@ export class Sandbox extends DurableObject<Env> {
     }
     if (this.#booting) await this.#booting.catch(() => undefined);
     if (this.ctx.container?.running) {
+      const cpuUsec = await this.#readCpu();
       await this.#container.destroy();
+      await this.#closeMeter(Date.now(), cpuUsec, "succeeded");
+    } else {
+      await this.#closeMeter(Date.now(), undefined, "succeeded");
     }
     await settleContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
   }
@@ -738,21 +788,24 @@ export class Sandbox extends DurableObject<Env> {
       kv.delete(RELEASE_DUE_KEY);
       kv.put(STOP_DUE_KEY, Date.now() + warmMs);
       kv.put(STOP_PENDING_KEY, true);
-      await this.ctx.storage.setAlarm(Date.now() + warmMs);
+      await this.#armAlarm();
       return;
     }
     const snapshotDue = Date.now() + RELEASE_DELAY_MS;
     kv.put(RELEASE_DUE_KEY, snapshotDue);
     kv.put(STOP_DUE_KEY, snapshotDue + warmMs);
     this.ctx.storage.kv.put(STOP_PENDING_KEY, true);
-    await this.#armReleaseAlarm();
+    await this.#armAlarm();
   }
 
-  async #armReleaseAlarm(): Promise<void> {
+  async #armAlarm(): Promise<void> {
     const kv = this.ctx.storage.kv;
     const steps = [
       kv.get<number>(RELEASE_DUE_KEY),
       kv.get<boolean>(STOP_PENDING_KEY) ? kv.get<number>(STOP_DUE_KEY) : undefined,
+      kv.get<ContainerMeter>(METER_KEY) || kv.get<unknown[]>(METER_CLOSING_KEY)?.length
+        ? kv.get<number>(METER_DUE_KEY) ?? Date.now() + METER_TICK_MS
+        : undefined,
     ].filter((due): due is number => due !== undefined);
     if (steps.length === 0) return;
     const due = Math.min(...steps);
@@ -784,13 +837,235 @@ export class Sandbox extends DurableObject<Env> {
         await this.#stopReleased();
       }
     }
+    const meterDue = kv.get<number>(METER_DUE_KEY);
+    if (meterDue === undefined || meterDue <= Date.now()) {
+      await this.#meterTick().catch((error: unknown) => {
+        console.log(
+          JSON.stringify({
+            level: "error",
+            event: "container_meter_tick_failed",
+            sandbox: this.ctx.id.toString().slice(0, 12),
+            message: errorText(error),
+          }),
+        );
+        kv.put(METER_DUE_KEY, Date.now() + METER_TICK_MS);
+      });
+    }
     if (!this.ctx.container?.running) {
       kv.delete(RELEASE_DUE_KEY);
       kv.delete(STOP_DUE_KEY);
       kv.delete(STOP_PENDING_KEY);
+    }
+    await this.#armAlarm();
+  }
+
+  async #active<T>(work: () => Promise<T>): Promise<T> {
+    this.#inflight += 1;
+    this.#touch();
+    try {
+      return await work();
+    } finally {
+      this.#inflight -= 1;
+      this.#touch();
+    }
+  }
+
+  // An alarm counts as Durable Object activity and restarts the platform's
+  // inactivity timeout, so while the meter ticks this object stops an idle
+  // container itself; that needs when the last call ended.
+  #touch(): void {
+    const now = Date.now();
+    this.#lastActiveAt = now;
+    if (now - this.#lastActiveWritten < LAST_ACTIVE_WRITE_EVERY_MS) return;
+    this.#lastActiveWritten = now;
+    this.ctx.storage.kv.put(LAST_ACTIVE_KEY, now);
+  }
+
+  // Processes the meter stopped for want of budget report that, not an
+  // out-of-memory kill, so the turn ends with the budget message.
+  #throwIfBudgetStopped(): void {
+    const message = this.ctx.storage.kv.get<string>(BUDGET_STOP_KEY);
+    if (message) throw containerBudgetError(message);
+  }
+
+  #gate(owner: string) {
+    return ownerGateStub(this.env.OWNER_GATES, owner);
+  }
+
+  #meterLog(event: string, fields: Record<string, unknown>): void {
+    console.log(
+      JSON.stringify({
+        level: event.endsWith("_failed") ? "error" : "info",
+        event,
+        sandbox: this.ctx.id.toString().slice(0, 12),
+        ...fields,
+      }),
+    );
+  }
+
+  async #readCpu(): Promise<number | undefined> {
+    if (!this.ctx.container?.running) return undefined;
+    try {
+      const result = await this.#run(CPU_READ_COMMAND);
+      return result.success ? parseCpuUsec(result.stdout) : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async #openMeter(boot: SandboxBoot): Promise<void> {
+    const kv = this.ctx.storage.kv;
+    const stale = kv.get<ContainerMeter>(METER_KEY);
+    if (stale) await this.#closeMeter(this.#lostStopTime(stale), undefined, "succeeded");
+    await this.#flushClosing();
+    if (!boot.owner) {
+      this.#meterLog("container_meter_unowned", { workload: boot.workload });
       return;
     }
-    await this.#armReleaseAlarm();
+    const now = Date.now();
+    const meter: ContainerMeter = {
+      owner: boot.owner,
+      size: boot.size,
+      run: crypto.randomUUID(),
+      startedAt: now,
+      settledThrough: now,
+      seq: 0,
+      lastSeenAt: now,
+    };
+    const hold = await this.#gate(boot.owner).reserveSpend({
+      id: meterReservationId(meter),
+      ...containerHold(boot.size, now),
+      requireCloudSandbox: true,
+    });
+    if (!hold.reserved) {
+      const message = refusalMessage(hold);
+      this.#meterLog("container_start_refused", { instanceSize: boot.size, plan: hold.plan, message });
+      throw containerBudgetError(message);
+    }
+    kv.delete(BUDGET_STOP_KEY);
+    kv.put(METER_KEY, meter);
+    kv.put(METER_DUE_KEY, now + METER_TICK_MS);
+    await this.#armAlarm();
+  }
+
+  // The VM's CPU counter starts at its boot; a container that came up long
+  // before this run's start (not expected) is measured from now instead.
+  async #meterBaseline(): Promise<void> {
+    const kv = this.ctx.storage.kv;
+    const meter = kv.get<ContainerMeter>(METER_KEY);
+    if (!meter) return;
+    const reading = await this.#readCpu();
+    if (reading === undefined) return;
+    const uptime = await this.#run(["cat", "/proc/uptime"])
+      .then((result) => Number(result.stdout.trim().split(/\s+/u)[0]))
+      .catch(() => Number.NaN);
+    const freshBoot = Number.isFinite(uptime) && uptime <= (Date.now() - meter.startedAt) / 1000 + 30;
+    kv.put(METER_KEY, { ...meter, cpuUsec: freshBoot ? 0 : reading });
+  }
+
+  // A container that stopped without this object (inactivity timeout, crash)
+  // stopped between the last tick that saw it and now: charge to the middle.
+  #lostStopTime(meter: ContainerMeter): number {
+    const now = Date.now();
+    return Math.max(meter.settledThrough, Math.min(now, meter.lastSeenAt + (now - meter.lastSeenAt) / 2));
+  }
+
+  async #closeMeter(until: number, cpuUsec: number | undefined, outcome: CostOutcome): Promise<void> {
+    const kv = this.ctx.storage.kv;
+    const meter = kv.get<ContainerMeter>(METER_KEY);
+    if (!meter) return;
+    const closing = kv.get<Array<{ meter: ContainerMeter; until: number; cpuUsec?: number; outcome: CostOutcome }>>(
+      METER_CLOSING_KEY,
+    ) ?? [];
+    closing.push({ meter, until: Math.max(until, meter.settledThrough), ...(cpuUsec === undefined ? {} : { cpuUsec }), outcome });
+    kv.put(METER_CLOSING_KEY, closing);
+    kv.delete(METER_KEY);
+    await this.#flushClosing();
+  }
+
+  async #flushClosing(): Promise<void> {
+    const kv = this.ctx.storage.kv;
+    const closing = kv.get<Array<{ meter: ContainerMeter; until: number; cpuUsec?: number; outcome: CostOutcome }>>(
+      METER_CLOSING_KEY,
+    );
+    if (!closing?.length) return;
+    const left: typeof closing = [];
+    for (const entry of closing) {
+      const interval = meterInterval(entry.meter, entry.until, entry.cpuUsec, entry.outcome);
+      try {
+        await this.#gate(entry.meter.owner).settleSpend({
+          ...interval,
+          reservationId: meterReservationId(entry.meter),
+          release: true,
+        });
+        this.#meterLog("container_meter_closed", {
+          run: entry.meter.run,
+          instanceType: interval.cost.sku,
+          ranSeconds: Math.round((entry.until - entry.meter.startedAt) / 1000),
+          intervalSeconds: interval.cost.quantity?.seconds,
+          cpuSeconds: interval.cost.quantity?.cpuSeconds,
+          basis: interval.cost.basis,
+          chargedMicroCents: interval.chargeMicroCents,
+          outcome: entry.outcome,
+        });
+      } catch (error) {
+        left.push(entry);
+        this.#meterLog("container_meter_settle_failed", { run: entry.meter.run, message: errorText(error) });
+      }
+    }
+    if (left.length) {
+      kv.put(METER_CLOSING_KEY, left);
+      if (kv.get<number>(METER_DUE_KEY) === undefined) kv.put(METER_DUE_KEY, Date.now() + METER_TICK_MS);
+    } else {
+      kv.delete(METER_CLOSING_KEY);
+    }
+  }
+
+  async #meterTick(): Promise<void> {
+    const kv = this.ctx.storage.kv;
+    kv.delete(METER_DUE_KEY);
+    await this.#flushClosing();
+    if (this.#booting) await this.#booting.catch(() => undefined);
+    const meter = kv.get<ContainerMeter>(METER_KEY);
+    if (!meter) return;
+    const now = Date.now();
+    if (!this.ctx.container?.running) {
+      await this.#closeMeter(this.#lostStopTime(meter), undefined, "succeeded");
+      return;
+    }
+    const boot = kv.get<SandboxBoot>("boot");
+    const idleMs = boot ? resolvedIdleTimeoutMs(boot) : DEFAULT_IDLE_TIMEOUT_MS;
+    const lastActive = this.#lastActiveAt;
+    if (this.#inflight === 0 && now - lastActive >= idleMs) {
+      await this.#stopReleased("idle");
+      return;
+    }
+    let current: ContainerMeter = { ...meter, lastSeenAt: now };
+    if (now - meter.settledThrough >= METER_SETTLE_EVERY_MS) {
+      const cpuUsec = await this.#readCpu();
+      const interval = meterInterval(meter, now, cpuUsec, "succeeded");
+      const gate = this.#gate(meter.owner);
+      await gate.settleSpend({ ...interval, reservationId: meterReservationId(meter) });
+      const { cpuUsec: _previous, ...rest } = current;
+      current = { ...rest, settledThrough: now, seq: meter.seq + 1, ...(cpuUsec === undefined ? {} : { cpuUsec }) };
+      kv.put(METER_KEY, current);
+      const hold = await gate.reserveSpend({
+        id: meterReservationId(meter),
+        ...containerHold(meter.size, now),
+        requireCloudSandbox: true,
+      });
+      if (!hold.reserved) {
+        kv.put(BUDGET_STOP_KEY, refusalMessage(hold));
+        this.#meterLog("container_budget_stop", { run: meter.run, plan: hold.plan, message: refusalMessage(hold) });
+        await this.#snapshotReleased().catch(() => undefined);
+        await this.#stopReleased("budget");
+        return;
+      }
+    } else {
+      kv.put(METER_KEY, current);
+    }
+    const idleDue = this.#inflight === 0 ? lastActive + idleMs + 1_000 : Number.POSITIVE_INFINITY;
+    kv.put(METER_DUE_KEY, Math.max(now + 5_000, Math.min(now + METER_TICK_MS, idleDue)));
   }
 
   async #snapshotReleased(): Promise<void> {
@@ -828,9 +1103,10 @@ export class Sandbox extends DurableObject<Env> {
     }
   }
 
-  async #stopReleased(): Promise<void> {
+  async #stopReleased(reason: "released" | "idle" | "budget" = "released"): Promise<void> {
     if (this.#booting) await this.#booting.catch(() => undefined);
     if (!this.ctx.container?.running) return;
+    const cpuUsec = await this.#readCpu();
     // A stop that fails leaves the inactivity timeout to do it.
     let failure: string | undefined;
     this.#stopping = this.#container
@@ -842,13 +1118,16 @@ export class Sandbox extends DurableObject<Env> {
         this.#stopping = null;
       });
     await this.#stopping;
-    if (!failure) await settleContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
+    if (!failure) {
+      await settleContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
+      await this.#closeMeter(Date.now(), cpuUsec, reason === "budget" ? "aborted" : "succeeded");
+    }
     console.log(
       JSON.stringify({
         level: failure ? "error" : "info",
         event: failure ? "sandbox_container_stop_failed" : "sandbox_container_stopped",
         sandbox: this.ctx.id.toString().slice(0, 12),
-        reason: "released",
+        reason,
         ...(failure ? { message: failure } : {}),
       }),
     );
@@ -1037,11 +1316,13 @@ export class Sandbox extends DurableObject<Env> {
     boot: SandboxBoot,
     request: SandboxExecRequest,
   ): Promise<SandboxExecResult> {
-    await this.#ensure(boot);
-    return await this.#run(
-      [...timeoutArgv(request.timeoutMs), "bash", "-c", request.command],
-      { cwd: request.cwd ?? DEFAULT_CWD, env: cleanEnv(request.env) },
-    );
+    return await this.#active(async () => {
+      await this.#ensure(boot);
+      return await this.#run(
+        [...timeoutArgv(request.timeoutMs), "bash", "-c", request.command],
+        { cwd: request.cwd ?? DEFAULT_CWD, env: cleanEnv(request.env) },
+      );
+    });
   }
 
   async readFile(
@@ -1052,20 +1333,22 @@ export class Sandbox extends DurableObject<Env> {
     | { success: true; encoding: "base64" | "utf-8"; content: string; size: number }
     | { success: true; encoding: "none"; content: ReadableStream; size: number }
   > {
-    await this.#ensure(boot);
-    const stat = await this.#fs.stat(path);
-    const response = await this.#fs.readFile(path);
-    const size = Number(stat.size);
-    if (encoding === "none") {
-      return { success: true, encoding, content: response.body!, size };
-    }
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    return {
-      success: true,
-      encoding,
-      content: encoding === "base64" ? bytesToBase64(bytes) : decoder.decode(bytes),
-      size,
-    };
+    return await this.#active(async () => {
+      await this.#ensure(boot);
+      const stat = await this.#fs.stat(path);
+      const response = await this.#fs.readFile(path);
+      const size = Number(stat.size);
+      if (encoding === "none") {
+        return { success: true, encoding, content: response.body!, size };
+      }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      return {
+        success: true,
+        encoding,
+        content: encoding === "base64" ? bytesToBase64(bytes) : decoder.decode(bytes),
+        size,
+      };
+    });
   }
 
   async writeFile(
@@ -1074,30 +1357,34 @@ export class Sandbox extends DurableObject<Env> {
     content: string | ReadableStream<Uint8Array>,
     encoding: "base64" | "utf-8" = "utf-8",
   ): Promise<{ success: true }> {
-    await this.#ensure(boot);
-    const bytes =
-      typeof content === "string" && encoding === "base64"
-        ? base64ToBytes(content)
-        : content;
-    const parent = path.slice(0, path.lastIndexOf("/")) || "/";
-    if (typeof bytes !== "string" && !(bytes instanceof Uint8Array)) {
-      await this.#fs.mkdir(parent, { recursive: true });
-    }
-    try {
-      await this.#fs.writeFile(path, bytes);
-    } catch (error) {
-      // 0.12 created missing parents.
-      if (!SandboxFileError.is(error) || error.code !== "ENOENT") throw error;
-      await this.#fs.mkdir(parent, { recursive: true });
-      await this.#fs.writeFile(path, bytes);
-    }
-    return { success: true };
+    return await this.#active(async () => {
+      await this.#ensure(boot);
+      const bytes =
+        typeof content === "string" && encoding === "base64"
+          ? base64ToBytes(content)
+          : content;
+      const parent = path.slice(0, path.lastIndexOf("/")) || "/";
+      if (typeof bytes !== "string" && !(bytes instanceof Uint8Array)) {
+        await this.#fs.mkdir(parent, { recursive: true });
+      }
+      try {
+        await this.#fs.writeFile(path, bytes);
+      } catch (error) {
+        // 0.12 created missing parents.
+        if (!SandboxFileError.is(error) || error.code !== "ENOENT") throw error;
+        await this.#fs.mkdir(parent, { recursive: true });
+        await this.#fs.writeFile(path, bytes);
+      }
+      return { success: true };
+    });
   }
 
   async deleteFile(boot: SandboxBoot, path: string): Promise<{ success: true }> {
-    await this.#ensure(boot);
-    await this.#fs.remove(path);
-    return { success: true };
+    return await this.#active(async () => {
+      await this.#ensure(boot);
+      await this.#fs.remove(path);
+      return { success: true };
+    });
   }
 
   async mkdir(
@@ -1105,126 +1392,143 @@ export class Sandbox extends DurableObject<Env> {
     path: string,
     recursive: boolean,
   ): Promise<{ success: true }> {
-    await this.#ensure(boot);
-    await this.#fs.mkdir(path, { recursive });
-    return { success: true };
+    return await this.#active(async () => {
+      await this.#ensure(boot);
+      await this.#fs.mkdir(path, { recursive });
+      return { success: true };
+    });
   }
 
   async exists(boot: SandboxBoot, path: string): Promise<boolean> {
-    await this.#ensure(boot);
-    try {
-      await this.#fs.lstat(path);
-      return true;
-    } catch (error) {
-      if (SandboxFileError.is(error) && error.code === "ENOENT") return false;
-      throw error;
-    }
+    return await this.#active(async () => {
+      await this.#ensure(boot);
+      try {
+        await this.#fs.lstat(path);
+        return true;
+      } catch (error) {
+        if (SandboxFileError.is(error) && error.code === "ENOENT") return false;
+        throw error;
+      }
+    });
   }
 
   async startProcess(
     boot: SandboxBoot,
     request: SandboxExecRequest & { processId: string },
   ): Promise<SandboxProcessInfo> {
-    await this.#ensure(boot);
-    const dir = processDirectory(request.processId);
-    const existing = await this.getProcess(request.processId);
-    if (existing && (existing.status === "running" || existing.status === "starting")) {
-      throw new Error(`Sandbox process ${request.processId} is already running.`);
-    }
-    await this.#run(["rm", "-rf", "--", dir]);
-    await this.#fs.mkdir(dir, { recursive: true });
-    await this.#container.exec(
-      [
-        "bash",
-        "-c",
-        RUN_SCRIPT,
-        "run",
-        dir,
-        ...timeoutArgv(request.timeoutMs),
-        "bash",
-        "-c",
-        request.command,
-      ],
-      {
-        cwd: request.cwd ?? DEFAULT_CWD,
-        env: cleanEnv(BASE_ENV, request.env),
-        stdout: "ignore",
-        stderr: "ignore",
-      },
-    );
-    return { id: request.processId, status: "running" };
+    return await this.#active(async () => {
+      await this.#ensure(boot);
+      const dir = processDirectory(request.processId);
+      const existing = await this.getProcess(request.processId);
+      if (existing && (existing.status === "running" || existing.status === "starting")) {
+        throw new Error(`Sandbox process ${request.processId} is already running.`);
+      }
+      await this.#run(["rm", "-rf", "--", dir]);
+      await this.#fs.mkdir(dir, { recursive: true });
+      await this.#container.exec(
+        [
+          "bash",
+          "-c",
+          RUN_SCRIPT,
+          "run",
+          dir,
+          ...timeoutArgv(request.timeoutMs),
+          "bash",
+          "-c",
+          request.command,
+        ],
+        {
+          cwd: request.cwd ?? DEFAULT_CWD,
+          env: cleanEnv(BASE_ENV, request.env),
+          stdout: "ignore",
+          stderr: "ignore",
+        },
+      );
+      return { id: request.processId, status: "running" };
+    });
   }
 
   async getProcess(id: string): Promise<SandboxProcessInfo | null> {
-    // A stopped container took every process with it, most often by running
-    // out of memory; 137 is what the OOM handling recognizes.
-    if (!this.ctx.container?.running) {
-      return { id, status: "killed", exitCode: 137 };
-    }
-    const result = await this.#run([
-      "bash",
-      "-c",
-      STATUS_SCRIPT,
-      "status",
-      processDirectory(id),
-    ]);
-    return statusFromLine(id, result.stdout);
+    return await this.#active(async () => {
+      // A stopped container took every process with it, most often by running
+      // out of memory; 137 is what the OOM handling recognizes.
+      if (!this.ctx.container?.running) {
+        this.#throwIfBudgetStopped();
+        return { id, status: "killed", exitCode: 137 };
+      }
+      const result = await this.#run([
+        "bash",
+        "-c",
+        STATUS_SCRIPT,
+        "status",
+        processDirectory(id),
+      ]);
+      return statusFromLine(id, result.stdout);
+    });
   }
 
   async processLogs(id: string): Promise<{ stdout: string; stderr: string }> {
-    if (!this.ctx.container?.running) return { stdout: "", stderr: "" };
-    const dir = processDirectory(id);
-    const read = async (name: string) => {
-      try {
-        return await (await this.#fs.readFile(`${dir}/${name}`)).text();
-      } catch (error) {
-        if (SandboxFileError.is(error) && error.code === "ENOENT") return "";
-        throw error;
-      }
-    };
-    const [stdout, stderr] = await Promise.all([
-      read("stdout.log"),
-      read("stderr.log"),
-    ]);
-    return { stdout, stderr };
+    return await this.#active(async () => {
+      if (!this.ctx.container?.running) return { stdout: "", stderr: "" };
+      const dir = processDirectory(id);
+      const read = async (name: string) => {
+        try {
+          return await (await this.#fs.readFile(`${dir}/${name}`)).text();
+        } catch (error) {
+          if (SandboxFileError.is(error) && error.code === "ENOENT") return "";
+          throw error;
+        }
+      };
+      const [stdout, stderr] = await Promise.all([
+        read("stdout.log"),
+        read("stderr.log"),
+      ]);
+      return { stdout, stderr };
+    });
   }
 
   async waitForExit(
     id: string,
     timeoutMs: number,
   ): Promise<{ exitCode: number }> {
-    if (!this.ctx.container?.running) {
-      throw new Error(`Sandbox process ${id} is not running.`);
-    }
-    const signal = AbortSignal.timeout(Math.max(1, timeoutMs));
-    const process = await this.#container.exec(
-      ["bash", "-c", WAIT_FOR_EXIT_SCRIPT, "wait", processDirectory(id)],
-      { signal, env: { ...BASE_ENV } },
-    );
-    const output = await process.output();
-    if (signal.aborted) {
-      throw new Error(`Sandbox process ${id} did not exit in time.`);
-    }
-    const value = decoder.decode(output.stdout).trim();
-    if (value === "lost") return { exitCode: 137 };
-    const exitCode = Number(value);
-    if (!Number.isSafeInteger(exitCode)) {
-      throw new Error(`Sandbox process ${id} reported no exit code.`);
-    }
-    return { exitCode };
+    return await this.#active(async () => {
+      if (!this.ctx.container?.running) {
+        this.#throwIfBudgetStopped();
+        throw new Error(`Sandbox process ${id} is not running.`);
+      }
+      const signal = AbortSignal.timeout(Math.max(1, timeoutMs));
+      const process = await this.#container.exec(
+        ["bash", "-c", WAIT_FOR_EXIT_SCRIPT, "wait", processDirectory(id)],
+        { signal, env: { ...BASE_ENV } },
+      );
+      const output = await process.output();
+      if (!this.ctx.container?.running) this.#throwIfBudgetStopped();
+      if (signal.aborted) {
+        throw new Error(`Sandbox process ${id} did not exit in time.`);
+      }
+      const value = decoder.decode(output.stdout).trim();
+      if (value === "lost") return { exitCode: 137 };
+      const exitCode = Number(value);
+      if (!Number.isSafeInteger(exitCode)) {
+        throw new Error(`Sandbox process ${id} reported no exit code.`);
+      }
+      return { exitCode };
+    });
   }
 
   async killProcess(id: string, signal = "SIGTERM"): Promise<boolean> {
-    if (!this.ctx.container?.running) return false;
-    const name = SIGNALS[signal] ?? signal.replace(/^SIG/u, "");
-    const result = await this.#run([
-      "bash",
-      "-c",
-      KILL_SCRIPT,
-      "kill",
-      processDirectory(id),
-      name,
-    ]);
-    return result.exitCode === 0;
+    return await this.#active(async () => {
+      if (!this.ctx.container?.running) return false;
+      const name = SIGNALS[signal] ?? signal.replace(/^SIG/u, "");
+      const result = await this.#run([
+        "bash",
+        "-c",
+        KILL_SCRIPT,
+        "kill",
+        processDirectory(id),
+        name,
+      ]);
+      return result.exitCode === 0;
+    });
   }
 }

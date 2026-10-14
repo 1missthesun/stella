@@ -745,12 +745,15 @@ export class Sandbox extends DurableObject<Env> {
       await this.#extendIdleTimeout(boot);
       return;
     }
-    await admitContainerStart(this.env, this.ctx.id.toString());
-    this.#booting = this.#start(this.#withWorld(boot))
-      .catch(async (error: unknown) => {
-        await settleContainer(this.env, this.ctx.id.toString()).catch(() => undefined);
-        throw error;
-      })
+    const sandbox = this.ctx.id.toString();
+    const world = this.#withWorld(boot);
+    this.#booting = admitContainerStart(this.env, sandbox)
+      .then(() =>
+        this.#start(world).catch(async (error: unknown) => {
+          await settleContainer(this.env, sandbox).catch(() => undefined);
+          throw error;
+        }),
+      )
       .finally(() => {
         this.#booting = null;
       });

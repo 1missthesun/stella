@@ -10,13 +10,15 @@ struct LauncherViewState {
     var status = ""
     var progress = 0.0
     var progressTo = 0.0
+    var title = ""
+    var offerRecovery = true
     var reason = ""
     var output: [String] = []
     var hasKnownGood = false
     var version = ""
 
     var json: [String: Any] {
-        ["platform": "macos", "phase": phase.rawValue, "status": status, "reason": reason,
+        ["platform": "macos", "phase": phase.rawValue, "status": status, "title": title, "offerRecovery": offerRecovery, "reason": reason,
          "progress": phase == .starting ? progress : 0, "progressTo": phase == .starting ? progressTo : 0,
          "output": output, "hasKnownGood": hasKnownGood, "version": version]
     }
@@ -302,7 +304,7 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             DispatchQueue.main.async { [self] in
                 guard state.phase == .failed else { return }
                 let alert = NSAlert()
-                alert.messageText = "Stella couldn't start"
+                alert.messageText = state.title.isEmpty ? "Stella couldn't start" : state.title
                 alert.informativeText = state.reason
                 alert.addButton(withTitle: "Try again")
                 alert.addButton(withTitle: "Quit")

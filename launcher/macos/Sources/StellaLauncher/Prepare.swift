@@ -8,7 +8,7 @@ enum Prepare {
         env: [String: String],
         state: inout LauncherState,
         progress: (String) -> Void
-    ) throws -> URL {
+    ) throws -> ElectronIdentity.Resolved {
         let app = paths.app
         let lockHash = try sha256File(app.appendingPathComponent("bun.lock"))
         let electronPackage = app.appendingPathComponent("node_modules/electron/package.json")
@@ -56,13 +56,33 @@ enum Prepare {
 }
 
 /// `bundles/electron-<v>/Stella.app`: Electron as macOS knows Stella (bundle
-/// id, name, icon, microphone string). Normally the Developer ID-signed copy
-/// CI publishes per Electron version (.github/workflows/build-electron-identity.yml):
-/// its identity is the same across versions and reinstalls, so the Keychain
-/// item and privacy grants keep trusting it. When that can't be fetched, a
-/// local copy of the installed Electron.app with an ad-hoc signature, which
-/// macOS treats as a new app for every Electron version.
+/// id, name, icon, microphone string), the Developer ID-signed copy CI
+/// publishes per Electron version (.github/workflows/build-electron-identity.yml).
+/// Its identity is the same across versions and reinstalls, so the Keychain
+/// item and privacy grants keep trusting it.
+///
+/// macOS ties those grants to the signature, so the launcher never switches
+/// to an unsigned copy on its own. When the signed copy for this Electron
+/// can't be downloaded, it keeps running the newest signed copy it already
+/// has and retries in the background; with none, it stops with
+/// `DownloadFailure` (the "Couldn't download Stella" screen). A local ad-hoc
+/// copy is built only when a developer sets `STELLA_LAUNCHER_UNSIGNED_ELECTRON=1`.
 enum ElectronIdentity {
+    struct Resolved {
+        let app: URL
+        /// The Electron version whose signed copy is still missing, when `app`
+        /// is an older signed copy standing in for it.
+        let pendingVersion: String?
+    }
+
+    struct DownloadFailure: Error, CustomStringConvertible {
+        let version: String
+        let underlying: String
+        var description: String {
+            "Stella couldn't download its signed app (Electron \(version)): \(underlying)"
+        }
+    }
+
     static let bundleId = "com.stella.app"
     static let appName = "Stella"
     static let microphoneUsage = "Stella uses your microphone for voice conversations."
@@ -78,7 +98,11 @@ enum ElectronIdentity {
         let canonical = plistPatch.map { "\($0.key)=\($0.value)" }.joined(separator: "\n")
         return SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
     }
-    static let signedBase = "\(Deployment.releasesURL)/electron-identity"
+    static var signedBase: String {
+        let override = ProcessInfo.processInfo.environment["STELLA_LAUNCHER_ELECTRON_IDENTITY_URL"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return override.isEmpty ? "\(Deployment.releasesURL)/electron-identity" : override
+    }
     static let requirement =
         "anchor apple generic and identifier \"com.stella.app\" and certificate leaf[subject.OU] = \"\(Deployment.appleTeamID)\""
     #if arch(arm64)
@@ -87,43 +111,121 @@ enum ElectronIdentity {
     static let arch = "x64"
     #endif
 
-    static func ensure(paths: LauncherPaths, env: [String: String], progress: (String) -> Void) throws -> URL {
-        let app = paths.app
+    static var unsignedOptIn: Bool {
+        ProcessInfo.processInfo.environment["STELLA_LAUNCHER_UNSIGNED_ELECTRON"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines) == "1"
+    }
+
+    /// Serializes installs between a launch and the background retry.
+    private static let installLock = NSLock()
+
+    static func signedMarker(_ version: String) -> String { "{\"electron\":\"\(version)\",\"signed\":true}" }
+
+    static func installedVersion(app: URL) throws -> (version: String, source: URL) {
         let electronDir = app.appendingPathComponent("node_modules/electron").resolvingSymlinksInPath()
         let packageData = try Data(contentsOf: electronDir.appendingPathComponent("package.json"))
         guard let package = try JSONSerialization.jsonObject(with: packageData) as? [String: Any],
               let version = package["version"] as? String
         else { throw LauncherError("Could not read the installed Electron version.") }
-        let source = electronDir.appendingPathComponent("dist/Electron.app")
+        return (version, electronDir.appendingPathComponent("dist/Electron.app"))
+    }
+
+    static func ensure(paths: LauncherPaths, env: [String: String], progress: (String) -> Void) throws -> Resolved {
+        let (version, source) = try installedVersion(app: paths.app)
+        installLock.lock()
+        defer { installLock.unlock() }
+        if let ready = signedCopy(paths: paths, version: version) {
+            return Resolved(app: ready, pendingVersion: nil)
+        }
+        let failure: String
+        do {
+            return Resolved(app: try downloadSigned(paths: paths, version: version, env: env, progress: progress),
+                            pendingVersion: nil)
+        } catch {
+            failure = "\(error)"
+            log("identity: signed Stella.app for Electron \(version) unavailable: \(failure)")
+        }
+        if unsignedOptIn {
+            log("identity: STELLA_LAUNCHER_UNSIGNED_ELECTRON=1; using a local ad-hoc copy (macOS permissions and Keychain access won't carry over)")
+            return Resolved(app: try buildAdHoc(paths: paths, version: version, source: source, env: env, progress: progress),
+                            pendingVersion: nil)
+        }
+        if let (older, olderVersion) = newestSignedCopy(paths: paths) {
+            log("identity: keeping the signed Stella.app for Electron \(olderVersion) until \(version) downloads")
+            return Resolved(app: older, pendingVersion: version)
+        }
+        throw DownloadFailure(version: version, underlying: failure)
+    }
+
+    /// Background retry for a launch that fell back to an older signed copy.
+    /// The new copy lands in its own folder and is used from the next launch.
+    static func retryDownload(paths: LauncherPaths, version: String, env: [String: String]) -> Bool {
+        installLock.lock()
+        defer { installLock.unlock() }
+        if signedCopy(paths: paths, version: version) != nil { return true }
+        do {
+            _ = try downloadSigned(paths: paths, version: version, env: env, progress: { _ in })
+            return true
+        } catch {
+            log("identity: retry for Electron \(version) failed: \(error)")
+            return false
+        }
+    }
+
+    private static func signedCopy(paths: LauncherPaths, version: String) -> URL? {
+        let dir = paths.bundles.appendingPathComponent("electron-\(version)")
+        let target = dir.appendingPathComponent("Stella.app")
+        let marker = try? String(contentsOf: dir.appendingPathComponent("identity.json"), encoding: .utf8)
+        guard marker == signedMarker(version),
+              FileManager.default.fileExists(atPath: target.appendingPathComponent("Contents/MacOS/Electron").path)
+        else { return nil }
+        return target
+    }
+
+    private static func newestSignedCopy(paths: LauncherPaths) -> (URL, String)? {
+        let entries = (try? FileManager.default.contentsOfDirectory(atPath: paths.bundles.path)) ?? []
+        let versions = entries.compactMap { name -> String? in
+            name.hasPrefix("electron-") ? String(name.dropFirst("electron-".count)) : nil
+        }
+        let sorted = versions.sorted { $0.compare($1, options: .numeric) == .orderedDescending }
+        for version in sorted {
+            if let app = signedCopy(paths: paths, version: version) { return (app, version) }
+        }
+        return nil
+    }
+
+    private static func downloadSigned(
+        paths: LauncherPaths, version: String, env: [String: String], progress: (String) -> Void
+    ) throws -> URL {
+        let dir = paths.bundles.appendingPathComponent("electron-\(version)")
+        let target = dir.appendingPathComponent("Stella.app")
+        let marker = dir.appendingPathComponent("identity.json")
+        try installSigned(version: version, dir: dir, target: target, env: env, progress: progress)
+        try signedMarker(version).write(to: marker, atomically: true, encoding: .utf8)
+        log("identity: \(target.path) ready (Developer ID)")
+        return target
+    }
+
+    private static func buildAdHoc(
+        paths: LauncherPaths, version: String, source: URL, env: [String: String], progress: (String) -> Void
+    ) throws -> URL {
+        let app = paths.app
         guard FileManager.default.fileExists(atPath: source.appendingPathComponent("Contents/MacOS/Electron").path) else {
             throw LauncherError("Electron \(version) is not installed (missing \(source.path)).")
         }
-
         let icon = app.appendingPathComponent("packages/desktop/build/icon.icns")
         let iconHash = (try? sha256File(icon)) ?? "none"
         let dir = paths.bundles.appendingPathComponent("electron-\(version)")
         let target = dir.appendingPathComponent("Stella.app")
         let marker = dir.appendingPathComponent("identity.json")
-        let signedMarker = "{\"electron\":\"\(version)\",\"signed\":true}"
         let expected = "{\"electron\":\"\(version)\",\"icon\":\"\(iconHash)\",\"plist\":\"\(plistPatchDigest)\"}"
-        let current = try? String(contentsOf: marker, encoding: .utf8)
-        if FileManager.default.fileExists(atPath: target.path), current == signedMarker {
-            return target
-        }
-        do {
-            try installSigned(version: version, dir: dir, target: target, env: env, progress: progress)
-            try signedMarker.write(to: marker, atomically: true, encoding: .utf8)
-            log("identity: \(target.path) ready (Developer ID)")
-            return target
-        } catch {
-            log("identity: signed Stella.app for Electron \(version) unavailable: \(error)")
-        }
-        if FileManager.default.fileExists(atPath: target.path), current == expected {
+        if FileManager.default.fileExists(atPath: target.path),
+           (try? String(contentsOf: marker, encoding: .utf8)) == expected {
             return target
         }
 
         progress("Setting up Stella.app…")
-        log("identity: building \(target.path) from Electron \(version)")
+        log("identity: building \(target.path) from Electron \(version) (ad-hoc)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let staging = dir.appendingPathComponent("Stella.app.partial")
         try? FileManager.default.removeItem(at: staging)
@@ -154,7 +256,7 @@ enum ElectronIdentity {
         try? FileManager.default.removeItem(at: target)
         try FileManager.default.moveItem(at: staging, to: target)
         try expected.write(to: marker, atomically: true, encoding: .utf8)
-        log("identity: \(target.path) ready")
+        log("identity: \(target.path) ready (ad-hoc)")
         return target
     }
 

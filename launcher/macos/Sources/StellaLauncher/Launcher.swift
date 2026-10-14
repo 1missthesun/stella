@@ -48,6 +48,7 @@ final class Launcher {
     private var signer: TreeSigner?
     private var runtimes: Runtimes?
     private var recoveryCount = 0
+    private var identityRetry: String?
     private var crashTimes: [Date] = []
     private(set) var current: ElectronProcess?
 
@@ -102,7 +103,7 @@ final class Launcher {
                 return 0
             }
             closeCode = 1
-            recover(reason: failure.reason, output: failure.output)
+            recover(reason: failure.reason, output: failure.output, kind: failure.kind)
         }
         return 1
     }
@@ -149,7 +150,12 @@ final class Launcher {
         Thread.sleep(forTimeInterval: 2.5)
     }
 
-    private func launch() -> (reason: String, output: [String])? {
+    enum FailureKind {
+        case start
+        case download
+    }
+
+    private func launch() -> (reason: String, output: [String], kind: FailureKind)? {
         while true {
             ui.update {
                 $0.phase = .starting
@@ -159,12 +165,13 @@ final class Launcher {
             }
             do {
                 let electronApp = try prepareForLaunch()
+                if let version = electronApp.pendingVersion { retryIdentityInBackground(version) }
                 ui.update {
                     $0.status = "Starting Stella…"
                     $0.progress = 0.94
                     $0.progressTo = 1
                 }
-                switch supervise(electronApp: electronApp) {
+                switch supervise(electronApp: electronApp.app) {
                 case .quit:
                     return nil
                 case .relaunch:
@@ -181,14 +188,17 @@ final class Launcher {
                     log("launcher: Stella crashed \(Int(sinceReady))s after ready (\(detail)); recent early crashes \(crashTimes.count)")
                     if crashTimes.count >= 2 {
                         crashTimes = []
-                        return ("Stella crashed twice shortly after starting (\(detail)).", output)
+                        return ("Stella crashed twice shortly after starting (\(detail)).", output, .start)
                     }
                 case let .failed(reason, output):
-                    return (reason, output)
+                    return (reason, output, .start)
                 }
+            } catch let failure as ElectronIdentity.DownloadFailure {
+                return ("Stella needs its signed app to keep your Mac's permissions. Check your connection and try again.",
+                        ["\(failure)"], .download)
             } catch {
                 let lines = "\(error)".split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
-                return (lines.first ?? "\(error)", Array(lines.dropFirst().suffix(40)))
+                return (lines.first ?? "\(error)", Array(lines.dropFirst().suffix(40)), .start)
             }
         }
     }
@@ -225,7 +235,26 @@ final class Launcher {
         state = LauncherState.load(paths)
     }
 
-    private func prepareForLaunch() throws -> URL {
+    /// The launch runs an older signed Stella.app; fetch the one for this
+    /// Electron meanwhile so the next launch uses it.
+    private func retryIdentityInBackground(_ version: String) {
+        guard identityRetry != version else { return }
+        identityRetry = version
+        let paths = self.paths
+        let env = baseEnvironment()
+        let interval = Options.seconds("STELLA_LAUNCHER_IDENTITY_RETRY_SECONDS", 15 * 60)
+        DispatchQueue.global(qos: .utility).async {
+            while true {
+                Thread.sleep(forTimeInterval: interval)
+                if ElectronIdentity.retryDownload(paths: paths, version: version, env: env) {
+                    log("identity: signed Stella.app for Electron \(version) downloaded; used from the next launch")
+                    return
+                }
+            }
+        }
+    }
+
+    private func prepareForLaunch() throws -> ElectronIdentity.Resolved {
         let fm = FileManager.default
         followServerFile()
         let (git, signer) = try tools()
@@ -523,13 +552,15 @@ final class Launcher {
         return (try? git.raw(["rev-parse", "--verify", "--quiet", "\(Launcher.knownGoodRef)^{commit}"], cwd: paths.app).code) == 0
     }
 
-    private func recover(reason: String, output: [String]) {
+    private func recover(reason: String, output: [String], kind: FailureKind = .start) {
         recoveryCount += 1
         hold.hide(after: 0)
         log("launcher: failure: \(reason)")
         let facts = installFacts()
         ui.update(show: .front) {
             $0.phase = .failed
+            $0.title = kind == .download ? "Couldn’t download Stella" : ""
+            $0.offerRecovery = kind == .start
             $0.reason = reason
             $0.output = output
             $0.hasKnownGood = facts.hasKnownGood

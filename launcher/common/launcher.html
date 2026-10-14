@@ -15,6 +15,8 @@
       progress: number,      // starting: 0..1, the part of setup that is done
       progressTo: number,    // starting: 0..1, where the current step ends; the
                              //   bar eases from progress toward it meanwhile
+      title: string,         // failed: headline; "" = "Stella couldn't start"
+      offerRecovery: boolean,// failed: show "Return to last working version" / "Reinstall"
       reason: string,        // failed: one sentence
       output: string[],      // failed: Electron's last lines (Settings > Last error)
       hasKnownGood: boolean, // "Return to last working version" is possible
@@ -506,7 +508,7 @@
           <button class="control pill ghost" id="shutdown">Shut down</button>
         </div>
         <div class="panel" data-for="failed">
-          <div class="line failed-title"><span>Stella couldn’t start</span></div>
+          <div class="line failed-title"><span id="failed-title">Stella couldn’t start</span></div>
           <button class="control pill primary" id="retry" data-default>Try again</button>
           <div class="links">
             <button class="link" id="failed-recover">Return to last working version</button>
@@ -581,6 +583,8 @@
           status: "",
           progress: 0,
           progressTo: 0,
+          title: "",
+          offerRecovery: true,
           reason: "",
           output: [],
           hasKnownGood: false,
@@ -641,6 +645,8 @@
           }
           tickBar();
           $("reason").textContent = state.reason;
+          $("failed-title").textContent = state.title || "Stella couldn’t start";
+          $("failed-recover").hidden = state.offerRecovery === false;
           $("failed-recover").textContent = state.hasKnownGood ? "Return to last working version" : "Reinstall";
           $("version").textContent = state.version || "—";
 

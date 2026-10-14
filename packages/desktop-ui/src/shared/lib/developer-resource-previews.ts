@@ -22,13 +22,13 @@ export const setDeveloperResourcePreviewsEnabled = (enabled: boolean) => {
 
 export const useDeveloperResourcePreviewsEnabled = (): boolean => {
   const subscribe = useCallback((onStoreChange: () => void) => {
-    window.addEventListener("storage", onStoreChange);
+    const stopExternal = uiState.onExternalChange(onStoreChange);
     window.addEventListener(
       DEVELOPER_RESOURCE_PREVIEWS_CHANGED_EVENT,
       onStoreChange,
     );
     return () => {
-      window.removeEventListener("storage", onStoreChange);
+      stopExternal();
       window.removeEventListener(
         DEVELOPER_RESOURCE_PREVIEWS_CHANGED_EVENT,
         onStoreChange,

@@ -18,34 +18,9 @@ type WriteAdapter = {
   clear: () => void;
 };
 
-const getStorageArea = (): Storage | null => {
-  try {
-    return window.localStorage ?? null;
-  } catch {
-    return null;
-  }
-};
+type ExternalChangeListener = (key: string, value: string | null) => void;
 
-const dispatchStorageEvent = (
-  key: string,
-  oldValue: string | null,
-  newValue: string | null,
-) => {
-  try {
-    window.dispatchEvent(
-      new StorageEvent("storage", {
-        key,
-        oldValue,
-        newValue,
-        url: window.location.href,
-        // Some listeners filter on `event.storageArea === localStorage`.
-        storageArea: getStorageArea(),
-      }),
-    );
-  } catch {
-    // StorageEvent construction is best-effort; listeners simply miss a sync.
-  }
-};
+const externalChangeListeners = new Set<ExternalChangeListener>();
 
 const applyRemoteChanges = (changes: UiStateChanges) => {
   for (const [key, value] of Object.entries(changes)) {
@@ -57,7 +32,7 @@ const applyRemoteChanges = (changes: UiStateChanges) => {
       if (oldValue === value) continue;
       memory.set(key, value);
     }
-    dispatchStorageEvent(key, oldValue, value);
+    for (const listener of externalChangeListeners) listener(key, value);
   }
 };
 
@@ -228,5 +203,12 @@ export const uiState = {
 
   keys(): string[] {
     return [...memory.keys()];
+  },
+
+  onExternalChange(listener: ExternalChangeListener): () => void {
+    externalChangeListeners.add(listener);
+    return () => {
+      externalChangeListeners.delete(listener);
+    };
   },
 };

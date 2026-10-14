@@ -70,20 +70,15 @@ function dedupeAndCap(items: ChatContextFile[]): ChatContextFile[] {
 function subscribe(onChange: Listener): () => void {
   subscribers.add(onChange);
 
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key !== STORAGE_KEY) return;
+  const stopExternal = uiState.onExternalChange((key) => {
+    if (key !== STORAGE_KEY) return;
     cached = null;
     onChange();
-  };
-  if (typeof window !== "undefined") {
-    window.addEventListener("storage", handleStorage);
-  }
+  });
 
   return () => {
     subscribers.delete(onChange);
-    if (typeof window !== "undefined") {
-      window.removeEventListener("storage", handleStorage);
-    }
+    stopExternal();
   };
 }
 

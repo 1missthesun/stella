@@ -43,8 +43,10 @@ const safeWrite = (state: StoredState): void => {
 const subscribers = new Set<() => void>();
 let listenersAttached = false;
 
-const handleStorageEvent = (event: StorageEvent) => {
-  if (event.key !== STORAGE_KEY) return;
+let stopExternalChanges: (() => void) | null = null;
+
+const handleExternalChange = (key: string) => {
+  if (key !== STORAGE_KEY) return;
   for (const notify of subscribers) notify();
 };
 
@@ -55,7 +57,7 @@ const handleCustomEvent = () => {
 const attachListeners = () => {
   if (listenersAttached || typeof window === "undefined") return;
   listenersAttached = true;
-  window.addEventListener("storage", handleStorageEvent);
+  stopExternalChanges = uiState.onExternalChange(handleExternalChange);
   window.addEventListener(CHANGE_EVENT, handleCustomEvent);
 };
 
@@ -63,7 +65,8 @@ const detachListeners = () => {
   if (!listenersAttached || typeof window === "undefined") return;
   if (subscribers.size > 0) return;
   listenersAttached = false;
-  window.removeEventListener("storage", handleStorageEvent);
+  stopExternalChanges?.();
+  stopExternalChanges = null;
   window.removeEventListener(CHANGE_EVENT, handleCustomEvent);
 };
 

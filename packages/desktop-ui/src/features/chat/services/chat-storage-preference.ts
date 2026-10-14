@@ -13,10 +13,10 @@ export const getChatStorageMode = (): "cloud" | "local" =>
     : "cloud";
 const subscribe = (listener: () => void) => {
   window.addEventListener(EVENT, listener);
-  window.addEventListener("storage", listener);
+  const stopExternal = uiState.onExternalChange(listener);
   return () => {
     window.removeEventListener(EVENT, listener);
-    window.removeEventListener("storage", listener);
+    stopExternal();
   };
 };
 export const useChatStorageMode = () =>

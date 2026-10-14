@@ -53,10 +53,10 @@ export function useNickname(): UseNicknameResult {
     setNicknameState(getStoredNickname(email));
     const handler = () => setNicknameState(getStoredNickname(email));
     window.addEventListener(NICKNAME_CHANGED_EVENT, handler);
-    window.addEventListener("storage", handler);
+    const stopExternal = uiState.onExternalChange(handler);
     return () => {
       window.removeEventListener(NICKNAME_CHANGED_EVENT, handler);
-      window.removeEventListener("storage", handler);
+      stopExternal();
     };
   }, [email]);
 

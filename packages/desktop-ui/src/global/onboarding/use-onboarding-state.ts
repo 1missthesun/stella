@@ -27,8 +27,10 @@ let durableCompleted = false;
 let durableRevision = 0;
 let hydrationPromise: Promise<void> | null = null;
 
-const handleStorageEvent = (event: StorageEvent) => {
-  if (event.key !== ONBOARDING_COMPLETE_KEY) return;
+let stopExternalChanges: (() => void) | null = null;
+
+const handleExternalChange = (key: string) => {
+  if (key !== ONBOARDING_COMPLETE_KEY) return;
   for (const notify of subscribers) notify();
 };
 
@@ -39,7 +41,7 @@ const handleCustomEvent = () => {
 const attachWindowListeners = () => {
   if (listenersAttached || typeof window === "undefined") return;
   listenersAttached = true;
-  window.addEventListener("storage", handleStorageEvent);
+  stopExternalChanges = uiState.onExternalChange(handleExternalChange);
   window.addEventListener(ONBOARDING_COMPLETE_EVENT, handleCustomEvent);
 };
 
@@ -47,7 +49,8 @@ const detachWindowListeners = () => {
   if (!listenersAttached || typeof window === "undefined") return;
   if (subscribers.size > 0) return;
   listenersAttached = false;
-  window.removeEventListener("storage", handleStorageEvent);
+  stopExternalChanges?.();
+  stopExternalChanges = null;
   window.removeEventListener(ONBOARDING_COMPLETE_EVENT, handleCustomEvent);
 };
 

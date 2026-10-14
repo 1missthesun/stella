@@ -197,25 +197,23 @@ function useThemePersistence(clearPreviews: () => void): PersistedThemeState {
   }, []);
 
   useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === THEME_STORAGE_KEY && e.newValue) {
-        setThemeIdRaw(migrateThemeId(e.newValue));
+    return uiState.onExternalChange((key, value) => {
+      if (key === THEME_STORAGE_KEY && value) {
+        setThemeIdRaw(migrateThemeId(value));
         clearPreviews();
-      } else if (e.key === CUSTOM_BASE_STORAGE_KEY && e.newValue) {
-        setCustomBaseRaw(migrateThemeId(e.newValue));
+      } else if (key === CUSTOM_BASE_STORAGE_KEY && value) {
+        setCustomBaseRaw(migrateThemeId(value));
         clearPreviews();
-      } else if (e.key === COLOR_MODE_STORAGE_KEY && e.newValue)
-        setColorModeRaw(e.newValue as ColorMode);
-      else if (e.key === GRADIENT_MODE_STORAGE_KEY && e.newValue) {
-        setGradientModeRaw(e.newValue as GradientMode);
+      } else if (key === COLOR_MODE_STORAGE_KEY && value)
+        setColorModeRaw(value as ColorMode);
+      else if (key === GRADIENT_MODE_STORAGE_KEY && value) {
+        setGradientModeRaw(value as GradientMode);
         clearPreviews();
-      } else if (e.key === GRADIENT_COLOR_STORAGE_KEY && e.newValue) {
-        setGradientColorRaw(e.newValue as GradientColor);
+      } else if (key === GRADIENT_COLOR_STORAGE_KEY && value) {
+        setGradientColorRaw(value as GradientColor);
         clearPreviews();
       }
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    });
   }, [clearPreviews]);
 
   const setThemeId = useCallback((id: string) => {

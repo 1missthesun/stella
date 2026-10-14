@@ -114,14 +114,12 @@ export function I18nProviderBase({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const handler = (event: StorageEvent) => {
-      if (event.key !== LOCALE_STORAGE_KEY || !event.newValue) return;
-      if (!isSupportedLocale(event.newValue)) return;
-      if (event.newValue === locale) return;
-      setLocaleState(event.newValue);
-    };
-    window.addEventListener("storage", handler);
-    return () => window.removeEventListener("storage", handler);
+    return uiState.onExternalChange((key, value) => {
+      if (key !== LOCALE_STORAGE_KEY || !value) return;
+      if (!isSupportedLocale(value)) return;
+      if (value === locale) return;
+      setLocaleState(value);
+    });
   }, [locale]);
 
   useEffect(() => {

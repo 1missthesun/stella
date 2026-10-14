@@ -43,10 +43,10 @@ export const setNativeFontSmoothingEnabled = (enabled: boolean) => {
 
 export const useNativeFontSmoothingEnabled = (): boolean => {
   const subscribe = useCallback((onStoreChange: () => void) => {
-    window.addEventListener("storage", onStoreChange);
+    const stopExternal = uiState.onExternalChange(onStoreChange);
     window.addEventListener(NATIVE_FONT_SMOOTHING_CHANGED_EVENT, onStoreChange);
     return () => {
-      window.removeEventListener("storage", onStoreChange);
+      stopExternal();
       window.removeEventListener(
         NATIVE_FONT_SMOOTHING_CHANGED_EVENT,
         onStoreChange,

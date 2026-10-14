@@ -52,13 +52,12 @@ export const useActiveEmojiPack = (): [
   );
   useEffect(() => {
     const sync = () => setPack(readActiveEmojiPack());
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === ACTIVE_EMOJI_PACK_KEY) sync();
-    };
-    window.addEventListener("storage", onStorage);
+    const stopExternal = uiState.onExternalChange((key) => {
+      if (key === ACTIVE_EMOJI_PACK_KEY) sync();
+    });
     window.addEventListener("stella-active-emoji-pack-change", sync);
     return () => {
-      window.removeEventListener("storage", onStorage);
+      stopExternal();
       window.removeEventListener("stella-active-emoji-pack-change", sync);
     };
   }, []);

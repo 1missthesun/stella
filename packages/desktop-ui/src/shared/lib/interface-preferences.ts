@@ -72,10 +72,10 @@ export const setReduceMotionPreference = (
 
 export const useInterfacePreferences = () => {
   const subscribe = useCallback((onStoreChange: () => void) => {
-    window.addEventListener("storage", onStoreChange);
+    const stopExternal = uiState.onExternalChange(onStoreChange);
     window.addEventListener(INTERFACE_PREFERENCES_CHANGED_EVENT, onStoreChange);
     return () => {
-      window.removeEventListener("storage", onStoreChange);
+      stopExternal();
       window.removeEventListener(
         INTERFACE_PREFERENCES_CHANGED_EVENT,
         onStoreChange,

@@ -12,6 +12,7 @@ import { CloudBrowserTakeoverSection } from "./CloudBrowserTakeoverSection";
 import { UpdatesSection } from "./UpdatesSection";
 import { EmailDigestSection } from "./EmailDigestSection";
 import { ScheduleSection } from "./ScheduleSection";
+import { RetainedSurface } from "@/ui/retained-surface";
 import "./sidebar-sections.css";
 
 const PER_ITEM_BODIES = {
@@ -22,16 +23,15 @@ const PER_ITEM_BODIES = {
 
 function SectionHost({ section, active, children }) {
   return (
-    <div
+    <RetainedSurface
+      active={active}
       className="sidebar-section"
       data-section={section}
       data-active={active ? "true" : undefined}
       role="tabpanel"
-      aria-hidden={!active}
-      inert={!active}
     >
       {children}
-    </div>
+    </RetainedSurface>
   );
 }
 

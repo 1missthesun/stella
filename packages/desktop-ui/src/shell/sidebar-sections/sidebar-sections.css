@@ -1,17 +1,3 @@
-/* Section hosts inside the display panel body — see `SidebarSectionBody.tsx`.
-
-   All three panel-owned sections are mounted at once and stacked; only the
-   active one is visible. Home/Activity is a separate shell surface.
-
-   Hiding is `visibility` + `content-visibility`, never `display: none`.
-   `display: none` destroys the subtree's layout boxes, and browsers do not
-   restore scroll offsets through that — which would silently break the promise
-   the always-mounted design exists to make. Two sections depend on it
-   concretely: Files hosts canvas iframes, and Apps hosts live user apps whose
-   scroll position and media state have to survive a tab switch.
-   `content-visibility: hidden` gets the same skipped rendering work and the
-   same offscreen IntersectionObserver reading, while keeping the boxes. */
-
 .sidebar-section {
   position: absolute;
   inset: 0;
@@ -20,16 +6,10 @@
   min-height: 0;
   min-width: 0;
   overflow: hidden;
-  visibility: hidden;
-  content-visibility: hidden;
-  pointer-events: none;
 }
 
 .sidebar-section[data-active="true"] {
   position: relative;
-  visibility: visible;
-  content-visibility: visible;
-  pointer-events: auto;
   flex: 1 1 auto;
 }
 

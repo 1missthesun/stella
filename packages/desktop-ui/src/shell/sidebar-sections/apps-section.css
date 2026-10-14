@@ -135,11 +135,6 @@
   max-width: 34ch;
 }
 
-/* App surfaces. Every retained app is stacked here at full size; only the one
-   the user opened is visible. `content-visibility: hidden` on the rest keeps
-   their DOM state — unlike `display: none` — while rendering work is skipped
-   and element-visibility signals (IntersectionObserver, element timing) read
-   as offscreen, so visible-only work in hidden apps pauses naturally. */
 .persistent-cloud-app-surface {
   position: absolute;
   inset: 0;
@@ -147,15 +142,6 @@
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  visibility: hidden;
-  pointer-events: none;
-  content-visibility: hidden;
-}
-
-.persistent-cloud-app-surface--active {
-  visibility: visible;
-  pointer-events: auto;
-  content-visibility: visible;
 }
 
 .persistent-user-app-status {

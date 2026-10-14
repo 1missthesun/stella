@@ -1,0 +1,5 @@
+[data-retained-surface="suspended"] {
+  visibility: hidden;
+  content-visibility: hidden;
+  pointer-events: none;
+}

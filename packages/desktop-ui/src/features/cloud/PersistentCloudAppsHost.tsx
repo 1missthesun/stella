@@ -9,6 +9,7 @@ import { CloudBoundary } from "./CloudBoundary";
 import { cloudAppTitles } from "./cloud-app-title-store";
 import { cloudAppIdFromLocation } from "./open-cloud-app-panel";
 import type { CloudAppsState } from "./use-cloud-apps";
+import { RetainedSurface } from "@/ui/retained-surface";
 
 function AccountScopedCloudAppsHost({ state }: { state: CloudAppsState }) {
   const openLocation = useSidebarSectionLocation("apps");
@@ -52,7 +53,7 @@ function AccountScopedCloudAppsHost({ state }: { state: CloudAppsState }) {
 
   if (openAppId && state.phase !== "ready") {
     return (
-      <div className="persistent-cloud-app-surface persistent-cloud-app-surface--active">
+      <div className="persistent-cloud-app-surface">
         <div
           className="persistent-user-app-status"
           role={state.phase === "error" ? "alert" : "status"}
@@ -73,13 +74,10 @@ function AccountScopedCloudAppsHost({ state }: { state: CloudAppsState }) {
         if (!app) return null;
         const active = openAppId === appId;
         return (
-          <div
+          <RetainedSurface
             key={appId}
-            className={`persistent-cloud-app-surface${
-              active ? " persistent-cloud-app-surface--active" : ""
-            }`}
-            aria-hidden={!active}
-            inert={!active}
+            active={active}
+            className="persistent-cloud-app-surface"
           >
             <CloudBoundary
               fallback={
@@ -91,7 +89,7 @@ function AccountScopedCloudAppsHost({ state }: { state: CloudAppsState }) {
             >
               <CloudAppPanel slug={app.slug} />
             </CloudBoundary>
-          </div>
+          </RetainedSurface>
         );
       })}
     </>

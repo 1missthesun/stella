@@ -201,19 +201,6 @@
   min-height: 0;
 }
 
-/* Panel closed. The section host stays mounted so nothing inside it loses
-   state — canvas iframes keep their browsing context, user apps keep running,
-   and every scroller keeps its offset — but it must cost nothing while the
-   panel is shut. `content-visibility: hidden` skips its rendering work and
-   makes element-visibility signals read as offscreen, and `visibility`
-   removes it from hit-testing, all without destroying the layout boxes that
-   `display: none` would take scroll positions down with. */
-.right-sidebar__active--kept {
-  visibility: hidden;
-  content-visibility: hidden;
-  pointer-events: none;
-}
-
 .right-sidebar__rich {
   flex: 1;
   min-height: 0;

@@ -23,6 +23,7 @@ import {
 import { payloadToTabSpec } from "./display/payload-to-tab-spec";
 import { SidebarSectionBody } from "@/shell/sidebar-sections/SidebarSectionBody";
 import { useT } from "@/shared/i18n";
+import { RetainedSurface } from "@/ui/retained-surface";
 import "./right-sidebar.css";
 import "./right-sidebar-panel.css";
 import "./shell-junction.css";
@@ -330,18 +331,10 @@ export const RightSidebar = memo(forwardRef<
         />
       ) : null}
       <div className="right-sidebar-inner right-sidebar-panel__frame">
-        {/* All panel-owned sections stay mounted; only the active one displays,
-            and the host itself survives the panel closing. Files' canvas
-            iframes and Apps' running user apps both lose their state to an
-            unmount, so neither a tab switch nor a close may remove them. */}
         <div className="right-sidebar-panel__body">
-          <div
-            className={`right-sidebar__active${
-              panelOpen ? "" : " right-sidebar__active--kept"
-            }`}
-          >
+          <RetainedSurface active={panelOpen} className="right-sidebar__active">
             <SidebarSectionBody />
-          </div>
+          </RetainedSurface>
         </div>
       </div>
     </aside>,

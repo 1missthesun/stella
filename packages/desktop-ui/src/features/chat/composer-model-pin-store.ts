@@ -1,30 +1,11 @@
 import { useSyncExternalStore } from "react";
-import { uiState } from "@/platform/ui-state";
 
 type Listener = () => void;
 
-const STORAGE_KEY = "stella.composer.modelPickerPinned";
-
-const readPersistedPinned = (): boolean => {
-  if (typeof window === "undefined") return false;
-  return uiState.getItem(STORAGE_KEY) === "1";
-};
-
-const writePersistedPinned = (next: boolean): void => {
-  if (typeof window === "undefined") return;
-  if (next) uiState.setItem(STORAGE_KEY, "1");
-  else uiState.removeItem(STORAGE_KEY);
-};
-
-// The pin always starts off. Nothing on desktop currently turns it on, so a
-// value left behind by an older build must not force the composer into its
-// expanded rectangle; drop any stale persisted flag rather than restoring it.
 let isPinned = false;
-if (readPersistedPinned()) writePersistedPinned(false);
 const listeners = new Set<Listener>();
 
 const emit = (): void => {
-  writePersistedPinned(isPinned);
   for (const listener of listeners) listener();
 };
 

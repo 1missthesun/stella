@@ -329,7 +329,7 @@ fn chrome_launch_error(message: &str, stderr_lines: &[String]) -> String {
         let lower = l.to_lowercase();
         lower.contains("sandbox") || lower.contains("namespace")
     }) {
-        "\nHint: try --args \"--no-sandbox\" (required in containers, VMs, and some Linux setups)"
+        "\nHint: this host has no usable Chrome sandbox (common in containers and CI). If that is expected, launch with --args \"--no-sandbox\" or set STELLA_BROWSER_ARGS=--no-sandbox."
     } else {
         ""
     };
@@ -525,42 +525,20 @@ fn get_chrome_user_data_dirs() -> Vec<PathBuf> {
 
 /// Returns true if Chrome's sandbox should be disabled because the environment
 /// doesn't support it (containers, VMs, CI runners, running as root).
+/// Chrome refuses to start sandboxed as root, so that is the only case the
+/// sandbox is dropped without the caller passing `--no-sandbox` (via `--args`
+/// or STELLA_BROWSER_ARGS). Anywhere else a host without a usable sandbox fails
+/// the launch with a hint instead of silently browsing unsandboxed.
 fn should_disable_sandbox(existing_args: &[String]) -> bool {
     if existing_args.iter().any(|a| a == "--no-sandbox") {
-        return false; // already set by user
+        return false;
     }
-
-    // CI environments (GitHub Actions, GitLab CI, etc.) often lack user namespace
-    // support due to AppArmor or kernel restrictions.
-    if std::env::var("CI").is_ok() {
-        return true;
-    }
-
     #[cfg(unix)]
     {
-        // Root user -- standard container default, Chrome sandbox requires non-root
         if unsafe { libc::geteuid() } == 0 {
             return true;
         }
-
-        // Docker container
-        if Path::new("/.dockerenv").exists() {
-            return true;
-        }
-
-        // Podman container
-        if Path::new("/run/.containerenv").exists() {
-            return true;
-        }
-
-        // Generic container detection: cgroup contains docker/kubepods/lxc
-        if let Ok(cgroup) = std::fs::read_to_string("/proc/1/cgroup") {
-            if cgroup.contains("docker") || cgroup.contains("kubepods") || cgroup.contains("lxc") {
-                return true;
-            }
-        }
     }
-
     false
 }
 

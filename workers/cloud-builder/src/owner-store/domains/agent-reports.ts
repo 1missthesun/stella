@@ -5,6 +5,7 @@ import {
   type AgentReportOutcome,
   type DeviceAgentReport,
   AGENT_REPORT_MAX_CHARS,
+  silentRunReport,
 } from "@stella/contracts/backend/agent-reports";
 import { AGENT_STOPPED_REASON, isAgentStopReason } from "@stella/contracts/agent-status";
 import { agentChangeHooks, appendAgentEvent } from "./agent-events.js";
@@ -20,6 +21,10 @@ import type {
 } from "../registry.js";
 
 export const AGENT_REPORT_JOB = "agentReports.deliver";
+export const AGENT_REPORT_AUDIT_JOB = "agentReports.audit";
+const REPORT_AUDIT_FIRST_MS = 3 * 60_000;
+const REPORT_AUDIT_MAX_MS = 60 * 60_000;
+const REPORT_AUDIT_CHECKS_MAX = 12;
 
 const LIVE_STATUSES = new Set([
   "queued",
@@ -34,7 +39,7 @@ const WORKING_STATUSES_SQL =
 const REPORTABLE = new Set<string>(["completed", "failed", "canceled"]);
 const REPORT_TEXT_MAX_CHARS = AGENT_REPORT_MAX_CHARS;
 
-const boundReportText = (text: string, threadId: string): string =>
+export const boundReportText = (text: string, threadId: string): string =>
   text.length <= REPORT_TEXT_MAX_CHARS
     ? text
     : `${text.slice(0, REPORT_TEXT_MAX_CHARS)}\n\n[Report shortened: ${text.length - REPORT_TEXT_MAX_CHARS} more characters are on thread_id ${threadId}.]`;
@@ -186,22 +191,22 @@ const requesterOf = (db: OwnerDbReader, thread: ThreadRow): Requester =>
       }
     : { kind: "conversation", conversationId: conversationOf(thread) };
 
+export const resultTextOf = (resultJson: string | null): string => {
+  if (!resultJson) return "";
+  try {
+    const parsed = JSON.parse(resultJson) as { finalText?: unknown };
+    if (parsed && typeof parsed === "object" && "finalText" in parsed) {
+      return typeof parsed.finalText === "string" ? parsed.finalText.trim() : "";
+    }
+  } catch {
+    return resultJson.trim();
+  }
+  return resultJson.trim();
+};
+
 const reportText = (thread: ThreadRow, outcome: AgentReportOutcome): string => {
   if (outcome === "completed") {
-    let text = thread.result_json ?? "";
-    if (thread.result_json) {
-      try {
-        const parsed = JSON.parse(thread.result_json) as {
-          finalText?: unknown;
-        };
-        if (typeof parsed.finalText === "string" && parsed.finalText.trim()) {
-          text = parsed.finalText;
-        }
-      } catch {
-        text = thread.result_json;
-      }
-    }
-    return boundReportText(text.trim() || "No result was reported.", thread.thread_id);
+    return boundReportText(resultTextOf(thread.result_json) || silentRunReport({}), thread.thread_id);
   }
   return boundReportText(
     thread.error_message?.trim() ||
@@ -228,6 +233,40 @@ const scheduleDelivery = (
   );
 };
 
+const auditJobId = (threadId: string, attemptGeneration: number): string =>
+  `agent-report-audit:${threadId}:${attemptGeneration}`;
+
+const scheduleAudit = (
+  db: OwnerDb,
+  thread: Pick<ThreadRow, "thread_id" | "attempt_generation">,
+  runAt: number,
+  checks: number,
+  replace: boolean,
+): void => {
+  db.run(
+    `INSERT INTO owner_jobs (id, kind, run_at, payload, attempts) VALUES (?, ?, ?, ?, 0)
+     ON CONFLICT (id) DO ${replace ? "UPDATE SET run_at = excluded.run_at, payload = excluded.payload, attempts = 0" : "NOTHING"}`,
+    auditJobId(thread.thread_id, thread.attempt_generation),
+    AGENT_REPORT_AUDIT_JOB,
+    Math.max(0, Math.floor(runAt)),
+    JSON.stringify({
+      threadId: thread.thread_id,
+      attemptGeneration: thread.attempt_generation,
+      checks,
+    }),
+  );
+};
+
+/** A finished agent whose report waits for its own agents still at work. */
+export const reportHeldForHelpers = (
+  db: OwnerDbReader,
+  thread: Pick<ThreadRow, "thread_id" | "attempt_generation" | "status" | "origin_delivery_ack_at">,
+): boolean =>
+  thread.status === "completed" &&
+  thread.origin_delivery_ack_at === null &&
+  !readOutbox(db, agentReportId(thread.thread_id, thread.attempt_generation)) &&
+  liveDescendants(db, thread.thread_id).length > 0;
+
 export const deriveAgentReport = (
   db: OwnerDb,
   threadId: string,
@@ -243,6 +282,7 @@ export const deriveAgentReport = (
   ) {
     return;
   }
+  scheduleAudit(db, thread, now + REPORT_AUDIT_FIRST_MS, 0, false);
   const outcome = thread.status as AgentReportOutcome;
   const queued = queuedInput(db, thread);
   const helpers =
@@ -383,6 +423,9 @@ const settle = (
   }
   if (state === "dropped" && row.requester_kind === "agent") {
     deriveJobReports(ctx.db, row.requester_id, ctx.now);
+  }
+  if (state === "dropped" && row.kind === "report") {
+    scheduleAudit(ctx.db, { thread_id: row.thread_id, attempt_generation: row.attempt_generation }, ctx.now, REPORT_AUDIT_CHECKS_MAX - 1, true);
   }
 };
 
@@ -572,6 +615,111 @@ const deliver = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   }
 };
 
+const missingReportNote = (
+  ctx: OwnerContext,
+  thread: ThreadRow,
+  reason: string,
+): void => {
+  const requester = requesterOf(ctx.db, thread);
+  appendAgentEvent(ctx.db, {
+    key: `report_missing:${thread.thread_id}:${thread.attempt_generation}`,
+    kind: "report_missing",
+    source: "owner:report-audit",
+    threadId: thread.thread_id,
+    conversationId: thread.conversation_id,
+    attemptGeneration: thread.attempt_generation,
+    status: thread.status,
+    detail: { reason },
+    createdAt: ctx.now,
+  });
+  if (requester.kind !== "conversation" || !conversationExists(ctx.db, requester.conversationId)) return;
+  const outcome = thread.status as AgentReportOutcome;
+  queueStellaNote(ctx, {
+    noteId: `missing:${agentReportReceipt(agentReportId(thread.thread_id, thread.attempt_generation))}`,
+    conversationId: requester.conversationId,
+    ownerGeneration: thread.owner_generation ?? "",
+    fromThreadId: thread.thread_id,
+    text: [
+      "[Agent report missing]",
+      `description: ${thread.description}`,
+      `thread_id: ${thread.thread_id}`,
+      `status: ${thread.status}`,
+      `problem: it finished, but its report could not be delivered (${reason}).`,
+      `${outcome === "completed" ? "result" : "error"}: ${reportText(thread, outcome)}`,
+    ].join("\n"),
+  });
+};
+
+// Every finished attempt gets one look a few minutes later: a report that was
+// never derived is derived now, one that was dropped is told to Stella, and a
+// report still waiting (helpers at work, an offline computer) is looked at again.
+const auditReport = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
+  const args = payload as { threadId?: unknown; attemptGeneration?: unknown; checks?: unknown } | null;
+  if (typeof args?.threadId !== "string" || typeof args.attemptGeneration !== "number") return;
+  const checks = typeof args.checks === "number" ? args.checks : 0;
+  const thread = readThread(ctx.db, args.threadId);
+  if (!thread || thread.attempt_generation !== args.attemptGeneration || !REPORTABLE.has(thread.status)) return;
+  if (thread.status === "canceled" && isAgentStopReason(thread.error_message)) return;
+  if (thread.origin_delivery_ack_at !== null) return;
+  const again = () => {
+    if (checks + 1 >= REPORT_AUDIT_CHECKS_MAX) return;
+    scheduleAudit(
+      ctx.db,
+      thread,
+      ctx.now + Math.min(REPORT_AUDIT_MAX_MS, REPORT_AUDIT_FIRST_MS * 2 ** (checks + 1)),
+      checks + 1,
+      true,
+    );
+  };
+  const reportId = agentReportId(thread.thread_id, thread.attempt_generation);
+  let row = readOutbox(ctx.db, reportId);
+  if (!row) {
+    deriveAgentReport(ctx.db, thread.thread_id, ctx.now);
+    row = readOutbox(ctx.db, reportId);
+    if (row) {
+      appendAgentEvent(ctx.db, {
+        key: `report_missing:${reportId}:derived`,
+        kind: "report_missing",
+        source: "owner:report-audit",
+        threadId: thread.thread_id,
+        conversationId: thread.conversation_id,
+        attemptGeneration: thread.attempt_generation,
+        status: thread.status,
+        detail: { recovered: "derived" },
+        createdAt: ctx.now,
+      });
+      again();
+      return;
+    }
+    if (queuedInput(ctx.db, thread) || liveDescendants(ctx.db, thread.thread_id).length > 0) {
+      again();
+      return;
+    }
+    missingReportNote(ctx, thread, "no report was ever recorded for it");
+    return;
+  }
+  if (row.state === "delivered") return;
+  if (row.state === "dropped") {
+    const dropped = ctx.db.one<{ detail: string | null }>(
+      "SELECT detail FROM agent_events WHERE event_key = ?",
+      `report_dropped:${reportId}`,
+    );
+    let reason = "delivery kept failing";
+    try {
+      const detail = JSON.parse(dropped?.detail ?? "{}") as { reason?: unknown };
+      if (typeof detail.reason === "string" && detail.reason.trim()) reason = detail.reason.trim().slice(0, 300);
+    } catch {
+      // The default reason stands.
+    }
+    if (reason !== "conversation_gone") missingReportNote(ctx, thread, reason);
+    return;
+  }
+  if (!ctx.db.one("SELECT 1 AS found FROM owner_jobs WHERE id = ?", deliveryJobId(reportId))) {
+    scheduleDelivery(ctx.db, reportId, ctx.now);
+  }
+  again();
+};
+
 export const queueStellaNote = (
   ctx: OwnerContext,
   args: {
@@ -723,6 +871,10 @@ export const agentReportsDomain = {
     [AGENT_REPORT_JOB]: {
       run: deliver,
       maxAttempts: REPORT_DELIVERY_ATTEMPTS_MAX + 5,
+    },
+    [AGENT_REPORT_AUDIT_JOB]: {
+      run: auditReport,
+      maxAttempts: 3,
     },
   },
 } satisfies OwnerDomain;

@@ -55,6 +55,7 @@ import {
   AGENT_REPORT_NOTE_MAX_CHARS,
   agentReportId,
   agentReportReceipt,
+  isPlaceholderAgentResult,
 } from "@stella/contracts/backend/agent-reports";
 import { isPlacementThreadId, placementRemoteThreadAgentId } from "@stella/contracts/placement-thread-id";
 import { OWNER_GENERATION_STALE } from "@stella/contracts/backend/protocol";
@@ -71,7 +72,7 @@ import { TURN_ATTACHMENTS_MAX, type AgentWorkspaceSize } from "@stella/contracts
 import { parseCloudExecutionSelection } from "../../turn-start-request.js";
 import { normalizeDrivePath } from "./drive.js";
 import { endedKind, recordAgentChange, startedKind } from "./agent-events.js";
-import { queueStellaNote } from "./agent-reports.js";
+import { boundReportText, queueStellaNote, reportHeldForHelpers } from "./agent-reports.js";
 import { resolveCurrentDeviceId } from "./devices.js";
 import { setAgentLogHolder } from "./agent-logs.js";
 import { AGENT_LOG_CLOUD_HOLDER, agentLogDeviceHolder } from "@stella/contracts/backend/agent-logs";
@@ -1522,7 +1523,7 @@ const agentDirectory = async (
   const agents = [...rows.values()].map((row): AgentDirectoryAgentRow => {
     const deviceId = threadDeviceId(row);
     const device = deviceId ? devices.get(resolveCurrentDeviceId(ctx.db, deviceId)) : undefined;
-    const status = normalizeAgentDirectoryStatus(row.status);
+    const status = reportHeldForHelpers(ctx.db, row) ? "waiting_for_helpers" : normalizeAgentDirectoryStatus(row.status);
     const live = isLiveAgentStatus(status);
     return {
       threadId: row.thread_id,
@@ -2952,9 +2953,46 @@ const completeComputerThread = async (
   args: AgentThreadCalls["computerThreads.complete"]["args"],
 ): Promise<AgentThreadCalls["computerThreads.complete"]["result"]> => {
   await assertGeneration(ctx, args.ownerGeneration);
-  const row = readComputerThread(ctx.db, args);
-  if (!row) throw new RpcError("NOT_FOUND", "That agent no longer exists.");
+  const known = readComputerThread(ctx.db, args);
+  if (!known) throw new RpcError("NOT_FOUND", "That agent no longer exists.");
+  const result = args.result?.trim() ? args.result : undefined;
+  // A newer attempt whose start never arrived (the computer restarted, or its
+  // start was refused before sign-in) still ends here; dropping its terminal
+  // would lose its report.
+  if (args.attemptGeneration > known.attempt_generation) {
+    recordAgentChange(
+      ctx.db,
+      {
+        threadId: known.thread_id,
+        kind: startedKind,
+        source: `device:${args.originDeviceId}`,
+        detail: { executor: "local", startMissing: true },
+        now: ctx.now,
+      },
+      () =>
+        ctx.db.run(
+          `UPDATE agent_threads SET status = 'running', attempt_generation = ?, origin_delivery_ack_at = NULL,
+             result_json = NULL, error_message = NULL, updated_at = ?
+           WHERE thread_id = ? AND attempt_generation < ?`,
+          args.attemptGeneration,
+          ctx.now,
+          known.thread_id,
+          args.attemptGeneration,
+        ),
+    );
+  }
+  const row = readComputerThread(ctx.db, args) ?? known;
   if (row.attempt_generation !== args.attemptGeneration || row.status !== "running") {
+    if (
+      row.attempt_generation === args.attemptGeneration &&
+      row.status === "completed" &&
+      args.status === "completed" &&
+      result !== undefined &&
+      !isPlaceholderAgentResult(JSON.stringify({ finalText: result })) &&
+      isPlaceholderAgentResult(row.result_json)
+    ) {
+      return upgradePlaceholderResult(ctx, row, result, args.originDeviceId);
+    }
     return { updated: false, status: row.status };
   }
   const status = agentThreadTerminalStatus(args.status);
@@ -2967,7 +3005,7 @@ const completeComputerThread = async (
         `UPDATE agent_threads SET status = ?, result_json = ?, error_message = ?, updated_at = ?
           WHERE thread_id = ?`,
         status,
-        args.result !== undefined ? JSON.stringify({ finalText: args.result }) : null,
+        result !== undefined ? JSON.stringify({ finalText: result }) : null,
         error,
         ctx.now,
         row.thread_id,
@@ -2975,9 +3013,47 @@ const completeComputerThread = async (
   );
   await postAgentLifecycleCard(ctx, row, {
     kind: status,
-    text: status === "completed" ? args.result : error,
+    text: status === "completed" ? result : error,
   });
   return { updated: true, status };
+};
+
+// The first terminal for an attempt wins. When that one carried no words (a
+// settle racing the real terminal), the real result replaces it, and so does
+// the report while it has not reached its requester yet.
+const upgradePlaceholderResult = (
+  ctx: OwnerContext,
+  row: ThreadRow,
+  result: string,
+  originDeviceId: string,
+): { updated: boolean; status: string } => {
+  const resultJson = JSON.stringify({ finalText: result });
+  recordAgentChange(
+    ctx.db,
+    {
+      threadId: row.thread_id,
+      kind: "result_replaced",
+      key: `result_replaced:${row.thread_id}:${row.attempt_generation}`,
+      source: `device:${originDeviceId}`,
+      now: ctx.now,
+    },
+    () => {
+      ctx.db.run(
+        "UPDATE agent_threads SET result_json = ? WHERE thread_id = ? AND attempt_generation = ?",
+        resultJson,
+        row.thread_id,
+        row.attempt_generation,
+      );
+      ctx.db.run(
+        `UPDATE agent_report_outbox SET text = ?, updated_at = ?
+          WHERE report_id = ? AND kind = 'report' AND state IN ('pending', 'offered')`,
+        boundReportText(result, row.thread_id),
+        ctx.now,
+        agentReportId(row.thread_id, row.attempt_generation),
+      );
+    },
+  );
+  return { updated: true, status: row.status };
 };
 
 const cancelComputerThread = async (

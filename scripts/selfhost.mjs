@@ -36,8 +36,8 @@ Options
   --subdomain <name>          workers.dev subdomain to register if the account has none
   --openrouter-key-file <f>   Optional OpenRouter key (or env OPENROUTER_API_KEY): read-aloud,
                               dictation and Stella's managed models
-  --cloud-agent-hours <n>     Cap on cloud agent container hours per month (default 40, 0 = no cap)
-  --cloud-agent-concurrency <n>  Cloud agents running at once (default 2)
+  --cloud-agent-hours <n>     Cloud agent container hours per month (default 40, 0 = no cap)
+  --cloud-agent-concurrency <n>  Cloud containers running at once (default 3, 0 = no cap)
   --ref <git ref>             update: deploy this ref instead of origin/master
   --no-fetch                  update: deploy this checkout as it is, without fetching
   --now                       update: skip the confirmation and the price-refresh wait
@@ -465,9 +465,9 @@ const buildConfigs = (state, { billing }) => {
     ADMIN_ACCESS_TEAM_DOMAIN: "off",
     ADMIN_ACCESS_AUD: "off",
     STELLA_OWNER_MODE: "1",
-      STELLA_CLOUD_AGENT_MONTHLY_HOURS: String(state.caps?.monthlyHours ?? 40),
-    STELLA_CLOUD_AGENT_MAX_CONCURRENT: String(state.caps?.maxConcurrent ?? 2),
-  });
+    });
+  if (state.caps?.monthlyHours !== undefined) vars.STELLA_CLOUD_AGENT_MONTHLY_HOURS = String(state.caps.monthlyHours);
+  if (state.caps?.maxConcurrent !== undefined) vars.STELLA_CLOUD_AGENT_MAX_CONCURRENT = String(state.caps.maxConcurrent);
   cb.vars = vars;
   delete cb.send_email;
   cb.artifacts = [{ binding: "ARTIFACTS", namespace: N.artifacts }];
@@ -1220,14 +1220,14 @@ const deployEverything = async (state, { first, waitForPrices }) => {
 };
 
 const applyCaps = (state) => {
-  state.caps ??= { monthlyHours: 40, maxConcurrent: 2 };
-  for (const [flag, key, min] of [
-    ["cloud-agent-hours", "monthlyHours", 0],
-    ["cloud-agent-concurrency", "maxConcurrent", 1],
+  state.caps ??= {};
+  for (const [flag, key] of [
+    ["cloud-agent-hours", "monthlyHours"],
+    ["cloud-agent-concurrency", "maxConcurrent"],
   ]) {
     if (options[flag] === undefined) continue;
     const value = Number(options[flag]);
-    if (!Number.isInteger(value) || value < min || value > 10_000) throw new Fatal(`--${flag} must be a whole number of at least ${min}.`);
+    if (!Number.isInteger(value) || value < 0 || value > 10_000) throw new Fatal(`--${flag} must be a whole number (0 turns the cap off).`);
     state.caps[key] = value;
   }
 };

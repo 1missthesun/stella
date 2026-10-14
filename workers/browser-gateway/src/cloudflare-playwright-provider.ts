@@ -40,6 +40,10 @@ import type {
   TrustedVerification,
   TrustedVerificationState,
 } from "./browser-provider.js";
+import {
+  isBrowserStorageSnapshot,
+  type BrowserStorageSnapshot,
+} from "./browser-provider.js";
 
 type BrowserWorker = { fetch: typeof fetch };
 
@@ -147,7 +151,7 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
 
   async ensure(args: {
     sessionId?: string;
-    storageState?: unknown;
+    storageState?: BrowserStorageSnapshot;
     allowedOrigins: readonly string[];
     onSessionAcquired: (sessionId: string, policyDigest: string) => void;
   }): Promise<void> {
@@ -200,11 +204,7 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     this.currentPolicyDigest = policyDigest;
     try {
       this.context = await browser.newContext(
-        args.storageState
-          ? ({ storageState: args.storageState } as unknown as Parameters<
-              Browser["newContext"]
-            >[0])
-          : undefined,
+        args.storageState ? { storageState: args.storageState } : undefined,
       );
       this.recordNetwork(this.context);
       this.page = this.context.pages()[0] ?? (await this.context.newPage());
@@ -579,19 +579,22 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
     await page.bringToFront();
   }
 
-  async storageState(): Promise<unknown> {
+  async storageState(): Promise<BrowserStorageSnapshot> {
     if (!this.context) throw new GatewayError("browser_unavailable", 503);
+    let state: unknown;
     try {
-      // @cloudflare/playwright 1.3.6 restores IndexedDB at runtime even though
-      // its published return type omits that field.
-      return (await this.context.storageState({ indexedDB: true })) as unknown;
+      state = await this.context.storageState({ indexedDB: true });
     } catch {
       throw new GatewayError("browser_unavailable", 503);
     }
+    if (!isBrowserStorageSnapshot(state)) {
+      throw new GatewayError("browser_unavailable", 503);
+    }
+    return state;
   }
 
   async verifyImportedStorageState(args: {
-    storageState: unknown;
+    storageState: BrowserStorageSnapshot;
     allowedOrigins: readonly string[];
     verification: TrustedVerification;
   }): Promise<void> {
@@ -608,7 +611,7 @@ export class CloudflarePlaywrightProvider implements BrowserBackend {
       temporaryBrowser = await connect(this.endpoint, acquired.sessionId);
       temporaryContext = await temporaryBrowser.newContext({
         storageState: args.storageState,
-      } as unknown as Parameters<Browser["newContext"]>[0]);
+      });
       const page =
         temporaryContext.pages()[0] ?? (await temporaryContext.newPage());
       await page.goto(args.verification.resumeUrl, {

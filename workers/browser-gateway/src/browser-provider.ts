@@ -82,10 +82,64 @@ export type TrustedVerificationState = "authenticated" | "logged_out";
 /** `pending`: the remote session may still be running and must be closed later. */
 export type RemoteCloseOutcome = "closed" | "pending";
 
+export type BrowserStorageCookie = {
+  name: string;
+  value: string;
+  domain: string;
+  path: string;
+  expires: number;
+  httpOnly: boolean;
+  secure: boolean;
+  sameSite: "Strict" | "Lax" | "None";
+};
+
+export type BrowserStorageOrigin = {
+  origin: string;
+  localStorage: Array<{ name: string; value: string }>;
+  indexedDB?: unknown[];
+};
+
+export type BrowserStorageSnapshot = {
+  cookies: BrowserStorageCookie[];
+  origins: BrowserStorageOrigin[];
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const isStorageCookie = (value: unknown): value is BrowserStorageCookie =>
+  isRecord(value) &&
+  typeof value.name === "string" &&
+  typeof value.value === "string" &&
+  typeof value.domain === "string" &&
+  typeof value.path === "string" &&
+  typeof value.expires === "number" &&
+  typeof value.httpOnly === "boolean" &&
+  typeof value.secure === "boolean" &&
+  (value.sameSite === "Strict" || value.sameSite === "Lax" || value.sameSite === "None");
+
+const isStorageOrigin = (value: unknown): value is BrowserStorageOrigin =>
+  isRecord(value) &&
+  typeof value.origin === "string" &&
+  Array.isArray(value.localStorage) &&
+  value.localStorage.every(
+    (entry) => isRecord(entry) && typeof entry.name === "string" && typeof entry.value === "string",
+  ) &&
+  (value.indexedDB === undefined || Array.isArray(value.indexedDB));
+
+export const isBrowserStorageSnapshot = (
+  value: unknown,
+): value is BrowserStorageSnapshot =>
+  isRecord(value) &&
+  Array.isArray(value.cookies) &&
+  value.cookies.every(isStorageCookie) &&
+  Array.isArray(value.origins) &&
+  value.origins.every(isStorageOrigin);
+
 export interface BrowserBackend {
   ensure(args: {
     sessionId?: string;
-    storageState?: unknown;
+    storageState?: BrowserStorageSnapshot;
     allowedOrigins: readonly string[];
     onSessionAcquired: (sessionId: string, policyDigest: string) => void;
   }): Promise<void>;
@@ -114,9 +168,9 @@ export interface BrowserBackend {
   wait(selector: string, timeoutMs: number): Promise<void>;
   tabs(): Promise<readonly SafeTab[]>;
   focusTab(tabId: string): Promise<void>;
-  storageState(): Promise<unknown>;
+  storageState(): Promise<BrowserStorageSnapshot>;
   verifyImportedStorageState(args: {
-    storageState: unknown;
+    storageState: BrowserStorageSnapshot;
     allowedOrigins: readonly string[];
     verification: TrustedVerification;
   }): Promise<void>;

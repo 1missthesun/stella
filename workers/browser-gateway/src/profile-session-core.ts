@@ -2,10 +2,13 @@ import {
   DEVICE_CODE_TTL_MS,
   type DeviceCodeFixtureBinding,
 } from "@stella/device-code-fixture/protocol";
-import type {
-  BrowserBackend,
-  SafeObservation,
-  TrustedVerification,
+import {
+  isBrowserStorageSnapshot,
+  type BrowserBackend,
+  type BrowserStorageCookie,
+  type BrowserStorageSnapshot,
+  type SafeObservation,
+  type TrustedVerification,
 } from "./browser-provider.js";
 import type {
   DeviceCodeFixtureClient,
@@ -96,22 +99,6 @@ type InteractionDetail = Readonly<{
   verificationUriComplete?: string;
   userCode?: string;
   loginUrl?: string;
-}>;
-
-type PlaywrightCookie = Readonly<{
-  name: string;
-  value: string;
-  domain: string;
-  path: string;
-  expires: number;
-  httpOnly: boolean;
-  secure: boolean;
-  sameSite: "Strict" | "Lax" | "None";
-}>;
-
-type ImportedStorageState = Readonly<{
-  cookies: readonly PlaywrightCookie[];
-  origins: readonly [];
 }>;
 
 const boundedString = (
@@ -309,10 +296,10 @@ const cookieDomainMatches = (hostname: string, domain: string): boolean => {
   return hostname === normalized || hostname.endsWith(`.${normalized}`);
 };
 
-const parseImportedStorageState = (
+const parseBrowserStorageSnapshot = (
   value: unknown,
   displayOrigin: string,
-): ImportedStorageState => {
+): BrowserStorageSnapshot => {
   const state = exactObject(value, ["cookies", "origins"]);
   if (
     !Array.isArray(state.cookies) ||
@@ -358,7 +345,7 @@ const parseImportedStorageState = (
       expires,
       httpOnly: cookie.httpOnly,
       secure: cookie.secure,
-      sameSite: cookie.sameSite as PlaywrightCookie["sameSite"],
+      sameSite: cookie.sameSite as BrowserStorageCookie["sameSite"],
     };
   });
   if (cookies.length === 0) {
@@ -559,22 +546,26 @@ export class BrowserProfileSessionCore {
 
   private async loadSnapshot(
     state: ProfileState,
-  ): Promise<unknown | undefined> {
+  ): Promise<BrowserStorageSnapshot | undefined> {
     if (!state.snapshot) return undefined;
     const object = await this.bucket.get(state.snapshot.key);
     if (!object) throw new GatewayError("snapshot_unavailable", 409);
     const bytes = new Uint8Array(await object.arrayBuffer());
-    return decryptStorageState({
+    const snapshot = await decryptStorageState({
       bytes,
       aad: this.aad(state, state.snapshot.revision),
       kekV1: this.kekV1,
       expectedObjectSha256: state.snapshot.objectSha256,
     });
+    if (!isBrowserStorageSnapshot(snapshot)) {
+      throw new GatewayError("snapshot_unavailable", 409);
+    }
+    return snapshot;
   }
 
   private async ensureBrowserWithStorageState(
     state: ProfileState,
-    storageState: unknown | undefined,
+    storageState: BrowserStorageSnapshot | undefined,
   ): Promise<ProfileState> {
     if (state.allowedOrigins.length < 1) {
       throw new GatewayError("bad_request", 400);
@@ -621,7 +612,7 @@ export class BrowserProfileSessionCore {
 
   private async checkpointStorageState(
     state: ProfileState,
-    storageState: unknown,
+    storageState: BrowserStorageSnapshot,
   ): Promise<ProfileState> {
     const revision = (state.snapshot?.revision ?? 0) + 1;
     const encrypted = await encryptStorageState({
@@ -1393,7 +1384,7 @@ export class BrowserProfileSessionCore {
     state: ProfileState,
     interaction: InteractionRecord,
     transfer: EncryptedSessionTransfer,
-  ): Promise<ImportedStorageState> {
+  ): Promise<BrowserStorageSnapshot> {
     const encryptedPrivateKey =
       interaction.verification?.sessionTransferCapability;
     if (
@@ -1437,7 +1428,7 @@ export class BrowserProfileSessionCore {
         displayOrigin: interaction.displayOrigin,
       },
     });
-    return parseImportedStorageState(storageState, interaction.displayOrigin);
+    return parseBrowserStorageSnapshot(storageState, interaction.displayOrigin);
   }
 
   async importSessionTransfer(envelope: InteractionEnvelope): Promise<unknown> {
@@ -1462,7 +1453,7 @@ export class BrowserProfileSessionCore {
         verified: true,
       };
     }
-    let storageState: ImportedStorageState;
+    let storageState: BrowserStorageSnapshot;
     try {
       storageState = await this.importedStorageState(
         state,

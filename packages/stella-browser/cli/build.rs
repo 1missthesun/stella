@@ -322,7 +322,6 @@ fn generate_domain(
 
     for type_def in &domain.types {
         if !type_def.enum_values.is_empty() {
-            // Deduplicate enum variants (some CDP enums have duplicated PascalCase forms)
             let mut seen_variants = HashSet::new();
             output.push_str("    #[derive(Debug, Clone, Serialize, Deserialize)]\n");
             output.push_str(&format!("    pub enum {} {{\n", type_def.id));
@@ -334,12 +333,16 @@ fn generate_domain(
                 if variant.chars().next().is_some_and(|c| c.is_ascii_digit()) {
                     variant = format!("V{}", variant);
                 }
-                if seen_variants.insert(variant.clone()) {
-                    output.push_str(&format!(
-                        "        #[serde(rename = \"{}\")]\n        {},\n",
-                        val, variant
-                    ));
+                let base = variant.clone();
+                let mut ordinal = 2;
+                while !seen_variants.insert(variant.clone()) {
+                    variant = format!("{}{}", base, ordinal);
+                    ordinal += 1;
                 }
+                output.push_str(&format!(
+                    "        #[serde(rename = \"{}\")]\n        {},\n",
+                    val, variant
+                ));
             }
             output.push_str("    }\n\n");
         } else if type_def.type_kind == "object" && !type_def.properties.is_empty() {

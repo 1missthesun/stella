@@ -92,20 +92,22 @@ export function ServerSection({
         {servers.map((entry, index) => {
           const active = entry.id === launchServer.id;
           return (
-            <Pressable
+            <View
               key={entry.id}
-              testID={`server-row-${entry.id}`}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active, disabled: busy }}
-              accessibilityLabel={nameOf(entry)}
-              disabled={busy || active}
-              onPress={() => confirmSwitch(entry)}
-              style={({ pressed }) => [
-                styles.row,
-                index > 0 && styles.rowDivider,
-                pressed && styles.rowPressed,
-              ]}
+              style={[styles.row, index > 0 && styles.rowDivider]}
             >
+              <Pressable
+                testID={`server-row-${entry.id}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active, disabled: busy }}
+                accessibilityLabel={nameOf(entry)}
+                disabled={busy || active}
+                onPress={() => confirmSwitch(entry)}
+                style={({ pressed }) => [
+                  { flex: 1, flexDirection: "row", alignItems: "center" },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
               <Icon
                 name={entry.kind === "hosted" ? "cloud" : "monitor"}
                 size={18}
@@ -125,6 +127,7 @@ export function ServerSection({
               {active ? (
                 <Icon name="check" size={16} color={colors.accent} />
               ) : null}
+              </Pressable>
               {entry.kind === "self-hosted" ? (
                 <Pressable
                   accessibilityRole="button"
@@ -139,7 +142,7 @@ export function ServerSection({
                   <Icon name="trash" size={16} color={colors.textMuted} />
                 </Pressable>
               ) : null}
-            </Pressable>
+            </View>
           );
         })}
         <Pressable

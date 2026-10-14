@@ -1,4 +1,4 @@
-import { Platform } from "react-native";
+import { DevSettings, Platform } from "react-native";
 import * as Device from "expo-device";
 import * as Linking from "expo-linking";
 import type {
@@ -23,14 +23,19 @@ import { clearAccountChatData } from "./chat-account-cleanup";
 
 /** Restart the JS so every module picks up the newly active server. */
 export const reloadApp = async (): Promise<void> => {
-  try {
-    const Updates = await import("expo-updates");
-    await Updates.reloadAsync();
-    return;
-  } catch {
-    /* development builds: fall through */
+  // Release builds restart through expo-updates. In development builds it is
+  // disabled and its reload resolves without restarting, so use the dev one.
+  if (!__DEV__) {
+    try {
+      const Updates = await import("expo-updates");
+      if (Updates.isEnabled) {
+        await Updates.reloadAsync();
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
   }
-  const { DevSettings } = await import("react-native");
   DevSettings.reload();
 };
 

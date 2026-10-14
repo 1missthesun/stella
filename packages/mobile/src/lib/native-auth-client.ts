@@ -199,15 +199,15 @@ export const nativeBearerClient = ({ scheme }: NativeAuthClientOptions) => {
         });
       }
 
-      // better-fetch calls every fetch plugin's init with the ORIGINAL options
-      // object and keeps only the last plugin's return value, so a sibling
-      // plugin that mutates and returns that original discards anything we
-      // hand back in a copy. Mutate the shared object so our headers and
-      // callback rewrites survive whatever else joins the chain.
-      options.body = rewrittenBody;
-      options.credentials = "omit";
-      options.headers = headers;
-      return { url, options };
+      return {
+        url,
+        options: {
+          ...options,
+          body: rewrittenBody,
+          credentials: "omit",
+          headers,
+        },
+      };
     },
   };
 

@@ -476,7 +476,7 @@
       "video_generation": "Video oluşturma"
     },
     "capabilityRestriction": {
-      "genericDescription": "Bu özellik Stella Pro'ya dahildir. Kullanmak için planınızı yükseltin.",
+      "genericDescription": "Bu özellik tüm ücretli Stella planlarına dahildir. Açmak için planını yükselt.",
       "genericTitle": "Planınıza dahil değil",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Kullanılamıyor",
@@ -485,22 +485,6 @@
       "unavailable": "{capability} şu anda hiçbir planda kullanılamıyor.",
       "upgrade": "{capability} Stella {plan} planına dahildir. Kullanmak için planınızı yükseltin."
     },
-    "features": {
-      "assistant": "Kişisel asistan",
-      "codingAgent": "Kodlama ajanı",
-      "dictationReadAloud": "Dikte ve sesli okuma",
-      "multipleAgents": "Birden fazla aracı",
-      "research": "Araştırma ve bilgi işi"
-    },
-    "freeAllowance": {
-      "caption": "Denemek ücretsiz.",
-      "exhaustedCta": "Go'ya yükselt",
-      "exhaustedDescription": "10× daha yüksek kullanım için Go'ya yükseltin.",
-      "exhaustedTitle": "Free planı sınırına ulaştınız",
-      "label": "Free planı kullanımı",
-      "remaining": "Denemek ücretsiz."
-    },
-    "heading": "Planınızı seçin",
     "mobile": {
       "accessEnds": "Erişim {date} tarihinde sona erer",
       "alreadySubscribedTitle": "Zaten bir aboneliğin var",
@@ -508,7 +492,6 @@
       "currentPlanLabel": "Mevcut plan",
       "errorRetry": "Tekrar dene",
       "footnote": "Stella tarafından Stripe aracılığıyla faturalandırılır. İptal edilene kadar aylık yenilenir; istediğin zaman iptal et.",
-      "introLine": "İlk ay {introPrice}, sonrasında {price}/ay",
       "manage": "Aboneliği yönet",
       "manageWebNote": "Bu aboneliği web'deki Stella'da stella.sh adresinden yönetin veya iptal edin.",
       "pendingBody": "Ödemeyi tarayıcıda tamamla. Ödeme onaylanır onaylanmaz planın burada otomatik olarak güncellenir — yeniden başlatmana gerek yok.",
@@ -524,30 +507,96 @@
       "successBody": "Aboneliğin etkin. Daha yüksek limitlerin keyfini çıkar.",
       "successTitle": "Stella {plan} kullanıyorsun"
     },
-    "plans": {
-      "free": {
-        "tagline": "Denemek ücretsiz."
-      },
-      "go": {
-        "tagline": "10× daha yüksek kullanım"
-      },
-      "pro": {
-        "tagline": "Medya üretimi ve birden fazla aracı için en yüksek kullanım sınırları"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Erişim {date} tarihinde sona erer",
-      "lapseDescription": "{plan} planınız {date} tarihine kadar geçerli. Sonrasında Stella durur — Free planının kullanım hakkı tek seferlik ve sizinki zaten kullanıldı.",
-      "lapseTitle": "Planınız bitince Stella duracak",
-      "nextLabel": "Sonraki yenileme",
-      "pendingLabel": "İptal bekliyor",
-      "renews": "{date} tarihinde yenilenir"
-    },
-    "subtitle": "Ücretsiz başlayın. Daha fazlasına ihtiyacınız olduğunda yükseltin.",
     "upgradeDialog": {
       "cta": "Başlayın",
       "description": "Yükseltme için teşekkürler. Daha yüksek öncelik ve artırılmış kullanım şimdi etkin — devam edin.",
       "title": "Stella {plan} kullanıyorsunuz."
+    },
+    "v3": {
+      "opening": "Açılıyor…",
+      "signIn": {
+        "title": "Planını görmek için oturum aç",
+        "body": "Planın, kullanımın ve ek kredin Stella hesabına aittir."
+      },
+      "notice": {
+        "checkoutOpened": "Ödeme tarayıcında açıldı. Ödeme tamamlanınca burası güncellenir.",
+        "portalOpened": "Faturalandırma tarayıcında açıldı. Değişiklikler burada otomatik görünür.",
+        "checkoutFailed": "Ödeme şu anda başlatılamadı.",
+        "portalFailed": "Faturalandırma şu anda açılamadı."
+      },
+      "usage": {
+        "title": "Kullanım",
+        "lede": "Tek bir bütçe, Stella'nın senin için çalıştırdığı her şeyi öder.",
+        "ofMonth": "/ {amount} bu ay",
+        "ofOneTime": "/ {amount} Stella'yı denemek için",
+        "oneTimeNote": "Tek seferlik, sıfırlanmaz",
+        "of": "/ {amount}",
+        "used": "Kullanılan",
+        "held": "Süren işler için ayrıldı",
+        "heldHint": "Ajanlar ve medya işleri bitene kadar ayrılır. Kullanılmayan kısım geri gelir.",
+        "rolling": "Sonraki {hours} saat",
+        "rollingHint": "Herhangi bir {hours} saatte en fazla {amount}.",
+        "weekly": "Bu hafta",
+        "weeklyHint": "Haftada en fazla {amount}.",
+        "resets": "Sıfırlanma: {date}",
+        "startsNext": "Bir sonraki kullanımınla başlar",
+        "credit": "Ek kredi",
+        "creditHint": "Planının bütçesi bittiğinde kullanılır.",
+        "available": "Şu an kullanılabilir",
+        "availableHint": "Stella'nın şu anda harcayabileceği, kredi dahil.",
+        "unlimited": "Sınırsız",
+        "outTitle": "Şimdilik kullanımın bitti",
+        "outBody": "Bütçen sıfırlanma tarihi: {date}. Hemen devam etmek için kredi ekle veya yükselt.",
+        "outBodyNoDate": "Hemen devam etmek için kredi ekle veya yükselt.",
+        "freeOutTitle": "Ücretsiz kullanımını bitirdin",
+        "freeOutBody": "Devam etmek için bir plan seç veya kredi ekle.",
+        "creditTitle": "Ek krediyle çalışıyor",
+        "creditBody": "Planının sınırı {date} tarihine kadar doldu. O zamana kadar Stella'nın yaptıklarını kredi karşılar.",
+        "upgradeTo": "{plan} planına yükselt"
+      },
+      "plan": {
+        "title": "Plan",
+        "lede": "Her plan aynı Stella'yı çalıştırır. Büyük planlar daha büyük bütçe ve aynı anda daha fazla iş sağlar.",
+        "current": "Mevcut",
+        "perMonth": "{price}/ay",
+        "checkout": "Ödemeye devam et · {price}",
+        "checkoutHint": "Ödeme tarayıcında açılır. Bütçen hemen başlar.",
+        "upgrade": "{plan} planına yükselt · {price}",
+        "downgrade": "{plan} planına düşür · {price}",
+        "changeHint": "Değişikliği tarayıcında onaylayacaksın.",
+        "cancel": "Planı iptal et",
+        "cancelHint": "{plan} planın {date} tarihine kadar sürer, sonra Free'ye geçersin.",
+        "renews": "Yenilenme",
+        "renewsHint": "{price}, Stripe tarafından aylık faturalandırılır.",
+        "ends": "Bitiş",
+        "endsHint": "{plan} o zamana kadar açık kalır. Faturalandırmayı yönet bölümünden devam ettirebilirsin.",
+        "manage": "Ödeme ve faturalar",
+        "manageHint": "Kart, faturalar ve iptal.",
+        "manageButton": "Faturalandırmayı yönet"
+      },
+      "includes": {
+        "oneTime": "Stella'yı denemek için {amount}, bir kez",
+        "monthly": "Her ay {amount} kullanım",
+        "local": "Bilgisayarındaki ajanlar",
+        "cloud": "Bulut ajanları, aynı anda {count}",
+        "media": "Görsel, video, müzik ve 3D"
+      },
+      "credit": {
+        "title": "Ek kredi",
+        "lede": "Planının bütçesi bittiğinde Stella'nın çalışmaya devam etmesini sağlar.",
+        "balance": "Bakiye",
+        "add": "Kredi ekle",
+        "addHint": "Stripe ile tek seferlik ödeme. Abonelik yok.",
+        "addAmount": "{amount} ekle",
+        "other": "Diğer",
+        "invalid": "Dolar cinsinden bir tutar gir.",
+        "min": "En az {amount}.",
+        "max": "En fazla {amount}."
+      },
+      "mobile": {
+        "usageRow": "Bu ay",
+        "usageOneTime": "Ücretsiz kullanım"
+      }
     }
   },
   "chat": {

@@ -9,16 +9,57 @@ import {
 import { useMobileCheckout } from "../lib/use-mobile-checkout";
 import { useColors } from "../theme/theme-context";
 import { fonts } from "../theme/fonts";
-import { useT } from "../i18n";
+import { useLocale, useT } from "../i18n";
+import {
+  PAID_BILLING_PLANS,
+  PLAN_CATALOG,
+  isPaidBillingPlan,
+  normalizeBillingPlan,
+  planLabel as catalogPlanLabel,
+} from "@stella/contracts/billing-plans";
 import { PrimaryButton } from "./PrimaryButton";
 import { tapLight } from "../lib/haptics";
 
-const PAID_PLANS = ["go", "pro"];
+function formatAmount(dollars) {
+  if (typeof dollars !== "number" || !Number.isFinite(dollars)) return "";
+  const value = Math.max(0, dollars);
+  return Number.isInteger(value) ? `$${value}` : `$${value.toFixed(2)}`;
+}
 
-function formatPrice(cents) {
-  if (typeof cents !== "number" || !Number.isFinite(cents)) return "";
-  const dollars = Math.max(0, cents) / 100;
-  return Number.isInteger(dollars) ? `$${dollars}` : `$${dollars.toFixed(2)}`;
+function formatUsd(dollars) {
+  return `$${Math.max(0, dollars || 0).toFixed(2)}`;
+}
+
+function formatReset(ms, locale) {
+  if (typeof ms !== "number" || ms <= 0) return "";
+  const delta = ms - Date.now();
+  try {
+    return new Date(ms).toLocaleString(
+      locale,
+      delta < 24 * 60 * 60 * 1000
+        ? { hour: "numeric", minute: "2-digit" }
+        : delta < 7 * 24 * 60 * 60 * 1000
+          ? { weekday: "long", hour: "numeric", minute: "2-digit" }
+          : { month: "short", day: "numeric" },
+    );
+  } catch {
+    return "";
+  }
+}
+
+function planIncludes(plan, t) {
+  const def = PLAN_CATALOG[plan];
+  if (!def.interval) {
+    return [
+      t("billing.v3.includes.oneTime", { amount: formatAmount(def.budget.oneTimeUsd ?? def.budget.monthlyUsd) }),
+      t("billing.v3.includes.local"),
+    ];
+  }
+  return [
+    t("billing.v3.includes.monthly", { amount: formatAmount(def.budget.monthlyUsd) }),
+    t("billing.v3.includes.cloud", { count: def.limits.cloudAgentsAtOnce }),
+    ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
+  ];
 }
 
 function formatDate(ms) {
@@ -37,6 +78,7 @@ function formatDate(ms) {
 export function SubscriptionSection() {
   const colors = useColors();
   const t = useT();
+  const locale = useLocale();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const status = useBackendView("billing.status", {}).value;
@@ -48,18 +90,17 @@ export function SubscriptionSection() {
   const startedPlanRef = useRef(null);
   const debugTapRef = useRef(0);
 
-  const plan = status ? status.plan : "free";
+  const plan = normalizeBillingPlan(status ? status.plan : "free");
   const signedIn = Boolean(status && status.authenticated && !status.isAnonymous);
-  const isPaid = PAID_PLANS.includes(plan);
+  const isPaid = isPaidBillingPlan(plan);
   const eligible = storefront.status === "eligible";
-  const plans = status ? status.plans : null;
 
   const checkoutPhase = checkout.phase;
-  const currentPlan = status ? status.plan : null;
+  const currentPlan = status ? normalizeBillingPlan(status.plan) : null;
   useEffect(() => {
     if (
       checkoutPhase === "pending" &&
-      PAID_PLANS.includes(currentPlan) &&
+      isPaidBillingPlan(currentPlan) &&
       currentPlan !== startedPlanRef.current
     ) {
       setJustSubscribedPlan(currentPlan);
@@ -138,6 +179,7 @@ export function SubscriptionSection() {
           ) : null}
         </Pressable>
         {isPaid ? renderRenewal() : null}
+        {renderUsage()}
 
         {justSubscribedPlan ? renderSuccess() : null}
 
@@ -151,8 +193,84 @@ export function SubscriptionSection() {
   );
 
   function planLabel(key) {
-    if (plans && plans[key] && plans[key].label) return plans[key].label;
-    return key.charAt(0).toUpperCase() + key.slice(1);
+    return catalogPlanLabel(key);
+  }
+
+  function renderUsage() {
+    const usage = status ? status.usage : null;
+    if (!usage || !status || status.usagePolicy.kind !== "managed_cost") return null;
+    const oneTime = plan === "free" && usage.lifetimeLimitUsd !== null;
+    const used = oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd;
+    const limit = oneTime ? usage.lifetimeLimitUsd : usage.monthlyLimitUsd;
+    const percent = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
+    const heldPercent = limit > 0 ? Math.min(100 - percent, (usage.reservedUsd / limit) * 100) : 0;
+    const credit = status.credits ? status.credits.balanceUsd : 0;
+    const blocked = usage.availableUsd !== null && usage.availableUsd <= 0.0001;
+    const exceeded = oneTime
+      ? []
+      : [
+          [usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt],
+          [usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt],
+          [usage.monthlyUsedUsd, usage.monthlyLimitUsd, usage.monthlyResetsAt],
+        ].filter(([u, l]) => l > 0 && u >= l);
+    const resumesAt = exceeded.length ? Math.max(...exceeded.map((w) => w[2])) : null;
+    return (
+      <View style={styles.usage}>
+        <View style={styles.usageHead}>
+          <Text style={styles.currentPlanLabel}>
+            {oneTime ? t("billing.v3.mobile.usageOneTime") : t("billing.v3.mobile.usageRow")}
+          </Text>
+          <Text style={styles.usageValue}>
+            {formatUsd(used)}{" "}
+            <Text style={styles.usageMuted}>{t("billing.v3.usage.of", { amount: formatAmount(limit) })}</Text>
+          </Text>
+        </View>
+        <View
+          style={styles.track}
+          accessibilityRole="progressbar"
+          accessibilityValue={{ min: 0, max: 100, now: Math.round(percent) }}
+        >
+          <View style={[styles.fill, percent >= 100 && styles.fillFull, { width: `${percent}%` }]} />
+          {heldPercent > 0 ? <View style={[styles.held, { width: `${heldPercent}%` }]} /> : null}
+        </View>
+        <Text style={styles.usageMuted}>
+          {oneTime
+            ? t("billing.v3.usage.oneTimeNote")
+            : t("billing.v3.usage.resets", { date: formatReset(usage.monthlyResetsAt, locale) })}
+        </Text>
+        {usage.reservedUsd > 0 ? (
+          <Text style={styles.usageMuted}>
+            {t("billing.v3.usage.held")}: {formatUsd(usage.reservedUsd)}
+          </Text>
+        ) : null}
+        {credit > 0 ? (
+          <Text style={styles.usageMuted}>
+            {t("billing.v3.usage.credit")}: {formatUsd(credit)}
+          </Text>
+        ) : null}
+        {blocked ? (
+          <View style={[styles.banner, styles.bannerError]}>
+            <Text style={styles.bannerTitle}>
+              {oneTime ? t("billing.v3.usage.freeOutTitle") : t("billing.v3.usage.outTitle")}
+            </Text>
+            <Text style={styles.bannerBody}>
+              {oneTime
+                ? t("billing.v3.usage.freeOutBody")
+                : resumesAt
+                  ? t("billing.v3.usage.outBody", { date: formatReset(resumesAt, locale) })
+                  : t("billing.v3.usage.outBodyNoDate")}
+            </Text>
+          </View>
+        ) : resumesAt && credit > 0 ? (
+          <View style={[styles.banner, styles.bannerPending]}>
+            <Text style={styles.bannerTitle}>{t("billing.v3.usage.creditTitle")}</Text>
+            <Text style={styles.bannerBody}>
+              {t("billing.v3.usage.creditBody", { date: formatReset(resumesAt, locale) })}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    );
   }
 
   function renderRenewal() {
@@ -233,7 +351,7 @@ export function SubscriptionSection() {
     return (
       <>
         <Text style={styles.cardTitle}>{t("billing.mobile.chooseHeading")}</Text>
-        <Text style={styles.cardSubtitle}>{t("billing.subtitle")}</Text>
+        <Text style={styles.cardSubtitle}>{t("billing.v3.usage.lede")}</Text>
         {checkoutPhase === "error" && checkout.error ? (
           <View style={[styles.banner, styles.bannerError]}>
             <Text style={styles.bannerTitle}>
@@ -253,30 +371,21 @@ export function SubscriptionSection() {
             </Pressable>
           </View>
         ) : null}
-        {PAID_PLANS.map((key) => renderPlanRow(key, { subscribe: true }))}
+        {PAID_BILLING_PLANS.map((key) => renderPlanRow(key, { subscribe: true }))}
         <Text style={styles.footnote}>{t("billing.mobile.footnote")}</Text>
       </>
     );
   }
 
   function renderPlanRow(key, opts) {
-    const config = plans ? plans[key] : null;
-    const priceText = config ? formatPrice(config.monthlyPriceCents) : "";
-    const intro =
-      config && typeof config.introFirstMonthPriceCents === "number"
-        ? formatPrice(config.introFirstMonthPriceCents)
-        : null;
+    const priceText = formatAmount(PLAN_CATALOG[key].monthlyPriceCents / 100);
     const starting = checkoutPhase === "starting";
     return (
       <View key={key} style={styles.planRow}>
         <View style={styles.planInfo}>
           <Text style={styles.planName}>{planLabel(key)}</Text>
-          <Text style={styles.planTagline}>{t(`billing.plans.${key}.tagline`)}</Text>
-          <Text style={styles.planPrice}>
-            {intro
-              ? t("billing.mobile.introLine", { introPrice: intro, price: priceText })
-              : t("billing.mobile.perMonth", { price: priceText })}
-          </Text>
+          <Text style={styles.planTagline}>{planIncludes(key, t).join(" · ")}</Text>
+          <Text style={styles.planPrice}>{t("billing.mobile.perMonth", { price: priceText })}</Text>
         </View>
         {opts.subscribe ? (
           <PrimaryButton
@@ -350,6 +459,44 @@ const makeStyles = (colors) => ({
     fontFamily: fonts.sans.regular,
     fontSize: 13,
     marginTop: -4,
+  },
+  usage: {
+    gap: 6,
+  },
+  usageHead: {
+    alignItems: "baseline",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  usageValue: {
+    color: colors.text,
+    fontFamily: fonts.sans.semiBold,
+    fontSize: 16,
+    fontVariant: ["tabular-nums"],
+  },
+  usageMuted: {
+    color: colors.textMuted,
+    fontFamily: fonts.sans.regular,
+    fontSize: 13,
+  },
+  track: {
+    backgroundColor: colors.border,
+    borderRadius: 4,
+    flexDirection: "row",
+    height: 8,
+    overflow: "hidden",
+  },
+  fill: {
+    backgroundColor: colors.text,
+    height: "100%",
+  },
+  fillFull: {
+    backgroundColor: colors.danger ?? colors.text,
+  },
+  held: {
+    backgroundColor: colors.textMuted,
+    height: "100%",
+    opacity: 0.5,
   },
   planRow: {
     alignItems: "center",

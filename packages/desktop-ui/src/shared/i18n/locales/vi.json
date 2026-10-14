@@ -471,7 +471,7 @@
       "video_generation": "Tạo video"
     },
     "capabilityRestriction": {
-      "genericDescription": "Tính năng này có trong Stella Pro. Nâng cấp để mở khóa.",
+      "genericDescription": "Tính năng này có trong mọi gói trả phí của Stella. Nâng cấp để mở khóa.",
       "genericTitle": "Không có trong gói của bạn",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Không khả dụng",
@@ -480,22 +480,6 @@
       "unavailable": "{capability} hiện không có trong bất kỳ gói nào.",
       "upgrade": "{capability} có trong Stella {plan}. Nâng cấp để mở khóa tính năng này."
     },
-    "features": {
-      "assistant": "Trợ lý cá nhân",
-      "codingAgent": "Tác nhân lập trình",
-      "dictationReadAloud": "Đọc chính tả và đọc thành tiếng",
-      "multipleAgents": "Nhiều tác nhân",
-      "research": "Nghiên cứu và công việc tri thức"
-    },
-    "freeAllowance": {
-      "caption": "Dùng thử miễn phí.",
-      "exhaustedCta": "Nâng cấp lên Go",
-      "exhaustedDescription": "Nâng cấp lên Go để có mức sử dụng cao hơn 10×.",
-      "exhaustedTitle": "Bạn đã đạt giới hạn của gói Free",
-      "label": "Mức sử dụng gói Free",
-      "remaining": "Dùng thử miễn phí."
-    },
-    "heading": "Chọn gói của bạn",
     "mobile": {
       "accessEnds": "Quyền truy cập kết thúc vào {date}",
       "alreadySubscribedTitle": "Bạn đã có gói đăng ký",
@@ -503,7 +487,6 @@
       "currentPlanLabel": "Gói hiện tại",
       "errorRetry": "Thử lại",
       "footnote": "Do Stella thu phí qua Stripe. Tự động gia hạn hằng tháng cho đến khi hủy; hủy bất cứ lúc nào.",
-      "introLine": "{introPrice} tháng đầu, sau đó {price}/tháng",
       "manage": "Quản lý gói đăng ký",
       "manageWebNote": "Quản lý hoặc hủy gói đăng ký này trên Stella phiên bản web tại stella.sh.",
       "pendingBody": "Hoàn tất thanh toán trong trình duyệt. Gói của bạn sẽ tự động cập nhật tại đây ngay khi thanh toán được xác nhận — không cần khởi động lại.",
@@ -519,30 +502,96 @@
       "successBody": "Gói đăng ký của bạn đã hoạt động. Tận hưởng các giới hạn cao hơn.",
       "successTitle": "Bạn đang dùng Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Dùng thử miễn phí."
-      },
-      "go": {
-        "tagline": "Mức sử dụng cao hơn 10×"
-      },
-      "pro": {
-        "tagline": "Giới hạn sử dụng cao nhất cho việc tạo nội dung đa phương tiện và nhiều tác nhân"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Kết thúc truy cập vào {date}",
-      "lapseDescription": "Gói {plan} của bạn còn hiệu lực đến {date}. Sau đó Stella sẽ dừng — hạn mức của gói Free chỉ được cấp một lần và bạn đã dùng hết.",
-      "lapseTitle": "Stella sẽ dừng khi gói của bạn kết thúc",
-      "nextLabel": "Lần gia hạn tiếp theo",
-      "pendingLabel": "Đang chờ hủy",
-      "renews": "Gia hạn vào {date}"
-    },
-    "subtitle": "Bắt đầu miễn phí. Nâng cấp khi bạn cần nhiều hơn.",
     "upgradeDialog": {
       "cta": "Bắt đầu",
       "description": "Cảm ơn bạn đã nâng cấp. Mức ưu tiên cao hơn và hạn mức sử dụng lớn hơn đã được kích hoạt — hãy tiếp tục.",
       "title": "Bạn đang dùng Stella {plan}."
+    },
+    "v3": {
+      "opening": "Đang mở…",
+      "signIn": {
+        "title": "Đăng nhập để xem gói của bạn",
+        "body": "Gói, mức sử dụng và tín dụng bổ sung thuộc về tài khoản Stella của bạn."
+      },
+      "notice": {
+        "checkoutOpened": "Trang thanh toán đã mở trong trình duyệt. Mục này sẽ cập nhật khi thanh toán xong.",
+        "portalOpened": "Trang thanh toán định kỳ đã mở trong trình duyệt. Thay đổi sẽ tự hiện ở đây.",
+        "checkoutFailed": "Không thể bắt đầu thanh toán lúc này.",
+        "portalFailed": "Không thể mở trang thanh toán lúc này."
+      },
+      "usage": {
+        "title": "Mức sử dụng",
+        "lede": "Một ngân sách chi trả mọi thứ Stella chạy cho bạn.",
+        "ofMonth": "trên {amount} tháng này",
+        "ofOneTime": "trên {amount} để dùng thử Stella",
+        "oneTimeNote": "Một lần, không đặt lại",
+        "of": "trên {amount}",
+        "used": "Đã dùng",
+        "held": "Giữ cho công việc đang chạy",
+        "heldHint": "Được giữ lại đến khi các tác tử và tác vụ đa phương tiện hoàn tất. Phần không dùng sẽ được hoàn lại.",
+        "rolling": "{hours} giờ tới",
+        "rollingHint": "Tối đa {amount} trong bất kỳ {hours} giờ nào.",
+        "weekly": "Tuần này",
+        "weeklyHint": "Tối đa {amount} mỗi tuần.",
+        "resets": "Đặt lại {date}",
+        "startsNext": "Bắt đầu khi bạn dùng lần tới",
+        "credit": "Tín dụng bổ sung",
+        "creditHint": "Được dùng khi ngân sách của gói hết.",
+        "available": "Có thể dùng ngay",
+        "availableHint": "Số tiền Stella có thể chi ngay, gồm cả tín dụng.",
+        "unlimited": "Không giới hạn",
+        "outTitle": "Tạm thời bạn đã hết mức sử dụng",
+        "outBody": "Ngân sách của bạn đặt lại {date}. Thêm tín dụng hoặc nâng cấp để tiếp tục ngay.",
+        "outBodyNoDate": "Thêm tín dụng hoặc nâng cấp để tiếp tục ngay.",
+        "freeOutTitle": "Bạn đã dùng hết mức miễn phí",
+        "freeOutBody": "Chọn một gói hoặc thêm tín dụng để tiếp tục.",
+        "creditTitle": "Đang dùng tín dụng bổ sung",
+        "creditBody": "Giới hạn của gói đã hết đến {date}. Tín dụng sẽ chi trả việc Stella làm đến lúc đó.",
+        "upgradeTo": "Nâng cấp lên {plan}"
+      },
+      "plan": {
+        "title": "Gói",
+        "lede": "Mọi gói đều chạy cùng một Stella. Gói lớn hơn cho nó ngân sách lớn hơn và làm được nhiều việc cùng lúc hơn.",
+        "current": "Hiện tại",
+        "perMonth": "{price}/tháng",
+        "checkout": "Tiếp tục thanh toán · {price}",
+        "checkoutHint": "Trang thanh toán mở trong trình duyệt. Ngân sách bắt đầu ngay.",
+        "upgrade": "Nâng cấp lên {plan} · {price}",
+        "downgrade": "Chuyển xuống {plan} · {price}",
+        "changeHint": "Bạn sẽ xác nhận thay đổi trong trình duyệt.",
+        "cancel": "Hủy gói",
+        "cancelHint": "Bạn giữ {plan} đến {date}, sau đó chuyển sang Free.",
+        "renews": "Gia hạn",
+        "renewsHint": "{price}, Stripe tính phí hằng tháng.",
+        "ends": "Kết thúc",
+        "endsHint": "{plan} vẫn hoạt động đến lúc đó. Tiếp tục từ Quản lý thanh toán.",
+        "manage": "Thanh toán và hóa đơn",
+        "manageHint": "Thẻ, hóa đơn và hủy gói.",
+        "manageButton": "Quản lý thanh toán"
+      },
+      "includes": {
+        "oneTime": "{amount} để dùng thử Stella, một lần",
+        "monthly": "{amount} mức sử dụng mỗi tháng",
+        "local": "Tác tử trên máy tính của bạn",
+        "cloud": "Tác tử đám mây, {count} cùng lúc",
+        "media": "Hình ảnh, video, nhạc và 3D"
+      },
+      "credit": {
+        "title": "Tín dụng bổ sung",
+        "lede": "Giúp Stella tiếp tục chạy khi ngân sách của gói hết.",
+        "balance": "Số dư",
+        "add": "Thêm tín dụng",
+        "addHint": "Thanh toán một lần qua Stripe. Không phải gói đăng ký.",
+        "addAmount": "Thêm {amount}",
+        "other": "Khác",
+        "invalid": "Nhập số tiền bằng đô la.",
+        "min": "Tối thiểu là {amount}.",
+        "max": "Tối đa là {amount}."
+      },
+      "mobile": {
+        "usageRow": "Tháng này",
+        "usageOneTime": "Mức sử dụng miễn phí"
+      }
     }
   },
   "chat": {

@@ -496,7 +496,7 @@
       "video_generation": "توليد الفيديو"
     },
     "capabilityRestriction": {
-      "genericDescription": "هذه الميزة مضمّنة في Stella Pro. رقِّ خطتك لفتحها.",
+      "genericDescription": "هذه الميزة متاحة في كل خطط Stella المدفوعة. قم بالترقية لفتحها.",
       "genericTitle": "غير مضمّن في خطتك",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "غير متاح",
@@ -505,22 +505,6 @@
       "unavailable": "{capability} غير متاح في أي خطة حاليًا.",
       "upgrade": "{capability} مضمّن في Stella {plan}. رقِّ خطتك لفتح هذه الميزة."
     },
-    "features": {
-      "assistant": "مساعد شخصي",
-      "codingAgent": "وكيل برمجة",
-      "dictationReadAloud": "الإملاء والقراءة بصوت عالٍ",
-      "multipleAgents": "وكلاء متعددون",
-      "research": "البحث والعمل المعرفي"
-    },
-    "freeAllowance": {
-      "caption": "مجاني للتجربة.",
-      "exhaustedCta": "الترقية إلى Go",
-      "exhaustedDescription": "قم بالترقية إلى Go لاستخدام أعلى 10×.",
-      "exhaustedTitle": "لقد وصلت إلى حد الخطة المجانية",
-      "label": "استخدام الخطة المجانية",
-      "remaining": "مجاني للتجربة."
-    },
-    "heading": "اختر خطتك",
     "mobile": {
       "accessEnds": "ينتهي الوصول في {date}",
       "alreadySubscribedTitle": "لديك اشتراك بالفعل",
@@ -528,7 +512,6 @@
       "currentPlanLabel": "الخطة الحالية",
       "errorRetry": "أعد المحاولة",
       "footnote": "تُصدر الفاتورة من Stella عبر Stripe. يتجدد شهريًا حتى الإلغاء؛ ألغِ في أي وقت.",
-      "introLine": "{introPrice} للشهر الأول، ثم {price}/شهر",
       "manage": "إدارة الاشتراك",
       "manageWebNote": "يمكنك إدارة هذا الاشتراك أو إلغاؤه من Stella على الويب على stella.sh.",
       "pendingBody": "أكمل الدفع في المتصفح. ستُحدَّث خطتك هنا تلقائيًا بمجرد تأكيد الدفع — لا حاجة لإعادة التشغيل.",
@@ -544,30 +527,96 @@
       "successBody": "اشتراكك نشط. استمتع بالحدود الأعلى.",
       "successTitle": "أنت الآن على Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "مجاني للتجربة."
-      },
-      "go": {
-        "tagline": "استخدام أعلى 10×"
-      },
-      "pro": {
-        "tagline": "أعلى حدود استخدام لإنشاء الوسائط والوكلاء المتعددين"
-      }
-    },
-    "renewal": {
-      "accessEnds": "ينتهي الوصول في {date}",
-      "lapseDescription": "تستمر خطة {plan} حتى {date}. بعد ذلك يتوقف Stella — رصيد خطة Free يُمنح مرة واحدة، ورصيدك استُهلك بالفعل.",
-      "lapseTitle": "سيتوقف Stella عند انتهاء خطتك",
-      "nextLabel": "التجديد التالي",
-      "pendingLabel": "الإلغاء قيد الانتظار",
-      "renews": "يتجدد في {date}"
-    },
-    "subtitle": "ابدأ مجانًا. قم بالترقية عندما تحتاج إلى المزيد.",
     "upgradeDialog": {
       "cta": "ابدأ",
       "description": "شكرًا على الترقية. الأولوية الأعلى والاستخدام الموسّع فعّالان الآن — تابع.",
       "title": "أنت الآن على Stella {plan}."
+    },
+    "v3": {
+      "opening": "جارٍ الفتح…",
+      "signIn": {
+        "title": "سجّل الدخول لرؤية خطتك",
+        "body": "خطتك واستخدامك ورصيدك الإضافي مرتبطة بحسابك في Stella."
+      },
+      "notice": {
+        "checkoutOpened": "فُتحت صفحة الدفع في متصفحك. سيتم التحديث هنا بعد اكتمال الدفع.",
+        "portalOpened": "فُتحت الفوترة في متصفحك. ستظهر التغييرات هنا تلقائيًا.",
+        "checkoutFailed": "تعذّر بدء الدفع الآن.",
+        "portalFailed": "تعذّر فتح الفوترة الآن."
+      },
+      "usage": {
+        "title": "الاستخدام",
+        "lede": "ميزانية واحدة تدفع كل ما تشغّله Stella لك.",
+        "ofMonth": "من {amount} هذا الشهر",
+        "ofOneTime": "من {amount} لتجربة Stella",
+        "oneTimeNote": "لمرة واحدة، لا تتجدد",
+        "of": "من {amount}",
+        "used": "المستخدَم",
+        "held": "محجوز للعمل الجاري",
+        "heldHint": "يُحجز حتى تنتهي الوكلاء ومهام الوسائط. ما لا تستخدمه يعود إليك.",
+        "rolling": "الساعات الـ{hours} القادمة",
+        "rollingHint": "حتى {amount} في أي {hours} ساعات.",
+        "weekly": "هذا الأسبوع",
+        "weeklyHint": "حتى {amount} أسبوعيًا.",
+        "resets": "تتجدد {date}",
+        "startsNext": "تبدأ مع استخدامك التالي",
+        "credit": "رصيد إضافي",
+        "creditHint": "يُستخدم عند نفاد ميزانية خطتك.",
+        "available": "المتاح الآن",
+        "availableHint": "ما يمكن لـStella إنفاقه الآن، شاملًا الرصيد.",
+        "unlimited": "غير محدود",
+        "outTitle": "نفد استخدامك حاليًا",
+        "outBody": "تتجدد ميزانيتك {date}. أضف رصيدًا أو قم بالترقية للمتابعة الآن.",
+        "outBodyNoDate": "أضف رصيدًا أو قم بالترقية للمتابعة الآن.",
+        "freeOutTitle": "لقد استخدمت استخدامك المجاني",
+        "freeOutBody": "اختر خطة أو أضف رصيدًا للمتابعة.",
+        "creditTitle": "يعمل على الرصيد الإضافي",
+        "creditBody": "استُنفد حدّ خطتك حتى {date}. يغطي الرصيد ما تفعله Stella حتى ذلك الحين.",
+        "upgradeTo": "الترقية إلى {plan}"
+      },
+      "plan": {
+        "title": "الخطة",
+        "lede": "كل الخطط تشغّل Stella نفسها. الخطط الأكبر تمنحها ميزانية أكبر ومهام أكثر في الوقت نفسه.",
+        "current": "الحالية",
+        "perMonth": "{price}/شهريًا",
+        "checkout": "متابعة إلى الدفع · {price}",
+        "checkoutHint": "يُفتح الدفع في متصفحك. تبدأ ميزانيتك فورًا.",
+        "upgrade": "الترقية إلى {plan} · {price}",
+        "downgrade": "الانتقال إلى {plan} · {price}",
+        "changeHint": "ستؤكد التغيير في متصفحك.",
+        "cancel": "إلغاء الخطة",
+        "cancelHint": "تحتفظ بـ{plan} حتى {date}، ثم تنتقل إلى Free.",
+        "renews": "تتجدد",
+        "renewsHint": "{price}، تُفوتر شهريًا عبر Stripe.",
+        "ends": "تنتهي",
+        "endsHint": "تبقى {plan} فعّالة حتى ذلك الحين. استأنفها من إدارة الفوترة.",
+        "manage": "الدفع والفواتير",
+        "manageHint": "البطاقة والفواتير والإلغاء.",
+        "manageButton": "إدارة الفوترة"
+      },
+      "includes": {
+        "oneTime": "{amount} لتجربة Stella، مرة واحدة",
+        "monthly": "{amount} من الاستخدام كل شهر",
+        "local": "وكلاء على حاسوبك",
+        "cloud": "وكلاء سحابيون، {count} في وقت واحد",
+        "media": "صور وفيديو وموسيقى وثلاثي الأبعاد"
+      },
+      "credit": {
+        "title": "رصيد إضافي",
+        "lede": "يُبقي Stella تعمل عند نفاد ميزانية خطتك.",
+        "balance": "الرصيد",
+        "add": "إضافة رصيد",
+        "addHint": "ادفع مرة واحدة عبر Stripe. بلا اشتراك.",
+        "addAmount": "إضافة {amount}",
+        "other": "مبلغ آخر",
+        "invalid": "أدخل مبلغًا بالدولار.",
+        "min": "الحد الأدنى {amount}.",
+        "max": "الحد الأقصى {amount}."
+      },
+      "mobile": {
+        "usageRow": "هذا الشهر",
+        "usageOneTime": "الاستخدام المجاني"
+      }
     }
   },
   "chat": {

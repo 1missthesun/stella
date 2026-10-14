@@ -486,7 +486,7 @@
       "video_generation": "Generování videa"
     },
     "capabilityRestriction": {
-      "genericDescription": "Tato funkce je součástí plánu Stella Pro. Upgradujte plán, abyste ji odemkli.",
+      "genericDescription": "Tato funkce je součástí každého placeného plánu Stella. Přejdi na vyšší plán a odemkni ji.",
       "genericTitle": "Není součástí vašeho plánu",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Nedostupné",
@@ -495,22 +495,6 @@
       "unavailable": "{capability} teď není dostupné v žádném plánu.",
       "upgrade": "{capability} je součástí plánu Stella {plan}. Upgradujte plán, abyste tuto funkci odemkli."
     },
-    "features": {
-      "assistant": "Osobní asistent",
-      "codingAgent": "Programovací agent",
-      "dictationReadAloud": "Diktování a předčítání",
-      "multipleAgents": "Více agentů",
-      "research": "Rešerše a znalostní práce"
-    },
-    "freeAllowance": {
-      "caption": "Zdarma na vyzkoušení.",
-      "exhaustedCta": "Upgradovat na Go",
-      "exhaustedDescription": "Upgradujte na Go pro 10× vyšší využití.",
-      "exhaustedTitle": "Dosáhli jste limitu tarifu Free",
-      "label": "Využití tarifu Free",
-      "remaining": "Zdarma na vyzkoušení."
-    },
-    "heading": "Vyberte si tarif",
     "mobile": {
       "accessEnds": "Přístup končí {date}",
       "alreadySubscribedTitle": "Předplatné už máte",
@@ -518,7 +502,6 @@
       "currentPlanLabel": "Aktuální plán",
       "errorRetry": "Zkusit znovu",
       "footnote": "Účtuje Stella prostřednictvím Stripe. Obnovuje se měsíčně až do zrušení; zrušit můžete kdykoli.",
-      "introLine": "{introPrice} první měsíc, poté {price}/měs.",
       "manage": "Spravovat předplatné",
       "manageWebNote": "Toto předplatné spravujte nebo zrušte ve Stelle na webu na stella.sh.",
       "pendingBody": "Dokončete platbu v prohlížeči. Váš plán se zde po potvrzení platby automaticky aktualizuje – není třeba nic restartovat.",
@@ -534,30 +517,96 @@
       "successBody": "Vaše předplatné je aktivní. Užijte si vyšší limity.",
       "successTitle": "Máte Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Zdarma na vyzkoušení."
-      },
-      "go": {
-        "tagline": "10× vyšší využití"
-      },
-      "pro": {
-        "tagline": "Nejvyšší limity využití pro generování médií a více agentů"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Přístup končí {date}",
-      "lapseDescription": "Váš plán {plan} běží do {date}. Poté Stella přestane fungovat — kredit plánu Free je jednorázový a ten svůj jste už vyčerpali.",
-      "lapseTitle": "Až plán skončí, Stella přestane fungovat",
-      "nextLabel": "Příští obnovení",
-      "pendingLabel": "Čeká na zrušení",
-      "renews": "Obnoví se {date}"
-    },
-    "subtitle": "Začněte zdarma. Upgradujte, až budete potřebovat více.",
     "upgradeDialog": {
       "cta": "Začít",
       "description": "Díky za upgrade. Vyšší priorita a větší limity už jsou aktivní — pokračujte.",
       "title": "Máte Stellu {plan}."
+    },
+    "v3": {
+      "opening": "Otevírání…",
+      "signIn": {
+        "title": "Přihlas se a uvidíš svůj plán",
+        "body": "Tvůj plán, využití a kredit navíc patří k tvému účtu Stella."
+      },
+      "notice": {
+        "checkoutOpened": "Platba se otevřela v prohlížeči. Tohle se aktualizuje po dokončení platby.",
+        "portalOpened": "Fakturace se otevřela v prohlížeči. Změny se tu zobrazí automaticky.",
+        "checkoutFailed": "Platbu teď nelze spustit.",
+        "portalFailed": "Fakturaci teď nelze otevřít."
+      },
+      "usage": {
+        "title": "Využití",
+        "lede": "Jeden rozpočet platí vše, co pro tebe Stella spouští.",
+        "ofMonth": "z {amount} tento měsíc",
+        "ofOneTime": "z {amount} na vyzkoušení Stelly",
+        "oneTimeNote": "Jednorázové, neobnovuje se",
+        "of": "z {amount}",
+        "used": "Využito",
+        "held": "Rezervováno probíhající prací",
+        "heldHint": "Odloženo, dokud agenti a mediální úlohy neskončí. Co nevyužijí, se vrátí.",
+        "rolling": "Příštích {hours} hodin",
+        "rollingHint": "Až {amount} za libovolných {hours} hodin.",
+        "weekly": "Tento týden",
+        "weeklyHint": "Až {amount} týdně.",
+        "resets": "Obnoví se {date}",
+        "startsNext": "Začne při dalším použití",
+        "credit": "Kredit navíc",
+        "creditHint": "Použije se, až dojde rozpočet tvého plánu.",
+        "available": "Dostupné teď",
+        "availableHint": "Kolik může Stella utratit právě teď, včetně kreditu.",
+        "unlimited": "Neomezeno",
+        "outTitle": "Využití ti zatím došlo",
+        "outBody": "Rozpočet se obnoví {date}. Přidej kredit nebo přejdi na vyšší plán a pokračuj hned.",
+        "outBodyNoDate": "Přidej kredit nebo přejdi na vyšší plán a pokračuj hned.",
+        "freeOutTitle": "Vyčerpal(a) jsi bezplatné využití",
+        "freeOutBody": "Vyber plán nebo přidej kredit a pokračuj.",
+        "creditTitle": "Běží na kreditu navíc",
+        "creditBody": "Limit tvého plánu je vyčerpán do {date}. Kredit do té doby pokryje práci Stelly.",
+        "upgradeTo": "Přejít na {plan}"
+      },
+      "plan": {
+        "title": "Plán",
+        "lede": "Každý plán spouští stejnou Stellu. Větší plány jí dají větší rozpočet a víc úloh najednou.",
+        "current": "Aktuální",
+        "perMonth": "{price}/měs.",
+        "checkout": "Pokračovat k platbě · {price}",
+        "checkoutHint": "Platba se otevře v prohlížeči. Rozpočet začne platit hned.",
+        "upgrade": "Přejít na {plan} · {price}",
+        "downgrade": "Přejít na nižší {plan} · {price}",
+        "changeHint": "Změnu potvrdíš v prohlížeči.",
+        "cancel": "Zrušit plán",
+        "cancelHint": "{plan} ti zůstane do {date}, pak přejdeš na Free.",
+        "renews": "Obnovuje se",
+        "renewsHint": "{price}, účtováno měsíčně přes Stripe.",
+        "ends": "Končí",
+        "endsHint": "{plan} platí do té doby. Obnovit ho můžeš ve Správě fakturace.",
+        "manage": "Platby a faktury",
+        "manageHint": "Karta, faktury a zrušení.",
+        "manageButton": "Spravovat fakturaci"
+      },
+      "includes": {
+        "oneTime": "{amount} na vyzkoušení Stelly, jednorázově",
+        "monthly": "{amount} využití každý měsíc",
+        "local": "Agenti na tvém počítači",
+        "cloud": "Agenti v cloudu, {count} najednou",
+        "media": "Obrázky, video, hudba a 3D"
+      },
+      "credit": {
+        "title": "Kredit navíc",
+        "lede": "Udrží Stellu v chodu, až dojde rozpočet tvého plánu.",
+        "balance": "Zůstatek",
+        "add": "Přidat kredit",
+        "addHint": "Jednorázová platba přes Stripe. Bez předplatného.",
+        "addAmount": "Přidat {amount}",
+        "other": "Jiná částka",
+        "invalid": "Zadej částku v dolarech.",
+        "min": "Minimum je {amount}.",
+        "max": "Maximum je {amount}."
+      },
+      "mobile": {
+        "usageRow": "Tento měsíc",
+        "usageOneTime": "Bezplatné využití"
+      }
     }
   },
   "chat": {

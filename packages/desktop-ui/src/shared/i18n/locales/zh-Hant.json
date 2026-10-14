@@ -471,7 +471,7 @@
       "video_generation": "影片生成"
     },
     "capabilityRestriction": {
-      "genericDescription": "此功能包含在 Stella Pro 方案中。升級方案即可解鎖。",
+      "genericDescription": "此功能包含在所有 Stella 付費方案中。升級即可解鎖。",
       "genericTitle": "你的方案不包含此功能",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "無法使用",
@@ -480,22 +480,6 @@
       "unavailable": "目前沒有任何方案提供{capability}。",
       "upgrade": "{capability}包含在 Stella {plan} 方案中。升級方案即可解鎖。"
     },
-    "features": {
-      "assistant": "個人助理",
-      "codingAgent": "程式設計代理",
-      "dictationReadAloud": "聽寫和朗讀",
-      "multipleAgents": "多個代理程式",
-      "research": "研究與知識工作"
-    },
-    "freeAllowance": {
-      "caption": "免費試用。",
-      "exhaustedCta": "升級到 Go",
-      "exhaustedDescription": "升級至 Go，獲得 10 倍更高用量。",
-      "exhaustedTitle": "你已達到 Free 方案的上限",
-      "label": "Free 方案用量",
-      "remaining": "免費試用。"
-    },
-    "heading": "選擇你的方案",
     "mobile": {
       "accessEnds": "使用權限於 {date} 結束",
       "alreadySubscribedTitle": "你已有訂閱",
@@ -503,7 +487,6 @@
       "currentPlanLabel": "目前方案",
       "errorRetry": "重試",
       "footnote": "由 Stella 透過 Stripe 收費。每月續訂，直到取消；可隨時取消。",
-      "introLine": "首月 {introPrice}，之後 {price}/月",
       "manage": "管理訂閱",
       "manageWebNote": "可在網頁版 Stella（stella.sh）管理或取消此訂閱。",
       "pendingBody": "請在瀏覽器中完成付款。付款確認後，方案會在此自動更新，無需重新啟動。",
@@ -519,30 +502,96 @@
       "successBody": "訂閱已生效。盡情享受更高的額度。",
       "successTitle": "你已訂閱 Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "免費試用。"
-      },
-      "go": {
-        "tagline": "10 倍更高用量"
-      },
-      "pro": {
-        "tagline": "適用於媒體生成和多個代理程式的最高用量限制"
-      }
-    },
-    "renewal": {
-      "accessEnds": "{date} 結束使用",
-      "lapseDescription": "你的 {plan} 方案可用到 {date}。之後 Stella 將停止服務 — Free 方案的額度只發放一次，你的已經用完了。",
-      "lapseTitle": "方案到期後 Stella 將停止服務",
-      "nextLabel": "下次續訂",
-      "pendingLabel": "已申請取消",
-      "renews": "{date} 續訂"
-    },
-    "subtitle": "免費開始。需要更多時再升級。",
     "upgradeDialog": {
       "cta": "開始使用",
       "description": "感謝升級。更高的優先權和更多用量現已生效 — 繼續使用吧。",
       "title": "你正在使用 Stella {plan}。"
+    },
+    "v3": {
+      "opening": "正在開啟…",
+      "signIn": {
+        "title": "登入以查看你的方案",
+        "body": "你的方案、用量和額外額度都屬於你的 Stella 帳戶。"
+      },
+      "notice": {
+        "checkoutOpened": "已在瀏覽器中開啟結帳頁面。付款完成後這裡會更新。",
+        "portalOpened": "已在瀏覽器中開啟帳單頁面。變更會自動顯示在這裡。",
+        "checkoutFailed": "暫時無法開始結帳。",
+        "portalFailed": "暫時無法開啟帳單頁面。"
+      },
+      "usage": {
+        "title": "用量",
+        "lede": "一份預算支付 Stella 為你執行的一切。",
+        "ofMonth": "/ 本月 {amount}",
+        "ofOneTime": "/ 試用 {amount}",
+        "oneTimeNote": "一次性,不會重設",
+        "of": "/ {amount}",
+        "used": "已用",
+        "held": "執行中的工作已預留",
+        "heldHint": "在代理和媒體工作完成前預留。沒用到的會退回。",
+        "rolling": "接下來 {hours} 小時",
+        "rollingHint": "任意 {hours} 小時內最多 {amount}。",
+        "weekly": "本週",
+        "weeklyHint": "每週最多 {amount}。",
+        "resets": "{date} 重設",
+        "startsNext": "下次使用時開始",
+        "credit": "額外額度",
+        "creditHint": "方案預算用完後使用。",
+        "available": "目前可用",
+        "availableHint": "Stella 現在可花費的金額(含額外額度)。",
+        "unlimited": "不限",
+        "outTitle": "你暫時沒有可用額度了",
+        "outBody": "你的預算將於 {date} 重設。新增額度或升級即可立即繼續。",
+        "outBodyNoDate": "新增額度或升級即可立即繼續。",
+        "freeOutTitle": "你的免費額度已用完",
+        "freeOutBody": "選擇一個方案或新增額度以繼續。",
+        "creditTitle": "正在使用額外額度",
+        "creditBody": "你的方案上限在 {date} 前已用完。在此之前,Stella 的工作由額外額度支付。",
+        "upgradeTo": "升級到 {plan}"
+      },
+      "plan": {
+        "title": "方案",
+        "lede": "所有方案執行的都是同一個 Stella。更大的方案提供更多預算,並能同時做更多事。",
+        "current": "目前",
+        "perMonth": "{price}/月",
+        "checkout": "繼續結帳 · {price}",
+        "checkoutHint": "結帳頁面會在瀏覽器中開啟。預算立即生效。",
+        "upgrade": "升級到 {plan} · {price}",
+        "downgrade": "降級到 {plan} · {price}",
+        "changeHint": "你會在瀏覽器中確認變更。",
+        "cancel": "取消方案",
+        "cancelHint": "{plan} 會保留到 {date},之後改為 Free。",
+        "renews": "續訂日期",
+        "renewsHint": "{price},由 Stripe 每月收費。",
+        "ends": "結束日期",
+        "endsHint": "{plan} 在此之前維持有效。可在「管理帳單」中恢復。",
+        "manage": "付款與發票",
+        "manageHint": "信用卡、發票與取消。",
+        "manageButton": "管理帳單"
+      },
+      "includes": {
+        "oneTime": "試用 {amount},僅一次",
+        "monthly": "每月 {amount} 用量",
+        "local": "在你電腦上執行的代理",
+        "cloud": "雲端代理,同時 {count} 個",
+        "media": "圖片、影片、音樂與 3D"
+      },
+      "credit": {
+        "title": "額外額度",
+        "lede": "方案預算用完後讓 Stella 繼續工作。",
+        "balance": "餘額",
+        "add": "新增額度",
+        "addHint": "透過 Stripe 一次付清,不是訂閱。",
+        "addAmount": "新增 {amount}",
+        "other": "其他",
+        "invalid": "請輸入美元金額。",
+        "min": "最低金額為 {amount}。",
+        "max": "最高金額為 {amount}。"
+      },
+      "mobile": {
+        "usageRow": "本月",
+        "usageOneTime": "免費額度"
+      }
     }
   },
   "chat": {

@@ -471,7 +471,7 @@
       "video_generation": "動画生成"
     },
     "capabilityRestriction": {
-      "genericDescription": "この機能は Stella Pro に含まれています。アップグレードすると利用できます。",
+      "genericDescription": "この機能は Stella のすべての有料プランに含まれます。アップグレードして利用できるようにしましょう。",
       "genericTitle": "現在のプランには含まれていません",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "利用不可",
@@ -480,22 +480,6 @@
       "unavailable": "{capability} は現在どのプランでも利用できません。",
       "upgrade": "{capability} は Stella {plan} に含まれています。アップグレードすると利用できます。"
     },
-    "features": {
-      "assistant": "パーソナルアシスタント",
-      "codingAgent": "コーディングエージェント",
-      "dictationReadAloud": "音声入力と読み上げ",
-      "multipleAgents": "複数のエージェント",
-      "research": "リサーチとナレッジワーク"
-    },
-    "freeAllowance": {
-      "caption": "無料でお試し。",
-      "exhaustedCta": "Go にアップグレード",
-      "exhaustedDescription": "10倍の利用上限が必要な場合はGoにアップグレードしてください。",
-      "exhaustedTitle": "Freeプランの上限に達しました",
-      "label": "Freeプランの使用量",
-      "remaining": "無料でお試し。"
-    },
-    "heading": "プランを選択",
     "mobile": {
       "accessEnds": "{date} に利用終了",
       "alreadySubscribedTitle": "すでにサブスクリプションをご利用中です",
@@ -503,7 +487,6 @@
       "currentPlanLabel": "現在のプラン",
       "errorRetry": "再試行",
       "footnote": "Stripe を通じて Stella が請求します。解約するまで毎月更新され、いつでも解約できます。",
-      "introLine": "初月 {introPrice}、以降は {price}/月",
       "manage": "サブスクリプションを管理",
       "manageWebNote": "このサブスクリプションの管理・解約は、ウェブ版 Stella（stella.sh）で行えます。",
       "pendingBody": "ブラウザで支払いを完了してください。支払いが確認され次第、プランはここで自動的に更新されます。再起動は不要です。",
@@ -519,30 +502,96 @@
       "successBody": "サブスクリプションが有効になりました。拡大された利用枠をお楽しみください。",
       "successTitle": "Stella {plan} をご利用中です"
     },
-    "plans": {
-      "free": {
-        "tagline": "無料でお試し。"
-      },
-      "go": {
-        "tagline": "10倍の利用上限"
-      },
-      "pro": {
-        "tagline": "メディア生成と複数エージェント向けの最大利用上限"
-      }
-    },
-    "renewal": {
-      "accessEnds": "{date} に利用終了",
-      "lapseDescription": "{plan} プランは {date} まで利用できます。その後は Stella が止まります — Free プランの利用枠は一度きりで、すでに使い切っています。",
-      "lapseTitle": "プランの終了とともに Stella は止まります",
-      "nextLabel": "次回の更新",
-      "pendingLabel": "解約手続き中",
-      "renews": "{date} に更新"
-    },
-    "subtitle": "無料で始めて、必要になったらアップグレード。",
     "upgradeDialog": {
       "cta": "始める",
       "description": "アップグレードありがとうございます。優先度の向上と利用量の増加がすでに有効です — そのまま続けましょう。",
       "title": "現在 Stella {plan} をご利用中です。"
+    },
+    "v3": {
+      "opening": "開いています…",
+      "signIn": {
+        "title": "サインインしてプランを確認",
+        "body": "プラン、利用状況、追加クレジットは Stella アカウントに紐づいています。"
+      },
+      "notice": {
+        "checkoutOpened": "ブラウザで決済画面を開きました。支払いが完了するとここが更新されます。",
+        "portalOpened": "ブラウザで請求画面を開きました。変更はここに自動で反映されます。",
+        "checkoutFailed": "今は決済を開始できませんでした。",
+        "portalFailed": "今は請求画面を開けませんでした。"
+      },
+      "usage": {
+        "title": "利用状況",
+        "lede": "ひとつの予算で、Stella があなたのために実行するすべてをまかないます。",
+        "ofMonth": "/ 今月 {amount}",
+        "ofOneTime": "/ お試し {amount}",
+        "oneTimeNote": "1回限り・リセットされません",
+        "of": "/ {amount}",
+        "used": "使用済み",
+        "held": "実行中の作業で確保中",
+        "heldHint": "エージェントやメディア生成が終わるまで確保されます。使われなかった分は戻ります。",
+        "rolling": "次の {hours} 時間",
+        "rollingHint": "任意の {hours} 時間で最大 {amount}。",
+        "weekly": "今週",
+        "weeklyHint": "1週間で最大 {amount}。",
+        "resets": "{date} にリセット",
+        "startsNext": "次に使ったときから始まります",
+        "credit": "追加クレジット",
+        "creditHint": "プランの予算を使い切ると使われます。",
+        "available": "今使える額",
+        "availableHint": "Stella が今使える額(クレジットを含む)。",
+        "unlimited": "無制限",
+        "outTitle": "利用枠を使い切りました",
+        "outBody": "予算は {date} にリセットされます。今すぐ続けるにはクレジットを追加するかアップグレードしてください。",
+        "outBodyNoDate": "今すぐ続けるにはクレジットを追加するかアップグレードしてください。",
+        "freeOutTitle": "無料の利用枠を使い切りました",
+        "freeOutBody": "続けるにはプランを選ぶかクレジットを追加してください。",
+        "creditTitle": "追加クレジットで稼働中",
+        "creditBody": "プランの上限は {date} まで使い切っています。それまでの Stella の作業はクレジットでまかないます。",
+        "upgradeTo": "{plan} にアップグレード"
+      },
+      "plan": {
+        "title": "プラン",
+        "lede": "どのプランでも同じ Stella が動きます。上位プランほど予算が大きく、同時にこなせる作業も増えます。",
+        "current": "現在",
+        "perMonth": "{price}/月",
+        "checkout": "決済に進む · {price}",
+        "checkoutHint": "決済はブラウザで開きます。予算はすぐに使えます。",
+        "upgrade": "{plan} にアップグレード · {price}",
+        "downgrade": "{plan} にダウングレード · {price}",
+        "changeHint": "変更はブラウザで確認します。",
+        "cancel": "プランを解約",
+        "cancelHint": "{date} まで {plan} を使え、その後 Free に移ります。",
+        "renews": "更新日",
+        "renewsHint": "{price}、Stripe で毎月請求。",
+        "ends": "終了日",
+        "endsHint": "{plan} はそれまで有効です。「請求を管理」から再開できます。",
+        "manage": "支払いと請求書",
+        "manageHint": "カード、請求書、解約。",
+        "manageButton": "請求を管理"
+      },
+      "includes": {
+        "oneTime": "お試し {amount}(1回限り)",
+        "monthly": "毎月 {amount} の利用枠",
+        "local": "あなたのコンピューターで動くエージェント",
+        "cloud": "クラウドエージェント、同時に {count} 個",
+        "media": "画像・動画・音楽・3D"
+      },
+      "credit": {
+        "title": "追加クレジット",
+        "lede": "プランの予算を使い切っても Stella を動かし続けます。",
+        "balance": "残高",
+        "add": "クレジットを追加",
+        "addHint": "Stripe で1回払い。サブスクリプションではありません。",
+        "addAmount": "{amount} を追加",
+        "other": "その他",
+        "invalid": "ドルで金額を入力してください。",
+        "min": "最低額は {amount} です。",
+        "max": "最高額は {amount} です。"
+      },
+      "mobile": {
+        "usageRow": "今月",
+        "usageOneTime": "無料の利用枠"
+      }
     }
   },
   "chat": {

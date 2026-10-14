@@ -14,13 +14,13 @@ export const STELLA_USAGE_LIMIT_TITLES: Record<StellaUsageLimitReason, string> =
 };
 
 export const STELLA_USAGE_LIMIT_DESCRIPTIONS: Record<StellaUsageLimitReason, string> = {
-  free_allowance: "Your free Stella allowance is spent. Upgrade to keep going.",
-  plan_limit: "You've used what your plan includes for now. Upgrade to keep going, or wait until it resets.",
+  free_allowance: "Your free Stella usage is spent. Choose a plan or add credit to keep going.",
+  plan_limit: "Stella pauses until your plan's budget resets. Add credit or upgrade to keep going now.",
 };
 
 export const STELLA_USAGE_LIMIT_MESSAGES: Record<StellaUsageLimitReason, string> = {
-  free_allowance: "You've used your free Stella allowance. Upgrade to keep going.",
-  plan_limit: "You've reached your plan's usage limit. Upgrade to keep going, or wait until it resets.",
+  free_allowance: "You've used your free Stella allowance. Choose a plan or add credit to keep going.",
+  plan_limit: "You've reached your plan's usage limit. Add credit or upgrade to keep going, or wait until it resets.",
 };
 
 export const isStellaUsageLimitReason = (value: unknown): value is StellaUsageLimitReason =>

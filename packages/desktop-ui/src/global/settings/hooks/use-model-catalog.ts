@@ -1,5 +1,6 @@
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import type { BillingStatus } from "@stella/contracts/backend/billing";
+import { normalizeBillingPlan } from "@stella/contracts/billing-plans";
 import { useCallback, useMemo } from "react";
 import { isWebsiteHost } from "@/platform/capabilities";
 import { useDesktopAuthSession, getAuthSessionSnapshot } from "@/global/auth/services/auth-session";
@@ -91,15 +92,7 @@ if (import.meta.hot && stopManagedCatalogUpdates) {
 function getBillingAudienceKey(
   billingStatus: BillingStatus | undefined,
 ): string | null {
-  if (!billingStatus) return null;
-  const { plan, usage } = billingStatus;
-  if (plan === "free") return "free";
-  const isDowngraded =
-    usage !== null &&
-    (usage.rollingUsedUsd >= usage.rollingLimitUsd ||
-    usage.weeklyUsedUsd >= usage.weeklyLimitUsd ||
-    usage.monthlyUsedUsd >= usage.monthlyLimitUsd);
-  return isDowngraded ? `${plan}_fallback` : plan;
+  return billingStatus ? normalizeBillingPlan(billingStatus.plan) : null;
 }
 
 function getSessionCacheKey(sessionData: AuthSessionData): string {

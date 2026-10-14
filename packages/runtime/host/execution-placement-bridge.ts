@@ -48,7 +48,10 @@ import {
   ExecutionPlacementInbox,
   type ExecutionPlacementInboxRow,
 } from "./execution-placement-inbox.js";
-import { ExecutionPlacementLeases } from "./execution-placement-leases.js";
+import {
+  CANCELLATION_MAX_ATTEMPTS,
+  ExecutionPlacementLeases,
+} from "./execution-placement-leases.js";
 
 export { ExecutionPlacementInbox };
 import {
@@ -62,6 +65,7 @@ const COMPLETE_ACK_TIMEOUT_MS = 10_000;
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 const MIN_TOKEN_REFRESH_DELAY_MS = 30_000;
 const HTTP_TIMEOUT_MS = 15_000;
+const CANCELLATION_RPC_TIMEOUT_MS = 60_000;
 const DISPATCH_WATCH_POLL_MS = 750;
 const DEVICE_PRESENCE_SILENCE_MS = 3 * DEVICE_PRESENCE_PING_INTERVAL_MS + 2_000;
 
@@ -1177,23 +1181,27 @@ export class ExecutionPlacementBridge {
     this.presenceSessionId = session.presenceSessionId;
     await this.stageRestartCancellations();
     this.started = true;
-    const cancellationsAcknowledged = await this.retryPendingCancellations();
-    if (!cancellationsAcknowledged) {
-      this.leases.startHeartbeat(() => {
-        void this.heartbeat();
-      });
-      return;
-    }
     await this.registerDevice();
     if (this.stopped || epoch !== this.lifecycleEpoch) {
       throw new Error("Execution placement stopped while registering.");
     }
     this.sessionReady = true;
     this.openSocket();
-    await this.reconcileInbox();
     this.leases.startHeartbeat(() => {
       void this.heartbeat();
     });
+    this.settleCancellationsInBackground();
+    await this.reconcileInbox();
+  }
+
+  private settleCancellationsInBackground() {
+    void this.retryPendingCancellations().catch((error) =>
+      this.log(
+        "warn",
+        "Execution placement cancellation retry was deferred.",
+        error,
+      ),
+    );
   }
 
   async stop(): Promise<void> {
@@ -1313,14 +1321,7 @@ export class ExecutionPlacementBridge {
     ) {
       this.builderOrigin = identity.builderOrigin;
       if (!this.sessionReady) {
-        const cancellationsAcknowledged =
-          await this.retryPendingCancellations();
-        if (!cancellationsAcknowledged) {
-          throw new Error(
-            "Execution placement session recovery is waiting for local cancellation acknowledgement.",
-          );
-        }
-        await Promise.allSettled([...this.executionTasks.values()]);
+        this.settleCancellationsInBackground();
         await this.registerDevice();
         this.sessionReady = true;
         this.openSocket();
@@ -1343,13 +1344,7 @@ export class ExecutionPlacementBridge {
       now: this.now(),
     });
     this.presenceSessionId = nextSession.presenceSessionId;
-    const cancellationsAcknowledged = await this.retryPendingCancellations();
-    if (!cancellationsAcknowledged) {
-      throw new Error(
-        "Execution placement owner rotation is waiting for local cancellation acknowledgement.",
-      );
-    }
-    await Promise.allSettled([...this.executionTasks.values()]);
+    this.settleCancellationsInBackground();
     await this.registerDevice();
     this.sessionReady = true;
     this.openSocket();
@@ -1364,7 +1359,7 @@ export class ExecutionPlacementBridge {
 
   private async runHeartbeat() {
     let identityRefreshNeeded = false;
-    await this.retryPendingCancellations();
+    this.settleCancellationsInBackground();
     if (!this.sessionReady) {
       await this.refreshIdentityAfterFence();
       return;
@@ -1487,20 +1482,32 @@ export class ExecutionPlacementBridge {
         } catch {
           payload = undefined;
         }
-        await this.options.cancelExecution({
-          dispatchId: row.dispatchId,
-          kind: row.kind,
-          conversationId: row.conversationId,
-          ...(payload ? { payload } : {}),
-          ...(row.errorCode === AGENT_STOPPED_ERROR_CODE ? { stopped: true } : {}),
-        });
+        await this.withCancellationTimeout(
+          this.options.cancelExecution({
+            dispatchId: row.dispatchId,
+            kind: row.kind,
+            conversationId: row.conversationId,
+            ...(payload ? { payload } : {}),
+            ...(row.errorCode === AGENT_STOPPED_ERROR_CODE ? { stopped: true } : {}),
+          }),
+        );
+        this.leases.clearCancellationFailure(row.dispatchId);
       } catch (error) {
+        const attempts = this.leases.noteCancellationFailure(row.dispatchId);
+        if (attempts < CANCELLATION_MAX_ATTEMPTS) {
+          this.log(
+            "warn",
+            `Execution placement local cancellation of ${row.dispatchId} (${row.kind}) was deferred (attempt ${attempts}/${CANCELLATION_MAX_ATTEMPTS}).`,
+            error,
+          );
+          return false;
+        }
+        this.leases.clearCancellationFailure(row.dispatchId);
         this.log(
-          "warn",
-          "Execution placement local cancellation RPC was deferred.",
+          "error",
+          `Execution placement local cancellation of ${row.dispatchId} (${row.kind}) failed ${attempts} times; settling it as canceled.`,
           error,
         );
-        return false;
       }
       const afterLocalCancel = this.inbox.get(row.dispatchId);
       if (!afterLocalCancel?.cancelRpcPending) return true;
@@ -1551,6 +1558,24 @@ export class ExecutionPlacementBridge {
         );
       }
       return true;
+    });
+  }
+
+  private withCancellationTimeout(task: Promise<void>): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const timer = forkDelayed(CANCELLATION_RPC_TIMEOUT_MS, () =>
+        reject(new Error("The local cancellation did not answer in time.")),
+      );
+      task.then(
+        () => {
+          timer.cancel();
+          resolve();
+        },
+        (error: unknown) => {
+          timer.cancel();
+          reject(error);
+        },
+      );
     });
   }
 

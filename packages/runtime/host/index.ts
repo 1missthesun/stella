@@ -716,6 +716,7 @@ export class StellaRuntimeHost {
         await previous.stop();
       } catch (error) {
         this.hostExecutionPlacementBridge = previous;
+        this.scheduleHostExecutionPlacementRetry();
         throw error;
       }
     }
@@ -1096,6 +1097,7 @@ export class StellaRuntimeHost {
         await bridge.stop();
       } catch (stopError) {
         this.hostExecutionPlacementBridge = bridge;
+        this.scheduleHostExecutionPlacementRetry();
         throw new Error(
           "Execution placement startup cleanup did not reach its cancellation/drain barrier.",
           { cause: stopError },

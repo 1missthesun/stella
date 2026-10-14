@@ -1765,6 +1765,7 @@ export class WorldSqlStore implements WorldToolFileApi {
   }
 
   exportTar(manifestId?: string): {
+    manifestId: string;
     revision: number;
     body: ReadableStream<Uint8Array>;
   } {
@@ -1877,6 +1878,7 @@ export class WorldSqlStore implements WorldToolFileApi {
     }
     const iterator = generate();
     return {
+      manifestId: exportedManifestId,
       revision,
       body: new ReadableStream<Uint8Array>({
         async pull(controller) {

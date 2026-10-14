@@ -552,16 +552,15 @@ export const handleWorldRoute = async (
     if (request.method !== "GET")
       return json({ error: "Method not allowed." }, 405);
     const requested = new URL(request.url).searchParams.get("manifest");
-    const manifestId = requested ?? (await stub.head()).manifestId;
-    if (!(await stub.manifest(manifestId, { limit: 1 }))) {
+    if (requested && !(await stub.manifest(requested, { limit: 1 }))) {
       return json({ error: "World manifest was not found." }, 404);
     }
-    const exported = await stub.exportTar(manifestId);
+    const exported = await stub.exportTar(requested ?? undefined);
     return new Response(exported.body, {
       headers: {
         "content-type": "application/x-tar",
         "cache-control": "private, no-store",
-        "x-stella-world-manifest": manifestId,
+        "x-stella-world-manifest": exported.manifestId,
         "x-stella-world-revision": String(exported.revision),
       },
     });

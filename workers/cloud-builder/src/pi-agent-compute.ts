@@ -209,7 +209,6 @@ export const openPiComputeLease = async (
     const coldContainerStartMs = Date.now() - started;
     const restoring = Date.now();
     await normalizeToolWorkspaceRoot(session, WORLD_ROOT);
-    const head = await host.env.WORLDS.getByName(world).head();
     const capability = await issueWorldCapability({
       secret: builderServiceSecret(host.env),
       worldName: world,
@@ -219,9 +218,8 @@ export const openPiComputeLease = async (
       ttlMs: CREDENTIAL_TTL_MS,
     });
     const exportUrl = new URL(`${publicOrigin(host)}/internal/worlds/${world}/export`);
-    exportUrl.searchParams.set("manifest", head.manifestId);
     const materialized = await session.exec(
-      worldMaterializationCommand({ worldRoot: WORLD_ROOT, manifestId: head.manifestId, exportUrl: exportUrl.toString(), capability }),
+      worldMaterializationCommand({ worldRoot: WORLD_ROOT, exportUrl: exportUrl.toString(), capability }),
       { origin: "internal", timeout: COMMAND_TIMEOUT_MS },
     );
     if (!materialized.success) {
@@ -253,7 +251,6 @@ export const openPiComputeLease = async (
       threadId,
       turnId,
       attemptGeneration,
-      revision: head.revision,
       ms: Date.now() - started,
     });
     return { session, coldContainerStartMs, restoreMs: Date.now() - restoring };

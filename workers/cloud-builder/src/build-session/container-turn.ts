@@ -1247,7 +1247,6 @@ export const attachAgentWorld = async (
   turnExecution.assertActive();
   const restoreStarted = performance.now();
   const materializeWorld = turn.agentRole !== "orchestrator";
-  const worldMetadataStarted = performance.now();
   const preparedName = await worldNamePreparation;
   if (!preparedName.ok) {
     await sandbox.deleteSession(args.sessionId).catch(() => undefined);
@@ -1255,23 +1254,9 @@ export const attachAgentWorld = async (
   }
   const worldNameMs = phaseMs(worldNameStarted);
   const { name } = preparedName;
-  let head: { manifestId: string; revision: number } | undefined;
-  let worldMetadataMs = 0;
   let capabilityMs = 0;
   let materializationMs = 0;
   if (materializeWorld) {
-    try {
-      const world = host.env.WORLDS.getByName(name);
-      // Keep this read immediately before export. The current WorldStore API
-      // does not transactionally bind a live head's contents to its
-      // revision; moving it ahead of provisioning widens a checkpoint+write
-      // data-loss race.
-      head = await world.head();
-    } catch (error) {
-      await sandbox.deleteSession(args.sessionId).catch(() => undefined);
-      throw error;
-    }
-    worldMetadataMs = phaseMs(worldMetadataStarted);
     const capabilityStarted = performance.now();
     const capability = await issueWorldCapability({
       secret: builderServiceSecret(host.env),
@@ -1284,12 +1269,10 @@ export const attachAgentWorld = async (
     capabilityMs = phaseMs(capabilityStarted);
     const origin = host.env.CLOUD_BUILDER_PUBLIC_URL.replace(/\/+$/u, "");
     const exportUrl = new URL(`${origin}/internal/worlds/${name}/export`);
-    exportUrl.searchParams.set("manifest", head.manifestId);
     const materializationStarted = performance.now();
     const materialized = await session.exec(
       worldMaterializationCommand({
         worldRoot,
-        manifestId: head.manifestId,
         exportUrl: exportUrl.toString(),
         capability,
       }),
@@ -1400,7 +1383,6 @@ export const attachAgentWorld = async (
     threadId: turn.threadId,
     coldContainerStartMs,
     worldNameMs,
-    worldMetadataMs,
     initialNormalizeMs,
     capabilityMs,
     materializationMs,
@@ -1408,7 +1390,6 @@ export const attachAgentWorld = async (
     ...(nativeRestore ? { nativeRestore } : {}),
     restoreConfirmationMs: phaseMs(confirmationStarted),
     totalAttachMs: phaseMs(attachStarted),
-    ...(head ? { observedHeadRevision: head.revision } : {}),
   });
   return {
     session,

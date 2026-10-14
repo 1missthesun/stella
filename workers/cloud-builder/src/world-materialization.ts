@@ -9,11 +9,10 @@ const shellQuote = (value: string): string => {
 
 export const worldMaterializationCommand = (args: {
   worldRoot: string;
-  manifestId: string;
   exportUrl: string;
   capability: string;
 }): string => {
-  if (!args.worldRoot.startsWith("/") || !args.manifestId) {
+  if (!args.worldRoot.startsWith("/")) {
     throw new TypeError("World materialization target must be exact.");
   }
   const marker = `${args.worldRoot}/.stella/world-manifest`;
@@ -31,7 +30,8 @@ export const worldMaterializationCommand = (args: {
       "trap 'rm -f -- \"$headers\"' EXIT",
       `find ${shellQuote(args.worldRoot)} -mindepth 1 -maxdepth 1 -exec rm -rf -- {} +`,
       `curl --fail --silent --show-error --dump-header "$headers" -H ${shellQuote(`Authorization: Bearer ${args.capability}`)} ${shellQuote(args.exportUrl)} | tar -x -f - -C ${shellQuote(args.worldRoot)}`,
-      `manifest=${shellQuote(args.manifestId)}`,
+      `manifest="$(tr -d '\\r' <"$headers" | awk 'tolower($0) ~ /^x-stella-world-manifest:/ { sub(/^[^:]*: */, ""); print }' | tail -1)"`,
+      'case "$manifest" in ""|*[!A-Za-z0-9:_-]*) { echo "The world export named no manifest."; } >&2; exit 1;; esac',
       `revision="$(tr -d '\\r' <"$headers" | awk -F': *' 'tolower($1) == "x-stella-world-revision" { print $2 }' | tail -1)"`,
       'case "$revision" in ""|*[!0-9]*) { echo "The world export named no revision. Its response headers:"; cut -d: -f1 "$headers"; } >&2; exit 1;; esac',
       `mkdir -p ${shellQuote(`${args.worldRoot}/.stella`)}`,

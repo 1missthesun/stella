@@ -452,6 +452,7 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         discardCapture(capture);
         safeSetStatus("idle");
         operationInFlightRef.current = false;
+        prewarm();
         return null;
       }
 
@@ -502,9 +503,10 @@ export function useDictation(options: UseDictationOptions): UseDictationResult {
         discardCapture(capture);
         safeSetStatus("idle");
         operationInFlightRef.current = false;
+        prewarm();
       }
     },
-    [discardCapture, releaseAudioMode, safeSetStatus],
+    [discardCapture, prewarm, releaseAudioMode, safeSetStatus],
   );
 
   const stop = useCallback(() => finalize(true), [finalize]);

@@ -347,10 +347,9 @@ For prod, repeat 1.3–1.5 with the prod names, `--env production`, and the
 
 A personal server runs in **owner mode**: var `STELLA_OWNER_MODE = "1"` on
 cloud-builder (the script sets it). The server has exactly one real owner and
-no sign-in page: anonymous sign-in, magic links and Google/Apple sign-in are
-off. Devices join only through a one-time pairing code (QR or
-`stella://pair?server=…&code=…` link), which mints a normal session for the
-owner. Codes are 256-bit, work once, expire after 10 minutes and allow 5
+no sign-in page: magic links and Google/Apple sign-in are off. Devices join
+only through a one-time pairing code (QR or `stella://pair?server=…&code=…`
+link), which mints a normal session for the owner. Codes are 256-bit, work once, expire after 10 minutes and allow 5
 attempts; the claim endpoint is also rate-limited per IP. Nothing that spends
 money is reachable without a session.
 
@@ -384,10 +383,8 @@ mode, version, features, URLs). Lost every device? With the Cloudflare login,
 `bun scripts/selfhost.mjs recover` rotates `STELLA_ADMIN_API_SECRET` with
 `wrangler secret put` and prints a new code.
 
-**Without owner mode** (a multi-user deployment like stella.sh) users sign in.
-Don't plan around anonymous accounts: they are refused for sync, the mobile
-app and cloud features, and an anonymous account idle for 30 days is deleted
-with its data. Set up at least one of:
+**Without owner mode** (a multi-user deployment like stella.sh) users sign in;
+there is no anonymous or guest sign-in. Set up at least one of:
 
 - **Email (magic links):** Cloudflare Email Service. Enable sending for a domain
   on a zone in your account (`bunx wrangler email sending enable example.com`;
@@ -402,9 +399,7 @@ with its data. Set up at least one of:
   then `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`
   (and `APPLE_APP_BUNDLE_IDENTIFIER` for the iOS app).
 
-and keep anonymous users off your managed models with
-`STELLA_TIER_CEILING_ANON_HOURLY_USD` and `STELLA_TIER_CEILING_ANON_DAILY_USD`
-set to `0`. After a browser sign-in the backend sends the browser to
+After a browser sign-in the backend sends the browser to
 `<STELLA_WEBSITE_URL>/auth/callback?done=true`; set `STELLA_WEBSITE_URL` if you
 host the website.
 
@@ -598,9 +593,9 @@ Secrets go on **cloud-builder** unless noted.
 
 | Feature | Keys | Provider | Without it |
 |---|---|---|---|
-| Owner mode (one owner, devices join by pairing code; 1.6) | var `STELLA_OWNER_MODE = "1"` on **cloud-builder** and **model-gateway**; optional `STELLA_OWNER_MODE_SIGN_IN` (`email`, `social`, `anonymous`, comma-separated) re-opens those sign-in methods; `STELLA_CLOUD_AGENT_MONTHLY_HOURS`, `STELLA_CLOUD_AGENT_MAX_CONCURRENT` | none | Off: a multi-user server with the sign-in methods you set up (1.6). Push notifications are off in owner mode |
-| Billing (plans, limits, Stripe checkout) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (webhook URL `<backend>/api/stripe/webhook`), `STRIPE_PRICE_GO`, `STRIPE_PRICE_PRO`, `STELLA_INCLUDED_USAGE_UTILIZATION_RATE`, `STELLA_GO_PRICE_CENTS`, `STELLA_PRO_PRICE_CENTS`, `STELLA_FREE_{ROLLING,WEEKLY,MONTHLY}_LIMIT_USD`, `STELLA_FREE_ROLLING_WINDOW_HOURS`, `STELLA_ANON_LIFETIME_LIMIT_USD`, `STELLA_ANON_MAX_REQUESTS`; optional overrides in `workers/cloud-builder/src/billing/plans.ts` | Stripe | Billing is off: every account is Pro, unlimited; checkout says billing isn't set up. Setting any one of `STELLA_INCLUDED_USAGE_UTILIZATION_RATE`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_GO`, `STRIPE_PRICE_PRO` turns billing on, and then all the required ones must be set or turns are refused |
-| Cloud containers by plan (cloud agents, cloud as a run destination, Claude Code in the cloud) | var or secret `STELLA_CLOUD_SANDBOX_PLANS`: comma list of `anonymous`, `free`, `go`, `pro` that may start a cloud container, e.g. `go,pro` to require a subscription. Read only when billing is on. Chat, chat storage and running on the user's own computer are never gated | none | Billing off: every account may use containers. Billing on and unset: every signed-in plan may (`free,go,pro`), anonymous may not. Refused callers get `subscription_required` (403), "Running in the cloud needs a Stella subscription." |
+| Owner mode (one owner, devices join by pairing code; 1.6) | var `STELLA_OWNER_MODE = "1"` on **cloud-builder** and **model-gateway**; optional `STELLA_OWNER_MODE_SIGN_IN` (`email`, `social`, comma-separated) re-opens those sign-in methods; `STELLA_CLOUD_AGENT_MONTHLY_HOURS`, `STELLA_CLOUD_AGENT_MAX_CONCURRENT` | none | Off: a multi-user server with the sign-in methods you set up (1.6). Push notifications are off in owner mode |
+| Billing (plans, limits, Stripe checkout) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (webhook URL `<backend>/api/stripe/webhook`), `STRIPE_PRICE_GO`, `STRIPE_PRICE_PRO`, `STELLA_INCLUDED_USAGE_UTILIZATION_RATE`, `STELLA_GO_PRICE_CENTS`, `STELLA_PRO_PRICE_CENTS`, `STELLA_FREE_{ROLLING,WEEKLY,MONTHLY}_LIMIT_USD`, `STELLA_FREE_ROLLING_WINDOW_HOURS`; optional overrides in `workers/cloud-builder/src/billing/plans.ts` | Stripe | Billing is off: every account is Pro, unlimited; checkout says billing isn't set up. Setting any one of `STELLA_INCLUDED_USAGE_UTILIZATION_RATE`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_GO`, `STRIPE_PRICE_PRO` turns billing on, and then all the required ones must be set or turns are refused |
+| Cloud containers by plan (cloud agents, cloud as a run destination, Claude Code in the cloud) | var or secret `STELLA_CLOUD_SANDBOX_PLANS`: comma list of `free`, `go`, `pro` that may start a cloud container, e.g. `go,pro` to require a subscription. Read only when billing is on. Chat, chat storage and running on the user's own computer are never gated | none | Billing off: every account may use containers. Billing on and unset: every plan may (`free,go,pro`). Refused callers get `subscription_required` (403), "Running in the cloud needs a Stella subscription." |
 | Email sign-in (magic links) | var `STELLA_EMAIL_FROM` on a domain enabled for Email Sending (see 1.6); or, instead or as a fallback, `RESEND_API_KEY`, `RESEND_FROM`; optional `STELLA_EMAIL_LOGO_URL` | Cloudflare Email Service (Resend fallback) | Magic links answer 503 "Email sign-in isn't set up" |
 | Google / Apple sign-in | see 1.6 | Google, Apple | The provider isn't offered |
 | Opening private canvas links in a browser | `CANVAS_SHARE_VIEW_SECRET` (`openssl rand -hex 32`): the same value on **cloud-builder** (every env that writes to the share bucket) and on **canvas-share** | none | Canvases still get private links and show in the app, but a private link opens nowhere else (the share domain shows its "private" page) until it is made public |
@@ -618,7 +613,7 @@ Secrets go on **cloud-builder** unless noted.
 | Stella Crew (tag Stella in Slack) | `SLACK_CLIENT_ID`, `SLACK_CLIENT_SECRET`, `SLACK_SIGNING_SECRET`, `OAUTH_STATE_SECRET`; create the Slack app from `workers/cloud-builder/slack/app-manifest.*.json` with your auth domain (see `workers/cloud-builder/slack/README.md`); workspaces install through `<auth>/api/slack/install` | Slack app (OAuth v2, Events API) | The `/api/slack/*` routes answer that Slack isn't set up |
 | Desktop OAuth connectors that exchange tokens on the server (Google Workspace, Box, Microsoft, Atlassian, ...) | `NATIVE_OAUTH_CLIENTS_JSON` (`{"<provider>": {"clientId": "...", "clientSecret": "..."}}`); desktop client ids can be overridden with `STELLA_NATIVE_OAUTH_<ID>_CLIENT_ID`. Providers that only allow https redirects use `<STELLA_WEB_URL>/oauth/<provider>/callback`, which `packages/website` doesn't serve (1.2) | each provider | Those connectors aren't offered |
 | Maps tool | `GOOGLE_MAPS_SERVER_API_KEY` (Places API (New) + Directions); the card's interactive view also needs `NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY` on the **website** | Google Maps Platform | The `map` tool says maps aren't set up |
-| Captcha on anonymous web sign-in | `TURNSTILE_SECRET_KEY`; site key in `VITE_TURNSTILE_SITE_KEY` (desktop web build) and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (website) | Cloudflare Turnstile | No captcha |
+| Captcha on web magic-link sign-in | `TURNSTILE_SECRET_KEY`; site key in `VITE_TURNSTILE_SITE_KEY` (desktop web build) and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (website) | Cloudflare Turnstile | No captcha |
 | Mobile app integrity | `APPLE_APP_ATTEST_TEAM_ID`, `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_JSON` (+ `EXPO_PUBLIC_PLAY_INTEGRITY_PROJECT_NUMBER`); `STELLA_APP_INTEGRITY_MODE` = `enforce` / `off` | Apple App Attest, Google Play Integrity | Off |
 | Admin API (test accounts, integrations catalog, billing tools) | `STELLA_ADMIN_API_SECRET`; test accounts also need var `STELLA_TEST_ACCOUNTS=1` (dev only). In `env.production`, `ADMIN_ACCESS_TEAM_DOMAIN` and `ADMIN_ACCESS_AUD` name the Cloudflare Access application whose JWT admin also requires: set them to your own Access app, or set both to `"off"` for bearer-only | none | Admin routes answer 503 |
 | Ops relay probe | `STELLA_RELAY_PROBE_SECRET` on **model-gateway** | none | No probe |

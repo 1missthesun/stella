@@ -754,7 +754,6 @@ spawn_agent({ description: "Prod smoke turn", destination: "cloud", model: "stel
 
 Its report must read `ok` (it arrives as `[Agent completed]`, typically within
 a minute). That covers the owner's session, cloud agent placement, an agent
-container and the model gateway. Scripted anonymous sign-in is no smoke check:
-prod expects a Turnstile or app-integrity proof for it.
+container and the model gateway.
 
 Desktop against a given backend: `STELLA_BACKEND_URL=<backend> TMPDIR=/tmp node .agents/skills/verify-stella/control-stella.mjs session launch`.

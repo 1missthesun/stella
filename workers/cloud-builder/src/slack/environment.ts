@@ -635,6 +635,15 @@ export const egressForConversation = async (
   return { kind: "slack", team: thread.team_id, repo, internet: environment.network === "full" };
 };
 
+/** Whether a conversation's network access reaches a host on its own (Full, or a domain the owner added). */
+export const conversationAllowsHost = async (env: Cloudflare.Env, conversationId: string, host: string): Promise<boolean> => {
+  const thread = await threadOf(env, conversationId);
+  if (!thread) return false;
+  const repo = await repoIdFor(env, conversationId, thread);
+  const policy = await cachedPolicy(env, thread.team_id, repo);
+  return policy.network === "full" || (policy.network === "limited" && policy.allowed.some((pattern) => hostMatches(pattern, host)));
+};
+
 const shellQuote = (value: string): string => `'${value.replace(/'/gu, `'\\''`)}'`;
 
 const writeFile = (path: string, content: string, mode: string): string =>
@@ -694,6 +703,38 @@ const noteInThread = async (env: Cloudflare.Env, thread: ThreadRow, text: string
     ...(thread.thread_key === "dm" ? {} : { thread_ts: thread.thread_key }),
     text,
   });
+};
+
+/** Hosts the egress proxy refused during a run, from its 403 bodies in the log. */
+export const blockedHostsIn = (log: string): string[] => {
+  const hosts = new Set<string>();
+  for (const match of log.matchAll(/network access, which doesn't include ([a-z0-9.-]+)\./giu)) {
+    if (match[1]) hosts.add(match[1].toLowerCase());
+  }
+  return [...hosts].slice(0, 5);
+};
+
+const NOISE = [/^\s*at\s/u, /^rm: cannot remove '\/var\/cache\/apt/u, /^\s*$/u, /^\s*[\^~]+\s*$/u, /^\s*[}\])]+;?\s*$/u];
+
+/** The line of a failed run's log most likely to say why. */
+const failureLine = (log: string): string => {
+  const lines = log.split("\n").filter((line) => !NOISE.some((pattern) => pattern.test(line)));
+  const telling = [...lines].reverse().find((line) => /error|failed|not found|denied|refused|cannot|can't|unable|timed? ?out/iu.test(line));
+  return (telling ?? lines[lines.length - 1] ?? "").trim().slice(0, 200);
+};
+
+const setupFailureNote = (
+  environment: SlackEnvironment,
+  reason: string,
+  log: string,
+  blocked: string[],
+): string => {
+  if (blocked.length) {
+    const list = blocked.map((host) => `\`${host}\``).join(", ");
+    return `:warning: The setup script for the *${environment.name}* environment ${reason} because its ${LEVEL_LABEL[environment.network]} network access blocked ${list}. To allow ${blocked.length === 1 ? "it" : "them"}, the workspace owner can ${environment.network === "none" ? "switch network access to Limited and add" : "add"} ${list} under *Also allow these domains* in this repository's environment on stella.sh/crew (or choose Full access). Continuing without the setup script.`;
+  }
+  const line = failureLine(log);
+  return `:warning: The setup script for the *${environment.name}* environment ${reason}${line ? `: \`${line.replace(/`/gu, "'")}\`` : ""}. Continuing without it. The full log is on stella.sh/crew.`;
 };
 
 export type PreparedEnvironment = {
@@ -806,17 +847,15 @@ cd ${shellQuote(cwd)} 2>/dev/null || cd ${shellQuote(WORLD_ROOT)}
       : exitCode === null
         ? "couldn't run"
         : `failed (exit ${exitCode})`;
+    const blocked = blockedHostsIn(output);
     if (!cached) {
-      const lastLine = output.trim().split("\n").pop()?.slice(0, 200) ?? "";
-      await noteInThread(
-        env,
-        thread,
-        `:warning: The setup script for the *${environment.name}* environment ${reason}${lastLine ? `: \`${lastLine.replace(/`/gu, "'")}\`` : ""}. Continuing without it. The full log is on stella.sh/crew.`,
-      ).catch(() => undefined);
+      await noteInThread(env, thread, setupFailureNote(environment, reason, output, blocked)).catch(() => undefined);
     }
     return {
       env: agentEnv,
-      notice: `The environment's setup script ${reason}, so tools it installs may be missing. The end of its log:\n${output.slice(-1500)}`,
+      notice: `The environment's setup script ${reason}, so tools it installs may be missing.${
+        blocked.length ? ` It needed ${blocked.join(", ")}, which this environment's network access doesn't include.` : ""
+      } The end of its log:\n${output.slice(-1500)}`,
     };
   }
   const after = await session.exec(`cat ${savedEnv}`, { origin: "internal", timeout: 30_000 } as Parameters<

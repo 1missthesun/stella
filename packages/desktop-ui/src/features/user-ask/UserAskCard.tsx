@@ -284,7 +284,7 @@ function UserAskSecureInputBody({
           <Button
             type="button"
             variant="ghost"
-            className="pill-btn"
+            className="pill-btn user-ask__decline-btn"
             disabled={busy}
             onClick={() => onDecline(note.trim())}
           >

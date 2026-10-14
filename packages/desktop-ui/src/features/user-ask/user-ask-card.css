@@ -583,6 +583,22 @@
   font-size: var(--font-size-md);
 }
 
+/* Secondary action: Send's shape and size with a quiet fill instead of a border. */
+.user-ask__actions .pill-btn.user-ask__decline-btn {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--foreground) 7%, transparent);
+  color: var(--text-base, var(--foreground));
+}
+
+.user-ask__actions .pill-btn.user-ask__decline-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 11%, transparent);
+  color: var(--text-strong, var(--foreground));
+}
+
+.user-ask__actions .pill-btn.user-ask__decline-btn:active:not(:disabled) {
+  background: color-mix(in srgb, var(--foreground) 15%, transparent);
+}
+
 .user-ask__error {
   display: inline-flex;
   align-items: center;

@@ -201,20 +201,6 @@ export type AgentToolSnapshot = {
   result?: string;
   error?: string;
   recentActivity?: string[];
-  /**
-   * Last discrete liveness event (streamed progress or tool start/end).
-   * Goes stale mid-call while a tool is running — check `activeToolCount`
-   * first; only fall back to this stamp (or diffing `recentActivity`) when
-   * no tool is in flight. Never implement an idle timeout on this alone.
-   */
-  lastActivityAt?: number;
-  /**
-   * Tool calls currently in flight. `lastActivityAt` only moves on discrete
-   * events (progress, tool start/end), so a single tool call outlasting an
-   * idle window would read as idle mid-call; a non-zero count means the
-   * agent is actively working regardless of how stale the stamp looks.
-   */
-  activeToolCount?: number;
   messages?: Array<{
     from: "orchestrator" | "subagent";
     text: string;

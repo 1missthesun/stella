@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { resolveVoiceErrorToast } from "@/features/voice/runtime/voice-error-toast";
+import { voiceFailureToast } from "@/features/voice/runtime/voice-error-toast";
 import { presentComposerNotice } from "@/features/chat/composer-notice-store";
 import { SIGN_IN_TOAST_ACTION } from "@/shared/lib/auth-cta";
 import { useT } from "@/shared/i18n";
@@ -7,8 +7,8 @@ import { useT } from "@/shared/i18n";
 export function VoiceErrorToastListener() {
   const t = useT();
   useEffect(() => {
-    const off = window.electronAPI?.voice?.onSessionError?.((message) => {
-      const toast = resolveVoiceErrorToast(message, t);
+    const off = window.electronAPI?.voice?.onSessionError?.((failure) => {
+      const toast = voiceFailureToast(failure, t);
       if (toast) {
         presentComposerNotice(
           {

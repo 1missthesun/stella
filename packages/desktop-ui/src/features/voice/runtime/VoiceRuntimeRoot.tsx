@@ -7,8 +7,6 @@ import {
   type SharedMicrophoneLease,
 } from "@/features/voice/services/shared-microphone";
 import { computeAnalyserEnergy } from "@/features/voice/services/audio-energy";
-import { resolveVoiceErrorToast } from "@/features/voice/runtime/voice-error-toast";
-import { useT } from "@/shared/i18n";
 
 type RuntimeVoiceState = {
   sessionState: VoiceSessionState;
@@ -46,7 +44,6 @@ const runtimeStateEquals = (a: RuntimeVoiceState, b: RuntimeVoiceState) =>
   Math.abs(a.outputLevel - b.outputLevel) < 0.01;
 
 export function VoiceRuntimeRoot() {
-  const t = useT();
   const { state } = useUiState();
   const [bootConversationId, setBootConversationId] = useState<string | null>(
     state.conversationId,
@@ -242,16 +239,18 @@ export function VoiceRuntimeRoot() {
       inputActiveRef,
       analyserRef,
       outputAnalyserRef,
-      onStateChange: (sessionState, errorMessage) => {
+      onStateChange: (sessionState, failure) => {
         sessionStateRef.current = sessionState;
         if (sessionState === "error") {
-          window.electronAPI?.voice.reportSessionErrorState?.(
-            errorMessage ?? "",
-          );
-          const toast = resolveVoiceErrorToast(errorMessage, t);
-          if (toast && lastVoiceErrorToastRef.current !== (errorMessage ?? "")) {
-            lastVoiceErrorToastRef.current = errorMessage ?? "";
-            window.electronAPI?.voice.reportSessionError(errorMessage ?? "");
+          const message = failure?.message ?? "";
+          window.electronAPI?.voice.reportSessionErrorState?.(message);
+          if (
+            failure?.action &&
+            message.trim() &&
+            lastVoiceErrorToastRef.current !== message
+          ) {
+            lastVoiceErrorToastRef.current = message;
+            window.electronAPI?.voice.reportSessionError(failure);
           }
         } else {
           lastVoiceErrorToastRef.current = null;
@@ -298,7 +297,7 @@ export function VoiceRuntimeRoot() {
         outputLevel: computeEnergy(outputAnalyserRef.current),
       });
     }, LEVEL_SAMPLE_MS);
-  }, [resolvedConversationId, sessionShouldRun, t]);
+  }, [resolvedConversationId, sessionShouldRun]);
 
   useEffect(() => {
     return () => {

@@ -3,6 +3,8 @@ import {
   type VoiceSessionEvent,
   type VoiceSessionState,
 } from "@/features/voice/services/realtime-voice";
+import type { VoiceSessionFailure } from "@stella/contracts/voice-failure";
+import { voiceSessionFailureOf } from "@/features/voice/services/realtime/voice-session-error";
 
 const SESSION_ROTATE_MS = 55 * 60 * 1000;
 const SESSION_ROTATE_IDLE_WAIT_MS = 30_000;
@@ -32,7 +34,10 @@ interface VoiceSessionManagerDeps {
   inputActiveRef: { current: boolean };
   analyserRef: { current: AnalyserNode | null };
   outputAnalyserRef: { current: AnalyserNode | null };
-  onStateChange: (state: VoiceSessionState, error?: string) => void;
+  onStateChange: (
+    state: VoiceSessionState,
+    failure?: VoiceSessionFailure,
+  ) => void;
   onSpeakingChange: (isSpeaking: boolean) => void;
   onUserSpeakingChange: (isUserSpeaking: boolean) => void;
 }
@@ -317,7 +322,10 @@ export class VoiceSessionManager {
           this.userSpeaking = false;
           this.deps.onSpeakingChange(false);
           this.deps.onUserSpeakingChange(false);
-          this.deps.onStateChange("error", event.error);
+          this.deps.onStateChange("error", {
+            message: event.error ?? "",
+            action: null,
+          });
           this.scheduleRetry();
         } else {
           this.deps.onStateChange(event.state);
@@ -428,7 +436,7 @@ export class VoiceSessionManager {
         (err as Error).message,
       );
       if (!previousSession) {
-        this.deps.onStateChange("error", (err as Error).message);
+        this.deps.onStateChange("error", voiceSessionFailureOf(err));
       }
       this.scheduleRetry();
     } finally {

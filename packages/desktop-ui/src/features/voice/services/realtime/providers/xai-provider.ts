@@ -1,5 +1,6 @@
 import { ASK_STELLA_SESSION_TOOLS } from "../ask-stella-tool";
 import { XaiWebSocketTransport } from "../transports/xai-websocket-transport";
+import { VoiceSessionError } from "../voice-session-error";
 import type { ProviderModule, VoiceSessionToken } from "./types";
 
 export const xaiProvider: ProviderModule = {
@@ -11,6 +12,7 @@ export const xaiProvider: ProviderModule = {
     const result = await voiceApi.createXaiSession({
       instructions: ctx.instructions,
     });
+    if ("failure" in result) throw new VoiceSessionError(result.failure);
     return {
       provider: "xai",
       transport: "xai-websocket",

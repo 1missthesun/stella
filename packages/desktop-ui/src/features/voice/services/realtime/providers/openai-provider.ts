@@ -1,6 +1,7 @@
 import { ASK_STELLA_SESSION_TOOLS } from "../ask-stella-tool";
 import { OpenAIWebRTCTransport } from "../transports/openai-webrtc-transport";
 import { bearerSdpFetcher } from "../transports/sdp-fetchers";
+import { VoiceSessionError } from "../voice-session-error";
 import type {
   ProviderModule,
   ProviderTokenContext,
@@ -27,6 +28,7 @@ export const openaiProvider: ProviderModule = {
     const result = await voiceApi.createOpenAISession({
       instructions: ctx.instructions,
     });
+    if ("failure" in result) throw new VoiceSessionError(result.failure);
     return {
       provider: "openai",
       transport: "openai-webrtc",

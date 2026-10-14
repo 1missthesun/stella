@@ -75,6 +75,10 @@ import type { RuntimeVoiceOrchestratorConfig } from "../protocol/index.js";
 import type { ConversationFocusRoot } from "../reply-refs.js";
 import type { UiStateSnapshot } from "../ui-state.js";
 import type {
+  VoiceProviderSessionRefusal,
+  VoiceSessionFailure,
+} from "../voice-failure.js";
+import type {
   UserAsk,
   UserAskAnswer,
   UserAskEscalationPolicy,
@@ -870,11 +874,13 @@ export type IpcInvokeContract = {
   >;
   [IPC_VOICE_CREATE_OPENAI_SESSION]: Invoke<
     [payload: { instructions?: string }],
-    Extract<RealtimeVoiceSession, { provider: "openai" }>
+    | Extract<RealtimeVoiceSession, { provider: "openai" }>
+    | VoiceProviderSessionRefusal
   >;
   [IPC_VOICE_CREATE_XAI_SESSION]: Invoke<
     [payload: { instructions?: string }],
-    Extract<RealtimeVoiceSession, { provider: "xai" }>
+    | Extract<RealtimeVoiceSession, { provider: "xai" }>
+    | VoiceProviderSessionRefusal
   >;
   [IPC_VOICE_GET_RUNTIME_STATE]: Invoke<[], VoiceRuntimeSnapshot>;
   [IPC_VOICE_RTC_SET_SHORTCUT]: Invoke<
@@ -1466,7 +1472,7 @@ export type IpcSendContract = {
   [IPC_VOICE_RTC_TOGGLE]: [];
   [IPC_VOICE_PERSIST_TRANSCRIPT]: [payload: VoiceTranscriptPayload];
   [IPC_VOICE_RUNTIME_STATE]: [state: VoiceRuntimeSnapshot];
-  [IPC_VOICE_REPORT_SESSION_ERROR]: [message: string];
+  [IPC_VOICE_REPORT_SESSION_ERROR]: [failure: VoiceSessionFailure];
   [IPC_VOICE_REPORT_SESSION_ERROR_STATE]: [message: string];
   [IPC_DICTATION_CANCEL_OPENROUTER]: [payload: { requestId: string }];
   [IPC_DICTATION_ACTIVE_CHANGED]: [payload: { active: boolean }];
@@ -1529,7 +1535,7 @@ export type IpcEventContract = {
   [IPC_UI_STATE_KV_CHANGED]: Record<string, string | null>;
   [IPC_VOICE_ORCHESTRATOR_ACTIVITY]: VoiceOrchestratorActivity;
   [IPC_VOICE_RUNTIME_STATE]: VoiceRuntimeSnapshot;
-  [IPC_VOICE_SESSION_ERROR]: string;
+  [IPC_VOICE_SESSION_ERROR]: VoiceSessionFailure;
   [IPC_VOICE_SESSION_ERROR_STATE]: string;
   [IPC_VOICE_PREFERENCES_CHANGED]: RealtimeVoicePreferences;
   [IPC_DICTATION_TOGGLE]: DictationToggle;

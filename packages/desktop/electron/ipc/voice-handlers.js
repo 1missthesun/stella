@@ -24,10 +24,15 @@ import {
 } from "@stella/contracts/desktop/ipc-channels";
 import { requireMatchingCloudConversationId, requireRequestedCloudConversationId, } from "../cloud-conversation-mode.js";
 import { randomUUID } from "node:crypto";
+import { isVoiceSessionFailure } from "@stella/contracts/voice-failure";
 import {
   handleIpc,
   onIpc,
 } from "./typed-ipc.js";
+const ACCOUNT_SETUP_STATUSES = new Set([401, 402, 403, 429]);
+const voiceSetupRefusal = (message) => ({
+    failure: { message, action: "settings" },
+});
 const DEFAULT_OPENAI_REALTIME_MODEL = "gpt-realtime-2.1";
 const DEFAULT_XAI_REALTIME_MODEL = "grok-voice-think-fast-1.0";
 const DEFAULT_RUNTIME_STATE = {
@@ -112,17 +117,19 @@ export const registerVoiceHandlers = (options) => {
             window.webContents.send(IPC_VOICE_RUNTIME_STATE, runtimeState);
         }
     };
-    const emitVoiceSessionErrorToast = (message) => {
-        const trimmed = typeof message === "string" ? message.trim() : "";
-        if (!trimmed)
+    const emitVoiceSessionErrorToast = (failure) => {
+        if (!isVoiceSessionFailure(failure) || !failure.message.trim())
             return;
         const target = options.windowManager.getFullWindow();
         if (target && !target.isDestroyed()) {
-            target.webContents.send(IPC_VOICE_SESSION_ERROR, trimmed);
+            target.webContents.send(IPC_VOICE_SESSION_ERROR, {
+                message: failure.message.trim(),
+                action: failure.action,
+            });
         }
     };
-    onIpc(IPC_VOICE_REPORT_SESSION_ERROR, (_event, message) => {
-        emitVoiceSessionErrorToast(message);
+    onIpc(IPC_VOICE_REPORT_SESSION_ERROR, (_event, failure) => {
+        emitVoiceSessionErrorToast(failure);
     });
     let lastVoiceSessionError = "";
     onIpc(IPC_VOICE_REPORT_SESSION_ERROR_STATE, (_event, message) => {
@@ -187,7 +194,7 @@ export const registerVoiceHandlers = (options) => {
         const apiKey = getLocalLlmCredential(options.stellaAppDir, "openai")?.trim() ||
             (await getLocalLlmOAuthApiKey(options.stellaAppDir, "openai"))?.trim();
         if (!apiKey) {
-            throw new Error("Connect OpenAI in Settings to use it for voice.");
+            return voiceSetupRefusal("Connect OpenAI in Settings to use it for voice.");
         }
         const model = preferences.model?.startsWith("openai/")
             ? preferences.model.slice("openai/".length)
@@ -215,7 +222,10 @@ export const registerVoiceHandlers = (options) => {
             }),
         });
         if (!response.ok) {
-            throw new Error(`Failed to create OpenAI voice session: ${response.status} ${await response.text()}`);
+            const message = `Failed to create OpenAI voice session: ${response.status} ${await response.text()}`;
+            if (ACCOUNT_SETUP_STATUSES.has(response.status))
+                return voiceSetupRefusal(message);
+            throw new Error(message);
         }
         const data = (await response.json());
         const clientSecret = typeof data.value === "string"
@@ -247,7 +257,7 @@ export const registerVoiceHandlers = (options) => {
         const apiKey = getLocalLlmCredential(options.stellaAppDir, "xai")?.trim() ||
             (await getLocalLlmOAuthApiKey(options.stellaAppDir, "xai"))?.trim();
         if (!apiKey) {
-            throw new Error("Connect xAI in Settings to use it for voice.");
+            return voiceSetupRefusal("Connect xAI in Settings to use it for voice.");
         }
         const model = preferences.model?.startsWith("xai/")
             ? preferences.model.slice("xai/".length)
@@ -268,7 +278,10 @@ export const registerVoiceHandlers = (options) => {
             body: JSON.stringify(buildXaiRealtimeClientSecretRequest()),
         });
         if (!response.ok) {
-            throw new Error(`Failed to create xAI voice session: ${response.status} ${await response.text()}`);
+            const message = `Failed to create xAI voice session: ${response.status} ${await response.text()}`;
+            if (ACCOUNT_SETUP_STATUSES.has(response.status))
+                return voiceSetupRefusal(message);
+            throw new Error(message);
         }
         const data = (await response.json());
         if (typeof data.value === "string") {

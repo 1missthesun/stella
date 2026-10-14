@@ -21,6 +21,7 @@ import { ProviderAccountsCard } from "@/features/cloud/ProviderAccountsCard";
 import { SessionsCard } from "./SessionsCard";
 import { PasskeysCard } from "./PasskeysCard";
 import { ServerSettingsCard } from "@/global/self-host/ServerSettingsCard";
+import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 
 type AccountDeleteAction = "data" | "account";
 
@@ -95,6 +96,7 @@ interface AccountTabProps {
 
 export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
   const t = useT();
+  const selfHosted = useSelfHostedServer();
   const { hasConnectedAccount } = useAuthSessionState();
   const [pendingDeleteAction, setPendingDeleteAction] =
     useState<AccountDeleteAction | null>(null);
@@ -211,26 +213,29 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
             </Button>
           </div>
         </div>
-        <div className="settings-row">
-          <div className="settings-row-info">
-            <div className="settings-row-label">
-              {t("settings.account.deleteAccount.label")}
+        {/* The owner of a self-hosted server can't delete it from here. */}
+        {selfHosted ? null : (
+          <div className="settings-row">
+            <div className="settings-row-info">
+              <div className="settings-row-label">
+                {t("settings.account.deleteAccount.label")}
+              </div>
+            </div>
+            <div className="settings-row-control">
+              <Button
+                type="button"
+                variant="ghost"
+                className="pill-btn pill-btn--danger"
+                onClick={() => setPendingDeleteAction("account")}
+                disabled={isDeleting || !hasConnectedAccount}
+              >
+                {isDeleting && pendingDeleteAction === "account"
+                  ? t("settings.account.deleteAccount.working")
+                  : t("settings.account.deleteAccount.action")}
+              </Button>
             </div>
           </div>
-          <div className="settings-row-control">
-            <Button
-              type="button"
-              variant="ghost"
-              className="pill-btn pill-btn--danger"
-              onClick={() => setPendingDeleteAction("account")}
-              disabled={isDeleting || !hasConnectedAccount}
-            >
-              {isDeleting && pendingDeleteAction === "account"
-                ? t("settings.account.deleteAccount.working")
-                : t("settings.account.deleteAccount.action")}
-            </Button>
-          </div>
-        </div>
+        )}
       </div>
       <div className="settings-card">
         <h3 className="settings-card-title">

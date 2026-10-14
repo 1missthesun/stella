@@ -13,6 +13,7 @@ import { ChatGptAccountsSection } from "@/features/chatgpt/ChatGptAccountsSectio
 import { ClaudeAccountsSection } from "@/features/claude/ClaudeAccountsSection";
 import { cloudEnginesApi, useCloudEngines } from "./cloud-engines-api";
 import { publishCloudExecutionSelection } from "./cloud-execution-store";
+import { useServerFeature } from "@/platform/backend/server-discovery";
 
 /**
  * The one place for the owner's Claude and ChatGPT accounts.
@@ -30,6 +31,8 @@ export function ProviderAccountsCard() {
   const { isAuthenticated } = useAuthState();
   const connections = useCloudEngines(isAuthenticated);
   const [switching, setSwitching] = useState(false);
+  // A self-hosted server without Stella's own models can't run on "Stella".
+  const managedModels = useServerFeature("managedModels");
 
   const usableProviders = new Set<string>(
     (connections?.connections ?? [])
@@ -89,16 +92,18 @@ export function ProviderAccountsCard() {
             <div className="settings-row-label">{t(`${K}.runsOnLabel`)}</div>
           </div>
           <div className="settings-row-control engine-account-controls">
-            <Button
-              type="button"
-              variant="ghost"
-              className={`pill-btn${chatEngine === "stella" ? " pill-btn--active" : ""}`}
-              aria-pressed={chatEngine === "stella"}
-              onClick={() => void chooseEngine("stella")}
-              disabled={switching}
-            >
-              Stella
-            </Button>
+            {managedModels ? (
+              <Button
+                type="button"
+                variant="ghost"
+                className={`pill-btn${chatEngine === "stella" ? " pill-btn--active" : ""}`}
+                aria-pressed={chatEngine === "stella"}
+                onClick={() => void chooseEngine("stella")}
+                disabled={switching}
+              >
+                Stella
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="ghost"

@@ -25,14 +25,14 @@ export const isValidCloudSpawnModel = (model: string): boolean =>
 export const CLOUD_SPAWN_MODEL_HELP =
   'Cloud spawn model must be "claude[/model]" (or "claude-code[/model]"), "codex[/model]", a canonical "stella/..." model, or "<provider>/<model>" for a key saved to the account, optionally followed by :low, :medium, :high, :xhigh, or :max.';
 
-const DEFAULT_CLOUD_ANTHROPIC_EXECUTION: CloudExecutionSelection = {
+export const DEFAULT_CLOUD_ANTHROPIC_EXECUTION: CloudExecutionSelection = {
   engine: "anthropic",
   provider: "anthropic",
   model: "claude-sonnet-4-6",
   reasoningEffort: DEFAULT_REASONING_EFFORT,
 };
 
-const DEFAULT_CLOUD_CODEX_EXECUTION: CloudExecutionSelection = {
+export const DEFAULT_CLOUD_CODEX_EXECUTION: CloudExecutionSelection = {
   engine: "chatgpt",
   provider: "chatgpt",
   model: "gpt-6.1-sol",

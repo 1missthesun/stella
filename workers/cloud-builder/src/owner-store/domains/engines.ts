@@ -93,6 +93,7 @@ import { ownerKekFor, ownerKeks, type OwnerKekTag } from "../../secret-rotation.
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 import { readOrDefault } from "../schema.js";
+import { DEFAULT_CLOUD_ANTHROPIC_EXECUTION, DEFAULT_CLOUD_CODEX_EXECUTION } from "../../cloud-spawn-model.js";
 
 export const ENGINES_MIGRATION = {
   id: "engines.1-init",
@@ -679,8 +680,22 @@ const connectedProvidersOf = (db: OwnerDbReader): string[] =>
     .all<{ provider: string }>("SELECT provider FROM provider_credentials WHERE status = 'ok' ORDER BY provider")
     .map((row) => row.provider);
 
+/**
+ * Owner-mode servers default to the owner's own subscription: Stella's
+ * managed models need an OpenRouter key the server may not have.
+ */
+const ownerModeDefault = (
+  connectedEngines: NonNullable<OwnerSnapshot["connectedEngines"]>,
+): CloudExecutionSelection =>
+  connectedEngines.includes("anthropic")
+    ? DEFAULT_CLOUD_ANTHROPIC_EXECUTION
+    : connectedEngines.includes("chatgpt")
+      ? DEFAULT_CLOUD_CODEX_EXECUTION
+      : DEFAULT_EXECUTION;
+
 export const snapshotEngines = (
   db: OwnerDbReader,
+  options: { ownerMode?: boolean } = {},
 ): Pick<OwnerSnapshot, "execution" | "connectedEngines" | "connectedProviders"> => {
   const connectedEngines = readOrDefault(() => connectedEnginesOf(db), []);
   const connectedProviders = readOrDefault(() => connectedProvidersOf(db), [] as string[]);
@@ -690,8 +705,10 @@ export const snapshotEngines = (
     (selection.engine === "provider"
       ? connectedProviders.includes(selection.provider)
       : connectedEngines.includes(selection.engine));
+  const fallback = options.ownerMode ? ownerModeDefault(connectedEngines) : DEFAULT_EXECUTION;
+  const usesDefault = !runnable || (selection.engine === "stella" && selection.model === DEFAULT_EXECUTION.model);
   return {
-    execution: runnable ? selection : DEFAULT_EXECUTION,
+    execution: usesDefault && options.ownerMode ? fallback : runnable ? selection : DEFAULT_EXECUTION,
     connectedEngines,
     connectedProviders,
   };

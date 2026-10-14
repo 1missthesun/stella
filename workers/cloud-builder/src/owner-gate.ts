@@ -122,6 +122,7 @@ import {
   MAX_DISPATCH_PAYLOAD_BYTES,
 } from "./dispatch-policy.js";
 import type { OwnerModelGrant } from "./owner-model-grants.js";
+import { ownerModeEnabled } from "./selfhost/owner-mode.js";
 import { MemoryPolicyError } from "./memory-policy.js";
 import type {
   MemoryPolicy,
@@ -885,7 +886,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
           budgetMicroCents: 0,
         },
         ...snapshotDevices(ctx.db),
-        ...snapshotEngines(ctx.db),
+        ...snapshotEngines(ctx.db, { ownerMode: ownerModeEnabled(ctx.env) }),
         ...snapshotTimeZone(ctx.db),
         fetchedAt: now,
         ttlMs: SNAPSHOT_TTL_MS,

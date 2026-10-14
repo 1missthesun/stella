@@ -16,7 +16,7 @@ import { FeedbackSheet } from "./FeedbackSheet";
 import { UserAskEscalationSection } from "./settings/UserAskEscalationSection";
 import { ServerSection } from "./settings/ServerSection";
 import { useServerFeatures } from "../lib/server-features";
-import { isSelfHostedLaunch } from "../lib/server-registry";
+import { isSelfHostedLaunch, launchServer } from "../lib/server-registry";
 import {
   makeSettingsStyles,
   type SettingsStyles,
@@ -126,7 +126,12 @@ export function SettingsContent() {
   useEffect(() => subscribeVoiceEnabled(setVoiceEnabledLocal), []);
 
   const user = session.data?.user;
-  const email = user?.email ?? "";
+  // A self-hosted owner's account email is synthetic
+  // (owner-…@selfhost.stella.local): name the server they own instead.
+  const email =
+    launchServer.kind === "self-hosted"
+      ? t("mobile.selfHost.ownerOf", { name: launchServer.name })
+      : (user?.email ?? "");
   const userName = user?.name?.trim() ?? "";
 
   // Appearance, notifications, and legal work without a session; everything

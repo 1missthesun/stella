@@ -270,7 +270,7 @@ export default function ConnectServerScreen() {
           ) : (
             <>
               <Text style={[styles.title, { marginTop: 8 }]} accessibilityRole="header">
-                {t("mobile.selfHost.connectTitle")}
+                {t("mobile.selfHost.connectOwn")}
               </Text>
               {signedOutOfActive ? (
                 <View style={styles.notice}>
@@ -453,7 +453,9 @@ function ConfirmStep({
   return (
     <>
       <Text style={[styles.title, { marginTop: 8 }]} accessibilityRole="header">
-        {t("mobile.selfHost.confirmTitle", { host })}
+        {t("mobile.selfHost.confirmTitle", {
+          name: step.discovery.name?.trim() || host,
+        })}
       </Text>
       <View style={styles.notice}>
         <Icon name="globe" size={18} color={colors.text} />

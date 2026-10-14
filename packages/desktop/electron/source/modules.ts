@@ -203,11 +203,10 @@ export const createModuleGraph = (options: ModuleGraphOptions) => {
         }
       }
     }
-    // `export {} from "x"` still loads "x", but the parser's module record
-    // leaves it out. oxc prints each statement on its own line.
-    for (const match of code.matchAll(/^export\s*\{\s*\}\s*from\s*(["'])([^"'\n]+)\1/gm)) {
-      const start = match.index + match[0].length - match[2]!.length - 2;
-      imports.push({ start, end: start + match[2]!.length + 2, specifier: match[2]!, dynamic: false });
+    for (const node of parsed.program.body) {
+      if (node.type === "ExportNamedDeclaration" && node.source && node.specifiers.length === 0) {
+        imports.push({ start: node.source.start, end: node.source.end, specifier: node.source.value, dynamic: false });
+      }
     }
     for (const entry of parsed.module.dynamicImports) {
       const literal = code.slice(entry.moduleRequest.start, entry.moduleRequest.end);

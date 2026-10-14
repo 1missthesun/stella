@@ -28,12 +28,6 @@ export type TurnRequest = {
   parentThreadId?: string;
   agentDepth: number;
   agentRole?: "orchestrator";
-  /**
-   * Present on the admitted dispatch when `agentRole` is `"orchestrator"`.
-   * Never part of the stored `turn` record (see `durableTurnRecord`): the
-   * spec lives in `orchestrator-cli-turn-store.ts` and is read back when
-   * turn-input.json is written.
-   */
   orchestratorCli?: CloudOrchestratorCliTurnSpec;
   orchestratorCliDigest?: string;
   originDeviceId?: string;

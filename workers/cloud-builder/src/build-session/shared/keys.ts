@@ -77,48 +77,68 @@ export const TERMINAL_EVENT_STATUS: Record<
   waiting_for_user: "waiting_for_user",
 };
 
+export type TurnDispatchIdentity = Pick<
+  TurnRequest,
+  | "kind"
+  | "ownerId"
+  | "appId"
+  | "turnId"
+  | "prompt"
+  | "description"
+  | "source"
+  | "clientMsgId"
+  | "parentTurnId"
+  | "parentThreadId"
+  | "agentDepth"
+  | "agentRole"
+  | "orchestratorCliDigest"
+  | "originDeviceId"
+  | "originConversationId"
+  | "workspace"
+  | "preflightDelayMs"
+  | "watchdogMs"
+  | "conversationId"
+  | "sessionId"
+  | "threadId"
+  | "execution"
+  | "ownerGeneration"
+  | "attemptGeneration"
+  | "turnBrokerRoute"
+>;
+
 export const turnDispatchIdentity = (
   turn: TurnRequest,
-): Omit<
-  TurnRequest,
-  | "ownerPurgeGeneration"
-  | "ownerPurgeLeaseId"
-  | "gateAdmittedByCaller"
-  | "audience"
-  | "budgetMicroCents"
-> => {
-  const identity = { ...turn } as Partial<TurnRequest>;
-  delete identity.ownerPurgeGeneration;
-  delete identity.ownerPurgeLeaseId;
-  // Who admitted the owner gate is a routing fact about one dispatch, not
-  // part of the turn: the same attempt replayed through the public route and
-  // through the orchestrator must still classify as a replay.
-  delete identity.gateAdmittedByCaller;
-  // The allowance is the owner gate's answer, not the caller's: the stored
-  // turn carries the snapshot's values while a replayed dispatch still
-  // carries the dispatcher's hints. Comparing them would turn every retry
-  // after a plan change into an idempotency conflict.
-  delete identity.audience;
-  delete identity.budgetMicroCents;
-  // Never stored (see `durableTurnRecord`); `orchestratorCliDigest` stands in.
-  delete identity.orchestratorCli;
-  return identity as Omit<
-    TurnRequest,
-    | "ownerPurgeGeneration"
-    | "ownerPurgeLeaseId"
-    | "gateAdmittedByCaller"
-    | "audience"
-    | "budgetMicroCents"
-  >;
-};
+): TurnDispatchIdentity => ({
+  kind: turn.kind,
+  ownerId: turn.ownerId,
+  appId: turn.appId,
+  turnId: turn.turnId,
+  prompt: turn.prompt,
+  description: turn.description,
+  source: turn.source,
+  clientMsgId: turn.clientMsgId,
+  parentTurnId: turn.parentTurnId,
+  parentThreadId: turn.parentThreadId,
+  agentDepth: turn.agentDepth,
+  agentRole: turn.agentRole,
+  orchestratorCliDigest: turn.orchestratorCliDigest,
+  originDeviceId: turn.originDeviceId,
+  originConversationId: turn.originConversationId,
+  workspace: turn.workspace,
+  preflightDelayMs: turn.preflightDelayMs,
+  watchdogMs: turn.watchdogMs,
+  conversationId: turn.conversationId,
+  sessionId: turn.sessionId,
+  threadId: turn.threadId,
+  execution: turn.execution,
+  ownerGeneration: turn.ownerGeneration,
+  attemptGeneration: turn.attemptGeneration,
+  turnBrokerRoute: turn.turnBrokerRoute,
+});
 
-/**
- * The `turn` key-value record. An orchestrator turn's spec is left out: it
- * can pass the per-value limit, and the record is read on nearly every
- * lifecycle step. `orchestrator-cli-turn-store.ts` holds it instead.
- */
-export const durableTurnRecord = (turn: TurnRequest): TurnRequest => {
-  if (turn.orchestratorCli === undefined) return turn;
+export type StoredTurn = Omit<TurnRequest, "orchestratorCli">;
+
+export const durableTurnRecord = (turn: TurnRequest): StoredTurn => {
   const { orchestratorCli: _spec, ...record } = turn;
   return record;
 };

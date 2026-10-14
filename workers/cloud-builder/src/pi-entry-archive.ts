@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { Buffer } from "node:buffer";
 import type { ConversationLogger } from "./conversation-types.js";
 
@@ -47,19 +48,15 @@ export type PiEntrySealer = {
 
 const pad = (value: number): string => String(value).padStart(12, "0");
 
-const withTimeout = async <T>(work: Promise<T>, ms: number): Promise<T> => {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      work,
-      new Promise<never>((_resolve, reject) => {
-        timer = setTimeout(() => reject(new Error("Archive storage timed out.")), ms);
+const withTimeout = <T>(work: Promise<T>, ms: number): Promise<T> =>
+  Effect.runPromise(
+    Effect.tryPromise({ try: () => work, catch: (error) => error }).pipe(
+      Effect.timeoutOrElse({
+        duration: ms,
+        orElse: () => Effect.fail(new Error("Archive storage timed out.")),
       }),
-    ]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
-};
+    ),
+  );
 
 const streamThrough = async (
   bytes: Uint8Array,

@@ -221,6 +221,56 @@ export class BackendClient {
     };
   }
 
+  /** The view's current value: the cached one, else the first delivered. */
+  read<K extends ViewName>(
+    view: K,
+    args: ViewArgs<K>,
+    options: { signal?: AbortSignal; timeoutMs: number; timeoutMessage?: string },
+  ): Promise<ViewResult<K>> {
+    const cached = this.subscriptions.get(subscriptionKey(view, args));
+    if (cached?.hasValue) return Promise.resolve(cached.value as ViewResult<K>);
+    return new Promise((resolve, reject) => {
+      const signal = options.signal;
+      if (signal?.aborted) {
+        reject(signal.reason);
+        return;
+      }
+      let settled = false;
+      let stop: (() => void) | undefined;
+      const finish = (complete: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        signal?.removeEventListener("abort", onAbort);
+        stop?.();
+        complete();
+      };
+      const onAbort = () => finish(() => reject(signal?.reason));
+      const timer = setTimeout(
+        () =>
+          finish(() =>
+            reject(
+              new BackendRequestError({
+                code: "UNAVAILABLE",
+                message: options.timeoutMessage ?? `${view} did not load.`,
+                retryable: true,
+              }),
+            ),
+          ),
+        options.timeoutMs,
+      );
+      signal?.addEventListener("abort", onAbort, { once: true });
+      const unwatch = this.watch(
+        view,
+        args,
+        (value) => finish(() => resolve(value)),
+        (error) => finish(() => reject(error)),
+      );
+      if (settled) unwatch();
+      else stop = unwatch;
+    });
+  }
+
   dispose(): void {
     this.disposed = true;
     this.subscriptions.clear();

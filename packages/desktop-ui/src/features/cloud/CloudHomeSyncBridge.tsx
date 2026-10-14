@@ -4,7 +4,6 @@ import {
   useRef,
   useSyncExternalStore,
 } from "react";
-import type { CloudSkillHead } from "@stella/contracts/cloud-home-sync";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { getAuthTokenForSubject } from "@/global/auth/services/auth-token";
 import { backendClient, backendUrl } from "@/platform/backend/backend-client";
@@ -27,43 +26,6 @@ const unavailable = (accountScope: string, message: string) =>
   });
 
 const SKILL_HEADS_TIMEOUT_MS = 20_000;
-
-const readSkillHeadsOnce = (
-  clientScope: string,
-  signal: AbortSignal,
-): Promise<CloudSkillHead[]> =>
-  new Promise((resolve, reject) => {
-    let settled = false;
-    let stop: (() => void) | null = null;
-    let timer: ReturnType<typeof setTimeout> | null = null;
-    const settle = (finish: () => void) => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      signal.removeEventListener("abort", onAbort);
-      stop?.();
-      finish();
-    };
-    const onAbort = () =>
-      settle(() => reject(new Error("Cloud Home sync was interrupted.")));
-    if (signal.aborted) {
-      onAbort();
-      return;
-    }
-    signal.addEventListener("abort", onAbort, { once: true });
-    timer = setTimeout(
-      () => settle(() => reject(new Error("Cloud skills did not load."))),
-      SKILL_HEADS_TIMEOUT_MS,
-    );
-    stop = backendClient.watch(
-      "skills.heads",
-      { clientScope },
-      (heads) => settle(() => resolve(heads)),
-      (error) => settle(() => reject(error)),
-    );
-    // `watch` delivers an already-cached value synchronously.
-    if (settled) stop();
-  });
 
 export function CloudHomeSyncBridge() {
   const {
@@ -133,7 +95,15 @@ export function CloudHomeSyncBridge() {
         scanLocal: () => cloudHome.scanLocal(scopeAtStart),
         readImportOwnership: cloudHome.getImportOwnership,
         readSkillHeads: () =>
-          readSkillHeadsOnce(scopeAtStart, controller.signal),
+          backendClient.read(
+            "skills.heads",
+            { clientScope: scopeAtStart },
+            {
+              signal: controller.signal,
+              timeoutMs: SKILL_HEADS_TIMEOUT_MS,
+              timeoutMessage: "Cloud skills did not load.",
+            },
+          ),
         deleteSkillMirror: ({ slug, expectedRevision }) =>
           backendClient.call("skills.deleteMirrored", {
             clientScope: scopeAtStart,

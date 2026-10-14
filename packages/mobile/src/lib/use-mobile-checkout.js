@@ -5,11 +5,6 @@ import { env } from "../config/env";
 import { getBackendClient } from "./backend";
 import { userFacingError } from "./user-facing-error";
 
-// Stripe requires an HTTPS return URL (the backend rejects custom schemes), so
-// Checkout returns to the existing web billing page. The native app does not
-// depend on reading that redirect: entitlement is confirmed by the live
-// `billing.status` view once Stripe's webhook lands, never by the client's
-// browser result.
 const CHECKOUT_RETURN_URL = `${env.siteUrl}/billing`;
 
 function backendErrorData(error) {

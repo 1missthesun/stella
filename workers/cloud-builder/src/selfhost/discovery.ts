@@ -17,6 +17,7 @@ import { json } from "../http/response.js";
 import { ownerModeEnabled, signInAllowed } from "./owner-mode.js";
 import { readServerIdentity } from "./owner.js";
 import { serverRelease } from "./release.js";
+import { webSearchBackend } from "../web-search.js";
 
 type GatewayCapabilities = { managedModels: boolean; webSearch: boolean };
 
@@ -91,7 +92,7 @@ export const serverFeatures = async (env: Cloudflare.Env): Promise<ServerFeature
     readAloud: has(env, "OPENROUTER_API_KEY", "FAL_KEY", "OPENAI_API_KEY"),
     dictation: has(env, "META_MODEL_API_KEY", "OPENROUTER_API_KEY"),
     realtimeVoice: has(env, "OPENAI_API_KEY"),
-    webSearch: true,
+    webSearch: webSearchBackend(env) !== "off",
     maps: has(env, "GOOGLE_MAPS_SERVER_API_KEY"),
     integrationsStore: has(env, "COMPOSIO_API_KEY"),
     emailSignIn: emailTransport && signInAllowed(env, "email"),

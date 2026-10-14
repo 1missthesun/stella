@@ -177,12 +177,98 @@ const withTimeout = <T>(promise: Promise<T>, signal: AbortSignal): Promise<T> =>
     );
   });
 
+type SearchBackend = "cloudflare" | "openrouter" | "off";
+
+const configured = (env: unknown, name: string): string => {
+  const value = (env as Record<string, unknown>)[name];
+  return typeof value === "string" ? value.trim() : "";
+};
+
+/**
+ * Cloudflare's Web Search API (AI Gateway credits) on hosted Stella. An
+ * owner-mode server searches through OpenRouter's web plugin when it has a
+ * key, and through Cloudflare only when STELLA_WEB_SEARCH says so; Claude
+ * Code turns search with their own tool either way.
+ */
+export const webSearchBackend = (env: unknown): SearchBackend => {
+  const chosen = configured(env, "STELLA_WEB_SEARCH").toLowerCase();
+  if (chosen === "cloudflare" || chosen === "openrouter" || chosen === "off") return chosen;
+  if (configured(env, "STELLA_OWNER_MODE") !== "1") return "cloudflare";
+  return configured(env, "OPENROUTER_API_KEY") ? "openrouter" : "off";
+};
+
+const OPENROUTER_SEARCH_MODEL = "openai/gpt-4o-mini";
+
+type OpenRouterAnnotation = {
+  type?: string;
+  url_citation?: { url?: string; title?: string; content?: string };
+};
+
+const searchOpenRouter = async (
+  env: Cloudflare.Env,
+  query: string,
+  signal: AbortSignal,
+): Promise<WebSearchOutcome> => {
+  const key = configured(env, "OPENROUTER_API_KEY");
+  if (!key) return failed("WebSearch through OpenRouter needs OPENROUTER_API_KEY on this server.");
+  try {
+    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: configured(env, "STELLA_WEB_SEARCH_MODEL") || OPENROUTER_SEARCH_MODEL,
+        plugins: [{ id: "web", max_results: MAX_RESULTS }],
+        max_tokens: 200,
+        messages: [{ role: "user", content: `Search the web for: ${query}\nSummarize the top results in two sentences.` }],
+      }),
+      signal,
+    });
+    const body = await readBody(response);
+    if (!response.ok) return failed(`WebSearch failed (${response.status}): ${body.slice(0, 300)}`);
+    const data = JSON.parse(body) as {
+      choices?: Array<{ message?: { annotations?: OpenRouterAnnotation[] } }>;
+      usage?: { cost?: number };
+    };
+    const terms = queryTerms(query);
+    const seen = new Set<string>();
+    const results = (data.choices?.[0]?.message?.annotations ?? [])
+      .filter((annotation) => annotation.type === "url_citation" && annotation.url_citation?.url)
+      .map((annotation) =>
+        toHit(
+          {
+            url: annotation.url_citation!.url!,
+            title: annotation.url_citation!.title ?? "",
+            description: annotation.url_citation!.content ?? "",
+          },
+          terms,
+        ),
+      )
+      .filter((hit) => hit.url && !seen.has(hit.url) && seen.add(hit.url))
+      .slice(0, MAX_RESULTS);
+    const cost = typeof data.usage?.cost === "number" ? Math.round(data.usage.cost * 100 * 1_000_000) : 0;
+    return { result: { text: formatText(query, results), results }, costMicroCents: cost };
+  } catch (error) {
+    if (signal.aborted) return failed("WebSearch timed out.");
+    return failed(`WebSearch failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
 export const searchWeb = async (
   env: Cloudflare.Env,
   input: { query: string; category?: string; signal: AbortSignal },
 ): Promise<WebSearchOutcome> => {
   const query = input.query.trim();
   if (!query) return failed("WebSearch failed: query is required.");
+  const backend = webSearchBackend(env);
+  if (backend === "off") {
+    return failed(
+      "Web search isn't set up on this Stella server. Claude Code agents search with their own tool; for other models, add an OpenRouter key to the server or turn on Cloudflare search (STELLA_WEB_SEARCH=cloudflare).",
+    );
+  }
+  if (backend === "openrouter") {
+    const category = input.category?.trim();
+    return await searchOpenRouter(env, (category ? `${query} ${category}` : query).slice(0, MAX_QUERY_CHARS), input.signal);
+  }
   const ai = (env as { AI?: Ai }).AI;
   if (!ai)
     return failed("WebSearch is not configured (missing the AI binding).");

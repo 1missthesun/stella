@@ -25,13 +25,13 @@ const HOUR = 60 * 60 * 1000;
 const useFormatters = (locale: string) =>
   useMemo(() => {
     const usd = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2 });
-    const whole = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 2, minimumFractionDigits: 0 });
+    const whole = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" });
     const weekday = new Intl.DateTimeFormat(locale, { weekday: "long", hour: "numeric", minute: "2-digit" });
     const day = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" });
     return {
       usd: (value: number) => usd.format(value),
-      amount: (value: number) => whole.format(value),
+      amount: (value: number) => (Number.isInteger(value) ? whole.format(value) : usd.format(value)),
       day: (ms: number) => day.format(ms),
       when: (ms: number, now: number) =>
         ms - now < 24 * HOUR ? time.format(ms) : ms - now < 7 * 24 * HOUR ? weekday.format(ms) : day.format(ms),
@@ -259,18 +259,21 @@ function UsageSection({
   const mainUsed = oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd;
   const mainLimit = oneTime ? (usage.lifetimeLimitUsd ?? 0) : usage.monthlyLimitUsd;
   const credit = status.credits.balanceUsd;
-  const available = usage.availableUsd;
-  const blocked = available !== null && available <= 0.0001;
+  const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
+  // Backends before pricing v3 send no reservation or availability.
+  const available: number | null | undefined = usage.availableUsd;
+  const blocked = typeof available === "number" && available <= 0.0001;
   const exceeded = oneTime
     ? []
     : [
         { used: usage.rollingUsedUsd, limit: usage.rollingLimitUsd, at: usage.rollingResetsAt },
         { used: usage.weeklyUsedUsd, limit: usage.weeklyLimitUsd, at: usage.weeklyResetsAt },
         { used: usage.monthlyUsedUsd, limit: usage.monthlyLimitUsd, at: usage.monthlyResetsAt },
-      ].filter((w) => w.limit > 0 && w.used >= w.limit);
+      ].filter((w) => w.limit > 0 && w.used >= w.limit && typeof w.at === "number");
   const resumesAt = exceeded.length ? Math.max(...exceeded.map((w) => w.at)) : null;
   const next = nextPlanUp(plan);
-  const resets = (at: number) => t("billing.v3.usage.resets", { date: f.when(at, now) });
+  const resets = (at: number | undefined) =>
+    typeof at === "number" && at > 0 ? t("billing.v3.usage.resets", { date: f.when(at, now) }) : "";
   const windowCaption = (used: number, limit: number, at: number) => (
     <>
       <span>
@@ -296,13 +299,13 @@ function UsageSection({
           label={t("billing.v3.usage.title")}
           used={mainUsed}
           limit={mainLimit}
-          reserved={usage.reservedUsd}
+          reserved={reserved}
           caption={
             <>
               <span className="billing-legend">
                 <i className="billing-legend-used" aria-hidden="true" />
                 <span>{t("billing.v3.usage.used")}</span>
-                {usage.reservedUsd > 0 ? (
+                {reserved > 0 ? (
                   <>
                     <i className="billing-legend-held" aria-hidden="true" />
                     <span>{t("billing.v3.usage.held")}</span>
@@ -375,16 +378,18 @@ function UsageSection({
           </>
         )}
         <Row label={t("billing.v3.usage.held")} hint={t("billing.v3.usage.heldHint")}>
-          <span className="billing-value">{f.usd(usage.reservedUsd)}</span>
+          <span className="billing-value">{f.usd(reserved)}</span>
         </Row>
         <Row label={t("billing.v3.usage.credit")} hint={t("billing.v3.usage.creditHint")}>
           <span className="billing-value">{f.usd(credit)}</span>
         </Row>
-        <Row label={t("billing.v3.usage.available")} hint={t("billing.v3.usage.availableHint")}>
-          <span className="billing-value billing-value--strong">
-            {available === null ? t("billing.v3.usage.unlimited") : f.usd(available)}
-          </span>
-        </Row>
+        {available === undefined ? null : (
+          <Row label={t("billing.v3.usage.available")} hint={t("billing.v3.usage.availableHint")}>
+            <span className="billing-value billing-value--strong">
+              {available === null ? t("billing.v3.usage.unlimited") : f.usd(available)}
+            </span>
+          </Row>
+        )}
       </div>
     </Section>
   );

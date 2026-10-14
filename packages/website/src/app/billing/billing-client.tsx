@@ -34,7 +34,8 @@ const whenLabel = (at: number, now: number): string => {
   return `on ${dateFormat.format(at)}`;
 };
 
-const resetLabel = (at: number, now: number): string => `Resets ${whenLabel(at, now)}`;
+const resetLabel = (at: number | undefined, now: number): string =>
+  typeof at === "number" && at > 0 ? `Resets ${whenLabel(at, now)}` : "";
 
 const pct = (used: number, limit: number) =>
   !Number.isFinite(limit) || limit <= 0 ? 0 : Math.min(100, Math.max(0, (used / limit) * 100));
@@ -375,15 +376,17 @@ function UsageSection({
   const mainUsed = oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd;
   const mainLimit = oneTime ? (usage.lifetimeLimitUsd ?? 0) : usage.monthlyLimitUsd;
   const credit = status.credits.balanceUsd;
-  const available = usage.availableUsd;
-  const blocked = available !== null && available <= 0.0001;
+  const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
+  // Backends before pricing v3 send no reservation or availability.
+  const available: number | null | undefined = usage.availableUsd;
+  const blocked = typeof available === "number" && available <= 0.0001;
   const blockingReset = (() => {
     if (oneTime) return null;
     const windows = [
       { used: usage.rollingUsedUsd, limit: usage.rollingLimitUsd, at: usage.rollingResetsAt },
       { used: usage.weeklyUsedUsd, limit: usage.weeklyLimitUsd, at: usage.weeklyResetsAt },
       { used: usage.monthlyUsedUsd, limit: usage.monthlyLimitUsd, at: usage.monthlyResetsAt },
-    ].filter((w) => w.used >= w.limit && w.limit > 0);
+    ].filter((w) => w.used >= w.limit && w.limit > 0 && typeof w.at === "number");
     return windows.length ? Math.max(...windows.map((w) => w.at)) : null;
   })();
   const next = plan === "free" ? "plus" : plan === "plus" ? "pro" : plan === "pro" ? "max" : null;
@@ -409,13 +412,13 @@ function UsageSection({
           large
           used={mainUsed}
           limit={mainLimit}
-          reserved={usage.reservedUsd}
+          reserved={reserved}
           caption={
             <>
               <span className="billing-legend">
                 <i className="billing-legend-used" aria-hidden="true" />
                 Used
-                {usage.reservedUsd > 0 ? (
+                {reserved > 0 ? (
                   <>
                     <i className="billing-legend-held" aria-hidden="true" />
                     Held by running work
@@ -483,14 +486,16 @@ function UsageSection({
           </>
         )}
         <Row label="Held by running work" hint="Set aside while agents and media jobs finish. What they don't use comes back.">
-          <span className="billing-value">{usd.format(usage.reservedUsd)}</span>
+          <span className="billing-value">{usd.format(reserved)}</span>
         </Row>
         <Row label="Extra credit" hint="Used once your plan's budget runs out.">
           <span className="billing-value">{usd.format(credit)}</span>
         </Row>
-        <Row label="Available now" hint="What Stella can spend right now, credit included.">
-          <span className="billing-value billing-value--strong">{available === null ? "Unlimited" : usd.format(available)}</span>
-        </Row>
+        {available === undefined ? null : (
+          <Row label="Available now" hint="What Stella can spend right now, credit included.">
+            <span className="billing-value billing-value--strong">{available === null ? "Unlimited" : usd.format(available)}</span>
+          </Row>
+        )}
       </div>
     </Section>
   );

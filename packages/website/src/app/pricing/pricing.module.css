@@ -482,12 +482,9 @@
     grid-template-columns: 1fr;
   }
 
-  .col {
-    border-left: 0;
-  }
-
   .col + .col {
     border-top: 1px solid var(--p-line);
+    border-left: 0;
   }
 }
 

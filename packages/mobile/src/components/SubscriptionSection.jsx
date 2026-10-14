@@ -203,16 +203,17 @@ export function SubscriptionSection() {
     const used = oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd;
     const limit = oneTime ? usage.lifetimeLimitUsd : usage.monthlyLimitUsd;
     const percent = limit > 0 ? Math.min(100, Math.max(0, (used / limit) * 100)) : 0;
-    const heldPercent = limit > 0 ? Math.min(100 - percent, (usage.reservedUsd / limit) * 100) : 0;
+    const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
+    const heldPercent = limit > 0 ? Math.min(100 - percent, (reserved / limit) * 100) : 0;
     const credit = status.credits ? status.credits.balanceUsd : 0;
-    const blocked = usage.availableUsd !== null && usage.availableUsd <= 0.0001;
+    const blocked = typeof usage.availableUsd === "number" && usage.availableUsd <= 0.0001;
     const exceeded = oneTime
       ? []
       : [
           [usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt],
           [usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt],
           [usage.monthlyUsedUsd, usage.monthlyLimitUsd, usage.monthlyResetsAt],
-        ].filter(([u, l]) => l > 0 && u >= l);
+        ].filter(([u, l, at]) => l > 0 && u >= l && typeof at === "number");
     const resumesAt = exceeded.length ? Math.max(...exceeded.map((w) => w[2])) : null;
     return (
       <View style={styles.usage}>
@@ -238,9 +239,9 @@ export function SubscriptionSection() {
             ? t("billing.v3.usage.oneTimeNote")
             : t("billing.v3.usage.resets", { date: formatReset(usage.monthlyResetsAt, locale) })}
         </Text>
-        {usage.reservedUsd > 0 ? (
+        {reserved > 0 ? (
           <Text style={styles.usageMuted}>
-            {t("billing.v3.usage.held")}: {formatUsd(usage.reservedUsd)}
+            {t("billing.v3.usage.held")}: {formatUsd(reserved)}
           </Text>
         ) : null}
         {credit > 0 ? (

@@ -500,3 +500,7 @@
     justify-content: flex-start;
   }
 }
+
+.billing-plan-action + .billing-rows {
+  margin-top: 10px;
+}

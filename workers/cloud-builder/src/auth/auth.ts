@@ -308,7 +308,7 @@ const endingSession = async (ctx: {
   return { userId, sessionId };
 };
 
-const ownerInternalCall = async (
+export const ownerInternalCall = async (
   env: AuthEnv,
   userId: string,
   name: string,

@@ -55,17 +55,34 @@ export type PairingLink = {
   secret: string;
 };
 
+/**
+ * `review`: a reusable code for app review demos, claimable by many devices
+ * until it expires (`days`, 1-90, default 30) or is canceled; canceling signs
+ * those devices out. Admin bearer only, and only on a server with
+ * STELLA_REVIEW_PAIRING=1.
+ */
+export type PairingStartRequest = {
+  review?: boolean;
+  days?: number;
+};
+
+export const REVIEW_PAIRING_DEFAULT_DAYS = 30;
+export const REVIEW_PAIRING_MAX_DAYS = 90;
+
 export type PairingStartResponse = {
   pairingId: string;
   secret: string;
   expiresAt: number;
   link: string;
+  reusable?: boolean;
 };
 
 export type PairingStatusResponse = {
   status: "pending" | "claimed" | "expired" | "canceled";
   deviceName: string | null;
   claimedAt: number | null;
+  reusable?: boolean;
+  uses?: number;
 };
 
 export type PairingClaimRequest = {

@@ -472,7 +472,7 @@ const projectTurn = (
       }),
     ];
     const askRecords = toolCalls(record).flatMap((call): UserAskRecord[] => {
-      if (call.name !== "ask_user") return [];
+      if (call.name !== "ask_user" && call.name !== "request_secure_input") return [];
       const result = toolResults.get(call.id);
       if (!result || result.error) return [];
       const content = Array.isArray(result.payload.content)

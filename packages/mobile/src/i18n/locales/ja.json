@@ -2960,15 +2960,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "このコンピュータに記憶する",
       "rememberRelayed": "要求元のコンピュータに記憶する",
       "rememberOn": "「{label}」として保存しました。エージェントは次回からあなたに尋ねずに再利用します。設定からいつでも削除できます。",
       "rememberOff": "一度だけ使用し、その後削除します。",
-      "replacing": "「{label}」に保存された値は使えませんでした。正しい値を入力してください。保存済みの値と置き換えます。"
+      "replacing": "「{label}」に保存された値は使えませんでした。正しい値を入力してください。保存済みの値と置き換えます。",
+      "note": "メモを追加（任意）",
+      "provided": "入力済み",
+      "declined": "辞退"
     }
   },
   "schedule": {

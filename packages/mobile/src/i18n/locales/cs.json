@@ -3010,15 +3010,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Zapamatovat na tomto počítači",
       "rememberRelayed": "Zapamatovat na počítači, který se ptal",
       "rememberOn": "Uloženo jako „{label}“. Agenti to znovu použijí, aniž by se vás znovu ptali; kdykoli to můžete smazat v Nastavení.",
       "rememberOff": "Použito jednou, pak smazáno.",
-      "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou."
+      "replacing": "Uložená hodnota pro „{label}“ nefungovala. Zadejte správnou; nahradí tu uloženou.",
+      "note": "Přidat poznámku (nepovinné)",
+      "provided": "Poskytnuto",
+      "declined": "Odmítnuto"
     }
   },
   "schedule": {

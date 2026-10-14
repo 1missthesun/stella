@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Husk på denne computer",
       "rememberRelayed": "Husk på den computer, der spurgte",
       "rememberOn": "Gemt som “{label}”. Agenter genbruger den uden at spørge dig igen; du kan slette den når som helst under Indstillinger.",
       "rememberOff": "Brugt én gang og derefter slettet.",
-      "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte."
+      "replacing": "Den gemte værdi for “{label}” virkede ikke. Indtast den rigtige; den erstatter den gemte.",
+      "note": "Tilføj en note (valgfrit)",
+      "provided": "Givet",
+      "declined": "Afvist"
     }
   },
   "schedule": {

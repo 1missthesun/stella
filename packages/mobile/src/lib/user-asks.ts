@@ -309,10 +309,13 @@ export const answerUserAsk = async (answer: UserAskAnswer): Promise<void> => {
   removeAskLocally(answer.askId);
 };
 
-export const cancelUserAsk = async (askId: string): Promise<void> => {
+export const cancelUserAsk = async (
+  askId: string,
+  reason = "",
+): Promise<void> => {
   await postJson(
     `/api/user-asks/${encodeURIComponent(askId)}/cancel`,
-    {},
+    reason ? { reason } : {},
     { origin: backendOrigin() },
   );
   removeAskLocally(askId);

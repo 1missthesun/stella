@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "इस कंप्यूटर पर याद रखें",
       "rememberRelayed": "पूछने वाले कंप्यूटर पर याद रखें",
       "rememberOn": "“{label}” के नाम से सहेजा गया। एजेंट आपसे दोबारा पूछे बिना इसे फिर इस्तेमाल करेंगे; आप इसे कभी भी सेटिंग्स में हटा सकते हैं।",
       "rememberOff": "एक बार इस्तेमाल हुआ, फिर हटा दिया गया।",
-      "replacing": "“{label}” के लिए सहेजा गया मान काम नहीं किया। सही मान डालें; यह सहेजे गए मान की जगह ले लेगा।"
+      "replacing": "“{label}” के लिए सहेजा गया मान काम नहीं किया। सही मान डालें; यह सहेजे गए मान की जगह ले लेगा।",
+      "note": "नोट जोड़ें (वैकल्पिक)",
+      "provided": "दिया गया",
+      "declined": "अस्वीकार किया"
     }
   },
   "schedule": {

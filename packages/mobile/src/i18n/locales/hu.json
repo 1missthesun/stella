@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Megjegyzés ezen a számítógépen",
       "rememberRelayed": "Megjegyzés a kérdező számítógépen",
       "rememberOn": "Mentve „{label}” néven. Az ügynökök újra felhasználják anélkül, hogy újra megkérdeznének; bármikor törölheted a Beállításokban.",
       "rememberOff": "Egyszer használva, majd törölve.",
-      "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet."
+      "replacing": "A(z) „{label}” mentett értéke nem működött. Add meg a helyeset; ez lecseréli a mentettet.",
+      "note": "Megjegyzés hozzáadása (nem kötelező)",
+      "provided": "Megadva",
+      "declined": "Elutasítva"
     }
   },
   "schedule": {

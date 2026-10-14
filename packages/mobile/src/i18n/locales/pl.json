@@ -3010,15 +3010,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Zapamiętaj na tym komputerze",
       "rememberRelayed": "Zapamiętaj na komputerze, który pytał",
       "rememberOn": "Zapisano jako „{label}”. Agenci użyją tego ponownie bez pytania; możesz to w każdej chwili usunąć w Ustawieniach.",
       "rememberOff": "Użyto raz, a potem usunięto.",
-      "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną."
+      "replacing": "Zapisana wartość dla „{label}” nie zadziałała. Wpisz poprawną; zastąpi zapisaną.",
+      "note": "Dodaj notatkę (opcjonalnie)",
+      "provided": "Podano",
+      "declined": "Odrzucono"
     }
   },
   "schedule": {

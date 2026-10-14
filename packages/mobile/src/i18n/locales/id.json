@@ -2960,15 +2960,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Ingat di komputer ini",
       "rememberRelayed": "Ingat di komputer yang meminta",
       "rememberOn": "Disimpan sebagai “{label}”. Agen akan memakainya lagi tanpa bertanya kepada Anda; hapus kapan saja di Pengaturan.",
       "rememberOff": "Dipakai sekali, lalu dihapus.",
-      "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan."
+      "replacing": "Nilai tersimpan untuk “{label}” tidak berhasil. Masukkan yang benar; nilai itu akan menggantikan yang tersimpan.",
+      "note": "Tambahkan catatan (opsional)",
+      "provided": "Diberikan",
+      "declined": "Ditolak"
     }
   },
   "schedule": {

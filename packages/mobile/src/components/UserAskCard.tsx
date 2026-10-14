@@ -23,7 +23,10 @@ import type {
   UserAskAnswerFieldValue,
   UserAskSecureInputDetail,
 } from "@stella/contracts/user-ask";
-import { userAskOffersRemember } from "@stella/contracts/user-ask";
+import {
+  USER_ASK_MAX_NOTE,
+  userAskOffersRemember,
+} from "@stella/contracts/user-ask";
 import {
   EMPTY_USER_ASK_DRAFT,
   nextUnansweredIndex,
@@ -35,6 +38,7 @@ import {
   userAskDeckEntries,
   userAskDeckKey,
   userAskRecordFromAnswer,
+  userAskSecureRecord,
   type UserAskRecord,
   type UserAskDraft,
   type UserAskDrafts,
@@ -148,9 +152,11 @@ export function UserAskRecordView({ record }: { record: UserAskRecord }) {
               answer.kind === "skipped" && styles.recordAnswerSkipped,
             ]}
           >
-            {answer.kind === "skipped"
-              ? t("userAsk.question.skipped")
-              : answer.answer}
+            {answer.kind === "provided" || answer.kind === "declined"
+              ? t(`userAsk.secureInput.${answer.kind}`)
+              : answer.kind === "skipped"
+                ? t("userAsk.question.skipped")
+                : answer.answer}
             {record.defaulted ? (
               <Text style={styles.recordTag}>
                 {"  "}
@@ -158,6 +164,10 @@ export function UserAskRecordView({ record }: { record: UserAskRecord }) {
               </Text>
             ) : null}
           </Text>
+          {(answer.kind === "provided" || answer.kind === "declined") &&
+          answer.answer ? (
+            <Text style={styles.recordNote}>{answer.answer}</Text>
+          ) : null}
         </View>
       ))}
     </View>
@@ -618,6 +628,7 @@ function SecureAskSurface({
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const [busy, setBusy] = useState(false);
   const [issue, setIssue] = useState<string | null>(null);
+  const [note, setNote] = useState("");
   const remaining = useRemaining(ask.blocking ? undefined : ask.deadlineAt);
 
   const submit = useCallback(
@@ -638,8 +649,15 @@ function SecureAskSurface({
 
   const decline = useCallback(() => {
     tapLight();
-    void submit(() => cancelUserAsk(ask.askId), "mobile.userAsk.cancelFailed");
-  }, [ask.askId, submit]);
+    const trimmed = note.trim();
+    void submit(async () => {
+      await cancelUserAsk(ask.askId, trimmed);
+      recordUserAskAnswer(
+        ask.conversationId,
+        userAskSecureRecord(ask, "declined", trimmed),
+      );
+    }, "mobile.userAsk.cancelFailed");
+  }, [ask, note, submit]);
 
   const body = (
     <>
@@ -689,6 +707,8 @@ function SecureAskSurface({
         styles={styles}
         colors={colors}
         t={t}
+        note={note}
+        onNoteChange={setNote}
         onAnswer={submit}
       />
 
@@ -736,6 +756,8 @@ function SecureInputBody({
   styles,
   colors,
   t,
+  note,
+  onNoteChange,
   onAnswer,
 }: {
   ask: UserAsk;
@@ -744,6 +766,8 @@ function SecureInputBody({
   styles: AskStyles;
   colors: Colors;
   t: Translate;
+  note: string;
+  onNoteChange: (next: string) => void;
   onAnswer: (run: () => Promise<void>, failureKey: string) => Promise<void>;
 }) {
   const [values, setValues] = useState<Record<string, string>>({});
@@ -796,21 +820,24 @@ function SecureInputBody({
       }
     }
     tapLight();
-    void onAnswer(
-      () =>
-        answerUserAsk({
-          askId: ask.askId,
-          revision: ask.revision,
-          kind: "fields",
-          fields: payload,
-          ...(offersRemember ? { remember } : {}),
-        }),
-      "mobile.userAsk.answerFailed",
-    );
+    const trimmedNote = note.trim();
+    void onAnswer(async () => {
+      await answerUserAsk({
+        askId: ask.askId,
+        revision: ask.revision,
+        kind: "fields",
+        fields: payload,
+        ...(offersRemember ? { remember } : {}),
+        ...(trimmedNote ? { note: trimmedNote } : {}),
+      });
+      recordUserAskAnswer(
+        ask.conversationId,
+        userAskSecureRecord(ask, "provided", trimmedNote),
+      );
+    }, "mobile.userAsk.answerFailed");
   }, [
-    ask.askId,
-    ask.recipientKey,
-    ask.revision,
+    ask,
+    note,
     detail.fields,
     offersRemember,
     remember,
@@ -819,6 +846,24 @@ function SecureInputBody({
     t,
     values,
   ]);
+
+  const noteInput = (
+    <View style={styles.note}>
+      <AskTextInput
+        accessibilityLabel={t("userAsk.secureInput.note")}
+        colors={colors}
+        editable={!busy}
+        maxLength={USER_ASK_MAX_NOTE}
+        multiline
+        onChangeText={onNoteChange}
+        placeholder={t("userAsk.secureInput.note")}
+        style={styles.noteInput}
+        submitBehavior="blurAndSubmit"
+        returnKeyType="done"
+        value={note}
+      />
+    </View>
+  );
 
   if (needsComputer) {
     return (
@@ -846,6 +891,7 @@ function SecureInputBody({
             ))}
           </View>
         </View>
+        {noteInput}
       </View>
     );
   }
@@ -973,6 +1019,8 @@ function SecureInputBody({
         );
       })}
 
+      {noteInput}
+
       {issue ? <Text style={styles.issue}>{issue}</Text> : null}
 
       <View style={styles.secureActions}>
@@ -1071,6 +1119,12 @@ const makeStyles = (colors: Colors) =>
     recordItem: {
       gap: 2,
       paddingVertical: 6,
+    },
+    recordNote: {
+      color: colors.text,
+      fontFamily: fonts.sans.regular,
+      fontSize: 16,
+      lineHeight: 21,
     },
     recordQuestion: {
       color: colors.textMuted,
@@ -1361,6 +1415,21 @@ const makeStyles = (colors: Colors) =>
       height: 36,
       justifyContent: "center",
       width: 36,
+    },
+    note: {
+      borderTopColor: colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    noteInput: {
+      color: colors.text,
+      fontFamily: fonts.sans.regular,
+      fontSize: 15,
+      lineHeight: 20,
+      maxHeight: 96,
+      minHeight: 38,
+      paddingBottom: 9,
+      paddingTop: 9,
+      textAlignVertical: "center",
     },
     otherInput: {
       color: colors.text,

@@ -2994,15 +2994,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "לזכור במחשב הזה",
       "rememberRelayed": "לזכור במחשב ששאל",
       "rememberOn": "נשמר בשם “{label}”. סוכנים ישתמשו בו שוב בלי לשאול אותך; אפשר למחוק אותו בכל עת בהגדרות.",
       "rememberOff": "בשימוש פעם אחת ואז נמחק.",
-      "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור."
+      "replacing": "הערך השמור עבור “{label}” לא עבד. הזן את הערך הנכון; הוא יחליף את השמור.",
+      "note": "הוסף הערה (אופציונלי)",
+      "provided": "נמסר",
+      "declined": "נדחה"
     }
   },
   "schedule": {

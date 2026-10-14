@@ -2978,15 +2978,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Onthouden op deze computer",
       "rememberRelayed": "Onthouden op de computer die het vroeg",
       "rememberOn": "Bewaard als ‘{label}’. Agents gebruiken het opnieuw zonder het je nog eens te vragen; je kunt het altijd verwijderen in Instellingen.",
       "rememberOff": "Eén keer gebruikt en daarna verwijderd.",
-      "replacing": "De bewaarde waarde voor ‘{label}’ werkte niet. Vul de juiste in; die vervangt de bewaarde."
+      "replacing": "De bewaarde waarde voor ‘{label}’ werkte niet. Vul de juiste in; die vervangt de bewaarde.",
+      "note": "Notitie toevoegen (optioneel)",
+      "provided": "Gegeven",
+      "declined": "Geweigerd"
     }
   },
   "schedule": {

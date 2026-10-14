@@ -2994,15 +2994,14 @@
       "submit": "Send securely",
       "submitting": "Sending…",
       "decline": "Decline",
-      "declineReason": "Reason for declining",
-      "declineReasonPlaceholder": "Reason, optional (e.g. wrong account)",
-      "declineBack": "Back",
-      "declineConfirm": "Decline request",
       "remember": "Mémoriser sur cet ordinateur",
       "rememberRelayed": "Mémoriser sur l’ordinateur qui l’a demandé",
       "rememberOn": "Enregistré sous « {label} ». Les agents le réutilisent sans vous le redemander ; supprimez-le quand vous voulez dans les Réglages.",
       "rememberOff": "Utilisé une fois, puis supprimé.",
-      "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée."
+      "replacing": "La valeur enregistrée pour « {label} » n’a pas fonctionné. Saisissez la bonne ; elle remplacera celle enregistrée.",
+      "note": "Ajouter une note (facultatif)",
+      "provided": "Fourni",
+      "declined": "Refusé"
     }
   },
   "schedule": {

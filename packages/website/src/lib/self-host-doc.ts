@@ -106,6 +106,7 @@ Then the user connects their Claude or ChatGPT account in the app (Settings → 
 |---|---|
 | \`bun scripts/selfhost.mjs update --json\` | Updates the server to Stella's latest release: pulls \`origin/master\` into the checkout, then migrations, deploys and app-source publish, then checks. A deploy stops cloud agent turns in progress. \`--ref server-YYYY.MM.DD\` deploys a specific release. |
 | \`bun scripts/selfhost.mjs pair --json\` | A new one-time pairing code for another device. |
+| \`bun scripts/selfhost.mjs pair --review --days 30 --json\` | One code that **many** devices can use for 1–90 days (default 30), for app store reviewers or a demo. Every device that uses it joins as the owner, so only make one when the user asks for it. The first time it needs \`--enable-review\` (one redeploy). \`pair --review --revoke\` cancels it and signs every device that used it out; \`pair --disable-review\` turns review codes off again. |
 | \`bun scripts/selfhost.mjs status --json\` | Whether the server is up, its version, and what's deployed. |
 | \`bun scripts/selfhost.mjs recover --json\` | Every device lost? Needs only the Cloudflare login: makes a new admin key and prints a pairing code. |
 | \`bun scripts/selfhost.mjs destroy\` | Deletes everything this install created (workers, database, buckets, queues, the app source). Asks first; \`--yes\` skips the question. Nothing else on the account is touched. |

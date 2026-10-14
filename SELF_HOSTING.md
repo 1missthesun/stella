@@ -369,6 +369,16 @@ account in the app (Settings → Engines); cloud turns use it by default
 account can't be deleted from a device; `bun scripts/selfhost.mjs destroy`
 removes the whole server.
 
+**Review codes** (app store review, demos): with var `STELLA_REVIEW_PAIRING = "1"`
+the admin bearer can start a reusable code, `{"review": true, "days": N}`
+(1–90, default 30). Every device that claims it gets its own owner session
+until it expires; `POST /api/auth/device-pairing/cancel {"pairingId"}` revokes
+it and signs all of them out, and an expired one signs its devices out at the
+next daily cron. `bun scripts/selfhost.mjs pair --review [--days N]
+--enable-review` sets the var (one redeploy) and prints the code;
+`pair --review --revoke` and `pair --disable-review` undo it. Normal setup
+never sets the var.
+
 `<backend>/.well-known/stella` describes the server to the apps (name, owner
 mode, version, features, URLs). Lost every device? With the Cloudflare login,
 `bun scripts/selfhost.mjs recover` rotates `STELLA_ADMIN_API_SECRET` with

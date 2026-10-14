@@ -581,10 +581,9 @@ NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY="$(cat <browser key file>)" env -u CLOUDFLAR
 NEXT_PUBLIC_GOOGLE_MAPS_BROWSER_KEY="$(cat <browser key file>)" env -u CLOUDFLARE_API_TOKEN bun run deploy:production
 ```
 
-The only runtime secret is `GOOGLE_MAPS_SERVER_API_KEY` (the legacy
-`POST /api/maps/resolve` for released desktops):
-`env -u CLOUDFLARE_API_TOKEN bunx wrangler secret put GOOGLE_MAPS_SERVER_API_KEY --env="" < <server key file>`
-(`--env production` for prod). The browser key is referrer-restricted to
+The website has no Maps server secret: its legacy `POST /api/maps/resolve`
+(for released desktops) only forwards signed-in callers to the backend's
+charged resolver. The browser key is referrer-restricted to
 `stella.sh` and `localhost:3000`, so maps on a workers.dev URL show
 `RefererNotAllowedMapError`. The dev backend does not trust the workers.dev origin
 either, so sign-in and `/chat` there fail CORS. Test those against the built

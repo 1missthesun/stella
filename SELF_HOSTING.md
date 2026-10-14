@@ -525,8 +525,6 @@ values; unset them, or set them to the same values.
 
 ```bash
 cd packages/website
-# Optional: the Maps server key for the legacy /api/maps/resolve route
-bunx wrangler secret put GOOGLE_MAPS_SERVER_API_KEY --env=""
 bun run cf:build
 bun run cf:deploy
 ```

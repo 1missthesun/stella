@@ -9,7 +9,6 @@ import { ownerGeneration, voiceInternal } from "../voice/routes.js";
 export const DICTATION_TRANSCRIBE_PATH = "/api/dictation/transcribe";
 
 const DEFAULT_MODEL = STELLA_MEDIA_MODELS.dictation;
-const FALLBACK_USD_PER_SECOND = 0.0000611;
 const TRANSCRIPTIONS_URL = "https://openrouter.ai/api/v1/audio/transcriptions";
 const SAMPLE_RATE = 16_000;
 const PCM_BYTES_PER_SECOND = SAMPLE_RATE * 2;
@@ -90,6 +89,10 @@ const toBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
+// Thrown when the provider had the audio and may have billed for it (a
+// timeout or unreadable answer), as opposed to refusing the request.
+class BilledSegmentError extends Error {}
+
 const transcribeSegment = async (
   key: string,
   model: string,
@@ -97,7 +100,7 @@ const transcribeSegment = async (
   signal: AbortSignal,
   attribution: boolean,
 ): Promise<{ text: string; costUsd: number | undefined }> => {
-  const response = await fetch(TRANSCRIPTIONS_URL, {
+  const sent = fetch(TRANSCRIPTIONS_URL, {
     method: "POST",
     headers: {
       authorization: `Bearer ${key}`,
@@ -107,10 +110,22 @@ const transcribeSegment = async (
     body: JSON.stringify({ model, input_audio: { data: toBase64(wavFromPcm(pcm)), format: "wav" } }),
     signal: AbortSignal.any([signal, AbortSignal.timeout(SEGMENT_TIMEOUT_MS)]),
   });
-  const text = await response.text();
+  let response: Response;
+  let text: string;
+  try {
+    response = await sent;
+    text = await response.text();
+  } catch (error) {
+    throw new BilledSegmentError(`Transcription did not finish: ${(error as Error).message}`);
+  }
   if (!response.ok) throw new Error(`Transcription failed (${response.status}): ${text.slice(0, 300)}`);
-  const body = JSON.parse(text) as { text?: unknown; usage?: { cost?: unknown } };
-  if (typeof body.text !== "string") throw new Error("Transcription response was missing text.");
+  let body: { text?: unknown; usage?: { cost?: unknown } };
+  try {
+    body = JSON.parse(text) as typeof body;
+  } catch {
+    throw new BilledSegmentError("Transcription response was not JSON.");
+  }
+  if (typeof body.text !== "string") throw new BilledSegmentError("Transcription response was missing text.");
   const cost = body.usage?.cost;
   return { text: body.text.trim(), costUsd: typeof cost === "number" && cost >= 0 ? cost : undefined };
 };
@@ -152,15 +167,31 @@ export const handleDictationTranscribeRoute = async (
 
   const model = env.STELLA_DICTATION_MODEL?.trim() || DEFAULT_MODEL;
   const parts: string[] = [];
+  const unsettled: Array<Record<string, unknown>> = [];
+  const settle = async (charge: Record<string, unknown>) => {
+    try {
+      await call("dictation.settleSegment", { sessionId, ...charge });
+    } catch {
+      unsettled.push(charge);
+    }
+  };
   try {
     for (let offset = 0, segment = 0; offset < pcm.byteLength; offset += SEGMENT_BYTES, segment += 1) {
       const slice = pcm.subarray(offset, offset + SEGMENT_BYTES);
-      const result = await transcribeSegment(key, model, slice, request.signal, !ownerModeEnabled(env));
-      await call("dictation.settleSegment", {
-        sessionId,
+      let result: { text: string; costUsd: number | undefined };
+      try {
+        result = await transcribeSegment(key, model, slice, request.signal, !ownerModeEnabled(env));
+      } catch (error) {
+        if (error instanceof BilledSegmentError) {
+          await settle({ segment, audioBytes: slice.byteLength, model, outcome: "failed" });
+        }
+        throw error;
+      }
+      await settle({
         segment,
         audioBytes: slice.byteLength,
-        costUsd: result.costUsd ?? (slice.byteLength / PCM_BYTES_PER_SECOND) * FALLBACK_USD_PER_SECOND,
+        model,
+        ...(result.costUsd !== undefined ? { costUsd: result.costUsd } : {}),
       });
       if (result.text) parts.push(result.text);
     }
@@ -168,7 +199,9 @@ export const handleDictationTranscribeRoute = async (
     console.error(JSON.stringify({ event: "dictation_transcribe_failed", message: (error as Error).message.slice(0, 300) }));
     return fail(502, "Stella couldn't transcribe that recording. Try again.");
   } finally {
-    await call("dictation.releaseClip", { sessionId }).catch(() => undefined);
+    await call("dictation.releaseClip", { sessionId, unsettled }).catch((error: unknown) =>
+      console.error(JSON.stringify({ event: "dictation_finish_failed", message: String(error).slice(0, 300) })),
+    );
   }
   return json({ text: parts.join(" "), seconds: pcm.byteLength / PCM_BYTES_PER_SECOND });
 };

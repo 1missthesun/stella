@@ -1,4 +1,14 @@
-import { PLAN_CATALOG } from "@stella/contracts/billing-plans";
+import { isPaidBillingPlan, PLAN_CATALOG } from "@stella/contracts/billing-plans";
+import {
+  DICTATION_TARIFF,
+  MAPS_TARIFF,
+  REALTIME_VOICE_TARIFF,
+  TARIFF_VERSION,
+  TTS_TARIFF,
+  usdToMicroCents,
+  type CostEntry,
+  type CostOutcome,
+} from "@stella/contracts/billing-tariffs";
 import { Deferred, Effect } from "effect";
 import {
   GPT_LIVE_MODEL,
@@ -12,21 +22,15 @@ import {
 } from "@stella/contracts/backend/voice";
 import { DEFAULT_GPT_LIVE_VOICE } from "@stella/contracts/realtime-voice-catalog";
 import { log } from "../../build-session/shared/keys.js";
-import { resolveGeminiTtsVoice, ttsProvider } from "../../voice/tts.js";
+import { estimateTtsUsage, resolveGeminiTtsVoice, TTS_MODEL, ttsProvider } from "../../voice/tts.js";
 import { HLS_MANIFEST_FILE, synthesizeHls, type HlsManifest } from "../../voice/hls.js";
 import { mintTtsTicket, ttsObjectKey, ttsOwnerPrefix } from "../../voice/ticket.js";
 import { array, empty, literal, number, object, optional, string, type Parser } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDomain, OwnerPurgeMode } from "../registry.js";
-import {
-  billingAccess,
-  billingPlan,
-  recordUsage,
-  releaseReservation,
-  reserveUsage,
-  settleReservation,
-} from "./billing.js";
+import { billingAccess, billingPlan, releaseSpend, reserveSpend, settleSpend } from "./billing.js";
+import { cancelSpendExpiry, expireSpendAt, spendExpiryJobs } from "./spend-expiry.js";
 
 const VOICE_SESSION_RATE = { count: 10, windowMs: 60_000 };
 const LEASE_TTL_MS = 10_000;
@@ -34,14 +38,16 @@ const SESSION_MAX_MS = 5 * 60_000;
 const IDLE_REAP_MS = 2 * 60_000;
 const CLOSED_LEASE_RETENTION_MS = 24 * 60 * 60_000;
 /**
- * GPT-Live charges $0.05 a minute of session duration, per second and not
- * rounded up. Charged for a session's open time, never above one full
- * session.
+ * GPT-Live charges per second of session duration, not rounded up. Charged
+ * for a session's open time until the provider session is actually closed,
+ * never above one full session. Creating a WebRTC session bills 15 seconds
+ * up front, credited once it runs.
  */
-const ENVELOPE_MICRO_CENTS_PER_SECOND = 83_333;
+const ENVELOPE_MICRO_CENTS_PER_SECOND = Math.round(usdToMicroCents(REALTIME_VOICE_TARIFF.gptLiveUsdPerMinute) / 60);
 const SESSION_CHARGE_CAP = (SESSION_MAX_MS / 1_000) * ENVELOPE_MICRO_CENTS_PER_SECOND;
-/** Creating a WebRTC session bills 15 seconds up front, credited once it runs. */
-const MIN_BILLED_SECONDS = 15;
+const MIN_BILLED_SECONDS = REALTIME_VOICE_TARIFF.minimumBilledSeconds;
+const VOICE_RESERVATION_MS = SESSION_MAX_MS + 2 * IDLE_REAP_MS + 30 * 60_000;
+const voiceSpendId = (leaseId: string) => `voice:${leaseId}`;
 
 const OPENAI_LIVE_SESSIONS_URL = "https://api.openai.com/v1/live/sessions";
 const liveAttachUrl = (sessionId: string): string =>
@@ -54,16 +60,18 @@ const TTS_TICKET_TTL_MS = 15 * 60_000;
 
 const MUSE_DICTATION_MODEL = "muse-voice-transcribe-1.0";
 const DICTATION_RATE = { count: 30, windowMs: 60_000 };
-const MUSE_STT_USD_PER_SECOND = 0.18 / 3_600;
+const MUSE_STT_USD_PER_SECOND = DICTATION_TARIFF.museUsdPerHour / 3_600;
 const MUSE_MAX_SESSION_SECONDS = 60 * 60;
+// Streaming dictation holds budget a few minutes of audio at a time and
+// extends the hold as the session runs.
+const MUSE_HOLD_SECONDS = 3 * 60;
+const MUSE_RESERVATION_MS = (MUSE_MAX_SESSION_SECONDS + 15 * 60) * 1_000;
 const PCM_BYTES_PER_SECOND = 16_000 * 2;
 const DICTATION_SESSION_ID = /^muse_[0-9a-f-]{36}$/u;
 
 export const VOICE_REAP_JOB = "voice.reap";
 export const TTS_SYNTHESIZE_JOB = "tts.synthesize";
 const ttsJobId = (id: string) => `tts:${id}`;
-
-const usdToMicroCents = (usd: number): number => Math.round(usd * 100_000_000);
 
 export const VOICE_MIGRATION = {
   id: "voice.1-init",
@@ -92,6 +100,17 @@ export const VOICE_MIGRATION = {
     `CREATE TABLE tts_daily (
        day TEXT PRIMARY KEY,
        chars INTEGER NOT NULL
+     )`,
+  ],
+};
+
+export const DICTATION_SESSIONS_MIGRATION = {
+  id: "voice.2-dictation-sessions",
+  statements: [
+    `CREATE TABLE dictation_sessions (
+       session_id TEXT PRIMARY KEY,
+       allowed_bytes INTEGER NOT NULL,
+       created_at INTEGER NOT NULL
      )`,
   ],
 };
@@ -195,6 +214,52 @@ const scheduleReap = (ctx: OwnerContext, at: number): void => {
   ctx.jobs.schedule(VOICE_REAP_JOB, at, null, { id: VOICE_REAP_JOB });
 };
 
+const voiceEnvelope = (lease: LeaseRow, until: number): number => {
+  if (lease.call_started_at === null) return 0;
+  const seconds = Math.max(MIN_BILLED_SECONDS, Math.ceil(Math.max(0, until - lease.call_started_at) / 1_000));
+  return Math.min(SESSION_CHARGE_CAP, seconds * ENVELOPE_MICRO_CENTS_PER_SECOND);
+};
+
+// Charge a lease up to `until` (what OpenAI bills for its open time), write
+// its cost row, and drop the hold once nothing more can accrue.
+const chargeLease = (
+  ctx: OwnerContext,
+  lease: LeaseRow,
+  input: { until: number; receipt: "final" | "hangup"; outcome: CostOutcome; release: boolean },
+): number => {
+  const residual = Math.max(0, voiceEnvelope(lease, input.until) - lease.charged);
+  const id = `${voiceSpendId(lease.lease_id)}:${input.receipt}`;
+  const { charged } = settleSpend(
+    { ...ctx, now: Date.now() },
+    {
+      receiptId: id,
+      chargeMicroCents: residual,
+      reservationId: voiceSpendId(lease.lease_id),
+      release: input.release,
+      ...(lease.call_started_at !== null
+        ? {
+            cost: {
+              id,
+              category: "voice",
+              provider: "openai",
+              sku: lease.model,
+              quantity: { seconds: Math.max(0, Math.ceil((input.until - lease.call_started_at) / 1_000)) },
+              providerCostMicroCents: residual,
+              basis: "estimated",
+              outcome: input.outcome,
+              requestId: lease.lease_id,
+              tariffVersion: TARIFF_VERSION,
+            } satisfies CostEntry,
+          }
+        : {}),
+    },
+  );
+  if (charged && residual > 0) {
+    ctx.db.run("UPDATE voice_leases SET charged = charged + ? WHERE lease_id = ?", residual, lease.lease_id);
+  }
+  return charged ? residual : 0;
+};
+
 const closeLease = async (ctx: OwnerContext, leaseId: string, reason: string, closedAt: number): Promise<void> => {
   const lease = readLease(ctx, leaseId);
   if (lease?.status !== "open") return;
@@ -206,18 +271,8 @@ const closeLease = async (ctx: OwnerContext, leaseId: string, reason: string, cl
     lease.call_id ? 1 : 0,
     lease.lease_id,
   );
-  let residual = 0;
-  if (lease.call_started_at !== null) {
-    const seconds = Math.max(MIN_BILLED_SECONDS, Math.ceil(Math.max(0, closedAt - lease.call_started_at) / 1_000));
-    const envelope = Math.min(SESSION_CHARGE_CAP, seconds * ENVELOPE_MICRO_CENTS_PER_SECOND);
-    residual = Math.max(0, envelope - lease.charged);
-    if (residual > 0) {
-      const { recorded } = recordUsage(ctx, [{ id: `voice:${lease.lease_id}:final`, costMicroCents: residual }]);
-      if (recorded > 0) {
-        ctx.db.run("UPDATE voice_leases SET charged = charged + ? WHERE lease_id = ?", residual, lease.lease_id);
-      }
-    }
-  }
+  const outcome: CostOutcome = reason.startsWith("openai_") ? "failed" : reason === "ended" ? "succeeded" : "aborted";
+  const residual = chargeLease(ctx, lease, { until: closedAt, receipt: "final", outcome, release: !lease.call_id });
   log("info", "voice_lease_closed", {
     leaseId: lease.lease_id,
     reason,
@@ -226,6 +281,7 @@ const closeLease = async (ctx: OwnerContext, leaseId: string, reason: string, cl
   });
   if (lease.call_id && (await closeLiveSession(ctx.env, lease.call_id))) {
     ctx.db.run("UPDATE voice_leases SET hangup_pending = 0 WHERE lease_id = ?", lease.lease_id);
+    releaseSpend(ctx, voiceSpendId(lease.lease_id));
   } else if (lease.call_id) {
     scheduleReap(ctx, now + 30_000);
   }
@@ -244,15 +300,15 @@ const openSession = async (
 ): Promise<VoiceSession> => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "voice.session", VOICE_SESSION_RATE, "Too many voice sessions. Try again in a minute.");
   const access = billingAccess(ctx);
-  if (access.plan !== "pro") {
-    throw new RpcError("FORBIDDEN", "Realtime voice is part of Stella Pro.", { reason: "capability_required" });
+  if (!isPaidBillingPlan(access.plan)) {
+    throw new RpcError("FORBIDDEN", "Realtime voice needs a paid plan.", { reason: "capability_required" });
   }
-  if (!access.allowed || (access.remainingMicroCents !== null && access.remainingMicroCents < SESSION_CHARGE_CAP)) {
-    throw new RpcError("FORBIDDEN", access.message || "Realtime voice needs more usage allowance than you have left.", {
+  const outOfBudget = (message: string) =>
+    new RpcError("FORBIDDEN", access.message || message, {
       reason: "usage_limit_reached",
       ...(access.retryAfterMs > 0 ? { retryAfterMs: access.retryAfterMs } : {}),
     });
-  }
+  if (!access.allowed) throw outOfBudget("Your Stella usage limit is reached.");
   if (!secret(ctx.env, "OPENAI_API_KEY")) {
     throw new RpcError("UNAVAILABLE", "Voice sessions are not configured yet.", { retryable: false });
   }
@@ -274,6 +330,11 @@ const openSession = async (
   }
   const now = Date.now();
   const leaseId = `voice_${crypto.randomUUID()}`;
+  const hold = reserveSpend(
+    { ...ctx, now },
+    { id: voiceSpendId(leaseId), microCents: SESSION_CHARGE_CAP, expiresAt: now + VOICE_RESERVATION_MS, category: "voice" },
+  );
+  if (!hold.reserved) throw outOfBudget("Realtime voice needs more usage allowance than you have left.");
   ctx.db.run(
     `INSERT INTO voice_leases (lease_id, model, voice, session_config, status, created_at, last_seen_at)
      VALUES (?, ?, ?, ?, 'open', ?, ?)`,
@@ -389,6 +450,9 @@ const reap = async (ctx: OwnerContext): Promise<void> => {
   for (const lease of ctx.db.all<LeaseRow>("SELECT * FROM voice_leases WHERE hangup_pending = 1 AND call_id IS NOT NULL")) {
     if (await closeLiveSession(ctx.env, lease.call_id!)) {
       ctx.db.run("UPDATE voice_leases SET hangup_pending = 0 WHERE lease_id = ?", lease.lease_id);
+      chargeLease(ctx, lease, { until: Date.now(), receipt: "hangup", outcome: "aborted", release: true });
+    } else if (now - (lease.closed_at ?? now) > VOICE_RESERVATION_MS) {
+      chargeLease(ctx, lease, { until: Date.now(), receipt: "hangup", outcome: "aborted", release: true });
     }
   }
   ctx.db.run(
@@ -405,25 +469,93 @@ const reap = async (ctx: OwnerContext): Promise<void> => {
 
 const utcDay = (now: number): string => new Date(now).toISOString().slice(0, 10);
 
-const admitTts = (ctx: OwnerContext, chars: number): void => {
+type TtsVendor = "fal" | "openrouter" | "openai";
+
+const TTS_RESERVATION_MS = 15 * 60_000;
+const ttsSpendId = (id: string) => `tts:${id}`;
+
+const ttsHoldMicroCents = (vendor: TtsVendor, chars: number): number =>
+  usdToMicroCents(
+    (chars / 1_000) *
+      (vendor === "openai" ? TTS_TARIFF.openAiMiniUsdPerThousandChars : TTS_TARIFF.falGeminiUsdPerThousandChars),
+  );
+
+// What one synthesis cost us: fal and OpenAI mini by input characters sent,
+// OpenRouter Gemini by text and audio tokens.
+const ttsCostMicroCents = (vendor: TtsVendor, chars: number, pcmBytes: number): number =>
+  vendor === "openai"
+    ? usdToMicroCents((chars / 1_000) * TTS_TARIFF.openAiMiniUsdPerThousandChars)
+    : usdToMicroCents(estimateTtsUsage(vendor, chars, pcmBytes).estimatedUsd);
+
+// Read-aloud spends the pooled budget. The per-plan daily character cap stays
+// as a safety limit on top.
+const admitTts = (ctx: OwnerContext, input: { id: string; chars: number; vendor: TtsVendor }): void => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "tts", TTS_RATE, "Too many read-aloud requests. Try again in a minute.");
   const day = utcDay(ctx.now);
   const limit = PLAN_CATALOG[billingPlan(ctx).plan].limits.readAloudCharsPerDay;
   const used = ctx.db.one<{ chars: number }>("SELECT chars FROM tts_daily WHERE day = ?", day)?.chars ?? 0;
-  if (used + chars > limit) {
+  if (used + input.chars > limit) {
     const midnight = Date.parse(`${day}T00:00:00Z`) + 24 * 60 * 60_000;
     throw new RpcError("RATE_LIMITED", "You've reached today's read-aloud limit.", {
       reason: "tts_quota",
       retryAfterMs: Math.max(1_000, midnight - ctx.now),
     });
   }
+  const hold = reserveSpend(ctx, {
+    id: ttsSpendId(input.id),
+    microCents: ttsHoldMicroCents(input.vendor, input.chars),
+    expiresAt: ctx.now + TTS_RESERVATION_MS,
+    category: "tts",
+  });
+  if (!hold.reserved) {
+    throw new RpcError("RATE_LIMITED", hold.message || "Your Stella budget is too low to read this aloud.", {
+      reason: "usage_limit",
+      ...(hold.retryAfterMs > 0 ? { retryAfterMs: hold.retryAfterMs } : {}),
+    });
+  }
+  expireSpendAt(ctx, { id: ttsSpendId(input.id), category: "tts", provider: input.vendor, sku: ttsSku(input.vendor) }, ctx.now + TTS_RESERVATION_MS);
   ctx.db.run(
     `INSERT INTO tts_daily (day, chars) VALUES (?, ?)
      ON CONFLICT (day) DO UPDATE SET chars = chars + excluded.chars`,
     day,
-    chars,
+    input.chars,
   );
   ctx.db.run("DELETE FROM tts_daily WHERE day < ?", day);
+};
+
+const ttsSku = (vendor: TtsVendor): string => (vendor === "openai" ? "gpt-4o-mini-tts" : TTS_MODEL);
+
+const settleTts = (
+  ctx: OwnerContext,
+  input: { id: string; vendor: TtsVendor; chars: number; pcmBytes: number; outcome: CostOutcome },
+): number => {
+  const charge = input.chars > 0 ? ttsCostMicroCents(input.vendor, input.chars, input.pcmBytes) : 0;
+  settleSpend(
+    { ...ctx, now: Date.now() },
+    {
+      receiptId: ttsSpendId(input.id),
+      chargeMicroCents: charge,
+      reservationId: ttsSpendId(input.id),
+      release: true,
+      ...(input.chars > 0
+        ? {
+            cost: {
+              id: ttsSpendId(input.id),
+              category: "tts",
+              provider: input.vendor,
+              sku: ttsSku(input.vendor),
+              quantity: { chars: input.chars, audioSeconds: Math.round(input.pcmBytes / 48_000) },
+              providerCostMicroCents: charge,
+              basis: "estimated",
+              outcome: input.outcome,
+              tariffVersion: TARIFF_VERSION,
+            } satisfies CostEntry,
+          }
+        : {}),
+    },
+  );
+  cancelSpendExpiry(ctx, ttsSpendId(input.id));
+  return charge;
 };
 
 export const ttsText = (text: string): string => text.trim().slice(0, TTS_MAX_INPUT_CHARS);
@@ -437,8 +569,9 @@ const prepareTts = async (
   if (!ctx.env.MEDIA || !ttsProvider(ctx.env)) {
     throw new RpcError("UNAVAILABLE", "Stella read-aloud is not configured yet.", { retryable: false });
   }
-  admitTts(ctx, text.length);
+  const vendor = ttsProvider(ctx.env)!.provider;
   const ticket = await mintTtsTicket(ctx.ownerId, ctx.now + TTS_TICKET_TTL_MS);
+  admitTts(ctx, { id: ticket.id, chars: text.length, vendor });
   await ctx.env.MEDIA.put(
     ttsObjectKey(ticket.ticket, HLS_MANIFEST_FILE),
     JSON.stringify({ segments: [], done: false, error: false } satisfies HlsManifest),
@@ -449,7 +582,7 @@ const prepareTts = async (
   ctx.jobs.schedule(
     TTS_SYNTHESIZE_JOB,
     ctx.now,
-    { id: ticket.id, ticket: ticket.ticket, text, voice: resolveGeminiTtsVoice(args.voice) },
+    { id: ticket.id, ticket: ticket.ticket, text, voice: resolveGeminiTtsVoice(args.voice), vendor },
     { id: ttsJobId(ticket.id) },
   );
   return { ticket: ticket.ticket, playlistPath: voiceTtsPlaylistPath(ticket.ticket), expiresAt: ticket.expiresAt };
@@ -459,56 +592,174 @@ const streamStatus = (ctx: OwnerContext, id: string): string | null =>
   ctx.db.one<{ status: string }>("SELECT status FROM tts_streams WHERE id = ?", id)?.status ?? null;
 
 const synthesize = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
-  const job = payload as { id: string; ticket: string; text: string; voice: string };
-  if (streamStatus(ctx, job.id) !== "synthesizing") return;
-  if (!ttsProvider(ctx.env) || !ctx.env.MEDIA) {
-    ctx.db.run("UPDATE tts_streams SET status = 'error' WHERE id = ?", job.id);
+  const job = payload as { id: string; ticket: string; text: string; voice: string; vendor?: TtsVendor };
+  const vendor = job.vendor ?? ttsProvider(ctx.env)?.provider ?? "fal";
+  if (streamStatus(ctx, job.id) !== "synthesizing" || !ttsProvider(ctx.env) || !ctx.env.MEDIA) {
+    ctx.db.run("UPDATE tts_streams SET status = 'error' WHERE id = ? AND status = 'synthesizing'", job.id);
+    settleTts(ctx, { id: job.id, vendor, chars: 0, pcmBytes: 0, outcome: "cancelled" });
     return;
   }
   const startedAt = Date.now();
-  const result = await synthesizeHls({
-    bucket: ctx.env.MEDIA,
-    env: ctx.env,
-    ticket: job.ticket,
-    text: job.text,
-    voice: job.voice,
-    canceled: () => streamStatus(ctx, job.id) !== "synthesizing",
-  });
-  ctx.db.run("UPDATE tts_streams SET status = ? WHERE id = ? AND status = 'synthesizing'", result.status, job.id);
-  log("info", "tts_usage", {
-    transport: "hls",
-    status: result.status,
-    segments: result.segments,
-    requestChars: job.text.length,
-    ...result.usage,
-    durationMs: Date.now() - startedAt,
+  let usage: { sentChars: number; pcmBytes: number } = { sentChars: 0, pcmBytes: 0 };
+  let status = "error";
+  try {
+    const result = await synthesizeHls({
+      bucket: ctx.env.MEDIA,
+      env: ctx.env,
+      ticket: job.ticket,
+      text: job.text,
+      voice: job.voice,
+      canceled: () => streamStatus(ctx, job.id) !== "synthesizing",
+    });
+    status = result.status;
+    usage = { sentChars: result.sentChars, pcmBytes: result.pcmBytes };
+    log("info", "tts_usage", {
+      transport: "hls",
+      status: result.status,
+      segments: result.segments,
+      requestChars: job.text.length,
+      ...result.usage,
+      durationMs: Date.now() - startedAt,
+    });
+  } finally {
+    ctx.db.run("UPDATE tts_streams SET status = ? WHERE id = ? AND status = 'synthesizing'", status, job.id);
+    settleTts(ctx, {
+      id: job.id,
+      vendor,
+      chars: usage.sentChars,
+      pcmBytes: usage.pcmBytes,
+      outcome: status === "done" ? "succeeded" : status === "canceled" ? "cancelled" : "failed",
+    });
+  }
+};
+
+const museCost = (audioBytes: number): number =>
+  usdToMicroCents((audioBytes / PCM_BYTES_PER_SECOND) * MUSE_STT_USD_PER_SECOND);
+const museBytesFor = (microCents: number): number =>
+  Math.min(
+    MUSE_MAX_SESSION_SECONDS * PCM_BYTES_PER_SECOND,
+    Math.floor((microCents / usdToMicroCents(MUSE_STT_USD_PER_SECOND)) * PCM_BYTES_PER_SECOND),
+  );
+const dictationSpendId = (sessionId: string) => `dictation:${sessionId}`;
+
+const museExpiry = (sessionId: string) => ({
+  id: dictationSpendId(sessionId),
+  category: "dictation" as const,
+  provider: "meta",
+  sku: MUSE_DICTATION_MODEL,
+});
+
+// Streaming dictation holds a few minutes of audio up front; the relay extends
+// the hold as it goes and ends the session when it can't.
+const holdMuse = (ctx: OwnerContext, sessionId: string, audioBytes: number) => {
+  const maxBytes = MUSE_MAX_SESSION_SECONDS * PCM_BYTES_PER_SECOND;
+  const target = Math.min(maxBytes, audioBytes + MUSE_HOLD_SECONDS * PCM_BYTES_PER_SECOND);
+  const floor = Math.min(maxBytes, audioBytes + PCM_BYTES_PER_SECOND);
+  const created = ctx.db.one<{ created_at: number }>(
+    "SELECT created_at FROM dictation_sessions WHERE session_id = ?",
+    sessionId,
+  )?.created_at ?? ctx.now;
+  return reserveSpend(ctx, {
+    id: dictationSpendId(sessionId),
+    microCents: museCost(target),
+    minimumMicroCents: museCost(floor),
+    expiresAt: created + MUSE_RESERVATION_MS,
+    category: "dictation",
   });
 };
 
 const prepareDictation = (ctx: OwnerContext, raw: unknown) => {
   const { sessionId } = object({ sessionId: string({ pattern: DICTATION_SESSION_ID }) })(raw);
   enforceOwnerRateLimit(ctx.db, ctx.now, "dictation", DICTATION_RATE, "Too many dictation sessions. Try again in a minute.");
-  const access = billingAccess(ctx);
-  const perSecond = usdToMicroCents(MUSE_STT_USD_PER_SECOND);
-  const maxSeconds =
-    access.remainingMicroCents === null
-      ? MUSE_MAX_SESSION_SECONDS
-      : Math.min(MUSE_MAX_SESSION_SECONDS, Math.floor(access.remainingMicroCents / perSecond));
-  if (!access.allowed || maxSeconds < 1) {
-    throw new RpcError("FORBIDDEN", access.message || "Your Stella usage allowance is too low to start dictation.", {
+  const hold = holdMuse(ctx, sessionId, 0);
+  if (!hold.reserved) {
+    throw new RpcError("FORBIDDEN", hold.message || "Your Stella usage allowance is too low to start dictation.", {
       reason: "usage_limit_reached",
     });
   }
+  const allowed = hold.unlimited ? MUSE_MAX_SESSION_SECONDS * PCM_BYTES_PER_SECOND : museBytesFor(hold.reservedMicroCents);
+  ctx.db.run(
+    "INSERT OR REPLACE INTO dictation_sessions (session_id, allowed_bytes, created_at) VALUES (?, ?, ?)",
+    sessionId,
+    allowed,
+    ctx.now,
+  );
+  expireSpendAt(ctx, museExpiry(sessionId), ctx.now + MUSE_RESERVATION_MS);
   return {
     sessionId,
-    providerDeadlineAt: ctx.now + maxSeconds * 1_000,
-    maxAudioBytes: maxSeconds * PCM_BYTES_PER_SECOND,
+    providerDeadlineAt: ctx.now + MUSE_MAX_SESSION_SECONDS * 1_000,
+    maxAudioBytes: allowed,
   };
+};
+
+const extendDictation = (ctx: OwnerContext, raw: unknown) => {
+  const { sessionId, audioBytes } = object({
+    sessionId: string({ pattern: DICTATION_SESSION_ID }),
+    audioBytes: number({ int: true, min: 0, max: MUSE_MAX_SESSION_SECONDS * PCM_BYTES_PER_SECOND }),
+  })(raw);
+  const session = ctx.db.one<{ allowed_bytes: number }>(
+    "SELECT allowed_bytes FROM dictation_sessions WHERE session_id = ?",
+    sessionId,
+  );
+  if (!session) return { maxAudioBytes: 0 };
+  const hold = holdMuse(ctx, sessionId, audioBytes);
+  if (!hold.reserved) return { maxAudioBytes: session.allowed_bytes };
+  const allowed = hold.unlimited
+    ? MUSE_MAX_SESSION_SECONDS * PCM_BYTES_PER_SECOND
+    : Math.max(session.allowed_bytes, museBytesFor(hold.reservedMicroCents));
+  ctx.db.run("UPDATE dictation_sessions SET allowed_bytes = ? WHERE session_id = ?", allowed, sessionId);
+  return { maxAudioBytes: allowed };
+};
+
+const settleDictation = (ctx: OwnerContext, raw: unknown) => {
+  const { sessionId, audioBytes, success } = object({
+    sessionId: string({ pattern: DICTATION_SESSION_ID }),
+    audioBytes: number({ int: true, min: 0, max: MUSE_MAX_SESSION_SECONDS * PCM_BYTES_PER_SECOND }),
+    success: optional(literal(true, false)),
+  })(raw);
+  const costMicroCents = museCost(audioBytes);
+  const id = dictationSpendId(sessionId);
+  settleSpend(ctx, {
+    receiptId: id,
+    chargeMicroCents: costMicroCents,
+    reservationId: id,
+    release: true,
+    ...(audioBytes > 0
+      ? {
+          cost: {
+            id,
+            category: "dictation",
+            provider: "meta",
+            sku: MUSE_DICTATION_MODEL,
+            quantity: { audioSeconds: Math.round(audioBytes / PCM_BYTES_PER_SECOND) },
+            providerCostMicroCents: costMicroCents,
+            basis: "estimated",
+            outcome: success === false ? "failed" : "succeeded",
+            requestId: sessionId,
+            tariffVersion: TARIFF_VERSION,
+          } satisfies CostEntry,
+        }
+      : {}),
+  });
+  ctx.db.run("DELETE FROM dictation_sessions WHERE session_id = ?", sessionId);
+  cancelSpendExpiry(ctx, id);
+  return { costMicroCents };
 };
 
 const DICTATION_CLIP_MAX_BYTES = 15 * 60 * PCM_BYTES_PER_SECOND;
 const DICTATION_RESERVATION_MS = 10 * 60_000;
-const clipReservationId = (sessionId: string) => `dictation:${sessionId}`;
+// The clip route settles at OpenRouter's reported cost, else the fallback
+// rate; hold above that so a clip can never settle past its reservation.
+const CLIP_RESERVE_MARGIN = 1.25;
+const clipFallbackCost = (audioBytes: number): number =>
+  usdToMicroCents((audioBytes / PCM_BYTES_PER_SECOND) * DICTATION_TARIFF.openRouterFallbackUsdPerSecond);
+
+const clipExpiry = (sessionId: string) => ({
+  id: dictationSpendId(sessionId),
+  category: "dictation" as const,
+  provider: "openrouter",
+  sku: "transcription",
+});
 
 const reserveDictationClip = (ctx: OwnerContext, raw: unknown) => {
   const { sessionId, audioBytes } = object({
@@ -516,70 +767,149 @@ const reserveDictationClip = (ctx: OwnerContext, raw: unknown) => {
     audioBytes: number({ int: true, min: 1, max: DICTATION_CLIP_MAX_BYTES }),
   })(raw);
   enforceOwnerRateLimit(ctx.db, ctx.now, "dictation", DICTATION_RATE, "Too many dictation sessions. Try again in a minute.");
-  const access = reserveUsage(ctx, {
-    id: clipReservationId(sessionId),
-    budgetMicroCents: usdToMicroCents((audioBytes / PCM_BYTES_PER_SECOND) * MUSE_STT_USD_PER_SECOND),
+  const hold = reserveSpend(ctx, {
+    id: dictationSpendId(sessionId),
+    microCents: Math.ceil(clipFallbackCost(audioBytes) * CLIP_RESERVE_MARGIN),
     expiresAt: ctx.now + DICTATION_RESERVATION_MS,
+    category: "dictation",
   });
-  if (!access.reserved) {
-    throw new RpcError("FORBIDDEN", access.message || "Your Stella usage allowance is too low for this recording.", {
+  if (!hold.reserved) {
+    throw new RpcError("FORBIDDEN", hold.message || "Your Stella usage allowance is too low for this recording.", {
       reason: "usage_limit_reached",
     });
   }
+  expireSpendAt(ctx, clipExpiry(sessionId), ctx.now + DICTATION_RESERVATION_MS);
   return { sessionId };
 };
 
+const segmentArg = object({
+  segment: number({ int: true, min: 0, max: 100 }),
+  audioBytes: number({ int: true, min: 0, max: DICTATION_CLIP_MAX_BYTES }),
+  costUsd: optional(number({ min: 0, max: 100 })),
+  model: optional(string({ max: 200 })),
+  outcome: optional(literal("succeeded", "failed", "aborted")),
+});
+
+type ClipSegment = ReturnType<typeof segmentArg>;
+
+const chargeClipSegment = (ctx: OwnerContext, sessionId: string, input: ClipSegment): number => {
+  const costMicroCents =
+    input.costUsd !== undefined ? usdToMicroCents(input.costUsd) : clipFallbackCost(input.audioBytes);
+  const id = `${dictationSpendId(sessionId)}:${input.segment}`;
+  settleSpend(ctx, {
+    receiptId: id,
+    chargeMicroCents: costMicroCents,
+    reservationId: dictationSpendId(sessionId),
+    cost: {
+      id,
+      category: "dictation",
+      provider: "openrouter",
+      sku: input.model ?? "transcription",
+      quantity: { audioSeconds: Math.round(input.audioBytes / PCM_BYTES_PER_SECOND) },
+      providerCostMicroCents: costMicroCents,
+      basis: input.costUsd !== undefined ? "actual" : "estimated",
+      outcome: input.outcome ?? "succeeded",
+      attempt: 1,
+      requestId: sessionId,
+      tariffVersion: TARIFF_VERSION,
+    },
+  });
+  return costMicroCents;
+};
+
 const settleDictationSegment = (ctx: OwnerContext, raw: unknown) => {
-  const { sessionId, segment, audioBytes, costUsd } = object({
+  const { sessionId, ...segment } = object({
     sessionId: string({ pattern: DICTATION_SESSION_ID }),
     segment: number({ int: true, min: 0, max: 100 }),
     audioBytes: number({ int: true, min: 0, max: DICTATION_CLIP_MAX_BYTES }),
     costUsd: optional(number({ min: 0, max: 100 })),
+    model: optional(string({ max: 200 })),
+    outcome: optional(literal("succeeded", "failed", "aborted")),
   })(raw);
-  const costMicroCents = usdToMicroCents(
-    costUsd ?? (audioBytes / PCM_BYTES_PER_SECOND) * MUSE_STT_USD_PER_SECOND,
-  );
-  recordUsage(ctx, [{ id: `${clipReservationId(sessionId)}:${segment}`, costMicroCents }]);
-  settleReservation(ctx, clipReservationId(sessionId), costMicroCents);
-  return { costMicroCents };
+  return { costMicroCents: chargeClipSegment(ctx, sessionId, segment) };
+};
+
+// Ends a clip: charges any segment whose settlement did not get through
+// (idempotent per segment), then drops what is left of the hold.
+const finishDictationClip = (ctx: OwnerContext, raw: unknown) => {
+  const { sessionId, unsettled } = object({
+    sessionId: string({ pattern: DICTATION_SESSION_ID }),
+    unsettled: optional(array(segmentArg, { max: 100 })),
+  })(raw);
+  for (const segment of unsettled ?? []) chargeClipSegment(ctx, sessionId, segment);
+  releaseSpend(ctx, dictationSpendId(sessionId));
+  cancelSpendExpiry(ctx, dictationSpendId(sessionId));
+  return { ok: true };
 };
 
 const MAPS_RATE = { count: 20, windowMs: 60_000 };
-const MAPS_PLACE_USD = 0.032;
-const MAPS_ROUTE_USD = 0.01;
+const MAPS_RESERVATION_MS = 5 * 60_000;
+const mapsSpendId = (requestId: string) => `maps:${requestId}`;
+const mapsCost = (places: number, routes: number): number =>
+  usdToMicroCents(places * MAPS_TARIFF.placeTextSearchUsd + routes * MAPS_TARIFF.routeUsd);
 
 const admitMaps = (ctx: OwnerContext, raw: unknown) => {
   const { requestId, places, route } = object({
     requestId: string({ min: 8, max: 64 }),
-    places: number({ int: true, min: 0, max: 8 }),
+    places: number({ int: true, min: 0, max: MAPS_TARIFF.maxPlacesPerRequest }),
     route: literal(true, false),
   })(raw);
   enforceOwnerRateLimit(ctx.db, ctx.now, "maps", MAPS_RATE, "Too many map lookups. Try again in a minute.");
-  const access = billingAccess(ctx);
-  if (!access.allowed) {
-    throw new RpcError("FORBIDDEN", access.message || "Your Stella usage limit is reached.", {
+  const maxCost = mapsCost(places, route ? 1 : 0);
+  const hold = reserveSpend(ctx, {
+    id: mapsSpendId(requestId),
+    microCents: maxCost,
+    expiresAt: ctx.now + MAPS_RESERVATION_MS,
+    category: "maps",
+  });
+  if (!hold.reserved) {
+    throw new RpcError("FORBIDDEN", hold.message || "Your Stella budget is too low for this map.", {
       reason: "usage_limit_reached",
     });
   }
-  const costMicroCents = usdToMicroCents(places * MAPS_PLACE_USD + (route ? MAPS_ROUTE_USD : 0));
-  recordUsage(ctx, [{ id: `maps:${requestId}`, costMicroCents }]);
-  return { costMicroCents };
+  expireSpendAt(
+    ctx,
+    { id: mapsSpendId(requestId), category: "maps", provider: "google", sku: "resolve" },
+    ctx.now + MAPS_RESERVATION_MS,
+  );
+  return { reservedMicroCents: maxCost };
 };
 
-const releaseDictationClip = (ctx: OwnerContext, raw: unknown) => {
-  const { sessionId } = object({ sessionId: string({ pattern: DICTATION_SESSION_ID }) })(raw);
-  releaseReservation(ctx, clipReservationId(sessionId));
-  return { ok: true };
-};
-
-const settleDictation = (ctx: OwnerContext, raw: unknown) => {
-  const { sessionId, audioBytes } = object({
-    sessionId: string({ pattern: DICTATION_SESSION_ID }),
-    audioBytes: number({ int: true, min: 0, max: MUSE_MAX_SESSION_SECONDS * PCM_BYTES_PER_SECOND }),
+// Charges each Google SKU the resolver actually called, not what was asked for.
+const settleMaps = (ctx: OwnerContext, raw: unknown) => {
+  const { requestId, placeCalls, routeCalls, outcome } = object({
+    requestId: string({ min: 8, max: 64 }),
+    placeCalls: number({ int: true, min: 0, max: MAPS_TARIFF.maxPlacesPerRequest }),
+    routeCalls: number({ int: true, min: 0, max: 1 }),
+    outcome: literal("succeeded", "failed", "aborted"),
   })(raw);
-  const costMicroCents = usdToMicroCents((audioBytes / PCM_BYTES_PER_SECOND) * MUSE_STT_USD_PER_SECOND);
-  recordUsage(ctx, [{ id: `dictation:${sessionId}`, costMicroCents }]);
-  return { costMicroCents };
+  const id = mapsSpendId(requestId);
+  const lines = [
+    { sku: "places_text_search", calls: placeCalls, cost: mapsCost(placeCalls, 0) },
+    { sku: "directions", calls: routeCalls, cost: mapsCost(0, routeCalls) },
+  ].filter((line) => line.calls > 0);
+  for (const line of lines) {
+    settleSpend(ctx, {
+      receiptId: `${id}:${line.sku}`,
+      chargeMicroCents: line.cost,
+      reservationId: id,
+      cost: {
+        id: `${id}:${line.sku}`,
+        category: "maps",
+        provider: "google",
+        sku: line.sku,
+        quantity: { requests: line.calls },
+        providerCostMicroCents: line.cost,
+        basis: "estimated",
+        outcome,
+        requestId,
+        tariffVersion: TARIFF_VERSION,
+      },
+    });
+  }
+  releaseSpend(ctx, id);
+  cancelSpendExpiry(ctx, id);
+  return { costMicroCents: mapsCost(placeCalls, routeCalls) };
 };
 
 const purgeVoice = async (ctx: OwnerContext, mode: OwnerPurgeMode): Promise<{ pending: boolean }> => {
@@ -590,6 +920,7 @@ const purgeVoice = async (ctx: OwnerContext, mode: OwnerPurgeMode): Promise<{ pe
   for (const { id } of ctx.db.all<{ id: string }>("SELECT id FROM tts_streams")) ctx.jobs.cancel(ttsJobId(id));
   ctx.db.run("DELETE FROM tts_streams");
   if (mode === "delete") ctx.db.run("DELETE FROM tts_daily");
+  ctx.db.run("DELETE FROM dictation_sessions");
   ctx.jobs.cancel(VOICE_REAP_JOB);
   await Promise.all(calls.map(({ call_id }) => closeLiveSession(ctx.env, call_id)));
   const bucket = ctx.env.MEDIA;
@@ -606,7 +937,7 @@ const historyArg: Parser<VoiceHistoryMessage> = object({
 
 export const voiceDomain = {
   name: "voice",
-  migrations: [VOICE_MIGRATION],
+  migrations: [VOICE_MIGRATION, DICTATION_SESSIONS_MIGRATION],
   calls: {
     "voice.session": {
       scope: "owner",
@@ -644,9 +975,23 @@ export const voiceDomain = {
   internal: {
     "voice.sdp": createCall,
     "tts.admit": (ctx, raw) => {
-      const { chars } = object({ chars: number({ int: true, min: 1, max: TTS_MAX_INPUT_CHARS }) })(raw);
-      admitTts(ctx, chars);
-      return { ok: true };
+      const { chars, vendor } = object({
+        chars: number({ int: true, min: 1, max: TTS_MAX_INPUT_CHARS }),
+        vendor: optional(literal("fal", "openrouter", "openai")),
+      })(raw);
+      const id = crypto.randomUUID();
+      admitTts(ctx, { id, chars, vendor: vendor ?? ttsProvider(ctx.env)?.provider ?? "fal" });
+      return { ok: true, id };
+    },
+    "tts.settle": (ctx, raw) => {
+      const input = object({
+        id: string({ min: 1, max: 64 }),
+        vendor: literal("fal", "openrouter", "openai"),
+        chars: number({ int: true, min: 0, max: TTS_MAX_INPUT_CHARS }),
+        pcmBytes: number({ int: true, min: 0, max: 1_000_000_000 }),
+        outcome: literal("succeeded", "failed", "aborted"),
+      })(raw);
+      return { chargedMicroCents: settleTts(ctx, input) };
     },
     "tts.cancel": (ctx, raw) => {
       const { id } = object({ id: string({ min: 1, max: 64 }) })(raw);
@@ -654,15 +999,18 @@ export const voiceDomain = {
       return { ok: true };
     },
     "dictation.prepare": prepareDictation,
+    "dictation.extend": extendDictation,
     "dictation.settle": settleDictation,
     "dictation.reserveClip": reserveDictationClip,
     "dictation.settleSegment": settleDictationSegment,
-    "dictation.releaseClip": releaseDictationClip,
+    "dictation.releaseClip": finishDictationClip,
     "maps.admit": admitMaps,
+    "maps.settle": settleMaps,
   },
   jobs: {
     [VOICE_REAP_JOB]: { run: (ctx: OwnerContext) => reap(ctx) },
     [TTS_SYNTHESIZE_JOB]: { run: synthesize, maxAttempts: 1 },
+    ...spendExpiryJobs,
   },
   purge: purgeVoice,
 } satisfies OwnerDomain;

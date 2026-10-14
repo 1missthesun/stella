@@ -2,13 +2,14 @@ import type {
   WebSearchHit,
   WebSearchResult,
 } from "@stella/contracts/backend/search";
+import { SEARCH_TARIFF, usdToMicroCents, type CostBasis, type CostOutcome } from "@stella/contracts/billing-tariffs";
 
 type Provider = "ceramic" | "exa" | "linkup";
 
 const PROVIDER_COST_MICRO_CENTS: Record<Provider, number> = {
-  ceramic: 25_000,
-  exa: 700_000,
-  linkup: 500_000,
+  ceramic: usdToMicroCents(SEARCH_TARIFF.ceramicUsd),
+  exa: usdToMicroCents(SEARCH_TARIFF.exaUsd),
+  linkup: usdToMicroCents(SEARCH_TARIFF.linkupUsd),
 };
 
 const DEFAULT_PROVIDER: Provider = "exa";
@@ -21,6 +22,7 @@ const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 export type WebSearchOutcome = {
   result: WebSearchResult;
   costMicroCents: number;
+  billing?: { provider: string; sku: string; basis: CostBasis; outcome: CostOutcome };
 };
 
 const providerOf = (env: Cloudflare.Env): Provider => {
@@ -58,9 +60,12 @@ const formatText = (query: string, results: WebSearchHit[]): string => {
   return `[External Content - Untrusted Source: web search: ${query}]\n${formatted}\n[End External Content]`;
 };
 
-const failed = (text: string): WebSearchOutcome => ({
+const failed = (text: string, billed?: { costMicroCents: number; provider: string; sku: string; outcome: CostOutcome }): WebSearchOutcome => ({
   result: { text, results: [] },
-  costMicroCents: 0,
+  costMicroCents: billed?.costMicroCents ?? 0,
+  ...(billed
+    ? { billing: { provider: billed.provider, sku: billed.sku, basis: "estimated" as const, outcome: billed.outcome } }
+    : {}),
 });
 
 const readBody = async (response: Response): Promise<string> => {
@@ -195,18 +200,22 @@ const searchOpenRouter = async (
 ): Promise<WebSearchOutcome> => {
   const key = configured(env, "OPENROUTER_API_KEY");
   if (!key) return failed("WebSearch through OpenRouter needs OPENROUTER_API_KEY on this server.");
+  const model = configured(env, "STELLA_WEB_SEARCH_MODEL") || OPENROUTER_SEARCH_MODEL;
+  const estimate = usdToMicroCents(SEARCH_TARIFF.openRouterEstimateUsd);
+  let answered = false;
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
       body: JSON.stringify({
-        model: configured(env, "STELLA_WEB_SEARCH_MODEL") || OPENROUTER_SEARCH_MODEL,
+        model,
         plugins: [{ id: "web", max_results: MAX_RESULTS }],
         max_tokens: 200,
         messages: [{ role: "user", content: `Search the web for: ${query}\nSummarize the top results in two sentences.` }],
       }),
       signal,
     });
+    answered = response.ok;
     const body = await readBody(response);
     if (!response.ok) return failed(`WebSearch failed (${response.status}): ${body.slice(0, 300)}`);
     const data = JSON.parse(body) as {
@@ -229,13 +238,27 @@ const searchOpenRouter = async (
       )
       .filter((hit) => hit.url && !seen.has(hit.url) && seen.add(hit.url))
       .slice(0, MAX_RESULTS);
-    const cost = typeof data.usage?.cost === "number" ? Math.round(data.usage.cost * 100 * 1_000_000) : 0;
-    return { result: { text: formatText(query, results), results }, costMicroCents: cost };
+    const reported = typeof data.usage?.cost === "number" && data.usage.cost >= 0 ? data.usage.cost : null;
+    return {
+      result: { text: formatText(query, results), results },
+      costMicroCents: reported !== null ? usdToMicroCents(reported) : estimate,
+      billing: { provider: "openrouter", sku: model, basis: reported !== null ? "actual" : "estimated", outcome: "succeeded" },
+    };
   } catch (error) {
-    if (signal.aborted) return failed("WebSearch timed out.");
-    return failed(`WebSearch failed: ${error instanceof Error ? error.message : String(error)}`);
+    // A request the provider accepted (or one we gave up on mid-flight) is billed.
+    const billed = answered || signal.aborted
+      ? { costMicroCents: estimate, provider: "openrouter", sku: model, outcome: (signal.aborted ? "aborted" : "failed") as CostOutcome }
+      : undefined;
+    if (signal.aborted) return failed("WebSearch timed out.", billed);
+    return failed(`WebSearch failed: ${error instanceof Error ? error.message : String(error)}`, billed);
   }
 };
+
+// The most one search can cost, held before it runs.
+export const webSearchMaxCostMicroCents = (env: Cloudflare.Env): number =>
+  webSearchBackend(env) === "openrouter"
+    ? usdToMicroCents(SEARCH_TARIFF.openRouterMaxUsd)
+    : PROVIDER_COST_MICRO_CENTS[providerOf(env)];
 
 export const searchWeb = async (
   env: Cloudflare.Env,
@@ -265,6 +288,13 @@ export const searchWeb = async (
     0,
     MAX_QUERY_CHARS,
   );
+  let answered = false;
+  const billed = (outcome: CostOutcome) => ({
+    costMicroCents: PROVIDER_COST_MICRO_CENTS[provider],
+    provider: `cloudflare:${provider}`,
+    sku: "websearch",
+    outcome,
+  });
   try {
     const response = await withTimeout(
       ai.websearch({
@@ -275,6 +305,7 @@ export const searchWeb = async (
       }),
       input.signal,
     );
+    answered = response.ok;
     const body = await readBody(response);
     const data = parseBody(body);
     if (!response.ok) {
@@ -290,11 +321,13 @@ export const searchWeb = async (
     return {
       result: { text: formatText(query, results), results },
       costMicroCents: PROVIDER_COST_MICRO_CENTS[provider],
+      billing: { provider: `cloudflare:${provider}`, sku: "websearch", basis: "estimated", outcome: "succeeded" },
     };
   } catch (error) {
-    if (input.signal.aborted) return failed("WebSearch timed out.");
+    if (input.signal.aborted) return failed("WebSearch timed out.", billed("aborted"));
     return failed(
       `WebSearch failed: ${error instanceof Error ? error.message : String(error)}`,
+      answered ? billed("failed") : undefined,
     );
   }
 };

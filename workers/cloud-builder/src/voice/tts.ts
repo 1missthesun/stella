@@ -163,6 +163,7 @@ const falSpeechChunk = async (apiKey: string, text: string, voice: string, signa
 const chunkedPcm = (
   chunks: string[],
   synthesize: (text: string) => Effect.Effect<Uint8Array, unknown>,
+  onSend: (chars: number) => void,
 ): ReadableStream<Uint8Array> => {
   let next = 0;
   const pending: Promise<Uint8Array>[] = [];
@@ -175,7 +176,9 @@ const chunkedPcm = (
   };
   const fill = () => {
     while (pending.length < CHUNKS_IN_FLIGHT && next < chunks.length) {
-      const fiber = Effect.runFork(synthesize(chunks[next++]!));
+      const chunk = chunks[next++]!;
+      onSend(chunk.length);
+      const fiber = Effect.runFork(synthesize(chunk));
       running.push(fiber);
       const promise = Effect.runPromise(Fiber.join(fiber));
       promise.catch(() => stop());
@@ -212,7 +215,7 @@ const chunkedPcm = (
 export const openTtsPcm = async (
   env: object,
   args: { text: string; voice: string; signal: AbortSignal },
-): Promise<{ provider: TtsProvider; pcm: ReadableStream<Uint8Array> }> => {
+): Promise<{ provider: TtsProvider; pcm: ReadableStream<Uint8Array>; sentChars: () => number }> => {
   const picked = ttsProvider(env);
   if (!picked) throw new Error("Read-aloud is not configured.");
   args.signal.throwIfAborted();
@@ -227,13 +230,17 @@ export const openTtsPcm = async (
       try: (interrupted) => request(picked.apiKey, text, args.voice, AbortSignal.any([args.signal, interrupted])),
       catch: (error) => error,
     });
-  const reader = chunkedPcm(splitTtsText(args.text), synthesize).getReader();
+  let sent = 0;
+  const reader = chunkedPcm(splitTtsText(args.text), synthesize, (chars) => {
+    sent += chars;
+  }).getReader();
   const first = await reader.read().catch(async (error: unknown) => {
     await reader.cancel(error).catch(() => undefined);
     throw error;
   });
   return {
     provider: picked.provider,
+    sentChars: () => sent,
     pcm: new ReadableStream<Uint8Array>({
       start(controller) {
         if (first.done) controller.close();

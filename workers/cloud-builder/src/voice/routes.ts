@@ -90,8 +90,18 @@ export const ownerDictationControl = (env: Pick<VoiceEnv, "OWNER_GATES">, ownerI
         throw error;
       }
     },
-    async settle({ sessionId, audioBytes }) {
-      await voiceInternal(env, ownerId, await current(), "dictation.settle", { sessionId, audioBytes });
+    async extend({ sessionId, audioBytes }) {
+      const { maxAudioBytes } = await voiceInternal<{ maxAudioBytes: number }>(
+        env,
+        ownerId,
+        await current(),
+        "dictation.extend",
+        { sessionId, audioBytes },
+      );
+      return maxAudioBytes;
+    },
+    async settle({ sessionId, audioBytes, success }) {
+      await voiceInternal(env, ownerId, await current(), "dictation.settle", { sessionId, audioBytes, success });
     },
   };
 };
@@ -114,11 +124,37 @@ const readJson = async (request: Request): Promise<Record<string, unknown>> => {
   );
 };
 
-const admitText = async (env: VoiceEnv, caller: OwnerCaller, raw: unknown): Promise<string> => {
+type TtsVendor = "fal" | "openrouter" | "openai";
+
+type AdmittedText = {
+  text: string;
+  settle: (usage: { chars: number; pcmBytes: number; outcome: "succeeded" | "failed" | "aborted" }) => Promise<void>;
+};
+
+const admitText = async (env: VoiceEnv, caller: OwnerCaller, raw: unknown, vendor: TtsVendor): Promise<AdmittedText> => {
   const text = typeof raw === "string" ? ttsText(raw) : "";
   if (!text) throw new RpcError("BAD_REQUEST", "text is required.");
-  await callOwner(env, caller.ownerId, "tts.admit", { chars: text.length });
-  return text;
+  const generation = await ownerGeneration(env, caller.ownerId);
+  const { id } = await voiceInternal<{ id: string }>(env, caller.ownerId, generation, "tts.admit", {
+    chars: text.length,
+    vendor,
+  });
+  let settled = false;
+  return {
+    text,
+    settle: async (usage) => {
+      if (settled) return;
+      settled = true;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        try {
+          await voiceInternal(env, caller.ownerId, generation, "tts.settle", { id, vendor, ...usage });
+          return;
+        } catch (error) {
+          log("error", "tts_settle_failed", { attempt, message: error instanceof Error ? error.message : String(error) });
+        }
+      }
+    },
+  };
 };
 
 const liveSdp = async (request: Request, env: VoiceEnv): Promise<Response> => {
@@ -153,25 +189,36 @@ const openPcm = async (env: VoiceEnv, text: string, voice: string, transport: st
 const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => {
   const caller = await authenticate(request, env);
   const body = await readJson(request);
-  if (!ttsProvider(env)) throw notConfigured();
-  const text = await admitText(env, caller, body.text);
+  const configured = ttsProvider(env);
+  if (!configured) throw notConfigured();
+  const { text, settle } = await admitText(env, caller, body.text, configured.provider);
   const voice = resolveGeminiTtsVoice(body.voice);
   const startedAt = Date.now();
-  const { provider, pcm } = await openPcm(env, text, voice, "stream", providerSignal(request));
+  const opened = await openPcm(env, text, voice, "stream", providerSignal(request)).catch(async (error: unknown) => {
+    await settle({ chars: 0, pcmBytes: 0, outcome: "failed" });
+    throw error;
+  });
+  const { provider, pcm } = opened;
   const reader = pcm.getReader();
   const encoder = createPcmMp3Encoder();
   let audioBytes = 0;
   let firstAudioMs: number | null = null;
-  const report = (status: string) =>
+  const report = async (status: string) => {
     logTtsUsage({
       transport: "stream",
       status,
       requestChars: text.length,
       audioBytes,
       firstAudioMs,
-      ...estimateTtsUsage(provider, text.length, encoder.pcmBytes),
+      ...estimateTtsUsage(provider, opened.sentChars(), encoder.pcmBytes),
       durationMs: Date.now() - startedAt,
     });
+    await settle({
+      chars: opened.sentChars(),
+      pcmBytes: encoder.pcmBytes,
+      outcome: status === "completed" ? "succeeded" : status === "failed" ? "failed" : "aborted",
+    });
+  };
   const stream = new ReadableStream<Uint8Array>({
     async pull(controller) {
       try {
@@ -181,7 +228,7 @@ const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => 
             const tail = encoder.finish();
             if (tail.length > 0) controller.enqueue(tail);
             audioBytes += tail.length;
-            report(audioBytes > 0 ? "completed" : "failed");
+            await report(audioBytes > 0 ? "completed" : "failed");
             controller.close();
             return;
           }
@@ -195,13 +242,13 @@ const ttsStream = async (request: Request, env: VoiceEnv): Promise<Response> => 
         }
       } catch (error) {
         await reader.cancel(error).catch(() => undefined);
-        report("interrupted");
+        await report("interrupted");
         controller.error(error);
       }
     },
     async cancel(reason) {
       await reader.cancel(reason).catch(() => undefined);
-      report("interrupted");
+      await report("interrupted");
     },
   });
   return new Response(stream, { headers: { "content-type": "audio/mpeg", "cache-control": "no-store" } });
@@ -211,16 +258,30 @@ const ttsOneShot = async (request: Request, env: VoiceEnv): Promise<Response> =>
   const caller = await authenticate(request, env);
   const body = await readJson(request);
   const provider = body.voiceProvider === "gemini" ? "gemini" : "openai";
-  const apiKey = provider === "gemini" ? (ttsProvider(env)?.apiKey ?? null) : secret(env, "OPENAI_API_KEY");
+  const gemini = ttsProvider(env);
+  const apiKey = provider === "gemini" ? (gemini?.apiKey ?? null) : secret(env, "OPENAI_API_KEY");
   if (!apiKey) throw notConfigured();
-  const text = await admitText(env, caller, body.text);
+  const { text, settle } = await admitText(
+    env,
+    caller,
+    body.text,
+    provider === "gemini" ? (gemini?.provider ?? "fal") : "openai",
+  );
   const startedAt = Date.now();
   const signal = providerSignal(request);
 
   if (provider === "gemini") {
     const voice = resolveGeminiTtsVoice(body.voice);
-    const opened = await openPcm(env, text, voice, "oneshot_gemini", signal);
+    const opened = await openPcm(env, text, voice, "oneshot_gemini", signal).catch(async (error: unknown) => {
+      await settle({ chars: 0, pcmBytes: 0, outcome: "failed" });
+      throw error;
+    });
     const pcm = new Uint8Array(await new Response(opened.pcm).arrayBuffer().catch(() => new ArrayBuffer(0)));
+    await settle({
+      chars: opened.sentChars(),
+      pcmBytes: pcm.byteLength,
+      outcome: pcm.byteLength > 0 ? "succeeded" : "failed",
+    });
     if (pcm.byteLength === 0) {
       log("error", "tts_provider_failed", { transport: "oneshot_gemini", provider: opened.provider });
       throw new RpcError("UNAVAILABLE", "Speech generation failed.");
@@ -254,6 +315,11 @@ const ttsOneShot = async (request: Request, env: VoiceEnv): Promise<Response> =>
     signal,
   }).catch(() => null);
   const audio = response?.ok ? await response.arrayBuffer().catch(() => null) : null;
+  await settle({
+    chars: response?.ok || signal.aborted ? text.length : 0,
+    pcmBytes: 0,
+    outcome: audio ? "succeeded" : response?.ok || signal.aborted ? "aborted" : "failed",
+  });
   if (!audio) {
     await response?.body?.cancel().catch(() => undefined);
     log("error", "tts_provider_failed", { transport: "oneshot_openai", status: response?.status ?? 0 });

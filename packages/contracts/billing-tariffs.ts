@@ -121,3 +121,27 @@ export type CostEntry = {
   requestId?: string;
   tariffVersion?: string;
 };
+
+// Speech-to-text. Muse is priced per second of audio streamed to it; the
+// OpenRouter clip route settles at the provider's reported cost, else this rate.
+export const DICTATION_TARIFF = {
+  museUsdPerHour: 0.18,
+  openRouterFallbackUsdPerSecond: 0.0000611,
+} as const;
+
+// Web search per request. Cloudflare AI Search providers are flat per call;
+// OpenRouter's web plugin reports its cost, and this is the most one request
+// can cost (6 results plus the summarizing model).
+export const SEARCH_TARIFF = {
+  ceramicUsd: 0.00025,
+  exaUsd: 0.007,
+  linkupUsd: 0.005,
+  openRouterEstimateUsd: 0.02,
+  openRouterMaxUsd: 0.03,
+} as const;
+
+// OpenAI GPT-Live realtime voice, billed per second of open session.
+export const REALTIME_VOICE_TARIFF = {
+  gptLiveUsdPerMinute: 0.05,
+  minimumBilledSeconds: 15,
+} as const;

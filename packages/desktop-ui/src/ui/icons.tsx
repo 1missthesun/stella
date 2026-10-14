@@ -69,6 +69,7 @@ export const ArrowLeft = createIcon("arrow-left", <path d="M19.5 12h-15M11 5.5 4
 export const ArrowRight = createIcon("arrow-right", <path d="M4.5 12h15M13 5.5 19.5 12 13 18.5"/>);
 export const Maximize2 = createIcon("maximize-2", <path d="M14 4.5h5.5V10M19.25 4.75 13.5 10.5M10 19.5H4.5V14M4.75 19.25 10.5 13.5"/>);
 export const Link = createIcon("link", <path d="M10.6 13.4a3.6 3.6 0 0 0 5.1 0l3.05-3.05a3.6 3.6 0 0 0-5.1-5.1l-1.15 1.15M13.4 10.6a3.6 3.6 0 0 0-5.1 0l-3.05 3.05a3.6 3.6 0 0 0 5.1 5.1l1.15-1.15"/>);
+export const Share = createIcon("share", <path d="M12 14.5V4.25M8.25 8 12 4.25 15.75 8M9 10.75H7.25a2.5 2.5 0 0 0-2.5 2.5v4.5a2.5 2.5 0 0 0 2.5 2.5h9.5a2.5 2.5 0 0 0 2.5-2.5v-4.5a2.5 2.5 0 0 0-2.5-2.5H15"/>);
 export const ExternalLink = createIcon("external-link", <path d="M19.75 13.25v3.5a3 3 0 0 1-3 3H7.25a3 3 0 0 1-3-3V7.25a3 3 0 0 1 3-3h3.5M14.5 4.25h5.25V9.5M19.25 4.75 12.5 11.5"/>);
 export const Mail = createIcon("mail", <><rect x="3.75" y="5.75" width="16.5" height="12.5" rx="2.75"/><path d="M4.6 7.4 12 12.9l7.4-5.5"/></>);
 export const RefreshCw = createIcon("refresh-cw", <path d="M20.25 12A8.25 8.25 0 1 1 12 3.75c2.83 0 5.33 1.42 6.82 3.58M19.5 3.5v4h-4"/>);

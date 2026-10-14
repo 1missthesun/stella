@@ -6,7 +6,8 @@ import {
   useRef,
   useState,
 } from "react";
-import { Copy, Download, Trash2 } from "@/ui/icons";
+import { Copy, Download, LoaderCircle, Share, Trash2 } from "@/ui/icons";
+import { publicFileLink } from "@/features/cloud/file-share-link";
 import { useDisplayFileBlobs } from "@/shared/hooks/use-display-file-data";
 import { copyImageBlob } from "@/shell/media-clipboard";
 import { useT } from "@/shared/i18n";
@@ -95,6 +96,25 @@ export const MediaActionBar = ({
     }
   }, [blob, filePath, item, t]);
 
+  const [sharing, setSharing] = useState(false);
+  const handleShare = useCallback(async () => {
+    if (!filePath || sharing) return;
+    setSharing(true);
+    try {
+      const url = await publicFileLink(filePath, blob?.blob ?? null);
+      await navigator.clipboard.writeText(url);
+      setMessage(t("shell.display.media.linkCopied"));
+    } catch (err) {
+      setMessage(
+        err instanceof Error && err.message
+          ? err.message
+          : t("shell.display.media.shareFailed"),
+      );
+    } finally {
+      setSharing(false);
+    }
+  }, [blob, filePath, sharing, t]);
+
   const canSave = Boolean(filePath && window.electronAPI?.system?.saveFileAs);
 
   return (
@@ -119,6 +139,22 @@ export const MediaActionBar = ({
       >
         <Copy size={14} strokeWidth={1.85} />
       </button>
+      {filePath ? (
+        <button
+          type="button"
+          className="media-tab__action-btn"
+          onClick={handleShare}
+          disabled={sharing}
+          aria-label={t("shell.display.media.share")}
+          title={t("shell.display.media.shareTitle")}
+        >
+          {sharing ? (
+            <LoaderCircle size={14} strokeWidth={1.85} className="media-tab__action-spin" />
+          ) : (
+            <Share size={14} strokeWidth={1.85} />
+          )}
+        </button>
+      ) : null}
       <button
         type="button"
         className={`media-tab__action-btn${

@@ -10,5 +10,5 @@ cc -O2 -g0 -Wall -Wextra -Wno-unused-parameter -Wno-deprecated-declarations \
   -DLAUNCHER_VERSION="${STELLA_LAUNCHER_VERSION:-0}" \
   ${defaults[@]+"${defaults[@]}"} \
   -o build/stella-launcher stella-launcher.c \
-  $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.1 libcrypto) -ldl -pthread
+  $(pkg-config --cflags --libs gtk+-3.0 webkit2gtk-4.1 libcrypto) $(pkg-config --cflags libsecret-1) -ldl -pthread
 echo "Built $(pwd)/build/stella-launcher"

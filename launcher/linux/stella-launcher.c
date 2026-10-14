@@ -26,6 +26,7 @@
 
 #include <glib-unix.h>
 #include <gtk/gtk.h>
+#include <libsecret/secret.h>
 #include <webkit2/webkit2.h>
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -808,23 +809,14 @@ static unsigned char *base64_decode(const char *text, size_t *len_out) {
     return out;
 }
 
-/* The parts of libsecret's ABI the launcher uses (stable since 0.18). */
-typedef struct { const char *name; int type; } LsSchemaAttribute;
-typedef struct {
-    const char *name;
-    int flags;
-    LsSchemaAttribute attributes[32];
-    int reserved;
-    void *reserved1, *reserved2, *reserved3, *reserved4, *reserved5, *reserved6, *reserved7;
-} LsSchema;
+typedef __typeof__(&secret_password_store_sync) ls_store_fn;
+typedef __typeof__(&secret_password_lookup_sync) ls_lookup_fn;
+typedef __typeof__(&secret_password_free) ls_free_fn;
 
-typedef int (*ls_store_fn)(const LsSchema *, const char *, const char *, const char *, void *, GError **, ...);
-typedef char *(*ls_lookup_fn)(const LsSchema *, void *, GError **, ...);
-typedef void (*ls_free_fn)(char *);
-
-static const LsSchema SIGNING_SCHEMA = {
-    "sh.stella.launcher.TreeSigning", 0, {{"service", 0}, {"account", 0}, {NULL, 0}}, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL};
+static const SecretSchema SIGNING_SCHEMA = {
+    .name = "sh.stella.launcher.TreeSigning",
+    .flags = SECRET_SCHEMA_NONE,
+    .attributes = {{"service", SECRET_SCHEMA_ATTRIBUTE_STRING}, {"account", SECRET_SCHEMA_ATTRIBUTE_STRING}, {NULL, 0}}};
 #define SECRET_SERVICE_ID "sh.stella.launcher.tree-signing"
 #define SECRET_ACCOUNT "p256"
 

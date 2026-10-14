@@ -44,8 +44,6 @@ import { type Colors } from "../theme/colors";
 import { GlassSurface } from "./glass";
 import { OverlayPortal } from "./OverlayHost";
 
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
 const SHADOW_CLEARANCE = 40;
 const RADIUS = 26;
 const SHOW_FALLBACK_MS = 250;
@@ -226,11 +224,14 @@ export function TopSheet({
 
   const layer = (
     <>
-      <AnimatedPressable
-        style={[
-          dim ? [styles.backdrop, scrim] : styles.clearBackdrop,
-          overlayBackdrop,
-        ]}
+      {dim ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.backdrop, scrim, overlayBackdrop]}
+        />
+      ) : null}
+      <Pressable
+        style={StyleSheet.absoluteFill}
         onPress={onClose}
         accessibilityRole="button"
         accessibilityLabel="Close"
@@ -321,10 +322,6 @@ const makeStyles = (colors: Colors) =>
     backdrop: {
       ...StyleSheet.absoluteFill,
       backgroundColor: "#000000",
-    },
-    clearBackdrop: {
-      ...StyleSheet.absoluteFill,
-      backgroundColor: "transparent",
     },
     slide: {
       left: 0,

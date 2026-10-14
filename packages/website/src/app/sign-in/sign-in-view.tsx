@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ArrowRight, MailCheck } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
-import { clearCachedToken } from "@/lib/auth-token";
+import { signOut } from "@/lib/sign-out";
 import { useDesktopBridgeAuthUser } from "@/lib/desktop-bridge-auth";
 import { useMagicLinkAuth } from "@/lib/use-magic-link-auth";
 import { isBackendConfigured } from "@/lib/backend-url";
@@ -188,8 +188,7 @@ function SignedInPanel({ user }: { user: SessionUser }) {
     setSignOutError(null);
     setSigningOut(true);
     try {
-      await authClient.signOut();
-      clearCachedToken();
+      await signOut();
     } catch (err) {
       setSignOutError(
         err instanceof Error ? err.message : "Failed to sign out.",

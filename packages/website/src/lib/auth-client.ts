@@ -6,20 +6,27 @@ import { readBackendUrl } from "./backend-url";
 
 const SESSION_TOKEN_KEY = "better-auth_session_token";
 
+let currentSessionToken: string | undefined;
+
 const readSessionToken = (): string => {
-  try {
-    return window.localStorage.getItem(SESSION_TOKEN_KEY)?.trim() ?? "";
-  } catch {
-    return "";
+  if (currentSessionToken === undefined) {
+    try {
+      currentSessionToken =
+        window.localStorage.getItem(SESSION_TOKEN_KEY)?.trim() ?? "";
+    } catch {
+      currentSessionToken = "";
+    }
   }
+  return currentSessionToken;
 };
 
-const writeSessionToken = (token: string | null): void => {
+export const writeSessionToken = (token: string | null): void => {
+  currentSessionToken = token ?? "";
   try {
     if (token) window.localStorage.setItem(SESSION_TOKEN_KEY, token);
     else window.localStorage.removeItem(SESSION_TOKEN_KEY);
   } catch {
-    // Storage denial leaves the session non-persistent.
+    return;
   }
 };
 
@@ -50,13 +57,7 @@ export const authClient = new Proxy({} as WebAuthClient, {
             if (token) context.headers.set("Authorization", `Bearer ${token}`);
             return context;
           },
-          // onResponse sees failures too, so a rejected sign-out still
-          // drops the local bearer.
           onResponse(context) {
-            if (new URL(context.request.url).pathname.endsWith("/sign-out")) {
-              writeSessionToken(null);
-              return;
-            }
             const rotated = context.response.headers
               .get("set-auth-token")
               ?.trim();

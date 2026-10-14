@@ -3,8 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ChevronDown, CreditCard, LogOut, MessagesSquare } from "lucide-react";
-import { authClient } from "@/lib/auth-client";
-import { clearCachedToken } from "@/lib/auth-token";
+import { signOut } from "@/lib/sign-out";
 import styles from "./account-menu.module.css";
 
 export type AccountMenuUser = {
@@ -44,8 +43,7 @@ export function AccountMenu({ user }: { user: AccountMenuUser }) {
 
   const handleSignOut = useCallback(async () => {
     setSigningOut(true);
-    await authClient.signOut().catch(() => undefined);
-    clearCachedToken();
+    await signOut().catch(() => undefined);
     setSigningOut(false);
     setOpen(false);
   }, []);

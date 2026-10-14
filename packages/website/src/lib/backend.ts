@@ -22,6 +22,10 @@ export function getBackendClient(): BackendClient {
   return cachedClient;
 }
 
+export function reconnectBackendClient(): void {
+  cachedClient?.reconnect();
+}
+
 export function useBackendValue<K extends ViewName>(
   view: K,
   args: ViewArgs<K> | "skip",

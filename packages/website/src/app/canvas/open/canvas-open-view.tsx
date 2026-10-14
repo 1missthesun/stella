@@ -16,7 +16,7 @@ import {
   parseCanvasShareSlug,
 } from "@stella/contracts/canvas-share";
 import { authClient } from "@/lib/auth-client";
-import { clearCachedToken } from "@/lib/auth-token";
+import { signOut as signOutWebSession } from "@/lib/sign-out";
 import { getBackendClient, isBackendConfigured } from "@/lib/backend";
 import { useMagicLinkAuth } from "@/lib/use-magic-link-auth";
 import { SocialSignInButtons } from "@/components/auth/social-sign-in-buttons";
@@ -127,11 +127,7 @@ function ConfiguredCanvasOpen({ slug }: { slug: string }) {
 
   const signOut = useCallback(async () => {
     setPhase({ kind: "opening" });
-    try {
-      await authClient.signOut();
-    } finally {
-      clearCachedToken();
-    }
+    await signOutWebSession();
   }, []);
 
   if (session.isPending) return <Shell />;

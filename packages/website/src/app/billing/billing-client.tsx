@@ -15,7 +15,7 @@ import {
 import Link from "next/link";
 import { openSignInDialog } from "@/components/auth/sign-in-dialog";
 import { authClient } from "@/lib/auth-client";
-import { clearCachedToken } from "@/lib/auth-token";
+import { signOut } from "@/lib/sign-out";
 import { useDesktopBridgeAuthUser } from "@/lib/desktop-bridge-auth";
 import { PLAN_ORDER, PLANS, type BillingPlan } from "@/lib/plans";
 
@@ -765,8 +765,7 @@ function AccountIdentity({
 
   const handleSignOut = useCallback(async () => {
     setSigningOut(true);
-    await authClient.signOut().catch(() => undefined);
-    clearCachedToken();
+    await signOut().catch(() => undefined);
     window.location.reload();
   }, []);
 

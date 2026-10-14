@@ -998,6 +998,14 @@ export const registerSystemHandlers = (options) => {
                 result.movedEntries.some((entry) => entry.startsWith(`skills${path.sep}`))) {
                 await ensureStellaDataDirSeeded(stellaInstallDir, stellaAppDir);
             }
+            if (result.failed) {
+                return {
+                    ok: false,
+                    movedEntries: result.movedEntries,
+                    trashDir: result.trashDir,
+                    error: `Couldn't move ${result.failed.entry} (${result.failed.message}); it and everything after it are unchanged. ${result.movedEntries.length} moved to ${result.trashDir}.`,
+                };
+            }
             return { ok: true, movedEntries: result.movedEntries, trashDir: result.trashDir };
         }
         catch (error) {

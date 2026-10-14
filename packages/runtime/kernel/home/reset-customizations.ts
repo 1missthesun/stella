@@ -7,7 +7,13 @@ import { listTrackedBundledSkillIds } from "./skills-sync.js";
 export type ResetCustomizationsResult = {
   movedEntries: string[];
   trashDir: string | null;
+  failed: { entry: string; message: string } | null;
 };
+
+const errorCode = (error: unknown): string | undefined =>
+  error && typeof error === "object" && "code" in error
+    ? String((error as { code: unknown }).code)
+    : undefined;
 
 const listMarkdownFiles = async (dir: string): Promise<string[]> => {
   try {
@@ -56,7 +62,7 @@ export const resetStellaCustomizations = async (
   }
 
   if (candidates.length === 0) {
-    return { movedEntries: [], trashDir: null };
+    return { movedEntries: [], trashDir: null, failed: null };
   }
 
   const trashDir = path.join(
@@ -64,22 +70,32 @@ export const resetStellaCustomizations = async (
     ".trash",
     new Date().toISOString().replace(/[:.]/g, "-"),
   );
+  await ensurePrivateDir(trashDir);
+  await fs.writeFile(
+    path.join(trashDir, "reset.json"),
+    `${JSON.stringify({ from: stellaDataDir, entries: candidates }, null, 2)}\n`,
+    { mode: 0o600 },
+  );
   const moved: string[] = [];
   for (const relPath of candidates) {
-    const source = path.join(stellaDataDir, relPath);
     const target = path.join(trashDir, relPath);
     try {
       await ensurePrivateDir(path.dirname(target));
-      await fs.rename(source, target);
+      await fs.rename(path.join(stellaDataDir, relPath), target);
       moved.push(relPath);
-    } catch {
-      // Cross-device or racing removals: fall back to copy+delete.
-      try {
-        await fs.cp(source, target, { recursive: true });
-        await fs.rm(source, { recursive: true, force: true });
-        moved.push(relPath);
-      } catch {}
+    } catch (error) {
+      if (errorCode(error) === "ENOENT") continue;
+      return {
+        movedEntries: moved,
+        trashDir,
+        failed: {
+          entry: relPath,
+          message:
+            errorCode(error) ??
+            (error instanceof Error ? error.message : String(error)),
+        },
+      };
     }
   }
-  return { movedEntries: moved, trashDir: moved.length > 0 ? trashDir : null };
+  return { movedEntries: moved, trashDir, failed: null };
 };

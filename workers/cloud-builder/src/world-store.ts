@@ -142,6 +142,14 @@ export class WorldStore extends DurableObject<Env> {
     return result;
   }
 
+  async erasePaths(paths: readonly string[]) {
+    const removed = await this.ctx.blockConcurrencyWhile(() =>
+      this.world.erasePaths(paths),
+    );
+    await this.ctx.storage.setAlarm(Date.now() + 1_000);
+    return removed;
+  }
+
   async purgeHistory(paths: readonly string[]) {
     const dropped = await this.ctx.blockConcurrencyWhile(() =>
       Promise.resolve(this.world.purgeHistory(paths)),

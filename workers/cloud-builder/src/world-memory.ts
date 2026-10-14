@@ -12,7 +12,9 @@
  * (`createWorldMemory`, whose path rules, redaction and caps are the shared
  * ones in `memory-client.ts`), and the turn reads the resident ones fresh
  * every time (`AgentHome.readDocuments`). The world has no locks, so the last
- * write wins; `memory.write`'s `expectSha` is the one compare-and-set.
+ * write wins; `memory.write`'s `expectSha` is the one compare-and-set. A wipe
+ * erases them with `erasePaths`, after which the world refuses any memory
+ * write based on a revision from before it.
  *
  * Each of the owner's computers keeps its `~/.stella` copy the same as these
  * through `createWorldMemorySync` (the `memory.files.*` calls), which writes
@@ -47,7 +49,6 @@ export type MemoryWorld = Readonly<{
     options: { limit: number },
   ): Promise<{ entries: WorldEntry[]; cursor?: string }>;
   readFile(path: string): Promise<Uint8Array | null>;
-  remove(path: string, options: { recursive: boolean }): Promise<unknown>;
   putBlob(
     stream: ReadableStream<Uint8Array>,
     input: { sha256: string; size: number },
@@ -58,7 +59,7 @@ export type MemoryWorld = Readonly<{
     entries: WorldListingEntry[];
     deleted: string[];
   }): Promise<{ status: string }>;
-  purgeHistory(paths: readonly string[]): Promise<number>;
+  erasePaths(paths: readonly string[]): Promise<number>;
 }>;
 
 export const ownerMemoryWorld = async (
@@ -71,10 +72,9 @@ export const ownerMemoryWorld = async (
     stat: (path) => stub.stat(path),
     list: (prefix, options) => stub.list(prefix, options),
     readFile: (path) => stub.readFile(path),
-    remove: (path, options) => stub.remove(path, options),
     putBlob: (stream, input) => stub.putBlob(stream, input),
     commitShell: (input) => stub.commitShell(input),
-    purgeHistory: (paths) => stub.purgeHistory(paths),
+    erasePaths: (paths) => stub.erasePaths(paths),
   };
 };
 
@@ -100,6 +100,7 @@ const ERASED_WHILE_WRITING =
 
 const removeIfUnchanged = async (
   target: MemoryWorld,
+  fence: MemoryEpochFence,
   path: string,
   expectSha: string,
 ): Promise<
@@ -109,6 +110,7 @@ const removeIfUnchanged = async (
 > => {
   for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt += 1) {
     const { revision } = await target.head();
+    await fence();
     const current = await target.stat(path);
     if (!current) return { status: "missing" };
     if (current.kind !== "file" || current.sha256 !== expectSha) {
@@ -133,9 +135,14 @@ const createWorldMemoryStore = (
   write: async (relative, bytes, sha, expectSha) => {
     const store = await world();
     const path = worldStellaPath(relative);
-    const epoch = fence ? await fence() : undefined;
+    let epoch: string | undefined;
     for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt += 1) {
       const { revision } = await store.head();
+      if (fence) {
+        const open = await fence();
+        epoch ??= open;
+        if (open !== epoch) throw new Error(ERASED_WHILE_WRITING);
+      }
       const current = await store.stat(path);
       if (current && current.kind !== "file") {
         throw new Error(`memory: ${relative} is not a file.`);
@@ -168,23 +175,7 @@ const createWorldMemoryStore = (
         ],
         deleted: [],
       });
-      if (committed.status === "committed") {
-        if (fence) {
-          // A wipe that began meanwhile may already have swept: take this
-          // write back out and refuse it.
-          const held = await fence()
-            .catch(() => fence())
-            .then(
-            (current) => current === epoch,
-            () => false,
-          );
-          if (!held) {
-            await removeIfUnchanged(store, path, sha).catch(() => undefined);
-            throw new Error(ERASED_WHILE_WRITING);
-          }
-        }
-        return { ok: true };
-      }
+      if (committed.status === "committed") return { ok: true };
       if (committed.status === "missing_blobs") {
         throw new Error(
           `memory: the workspace did not keep the content for ${relative}; nothing was written. Try again.`,
@@ -236,11 +227,12 @@ export const createWorldMemory = (
  */
 export const createWorldMemoryFile = async (
   world: () => Promise<MemoryWorld>,
+  fence: MemoryEpochFence,
   relative: string,
   bytes: Uint8Array,
 ): Promise<string | null> => {
   const sha = await memorySha(bytes);
-  const outcome = await createWorldMemoryStore(world).write(
+  const outcome = await createWorldMemoryStore(world, fence).write(
     relative,
     bytes,
     sha,
@@ -262,8 +254,11 @@ const syncedPath = (path: string): string => {
   return path;
 };
 
-export const createWorldMemorySync = (world: () => Promise<MemoryWorld>) => {
-  const store = createWorldMemoryStore(world);
+export const createWorldMemorySync = (
+  world: () => Promise<MemoryWorld>,
+  fence: MemoryEpochFence,
+) => {
+  const store = createWorldMemoryStore(world, fence);
   return {
     list: async (): Promise<MemoryFileInfo[]> => {
       const { files, cutShort } = await listWorldMemoryFiles(await world());
@@ -328,6 +323,7 @@ export const createWorldMemorySync = (world: () => Promise<MemoryWorld>) => {
       const relative = syncedPath(input);
       const outcome = await removeIfUnchanged(
         await world(),
+        fence,
         worldStellaPath(relative),
         expectSha,
       );
@@ -344,13 +340,5 @@ export const WORLD_MEMORY_WIPE_PATHS: readonly string[] = [
   worldStellaPath(WORLD_PERSONALITY_FILE),
 ];
 
-export const wipeWorldMemory = async (world: MemoryWorld): Promise<number> => {
-  let removed = 0;
-  for (const path of WORLD_MEMORY_WIPE_PATHS) {
-    if (!(await world.stat(path))) continue;
-    await world.remove(path, { recursive: true });
-    removed += 1;
-  }
-  await world.purgeHistory(WORLD_MEMORY_WIPE_PATHS);
-  return removed;
-};
+export const wipeWorldMemory = (world: MemoryWorld): Promise<number> =>
+  world.erasePaths(WORLD_MEMORY_WIPE_PATHS);

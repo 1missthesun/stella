@@ -1288,6 +1288,42 @@ export class WorldSqlStore implements WorldToolFileApi {
     return { manifestId, forkId };
   }
 
+  async erasePaths(inputs: readonly string[]): Promise<number> {
+    const forkId = this.forkRow().fork_id;
+    const paths = [...new Set(inputs.map((input) => normalizeWorldPath(input)))];
+    let removed = 0;
+    await this.mutate(forkId, async () => {
+      const fences = this.writeFences(forkId);
+      const revision = this.revision(forkId) + 1;
+      for (const path of paths) {
+        if ((await this.allEntries(path, forkId)).length > 0) {
+          await this.remove(path, { recursive: true });
+          removed += 1;
+        } else {
+          this.noteChange(forkId, path, "delete");
+        }
+        fences[path] = revision;
+      }
+      this.sql.exec(
+        "INSERT INTO world_meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        `write_fence:${forkId}`,
+        JSON.stringify(fences),
+      );
+    });
+    this.purgeHistory(paths);
+    return removed;
+  }
+
+  private writeFences(forkId: string): Record<string, number> {
+    const raw = this.sql
+      .exec<MetaRow>(
+        "SELECT value FROM world_meta WHERE key = ?",
+        `write_fence:${forkId}`,
+      )
+      .toArray()[0]?.value;
+    return raw ? (JSON.parse(raw) as Record<string, number>) : {};
+  }
+
   purgeHistory(inputs: readonly string[]): number {
     const live = this.liveManifest();
     let dropped = 0;
@@ -1584,6 +1620,18 @@ export class WorldSqlStore implements WorldToolFileApi {
     const forkId = this.forkRow().fork_id;
     if (input.baseRevision < this.changeFloor(forkId)) {
       return { status: "conflict", paths: [] };
+    }
+    const fenced = Object.entries(this.writeFences(forkId)).filter(
+      ([, revision]) => revision > input.baseRevision,
+    );
+    if (fenced.length > 0) {
+      const crossing = [
+        ...input.entries.map((entry) => entry.path),
+        ...input.deleted,
+      ].filter((path) => fenced.some(([prefix]) => pathWithin(path, prefix)));
+      if (crossing.length > 0) {
+        return { status: "conflict", paths: crossing.sort().slice(0, 20) };
+      }
     }
     const changed = this.sql
       .exec<{ path: string }>(

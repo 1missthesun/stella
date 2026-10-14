@@ -204,6 +204,10 @@ const wipeActive = () =>
 const epochStale = () =>
   conflict("CLOUD_MEMORY_EPOCH_STALE", "This memory operation started before cloud memory was erased.");
 
+const memoryClosed = (error: unknown): boolean =>
+  error instanceof RpcError &&
+  (error.reason === "CLOUD_MEMORY_WIPE_ACTIVE" || error.reason === "CLOUD_MEMORY_EPOCH_STALE");
+
 const generationStale = () =>
   conflict("owner_generation_stale", "This request is from before your cloud data was reset.");
 
@@ -588,8 +592,11 @@ const assertSyncOpen = (db: OwnerDbReader, expectedEpoch?: string): StateRow => 
   return state;
 };
 
-const memorySync = (ctx: OwnerContext) =>
-  createWorldMemorySync(() => ownerMemoryWorld(ctx.env.WORLDS, ctx.ownerId));
+const memorySync = (ctx: OwnerContext, expectedEpoch?: string) =>
+  createWorldMemorySync(
+    () => ownerMemoryWorld(ctx.env.WORLDS, ctx.ownerId),
+    async () => assertSyncOpen(ctx.db, expectedEpoch).memory_epoch,
+  );
 
 const fileRefusal = async <T>(work: () => Promise<T>): Promise<T> => {
   try {
@@ -603,25 +610,6 @@ const fileRefusal = async <T>(work: () => Promise<T>): Promise<T> => {
     }
     throw error;
   }
-};
-
-/**
- * A wipe that began while a sync write was on its way to the world may have
- * swept before the write landed. Take the write back out, then refuse it, so
- * a computer can never put memory into the epoch after the one it listed.
- */
-const settleAgainstWipe = async (
-  ctx: OwnerContext,
-  epoch: string,
-  path: string,
-  sha: string,
-): Promise<void> => {
-  const state = readState(ctx.db);
-  if (state.memory_state !== "wiping" && state.memory_epoch === epoch) return;
-  await memorySync(ctx)
-    .remove(path, sha)
-    .catch(() => undefined);
-  throw state.memory_state === "wiping" ? wipeActive() : epochStale();
 };
 
 // ── Legacy memory ────────────────────────────────────────────────────────
@@ -700,7 +688,8 @@ const importLegacyMemory = async (ctx: OwnerContext): Promise<number> => {
   const bucket = ctx.env.AGENT_HOME;
   if (rows.length > 0 && !bucket) throw new Error("Cloud home storage is unavailable.");
   const world = () => ownerMemoryWorld(ctx.env.WORLDS, ctx.ownerId);
-  const written: { path: string; sha: string }[] = [];
+  const fence = async () => assertMemoryOpen(ctx.db, state.memory_epoch).memory_epoch;
+  let written = 0;
   for (const row of rows) {
     const path = legacyWorldPath(row.display_path);
     if (!path || row.memory_epoch !== state.memory_epoch || !bucket) continue;
@@ -708,21 +697,17 @@ const importLegacyMemory = async (ctx: OwnerContext): Promise<number> => {
     if (!object) continue;
     const bytes = new Uint8Array(await object.arrayBuffer());
     if ((await sha256BytesHex(bytes)) !== row.sha256) continue;
-    const sha = await createWorldMemoryFile(world, path, bytes);
-    if (sha) written.push({ path, sha });
+    try {
+      if (await createWorldMemoryFile(world, fence, path, bytes)) written += 1;
+    } catch (error) {
+      if (memoryClosed(error)) return 0;
+      throw error;
+    }
   }
   const after = readState(ctx.db);
-  if (after.memory_state === "wiping" || after.memory_epoch !== state.memory_epoch) {
-    // A wipe began meanwhile and may already have swept: take the copies back out.
-    for (const file of written) {
-      await memorySync(ctx)
-        .remove(file.path, file.sha)
-        .catch(() => undefined);
-    }
-    return 0;
-  }
-  markLegacyImportDone(ctx.db, Date.now(), written.length);
-  return written.length;
+  if (after.memory_state === "wiping" || after.memory_epoch !== state.memory_epoch) return 0;
+  markLegacyImportDone(ctx.db, Date.now(), written);
+  return written;
 };
 
 const syncPathArg = string({ min: 1, max: 240 });
@@ -1378,13 +1363,9 @@ export const homeDomain = {
         if (args.importing && state.import_disposition === "explicit_required") {
           throw reimportRequired();
         }
-        const outcome = await fileRefusal(() =>
-          memorySync(ctx).write(args.path, args.content, args.expectSha),
+        return await fileRefusal(() =>
+          memorySync(ctx, args.expectedMemoryEpoch).write(args.path, args.content, args.expectSha),
         );
-        if (outcome.status === "written") {
-          await settleAgainstWipe(ctx, args.expectedMemoryEpoch, args.path, outcome.sha);
-        }
-        return outcome;
       },
     },
     "memory.files.delete": {
@@ -1396,7 +1377,9 @@ export const homeDomain = {
       }),
       handler: async (ctx: OwnerContext, args: HomeCalls["memory.files.delete"]["args"]) => {
         assertSyncOpen(ctx.db, args.expectedMemoryEpoch);
-        return await fileRefusal(() => memorySync(ctx).remove(args.path, args.expectSha));
+        return await fileRefusal(() =>
+          memorySync(ctx, args.expectedMemoryEpoch).remove(args.path, args.expectSha),
+        );
       },
     },
     "skills.deleteMirrored": {

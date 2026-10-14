@@ -34,6 +34,7 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+#include <cctype>
 #include <bcrypt.h>
 #include <commctrl.h>
 #include <dwmapi.h>
@@ -350,7 +351,13 @@ static void logLine(const string &message) {
 struct Paths {
     wstring root;
     bool isolated = false;
-    wstring app() const { return root + L"\\app"; }
+    // A self-hosted server from server.json: its checkout and state live in
+    // servers\<serverId>\, so the stella.sh install stays as it was.
+    wstring serverId;
+    wstring installRoot() const { return serverId.empty() ? root : root + L"\\servers\\" + serverId; }
+    wstring serverFile() const { return root + L"\\server.json"; }
+    wstring app() const { return installRoot() + L"\\app"; }
+    wstring appStaging() const { return installRoot() + L"\\app.partial"; }
     wstring runtimes() const { return root + L"\\runtimes"; }
     wstring logs() const { return root + L"\\logs"; }
     wstring launcherLog() const { return logs() + L"\\launcher.log"; }
@@ -358,7 +365,7 @@ struct Paths {
     wstring installLog() const { return logs() + L"\\install.log"; }
     wstring signingPub() const { return root + L"\\signing.pub"; }
     wstring signingKey() const { return root + L"\\signing.key"; }
-    wstring stateFile() const { return root + L"\\launcher-state.json"; }
+    wstring stateFile() const { return installRoot() + L"\\launcher-state.json"; }
     wstring lockFile() const { return root + L"\\launcher.lock"; }
     wstring isolatedUserData() const { return root + L"\\user-data"; }
     wstring isolatedHome() const { return root + L"\\stella-home"; }
@@ -381,6 +388,66 @@ struct Paths {
 };
 
 static Paths P;
+
+// ---------------------------------------------------------------- server
+
+// A self-hosted Stella server from server.json ({origin, serverId, name}),
+// written by the app's "Connect to your own server".
+struct Server {
+    string origin, serverId, name;
+    bool operator==(const Server &o) const { return origin == o.origin && serverId == o.serverId; }
+};
+
+static bool gHasServer = false;
+static Server gServer;
+
+// https://host[:port] (http only for localhost), lowercased; empty when invalid.
+static string normalizeOrigin(const string &raw) {
+    string t = trim(raw);
+    for (auto &c : t) c = (char)tolower((unsigned char)c);
+    string scheme, rest;
+    if (t.rfind("https://", 0) == 0) { scheme = "https"; rest = t.substr(8); }
+    else if (t.rfind("http://", 0) == 0) { scheme = "http"; rest = t.substr(7); }
+    else return "";
+    if (!rest.empty() && rest.back() == '/') rest.pop_back();
+    if (rest.empty()) return "";
+    for (char c : rest)
+        if (!isalnum((unsigned char)c) && c != '.' && c != '-' && c != ':') return "";
+    if (scheme == "http" && rest != "localhost" && rest.rfind("localhost:", 0) != 0 && rest != "127.0.0.1" &&
+        rest.rfind("127.0.0.1:", 0) != 0)
+        return "";
+    return scheme + "://" + rest;
+}
+
+static bool validServerId(const char *id) {
+    if (!id) return false;
+    size_t n = 0;
+    for (; id[n]; n++)
+        if (!isalnum((unsigned char)id[n]) && id[n] != '-' && id[n] != '_') return false;
+    return n > 0 && n <= 64;
+}
+
+// False for none, the compiled default, or anything malformed.
+static bool loadServer(Server &out) {
+    string data;
+    if (!readFile(P.serverFile(), data)) return false;
+    mj_value *json = mj_parse(data.data(), data.size());
+    if (!json) return false;
+    const char *origin = mj_get_string(json, "origin"), *id = mj_get_string(json, "serverId"),
+               *name = mj_get_string(json, "name");
+    string normalized = origin ? normalizeOrigin(origin) : "";
+    bool ok = !normalized.empty() && validServerId(id);
+    if (!ok) LOG("server: ignoring %s: not a valid server file", utf8(P.serverFile()).c_str());
+    if (ok && normalized != normalizeOrigin(utf8(kDefaultBackendURL))) {
+        out.origin = normalized;
+        out.serverId = id;
+        out.name = name && *name ? trim(name) : "Stella";
+    } else {
+        ok = false;
+    }
+    mj_free(json);
+    return ok;
+}
 
 // ----------------------------------------------------------------- state
 
@@ -445,6 +512,7 @@ struct Options {
     bool show = false;
     DWORD after = 0;         // wait for this launcher (handing over) to exit first
     bool backendArg = false; // --backend was given (passed on at a handover)
+    bool backendOverride = false; // --backend or STELLA_LAUNCHER_BACKEND_URL: wins over server.json
     string source;      // a local path or git URL instead of the upstream bootstrap
     string sourceRef;
     wstring backend;
@@ -458,6 +526,26 @@ struct Options {
 
 static Options O;
 
+// The backend Stella installs from and talks to.
+static wstring backendURL() {
+    if (O.backendOverride) return O.backend;
+    return gHasServer ? wide(gServer.origin) : kDefaultBackendURL;
+}
+
+// Stella may have picked another server (or gone back to the default) before
+// asking to relaunch: follow server.json to that install.
+static void followServerFile() {
+    if (O.backendOverride) return;
+    Server next;
+    bool has = loadServer(next);
+    if (has == gHasServer && (!has || next == gServer)) return;
+    LOG("server: %s -> %s", gHasServer ? gServer.origin.c_str() : "default", has ? next.origin.c_str() : "default");
+    gHasServer = has;
+    gServer = has ? next : Server{};
+    P.serverId = has ? wide(next.serverId) : L"";
+    S = State::load();
+}
+
 static const char *kUsage =
     "usage: Stella.exe [--self-test] [--source <path|git url>] [--source-ref <ref>]\n"
     "                  [--backend <url>] [--bun <path>] [--hold <seconds>]\n"
@@ -467,7 +555,7 @@ static const char *kUsage =
     "\n"
     "Environment: STELLA_LAUNCHER_ROOT (install root, for testing),\n"
     "STELLA_LAUNCHER_KEY_FILE (PKCS#8 PEM instead of the DPAPI key),\n"
-    "STELLA_LAUNCHER_BACKEND_URL, STELLA_LAUNCHER_STABLE_SECONDS,\n"
+    "STELLA_LAUNCHER_BACKEND_URL (wins over <root>\\server.json), STELLA_LAUNCHER_STABLE_SECONDS,\n"
     "STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS,\n"
     "STELLA_LAUNCHER_INSTALL_DIR (instead of %LOCALAPPDATA%\\Programs\\Stella),\n"
     "STELLA_LAUNCHER_UPDATE_URL, STELLA_LAUNCHER_UPDATE_DELAY_SECONDS and\n"
@@ -477,7 +565,8 @@ static void parseOptions() {
     int argc = 0;
     LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
     wstring backend = envVar(L"STELLA_LAUNCHER_BACKEND_URL");
-    O.backend = backend.empty() ? kDefaultBackendURL : backend;
+    O.backend = backend;
+    O.backendOverride = !backend.empty();
     for (int i = 1; i < argc; i++) {
         wstring a = argv[i];
         auto value = [&]() -> wstring {
@@ -490,7 +579,7 @@ static void parseOptions() {
         if (a == L"--self-test") O.selfTest = true;
         else if (a == L"--source") O.source = utf8(value());
         else if (a == L"--source-ref") O.sourceRef = utf8(value());
-        else if (a == L"--backend") { O.backend = value(); O.backendArg = true; }
+        else if (a == L"--backend") { O.backend = value(); O.backendArg = true; O.backendOverride = true; }
         else if (a == L"--start") O.start = true;
         else if (a == L"--show") O.show = true;
         else if (a == L"--after") O.after = wcstoul(value().c_str(), nullptr, 10);
@@ -1197,7 +1286,15 @@ static Env electronEnvironment(const wstring &pipeName) {
     Env env = baseEnvironment();
     env[L"STELLA_LAUNCHER"] = L"1";
     // The backend this launcher installs from is the one the app talks to.
-    env[L"VITE_STELLA_BACKEND_URL"] = O.backend;
+    env[L"VITE_STELLA_BACKEND_URL"] = backendURL();
+    // Where Stella writes server.json; also tells it this launcher reads one.
+    env[L"STELLA_LAUNCHER_DATA_DIR"] = P.root;
+    env.erase(L"STELLA_LAUNCHER_SERVER_ID");
+    env.erase(L"STELLA_LAUNCHER_SERVER_NAME");
+    if (!O.backendOverride && gHasServer) {
+        env[L"STELLA_LAUNCHER_SERVER_ID"] = wide(gServer.serverId);
+        env[L"STELLA_LAUNCHER_SERVER_NAME"] = wide(gServer.name);
+    }
     env[L"STELLA_LAUNCHER_PIPE"] = pipeName;
     if (!gBunBin.empty()) env[L"STELLA_BUN_PATH"] = gBunBin;
     if (gGit)
@@ -2329,7 +2426,7 @@ static void ensureBun() {
 
 // POST <backend>/api/app-source/bootstrap → {upstream: {remote, token, expiresAt}}.
 static void bootstrapAccess(string &remote, string &token) {
-    wstring base = O.backend;
+    wstring base = backendURL();
     while (!base.empty() && base.back() == L'/') base.pop_back();
     wstring url = base + L"/api/app-source/bootstrap";
     LOG("install: POST %s", utf8(url).c_str());
@@ -2354,8 +2451,9 @@ static void bootstrapAccess(string &remote, string &token) {
 // never leaves half a tree.
 static void cloneSource() {
     progress("Downloading Stella…", 0.10, 0.30);
-    wstring staging = P.root + L"\\app.partial";
+    wstring staging = P.appStaging();
     removeTree(staging);
+    mkdirs(P.installRoot());
     // LF working tree regardless of PortableGit's system autocrlf, so scripts
     // and the signed tree read the same bytes on every OS.
     vector<string> args = {"clone", "--origin", kUpstreamRemoteName, "--config", "core.autocrlf=false",
@@ -2380,7 +2478,7 @@ static void cloneSource() {
     args.push_back(remote);
     args.push_back(utf8(staging));
     LOG("install: cloning %s", remote.c_str());
-    gGit->run(args, P.root, env);
+    gGit->run(args, P.installRoot(), env);
     if (!MoveFileExW(staging.c_str(), P.app().c_str(), 0)) fail(format("could not move the checkout into place (error %lu)", GetLastError()));
     LOG("install: source at %s", gGit->run({"rev-parse", "HEAD"}, P.app()).c_str());
 }
@@ -3390,7 +3488,7 @@ static void resetInstallState() {
 // No known-good version yet: move the checkout aside and clone again.
 static void reinstall() {
     if (exists(P.app())) {
-        wstring aside = P.root + L"\\app.previous-" + std::to_wstring((long long)time(nullptr));
+        wstring aside = P.installRoot() + L"\\app.previous-" + std::to_wstring((long long)time(nullptr));
         if (!MoveFileExW(P.app().c_str(), aside.c_str(), 0))
             fail(format("could not move the old checkout aside (error %lu)", GetLastError()));
         LOG("recovery: moved the old checkout to %s", utf8(aside).c_str());
@@ -3488,6 +3586,7 @@ static void ensureTools() {
 
 static wstring prepareForLaunch() {
     ensureTools();
+    followServerFile();
     if (!exists(P.app() + L"\\.git")) {
         cloneSource();
         // The initial clone is signed at install.
@@ -3507,8 +3606,8 @@ static wstring prepareForLaunch() {
 }
 
 static int run() {
-    LOG("launcher: start version=%llu root=%s selfTest=%d pid=%lu", kLauncherVersion, utf8(P.root).c_str(), O.selfTest ? 1 : 0,
-        GetCurrentProcessId());
+    LOG("launcher: start version=%llu root=%s server=%s selfTest=%d pid=%lu", kLauncherVersion, utf8(P.root).c_str(),
+        gHasServer ? gServer.origin.c_str() : "default", O.selfTest ? 1 : 0, GetCurrentProcessId());
     adoptGit();
     refreshInstallInfo();
     // Nothing starts until the user presses Start (the self-test presses it),
@@ -3635,6 +3734,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         return O.selfTest ? 1 : 0;
     }
     S = State::load();
+    followServerFile();
     if (!P.isolated && !O.selfTest) installSelf();
     startUpdateChecks();
 

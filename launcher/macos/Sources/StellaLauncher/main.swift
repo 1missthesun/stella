@@ -20,7 +20,8 @@ over after an update), and --show keeps the window up while it does;
 
 Environment: STELLA_LAUNCHER_ROOT (install root, for testing),
 STELLA_LAUNCHER_KEY_FILE (0600 PEM instead of the keychain),
-STELLA_LAUNCHER_BACKEND_URL, STELLA_LAUNCHER_STABLE_SECONDS,
+STELLA_LAUNCHER_BACKEND_URL (wins over <root>/server.json, the self-hosted
+server Stella picked), STELLA_LAUNCHER_STABLE_SECONDS,
 STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_UPDATE_URL (check this
 launcher/stable/ instead, even for a local build or a test root),
 STELLA_LAUNCHER_UPDATE_DELAY_SECONDS, STELLA_LAUNCHER_UPDATE_REQUIREMENT (with

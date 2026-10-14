@@ -10,6 +10,8 @@
  *   runtimes/bun-<v>/bun  pinned Bun (git is the system git on Linux)
  *   signing.pub, launcher-state.json, logs/{launcher,electron,install}.log
  *   bin/stella-launcher   the installed copy the .desktop entry runs
+ *   server.json           a self-hosted server Stella picked; its checkout and
+ *                         state live in servers/<serverId>/ instead
  *
  * Shells out to curl, tar/unzip and git; uses libcrypto for SHA-256 and
  * ECDSA P-256; keeps the signing key in the Secret Service (libsecret,
@@ -17,6 +19,7 @@
  * window, launcher/common/launcher.html (headless runs log instead).
  */
 #define _GNU_SOURCE
+#include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -327,7 +330,8 @@ static const char *last_error(void) { return g_error ? g_error : "unknown error"
 typedef struct {
     char *root;
     int isolated;
-    char *app, *runtimes, *logs, *launcher_log, *electron_log, *install_log;
+    char *install_root, *app, *app_staging, *server_file;
+    char *runtimes, *logs, *launcher_log, *electron_log, *install_log;
     char *signing_pub, *state_file, *lock_file, *isolated_user_data, *isolated_home, *bin_dir;
 } Paths;
 
@@ -352,7 +356,10 @@ static void paths_resolve(void) {
         else P.root = xasprintf("%s/.local/share/stella", getenv("HOME") ? getenv("HOME") : "/tmp");
     }
     free(t);
+    P.install_root = xstrdup(P.root);
     P.app = xasprintf("%s/app", P.root);
+    P.app_staging = xasprintf("%s/app.partial", P.root);
+    P.server_file = xasprintf("%s/server.json", P.root);
     P.runtimes = xasprintf("%s/runtimes", P.root);
     P.logs = xasprintf("%s/logs", P.root);
     P.launcher_log = xasprintf("%s/launcher.log", P.logs);
@@ -364,6 +371,97 @@ static void paths_resolve(void) {
     P.isolated_user_data = xasprintf("%s/user-data", P.root);
     P.isolated_home = xasprintf("%s/stella-home", P.root);
     P.bin_dir = xasprintf("%s/bin", P.root);
+}
+
+/* ---------------------------------------------------------------- server */
+
+/* A self-hosted Stella server from server.json ({origin, serverId, name}),
+ * written by the app's "Connect to your own server". */
+typedef struct {
+    char *origin, *server_id, *name;
+} Server;
+
+static Server *g_server;
+
+static void server_free(Server *s) {
+    if (!s) return;
+    free(s->origin);
+    free(s->server_id);
+    free(s->name);
+    free(s);
+}
+
+/* https://host[:port] (http only for localhost), lowercased, or NULL. */
+static char *normalize_origin(const char *raw) {
+    char *t = trimmed(raw), *p, *rest, *out;
+    const char *scheme;
+    size_t len;
+    int https;
+    for (p = t; *p; p++) *p = (char)tolower((unsigned char)*p);
+    if (!strncmp(t, "https://", 8)) { https = 1; rest = t + 8; scheme = "https"; }
+    else if (!strncmp(t, "http://", 7)) { https = 0; rest = t + 7; scheme = "http"; }
+    else { free(t); return NULL; }
+    len = strlen(rest);
+    if (len && rest[len - 1] == '/') rest[--len] = 0;
+    if (!len) { free(t); return NULL; }
+    for (p = rest; *p; p++) {
+        if (!isalnum((unsigned char)*p) && *p != '.' && *p != '-' && *p != ':') { free(t); return NULL; }
+    }
+    if (!https && strcmp(rest, "localhost") && strncmp(rest, "localhost:", 10) &&
+        strcmp(rest, "127.0.0.1") && strncmp(rest, "127.0.0.1:", 10)) {
+        free(t);
+        return NULL;
+    }
+    out = xasprintf("%s://%s", scheme, rest);
+    free(t);
+    return out;
+}
+
+static int valid_server_id(const char *id) {
+    size_t n = 0;
+    if (!id) return 0;
+    for (; id[n]; n++) {
+        if (!isalnum((unsigned char)id[n]) && id[n] != '-' && id[n] != '_') return 0;
+    }
+    return n > 0 && n <= 64;
+}
+
+/* NULL for none, the compiled default, or anything malformed. */
+static Server *server_load(void) {
+    char *data = read_file(P.server_file, NULL), *origin, *fallback;
+    mj_value *json = data ? mj_parse(data, strlen(data)) : NULL;
+    const char *id, *name;
+    Server *s = NULL;
+    free(data);
+    if (!json) return NULL;
+    origin = mj_get_string(json, "origin") ? normalize_origin(mj_get_string(json, "origin")) : NULL;
+    id = mj_get_string(json, "serverId");
+    name = mj_get_string(json, "name");
+    fallback = normalize_origin(DEFAULT_BACKEND_URL);
+    if (origin && valid_server_id(id) && !(fallback && !strcmp(origin, fallback))) {
+        s = calloc(1, sizeof(*s));
+        s->origin = origin;
+        origin = NULL;
+        s->server_id = xstrdup(id);
+        s->name = name && *name ? trimmed(name) : xstrdup("Stella");
+    } else if (!origin || !valid_server_id(id)) {
+        LOG("server: ignoring %s: not a valid server file", P.server_file);
+    }
+    free(origin);
+    free(fallback);
+    mj_free(json);
+    return s;
+}
+
+static void paths_apply_server(void) {
+    free(P.install_root);
+    free(P.app);
+    free(P.app_staging);
+    free(P.state_file);
+    P.install_root = g_server ? xasprintf("%s/servers/%s", P.root, g_server->server_id) : xstrdup(P.root);
+    P.app = xasprintf("%s/app", P.install_root);
+    P.app_staging = xasprintf("%s/app.partial", P.install_root);
+    P.state_file = xasprintf("%s/launcher-state.json", P.install_root);
 }
 
 /* ----------------------------------------------------------------- state */
@@ -456,7 +554,7 @@ typedef struct {
     int show;
     char *source;        /* a local path or git URL instead of the upstream bootstrap */
     char *source_ref;
-    char *backend;
+    char *backend;       /* --backend or STELLA_LAUNCHER_BACKEND_URL; wins over server.json */
     char *local_bun;     /* adopt this Bun instead of downloading */
     double hold;         /* self-test: stay up this long after ready */
     Choice recovery_choice;
@@ -467,6 +565,37 @@ typedef struct {
 
 static Options O;
 
+/* The backend Stella installs from and talks to. */
+static const char *backend_url(void) {
+    return O.backend ? O.backend : g_server ? g_server->origin : DEFAULT_BACKEND_URL;
+}
+
+/* Stella may have picked another server (or gone back to the default) before
+ * asking to relaunch: follow server.json to that install. The signing key's
+ * record stays with the root's state. */
+static void follow_server_file(void) {
+    Server *next;
+    char *key_store;
+    if (O.backend) return;
+    next = server_load();
+    if ((!next && !g_server) ||
+        (next && g_server && !strcmp(next->origin, g_server->origin) &&
+         !strcmp(next->server_id, g_server->server_id))) {
+        server_free(next);
+        return;
+    }
+    LOG("server: %s -> %s", g_server ? g_server->origin : "default", next ? next->origin : "default");
+    server_free(g_server);
+    g_server = next;
+    paths_apply_server();
+    key_store = S.key_store ? xstrdup(S.key_store) : NULL;
+    state_load();
+    if (key_store) {
+        free(S.key_store);
+        S.key_store = key_store;
+    }
+}
+
 static const char *USAGE =
     "usage: stella-launcher [--start [--show]] [--version] [--self-test] [--source <path|git url>]\n"
     "                       [--source-ref <ref>] [--backend <url>] [--bun <path>] [--hold <seconds>]\n"
@@ -474,13 +603,13 @@ static const char *USAGE =
     "\n"
     "Environment: STELLA_LAUNCHER_ROOT (install root, for testing),\n"
     "STELLA_LAUNCHER_KEY_FILE (0600 PEM instead of the Secret Service),\n"
-    "STELLA_LAUNCHER_BACKEND_URL, STELLA_LAUNCHER_STABLE_SECONDS,\n"
+    "STELLA_LAUNCHER_BACKEND_URL (wins over <root>/server.json), STELLA_LAUNCHER_STABLE_SECONDS,\n"
     "STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS.\n";
 
 static void parse_options(int argc, char **argv) {
     int i;
     const char *backend = getenv("STELLA_LAUNCHER_BACKEND_URL");
-    O.backend = xstrdup(backend && *backend ? backend : DEFAULT_BACKEND_URL);
+    O.backend = backend && *backend ? xstrdup(backend) : NULL;
     O.ready_timeout = env_seconds("STELLA_LAUNCHER_READY_TIMEOUT_SECONDS", 90);
     O.stable_seconds = env_seconds("STELLA_LAUNCHER_STABLE_SECONDS", 60);
     for (i = 1; i < argc; i++) {
@@ -1691,7 +1820,15 @@ static StrList electron_environment(void) {
     StrList env = base_environment();
     env_set(&env, "STELLA_LAUNCHER", "1");
     /* The backend this launcher installs from is the one the app talks to. */
-    env_set(&env, "VITE_STELLA_BACKEND_URL", O.backend);
+    env_set(&env, "VITE_STELLA_BACKEND_URL", backend_url());
+    /* Where Stella writes server.json; also tells it this launcher reads one. */
+    env_set(&env, "STELLA_LAUNCHER_DATA_DIR", P.root);
+    env_unset(&env, "STELLA_LAUNCHER_SERVER_ID");
+    env_unset(&env, "STELLA_LAUNCHER_SERVER_NAME");
+    if (!O.backend && g_server) {
+        env_set(&env, "STELLA_LAUNCHER_SERVER_ID", g_server->server_id);
+        env_set(&env, "STELLA_LAUNCHER_SERVER_NAME", g_server->name);
+    }
     if (g_bun_bin) env_set(&env, "STELLA_BUN_PATH", g_bun_bin);
     if (g_git) env_set(&env, "STELLA_GIT_BIN", g_git->bin);
     if (g_signer) env_set(&env, "STELLA_LAUNCHER_PUBKEY", g_signer->spki_base64);
@@ -1875,7 +2012,7 @@ out:
 
 /* POST <backend>/api/app-source/bootstrap → {upstream: {remote, token, expiresAt}}. */
 static int bootstrap_access(char **remote, char **token) {
-    char *base = xstrdup(O.backend), *url;
+    char *base = xstrdup(backend_url()), *url;
     char *argv[12];
     StrList env = base_environment();
     CmdResult r;
@@ -1919,7 +2056,7 @@ static int bootstrap_access(char **remote, char **token) {
 /* Clone into app/; staged beside it and renamed, so an interrupted install
  * never leaves half a tree. */
 static int clone_source(void) {
-    char *staging = xasprintf("%s/app.partial", P.root);
+    char *staging = xstrdup(P.app_staging);
     StrList args = {0}, extra = {0};
     char *remote = NULL, *token = NULL, *out, *head;
     int rc = -1;
@@ -1948,7 +2085,8 @@ static int clone_source(void) {
     sl_push(&args, remote);
     sl_push(&args, staging);
     LOG("install: cloning %s", remote);
-    out = git_run((const char *const *)args.items, P.root, extra.items ? (const char *const *)extra.items : NULL);
+    mkdirs(P.install_root, 0755);
+    out = git_run((const char *const *)args.items, P.install_root, extra.items ? (const char *const *)extra.items : NULL);
     if (!out) goto out;
     free(out);
     if (rename(staging, P.app) != 0) { set_error("could not move the checkout into place: %s", strerror(errno)); goto out; }
@@ -2586,7 +2724,7 @@ static int has_known_good(void) {
 
 static int reinstall(void) {
     if (file_exists(P.app)) {
-        char *aside = xasprintf("%s/app.previous-%ld", P.root, (long)time(NULL));
+        char *aside = xasprintf("%s/app.previous-%ld", P.install_root, (long)time(NULL));
         if (rename(P.app, aside) != 0) {
             set_error("could not move the old checkout aside: %s", strerror(errno));
             free(aside);
@@ -2952,6 +3090,7 @@ static char *prepare_for_launch(void) {
     mkdirs(P.runtimes, 0755);
     if (ensure_git() != 0) return NULL;
     if (!g_signer && !(g_signer = signer_create())) return NULL;
+    follow_server_file();
 
     git_dir = xasprintf("%s/.git", P.app);
     if (!file_exists(git_dir)) {
@@ -2994,7 +3133,8 @@ static int launcher_run(void) {
     int check_update = !O.start;
     char *reason = NULL;
     StrList output = {0};
-    LOG("launcher: start version=%d root=%s selfTest=%d pid=%d", LAUNCHER_VERSION, P.root, O.self_test, (int)getpid());
+    LOG("launcher: start version=%d root=%s server=%s selfTest=%d pid=%d", LAUNCHER_VERSION, P.root,
+        g_server ? g_server->origin : "default", O.self_test, (int)getpid());
     if (O.start && O.show) progress_show("Starting Stella…", 0, 0.05);
     if (ensure_git() == 0) ui_refresh_version();
     if (O.self_test && g_ui) {
@@ -3153,6 +3293,7 @@ int main(int argc, char **argv) {
         return 0;
     }
     state_load();
+    follow_server_file();
     updater_start();
 
     memset(&sa, 0, sizeof(sa));

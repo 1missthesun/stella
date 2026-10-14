@@ -12,7 +12,9 @@ struct Options {
     /// A local path or git URL to clone instead of the upstream bootstrap.
     var source: String?
     var sourceRef: String?
-    var backend = ProcessInfo.processInfo.environment["STELLA_LAUNCHER_BACKEND_URL"] ?? Pins.defaultBackendURL
+    /// `--backend` or `STELLA_LAUNCHER_BACKEND_URL`: wins over `server.json`.
+    var backend: String? = ProcessInfo.processInfo.environment["STELLA_LAUNCHER_BACKEND_URL"]
+        .flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
     /// Self-test: stay up this long after `ready` before asking Electron to quit.
     var hold: TimeInterval = 0
     /// Self-test: the recovery button to click on the first failure.
@@ -46,7 +48,7 @@ final class Launcher {
     static let knownGoodRef = "refs/stella/known-good"
 
     private let options: Options
-    private let paths: LauncherPaths
+    private var paths: LauncherPaths
     /// The launcher's window: Start, progress, running, failure, Settings.
     let ui: LauncherWindow
     private let commands = EventQueue<LauncherCommand>()
@@ -66,6 +68,8 @@ final class Launcher {
 
     init(options: Options, paths: LauncherPaths) {
         self.options = options
+        var paths = paths
+        if options.backend == nil { paths.server = ServerConfig.load(paths.serverFile) }
         self.paths = paths
         ui = LauncherWindow(logs: paths.logs, captureDir: options.captureDir)
         state = LauncherState.load(paths)
@@ -75,7 +79,7 @@ final class Launcher {
     // MARK: Main loop
 
     func run() -> Int32 {
-        log("launcher: start root=\(paths.root.path) version=\(LauncherUpdater.ownVersion) selfTest=\(options.selfTest) start=\(options.startNow) pid=\(getpid())")
+        log("launcher: start root=\(paths.root.path) server=\(paths.server?.origin ?? "default") version=\(LauncherUpdater.ownVersion) selfTest=\(options.selfTest) start=\(options.startNow) pid=\(getpid())")
         if let file = options.holdWindow {
             // The previous launcher's update hold, until this one's Electron is ready.
             if let data = try? Data(contentsOf: file),
@@ -242,8 +246,23 @@ final class Launcher {
 
     // MARK: Install, verify, prepare
 
+    /// The backend Stella installs from and talks to.
+    private var backend: String { options.backend ?? paths.server?.origin ?? Pins.defaultBackendURL }
+
+    /// Stella may have picked another server (or gone back to the default)
+    /// before asking to relaunch: follow `server.json` to that install.
+    private func followServerFile() {
+        guard options.backend == nil else { return }
+        let next = ServerConfig.load(paths.serverFile)
+        guard next != paths.server else { return }
+        log("server: \(paths.server?.origin ?? "default") -> \(next?.origin ?? "default")")
+        paths.server = next
+        state = LauncherState.load(paths)
+    }
+
     private func prepareForLaunch() throws -> URL {
         let fm = FileManager.default
+        followServerFile()
         let (git, signer) = try tools()
         let env = baseEnvironment()
 
@@ -299,7 +318,7 @@ final class Launcher {
 
     private var source: Install.Source {
         if let source = options.source { return .explicit(source, ref: options.sourceRef) }
-        return .upstream(backend: options.backend)
+        return .upstream(backend: backend)
     }
 
     private func refusalMessage(_ verdict: TreeSigner.Verdict) -> String {
@@ -352,7 +371,15 @@ final class Launcher {
         var env = baseEnvironment()
         env["STELLA_LAUNCHER"] = "1"
         // The backend this launcher installs from is the one the app talks to.
-        env["VITE_STELLA_BACKEND_URL"] = options.backend
+        env["VITE_STELLA_BACKEND_URL"] = backend
+        // Where Stella writes `server.json`; also tells it this launcher reads one.
+        env["STELLA_LAUNCHER_DATA_DIR"] = paths.root.path
+        env.removeValue(forKey: "STELLA_LAUNCHER_SERVER_ID")
+        env.removeValue(forKey: "STELLA_LAUNCHER_SERVER_NAME")
+        if options.backend == nil, let server = paths.server {
+            env["STELLA_LAUNCHER_SERVER_ID"] = server.serverId
+            env["STELLA_LAUNCHER_SERVER_NAME"] = server.name
+        }
         if let runtimes {
             env["STELLA_BUN_PATH"] = runtimes.bunBin.path
             for (key, value) in runtimes.git.runtimeEnv { env[key] = value }

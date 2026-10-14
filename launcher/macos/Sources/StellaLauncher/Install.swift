@@ -160,8 +160,9 @@ enum Install {
     /// renamed into place, so an interrupted install never leaves half a tree.
     static func cloneSource(paths: LauncherPaths, git: GitTool, source: Source, progress: (String) -> Void) throws {
         progress("Downloading Stella…")
-        let staging = paths.root.appendingPathComponent("app.partial")
+        let staging = paths.appStaging
         try? FileManager.default.removeItem(at: staging)
+        try FileManager.default.createDirectory(at: staging.deletingLastPathComponent(), withIntermediateDirectories: true)
         var args = ["clone", "--origin", Pins.upstreamRemoteName]
         var env: [String: String] = [:]
         let remote: String

@@ -9,13 +9,16 @@ struct LauncherError: Error, CustomStringConvertible {
 /// Everything the launcher owns lives under one root:
 /// `app/` (the checkout), `runtimes/{bun-<v>,git-<v>}`,
 /// `bundles/electron-<v>/Stella.app`, `signing.pub`, `launcher-state.json`
-/// and `logs/launcher.log`.
+/// and `logs/launcher.log`. A self-hosted server picked in `server.json`
+/// gets its own checkout and state under `servers/<serverId>/`, so the
+/// stella.sh install stays as it was.
 struct LauncherPaths {
     let root: URL
     /// Set by `STELLA_LAUNCHER_ROOT` (testing). An overridden root also gets
     /// its own Electron userData and Stella home, so a test install never
     /// touches the real profile or collides with a running Stella.
     let isolated: Bool
+    var server: ServerConfig? = nil
 
     static func resolve() -> LauncherPaths {
         let raw = ProcessInfo.processInfo.environment["STELLA_LAUNCHER_ROOT"]?
@@ -28,7 +31,13 @@ struct LauncherPaths {
         return LauncherPaths(root: support.appendingPathComponent("Stella"), isolated: false)
     }
 
-    var app: URL { root.appendingPathComponent("app") }
+    var serverFile: URL { root.appendingPathComponent("server.json") }
+    private var installRoot: URL {
+        guard let server else { return root }
+        return root.appendingPathComponent("servers").appendingPathComponent(server.serverId)
+    }
+    var app: URL { installRoot.appendingPathComponent("app") }
+    var appStaging: URL { installRoot.appendingPathComponent("app.partial") }
     var runtimes: URL { root.appendingPathComponent("runtimes") }
     var bundles: URL { root.appendingPathComponent("bundles") }
     var logs: URL { root.appendingPathComponent("logs") }
@@ -36,10 +45,46 @@ struct LauncherPaths {
     var electronLog: URL { logs.appendingPathComponent("electron.log") }
     var installLog: URL { logs.appendingPathComponent("install.log") }
     var signingPub: URL { root.appendingPathComponent("signing.pub") }
-    var stateFile: URL { root.appendingPathComponent("launcher-state.json") }
+    var stateFile: URL { installRoot.appendingPathComponent("launcher-state.json") }
     var lockFile: URL { root.appendingPathComponent("launcher.lock") }
     var isolatedUserData: URL { root.appendingPathComponent("user-data") }
     var isolatedHome: URL { root.appendingPathComponent("stella-home") }
+}
+
+/// A self-hosted Stella server, written to `server.json` by the app's
+/// "Connect to your own server": `{"origin", "serverId", "name"}`.
+/// Anything malformed, or the compiled default server, reads as none.
+struct ServerConfig: Equatable {
+    let origin: String
+    let serverId: String
+    let name: String
+
+    static func normalizeOrigin(_ raw: String) -> String? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased(),
+              let host = url.host?.lowercased(), !host.isEmpty,
+              url.user == nil, url.password == nil
+        else { return nil }
+        let local = host == "localhost" || host == "127.0.0.1"
+        guard scheme == "https" || (scheme == "http" && local) else { return nil }
+        guard url.path.isEmpty || url.path == "/", url.query == nil, url.fragment == nil else { return nil }
+        return url.port.map { "\(scheme)://\(host):\($0)" } ?? "\(scheme)://\(host)"
+    }
+
+    static func load(_ file: URL) -> ServerConfig? {
+        guard let data = try? Data(contentsOf: file) else { return nil }
+        guard let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let origin = (json["origin"] as? String).flatMap(normalizeOrigin),
+              let serverId = json["serverId"] as? String,
+              serverId.range(of: "^[A-Za-z0-9_-]{1,64}$", options: .regularExpression) != nil
+        else {
+            log("server: ignoring \(file.path): not a valid server file")
+            return nil
+        }
+        if origin == normalizeOrigin(Pins.defaultBackendURL) { return nil }
+        let name = (json["name"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return ServerConfig(origin: origin, serverId: serverId, name: name.isEmpty ? "Stella" : String(name.prefix(80)))
+    }
 }
 
 /// The deployment this launcher belongs to. A fork's build.sh writes its own

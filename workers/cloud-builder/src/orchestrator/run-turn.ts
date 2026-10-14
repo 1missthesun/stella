@@ -36,8 +36,11 @@ import {
   GATEWAY_RESOLVE_PATH,
   GATEWAY_SUBSCRIPTION_LIMIT_HEADER,
   nativeSubscriptionLimitNotice,
+  byokRejectionNotice,
+  GATEWAY_BYOK_REJECTION_HEADER,
 } from "@stella/contracts/gateway/api";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
+import { getProviderDisplayName } from "@stella/contracts/provider-display";
 import type { CanonicalPrompts } from "../cloud-prompt.js";
 import type { ExactTurnCancellation } from "../execution-placement-turn-cancellation.js";
 import type {
@@ -526,6 +529,9 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
     };
     this.currentTurnCancellation = turnCancellation;
     let subscriptionLimitNotice: string | undefined;
+    // The owner's provider refused the latest model request itself (its key,
+    // its model or the request); the user reads the provider's reason.
+    let providerRejection: string | undefined;
     let gatewayRefusal: GatewayPlanRefusal | undefined;
     try {
       // The queue boundary checked the live owner lease. The provider guard
@@ -854,6 +860,13 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
                     });
                   })()
                 : await guard(guardedRequest);
+            providerRejection =
+              executionSelection.engine === "provider" && !response.ok
+                ? byokRejectionNotice(
+                    getProviderDisplayName(executionSelection.provider),
+                    response.headers.get(GATEWAY_BYOK_REJECTION_HEADER),
+                  )
+                : undefined;
             if (!response.ok) {
               subscriptionLimitNotice = nativeSubscriptionLimitNotice(
                 response.headers.get(GATEWAY_SUBSCRIPTION_LIMIT_HEADER),
@@ -903,7 +916,9 @@ export abstract class OrchestratorRunTurn extends OrchestratorCliTurn {
           ? planNotice.message
           : error instanceof CliTurnFailedError && error.userMessage
             ? error.userMessage
-            : (subscriptionLimitNotice ?? TERMINAL_NOTICE.failed);
+            : (subscriptionLimitNotice ??
+              providerRejection ??
+              TERMINAL_NOTICE.failed);
       const terminalPayload = contextFailure
         ? {
             message: terminalNotice,

@@ -1,6 +1,7 @@
 import {
   GATEWAY_BYOK_HEADER_PREFIX,
   GATEWAY_BYOK_PLACEHOLDER_KEY,
+  GATEWAY_BYOK_REJECTION_HEADER,
   GATEWAY_BYOK_RELAY_PREFIX,
   GATEWAY_BYOK_UPSTREAM_HEADER,
   GATEWAY_TRACE_HEADER,
@@ -152,6 +153,75 @@ const forwardHeaders = (request: Request, access: ProviderAccessResponse): Heade
   return headers;
 };
 
+const MAX_ERROR_BODY_BYTES = 64 * 1024;
+const MAX_REASON_CHARS = 400;
+
+const stringAt = (value: unknown, ...path: string[]): string | undefined => {
+  let current = value;
+  for (const key of path) {
+    if (!current || typeof current !== "object") return undefined;
+    current = (current as Record<string, unknown>)[key];
+  }
+  return typeof current === "string" && current.trim() ? current.trim() : undefined;
+};
+
+/**
+ * A provider's refusal as one short line: its own message, plus the model
+ * host's message when a router (OpenRouter) wraps one. Keys and bearer tokens
+ * are cut out; the line is capped, so a provider echoing request text can't
+ * put much of it in a log.
+ */
+const rejectionReason = (bodyText: string, apiKey: string | undefined): string => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(bodyText);
+  } catch {
+    parsed = undefined;
+  }
+  const parts: string[] = [];
+  const message = stringAt(parsed, "error", "message") ?? stringAt(parsed, "message") ?? stringAt(parsed, "error");
+  if (message) parts.push(message);
+  const raw = stringAt(parsed, "error", "metadata", "raw");
+  if (raw) {
+    let inner: string | undefined;
+    try {
+      const rawParsed: unknown = JSON.parse(raw);
+      inner = stringAt(rawParsed, "error", "message") ?? stringAt(rawParsed, "message");
+    } catch {
+      inner = raw;
+    }
+    if (inner && inner !== message) parts.push(inner);
+  }
+  const host = stringAt(parsed, "error", "metadata", "provider_name");
+  let reason = parts.length > 0 ? parts.join(" — ") : parsed === undefined ? bodyText.trim() : "";
+  if (host && reason) reason = `${reason} (${host})`;
+  if (apiKey) reason = reason.split(apiKey).join("[key]");
+  reason = reason
+    .replace(/\b(?:sk|pk|rk)-[A-Za-z0-9_-]{8,}/gu, "[key]")
+    .replace(/\bBearer\s+\S+/giu, "Bearer [key]")
+    .replace(/\s+/gu, " ")
+    .trim();
+  return reason.length > MAX_REASON_CHARS ? `${reason.slice(0, MAX_REASON_CHARS - 1)}…` : reason;
+};
+
+const readCapped = async (body: ReadableStream<Uint8Array>): Promise<string> => {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  let bytes = 0;
+  try {
+    while (bytes < MAX_ERROR_BODY_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      bytes += value.byteLength;
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    void reader.cancel().catch(() => undefined);
+  }
+  return text + decoder.decode();
+};
+
 export const isByokRelayPath = (pathname: string): boolean =>
   pathname.startsWith(`${GATEWAY_BYOK_RELAY_PREFIX}/`);
 
@@ -246,6 +316,18 @@ export const handleByokRelay = async (args: {
   }
   if (upstream.status === 401 || upstream.status === 403) {
     accessCache.delete(`${claims.sub}|${claims.gen}|${provider}`);
+  }
+  if (upstream.status >= 400 && upstream.status < 500) {
+    // The provider refused the request itself. Its reason goes to the log
+    // and, cleaned, to the caller, so a refusal isn't a bare status code.
+    const errorText = upstream.body ? await readCapped(upstream.body).catch(() => "") : "";
+    controller.dispose();
+    const reason = rejectionReason(errorText, access.apiKey);
+    console.warn(
+      `[model-gateway] trace=${traceId} byok=${provider} kind=${claims.kind} model=${model} host=${target.host} status=${upstream.status} ms=${deps.now() - startedAt} rejected=${JSON.stringify(reason)}`,
+    );
+    responseHeaders.set(GATEWAY_BYOK_REJECTION_HEADER, encodeURIComponent(reason));
+    return new Response(errorText, { status: upstream.status, headers: responseHeaders });
   }
   let responseBody: ReadableStream<Uint8Array> | null = upstream.body;
   if (upstream.body) {

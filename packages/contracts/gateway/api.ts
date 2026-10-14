@@ -57,6 +57,27 @@ export const GATEWAY_BYOK_PLACEHOLDER_KEY = "stella-account-key" as const;
 export const gatewayByokRelayPath = (provider: string): string =>
   `${GATEWAY_BYOK_RELAY_PREFIX}/${encodeURIComponent(provider)}`;
 
+/**
+ * On a BYOK response the provider itself refused (4xx), the provider's own
+ * reason, cleaned of keys and cut short, URI-encoded. Absent when the gateway
+ * refused the request, so a caller can tell the two apart.
+ */
+export const GATEWAY_BYOK_REJECTION_HEADER = "x-stella-byok-rejection" as const;
+
+/** What a user reads when their provider refused a model request. */
+export const byokRejectionNotice = (providerName: string, header: string | null): string | undefined => {
+  if (header === null) return undefined;
+  let reason = "";
+  try {
+    reason = decodeURIComponent(header).trim();
+  } catch {
+    reason = "";
+  }
+  return reason
+    ? `${providerName} rejected the request: ${reason}`
+    : `${providerName} rejected the request.`;
+};
+
 /** Caller-minted idempotency key. Same id + same body => cached result. */
 export const GATEWAY_REQUEST_ID_HEADER = "x-stella-request-id" as const;
 /** Full descriptor digest checked before reservation or provider dispatch. */

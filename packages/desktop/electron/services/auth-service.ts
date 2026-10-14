@@ -1228,6 +1228,11 @@ export class AuthService {
     return cached;
   }
 
+  async whenRuntimeAuthenticated(): Promise<boolean> {
+    await this.awaitPendingResync();
+    return Boolean(await this.getAuthToken());
+  }
+
   async getScheduleScriptAuth(): Promise<{
     baseUrl: string;
     authToken: string;

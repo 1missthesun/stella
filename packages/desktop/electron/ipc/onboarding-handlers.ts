@@ -21,6 +21,7 @@ type OneShotRunner = {
 
 type OnboardingHandlersOptions = {
   getStellaHostRunner: () => OneShotRunner | null;
+  whenRuntimeAuthenticated: () => Promise<boolean>;
   assertPrivilegedSender: (
     event: IpcMainEvent | IpcMainInvokeEvent,
     channel: string,
@@ -186,6 +187,9 @@ export const registerOnboardingHandlers = (
         throw new Error(
           "Blocked untrusted onboarding:synthesizeCoreMemory request.",
         );
+      }
+      if (!(await options.whenRuntimeAuthenticated())) {
+        throw new Error("Sign in to Stella to finish setting up.");
       }
       const runner = options.getStellaHostRunner();
       if (!runner) throw new Error("Stella runtime is not ready.");

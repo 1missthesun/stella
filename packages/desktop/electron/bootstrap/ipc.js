@@ -302,6 +302,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
     });
     registerOnboardingHandlers({
         getStellaHostRunner: lifecycle.getRunner,
+        whenRuntimeAuthenticated: () => services.authService.whenRuntimeAuthenticated(),
         assertPrivilegedSender: (event, channel) => services.externalLinkService.assertPrivilegedSender(event, channel),
     });
     registerRemoteExecutionConsentHandlers({

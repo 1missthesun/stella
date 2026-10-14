@@ -93,9 +93,6 @@ const waitForAccount = (isCurrent: () => boolean): Promise<boolean> =>
     });
   });
 
-/** Right after sign-in the runtime may still be picking up the new token. */
-const SYNTHESIS_RETRY_DELAY_MS = 3_000;
-
 export const startDiscoveryJob = (input: DiscoveryJobInput) => {
   generation += 1;
   const jobGeneration = generation;
@@ -134,23 +131,13 @@ export const startDiscoveryJob = (input: DiscoveryJobInput) => {
         return;
       }
 
-      const waited = !hasAccount();
-      if (waited) {
+      if (!hasAccount()) {
         publish({ status: "waiting_for_account", result: null, error: null });
         if (!(await waitForAccount(isCurrent))) return;
       }
 
       publish({ status: "synthesizing", result: null, error: null });
-      const synthesis = await synthesizeCoreMemory(formattedSections).catch(
-        async (error: unknown) => {
-          if (!waited) throw error;
-          await new Promise((resolve) =>
-            setTimeout(resolve, SYNTHESIS_RETRY_DELAY_MS),
-          );
-          if (!isCurrent()) throw error;
-          return await synthesizeCoreMemory(formattedSections);
-        },
-      );
+      const synthesis = await synthesizeCoreMemory(formattedSections);
       if (!isCurrent()) return;
       if (!synthesis.coreMemory) {
         fail(

@@ -6,7 +6,7 @@
   "scripts": {
     "types:generate": "wrangler types worker-configuration.d.ts --include-runtime false --env=",
     "types:check": "wrangler types worker-configuration.d.ts --include-runtime false --env= --check",
-    "typecheck": "bun run types:check && tsc --noEmit",
+    "typecheck": "bun run types:check && tsc --noEmit && tsc -p tsconfig.page.json",
     "build:dry-run": "wrangler deploy --dry-run --env= --outdir .wrangler/dry-run-dev",
     "build:dry-run:bn118": "wrangler deploy --dry-run --env bn118 --outdir .wrangler/dry-run-bn118",
     "build:dry-run:production": "wrangler deploy --dry-run --env production --outdir .wrangler/dry-run-production",

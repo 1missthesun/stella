@@ -8,6 +8,7 @@ import {
   type Locator,
   type Page,
 } from "@cloudflare/playwright";
+import { collectElements, type RawElement } from "./collect-elements.page.js";
 import { GatewayError } from "./errors.js";
 import { handoffNetworkRequestAllowed } from "./handoff-navigation-policy.js";
 import { browserGuardrailDomains } from "./network-policy.js";
@@ -66,148 +67,8 @@ const NETWORK_LOG_SIZE = 500;
 const NETWORK_BODY_RETAINED = 100;
 const RESPONSE_BODY_MAX_CHARS = 8 * 1024 * 1024;
 
-type RawElement = {
-  ref: string;
-  role: string;
-  name: string;
-  id?: string;
-  testId?: string;
-  href?: string;
-  checked?: boolean;
-  disabled?: boolean;
-  sensitive?: boolean;
-};
 
-/**
- * Runs in the page. Stamps a ref on each visible, actionable element and
- * describes it by role and accessible name, the way the desktop snapshot
- * does. Form values are never read: a text field is described by its label,
- * not its contents.
- *
- * Kept as plain source: Playwright serializes the function with `String()`,
- * and the bundler's name-keeping helpers (`__name`) do not exist in the page.
- */
-const COLLECT_ELEMENTS_SOURCE = String.raw`(body, args) => {
-  const doc = body.ownerDocument;
-  const view = doc.defaultView;
-  for (const stale of Array.from(doc.querySelectorAll("[" + args.attribute + "]"))) {
-    stale.removeAttribute(args.attribute);
-  }
-  const roles = new Set([
-    "button", "checkbox", "combobox", "heading", "img", "link", "listbox",
-    "menuitem", "option", "radio", "searchbox", "switch", "tab", "textbox",
-  ]);
-  const sensitive = new RegExp(args.sensitive, "u");
-  const clean = (value) => (value || "").replace(/\s+/gu, " ").trim().slice(0, 120);
-  const implicitRole = (element) => {
-    const tag = element.tagName.toLowerCase();
-    const type = (element.getAttribute("type") || "text").toLowerCase();
-    if (tag === "a") return element.hasAttribute("href") ? "link" : "";
-    if (tag === "button" || tag === "summary") return "button";
-    if (tag === "select") return element.hasAttribute("multiple") ? "listbox" : "combobox";
-    if (tag === "textarea") return "textbox";
-    if (/^h[1-3]$/u.test(tag)) return "heading";
-    if (tag === "img") return element.getAttribute("alt") ? "img" : "";
-    if (tag === "input") {
-      if (type === "hidden") return "";
-      if (["submit", "button", "reset", "image"].includes(type)) return "button";
-      if (type === "checkbox") return "checkbox";
-      if (type === "radio") return "radio";
-      if (type === "search") return "searchbox";
-      if (["file", "range", "color"].includes(type)) return "";
-      return "textbox";
-    }
-    const editable = element.getAttribute("contenteditable");
-    if (editable === "true" || editable === "") return "textbox";
-    return "";
-  };
-  const textOf = (element) => clean(element.innerText || element.textContent);
-  const nameOf = (element, role) => {
-    const label = element.getAttribute("aria-label");
-    if (label) return clean(label);
-    const labelledBy = element.getAttribute("aria-labelledby");
-    if (labelledBy) {
-      const joined = labelledBy
-        .split(/\s+/u)
-        .map((id) => doc.getElementById(id))
-        .filter((node) => Boolean(node))
-        .map((node) => textOf(node))
-        .join(" ");
-      if (joined) return clean(joined);
-    }
-    const tag = element.tagName.toLowerCase();
-    if (tag === "img") return clean(element.getAttribute("alt"));
-    if (tag === "input" || tag === "textarea" || tag === "select") {
-      const type = (element.getAttribute("type") || "").toLowerCase();
-      if (tag === "input" && ["submit", "button", "reset"].includes(type)) {
-        return clean(element.getAttribute("value") || type);
-      }
-      if (element.labels && element.labels.length > 0) return textOf(element.labels[0]);
-      return clean(element.getAttribute("placeholder") || element.getAttribute("title"));
-    }
-    if (role === "textbox") return clean(element.getAttribute("title"));
-    return textOf(element) || clean(element.getAttribute("title"));
-  };
-  const visible = (element) => {
-    const rect = element.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return false;
-    const style = view ? view.getComputedStyle(element) : null;
-    if (style && (style.visibility === "hidden" || style.display === "none")) return false;
-    return !element.closest('[aria-hidden="true"]');
-  };
-  const unique = (selector) => {
-    try {
-      return doc.querySelectorAll(selector).length === 1;
-    } catch {
-      return false;
-    }
-  };
-  const results = [];
-  const candidates = doc.querySelectorAll(
-    "a[href],button,input,select,textarea,summary,img[alt],h1,h2,h3,[role],[contenteditable]",
-  );
-  for (const element of Array.from(candidates)) {
-    if (results.length >= args.max) break;
-    const explicit = (element.getAttribute("role") || "").split(/\s+/u)[0] || "";
-    const role = explicit || implicitRole(element);
-    if (!roles.has(role) || !visible(element)) continue;
-    const ref = "e" + (results.length + 1);
-    element.setAttribute(args.attribute, ref);
-    const tag = element.tagName.toLowerCase();
-    const formControl =
-      role === "textbox" || role === "searchbox" || role === "combobox" ||
-      tag === "input" || tag === "textarea" || tag === "select";
-    const descriptor = ["type", "autocomplete", "name", "id", "placeholder", "aria-label"]
-      .map((attribute) => element.getAttribute(attribute) || "")
-      .join(" ")
-      .toLowerCase();
-    const id = element.getAttribute("id") || "";
-    const testId = element.getAttribute("data-testid") || "";
-    const record = { ref, role, name: nameOf(element, role) };
-    if (/^[A-Za-z][A-Za-z0-9_-]*$/u.test(id) && unique("#" + id)) record.id = id;
-    if (/^[A-Za-z0-9_.:-]{1,96}$/u.test(testId) && unique('[data-testid="' + testId + '"]')) {
-      record.testId = testId;
-    }
-    if (role === "link" && element.href) record.href = String(element.href);
-    if (role === "checkbox" || role === "radio" || role === "switch") {
-      record.checked = element.checked === true || element.getAttribute("aria-checked") === "true";
-    }
-    if (element.disabled === true || element.getAttribute("aria-disabled") === "true") {
-      record.disabled = true;
-    }
-    if (formControl && sensitive.test(descriptor)) record.sensitive = true;
-    results.push(record);
-  }
-  return results;
-}`;
 
-type CollectElementsArgs = { attribute: string; max: number; sensitive: string };
-
-/** A function object Playwright serializes to exactly the source above. */
-const collectElements = Object.assign(
-  (_body: Element, _args: CollectElementsArgs): RawElement[] => [],
-  { toString: () => COLLECT_ELEMENTS_SOURCE },
-);
 
 const safeElement = (raw: RawElement): SafeElement => {
   const name = redactVisibleText(raw.name ?? "").slice(0, 120);

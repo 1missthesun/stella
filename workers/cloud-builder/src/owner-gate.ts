@@ -22,7 +22,9 @@ import { applyOwnerEventsToStore } from "./owner-store/owner-events.js";
 import type { RpcResponse } from "@stella/contracts/backend/protocol";
 import {
   GATEWAY_CAPABILITY_ISSUERS,
+  GATEWAY_BUDGET_UNLIMITED,
   GATEWAY_SESSION_CAPABILITY_TTL_MS,
+  GATEWAY_TURN_CAPABILITY_TTL_MS,
 } from "@stella/contracts/gateway/capability";
 import { signCapability } from "@stella/contracts/gateway/jwt";
 import type {
@@ -61,6 +63,9 @@ import {
   cloudSandboxAccess,
   recordBillingIdentity,
   reserveSessionGrant,
+  reserveSpend,
+  reservationHeld,
+  releaseSpend,
   setAdminPlan,
   turnAllowance,
   type UsageBatchResult,
@@ -197,6 +202,8 @@ export {
   snapshotAllowsExecution,
   snapshotAllowsCloudSandbox,
 } from "./owner-gate/support.js";
+
+const turnGrantId = (turnId: string): string => `turn:${turnId}`;
 
 export class OwnerGate extends OwnerGateCloudDispatch {
   private testClaudeChecked = false;
@@ -1072,7 +1079,8 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       }>(`SELECT lane FROM running WHERE turn_id = ?`, turnId)
       .toArray();
     if (existing.length > 0) {
-      return { ok: true, snapshot, replayed: true };
+      const held = this.ownerStore().context(null, now);
+      return { ok: true, snapshot: this.withTurnBudget(snapshot, reservationHeld(held, turnGrantId(turnId))), replayed: true };
     }
     this.ctx.storage.sql.exec(
       `INSERT INTO running (turn_id, lane, conversation_id, started_at)
@@ -1082,7 +1090,29 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       input.conversationId ?? "",
       now,
     );
-    return { ok: true, snapshot, replayed: false };
+    return { ok: true, snapshot: await this.reserveTurnBudget(snapshot, turnId, now), replayed: false };
+  }
+
+  // Each admitted turn holds its own slice of the budget, so concurrent turns
+  // can't each spend the same headroom through their turn capabilities.
+  private async reserveTurnBudget(snapshot: OwnerSnapshot, turnId: string, now: number): Promise<OwnerSnapshot> {
+    const wanted = snapshot.allowance.budgetMicroCents;
+    if (wanted === GATEWAY_BUDGET_UNLIMITED || wanted <= 0) return snapshot;
+    const reservation = await this.billingWrite((ctx) =>
+      reserveSpend(ctx, {
+        id: turnGrantId(turnId),
+        microCents: wanted,
+        expiresAt: now + GATEWAY_TURN_CAPABILITY_TTL_MS,
+        category: "model",
+        minimumMicroCents: 1,
+      }),
+    );
+    return this.withTurnBudget(snapshot, reservation.reserved ? reservation.reservedMicroCents : 0);
+  }
+
+  private withTurnBudget(snapshot: OwnerSnapshot, budgetMicroCents: number): OwnerSnapshot {
+    if (snapshot.allowance.budgetMicroCents === GATEWAY_BUDGET_UNLIMITED) return snapshot;
+    return { ...snapshot, allowance: { ...snapshot.allowance, budgetMicroCents } };
   }
 
   async release(input: { turnId: string }): Promise<void> {
@@ -1090,6 +1120,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     const turnId = input.turnId?.trim() ?? "";
     if (!turnId) return;
     this.ctx.storage.sql.exec(`DELETE FROM running WHERE turn_id = ?`, turnId);
+    await this.billingWrite((ctx) => releaseSpend(ctx, turnGrantId(turnId)));
   }
 
   async acquireAgentContainer(input: {

@@ -816,6 +816,9 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
       continue;
     }
     ctx.db.run("UPDATE billing_grants SET settled = settled + ? WHERE jti = ?", charged, event.capabilityId);
+    if (event.kind === "turn" && event.turnId) {
+      ctx.db.run("UPDATE billing_grants SET settled = settled + ? WHERE jti = ?", charged, `turn:${event.turnId}`);
+    }
     // Failed and aborted attempts are charged at what the provider billed us.
     if (charged > 0) charge(ctx, charged);
     const providerCost = event.providerCostMicroCents ?? event.usage.costMicroCents ?? event.chargedMicroCents;

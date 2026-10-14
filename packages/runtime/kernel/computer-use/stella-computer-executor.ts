@@ -78,6 +78,7 @@ import {
   runAutomationDaemonCommand,
   runAutomationDaemonTypedOperation,
   stopAutomationDaemon,
+  stopAutomationDaemonGracefully,
   type TypedAutomationAction,
   type TypedAutomationObservationPrecondition,
   type TypedAutomationOperation,
@@ -1796,6 +1797,19 @@ export const createMacComputerUseSession = (options: {
     }
   },
 });
+
+export const releaseMacStellaComputerSession = async (
+  sessionId: string,
+): Promise<boolean> => {
+  if (process.platform !== "darwin") return false;
+  macComputerUseResourceArbiter.forgetSession(sessionId);
+  const sanitized = sanitizeStellaComputerSessionId(sessionId);
+  if (!sanitized) return false;
+  if (sanitized !== sessionId) {
+    macComputerUseResourceArbiter.forgetSession(sanitized);
+  }
+  return await stopAutomationDaemonGracefully(resolveSessionPaths(sanitized));
+};
 
 export const shutdownMacStellaComputerSession = (
   sessionId: string,

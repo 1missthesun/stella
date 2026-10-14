@@ -58,9 +58,11 @@ export const expandHomePath = (value: string, home: string = os.homedir()) => {
     .replace(/\$TMP\b/gi, tempDir)
     .replace(/%TMP%/gi, tempDir)
     .replace(/\$HOME\b/gi, home)
-    .replace(/%HOME%/gi, home)
-    // Windows doesn't have /tmp, but prompts sometimes include it.
-    .replace(/\/tmp\b/g, tempDir);
+    .replace(/%HOME%/gi, home);
+
+  if (process.platform === "win32") {
+    expanded = expanded.replace(/^\/tmp(?=$|[\\/])/, tempDir);
+  }
 
   return expanded;
 };

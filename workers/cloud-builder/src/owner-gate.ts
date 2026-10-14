@@ -636,6 +636,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     usageMode?: "default" | "unlimited";
     resetUsage?: boolean;
     spendAllowance?: boolean;
+    complimentary?: boolean;
   }): Promise<void> {
     await this.billingWrite((ctx) => setAdminPlan(ctx, input));
   }

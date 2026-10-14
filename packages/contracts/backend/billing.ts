@@ -1,7 +1,8 @@
 import type { IdentityLevel } from "../gateway/api.js";
 
-export type BillingPlan = "free" | "go" | "pro";
-export type PaidBillingPlan = Exclude<BillingPlan, "free">;
+import type { BillingPlan, PaidBillingPlan } from "../billing-plans.js";
+
+export type { BillingPlan, PaidBillingPlan } from "../billing-plans.js";
 
 export type CloudSandboxAccess = {
   enabled: boolean;
@@ -13,13 +14,14 @@ export const CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE =
 export type BillingPlanConfig = {
   label: string;
   monthlyPriceCents: number;
-  introFirstMonthPriceCents?: number;
   rollingLimitUsd: number;
   rollingWindowHours: number;
   weeklyLimitUsd: number;
   monthlyLimitUsd: number;
   lifetimeLimitUsd?: number;
   cloudSandbox: CloudSandboxAccess;
+  mediaGeneration: boolean;
+  includes: readonly string[];
 };
 
 export type BillingUsage = {
@@ -31,6 +33,13 @@ export type BillingUsage = {
   monthlyLimitUsd: number;
   lifetimeUsedUsd: number;
   lifetimeLimitUsd: number | null;
+  rollingResetsAt: number;
+  weeklyResetsAt: number;
+  monthlyResetsAt: number;
+  // Held by work still running (model streams, media jobs, cloud agents).
+  reservedUsd: number;
+  // What can still be spent now: the tightest window plus credit, minus reserved.
+  availableUsd: number | null;
 };
 
 export type BillingStatus = {

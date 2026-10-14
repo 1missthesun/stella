@@ -4,6 +4,13 @@ import type {
   CloudSandboxAccess,
   PaidBillingPlan,
 } from "@stella/contracts/backend/billing";
+import {
+  BILLING_PLANS,
+  PAID_BILLING_PLANS,
+  PLAN_CATALOG,
+  type PlanDefinition,
+} from "@stella/contracts/billing-plans";
+import { stripeRequest, StripeError } from "./stripe.js";
 
 export type PlanCatalog = Record<BillingPlan, BillingPlanConfig>;
 
@@ -12,15 +19,9 @@ export type BillingConfig = {
   plans: PlanCatalog;
   freeEmailAllowanceShare: number;
   stripePrices: Record<PaidBillingPlan, string>;
-  goFirstMonthCoupon?: string;
 };
 
 export class BillingConfigError extends Error {}
-
-const ROLLING_LIMIT_SHARE = 0.2;
-const WEEKLY_LIMIT_SHARE = 0.5;
-const DEFAULT_ROLLING_WINDOW_HOURS = 5;
-const DEFAULT_FREE_EMAIL_ALLOWANCE_SHARE = 0.4;
 
 type EnvReader = (name: string) => string | undefined;
 
@@ -32,98 +33,74 @@ const reader = (env: Cloudflare.Env): EnvReader => {
   };
 };
 
-const required = (read: EnvReader, name: string): number => {
-  const raw = read(name);
-  if (raw === undefined) throw new BillingConfigError(`Missing billing secret ${name}.`);
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value < 0) {
-    throw new BillingConfigError(`Billing secret ${name} must be a non-negative number.`);
-  }
-  return value;
-};
-
-const optional = (read: EnvReader, name: string): number | undefined =>
-  read(name) === undefined ? undefined : required(read, name);
-
-const roundUsd = (value: number) => Math.max(0, Math.round(value * 100) / 100);
-
-type CloudSandboxPlan = BillingPlan;
-const CLOUD_SANDBOX_PLANS: readonly CloudSandboxPlan[] = ["free", "go", "pro"];
-const DEFAULT_CLOUD_SANDBOX_PLANS: readonly CloudSandboxPlan[] = ["free", "go", "pro"];
-
-const cloudSandboxPlans = (read: EnvReader): ReadonlySet<CloudSandboxPlan> => {
+const cloudSandboxPlans = (read: EnvReader): ReadonlySet<BillingPlan> => {
   const raw = read("STELLA_CLOUD_SANDBOX_PLANS");
-  if (raw === undefined) return new Set(DEFAULT_CLOUD_SANDBOX_PLANS);
-  const plans = new Set<CloudSandboxPlan>();
+  if (raw === undefined) {
+    return new Set(BILLING_PLANS.filter((plan) => PLAN_CATALOG[plan].cloudContainers));
+  }
+  const plans = new Set<BillingPlan>();
   for (const entry of raw.split(",")) {
     const name = entry.trim().toLowerCase();
-    if (!name || name === "anonymous") continue;
-    if (!(CLOUD_SANDBOX_PLANS as readonly string[]).includes(name)) {
+    if (!name) continue;
+    if (!(BILLING_PLANS as readonly string[]).includes(name)) {
       console.warn(
-        JSON.stringify({
-          event: "billing_config_unknown_cloud_sandbox_plan",
-          plan: name,
-          known: CLOUD_SANDBOX_PLANS,
-        }),
+        JSON.stringify({ event: "billing_config_unknown_cloud_sandbox_plan", plan: name, known: BILLING_PLANS }),
       );
       continue;
     }
-    plans.add(name as CloudSandboxPlan);
+    plans.add(name as BillingPlan);
   }
   return plans;
 };
 
-const cloudSandboxFor = (
-  plans: ReadonlySet<CloudSandboxPlan>,
-  plan: CloudSandboxPlan,
-): CloudSandboxAccess => ({ enabled: plans.has(plan) });
+const planConfig = (
+  definition: PlanDefinition,
+  sandboxPlans: ReadonlySet<BillingPlan>,
+): BillingPlanConfig => ({
+  label: definition.label,
+  monthlyPriceCents: definition.monthlyPriceCents,
+  rollingLimitUsd: definition.budget.rollingUsd,
+  rollingWindowHours: definition.budget.rollingWindowHours,
+  weeklyLimitUsd: definition.budget.weeklyUsd,
+  monthlyLimitUsd: definition.budget.monthlyUsd,
+  ...(definition.budget.oneTimeUsd !== undefined ? { lifetimeLimitUsd: definition.budget.oneTimeUsd } : {}),
+  cloudSandbox: { enabled: sandboxPlans.has(definition.id) } satisfies CloudSandboxAccess,
+  mediaGeneration: definition.mediaGeneration,
+  includes: definition.includes,
+});
 
-const paidPlan = (
-  read: EnvReader,
-  plan: PaidBillingPlan,
-  utilizationRate: number,
-  sandboxPlans: ReadonlySet<CloudSandboxPlan>,
-): BillingPlanConfig => {
-  const prefix = `STELLA_${plan.toUpperCase()}`;
-  const monthlyPriceCents = required(read, `${prefix}_PRICE_CENTS`);
-  const derivedMonthly = roundUsd(monthlyPriceCents / 100 / utilizationRate);
-  return {
-    label: plan === "go" ? "Go" : "Pro",
-    monthlyPriceCents,
-    rollingLimitUsd:
-      optional(read, `${prefix}_ROLLING_LIMIT_USD`) ?? roundUsd(derivedMonthly * ROLLING_LIMIT_SHARE),
-    rollingWindowHours:
-      optional(read, `${prefix}_ROLLING_WINDOW_HOURS`) ?? DEFAULT_ROLLING_WINDOW_HOURS,
-    weeklyLimitUsd:
-      optional(read, `${prefix}_WEEKLY_LIMIT_USD`) ?? roundUsd(derivedMonthly * WEEKLY_LIMIT_SHARE),
-    monthlyLimitUsd: optional(read, `${prefix}_MONTHLY_LIMIT_USD`) ?? derivedMonthly,
-    cloudSandbox: cloudSandboxFor(sandboxPlans, plan),
-  };
+const STRIPE_PRICE_SECRETS: Record<PaidBillingPlan, string> = {
+  plus: "STRIPE_PRICE_PLUS",
+  pro: "STRIPE_PRICE_PRO",
+  max: "STRIPE_PRICE_MAX",
 };
 
-const BILLING_SWITCHES = [
-  "STELLA_INCLUDED_USAGE_UTILIZATION_RATE",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_PRICE_GO",
-  "STRIPE_PRICE_PRO",
-] as const;
+const BILLING_SWITCHES = ["STRIPE_SECRET_KEY", ...Object.values(STRIPE_PRICE_SECRETS)] as const;
 
 const OPEN_LIMIT_USD = 1_000_000;
-const openPlan = (label: string): BillingPlanConfig => ({
-  label,
-  monthlyPriceCents: 0,
+const openPlan = (definition: PlanDefinition): BillingPlanConfig => ({
+  ...planConfig(definition, new Set(BILLING_PLANS)),
   rollingLimitUsd: OPEN_LIMIT_USD,
-  rollingWindowHours: DEFAULT_ROLLING_WINDOW_HOURS,
   weeklyLimitUsd: OPEN_LIMIT_USD,
   monthlyLimitUsd: OPEN_LIMIT_USD,
   cloudSandbox: { enabled: true },
+  mediaGeneration: true,
 });
+
+const openPlans = (): PlanCatalog => {
+  const plans = {} as PlanCatalog;
+  for (const plan of BILLING_PLANS) {
+    const { lifetimeLimitUsd: _lifetime, ...open } = openPlan(PLAN_CATALOG[plan]);
+    plans[plan] = open;
+  }
+  return plans;
+};
 
 const OPEN_BILLING_CONFIG: BillingConfig = {
   enabled: false,
-  plans: { free: openPlan("Free"), go: openPlan("Go"), pro: openPlan("Pro") },
+  plans: openPlans(),
   freeEmailAllowanceShare: 1,
-  stripePrices: { go: "", pro: "" },
+  stripePrices: { plus: "", pro: "", max: "" },
 };
 
 const loadBillingConfig = (env: Cloudflare.Env): BillingConfig => {
@@ -131,46 +108,20 @@ const loadBillingConfig = (env: Cloudflare.Env): BillingConfig => {
   if (read("STELLA_OWNER_MODE") === "1" || BILLING_SWITCHES.every((name) => read(name) === undefined)) {
     return OPEN_BILLING_CONFIG;
   }
-  const utilizationRate = required(read, "STELLA_INCLUDED_USAGE_UTILIZATION_RATE");
-  if (utilizationRate <= 0 || utilizationRate > 1) {
-    throw new BillingConfigError("STELLA_INCLUDED_USAGE_UTILIZATION_RATE must be in (0, 1].");
+  const missing = BILLING_SWITCHES.filter((name) => read(name) === undefined);
+  if (missing.length > 0) {
+    throw new BillingConfigError(`Missing billing secret ${missing.join(", ")}.`);
   }
   const sandboxPlans = cloudSandboxPlans(read);
-  const go = paidPlan(read, "go", utilizationRate, sandboxPlans);
-  const intro = optional(read, "STELLA_GO_INTRO_FIRST_MONTH_PRICE_CENTS");
-  const goFirstMonthCoupon = read("STRIPE_COUPON_GO_FIRST_MONTH");
-  if ((intro === undefined) !== (goFirstMonthCoupon === undefined)) {
-    throw new BillingConfigError(
-      "Set STELLA_GO_INTRO_FIRST_MONTH_PRICE_CENTS and STRIPE_COUPON_GO_FIRST_MONTH together.",
-    );
-  }
-  if (intro !== undefined) go.introFirstMonthPriceCents = intro;
-  const freeLifetime = optional(read, "STELLA_FREE_LIFETIME_LIMIT_USD");
-  const priceGo = read("STRIPE_PRICE_GO");
-  const pricePro = read("STRIPE_PRICE_PRO");
-  if (!priceGo || !pricePro) {
-    throw new BillingConfigError("Missing billing secret STRIPE_PRICE_GO or STRIPE_PRICE_PRO.");
-  }
+  const plans = {} as PlanCatalog;
+  for (const plan of BILLING_PLANS) plans[plan] = planConfig(PLAN_CATALOG[plan], sandboxPlans);
+  const stripePrices = {} as Record<PaidBillingPlan, string>;
+  for (const plan of PAID_BILLING_PLANS) stripePrices[plan] = read(STRIPE_PRICE_SECRETS[plan])!;
   return {
     enabled: true,
-    plans: {
-      free: {
-        label: "Free",
-        monthlyPriceCents: 0,
-        rollingLimitUsd: required(read, "STELLA_FREE_ROLLING_LIMIT_USD"),
-        rollingWindowHours: required(read, "STELLA_FREE_ROLLING_WINDOW_HOURS"),
-        weeklyLimitUsd: required(read, "STELLA_FREE_WEEKLY_LIMIT_USD"),
-        monthlyLimitUsd: required(read, "STELLA_FREE_MONTHLY_LIMIT_USD"),
-        ...(freeLifetime !== undefined ? { lifetimeLimitUsd: freeLifetime } : {}),
-        cloudSandbox: cloudSandboxFor(sandboxPlans, "free"),
-      },
-      go,
-      pro: paidPlan(read, "pro", utilizationRate, sandboxPlans),
-    },
-    freeEmailAllowanceShare:
-      optional(read, "STELLA_FREE_EMAIL_ALLOWANCE_SHARE") ?? DEFAULT_FREE_EMAIL_ALLOWANCE_SHARE,
-    stripePrices: { go: priceGo, pro: pricePro },
-    ...(goFirstMonthCoupon ? { goFirstMonthCoupon } : {}),
+    plans,
+    freeEmailAllowanceShare: PLAN_CATALOG.free.emailOnlyBudgetShare ?? 1,
+    stripePrices,
   };
 };
 
@@ -188,7 +139,68 @@ export const planForStripePrice = (
   priceId: string | null | undefined,
 ): PaidBillingPlan | null => {
   if (!priceId || !config.enabled) return null;
-  if (config.stripePrices.go === priceId) return "go";
-  if (config.stripePrices.pro === priceId) return "pro";
+  for (const plan of PAID_BILLING_PLANS) {
+    if (config.stripePrices[plan] === priceId) return plan;
+  }
   return null;
+};
+
+type StripePrice = {
+  id: string;
+  active: boolean;
+  currency: string;
+  unit_amount: number | null;
+  type: string;
+  recurring?: { interval?: string; interval_count?: number; usage_type?: string } | null;
+};
+
+export class StripePriceMismatchError extends Error {}
+
+const PRICE_CHECK_TTL_MS = 10 * 60_000;
+const verifiedPrices = new Map<string, number>();
+
+// A configured price must be exactly the catalog's amount, in USD, billed
+// monthly. Anything else would charge a customer a different amount than
+// every display and allowance in Stella promises.
+export const priceMismatch = (plan: PaidBillingPlan, price: StripePrice): string | null => {
+  const definition = PLAN_CATALOG[plan];
+  if (!price.active) return `${price.id} is archived`;
+  if (price.type !== "recurring") return `${price.id} is not recurring`;
+  if (price.currency.toLowerCase() !== definition.currency) return `${price.id} is in ${price.currency}`;
+  if (price.unit_amount !== definition.monthlyPriceCents) {
+    return `${price.id} is ${price.unit_amount} cents, ${definition.label} is ${definition.monthlyPriceCents}`;
+  }
+  if (price.recurring?.interval !== definition.interval || (price.recurring?.interval_count ?? 1) !== 1) {
+    return `${price.id} bills every ${price.recurring?.interval_count ?? 1} ${price.recurring?.interval}`;
+  }
+  if (price.recurring?.usage_type && price.recurring.usage_type !== "licensed") {
+    return `${price.id} is metered`;
+  }
+  return null;
+};
+
+export const verifyStripePrice = async (
+  env: Cloudflare.Env,
+  config: BillingConfig,
+  plan: PaidBillingPlan,
+): Promise<string> => {
+  const priceId = config.stripePrices[plan];
+  const checked = verifiedPrices.get(priceId);
+  if (checked !== undefined && Date.now() - checked < PRICE_CHECK_TTL_MS) return priceId;
+  let price: StripePrice;
+  try {
+    price = await stripeRequest<StripePrice>(env, "GET", `/prices/${encodeURIComponent(priceId)}`);
+  } catch (error) {
+    if (error instanceof StripeError && error.status === 404) {
+      throw new StripePriceMismatchError(`STRIPE_PRICE_${plan.toUpperCase()} ${priceId} does not exist`);
+    }
+    throw error;
+  }
+  const mismatch = priceMismatch(plan, price);
+  if (mismatch) {
+    console.error(JSON.stringify({ event: "billing_stripe_price_mismatch", plan, priceId, mismatch }));
+    throw new StripePriceMismatchError(mismatch);
+  }
+  verifiedPrices.set(priceId, Date.now());
+  return priceId;
 };

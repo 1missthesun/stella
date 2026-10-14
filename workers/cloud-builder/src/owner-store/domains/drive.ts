@@ -1,3 +1,4 @@
+import { PLAN_CATALOG, type BillingPlan } from "@stella/contracts/billing-plans";
 import type {
   DeviceFileLocation,
   DriveFile,
@@ -24,10 +25,9 @@ const GB = 1024 * MB;
 
 type DriveQuota = { totalBytes: number; maxFiles: number; maxFileBytes: number };
 
-const PLAN_QUOTAS: Record<"free" | "go" | "pro", DriveQuota> = {
-  free: { totalBytes: 256 * MB, maxFiles: 200, maxFileBytes: 25 * MB },
-  go: { totalBytes: 10 * GB, maxFiles: 1_000, maxFileBytes: 100 * MB },
-  pro: { totalBytes: 50 * GB, maxFiles: 5_000, maxFileBytes: 250 * MB },
+const planQuota = (plan: BillingPlan): DriveQuota => {
+  const { driveBytes, driveFiles, driveFileBytes } = PLAN_CATALOG[plan].limits;
+  return { totalBytes: driveBytes, maxFiles: driveFiles, maxFileBytes: driveFileBytes };
 };
 const UNLIMITED_QUOTA: DriveQuota = {
   totalBytes: 200 * GB,
@@ -474,7 +474,7 @@ const partitionWrite = (
   files: WriteCandidate[],
 ): WriteVerdict => {
   const { plan, unlimited } = billingPlan(ctx);
-  const quota = unlimited ? UNLIMITED_QUOTA : PLAN_QUOTAS[plan];
+  const quota = unlimited ? UNLIMITED_QUOTA : planQuota(plan);
   const proxied = !ctx.env.R2_ACCESS_KEY_ID?.trim() || !ctx.env.R2_SECRET_ACCESS_KEY?.trim();
   const planLabel = plan === "free" ? "Free" : plan;
   let { fileCount, totalBytes } = usage(ctx.db);
@@ -1824,7 +1824,7 @@ export const driveDomain = {
   internal: {
     "drive.usage": (ctx: OwnerContext) => {
       const { plan, unlimited } = billingPlan(ctx);
-      return { ...usage(ctx.db), plan, unlimited, quota: unlimited ? UNLIMITED_QUOTA : PLAN_QUOTAS[plan] };
+      return { ...usage(ctx.db), plan, unlimited, quota: unlimited ? UNLIMITED_QUOTA : planQuota(plan) };
     },
     "drive.list": (ctx: OwnerContext, raw: unknown) => {
       const input = record(raw);

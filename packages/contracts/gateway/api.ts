@@ -1,3 +1,4 @@
+import { PLAN_CATALOG, normalizeBillingPlan, type BillingPlan } from "../billing-plans.js";
 import type { GatewayDeviceKeyProof } from "./dpop.js";
 
 export const GATEWAY_VALIDATED_RELAY_PREFIX = "/v2/relay" as const;
@@ -190,12 +191,22 @@ export type GatewayOwnerRelayLimit = {
   mintsPerHour: number;
 };
 
+const relayLimit = (plan: BillingPlan, mintsPerHour: number): GatewayOwnerRelayLimit => ({
+  inFlight: PLAN_CATALOG[plan].limits.modelRequestsAtOnce,
+  perMinute: PLAN_CATALOG[plan].limits.modelRequestsPerMinute,
+  mintsPerHour,
+});
+
+const budgetChunk = (plan: BillingPlan): number =>
+  Math.round(PLAN_CATALOG[plan].limits.modelBudgetChunkUsd * 100_000_000);
+
 export const GATEWAY_OWNER_RELAY_LIMITS: Readonly<
   Record<ManagedModelAudienceForLimits, GatewayOwnerRelayLimit>
 > = {
-  free: { inFlight: 2, perMinute: 40, mintsPerHour: 12 },
-  go: { inFlight: 4, perMinute: 80, mintsPerHour: 24 },
-  pro: { inFlight: 8, perMinute: 120, mintsPerHour: 24 },
+  free: relayLimit("free", 12),
+  plus: relayLimit("plus", 24),
+  pro: relayLimit("pro", 24),
+  max: relayLimit("max", 24),
 };
 
 export const GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR = 240;
@@ -217,27 +228,16 @@ export const GATEWAY_NETWORK_LIMITS = {
 export const GATEWAY_SESSION_BUDGET_CHUNK_MICRO_CENTS: Readonly<
   Record<ManagedModelAudienceForLimits, number>
 > = {
-  free: 100_000_000,
-  go: 200_000_000,
-  pro: 500_000_000,
+  free: budgetChunk("free"),
+  plus: budgetChunk("plus"),
+  pro: budgetChunk("pro"),
+  max: budgetChunk("max"),
 };
 
-export type ManagedModelAudienceForLimits = "free" | "go" | "pro";
+export type ManagedModelAudienceForLimits = BillingPlan;
 
-export const limitsAudienceFor = (
-  audience: string,
-): ManagedModelAudienceForLimits => {
-  switch (audience) {
-    case "go":
-    case "go_fallback":
-      return "go";
-    case "pro":
-    case "pro_fallback":
-      return "pro";
-    default:
-      return "free";
-  }
-};
+export const limitsAudienceFor = (audience: string): ManagedModelAudienceForLimits =>
+  normalizeBillingPlan(audience);
 
 export const GATEWAY_MAX_REQUEST_BODY_BYTES = 24 * 1024 * 1024;
 export const GATEWAY_MAX_RESULT_CACHE_BYTES = 8 * 1024 * 1024;

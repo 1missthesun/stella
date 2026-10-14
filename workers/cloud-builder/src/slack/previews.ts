@@ -1,3 +1,4 @@
+import { PLAN_CATALOG, normalizeBillingPlan } from "@stella/contracts/billing-plans";
 /**
  * Stella previews for Slack: static sites a workspace's agents build and
  * Stella hosts, for when the repository publishes no preview of its own.
@@ -72,13 +73,8 @@ const MAX_CODE_BYTES = 48 * MB;
 const MAX_UPLOAD_BYTES = 95 * MB;
 const MAX_FILES = 20_000;
 const MAX_LIVE_PREVIEWS = 500;
-const QUOTA_BYTES: Record<ManagedModelAudience, number> = {
-  free: 250 * MB,
-  go: 1024 * MB,
-  pro: 5 * 1024 * MB,
-  go_fallback: 1024 * MB,
-  pro_fallback: 5 * 1024 * MB,
-};
+const quotaBytes = (audience: ManagedModelAudience): number =>
+  PLAN_CATALOG[normalizeBillingPlan(audience)].limits.crewPreviewBytes;
 
 const PUBLISH: TokenKind = { prefix: "sp1", domain: "stella.slack-preview-publish.v1" };
 const SIGNIN_STATE: TokenKind = { prefix: "ss1", domain: "stella.slack-preview-signin.v1" };
@@ -187,7 +183,7 @@ const usage = async (env: Cloudflare.Env, teamId: string): Promise<{ bytes: numb
 const quotaFor = async (env: Cloudflare.Env, ownerId: string | null): Promise<number> => {
   if (!ownerId) return 0;
   const access = await ownerGateStub(env.OWNER_GATES, ownerId).billingAccess();
-  return QUOTA_BYTES[access.audience as ManagedModelAudience] ?? 0;
+  return quotaBytes(access.audience as ManagedModelAudience);
 };
 
 export const describePreviews = async (

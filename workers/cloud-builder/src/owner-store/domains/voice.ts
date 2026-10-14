@@ -1,3 +1,4 @@
+import { PLAN_CATALOG } from "@stella/contracts/billing-plans";
 import { Deferred, Effect } from "effect";
 import {
   GPT_LIVE_MODEL,
@@ -48,7 +49,7 @@ const liveAttachUrl = (sessionId: string): string =>
 
 const TTS_RATE = { count: 20, windowMs: 60_000 };
 const TTS_MAX_INPUT_CHARS = 8_000;
-const TTS_DAILY_CHARS = { free: 60_000, go: 300_000, pro: 1_000_000 } as const;
+
 const TTS_TICKET_TTL_MS = 15 * 60_000;
 
 const MUSE_DICTATION_MODEL = "muse-voice-transcribe-1.0";
@@ -407,7 +408,7 @@ const utcDay = (now: number): string => new Date(now).toISOString().slice(0, 10)
 const admitTts = (ctx: OwnerContext, chars: number): void => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "tts", TTS_RATE, "Too many read-aloud requests. Try again in a minute.");
   const day = utcDay(ctx.now);
-  const limit = TTS_DAILY_CHARS[billingPlan(ctx).plan];
+  const limit = PLAN_CATALOG[billingPlan(ctx).plan].limits.readAloudCharsPerDay;
   const used = ctx.db.one<{ chars: number }>("SELECT chars FROM tts_daily WHERE day = ?", day)?.chars ?? 0;
   if (used + chars > limit) {
     const midnight = Date.parse(`${day}T00:00:00Z`) + 24 * 60 * 60_000;

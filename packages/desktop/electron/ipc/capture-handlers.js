@@ -1,4 +1,4 @@
-import { shell } from "electron";
+import { openMacPermissionSettings } from "../utils/macos-permission-settings.js";
 import { hasMacPermission, requestMacPermission, } from "../utils/macos-permissions.js";
 import {
   IPC_CHAT_CONTEXT_GET,
@@ -29,7 +29,7 @@ export const registerCaptureHandlers = (options) => {
         if (result.granted) {
             return true;
         }
-        await shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture");
+        await openMacPermissionSettings("screen");
         return false;
     };
     handleIpc(IPC_CHAT_CONTEXT_GET, () => options.captureService.getChatContextSnapshot());

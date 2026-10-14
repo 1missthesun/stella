@@ -114,6 +114,7 @@ import {
   IPC_LLM_CREDENTIALS_DELETE,
 } from "@stella/contracts/desktop/ipc-channels";
 import { resolveNativeHelperPath } from "../native-helper-path.js";
+import { launchPermissionSettings, openMacPermissionSettings } from "../utils/macos-permission-settings.js";
 import { hasMacPermission, clearPermissionCache, getMicrophonePermissionStatus, requestMacPermission, resetMacMicrophonePermissions, resetMacPermission, } from "../utils/macos-permissions.js";
 import { waitForConnectedRunner } from "./runtime-availability.js";
 import { setGlobalShortcutsSuspended, } from "./global-shortcuts.js";
@@ -147,48 +148,8 @@ const screenCapturePermissionsHasPrompted = (mod) => {
         return false;
     }
 };
-const PERMISSION_SETTINGS_OPEN_COOLDOWN_MS = 1500;
-let lastPermissionSettingsOpenAt = 0;
-const consumePermissionSettingsOpenSlot = () => {
-    const now = Date.now();
-    if (now - lastPermissionSettingsOpenAt < PERMISSION_SETTINGS_OPEN_COOLDOWN_MS) {
-        return false;
-    }
-    lastPermissionSettingsOpenAt = now;
-    return true;
-};
-const openScreenCaptureSystemPreferences = async (mod) => {
-    if (!mod) {
-        return false;
-    }
-    if (!consumePermissionSettingsOpenSlot()) {
-        return false;
-    }
-    try {
-        await mod.openSystemPreferences();
-        return true;
-    }
-    catch {
-        return false;
-    }
-};
-const permissionSettingsUrlByKind = {
-    accessibility: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility",
-    screen: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture",
-    "full-disk-access": "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles",
-    microphone: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone",
-};
-const openMacPermissionSettings = async (kind) => {
-    const url = permissionSettingsUrlByKind[kind];
-    if (!url) {
-        return { opened: false, url: null };
-    }
-    if (!consumePermissionSettingsOpenSlot()) {
-        return { opened: false, url };
-    }
-    await shell.openExternal(url);
-    return { opened: true, url };
-};
+const openScreenCaptureSystemPreferences = async (mod) => mod ? launchPermissionSettings(() => mod.openSystemPreferences()) : false;
+const permissionRequestsInFlight = new Map();
 const clampHeapTraceDurationMs = (value) => {
     const parsed = Number(value);
     if (!Number.isFinite(parsed))
@@ -1600,35 +1561,30 @@ export const registerSystemHandlers = (options) => {
         if (!["accessibility", "screen"].includes(macKind)) {
             return { granted: false, alreadyGranted: false };
         }
+        const pending = permissionRequestsInFlight.get(macKind);
+        if (pending) {
+            return pending;
+        }
+        const request = requestMacPermissionOrSettings(macKind).finally(() => {
+            permissionRequestsInFlight.delete(macKind);
+        });
+        permissionRequestsInFlight.set(macKind, request);
+        return request;
+    });
+    const requestMacPermissionOrSettings = async (macKind) => {
         clearPermissionCache();
         const result = await requestMacPermission(macKind);
         clearPermissionCache();
         let openedSettings = false;
         if (macKind === "screen" && !result.granted) {
-            try {
-                const scp = getScreenCapturePermissions();
-                if (screenCapturePermissionsHasPrompted(scp)) {
-                    const openedViaModule = await openScreenCaptureSystemPreferences(scp);
-                    if (openedViaModule) {
-                        openedSettings = true;
-                    }
-                    else {
-                        const fallback = await openMacPermissionSettings("screen");
-                        openedSettings = fallback.opened;
-                    }
-                }
-                else {
-                    const fallback = await openMacPermissionSettings("screen");
-                    openedSettings = fallback.opened;
-                }
-            }
-            catch {
-                // Best effort only; the renderer can still expose manual settings access.
-            }
+            const scp = getScreenCapturePermissions();
+            openedSettings =
+                (screenCapturePermissionsHasPrompted(scp) && (await openScreenCaptureSystemPreferences(scp))) ||
+                    (await openMacPermissionSettings("screen")).opened;
         }
         if (result.granted && !result.alreadyGranted) {
             options.onPermissionGranted?.(macKind);
         }
         return { ...result, openedSettings };
-    });
+    };
 };

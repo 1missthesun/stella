@@ -16,7 +16,6 @@ export type DesktopPermissionStatus = Record<DesktopPermissionKind, boolean> & {
 type UseDesktopPermissionsOptions = {
   enabled?: boolean;
   pollMs: number;
-  cooldownMs?: number;
   initialStatus: DesktopPermissionStatus;
   restartKinds?: readonly DesktopPermissionKind[];
   normalizeStatus?: (
@@ -32,7 +31,6 @@ const defaultErrorMessage = (error: unknown) =>
 export const useDesktopPermissions = ({
   enabled = true,
   pollMs,
-  cooldownMs = 2000,
   initialStatus,
   restartKinds = [],
   normalizeStatus,
@@ -47,21 +45,8 @@ export const useDesktopPermissions = ({
   );
   const [restartRecommended, setRestartRecommended] = useState(false);
   const [isRestarting, setIsRestarting] = useState(false);
-  const [cooldownAction, setCooldownAction] =
-    useState<DesktopPermissionKind | null>(null);
   const activeActionRef = useRef<DesktopPermissionKind | null>(null);
-  const cooldownRef = useRef(false);
-  const cooldownTimerRef = useRef<number | null>(null);
   const lastStatusRef = useRef<DesktopPermissionStatus | null>(null);
-
-  useEffect(
-    () => () => {
-      if (cooldownTimerRef.current !== null) {
-        window.clearTimeout(cooldownTimerRef.current);
-      }
-    },
-    [],
-  );
 
   const isShallowEqual = (
     a: DesktopPermissionStatus,
@@ -194,11 +179,7 @@ export const useDesktopPermissions = ({
         throw new Error("Desktop permissions are unavailable in this window.");
       }
 
-      // Debounce guard: while a request is in flight or within the post-request
-      // cooldown, ignore repeat clicks. Rapidly re-firing openExternal against
-      // the x-apple.systempreferences: URL relaunches System Settings and
-      // corrupts its view (it can render nearly blank), so one click is enough.
-      if (activeActionRef.current || cooldownRef.current) {
+      if (activeActionRef.current) {
         return lastStatusRef.current ?? initialStatus;
       }
 
@@ -220,19 +201,9 @@ export const useDesktopPermissions = ({
       } finally {
         activeActionRef.current = null;
         setActiveAction(null);
-        cooldownRef.current = true;
-        setCooldownAction(kind);
-        if (cooldownTimerRef.current !== null) {
-          window.clearTimeout(cooldownTimerRef.current);
-        }
-        cooldownTimerRef.current = window.setTimeout(() => {
-          cooldownRef.current = false;
-          cooldownTimerRef.current = null;
-          setCooldownAction(null);
-        }, cooldownMs);
       }
     },
-    [cooldownMs, initialStatus, refresh],
+    [initialStatus, refresh],
   );
 
   const restart = useCallback(async () => {
@@ -262,7 +233,6 @@ export const useDesktopPermissions = ({
     setError,
     activeAction,
     setActiveAction,
-    cooldownAction,
     restartRecommended,
     setRestartRecommended,
     isRestarting,

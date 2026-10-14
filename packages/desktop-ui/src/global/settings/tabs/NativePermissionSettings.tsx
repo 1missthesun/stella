@@ -48,7 +48,6 @@ function MacPermissionSettings() {
     error: permissionsError,
     setError: setPermissionsError,
     activeAction: activePermissionAction,
-    cooldownAction: permissionCooldownAction,
     restartRecommended: screenRestartRecommended,
     isRestarting: isRestartingAfterPermissions,
     refresh: refreshPermissions,
@@ -282,15 +281,13 @@ function MacPermissionSettings() {
             disabled={
               !permissionsLoaded ||
               permissionStatus.accessibility ||
-              activePermissionAction === "accessibility" ||
-              permissionCooldownAction === "accessibility"
+              activePermissionAction === "accessibility"
             }
             onClick={() => void handlePermissionEnable("accessibility")}
           >
             {permissionStatusLabel(
               permissionStatus.accessibility,
-              activePermissionAction === "accessibility" ||
-                permissionCooldownAction === "accessibility",
+              activePermissionAction === "accessibility",
             )}
           </Button>
           <PermissionResetButton
@@ -323,15 +320,13 @@ function MacPermissionSettings() {
             disabled={
               !permissionsLoaded ||
               permissionStatus.screen ||
-              activePermissionAction === "screen" ||
-              permissionCooldownAction === "screen"
+              activePermissionAction === "screen"
             }
             onClick={() => void handlePermissionEnable("screen")}
           >
             {permissionStatusLabel(
               permissionStatus.screen,
-              activePermissionAction === "screen" ||
-                permissionCooldownAction === "screen",
+              activePermissionAction === "screen",
             )}
           </Button>
           <PermissionResetButton

@@ -84,6 +84,7 @@ export const BROWSER_PROTOCOL_ACTIONS = [
   "finalize_tabs",
   "close_owner",
   "release_owner_lease",
+  "extension_status",
 ] as const;
 
 export type BrowserChainAction = (typeof BROWSER_CHAIN_ACTIONS)[number];

@@ -247,11 +247,24 @@ export interface BrowserWorkerTabs {
   finalize(entries?: unknown): Promise<unknown>;
 }
 
+export type BrowserWorkerConnectedBrowser = Readonly<{
+  id: string;
+  label: string;
+  browser: string;
+  profile: string | null;
+  email: string | null;
+  enabled: boolean;
+  inUse: boolean;
+  current: boolean;
+}>;
+
 export interface BrowserWorkerApi {
   readonly backend: BrowserWorkerBackend;
   use(
-    backend: BrowserWorkerBackend,
+    backend?: BrowserWorkerBackend,
+    options?: Readonly<{ browser?: string }>,
   ): Promise<Readonly<{ backend: BrowserWorkerBackend }>>;
+  browsers(): Promise<readonly BrowserWorkerConnectedBrowser[]>;
   readonly capabilities: Readonly<{
     observations: readonly string[];
     actions: readonly string[];
@@ -305,15 +318,71 @@ export function installBrowserWorkerApi(
     get backend() {
       return context.selectedBackend;
     },
-    use: async (backend: BrowserWorkerBackend) => {
+    use: async (
+      backend?: BrowserWorkerBackend,
+      options?: Readonly<{ browser?: string }>,
+    ) => {
+      if (backend === undefined) {
+        return Object.freeze({ backend: await context.ensureBackend() });
+      }
+      if (options !== undefined) {
+        if (!isPlainObject(options) || Object.keys(options).some((key) => key !== "browser")) {
+          throw new TypeError("browser.use options support only { browser }.");
+        }
+        if (backend !== "external") {
+          throw new TypeError("{ browser } applies only to browser.use(\"external\", { browser }).");
+        }
+        if (typeof options.browser !== "string" || options.browser.trim() === "") {
+          throw new TypeError(
+            "options.browser must be a label or id from await browser.browsers(), e.g. \"Brave\".",
+          );
+        }
+      }
       if (backend !== "in-app" && backend !== "external") {
-        throw new TypeError("backend must be 'in-app' or 'external'.");
+        throw new TypeError(
+          "backend must be 'in-app' (Stella's browser) or 'external' (the user's own browser), or omit it to get the default.",
+        );
       }
       const result = await callBrowser("use", [backend]);
       context.selectedBackend = backend;
+      if (options?.browser !== undefined) {
+        await context.command(
+          "tab_list",
+          { browserTarget: options.browser.trim() },
+          "external",
+        );
+      }
       return (isPlainObject(result) ? result : { backend }) as Readonly<{
         backend: BrowserWorkerBackend;
       }>;
+    },
+    browsers: async () => {
+      let data: unknown;
+      try {
+        data = await context.command("extension_status", {}, "external");
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (/not connected|connect the stella browser extension/i.test(message)) {
+          return Object.freeze([]);
+        }
+        throw error;
+      }
+      const clients =
+        isPlainObject(data) && Array.isArray(data.clients) ? data.clients : [];
+      return Object.freeze(
+        clients.filter(isPlainObject).map((client) =>
+          Object.freeze({
+            id: String(client.id ?? ""),
+            label: String(client.label ?? client.browser ?? ""),
+            browser: String(client.browser ?? ""),
+            profile: typeof client.profile === "string" ? client.profile : null,
+            email: typeof client.email === "string" ? client.email : null,
+            enabled: client.enabled !== false,
+            inUse: client.inUse === true,
+            current: client.current === true,
+          }),
+        ),
+      );
     },
     capabilities: Object.freeze({
       observations: Object.freeze([

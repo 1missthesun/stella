@@ -1748,7 +1748,11 @@ export class BrowserSession implements BrowserSessionClient {
         (cause instanceof BrowserTransportError && cause.code === "timeout") ||
         /timed out/i.test(message);
       const timeoutProvenance = timedOut
-        ? ` [browser deadline: timeoutMs=${timeoutMs} source=${timeoutSource} dispatched=${requestDispatched} outcome=${requestDispatched ? "unknown" : "not-started"}]`
+        ? ` [browser deadline: timeoutMs=${timeoutMs} source=${timeoutSource} dispatched=${requestDispatched} outcome=${requestDispatched ? "unknown" : "not-started"}] ${
+            requestDispatched
+              ? "Next: the page may be loading, frozen or blocked by a dialog. Check it cheaply with await tab.url(); if this tab keeps timing out, close it and continue in a new one from browser.tabs.new(). Confirm a mutating action did not happen before repeating it."
+              : `Nothing was sent: the ${backend === "external" ? "user's browser (extension)" : "in-app browser"} did not accept the command in time. Retry once; if it fails again, ${backend === "external" ? 'continue in Stella\'s browser with browser.use("in-app")' : 'try browser.use("external") if the extension is connected'}, or report the exact error.`
+          }`
         : "";
       throw new BrowserSessionCommandError(
         "execution_failed",

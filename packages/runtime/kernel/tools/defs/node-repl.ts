@@ -6,6 +6,7 @@ import {
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import type { ToolDefinition } from "../types.js";
 import { CODE_TOOL_NAME } from "../code-tool.js";
+import { browserApiHint } from "../../browser-use/api-hints.js";
 import {
   CODE_TOOL_DESCRIPTION,
   CODE_TOOL_PARAMETERS,
@@ -25,9 +26,12 @@ const cleanCodeError = (raw: string): string => {
   const kept = lines.filter((line) => !/^\s+at\s/.test(line));
   while (kept.length > 0 && kept[kept.length - 1]!.trim() === "") kept.pop();
   const message = kept.join("\n").trim() || "Code cell failed.";
-  return position && !message.includes(`stella-code:${position[1]}`)
-    ? `${message} (line ${position[1]}:${position[2]})`
-    : message;
+  const located =
+    position && !message.includes(`stella-code:${position[1]}`)
+      ? `${message} (line ${position[1]}:${position[2]})`
+      : message;
+  const hint = browserApiHint(message);
+  return hint ? `${located}\nHint: ${hint}` : located;
 };
 
 export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {

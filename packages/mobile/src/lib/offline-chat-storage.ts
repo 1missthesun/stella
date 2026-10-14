@@ -124,6 +124,7 @@ type SQLiteDatabase = {
   getFirstAsync: <T>(sql: string, ...params: unknown[]) => Promise<T | null>;
   getAllAsync: <T>(sql: string, ...params: unknown[]) => Promise<T[]>;
   withTransactionAsync: (task: () => Promise<void>) => Promise<void>;
+  closeAsync: () => Promise<void>;
 };
 
 type StoredMessageRow = {
@@ -341,6 +342,18 @@ async function openTranscriptDb(): Promise<SQLiteDatabase | null> {
   )) as unknown as SQLiteDatabase;
   await db.execAsync(TRANSCRIPT_SCHEMA);
   return db;
+}
+
+/**
+ * Close the transcript database before the JS restarts (switching servers).
+ * expo-sqlite closes open databases while the module tears down on reload,
+ * and doing that under a live connection crashes natively.
+ */
+export async function closeTranscriptDbForReload(): Promise<void> {
+  const pending = transcriptDbPromise;
+  transcriptDbPromise = null;
+  const db = await pending?.catch(() => null);
+  await db?.closeAsync().catch(() => undefined);
 }
 
 const getTranscriptDb = async () => {

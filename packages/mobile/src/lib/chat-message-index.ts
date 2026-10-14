@@ -79,6 +79,17 @@ async function openDb(): Promise<SQLite.SQLiteDatabase> {
   return db;
 }
 
+/**
+ * Close the index before the JS restarts (switching servers): expo-sqlite
+ * closing the FTS5 table itself during module teardown crashes natively.
+ */
+export async function closeMessageIndexForReload(): Promise<void> {
+  const pending = dbPromise;
+  dbPromise = null;
+  const db = await pending?.catch(() => null);
+  await db?.closeAsync().catch(() => undefined);
+}
+
 function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = openDb().catch((error) => {

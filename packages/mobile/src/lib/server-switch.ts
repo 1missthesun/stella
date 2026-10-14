@@ -20,9 +20,15 @@ import {
 } from "./server-registry";
 import { markOnboardingSeen } from "./onboarding";
 import { clearAccountChatData } from "./chat-account-cleanup";
+import { closeMessageIndexForReload } from "./chat-message-index";
+import { closeTranscriptDbForReload } from "./offline-chat-storage";
 
 /** Restart the JS so every module picks up the newly active server. */
 export const reloadApp = async (): Promise<void> => {
+  await Promise.all([
+    closeMessageIndexForReload().catch(() => undefined),
+    closeTranscriptDbForReload().catch(() => undefined),
+  ]);
   // Release builds restart through expo-updates. In development builds it is
   // disabled and its reload resolves without restarting, so use the dev one.
   if (!__DEV__) {

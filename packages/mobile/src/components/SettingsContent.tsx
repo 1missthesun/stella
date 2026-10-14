@@ -132,6 +132,7 @@ export function SettingsContent() {
   // Appearance, notifications, and legal work without a session; everything
   // that needs an identity (plan, computers, cloud, sign-out) hides.
   const isSignedIn = Boolean(user) && !guest;
+  const showFeedback = isSignedIn && !isSelfHostedLaunch;
   const showLoadingHeader = !guest && session.isPending && !user;
 
   const runResetCloudBrowser = async () => {
@@ -546,7 +547,9 @@ export function SettingsContent() {
           {t("mobile.settings.aboutSection")}
         </Text>
         <View style={settingsStyles.group}>
-          {isSignedIn ? (
+          {/* Feedback is stored on the active server; on a self-hosted one
+              nobody at Stella would ever read it. */}
+          {showFeedback ? (
             <LinkRow
               label={t("sidebar.feedback")}
               accessibilityLabel={t("sidebar.feedback")}
@@ -558,7 +561,7 @@ export function SettingsContent() {
           <LinkRow
             label={t("mobile.settings.termsOfService")}
             accessibilityLabel={t("mobile.settings.openTermsLabel")}
-            divided={isSignedIn}
+            divided={showFeedback}
             styles={settingsStyles}
             colors={colors}
             onPress={() => void Linking.openURL(`${env.siteUrl}/terms`)}

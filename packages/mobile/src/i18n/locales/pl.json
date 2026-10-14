@@ -1960,8 +1960,19 @@
     },
     "browserExtension": {
       "action": "Pobierz rozszerzenie",
+      "automatic": "Automatycznie (ostatnio używana przeglądarka)",
       "description": "Pozwól Stelli widzieć przeglądarkę i działać w niej.",
-      "title": "Stella dla Chrome"
+      "saveError": "Nie udało się zapisać wyboru przeglądarki. Spróbuj ponownie.",
+      "status": {
+        "inUse": "W użyciu",
+        "connected": "Połączono",
+        "notConnected": "Nie połączono",
+        "off": "Wyłączona"
+      },
+      "title": "Stella dla Chrome",
+      "unknownBrowser": "Przeglądarka",
+      "useDescription": "Stella działa w tej przeglądarce. Wyłącz którąś, aby Stella z niej nie korzystała.",
+      "useLabel": "Przeglądarka do użycia"
     },
     "passkeys": {
       "add": "Add a passkey",

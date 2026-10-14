@@ -1960,8 +1960,19 @@
     },
     "browserExtension": {
       "action": "Získat rozšíření",
+      "automatic": "Automaticky (prohlížeč, který jste použili naposledy)",
       "description": "Dovolte Stelle vidět váš prohlížeč a jednat v něm.",
-      "title": "Stella pro Chrome"
+      "saveError": "Volbu prohlížeče se nepodařilo uložit. Zkuste to znovu.",
+      "status": {
+        "inUse": "Používá se",
+        "connected": "Připojeno",
+        "notConnected": "Nepřipojeno",
+        "off": "Vypnuto"
+      },
+      "title": "Stella pro Chrome",
+      "unknownBrowser": "Prohlížeč",
+      "useDescription": "Stella pracuje v tomto prohlížeči. Vypněte některý, aby do něj Stella nezasahovala.",
+      "useLabel": "Prohlížeč k použití"
     },
     "passkeys": {
       "add": "Add a passkey",

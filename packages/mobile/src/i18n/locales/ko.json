@@ -1936,8 +1936,19 @@
     },
     "browserExtension": {
       "action": "확장 프로그램 받기",
+      "automatic": "자동 (마지막으로 사용한 브라우저)",
       "description": "Stella가 브라우저를 보고 조작하도록 허용합니다.",
-      "title": "Stella for Chrome"
+      "saveError": "브라우저 선택을 저장하지 못했습니다. 다시 시도하세요.",
+      "status": {
+        "inUse": "사용 중",
+        "connected": "연결됨",
+        "notConnected": "연결 안 됨",
+        "off": "꺼짐"
+      },
+      "title": "Stella for Chrome",
+      "unknownBrowser": "브라우저",
+      "useDescription": "Stella는 이 브라우저에서 작업합니다. Stella가 사용하지 않게 하려면 브라우저를 끄세요.",
+      "useLabel": "사용할 브라우저"
     },
     "passkeys": {
       "add": "Add a passkey",

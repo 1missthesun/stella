@@ -1936,8 +1936,19 @@
     },
     "browserExtension": {
       "action": "Dapatkan ekstensi",
+      "automatic": "Otomatis (browser yang terakhir Anda gunakan)",
       "description": "Izinkan Stella melihat dan bertindak di browser Anda.",
-      "title": "Stella untuk Chrome"
+      "saveError": "Pilihan browser tidak dapat disimpan. Coba lagi.",
+      "status": {
+        "inUse": "Digunakan",
+        "connected": "Terhubung",
+        "notConnected": "Tidak terhubung",
+        "off": "Mati"
+      },
+      "title": "Stella untuk Chrome",
+      "unknownBrowser": "Browser",
+      "useDescription": "Stella bekerja di browser ini. Matikan salah satu agar Stella tidak memakainya.",
+      "useLabel": "Browser yang digunakan"
     },
     "passkeys": {
       "add": "Add a passkey",

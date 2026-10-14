@@ -1952,8 +1952,19 @@
     },
     "browserExtension": {
       "action": "Obtener extensión",
+      "automatic": "Automático (el navegador que usaste por última vez)",
       "description": "Deja que Stella vea y actúe en tu navegador.",
-      "title": "Stella para Chrome"
+      "saveError": "No se pudo guardar tu elección de navegador. Inténtalo de nuevo.",
+      "status": {
+        "inUse": "En uso",
+        "connected": "Conectado",
+        "notConnected": "No conectado",
+        "off": "Desactivado"
+      },
+      "title": "Stella para Chrome",
+      "unknownBrowser": "Navegador",
+      "useDescription": "Stella trabaja en este navegador. Desactiva uno para que Stella no lo use.",
+      "useLabel": "Navegador que se usa"
     },
     "passkeys": {
       "add": "Add a passkey",

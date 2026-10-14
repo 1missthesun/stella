@@ -1952,8 +1952,19 @@
     },
     "browserExtension": {
       "action": "Obține extensia",
+      "automatic": "Automat (browserul folosit ultima dată)",
       "description": "Permite-i Stellei să vadă și să acționeze în browserul tău.",
-      "title": "Stella pentru Chrome"
+      "saveError": "Nu s-a putut salva alegerea browserului. Încearcă din nou.",
+      "status": {
+        "inUse": "În uz",
+        "connected": "Conectat",
+        "notConnected": "Neconectat",
+        "off": "Dezactivat"
+      },
+      "title": "Stella pentru Chrome",
+      "unknownBrowser": "Browser",
+      "useDescription": "Stella lucrează în acest browser. Dezactivează unul ca Stella să nu-l folosească.",
+      "useLabel": "Browserul folosit"
     },
     "passkeys": {
       "add": "Add a passkey",

@@ -1944,8 +1944,19 @@
     },
     "browserExtension": {
       "action": "Uzantıyı al",
+      "automatic": "Otomatik (en son kullandığın tarayıcı)",
       "description": "Stella'nın tarayıcını görmesine ve orada işlem yapmasına izin ver.",
-      "title": "Chrome için Stella"
+      "saveError": "Tarayıcı seçimin kaydedilemedi. Tekrar dene.",
+      "status": {
+        "inUse": "Kullanımda",
+        "connected": "Bağlı",
+        "notConnected": "Bağlı değil",
+        "off": "Kapalı"
+      },
+      "title": "Chrome için Stella",
+      "unknownBrowser": "Tarayıcı",
+      "useDescription": "Stella bu tarayıcıda çalışır. Stella'yı uzak tutmak için bir tarayıcıyı kapat.",
+      "useLabel": "Kullanılacak tarayıcı"
     },
     "passkeys": {
       "add": "Add a passkey",

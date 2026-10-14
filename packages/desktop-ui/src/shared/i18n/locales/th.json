@@ -1936,8 +1936,19 @@
     },
     "browserExtension": {
       "action": "รับส่วนขยาย",
+      "automatic": "อัตโนมัติ (เบราว์เซอร์ที่คุณใช้ล่าสุด)",
       "description": "ให้ Stella เห็นและทำงานในเบราว์เซอร์ของคุณ",
-      "title": "Stella สำหรับ Chrome"
+      "saveError": "บันทึกตัวเลือกเบราว์เซอร์ไม่ได้ ลองอีกครั้ง",
+      "status": {
+        "inUse": "กำลังใช้",
+        "connected": "เชื่อมต่อแล้ว",
+        "notConnected": "ไม่ได้เชื่อมต่อ",
+        "off": "ปิด"
+      },
+      "title": "Stella สำหรับ Chrome",
+      "unknownBrowser": "เบราว์เซอร์",
+      "useDescription": "Stella ทำงานในเบราว์เซอร์นี้ ปิดเบราว์เซอร์ใดก็ได้เพื่อไม่ให้ Stella ใช้",
+      "useLabel": "เบราว์เซอร์ที่ใช้"
     },
     "passkeys": {
       "add": "Add a passkey",

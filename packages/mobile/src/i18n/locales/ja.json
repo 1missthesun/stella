@@ -1936,8 +1936,19 @@
     },
     "browserExtension": {
       "action": "拡張機能を入手",
+      "automatic": "自動（最後に使ったブラウザ）",
       "description": "Stella がブラウザを見て操作できるようにします。",
-      "title": "Stella for Chrome"
+      "saveError": "ブラウザの選択を保存できませんでした。もう一度お試しください。",
+      "status": {
+        "inUse": "使用中",
+        "connected": "接続済み",
+        "notConnected": "未接続",
+        "off": "オフ"
+      },
+      "title": "Stella for Chrome",
+      "unknownBrowser": "ブラウザ",
+      "useDescription": "Stella はこのブラウザで作業します。Stella に使わせたくないブラウザはオフにしてください。",
+      "useLabel": "使用するブラウザ"
     },
     "passkeys": {
       "add": "Add a passkey",

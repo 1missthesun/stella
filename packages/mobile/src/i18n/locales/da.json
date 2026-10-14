@@ -1944,8 +1944,19 @@
     },
     "browserExtension": {
       "action": "Hent udvidelse",
+      "automatic": "Automatisk (den browser, du sidst brugte)",
       "description": "Lad Stella se og handle i din browser.",
-      "title": "Stella til Chrome"
+      "saveError": "Dit browservalg kunne ikke gemmes. Prøv igen.",
+      "status": {
+        "inUse": "I brug",
+        "connected": "Forbundet",
+        "notConnected": "Ikke forbundet",
+        "off": "Fra"
+      },
+      "title": "Stella til Chrome",
+      "unknownBrowser": "Browser",
+      "useDescription": "Stella arbejder i denne browser. Slå en fra for at holde Stella ude af den.",
+      "useLabel": "Browser, der skal bruges"
     },
     "passkeys": {
       "add": "Add a passkey",

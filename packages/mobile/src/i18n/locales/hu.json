@@ -1944,8 +1944,19 @@
     },
     "browserExtension": {
       "action": "Bővítmény beszerzése",
+      "automatic": "Automatikus (a legutóbb használt böngésző)",
       "description": "Engedd, hogy a Stella lássa a böngésződet és műveleteket végezzen benne.",
-      "title": "Stella Chrome-hoz"
+      "saveError": "Nem sikerült menteni a böngészőválasztást. Próbáld újra.",
+      "status": {
+        "inUse": "Használatban",
+        "connected": "Csatlakoztatva",
+        "notConnected": "Nincs csatlakoztatva",
+        "off": "Ki"
+      },
+      "title": "Stella Chrome-hoz",
+      "unknownBrowser": "Böngésző",
+      "useDescription": "Stella ebben a böngészőben dolgozik. Kapcsolj ki egyet, hogy Stella ne használja.",
+      "useLabel": "Használt böngésző"
     },
     "passkeys": {
       "add": "Add a passkey",

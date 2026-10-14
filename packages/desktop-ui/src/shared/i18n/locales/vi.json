@@ -1936,8 +1936,19 @@
     },
     "browserExtension": {
       "action": "Tải tiện ích",
+      "automatic": "Tự động (trình duyệt bạn dùng gần nhất)",
       "description": "Cho phép Stella xem và thao tác trong trình duyệt của bạn.",
-      "title": "Stella cho Chrome"
+      "saveError": "Không lưu được lựa chọn trình duyệt. Hãy thử lại.",
+      "status": {
+        "inUse": "Đang dùng",
+        "connected": "Đã kết nối",
+        "notConnected": "Chưa kết nối",
+        "off": "Tắt"
+      },
+      "title": "Stella cho Chrome",
+      "unknownBrowser": "Trình duyệt",
+      "useDescription": "Stella làm việc trong trình duyệt này. Tắt một trình duyệt để Stella không dùng nó.",
+      "useLabel": "Trình duyệt sử dụng"
     },
     "passkeys": {
       "add": "Add a passkey",

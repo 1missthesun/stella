@@ -1952,8 +1952,19 @@
     },
     "browserExtension": {
       "action": "קבל הרחבה",
+      "automatic": "אוטומטי (הדפדפן שבו השתמשת לאחרונה)",
       "description": "אפשרו ל-Stella לראות את הדפדפן ולפעול בו.",
-      "title": "Stella ל-Chrome"
+      "saveError": "לא ניתן היה לשמור את בחירת הדפדפן. נסו שוב.",
+      "status": {
+        "inUse": "בשימוש",
+        "connected": "מחובר",
+        "notConnected": "לא מחובר",
+        "off": "כבוי"
+      },
+      "title": "Stella ל-Chrome",
+      "unknownBrowser": "דפדפן",
+      "useDescription": "Stella עובדת בדפדפן הזה. כבו דפדפן כדי ש-Stella לא תשתמש בו.",
+      "useLabel": "דפדפן לשימוש"
     },
     "passkeys": {
       "add": "Add a passkey",

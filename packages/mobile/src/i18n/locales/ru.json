@@ -1960,8 +1960,19 @@
     },
     "browserExtension": {
       "action": "Установить расширение",
+      "automatic": "Автоматически (браузер, которым вы пользовались последним)",
       "description": "Разрешите Stella видеть браузер и действовать в нём.",
-      "title": "Stella для Chrome"
+      "saveError": "Не удалось сохранить выбор браузера. Попробуйте ещё раз.",
+      "status": {
+        "inUse": "Используется",
+        "connected": "Подключён",
+        "notConnected": "Не подключён",
+        "off": "Выключен"
+      },
+      "title": "Stella для Chrome",
+      "unknownBrowser": "Браузер",
+      "useDescription": "Stella работает в этом браузере. Отключите браузер, чтобы Stella им не пользовалась.",
+      "useLabel": "Используемый браузер"
     },
     "passkeys": {
       "add": "Add a passkey",

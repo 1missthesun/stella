@@ -1944,8 +1944,19 @@
     },
     "browserExtension": {
       "action": "एक्सटेंशन प्राप्त करें",
+      "automatic": "स्वचालित (जो ब्राउज़र आपने आख़िरी बार इस्तेमाल किया)",
       "description": "Stella को अपने ब्राउज़र में देखने और काम करने दें।",
-      "title": "Chrome के लिए Stella"
+      "saveError": "आपकी ब्राउज़र पसंद सहेजी नहीं जा सकी। फिर से कोशिश करें।",
+      "status": {
+        "inUse": "उपयोग में",
+        "connected": "कनेक्टेड",
+        "notConnected": "कनेक्ट नहीं",
+        "off": "बंद"
+      },
+      "title": "Chrome के लिए Stella",
+      "unknownBrowser": "ब्राउज़र",
+      "useDescription": "Stella इस ब्राउज़र में काम करती है। Stella को किसी ब्राउज़र से दूर रखने के लिए उसे बंद करें।",
+      "useLabel": "इस्तेमाल होने वाला ब्राउज़र"
     },
     "passkeys": {
       "add": "Add a passkey",

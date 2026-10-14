@@ -1976,8 +1976,19 @@
     },
     "browserExtension": {
       "action": "الحصول على الإضافة",
+      "automatic": "تلقائي (المتصفح الذي استخدمته آخر مرة)",
       "description": "اسمح لـ Stella برؤية متصفحك والعمل فيه.",
-      "title": "Stella لـ Chrome"
+      "saveError": "تعذّر حفظ اختيار المتصفح. حاول مرة أخرى.",
+      "status": {
+        "inUse": "قيد الاستخدام",
+        "connected": "متصل",
+        "notConnected": "غير متصل",
+        "off": "متوقف"
+      },
+      "title": "Stella لـ Chrome",
+      "unknownBrowser": "متصفح",
+      "useDescription": "تعمل Stella في هذا المتصفح. أوقف تشغيل متصفح لإبعاد Stella عنه.",
+      "useLabel": "المتصفح المستخدم"
     },
     "passkeys": {
       "add": "Add a passkey",

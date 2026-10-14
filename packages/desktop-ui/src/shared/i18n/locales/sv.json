@@ -1944,8 +1944,19 @@
     },
     "browserExtension": {
       "action": "Hämta tillägg",
+      "automatic": "Automatiskt (webbläsaren du senast använde)",
       "description": "Låt Stella se och agera i din webbläsare.",
-      "title": "Stella för Chrome"
+      "saveError": "Det gick inte att spara ditt val av webbläsare. Försök igen.",
+      "status": {
+        "inUse": "Används",
+        "connected": "Ansluten",
+        "notConnected": "Inte ansluten",
+        "off": "Av"
+      },
+      "title": "Stella för Chrome",
+      "unknownBrowser": "Webbläsare",
+      "useDescription": "Stella arbetar i den här webbläsaren. Stäng av en för att hålla Stella borta från den.",
+      "useLabel": "Webbläsare att använda"
     },
     "passkeys": {
       "add": "Add a passkey",

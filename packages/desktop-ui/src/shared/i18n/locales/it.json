@@ -1952,8 +1952,19 @@
     },
     "browserExtension": {
       "action": "Ottieni estensione",
+      "automatic": "Automatico (l'ultimo browser che hai usato)",
       "description": "Permetti a Stella di vedere e agire nel tuo browser.",
-      "title": "Stella per Chrome"
+      "saveError": "Impossibile salvare la scelta del browser. Riprova.",
+      "status": {
+        "inUse": "In uso",
+        "connected": "Connesso",
+        "notConnected": "Non connesso",
+        "off": "Disattivato"
+      },
+      "title": "Stella per Chrome",
+      "unknownBrowser": "Browser",
+      "useDescription": "Stella lavora in questo browser. Disattivane uno per tenere Stella fuori.",
+      "useLabel": "Browser da usare"
     },
     "passkeys": {
       "add": "Add a passkey",

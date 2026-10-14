@@ -1944,8 +1944,19 @@
     },
     "browserExtension": {
       "action": "Hanki laajennus",
+      "automatic": "Automaattinen (viimeksi käyttämäsi selain)",
       "description": "Anna Stellan nähdä selaimesi ja toimia siinä.",
-      "title": "Stella Chromelle"
+      "saveError": "Selainvalintaa ei voitu tallentaa. Yritä uudelleen.",
+      "status": {
+        "inUse": "Käytössä",
+        "connected": "Yhdistetty",
+        "notConnected": "Ei yhdistetty",
+        "off": "Pois"
+      },
+      "title": "Stella Chromelle",
+      "unknownBrowser": "Selain",
+      "useDescription": "Stella toimii tässä selaimessa. Poista selain käytöstä pitääksesi Stellan poissa siitä.",
+      "useLabel": "Käytettävä selain"
     },
     "passkeys": {
       "add": "Add a passkey",

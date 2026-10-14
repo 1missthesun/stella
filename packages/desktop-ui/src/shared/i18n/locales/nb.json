@@ -1944,8 +1944,19 @@
     },
     "browserExtension": {
       "action": "Hent utvidelse",
+      "automatic": "Automatisk (nettleseren du brukte sist)",
       "description": "La Stella se og handle i nettleseren din.",
-      "title": "Stella for Chrome"
+      "saveError": "Kunne ikke lagre nettleservalget ditt. Prøv igjen.",
+      "status": {
+        "inUse": "I bruk",
+        "connected": "Tilkoblet",
+        "notConnected": "Ikke tilkoblet",
+        "off": "Av"
+      },
+      "title": "Stella for Chrome",
+      "unknownBrowser": "Nettleser",
+      "useDescription": "Stella jobber i denne nettleseren. Slå av en for å holde Stella unna den.",
+      "useLabel": "Nettleser som skal brukes"
     },
     "passkeys": {
       "add": "Add a passkey",

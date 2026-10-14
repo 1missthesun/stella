@@ -1944,8 +1944,19 @@
     },
     "browserExtension": {
       "action": "Extensie ophalen",
+      "automatic": "Automatisch (de browser die je het laatst gebruikte)",
       "description": "Laat Stella je browser zien en erin handelen.",
-      "title": "Stella voor Chrome"
+      "saveError": "Je browserkeuze kon niet worden opgeslagen. Probeer het opnieuw.",
+      "status": {
+        "inUse": "In gebruik",
+        "connected": "Verbonden",
+        "notConnected": "Niet verbonden",
+        "off": "Uit"
+      },
+      "title": "Stella voor Chrome",
+      "unknownBrowser": "Browser",
+      "useDescription": "Stella werkt in deze browser. Zet er een uit om Stella erbuiten te houden.",
+      "useLabel": "Browser om te gebruiken"
     },
     "passkeys": {
       "add": "Add a passkey",

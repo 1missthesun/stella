@@ -1936,8 +1936,19 @@
     },
     "browserExtension": {
       "action": "获取扩展",
+      "automatic": "自动（你最近使用的浏览器）",
       "description": "让 Stella 查看并操作你的浏览器。",
-      "title": "Stella for Chrome"
+      "saveError": "无法保存你的浏览器选择。请重试。",
+      "status": {
+        "inUse": "使用中",
+        "connected": "已连接",
+        "notConnected": "未连接",
+        "off": "已关闭"
+      },
+      "title": "Stella for Chrome",
+      "unknownBrowser": "浏览器",
+      "useDescription": "Stella 会在这个浏览器中工作。关闭某个浏览器即可让 Stella 不使用它。",
+      "useLabel": "使用的浏览器"
     },
     "passkeys": {
       "add": "Add a passkey",

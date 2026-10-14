@@ -24,12 +24,14 @@ type LatLngBounds = {
   getCenter(): LatLng;
 };
 type MarkerLabel = { text: string; color?: string; fontSize?: string };
-type Marker = {
+type Overlay = { setMap(map: GoogleMap | null): void };
+type Marker = Overlay & {
   addListener(eventName: "click", handler: () => void): MapsEventListener;
 };
 type InfoWindow = {
   setContent(content: string): void;
   open(options: { map: GoogleMap; anchor: Marker }): void;
+  close(): void;
 };
 type MapStyle = {
   featureType?: string;
@@ -64,7 +66,7 @@ type GoogleMaps = {
     strokeColor?: string;
     strokeOpacity?: number;
     strokeWeight?: number;
-  }) => unknown;
+  }) => Overlay;
   geometry: { encoding: { decodePath(encoded: string): LatLng[] } };
   event: {
     addListenerOnce(
@@ -196,7 +198,7 @@ const renderArtifact = (
   container: HTMLElement,
   artifact: MapRouteArtifact,
   dark: boolean,
-) => {
+): (() => void) => {
   const map = new maps.Map(container, {
     center: { lat: artifact.markers[0].lat, lng: artifact.markers[0].lng },
     zoom: 13,
@@ -209,6 +211,8 @@ const renderArtifact = (
 
   const bounds = new maps.LatLngBounds();
   const infoWindow = new maps.InfoWindow();
+  const overlays: Overlay[] = [];
+  const listeners: MapsEventListener[] = [];
   const routeLabels: Record<string, string> = {
     origin: "A",
     destination: "B",
@@ -225,23 +229,28 @@ const renderArtifact = (
         ? { label: { text: label, color: "#ffffff", fontSize: "12px" } }
         : {}),
     });
-    pin.addListener("click", () => {
-      infoWindow.setContent(infoWindowHtml(marker));
-      infoWindow.open({ map, anchor: pin });
-    });
+    overlays.push(pin);
+    listeners.push(
+      pin.addListener("click", () => {
+        infoWindow.setContent(infoWindowHtml(marker));
+        infoWindow.open({ map, anchor: pin });
+      }),
+    );
   }
 
   if (artifact.route) {
     try {
       const path = maps.geometry.encoding.decodePath(artifact.route.polyline);
       for (const point of path) bounds.extend(point);
-      new maps.Polyline({
-        map,
-        path,
-        strokeColor: dark ? "#7aa5ff" : "#1a73e8",
-        strokeOpacity: 0.9,
-        strokeWeight: 5,
-      });
+      overlays.push(
+        new maps.Polyline({
+          map,
+          path,
+          strokeColor: dark ? "#7aa5ff" : "#1a73e8",
+          strokeOpacity: 0.9,
+          strokeWeight: 5,
+        }),
+      );
     } catch {
       // A bad polyline still leaves a useful pins-only map.
     }
@@ -252,10 +261,18 @@ const renderArtifact = (
     map.setZoom(15);
   } else {
     map.fitBounds(bounds, 48);
-    maps.event.addListenerOnce(map, "idle", () => {
-      if ((map.getZoom() ?? 0) > 16) map.setZoom(16);
-    });
+    listeners.push(
+      maps.event.addListenerOnce(map, "idle", () => {
+        if ((map.getZoom() ?? 0) > 16) map.setZoom(16);
+      }),
+    );
   }
+
+  return () => {
+    for (const listener of listeners) listener.remove();
+    infoWindow.close();
+    for (const overlay of overlays) overlay.setMap(null);
+  };
 };
 
 export function MapsEmbedClient() {
@@ -276,19 +293,19 @@ export function MapsEmbedClient() {
     const container = containerRef.current;
     if (!container || !artifact || !BROWSER_KEY) return;
     let cancelled = false;
+    let disposeMap: (() => void) | undefined;
     loadGoogleMaps()
       .then((maps) => {
         if (cancelled) return;
         setLoadError(null);
-        renderArtifact(maps, container, artifact, dark);
+        disposeMap = renderArtifact(maps, container, artifact, dark);
       })
       .catch(() => {
         if (!cancelled) setLoadError("The map could not be loaded.");
       });
     return () => {
       cancelled = true;
-      // Google Maps has no destroy API; dropping the DOM subtree is the
-      // documented teardown for an embedded map this small.
+      disposeMap?.();
       container.replaceChildren();
     };
   }, [artifact, dark]);

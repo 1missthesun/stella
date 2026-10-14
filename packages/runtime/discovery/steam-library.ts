@@ -84,6 +84,28 @@ const parseVdf = (text: string): Record<string, unknown> => {
   return readObject();
 };
 
+const isVdfObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const vdfPath = (
+  root: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, unknown> | undefined => {
+  let node: Record<string, unknown> | undefined = root;
+  for (const key of keys) {
+    const wanted = key.toLowerCase();
+    const child: unknown = Object.entries(node).find(
+      ([name]) => name.toLowerCase() === wanted,
+    )?.[1];
+    if (!isVdfObject(child)) return undefined;
+    node = child;
+  }
+  return node;
+};
+
+const vdfNumber = (value: unknown): number | undefined =>
+  typeof value === "string" && /^\d+$/.test(value) ? Number(value) : undefined;
+
 const getSteamPaths = (): string[] => {
   const home = os.homedir();
   const platform = process.platform;
@@ -217,36 +239,23 @@ const getPlaytimeData = async (
     const configPath = path.join(steamDir, "userdata", userId, "config", "localconfig.vdf");
     const content = await fs.readFile(configPath, "utf-8");
 
-    // Extract per-app entries from the Software/Valve/Steam/apps section
-    // Using regex for targeted extraction since the file can be large
-    const appsIdx = content.indexOf('"apps"', content.indexOf('"Software"'));
-    if (appsIdx === -1) return playtime;
-
-    const braceStart = content.indexOf("{", appsIdx);
-    if (braceStart === -1) return playtime;
-    let depth = 1;
-    let pos = braceStart + 1;
-    while (pos < content.length && depth > 0) {
-      if (content[pos] === "{") depth++;
-      else if (content[pos] === "}") depth--;
-      pos++;
-    }
-    const appsBlock = content.substring(braceStart, pos);
-
-    const appPattern = /"(\d+)"\s*\{([^}]*(?:\{[^}]*\}[^}]*)*)\}/g;
-    let match;
-    while ((match = appPattern.exec(appsBlock)) !== null) {
-      const appId = match[1];
-      const body = match[2];
-      const lastPlayedMatch = body.match(/"LastPlayed"\s+"(\d+)"/);
-      const playtimeMatch = body.match(/"Playtime"\s+"(\d+)"/);
-
-      if (lastPlayedMatch || playtimeMatch) {
-        playtime.set(appId, {
-          playtimeMinutes: playtimeMatch ? Number(playtimeMatch[1]) : 0,
-          lastPlayed: lastPlayedMatch ? Number(lastPlayedMatch[1]) : 0,
-        });
-      }
+    const apps = vdfPath(parseVdf(content), [
+      "UserLocalConfigStore",
+      "Software",
+      "Valve",
+      "Steam",
+      "apps",
+    ]);
+    if (!apps) return playtime;
+    for (const [appId, entry] of Object.entries(apps)) {
+      if (!/^\d+$/.test(appId) || !isVdfObject(entry)) continue;
+      const lastPlayed = vdfNumber(entry.LastPlayed);
+      const playtimeMinutes = vdfNumber(entry.Playtime);
+      if (lastPlayed === undefined && playtimeMinutes === undefined) continue;
+      playtime.set(appId, {
+        playtimeMinutes: playtimeMinutes ?? 0,
+        lastPlayed: lastPlayed ?? 0,
+      });
     }
   } catch (error) {
     log("Failed to parse localconfig.vdf:", error);

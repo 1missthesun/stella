@@ -20,7 +20,7 @@
  */
 
 import {
-  floatToInt16Pcm,
+  floatToPcm16Le,
   resampleLinear,
 } from "@/features/voice/services/audio-encoding";
 
@@ -86,8 +86,7 @@ export class MicCapture {
         sourceRate === targetRate
           ? input
           : resampleLinear(input, sourceRate, targetRate);
-      const pcm16 = floatToInt16Pcm(downsampled);
-      this.onChunk(toBase64(pcm16));
+      this.onChunk(toBase64(floatToPcm16Le(downsampled)));
     };
   }
 
@@ -160,21 +159,11 @@ export class MicCapture {
   }
 }
 
-function toBase64(pcm16: Int16Array): string {
-  // Reinterpret the Int16Array buffer as bytes; little-endian on every
-  // platform Electron supports.
-  const bytes = new Uint8Array(
-    pcm16.buffer,
-    pcm16.byteOffset,
-    pcm16.byteLength,
-  );
+function toBase64(bytes: Uint8Array): string {
   let binary = "";
   const CHUNK = 0x8000;
   for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode.apply(
-      null,
-      bytes.subarray(i, i + CHUNK) as unknown as number[],
-    );
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   }
   return btoa(binary);
 }

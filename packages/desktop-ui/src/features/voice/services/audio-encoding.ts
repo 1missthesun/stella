@@ -22,11 +22,14 @@ export const resampleLinear = (
   return resampled;
 };
 
-export const floatToInt16Pcm = (samples: Float32Array): Int16Array => {
-  const pcm = new Int16Array(samples.length);
+export const floatToPcm16Le = (samples: Float32Array): Uint8Array => {
+  const bytes = new Uint8Array(samples.length * 2);
+  const view = new DataView(bytes.buffer);
   for (let i = 0; i < samples.length; i += 1) {
     const clamped = Math.max(-1, Math.min(1, samples[i]!));
-    pcm[i] = clamped < 0 ? Math.round(clamped * 0x8000) : Math.round(clamped * 0x7fff);
+    const sample =
+      clamped < 0 ? Math.round(clamped * 0x8000) : Math.round(clamped * 0x7fff);
+    view.setInt16(i * 2, sample, true);
   }
-  return pcm;
+  return bytes;
 };

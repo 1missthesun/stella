@@ -1,8 +1,10 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { setProtectedStorageProviderOverride } from "@stella/runtime/kernel/shared/protected-storage";
 import { isDevHarness } from "../app-identity.js";
 
 const HARNESS_STORAGE_KEY_ENV = "STELLA_DEV_HARNESS_STORAGE_KEY";
+const HARNESS_STORAGE_KEY_FILE_ENV = "STELLA_DEV_HARNESS_STORAGE_KEY_FILE";
 const KEY_BYTES = 32;
 const IV_BYTES = 12;
 const TAG_BYTES = 16;
@@ -68,8 +70,6 @@ export const createDevHarnessSafeStorage = (
   };
 };
 
-let consumedHarnessKey: string | null = null;
-
 export const configureDevHarnessProtectedStorage = ({
   env = process.env,
   isPackaged,
@@ -79,26 +79,17 @@ export const configureDevHarnessProtectedStorage = ({
 }): boolean => {
   if (!isDevHarness({ isPackaged, env })) return false;
 
-  const encodedKey = env[HARNESS_STORAGE_KEY_ENV]?.trim();
+  const keyFile = env[HARNESS_STORAGE_KEY_FILE_ENV]?.trim();
+  const encodedKey = keyFile
+    ? readFileSync(keyFile, "utf8").trim()
+    : env[HARNESS_STORAGE_KEY_ENV]?.trim();
+  delete env[HARNESS_STORAGE_KEY_ENV];
   if (!encodedKey) {
     throw new Error(
-      `${HARNESS_STORAGE_KEY_ENV} is required when STELLA_DEV_HARNESS=1.`,
+      `${HARNESS_STORAGE_KEY_FILE_ENV} is required when STELLA_DEV_HARNESS=1.`,
     );
   }
 
   setProtectedStorageProviderOverride(createDevHarnessSafeStorage(encodedKey));
-  consumedHarnessKey = encodedKey;
-  delete env[HARNESS_STORAGE_KEY_ENV];
   return true;
-};
-
-/**
- * `app.relaunch()` inherits this process's environment, where the key was
- * deleted after use; without it the relaunched harness instance fails at
- * startup. Put it back just before relaunching.
- */
-export const restoreDevHarnessStorageKeyForRelaunch = (
-  env: NodeJS.ProcessEnv = process.env,
-) => {
-  if (consumedHarnessKey) env[HARNESS_STORAGE_KEY_ENV] = consumedHarnessKey;
 };

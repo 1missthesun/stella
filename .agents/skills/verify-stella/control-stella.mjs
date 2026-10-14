@@ -706,12 +706,10 @@ const doctorReport = async (run) => {
   return report;
 };
 
-const runStorageKey = (runDir) => {
+const runStorageKeyFile = (runDir) => {
   const file = path.join(runDir, "protected-storage.key");
-  if (existsSync(file)) return readFileSync(file, "utf8").trim();
-  const key = randomBytes(32).toString("base64url");
-  writeFileSync(file, key, { mode: 0o600 });
-  return key;
+  if (!existsSync(file)) writeFileSync(file, randomBytes(32).toString("base64url"), { mode: 0o600 });
+  return file;
 };
 
 const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge }) => {
@@ -772,7 +770,8 @@ const startElectron = async (run, { minted, modelGateway, fakeMic, browserBridge
       STELLA_DATA_DIR: dataDir,
       STELLA_V2_DEV_DATA_DIR: dataDir,
       STELLA_DEV_HARNESS: "1",
-      STELLA_DEV_HARNESS_STORAGE_KEY: runStorageKey(runDir),
+      STELLA_DEV_HARNESS_STORAGE_KEY_FILE: runStorageKeyFile(runDir),
+      STELLA_DEV_HARNESS_STORAGE_KEY: readFileSync(runStorageKeyFile(runDir), "utf8").trim(),
       ...(minted
         ? { STELLA_DEV_HARNESS_SESSION_TOKEN: minted.sessionToken }
         : {}),

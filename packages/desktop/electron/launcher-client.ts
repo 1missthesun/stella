@@ -2,7 +2,6 @@ import { app, type BrowserWindow } from "electron";
 import { createPublicKey, verify as verifySignature } from "node:crypto";
 import { fstatSync } from "node:fs";
 import net from "node:net";
-import { restoreDevHarnessStorageKeyForRelaunch } from "./bootstrap/dev-harness-protected-storage.js";
 import { git, gitRaw } from "./services/app-source/git.js";
 
 export const LAUNCHER_RELAUNCH_EXIT_CODE = 75;
@@ -183,7 +182,6 @@ export const relaunchApp = () => {
     app.quit();
     return;
   }
-  restoreDevHarnessStorageKeyForRelaunch();
   app.relaunch();
   app.quit();
 };

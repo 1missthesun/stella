@@ -509,7 +509,7 @@ const runDispatch = async (ctx: OwnerContext, job: DispatchJob): Promise<void> =
       thread,
       turn,
       prompt,
-      dispatchAttachments(dispatchRow?.attachments),
+      dispatchRow?.attachments,
     );
     return;
   }
@@ -650,21 +650,21 @@ const waitForAvailableDevice = (
 const deviceWaitExpiredMessage = (message: string): string =>
   `${message} It did not become available within ${Math.round(DEVICE_AVAILABILITY_WAIT_MS / 60_000)} minutes, so this agent never started.`;
 
-/**
- * The stored attachment list, or none. A row written before this column
- * existed, or a value that no longer parses, degrades to an agent without
- * attachments rather than failing a dispatch that is otherwise fine.
- */
 const dispatchAttachments = (raw: string | null | undefined): string[] => {
-  if (!raw) return [];
+  if (raw == null) return [];
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
-      : [];
+    parsed = JSON.parse(raw);
   } catch {
-    return [];
+    parsed = undefined;
   }
+  if (
+    !Array.isArray(parsed) ||
+    !parsed.every((entry): entry is string => typeof entry === "string" && entry.length > 0)
+  ) {
+    throw new DispatchError("The agent's stored attachment list is unreadable, so it was not started.", false);
+  }
+  return parsed;
 };
 
 const runDeviceDispatch = async (
@@ -673,9 +673,10 @@ const runDeviceDispatch = async (
   thread: ThreadRow,
   turn: TurnRow,
   prompt: string,
-  attachments: readonly string[],
+  storedAttachments: string | null | undefined,
 ): Promise<void> => {
   try {
+    const attachments = dispatchAttachments(storedAttachments);
     const { dispatchId } = await ctx.host.dispatchDeviceAgentTurn({
       ownerGeneration: thread.owner_generation ?? "",
       conversationId: thread.conversation_id,

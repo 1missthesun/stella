@@ -535,11 +535,11 @@ const buildConfigs = (state, { billing }) => {
   });
   mg.queues = {
     producers: (mg.queues?.producers ?? []).map((producer) => ({ ...producer, queue: N.queues.usage })),
-    consumers: (mg.queues?.consumers ?? []).map((consumer) => ({
-      ...consumer,
-      queue: N.queues.usage,
-      dead_letter_queue: N.queues.usageDlq,
-    })),
+    consumers: (mg.queues?.consumers ?? []).map((consumer) =>
+      consumer.dead_letter_queue
+        ? { ...consumer, queue: N.queues.usage, dead_letter_queue: N.queues.usageDlq }
+        : { ...consumer, queue: N.queues.usageDlq },
+    ),
   };
   mg.ratelimits = (mg.ratelimits ?? []).map((limit, index) => ({
     ...limit,

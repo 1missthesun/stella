@@ -11,6 +11,9 @@ import {
   type GatewayJwks,
 } from "./capability.js";
 import { isStellaUsageLimitReason } from "../stella-usage-limit.js";
+import { normalizeBillingPlan } from "../billing-plans.js";
+
+const LEGACY_MANAGED_MODEL_AUDIENCES = new Set(["go", "go_fallback", "pro_fallback"]);
 
 /**
  * Compact-JWS capability signing and verification on WebCrypto only, so the
@@ -172,6 +175,16 @@ const isFiniteNumber = (value: unknown): value is number =>
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === "string" && value.length > 0;
 
+// Capabilities minted before plans were renamed carry go, go_fallback or
+// pro_fallback for the rest of their short lifetime.
+const withCurrentAudience = (claims: unknown): unknown =>
+  isRecord(claims) &&
+  typeof claims.audience === "string" &&
+  !isManagedModelAudience(claims.audience) &&
+  LEGACY_MANAGED_MODEL_AUDIENCES.has(claims.audience)
+    ? { ...claims, audience: normalizeBillingPlan(claims.audience) }
+    : claims;
+
 export const validateCapabilityClaims = (
   value: unknown,
 ): value is GatewayCapabilityClaims => {
@@ -282,7 +295,7 @@ export const verifyCapability = async (
     textEncoder.encode(`${parts[0]}.${parts[1]}`),
   );
   if (!valid) return { ok: false, reason: "bad_signature" };
-  const claims = decoded.claims;
+  const claims = withCurrentAudience(decoded.claims);
   if (!validateCapabilityClaims(claims)) {
     return { ok: false, reason: "invalid_claims" };
   }

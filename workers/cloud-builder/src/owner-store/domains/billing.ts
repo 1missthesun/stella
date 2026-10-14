@@ -809,9 +809,13 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
     }
     const charged = event.billable ? Math.max(0, Math.floor(event.chargedMicroCents)) : 0;
     // Receipts carry the same scope as the gateway's replay key (capability +
-    // request); request ids alone can repeat across capabilities.
-    const legacyReceipt = ctx.db.one("SELECT 1 AS seen FROM billing_receipts WHERE id = ?", `gw:${event.requestId}`);
-    if (legacyReceipt || !claimReceipt(ctx, `gw:${event.capabilityId}:${event.requestId}`, charged)) {
+    // request); request ids alone can repeat across capabilities. A retry is
+    // a new physical attempt of the same request and is paid separately.
+    const attempt = Math.max(1, Math.floor(event.attempt ?? 1));
+    const scope = `${event.capabilityId}:${event.requestId}${attempt > 1 ? `:${attempt}` : ""}`;
+    const legacyReceipt =
+      attempt === 1 && ctx.db.one("SELECT 1 AS seen FROM billing_receipts WHERE id = ?", `gw:${event.requestId}`);
+    if (legacyReceipt || !claimReceipt(ctx, `gw:${scope}`, charged)) {
       result.duplicate.push(event.requestId);
       continue;
     }
@@ -826,7 +830,7 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
       recordCost(
         ctx,
         {
-          id: `model:${event.capabilityId}:${event.requestId}`,
+          id: `model:${scope}`,
           category: "model",
           provider: event.provider,
           sku: event.resolvedModel || event.requestedModel,
@@ -841,7 +845,7 @@ export const applyGatewayUsage = (ctx: OwnerContext, events: GatewayUsageEvent[]
           providerCostMicroCents: event.billable ? providerCost : 0,
           basis: event.costBasis ?? (event.usage.reported && event.usage.costMicroCents !== undefined ? "actual" : "estimated"),
           outcome: event.outcome === "succeeded" ? "succeeded" : event.outcome === "aborted" ? "aborted" : "failed",
-          attempt: event.attempt ?? 1,
+          attempt,
           requestId: event.requestId,
           ...(event.tariffVersion ? { tariffVersion: event.tariffVersion } : {}),
         },

@@ -110,6 +110,13 @@
         "max_retries": 5,
         "dead_letter_queue": "stella-v2-gateway-usage-dlq-dev",
       },
+      {
+        "queue": "stella-v2-gateway-usage-dlq-dev",
+        "max_batch_size": 50,
+        "max_batch_timeout": 30,
+        "max_retries": 10,
+        "retry_delay": 600,
+      },
     ],
   },
   "env": {
@@ -193,6 +200,13 @@
             "max_batch_timeout": 5,
             "max_retries": 5,
             "dead_letter_queue": "stella-v2-gateway-usage-dlq",
+          },
+          {
+            "queue": "stella-v2-gateway-usage-dlq",
+            "max_batch_size": 50,
+            "max_batch_timeout": 30,
+            "max_retries": 10,
+            "retry_delay": 600,
           },
         ],
       },

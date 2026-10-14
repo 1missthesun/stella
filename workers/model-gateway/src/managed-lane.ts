@@ -41,6 +41,7 @@ import {
 import {
   billableTokens,
   computeUsageCostMicroCents,
+  type TokenPriceConfig,
 } from "@stella/model-catalog/pricing";
 import {
   estimateRequestTokens,
@@ -95,10 +96,18 @@ import {
   type ManagedRoute,
 } from "./resolve.js";
 import type { SharedGatewayConfigStore } from "./shared-config.js";
+import { logUnreconciled } from "./usage-outbox.js";
 
 export const GATEWAY_REPLAY_HEADER = "x-stella-gateway-replay" as const;
 
 const MAX_UPSTREAM_STREAM_BYTES = 64 * 1024 * 1024;
+
+// Output ceiling assumed for budgeting when neither the model nor the caller
+// names one.
+const ASSUMED_MAX_OUTPUT_TOKENS = 64_000;
+// The smallest answer worth sending when the budget can't cover the full
+// output ceiling; below this the request is refused as over budget.
+const MIN_AFFORDABLE_OUTPUT_TOKENS = 1_024;
 
 const assemblerFor = (protocol: GatewayProtocol): Assembler => {
   switch (protocol) {
@@ -143,6 +152,25 @@ const streamingRequestJson = (
   // `store: true` outright ("not supported on this proxy").
   if (protocol === "openai-responses" && body.store === true) body.store = false;
   return body;
+};
+
+const declaredMaxOutputTokens = (
+  body: Record<string, unknown>,
+): number | null => {
+  const generationConfig =
+    body.generationConfig && typeof body.generationConfig === "object"
+      ? (body.generationConfig as Record<string, unknown>)
+      : {};
+  const declared = [
+    body.max_tokens,
+    body.max_output_tokens,
+    body.max_completion_tokens,
+    generationConfig.maxOutputTokens,
+  ].filter(
+    (value): value is number =>
+      typeof value === "number" && Number.isFinite(value) && value >= 0,
+  );
+  return declared.length > 0 ? Math.floor(Math.min(...declared)) : null;
 };
 
 export type ShapedUpstreamRequest = {
@@ -250,6 +278,7 @@ export const shapeUpstreamRequest = (args: {
   apiKey: string;
   ownerMode?: boolean;
   audience: ManagedModelAudience;
+  outputCeiling?: number;
 }): ShapedUpstreamRequest => {
   const shapingRequest = new Request(
     shapingUrlFor(args.request, args.protocol),
@@ -265,7 +294,7 @@ export const shapeUpstreamRequest = (args: {
           requestJson: args.requestJson,
           protocol: args.protocol,
           audience: args.audience,
-          modelCeiling: args.route.config.maxOutputTokens,
+          modelCeiling: args.outputCeiling ?? args.route.config.maxOutputTokens,
         }),
         args.protocol,
       ),
@@ -295,12 +324,15 @@ export const shapeUpstreamRequest = (args: {
 
 const usageTokens = (
   usage: RelayUsage | null,
-  estimate: TokenEstimate,
+  seen: TokenEstimate,
+  complete: boolean,
 ): GatewayUsageTokens =>
-  usage && (usage.inputTokens !== undefined || usage.outputTokens !== undefined)
+  hasReportedTokens(usage)
     ? {
-        inputTokens: usage.inputTokens ?? 0,
-        outputTokens: usage.outputTokens ?? 0,
+        inputTokens: usage.inputTokens ?? seen.inputTokens,
+        outputTokens: complete
+          ? (usage.outputTokens ?? seen.outputTokens)
+          : Math.max(usage.outputTokens ?? 0, seen.outputTokens),
         ...(usage.cachedInputTokens !== undefined
           ? { cachedInputTokens: usage.cachedInputTokens }
           : {}),
@@ -316,10 +348,62 @@ const usageTokens = (
         reported: true,
       }
     : {
-        inputTokens: estimate.inputTokens,
-        outputTokens: estimate.outputTokens,
+        inputTokens: seen.inputTokens,
+        outputTokens: seen.outputTokens,
         reported: false,
       };
+
+const hasReportedTokens = (usage: RelayUsage | null): usage is RelayUsage =>
+  !!usage && (usage.inputTokens !== undefined || usage.outputTokens !== undefined);
+
+export type AttemptCost = {
+  chargedMicroCents: number;
+  tokens: GatewayUsageTokens;
+  basis: "actual" | "estimated";
+};
+
+/**
+ * What one physical attempt cost Stella: the provider's reported cost when
+ * it sent one, else the tokens it reported (or that were seen streaming
+ * before a failure) at the tariff. `inputTokens` is the request estimate
+ * the provider's own count replaces.
+ */
+export const attemptCost = (args: {
+  model: string;
+  price: TokenPriceConfig;
+  usage: RelayUsage | null;
+  inputTokens: number;
+  streamedOutputTokens: number;
+  /** The provider finished the response, so its reported counts are final. */
+  complete: boolean;
+}): AttemptCost => {
+  const seen = { inputTokens: args.inputTokens, outputTokens: Math.max(0, args.streamedOutputTokens) };
+  const tokens = usageTokens(args.usage, seen, args.complete);
+  if (args.usage?.costMicroCents !== undefined && hasReportedTokens(args.usage)) {
+    return {
+      chargedMicroCents: Math.max(0, Math.round(args.usage.costMicroCents)),
+      tokens,
+      basis: "actual",
+    };
+  }
+  const usage = args.usage;
+  return {
+    chargedMicroCents: computeUsageCostMicroCents({
+      model: args.model,
+      tokens: billableTokens({
+        inputTokens: tokens.inputTokens,
+        outputTokens: tokens.outputTokens,
+        cachedInputTokens: usage?.cachedInputTokens,
+        cacheWriteInputTokens: usage?.cacheWriteInputTokens,
+        cacheWrite1hInputTokens: usage?.cacheWrite1hInputTokens,
+        reasoningTokens: usage?.reasoningTokens,
+      }),
+      price: args.price,
+    }),
+    tokens,
+    basis: "estimated",
+  };
+};
 
 const recordOf = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -676,22 +760,36 @@ export const handleManagedRelay = async (args: {
         `Model "${route.resolvedModel}" has no price.`,
       );
     }
+    const modelCeiling = route.config.maxOutputTokens;
     const cappedRequestJson = clampOutputTokens({
       requestJson,
       protocol,
       audience: claims.audience,
-      modelCeiling: route.config.maxOutputTokens,
+      modelCeiling,
     });
     const estimate = estimateRequestTokens(cappedRequestJson);
-    const estimatedMicroCents = computeUsageCostMicroCents({
+    const maxOutputTokens =
+      declaredMaxOutputTokens(cappedRequestJson) ?? ASSUMED_MAX_OUTPUT_TOKENS;
+    const inputEstimateMicroCents = computeUsageCostMicroCents({
       model: route.resolvedModel,
-      tokens: billableTokens({
-        inputTokens: estimate.inputTokens,
-        outputTokens: estimate.outputTokens,
-      }),
+      tokens: billableTokens({ inputTokens: estimate.inputTokens, outputTokens: 0 }),
       price,
     });
-    if (!(estimatedMicroCents > 0)) {
+    // Priced as reasoning, which no provider bills below the output rate.
+    const outputMicroCentsPerToken =
+      computeUsageCostMicroCents({
+        model: route.resolvedModel,
+        tokens: billableTokens({
+          inputTokens: 0,
+          outputTokens: 1_000_000,
+          reasoningTokens: 1_000_000,
+        }),
+        price,
+      }) / 1_000_000;
+    const costWithOutput = (outputTokens: number): number =>
+      Math.ceil(inputEstimateMicroCents + outputTokens * outputMicroCentsPerToken);
+    const maxCostMicroCents = costWithOutput(maxOutputTokens);
+    if (!(maxCostMicroCents > 0)) {
       throw new GatewayError(
         500,
         "internal",
@@ -715,21 +813,10 @@ export const handleManagedRelay = async (args: {
       }
       throw new GatewayError(503, "internal", "The model provider is not configured.", { retryable: false });
     }
-    const {
-      url: target,
-      headers,
-      body: upstreamBody,
-    } = shapeUpstreamRequest({
-      request,
-      protocol,
-      route,
-      requestJson: cappedRequestJson,
-      apiKey,
-      ownerMode: ownerModeEnabled(env),
-      audience: claims.audience,
-    });
 
     let capabilityHardLimitMicroCents: number | null = null;
+    let heldMicroCents = maxCostMicroCents;
+    let attemptNumber = 1;
     if (accounting) {
       const reservation = await timing.measure(
         accounting.authority === "owner"
@@ -742,7 +829,10 @@ export const handleManagedRelay = async (args: {
             maxRequests: claims.maxRequests,
             expiresAt: claims.exp * 1000,
             requestId,
-            estimatedMicroCents,
+            estimatedMicroCents: maxCostMicroCents,
+            minimumMicroCents: costWithOutput(
+              Math.min(maxOutputTokens, MIN_AFFORDABLE_OUTPUT_TOKENS),
+            ),
           }),
       );
       switch (reservation.kind) {
@@ -792,13 +882,46 @@ export const handleManagedRelay = async (args: {
           );
         case "reserved":
           held = reservation.held;
+          heldMicroCents = reservation.held.heldMicroCents;
+          attemptNumber = reservation.held.attemptNumber;
           capabilityHardLimitMicroCents =
             reservation.held.remainingMicroCents === null
               ? null
-              : estimatedMicroCents + reservation.held.remainingMicroCents;
+              : heldMicroCents + reservation.held.remainingMicroCents;
           break;
       }
     }
+    // A partial hold buys only the output it covers; the provider is told so.
+    const affordableOutputTokens =
+      heldMicroCents < maxCostMicroCents
+        ? Math.max(
+            1,
+            Math.floor(
+              (heldMicroCents - inputEstimateMicroCents) / outputMicroCentsPerToken,
+            ),
+          )
+        : null;
+    const {
+      url: target,
+      headers,
+      body: upstreamBody,
+    } = shapeUpstreamRequest({
+      request,
+      protocol,
+      route,
+      requestJson: cappedRequestJson,
+      apiKey,
+      ownerMode: ownerModeEnabled(env),
+      audience: claims.audience,
+      ...(affordableOutputTokens !== null
+        ? {
+            outputCeiling: Math.min(
+              modelCeiling ?? Number.POSITIVE_INFINITY,
+              affordableOutputTokens,
+            ),
+          }
+        : {}),
+    });
 
     const tierCeiling = config.tierCeilings.get(limitsAudience);
     if (
@@ -813,67 +936,88 @@ export const handleManagedRelay = async (args: {
         now: deps.now,
         limitsAudience,
         ceiling: tierCeiling,
-        estimateMicroCents: estimatedMicroCents,
+        estimateMicroCents: heldMicroCents,
       });
       tierGate = tier.gate;
       tierReservation = tier.reservation;
     }
 
+    const tariffVersion = `models@${new Date(config.snapshot.updatedAt).toISOString()}`;
     const finish = async (
       outcome: GatewayUsageOutcome,
-      tokens: GatewayUsageTokens,
-      chargedMicroCents: number,
+      cost: AttemptCost,
       upstreamStatus: number | undefined,
       refundRequest: boolean,
       result?: RelaySettlement["result"],
     ): Promise<LedgerSettleResult | null> => {
+      const chargedMicroCents = cost.chargedMicroCents;
       tierActualMicroCents = chargedMicroCents;
+      const event: GatewayUsageEvent | null = probe
+        ? null
+        : {
+            v: GATEWAY_USAGE_EVENT_VERSION,
+            requestId,
+            capabilityId: claims.jti,
+            kind: claims.kind,
+            ownerId: claims.sub,
+            ownerGeneration: claims.gen,
+            audience: claims.audience,
+            agentType,
+            ...(claims.turn
+              ? {
+                  turnId: claims.turn.turnId,
+                  conversationId: claims.turn.conversationId,
+                }
+              : {}),
+            provider: route.provider,
+            protocol,
+            requestedModel: route.requestedModel,
+            resolvedModel: route.resolvedModel,
+            usage: cost.tokens,
+            chargedMicroCents,
+            outcome,
+            ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
+            startedAt,
+            finishedAt: deps.now(),
+            billable: true,
+            networkClass,
+            ...(deviceKeyHash ? { deviceKeyHash } : {}),
+            providerCostMicroCents: chargedMicroCents,
+            costBasis: cost.basis,
+            attempt: attemptNumber,
+            tariffVersion,
+          };
       let settlement: LedgerSettleResult | null = null;
+      let recorded = false;
       if (held) {
         const reservation = held;
-        settlement = await timing.measure("ledgerSettlementMs", () =>
-          reservation.settle({ chargedMicroCents, refundRequest, result }),
-        );
-        heldSettled = true;
-        if (result) timing.mark("resultPersisted");
-      }
-      if (probe) return settlement;
-      const event: GatewayUsageEvent = {
-        v: GATEWAY_USAGE_EVENT_VERSION,
-        requestId,
-        capabilityId: claims.jti,
-        kind: claims.kind,
-        ownerId: claims.sub,
-        ownerGeneration: claims.gen,
-        audience: claims.audience,
-        agentType,
-        ...(claims.turn
-          ? {
-              turnId: claims.turn.turnId,
-              conversationId: claims.turn.conversationId,
-            }
-          : {}),
-        provider: route.provider,
-        protocol,
-        requestedModel: route.requestedModel,
-        resolvedModel: route.resolvedModel,
-        usage: tokens,
-        chargedMicroCents,
-        outcome,
-        ...(upstreamStatus !== undefined ? { upstreamStatus } : {}),
-        startedAt,
-        finishedAt: deps.now(),
-        billable: true,
-        networkClass,
-        ...(deviceKeyHash ? { deviceKeyHash } : {}),
-      };
-      deps.waitUntil(
-        env.USAGE_QUEUE.send(event).catch((error: unknown) => {
-          console.error(
-            `[model-gateway] trace=${traceId} usage enqueue failed: ${error instanceof Error ? error.message : "unknown"}`,
+        try {
+          settlement = await timing.measure("ledgerSettlementMs", () =>
+            reservation.settle({
+              chargedMicroCents,
+              refundRequest,
+              result,
+              ...(event ? { usage: event } : {}),
+            }),
           );
-        }),
-      );
+          heldSettled = true;
+          recorded = true;
+          if (result) timing.mark("resultPersisted");
+        } catch (error) {
+          console.error(
+            `[model-gateway] trace=${traceId} ledger settlement failed: ${error instanceof Error ? error.message : "unknown"}`,
+          );
+        }
+      }
+      if (event && !recorded) {
+        try {
+          await env.USAGE_QUEUE.send(event);
+        } catch (error) {
+          logUnreconciled(event, "enqueue_failed", {
+            error: error instanceof Error ? error.message : "unknown",
+          });
+        }
+      }
       return settlement;
     };
 
@@ -883,35 +1027,21 @@ export const handleManagedRelay = async (args: {
       maxDurationMs: GATEWAY_UPSTREAM_MAX_DURATION_MS,
     });
     const usageParser = createRelayUsageParser(route.provider);
-    const chargeFor = (usage: RelayUsage | null): number => {
-      if (
-        !usage ||
-        (usage.inputTokens === undefined && usage.outputTokens === undefined)
-      ) {
-        return estimatedMicroCents;
-      }
-      if (usage.costMicroCents !== undefined) return usage.costMicroCents;
-      return computeUsageCostMicroCents({
+    let streamedOutputChars = 0;
+    const costOf = (usage: RelayUsage | null, complete: boolean): AttemptCost =>
+      attemptCost({
         model: route.resolvedModel,
-        tokens: billableTokens({
-          inputTokens: usage.inputTokens ?? 0,
-          outputTokens: usage.outputTokens ?? 0,
-          cachedInputTokens: usage.cachedInputTokens,
-          cacheWriteInputTokens: usage.cacheWriteInputTokens,
-          cacheWrite1hInputTokens: usage.cacheWrite1hInputTokens,
-          reasoningTokens: usage.reasoningTokens,
-        }),
         price,
-      });
-    };
-    const inputEstimateMicroCents = computeUsageCostMicroCents({
-      model: route.resolvedModel,
-      tokens: billableTokens({
+        usage,
         inputTokens: estimate.inputTokens,
-        outputTokens: 0,
-      }),
-      price,
-    });
+        streamedOutputTokens: Math.ceil(streamedOutputChars / 4),
+        complete,
+      });
+    const nothingBilled: AttemptCost = {
+      chargedMicroCents: 0,
+      tokens: { inputTokens: 0, outputTokens: 0, reported: false },
+      basis: "estimated",
+    };
     const runningCostFor = (outputTokens: number): number =>
       inputEstimateMicroCents +
       computeUsageCostMicroCents({
@@ -1017,17 +1147,12 @@ export const handleManagedRelay = async (args: {
       console.warn(
         `[model-gateway] trace=${traceId} provider=${route.provider} upstream fetch failed cause=${controller.cause() ?? (error instanceof Error ? error.message : "unknown")}`,
       );
-      const charged =
-        firstUpstreamByte &&
-        (failure.code === "canceled" || failure.code === "upstream_timeout")
-          ? estimatedMicroCents
-          : 0;
+      // No response, so no token reached us and none was billed.
       await finish(
         failure.code === "canceled" ? "aborted" : "failed",
-        usageTokens(null, estimate),
-        charged,
+        nothingBilled,
         undefined,
-        !firstUpstreamByte,
+        true,
       );
       throw failure;
     }
@@ -1046,12 +1171,13 @@ export const handleManagedRelay = async (args: {
       console.warn(
         `[model-gateway] trace=${traceId} provider=${route.provider} model=${route.resolvedModel} upstream status=${upstream.status}`,
       );
+      usageParser.pushText(text);
+      const errorUsage = usageParser.finish();
       await finish(
         "failed",
-        usageTokens(null, estimate),
-        0,
+        hasReportedTokens(errorUsage) ? costOf(errorUsage, true) : nothingBilled,
         upstream.status,
-        true,
+        !hasReportedTokens(errorUsage),
       );
       if (upstream.status === 401 || upstream.status === 403) {
         throw new GatewayError(
@@ -1074,15 +1200,13 @@ export const handleManagedRelay = async (args: {
       !/text\/event-stream/iu.test(contentType);
     let assembled: Record<string, unknown> | null = null;
     let assemblyFailure: { message: string; detail?: unknown } | null = null;
-    let budgetStop: {
-      chargedMicroCents: number;
-      tokens: GatewayUsageTokens;
-    } | null = null;
+    let budgetStop: AttemptCost | null = null;
 
     try {
       if (isJson) {
         const text = await readUpstreamText(upstream);
         firstUpstreamByte = text.length > 0;
+        streamedOutputChars = text.length;
         usageParser.pushText(text);
         const parsed = JSON.parse(text) as unknown;
         if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
@@ -1101,7 +1225,6 @@ export const handleManagedRelay = async (args: {
         const decoder = new TextDecoder();
         const sse = createSseParser();
         let received = 0;
-        let outputTextLength = 0;
         try {
           while (true) {
             const { done, value } = await reader.read();
@@ -1125,12 +1248,14 @@ export const handleManagedRelay = async (args: {
             const text = decoder.decode(value, { stream: true });
             usageParser.pushText(text);
             for (const frame of sse.push(text)) {
-              outputTextLength += outputTextLengthInFrame(protocol, frame);
+              streamedOutputChars += outputTextLengthInFrame(protocol, frame);
               assembler.push(frame);
             }
             const partialUsage = usageParser.current();
-            const outputTokens =
-              partialUsage?.outputTokens ?? Math.ceil(outputTextLength / 4);
+            const outputTokens = Math.max(
+              partialUsage?.outputTokens ?? 0,
+              Math.ceil(streamedOutputChars / 4),
+            );
             const runningCost = runningCostFor(outputTokens);
             if (
               capabilityHardLimitMicroCents !== null &&
@@ -1138,23 +1263,10 @@ export const handleManagedRelay = async (args: {
             ) {
               await reader.cancel("budget_exhausted");
               controller.abort("budget");
+              const partial = costOf(partialUsage, false);
               budgetStop = {
-                chargedMicroCents: runningCost,
-                tokens: partialUsage
-                  ? usageTokens(
-                      {
-                        ...partialUsage,
-                        inputTokens:
-                          partialUsage.inputTokens ?? estimate.inputTokens,
-                        outputTokens,
-                      },
-                      estimate,
-                    )
-                  : {
-                      inputTokens: estimate.inputTokens,
-                      outputTokens,
-                      reported: false,
-                    },
+                ...partial,
+                chargedMicroCents: Math.max(partial.chargedMicroCents, runningCost),
               };
               break;
             }
@@ -1188,19 +1300,10 @@ export const handleManagedRelay = async (args: {
       console.warn(
         `[model-gateway] trace=${traceId} provider=${route.provider} stream read failed cause=${controller.cause() ?? (error instanceof Error ? error.message : "unknown")}`,
       );
-      const charged = !firstUpstreamByte
-        ? 0
-        : failure.code === "canceled" || failure.code === "upstream_timeout"
-          ? usage
-            ? chargeFor(usage)
-            : estimatedMicroCents
-          : usage
-            ? chargeFor(usage)
-            : 0;
+      // Whatever streamed before the failure was generated, and billed.
       await finish(
         failure.code === "canceled" ? "aborted" : "failed",
-        usageTokens(usage, estimate),
-        charged,
+        firstUpstreamByte ? costOf(usage, false) : nothingBilled,
         upstream.status,
         !firstUpstreamByte,
       );
@@ -1209,13 +1312,7 @@ export const handleManagedRelay = async (args: {
     controller.dispose();
 
     if (budgetStop) {
-      await finish(
-        "failed",
-        budgetStop.tokens,
-        budgetStop.chargedMicroCents,
-        upstream.status,
-        false,
-      );
+      await finish("failed", budgetStop, upstream.status, false);
       throw new GatewayError(
         402,
         "budget_exhausted",
@@ -1231,8 +1328,7 @@ export const handleManagedRelay = async (args: {
       );
       await finish(
         "failed",
-        usageTokens(usage, estimate),
-        usage ? chargeFor(usage) : 0,
+        firstUpstreamByte ? costOf(usage, false) : nothingBilled,
         upstream.status,
         !firstUpstreamByte,
       );
@@ -1247,11 +1343,10 @@ export const handleManagedRelay = async (args: {
 
     const bodyText = JSON.stringify(assembled);
     timing.mark("assemblyComplete");
-    const chargedMicroCents = chargeFor(usage);
+    const cost = costOf(usage, true);
     const settlement = await finish(
       "succeeded",
-      usageTokens(usage, estimate),
-      chargedMicroCents,
+      cost,
       upstream.status,
       false,
       {
@@ -1260,7 +1355,7 @@ export const handleManagedRelay = async (args: {
       },
     );
     console.log(
-      `[model-gateway] trace=${traceId} agent=${agentType} requested=${route.requestedModel} resolved=${route.resolvedModel} provider=${route.provider} protocol=${protocol} status=${upstream.status} charged=${chargedMicroCents} reported=${usage ? 1 : 0} ledger_settled=${settlement ? (settlement.ok ? 1 : 0) : "-"} ledger_spent=${settlement?.spentMicroCents ?? "-"} ledger_reserved=${settlement?.reservedMicroCents ?? "-"} ms=${deps.now() - startedAt}`,
+      `[model-gateway] trace=${traceId} agent=${agentType} requested=${route.requestedModel} resolved=${route.resolvedModel} provider=${route.provider} protocol=${protocol} status=${upstream.status} charged=${cost.chargedMicroCents} basis=${cost.basis} attempt=${attemptNumber} reported=${usage ? 1 : 0} ledger_settled=${settlement ? (settlement.ok ? 1 : 0) : "-"} ledger_spent=${settlement?.spentMicroCents ?? "-"} ledger_reserved=${settlement?.reservedMicroCents ?? "-"} ms=${deps.now() - startedAt}`,
     );
     return new Response(bodyText, {
       status: upstream.status,

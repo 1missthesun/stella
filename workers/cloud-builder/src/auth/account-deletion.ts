@@ -92,7 +92,8 @@ export const requestAccountDeletion = async (request: Request, env: Cloudflare.E
   const now = Date.now();
   const email = typeof user.email === "string" ? user.email : "";
   let grace = ACCOUNT_DELETION_GRACE_MS;
-  if (testAccountsEnabled(env) && email.endsWith(TEST_ACCOUNT_SUFFIX)) {
+  const testAccount = testAccountsEnabled(env) && email.endsWith(TEST_ACCOUNT_SUFFIX);
+  if (testAccount) {
     const body = (await request.clone().json().catch(() => null)) as { graceMs?: unknown } | null;
     if (typeof body?.graceMs === "number" && body.graceMs >= 0) grace = Math.min(body.graceMs, grace);
   }
@@ -115,6 +116,7 @@ export const requestAccountDeletion = async (request: Request, env: Cloudflare.E
       .first<DeletionRow>();
     if (!row || row.status !== "pending") throw new Error(`Deletion request is ${row?.status ?? "missing"}.`);
     await gate.setDeletionHold(true);
+    if (testAccount && email.includes("+deletefail")) throw new Error("Simulated failure for a +deletefail test account.");
     await revokeTokensIssuedBefore(env, user.id, now);
     await d1(env).prepare('DELETE FROM "session" WHERE "userId" = ?').bind(user.id).run();
   } catch (error) {

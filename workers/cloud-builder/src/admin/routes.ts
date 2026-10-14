@@ -351,6 +351,18 @@ const ROUTES: Record<string, { method: "GET" | "POST"; run: (request: Request, u
     run: async (request, _url, env) =>
       (await import("../selfhost/owner.js")).bootstrapOwnerRoute(request, env as unknown as Cloudflare.Env),
   },
+  "/api/admin/test-accounts/run-account-deletions": {
+    method: "POST",
+    run: async (_request, _url, env) => {
+      const { testAccountsEnabled } = await import("../auth/auth.js");
+      if (!testAccountsEnabled(env)) return fail(404, "Test accounts disabled.", { env: "STELLA_TEST_ACCOUNTS" });
+      await (await import("../auth/account-deletion.js")).runAccountDeletions(env as unknown as Cloudflare.Env);
+      const rows = await (env as unknown as Cloudflare.Env).DB?.prepare(
+        "SELECT user_id, email, status, requested_at, due_at, confirmation_sent_at, started_at, owner_closed_at, completed_at, attempts, last_error FROM account_deletions WHERE email IS NULL OR email LIKE '%@test.stella.local' ORDER BY requested_at DESC LIMIT 20",
+      ).all();
+      return json({ rows: rows?.results ?? [] });
+    },
+  },
   "/api/admin/test-accounts/conversation-restart": {
     method: "POST",
     run: (request, _url, env) => conversationRestart(request, env),

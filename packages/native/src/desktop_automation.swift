@@ -827,6 +827,34 @@ let namedKeyCodes: [String: CGKeyCode] = [
     "down": 125,
     "left": 123,
     "right": 124,
+    "arrowup": 126,
+    "arrowdown": 125,
+    "arrowleft": 123,
+    "arrowright": 124,
+    "grave": 50,
+    "backtick": 50,
+    "`": 50,
+    "minus": 27,
+    "-": 27,
+    "equal": 24,
+    "equals": 24,
+    "=": 24,
+    "leftbracket": 33,
+    "[": 33,
+    "rightbracket": 30,
+    "]": 30,
+    "semicolon": 41,
+    ";": 41,
+    "quote": 39,
+    "'": 39,
+    "comma": 43,
+    ",": 43,
+    "period": 47,
+    ".": 47,
+    "slash": 44,
+    "/": 44,
+    "backslash": 42,
+    "\\": 42,
     "home": 115,
     "end": 119,
     "pageup": 116,
@@ -1827,6 +1855,36 @@ func valueTypeName(_ raw: AnyObject?) -> String? {
     }
 }
 
+func fallbackWindowElement(for app: AXUIElement) -> AXUIElement? {
+    let windows = axElementArrayValue(app, kAXWindowsAttribute as String).filter(isUsableWindowElement)
+    let preferredSubroles: Set<String> = ["AXStandardWindow", "AXDialog", "AXSystemDialog", "AXFloatingWindow"]
+    return windows.first {
+        preferredSubroles.contains(axStringValue($0, kAXSubroleAttribute as String) ?? "")
+    } ?? windows.first
+}
+
+func modalWindowElements(for app: AXUIElement) -> [AXUIElement] {
+    axElementArrayValue(app, kAXWindowsAttribute as String).filter {
+        isUsableWindowElement($0) && axBoolValue($0, "AXModal") == true
+    }
+}
+
+func modalDialogWarnings(for target: AppTarget) -> [String] {
+    modalWindowElements(for: target.axApp).map { window in
+        let texts = axElementArrayValue(window, kAXChildrenAttribute as String)
+            .filter { axStringValue($0, kAXRoleAttribute as String) == kAXStaticTextRole as String }
+            .compactMap { axStringValue($0, kAXValueAttribute as String) }
+            .filter { !$0.isEmpty }
+        let label = ([axStringValue(window, kAXTitleAttribute as String) ?? ""] + texts)
+            .filter { !$0.isEmpty }
+            .prefix(2)
+            .joined(separator: " ")
+        let described = label.isEmpty ? "" : " (\(truncateValue(label) ?? label))"
+        return "A modal dialog\(described) is open and blocks input to the app's other windows. "
+            + "It is listed first in this state: click one of its buttons or press Return/Escape with this state_id, then observe again."
+    }
+}
+
 func snapshotRoots(for app: AXUIElement) -> [AXUIElement] {
     var roots: [AXUIElement] = []
     let rootBatch = axBatchedAttributes(
@@ -1838,6 +1896,7 @@ func snapshotRoots(for app: AXUIElement) -> [AXUIElement] {
         ]
     )
 
+    appendUniqueElements(modalWindowElements(for: app), into: &roots, excluding: app)
     appendUniqueElement(
         usableWindowElement(coerceElement(rootBatch[kAXFocusedWindowAttribute as String])),
         into: &roots,
@@ -1848,6 +1907,13 @@ func snapshotRoots(for app: AXUIElement) -> [AXUIElement] {
         into: &roots,
         excluding: app
     )
+    if !roots.contains(where: isUsableWindowElement) {
+        appendUniqueElement(
+            fallbackWindowElement(for: app),
+            into: &roots,
+            excluding: app
+        )
+    }
     appendUniqueElement(
         coerceElement(rootBatch[kAXFocusedUIElementAttribute as String]),
         into: &roots,
@@ -1898,13 +1964,20 @@ func recoverHiddenTargetWindowIfNeeded(
     }
 
     let appName = target.app.localizedName ?? target.app.bundleIdentifier ?? "pid \(target.app.processIdentifier)"
+    let windows = axElementArrayValue(target.axApp, kAXWindowsAttribute as String)
+    if !target.app.isHidden, windows.isEmpty {
+        return [
+            "'\(appName)' has no open windows; showing its app-level elements (menu bar, Dock items, status items) instead."
+        ]
+    }
     let unavailableReason = target.app.isHidden
         ? "hidden"
-        : "minimized or unavailable"
+        : "minimized or has no window on the current Space"
     guard allowRaise else {
         throw failure(
-            "Target app '\(appName)' is \(unavailableReason). Background observation will not unhide, "
-            + "restore, raise, or focus it; retry with explicit --raise if foreground recovery is acceptable."
+            "Target app '\(appName)' is \(unavailableReason), so its window cannot be observed in the background. "
+            + "Call get_app_state again with raise: true to unhide or restore it (this brings the window on screen), "
+            + "or ask the user to bring it back."
         )
     }
 
@@ -1930,14 +2003,20 @@ func recoverHiddenTargetWindowIfNeeded(
     }
 
     if recovered {
-        Thread.sleep(forTimeInterval: 0.4)
+        let deadline = Date().addingTimeInterval(2.0)
+        repeat {
+            Thread.sleep(forTimeInterval: 0.15)
+        } while Date() < deadline && (
+            target.app.isHidden
+                || !snapshotRoots(for: target.axApp).contains(where: isUsableWindowElement)
+        )
     }
 
     guard !target.app.isHidden,
           snapshotRoots(for: target.axApp).contains(where: isUsableWindowElement) else {
-        throw failure("Failed to recover a visible window for target app '\(appName)' with explicit --raise.")
+        throw failure("Failed to restore a visible window for '\(appName)' even with raise: true. Ask the user to show the window, then observe again.")
     }
-    return ["Recovered hidden/minimized target '\(appName)' because explicit --raise was requested."]
+    return ["Recovered hidden/minimized target '\(appName)' because raise: true was requested."]
 }
 
 func primaryLabel(
@@ -4410,8 +4489,30 @@ private func captureViaScreenCaptureKit(
                 captureError = "ScreenCaptureKit could not find preferred window \(preferredWindow.windowID) for pid \(pid)"
                 return
             }
-            let filter = SCContentFilter(desktopIndependentWindow: window)
+            let overlays = content.windows.filter {
+                $0.owningApplication?.processID == pid &&
+                    $0.isOnScreen &&
+                    $0.windowID != window.windowID &&
+                    $0.windowLayer > window.windowLayer &&
+                    $0.frame.intersects(window.frame)
+            }
+            let display = overlays.isEmpty ? nil : content.displays.first(where: {
+                $0.frame.contains(CGPoint(x: window.frame.midX, y: window.frame.midY))
+            })
+            let filter: SCContentFilter
             let cfg = SCStreamConfiguration()
+            if let display {
+                filter = SCContentFilter(display: display, including: [window] + overlays)
+                cfg.sourceRect = CGRect(
+                    x: window.frame.minX - display.frame.minX,
+                    y: window.frame.minY - display.frame.minY,
+                    width: window.frame.width,
+                    height: window.frame.height
+                )
+                trace("screenshot:sck composited \(overlays.count) overlay window(s) over \(window.windowID)")
+            } else {
+                filter = SCContentFilter(desktopIndependentWindow: window)
+            }
             cfg.width = Int(window.frame.width)
             cfg.height = Int(window.frame.height)
             capturedImage = try await SCScreenshotManager.captureImage(
@@ -4536,6 +4637,11 @@ func currentWindowFrame(for target: AppTarget) -> Rect? {
         }
     }
 
+    if let window = fallbackWindowElement(for: target.axApp),
+       let frame = nodeDetails(for: window).frame {
+        return frame
+    }
+
     if let focused = axElementValue(target.axApp, kAXFocusedUIElementAttribute as String) {
         return nodeDetails(for: focused).frame
     }
@@ -4556,6 +4662,11 @@ func currentWindowTitle(for target: AppTarget) -> String? {
         if let title = details.title, !title.isEmpty {
             return title
         }
+    }
+
+    if let window = fallbackWindowElement(for: target.axApp),
+       let title = nodeDetails(for: window).title, !title.isEmpty {
+        return title
     }
 
     return target.app.localizedName
@@ -7679,6 +7790,43 @@ func simulateUnicodeText(_ text: String) -> Bool {
     return true
 }
 
+func pressModalDialogButton(for keySpec: String, target: AppTarget) -> InputDispatchResult? {
+    let attribute: String
+    switch normalized(keySpec) {
+    case "return", "enter", "kp_enter":
+        attribute = "AXDefaultButton"
+    case "escape", "esc":
+        attribute = "AXCancelButton"
+    default:
+        return nil
+    }
+    for window in modalWindowElements(for: target.axApp) {
+        guard let button = axElementValue(window, attribute) else { continue }
+        if AXUIElementPerformAction(button, kAXPressAction as CFString) == .success {
+            trace("input:key path=modal-\(attribute) key=\(keySpec)")
+            return InputDispatchResult(usedAction: "AXPress:\(attribute)", dispatch: .accessibility)
+        }
+    }
+    return nil
+}
+
+func keyChordProblem(_ keySpec: String) -> String? {
+    let parts = keySpec.split(separator: "+", omittingEmptySubsequences: false).map(String.init)
+    let modifierNames: Set<String> = ["cmd", "command", "meta", "ctrl", "control", "alt", "option", "shift"]
+    let usage = "Write keys as Return, Escape, Tab, Space, Delete, Up/Down/Left/Right, Home, End, PageUp, PageDown, F1-F20, "
+        + "a letter, digit or punctuation character, with modifiers cmd, ctrl, alt or shift joined by '+' (for example cmd+shift+t)."
+    guard let keyToken = parts.last, !keyToken.isEmpty else {
+        return "Key '\(keySpec)' is empty or malformed. \(usage)"
+    }
+    if let unknown = parts.dropLast().first(where: { !modifierNames.contains(normalized($0)) }) {
+        return "Unknown modifier '\(unknown)' in '\(keySpec)'. \(usage)"
+    }
+    if keyCode(for: keyToken) == nil && !(parts.count == 1 && keyToken.count == 1) {
+        return "Unknown key '\(keyToken)' in '\(keySpec)'. \(usage)"
+    }
+    return nil
+}
+
 func keyCode(for token: String) -> CGKeyCode? {
     let key = normalized(token)
     return namedKeyCodes[key] ?? letterKeyCodes[key] ?? digitKeyCodes[key]
@@ -8113,7 +8261,7 @@ func snapshotCommand(_ options: SnapshotOptions) throws -> SnapshotDocument {
     let windowFrame = currentWindowFrame(for: target) ?? nodes.first?.frame
     let selectedText = selectedTextFromFocusedElement(for: target)
     let focusedElementSummary = focusedSummary(in: nodes)
-    var warnings = recoveryWarnings + builder.warnings
+    var warnings = recoveryWarnings + builder.warnings + modalDialogWarnings(for: target)
 
     let capture = options.screenshotPolicy == .always ||
         (options.screenshotPolicy == .auto && shouldCaptureAutoScreenshot(
@@ -10005,9 +10153,10 @@ func executeCommandInternal(args: [String]) throws -> CommandExecutionResult {
         }
         try prepareTargetForAction(target, statePath: options.statePath, raise: options.raise)
         try ensureSafeActionContext(snapshot: snapshot, target: target)
-        guard let keyDispatch = postKeyChord(keySpec, target: target, raise: options.raise) else {
+        guard let keyDispatch = pressModalDialogButton(for: keySpec, target: target)
+            ?? postKeyChord(keySpec, target: target, raise: options.raise) else {
             throw failureWithScreenshot(
-                "Failed to send key press.",
+                keyChordProblem(keySpec) ?? "Failed to send key press '\(keySpec)'.",
                 statePath: options.statePath,
                 target: target,
                 warnings: options.raise

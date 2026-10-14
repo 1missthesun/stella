@@ -111,6 +111,10 @@ For a data-driven sequence, `sky.batch([...])` first validates every action agai
 
 Use `wait_for_change` when the next step depends on a mutation becoming observable. It polls without advancing the saved diff baseline and returns a final diff anchored exactly to `after_state_id`. Pass `after_visual_state_id` when screenshot-only changes matter; omit it to wait only for semantic accessibility changes. Use `get_app_state` directly when no prior state is available or a change is not required. Always re-derive element indices from the latest state.
 
+## Dialogs, Sheets And Alerts
+
+A native modal dialog (a browser's "Leave site?", a save sheet, a permission alert) is listed first in the state, ahead of the window it blocks, and the state carries a `[warning]` naming it. Act on it like any other element: click its button with that state's `state_id`, or press `Return` (its default button) or `Escape` (its cancel button). Then observe again. A browser may ignore a click that lands in the first instant after its dialog appears; if the dialog is still there in the next state, act again with that new state.
+
 ## When An Action Is Rejected
 
 A rejection saying the app changed after your state means nothing was sent. Observe again, re-derive the `element_index` from that state, and act with its `state_id` straight away. Do not reuse one state for several actions in a row unless you batch them. If the app keeps changing (animations, a page still loading), call `wait_for_change` so it settles, then act. Repeating the same call with the same old `state_id` never succeeds.

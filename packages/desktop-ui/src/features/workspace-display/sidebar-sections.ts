@@ -53,11 +53,28 @@ const restoreTabKind = (
 
 const SINGLE_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set(["updates", "email", "schedule"]);
 
+/**
+ * Surfaces that may hold several tabs, one per specific item (an app, a file),
+ * but at most one "empty" tab: the Apps list, the Browser, the Files root.
+ */
+const SINGLE_EMPTY_TAB_SECTIONS: ReadonlySet<SidebarSection> = new Set([
+  "apps",
+  "browser",
+  "files",
+]);
+
+const isSingleEmptyTab = (kind: SidebarSection, location: string | null) =>
+  location === null && SINGLE_EMPTY_TAB_SECTIONS.has(kind);
+
+/** Whether a tab of `kind` at `location` may exist only once. */
+const isSingletonTab = (kind: SidebarSection, location: string | null) =>
+  SINGLE_TAB_SECTIONS.has(kind) || isSingleEmptyTab(kind, location);
+
 /** Drop repeats of a single-tab surface (layouts saved before the rule). */
 const withoutRepeats = (tabs: SidebarTab[]): SidebarTab[] => {
   const seen = new Set<SidebarSection>();
   return tabs.filter((tab) => {
-    if (!SINGLE_TAB_SECTIONS.has(tab.kind)) return true;
+    if (!isSingletonTab(tab.kind, tab.location)) return true;
     if (seen.has(tab.kind)) return false;
     seen.add(tab.kind);
     return true;
@@ -342,7 +359,7 @@ export const sidebarSections = {
     const kind = resolveSidebarSection(section);
     const loc = location ?? null;
 
-    if (loc !== null || SINGLE_TAB_SECTIONS.has(kind)) {
+    if (loc !== null || isSingletonTab(kind, loc)) {
       const existing = snapshot.tabs.find(
         (tab) =>
           tab.kind === kind &&
@@ -354,7 +371,7 @@ export const sidebarSections = {
           active &&
           active.id !== existing.id &&
           active.kind === "home" &&
-          SINGLE_TAB_SECTIONS.has(kind)
+          isSingletonTab(kind, loc)
         ) {
           emit({
             tabs: snapshot.tabs.filter((tab) => tab.id !== active.id),
@@ -421,9 +438,21 @@ export const sidebarSections = {
     const active = activeTabOf(snapshot);
     if (!active || active.kind !== kind) return;
     if (active.location === (location ?? null)) return;
-    const tabs = snapshot.tabs.map((tab) =>
-      tab.id === active.id ? withLocation(tab, tab.kind, location ?? null) : tab,
-    );
+    const tabs = snapshot.tabs
+      .filter(
+        // Going back to the empty view keeps this tab and drops any other
+        // empty tab of the same kind, so there is still only one.
+        (tab) =>
+          tab.id === active.id ||
+          tab.kind !== kind ||
+          !isSingleEmptyTab(tab.kind, location ?? null) ||
+          tab.location !== null,
+      )
+      .map((tab) =>
+        tab.id === active.id
+          ? withLocation(tab, tab.kind, location ?? null)
+          : tab,
+      );
     emit({ ...snapshot, tabs });
   },
 

@@ -46,21 +46,31 @@ import { signToken, verifyToken, type TokenKind } from "./signed-token.js";
 import { loadInstallation } from "./store.js";
 import { resolveConversationRepo } from "./repos.js";
 import { isSlackConversationId } from "./workspace.js";
+import { conversationAllowsHost } from "./environment.js";
 import publishScript from "./stella-publish.cjs.txt";
+import shotScript from "./stella-shot.cjs.txt";
+import {
+  WORKER_CODE,
+  WORKER_MANIFEST,
+  destroyPreviewData,
+  parseWorkerManifest,
+  serveWorkerPreview,
+} from "./preview-worker.js";
 
 export const SLACK_PREVIEWS_PATH = "/api/slack/previews";
 const SIGNIN_PATH = `${SLACK_PREVIEWS_PATH}/signin`;
 const SIGNIN_DM_PATH = `${SLACK_PREVIEWS_PATH}/signin/dm`;
 /** A subdirectory of the Slack app's registered redirect URL, so no app change is needed. */
 const OIDC_CALLBACK_PATH = `${SLACK_PATHS.oauthCallback}/preview`;
-const KEY_PREFIX = "slack-previews";
+export const KEY_PREFIX = "slack-previews";
 
 const DAY_MS = 24 * 60 * 60_000;
 const MB = 1024 * 1024;
-export const MAX_PREVIEW_BYTES = 100 * MB;
+export const MAX_PREVIEW_BYTES = 400 * MB;
 const MAX_FILE_BYTES = 25 * MB;
+const MAX_CODE_BYTES = 48 * MB;
 const MAX_UPLOAD_BYTES = 95 * MB;
-const MAX_FILES = 5_000;
+const MAX_FILES = 20_000;
 const MAX_LIVE_PREVIEWS = 500;
 const QUOTA_BYTES: Record<ManagedModelAudience, number> = {
   anonymous: 0,
@@ -91,6 +101,8 @@ const d1 = (env: Cloudflare.Env): D1Database => {
   if (!env.DB) throw new Error("The DB binding is missing.");
   return env.DB;
 };
+
+export const previewBucket = (env: Cloudflare.Env): R2Bucket => bucket(env);
 
 const bucket = (env: Cloudflare.Env): R2Bucket => {
   if (!env.APP_BUILDS) throw new Error("The APP_BUILDS binding is missing.");
@@ -286,6 +298,7 @@ type PublishClaims = { team: string; conv: string };
 
 const HELPER_DIR = "/opt/stella-preview";
 const PUBLISH_HELPER = "/usr/local/bin/stella-publish";
+const SHOT_HELPER = "/usr/local/bin/stella-shot";
 const TOOL_UID = 42424;
 
 const shellQuote = (value: string): string => `'${value.replace(/'/gu, `'\\''`)}'`;
@@ -331,6 +344,7 @@ export const prepareSlackPreviews = async (
       writeFile(`${HELPER_DIR}/capability`, capability, "0640", `root:${TOOL_UID}`),
       writeFile(`${HELPER_DIR}/origin`, origin, "0644", "root:root"),
       writeFile(PUBLISH_HELPER, publishScript, "0755", "root:root"),
+      writeFile(SHOT_HELPER, shotScript, "0755", "root:root"),
     ].join("\n");
     const result = await session.exec(command, {
       origin: "internal",
@@ -391,7 +405,7 @@ const CONTENT_TYPES: Record<string, string> = {
   zip: "application/zip",
 };
 
-const extensionOf = (path: string): string => {
+export const extensionOf = (path: string): string => {
   const name = path.slice(path.lastIndexOf("/") + 1);
   const dot = name.lastIndexOf(".");
   return dot > 0 ? name.slice(dot + 1).toLowerCase() : "";
@@ -400,7 +414,7 @@ const extensionOf = (path: string): string => {
 const contentTypeOf = (path: string): string => CONTENT_TYPES[extensionOf(path)] ?? "application/octet-stream";
 
 /** A clean relative path inside the site, or null for anything that could escape it. */
-const cleanPath = (raw: string): string | null => {
+export const cleanPath = (raw: string): string | null => {
   const parts: string[] = [];
   for (const part of raw.replace(/\\/gu, "/").split("/")) {
     if (!part || part === ".") continue;
@@ -531,8 +545,9 @@ async function* tarFiles(stream: ReadableStream<Uint8Array>): AsyncGenerator<Tar
       if (!(await reader.skip(padded))) throw new UploadError("The upload ended early.");
       continue;
     }
-    if (size > MAX_FILE_BYTES) {
-      throw new UploadError(`${name.replace(/^\.\//u, "")} is larger than ${MAX_FILE_BYTES / MB} MB.`, 413);
+    const limit = name.replace(/^\.\//u, "") === WORKER_CODE ? MAX_CODE_BYTES : MAX_FILE_BYTES;
+    if (size > limit) {
+      throw new UploadError(`${name.replace(/^\.\//u, "")} is larger than ${limit / MB} MB.`, 413);
     }
     const body = await reader.read(padded);
     if (!body) throw new UploadError("The upload ended early.");
@@ -563,6 +578,19 @@ const deletePrefix = async (env: Cloudflare.Env, prefix: string): Promise<void> 
 
 const formatMb = (bytes: number): string => `${Math.round((bytes / MB) * 10) / 10} MB`;
 
+type UploadClaims = { id: string; team: string; conv: string; bytes: number; files: number; parts: number; kind: PreviewKind };
+type PreviewKind = "static" | "worker";
+
+const UPLOAD: TokenKind = { prefix: "su1", domain: "stella.slack-preview-upload.v1" };
+const UPLOAD_TTL_MS = 30 * 60_000;
+const MAX_PARTS = 16;
+
+/**
+ * One part of an upload (a gzipped tar). A site that doesn't fit one request
+ * comes in several: the first starts the preview (a row that isn't served
+ * until it's ready) and returns an upload token for the next, and the one
+ * marked `final=1` checks the whole site and publishes the link.
+ */
 const publish = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
   const header = request.headers.get("authorization") ?? "";
   const claims = header.startsWith("Bearer ")
@@ -581,30 +609,65 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
   if (!request.body) return Response.json({ error: "Send the site as a gzipped tar." }, { status: 400 });
 
   const url = new URL(request.url);
+  const token = url.searchParams.get("upload");
+  const upload = token ? await verifyToken<UploadClaims>(env, UPLOAD, token) : null;
+  if (token && !upload) return Response.json({ error: "The upload expired. Run stella-publish again." }, { status: 400 });
+  if (upload && (upload.team !== claims.team || upload.conv !== claims.conv)) {
+    return Response.json({ error: "Unauthorized" }, { status: 403 });
+  }
+  if (upload && upload.parts >= MAX_PARTS) {
+    return Response.json({ error: `A preview can be uploaded in at most ${MAX_PARTS} parts.` }, { status: 413 });
+  }
+  const final = url.searchParams.get("final") !== "0";
+  const kind: PreviewKind = upload?.kind ?? (url.searchParams.get("kind") === "worker" ? "worker" : "static");
+  if (kind === "worker" && !sitesHost(env)) {
+    return Response.json(
+      { error: "This Stella server shares one address for all its sites, so it can only preview static sites; live previews of Worker apps need SITES_HOST." },
+      { status: 400 },
+    );
+  }
   const commit = (url.searchParams.get("commit") ?? "").slice(0, 40);
   const repo =
     (url.searchParams.get("repo") ?? "").slice(0, 200) ||
     ((await resolveConversationRepo(env, claims.conv).catch(() => null))?.repo?.fullName ?? "");
   const settings = await loadPreviewSettings(env, claims.team, repo || null);
   const [used, quota] = await Promise.all([usage(env, claims.team), quotaFor(env, install.ownerId)]);
-  if (used.live >= MAX_LIVE_PREVIEWS) {
+  if (!upload && used.live >= MAX_LIVE_PREVIEWS) {
     return Response.json(
       { error: `This workspace has ${used.live} live previews, the most it can hold. Older ones free up as they expire.` },
       { status: 429 },
     );
   }
-  const room = Math.min(MAX_PREVIEW_BYTES, quota - used.bytes);
+  const before = upload?.bytes ?? 0;
+  const room = Math.min(MAX_PREVIEW_BYTES - before, quota - used.bytes);
   if (room <= 0) {
     return Response.json(
       {
-        error: `This workspace's previews use ${formatMb(used.bytes)} of its ${formatMb(quota)} on the owner's plan. Older previews free up space as they expire, or the owner can shorten how long they last on stella.sh/crew.`,
+        error:
+          before > 0 && quota - used.bytes > 0
+            ? `The site is larger than ${formatMb(MAX_PREVIEW_BYTES)}, the most one preview can be.`
+            : `This workspace's previews use ${formatMb(used.bytes)} of its ${formatMb(quota)} on the owner's plan. Older previews free up space as they expire, or the owner can shorten how long they last on stella.sh/crew.`,
       },
       { status: 413 },
     );
   }
 
-  const id = newId();
+  const id = upload?.id ?? newId();
   const prefix = `${KEY_PREFIX}/${id}/`;
+  const now = Date.now();
+  if (!upload) {
+    await d1(env)
+      .prepare(
+        `INSERT INTO slack_previews (id, team_id, conversation_id, created_at, bytes, files, spa, repo, commit_sha, kind, ready)
+         VALUES (?, ?, ?, ?, 0, 0, 1, ?, ?, ?, 0)`,
+      )
+      .bind(id, claims.team, claims.conv, now, repo || null, commit || null, kind)
+      .run();
+  }
+  const abandon = async () => {
+    await deletePrefix(env, prefix).catch(() => {});
+    await d1(env).prepare("UPDATE slack_previews SET deleted_at = ? WHERE id = ?").bind(Date.now(), id).run().catch(() => {});
+  };
   const seen = new Set<string>();
   let bytes = 0;
   const pending = new Set<Promise<unknown>>();
@@ -620,8 +683,8 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
       if (!path || seen.has(path)) continue;
       seen.add(path);
       bytes += entry.data.byteLength;
-      if (seen.size > MAX_FILES) throw new UploadError(`The site has more than ${MAX_FILES} files.`, 413);
-      if (bytes > MAX_PREVIEW_BYTES) {
+      if ((upload?.files ?? 0) + seen.size > MAX_FILES) throw new UploadError(`The site has more than ${MAX_FILES} files.`, 413);
+      if (before + bytes > MAX_PREVIEW_BYTES) {
         throw new UploadError(`The site is larger than ${formatMb(MAX_PREVIEW_BYTES)}, the most one preview can be.`, 413);
       }
       if (bytes > room) {
@@ -647,37 +710,148 @@ const publish = async (request: Request, env: Cloudflare.Env): Promise<Response>
     }
     await Promise.all(pending);
     if (firstError) throw firstError;
-    if (!seen.has("index.html")) throw new UploadError("The site has no index.html at its top level.");
   } catch (error) {
     await Promise.allSettled(pending);
-    await deletePrefix(env, prefix).catch(() => {});
+    await abandon();
     return publishFailure(error instanceof TypeError && /gzip|decompress|header/iu.test(error.message)
       ? new UploadError("The upload isn't a gzipped tar.")
       : error);
   }
 
-  const now = Date.now();
+  const totalBytes = before + bytes;
+  const totalFiles = (upload?.files ?? 0) + seen.size;
+  if (!final) {
+    await d1(env).prepare("UPDATE slack_previews SET bytes = ?, files = ? WHERE id = ?").bind(totalBytes, totalFiles, id).run();
+    const next = await signToken<UploadClaims>(
+      env,
+      UPLOAD,
+      { id, team: claims.team, conv: claims.conv, bytes: totalBytes, files: totalFiles, parts: (upload?.parts ?? 0) + 1, kind },
+      UPLOAD_TTL_MS,
+    );
+    return Response.json({ id, upload: next, bytes: totalBytes, files: totalFiles }, { headers: { "cache-control": "no-store" } });
+  }
+
+  let spa = 1;
+  if (kind === "worker") {
+    const [manifestObject, code] = await Promise.all([
+      bucket(env).get(`${prefix}${WORKER_MANIFEST}`),
+      bucket(env).head(`${prefix}${WORKER_CODE}`),
+    ]);
+    const manifest = manifestObject ? parseWorkerManifest(await manifestObject.json().catch(() => null)) : "The upload has no stella-worker.json.";
+    if (typeof manifest === "string" || !code) {
+      await abandon();
+      return Response.json({ error: typeof manifest === "string" ? manifest : "The upload has no server code." }, { status: 400 });
+    }
+    spa = manifest.assets.notFoundHandling === "single-page-application" ? 1 : 0;
+  } else {
+    const [index, notFound] = await Promise.all([bucket(env).head(`${prefix}index.html`), bucket(env).head(`${prefix}404.html`)]);
+    if (!index) {
+      await abandon();
+      return Response.json({ error: "The site has no index.html at its top level." }, { status: 400 });
+    }
+    spa = notFound ? 0 : 1;
+  }
   await d1(env)
-    .prepare(
-      `INSERT INTO slack_previews (id, team_id, conversation_id, created_at, bytes, files, spa, repo, commit_sha)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .bind(id, claims.team, claims.conv, now, bytes, seen.size, seen.has("404.html") ? 0 : 1, repo || null, commit || null)
+    .prepare("UPDATE slack_previews SET bytes = ?, files = ?, spa = ?, commit_sha = COALESCE(?, commit_sha), ready = 1 WHERE id = ?")
+    .bind(totalBytes, totalFiles, spa, commit || null, id)
     .run();
   console.log(
-    JSON.stringify({ event: "slack_preview_published", teamId: claims.team, id, bytes, files: seen.size, access: settings.access }),
+    JSON.stringify({ event: "slack_preview_published", teamId: claims.team, id, kind, bytes: totalBytes, files: totalFiles, access: settings.access }),
   );
   return Response.json(
     {
       id,
+      kind,
       url: previewLink(env, id),
       access: settings.access,
       expiresAt: now + settings.ttlDays * DAY_MS,
-      bytes,
-      files: seen.size,
+      bytes: totalBytes,
+      files: totalFiles,
     },
     { headers: { "cache-control": "no-store" } },
   );
+};
+
+// ── Screenshots and recordings (visual proof for agents) ─────────────────
+
+const CAPTURE_PATH = `${SLACK_PREVIEWS_PATH}/capture`;
+const DEFAULT_VIEWS = [
+  { name: "desktop", width: 1440, height: 900, scale: 1, mobile: false },
+  { name: "phone", width: 390, height: 844, scale: 3, mobile: true },
+];
+
+/**
+ * Screenshots of a page at desktop and phone widths, and optionally a short
+ * recording of steps on it, taken by a fresh profile-less cloud browser. The
+ * page must be one of this workspace's previews, or a host the
+ * conversation's network access reaches on its own.
+ */
+const capture = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+  const header = request.headers.get("authorization") ?? "";
+  const claims = header.startsWith("Bearer ")
+    ? await verifyToken<PublishClaims>(env, PUBLISH, header.slice(7).trim())
+    : null;
+  if (!claims) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!env.BROWSER_GATEWAY) return Response.json({ error: "Screenshots aren't available on this deployment." }, { status: 503 });
+  const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const raw = typeof body?.url === "string" ? body.url : "";
+  let target: URL;
+  try {
+    target = new URL(raw);
+  } catch {
+    return Response.json({ error: "Pass the page's full https URL." }, { status: 400 });
+  }
+  if (target.protocol !== "https:") return Response.json({ error: "Only https pages can be captured." }, { status: 400 });
+  const id = previewIdFor(new Request(target), env);
+  const preview = id ? await loadPreview(env, id) : null;
+  let navigate = target.toString();
+  if (preview) {
+    if (preview.team_id !== claims.team) return Response.json({ error: "That preview belongs to another workspace." }, { status: 403 });
+    const settings = await loadPreviewSettings(env, preview.team_id, preview.repo);
+    if (settings.access !== "public") {
+      const origin = previewOrigin(env, preview.id);
+      const grant = await signToken<GrantClaims>(
+        env,
+        GRANT,
+        { p: preview.id, t: preview.team_id, r: safePath(`${target.pathname}${target.search}`) },
+        5 * 60_000,
+      );
+      navigate = `${origin}/__stella/auth?g=${encodeURIComponent(grant)}`;
+    }
+  } else if (!(await conversationAllowsHost(env, claims.conv, target.hostname.toLowerCase()).catch(() => false))) {
+    return Response.json(
+      {
+        error: `${target.hostname} isn't a Stella preview of this workspace, and this environment's network access doesn't include it. Capture the preview link stella-publish printed.`,
+      },
+      { status: 403 },
+    );
+  }
+  const views = Array.isArray(body?.views) && body.views.length ? body.views : DEFAULT_VIEWS;
+  const fullPage = body?.fullPage === true;
+  const recording = body?.recording && typeof body.recording === "object" ? body.recording : null;
+  let upstream: Response;
+  try {
+    upstream = await env.BROWSER_GATEWAY.fetch("https://browser-gateway/internal/sites/capture", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        url: navigate,
+        views: (views as Array<Record<string, unknown>>).map((view) => ({ ...view, fullPage: view.fullPage ?? fullPage })),
+        ...(typeof body?.waitFor === "string" ? { waitFor: body.waitFor } : {}),
+        ...(recording ? { recording } : {}),
+      }),
+      signal: AbortSignal.timeout(170_000),
+    });
+  } catch {
+    return Response.json({ error: "The cloud browser didn't answer. Try again." }, { status: 503 });
+  }
+  if (!upstream.ok) {
+    const text = await upstream.text().catch(() => "");
+    console.warn(JSON.stringify({ event: "slack_preview_capture_failed", status: upstream.status, body: text.slice(0, 300) }));
+    return Response.json({ error: "The cloud browser couldn't capture that page. Try again." }, { status: 502 });
+  }
+  console.log(JSON.stringify({ event: "slack_preview_captured", teamId: claims.team, preview: preview?.id ?? null, recording: Boolean(recording) }));
+  return new Response(upstream.body, { headers: { "content-type": "application/json", "cache-control": "no-store" } });
 };
 
 // ── Sign in with Slack (members-only previews) ────────────────────────────
@@ -689,15 +863,17 @@ type PreviewRow = {
   spa: number;
   repo: string | null;
   deleted_at: number | null;
+  kind: string;
+  ready: number;
 };
 
 const loadPreview = async (env: Cloudflare.Env, id: string): Promise<PreviewRow | null> => {
   if (!ID_PATTERN.test(id)) return null;
   const row = await d1(env)
-    .prepare("SELECT id, team_id, created_at, spa, repo, deleted_at FROM slack_previews WHERE id = ?")
+    .prepare("SELECT id, team_id, created_at, spa, repo, deleted_at, kind, ready FROM slack_previews WHERE id = ?")
     .bind(id)
     .first<PreviewRow>();
-  return row && !row.deleted_at ? row : null;
+  return row && !row.deleted_at && row.ready ? row : null;
 };
 
 type SigninState = { p: string; r: string; n: string };
@@ -865,6 +1041,14 @@ export const handleSlackPreviewRoute = async (request: Request, env: Cloudflare.
       return publishFailure(error);
     }
   }
+  if (pathname === CAPTURE_PATH && request.method === "POST") {
+    try {
+      return await capture(request, env);
+    } catch (error) {
+      console.error(JSON.stringify({ event: "slack_preview_capture_error", message: String(error).slice(0, 300) }));
+      return Response.json({ error: "Stella couldn't capture that page. Try again." }, { status: 502 });
+    }
+  }
   if (pathname === SIGNIN_PATH && request.method === "GET") return await signin(request, env);
   if (pathname === SIGNIN_DM_PATH && request.method === "POST") return await sendDmLink(request, env);
   if (pathname === SIGNIN_DM_PATH && request.method === "GET") return await openDmLink(request, env);
@@ -876,7 +1060,7 @@ export const handleSlackPreviewRoute = async (request: Request, env: Cloudflare.
 
 const PREVIEW_CSP = "base-uri 'self'; object-src 'none'; form-action 'self' https:";
 
-const servingHeaders = (object: R2Object, isPublic: boolean, html: boolean): Headers => {
+export const servingHeaders = (object: R2Object, isPublic: boolean, html: boolean): Headers => {
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set("etag", object.httpEtag);
@@ -891,7 +1075,7 @@ const servingHeaders = (object: R2Object, isPublic: boolean, html: boolean): Hea
   return headers;
 };
 
-const decodePath = (pathname: string): string | null => {
+export const decodePath = (pathname: string): string | null => {
   try {
     return decodeURIComponent(pathname);
   } catch {
@@ -988,11 +1172,9 @@ const hasView = async (request: Request, env: Cloudflare.Env, teamId: string): P
   return false;
 };
 
-export const servePreview = async (request: Request, env: Cloudflare.Env): Promise<Response> => {
+export const servePreview = async (request: Request, env: Cloudflare.Env, exports?: unknown): Promise<Response> => {
   const url = new URL(request.url);
-  if (request.method !== "GET" && request.method !== "HEAD") {
-    return new Response("Method not allowed", { status: 405, headers: { allow: "GET, HEAD" } });
-  }
+  const readOnly = request.method === "GET" || request.method === "HEAD";
   const shared = !sitesHost(env);
 
   if (shared && url.pathname.startsWith("/__stella/open/")) {
@@ -1031,6 +1213,10 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
   const id = previewIdFor(request, env);
   const preview = id ? await loadPreview(env, id) : null;
   if (!preview) return missing();
+  const isWorker = preview.kind === "worker";
+  if (!readOnly && !isWorker) {
+    return new Response("Method not allowed", { status: 405, headers: { allow: "GET, HEAD" } });
+  }
   const [settings, install] = await Promise.all([
     loadPreviewSettings(env, preview.team_id, preview.repo),
     loadInstallation(env, preview.team_id),
@@ -1050,6 +1236,12 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
       `<p>This preview is for members of the ${escapeHtml(install.teamName)} Slack workspace.</p><a class="button" href="${escapeHtml(target.toString())}">Sign in</a>`,
     );
   }
+  if (isWorker) {
+    if (shared) return page(503, "This preview can't run here", "<p>Live previews of apps need their own sites domain on this Stella server.</p>");
+    const response = await serveWorkerPreview(request, env, exports, preview.id, isPublic);
+    response.headers.delete("service-worker-allowed");
+    return response;
+  }
   const pathname = shared ? url.pathname.slice(preview.id.length + 1) || "/" : url.pathname;
   const response = await serveFile(request, env, preview, pathname, isPublic);
   response.headers.delete("service-worker-allowed");
@@ -1060,7 +1252,7 @@ export const servePreview = async (request: Request, env: Cloudflare.Env): Promi
 export class SitesHost extends WorkerEntrypoint<Cloudflare.Env> {
   override async fetch(request: Request): Promise<Response> {
     try {
-      return await servePreview(request, this.env);
+      return await servePreview(request, this.env, this.ctx.exports);
     } catch (error) {
       console.error(
         JSON.stringify({
@@ -1085,12 +1277,16 @@ export const sweepSlackPreviews = async (env: Cloudflare.Env): Promise<number> =
        LEFT JOIN slack_repos r ON r.team_id = p.team_id AND r.full_name = p.repo COLLATE NOCASE
        LEFT JOIN slack_installations i ON i.team_id = p.team_id AND i.revoked_at IS NULL
        WHERE p.deleted_at IS NULL
-         AND (i.team_id IS NULL OR p.created_at + COALESCE(r.preview_ttl_days, s.ttl_days, ?) * ? <= ?)
+         AND (i.team_id IS NULL OR p.created_at + COALESCE(r.preview_ttl_days, s.ttl_days, ?) * ? <= ?
+           OR (p.ready = 0 AND p.created_at + ? <= ?))
        LIMIT 300`,
     )
-    .bind(SLACK_PREVIEW_TTL_DAYS_DEFAULT, DAY_MS, now)
+    .bind(SLACK_PREVIEW_TTL_DAYS_DEFAULT, DAY_MS, now, DAY_MS, now)
     .all<{ id: string }>();
   for (const { id } of results) {
+    await destroyPreviewData(env, id).catch((error: unknown) => {
+      console.warn(JSON.stringify({ event: "slack_preview_data_sweep_failed", id, message: String(error).slice(0, 200) }));
+    });
     await deletePrefix(env, `${KEY_PREFIX}/${id}/`);
     await d1(env).prepare("UPDATE slack_previews SET deleted_at = ? WHERE id = ?").bind(now, id).run();
   }

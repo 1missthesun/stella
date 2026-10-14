@@ -13,6 +13,7 @@ export { BillingControl } from "./billing/control.js";
 export { WorldStore } from "./world-store.js";
 export { AppReleaseChannel } from "./app-source-releases.js";
 export { SitesHost } from "./slack/previews.js";
+export { SlackPreviewAssets, SlackPreviewBindings, SlackPreviewData, SlackPreviewOutbound } from "./slack/preview-worker.js";
 
 /**
  * Every sandbox, of either size and either workload, is one object in this

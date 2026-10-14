@@ -2,25 +2,31 @@
 "use strict";
 // stella-publish [options] [dir]
 //
-// Publishes a static site as a Stella preview and prints its link.
+// Publishes a site or a web app as a Stella preview and prints its link.
 //
 // With a dir: uploads that folder as it is (it needs an index.html at its top).
 // Without one, from inside a project:
 //   1. If this is the workspace's GitHub repository and HEAD is pushed, waits for the
 //      repository's own preview of that commit (stella-preview) and prints it.
-//   2. Otherwise installs dependencies, builds the project and uploads the output.
-//      The build command and output folder come from stella.preview.json
-//      ({"root": ".", "install": "...", "build": "...", "output": "dist"}) when the
-//      project has one, else from the framework (Vite, Next.js static export,
-//      Create React App, Astro, SvelteKit static, Gatsby, Nuxt generate, Angular,
-//      VitePress, Vue CLI, Eleventy) or a plain folder with an index.html.
+//   2. Otherwise finds the app (in a monorepo, the one with the change; --root picks
+//      another), installs dependencies, builds it and uploads what it made:
+//      - a Cloudflare Worker app (TanStack Start, Astro, Remix, React Router, Hono,
+//        SvelteKit, Nuxt... with a wrangler config) runs on Stella as a live copy,
+//        with its own database seeded from the local one or the migrations;
+//      - a static site (Vite, Next.js static export, Create React App, Astro static,
+//        Gatsby, Angular, VitePress, Eleventy, a plain index.html) is served as files.
+//      The build command and output folder can be set in stella.preview.json
+//      ({"root": "web", "install": "...", "build": "...", "output": "dist"}).
 //
-// Options: --no-repo-preview  skip step 1
-//          --build "<cmd>"    build command    --out <dir>  output folder
+// Options: --no-repo-preview  skip step 1        --root <dir>  the app's folder
+//          --build "<cmd>"    build command      --out <dir>   output folder (static)
+//          --var KEY=value    a variable for a Worker app in the preview (not a secret:
+//                             e.g. a test sign-in key), repeatable; "vars" in stella.preview.json
+//          --host <host>      the host a Worker app sees requests on (default localhost)
 //
-// Exit 0: link printed. 2: the build failed (log tail on stderr). 3: nothing to
-// publish (no static site found). 5: refused by a size limit or the workspace's
-// quota. 1: anything else.
+// Exit 0: link printed. 2: the build failed (log tail on stderr). 3: nothing that can
+// be previewed (the reason is the last line). 5: refused by a size limit or the
+// workspace's quota. 1: anything else.
 
 const fs = require("fs");
 const os = require("os");
@@ -29,6 +35,7 @@ const cp = require("child_process");
 
 const HELPER_DIR = process.env.STELLA_PREVIEW_HELPER_DIR || "/opt/stella-preview";
 const MB = 1024 * 1024;
+const PART_BYTES = 80 * MB;
 
 const say = (line) => process.stderr.write(line + "\n");
 const fail = (code, message) => {
@@ -37,14 +44,21 @@ const fail = (code, message) => {
 };
 
 const parseArgs = (argv) => {
-  const options = { repoPreview: true, build: null, out: null, dir: null };
+  const options = { repoPreview: true, build: null, out: null, root: null, dir: null, host: null, vars: {} };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--no-repo-preview") options.repoPreview = false;
     else if (arg === "--build") options.build = argv[++i] || null;
     else if (arg === "--out") options.out = argv[++i] || null;
+    else if (arg === "--root") options.root = argv[++i] || null;
+    else if (arg === "--host") options.host = argv[++i] || null;
+    else if (arg === "--var") {
+      const pair = argv[++i] || "";
+      const eq = pair.indexOf("=");
+      if (eq > 0) options.vars[pair.slice(0, eq)] = pair.slice(eq + 1);
+    }
     else if (arg === "-h" || arg === "--help") {
-      say("usage: stella-publish [--no-repo-preview] [--build <cmd>] [--out <dir>] [dir]");
+      say("usage: stella-publish [--no-repo-preview] [--root <dir>] [--build <cmd>] [--out <dir>] [dir]");
       process.exit(0);
     } else if (!options.dir) options.dir = arg;
   }
@@ -58,7 +72,7 @@ const run = (command, cwd, opts) => {
     maxBuffer: 64 * MB,
     timeout: (opts && opts.timeoutMs) || 15 * 60_000,
     env: Object.assign({}, process.env, { CI: "1", BROWSER: "none", FORCE_COLOR: "0" }, (opts && opts.env) || {}),
-    stdio: opts && opts.inherit ? ["ignore", "pipe", "inherit"] : ["ignore", "pipe", "pipe"],
+    stdio: ["ignore", "pipe", "pipe"],
   });
   return {
     ok: result.status === 0,
@@ -78,9 +92,44 @@ const exists = (p) => {
   }
 };
 
+const isDir = (p) => {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+};
+
+const stripJsonComments = (text) => {
+  let out = "";
+  let inString = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    const next = text[i + 1];
+    if (inString) {
+      out += c;
+      if (c === "\\") {
+        out += next || "";
+        i += 1;
+      } else if (c === '"') inString = false;
+    } else if (c === '"') {
+      inString = true;
+      out += c;
+    } else if (c === "/" && next === "/") {
+      while (i < text.length && text[i] !== "\n") i += 1;
+      out += "\n";
+    } else if (c === "/" && next === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i += 1;
+      i += 1;
+    } else out += c;
+  }
+  return out.replace(/,(\s*[}\]])/g, "$1");
+};
+
 const readJson = (p) => {
   try {
-    return JSON.parse(fs.readFileSync(p, "utf8"));
+    return JSON.parse(stripJsonComments(fs.readFileSync(p, "utf8")));
   } catch {
     return null;
   }
@@ -110,6 +159,12 @@ const connectedRepo = () => {
   }
 };
 
+const githubRepo = (root) => {
+  const remote = git(["remote", "get-url", "origin"], root);
+  const match = /github\.com[:/]([^/]+\/[^/.]+?)(?:\.git)?$/.exec(remote);
+  return match ? match[1] : "";
+};
+
 const repoPreview = (root) => {
   if (!which("stella-preview")) return null;
   const connected = connectedRepo();
@@ -131,6 +186,124 @@ const repoPreview = (root) => {
   const why = { 1: "couldn't check it", 2: "its preview build failed", 3: "it publishes no previews", 4: "its preview timed out" };
   say("The repository's own preview isn't available (" + (why[result.status] || "exit " + result.status) + "); building one on Stella.");
   return null;
+};
+
+// ---- finding the app ----------------------------------------------------------
+
+const FRAMEWORKS = [
+  { dep: "next", name: "Next.js", outputs: ["out"] },
+  { dep: "nuxt", name: "Nuxt", outputs: [".output/public", "dist"], script: "generate" },
+  { dep: "astro", name: "Astro", outputs: ["dist/client", "dist"] },
+  { dep: "@sveltejs/kit", name: "SvelteKit", outputs: ["build", ".svelte-kit/output/prerendered/pages"] },
+  { dep: "@tanstack/react-start", name: "TanStack Start", outputs: ["dist/client", ".output/public"] },
+  { dep: "@remix-run/react", name: "Remix", outputs: ["build/client", "public"] },
+  { dep: "@react-router/dev", name: "React Router", outputs: ["build/client"] },
+  { dep: "gatsby", name: "Gatsby", outputs: ["public"] },
+  { dep: "@angular/core", name: "Angular", outputs: ["dist"] },
+  { dep: "vitepress", name: "VitePress", outputs: ["docs/.vitepress/dist", ".vitepress/dist"] },
+  { dep: "react-scripts", name: "Create React App", outputs: ["build"] },
+  { dep: "@vue/cli-service", name: "Vue CLI", outputs: ["dist"] },
+  { dep: "@11ty/eleventy", name: "Eleventy", outputs: ["_site"] },
+  { dep: "vite", name: "Vite", outputs: ["dist"] },
+];
+const WEB_DEPS = FRAMEWORKS.map((f) => f.dep).concat(["react-dom", "vue", "svelte", "solid-js", "preact", "hono", "@cloudflare/vite-plugin", "express", "fastify"]);
+const GENERIC_OUTPUTS = ["dist", "build", "out", "public", "_site", "site", ".output/public", "www"];
+const STATIC_FOLDERS = [".", "public", "site", "docs", "www", "dist", "build", "_site"];
+const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "out", ".next", ".output", ".wrangler", ".turbo", "coverage", "vendor", "target", ".svelte-kit", ".vercel", ".cache", ".astro", "Pods", "ios", "android"]);
+const WRANGLER_FILES = ["wrangler.jsonc", "wrangler.json", "wrangler.toml"];
+
+const wranglerFile = (dir) => {
+  for (const name of WRANGLER_FILES) if (exists(path.join(dir, name))) return path.join(dir, name);
+  return null;
+};
+
+const projectInfo = (dir) => {
+  const pkg = readJson(path.join(dir, "package.json"));
+  const deps = pkg ? Object.assign({}, pkg.dependencies || {}, pkg.devDependencies || {}) : {};
+  const scripts = (pkg && pkg.scripts) || {};
+  const wrangler = wranglerFile(dir);
+  return {
+    dir,
+    pkg,
+    deps,
+    wrangler,
+    web: WEB_DEPS.some((dep) => deps[dep]),
+    buildable: Boolean(scripts.build || scripts.generate || wrangler),
+  };
+};
+
+const changedFiles = (top) => {
+  const files = new Set();
+  for (const line of git(["diff", "--name-only", "HEAD~1", "HEAD"], top).split("\n")) if (line) files.add(line);
+  for (const line of git(["status", "--porcelain"], top).split("\n")) if (line.length > 3) files.add(line.slice(3).replace(/^"|"$/g, ""));
+  return [...files];
+};
+
+const subprojects = (top) => {
+  const found = [];
+  const walk = (dir, depth) => {
+    if (depth > 3) return;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith(".") || SKIP_DIRS.has(entry.name)) continue;
+      const child = path.join(dir, entry.name);
+      const info = projectInfo(child);
+      if (info.buildable && (info.web || info.wrangler)) found.push(info);
+      walk(child, depth + 1);
+    }
+  };
+  walk(top, 1);
+  return found;
+};
+
+const PREFERRED_NAMES = ["web", "site", "www", "app", "frontend", "website", "client"];
+
+const findProject = (top, cwd, options, config) => {
+  if (options.root) return path.resolve(cwd, options.root);
+  if (config.root) return path.resolve(top, config.root);
+  const here = projectInfo(cwd);
+  if (cwd !== top && (here.pkg || here.wrangler)) return cwd;
+  const root = projectInfo(top);
+  if (root.buildable && (root.web || root.wrangler || !root.pkg)) return top;
+  if (!root.pkg && (exists(path.join(top, "index.html")) || findIndex(top, STATIC_FOLDERS))) return top;
+  const candidates = subprojects(top);
+  if (candidates.length === 0) return top;
+  let chosen = candidates[0];
+  if (candidates.length > 1) {
+    const changed = changedFiles(top);
+    const score = (info) => {
+      const rel = path.relative(top, info.dir) + "/";
+      const hits = changed.filter((file) => file.startsWith(rel)).length;
+      const named = PREFERRED_NAMES.includes(path.basename(info.dir)) ? 1 : 0;
+      return hits * 100 + (info.web ? 10 : 0) + named * 5 - rel.split("/").length;
+    };
+    chosen = candidates.slice().sort((a, b) => score(b) - score(a))[0];
+    say(
+      "This repository has several apps (" + candidates.map((c) => path.relative(top, c.dir)).join(", ") + "); previewing " +
+        path.relative(top, chosen.dir) + "/. Pass --root <dir> for another.",
+    );
+  } else if (chosen.dir !== top) {
+    say("Previewing the app in " + path.relative(top, chosen.dir) + "/.");
+  }
+  return chosen.dir;
+};
+
+// ---- building -------------------------------------------------------------------
+
+const LOCKFILES = ["bun.lock", "bun.lockb", "pnpm-lock.yaml", "yarn.lock", "package-lock.json"];
+
+const lockDirFor = (dir, top) => {
+  let current = dir;
+  for (;;) {
+    if (LOCKFILES.some((name) => exists(path.join(current, name)))) return current;
+    if (current === top || path.dirname(current) === current) return dir;
+    current = path.dirname(current);
+  }
 };
 
 const packageManager = (dir) => {
@@ -156,22 +329,18 @@ const runScript = (pm, script) => {
   return "npm run " + script;
 };
 
-const FRAMEWORKS = [
-  { dep: "next", name: "Next.js", outputs: ["out"] },
-  { dep: "nuxt", name: "Nuxt", outputs: [".output/public", "dist"], script: "generate" },
-  { dep: "astro", name: "Astro", outputs: ["dist"] },
-  { dep: "@sveltejs/kit", name: "SvelteKit", outputs: ["build", ".svelte-kit/output/prerendered/pages"] },
-  { dep: "gatsby", name: "Gatsby", outputs: ["public"] },
-  { dep: "@angular/core", name: "Angular", outputs: ["dist"] },
-  { dep: "vitepress", name: "VitePress", outputs: ["docs/.vitepress/dist", ".vitepress/dist"] },
-  { dep: "react-scripts", name: "Create React App", outputs: ["build"] },
-  { dep: "@vue/cli-service", name: "Vue CLI", outputs: ["dist"] },
-  { dep: "@11ty/eleventy", name: "Eleventy", outputs: ["_site"] },
-  { dep: "vite", name: "Vite", outputs: ["dist"] },
-];
-
-const GENERIC_OUTPUTS = ["dist", "build", "out", "public", "_site", "site", ".output/public", "www"];
-const STATIC_FOLDERS = [".", "public", "site", "docs", "www", "dist", "build", "_site"];
+const installed = (lockDir) => {
+  const modules = path.join(lockDir, "node_modules");
+  if (!isDir(modules)) return false;
+  const lock = LOCKFILES.map((name) => path.join(lockDir, name)).find(exists);
+  if (!lock) return true;
+  try {
+    const marker = [path.join(modules, ".package-lock.json"), path.join(modules, ".yarn-integrity"), path.join(modules, ".modules.yaml"), modules].find(exists);
+    return fs.statSync(marker).mtimeMs >= fs.statSync(lock).mtimeMs;
+  } catch {
+    return false;
+  }
+};
 
 const findIndex = (dir, candidates, since) => {
   for (const candidate of candidates) {
@@ -179,7 +348,7 @@ const findIndex = (dir, candidates, since) => {
     if (exists(path.join(base, "index.html"))) {
       if (!since || fs.statSync(path.join(base, "index.html")).mtimeMs >= since) return base;
     }
-    if (candidate === "dist" && exists(base)) {
+    if (candidate === "dist" && isDir(base)) {
       for (const child of fs.readdirSync(base)) {
         const nested = path.join(base, child, "browser");
         if (exists(path.join(nested, "index.html"))) return nested;
@@ -190,134 +359,542 @@ const findIndex = (dir, candidates, since) => {
   return null;
 };
 
-const build = (root, options) => {
-  const config = readJson(path.join(root, "stella.preview.json")) || readJson(path.join(root, ".stella", "preview.json")) || {};
-  const dir = path.resolve(root, config.root || ".");
-  const buildCommand = options.build || config.build || null;
-  const output = options.out || config.output || null;
-  const pkg = readJson(path.join(dir, "package.json"));
+/** The wrangler.json a build generated (Cloudflare's Vite plugin, Astro's adapter...), newest first. */
+const generatedWorker = (dir, since) => {
+  const found = [];
+  const walk = (current, depth) => {
+    if (depth > 3) return;
+    let entries = [];
+    try {
+      entries = fs.readdirSync(current, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name !== "node_modules" && entry.name !== ".git") walk(full, depth + 1);
+      } else if (entry.name === "wrangler.json") {
+        const config = readJson(full);
+        if (config && typeof config.main === "string" && exists(path.resolve(current, config.main))) {
+          found.push({ file: full, mtime: fs.statSync(full).mtimeMs, config });
+        }
+      }
+    }
+  };
+  for (const name of ["dist", "build", ".output", "out"]) if (isDir(path.join(dir, name))) walk(path.join(dir, name), 1);
+  found.sort((a, b) => b.mtime - a.mtime);
+  const fresh = found.find((item) => !since || item.mtime >= since);
+  return fresh || null;
+};
 
-  if (!pkg) {
+const readWranglerConfig = (dir, file) => {
+  for (const base of [dir, path.dirname(dir)]) {
+    try {
+      const wrangler = require(require.resolve("wrangler", { paths: [base] }));
+      if (wrangler.unstable_readConfig) {
+        const config = wrangler.unstable_readConfig({ config: file }, { hideWarnings: true });
+        if (config) return config;
+      }
+    } catch {}
+  }
+  if (file.endsWith(".toml")) return null;
+  return readJson(file);
+};
+
+const build = (dir, top, options, config) => {
+  const info = projectInfo(dir);
+  const buildCommand = options.build || config.build || null;
+  if (!info.pkg) {
     if (buildCommand) {
       say("Building: " + buildCommand);
       const built = run(buildCommand, dir);
       if (!built.ok) fail(2, "Build failed: " + buildCommand + "\n" + tail(built.output, 80));
     }
-    const out = output ? path.resolve(dir, output) : findIndex(dir, STATIC_FOLDERS);
-    if (!out || !exists(path.join(out, "index.html"))) {
-      fail(3, "Nothing to publish: no package.json and no index.html in " + STATIC_FOLDERS.join(", ") + ". Pass the folder to publish: stella-publish <dir>.");
-    }
-    return out;
+    return { info, started: Date.now() - 1000, framework: null };
   }
-
-  const deps = Object.assign({}, pkg.dependencies || {}, pkg.devDependencies || {});
-  const framework = FRAMEWORKS.find((f) => deps[f.dep]) || null;
-  const pm = packageManager(dir);
-  const scripts = pkg.scripts || {};
+  const framework = FRAMEWORKS.find((f) => info.deps[f.dep]) || null;
+  const scripts = info.pkg.scripts || {};
   const script = framework && framework.script && scripts[framework.script] ? framework.script : scripts.build ? "build" : null;
+  const lockDir = lockDirFor(dir, top);
+  const pm = packageManager(lockDir);
   const command = buildCommand || (script ? runScript(pm, script) : null);
-
-  if (!command) {
-    const out = output ? path.resolve(dir, output) : findIndex(dir, STATIC_FOLDERS);
-    if (out && exists(path.join(out, "index.html"))) return out;
-    fail(3, "Nothing to publish: package.json has no build script and there's no index.html. Pass --build and --out, or add stella.preview.json.");
+  if (config.install || !installed(lockDir)) {
+    const install = config.install || installCommand(pm, lockDir);
+    say("Installing dependencies" + (lockDir !== dir ? " in " + (path.relative(top, lockDir) || ".") : "") + ": " + install);
+    const done = run(install, lockDir, { timeoutMs: 10 * 60_000 });
+    if (!done.ok) fail(2, "Installing dependencies failed: " + install + "\n" + tail(done.output, 80));
+  } else {
+    say("Dependencies are already installed.");
   }
-
-  const install = config.install || installCommand(pm, dir);
-  say("Installing dependencies: " + install);
-  const installed = run(install, dir, { timeoutMs: 10 * 60_000 });
-  if (!installed.ok) fail(2, "Installing dependencies failed: " + install + "\n" + tail(installed.output, 80));
-
-  say("Building" + (framework ? " (" + framework.name + ")" : "") + ": " + command);
   const started = Date.now() - 1000;
-  const built = run(command, dir);
-  if (!built.ok) {
-    fail(2, "Build failed: " + command + (built.timedOut ? " (timed out)" : "") + "\n" + tail(built.output, 80));
+  if (command) {
+    say("Building" + (framework ? " (" + framework.name + ")" : "") + ": " + command);
+    const built = run(command, dir);
+    if (!built.ok) fail(2, "Build failed: " + command + (built.timedOut ? " (timed out)" : "") + "\n" + tail(built.output, 80));
   }
-  const candidates = output ? [output] : (framework ? framework.outputs : []).concat(GENERIC_OUTPUTS);
-  const out = findIndex(dir, candidates, output ? 0 : started) || findIndex(dir, candidates);
-  if (!out) {
-    if (framework && framework.dep === "next") {
-      fail(3, "This Next.js app has no static export (out/index.html). Stella previews host static sites: add output: 'export' to next.config, or use a host that runs Next.js servers.");
+  return { info, started, framework, built: Boolean(command) };
+};
+
+// ---- Worker apps ----------------------------------------------------------------
+
+const MODULE_TYPES = { ".js": "js", ".mjs": "js", ".cjs": "cjs", ".wasm": "wasm64", ".txt": "text", ".html": "text", ".sql": "text", ".md": "text", ".bin": "data64", ".json": "json" };
+
+const collectModules = (serverDir) => {
+  const modules = {};
+  let bytes = 0;
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      const rel = path.relative(serverDir, full).split(path.sep).join("/");
+      if (entry.isDirectory()) {
+        if (entry.name !== "node_modules" && entry.name !== ".git" && entry.name !== ".vite") walk(full);
+        continue;
+      }
+      if (entry.name === "wrangler.json" || entry.name === ".dev.vars" || entry.name.endsWith(".map") || entry.name.startsWith(".")) continue;
+      if (/^README/i.test(entry.name)) continue;
+      const type = MODULE_TYPES[path.extname(entry.name).toLowerCase()];
+      if (!type) continue;
+      const data = fs.readFileSync(full);
+      bytes += data.length;
+      if (type === "js" || type === "cjs" || type === "text") modules[rel] = { [type]: data.toString("utf8") };
+      else if (type === "json") {
+        try {
+          modules[rel] = { json: JSON.parse(data.toString("utf8")) };
+        } catch {}
+      } else modules[rel] = { [type]: data.toString("base64") };
     }
-    fail(3, "The build finished but no folder with an index.html was found (looked in " + candidates.join(", ") + "). Pass --out <dir> or add stella.preview.json.");
+  };
+  walk(serverDir);
+  return { modules, bytes };
+};
+
+const listBindings = (config) => {
+  const names = (list, key) => (Array.isArray(list) ? list.map((item) => item && item[key]).filter((name) => typeof name === "string") : []);
+  const omitted = [];
+  const note = (list, key, label) => {
+    for (const name of names(list, key)) omitted.push(name + " (" + label + ")");
+  };
+  note(config.services, "binding", "service binding");
+  note(config.hyperdrive, "binding", "Hyperdrive");
+  note(config.vectorize, "binding", "Vectorize");
+  note(config.analytics_engine_datasets, "binding", "Analytics Engine");
+  note(config.workflows, "binding", "Workflow");
+  note(config.dispatch_namespaces, "binding", "dispatch namespace");
+  note(config.mtls_certificates, "binding", "mTLS");
+  if (config.ai && config.ai.binding) omitted.push(config.ai.binding + " (Workers AI)");
+  if (config.browser && config.browser.binding) omitted.push(config.browser.binding + " (Browser Rendering)");
+  if (config.images && config.images.binding) omitted.push(config.images.binding + " (Images)");
+  return {
+    bindings: {
+      assets: config.assets && typeof config.assets.binding === "string" ? config.assets.binding : null,
+      d1: names(config.d1_databases, "binding"),
+      kv: names(config.kv_namespaces, "binding"),
+      r2: names(config.r2_buckets, "binding"),
+      durableObjects: names(config.durable_objects && config.durable_objects.bindings, "name"),
+      email: names(config.send_email, "name"),
+      queues: names(config.queues && config.queues.producers, "binding"),
+    },
+    omitted,
+  };
+};
+
+const loadSqlite = () => {
+  try {
+    const emit = process.emitWarning;
+    process.emitWarning = () => {};
+    const sqlite = require("node:sqlite");
+    process.emitWarning = emit;
+    return sqlite;
+  } catch {
+    return null;
   }
+};
+
+const quoteIdent = (name) => '"' + String(name).replace(/"/g, '""') + '"';
+
+const dumpDatabase = (db) => {
+  const objects = db
+    .prepare("SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%' ORDER BY rowid")
+    .all();
+  const virtual = objects.filter((o) => o.type === "table" && /^\s*CREATE\s+VIRTUAL\s+TABLE/i.test(o.sql)).map((o) => o.name);
+  const shadow = (name) => virtual.some((v) => name !== v && name.startsWith(v + "_"));
+  const out = [];
+  let bytes = 0;
+  let rows = 0;
+  const tables = objects.filter((o) => o.type === "table" && !shadow(o.name));
+  for (const table of tables) out.push({ sql: table.sql });
+  for (const table of tables) {
+    for (const row of db.prepare("SELECT * FROM " + quoteIdent(table.name)).all()) {
+      const columns = Object.keys(row);
+      const params = columns.map((column) => {
+        const value = row[column];
+        if (value instanceof Uint8Array) return { $b64: Buffer.from(value).toString("base64") };
+        if (typeof value === "bigint") return Number(value);
+        return value;
+      });
+      out.push({
+        sql: "INSERT INTO " + quoteIdent(table.name) + " (" + columns.map(quoteIdent).join(", ") + ") VALUES (" + columns.map(() => "?").join(", ") + ")",
+        params,
+      });
+      rows += 1;
+      bytes += JSON.stringify(params).length;
+      if (bytes > 40 * MB) return { statements: out, rows, truncated: true };
+    }
+  }
+  for (const item of objects) {
+    if ((item.type === "index" || item.type === "trigger" || item.type === "view") && !shadow(item.tbl_name)) out.push({ sql: item.sql });
+  }
+  return { statements: out, rows, truncated: false };
+};
+
+const migrationFiles = (dir) =>
+  isDir(dir)
+    ? fs
+        .readdirSync(dir)
+        .filter((name) => name.endsWith(".sql"))
+        .sort()
+        .map((name) => path.join(dir, name))
+    : [];
+
+/** A database's starting point: the local one (from the dev server) when there is one, else the migrations. */
+const seedDatabase = (database, configDir, projectDir, onlyBinding) => {
+  const sqlite = loadSqlite();
+  const migrations = migrationFiles(path.resolve(configDir, database.migrations_dir || path.relative(configDir, path.join(projectDir, "migrations"))));
+  const stateDir = path.join(projectDir, ".wrangler", "state", "v3", "d1", "miniflare-D1DatabaseObject");
+  const local = onlyBinding && isDir(stateDir)
+    ? fs
+        .readdirSync(stateDir)
+        .filter((name) => name.endsWith(".sqlite"))
+        .map((name) => path.join(stateDir, name))
+        .sort((a, b) => fs.statSync(b).size - fs.statSync(a).size)[0]
+    : null;
+  if (sqlite && local) {
+    try {
+      const db = new sqlite.DatabaseSync(local, { readOnly: true });
+      const dump = dumpDatabase(db);
+      db.close();
+      if (dump.statements.length) {
+        return { statements: dump.statements, from: "the local database (" + dump.rows + " rows" + (dump.truncated ? ", cut at 40 MB" : "") + ")" };
+      }
+    } catch (error) {
+      say("Couldn't read the local database for " + database.binding + " (" + (error && error.message) + "); using its migrations.");
+    }
+  }
+  if (migrations.length === 0) return { statements: [], from: "an empty database" };
+  if (sqlite) {
+    const db = new sqlite.DatabaseSync(":memory:");
+    for (const file of migrations) {
+      try {
+        db.exec(fs.readFileSync(file, "utf8"));
+      } catch (error) {
+        say("Migration " + path.basename(file) + " failed locally: " + (error && error.message));
+      }
+    }
+    const dump = dumpDatabase(db);
+    db.close();
+    return { statements: dump.statements, from: migrations.length + " migrations" };
+  }
+  return { statements: migrations.map((file) => ({ exec: fs.readFileSync(file, "utf8") })), from: migrations.length + " migrations" };
+};
+
+const copyTree = (from, to, skip) => {
+  let files = 0;
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      const rel = path.relative(from, full);
+      if (skip(rel, entry)) continue;
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) {
+        const target = path.join(to, rel);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.copyFileSync(full, target);
+        files += 1;
+      }
+    }
+  };
+  if (isDir(from)) walk(from);
+  return files;
+};
+
+const assetsIgnore = (dir) => {
+  const file = path.join(dir, ".assetsignore");
+  if (!exists(file)) return [];
+  return fs
+    .readFileSync(file, "utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"))
+    .map((line) => new RegExp("^" + line.replace(/^\//, "").replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "(/.*)?$"));
+};
+
+const stageWorker = (worker, projectDir, options, previewConfig) => {
+  const { config, serverDir, configDir, mainRel } = worker;
+  const stage = fs.mkdtempSync(path.join(os.tmpdir(), "stella-worker-"));
+  const { modules, bytes } = collectModules(serverDir);
+  if (!modules[mainRel]) fail(3, "The Worker build has no " + mainRel + " in " + serverDir + ", so there's nothing to run.");
+  const { bindings, omitted } = listBindings(config);
+  const assetsDir = config.assets && config.assets.directory ? path.resolve(configDir, config.assets.directory) : null;
+  const assets = config.assets || {};
+  const manifest = {
+    version: 1,
+    main: mainRel,
+    compatibilityDate: config.compatibility_date || "2025-09-01",
+    compatibilityFlags: config.compatibility_flags || [],
+    host: options.host || previewConfig.host || "localhost",
+    vars: Object.assign({}, config.vars || {}, previewConfig.vars || {}, options.vars),
+    bindings,
+    assets: {
+      htmlHandling: assets.html_handling || "auto-trailing-slash",
+      notFoundHandling: assets.not_found_handling || "none",
+      runWorkerFirst: assets.run_worker_first || false,
+    },
+  };
+  fs.writeFileSync(path.join(stage, "stella-worker.json"), JSON.stringify(manifest));
+  fs.writeFileSync(path.join(stage, "stella-worker-code.json"), JSON.stringify({ modules }));
+  let assetFiles = 0;
+  if (assetsDir) {
+    const ignored = assetsIgnore(assetsDir);
+    assetFiles = copyTree(assetsDir, path.join(stage, "assets"), (rel, entry) => {
+      const posix = rel.split(path.sep).join("/");
+      if (entry.name === ".assetsignore" || entry.name === "node_modules" || entry.name === ".git" || entry.name.startsWith(".env") || entry.name === ".dev.vars") return true;
+      return ignored.some((pattern) => pattern.test(posix));
+    });
+  }
+  const seeds = [];
+  const databases = Array.isArray(config.d1_databases) ? config.d1_databases : [];
+  for (const database of databases) {
+    if (!database || typeof database.binding !== "string") continue;
+    const seed = seedDatabase(database, configDir, projectDir, databases.length === 1);
+    fs.mkdirSync(path.join(stage, "d1"), { recursive: true });
+    fs.writeFileSync(path.join(stage, "d1", database.binding + ".json"), JSON.stringify(seed.statements));
+    seeds.push(database.binding + " starts from " + seed.from);
+  }
+  say(
+    "Worker app: " + Object.keys(modules).length + " server modules (" + Math.round((bytes / MB) * 10) / 10 + " MB)" +
+      (assetsDir ? ", " + assetFiles + " static files" : "") + ".",
+  );
+  if (seeds.length) say("Its own database" + (seeds.length > 1 ? "s" : "") + " in the preview: " + seeds.join("; ") + ". Changes made in the preview stay in the preview.");
+  const stubbed = bindings.durableObjects.concat(bindings.email, bindings.queues);
+  if (stubbed.length) say("Not running in the preview: " + stubbed.join(", ") + " (Durable Objects, email and queues do nothing there).");
+  if (omitted.length) say("Not connected in the preview: " + omitted.join(", ") + ". The app sees them as missing.");
+  const extra = Object.keys(Object.assign({}, previewConfig.vars || {}, options.vars));
+  say("Secrets aren't available in previews; the app gets its plain vars" + (extra.length ? " plus " + extra.join(", ") : "") + " (--var KEY=value adds one).");
+  say("The app sees requests on https://" + manifest.host + " (its links are mapped back to the preview's address).");
+  return stage;
+};
+
+/** A Worker build, or null. */
+const findWorker = (dir, started) => {
+  const generated = generatedWorker(dir, started);
+  if (generated) {
+    const configDir = path.dirname(generated.file);
+    return {
+      config: generated.config,
+      configDir,
+      serverDir: path.dirname(path.resolve(configDir, generated.config.main)),
+      mainRel: path.basename(generated.config.main),
+    };
+  }
+  const file = wranglerFile(dir);
+  if (!file) return null;
+  const config = readWranglerConfig(dir, file);
+  if (!config || typeof config.main !== "string" || !config.main) return null;
+  const outdir = fs.mkdtempSync(path.join(os.tmpdir(), "stella-bundle-"));
+  const local = exists(path.join(dir, "node_modules", ".bin", "wrangler"));
+  const command = (local ? "npx wrangler" : "npx --yes wrangler@4") + " deploy --dry-run --outdir '" + outdir + "' --config '" + file + "'";
+  say("Bundling the Worker: " + command);
+  const bundled = run(command, dir, { timeoutMs: 10 * 60_000 });
+  if (!bundled.ok) fail(2, "Bundling the Worker failed: " + command + "\n" + tail(bundled.output, 60));
+  const mainBase = path.basename(config.main).replace(/\.(ts|tsx|mts|jsx)$/, ".js");
+  const candidates = fs.readdirSync(outdir).filter((name) => /\.(m?js)$/.test(name));
+  const mainRel = candidates.includes(mainBase) ? mainBase : candidates.includes("index.js") ? "index.js" : candidates[0];
+  if (!mainRel) fail(2, "Bundling the Worker produced no JavaScript.");
+  return { config, configDir: path.dirname(file), serverDir: outdir, mainRel };
+};
+
+/** Assets-only Workers (a wrangler config with assets and no main): a static site. */
+const assetsOnly = (dir) => {
+  const file = wranglerFile(dir);
+  if (!file) return null;
+  const config = readWranglerConfig(dir, file);
+  if (!config || config.main || !config.assets || !config.assets.directory) return null;
+  const out = path.resolve(path.dirname(file), config.assets.directory);
+  return exists(path.join(out, "index.html")) ? out : null;
+};
+
+const serverOnlyReason = (info, framework) => {
+  const scripts = (info.pkg && info.pkg.scripts) || {};
+  if (framework && framework.dep === "next") {
+    return "This Next.js app needs a Node.js server, which Stella previews can't run; it can be previewed as a static export (output: 'export') or on Cloudflare Workers (@opennextjs/cloudflare).";
+  }
+  if (info.deps.express || info.deps.fastify || info.deps.koa || scripts.start) {
+    return "This app runs as a Node.js server (" + (scripts.start ? "npm start" : "a server framework") + "), which Stella previews can't run; they host static sites and Cloudflare Worker apps.";
+  }
+  return null;
+};
+
+// ---- uploading ------------------------------------------------------------------
+
+const EXCLUDED = new Set([".git", "node_modules", ".DS_Store", ".github", ".vscode", ".idea", "stella.preview.json", ".wrangler", ".dev.vars"]);
+
+const listFiles = (root) => {
+  const files = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      if (EXCLUDED.has(entry.name) || entry.name === ".env" || entry.name.startsWith(".env.")) continue;
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.isFile()) files.push({ rel: path.relative(root, full).split(path.sep).join("/"), size: fs.statSync(full).size });
+    }
+  };
+  walk(root);
+  return files;
+};
+
+const parts = (files) => {
+  const out = [];
+  let current = [];
+  let size = 0;
+  const ordered = files.slice().sort((a, b) => (a.rel.startsWith("stella-worker") ? 1 : 0) - (b.rel.startsWith("stella-worker") ? 1 : 0));
+  for (const file of ordered) {
+    if (current.length && size + file.size > PART_BYTES) {
+      out.push(current);
+      current = [];
+      size = 0;
+    }
+    current.push(file);
+    size += file.size;
+  }
+  if (current.length) out.push(current);
   return out;
 };
 
-const githubRepo = (root) => {
-  const remote = git(["remote", "get-url", "origin"], root);
-  const match = /github\.com[:/]([^/]+\/[^/.]+?)(?:\.git)?$/.exec(remote);
-  return match ? match[1] : "";
-};
-
-const upload = async (dir, root) => {
+const upload = async (dir, root, kind) => {
   const capability = fs.readFileSync(path.join(HELPER_DIR, "capability"), "utf8").trim();
   const origin = fs.readFileSync(path.join(HELPER_DIR, "origin"), "utf8").trim();
-  const archive = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "stella-publish-")), "site.tar.gz");
-  const excludes = [".git", "node_modules", ".env", ".env.*", ".DS_Store", ".github", ".vscode", ".idea", "stella.preview.json"]
-    .map((pattern) => "--exclude='" + pattern + "'")
-    .join(" ");
-  const packed = run("tar -czf '" + archive + "' " + excludes + " -C '" + dir.replace(/'/g, "'\\''") + "' .", dir);
-  if (!packed.ok) fail(1, "Couldn't pack " + dir + ": " + tail(packed.output, 10));
-  const body = fs.readFileSync(archive);
-  fs.rmSync(path.dirname(archive), { recursive: true, force: true });
-  if (body.length > 95 * MB) fail(5, "The site is " + Math.round(body.length / MB) + " MB compressed; a preview can be at most 95 MB.");
-  const query = new URLSearchParams();
+  const files = listFiles(dir);
+  if (files.length === 0) fail(3, "Nothing to publish: " + dir + " is empty.");
+  const total = files.reduce((sum, file) => sum + file.size, 0);
+  const chunks = parts(files);
   const commit = root ? git(["rev-parse", "HEAD"], root) : "";
   const repo = root ? githubRepo(root) : "";
-  if (commit) query.set("commit", commit);
-  if (repo) query.set("repo", repo);
-  say("Uploading " + Math.round((body.length / MB) * 10) / 10 + " MB from " + dir + "...");
-  let response;
-  try {
-    response = await fetch(origin + "/api/slack/previews?" + query.toString(), {
-      method: "POST",
-      headers: { authorization: "Bearer " + capability, "content-type": "application/gzip" },
-      body,
-    });
-  } catch (error) {
-    fail(1, "Couldn't reach Stella: " + (error && error.message ? error.message : String(error)));
-  }
-  const text = await response.text();
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), "stella-publish-"));
+  let token = "";
   let result = null;
-  try {
-    result = JSON.parse(text);
-  } catch {}
-  if (!response.ok || !result || !result.url) {
-    const message = (result && result.error) || text.slice(0, 300) || "HTTP " + response.status;
-    fail(response.status === 413 || response.status === 429 ? 5 : 1, "Stella didn't publish the preview: " + message);
+  say("Uploading " + Math.round((total / MB) * 10) / 10 + " MB (" + files.length + " files" + (chunks.length > 1 ? ", " + chunks.length + " parts" : "") + ")...");
+  for (let i = 0; i < chunks.length; i += 1) {
+    const list = path.join(work, "files-" + i);
+    const archive = path.join(work, "part-" + i + ".tar.gz");
+    fs.writeFileSync(list, chunks[i].map((file) => file.rel).join("\0") + "\0");
+    const packed = run("tar -czf '" + archive + "' -C '" + dir.replace(/'/g, "'\\''") + "' --null -T '" + list + "'", dir);
+    if (!packed.ok) fail(1, "Couldn't pack " + dir + ": " + tail(packed.output, 10));
+    const body = fs.readFileSync(archive);
+    fs.rmSync(archive, { force: true });
+    if (body.length > 95 * MB) fail(5, "Part " + (i + 1) + " is " + Math.round(body.length / MB) + " MB compressed; a part can be at most 95 MB.");
+    const query = new URLSearchParams();
+    if (commit) query.set("commit", commit);
+    if (repo) query.set("repo", repo);
+    query.set("kind", kind);
+    query.set("final", i === chunks.length - 1 ? "1" : "0");
+    if (token) query.set("upload", token);
+    let response;
+    try {
+      response = await fetch(origin + "/api/slack/previews?" + query.toString(), {
+        method: "POST",
+        headers: { authorization: "Bearer " + capability, "content-type": "application/gzip" },
+        body,
+      });
+    } catch (error) {
+      fail(1, "Couldn't reach Stella: " + (error && error.message ? error.message : String(error)));
+    }
+    const text = await response.text();
+    let parsed = null;
+    try {
+      parsed = JSON.parse(text);
+    } catch {}
+    if (!response.ok || !parsed) {
+      const message = (parsed && parsed.error) || text.slice(0, 300) || "HTTP " + response.status;
+      fail(response.status === 413 || response.status === 429 ? 5 : 1, "Stella didn't publish the preview: " + message);
+    }
+    if (i < chunks.length - 1) {
+      token = parsed.upload;
+      if (!token) fail(1, "Stella didn't accept part " + (i + 1) + " of the upload.");
+    } else result = parsed;
   }
+  fs.rmSync(work, { recursive: true, force: true });
+  if (!result || !result.url) fail(1, "Stella didn't return a link for the preview.");
   const days = Math.round((result.expiresAt - Date.now()) / 86_400_000);
   say(
-    "Published " + result.files + " files (" + Math.round((result.bytes / MB) * 10) / 10 + " MB). " +
+    "Published " + (kind === "worker" ? "a live copy of the app" : result.files + " files") + " (" + Math.round((result.bytes / MB) * 10) / 10 + " MB). " +
       (result.access === "public" ? "Anyone with the link can open it" : "Members of this Slack workspace can open it (they sign in with Slack)") +
       "; it expires in " + days + " day" + (days === 1 ? "" : "s") + ".",
   );
+  say("For screenshots of a page: stella-shot " + result.url + " --out <folder>");
   process.stdout.write(result.url + "\n");
 };
+
+// ---- main -----------------------------------------------------------------------
 
 const main = async () => {
   const options = parseArgs(process.argv.slice(2));
   if (!exists(path.join(HELPER_DIR, "capability"))) fail(1, "Stella previews aren't available in this container.");
-  const top = git(["rev-parse", "--show-toplevel"], process.cwd());
+  const cwd = process.cwd();
+  const top = git(["rev-parse", "--show-toplevel"], cwd);
   if (options.dir) {
     const dir = path.resolve(options.dir);
     if (!exists(path.join(dir, "index.html"))) fail(3, dir + " has no index.html at its top level.");
-    await upload(dir, top);
+    await upload(dir, top, "static");
     return;
   }
-  const root = top || process.cwd();
+  const root = top || cwd;
   if (options.repoPreview && top) {
     const url = repoPreview(root);
     if (url) {
       say("This is the repository's own preview.");
+      say("For screenshots of a page: stella-shot " + url + " --out <folder>");
       process.stdout.write(url + "\n");
       return;
     }
   }
-  const out = build(root, options);
-  await upload(out, top);
+  const config = readJson(path.join(root, "stella.preview.json")) || readJson(path.join(root, ".stella", "preview.json")) || {};
+  const dir = findProject(root, cwd, options, config);
+  const built = build(dir, root, options, config);
+  const output = options.out || config.output || null;
+  if (output) {
+    const out = path.resolve(dir, output);
+    if (!exists(path.join(out, "index.html"))) fail(3, "Nothing to publish: " + out + " has no index.html.");
+    await upload(out, top, "static");
+    return;
+  }
+  const worker = findWorker(dir, built.started);
+  if (worker) {
+    const stage = stageWorker(worker, dir, options, config);
+    await upload(stage, top, "worker");
+    fs.rmSync(stage, { recursive: true, force: true });
+    return;
+  }
+  const assets = assetsOnly(dir);
+  if (assets) {
+    await upload(assets, top, "static");
+    return;
+  }
+  const candidates = (built.framework ? built.framework.outputs : []).concat(GENERIC_OUTPUTS);
+  const out = built.built
+    ? findIndex(dir, candidates, built.started) || findIndex(dir, candidates)
+    : findIndex(dir, STATIC_FOLDERS);
+  if (out) {
+    await upload(out, top, "static");
+    return;
+  }
+  const reason = built.info.pkg ? serverOnlyReason(built.info, built.framework) : null;
+  if (reason) fail(3, reason);
+  if (!built.info.pkg) {
+    fail(3, "Nothing to preview: no package.json, wrangler config or index.html in " + (path.relative(root, dir) || "the repository") + ". Pass the folder to publish: stella-publish <dir>.");
+  }
+  if (!built.built) fail(3, "Nothing to preview: " + (path.relative(root, dir) || "the project") + " has no build script, wrangler config or index.html. Pass --build and --out, or add stella.preview.json.");
+  fail(3, "The build finished but made neither a Worker nor a folder with an index.html (looked in " + candidates.join(", ") + "). Pass --out <dir> or add stella.preview.json.");
 };
 
 main().catch((error) => fail(1, "stella-publish failed: " + (error && error.stack ? error.stack : String(error))));

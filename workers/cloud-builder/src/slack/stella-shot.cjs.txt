@@ -1,0 +1,148 @@
+#!/usr/bin/env node
+"use strict";
+// stella-shot <url> --out <folder> [options]
+//
+// Screenshots a page at desktop (1440 px) and phone (390 px) widths in a fresh cloud
+// browser, and optionally records a short video of steps on it. The page must be a
+// Stella preview of this workspace (the link stella-publish printed, any path on it)
+// or a site this environment's network access reaches.
+//
+// Options:
+//   --out <folder>       where the files go (created); default: the current folder
+//   --name <prefix>      file name prefix (default: from the page path, e.g. "home")
+//   --full               full-page screenshots instead of the first screen
+//   --wait <selector>    wait for this element before capturing
+//   --only desktop|phone one width only
+//   --record "<steps>"   also record a video (desktop width) of these steps, separated
+//                        by ";": click <selector> | hover <selector> | type <selector> = <text>
+//                        | press <key> | scroll <pixels> | wait <ms>
+//                        e.g. --record "wait 800; hover text=Explore the shelves; click text=Explore the shelves; wait 1500"
+//   --seconds <n>        how long the recording runs (default 6, at most 20)
+//
+// Prints each file it wrote. Exit 0: done. 1: failed (the reason is on stderr).
+
+const fs = require("fs");
+const path = require("path");
+
+const HELPER_DIR = process.env.STELLA_PREVIEW_HELPER_DIR || "/opt/stella-preview";
+
+const say = (line) => process.stderr.write(line + "\n");
+const fail = (message) => {
+  say(message);
+  process.exit(1);
+};
+
+const parseArgs = (argv) => {
+  const options = { url: null, out: ".", name: null, full: false, wait: null, only: null, record: null, seconds: 6 };
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === "--out") options.out = argv[++i] || ".";
+    else if (arg === "--name") options.name = argv[++i] || null;
+    else if (arg === "--full") options.full = true;
+    else if (arg === "--wait") options.wait = argv[++i] || null;
+    else if (arg === "--only") options.only = argv[++i] || null;
+    else if (arg === "--record") options.record = argv[++i] || null;
+    else if (arg === "--seconds") options.seconds = Number(argv[++i]) || 6;
+    else if (arg === "-h" || arg === "--help") {
+      say("usage: stella-shot <url> --out <folder> [--full] [--wait <selector>] [--only desktop|phone] [--record \"<steps>\"] [--seconds <n>]");
+      process.exit(0);
+    } else if (!options.url) options.url = arg;
+  }
+  return options;
+};
+
+const parseSteps = (text) =>
+  text
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) => {
+      const space = part.indexOf(" ");
+      const verb = (space === -1 ? part : part.slice(0, space)).toLowerCase();
+      const rest = space === -1 ? "" : part.slice(space + 1).trim();
+      if (verb === "click" || verb === "hover") return { action: verb, selector: rest };
+      if (verb === "type") {
+        const eq = rest.indexOf(" = ");
+        if (eq === -1) fail("type needs a selector and text: type <selector> = <text>");
+        return { action: "type", selector: rest.slice(0, eq).trim(), text: rest.slice(eq + 3) };
+      }
+      if (verb === "press") return { action: "press", key: rest };
+      if (verb === "scroll") return { action: "scroll", y: Number(rest) || 600 };
+      if (verb === "wait") return { action: "wait", ms: Number(rest) || 1000 };
+      fail("Unknown step: " + part + " (use click, hover, type, press, scroll or wait).");
+      return null;
+    });
+
+const VIEWS = {
+  desktop: { name: "desktop", width: 1440, height: 900, scale: 1, mobile: false },
+  phone: { name: "phone", width: 390, height: 844, scale: 3, mobile: true },
+};
+
+const slug = (url) => {
+  try {
+    const parts = new URL(url).pathname.split("/").filter(Boolean);
+    const name = parts.join("-").replace(/[^a-zA-Z0-9-]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase();
+    return (name || "home").slice(0, 60);
+  } catch {
+    return "page";
+  }
+};
+
+const main = async () => {
+  const options = parseArgs(process.argv.slice(2));
+  if (!options.url) fail("usage: stella-shot <url> --out <folder>");
+  if (!fs.existsSync(path.join(HELPER_DIR, "capability"))) fail("Screenshots aren't available in this container.");
+  const capability = fs.readFileSync(path.join(HELPER_DIR, "capability"), "utf8").trim();
+  const origin = fs.readFileSync(path.join(HELPER_DIR, "origin"), "utf8").trim();
+  const views = options.only ? [VIEWS[options.only]].filter(Boolean) : [VIEWS.desktop, VIEWS.phone];
+  if (views.length === 0) fail("--only takes desktop or phone.");
+  const body = {
+    url: options.url,
+    views: views.map((view) => Object.assign({}, view, { fullPage: options.full })),
+  };
+  if (options.wait) body.waitFor = options.wait;
+  if (options.record) {
+    body.recording = {
+      view: VIEWS.desktop,
+      steps: parseSteps(options.record),
+      ms: Math.min(20, Math.max(1, options.seconds)) * 1000,
+    };
+  }
+  say("Capturing " + options.url + " (" + views.map((v) => v.name + " " + v.width + " px").join(", ") + (options.record ? ", plus a recording" : "") + ")...");
+  let response;
+  try {
+    response = await fetch(origin + "/api/slack/previews/capture", {
+      method: "POST",
+      headers: { authorization: "Bearer " + capability, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (error) {
+    fail("Couldn't reach Stella: " + (error && error.message ? error.message : String(error)));
+  }
+  const text = await response.text();
+  let result = null;
+  try {
+    result = JSON.parse(text);
+  } catch {}
+  if (!response.ok || !result) fail("Stella couldn't capture the page: " + ((result && result.error) || text.slice(0, 300) || "HTTP " + response.status));
+  fs.mkdirSync(options.out, { recursive: true });
+  const prefix = options.name || slug(options.url);
+  const written = [];
+  for (const shot of result.shots || []) {
+    const file = path.join(options.out, prefix + "-" + shot.name + ".png");
+    fs.writeFileSync(file, Buffer.from(shot.data, "base64"));
+    written.push(file);
+  }
+  if (result.recording) {
+    const ext = result.recording.contentType === "video/mp4" ? ".mp4" : ".webm";
+    const file = path.join(options.out, prefix + "-recording" + ext);
+    fs.writeFileSync(file, Buffer.from(result.recording.data, "base64"));
+    written.push(file);
+    if (result.recording.steps && result.recording.steps.length) say("These steps didn't work and were skipped: " + result.recording.steps.join(", ") + ".");
+  } else if (result.recordingError) say(result.recordingError);
+  const title = (result.shots || [])[0] && result.shots[0].title;
+  if (title) say("Page title: " + title);
+  for (const file of written) process.stdout.write(file + "\n");
+};
+
+main().catch((error) => fail("stella-shot failed: " + (error && error.stack ? error.stack : String(error))));

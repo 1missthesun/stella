@@ -294,6 +294,11 @@
         "name": "APP_RELEASES",
         "class_name": "AppReleaseChannel",
       },
+      {
+        // One object per Worker preview database or KV namespace (src/slack/preview-worker.ts).
+        "name": "SLACK_PREVIEW_DATA",
+        "class_name": "SlackPreviewData",
+      },
     ],
   },
   "migrations": [
@@ -348,6 +353,10 @@
     {
       "tag": "v12",
       "new_sqlite_classes": ["AppReleaseChannel"],
+    },
+    {
+      "tag": "v13",
+      "new_sqlite_classes": ["SlackPreviewData"],
     },
   ],
   // Per-agent Worker Previews (DEPLOY.md, "Previews"). Deploy them only with
@@ -523,6 +532,11 @@
           "name": "APP_RELEASES",
           "class_name": "AppReleaseChannel",
         },
+        {
+          // One object per Worker preview database or KV namespace (src/slack/preview-worker.ts).
+          "name": "SLACK_PREVIEW_DATA",
+          "class_name": "SlackPreviewData",
+        },
       ],
     },
   },
@@ -672,6 +686,11 @@
             "name": "APP_RELEASES",
             "class_name": "AppReleaseChannel",
           },
+          {
+            // One object per Worker preview database or KV namespace (src/slack/preview-worker.ts).
+            "name": "SLACK_PREVIEW_DATA",
+            "class_name": "SlackPreviewData",
+          },
         ],
       },
       "migrations": [
@@ -724,6 +743,10 @@
         {
           "tag": "v12",
           "new_sqlite_classes": ["AppReleaseChannel"],
+        },
+        {
+          "tag": "v13",
+          "new_sqlite_classes": ["SlackPreviewData"],
         },
       ],
     },
@@ -921,6 +944,11 @@
             "name": "APP_RELEASES",
             "class_name": "AppReleaseChannel",
           },
+          {
+            // One object per Worker preview database or KV namespace (src/slack/preview-worker.ts).
+            "name": "SLACK_PREVIEW_DATA",
+            "class_name": "SlackPreviewData",
+          },
         ],
       },
       "migrations": [
@@ -973,6 +1001,10 @@
         {
           "tag": "v12",
           "new_sqlite_classes": ["AppReleaseChannel"],
+        },
+        {
+          "tag": "v13",
+          "new_sqlite_classes": ["SlackPreviewData"],
         },
       ],
     },

@@ -828,37 +828,6 @@ export class AuthService {
     return getAuthSnapshotSession(await this.getAuthSessionSnapshot());
   }
 
-  async signInAnonymous() {
-    if (this.getBearerToken() || this.getIdentityIntent() === "connected") {
-      throw new Error(
-        "Anonymous sign-in is not allowed while an existing credential or connected identity exists.",
-      );
-    }
-    const turnstileToken = await this.getChallengeToken();
-    const response = await this.authFetch("/sign-in/anonymous", {
-      method: "POST",
-      headers: {
-        accept: "application/json",
-        "content-type": "application/json",
-        ...(turnstileToken ? { [AUTH_CAPTCHA_HEADER]: turnstileToken } : {}),
-      },
-      body: JSON.stringify({}),
-    });
-    if (!response.ok) {
-      const failure = await readAuthFailure(response);
-      console.warn("[auth] Anonymous sign-in failed.", {
-        status: failure.error.status,
-        code: failure.error.code,
-        requestId: failure.error.requestId,
-      });
-      throw new Error(`Anonymous sign-in failed with HTTP ${response.status}.`);
-    }
-    const body = await response.json().catch(() => ({ ok: true }));
-    this.setIdentityIntent("anonymous");
-    await this.resyncAfterCredentialChange();
-    return body;
-  }
-
   async signOut() {
     const response = await this.authFetch("/sign-out", {
       method: "POST",
@@ -880,7 +849,7 @@ export class AuthService {
     this.lastSessionSnapshot = resolveMissingCredentialSnapshot({
       identityIntent: "anonymous",
       staleSession: null,
-      anonymousReason: "explicit_sign_out",
+      signedOutReason: "explicit_sign_out",
     });
     return { ok: response?.ok !== false };
   }
@@ -1016,7 +985,7 @@ export class AuthService {
     this.lastSessionSnapshot = resolveMissingCredentialSnapshot({
       identityIntent: "anonymous",
       staleSession: null,
-      anonymousReason: "explicit_sign_out",
+      signedOutReason: "explicit_sign_out",
     });
     return { ok: true };
   }

@@ -35,7 +35,6 @@ import {
   IPC_AUTH_REVOKE_SESSIONS,
   IPC_AUTH_LIST_SESSIONS,
   IPC_AUTH_REVOKE_SESSION,
-  IPC_AUTH_SIGN_IN_ANONYMOUS,
   IPC_AUTH_SIGN_OUT,
   IPC_DIAGNOSTICS_EXPORT_LOGS,
   IPC_DIAGNOSTICS_RECORD_HEAP_TRACE,
@@ -451,12 +450,6 @@ export const registerSystemHandlers = (options) => {
         return await options.authService.getAuthSessionSnapshot({
             allowCached: payload?.allowCached === true,
         });
-    });
-    handleIpc(IPC_AUTH_SIGN_IN_ANONYMOUS, async (event) => {
-        if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_SIGN_IN_ANONYMOUS)) {
-            throw new Error("Blocked untrusted anonymous sign-in request.");
-        }
-        return await options.authService.signInAnonymous();
     });
     handleIpc(IPC_AUTH_GET_CHALLENGE_TOKEN, async (event) => {
         if (!options.externalLinkService.assertPrivilegedSender(event, IPC_AUTH_GET_CHALLENGE_TOKEN)) {

@@ -16,10 +16,9 @@ import { reportCloudReadiness } from "@/features/cloud/cloud-readiness-timing";
 /**
  * The one authority predicate for conversation storage and routing.
  *
- * Both anonymous and connected Better Auth sessions own cloud conversations.
- * There is deliberately no signed-out/local fallback: while automatic
- * anonymous auth or token exchange is incomplete, conversation selection
- * remains in a loading state.
+ * A signed-in Better Auth session owns cloud conversations. There is
+ * deliberately no signed-out/local fallback: until the user signs in and the
+ * token exchange completes, conversation selection stays in a loading state.
  *
  * The identity proof is the backend's own answer: `conversations.bootstrap`
  * returns the owner it verified from the current token, and selection waits

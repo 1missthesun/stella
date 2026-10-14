@@ -93,6 +93,7 @@ import { SettingsDialogHost } from "@/shell/SettingsDialogHost";
 import { FeedbackDialogHost } from "@/shell/FeedbackDialogHost";
 import { PlanUsageDialogHost } from "@/shell/PlanUsageDialogHost";
 import { SelfHostPairScreen } from "@/global/self-host/SelfHostPairScreen";
+import { SignInScreen } from "@/global/auth/SignInScreen";
 import {
   STELLA_COMPOSE_TEXT_EVENT,
   type StellaComposeTextDetail,
@@ -432,6 +433,7 @@ function RootLayout() {
     Boolean(authBootstrapError) ||
     showsMainConversationFailure ||
     authBootstrapStatus === "reauth_required" ||
+    authBootstrapStatus === "signed_out" ||
     authBootstrapStatus === "needs_pairing";
   useEffect(() => {
     if (shouldDismissLaunchSplash) dismissLaunchSplash();
@@ -448,6 +450,11 @@ function RootLayout() {
 
   if (authBootstrapStatus === "needs_pairing") {
     return <SelfHostPairScreen />;
+  }
+
+  // Stella needs an account before the first chat.
+  if (authBootstrapStatus === "signed_out") {
+    return <SignInScreen />;
   }
 
   if (!isPrivate && authBootstrapError) {

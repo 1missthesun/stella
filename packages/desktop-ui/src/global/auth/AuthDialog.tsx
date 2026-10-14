@@ -124,8 +124,7 @@ const pollDesktopSocialAuth = async (
 export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
   const t = useT();
   const { hasConnectedAccount } = useAuthSessionState();
-  // Signing in keeps the anonymous account's data (it is upgraded in place),
-  // so the dialog closes as soon as the account is connected.
+  // The dialog closes as soon as the account is connected.
   useEffect(() => {
     if (hasConnectedAccount && open) onOpenChange(false);
   }, [hasConnectedAccount, open, onOpenChange]);
@@ -142,46 +141,55 @@ export const AuthDialog = ({ open, onOpenChange }: AuthDialogProps) => {
           </DialogDescription>
         </VisuallyHidden>
         <DialogCloseButton className="auth-dialog-close" />
-        {
-          <DialogBody className="auth-dialog-body">
-            <div className="auth-dialog-hero">
-              <p className="auth-dialog-headline">
-                {t("global.auth.welcomeTitle")}
-              </p>
-              <p className="auth-dialog-sub">{t("global.auth.welcomeSub")}</p>
-            </div>
-            <GoogleAuthButton />
-            <PasskeyAuthButton />
-            <div className="auth-dialog-method-divider">
-              <span>{t("global.auth.orUseEmail")}</span>
-            </div>
-            <MagicLinkAuthFlow
-              className="auth-dialog-flow"
-              hideEmailLabel
-              inputVariant="normal"
-              emailPlaceholder={t("global.auth.emailPlaceholder")}
-              autoFocus
-              formClassName="auth-dialog-form"
-              inputClassName="auth-dialog-input"
-              buttonClassName="pill-btn pill-btn--primary pill-btn--lg auth-dialog-cta"
-              buttonVariant="primary"
-              buttonSize="large"
-              submitLabel={t("common.continue")}
-              sendingLabel={t("global.auth.sending")}
-              resendLabel={t("global.auth.resendEmail")}
-              extrasClassName="auth-dialog-extras"
-              extrasInnerClassName="auth-dialog-extras-inner"
-              sentClassName="auth-dialog-sent"
-              sentMessage={t("global.auth.magicLinkSentDesktop")}
-              openInboxClassName="pill-btn pill-btn--primary pill-btn--lg auth-dialog-open-inbox"
-              errorClassName="auth-dialog-error"
-            />
-          </DialogBody>
-        }
+        <DialogBody className="auth-dialog-body">
+          <AuthMethods />
+        </DialogBody>
       </DialogContent>
     </Dialog>
   );
 };
+
+/**
+ * Every way to sign in to Stella: Google, a passkey (web only) and an email
+ * link. The dialog and the full-window sign-in screen both show this.
+ */
+export function AuthMethods() {
+  const t = useT();
+  return (
+    <>
+      <div className="auth-dialog-hero">
+        <p className="auth-dialog-headline">{t("global.auth.welcomeTitle")}</p>
+        <p className="auth-dialog-sub">{t("global.auth.welcomeSub")}</p>
+      </div>
+      <GoogleAuthButton />
+      <PasskeyAuthButton />
+      <div className="auth-dialog-method-divider">
+        <span>{t("global.auth.orUseEmail")}</span>
+      </div>
+      <MagicLinkAuthFlow
+        className="auth-dialog-flow"
+        hideEmailLabel
+        inputVariant="normal"
+        emailPlaceholder={t("global.auth.emailPlaceholder")}
+        autoFocus
+        formClassName="auth-dialog-form"
+        inputClassName="auth-dialog-input"
+        buttonClassName="pill-btn pill-btn--primary pill-btn--lg auth-dialog-cta"
+        buttonVariant="primary"
+        buttonSize="large"
+        submitLabel={t("common.continue")}
+        sendingLabel={t("global.auth.sending")}
+        resendLabel={t("global.auth.resendEmail")}
+        extrasClassName="auth-dialog-extras"
+        extrasInnerClassName="auth-dialog-extras-inner"
+        sentClassName="auth-dialog-sent"
+        sentMessage={t("global.auth.magicLinkSentDesktop")}
+        openInboxClassName="pill-btn pill-btn--primary pill-btn--lg auth-dialog-open-inbox"
+        errorClassName="auth-dialog-error"
+      />
+    </>
+  );
+}
 
 function GoogleAuthButton() {
   const t = useT();

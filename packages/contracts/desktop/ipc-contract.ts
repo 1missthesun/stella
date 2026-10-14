@@ -146,7 +146,6 @@ import {
   IPC_AUTH_REVOKE_SESSION,
   IPC_AUTH_REVOKE_SESSIONS,
   IPC_AUTH_SESSION_INVALIDATED,
-  IPC_AUTH_SIGN_IN_ANONYMOUS,
   IPC_AUTH_SIGN_OUT,
   IPC_BROWSER_BRIDGE_STATUS,
   IPC_BROWSER_VIEW_CLOSE_TAB,
@@ -968,7 +967,6 @@ export type IpcInvokeContract = {
     [options?: { allowCached?: boolean }],
     AuthSessionSnapshot
   >;
-  [IPC_AUTH_SIGN_IN_ANONYMOUS]: Invoke<[], unknown>;
   [IPC_AUTH_GET_CHALLENGE_TOKEN]: Invoke<[], string | undefined>;
   [IPC_AUTH_SIGN_OUT]: Invoke<[], OkResult>;
   [IPC_AUTH_DELETE_USER]: Invoke<[], OkResult>;

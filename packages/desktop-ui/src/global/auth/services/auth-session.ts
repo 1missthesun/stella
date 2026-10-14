@@ -7,10 +7,6 @@ import {
   type AuthSessionSnapshot,
 } from "@stella/contracts/auth-session";
 import { configurePiRuntime } from "@/platform/electron/device";
-import {
-  captchaHeaders,
-  getPlatformChallengeToken,
-} from "@/platform/auth/challenge-token";
 import { getStellaInteriorBridge } from "@/platform/interior/interior-bridge";
 import { authClient } from "@/global/auth/lib/auth-client";
 import {
@@ -156,7 +152,7 @@ const commitBrowserSnapshot = (snapshot: AuthSessionSnapshot): void => {
   } else if (snapshot.status === "reauth_required") {
     clearBrowserSessionToken();
     writeBrowserIdentityIntent("connected");
-  } else if (snapshot.status === "anonymous_required") {
+  } else if (snapshot.status === "signed_out") {
     clearBrowserSessionToken();
     writeBrowserIdentityIntent("anonymous");
     writeBrowserCachedSession(null);
@@ -348,7 +344,7 @@ export const refreshAuthSession = async (options: RefreshOptions = {}) => {
       }
       // Authoritative follow-up read. The host returns the revalidated session
       // here (joining its in-flight revalidation, or the recorded result),
-      // moving to reauth/anonymous-required only after a recognized verdict.
+      // moving to reauth/signed-out only after a recognized verdict.
       // This also protects authoritative callers (sign-in / link) from ever
       // emitting a stale optimistic value: they skip the early emit above and
       // only commit this revalidated result.
@@ -427,8 +423,7 @@ const redeemPendingBrowserAuthHandoff =
     }
     if (handoff.kind === "invalid") {
       // The malformed credential was already erased. Treat it as a terminal
-      // handoff failure so anonymous bootstrap cannot overwrite the intended
-      // account transition.
+      // handoff failure.
       console.error("Failed to finish browser sign-in.");
       return "failed";
     }
@@ -454,82 +449,20 @@ const redeemPendingBrowserAuthHandoff =
       return "redeemed";
     } catch {
       // The credential has already been removed from the URL. Do not log it,
-      // retry it implicitly, or fall through to anonymous-session creation:
-      // an ambiguous POST failure may still have redeemed it server-side.
+      // or retry it implicitly: an ambiguous POST failure may still have
+      // redeemed it server-side.
       console.error("Failed to finish browser sign-in.");
       return "failed";
     }
   };
 
-// Module initialization starts this before React mounts. Automatic anonymous
-// bootstrap awaits the same promise, so it cannot race or overwrite a valid
-// one-time-token session handoff.
+// Module initialization starts this before React mounts. The session
+// bootstrap awaits the same promise, so it cannot race a valid one-time-token
+// session handoff.
 const browserAuthHandoffPromise = redeemPendingBrowserAuthHandoff();
 
 export const waitForBrowserAuthHandoff =
   (): Promise<BrowserAuthHandoffResult> => browserAuthHandoffPromise;
-
-export const signInAnonymous = async () => {
-  const interiorBridge = getStellaInteriorBridge();
-  if (interiorBridge) {
-    await interiorBridge.getToken({ forceRefresh: true });
-    await refreshAuthSession();
-    if (!currentSession.data) {
-      throw new Error("The Stella interior session could not be refreshed.");
-    }
-    return;
-  }
-  if (!window.electronAPI) {
-    if (
-      readBrowserSessionToken() ||
-      readBrowserIdentityIntent() === "connected"
-    ) {
-      throw new Error(
-        "Anonymous sign-in is not allowed while an existing identity is present.",
-      );
-    }
-    const turnstileToken = await getPlatformChallengeToken();
-    const result = await authClient.signIn.anonymous({
-      fetchOptions: {
-        headers: captchaHeaders(turnstileToken),
-      },
-    });
-    if (result.error) {
-      const failure = browserErrorObservation(result.error);
-      console.warn("[auth] Browser anonymous sign-in failed.", {
-        kind: failure.kind,
-        ...(failure.kind === "unknown"
-          ? {
-              status: failure.error.status,
-              code: failure.error.code,
-            }
-          : {}),
-      });
-      throw new Error(
-        result.error.message ?? "Could not start a browser session.",
-      );
-    }
-    if (!readBrowserSessionToken()) {
-      throw new Error(
-        "The browser session token was not returned by the auth service.",
-      );
-    }
-    writeBrowserIdentityIntent("anonymous");
-    await refreshAuthSession();
-    if (!currentSession.data) {
-      throw new Error(
-        "The browser session could not be verified after sign-in.",
-      );
-    }
-    return;
-  }
-  if (!window.electronAPI.system.signInAnonymous) {
-    throw new Error("Desktop anonymous sign-in is unavailable.");
-  }
-  await configurePiRuntime();
-  await window.electronAPI.system.signInAnonymous();
-  await refreshAuthSession();
-};
 
 export const signOutAuthSession = async () => {
   if (getStellaInteriorBridge()) {
@@ -556,7 +489,7 @@ export const signOutAuthSession = async () => {
   refreshVersion += 1;
   setCurrentSession({
     snapshot: {
-      status: "anonymous_required",
+      status: "signed_out",
       identityIntent: "anonymous",
       reason: "explicit_sign_out",
     },
@@ -585,7 +518,7 @@ export const deleteAuthUser = async () => {
   refreshVersion += 1;
   setCurrentSession({
     snapshot: {
-      status: "anonymous_required",
+      status: "signed_out",
       identityIntent: "anonymous",
       reason: "explicit_sign_out",
     },
@@ -601,7 +534,7 @@ export function getAuthSessionSnapshot(): AuthSessionResult {
 // Stable subscribe for `useSyncExternalStore`: registers the store listener
 // and returns its unsubscribe. Defined at module scope so its identity never
 // changes across renders.
-function subscribeAuthSession(listener: () => void): () => void {
+export function subscribeAuthSession(listener: () => void): () => void {
   listeners.add(listener);
   return () => {
     listeners.delete(listener);
@@ -664,7 +597,7 @@ function ensureAuthSessionRevalidationListeners() {
 
 /**
  * Kick off the cold-start session read once. Browser session discovery waits
- * for an OTT handoff to settle so an older cached/anonymous identity is never
+ * for an OTT handoff to settle so an older cached identity is never
  * surfaced while the intended account exchange is still in flight.
  */
 function startAuthSessionBootstrap(): void {

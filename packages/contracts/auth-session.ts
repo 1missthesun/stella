@@ -1,3 +1,9 @@
+/**
+ * What this device expects: "connected" once an account signed in here (a
+ * rejected session then asks to sign in again), "anonymous" when no account is
+ * expected (never signed in, or signed out). Stella has no guest accounts;
+ * the "anonymous" value is the stored name for signed out.
+ */
 export type AuthIdentityIntent = "anonymous" | "connected";
 
 /**
@@ -42,10 +48,15 @@ export type AuthSessionSnapshot<Session = unknown> =
       reason: "credential_missing" | "session_rejected";
     }
   | {
-      status: "anonymous_required";
+      status: "signed_out";
       identityIntent: "anonymous" | null;
-      reason: "first_install" | "explicit_sign_out" | "anonymous_rejected";
+      reason: AuthSignedOutReason;
     };
+
+export type AuthSignedOutReason =
+  | "first_install"
+  | "explicit_sign_out"
+  | "session_rejected";
 
 export type AuthSessionObservation<Session = unknown> =
   | { kind: "authenticated"; session: Session }
@@ -91,22 +102,16 @@ export const getAuthSnapshotSession = <Session>(
     case "unknown":
     case "reauth_required":
       return snapshot.staleSession;
-    case "anonymous_required":
+    case "signed_out":
       return null;
   }
 };
-
-export const canBootstrapAnonymous = (snapshot: AuthSessionSnapshot): boolean =>
-  snapshot.status === "anonymous_required";
 
 export const resolveAuthSessionObservation = <Session>(args: {
   observation: AuthSessionObservation<Session>;
   identityIntent: AuthIdentityIntent | null;
   staleSession: Session | null;
-  anonymousReason?:
-    | "first_install"
-    | "explicit_sign_out"
-    | "anonymous_rejected";
+  signedOutReason?: AuthSignedOutReason;
 }): AuthSessionSnapshot<Session> => {
   const { observation, staleSession } = args;
   if (observation.kind === "authenticated") {
@@ -120,6 +125,15 @@ export const resolveAuthSessionObservation = <Session>(args: {
           kind: "malformed",
           message: "The auth service returned a session without an identity.",
         },
+      };
+    }
+    // A guest session from before Stella required an account no longer
+    // counts: the device signs in like a new one.
+    if (observedIntent === "anonymous") {
+      return {
+        status: "signed_out",
+        identityIntent: "anonymous",
+        reason: "session_rejected",
       };
     }
     return {
@@ -148,12 +162,12 @@ export const resolveAuthSessionObservation = <Session>(args: {
   }
 
   return {
-    status: "anonymous_required",
+    status: "signed_out",
     identityIntent: args.identityIntent,
     reason:
-      args.anonymousReason ??
+      args.signedOutReason ??
       (args.identityIntent === "anonymous"
-        ? "anonymous_rejected"
+        ? "session_rejected"
         : "first_install"),
   };
 };
@@ -161,7 +175,7 @@ export const resolveAuthSessionObservation = <Session>(args: {
 export const resolveMissingCredentialSnapshot = <Session>(args: {
   identityIntent: AuthIdentityIntent | null;
   staleSession: Session | null;
-  anonymousReason?: "first_install" | "explicit_sign_out";
+  signedOutReason?: "first_install" | "explicit_sign_out";
 }): AuthSessionSnapshot<Session> => {
   if (args.identityIntent === "connected") {
     return {
@@ -172,10 +186,10 @@ export const resolveMissingCredentialSnapshot = <Session>(args: {
     };
   }
   return {
-    status: "anonymous_required",
+    status: "signed_out",
     identityIntent: args.identityIntent,
     reason:
-      args.anonymousReason ??
+      args.signedOutReason ??
       (args.identityIntent === "anonymous"
         ? "explicit_sign_out"
         : "first_install"),

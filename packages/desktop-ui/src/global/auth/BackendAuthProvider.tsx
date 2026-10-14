@@ -1,13 +1,11 @@
 import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
 import type { ReactNode } from "react";
-import { canBootstrapAnonymous } from "@stella/contracts/auth-session";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import { MagicLinkAuthProvider } from "@/global/auth/useMagicLinkAuth";
@@ -15,7 +13,6 @@ import { clearCachedToken } from "@/global/auth/services/auth-token";
 import {
   getAuthSessionSnapshot,
   refreshAuthSession,
-  signInAnonymous,
   useDesktopAuthSession,
   waitForBrowserAuthHandoff,
 } from "@/global/auth/services/auth-session";
@@ -25,8 +22,8 @@ import { showToast } from "@/ui/toast";
 
 export type AuthBootstrapStatus =
   | "loading_session"
-  | "creating_anonymous_session"
   | "ready"
+  | "signed_out"
   | "reauth_required"
   | "needs_pairing"
   | "failed";
@@ -72,25 +69,15 @@ export function useAuthState() {
 
 function DesktopAuthRuntimeEffects({
   retryAttempt,
-  scheduleRetry,
   setAuthBootstrapState,
 }: {
   retryAttempt: number;
-  scheduleRetry: () => void;
   setAuthBootstrapState: (state: AuthBootstrapState) => void;
 }) {
   const session = useDesktopAuthSession();
-  const attemptedAnonAuthRef = useRef(false);
-  const lastRetryAttemptRef = useRef(retryAttempt);
 
   useEffect(() => {
-    if (lastRetryAttemptRef.current !== retryAttempt) {
-      lastRetryAttemptRef.current = retryAttempt;
-      attemptedAnonAuthRef.current = false;
-    }
-
     let cancelled = false;
-    let retryTimer: number | null = null;
     void waitForBrowserAuthHandoff().then(async (handoff) => {
       if (cancelled) return;
       if (handoff === "failed") {
@@ -126,7 +113,6 @@ function DesktopAuthRuntimeEffects({
           });
           return;
         }
-        attemptedAnonAuthRef.current = false;
         // A verified session identity is the whole barrier now. Electron main
         // owns token minting and refresh, and a browser shell mints through
         // Better Auth's JWT plugin; neither needs the renderer to hand a token
@@ -135,44 +121,24 @@ function DesktopAuthRuntimeEffects({
         return;
       }
 
-      // A self-hosted server has no anonymous accounts: this computer joins
-      // with a pairing link instead.
-      if (isSelfHostedServer()) {
-        setAuthBootstrapState({ status: "needs_pairing", error: null });
-        return;
-      }
-
-      if (!canBootstrapAnonymous(snapshot.snapshot)) {
+      if (snapshot.status !== "signed_out") {
         setAuthBootstrapState({ status: "loading_session", error: null });
         return;
       }
 
-      if (attemptedAnonAuthRef.current) return;
-      attemptedAnonAuthRef.current = true;
+      // No account on this computer yet. A self-hosted server's computers
+      // join with a pairing link; on Stella's own server the user signs in.
       setAuthBootstrapState({
-        status: "creating_anonymous_session",
+        status: isSelfHostedServer() ? "needs_pairing" : "signed_out",
         error: null,
       });
-      try {
-        await signInAnonymous();
-      } catch {
-        if (cancelled) return;
-        attemptedAnonAuthRef.current = false;
-        setAuthBootstrapState({
-          status: "loading_session",
-          error: null,
-        });
-        retryTimer = window.setTimeout(scheduleRetry, 2_000);
-      }
     });
 
     return () => {
       cancelled = true;
-      if (retryTimer !== null) window.clearTimeout(retryTimer);
     };
   }, [
     retryAttempt,
-    scheduleRetry,
     session.data,
     session.isPending,
     session.status,
@@ -228,9 +194,6 @@ export function BackendAuthProvider({
           },
     );
   const [retryAttempt, setRetryAttempt] = useState(0);
-  const scheduleRetry = useCallback(() => {
-    setRetryAttempt((attempt) => attempt + 1);
-  }, []);
   const retryAuthBootstrap = useCallback(() => {
     clearCachedToken();
     setAuthBootstrapState({ status: "loading_session", error: null });
@@ -251,7 +214,6 @@ export function BackendAuthProvider({
         {enableRuntimeEffects ? (
           <DesktopAuthRuntimeEffects
             retryAttempt={retryAttempt}
-            scheduleRetry={scheduleRetry}
             setAuthBootstrapState={setAuthBootstrapState}
           />
         ) : null}

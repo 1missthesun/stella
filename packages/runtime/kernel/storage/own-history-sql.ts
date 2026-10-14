@@ -1,11 +1,11 @@
 import { Database, type SQLQueryBindings } from "bun:sqlite";
-import { agentHistoryKind, historyMessageText, readOnlyHistoryQuery } from "@stella/contracts/history-search";
+import { agentHistoryKind, historyMessageText, historyQueryStatement } from "@stella/contracts/history-search";
 import type { OwnHistorySql } from "@stella/contracts/history-search";
 
 const RESULT_MAX_BYTES = 1024 * 1024;
 
 export const ownHistorySql: OwnHistorySql = (rows, query, params) => {
-  const statement = readOnlyHistoryQuery(query);
+  const statement = historyQueryStatement(query);
   const db = new Database(":memory:");
   try {
     db.run(`CREATE TABLE journal (
@@ -33,6 +33,7 @@ export const ownHistorySql: OwnHistorySql = (rows, query, params) => {
         if (kind && text) insertText.run(row.seq, text, row.turnId, kind, row.createdAtMs);
       }
     })();
+    db.run("PRAGMA query_only = ON");
     const result = db.prepare(statement).all(...(params as SQLQueryBindings[])) as Record<string, unknown>[];
     const size = new TextEncoder().encode(JSON.stringify(result)).byteLength;
     if (size > RESULT_MAX_BYTES) {

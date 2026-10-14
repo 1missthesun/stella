@@ -80,19 +80,18 @@ const stem = (token: string): string => {
 const OPAQUE_SQL_RE =
   /'(?:[^']|'')*'|"(?:[^"]|"")*"|`(?:[^`]|``)*`|\[[^\]]*\]|--[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/gu;
 
-/** `replace(` is the string function; bare REPLACE starts a write. */
-const WRITE_KEYWORD_RE =
-  /\b(?:insert|update|delete|replace(?!\s*\()|create|drop|alter|attach|detach|pragma|vacuum|reindex|analyze|begin|commit|rollback|savepoint|release|returning)\b/iu;
-
-/** `history.sql`'s text: one read-only SELECT or WITH statement. */
-export const readOnlyHistoryQuery = (query: string): string => {
+/**
+ * `history.sql`'s text: one statement that starts as a query. Each host makes
+ * its database refuse writes; this only gives an early, readable error.
+ */
+export const historyQueryStatement = (query: string): string => {
   const statement = query.trim().replace(/;\s*$/u, "");
   const code = statement.replace(OPAQUE_SQL_RE, " ").trim();
   if (code.includes(";")) {
     throw new Error("history.sql runs exactly one statement.");
   }
-  if (!/^(?:select|with)\b/iu.test(code) || WRITE_KEYWORD_RE.test(code)) {
-    throw new Error("history.sql accepts only a read-only SELECT or WITH query.");
+  if (!/^(?:select|with)\b/iu.test(code)) {
+    throw new Error("history.sql accepts only a SELECT or WITH query.");
   }
   return statement;
 };

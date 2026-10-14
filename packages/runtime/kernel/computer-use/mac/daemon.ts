@@ -60,6 +60,7 @@ export type TypedAutomationState = {
   screenshotPath?: string;
   screenshotPolicy?: "auto" | "always" | "never";
   inlineScreenshot?: boolean;
+  raise?: boolean;
 };
 
 export type TypedAutomationAction = {

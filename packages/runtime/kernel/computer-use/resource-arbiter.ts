@@ -410,8 +410,15 @@ export class ComputerUseResourceStaleError extends Error {
       nativeReason?: string;
     } = {},
   ) {
+    const reason = details.nativeReason
+      ? details.nativeReason.replaceAll("_", " ")
+      : observedStateId.startsWith("visual_")
+        ? "the screenshot changed"
+        : currentStateId.startsWith("resource_generation_")
+          ? "another action changed this app"
+          : "the accessibility tree changed";
     super(
-      `Computer state changed after the supplied snapshot (observed_state_id=${observedStateId}, current_state_id=${currentStateId}). Call get_app_state for the target, then retry with its new state_id.`,
+      `The app changed after the state this action was based on (${reason}; observed_state_id=${observedStateId}, current_state_id=${currentStateId}). Nothing was sent. Call get_app_state again, re-derive the element_index from that state, and act with its new state_id right away. If the app keeps changing (animations, live content, a busy page), use wait_for_change first so it settles, or pass the state from the observation made immediately before the action.`,
     );
     this.name = "ComputerUseResourceStaleError";
     this.resourceKeys = details.resourceKeys;

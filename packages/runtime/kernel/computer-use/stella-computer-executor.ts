@@ -1109,10 +1109,17 @@ const resolveMacTypedTarget = async (
     const window = (await windows()).find(
       (candidate) => candidate.windowId === windowId,
     );
-    if (!window) {
-      throw new Error(`No running window matches id ${target.windowId}.`);
+    const pid =
+      window?.pid ??
+      Object.values(readSessionTargetRegistry(sessionPaths).targets)
+        .map((entry) => readSnapshotDocument(entry.statePath))
+        .find((snapshot) => snapshot?.windowId === windowId)?.pid;
+    if (pid === undefined) {
+      throw new Error(
+        `No on-screen window has id ${target.windowId}: it was closed, minimized or moved to another Space. Call list_windows for current ids, or get_app_state with the app name (add raise: true to restore a minimized window).`,
+      );
     }
-    matched = apps.apps.find((app) => app.pid === window.pid);
+    matched = apps.apps.find((app) => app.pid === pid);
   } else {
     const needle = target.app.trim().toLocaleLowerCase();
     const exact = apps.apps.filter(
@@ -1339,14 +1346,9 @@ const typedActionOperation = async (
   } finally {
     removeWaitArtifacts(validationPath);
   }
-  const stableTarget: TypedAutomationTarget = resolved.target.bundleId
-    ? { bundleId: resolved.target.bundleId }
-    : resolved.target.appName
-      ? { appName: resolved.target.appName }
-      : resolved.target;
   return {
     type: "action",
-    target: stableTarget,
+    target: resolved.target,
     state,
     action: typedNativeAction(command.action, state.path),
     precondition,
@@ -1376,6 +1378,7 @@ const captureMacState = async (
   target: TypedAutomationTarget,
   statePath: string,
   screenshotPolicy: "auto" | "always" | "never",
+  raise = false,
 ) =>
   (await runAutomationDaemonTypedOperation(sessionPaths, {
     type: "get_app_state",
@@ -1389,6 +1392,7 @@ const captureMacState = async (
           : deriveScreenshotPath(statePath),
       screenshotPolicy,
       inlineScreenshot: false,
+      ...(raise ? { raise: true } : {}),
     },
   })) as SnapshotDocument;
 
@@ -1456,9 +1460,12 @@ const renderMacState = (input: {
   const imagePath = snapshot.screenshot?.path ?? snapshot.screenshotPath;
   return {
     app: input.app,
-    text: useDiff
-      ? formatStateDiffBlock(diff!).trim()
-      : appStateLines(snapshot).join("\n"),
+    text: [
+      useDiff
+        ? formatStateDiffBlock(diff!).trim()
+        : appStateLines(snapshot).join("\n"),
+      ...(snapshot.warnings ?? []).map((warning) => `[warning] ${warning}`),
+    ].join("\n"),
     stateId,
     semanticStateId: stateId,
     ...(visualStateId ? { visualStateId } : {}),
@@ -1547,6 +1554,7 @@ const executeMacComputerUseRequest = async (
       resolved.target,
       statePath,
       request.screenshotPolicy,
+      request.raise === true,
     );
     syncSessionTargetSnapshot(sessionPaths, statePath);
     return {

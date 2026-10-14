@@ -23,6 +23,10 @@ if (state.screenshot) await codeRuntime.emitImage(state.screenshot.url);
 Every state includes an opaque semantic `state_id`, an immutable compound `observation_id`, `is_diff`, and, for a diff, `base_state_id`. A captured screenshot also has an independent `visual_state_id`; screenshot capture settings do not change `state_id`, while a different visual or resource generation changes `observation_id`. Treat a diff as valid only when its `base_state_id` matches the full state you are building on. Pass `disable_diff: true` whenever the base is unavailable or mismatched.
 
 Use the app name directly. Call `await sky.list_apps()` only when the requested app cannot be resolved.
+The `sky` methods are exactly `list_apps`, `list_windows`, `get_app_state`, `wait_for_change`, `click`, `drag`, `perform_secondary_action`, `press_key`, `scroll`, `select_text`, `set_value`, `type_text` and `batch`; there is no `documentation`, `activate_app` or `open_app`.
+When the same app runs more than once (two Chrome profiles, several simulators), pass `window_id` from `list_windows`; actions then go to the process that owns that window.
+A hidden or minimized app, or one with no window on the current Space, fails observation with a message saying so. Pass `raise: true` to `get_app_state` to unhide or restore it; that brings the window on screen, so use it only when the task needs that app. An app with no windows at all (Dock, a menu-bar app, Finder with every window closed) returns its app-level elements instead.
+Stella's own app and password or system-security apps are protected and always refused. To look at Stella's UI, use the verify-stella skill's isolated instance.
 Call `await sky.list_windows()` when window titles or native window IDs are needed to disambiguate several top-level windows.
 
 The default state is an accessibility-tree diff when that is sufficient. A screenshot is returned only when visual context is needed. Prefer the accessibility text and numbered `element_index` values; inspect the screenshot when the tree is sparse or the visible control is absent.
@@ -106,6 +110,14 @@ if (nextState.screenshot) await codeRuntime.emitImage(nextState.screenshot.url);
 For a data-driven sequence, `sky.batch([...])` first validates every action against its supplied observation, then executes the actions in order. A stale action rejects the entire batch before any action is dispatched. Give every item the `state_id` from the same fresh starting state when they target the same app. Do not batch across a decision point, permission prompt, navigation-policy boundary, or any step whose result determines the next action.
 
 Use `wait_for_change` when the next step depends on a mutation becoming observable. It polls without advancing the saved diff baseline and returns a final diff anchored exactly to `after_state_id`. Pass `after_visual_state_id` when screenshot-only changes matter; omit it to wait only for semantic accessibility changes. Use `get_app_state` directly when no prior state is available or a change is not required. Always re-derive element indices from the latest state.
+
+## When An Action Is Rejected
+
+A rejection saying the app changed after your state means nothing was sent. Observe again, re-derive the `element_index` from that state, and act with its `state_id` straight away. Do not reuse one state for several actions in a row unless you batch them. If the app keeps changing (animations, a page still loading), call `wait_for_change` so it settles, then act. Repeating the same call with the same old `state_id` never succeeds.
+
+Every `batch` item needs `type` (`click`, `drag`, `perform_secondary_action`, `press_key`, `scroll`, `select_text`, `set_value` or `type_text`) plus that method's arguments.
+
+Keys are written like `Return`, `Escape`, `Tab`, `Space`, `Delete`, `Up`/`ArrowUp`, `PageDown`, `F5`, a letter, digit or punctuation (`` ` ``, `-`, `/`), with modifiers `cmd`, `ctrl`, `alt` or `shift` joined by `+`, for example `cmd+shift+t`.
 
 ## Text Selection
 

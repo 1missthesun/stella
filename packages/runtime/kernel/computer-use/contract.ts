@@ -103,6 +103,7 @@ export type ComputerUseRequest =
         target: ComputerUseTarget;
         screenshotPolicy: "auto" | "always" | "never";
         disableDiff: boolean;
+        raise?: boolean;
       }>)
   | (ComputerUseRequestEnvelope &
       Readonly<{
@@ -573,7 +574,13 @@ export const assertComputerUseRequest: (
     case "get_app_state":
       exactKeys(
         candidate,
-        [...REQUEST_ENVELOPE_KEYS, "target", "screenshotPolicy", "disableDiff"],
+        [
+          ...REQUEST_ENVELOPE_KEYS,
+          "target",
+          "screenshotPolicy",
+          "disableDiff",
+          "raise",
+        ],
         "ComputerUseRequest",
       );
       assertComputerUseTarget(candidate.target, "ComputerUseRequest.target");
@@ -583,6 +590,9 @@ export const assertComputerUseRequest: (
         "ComputerUseRequest.screenshotPolicy",
       );
       booleanValue(candidate.disableDiff, "ComputerUseRequest.disableDiff");
+      if (candidate.raise !== undefined) {
+        booleanValue(candidate.raise, "ComputerUseRequest.raise");
+      }
       return;
     case "wait_for_change":
       exactKeys(

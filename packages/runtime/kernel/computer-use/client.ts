@@ -83,9 +83,10 @@ export type GetAppStateArgs = CommonAction & {
   screenshot_policy?: "auto" | "always" | "never";
   disable_diff?: boolean;
   disableDiff?: boolean;
+  raise?: boolean;
 };
 
-export type WaitForChangeArgs = GetAppStateArgs & {
+export type WaitForChangeArgs = Omit<GetAppStateArgs, "raise"> & {
   after_state_id: string;
   after_visual_state_id?: string;
   timeout_ms?: number;
@@ -368,7 +369,7 @@ const actionCommand = (entry: SkyAction): ComputerUseActionCommand => {
       });
     default:
       throw new Error(
-        `Unsupported batch action: ${String((entry as { type?: unknown }).type)}`,
+        `Unsupported batch action type ${JSON.stringify((entry as { type?: unknown }).type ?? null)}. Each batch item needs type set to click, drag, perform_secondary_action, press_key, scroll, select_text, set_value or type_text, plus that method's own arguments, e.g. { type: "click", app: "Calculator", element_index: 12, state_id: state.state_id }.`,
       );
   }
 };
@@ -427,7 +428,9 @@ export const createSkyClient = (options: CreateSkyClientOptions): SkyClient => {
   const authorizePolicy = async (policy: ComputerUseAppPolicy) => {
     if (policy.decision === "forbidden") {
       throw new Error(
-        `${policy.displayName} is forbidden by computer-use policy.`,
+        policy.bundleIdentifier.toLocaleLowerCase().startsWith("com.stella.")
+          ? `${policy.displayName} (${policy.bundleIdentifier}) is Stella's own app, which computer use never controls (an agent must not drive its own app). To see or test Stella's UI, launch an isolated instance with the verify-stella skill and drive that; to read this conversation, use your own history.`
+          : `${policy.displayName} (${policy.bundleIdentifier}) is protected from computer use because it holds passwords or system security settings. Ask the user to make the change there, or get what you need another way.`,
       );
     }
     if (policy.decision === "denied") {
@@ -615,6 +618,7 @@ export const createSkyClient = (options: CreateSkyClientOptions): SkyClient => {
       target,
       screenshotPolicy: args.screenshot_policy ?? "auto",
       disableDiff: args.disable_diff === true || args.disableDiff === true,
+      ...(args.raise === true ? { raise: true } : {}),
     });
     return mapAppState(response, policy);
   };

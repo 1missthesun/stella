@@ -944,7 +944,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
       const spawnedAtMs = { ...(row.backgroundWork.spawnedAtMs ?? {}) };
       const statusTexts = { ...(row.backgroundWork.statusTexts ?? {}) };
       const progressTexts = { ...(row.backgroundWork.progressTexts ?? {}) };
-      const toolActivities = { ...(row.backgroundWork.toolActivities ?? {}) };
       const startEventIdsByThread = {
         ...row.backgroundWork.startEventIdsByThread,
       };
@@ -960,7 +959,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         delete spawnedAtMs[id];
         delete statusTexts[id];
         delete progressTexts[id];
-        delete toolActivities[id];
         delete startEventIdsByThread[id];
         delete attemptGenerationsByThread[id];
         delete rootRunIdsByThread[id];
@@ -996,7 +994,6 @@ export function useEventRows(opts: UseEventRowsOptions): UseEventRowsResult {
         spawnedAtMs,
         statusTexts,
         progressTexts,
-        toolActivities,
         startEventIdsByThread,
         attemptGenerationsByThread,
         rootRunIdsByThread,

@@ -5,7 +5,6 @@ import type {
 } from "@/features/chat/lib/event-transforms";
 import type { DisplayPayload } from "@stella/contracts/desktop/display-payload";
 import type { AgentResponseTarget } from "@/features/chat/streaming/streaming-types";
-import type { TaskToolActivity } from "@stella/contracts/agent-runtime";
 import type { TurnMapArtifact } from "@/features/chat/lib/derive-turn-map-artifacts";
 import type { PastedTextDescriptor } from "@/features/chat/lib/paste-context";
 import type { ToolActivityGroup } from "@/features/chat/lib/tool-activity";
@@ -83,7 +82,6 @@ export type AssistantRowViewModel = {
     descriptions: Record<string, string>;
     statusTexts?: Record<string, string>;
     progressTexts?: Record<string, string>;
-    toolActivities?: Record<string, TaskToolActivity>;
     followUpThreadIds?: string[];
     spawnedAtMs?: Record<string, number>;
     startEventIdsByThread: Record<string, string>;

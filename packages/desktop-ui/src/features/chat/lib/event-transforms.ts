@@ -1,7 +1,6 @@
 import {
   AGENT_IDS,
   type TaskLifecycleStatus,
-  type TaskToolActivity,
 } from "@stella/contracts/agent-runtime"
 import type { AgentModelConfigSnapshot } from "@stella/contracts/agent-engine"
 import type { ActivityIndicatorEntry } from "@stella/contracts/activity-indicator"
@@ -74,7 +73,6 @@ type AgentCanceledEventPayload = AgentLifecycleFields & {
 type AgentProgressEventPayload = AgentLifecycleFields & {
   agentId: string
   statusText: string
-  toolActivity?: TaskToolActivity
 }
 
 export type TaskItem = {
@@ -89,7 +87,6 @@ export type TaskItem = {
   anchorTurnId?: string
   parentAgentId?: string
   statusText?: string
-  toolActivity?: TaskToolActivity
   reasoningText?: string
   startedAtMs: number
   completedAtMs?: number
@@ -109,7 +106,6 @@ export type TaskLiveDecoration = {
   lifecycleSequence?: number
   anchorTurnId?: string
   statusText?: string
-  toolActivity?: TaskToolActivity
   reasoningText?: string
 }
 
@@ -172,7 +168,6 @@ export function buildActivityTasks(
               ? undefined
               : record.description))
           : undefined,
-        toolActivity: running ? decoration?.toolActivity : undefined,
         reasoningText: running ? decoration?.reasoningText : undefined,
         startedAtMs: record.startedAt,
         completedAtMs: running

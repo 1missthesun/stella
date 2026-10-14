@@ -233,7 +233,6 @@ export const mergeCloudConversationTasks = (
     return {
       ...task,
       ...(overlay.statusText ? { statusText: overlay.statusText } : {}),
-      ...(overlay.toolActivity ? { toolActivity: overlay.toolActivity } : {}),
       ...(overlay.reasoningText
         ? { reasoningText: overlay.reasoningText }
         : {}),

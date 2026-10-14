@@ -74,7 +74,7 @@ With \`--json\`, every line is one JSON object:
 
 | step | page (\`url\`) | what to do |
 |---|---|---|
-| \`login\` | Cloudflare's "Allow Wrangler" page | Sign in to Cloudflare (or create a free account there), then click **Allow**. The script waits for it. |
+| \`login\` | Cloudflare's "Allow Wrangler" page | Sign in to Cloudflare (or create a free account there), then click **Allow**. Cloudflare may first email a verification code to the account's address: ask the user for it, or read it from their inbox if you can. Each link only lasts about 2 minutes; if it runs out, the script prints a new \`waiting\` line with a fresh \`url\`, so always use the latest one. Clicking **Allow** accepts Cloudflare's terms for wrangler; if your own rules need the user for that, ask them to click it. |
 | \`workers-paid\` | dash.cloudflare.com/…/workers/plans | Choose **Workers Paid ($5/month)** and add a payment method. This is the only step that costs money. |
 | \`r2\` | dash.cloudflare.com/…/r2/overview | Turn on **R2** storage (no extra charge within the free 10 GB; Cloudflare asks to confirm the payment method). |
 | \`docker\` | Docker's download page, or none | Install or start Docker (see section 3). |

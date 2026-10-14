@@ -680,38 +680,46 @@ const ensureLogin = async () => {
     cfToken = null;
   }
   emit(step, "start", "Signing in to Cloudflare (wrangler login)…");
-  const child = spawn(nodeBin(), [wranglerBin(), "login", "--browser=false"], {
-    cwd: path.join(ROOT, "workers", "cloud-builder"),
-    env: childEnv(),
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  let announced = false;
-  let output = "";
-  const onData = (chunk) => {
-    output += chunk;
-    const match = /(https:\/\/dash\.cloudflare\.com\/oauth2\/auth\S+)/.exec(output);
-    if (match && !announced) {
-      announced = true;
-      emit(step, "waiting", "Open this link and allow wrangler access to your Cloudflare account (create a free account there if you don't have one).", {
-        needsHuman: true,
-        url: match[1],
-      });
-      openUrl(match[1]);
-    }
-  };
-  child.stdout.on("data", onData);
-  child.stderr.on("data", onData);
-  const status = await new Promise((resolve) => {
-    const timer = setTimeout(() => child.kill("SIGKILL"), WAIT_LIMIT_MS);
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      resolve(code);
+  const started = Date.now();
+  for (let attempt = 0; Date.now() - started < WAIT_LIMIT_MS; attempt += 1) {
+    const child = spawn(nodeBin(), [wranglerBin(), "login", "--browser=false"], {
+      cwd: path.join(ROOT, "workers", "cloud-builder"),
+      env: childEnv(),
+      stdio: ["ignore", "pipe", "pipe"],
     });
-  });
-  log(output.replace(/https:\/\/dash\.cloudflare\.com\/oauth2\/auth\S+/g, "<login url>"));
-  cfToken = await loadToken();
-  if (status !== 0 || !cfToken) fail(step, "Cloudflare sign-in didn't finish. Run the command again to retry.");
-  emit(step, "ok", "Signed in to Cloudflare");
+    let announced = false;
+    let output = "";
+    const onData = (chunk) => {
+      output += chunk;
+      const match = /(https:\/\/dash\.cloudflare\.com\/oauth2\/auth\S+)/.exec(output);
+      if (match && !announced) {
+        announced = true;
+        const message =
+          attempt === 0
+            ? "Open this link and allow wrangler access to your Cloudflare account (create a free account there if you don't have one)."
+            : "The last sign-in link expired before it was allowed (Cloudflare's links last about 2 minutes). Open this new link and click Allow.";
+        emit(step, "waiting", message, { needsHuman: true, url: match[1] });
+        if (attempt === 0) openUrl(match[1]);
+      }
+    };
+    child.stdout.on("data", onData);
+    child.stderr.on("data", onData);
+    await new Promise((resolve) => {
+      const timer = setTimeout(() => child.kill("SIGKILL"), WAIT_LIMIT_MS);
+      child.on("close", () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
+    log(output.replace(/https:\/\/dash\.cloudflare\.com\/oauth2\/auth\S+/g, "<login url>"));
+    cfToken = await loadToken();
+    if (cfToken) {
+      emit(step, "ok", "Signed in to Cloudflare");
+      return;
+    }
+    if (!announced) break;
+  }
+  fail(step, "Cloudflare sign-in didn't finish. Run the command again to retry.");
 };
 
 const resolveAccount = async () => {

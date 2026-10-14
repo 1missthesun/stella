@@ -48,6 +48,8 @@ const ACTIVE_SUBSCRIPTION_STATUSES = new Set(["active", "trialing", "past_due", 
 const CREDIT_CURRENCY = "usd";
 const CREDIT_MIN_CENTS = 100;
 const CREDIT_MAX_CENTS = 50_000;
+// Managed Payments refuses products without a tax code: software as a service, personal use.
+const CREDIT_TAX_CODE = "txcd_10103000";
 const CREDIT_PRESET_CENTS = [500, 1_000, 2_500, 5_000];
 const STRIPE_RATE_LIMIT = { count: 10, windowMs: 60_000 };
 const COST_LEDGER_RETENTION_MS = 120 * 24 * 60 * 60 * 1000;
@@ -1066,7 +1068,7 @@ const creditCheckout = async (
           price_data: {
             currency: CREDIT_CURRENCY,
             unit_amount: amountCents,
-            product_data: { name: "Stella extra usage credit" },
+            product_data: { name: "Stella extra usage credit", tax_code: CREDIT_TAX_CODE },
           },
           quantity: 1,
         },

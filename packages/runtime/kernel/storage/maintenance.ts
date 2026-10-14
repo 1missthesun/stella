@@ -54,13 +54,8 @@
  * `reclaimMinFreelistBytes` and `reclaimMinFreelistRatio` of the file, and
  * statfs shows room for VACUUM's two transient copies (the temp database and,
  * in WAL mode, a WAL as large as the result), the reclaim runs:
- *   TRUNCATE checkpoint → mark `fts_rebuild_pending` → VACUUM →
- *   rebuild every external-content FTS index + record completion (one tx) →
+ *   TRUNCATE checkpoint → VACUUM → record completion →
  *   TRUNCATE checkpoint (this is what actually shrinks the file).
- * The rebuild is mandatory: `entry` and `thread` have no INTEGER PRIMARY KEY,
- * and SQLite documents that VACUUM may change such rowids, which would point
- * the external-content FTS rows at the wrong content. The pending marker makes
- * a crash between VACUUM and rebuild self-healing on the next idle tick.
  *
  * Why not `auto_vacuum = INCREMENTAL`: switching an existing database to it
  * requires a full VACUUM anyway (the one-time cost this module pays once),
@@ -82,7 +77,7 @@
  * has run the reclaim (the VACUUM itself is synchronous, so no timer can
  * fire mid-VACUUM). Three BUSY deferrals end the hold for the session.
  * Worst-case post-quit linger, once per database: one tick (<= 60 s) +
- * VACUUM + FTS rebuild + final checkpoint — about 5–7 minutes for the
+ * VACUUM + final checkpoint — about 5–7 minutes for the
  * 13.3 GiB prod file (~6 GiB live).
  *
  * The search-text index. The covering partial index is not in the
@@ -114,10 +109,8 @@
  * ignores the uncommitted frames; the temp database is an unlinked-on-open
  * (unix) / delete-on-close (Windows) file, so nothing is left behind.
  * Verified by SIGKILLing a VACUUM on a 200 MiB fixture: integrity_check ok,
- * freelist unchanged, `freelist_reclaim_v1` unset. The `fts_rebuild_pending`
- * marker, committed before VACUUM began, survives; the next idle tick
- * rebuilds the FTS indexes (harmless — rowids never moved) and clears it,
- * and the reclaim retries in a later detached window.
+ * freelist unchanged, `freelist_reclaim_v1` unset, and the reclaim retries in
+ * a later detached window.
  */
 
 import fs from "node:fs";
@@ -128,11 +121,9 @@ import { openSqliteConnection } from "./database.js";
 import { forkFixedRateFiber } from "./effect-runtime.js";
 import { deleteLegacyRunEventBatch } from "./entry-retention.js";
 import {
-  EXTERNAL_CONTENT_FTS_TABLES,
   SCHEMA_VERSION,
   SEARCH_TEXT_INDEX_NAME,
   SEARCH_TEXT_INDEX_SQL,
-  rebuildFtsIndexSql,
 } from "./schema.js";
 import type { SqliteDatabase } from "./shared.js";
 
@@ -172,7 +163,6 @@ export const MAINTENANCE_DEFAULTS: Readonly<MaintenanceSettings> = {
 export const MAINTENANCE_META_KEYS = {
   analyzedSchemaVersion: "maintenance.analyze_schema_version",
   freelistReclaimed: "maintenance.freelist_reclaim_v1",
-  ftsRebuildPending: "maintenance.fts_rebuild_pending",
   runEventSweepDrained: "maintenance.run_event_sweep_drained",
 } as const;
 
@@ -208,15 +198,13 @@ export type ReclaimOutcome =
       status: "reclaimed";
       before: DatabaseHealth;
       after: DatabaseHealth;
-      rebuiltIndexes: string[];
       vacuumMs: number;
-      rebuildMs: number;
       finalCheckpointBusy: boolean;
     }
   | {
       status: "deferred";
       reason: "busy";
-      step: "checkpoint" | "mark-pending" | "vacuum" | "fts-rebuild";
+      step: "checkpoint" | "vacuum" | "record";
     }
   | {
       status: "skipped";
@@ -335,17 +323,6 @@ const writeMeta = (db: SqliteDatabase, key: string, value: string): void => {
   ).run(key, value, Date.now());
 };
 
-const deleteMeta = (db: SqliteDatabase, key: string): void => {
-  db.prepare("DELETE FROM meta WHERE key = ?").run(key);
-};
-
-const tableExists = (db: SqliteDatabase, name: string): boolean =>
-  Boolean(
-    db
-      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
-      .get(name),
-  );
-
 const inImmediateTransaction = <A>(db: SqliteDatabase, fn: () => A): A => {
   db.exec("BEGIN IMMEDIATE;");
   try {
@@ -360,40 +337,6 @@ const inImmediateTransaction = <A>(db: SqliteDatabase, fn: () => A): A => {
     }
     throw error;
   }
-};
-
-/**
- * Rebuild every schema-owned external-content FTS index that exists (a
- * SQLite build without FTS5 has none). Caller owns the transaction.
- */
-export const rebuildExternalContentFtsIndexes = (
-  db: SqliteDatabase,
-): string[] => {
-  const present = EXTERNAL_CONTENT_FTS_TABLES.filter((table) =>
-    tableExists(db, table),
-  );
-  for (const table of present) {
-    db.exec(rebuildFtsIndexSql(table));
-  }
-  return present;
-};
-
-/**
- * Finish a reclaim that stopped between VACUUM and the FTS rebuild (crash,
- * or BUSY on the rebuild transaction). Returns the rebuilt indexes, or null
- * when nothing was pending.
- */
-export const recoverPendingFtsRebuild = (
-  db: SqliteDatabase,
-): string[] | null => {
-  if (readMeta(db, MAINTENANCE_META_KEYS.ftsRebuildPending) === null) {
-    return null;
-  }
-  return inImmediateTransaction(db, () => {
-    const rebuilt = rebuildExternalContentFtsIndexes(db);
-    deleteMeta(db, MAINTENANCE_META_KEYS.ftsRebuildPending);
-    return rebuilt;
-  });
 };
 
 export const analyzeOncePerSchemaVersion = (
@@ -590,25 +533,10 @@ export const reclaimFreelist = (
 
   connection.exec("PRAGMA temp_store = FILE;");
   return withBusyTimeout(connection, policy.busyTimeoutMs, () => {
-    try {
-      writeMeta(connection, MAINTENANCE_META_KEYS.ftsRebuildPending, "vacuum");
-    } catch (error) {
-      if (isSqliteBusyError(error)) {
-        return { status: "deferred", reason: "busy", step: "mark-pending" };
-      }
-      throw error;
-    }
-
     const vacuumStartedAt = performance.now();
     try {
       (policy.vacuum ?? ((db) => db.exec("VACUUM;")))(connection);
     } catch (error) {
-      // VACUUM is atomic: on failure no rowid moved, so drop the marker.
-      try {
-        deleteMeta(connection, MAINTENANCE_META_KEYS.ftsRebuildPending);
-      } catch {
-        /* a leftover marker only costs one redundant rebuild */
-      }
       if (isSqliteBusyError(error)) {
         return { status: "deferred", reason: "busy", step: "vacuum" };
       }
@@ -616,30 +544,22 @@ export const reclaimFreelist = (
     }
     const vacuumMs = Math.round(performance.now() - vacuumStartedAt);
 
-    const rebuildStartedAt = performance.now();
-    let rebuiltIndexes: string[];
     try {
-      rebuiltIndexes = inImmediateTransaction(connection, () => {
-        const rebuilt = rebuildExternalContentFtsIndexes(connection);
-        deleteMeta(connection, MAINTENANCE_META_KEYS.ftsRebuildPending);
-        writeMeta(
-          connection,
-          MAINTENANCE_META_KEYS.freelistReclaimed,
-          JSON.stringify({
-            at: Date.now(),
-            fileBytesBefore: before.fileBytes,
-            freelistBytesBefore: before.freelistBytes,
-          }),
-        );
-        return rebuilt;
-      });
+      writeMeta(
+        connection,
+        MAINTENANCE_META_KEYS.freelistReclaimed,
+        JSON.stringify({
+          at: Date.now(),
+          fileBytesBefore: before.fileBytes,
+          freelistBytesBefore: before.freelistBytes,
+        }),
+      );
     } catch (error) {
       if (isSqliteBusyError(error)) {
-        return { status: "deferred", reason: "busy", step: "fts-rebuild" };
+        return { status: "deferred", reason: "busy", step: "record" };
       }
       throw error;
     }
-    const rebuildMs = Math.round(performance.now() - rebuildStartedAt);
 
     // This checkpoint copies the vacuumed pages back and truncates the file.
     // BUSY (a reader on an old snapshot) is fine: the WAL-size rule on a
@@ -653,9 +573,7 @@ export const reclaimFreelist = (
       status: "reclaimed",
       before,
       after: readDatabaseHealth(connection, databasePath),
-      rebuiltIndexes,
       vacuumMs,
-      rebuildMs,
       finalCheckpointBusy: finalCheckpoint.busy,
     };
   });
@@ -848,17 +766,6 @@ export class DatabaseMaintenance {
         busy: !ran,
         ms: elapsedMs(startedAt),
       });
-    }
-
-    const recoverStartedAt = performance.now();
-    const recovered = recoverPendingFtsRebuild(connection);
-    if (recovered) {
-      this.logger?.process("storage.maintenance.fts-rebuild", {
-        reason: "pending-marker",
-        indexes: recovered.join(","),
-        ms: elapsedMs(recoverStartedAt),
-      });
-      return;
     }
 
     this.checkpoint(connection);
@@ -1123,8 +1030,6 @@ export class DatabaseMaintenance {
           freelistBytesAfter: outcome.after.freelistBytes,
           walBytesAfter: outcome.after.walBytes,
           vacuumMs: outcome.vacuumMs,
-          ftsRebuildMs: outcome.rebuildMs,
-          ftsIndexes: outcome.rebuiltIndexes.join(","),
           finalCheckpointBusy: outcome.finalCheckpointBusy,
           ms,
         });

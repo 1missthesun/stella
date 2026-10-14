@@ -1,8 +1,6 @@
 import type { SqliteDatabase } from "./shared.js";
 
-export const SCHEMA_VERSION = 10;
-
-const FTS_TOKENIZER = "'porter unicode61 remove_diacritics 2'";
+export const SCHEMA_VERSION = 11;
 
 export const CORE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -186,11 +184,10 @@ CREATE INDEX IF NOT EXISTS idx_cloud_journal_admission_receipts_created
 
 const applyCloudColumnBackfills = (db: SqliteDatabase): void => {
   const addColumn = (table: string, column: string) => {
-    try {
-      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column};`);
-    } catch {
-      /* column already exists */
-    }
+    const name = column.split(" ")[0];
+    const columns = db.prepare(`SELECT name FROM pragma_table_info(?)`).all(table) as Array<{ name: string }>;
+    if (columns.length === 0 || columns.some((existing) => existing.name === name)) return;
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column};`);
   };
   addColumn("cloud_transcript_outbox", "owner_generation TEXT");
   addColumn("cloud_transcript_outbox", "recovery_json TEXT");
@@ -245,39 +242,17 @@ CREATE TABLE IF NOT EXISTS claude_session_sync_files (
 );
 `;
 
-export const FTS_SCHEMA_SQL = `
-CREATE VIRTUAL TABLE IF NOT EXISTS entry_fts USING fts5(
-  search_text,
-  content='entry',
-  content_rowid='rowid',
-  tokenize = ${FTS_TOKENIZER}
-);
-CREATE TRIGGER IF NOT EXISTS trg_entry_fts_insert
-AFTER INSERT ON entry WHEN NEW.search_text IS NOT NULL
-BEGIN
-  INSERT INTO entry_fts(rowid, search_text) VALUES (NEW.rowid, NEW.search_text);
-END;
-CREATE TRIGGER IF NOT EXISTS trg_entry_fts_delete
-AFTER DELETE ON entry WHEN OLD.search_text IS NOT NULL
-BEGIN
-  INSERT INTO entry_fts(entry_fts, rowid, search_text)
-  VALUES ('delete', OLD.rowid, OLD.search_text);
-END;
-CREATE TRIGGER IF NOT EXISTS trg_entry_fts_update
-AFTER UPDATE OF search_text ON entry
-BEGIN
-  INSERT INTO entry_fts(entry_fts, rowid, search_text)
-  SELECT 'delete', OLD.rowid, OLD.search_text WHERE OLD.search_text IS NOT NULL;
-  INSERT INTO entry_fts(rowid, search_text)
-  SELECT NEW.rowid, NEW.search_text WHERE NEW.search_text IS NOT NULL;
-END;
-
-`;
-
 const DROP_AGENT_LOOP_SEARCH_INDEXES = [
   "DROP TABLE IF EXISTS thread_fts;",
   "DROP TABLE IF EXISTS durable_thread_summaries_fts;",
 ];
+const DROP_ENTRY_SEARCH_INDEX_SQL = `
+DROP TRIGGER IF EXISTS trg_entry_fts_insert;
+DROP TRIGGER IF EXISTS trg_entry_fts_delete;
+DROP TRIGGER IF EXISTS trg_entry_fts_update;
+DROP TABLE IF EXISTS entry_fts;
+DELETE FROM meta WHERE key IN ('fts_ready', 'maintenance.fts_rebuild_pending');
+`;
 const DROP_AGENT_LOOP_TABLES_SQL = `
 DROP TABLE IF EXISTS thread_context;
 DROP TABLE IF EXISTS thread_entry;
@@ -314,21 +289,6 @@ const MIGRATIONS: Migration[] = [
       db.exec(CORE_SCHEMA_SQL);
       applyCloudColumnBackfills(db);
       db.exec(CLOUD_SCHEMA_SQL);
-      // A SQLite build without FTS5 (some bun:sqlite linkages) must not lose
-      // chat storage entirely: skip the search indexes.
-      let ftsReady = false;
-      try {
-        db.exec(FTS_SCHEMA_SQL);
-        ftsReady = true;
-      } catch {
-        /* searches degrade; everything else keeps working */
-      }
-      if (ftsReady) {
-        db.prepare(
-          `INSERT INTO meta (key, value, updated_at) VALUES (?, '1', ?)
-           ON CONFLICT(key) DO UPDATE SET value = '1', updated_at = excluded.updated_at`,
-        ).run("fts_ready", Date.now());
-      }
     },
   },
   {
@@ -346,29 +306,17 @@ const MIGRATIONS: Migration[] = [
   {
     version: 10,
     apply: (db) => {
-      // A SQLite build without FTS5 cannot drop an FTS5 table; it never
-      // made one either.
-      for (const statement of DROP_AGENT_LOOP_SEARCH_INDEXES) {
-        try {
-          db.exec(statement);
-        } catch {
-          /* no FTS5 here */
-        }
-      }
+      for (const statement of DROP_AGENT_LOOP_SEARCH_INDEXES) db.exec(statement);
       db.exec(DROP_AGENT_LOOP_TABLES_SQL);
     },
   },
+  {
+    version: 11,
+    apply: (db) => {
+      db.exec(DROP_ENTRY_SEARCH_INDEX_SQL);
+    },
+  },
 ];
-
-/**
- * Every external-content FTS5 index the schema owns. Their rows are keyed by
- * the content table's rowid, so anything that can renumber rowids (VACUUM on
- * `entry`, which has no INTEGER PRIMARY KEY) must rebuild all of them. `kernel/storage/maintenance.ts` relies on this list being complete.
- */
-export const EXTERNAL_CONTENT_FTS_TABLES = ["entry_fts"] as const;
-
-export const rebuildFtsIndexSql = (table: string): string =>
-  `INSERT INTO ${table}(${table}) VALUES ('rebuild');`;
 
 export const applyConnectionPragmas = (db: SqliteDatabase): void => {
   db.exec("PRAGMA journal_mode = WAL;");

@@ -103,34 +103,33 @@ const runElectronPids = (run) => {
   return pids;
 };
 
-/**
- * The run's Electron main process. Matched by binary rather than by the
- * run's environment: the runtime shares that environment, and a relaunched
- * main process no longer has it.
- */
-const runMainPid = (run) => {
-  if (process.platform !== "linux") return run.electronPid;
-  const electron = path.join(appDir, "node_modules");
-  for (const entry of readdirSync("/proc")) {
-    if (!/^\d+$/.test(entry)) continue;
-    try {
-      // Chromium rewrites its command line, NULs to spaces, in some processes.
-      const cmdline = readFileSync(`/proc/${entry}/cmdline`, "utf8");
-      const binary = cmdline.split(/[\0 ]/)[0];
-      if (binary.startsWith(electron) && /\/electron$/.test(binary) && !cmdline.includes("--type=")) {
-        return Number(entry);
-      }
-    } catch {
-      // Gone, or not ours.
-    }
+const runMainPid = async (run) => {
+  try {
+    const version = await fetch(`http://127.0.0.1:${run.cdpPort}/json/version`, {
+      signal: AbortSignal.timeout(2000),
+    }).then((response) => response.json());
+    const ws = new WebSocket(version.webSocketDebuggerUrl);
+    const info = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("timed out")), 2000);
+      ws.addEventListener("error", reject, { once: true });
+      ws.addEventListener("open", () => ws.send(JSON.stringify({ id: 1, method: "SystemInfo.getProcessInfo" })), { once: true });
+      ws.addEventListener("message", (event) => {
+        const message = JSON.parse(event.data);
+        if (message.id !== 1) return;
+        clearTimeout(timer);
+        resolve(message.result);
+      });
+    }).finally(() => ws.close());
+    return info?.processInfo?.find((entry) => entry.type === "browser")?.id;
+  } catch {
+    return process.platform === "linux" ? undefined : run.electronPid;
   }
-  return undefined;
 };
 
-const stop = () => {
+const stop = async () => {
   if (!existsSync(pointerFile)) return;
   const run = readRun();
-  for (const pid of new Set([...runElectronPids(run), runMainPid(run)].filter(Boolean))) {
+  for (const pid of new Set([...runElectronPids(run), await runMainPid(run)].filter(Boolean))) {
     try {
       process.kill(pid, "SIGTERM");
     } catch {
@@ -142,7 +141,7 @@ const stop = () => {
 
 const launch = async () => {
   const mode = option("mode", "production");
-  if (existsSync(pointerFile)) stop();
+  if (existsSync(pointerFile)) await stop();
   const result = harness(["session", "launch", "--replace", "--account", "signed-in"], {
     STELLA_RENDERER_MODE: mode,
   });
@@ -496,7 +495,7 @@ const iterate = async (variation) => {
     const name = `bench-${variation}-${nonce}`;
     const commit = commitOnto(change.base, change.files, `Update bench: ${variation} ${nonce}${change.note ? ` (${change.note})` : ""}`);
     const prepareTail = new LogTail(run);
-    const prepareResources = new ResourceSampler(runMainPid(run));
+    const prepareResources = new ResourceSampler(await runMainPid(run));
     const createdAt = Date.now();
     git(appDir, ["branch", "--force", `draft/${name}`, commit]);
     const offeredBy = Date.now() + 180_000;
@@ -529,7 +528,7 @@ const iterate = async (variation) => {
   const kind = KIND[variation];
   const tail = new LogTail(run);
   const oldPids = new Set(runElectronPids(run));
-  const clickResources = new ResourceSampler(runMainPid(run));
+  const clickResources = new ResourceSampler(await runMainPid(run));
   const t0 = Date.now();
   await evaluate(run.cdpPort, `(${action}.then((result) => { window.__benchResult = result; }), true)`);
   const deadline = t0 + 120_000;
@@ -705,7 +704,7 @@ try {
   else if (command === "launch") await launch();
   else if (command === "run") await runBench();
   else if (command === "report") report();
-  else if (command === "stop") stop();
+  else if (command === "stop") await stop();
   else {
     console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("*/")[0]);
     process.exit(command ? 1 : 0);

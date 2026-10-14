@@ -659,12 +659,9 @@ export class OwnerRelayGate extends DurableObject<Env> {
         resetAt: (oldest ?? now) + HOUR_MS,
       };
     }
-    const issued =
-      args.audience === "anonymous"
-        ? undefined
-        : this.ctx.storage.sql
-            .exec<AudienceRow>("SELECT audience FROM mint_audience WHERE singleton = 1")
-            .toArray()[0]?.audience;
+    const issued = this.ctx.storage.sql
+      .exec<AudienceRow>("SELECT audience FROM mint_audience WHERE singleton = 1")
+      .toArray()[0]?.audience;
     const policy = GATEWAY_OWNER_RELAY_LIMITS[limitsAudienceFor(issued ?? args.audience)];
     const limit = args.testAccount
       ? GATEWAY_TEST_ACCOUNT_MINTS_PER_HOUR

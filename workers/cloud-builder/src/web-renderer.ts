@@ -126,7 +126,7 @@ const upload = async (
   treeSha: string,
   waitUntil: (promise: Promise<unknown>) => void,
 ): Promise<Response> => {
-  const verified = await requireCaller(request, env, { allowAnonymous: false });
+  const verified = await requireCaller(request, env);
   if (!verified.ok) return failRpcError(verified.error);
   const { caller } = verified;
   const archive = await readBodyBytes(request, MAX_TAR_BYTES);

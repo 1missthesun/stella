@@ -26,21 +26,8 @@ export const verifyCaller = async (env: CallerEnv, token: string): Promise<Verif
 };
 
 /**
- * The caller behind the request's `Authorization: Bearer` JWT. Unless
- * `allowAnonymous`, an anonymous session is refused as `FORBIDDEN` with
- * `anonymousMessage`. Routes answer the error with `rpcErrorStatus`.
+ * The caller behind the request's `Authorization: Bearer` JWT. Routes answer
+ * the error with `rpcErrorStatus`.
  */
-export const requireCaller = async (
-  request: Request,
-  env: CallerEnv,
-  options: { allowAnonymous: boolean; anonymousMessage?: string },
-): Promise<VerifiedCaller> => {
-  const verified = await verifyCaller(env, bearerCredential(request.headers.get("authorization")) ?? "");
-  if (verified.ok && verified.caller.isAnonymous && !options.allowAnonymous) {
-    return {
-      ok: false,
-      error: new RpcError("FORBIDDEN", options.anonymousMessage ?? "Sign in with an account to use this."),
-    };
-  }
-  return verified;
-};
+export const requireCaller = (request: Request, env: CallerEnv): Promise<VerifiedCaller> =>
+  verifyCaller(env, bearerCredential(request.headers.get("authorization")) ?? "");

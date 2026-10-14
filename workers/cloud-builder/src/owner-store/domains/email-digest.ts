@@ -446,20 +446,17 @@ export const emailDigestDomain = {
   calls: {
     "emailDigest.start": {
       scope: "owner",
-      requireAccount: true,
       parse: empty(),
       handler: start,
     },
     "emailDigest.checkNow": {
       scope: "owner",
-      requireAccount: true,
       parse: empty(),
       handler: checkNow,
     },
   },
   views: {
     "emailDigest.feed": {
-      requireAccount: true,
       parse: empty(),
       read: (ctx) => readFeed(ctx.db, ctx.now),
     },

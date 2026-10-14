@@ -263,7 +263,7 @@ const log = (
 ): void => console[level](JSON.stringify({ service: "owner-user-asks", event, ...fields }));
 
 const requireAccountCaller = (caller: OwnerCaller | null): OwnerCaller => {
-  if (!caller || caller.isAnonymous) {
+  if (!caller) {
     throw new RpcError("FORBIDDEN", "Sign in with an account to use this.");
   }
   return caller;
@@ -1925,14 +1925,12 @@ export const userAsksDomain = {
   calls: {
     "userAsks.policy": {
       scope: "owner",
-      requireAccount: true,
       parse: empty(),
       handler: (ctx: OwnerContext) => readPolicy(ctx.db),
     },
   },
   views: {
     "userAsks.open": {
-      requireAccount: true,
       parse: empty(),
       read: (ctx) => listOpenUserAsks(ctx.db),
     },

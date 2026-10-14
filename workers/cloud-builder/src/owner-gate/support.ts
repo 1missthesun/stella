@@ -1,6 +1,5 @@
 import type { OwnerCaller } from "../owner-store/registry.js";
 import {
-  HEADER_ANONYMOUS,
   HEADER_IDENTITY_LEVEL,
   HEADER_OWNER,
   HEADER_SESSION,
@@ -190,7 +189,6 @@ export const trustedOwnerCaller = (request: Request): OwnerCaller | null => {
     subject,
     sessionId,
     expiresAtMs,
-    isAnonymous: request.headers.get(HEADER_ANONYMOUS) === "1",
     ...(identityLevel === 0 ||
     identityLevel === 1 ||
     identityLevel === 2 ||

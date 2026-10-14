@@ -709,25 +709,21 @@ export const browserDomain = {
   calls: {
     "browser.detail": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ interactionId }),
       handler: detail,
     },
     "browser.liveView": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ interactionId, expectedRevision }),
       handler: liveView,
     },
     "browser.sessionTransferKey": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ interactionId, expectedRevision }),
       handler: sessionTransferKey,
     },
     "browser.importSessionTransfer": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         interactionId,
         expectedRevision,
@@ -744,7 +740,6 @@ export const browserDomain = {
     },
     "browser.decide": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         interactionId,
         expectedRevision,
@@ -755,14 +750,12 @@ export const browserDomain = {
     },
     "browser.resetProfile": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ requestId }),
       handler: resetProfile,
     },
   },
   views: {
     "browser.pending": {
-      requireAccount: true,
       parse: empty(),
       read: (ctx) => listPending(ctx.db),
     },

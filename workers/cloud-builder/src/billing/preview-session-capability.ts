@@ -96,7 +96,6 @@ export async function handlePreviewSessionCapabilityRoute(
   try {
     const result = await ownerGateStub(env.OWNER_GATES, ownerId).issueSessionCapability({
       ownerId,
-      isAnonymous: verified.token.isAnonymous,
       ipHash,
       networkClass,
       deviceKeyHash: deviceProof.deviceKeyHash,

@@ -626,26 +626,22 @@ export const claudeSessionsDomain = {
   calls: {
     "claudeSessions.append": {
       scope: "owner",
-      requireAccount: true,
       maxBodyBytes: CLAUDE_SESSION_APPEND_MAX_BODY_BYTES,
       parse: appendParser,
       handler: appendChunk,
     },
     "claudeSessions.tag": {
       scope: "owner",
-      requireAccount: true,
       parse: object(tagShape),
       handler: tagSession,
     },
     "claudeSessions.latest": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ threadId: threadIdArg }),
       handler: latestSession,
     },
     "claudeSessions.readChunk": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         threadId: threadIdArg,
         sessionId: sessionIdArg,

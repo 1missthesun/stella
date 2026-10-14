@@ -3924,31 +3924,26 @@ export const agentThreadsDomain = {
     },
     "agentThreads.message": {
       scope: "owner",
-      requireAccount: true,
       parse: messageParser,
       handler: messageAgent,
     },
     "agentThreads.stop": {
       scope: "owner",
-      requireAccount: true,
       parse: stopParser,
       handler: stopAgent,
     },
     "agentThreads.pause": {
       scope: "owner",
-      requireAccount: true,
       parse: pauseParser,
       handler: legacyPauseAgent,
     },
     "agentThreads.control": {
       scope: "owner",
-      requireAccount: true,
       parse: controlParser,
       handler: controlRequest,
     },
     "agentThreads.spawnFromDesktop": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         ...origin,
         ownerGeneration: generation,
@@ -3966,7 +3961,6 @@ export const agentThreadsDomain = {
     },
     "agentThreads.handoff": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         ownerGeneration: generation,
         handoffId: id(),
@@ -3983,7 +3977,6 @@ export const agentThreadsDomain = {
     },
     "agentThreads.cancel": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         ...origin,
         ownerGeneration: generation,

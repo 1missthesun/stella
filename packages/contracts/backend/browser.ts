@@ -5,7 +5,7 @@
  * (the login URL, the Live View, the session), and these calls fetch it on
  * demand. `browser.decide` answers the wait and resumes the agent.
  *
- * Every call needs a connected (non-anonymous) account.
+ * Every call needs a signed-in account.
  */
 
 import type {

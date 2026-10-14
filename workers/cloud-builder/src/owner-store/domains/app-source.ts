@@ -243,20 +243,17 @@ export const appSourceDomain = {
     },
     "appSource.access": {
       scope: "owner",
-      requireAccount: true,
       parse: empty(),
       handler: (ctx: OwnerContext) => access(ctx),
     },
     "appSource.forkPushed": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ tip: string({ pattern: TREE_SHA_PATTERN }) }),
       handler: (ctx: OwnerContext, args: AppSourceCalls["appSource.forkPushed"]["args"]) => forkPushed(ctx, args),
     },
   },
   views: {
     "appSource.fork": {
-      requireAccount: true,
       parse: empty(),
       read: (ctx) => forkPush(ctx.db),
     },

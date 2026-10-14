@@ -37,7 +37,6 @@ export const mediaAccessForAudience = (
   audience: ManagedCapabilityAudience | string,
 ): MediaAccess["stella"] => {
   const plan = toCapabilityAudience(audience as ManagedCapabilityAudience) ?? "free";
-  if (plan === "anonymous") return "sign_in";
   return CAPABILITIES.every((capability) => hasCapability(plan, capability)) ? "included" : "upgrade";
 };
 

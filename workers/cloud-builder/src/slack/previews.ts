@@ -73,7 +73,6 @@ const MAX_UPLOAD_BYTES = 95 * MB;
 const MAX_FILES = 20_000;
 const MAX_LIVE_PREVIEWS = 500;
 const QUOTA_BYTES: Record<ManagedModelAudience, number> = {
-  anonymous: 0,
   free: 250 * MB,
   go: 1024 * MB,
   pro: 5 * 1024 * MB,

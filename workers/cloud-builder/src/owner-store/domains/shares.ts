@@ -604,7 +604,6 @@ export const sharesDomain = {
   calls: {
     "shares.publish": {
       scope: "owner",
-      requireAccount: true,
       // JSON-escaped HTML runs larger than its byte cap.
       maxBodyBytes: SHARE_MAX_HTML_BYTES * 2,
       parse: object({
@@ -615,14 +614,12 @@ export const sharesDomain = {
     },
     "shares.save": {
       scope: "owner",
-      requireAccount: true,
       maxBodyBytes: SHARE_MAX_HTML_BYTES * 2,
       parse: saveArgs,
       handler: save,
     },
     "shares.setVisibility": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         slug: string({ min: 1, max: 128 }),
         visibility: literal("private", "public"),
@@ -631,19 +628,16 @@ export const sharesDomain = {
     },
     "shares.viewLink": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ slug: string({ min: 1, max: 128 }) }),
       handler: viewLink,
     },
     "shares.shareFile": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ path: string({ min: 1, max: 4_000 }) }),
       handler: shareFile,
     },
     "shares.revoke": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ slug: string({ min: 1, max: 128 }) }),
       handler: revoke,
     },

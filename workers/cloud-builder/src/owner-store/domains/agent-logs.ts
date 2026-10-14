@@ -432,7 +432,6 @@ export const agentLogsDomain = {
   calls: {
     "agentLogs.append": {
       scope: "owner",
-      requireAccount: true,
       maxBodyBytes: AGENT_LOG_APPEND_MAX_BODY_BYTES,
       parse: object({
         threadId: threadIdArg,
@@ -447,7 +446,6 @@ export const agentLogsDomain = {
     },
     "agentLogs.read": {
       scope: "owner",
-      requireAccount: true,
       parse: readParser,
       handler: read,
     },

@@ -675,19 +675,16 @@ export const mcpServersDomain = {
   calls: {
     "mcpServers.list": {
       scope: "owner",
-      requireAccount: true,
       parse: empty(),
       handler: (ctx) => ({ servers: listRecords(ctx.db) }),
     },
     "mcpServers.put": {
       scope: "owner",
-      requireAccount: true,
       parse: putParser as never,
       handler: putFromComputer,
     },
     "mcpServers.remove": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ id: idParser }),
       handler: (ctx, args) => {
         rateLimit(ctx, "mcpServers.remove");
@@ -696,7 +693,6 @@ export const mcpServersDomain = {
     },
     "mcpServers.call": {
       scope: "owner",
-      requireAccount: true,
       parse: callParser as never,
       handler: (ctx, args) => callServer(ctx, args.id, args.tool, callArgs(args.args)),
     },

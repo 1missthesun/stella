@@ -255,7 +255,7 @@ export const resolveCurrentDeviceId = (db: OwnerDbReader, deviceId: string): str
 };
 
 const requireAccountCaller = (caller: OwnerCaller | null): OwnerCaller => {
-  if (!caller || caller.isAnonymous) {
+  if (!caller) {
     throw new RpcError("FORBIDDEN", "Sign in with an account to use this.");
   }
   return caller;
@@ -1071,13 +1071,11 @@ export const devicesDomain = {
   calls: {
     "devices.identity": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ deviceId: optional(string({ max: 256 })) }),
       handler: (ctx: OwnerContext, args: DeviceCalls["devices.identity"]["args"]) => identity(ctx, args),
     },
     "devices.register": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         deviceId: deviceIdArg,
         devicePublicKey: string({ min: 1, max: 512 }),
@@ -1089,31 +1087,26 @@ export const devicesDomain = {
     },
     "devices.setRemoteExecution": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ deviceId: deviceIdArg, enabled: boolean() }),
       handler: (ctx: OwnerContext, args: DeviceCalls["devices.setRemoteExecution"]["args"]) => setRemoteExecution(ctx, args),
     },
     "devices.requestRemoteExecution": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ deviceId: deviceIdArg }),
       handler: (ctx: OwnerContext, args: DeviceCalls["devices.requestRemoteExecution"]["args"]) => requestRemoteExecution(ctx, args),
     },
     "devices.setBrainHome": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ deviceId: nullable(deviceIdArg) }),
       handler: (ctx: OwnerContext, args: DeviceCalls["devices.setBrainHome"]["args"]) => setBrainHome(ctx, args),
     },
     "devices.adoptSuccession": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ previousDeviceId: deviceIdArg, deviceId: deviceIdArg }),
       handler: (ctx: OwnerContext, args: DeviceCalls["devices.adoptSuccession"]["args"]) => adoptSuccession(ctx, args),
     },
     "phone.notifyActivity": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         kind: literal("started", "completed", "failed"),
         title: optional(string({ max: 400 })),

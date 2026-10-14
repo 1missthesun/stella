@@ -19,7 +19,7 @@ const MAX_BODY_BYTES = 64 * 1024;
 
 const mobileRoute = async (request: Request, env: Cloudflare.Env, url: URL): Promise<Response> => {
   if (request.method !== "GET" && request.method !== "POST") return fail(405, "Method not allowed");
-  const verified = await requireCaller(request, env, { allowAnonymous: false });
+  const verified = await requireCaller(request, env);
   if (!verified.ok) return failRpcError(verified.error);
   const body =
     request.method === "POST"

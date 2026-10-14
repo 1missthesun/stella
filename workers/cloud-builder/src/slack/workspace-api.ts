@@ -109,7 +109,7 @@ const ownerInternal = async (env: Cloudflare.Env, ownerId: string, name: string,
 };
 
 const audienceOf = async (env: Cloudflare.Env, caller: OwnerCaller): Promise<ManagedModelAudience> =>
-  (await ownerGateStub(env.OWNER_GATES, caller.ownerId).billingAccess({ isAnonymous: false })).audience;
+  (await ownerGateStub(env.OWNER_GATES, caller.ownerId).billingAccess()).audience;
 
 const readText = async (env: Cloudflare.Env, ownerId: string, path: string): Promise<string> => {
   try {
@@ -569,10 +569,7 @@ export const handleSlackWorkspaceApi = async (request: Request, env: Cloudflare.
   const isOne = pathname.startsWith(`${SLACK_WORKSPACES_PATH}/`);
   const isInstall = pathname === SLACK_INSTALL_START_PATH;
   if (!isList && !isOne && !isInstall) return null;
-  const verified = await requireCaller(request, env, {
-    allowAnonymous: false,
-    anonymousMessage: "Sign in to your Stella account to set up Stella Crew.",
-  });
+  const verified = await requireCaller(request, env);
   if (!verified.ok) return fail(rpcErrorStatus(verified.error.code), verified.error.message);
   const { caller } = verified;
   if (isList && request.method === "GET") return await list(env, caller);

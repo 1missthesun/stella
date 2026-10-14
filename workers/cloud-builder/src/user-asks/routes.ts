@@ -87,7 +87,7 @@ const userAskRoute = async (
   if (resolved.route === "POST reply") {
     return await replyRoute(request, env, resolved.askId);
   }
-  const verified = await requireCaller(request, env, { allowAnonymous: false });
+  const verified = await requireCaller(request, env);
   if (!verified.ok) {
     return failRpcError(verified.error, { code: verified.error.code });
   }

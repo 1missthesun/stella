@@ -607,14 +607,12 @@ export const catchUpsDomain = {
   calls: {
     "catchUps.request": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ conversationId: conversationIdArg }),
       handler: request,
     },
   },
   views: {
     "catchUps.list": {
-      requireAccount: true,
       parse: object({ conversationId: conversationIdArg }),
       read: (ctx, args) => ({ catchUps: listFor(ctx.db, args.conversationId) }),
     },

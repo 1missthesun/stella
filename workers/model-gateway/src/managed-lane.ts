@@ -14,7 +14,6 @@ import { ownerModeEnabled } from "./owner-mode.js";
 import {
   GATEWAY_MAX_OUTPUT_TOKENS_BY_AUDIENCE,
   GATEWAY_NETWORK_POLICY,
-  GATEWAY_SIGN_IN_REQUIRED_MESSAGE,
   GATEWAY_TRACE_HEADER,
   GATEWAY_UPSTREAM_IDLE_TIMEOUT_MS,
   GATEWAY_UPSTREAM_MAX_DURATION_MS,
@@ -79,7 +78,6 @@ import {
 } from "./owner-enforcement.js";
 import {
   agentTypeFrom,
-  clientIp,
   createUpstreamController,
   ipHashFrom,
   readJsonObject,
@@ -429,18 +427,15 @@ const reserveTierBudget = async (args: {
     }),
   );
   if (!reservation.ok) {
-    const anonymous = limitsAudience === "anonymous";
     throw new GatewayError(
-      anonymous ? 403 : 429,
-      anonymous ? "sign_in_required" : "tier_paused",
-      anonymous
-        ? GATEWAY_SIGN_IN_REQUIRED_MESSAGE
-        : "Managed model access is paused for this plan.",
+      429,
+      "tier_paused",
+      "Managed model access is paused for this plan.",
       quotaErrorOptions({
         scope: "tier",
         now: args.now(),
         resetAt: reservation.resetAt,
-        retryable: !anonymous,
+        retryable: true,
       }),
     );
   }
@@ -563,18 +558,6 @@ export const handleManagedRelay = async (args: {
 
   const limitsAudience = limitsAudienceFor(claims.audience);
   const networkClass = await classifyNetwork(request, env.ASN_POLICY);
-  if (
-    limitsAudience === "anonymous" &&
-    GATEWAY_NETWORK_POLICY.anonymousRefused.some(
-      (refused) => refused === networkClass,
-    )
-  ) {
-    throw new GatewayError(
-      403,
-      "sign_in_required",
-      GATEWAY_SIGN_IN_REQUIRED_MESSAGE,
-    );
-  }
   const networkCapShare =
     limitsAudience === "free" &&
     GATEWAY_NETWORK_POLICY.freeChallenged.some(
@@ -583,26 +566,10 @@ export const handleManagedRelay = async (args: {
       ? 0.5
       : 1;
   let ipHash: string | undefined;
-  if (limitsAudience === "anonymous" || limitsAudience === "free") {
+  if (limitsAudience === "free") {
     ipHash = await ipHashFrom(request);
   }
-  if (limitsAudience === "anonymous" && !probe) {
-    const edgeResetAt = deps.now() + 60_000;
-    const outcome = await env.ANON_IP_LIMITER.limit({ key: clientIp(request) });
-    if (!outcome.success) {
-      throw new GatewayError(
-        429,
-        "rate_limited",
-        "Too many anonymous requests from this network.",
-        quotaErrorOptions({
-          scope: "network",
-          now: deps.now(),
-          resetAt: edgeResetAt,
-        }),
-      );
-    }
-  }
-  if (ipHash && (limitsAudience === "anonymous" || limitsAudience === "free")) {
+  if (ipHash && limitsAudience === "free") {
     const networkGate = env.NETWORK_GATE.get(
       env.NETWORK_GATE.idFromName(ipHash),
     );
@@ -942,9 +909,6 @@ export const handleManagedRelay = async (args: {
         billable: true,
         networkClass,
         ...(deviceKeyHash ? { deviceKeyHash } : {}),
-        ...(limitsAudience === "anonymous" && ipHash
-          ? { anonymous: { ipHash } }
-          : {}),
       };
       deps.waitUntil(
         env.USAGE_QUEUE.send(event).catch((error: unknown) => {

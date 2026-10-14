@@ -122,10 +122,7 @@ const callOwner = async <T>(env: VoiceEnv, ownerId: string, name: string, args: 
   await voiceInternal<T>(env, ownerId, await ownerGeneration(env, ownerId), name, args);
 
 const authenticate = async (request: Request, env: VoiceEnv): Promise<OwnerCaller> => {
-  const verified = await requireCaller(request, env, {
-    allowAnonymous: false,
-    anonymousMessage: "Sign in to Stella to use voice.",
-  });
+  const verified = await requireCaller(request, env);
   if (!verified.ok) throw verified.error;
   return verified.caller;
 };

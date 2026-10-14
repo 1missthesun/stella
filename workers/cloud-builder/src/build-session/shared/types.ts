@@ -265,7 +265,6 @@ export type ConversationCaller = {
   sessionId: string;
   expiresAtMs: number;
   issuer: string;
-  isAnonymous: boolean;
   identityLevel: VerifiedToken["identityLevel"];
   issuedAtMs: number;
 };
@@ -282,11 +281,10 @@ export type ConversationCaller = {
  */
 export type DispatchCaller =
   | { kind: "service"; ownerId: string; ownerGeneration: string }
-  | { kind: "user"; ownerId: string; isAnonymous: boolean }
+  | { kind: "user"; ownerId: string }
   | {
       kind: "mobile";
       ownerId: string;
-      isAnonymous: boolean;
       mobileDeviceId: string;
       desktopDeviceId: string;
     };

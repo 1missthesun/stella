@@ -63,7 +63,6 @@ import {
 import {
   abuseState,
   admitSession,
-  chargeAnonymousNetworks,
   enforcementForSnapshot,
   readEnforcement,
   recordGatewayUsageRisk,
@@ -545,7 +544,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   /**
    * A session capability for a client runtime, asked for by the model
    * gateway. The abuse domain rules on admission (step-up, sybil pressure,
-   * suspension, the anonymous request chunk); this ledger reserves the
+   * suspension); this ledger reserves the
    * budget, and this Worker signs the capability.
    */
   async issueSessionCapability(
@@ -563,15 +562,14 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       admitSession(ctx, { ...request, paying, snapshot }),
     );
     if (!admission.ok) return admission;
-    const { ownerGeneration, isAnonymous, identityLevel, maxRequests } =
-      admission.body;
+    const { ownerGeneration, identityLevel } = admission.body;
     const jti = crypto.randomUUID();
     const expiresAt =
       (Math.floor(now / 1000) +
         Math.ceil(GATEWAY_SESSION_CAPABILITY_TTL_MS / 1000)) *
       1000;
     const grant = await this.billingWrite((ctx) => {
-      recordBillingIdentity(ctx, { isAnonymous, identityLevel });
+      recordBillingIdentity(ctx, { identityLevel });
       return reserveSessionGrant(ctx, { jti, expiresAt });
     });
     const signed = await signCapability(
@@ -584,7 +582,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         kind: "session",
         audience: grant.audience,
         budgetMicroCents: grant.budgetMicroCents,
-        ...(maxRequests !== undefined ? { maxRequests } : {}),
         ...(grant.usageLimit ? { usageLimit: grant.usageLimit.reason } : {}),
       },
       await capabilitySigningKey(this.env),
@@ -598,7 +595,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         audience: grant.audience,
         budgetMicroCents: grant.budgetMicroCents,
         identityLevel: grant.identityLevel,
-        ...(maxRequests !== undefined ? { maxRequests } : {}),
       },
     };
   }
@@ -607,7 +603,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   async applyGatewayUsage(
     events: GatewayUsageEvent[],
   ): Promise<UsageBatchResult> {
-    const result = await this.billingWrite((ctx) => {
+    return await this.billingWrite((ctx) => {
       const settled = applyGatewayUsage(ctx, events);
       const accepted = events.filter((event) =>
         settled.accepted.includes(event.requestId),
@@ -615,19 +611,6 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       recordGatewayUsageRisk(ctx, accepted, billingAccess(ctx).identityLevel);
       return settled;
     });
-    const accepted = events.filter((event) =>
-      result.accepted.includes(event.requestId),
-    );
-    await chargeAnonymousNetworks(
-      this.env as Cloudflare.Env,
-      accepted,
-      Date.now(),
-    ).catch((error: unknown) => {
-      log("error", "anon_network_allowance_failed", {
-        message: error instanceof Error ? error.message : String(error),
-      });
-    });
-    return result;
   }
 
   /** The owner's enforcement, for the model gateway's bootstrap read (`BillingControl`). */
@@ -653,14 +636,8 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   }
 
   /** What this owner may spend now. */
-  async billingAccess(identity?: {
-    isAnonymous: boolean;
-  }): Promise<BillingAccess> {
-    if (!identity) return billingAccess(this.ownerStore().context(null));
-    return await this.billingWrite((ctx) => {
-      recordBillingIdentity(ctx, identity);
-      return billingAccess(ctx);
-    });
+  async billingAccess(): Promise<BillingAccess> {
+    return billingAccess(this.ownerStore().context(null));
   }
 
   /** Admin and test accounts: set the plan outside Stripe. */
@@ -879,13 +856,13 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         ownerId: this.ownerId(),
         ownerGeneration: state.generation,
         writable: state.writable && enforcement?.status !== "suspended",
-        isAnonymous: state.isAnonymous,
+        isAnonymous: false,
         identityLevel: state.identityLevel,
         ...(enforcement ? { enforcement } : {}),
         plan: "free",
         cloudSandbox: { enabled: false },
         allowance: {
-          audience: state.isAnonymous ? "anonymous" : "free",
+          audience: "free",
           budgetMicroCents: 0,
         },
         ...snapshotDevices(ctx.db),
@@ -896,10 +873,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       };
       let billing: ReturnType<typeof turnAllowance>;
       try {
-        recordBillingIdentity(ctx, {
-          isAnonymous: state.isAnonymous,
-          identityLevel: state.identityLevel,
-        });
+        recordBillingIdentity(ctx, { identityLevel: state.identityLevel });
         billing = turnAllowance(ctx);
       } catch (error) {
         if (!(error instanceof BillingConfigError)) throw error;
@@ -925,10 +899,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
   }
 
   /** Record the identity a Worker-verified token claims, for the snapshot. */
-  async noteIdentity(input: {
-    isAnonymous: boolean;
-    identityLevel?: IdentityLevel;
-  }): Promise<void> {
+  async noteIdentity(input: { identityLevel?: IdentityLevel }): Promise<void> {
     const store = this.ownerStore();
     try {
       noteCallerIdentity(store.context(null).db, input);

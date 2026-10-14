@@ -872,7 +872,6 @@ export const providersDomain = {
   calls: {
     "providers.setApiKey": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ provider: string({ min: 1, max: 64 }), apiKey: string({ min: 1, max: 4_096 }) }),
       handler: setApiKey,
     },
@@ -883,7 +882,6 @@ export const providersDomain = {
     },
     "providers.startOAuth": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ provider: string({ min: 1, max: 64 }) }),
       handler: startOAuth,
     },

@@ -50,7 +50,7 @@ const authenticate = async (
   request: Request,
   env: RouteEnv,
 ): Promise<{ ok: true; caller: OwnerCaller } | { ok: false; response: Response }> => {
-  const verified = await requireCaller(request, env, { allowAnonymous: true });
+  const verified = await requireCaller(request, env);
   if (verified.ok) return verified;
   if (verified.error.code !== "UNAUTHENTICATED") {
     return { ok: false, response: fail(rpcErrorStatus(verified.error.code), verified.error.message) };

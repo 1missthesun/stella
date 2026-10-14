@@ -46,7 +46,7 @@ import { json, literal, number, object, optional, string, type Parser } from "..
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
-import { billingAccess, recordBillingIdentity, recordUsage } from "./billing.js";
+import { billingAccess, recordUsage } from "./billing.js";
 
 export const MEDIA_DOCS_URL = "https://stella.sh/docs/media";
 export const MEDIA_POLL_JOB = "media.poll";
@@ -467,12 +467,7 @@ const completeJob = async (ctx: OwnerContext, row: JobRow, payload: unknown): Pr
 // ── Generating ───────────────────────────────────────────────────────────
 
 const admit = (ctx: OwnerContext, model: MediaModel, input: Record<string, unknown>): void => {
-  // A signed-in caller's identity is fresher than the ledger's last note of it.
-  if (ctx.caller) recordBillingIdentity(ctx, { isAnonymous: ctx.caller.isAnonymous });
   const access = billingAccess(ctx);
-  if (access.isAnonymous) {
-    throw new RpcError("FORBIDDEN", "Sign in to Stella to use media generation.", { reason: "account_required" });
-  }
   if (model.plan) {
     const audience = toCapabilityAudience(access.audience) ?? "free";
     if (!hasCapability(audience, model.plan)) {
@@ -828,13 +823,11 @@ export const mediaDomain = {
   calls: {
     "media.generate": {
       scope: "owner",
-      requireAccount: true,
       parse: generateArgs,
       handler: (ctx: OwnerContext, args: MediaGenerateRequest) => startJob(ctx, args),
     },
     "media.cancel": {
       scope: "owner",
-      requireAccount: true,
       parse: lookupArgs,
       handler: cancelJob,
     },

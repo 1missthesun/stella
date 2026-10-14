@@ -7,7 +7,6 @@ import { billingControl, billingGatewayConfig } from "./billing-control.js";
 import {
   GATEWAY_HEALTH_PATH,
   GATEWAY_MODEL_REVISION_HEADER,
-  GATEWAY_NETWORK_POLICY,
   GATEWAY_SIGN_IN_REQUIRED_MESSAGE,
   GATEWAY_PREPARE_PATH,
   GATEWAY_RELAY_PREFIX,
@@ -225,18 +224,6 @@ const handleSessionCapability = async (
     );
   }
   const networkClass = await classifyNetwork(request, env.ASN_POLICY);
-  if (
-    verified.token.isAnonymous &&
-    GATEWAY_NETWORK_POLICY.anonymousRefused.some(
-      (refused) => refused === networkClass,
-    )
-  ) {
-    throw new GatewayError(
-      403,
-      "sign_in_required",
-      GATEWAY_SIGN_IN_REQUIRED_MESSAGE,
-    );
-  }
   const body = await readJsonObject(request, { allowEmpty: true });
   const deviceKey = parseDeviceKeyProof(body.deviceKey);
   if (!deviceKey) {
@@ -281,7 +268,7 @@ const handleSessionCapability = async (
       "This account is suspended from model access.",
     );
   }
-  const audience = verified.token.isAnonymous ? "anonymous" : "free";
+  const audience = "free";
   const ownerGate = env.OWNER_RELAY_GATE.get(
     env.OWNER_RELAY_GATE.idFromName(ownerId),
   );
@@ -308,32 +295,8 @@ const handleSessionCapability = async (
   }
   // Only an exchange that issues a capability counts against the allowances.
   let issuedAudience: string | undefined;
-  let releaseNetworkMint: (() => Promise<void>) | undefined;
   try {
     const ipHash = await ipHashFrom(request);
-    if (verified.token.isAnonymous) {
-      const networkGate = env.NETWORK_GATE.get(
-        env.NETWORK_GATE.idFromName(ipHash),
-      );
-      const networkAdmission = await networkGate.admitMint();
-      if (networkAdmission.ok) {
-        const { admissionId } = networkAdmission;
-        releaseNetworkMint = () => networkGate.releaseMint(admissionId);
-      } else {
-        throw new GatewayError(
-          429,
-          "rate_limited",
-          networkAdmission.refused === "refused_attempts"
-            ? "Too many refused capability exchanges from this network. Wait a while before trying again."
-            : "Too many capability exchanges from this network.",
-          quotaErrorOptions({
-            scope: "network",
-            now: deps.now(),
-            resetAt: networkAdmission.resetAt,
-          }),
-        );
-      }
-    }
     const result = sessionIssuer.preview
       ? await issuePreviewSessionCapability({
           issuer: sessionIssuer.issuer,
@@ -351,7 +314,6 @@ const handleSessionCapability = async (
         })
       : await billingControl(env).issueSessionCapability({
           ownerId,
-          isAnonymous: verified.token.isAnonymous,
           ipHash,
           networkClass,
           deviceKeyHash: deviceProof.deviceKeyHash,
@@ -409,7 +371,6 @@ const handleSessionCapability = async (
         ...(issuedAudience !== undefined ? { issuedAudience } : {}),
       })
       .catch(() => undefined);
-    if (issuedAudience === undefined) await releaseNetworkMint?.().catch(() => undefined);
   }
 };
 

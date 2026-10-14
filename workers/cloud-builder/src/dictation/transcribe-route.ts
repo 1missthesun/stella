@@ -126,7 +126,7 @@ export const handleDictationTranscribeRoute = async (
   }
   if (request.method !== "POST") return fail(405, "Method not allowed.");
 
-  const verified = await requireCaller(request, env, { allowAnonymous: true });
+  const verified = await requireCaller(request, env);
   if (!verified.ok) return failRpcError(verified.error);
   const key = apiKey(env);
   if (!key) return fail(503, "Dictation isn't set up on this Stella.", { code: "dictation_unavailable" });

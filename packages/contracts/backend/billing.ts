@@ -45,6 +45,7 @@ export type BillingUsage = {
 
 export type BillingStatus = {
   authenticated: boolean;
+  /** Always false: anonymous sign-in is gone. Kept for older clients. */
   isAnonymous: boolean;
   identityLevel: IdentityLevel;
   plan: BillingPlan;

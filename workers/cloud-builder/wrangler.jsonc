@@ -346,7 +346,7 @@
       "deleted_classes": ["SandboxSmall", "AppBuildSandbox"],
     },
     {
-      // Owner transfer is gone: Better Auth upgrades anonymous users in place.
+      // Owner transfer is gone.
       "tag": "v11",
       "deleted_classes": ["OwnerTransferCoordinator"],
     },
@@ -736,7 +736,7 @@
           "deleted_classes": ["SandboxSmall", "AppBuildSandbox"],
         },
         {
-          // Owner transfer is gone: Better Auth upgrades anonymous users in place.
+          // Owner transfer is gone.
           "tag": "v11",
           "deleted_classes": ["OwnerTransferCoordinator"],
         },
@@ -994,7 +994,7 @@
           "deleted_classes": ["SandboxSmall", "AppBuildSandbox"],
         },
         {
-          // Owner transfer is gone: Better Auth upgrades anonymous users in place.
+          // Owner transfer is gone.
           "tag": "v11",
           "deleted_classes": ["OwnerTransferCoordinator"],
         },

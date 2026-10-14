@@ -411,9 +411,7 @@ const settingCommand = async (
     return "Changing Stella's engine, model or effort from Slack is turned off for this workspace. Its owner can turn it on at stella.sh/crew.";
   }
   const audience = (
-    await ownerGateStub(env.OWNER_GATES, installation.ownerId!).billingAccess({
-      isAnonymous: false,
-    })
+    await ownerGateStub(env.OWNER_GATES, installation.ownerId!).billingAccess()
   ).audience;
   const options = workspaceOptions(audience);
   if (verb === "engine") {

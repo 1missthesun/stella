@@ -16,7 +16,7 @@ import { ownerGateStub } from "../rpc-release.js";
  * `GET /api/stella/models`: the public model catalog for Stella runtimes.
  * Which `stella/...` models the caller's audience may pick, the per-agent
  * defaults, each model's price, and where the model gateway lives. The
- * bearer is optional: without one the audience is anonymous; with one it is
+ * bearer is optional: without one the audience is Free; with one it is
  * the plan the owner's billing says. Clients revalidate with `If-None-Match`.
  */
 
@@ -45,13 +45,12 @@ const audienceFor = async (
   env: Cloudflare.Env,
 ): Promise<{ ok: true; audience: ManagedModelAudience } | { ok: false; response: Response }> => {
   const token = bearerCredential(request.headers.get("authorization"));
-  if (!token) return { ok: true, audience: "anonymous" };
+  if (!token) return { ok: true, audience: "free" };
   const verified = await verifyCaller(env, token);
   if (!verified.ok) {
     return { ok: false, response: reply(rpcErrorStatus(verified.error.code), { error: verified.error.message }) };
   }
-  if (verified.caller.isAnonymous) return { ok: true, audience: "anonymous" };
-  const access = await ownerGateStub(env.OWNER_GATES, verified.caller.ownerId).billingAccess({ isAnonymous: false });
+  const access = await ownerGateStub(env.OWNER_GATES, verified.caller.ownerId).billingAccess();
   return { ok: true, audience: access.audience };
 };
 

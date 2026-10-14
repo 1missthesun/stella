@@ -285,7 +285,7 @@ const openSession = async (
 ): Promise<VoiceSession> => {
   enforceOwnerRateLimit(ctx.db, ctx.now, "voice.session", VOICE_SESSION_RATE, "Too many voice sessions. Try again in a minute.");
   const access = billingAccess(ctx);
-  if (access.isAnonymous || access.plan !== "pro") {
+  if (access.plan !== "pro") {
     throw new RpcError("FORBIDDEN", "Realtime voice is part of Stella Pro.", { reason: "capability_required" });
   }
   if (!access.allowed || (access.remainingMicroCents !== null && access.remainingMicroCents < SESSION_CHARGE_CAP)) {
@@ -671,7 +671,6 @@ export const voiceDomain = {
   calls: {
     "voice.session": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         instructions: string({ min: 1, max: VOICE_INSTRUCTIONS_MAX_CHARS }),
         history: optional(array(historyArg, { max: VOICE_HISTORY_MAX_MESSAGES })),
@@ -682,7 +681,6 @@ export const voiceDomain = {
     },
     "voice.lease": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         leaseId: string({ min: 1, max: 200 }),
         event: literal("heartbeat", "ended", "expired", "lost"),
@@ -691,7 +689,6 @@ export const voiceDomain = {
     },
     "tts.prepare": {
       scope: "owner",
-      requireAccount: true,
       parse: object({ text: string({ min: 1, max: 100_000 }), voice: optional(string({ max: 100 })) }),
       handler: prepareTts,
     },

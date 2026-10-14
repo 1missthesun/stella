@@ -706,7 +706,6 @@ export const agentReportsDomain = {
   calls: {
     "agentReports.note": {
       scope: "owner",
-      requireAccount: true,
       parse: noteParser,
       handler: (ctx, args) => {
         queueStellaNote(ctx, args);
@@ -715,7 +714,6 @@ export const agentReportsDomain = {
     },
     "agentReports.acknowledge": {
       scope: "owner",
-      requireAccount: true,
       parse: object({
         deviceId: id(),
         ownerGeneration: id(512),
@@ -726,7 +724,6 @@ export const agentReportsDomain = {
   },
   views: {
     "agentReports.forDevice": {
-      requireAccount: true,
       parse: object({ deviceId: id(), ownerGeneration: id(512) }),
       read: (ctx, args) => deviceReports(ctx.db, args),
     },

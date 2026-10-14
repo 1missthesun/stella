@@ -20,6 +20,7 @@ export type OwnerIdentity = {
   ownerId: string;
   /** Changes when the owner resets or deletes their data; fences stale work. */
   ownerGeneration: string;
+  /** Always false: anonymous sign-in is gone. Kept for older clients. */
   isAnonymous: boolean;
 };
 

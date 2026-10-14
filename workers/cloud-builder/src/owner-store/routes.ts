@@ -24,7 +24,6 @@ import {
 } from "@stella/contracts/backend/protocol";
 import { stripStellaHeaders } from "../conversation-hub.js";
 import {
-  HEADER_ANONYMOUS,
   HEADER_IDENTITY_LEVEL,
   HEADER_OWNER,
   HEADER_SESSION,
@@ -52,9 +51,6 @@ const appendClaudeSessionChunk = async (
   caller: OwnerCaller,
   args: unknown,
 ): Promise<RpcResponse> => {
-  if (caller.isAnonymous) {
-    throw new RpcError("FORBIDDEN", "Sign in with an account to use this.");
-  }
   const staged = await stageClaudeSessionChunk(env, caller.ownerId, args);
   const response = (await ownerGateStub(env.OWNER_GATES, caller.ownerId).claudeSessionCommit({
     staged,
@@ -103,7 +99,7 @@ export const handleRpc = async (
   if (!def) {
     return rpcJson({ ok: false, error: toBackendError(new RpcError("NOT_FOUND", `Unknown function ${name}.`)) });
   }
-  const verified = await requireCaller(request, env, { allowAnonymous: true });
+  const verified = await requireCaller(request, env);
   if (!verified.ok) return rpcJson({ ok: false, error: toBackendError(verified.error) });
   const { caller } = verified;
   let args: unknown;
@@ -124,9 +120,6 @@ export const handleRpc = async (
     return rpcJson(response);
   }
   try {
-    if (def.requireAccount && caller.isAnonymous) {
-      throw new RpcError("FORBIDDEN", "Sign in with an account to use this.");
-    }
     const value = await def.handler(
       { caller, env: env as unknown as Cloudflare.Env, now: Date.now() },
       def.parse(args) as never,
@@ -225,7 +218,6 @@ export const handleLive = async (request: Request, env: RouteEnv): Promise<Respo
   forwarded.headers.set(HEADER_SUBJECT, caller.subject);
   forwarded.headers.set(HEADER_SESSION, caller.sessionId);
   forwarded.headers.set(HEADER_TOKEN_EXP, String(caller.expiresAtMs));
-  forwarded.headers.set(HEADER_ANONYMOUS, caller.isAnonymous ? "1" : "0");
   if (caller.identityLevel !== undefined) forwarded.headers.set(HEADER_IDENTITY_LEVEL, String(caller.identityLevel));
   if (caller.issuedAtMs !== undefined) forwarded.headers.set(HEADER_TOKEN_IAT, String(caller.issuedAtMs));
   try {

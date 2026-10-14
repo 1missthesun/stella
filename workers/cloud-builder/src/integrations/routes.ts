@@ -92,7 +92,7 @@ const authenticate = async (
   request: Request,
   env: RouteEnv,
 ): Promise<{ ok: true; caller: OwnerCaller } | { ok: false; response: Response }> => {
-  const verified = await requireCaller(request, env, { allowAnonymous: false, anonymousMessage: "sign_in_required" });
+  const verified = await requireCaller(request, env);
   return verified.ok ? verified : { ok: false, response: failRpcError(verified.error) };
 };
 

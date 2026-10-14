@@ -2,9 +2,8 @@
  * Abuse admission and enforcement for one owner.
  *
  * - **Admission:** `admitSession` rules on a model-gateway session mint
- *   before billing reserves its budget: enforcement, step-up (Turnstile),
- *   sybil pressure from D1 sightings, and the anonymous trial's request
- *   chunk from D1's `anon_allowance`.
+ *   before billing reserves its budget: enforcement, step-up (Turnstile)
+ *   and sybil pressure from D1 sightings.
  * - **Enforcement:** `abuse_state` holds the owner's status (ok, challenged,
  *   throttled, suspended) with an optional expiry. Every change is pushed to
  *   the model gateway (`ModelGatewayControl.applyOwnerEnforcement`) by the
@@ -20,7 +19,6 @@
  */
 
 import {
-  GATEWAY_ANONYMOUS_REQUEST_CHUNK,
   GATEWAY_NETWORK_POLICY,
   type GatewayErrorCode,
   type IdentityLevel,
@@ -40,7 +38,6 @@ import {
 import type { OwnerSnapshot } from "@stella/contracts/turn-plane/owner-snapshot";
 import { ownerModeEnabled } from "../../selfhost/owner-mode.js";
 import { dollarsToMicroCents } from "@stella/model-catalog/pricing";
-import { billingConfig } from "../../billing/plans.js";
 import { log } from "../../build-session/shared/keys.js";
 import { RpcError } from "../errors.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain, OwnerPurgeMode } from "../registry.js";
@@ -56,12 +53,9 @@ const RISK_ENFORCEMENT_MS = DAY_MS;
 
 const SYBIL_DEVICE_WINDOW_MS = 30 * DAY_MS;
 const SYBIL_DEVICE_CHALLENGE_COUNT = 2;
-const SYBIL_ANON_IP_CHALLENGE_COUNT = 5;
-const SYBIL_ANON_IP_SIGN_IN_COUNT = 20;
 const SYBIL_HOSTING_CHALLENGE_COUNT = 5;
 export const SYBIL_SIGHTING_RETENTION_MS = SYBIL_DEVICE_WINDOW_MS;
 
-export const ANON_ALLOWANCE_WINDOW_MS = 30 * DAY_MS;
 /** Admin top-list rows for owners back at `ok` are dropped after this. */
 export const OWNER_RISK_RETENTION_MS = 2 * DAY_MS;
 
@@ -384,7 +378,6 @@ export const recordGatewayUsageRisk = (
     delta.chargedMicroCents += count(event.chargedMicroCents);
     if (event.networkClass === "hosting") delta.hostingRequests += 1;
     if (event.outcome === "failed") delta.failedRequests += 1;
-    if (event.anonymous?.ipHash) delta.ipHashes.push(event.anonymous.ipHash);
     if (event.conversationId) delta.conversationIds.push(event.conversationId);
   }
   recordRiskSignals(ctx, delta, identityLevel);
@@ -427,14 +420,13 @@ export const abuseState = (ctx: { db: OwnerDbReader; now: number }) => ({
 
 type SybilPressure =
   | { action: "ok" }
-  | { action: "challenge"; reason: "device_key" | "anonymous_ip" | "hosting_network" }
-  | { action: "sign_in_required"; reason: "anonymous_ip" };
+  | { action: "challenge"; reason: "device_key" | "hosting_network" };
 
-type SybilKind = "device" | "anon_ip" | "hosting_ip";
+type SybilKind = "device" | "hosting_ip";
 
 /**
  * Distinct owners behind this device key or network, counting this owner.
- * Only identity levels 0-1 are checked (and recorded).
+ * Only identity level 1 is checked (and recorded).
  */
 const evaluateSybilPressure = async (
   database: D1Database,
@@ -455,10 +447,7 @@ const evaluateSybilPressure = async (
            WHERE kind = ? AND key_hash = ? AND owner_id <> ? AND last_seen_at >= ? LIMIT ?)`,
       )
       .bind(kind, key, input.ownerId, input.now - windowMs, limit);
-  const checks: Array<{ check: "anon_ip" | "device" | "hosting"; statement: D1PreparedStatement }> = [];
-  if (input.identityLevel === 0 && input.ipHash) {
-    checks.push({ check: "anon_ip", statement: query("anon_ip", input.ipHash, DAY_MS, SYBIL_ANON_IP_SIGN_IN_COUNT) });
-  }
+  const checks: Array<{ check: "device" | "hosting"; statement: D1PreparedStatement }> = [];
   checks.push({
     check: "device",
     statement: query("device", input.deviceKeyHash, SYBIL_DEVICE_WINDOW_MS, SYBIL_DEVICE_CHALLENGE_COUNT),
@@ -473,9 +462,6 @@ const evaluateSybilPressure = async (
   const owners = new Map(
     checks.map((entry, index) => [entry.check, Number(results[index]?.results[0]?.n ?? 0) + 1]),
   );
-  const anonIp = owners.get("anon_ip") ?? 0;
-  if (anonIp >= SYBIL_ANON_IP_SIGN_IN_COUNT) return { action: "sign_in_required", reason: "anonymous_ip" };
-  if (anonIp >= SYBIL_ANON_IP_CHALLENGE_COUNT) return { action: "challenge", reason: "anonymous_ip" };
   if ((owners.get("device") ?? 0) >= SYBIL_DEVICE_CHALLENGE_COUNT) return { action: "challenge", reason: "device_key" };
   if ((owners.get("hosting") ?? 0) >= SYBIL_HOSTING_CHALLENGE_COUNT) {
     return { action: "challenge", reason: "hosting_network" };
@@ -496,79 +482,8 @@ const recordSightings = async (
       )
       .bind(kind, key, input.ownerId, input.now);
   const statements = [upsert("device", input.deviceKeyHash)];
-  if (input.identityLevel === 0 && input.ipHash) statements.push(upsert("anon_ip", input.ipHash));
   if (input.networkClass === "hosting" && input.ipHash) statements.push(upsert("hosting_ip", input.ipHash));
   await database.batch(statements);
-};
-
-const ownerBucket = (ownerId: string) => `owner:${ownerId}`;
-const networkBucket = (ipHash: string) => `ip:${ipHash}`;
-
-/**
- * Reserve up to one chunk of anonymous requests from the owner's bucket,
- * capped by what the network has left. One atomic upsert: it adds `cap` only
- * while the bucket is under its ceiling (or restarts a stale window), so the
- * grant is `cap` less whatever it overshot the ceiling by.
- */
-const reserveAnonymousRequests = async (
-  database: D1Database,
-  input: { ownerId: string; ipHash?: string; maxPerOwner: number; maxPerIp: number; now: number },
-): Promise<number> => {
-  const windowFloor = input.now - ANON_ALLOWANCE_WINDOW_MS;
-  let networkRemaining = Number.POSITIVE_INFINITY;
-  if (input.ipHash) {
-    const row = await database
-      .prepare("SELECT window_start, request_count FROM anon_allowance WHERE bucket = ?")
-      .bind(networkBucket(input.ipHash))
-      .first<{ window_start: number; request_count: number }>();
-    networkRemaining =
-      row && row.window_start > windowFloor ? Math.max(0, input.maxPerIp - row.request_count) : input.maxPerIp;
-  }
-  const cap = Math.max(0, Math.min(GATEWAY_ANONYMOUS_REQUEST_CHUNK, networkRemaining));
-  if (cap === 0) return 0;
-  const row = await database
-    .prepare(
-      `INSERT INTO anon_allowance (bucket, window_start, request_count) VALUES (?1, ?2, ?3)
-       ON CONFLICT(bucket) DO UPDATE SET
-         window_start = CASE WHEN anon_allowance.window_start <= ?4 THEN excluded.window_start
-                             ELSE anon_allowance.window_start END,
-         request_count = CASE WHEN anon_allowance.window_start <= ?4 THEN excluded.request_count
-                              ELSE anon_allowance.request_count + excluded.request_count END
-       WHERE anon_allowance.window_start <= ?4 OR anon_allowance.request_count < ?5
-       RETURNING request_count`,
-    )
-    .bind(ownerBucket(input.ownerId), input.now, cap, windowFloor, input.maxPerOwner)
-    .first<{ request_count: number }>();
-  if (!row) return 0;
-  return Math.max(0, cap - Math.max(0, row.request_count - input.maxPerOwner));
-};
-
-/** Anonymous requests also count against their network's bucket, as they settle. */
-export const chargeAnonymousNetworks = async (env: Cloudflare.Env, events: GatewayUsageEvent[], now: number) => {
-  const counts = new Map<string, number>();
-  for (const event of events) {
-    const ipHash = event.anonymous?.ipHash?.trim();
-    if (!ipHash || event.audience !== "anonymous" || !event.billable || event.outcome === "failed") continue;
-    counts.set(ipHash, (counts.get(ipHash) ?? 0) + 1);
-  }
-  if (counts.size === 0) return;
-  const database = env.DB;
-  if (!database) throw new Error("The DB binding is missing.");
-  const windowFloor = now - ANON_ALLOWANCE_WINDOW_MS;
-  await database.batch(
-    [...counts].map(([ipHash, requests]) =>
-      database
-        .prepare(
-          `INSERT INTO anon_allowance (bucket, window_start, request_count) VALUES (?1, ?2, ?3)
-           ON CONFLICT(bucket) DO UPDATE SET
-             window_start = CASE WHEN anon_allowance.window_start <= ?4 THEN excluded.window_start
-                                 ELSE anon_allowance.window_start END,
-             request_count = CASE WHEN anon_allowance.window_start <= ?4 THEN excluded.request_count
-                                  ELSE anon_allowance.request_count + excluded.request_count END`,
-        )
-        .bind(networkBucket(ipHash), now, requests, windowFloor),
-    ),
-  );
 };
 
 let loggedTurnstileOff = false;
@@ -619,7 +534,7 @@ export type SessionAdmissionInput = SessionCapabilityRequest & {
 
 /**
  * May this owner, device and network have a session capability? Rules on
- * enforcement, step-up, sybil pressure and the anonymous request chunk, and
+ * enforcement, step-up and sybil pressure, and
  * records the mint's sightings and risk signals.
  */
 export const admitSession = async (
@@ -630,20 +545,11 @@ export const admitSession = async (
   const enforcement = readEnforcement(ctx).enforcement;
   if (enforcement.status === "suspended") return refuse("owner_suspended", 403);
   if (!snapshot.writable) return refuse(null, 404);
-  const isAnonymous = snapshot.isAnonymous;
-  const identityLevel: IdentityLevel = isAnonymous
-    ? 0
-    : input.paying
-      ? 3
-      : (Math.min(2, Math.max(1, snapshot.identityLevel)) as IdentityLevel);
-  if (ownerModeEnabled(ctx.env) && !isAnonymous) {
-    return {
-      ok: true,
-      body: { ownerGeneration: snapshot.ownerGeneration, isAnonymous, identityLevel: 3 },
-    };
-  }
-  if (isAnonymous && inClass(GATEWAY_NETWORK_POLICY.anonymousRefused, input.networkClass)) {
-    return refuse("sign_in_required", 403);
+  const identityLevel: IdentityLevel = input.paying
+    ? 3
+    : (Math.min(2, Math.max(1, snapshot.identityLevel)) as IdentityLevel);
+  if (ownerModeEnabled(ctx.env)) {
+    return { ok: true, body: { ownerGeneration: snapshot.ownerGeneration, identityLevel: 3 } };
   }
   const database = ctx.env.DB;
   if (!database) {
@@ -660,11 +566,6 @@ export const admitSession = async (
     now,
   };
   const sybil = await evaluateSybilPressure(database, sighting);
-  if (sybil.action === "sign_in_required") {
-    recordRiskSignals(ctx, { sybilFlags: 1 }, identityLevel);
-    log("info", "abuse_admission_refused", { ownerId: ctx.ownerId, code: "sign_in_required", reason: sybil.reason });
-    return refuse("sign_in_required", 403);
-  }
   const secret = turnstileSecret(ctx.env);
   if (!secret && !loggedTurnstileOff) {
     loggedTurnstileOff = true;
@@ -672,7 +573,7 @@ export const admitSession = async (
   }
   const challengeRequired =
     enforcement.status === "challenged" ||
-    (!isAnonymous && identityLevel < 3 && inClass(GATEWAY_NETWORK_POLICY.freeChallenged, input.networkClass)) ||
+    (identityLevel < 3 && inClass(GATEWAY_NETWORK_POLICY.freeChallenged, input.networkClass)) ||
     sybil.action === "challenge";
   if (secret && challengeRequired && !(await verifyTurnstile(secret, input.turnstileToken))) {
     if (sybil.action !== "ok") recordRiskSignals(ctx, { sybilFlags: 1 }, identityLevel);
@@ -685,36 +586,12 @@ export const admitSession = async (
   }
   await recordSightings(database, sighting);
   recordRiskSignals(ctx, { mints: 1, sybilFlags: sybil.action !== "ok" ? 1 : 0 }, identityLevel);
-  let maxRequests: number | undefined;
-  if (isAnonymous) {
-    const config = billingConfig(ctx.env);
-    maxRequests = await reserveAnonymousRequests(database, {
-      ownerId: ctx.ownerId,
-      ...(input.ipHash ? { ipHash: input.ipHash } : {}),
-      maxPerOwner: config.anonymousMaxRequests,
-      maxPerIp: config.anonymousMaxRequestsPerIp,
-      now,
-    });
-    if (maxRequests === 0) {
-      log("info", "abuse_admission_refused", { ownerId: ctx.ownerId, code: "sign_in_required", reason: "anonymous_allowance" });
-      return refuse("sign_in_required", 403);
-    }
-  }
   log("info", "abuse_admission", {
     ownerId: ctx.ownerId,
     identityLevel,
     sybil: sybil.action === "ok" ? "ok" : sybil.reason,
-    ...(maxRequests !== undefined ? { maxRequests } : {}),
   });
-  return {
-    ok: true,
-    body: {
-      ownerGeneration: snapshot.ownerGeneration,
-      isAnonymous,
-      identityLevel,
-      ...(maxRequests !== undefined ? { maxRequests } : {}),
-    },
-  };
+  return { ok: true, body: { ownerGeneration: snapshot.ownerGeneration, identityLevel } };
 };
 
 // ── Sweeps and purge ───────────────────────────────────────────────────────
@@ -725,7 +602,6 @@ export const sweepAbuseTables = async (env: Cloudflare.Env, now = Date.now()): P
   if (!database) throw new Error("The DB binding is missing.");
   await database.batch([
     database.prepare("DELETE FROM sybil_sightings WHERE last_seen_at < ?").bind(now - SYBIL_SIGHTING_RETENTION_MS),
-    database.prepare("DELETE FROM anon_allowance WHERE window_start < ?").bind(now - ANON_ALLOWANCE_WINDOW_MS),
     database
       .prepare("DELETE FROM owner_risk WHERE status = 'ok' AND updated_at < ?")
       .bind(now - OWNER_RISK_RETENTION_MS),
@@ -735,7 +611,7 @@ export const sweepAbuseTables = async (env: Cloudflare.Env, now = Date.now()): P
 /**
  * Enforcement and risk survive a reset, so resetting can't lift a
  * suspension. Account deletion drops them and the admin row; D1 sightings
- * and allowances age out on their own.
+ * age out on their own.
  */
 const purgeAbuse = async (ctx: OwnerContext, mode: OwnerPurgeMode): Promise<{ pending: boolean }> => {
   if (mode !== "delete") return { pending: false };

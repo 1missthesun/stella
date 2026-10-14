@@ -140,8 +140,7 @@ const PROVIDER_RETRY_MS = 5_000;
 const DIRECTORY_TIMEOUT_MS = 5_000;
 const AGENT_MESSAGE_TIMEOUT_MS = 15_000;
 const AGENT_REPORT_REQUEST_PREFIX = "agent-report:";
-/** How many of the newest entries a report's receipt is looked for in. */
-const PROMPT_DEDUPE_SCAN = 400;
+const PROMPT_SCAN_PAGE = 200;
 
 export type DesktopChatsOptions = {
   dataDir: string;
@@ -1459,21 +1458,24 @@ export function desktopChats(options: DesktopChatsOptions) {
    * the cloud with other devices' turns, imported first, waiting at most a
    * moment for the journal; one kept on this computer with another engine's.
    */
-  /** Whether a prompt with this client id is among the transcript's recent prompts. */
-  const transcriptHasPrompt = async (chat: Chat, clientMsgId: string): Promise<boolean> => {
-    const recent = await chat.harness.commit(
-      async (tx) => (await tx.scanEntries({ conversationId: chat.root.id, order: "descending" }, PROMPT_DEDUPE_SCAN)).items,
-      context,
-    );
-    return recent.some((entry) => {
-      if (entry.kind !== "pi.user") return false;
-      const content = (entry.model?.[0] as { content?: unknown } | undefined)?.content;
-      return (
-        Array.isArray(content) &&
-        content.some((part) => (part as { stella?: { clientMsgId?: unknown } } | null)?.stella?.clientMsgId === clientMsgId)
-      );
-    });
-  };
+  const transcriptHasPrompt = (chat: Chat, clientMsgId: string): Promise<boolean> =>
+    chat.harness.commit(async (tx) => {
+      let cursor: Parameters<typeof tx.scanEntries>[2];
+      do {
+        const page = await tx.scanEntries({ conversationId: chat.root.id, order: "descending" }, PROMPT_SCAN_PAGE, cursor);
+        const found = page.items.some((entry) => {
+          if (entry.kind !== "pi.user") return false;
+          const content = (entry.model?.[0] as { content?: unknown } | undefined)?.content;
+          return (
+            Array.isArray(content) &&
+            content.some((part) => (part as { stella?: { clientMsgId?: unknown } } | null)?.stella?.clientMsgId === clientMsgId)
+          );
+        });
+        if (found) return true;
+        cursor = page.next;
+      } while (cursor !== undefined);
+      return false;
+    }, context);
   const caughtUp = async (chat: Chat): Promise<void> => {
     await chat.localLog?.importNow().catch((error: unknown) => options.report(error));
     if (!chat.mirror) return;

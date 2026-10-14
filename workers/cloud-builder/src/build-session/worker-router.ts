@@ -126,17 +126,6 @@ import {
 } from "../socket-ticket.js";
 import { ownerGateStub, released } from "../rpc-release.js";
 
-// ---------------------------------------------------------------------------
-// The user-authenticated conversation surfaces
-//
-// Every other route on this worker is server-to-server and gated by the shared
-// service secret. These two are the exception: they carry a signed-in user's
-// user JWT, which is NOT the service secret, so they are matched before that
-// gate. Verification happens here rather than in the Durable Object so an
-// unauthenticated connect never instantiates one, never takes a socket slot,
-// and never touches the agent's thread.
-// ---------------------------------------------------------------------------
-
 const SOCKET_HANDOFF_TIMEOUT_MS = 15_000;
 
 /**
@@ -769,16 +758,6 @@ const handleDispatchControlRoute = async (
   }
 };
 
-// ---------------------------------------------------------------------------
-// The route table
-//
-// Hono runs handlers in registration order, and the order below is load
-// bearing: every self-authenticating route (user JWT, signed callback, public)
-// is registered before the service-secret gate, and every server-to-server
-// route after it. A request that matches nothing above the gate is answered
-// 401 unless it carries the service secret, so an unknown path never reveals
-// whether it exists.
-// ---------------------------------------------------------------------------
 
 type RouterEnv = {
   Bindings: Env;
@@ -1061,8 +1040,6 @@ app.get(DEVICES_PATH, userAuth(), async (c) => {
   }
 });
 
-// Placement and turn starts accept the service secret as well as a user JWT,
-// so they authenticate inside their handlers and sit above the gate.
 app.post(DISPATCH_SUBMIT_PATH, (c) =>
   handleDispatchSubmitRoute(c.req.raw, c.env, c.var.requestId),
 );
@@ -1207,9 +1184,6 @@ app.all("/cloud-home/:rest{.*}", userAuth(), async (c, next) => {
   await next();
 });
 
-// Sandbox-originated broker calls authenticate with their one-time capability
-// inside the exact BuildSession. They intentionally sit above the
-// service-secret gate; no other route shares this exception.
 app.all(`/sessions/:sessionId{${BROKER_SESSION_ID}}/turn-broker`, async (c) => {
   const brokerSessionId = c.req.param("sessionId");
   const request = c.req.raw;
@@ -1235,20 +1209,15 @@ app.all(`/sessions/:sessionId{${BROKER_SESSION_ID}}/turn-broker`, async (c) => {
   return response;
 });
 
-// ── Service-secret gate ───────────────────────────────────────────────────
-// Everything past this point is server-to-server. Nothing may be registered
-// below it without the gate in front.
 
-app.use(serviceSecret);
-
-app.post("/conversations/:id/cancel", jsonBody(tinyControl), (c) =>
+app.post("/conversations/:id/cancel", serviceSecret, jsonBody(tinyControl), (c) =>
   forwardBody(
     c.env.ORCHESTRATOR_SESSIONS.getByName(c.req.param("id")),
     "https://orchestrator-session/cancel",
     c.req.raw,
   ),
 );
-app.get("/conversations/:id/journal", (c) => {
+app.get("/conversations/:id/journal", serviceSecret, (c) => {
   const probe = new URL("https://orchestrator-session/journal");
   probe.search = new URL(c.req.url).search;
   return c.env.ORCHESTRATOR_SESSIONS.getByName(c.req.param("id")).fetch(
@@ -1256,25 +1225,29 @@ app.get("/conversations/:id/journal", (c) => {
     { method: "GET" },
   );
 });
-app.post("/sessions/:sessionId/cancel", jsonBody(tinyControl), (c) =>
+app.post("/sessions/:sessionId/cancel", serviceSecret, jsonBody(tinyControl), (c) =>
   forwardBody(
     c.env.BUILD_SESSIONS.getByName(c.req.param("sessionId")),
     "https://build-session/cancel",
     c.req.raw,
   ),
 );
-app.post("/sessions/:sessionId/expire", jsonBody(tinyControl), (c) =>
+app.post("/sessions/:sessionId/expire", serviceSecret, jsonBody(tinyControl), (c) =>
   forwardBody(
     c.env.BUILD_SESSIONS.getByName(c.req.param("sessionId")),
     "https://build-session/expire-agent-turn",
     c.req.raw,
   ),
 );
-app.post("/internal/sandboxes/retire", jsonBody(tinyControl), (c) =>
+app.post("/internal/sandboxes/retire", serviceSecret, jsonBody(tinyControl), (c) =>
   retireSandboxInstance(c.env, c.req.raw),
 );
 
-app.notFound(() => json({ error: "Not found." }, 404));
+app.notFound(async (c) =>
+  (await verifyServiceBearerRequestWithAny(c.req.raw, builderServiceSecrets(c.env)))
+    ? json({ error: "Not found." }, 404)
+    : json({ error: "Unauthorized." }, 401),
+);
 app.onError((error) => {
   throw error;
 });

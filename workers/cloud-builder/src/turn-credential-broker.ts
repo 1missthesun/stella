@@ -3,8 +3,8 @@ import { CLOUD_CODE_CONNECT_PATH } from "@stella/executor-cloud/cloud-code-conne
 import {
   TURN_BROKER_AUTH_SCHEME,
   TURN_BROKER_HEADERS,
-  TURN_BROKER_NATIVE_STATE_CHECKPOINT_PATH,
   TURN_BROKER_RESPONSE_HEADERS,
+  TURN_BROKER_TURN_STATE_CHECKPOINT_PATH,
   TURN_BROKER_VERSION,
   type TurnBrokerHandoff,
   type TurnBrokerIdentity,
@@ -405,7 +405,7 @@ export const validateTurnBrokerTarget = (
       maxBodyBytes: MAX_CALLBACK_BODY_BYTES,
     };
   }
-  if (parsed.pathname === TURN_BROKER_NATIVE_STATE_CHECKPOINT_PATH) {
+  if (parsed.pathname === TURN_BROKER_TURN_STATE_CHECKPOINT_PATH) {
     return {
       kind: "builder-callback",
       method: "POST",

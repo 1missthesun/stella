@@ -3,9 +3,6 @@ export const TURN_BROKER_AUTH_SCHEME = "StellaTurnBroker";
 export const TURN_BROKER_TURN_TOKEN_HEADER = "x-stella-turn-token";
 export const TURN_BROKER_TURN_STATE_CHECKPOINT_PATH =
   "/internal/stella/turn/state-checkpoint";
-/** @deprecated Use the world + native turn-state checkpoint path. */
-export const TURN_BROKER_NATIVE_STATE_CHECKPOINT_PATH =
-  TURN_BROKER_TURN_STATE_CHECKPOINT_PATH;
 
 export const TURN_BROKER_HEADERS = {
   ownerId: "x-stella-broker-owner-id",

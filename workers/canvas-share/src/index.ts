@@ -26,9 +26,9 @@
  * written before visibility existed carry none and stay public.
  *
  * Shared drive files: `GET /f/:slug/:name` serves `files/<slug>` with the
- * content type and disposition the backend stored on it (media, PDFs and
- * plain text inline, everything else as a download), under a scriptless
- * sandbox. Range requests are honoured so videos play and seek. File links
+ * content type the backend stored on it, under a scriptless sandbox. Only
+ * images (never SVG), video, audio and PDFs open inline; everything else is
+ * always a download, whatever the stored metadata says. Range requests are honoured so videos play and seek. File links
  * are always public; the trailing name is cosmetic.
  */
 
@@ -187,6 +187,8 @@ const parseSlug = (pathname: string): string | null => {
 /** No scripts at all for a shared file, unlike a canvas. */
 const FILE_CSP = "sandbox; default-src 'none'; img-src 'self'; media-src 'self'; style-src 'unsafe-inline'";
 
+const INLINE_FILE_TYPE = /^(?:image\/(?!svg)[a-z0-9.+-]+|video\/[a-z0-9.+-]+|audio\/[a-z0-9.+-]+|application\/pdf)$/;
+
 const parseFileSlug = (pathname: string): string | null => {
   const match = /^\/f\/([^/]+)(?:\/[^/]*)?$/.exec(pathname);
   if (!match) return null;
@@ -225,6 +227,15 @@ const serveFile = async (
   });
   head.writeHttpMetadata(headers);
   headers.set("cache-control", "public, max-age=60");
+  headers.set("x-content-type-options", "nosniff");
+  const contentType = (head.httpMetadata?.contentType ?? "").split(";")[0]!.trim().toLowerCase();
+  if (!INLINE_FILE_TYPE.test(contentType)) {
+    const name = head.httpMetadata?.contentDisposition?.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+    headers.set("content-disposition", `attachment${name ? `; filename*=UTF-8''${name}` : ""}`);
+    if (!contentType || /html|svg|xml|javascript/.test(contentType)) {
+      headers.set("content-type", "application/octet-stream");
+    }
+  }
   headers.set("etag", head.httpEtag);
 
   if (request.method === "HEAD") {

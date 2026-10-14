@@ -450,7 +450,7 @@ const viewLink = async (ctx: OwnerContext, args: { slug: string }): Promise<{ ur
 const fileKeyForSlug = (slug: string): string => `files/${slug}`;
 
 const inlineContentType = (contentType: string): boolean =>
-  /^(?:image\/(?!svg)|video\/|audio\/|application\/pdf$|text\/plain$)/i.test(contentType);
+  /^(?:image\/(?!svg)|video\/|audio\/|application\/pdf$)/i.test(contentType);
 
 /**
  * A public link to one of the owner's drive files. The file is copied to the

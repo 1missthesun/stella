@@ -34,7 +34,6 @@ import {
 import { timestampHeaders } from "@/features/chat/lib/message-time-labels";
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
 import { shownAgentLabelIds } from "@/features/chat/lib/assistant-row-content";
-import type { AgentModelConfigsByThread } from "@/features/chat/hooks/use-agent-model-configs";
 import { LoaderCircle } from "@/ui/icons";
 import { notifyChatContentGrowth } from "@/shell/chat-scroll-follow";
 import { UserAskRecordCard } from "@/features/user-ask/UserAskRecordCard";
@@ -50,7 +49,6 @@ import {
 type ChatTimelineProps = {
   rows: EventRowViewModel[];
   conversationId?: string | null;
-  agentModelConfigByThread?: AgentModelConfigsByThread;
   hasOlderEvents?: boolean;
   isLoadingOlder?: boolean;
   isLoadingHistory?: boolean;
@@ -158,7 +156,6 @@ const ItemSeparator = ({ leadingItem }: { leadingItem: TimelineListItem }) => (
 const renderRow = (
   row: EventRowViewModel,
   conversationId?: string | null,
-  agentModelConfigByThread?: AgentModelConfigsByThread,
 ) => {
   if (row.kind === "user") {
     return <UserMessageRow key={row.id} row={row} />;
@@ -168,7 +165,6 @@ const renderRow = (
       key={row.id}
       row={row}
       conversationId={conversationId}
-      agentModelConfigByThread={agentModelConfigByThread}
     />
   );
 };
@@ -196,7 +192,6 @@ const TimelineUserItem = ({
 export const ChatTimeline = memo(function ChatTimeline({
   rows,
   conversationId,
-  agentModelConfigByThread,
   hasOlderEvents,
   isLoadingOlder,
   isLoadingHistory,
@@ -373,7 +368,6 @@ export const ChatTimeline = memo(function ChatTimeline({
           renderRow(
             item.row,
             conversationId,
-            agentModelConfigByThread,
           )
         );
       return (
@@ -388,7 +382,7 @@ export const ChatTimeline = memo(function ChatTimeline({
         </>
       );
     },
-    [agentModelConfigByThread, conversationId, flashItemId, indicator, onCancelQueued],
+    [conversationId, flashItemId, indicator, onCancelQueued],
   );
 
   const keyExtractor = useCallback((item: TimelineListItem) => item.id, []);

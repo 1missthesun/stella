@@ -76,7 +76,6 @@ import type {
   AssistantRowViewModel,
   UserRowViewModel,
 } from "@/features/chat/conversation-row-types";
-import type { AgentModelConfigsByThread } from "@/features/chat/hooks/use-agent-model-configs";
 
 type Translate = ReturnType<typeof useT>;
 
@@ -562,12 +561,9 @@ export const UserMessageRow = memo(
 type AssistantRowProps = {
   row: AssistantRowViewModel;
   conversationId?: string | null;
-  agentModelConfigByThread?: AgentModelConfigsByThread;
 };
 
 export const AssistantMessageRow = memo(
-  // `agentModelConfigByThread` stays on the props (the memo comparator keys
-  // on it) but the row no longer renders anything per-thread that needs it.
   function AssistantMessageRow({
     row,
     conversationId,
@@ -812,6 +808,5 @@ export const AssistantMessageRow = memo(
   },
   (prev, next) =>
     prev.conversationId === next.conversationId &&
-    prev.agentModelConfigByThread === next.agentModelConfigByThread &&
     eventRowEqual(prev.row, next.row),
 );

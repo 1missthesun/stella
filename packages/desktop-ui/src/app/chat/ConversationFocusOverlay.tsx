@@ -16,7 +16,6 @@ import {
   getDisplayUserText,
 } from "@/features/chat/lib/message-turn-display";
 import { toReplyPreview } from "@stella/contracts/reply-refs";
-import type { AgentModelConfigsByThread } from "@/features/chat/hooks/use-agent-model-configs";
 import { useAgentTitle } from "@/features/cloud/use-agent-title";
 import "./conversation-focus-overlay.css";
 
@@ -29,12 +28,10 @@ const FOCUS_CONTENT_STYLE = {
 
 type ConversationFocusOverlayProps = {
   conversationId: string | null | undefined;
-  agentModelConfigByThread?: AgentModelConfigsByThread;
 };
 
 export const ConversationFocusOverlay = memo(function ConversationFocusOverlay({
   conversationId,
-  agentModelConfigByThread,
 }: ConversationFocusOverlayProps) {
   const focus = useConversationFocus(conversationId);
   if (!focus || !conversationId) return null;
@@ -46,7 +43,6 @@ export const ConversationFocusOverlay = memo(function ConversationFocusOverlay({
       conversationId={conversationId}
       root={focus.root}
       title={focus.title}
-      agentModelConfigByThread={agentModelConfigByThread}
     />
   );
 });
@@ -55,12 +51,10 @@ function FocusPanel({
   conversationId,
   root,
   title,
-  agentModelConfigByThread,
 }: {
   conversationId: string;
   root: NonNullable<ReturnType<typeof useConversationFocus>>["root"];
   title?: string;
-  agentModelConfigByThread?: AgentModelConfigsByThread;
 }) {
   const t = useT();
   const lineage = useLineageMessages(conversationId, root);
@@ -129,7 +123,6 @@ function FocusPanel({
             <ConversationEvents
               messages={lineage.messages}
               conversationId={conversationId}
-              agentModelConfigByThread={agentModelConfigByThread}
               hasOlderMessages={lineage.hasOlder}
               isLoadingOlder={lineage.isLoadingOlder}
               isLoadingHistory={!lineage.hasLoaded}

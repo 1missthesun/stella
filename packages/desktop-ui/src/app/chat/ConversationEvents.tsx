@@ -16,7 +16,6 @@ import { useDriveAttachmentPreviews } from "@/features/cloud/drive-attachment-pr
 import { ChatTimeline } from "./ChatTimeline";
 import type { InlineWorkingIndicatorMountProps } from "./InlineWorkingIndicator";
 import type { QueuedUserMessage } from "@/features/chat/hooks/use-streaming-chat";
-import type { AgentModelConfigsByThread } from "@/features/chat/hooks/use-agent-model-configs";
 import { hasQueuedMessageEntryPlayed } from "@/features/chat/lib/message-entry-animation-state";
 import type { EventRowViewModel } from "@/features/chat/conversation-row-types";
 
@@ -36,7 +35,6 @@ const assistantEnterActiveUntil = new Map<string, number>();
 type Props = {
   messages: MessageRecord[];
   conversationId?: string | null;
-  agentModelConfigByThread?: AgentModelConfigsByThread;
   maxItems?: number;
   pendingUserMessageId?: string | null;
   queuedUserMessages?: QueuedUserMessage[];
@@ -152,7 +150,6 @@ function useAssistantArrivalIds(
 export const ConversationEvents = memo(function ConversationEvents({
   messages,
   conversationId,
-  agentModelConfigByThread,
   maxItems,
   pendingUserMessageId,
   queuedUserMessages,
@@ -226,7 +223,6 @@ export const ConversationEvents = memo(function ConversationEvents({
     <ChatTimeline
       rows={rows}
       conversationId={conversationId}
-      agentModelConfigByThread={agentModelConfigByThread}
       hasOlderEvents={hasOlderMessages}
       isLoadingOlder={isLoadingOlder}
       isLoadingHistory={isLoadingHistory}

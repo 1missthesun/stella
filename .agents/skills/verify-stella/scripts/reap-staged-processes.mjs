@@ -7,7 +7,8 @@
 // names it. The folder name is random, so nothing else can match.
 //
 //   reap-staged-processes.mjs <staged-path>   stop that folder's processes
-//   reap-staged-processes.mjs --orphans       stop processes of staging folders that no longer exist
+//   reap-staged-processes.mjs --orphans       stop processes of staging folders that no longer exist,
+//                                             and Metro/Expo/RN DevTools whose checkout was deleted
 //   add --dry-run to only list them
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -57,10 +58,22 @@ const cwdByPid = cwds();
 const belongs = (paths) =>
   orphans ? paths.some((entry) => !existsSync(entry)) : paths.includes(target);
 
+// Metro, Expo and React Native DevTools whose own install was deleted (a
+// removed worktree, not just a /tmp stage). A live project's files exist,
+// so only leftovers of deleted checkouts match.
+const RN_TOOL = /react-native-devtools|@react-native\/debugger-shell|expo(?:\/bin\/cli|\s+start)|\bmetro\b/;
+const installDeleted = (row) => {
+  const command = row.text.split(/\s[A-Z_][A-Z0-9_]*=/)[0] ?? row.text;
+  if (!RN_TOOL.test(command)) return false;
+  const modulePaths = (command.match(/\/[^\s]*\/node_modules\/[^\s]*/g) ?? []).map((entry) => entry.split(/[?=]/)[0]);
+  return modulePaths.length > 0 && modulePaths.some((entry) => !existsSync(entry));
+};
+
 const victims = rows.filter((row) => {
   if (ancestors.has(row.pid) || SHARED.test(row.text.split(/\s+/)[0] ?? "")) return false;
   const paths = stagedPathsIn(`${row.text} ${cwdByPid.get(row.pid) ?? ""}`);
-  return paths.length > 0 && belongs(paths);
+  if (paths.length > 0) return belongs(paths);
+  return orphans && installDeleted(row);
 });
 
 const summary = victims.map(({ pid, text }) => ({ pid, command: text.slice(0, 140) }));

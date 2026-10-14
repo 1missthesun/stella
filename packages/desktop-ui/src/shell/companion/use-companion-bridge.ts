@@ -2,7 +2,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   useSyncExternalStore,
 } from "react";
 import type { MessageRecord } from "@stella/contracts/local-chat";
@@ -16,11 +15,13 @@ import { countActiveTopLevelActivityWorkUnits } from "@/features/chat/lib/event-
 import { getWorkingIndicatorCharacterState } from "@/features/chat/working-indicator-state";
 import { stripMarkdownForTts } from "@/features/voice/services/read-aloud/markdown-strip";
 import { readAloudPrefStore } from "@/features/voice/services/read-aloud/read-aloud-pref";
-import { isReadAloudPlaying } from "@/features/voice/services/read-aloud/read-aloud-player";
+import {
+  isReadAloudPlaying,
+  subscribeReadAloudPlaying,
+} from "@/features/voice/services/read-aloud/read-aloud-player";
 import { useCompanionVisible } from "./use-companion-window";
 
 const PUBLISH_THROTTLE_MS = 80;
-const READ_ALOUD_POLL_MS = 300;
 const USER_PREVIEW_MAX_CHARS = 400;
 const ASSISTANT_PREVIEW_MAX_CHARS = 700;
 
@@ -101,18 +102,10 @@ export function useCompanionBridge(conversationId: string | null): void {
 
   const companionVisible = useCompanionVisible(false);
 
-  // Read-aloud playback has no change event; poll only while it can matter.
-  const [readAloudPlaying, setReadAloudPlaying] = useState(false);
-  useEffect(() => {
-    if (!companionVisible || !readAloudEnabled) {
-      setReadAloudPlaying(false);
-      return;
-    }
-    const tick = () => setReadAloudPlaying(isReadAloudPlaying());
-    tick();
-    const timer = window.setInterval(tick, READ_ALOUD_POLL_MS);
-    return () => window.clearInterval(timer);
-  }, [companionVisible, readAloudEnabled]);
+  const readAloudPlaying =
+    useSyncExternalStore(subscribeReadAloudPlaying, isReadAloudPlaying) &&
+    companionVisible &&
+    readAloudEnabled;
 
   const runningAgentCount = useMemo(
     () => countActiveTopLevelActivityWorkUnits(tasks),

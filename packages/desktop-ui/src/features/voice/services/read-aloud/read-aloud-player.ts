@@ -1,6 +1,15 @@
 let context: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
 let currentStream: StreamPlayback | null = null;
+let publishedPlaying = false;
+const playingListeners = new Set<() => void>();
+
+const publishPlaying = () => {
+  const playing = currentSource !== null || currentStream !== null;
+  if (playing === publishedPlaying) return;
+  publishedPlaying = playing;
+  for (const listener of playingListeners) listener();
+};
 
 const getContext = (): AudioContext => {
   if (context && context.state !== "closed") return context;
@@ -22,11 +31,13 @@ const stopWebAudio = () => {
     /* already disconnected */
   }
   currentSource = null;
+  publishPlaying();
 };
 
 const stopStream = () => {
   const stream = currentStream;
   currentStream = null;
+  publishPlaying();
   if (stream) {
     try {
       stream.teardown();
@@ -69,11 +80,13 @@ export async function playReadAloud(
   source.onended = () => {
     if (currentSource === thisSource) {
       currentSource = null;
+      publishPlaying();
     }
     options.onEnded?.();
   };
 
   currentSource = source;
+  publishPlaying();
   source.start();
 }
 
@@ -155,10 +168,13 @@ export async function playReadAloudStream(
 
   const playback: StreamPlayback = { teardown };
   currentStream = playback;
+  publishPlaying();
 
   return await new Promise<void>((resolve, reject) => {
     const detach = () => {
-      if (currentStream === playback) currentStream = null;
+      if (currentStream !== playback) return;
+      currentStream = null;
+      publishPlaying();
     };
 
     const finishStart = () => {
@@ -290,5 +306,10 @@ export function stopReadAloud(): void {
 }
 
 export function isReadAloudPlaying(): boolean {
-  return currentSource !== null || currentStream !== null;
+  return publishedPlaying;
+}
+
+export function subscribeReadAloudPlaying(listener: () => void): () => void {
+  playingListeners.add(listener);
+  return () => playingListeners.delete(listener);
 }

@@ -178,11 +178,8 @@ function AccountScopedChatPanelTab({
   onSend,
   onStop,
 }: ChatPanelTabProps) {
-  const {
-    store: inputTextStore,
-    setMessage: setInputText,
-    messageRef: inputTextRef,
-  } = useComposerMessageStore();
+  const { store: inputTextStore, setMessage: setInputText } =
+    useComposerMessageStore();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const { showStop, requestStop } = useOptimisticStop(isStreaming, onStop);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -384,7 +381,7 @@ function AccountScopedChatPanelTab({
 
   const sendCurrentMessage = useCallback(async () => {
     const { canSubmit, trimmedMessage } = deriveComposerState({
-      message: inputTextRef.current,
+      message: inputTextStore.getSnapshot(),
       chatContext,
       selectedText,
     });
@@ -409,7 +406,7 @@ function AccountScopedChatPanelTab({
     setSidebarExpanded(false);
   }, [
     chatContext,
-    inputTextRef,
+    inputTextStore,
     isStreaming,
     onSend,
     selectedText,

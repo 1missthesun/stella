@@ -147,11 +147,8 @@ export function useFullShellChat({
 }) {
   const { cloudFeaturesEnabled, storageMode } = useChatStore();
   const { accountScope } = useCloudConversationSession();
-  const {
-    store: composerMessageStore,
-    setMessage,
-    messageRef: latestMessageRef,
-  } = useComposerMessageStore();
+  const { store: composerMessageStore, setMessage } =
+    useComposerMessageStore();
   const hasComposerText = useComposerMessageSelector(
     composerMessageStore,
     hasNonWhitespaceText,
@@ -211,7 +208,7 @@ export function useFullShellChat({
           composerMemoryByConversationRef.current,
           previousConversationId,
           {
-            message: latestMessageRef.current,
+            message: composerMessageStore.getSnapshot(),
             chatContext,
             selectedText,
           },
@@ -235,7 +232,7 @@ export function useFullShellChat({
   }, [
     activeConversationId,
     chatContext,
-    latestMessageRef,
+    composerMessageStore,
     selectedText,
     setChatContext,
     setMessage,
@@ -654,7 +651,7 @@ export function useFullShellChat({
     const shouldFollowSend =
       showHomeContent || getIsEffectivelyAtBottom() || getShouldFollowSend();
     const submittedConversationId = activeConversationId;
-    const submittedMessage = latestMessageRef.current;
+    const submittedMessage = composerMessageStore.getSnapshot();
     const submittedSelectedText = selectedText;
     const submittedChatContext = chatContext;
     const submittedFromHome = showHomeContent;
@@ -711,7 +708,7 @@ export function useFullShellChat({
           return;
         }
         const shouldRestoreHome =
-          submittedFromHome && !latestMessageRef.current;
+          submittedFromHome && !composerMessageStore.getSnapshot();
         setMessage((current) => current || submittedMessage);
         setSelectedText((current) => current ?? submittedSelectedText);
         setChatContext((current) => current ?? submittedChatContext);
@@ -735,7 +732,7 @@ export function useFullShellChat({
     getShouldFollowSend,
     getIsEffectivelyAtBottom,
     isStreaming,
-    latestMessageRef,
+    composerMessageStore,
     followAfterSend,
     releaseFollow,
     resetIdleTimer,
@@ -763,7 +760,7 @@ export function useFullShellChat({
   useEffect(() => {
     const text = pendingAutoSendTextRef.current;
     if (!text || !canSubmit || isStreaming) return;
-    if (latestMessageRef.current !== text) return;
+    if (composerMessageStore.getSnapshot() !== text) return;
     pendingAutoSendTextRef.current = null;
     void handleSend();
   }, [
@@ -771,7 +768,7 @@ export function useFullShellChat({
     canSubmit,
     handleSend,
     isStreaming,
-    latestMessageRef,
+    composerMessageStore,
   ]);
   const chatColumnConversation = useMemo(
     () => ({

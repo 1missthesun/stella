@@ -337,8 +337,8 @@ export class DictationSession {
         this.setState("idle");
         return;
       }
-      this.setState("idle");
       this.callbacks.onFinalTranscript?.(transcript);
+      this.setState("idle");
     } catch (err) {
       if (this.cancelled) {
         this.setState("idle");

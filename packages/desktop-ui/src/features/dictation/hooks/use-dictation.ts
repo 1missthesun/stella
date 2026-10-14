@@ -103,17 +103,7 @@ export const useDictation = ({
   const fireCommitIfPending = useCallback(() => {
     if (!sendAfterCommitRef.current) return;
     sendAfterCommitRef.current = false;
-    // Defer one frame so the parent usually re-renders with the appended
-    // transcript before the commit submits. This is best-effort only: the
-    // rAF callback can legitimately run BEFORE React flushes that render
-    // (the render is a scheduler macrotask; a frame deadline can preempt
-    // it), so commit handlers must NOT read the message from render-synced
-    // state/refs. Consumers read a write-time-synced ref instead — see
-    // use-composer-message-state — which makes the send deterministic
-    // regardless of which side wins this race.
-    requestAnimationFrame(() => {
-      onCommitRef.current?.();
-    });
+    onCommitRef.current?.();
   }, []);
 
   stateRef.current = state;
@@ -243,11 +233,7 @@ export const useDictation = ({
               setLevels([]);
               setShowControls(false);
               setShowRecordingBar(false);
-              // For success paths the inworld session emits `idle` before
-              // `onFinalTranscript`; defer to a microtask so commit fires
-              // after the transcript has been appended. For no-audio /
-              // error paths, no transcript ever arrives so we still fire.
-              queueMicrotask(fireCommitIfPending);
+              fireCommitIfPending();
             }
           },
           onFinalTranscript: (transcript) => {

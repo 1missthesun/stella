@@ -15,7 +15,10 @@ import {
 } from "@stella/contracts/desktop/companion";
 import { useUiState } from "@/context/ui-state";
 import { WorkingDots } from "@/ui/working-dots";
-import { useComposerMessageState } from "@/features/chat/hooks/use-composer-message-state";
+import {
+  useComposerMessage,
+  useComposerMessageStore,
+} from "@/features/chat/hooks/use-composer-message-state";
 import { useDictation } from "@/features/dictation/hooks/use-dictation";
 import { setReadAloudEnabled } from "@/features/voice/services/read-aloud/read-aloud-pref";
 import { useRealtimeVoiceVisible } from "@/shared/lib/realtime-voice-visibility";
@@ -87,11 +90,12 @@ export function CompanionPanelRoot() {
 
   useDictationToggleBridge();
 
-  const { message, setMessage, messageRef } = useComposerMessageState();
+  const { store: messageStore, setMessage } = useComposerMessageStore();
+  const message = useComposerMessage(messageStore);
   const collapseAfterSendRef = useRef(false);
 
   const sendCurrent = useCallback(() => {
-    const text = messageRef.current.trim();
+    const text = messageStore.getSnapshot().trim();
     if (!text) return;
     api?.send({ text });
     setMessage("");
@@ -99,7 +103,7 @@ export function CompanionPanelRoot() {
       collapseAfterSendRef.current = false;
       setExpanded(false);
     }
-  }, [api, messageRef, setMessage]);
+  }, [api, messageStore, setMessage]);
 
   const dictation = useDictation({
     setMessage,

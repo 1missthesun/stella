@@ -44,6 +44,12 @@ type ComputerAgentCloudOutboxStore = Pick<
   | "deleteComputerAgentCloudOutbox"
 >;
 
+export type ComputerAgentAttempt = {
+  readonly threadId: string;
+  readonly attemptGeneration: number;
+  readonly ownerGeneration: string;
+};
+
 export type ComputerAgentCloudRecords = {
   create: (args: {
     agentId: string;
@@ -64,10 +70,8 @@ export type ComputerAgentCloudRecords = {
   }) => Promise<void>;
   get: (agentId: string) => Promise<AgentToolSnapshot | null>;
   cancel: (
-    agentId: string,
+    attempt: ComputerAgentAttempt,
     reason?: string,
-    attemptGeneration?: number,
-    ownerGeneration?: string,
   ) => Promise<{ canceled: boolean }>;
   pending: () => number;
   resume: () => void;
@@ -730,24 +734,12 @@ export const createComputerAgentCloudRecords = (
       }
     },
 
-    cancel: async (agentId, reason, attemptGeneration, ownerGeneration) => {
-      if (attemptGeneration === undefined) {
-        // A thread id is reusable across attempts, so owner generation alone
-        // cannot identify the execution being canceled. Never let an
-        // unknown-agent fallback mutate whichever attempt happens to be
-        // current after an ABA replacement.
-        return { canceled: false };
-      }
-      const expectedGeneration =
-        ownerGeneration ??
-        options.store.getComputerAgentCloudThreadAuthority(agentId)
-          ?.ownerGeneration;
-      if (!expectedGeneration) return { canceled: false };
+    cancel: async (attempt, reason) => {
       await enqueue({
         kind: "cancel",
-        threadId: agentId,
-        attemptGeneration,
-        ownerGeneration: expectedGeneration,
+        threadId: attempt.threadId,
+        attemptGeneration: attempt.attemptGeneration,
+        ownerGeneration: attempt.ownerGeneration,
         payload: {
           ...(reason ? { reason } : {}),
         } satisfies ComputerAgentCancelPayload,

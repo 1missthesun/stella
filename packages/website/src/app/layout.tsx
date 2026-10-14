@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { PLAN_CATALOG, PLAN_ORDER } from "@/lib/plans";
 import { IBM_Plex_Mono, Manrope, Mona_Sans } from "next/font/google";
 import { getSiteUrl } from "@/lib/site-url";
 import { SignInDialogHost } from "@/components/auth/sign-in-dialog-host";
@@ -140,17 +141,21 @@ const jsonLd = {
         "Browses the web and fills in forms",
         "Creates and edits documents, spreadsheets, presentations and PDFs",
         "One ongoing chat with background agents",
-        "Multiple agents working in parallel (Pro)",
-        "Image, video, music and 3D generation (Pro)",
+        "Agents working in parallel, on your computer or in the cloud (paid plans)",
+        "Image, video, music and 3D generation (paid plans)",
         "Dictation and “Hey Stella” wake word",
         "Runs on Stella's models, Claude Code, a ChatGPT plan, your own API keys or local models",
         "Redesigns its own interface on request",
         "Open source under MIT",
       ],
       offers: [
-        { "@type": "Offer", name: "Free", price: "0", priceCurrency: "USD" },
-        { "@type": "Offer", name: "Go", price: "5", priceCurrency: "USD", description: "Per month" },
-        { "@type": "Offer", name: "Pro", price: "15", priceCurrency: "USD", description: "Per month" },
+        ...PLAN_ORDER.map((id) => ({
+          "@type": "Offer",
+          name: PLAN_CATALOG[id].label,
+          price: String(PLAN_CATALOG[id].monthlyPriceCents / 100),
+          priceCurrency: "USD",
+          ...(PLAN_CATALOG[id].interval ? { description: "Per month" } : {}),
+        })),
       ],
       sameAs: [
         "https://apps.apple.com/us/app/stella-your-ai/id6761148311",

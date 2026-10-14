@@ -105,8 +105,8 @@ export default function VoicePage() {
             a look at your screen when you ask her to.
           </p>
           <p className={styles.planNote}>
-            Live conversation and having Stella read her replies aloud come with the{" "}
-            <Link href="/pricing">Pro plan</Link>. Dictation and &quot;Hey Stella&quot; are on every tier.
+            Live conversation comes with every <Link href="/pricing">paid plan</Link>. Dictation, read-aloud and
+            &quot;Hey Stella&quot; are on every plan.
           </p>
         </div>
         <LiveVisual />

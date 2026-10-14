@@ -52,12 +52,12 @@ const capabilities = [
   {
     icon: Sparkles,
     title: "Create media",
-    body: "Help make images, video, audio, 3D assets, small apps, games, mockups, and visual artifacts. Image, video, 3D, and voice generation come with the Pro plan.",
+    body: "Help make images, video, audio, 3D assets, small apps, games, mockups, and visual artifacts. Image, video, music, and 3D generation come with every paid plan.",
   },
   {
     icon: Mic,
     title: "Listen and speak",
-    body: "Use in-app dictation, OS-wide dictation, read-aloud, and realtime voice. Wake-word activation is optional. Dictation and wake word are on every tier; read-aloud and realtime voice come with the Pro plan.",
+    body: "Use in-app dictation, OS-wide dictation, read-aloud, and realtime voice. Wake-word activation is optional. Dictation, read-aloud and wake word are on every plan; realtime voice comes with every paid plan.",
   },
   {
     icon: CalendarClock,

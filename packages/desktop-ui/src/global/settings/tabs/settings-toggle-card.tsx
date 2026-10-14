@@ -1,8 +1,10 @@
 import { Button } from "@/ui/button";
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
+import { useT } from "@/shared/i18n";
 import { Switch } from "@/ui/switch";
 
 export function SettingsToggleCard({
-  title,
+  titleKey,
   description,
   error,
   checked,
@@ -11,7 +13,7 @@ export function SettingsToggleCard({
   retry,
   retryLabel,
 }: {
-  title: string;
+  titleKey: string;
   description: string;
   error: string | null;
   checked: boolean;
@@ -20,12 +22,13 @@ export function SettingsToggleCard({
   retry?: () => void;
   retryLabel?: string;
 }) {
+  const t = useT();
   return (
     <div className="settings-card">
       <div className="settings-card-header">
-        <h3 className="settings-card-title">{title}</h3>
+        <SettingsCardTitle titleKey={titleKey} />
         <Switch
-          aria-label={title}
+          aria-label={t(titleKey)}
           checked={checked}
           disabled={disabled}
           onCheckedChange={(next) => onChange(Boolean(next))}

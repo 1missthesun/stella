@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useState } from "react";
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import { Button } from "@/ui/button";
@@ -41,9 +42,7 @@ function CloudBrowserDataCardImpl() {
   return (
     <>
       <div className="settings-card" data-cloud-browser-settings>
-        <h3 className="settings-card-title">
-          {t("cloudBrowser.settings.title")}
-        </h3>
+        <SettingsCardTitle titleKey="cloudBrowser.settings.title" />
         <div className="settings-row">
           <div className="settings-row-info">
             <div className="settings-row-label">

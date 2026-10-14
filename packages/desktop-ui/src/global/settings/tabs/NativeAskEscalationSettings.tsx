@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState } from "react";
 import type {
   UserAskEscalationPolicy,
@@ -133,9 +134,7 @@ export function NativeAskEscalationSettings() {
   return (
     <div className="settings-card">
       <div className="settings-card-header">
-        <h3 className="settings-card-title">
-          {t("settings.escalation.title")}
-        </h3>
+        <SettingsCardTitle titleKey="settings.escalation.title" />
       </div>
       <p className="settings-card-desc">
         {t("settings.escalation.description")}

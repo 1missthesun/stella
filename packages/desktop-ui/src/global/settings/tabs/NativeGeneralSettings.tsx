@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/ui/button";
 import { Switch } from "@/ui/switch";
@@ -215,7 +216,7 @@ export function NativeDesktopGeneralSettings() {
     <>
       {platform === "darwin" ? (
         <SettingsToggleCard
-          title={t("settings.nativeFontSmoothing.title")}
+          titleKey="settings.nativeFontSmoothing.title"
           description={t("settings.nativeFontSmoothing.description")}
           error={null}
           checked={nativeFontSmoothingEnabled}
@@ -224,7 +225,7 @@ export function NativeDesktopGeneralSettings() {
         />
       ) : null}
       <SettingsToggleCard
-        title={t("settings.notifications.title")}
+        titleKey="settings.notifications.title"
         description={t("settings.notifications.description")}
         error={soundNotificationsError}
         checked={soundNotificationsEnabled}
@@ -232,7 +233,7 @@ export function NativeDesktopGeneralSettings() {
         onChange={(checked) => void handleSoundNotificationsChange(checked)}
       />
       <SettingsToggleCard
-        title={t("settings.power.title")}
+        titleKey="settings.power.title"
         description={t("settings.power.description")}
         error={preventSleepError}
         checked={preventComputerSleep}
@@ -241,9 +242,7 @@ export function NativeDesktopGeneralSettings() {
       />
       <div className="settings-card">
         <div className="settings-card-header">
-          <h3 className="settings-card-title">
-            {t("settings.browserExtension.title")}
-          </h3>
+          <SettingsCardTitle titleKey="settings.browserExtension.title" />
           <Button
             type="button"
             variant="ghost"
@@ -259,9 +258,7 @@ export function NativeDesktopGeneralSettings() {
       </div>
       <div className="settings-card">
         <div className="settings-card-header">
-          <h3 className="settings-card-title">
-            {t("settings.developerPreviews.title")}
-          </h3>
+          <SettingsCardTitle titleKey="settings.developerPreviews.title" />
           <Switch
             checked={developerResourcePreviewsEnabled}
             onCheckedChange={(checked) =>
@@ -278,9 +275,7 @@ export function NativeDesktopGeneralSettings() {
       <OnboardingReplayCard />
       <div className="settings-card">
         <div className="settings-card-header">
-          <h3 className="settings-card-title">
-            {t("settings.resetCustomizations.title")}
-          </h3>
+          <SettingsCardTitle titleKey="settings.resetCustomizations.title" />
           <Button
             type="button"
             variant="ghost"
@@ -397,7 +392,7 @@ export function NativeLockedComputerUseCard() {
 
   return (
     <SettingsToggleCard
-      title={t("settings.lockedComputerUse.title")}
+      titleKey="settings.lockedComputerUse.title"
       description={
         platform === "darwin"
           ? t("settings.lockedComputerUse.description")

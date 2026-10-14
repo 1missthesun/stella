@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { lazy, Suspense } from "react";
 import { Select } from "@/ui/select";
 import { LanguageSettingsRow } from "@/global/settings/LanguageSettingsRow";
@@ -36,7 +37,7 @@ export function GeneralTab() {
     <div className="settings-tab-content">
       <LanguageSettingsRow />
       <div className="settings-card">
-        <h3 className="settings-card-title">{t("settings.motion.title")}</h3>
+        <SettingsCardTitle titleKey="settings.motion.title" />
         <div className="settings-row">
           <div className="settings-row-info">
             <div className="settings-row-label">

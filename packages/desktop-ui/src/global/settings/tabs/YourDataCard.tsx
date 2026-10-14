@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
@@ -92,7 +93,7 @@ export function YourDataCard() {
 
   return (
     <div className="settings-card">
-      <h3 className="settings-card-title">{t("settings.yourData.title")}</h3>
+      <SettingsCardTitle titleKey="settings.yourData.title" />
       <p className="settings-card-desc">
         {t("settings.yourData.description")}
       </p>

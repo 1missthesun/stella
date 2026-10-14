@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/ui/button";
 import { Select } from "@/ui/select";
@@ -198,9 +199,7 @@ export function PromptPresetCard() {
 
   return (
     <div className="settings-card">
-      <h3 className="settings-card-title">
-        {t("settings.systemPrompt.title")}
-      </h3>
+      <SettingsCardTitle titleKey="settings.systemPrompt.title" />
       <p
         className={
           status?.kind === "error"

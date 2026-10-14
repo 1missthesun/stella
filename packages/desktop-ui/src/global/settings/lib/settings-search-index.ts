@@ -21,12 +21,6 @@ export type SettingsSearchPlatform = "darwin" | "linux" | "win32";
  *     translated title/description.
  *   - Global `SEARCH_SYNONYMS` map below — for words that should match
  *     across many settings ("mute" → sound/audio/volume/notification).
- *
- * `titleKey` MUST resolve to the same string rendered in the matching
- * `<h3 className="settings-card-title">…</h3>` (or `cardTitleKey` for
- * row-level entries) — that resolved title is what we use to scroll the
- * user to the section after jumping to its tab, so reusing the card's
- * own catalog key keeps it correct in every locale automatically.
  */
 export interface SettingsSearchEntryDef {
   tab: SettingsTab;
@@ -44,7 +38,7 @@ export interface ResolvedSettingsSearchEntry {
   platforms?: readonly SettingsSearchPlatform[];
   title: string;
   description: string;
-  cardTitle?: string;
+  cardKey: string;
   keywords: string[];
 }
 
@@ -645,14 +639,13 @@ function resolveEntries(
   t: SettingsSearchTranslate,
 ): ResolvedSettingsSearchEntry[] {
   return SETTINGS_SEARCH_ENTRY_DEFS.map((def) => {
-    const cardTitle = def.cardTitleKey ? t(def.cardTitleKey) : undefined;
     return {
       tab: def.tab,
       availability: def.availability ?? "all",
       ...(def.platforms ? { platforms: def.platforms } : {}),
       title: t(def.titleKey),
       description: t(def.descriptionKey),
-      ...(cardTitle ? { cardTitle } : {}),
+      cardKey: def.cardTitleKey ?? def.titleKey,
       keywords: def.keywords,
     };
   });

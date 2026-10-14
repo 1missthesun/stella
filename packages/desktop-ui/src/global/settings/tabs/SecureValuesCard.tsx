@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import type { UserAskStoredSecureValue } from "@stella/contracts/user-ask";
 import { Button } from "@/ui/button";
@@ -86,9 +87,7 @@ export function SecureValuesCard() {
   return (
     <div className="settings-card" data-testid="secure-values-card">
       <div className="settings-card-header">
-        <h3 className="settings-card-title">
-          {t("settings.secureValues.title")}
-        </h3>
+        <SettingsCardTitle titleKey="settings.secureValues.title" />
       </div>
       <p className="settings-card-desc">
         {t("settings.secureValues.description")}

@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useState } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import { Button } from "@/ui/button";
@@ -175,7 +176,7 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
       ) : null}
       {hasConnectedAccount ? <PasskeysCard /> : null}
       <div className="settings-card">
-        <h3 className="settings-card-title">{t("settings.account.title")}</h3>
+        <SettingsCardTitle titleKey="settings.account.title" />
         <div className="settings-row">
           <div className="settings-row-info">
             <div className="settings-row-label">
@@ -238,9 +239,7 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
         )}
       </div>
       <div className="settings-card">
-        <h3 className="settings-card-title">
-          {t("settings.account.legal.title")}
-        </h3>
+        <SettingsCardTitle titleKey="settings.account.legal.title" />
         <div className="settings-row-control">
           <Button
             type="button"

@@ -105,7 +105,7 @@ export function TelemetrySettingsCard() {
 
   return (
     <SettingsToggleCard
-      title={t("settings.telemetry.title")}
+      titleKey="settings.telemetry.title"
       description={t("settings.telemetry.description")}
       error={error}
       checked={enabled}

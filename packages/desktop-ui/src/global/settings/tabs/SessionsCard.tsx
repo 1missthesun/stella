@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState } from "react";
 import type { AccountSessionSummary } from "@stella/contracts/auth-session";
 import {
@@ -60,7 +61,7 @@ export function SessionsCard() {
 
   return (
     <div className="settings-card">
-      <h3 className="settings-card-title">{t("settings.sessions.title")}</h3>
+      <SettingsCardTitle titleKey="settings.sessions.title" />
       <p className="settings-card-desc">
         {t("settings.sessions.description")}
       </p>

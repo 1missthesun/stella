@@ -55,7 +55,7 @@ export function CompanionSettingsCard() {
 
   return (
     <SettingsToggleCard
-      title={t("settings.companion.title")}
+      titleKey="settings.companion.title"
       description={t("settings.companion.description")}
       error={error}
       checked={visible}

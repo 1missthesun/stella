@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useState, useSyncExternalStore } from "react";
 import { Button } from "@/ui/button";
 import { useLocale, useT } from "@/shared/i18n";
@@ -103,9 +104,7 @@ export function CloudSyncCard() {
 
   return (
     <div className="settings-card">
-      <h3 className="settings-card-title">
-        {t("settings.account.cloudHome.title")}
-      </h3>
+      <SettingsCardTitle titleKey="settings.account.cloudHome.title" />
       <div className="settings-row" data-memory-sync={memorySync?.phase}>
         <div className="settings-row-info">
           <div className="settings-row-label">

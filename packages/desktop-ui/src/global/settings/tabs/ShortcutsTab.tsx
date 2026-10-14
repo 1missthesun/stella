@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState } from "react";
 import { showToast } from "@/ui/toast";
 import { Button } from "@/ui/button";
@@ -279,7 +280,7 @@ export function ShortcutsTab() {
   return (
     <div className="settings-tab-content">
       <div className="settings-card">
-        <h3 className="settings-card-title">{t("settings.shortcuts.title")}</h3>
+        <SettingsCardTitle titleKey="settings.shortcuts.title" />
         {shortcutError ? (
           <p
             className="settings-card-desc settings-card-desc--error"

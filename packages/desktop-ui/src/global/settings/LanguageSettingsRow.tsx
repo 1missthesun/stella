@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useMemo } from "react";
 import { useT, useI18n, LOCALE_NATIVE_LABELS, type Locale } from "@/shared/i18n";
 import { Select } from "@/ui/select";
@@ -16,7 +17,7 @@ export function LanguageSettingsRow() {
 
   return (
     <div className="settings-card">
-      <h3 className="settings-card-title">{t("settings.language.title")}</h3>
+      <SettingsCardTitle titleKey="settings.language.title" />
       <div className="settings-row">
         <div className="settings-row-info">
           <div className="settings-row-label">{t("common.language")}</div>

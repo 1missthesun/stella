@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import {
   lazy,
   Suspense,
@@ -229,9 +230,7 @@ export function AudioTab() {
   return (
     <div className="settings-tab-content">
       <div className="settings-card">
-        <h3 className="settings-card-title">
-          {t("settings.audio.microphone.title")}
-        </h3>
+        <SettingsCardTitle titleKey="settings.audio.microphone.title" />
         {permissionError ? (
           <p
             className="settings-card-desc settings-card-desc--error"
@@ -271,9 +270,7 @@ export function AudioTab() {
 
       {platformCapabilities.canSelectSpeaker() ? (
         <div className="settings-card">
-          <h3 className="settings-card-title">
-            {t("settings.audio.speaker.title")}
-          </h3>
+          <SettingsCardTitle titleKey="settings.audio.speaker.title" />
           {audioOutputDevices.length > 0 ? (
             <div className="settings-row">
               <div className="settings-row-info">
@@ -320,7 +317,7 @@ export function AudioTab() {
 
       {platformCapabilities.realtimeVoice ? (
         <SettingsToggleCard
-          title={t("settings.voiceAgent.title")}
+          titleKey="settings.voiceAgent.title"
           description={t("settings.voiceAgent.description")}
           error={voiceError}
           checked={voiceEnabled}

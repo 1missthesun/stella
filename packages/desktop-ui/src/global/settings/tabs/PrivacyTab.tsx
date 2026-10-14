@@ -42,7 +42,7 @@ export function PrivacyTab() {
     <div className="settings-tab-content">
       {platformCapabilities.nativeSettings ? (
         <SettingsToggleCard
-          title={t("settings.chatStorage.title")}
+          titleKey="settings.chatStorage.title"
           description={t("settings.chatStorage.description")}
           checked={storageMode === "cloud"}
           disabled={savingStorage || uiState.isVoiceRtcActive}
@@ -62,7 +62,7 @@ export function PrivacyTab() {
         />
       ) : null}
       <SettingsToggleCard
-        title={t("settings.memory.title")}
+        titleKey="settings.memory.title"
         description={t("settings.memory.description")}
         error={
           memoryPreference.issue

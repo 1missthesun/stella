@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback } from "react";
 import { Button } from "@/ui/button";
 import { useT } from "@/shared/i18n";
@@ -20,9 +21,7 @@ export function OnboardingReplayCard() {
   return (
     <div className="settings-card">
       <div className="settings-card-header">
-        <h3 className="settings-card-title">
-          {t("settings.onboardingReplay.title")}
-        </h3>
+        <SettingsCardTitle titleKey="settings.onboardingReplay.title" />
         <Button
           type="button"
           variant="ghost"

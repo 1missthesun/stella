@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useState } from "react";
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import type {
@@ -64,7 +65,7 @@ export function ProviderAccountsCard() {
 
   return (
     <div className="settings-card">
-      <h3 className="settings-card-title">{t(`${K}.cardTitle`)}</h3>
+      <SettingsCardTitle titleKey={`${K}.cardTitle`} />
       <ChatGptAccountsSection
         settings={connections}
         refreshing={refreshing}

@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useState } from "react";
 import { Button } from "@/ui/button";
 import { useT } from "@/shared/i18n";
@@ -34,7 +35,7 @@ export function ServerSettingsCard() {
 
   return (
     <div className="settings-card" data-testid="self-host-server-card">
-      <h3 className="settings-card-title">{t("selfHost.settings.title")}</h3>
+      <SettingsCardTitle titleKey="selfHost.settings.title" />
       <div className="settings-row">
         <div className="settings-row-info">
           <div className="settings-row-label">

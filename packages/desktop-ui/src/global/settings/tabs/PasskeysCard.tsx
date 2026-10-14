@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useState } from "react";
 import { authClient } from "@/global/auth/lib/auth-client";
 import { Button } from "@/ui/button";
@@ -81,7 +82,7 @@ export function PasskeysCard() {
 
   return (
     <div className="settings-card">
-      <h3 className="settings-card-title">{t("settings.passkeys.title")}</h3>
+      <SettingsCardTitle titleKey="settings.passkeys.title" />
       <p className="settings-card-desc">
         {t("settings.passkeys.description")}
       </p>

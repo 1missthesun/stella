@@ -1,3 +1,4 @@
+import { SettingsCardTitle } from "@/global/settings/settings-card-targets";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/ui/button";
 import {
@@ -255,7 +256,7 @@ function MacPermissionSettings() {
 
   return (
     <div className="settings-card">
-      <h3 className="settings-card-title">{t("settings.permissions.title")}</h3>
+      <SettingsCardTitle titleKey="settings.permissions.title" />
       {permissionsError ? (
         <p
           className="settings-card-desc settings-card-desc--error"

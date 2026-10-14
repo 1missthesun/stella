@@ -147,6 +147,7 @@ secrets only reach Previews created afterwards.
 | `packages/stella-browser/cli` | Push to master (dev channel), then `promote-stella-browser.yml` | Next launcher prepare after promotion |
 | Electron version (`package.json`) | Push (signed identity) + app-source publish | Update installs it and relaunches (see below) |
 | Website / web chat (`packages/website`) | `deploy-stella.sh` to the website Worker | Immediately |
+| Self-hosted servers | Prod backend deploy + its `server-*` tag (see "Release tags") | When the owner runs `bun scripts/selfhost.mjs update` |
 
 There is no desktop build in CI and no installer to ship: the desktop app is
 a git checkout run from source by the native launchers.
@@ -204,6 +205,36 @@ cd ../model-gateway && env -u CLOUDFLARE_API_TOKEN bun run deploy:production
 ```
 
 New bindings, vars or secrets: add them to the `env.production` block of the
+worker's `wrangler.jsonc` too (bindings and vars don't inherit), regenerate
+types (`node scripts/generate-worker-types.mjs` in cloud-builder), and set prod
+secrets before the prod deploy: `... | bunx wrangler secret put NAME --env production`.
+
+### Release tags (prod backend)
+
+Self-hosted servers follow our releases, and the apps judge a server by the
+release it reports in `/.well-known/stella` (`version`, `releasedAt`,
+`commit`; the phone app asks for a server update when it is more than 90 days
+older than the app). The cloud-builder build bakes that release in from git
+(`scripts/build-worker.mjs`): a `server-YYYY.MM.DD[.n]` tag on a clean `HEAD`
+becomes the version, otherwise it reports `dev-YYYY.MM.DD-<sha>`. So every
+prod backend deploy is tagged **before** it is built, and the tag is pushed
+once the deploy succeeded:
+
+```bash
+git fetch origin --tags && git status --short   # deploy from a clean tree
+d=$(date -u +%Y.%m.%d); TAG=server-$d; n=1
+while git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; do n=$((n+1)); TAG=server-$d.$n; done
+git tag -a "$TAG" -m "Stella server $TAG"       # on the commit being deployed
+cd workers/cloud-builder && env -u CLOUDFLARE_API_TOKEN bun run deploy:production
+git push origin "$TAG"                           # only after the deploy succeeded
+curl -s https://auth.stella.sh/.well-known/stella | jq '{version, releasedAt, commit}'
+```
+
+If the deploy fails, drop the tag (`git tag -d "$TAG"`) and tag again when you
+retry. Self-hosters run `bun scripts/selfhost.mjs update`, which deploys
+`origin/master` (or `--ref server-…`) to their account in the same order
+as above; a release that raises the minimum server API (`MIN_SUPPORTED_SERVER_API`
+in `packages/contracts/self-host.ts`) says so in its notes.
 
 ### Sandbox image and code bundle (cloud-builder)
 
@@ -313,10 +344,6 @@ could have provisioned a fresh namespace and orphaned the live one. A binding
 with no id is a bug; read the deployed id and pin it rather than deploying
 past it. Prod was repaired and pinned on 2026-10-08.
 
-
-worker's `wrangler.jsonc` too (bindings and vars don't inherit), regenerate
-types (`node scripts/generate-worker-types.mjs` in cloud-builder), and set prod
-secrets before the prod deploy: `... | bunx wrangler secret put NAME --env production`.
 
 ### Test accounts' cloud Claude login (dev only)
 
@@ -709,11 +736,12 @@ release covers nothing on Play.
 
 ## Smoke check after a prod deploy
 
-No human and no secret needed. Run all three:
+No human and no secret needed. Run all of these:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' https://auth.stella.sh/api/auth/jwks   # 200
 curl -s https://auth.stella.sh/readyz                                          # "ok":true
+curl -s https://auth.stella.sh/.well-known/stella | jq .version                # the server-* tag you just pushed
 ```
 
 Then one real cloud turn on Stella's own model, as the owner (Rahul's prod

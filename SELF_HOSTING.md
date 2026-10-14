@@ -1,9 +1,26 @@
 # Self-hosting Stella
 
-This guide sets up your own Stella deployment on your own Cloudflare account,
-then runs the desktop app (and optionally the mobile app) against it. It is
-written so you can hand it to a coding agent: every step is a command or an
-exact edit.
+**The quick way is one command.** From a clone of this repo:
+
+```bash
+bun scripts/selfhost.mjs setup --name "My Stella"
+```
+
+It signs in to Cloudflare, checks the Workers Paid plan and R2, creates every
+resource under a name prefix (`--prefix`, default `stella`), generates every
+secret, deploys the workers on your `workers.dev` subdomain in owner mode,
+creates the owner and prints a one-time pairing QR code that the phone and
+desktop apps scan. It is idempotent and resumable, and `--json` prints one
+line per step for an agent. The guide for agents (and people) is
+**https://stella.sh/self-host.md**; `bun scripts/selfhost.mjs help` lists
+`setup`, `update`, `pair`, `recover`, `status` and `destroy`. Nothing in the
+tracked configs is edited: the script writes its own wrangler configs into
+`.selfhost/<prefix>/` (gitignored) and keeps its state, including the admin
+key, in `~/.config/stella-server/<account id>-<prefix>.json` (mode 600).
+
+The rest of this file is the **manual reference**: what the script does, every
+setting it uses, and the optional providers. Read it to customise a deployment
+(your own domain, website, mobile app, billing) or to see what a setting means.
 
 Stella's own deployment is described in `DEPLOY.md`. Everything below uses the
 same commands; you only change the values that belong to an account.
@@ -21,13 +38,17 @@ and nothing else breaks.
   Durable Objects (SQLite), D1, R2, KV, Queues, Cron Triggers, rate-limit
   bindings, **Containers** (cloud agent sandboxes), **Dynamic Workers** (the
   `worker_loaders` binding, for code mode), **Artifacts** (open beta; holds the
-  app's source), **Browser Run** (the cloud browser), **Pipelines** (one
-  stream, for telemetry) and **AI Gateway** (the web search tool, see 1.3).
-- **An OpenRouter API key.** The default models for every agent run on
-  OpenRouter. It is the only third-party key Stella needs.
-- **Tools:** git, [Bun](https://bun.sh) 1.4.0, Docker (cloud-builder builds its
-  sandbox image on deploy), and `openssl`. Wrangler comes from the repo
-  (`bunx wrangler`).
+  app's source), **Browser Run** (the cloud browser) and, optionally,
+  **Pipelines** (telemetry) and **AI Gateway** credits (the web search tool,
+  see 1.3). Workers Paid ($5/month plus usage) is the floor: the free plan has
+  no Containers.
+- **Models:** the owner's own Claude (Claude Code) or ChatGPT subscription,
+  connected in the app. No API key is required. An **OpenRouter API key is
+  optional**: it turns on Stella's managed models, read-aloud and
+  record-then-transcribe dictation (Part 2).
+- **Tools:** git, [Bun](https://bun.sh) 1.4.0, Node.js 22+, Docker
+  (cloud-builder builds its sandbox image on deploy), and `openssl`. Wrangler
+  comes from the repo (`bunx wrangler`).
 
 ```bash
 git clone <your fork> stella && cd stella
@@ -40,6 +61,15 @@ If `CLOUDFLARE_API_TOKEN` is set in your shell, prefix wrangler commands with
 containers.
 
 ### 1.2 Names, identities and the values to change
+
+`scripts/selfhost.mjs` does all of 1.2–1.7 for you without touching these
+files: it reads each tracked `wrangler.jsonc`, merges `env.production` over the
+top level, renames every worker, bucket, database, KV namespace, queue and the
+Artifacts namespace with its prefix, points every URL at your subdomain, drops
+Stella's routes and custom domains, the telemetry binding and
+`STELLA_TEST_ACCOUNTS`, sets admin access to `"off"` (bearer only) and owner
+mode on, and writes the result to `.selfhost/<prefix>/<worker>.json`. The
+manual steps follow.
 
 Each worker's `wrangler.jsonc` is its configuration. The top-level block is the
 **dev** environment (`--env=""`); `env.production` is prod and repeats every
@@ -171,9 +201,17 @@ bunx wrangler pipelines streams create stella_telemetry_dev \
 The stream alone is enough to deploy. Storing events (sink, R2 Data Catalog,
 SQL pipeline) is optional and described in `infra/telemetry/README.md`.
 
-**Web search** runs on the same account, with no provider key and no API
+**Web search (optional).** Var `STELLA_WEB_SEARCH` picks the backend:
+`cloudflare` (hosted Stella's default), `openrouter` (OpenRouter's web plugin
+with the server's `OPENROUTER_API_KEY`; model `STELLA_WEB_SEARCH_MODEL`, default
+`openai/gpt-4o-mini`) or `off`. In owner mode the default is `openrouter` when
+the key is set, otherwise `off`: the web search tool then says it isn't set
+up, and Claude Code and Codex agents search with their engine's own tool.
+Cloudflare's search runs on the same account with no provider key and no API
 token: cloud-builder's `AI` binding calls the Web Search API through the AI
-Gateway named `default`, which every account has. Two dashboard steps:
+Gateway named `default`, which every account has. It costs money per search;
+on an owner-mode server set `STELLA_WEB_SEARCH=cloudflare` and do these two
+dashboard steps:
 
 1. AI → AI Gateway: open the `default` gateway once so it exists (or create
    one and set the var `AI_GATEWAY_ID` on cloud-builder to its id). The
@@ -200,9 +238,13 @@ bunx wrangler r2 bucket cors set stella-v2-drive-dev --file r2-cors.json --force
 bunx wrangler r2 bucket cors set stella-v2-media-dev --file r2-cors.json --force
 ```
 
-The presigned URLs also need an **R2 API token**: Dashboard → R2 → Manage API
-tokens → create one with Object Read & Write on the drive and media buckets.
-Its access key id and secret go into 1.4.
+**R2 API token (optional):** with `R2_ACCESS_KEY_ID` and
+`R2_SECRET_ACCESS_KEY` set, drive and media files move with presigned URLs
+straight to R2, which is faster for large files. Without them the Worker
+serves the same files through its R2 bindings. To add one: Dashboard → R2 →
+Manage API tokens → create one with Object Read & Write on the drive and media
+buckets, and set both secrets on cloud-builder (1.4). Through the Worker a
+single file is limited to 100 MB.
 
 Artifacts needs nothing up front: the namespace is created when you first
 publish the app source (1.7). Containers need nothing either: the first
@@ -210,16 +252,12 @@ cloud-builder deploy builds and pushes the image.
 
 ### 1.4 Secrets
 
-**The quick way:** `bun scripts/self-host-setup.mjs` shows what it would do;
-`bun scripts/self-host-setup.mjs --apply` (add `--env production` for prod)
-generates every internal secret below, sets them on their workers, creates the
-capability key pair, writes `CAPABILITY_JWKS` and `CAPABILITY_SIGNING_KID` into
-the wrangler configs, and saves `STELLA_ADMIN_API_SECRET` to
-`workers/cloud-builder/.dev.vars` (dev) or
-`~/.config/stella/admin-api-secret.production` (prod). It never replaces a
-secret a worker already has, and lists what is still yours to set (the R2 API
-token, `OPENROUTER_API_KEY`). Commit the wrangler.jsonc changes afterwards. The
-rest of this section is what it does, by hand.
+**The quick way:** `bun scripts/selfhost.mjs setup` generates every internal
+secret below and the capability key pair, and passes them to each worker with
+its first deploy (`wrangler deploy --secrets-file`). It lists each worker's
+secrets first and never replaces one it already has; the only exceptions are
+repairs it names in its output (an admin key or capability key whose saved copy
+was lost is rotated). The rest of this section is what it does, by hand.
 
 Every secret is set with `printf %s "$VALUE" | bunx wrangler secret put NAME --env=""`
 from the worker's directory (`--env production` for prod). Never commit them.
@@ -231,7 +269,9 @@ from the worker's directory (`--env production` for prod). Never commit them.
 | `BUILDER_SERVICE_SECRET` | `openssl rand -hex 32` |
 | `BETTER_AUTH_SECRET` | `openssl rand -hex 32` (signs sessions; changing it signs everyone out) |
 | `CAPABILITY_SIGNING_KEY` | the private key below |
-| `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | the R2 API token from 1.3 |
+| `MEDIA_SIGNING_SECRET`, `OAUTH_STATE_SECRET`, `STELLA_ADMIN_API_SECRET` | `openssl rand -hex 32` each. The admin secret is the bearer the CLI uses to create the owner and pairing codes; keep a copy |
+| `OWNER_SECRETS_KEK` | `openssl rand -base64 32` (encrypts the owner's engine and provider credentials) |
+| `CANVAS_SHARE_VIEW_SECRET` | `openssl rand -hex 32`, the same value on **canvas-share** |
 
 The capability key signs cloud turns; the model gateway checks them with its
 public half:
@@ -249,18 +289,19 @@ Put the public entry in model-gateway's `vars.CAPABILITY_JWKS` as
 and keep cloud-builder's `vars.CAPABILITY_SIGNING_KID` equal to the kid
 (`builder-1`). Use a different kid for prod (`builder-prod-1`).
 
-**model-gateway:** `OPENROUTER_API_KEY`.
+**model-gateway:** nothing required. `OPENROUTER_API_KEY` is optional (Part 2);
+set it on cloud-builder too for dictation.
 
 **browser-gateway:** `BROWSER_PROFILE_KEK_V1` = 32 random bytes, base64url:
 `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`.
 
-**telemetry:** `TELEMETRY_PSEUDONYM_KEY` and `TELEMETRY_SERVER_SECRET`, each
-`openssl rand -hex 32`.
+**telemetry** (optional, not deployed by the script): `TELEMETRY_PSEUDONYM_KEY`
+and `TELEMETRY_SERVER_SECRET`, each `openssl rand -hex 32`.
 
 That is the whole required set. Billing is off when none of its secrets are set
-(see Part 2): every account is Pro with unlimited usage. **Anyone who can reach
-your backend can sign in (anonymously, at least) and spend your OpenRouter
-credit**, so keep the URLs to yourself or set the billing limits in Part 2.
+(see Part 2): every account is Pro with unlimited usage, which is why a
+personal server runs in owner mode (1.6), where nobody but the owner's paired
+devices can sign in.
 
 ### 1.5 Migrations and deploy order
 
@@ -274,15 +315,23 @@ exist yet. cloud-builder and model-gateway bind to each other, so the very
 first deploy needs one extra step:
 
 ```bash
-cd workers/telemetry       && bun run deploy:dev
-cd ../browser-gateway      && bun run deploy:dev
+cd workers/browser-gateway && bun run deploy:dev
 # First time only: comment out the BILLING entry in model-gateway's "services",
 # deploy, then restore it.
 cd ../model-gateway        && bun run deploy:dev
 cd ../cloud-builder        && bun run deploy:dev     # Docker must be running
 cd ../model-gateway        && bun run deploy:dev     # BILLING restored
 cd ../apps-host            && bun run deploy:dev
+cd ../canvas-share         && bun run deploy         # shares, 1.6
+cd ../sites-host           && bun run deploy:dev     # Stella sites, 1.6
+# telemetry is optional: cd ../telemetry && bun run deploy:dev
 ```
+
+The script does this with its generated configs, so the first model-gateway
+pass simply has no `BILLING` binding. The release the server reports in
+`/.well-known/stella` (version, release date, commit) is baked into the
+cloud-builder build from git: a `server-YYYY.MM.DD[.n]` tag on a clean `HEAD`,
+otherwise `dev-<date>-<sha>`.
 
 After that, use the order in `DEPLOY.md`: D1 migrations → cloud-builder →
 model-gateway → the rest. A deploy kills cloud turns in flight.
@@ -294,16 +343,35 @@ request and then daily.
 For prod, repeat 1.3–1.5 with the prod names, `--env production`, and the
 `deploy:production` scripts.
 
-### 1.6 Auth
+### 1.6 Owner mode, devices and sharing
 
-Anonymous sign-in works with no setup, so no sign-in method is required: an
-anonymous user can chat on Claude Code, ChatGPT or their own API keys, and,
-with billing off, on your managed models. To keep anonymous users off your
-managed models, set `STELLA_TIER_CEILING_ANON_HOURLY_USD` and
-`STELLA_TIER_CEILING_ANON_DAILY_USD` to `0`. Sign-in is only needed for
-accounts: sync across computers, the mobile app and, once you set billing
-limits, Stella's managed models. Add these as you need them; each is
-optional (Part 2):
+A personal server runs in **owner mode**: var `STELLA_OWNER_MODE = "1"` on
+cloud-builder (the script sets it). The server has exactly one real owner and
+no sign-in page: anonymous sign-in, magic links and Google/Apple sign-in are
+off. Devices join only through a one-time pairing code (QR or
+`stella://pair?server=…&code=…` link), which mints a normal session for the
+owner. Codes are 256-bit, work once, expire after 10 minutes and allow 5
+attempts; the claim endpoint is also rate-limited per IP. Nothing that spends
+money is reachable without a session.
+
+1. Create the owner once (idempotent; the name is what the apps show):
+   `curl -X POST -H "Authorization: Bearer $STELLA_ADMIN_API_SECRET" -H "Content-Type: application/json" -d '{"name":"My Stella"}' <backend>/api/admin/selfhost/owner`
+2. Make a pairing code: `POST <backend>/api/auth/device-pairing/start` with the
+   same bearer and `{}`. The answer's `link` is the code. `setup` does both
+   steps; `bun scripts/selfhost.mjs pair` makes a new code and prints it as a
+   QR code.
+3. Phone: Stella app → **Connect your own server** → scan. Desktop: open the
+   link, or Stella → **Connect to your own server** and paste it.
+
+`<backend>/.well-known/stella` describes the server to the apps (name, owner
+mode, version, features, URLs). Lost every device? With the Cloudflare login,
+`bun scripts/selfhost.mjs recover` rotates `STELLA_ADMIN_API_SECRET` with
+`wrangler secret put` and prints a new code.
+
+**Without owner mode** (a multi-user deployment like stella.sh) users sign in.
+Don't plan around anonymous accounts: they are refused for sync, the mobile
+app and cloud features, and an anonymous account idle for 30 days is deleted
+with its data. Set up at least one of:
 
 - **Email (magic links):** Cloudflare Email Service. Enable sending for a domain
   on a zone in your account (`bunx wrangler email sending enable example.com`;
@@ -318,13 +386,31 @@ optional (Part 2):
   then `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`
   (and `APPLE_APP_BUNDLE_IDENTIFIER` for the iOS app).
 
-After a browser sign-in the backend sends the browser to
+and keep anonymous users off your managed models with
+`STELLA_TIER_CEILING_ANON_HOURLY_USD` and `STELLA_TIER_CEILING_ANON_DAILY_USD`
+set to `0`. After a browser sign-in the backend sends the browser to
 `<STELLA_WEBSITE_URL>/auth/callback?done=true`; set `STELLA_WEBSITE_URL` if you
 host the website.
 
-**Canvas sharing (optional):** deploy `workers/canvas-share` (`bun run deploy`)
-with its own route or workers.dev, and set the canvas-share rows of the
-identities table (1.2) to it.
+**Canvas shares and Stella sites** run on your `workers.dev` subdomain, each
+on its own worker, separate from the backend: canvas-share at
+`https://<prefix>-share.<sub>.workers.dev/c/<id>` (cloud-builder
+`CANVAS_SHARE_BASE_URL`; canvas-share `OWNER_SITE_URL = ""` in owner mode) and
+sites-host path-based at `https://<prefix>-sites.<sub>.workers.dev/<id>/`
+(cloud-builder `SITES_HOST = ""` and `SITES_SHARED_ORIGIN` = that origin;
+sites-host `SITES_APEX = ""`, `workers_dev: true`). All sites then share one
+origin, which is fine on a single-owner server. A domain of your own (a zone on
+your account) restores per-site subdomains: set `SITES_HOST` to
+`*.sites.example.com` with a matching route on sites-host.
+
+**Cloud agents' spending cap:** `STELLA_CLOUD_AGENT_MONTHLY_HOURS` (container
+hours per month, default 40 in owner mode, `"0"` for no cap) and
+`STELLA_CLOUD_AGENT_MAX_CONCURRENT` (containers at once, the cloud
+orchestrator's included; default 3, `"0"` for no cap). Both are counted across
+the whole server in D1; past either, a new cloud agent is refused with a
+message saying what to do. Hosted Stella has no cap unless they are set. The
+script sets them only when you pass `--cloud-agent-hours` or
+`--cloud-agent-concurrency`.
 
 ### 1.7 Publish the app source
 
@@ -333,8 +419,10 @@ user gets a fork of its `upstream` repo, and Stella's self-modification works
 on that fork. Publish whenever desktop or runtime code changes:
 
 ```bash
-env -u CLOUDFLARE_API_TOKEN bun run app-source:publish -- --namespace stella-app-dev
+env -u CLOUDFLARE_API_TOKEN bun run app-source:publish -- --namespace stella-app-dev --backend <your backend>
 ```
+
+(The script publishes to `<prefix>-app`.)
 
 The first publish creates the namespace and the `upstream` repo. An unchanged
 tree publishes nothing.
@@ -494,12 +582,13 @@ Secrets go on **cloud-builder** unless noted.
 
 | Feature | Keys | Provider | Without it |
 |---|---|---|---|
+| Owner mode (one owner, devices join by pairing code; 1.6) | var `STELLA_OWNER_MODE = "1"` on **cloud-builder** and **model-gateway**; optional `STELLA_OWNER_MODE_SIGN_IN` (`email`, `social`, `anonymous`, comma-separated) re-opens those sign-in methods; `STELLA_CLOUD_AGENT_MONTHLY_HOURS`, `STELLA_CLOUD_AGENT_MAX_CONCURRENT` | none | Off: a multi-user server with the sign-in methods you set up (1.6). Push notifications are off in owner mode |
 | Billing (plans, limits, Stripe checkout) | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` (webhook URL `<backend>/api/stripe/webhook`), `STRIPE_PRICE_GO`, `STRIPE_PRICE_PRO`, `STELLA_INCLUDED_USAGE_UTILIZATION_RATE`, `STELLA_GO_PRICE_CENTS`, `STELLA_PRO_PRICE_CENTS`, `STELLA_FREE_{ROLLING,WEEKLY,MONTHLY}_LIMIT_USD`, `STELLA_FREE_ROLLING_WINDOW_HOURS`, `STELLA_ANON_LIFETIME_LIMIT_USD`, `STELLA_ANON_MAX_REQUESTS`; optional overrides in `workers/cloud-builder/src/billing/plans.ts` | Stripe | Billing is off: every account is Pro, unlimited; checkout says billing isn't set up. Setting any one of `STELLA_INCLUDED_USAGE_UTILIZATION_RATE`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_GO`, `STRIPE_PRICE_PRO` turns billing on, and then all the required ones must be set or turns are refused |
 | Cloud containers by plan (cloud agents, cloud as a run destination, Claude Code in the cloud) | var or secret `STELLA_CLOUD_SANDBOX_PLANS`: comma list of `anonymous`, `free`, `go`, `pro` that may start a cloud container, e.g. `go,pro` to require a subscription. Read only when billing is on. Chat, chat storage and running on the user's own computer are never gated | none | Billing off: every account may use containers. Billing on and unset: every signed-in plan may (`free,go,pro`), anonymous may not. Refused callers get `subscription_required` (403), "Running in the cloud needs a Stella subscription." |
 | Email sign-in (magic links) | var `STELLA_EMAIL_FROM` on a domain enabled for Email Sending (see 1.6); or, instead or as a fallback, `RESEND_API_KEY`, `RESEND_FROM`; optional `STELLA_EMAIL_LOGO_URL` | Cloudflare Email Service (Resend fallback) | Magic links answer 503 "Email sign-in isn't set up" |
 | Google / Apple sign-in | see 1.6 | Google, Apple | The provider isn't offered |
 | Opening private canvas links in a browser | `CANVAS_SHARE_VIEW_SECRET` (`openssl rand -hex 32`): the same value on **cloud-builder** (every env that writes to the share bucket) and on **canvas-share** | none | Canvases still get private links and show in the app, but a private link opens nowhere else (the share domain shows its "private" page) until it is made public |
-| Web search tool | No key: cloud-builder's `AI` binding (already in `wrangler.jsonc`) calls [Cloudflare's Web Search API](https://developers.cloudflare.com/web-search/) through your account's `default` AI Gateway, paid from AI Gateway credits (1.3). Optional vars: `AI_GATEWAY_ID` (another gateway), `WEB_SEARCH_PROVIDER` (`exa` default, `ceramic`, `linkup`) | Cloudflare Web Search API: Exa ($7 per 1,000 searches; Ceramic $0.25, Linkup $5) | Searches answer "WebSearch failed (402)" with Cloudflare's reason (no credits) |
+| Web search tool | `STELLA_WEB_SEARCH` (1.3): `openrouter` uses `OPENROUTER_API_KEY` (owner mode's default when it is set); `cloudflare` uses cloud-builder's `AI` binding and [Cloudflare's Web Search API](https://developers.cloudflare.com/web-search/) through your account's `default` AI Gateway, paid from AI Gateway credits (optional vars `AI_GATEWAY_ID`, `WEB_SEARCH_PROVIDER`: `exa` default, `ceramic`, `linkup`) | OpenRouter web plugin; Cloudflare Web Search API: Exa ($7 per 1,000 searches; Ceramic $0.25, Linkup $5) | Owner mode with no key: the tool says web search isn't set up; Claude Code and Codex agents use their own search. `cloudflare` with no credits: "WebSearch failed (402)" |
 | Image, video, music, speech, transcription and 3D generation (`stella-media`, `image_gen`) | `FAL_KEY` | fal.ai: the models in `packages/contracts/media-models.ts` (GPT Image 2.5 Flare, Seedance 2.5, Lyria 3.5, Gemini 3.8 Flash Lite TTS, ElevenLabs Scribe v2, Tripo P2) | 503 "Media generation is not configured yet" |
 | Read-aloud (TTS) | `OPENROUTER_API_KEY` or `FAL_KEY`; OpenRouter with both (cheaper, one hop), unless `STELLA_MEDIA_PROVIDER` = `fal`.; the OpenAI read-aloud voice uses `OPENAI_API_KEY` | Gemini 3.8 Flash Lite TTS on OpenRouter or fal; OpenAI | 503 "read-aloud is not configured yet" |
 | Realtime voice | `OPENAI_API_KEY` | OpenAI Realtime | Unavailable (users can still bring their own xAI / Inworld keys on desktop) |

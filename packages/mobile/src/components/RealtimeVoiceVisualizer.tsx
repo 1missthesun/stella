@@ -9,7 +9,7 @@ import Animated, {
   withRepeat,
   withTiming,
 } from "react-native-reanimated";
-import { STELLA_STAR_PATH } from "./stella-mark/geometry";
+import { STELLA_STAR_PATH } from "@stella/contracts/stella-mark";
 import { MarkLayer } from "./stella-mark/MarkLayer";
 import { StellaFace } from "./stella-mark/StellaFace";
 import { CLOCK_SPAN_MS, clamp01 } from "./stella-mark/motion";

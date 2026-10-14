@@ -1,4 +1,5 @@
-import { STELLA_ORB_PATH, STELLA_STAR_PATH } from "./geometry";
+import { STELLA_STAR_PATH } from "@stella/contracts/stella-mark";
+import { STELLA_ORB_PATH } from "./geometry";
 
 export function blendStarToOrb(t: number): string {
   const orb = STELLA_ORB_PATH.match(/-?\d*\.?\d+/g) ?? [];

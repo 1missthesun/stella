@@ -10,7 +10,8 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from "react-native-reanimated";
-import { STELLA_ORB_PATH, STELLA_STAR_PATH } from "./geometry";
+import { STELLA_STAR_PATH } from "@stella/contracts/stella-mark";
+import { STELLA_ORB_PATH } from "./geometry";
 import { STELLA_SOFT_PATH } from "./blend";
 import { MarkLayer } from "./MarkLayer";
 import { StellaFace } from "./StellaFace";

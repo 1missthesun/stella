@@ -4,6 +4,7 @@ import os from "os";
 import { Effect } from "effect";
 import { runDiscovery, tryDiscovery, tryDiscoverySync } from "./effect-io.js";
 import { openSqliteSnapshot } from "./sqlite-snapshot.js";
+import { isPlistDict, parsePlistXml } from "./plist-xml.js";
 
 const log = (...args: unknown[]) => console.error("[music-library]", ...args);
 
@@ -55,12 +56,6 @@ const findItunesXml = async (): Promise<string | null> => {
   return null;
 };
 
-/**
- * Lightweight XML plist track parser.
- * iTunes XML is a plist with a <dict> of track entries.
- * Each track has key-value pairs for Name, Artist, Genre, Play Count, etc.
- * We parse just the track dicts without a full XML parser.
- */
 const parseItunesXml = async (xmlPath: string): Promise<MusicLibrarySignals> => {
   const content = await fs.readFile(xmlPath, "utf-8");
 
@@ -68,52 +63,22 @@ const parseItunesXml = async (xmlPath: string): Promise<MusicLibrarySignals> => 
   const genreCounts = new Map<string, number>();
   let totalTracks = 0;
 
-  const tracksIdx = content.indexOf("<key>Tracks</key>");
-  if (tracksIdx === -1) {
+  const library = parsePlistXml(content);
+  const tracks = library !== null && isPlistDict(library) && isPlistDict(library.Tracks) ? library.Tracks : null;
+  if (!tracks) {
     return { source: "itunes", totalTracks: 0, topArtists: [], topGenres: [] };
   }
 
-  // Match individual track entries: <key>ID</key><dict>...</dict>
-  // We iterate through key-value pairs within each track dict
-  // Start after the Tracks key
-  const tracksSection = content.substring(tracksIdx);
-
-  // Simpler approach: find all Artist and Genre values with their Play Count
-  // Each track dict has sequential key-value pairs
-  const trackPattern = /<key>Track ID<\/key>/g;
-  let match;
-  let prevIdx = 0;
-
-  // Split by Track ID to get individual track blocks
-  const trackBlocks: string[] = [];
-  while ((match = trackPattern.exec(tracksSection)) !== null) {
-    if (prevIdx > 0) {
-      trackBlocks.push(tracksSection.substring(prevIdx, match.index));
-    }
-    prevIdx = match.index;
-  }
-  if (prevIdx > 0) {
-    // Add the last block (up to the closing dict of Tracks)
-    const endIdx = tracksSection.indexOf("</dict>", prevIdx + 1000);
-    if (endIdx > 0) trackBlocks.push(tracksSection.substring(prevIdx, endIdx));
-  }
-
-  for (const block of trackBlocks) {
-    const podcastMatch = block.match(/<key>Podcast<\/key>\s*<true\/>/);
-    if (podcastMatch) continue;
-    const kindMatch = block.match(/<key>Kind<\/key>\s*<string>([^<]+)<\/string>/);
-    if (kindMatch && kindMatch[1].toLowerCase().includes("audiobook")) continue;
+  for (const track of Object.values(tracks)) {
+    if (!isPlistDict(track)) continue;
+    if (track.Podcast === true) continue;
+    if (typeof track.Kind === "string" && track.Kind.toLowerCase().includes("audiobook")) continue;
 
     totalTracks++;
 
-    const artistMatch = block.match(/<key>Artist<\/key>\s*<string>([^<]+)<\/string>/);
-    const artist = artistMatch?.[1];
-
-    const genreMatch = block.match(/<key>Genre<\/key>\s*<string>([^<]+)<\/string>/);
-    const genre = genreMatch?.[1];
-
-    const playCountMatch = block.match(/<key>Play Count<\/key>\s*<integer>(\d+)<\/integer>/);
-    const playCount = playCountMatch ? Number(playCountMatch[1]) : 0;
+    const artist = typeof track.Artist === "string" ? track.Artist : undefined;
+    const genre = typeof track.Genre === "string" ? track.Genre : undefined;
+    const playCount = typeof track["Play Count"] === "number" ? track["Play Count"] : 0;
 
     if (artist) {
       artistCounts.set(artist, (artistCounts.get(artist) ?? 0) + playCount);

@@ -1,22 +1,4 @@
 /**
- * Full-window top bar.
- *
- * Before the shell redesign the full window had no top bar at all — the left
- * sidebar's chrome carried the macOS traffic-light inset, the update pill and
- * account controls, and the only other chrome was a pair of floating edge
- * toggles. With the sidebar gone, this bar takes over that job: it owns the
- * main-column drag region, clears the traffic lights, and hosts navigation
- * plus the account. The account follows the main column as the right sidebar
- * opens and closes; the sidebar's own header replaces the closed Settings and
- * panel controls while open.
- *
- * The treatment follows Stella v2's: a transparent 38px strip with no border
- * and no backdrop, carrying floating controls. Everything inside carves
- * `no-drag` out of the bar's `drag` region, and the bar is rendered late in the
- * shell tree because `-webkit-app-region` resolves in DOM order rather than by
- * z-index — a control painted above but declared earlier still reads as
- * draggable and swallows its own clicks.
- *
  * Apps are deliberately absent from the nav: they now open inside the right
  * sidebar's Apps section rather than the main content area, so a nav entry
  * pointing at the `/apps` route would compete with the sidebar for the same

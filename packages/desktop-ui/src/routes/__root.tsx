@@ -809,11 +809,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
         </div>
       </div>
 
-      {/* The top bar spans the whole shell, then follows the main column's
-          right edge when the display panel opens. It is rendered after the
-          content area's drag strip so its `no-drag` controls remain
-          interactive, and it carries the activity indicator that replaced
-          the standalone right-hand activity surface. */}
       <ShellTopBarFull onSignIn={showAuthDialog} />
 
       <DisplayPanelTopBar />

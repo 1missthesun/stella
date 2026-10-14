@@ -286,11 +286,6 @@ export async function playReadAloudStream(
       },
       { once: true },
     );
-
-    // If the element errors while wiring up the MediaSource, surface it.
-    if (mediaSource.readyState === "closed") {
-      // Normal: sourceopen fires after src assignment. No-op guard for lint.
-    }
   });
 }
 

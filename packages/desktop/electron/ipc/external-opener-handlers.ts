@@ -11,7 +11,6 @@ import {
   BROWSER_EXTS,
   CODE_EXTS,
   DOC_EXTS,
-  HTML_EXTS,
   IMAGE_EXTS,
   PDF_EXTS,
   SHEET_EXTS,
@@ -200,10 +199,6 @@ const MAC_APP_CATALOG: MacAppDef[] = [
     extensions: SHEET_EXTS,
   },
 ];
-
-// Silence unused-import warning when only some ext groups feed the
-// catalog above (helps when iterating on the list).
-void HTML_EXTS;
 
 const macAppById = new Map(MAC_APP_CATALOG.map((entry) => [entry.id, entry]));
 

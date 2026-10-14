@@ -903,12 +903,11 @@ export class ExecutionPlacementBridge {
     "request.cancel": (frame) => {
       this.deviceRequests.cancel(frame.requestId);
     },
-    error: (frame, socket) => {
+    error: (frame) => {
       this.log(
         "warn",
         `The owner gate refused a presence frame (${frame.code}): ${frame.message}`,
       );
-      if (!frame.retryable) socket.close(4000, frame.code);
     },
     pong: () => {},
   };
@@ -2063,7 +2062,22 @@ export class ExecutionPlacementBridge {
     try {
       dispatch = await acknowledged;
     } catch {
-      dispatch = await this.getDispatchStatus(row.dispatchId).catch(() => null);
+      let missing = false;
+      dispatch = await this.getDispatchStatus(row.dispatchId).then(
+        (status) => {
+          missing = status === null;
+          return status;
+        },
+        () => null,
+      );
+      if (missing) {
+        this.inbox.markOrphaned(row.dispatchId, this.now());
+        this.log(
+          "warn",
+          `Execution placement dropped the terminal receipt for ${row.dispatchId}: the owner gate has no such dispatch.`,
+        );
+        return;
+      }
       if (dispatch && !isTerminalState(dispatch.state)) dispatch = null;
     }
     if (!dispatch) {

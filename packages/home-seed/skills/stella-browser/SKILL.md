@@ -7,7 +7,7 @@ description: Control browser tabs through the persistent code runtime and its fr
 
 Use `code` for production browser automation. Its persistent JavaScript runtime exposes a deeply frozen `browser` object with top-level `await`. Bindings and `Tab` and `Locator` identities persist across calls, so create handles once and reuse them.
 
-Use `var` for reusable REPL bindings. Browser actions are not exposed through `Bash`; use the frozen `browser` API only.
+Use `var` for reusable REPL bindings: `let`/`const` names can't be declared again in a later cell. Browser actions are not exposed through `Bash`; use the frozen `browser` API only.
 
 ## Which Browser
 
@@ -16,7 +16,7 @@ Pick the browser at the start of the task:
 - **The user's own browser**, `browser.use("external")`, the default while the Stella Browser extension is connected: their real browser (Chrome, Brave, Edge or Arc), signed in exactly as the user is, so their email, GitHub, bank, shopping, social and work tools just work. Your tabs open in the background, in a tab group labeled "Stella". Nothing is copied, so a session never goes stale.
 - **Stella's browser**, `browser.use("in-app")`: when the extension isn't connected, or for work that should stay out of the user's browser (throwaway or test sessions, anything that would disturb their tabs or sign them out). It has its own profile and is signed in only where someone signed in inside it (the user in Stella's Browser panel, or a sign-in the user completed in your tab).
 
-Without a `browser.use()` call, the first browser call picks the user's browser if the extension is connected, else Stella's; `browser.backend` tells you which.
+Without a `browser.use()` call, the first browser call picks the user's browser if the extension is connected, else Stella's. `await browser.use()` (no argument) resolves that default and returns `{ backend }`; read it instead of `browser.backend`, which only reflects an explicit choice.
 
 ```js
 await browser.use("external"); // or leave it to the default
@@ -25,6 +25,20 @@ await tab.goto("https://github.com/notifications");
 ```
 
 `browser.use()` sets the browser for handles you acquire afterwards. Every `Tab` and `Locator` keeps its fixed `.backend`, so an existing handle keeps routing to the browser that created it. Use both in one task when it helps, for example a throwaway test session in Stella's browser beside the signed-in work in the user's.
+
+### Several browsers or profiles
+
+The extension can be connected in several browsers and profiles at once (say Chrome and Brave, or a work and a personal profile). Stella uses the one picked in Settings, otherwise the one the user is in right now (the frontmost browser, its most recently used profile). Once your first external command lands in a browser, your later commands stay there.
+
+```js
+await browser.browsers();
+// [{ id, label: "Brave · Work (me@corp.com)", browser, profile, email, enabled, inUse, current }]
+await browser.use("external", { browser: "Brave" }); // a label, id, browser or profile name from browsers()
+```
+
+`current: true` marks the browser your commands go to, `inUse: true` the one Stella would pick by default. Only target a specific one when the task needs that account (for example the work profile); otherwise leave the default. If your browser is closed mid-task, commands fail after a short wait with a message naming it: open a new tab with `browser.tabs.new()` to continue in another connected browser, or ask the user to reopen it.
+
+### Guest rules
 
 In the user's browser you are a guest in their window:
 
@@ -128,6 +142,16 @@ await tab.axSnapshot();
 
 Use `await tab.axSnapshot({ mode: "full" })` after context compaction, output pruning, or whenever the referenced baseline is no longer in context. `mode: "diff"` requests differences even if larger; a missing or incompatible baseline or exhausted computation budget still returns full output. AX options are `mode`, `interactive`, `compact`, `maxDepth`, and `selector`. Keep using the same options to retain the baseline. The DOM snapshot APIs remain full-output and do not share the AX baseline.
 
+## Dialogs and Unresponsive Tabs
+
+Page dialogs never block you:
+
+- `alert()` is dismissed, `confirm()` answers Cancel and `prompt()` returns null. Actions that may trigger one (`click`, `press`, `check`, `selectOption`, …) return `{ dialogs: [{ type, message, answer }] }` when one fired, so read it to learn what the page said.
+- To accept a confirm (for example "Delete this item?"), override it before the click: `await page.evaluate(() => { window.confirm = () => true; })`.
+- "Leave site?" (beforeunload) prompts are accepted automatically when you navigate, go back or close your tab.
+
+If a tab stops answering (a command times out with a message saying the page may be blocked), don't retry the same command on it. `await tab.goto(url)` usually recovers it; if not, `await tab.close()` and continue in `await browser.tabs.new()`. After a timeout on a mutating action, check the page state before repeating it.
+
 ## Synchronize on Browser State
 
 Wait for the state caused by the action:
@@ -198,7 +222,7 @@ The public object graph is frozen. Do not mutate it or attach properties. This i
 
 | Object         | Supported API                                                        |
 | -------------- | -------------------------------------------------------------------- |
-| `browser`      | `capabilities`, `use(backend)`, `chain(steps, options)`, `tabs`      |
+| `browser`      | `capabilities`, `use(backend?, { browser? })`, `browsers()`, `chain(steps, options)`, `tabs` |
 | `browser.tabs` | `list()`, `new(url?)`, `selected()`, `get(id)`, `finalize(entries?)` |
 
 For a new task, call `tabs.new()` once and then navigate that handle with `tab.goto(url)`. If navigation fails, reuse the same handle or inspect `tabs.list()`; do not loop on `tabs.new()` because a delayed response can otherwise create a pileup of blank tabs. Use `tabs.selected()` only when the user's currently selected owned tab is the target, and `tabs.list()` when tab choice is itself a decision.
@@ -216,7 +240,7 @@ For a new task, call `tabs.new()` once and then navigate that handle with `tab.g
 | `close()`                                                             | Close this tab.                          |
 | `markHandoff()`, `markDeliverable()`                                  | Retain during automatic turn cleanup.    |
 | `show()`                                                              | Bring this tab forward for the user.     |
-| `url()`, `title()`                                                    | Cheapest page identity reads.            |
+| `url()`, `title()`                                                    | Async methods, not strings: `(await tab.url()).includes(…)`. |
 | `snapshot(options?)`                                                  | Structural observation.                  |
 | `axSnapshot({ mode?, interactive?, compact?, maxDepth?, selector? })`   | AX tree, incremental; not in cloud sessions. |
 | `screenshot(options?)`                                                | Pixel observation.                       |

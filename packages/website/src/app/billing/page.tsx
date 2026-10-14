@@ -3,9 +3,8 @@ import { BillingShell } from "./billing-shell";
 import { BillingClient } from "./billing-client";
 
 export const metadata: Metadata = {
-  title: "Account",
-  description:
-    "Choose a Stella plan. Go raises your usage limits; Pro adds image, video, 3D and voice generation plus orchestrator mode.",
+  title: "Plan & usage",
+  description: "See your Stella usage, change your plan, and add extra credit.",
   robots: { index: false, follow: true },
 };
 

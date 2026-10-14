@@ -1,50 +1,56 @@
-export type BillingPlan = "free" | "go" | "pro";
+import {
+  BUDGET_COVERS,
+  INCLUDED_IN_EVERY_PLAN,
+  PAID_BILLING_PLANS,
+  PLAN_CATALOG,
+  PLAN_ORDER,
+  formatPlanPrice,
+  isPaidBillingPlan,
+  nextPlanUp,
+  normalizeBillingPlan,
+  planLabel,
+  planRank,
+  type BillingPlan,
+  type PaidBillingPlan,
+  type PlanDefinition,
+} from "@stella/contracts/billing-plans";
 
-export type PlanDisplay = {
-  label: string;
-  monthlyPriceCents: number;
-  tagline: string;
-  features: readonly string[];
-  featured?: boolean;
+export {
+  BUDGET_COVERS,
+  INCLUDED_IN_EVERY_PLAN,
+  PAID_BILLING_PLANS,
+  PLAN_CATALOG,
+  PLAN_ORDER,
+  formatPlanPrice,
+  isPaidBillingPlan,
+  nextPlanUp,
+  normalizeBillingPlan,
+  planLabel,
+  planRank,
+  type BillingPlan,
+  type PaidBillingPlan,
+  type PlanDefinition,
 };
 
-export const PLAN_ORDER: readonly BillingPlan[] = ["free", "go", "pro"];
+export const FEATURED_PLAN: BillingPlan = "pro";
 
-export const PLANS: Record<BillingPlan, PlanDisplay> = {
-  free: {
-    label: "Free",
-    monthlyPriceCents: 0,
-    tagline: "No credit card, no trial.",
-    features: [
-      "Coding agent",
-      "Personal assistant",
-      "Research and knowledge work",
-      "Dictation and read-aloud",
-    ],
-  },
-  go: {
-    label: "Go",
-    monthlyPriceCents: 500,
-    tagline: "10× higher usage",
-    features: ["Coding, assistant and research", "Dictation and read-aloud"],
-  },
-  pro: {
-    label: "Pro",
-    monthlyPriceCents: 1_500,
-    tagline: "The highest usage limits",
-    featured: true,
-    features: [
-      "Image, video, 3D and voice generation",
-      "Multiple agents working together",
-    ],
-  },
+export const formatUsd = (usd: number): string =>
+  Number.isInteger(usd) ? `$${usd}` : `$${usd.toFixed(2)}`;
+
+// "$20/mo" or "$0".
+export const planPriceLabel = (plan: BillingPlan): string => {
+  const def = PLAN_CATALOG[plan];
+  return def.interval ? `${formatPlanPrice(def.monthlyPriceCents)}/mo` : formatPlanPrice(0);
 };
 
-export const INCLUDED_IN_EVERY_PLAN = [
-  "Browser, desktop, and mobile access",
-  "Coding, assistant and research in one app",
-  "Dictation and wake word on every tier",
-  "Customizable interface",
-  "Work with files and apps",
-  "Bring your own models and keys",
-] as const;
+// One line for summaries: "Plus — $20/mo with $15 of usage every month".
+export const planSummary = (plan: BillingPlan): string => {
+  const def = PLAN_CATALOG[plan];
+  if (!def.interval) {
+    return `${def.label} — $0, with ${formatUsd(def.budget.oneTimeUsd ?? def.budget.monthlyUsd)} of usage to try Stella`;
+  }
+  return `${def.label} — ${planPriceLabel(plan)} with ${formatUsd(def.budget.monthlyUsd)} of usage every month`;
+};
+
+export const cheapestMediaPlan = (): PaidBillingPlan =>
+  PAID_BILLING_PLANS.find((plan) => PLAN_CATALOG[plan].mediaGeneration) ?? "plus";

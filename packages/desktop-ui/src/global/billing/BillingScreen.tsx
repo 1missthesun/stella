@@ -1,165 +1,53 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from "react";
+import type { BillingStatus } from "@stella/contracts/backend/billing";
+import {
+  PLAN_CATALOG,
+  PLAN_ORDER,
+  isPaidBillingPlan,
+  nextPlanUp,
+  normalizeBillingPlan,
+  planRank,
+  type BillingPlan,
+  type PaidBillingPlan,
+} from "@stella/contracts/billing-plans";
 import { backendClient } from "@/platform/backend/backend-client";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { useLocale, useT } from "@/shared/i18n";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { openExternalUrl } from "@/platform/electron/open-external";
-import { Check } from "@/ui/icons";
-import { CAPABILITIES, hasCapability } from "./capabilities";
-import { resolveFreeAllowance } from "./audience";
 import "./BillingScreen.css";
 
-type BillingPlan = "free" | "go" | "pro";
-type PaidBillingPlan = Exclude<BillingPlan, "free">;
+type Translate = ReturnType<typeof useT>;
+type Busy = "checkout" | "portal" | "credit" | null;
 
-type BillingPlanConfig = {
-  label: string;
-  monthlyPriceCents: number;
-  introFirstMonthPriceCents?: number;
-  rollingLimitUsd: number;
-  rollingWindowHours: number;
-  weeklyLimitUsd: number;
-  monthlyLimitUsd: number;
-  lifetimeLimitUsd?: number;
-};
+const HOUR = 60 * 60 * 1000;
 
-type BillingUsage = {
-  rollingUsedUsd: number;
-  rollingLimitUsd: number;
-  weeklyUsedUsd: number;
-  weeklyLimitUsd: number;
-  monthlyUsedUsd: number;
-  monthlyLimitUsd: number;
-  lifetimeUsedUsd: number;
-  lifetimeLimitUsd: number | null;
-};
+const useFormatters = (locale: string) =>
+  useMemo(() => {
+    const usd = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", minimumFractionDigits: 2 });
+    const whole = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+    const time = new Intl.DateTimeFormat(locale, { hour: "numeric", minute: "2-digit" });
+    const weekday = new Intl.DateTimeFormat(locale, { weekday: "long", hour: "numeric", minute: "2-digit" });
+    const day = new Intl.DateTimeFormat(locale, { month: "long", day: "numeric" });
+    return {
+      usd: (value: number) => usd.format(value),
+      amount: (value: number) => (Number.isInteger(value) ? whole.format(value) : usd.format(value)),
+      day: (ms: number) => day.format(ms),
+      when: (ms: number, now: number) =>
+        ms - now < 24 * HOUR ? time.format(ms) : ms - now < 7 * 24 * HOUR ? weekday.format(ms) : day.format(ms),
+    };
+  }, [locale]);
 
-type BillingStatus = {
-  authenticated: boolean;
-  isAnonymous: boolean;
-  plan: BillingPlan;
-  subscriptionStatus: string;
-  cancelAtPeriodEnd: boolean;
-  currentPeriodEnd: number | null;
-  usage: BillingUsage | null;
-  usagePolicy:
-    | {
-        kind: "anonymous_requests";
-        requestLimit: number;
-        perIpRequestLimit: number;
-        resetAfterInactivityDays: number;
-      }
-    | { kind: "managed_cost" };
-  plans: Record<BillingPlan, BillingPlanConfig>;
-};
+type Formatters = ReturnType<typeof useFormatters>;
 
-type UsageCreditOptions = {
-  currency: string;
-  minAmountCents: number;
-  maxAmountCents: number;
-  presetAmountCents: number[];
-};
+const pct = (used: number, limit: number) =>
+  !Number.isFinite(limit) || limit <= 0 ? 0 : Math.min(100, Math.max(0, (used / limit) * 100));
 
-type UsageCreditStatus = {
-  authenticated: boolean;
-  currency: string;
-  balanceUsd: number;
-  totalPurchasedUsd: number;
-  totalConsumedUsd: number;
-};
-
-const PLAN_ORDER: BillingPlan[] = ["free", "go", "pro"];
-const RECOMMENDED_PLAN: BillingPlan = "pro";
-
-const STATIC_PLAN_DISPLAY: Record<
-  BillingPlan,
-  { label: string; monthlyPriceCents: number }
-> = {
-  free: { label: "Free", monthlyPriceCents: 0 },
-  go: { label: "Go", monthlyPriceCents: 500 },
-  pro: { label: "Pro", monthlyPriceCents: 1_500 },
-};
-
-type UsageMeter = {
-  key: string;
-  label: string;
-  usedUsd: number;
-  limitUsd: number;
-};
-
-type PlanFeature = { key: string; plans: readonly BillingPlan[] };
-
-const ALL_PLANS: readonly BillingPlan[] = ["free", "go", "pro"];
-const BASE_PLAN_FEATURES: readonly PlanFeature[] = [
-  { key: "billing.features.assistant", plans: ALL_PLANS },
-  { key: "billing.features.codingAgent", plans: ALL_PLANS },
-  { key: "billing.features.research", plans: ALL_PLANS },
-  { key: "billing.features.dictationReadAloud", plans: ALL_PLANS },
-];
-
-const MARKETED_PLAN_FEATURES: readonly PlanFeature[] = [
-  { key: "billing.features.multipleAgents", plans: ["pro"] },
-];
-
-const CAPABILITY_PLAN_FEATURES: readonly PlanFeature[] = CAPABILITIES.map(
-  (capability) => ({
-    key: `billing.capability.${capability}`,
-    plans: PLAN_ORDER.filter((plan) => hasCapability(plan, capability)),
-  }),
-).filter((feature) => feature.plans.length > 0);
-
-const PLAN_FEATURE_MATRIX: readonly PlanFeature[] = [
-  ...BASE_PLAN_FEATURES,
-  ...MARKETED_PLAN_FEATURES,
-  ...CAPABILITY_PLAN_FEATURES,
-]
-  .map((feature, index) => ({ feature, index }))
-  .sort(
-    (a, b) =>
-      b.feature.plans.length - a.feature.plans.length || a.index - b.index,
-  )
-  .map(({ feature }) => feature);
-
-const useBillingFormatters = (locale: string) =>
-  useMemo(
-    () => ({
-      currency: new Intl.NumberFormat(locale, {
-        style: "currency",
-        currency: "USD",
-        maximumFractionDigits: 0,
-      }),
-      usd: new Intl.NumberFormat(locale, {
-        style: "currency",
-        currency: "USD",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }),
-      date: new Intl.DateTimeFormat(locale, {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      }),
-      percent: new Intl.NumberFormat(locale, {
-        style: "percent",
-        maximumFractionDigits: 0,
-      }),
-    }),
-    [locale],
-  );
-
-const toUsagePercent = (usedUsd: number, limitUsd: number) => {
-  if (!Number.isFinite(limitUsd) || limitUsd <= 0) return 0;
-  if (!Number.isFinite(usedUsd) || usedUsd <= 0) return 0;
-  return Math.min(100, Math.max(0, (usedUsd / limitUsd) * 100));
-};
-
-const getErrorMessage = (error: unknown, fallback: string) =>
+const errorText = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
 
 const getBillingReturnUrl = async (): Promise<string> => {
-  let baseUrl =
-    (import.meta.env.VITE_STELLA_WEB_URL as string | undefined)?.trim() ||
-    "https://stella.sh";
+  let baseUrl = (import.meta.env.VITE_STELLA_WEB_URL as string | undefined)?.trim() || "https://stella.sh";
   try {
     const resolved = await window.electronAPI?.website?.getBaseUrl?.();
     if (resolved) baseUrl = resolved;
@@ -173,696 +61,544 @@ const openSignInDialog = () => {
   void import("@/router").then(({ router }) => {
     void router.navigate({
       to: ".",
-      search: (prev: { dialog?: "auth" | "connect" }) => ({
-        ...prev,
-        dialog: "auth" as const,
-      }),
+      search: (prev: { dialog?: "auth" | "connect" }) => ({ ...prev, dialog: "auth" as const }),
     });
   });
 };
 
+export const planIncludesLines = (plan: BillingPlan, t: Translate, f: Pick<Formatters, "amount">): string[] => {
+  const def = PLAN_CATALOG[plan];
+  if (!def.interval) {
+    return [
+      t("billing.v3.includes.oneTime", { amount: f.amount(def.budget.oneTimeUsd ?? def.budget.monthlyUsd) }),
+      t("billing.v3.includes.local"),
+    ];
+  }
+  return [
+    t("billing.v3.includes.monthly", { amount: f.amount(def.budget.monthlyUsd) }),
+    t("billing.v3.includes.cloud", { count: def.limits.cloudAgentsAtOnce }),
+    ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
+  ];
+};
+
+function Row({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="billing-row">
+      <div className="billing-row-text">
+        <span className="billing-row-label">{label}</span>
+        {hint ? <span className="billing-row-hint">{hint}</span> : null}
+      </div>
+      <div className="billing-row-control">{children}</div>
+    </div>
+  );
+}
+
+function Meter({
+  used,
+  limit,
+  reserved = 0,
+  label,
+  caption,
+  large = false,
+}: {
+  used: number;
+  limit: number;
+  reserved?: number;
+  label: string;
+  caption: ReactNode;
+  large?: boolean;
+}) {
+  const usedPct = pct(used, limit);
+  const heldPct = Math.min(100 - usedPct, pct(reserved, limit));
+  return (
+    <div className="billing-meter" data-large={large || undefined}>
+      <div
+        className="billing-meter-track"
+        role="progressbar"
+        aria-label={label}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(usedPct)}
+      >
+        <span className="billing-meter-used" data-full={(limit > 0 && used >= limit) || undefined} style={{ width: `${usedPct}%` }} />
+        {heldPct > 0 ? <span className="billing-meter-held" style={{ width: `${heldPct}%` }} /> : null}
+      </div>
+      <div className="billing-meter-caption">{caption}</div>
+    </div>
+  );
+}
+
+function Section({ title, lede, children }: { title: string; lede?: string; children: ReactNode }) {
+  return (
+    <section className="billing-section">
+      <header className="billing-section-head">
+        <h2 className="billing-section-title">{title}</h2>
+        {lede ? <p className="billing-section-lede">{lede}</p> : null}
+      </header>
+      {children}
+    </section>
+  );
+}
+
 export function BillingPanel() {
   const { hasConnectedAccount } = useAuthSessionState();
-  const locale = useLocale();
   const t = useT();
-  const formatters = useBillingFormatters(locale);
-
-  const formatUsagePercent = useCallback(
-    (usedUsd: number, limitUsd: number) => {
-      const fraction = toUsagePercent(usedUsd, limitUsd) / 100;
-      if (fraction > 0 && fraction < 0.01) {
-        return `<${formatters.percent.format(0.01)}`;
-      }
-      return formatters.percent.format(fraction);
-    },
-    [formatters],
-  );
-
-  const ledger = useBackendValue("billing.status", hasConnectedAccount ? {} : "skip");
-  const billingStatus: BillingStatus | undefined = ledger;
-  const creditOptions: UsageCreditOptions | undefined = ledger?.creditPurchase;
-  const creditStatus: UsageCreditStatus | undefined = ledger
-    ? { authenticated: !ledger.isAnonymous, ...ledger.credits }
-    : undefined;
-  const startCheckout = useCallback(
-    (args: { plan: PaidBillingPlan; returnUrl: string; requestId: string }) =>
-      backendClient.call("billing.checkout", {
-        plan: args.plan,
-        returnUrl: args.returnUrl,
-      }),
-    [],
-  );
-  const openPortal = useCallback(
-    (args: { returnUrl: string; requestId: string }) =>
-      backendClient.call("billing.portal", { returnUrl: args.returnUrl }),
-    [],
-  );
-  const startCreditCheckout = useCallback(
-    (args: { amountCents: number; returnUrl: string; requestId: string }) =>
-      backendClient.call("billing.creditCheckout", {
-        amountCents: args.amountCents,
-        returnUrl: args.returnUrl,
-      }),
-    [],
-  );
-
-  const [startingPlan, setStartingPlan] = useState<PaidBillingPlan | null>(
-    null,
-  );
-  const [openingPortal, setOpeningPortal] = useState(false);
-  const [startingCredit, setStartingCredit] = useState(false);
+  const f = useFormatters(useLocale());
+  const status = useBackendValue("billing.status", hasConnectedAccount ? {} : "skip");
+  const [now, setNow] = useState(() => Date.now());
+  const [busy, setBusy] = useState<Busy>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [creditCustomAmount, setCreditCustomAmount] = useState("");
-  const [creditSelectedPresetCents, setCreditSelectedPresetCents] = useState<
-    number | null
-  >(null);
-  const checkoutRequestRef = useRef<{
-    plan: PaidBillingPlan;
-    requestId: string;
-  } | null>(null);
-  const portalRequestRef = useRef<string | null>(null);
-  const creditRequestRef = useRef<{
-    amountCents: number;
-    requestId: string;
-  } | null>(null);
 
-  const planCatalog = billingStatus?.plans;
-  const currentPlan = billingStatus?.plan ?? "free";
-  const usage = billingStatus?.usage;
-  const hasAccount = Boolean(
-    hasConnectedAccount &&
-    billingStatus?.authenticated &&
-    !billingStatus.isAnonymous,
-  );
-  const isLoadingStatus = hasConnectedAccount && billingStatus === undefined;
-  const isActivePaidSubscriber = hasAccount && currentPlan !== "free";
-  const currentPlanRank = PLAN_ORDER.indexOf(currentPlan);
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(id);
+  }, []);
 
-  const getPlanDisplay = useCallback(
-    (plan: BillingPlan) => {
-      const live = planCatalog?.[plan];
-      const fallback = STATIC_PLAN_DISPLAY[plan];
-      return {
-        label: live?.label ?? fallback.label,
-        monthlyPriceCents:
-          live?.monthlyPriceCents ?? fallback.monthlyPriceCents,
-        ...(typeof live?.introFirstMonthPriceCents === "number"
-          ? { introFirstMonthPriceCents: live.introFirstMonthPriceCents }
-          : {}),
-      };
-    },
-    [planCatalog],
-  );
+  const hasAccount = Boolean(hasConnectedAccount && status?.authenticated && !status.isAnonymous);
 
-  const handleStartCheckout = useCallback(
-    async (plan: PaidBillingPlan) => {
+  const run = useCallback(
+    async (kind: Exclude<Busy, null>, action: (returnUrl: string) => Promise<{ url: string }>) => {
       if (!hasAccount) {
         openSignInDialog();
         return;
       }
       setError(null);
       setNotice(null);
-      setStartingPlan(plan);
+      setBusy(kind);
       try {
-        const request =
-          checkoutRequestRef.current?.plan === plan
-            ? checkoutRequestRef.current
-            : { plan, requestId: crypto.randomUUID() };
-        checkoutRequestRef.current = request;
-        const session = await startCheckout({
-          plan,
-          returnUrl: await getBillingReturnUrl(),
-          requestId: request.requestId,
-        });
+        const session = await action(await getBillingReturnUrl());
         openExternalUrl(session.url);
-        checkoutRequestRef.current = null;
-        setNotice(
-          "Checkout opened in your browser. Your plan updates here automatically once payment completes.",
-        );
+        setNotice(kind === "portal" ? t("billing.v3.notice.portalOpened") : t("billing.v3.notice.checkoutOpened"));
       } catch (err) {
-        setError(getErrorMessage(err, "Unable to start checkout right now."));
+        setError(errorText(err, kind === "portal" ? t("billing.v3.notice.portalFailed") : t("billing.v3.notice.checkoutFailed")));
       } finally {
-        setStartingPlan(null);
+        setBusy(null);
       }
     },
-    [hasAccount, startCheckout],
+    [hasAccount, t],
   );
 
-  const handleOpenPortal = useCallback(async () => {
-    if (!hasAccount) {
-      openSignInDialog();
-      return;
-    }
-    setError(null);
-    setNotice(null);
-    setOpeningPortal(true);
-    try {
-      const requestId = portalRequestRef.current ?? crypto.randomUUID();
-      portalRequestRef.current = requestId;
-      const session = await openPortal({
-        returnUrl: await getBillingReturnUrl(),
-        requestId,
-      });
-      openExternalUrl(session.url);
-      portalRequestRef.current = null;
-      setNotice(
-        "Billing management opened in your browser. Changes appear here automatically.",
-      );
-    } catch (err) {
-      setError(getErrorMessage(err, "Unable to open billing right now."));
-    } finally {
-      setOpeningPortal(false);
-    }
-  }, [hasAccount, openPortal]);
-
-  const parseCustomAmountCents = useCallback(
-    (raw: string): { amountCents: number; error: string | null } => {
-      if (!creditOptions) {
-        return { amountCents: 0, error: "Credit options are still loading." };
-      }
-      const trimmed = raw.trim();
-      if (!trimmed) {
-        return { amountCents: 0, error: "Enter an amount." };
-      }
-      const parsed = Number(trimmed);
-      if (!Number.isFinite(parsed) || parsed <= 0) {
-        return { amountCents: 0, error: "Enter a valid amount in dollars." };
-      }
-      const amountCents = Math.round(parsed * 100);
-      if (amountCents < creditOptions.minAmountCents) {
-        return {
-          amountCents,
-          error: `Minimum is ${formatters.usd.format(creditOptions.minAmountCents / 100)}.`,
-        };
-      }
-      if (amountCents > creditOptions.maxAmountCents) {
-        return {
-          amountCents,
-          error: `Maximum is ${formatters.usd.format(creditOptions.maxAmountCents / 100)}.`,
-        };
-      }
-      return { amountCents, error: null };
-    },
-    [creditOptions],
+  const checkout = useCallback(
+    (plan: PaidBillingPlan) => void run("checkout", (returnUrl) => backendClient.call("billing.checkout", { plan, returnUrl })),
+    [run],
   );
-
-  const handleSelectCreditPreset = useCallback((amountCents: number) => {
-    setCreditSelectedPresetCents(amountCents);
-    setCreditCustomAmount((amountCents / 100).toFixed(2).replace(/\.00$/, ""));
-  }, []);
-
-  const handleStartCreditCheckout = useCallback(async () => {
-    if (!hasAccount) {
-      openSignInDialog();
-      return;
-    }
-    setError(null);
-    setNotice(null);
-    const { amountCents, error: amountError } =
-      parseCustomAmountCents(creditCustomAmount);
-    if (amountError) {
-      setError(amountError);
-      return;
-    }
-    setStartingCredit(true);
-    try {
-      const request =
-        creditRequestRef.current?.amountCents === amountCents
-          ? creditRequestRef.current
-          : { amountCents, requestId: crypto.randomUUID() };
-      creditRequestRef.current = request;
-      const session = await startCreditCheckout({
-        amountCents,
-        returnUrl: await getBillingReturnUrl(),
-        requestId: request.requestId,
-      });
-      openExternalUrl(session.url);
-      creditRequestRef.current = null;
-      setNotice(
-        "Checkout opened in your browser. Credit is added automatically once payment completes.",
-      );
-    } catch (err) {
-      setError(getErrorMessage(err, "Unable to start checkout right now."));
-    } finally {
-      setStartingCredit(false);
-    }
-  }, [
-    creditCustomAmount,
-    hasAccount,
-    parseCustomAmountCents,
-    startCreditCheckout,
-  ]);
+  const portal = useCallback(
+    () => void run("portal", (returnUrl) => backendClient.call("billing.portal", { returnUrl })),
+    [run],
+  );
+  const buyCredit = useCallback(
+    (amountCents: number) =>
+      void run("credit", (returnUrl) => backendClient.call("billing.creditCheckout", { amountCents, returnUrl })),
+    [run],
+  );
 
   if (!hasConnectedAccount) {
     return (
       <div className="billing-panel">
-        <div className="billing-state" role="status">
-          <strong>Sign in to manage your plan</strong>
-          <span>
-            Plans, usage limits and extra credit are tied to your Stella
-            account.
-          </span>
-          <button
-            type="button"
-            className="pill-btn pill-btn--lg pill-btn--primary"
-            onClick={openSignInDialog}
-          >
-            Sign in
+        <div className="billing-empty" role="status">
+          <strong>{t("billing.v3.signIn.title")}</strong>
+          <span>{t("billing.v3.signIn.body")}</span>
+          <button type="button" className="billing-btn billing-btn--primary" onClick={openSignInDialog}>
+            {t("common.signIn")}
           </button>
         </div>
       </div>
     );
   }
 
-  const currentPlanCatalogEntry = planCatalog?.[currentPlan];
-  const rollingWindowHours = currentPlanCatalogEntry?.rollingWindowHours ?? 5;
+  if (!status) {
+    return <div className="billing-panel billing-panel--loading" aria-busy="true" />;
+  }
 
-  const freeAllowance = usage
-    ? resolveFreeAllowance({ plan: currentPlan, usage })
-    : null;
-
-  const usageMeters: UsageMeter[] | null =
-    usage && billingStatus?.usagePolicy.kind === "managed_cost"
-      ? freeAllowance
-        ? [
-            {
-              key: "lifetime",
-              label: t("billing.freeAllowance.label"),
-              usedUsd: freeAllowance.usedUsd,
-              limitUsd: freeAllowance.limitUsd,
-            },
-          ]
-        : [
-            {
-              key: "rolling",
-              label: `Last ${rollingWindowHours}h`,
-              usedUsd: usage.rollingUsedUsd,
-              limitUsd: usage.rollingLimitUsd,
-            },
-            {
-              key: "weekly",
-              label: "This week",
-              usedUsd: usage.weeklyUsedUsd,
-              limitUsd: usage.weeklyLimitUsd,
-            },
-            {
-              key: "monthly",
-              label: "This month",
-              usedUsd: usage.monthlyUsedUsd,
-              limitUsd: usage.monthlyLimitUsd,
-            },
-          ]
-      : null;
-
-  const periodEndLabel = billingStatus?.currentPeriodEnd
-    ? formatters.date.format(new Date(billingStatus.currentPeriodEnd))
-    : null;
-
-  const renewalLabel = billingStatus?.cancelAtPeriodEnd
-    ? t("billing.renewal.pendingLabel")
-    : t("billing.renewal.nextLabel");
-  const renewalDetail = periodEndLabel
-    ? billingStatus?.cancelAtPeriodEnd
-      ? t("billing.renewal.accessEnds", { date: periodEndLabel })
-      : t("billing.renewal.renews", { date: periodEndLabel })
-    : null;
-
-  const freeLifetimeCapUsd = billingStatus?.plans.free.lifetimeLimitUsd ?? null;
-  const lapseEndsAccess =
-    billingStatus?.cancelAtPeriodEnd === true &&
-    periodEndLabel !== null &&
-    usage != null &&
-    freeLifetimeCapUsd !== null &&
-    usage.lifetimeUsedUsd >= freeLifetimeCapUsd;
+  const plan = normalizeBillingPlan(status.plan);
 
   return (
     <div className="billing-panel">
       {error ? (
-        <p className="billing-notice billing-notice--error" role="alert">
+        <p className="billing-banner billing-banner--error" role="alert">
           {error}
         </p>
       ) : null}
-      {notice ? <p className="billing-notice">{notice}</p> : null}
+      {notice ? (
+        <p className="billing-banner" role="status">
+          {notice}
+        </p>
+      ) : null}
+      <UsageSection status={status} plan={plan} now={now} f={f} t={t} busy={busy} onCheckout={checkout} onPortal={portal} />
+      <PlanSection status={status} plan={plan} f={f} t={t} busy={busy} onCheckout={checkout} onPortal={portal} />
+      <CreditSection status={status} f={f} t={t} busy={busy} onBuy={buyCredit} />
+    </div>
+  );
+}
 
-      <section className="billing-account" aria-label="Your plan">
-        <div className="billing-account-head">
-          <div className="billing-account-plan">
-            <span className="billing-label">Current plan</span>
-            <span className="billing-account-plan-name">
-              {isLoadingStatus ? "…" : getPlanDisplay(currentPlan).label}
-            </span>
-            {isActivePaidSubscriber && renewalDetail ? (
-              <span className="billing-account-renewal">
-                {renewalLabel} · {renewalDetail}
+function UsageSection({
+  status,
+  plan,
+  now,
+  f,
+  t,
+  busy,
+  onCheckout,
+  onPortal,
+}: {
+  status: BillingStatus;
+  plan: BillingPlan;
+  now: number;
+  f: Formatters;
+  t: Translate;
+  busy: Busy;
+  onCheckout: (plan: PaidBillingPlan) => void;
+  onPortal: () => void;
+}) {
+  const usage = status.usage;
+  if (!usage || status.usagePolicy.kind !== "managed_cost") return null;
+
+  const def = PLAN_CATALOG[plan];
+  const oneTime = plan === "free" && usage.lifetimeLimitUsd !== null;
+  const mainUsed = oneTime ? usage.lifetimeUsedUsd : usage.monthlyUsedUsd;
+  const mainLimit = oneTime ? (usage.lifetimeLimitUsd ?? 0) : usage.monthlyLimitUsd;
+  const credit = status.credits.balanceUsd;
+  const reserved = Number.isFinite(usage.reservedUsd) ? usage.reservedUsd : 0;
+  // Backends before pricing v3 send no reservation or availability.
+  const available: number | null | undefined = usage.availableUsd;
+  const blocked = typeof available === "number" && available <= 0.0001;
+  const exceeded = oneTime
+    ? []
+    : [
+        { used: usage.rollingUsedUsd, limit: usage.rollingLimitUsd, at: usage.rollingResetsAt },
+        { used: usage.weeklyUsedUsd, limit: usage.weeklyLimitUsd, at: usage.weeklyResetsAt },
+        { used: usage.monthlyUsedUsd, limit: usage.monthlyLimitUsd, at: usage.monthlyResetsAt },
+      ].filter((w) => w.limit > 0 && w.used >= w.limit && typeof w.at === "number");
+  const resumesAt = exceeded.length ? Math.max(...exceeded.map((w) => w.at)) : null;
+  const next = nextPlanUp(plan);
+  const resets = (at: number | undefined) =>
+    typeof at === "number" && at > 0 ? t("billing.v3.usage.resets", { date: f.when(at, now) }) : "";
+  const windowCaption = (used: number, limit: number, at: number) => (
+    <>
+      <span>
+        {f.usd(used)} <span className="billing-muted">{t("billing.v3.usage.of", { amount: f.amount(limit) })}</span>
+      </span>
+      <span className="billing-muted">{used > 0 ? resets(at) : t("billing.v3.usage.startsNext")}</span>
+    </>
+  );
+
+  return (
+    <Section title={t("billing.v3.usage.title")} lede={t("billing.v3.usage.lede")}>
+      <div className="billing-total">
+        <div className="billing-total-head">
+          <span className="billing-total-amount">{f.usd(mainUsed)}</span>
+          <span className="billing-muted">
+            {oneTime
+              ? t("billing.v3.usage.ofOneTime", { amount: f.amount(mainLimit) })
+              : t("billing.v3.usage.ofMonth", { amount: f.amount(mainLimit) })}
+          </span>
+        </div>
+        <Meter
+          large
+          label={t("billing.v3.usage.title")}
+          used={mainUsed}
+          limit={mainLimit}
+          reserved={reserved}
+          caption={
+            <>
+              <span className="billing-legend">
+                <i className="billing-legend-used" aria-hidden="true" />
+                <span>{t("billing.v3.usage.used")}</span>
+                {reserved > 0 ? (
+                  <>
+                    <i className="billing-legend-held" aria-hidden="true" />
+                    <span>{t("billing.v3.usage.held")}</span>
+                  </>
+                ) : null}
               </span>
-            ) : null}
+              <span className="billing-muted">{oneTime ? t("billing.v3.usage.oneTimeNote") : resets(usage.monthlyResetsAt)}</span>
+            </>
+          }
+        />
+      </div>
+
+      {blocked ? (
+        <div className="billing-callout" data-tone="warning" role="status">
+          <div>
+            <strong>{oneTime ? t("billing.v3.usage.freeOutTitle") : t("billing.v3.usage.outTitle")}</strong>
+            <span>
+              {oneTime
+                ? t("billing.v3.usage.freeOutBody")
+                : resumesAt
+                  ? t("billing.v3.usage.outBody", { date: f.when(resumesAt, now) })
+                  : t("billing.v3.usage.outBodyNoDate")}
+            </span>
           </div>
-          {isActivePaidSubscriber ? (
+          {next ? (
             <button
               type="button"
-              className="pill-btn pill-btn--lg"
-              onClick={() => void handleOpenPortal()}
-              disabled={openingPortal}
+              className="billing-btn billing-btn--primary"
+              disabled={busy !== null}
+              onClick={() => (plan === "free" ? onCheckout(next) : onPortal())}
             >
-              {openingPortal ? "Opening…" : "Manage subscription"}
+              {t("billing.v3.usage.upgradeTo", { plan: PLAN_CATALOG[next].label })}
             </button>
           ) : null}
         </div>
-
-        {usageMeters ? (
-          <div className="billing-account-meters">
-            {usageMeters.map((meter) => {
-              const percent = toUsagePercent(meter.usedUsd, meter.limitUsd);
-              return (
-                <div key={meter.key} className="billing-meter">
-                  {/* The bar communicates relative usage without exposing
-                      the internal dollar-denominated accounting. The
-                      percentage stays in the accessible name, where a bar
-                      cannot communicate its scale visually. */}
-                  <div className="billing-meter-head">
-                    <span className="billing-meter-label">{meter.label}</span>
-                  </div>
-                  <div
-                    className="billing-meter-track"
-                    role="progressbar"
-                    aria-label={`${meter.label}: ${formatUsagePercent(
-                      meter.usedUsd,
-                      meter.limitUsd,
-                    )} used`}
-                    aria-valuenow={Math.round(percent)}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  >
-                    <div
-                      className="billing-meter-fill"
-                      style={{ width: `${percent}%` }}
-                      data-full={percent >= 100 || undefined}
-                    />
-                  </div>
-                </div>
-              );
-            })}
+      ) : resumesAt !== null && credit > 0 ? (
+        <div className="billing-callout" role="status">
+          <div>
+            <strong>{t("billing.v3.usage.creditTitle")}</strong>
+            <span>{t("billing.v3.usage.creditBody", { date: f.when(resumesAt, now) })}</span>
           </div>
-        ) : null}
+        </div>
+      ) : null}
 
-        {/* A spent lifetime allowance is a terminal state, not a wait.
-            Say so plainly and point at the only thing that resolves it —
-            "try again later" would be a lie about a quota with no
-            reset. */}
-        {freeAllowance ? (
-          freeAllowance.exhausted ? (
-            <div
-              className="billing-allowance billing-allowance--spent"
-              role="status"
+      <div className="billing-rows">
+        {oneTime ? null : (
+          <>
+            <Row
+              label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })}
+              hint={t("billing.v3.usage.rollingHint", {
+                amount: f.amount(usage.rollingLimitUsd),
+                hours: def.budget.rollingWindowHours,
+              })}
             >
-              <div className="billing-allowance-copy">
-                <strong>{t("billing.freeAllowance.exhaustedTitle")}</strong>
-                <span>{t("billing.freeAllowance.exhaustedDescription")}</span>
-              </div>
-              <button
-                type="button"
-                className="pill-btn pill-btn--lg pill-btn--primary"
-                onClick={() => {
-                  if (isActivePaidSubscriber) {
-                    void handleOpenPortal();
-                    return;
-                  }
-                  void handleStartCheckout("go");
-                }}
-                disabled={startingPlan !== null}
-              >
-                {t("billing.freeAllowance.exhaustedCta")}
-              </button>
-            </div>
-          ) : null
-        ) : null}
+              <Meter
+                label={t("billing.v3.usage.rolling", { hours: def.budget.rollingWindowHours })}
+                used={usage.rollingUsedUsd}
+                limit={usage.rollingLimitUsd}
+                caption={windowCaption(usage.rollingUsedUsd, usage.rollingLimitUsd, usage.rollingResetsAt)}
+              />
+            </Row>
+            <Row label={t("billing.v3.usage.weekly")} hint={t("billing.v3.usage.weeklyHint", { amount: f.amount(usage.weeklyLimitUsd) })}>
+              <Meter
+                label={t("billing.v3.usage.weekly")}
+                used={usage.weeklyUsedUsd}
+                limit={usage.weeklyLimitUsd}
+                caption={windowCaption(usage.weeklyUsedUsd, usage.weeklyLimitUsd, usage.weeklyResetsAt)}
+              />
+            </Row>
+          </>
+        )}
+        <Row label={t("billing.v3.usage.held")} hint={t("billing.v3.usage.heldHint")}>
+          <span className="billing-value">{f.usd(reserved)}</span>
+        </Row>
+        <Row label={t("billing.v3.usage.credit")} hint={t("billing.v3.usage.creditHint")}>
+          <span className="billing-value">{f.usd(credit)}</span>
+        </Row>
+        {available === undefined ? null : (
+          <Row label={t("billing.v3.usage.available")} hint={t("billing.v3.usage.availableHint")}>
+            <span className="billing-value billing-value--strong">
+              {available === null ? t("billing.v3.usage.unlimited") : f.usd(available)}
+            </span>
+          </Row>
+        )}
+      </div>
+    </Section>
+  );
+}
 
-        {lapseEndsAccess && periodEndLabel ? (
-          <div
-            className="billing-allowance billing-allowance--spent"
-            role="status"
-          >
-            <div className="billing-allowance-copy">
-              <strong>{t("billing.renewal.lapseTitle")}</strong>
-              <span>
-                {t("billing.renewal.lapseDescription", {
-                  plan: getPlanDisplay(currentPlan).label,
-                  date: periodEndLabel,
-                })}
-              </span>
-            </div>
-          </div>
-        ) : null}
-      </section>
+function PlanSection({
+  status,
+  plan,
+  f,
+  t,
+  busy,
+  onCheckout,
+  onPortal,
+}: {
+  status: BillingStatus;
+  plan: BillingPlan;
+  f: Formatters;
+  t: Translate;
+  busy: Busy;
+  onCheckout: (plan: PaidBillingPlan) => void;
+  onPortal: () => void;
+}) {
+  const name = useId();
+  const [selected, setSelected] = useState<BillingPlan>(plan);
+  useEffect(() => setSelected(plan), [plan]);
+  const isPaid = isPaidBillingPlan(plan);
+  const periodEnd = status.currentPeriodEnd ? f.day(status.currentPeriodEnd) : null;
+  const priceOf = (id: BillingPlan) => t("billing.v3.plan.perMonth", { price: f.amount(PLAN_CATALOG[id].monthlyPriceCents / 100) });
 
-      <header className="billing-plan-intro">
-        <h1>{t("billing.heading")}</h1>
-        <p>{t("billing.subtitle")}</p>
-      </header>
+  const action = (() => {
+    if (selected === plan) return null;
+    if (!isPaid && isPaidBillingPlan(selected)) {
+      return {
+        label: t("billing.v3.plan.checkout", { price: priceOf(selected) }),
+        hint: t("billing.v3.plan.checkoutHint"),
+        danger: false,
+        onClick: () => onCheckout(selected),
+      };
+    }
+    if (selected === "free") {
+      return {
+        label: t("billing.v3.plan.cancel"),
+        hint: t("billing.v3.plan.cancelHint", { plan: PLAN_CATALOG[plan].label, date: periodEnd ?? "—" }),
+        danger: true,
+        onClick: onPortal,
+      };
+    }
+    const params = { plan: PLAN_CATALOG[selected].label, price: priceOf(selected) };
+    return {
+      label: planRank(selected) > planRank(plan) ? t("billing.v3.plan.upgrade", params) : t("billing.v3.plan.downgrade", params),
+      hint: t("billing.v3.plan.changeHint"),
+      danger: false,
+      onClick: onPortal,
+    };
+  })();
 
-      <section className="billing-plans" aria-label={t("billing.heading")}>
-        {PLAN_ORDER.map((plan) => {
-          const display = getPlanDisplay(plan);
-          const isCurrentPlan = plan === currentPlan;
-          const introCents =
-            plan === "go" &&
-            typeof display.introFirstMonthPriceCents === "number" &&
-            display.introFirstMonthPriceCents > 0 &&
-            display.monthlyPriceCents > display.introFirstMonthPriceCents &&
-            !isCurrentPlan &&
-            !isActivePaidSubscriber
-              ? display.introFirstMonthPriceCents
-              : null;
-          const isPaidPlan = plan !== "free";
-          const isStartingThisPlan = startingPlan === plan;
-          const isRecommended =
-            plan === RECOMMENDED_PLAN && currentPlan !== RECOMMENDED_PLAN;
-          const targetRank = PLAN_ORDER.indexOf(plan);
-          const changeVerb =
-            isActivePaidSubscriber && isPaidPlan && !isCurrentPlan
-              ? targetRank > currentPlanRank
-                ? "Upgrade to"
-                : "Downgrade to"
-              : "Choose";
-          const ctaLabel = isCurrentPlan
-            ? "Current plan"
-            : isStartingThisPlan
-              ? "Opening…"
-              : isActivePaidSubscriber && !isPaidPlan
-                ? "Cancel to switch"
-                : isActivePaidSubscriber && isPaidPlan
-                  ? openingPortal
-                    ? "Opening…"
-                    : `${changeVerb} ${display.label}`
-                  : isPaidPlan
-                    ? `Choose ${display.label}`
-                    : "Included";
-
-          const handlePlanClick = () => {
-            if (isCurrentPlan) return;
-            if (isActivePaidSubscriber) {
-              void handleOpenPortal();
-              return;
-            }
-            if (isPaidPlan) {
-              void handleStartCheckout(plan as PaidBillingPlan);
-            }
-          };
-
-          const isDisabled =
-            isCurrentPlan ||
-            startingPlan !== null ||
-            (isActivePaidSubscriber ? openingPortal : !isPaidPlan);
-
+  return (
+    <Section title={t("billing.v3.plan.title")} lede={t("billing.v3.plan.lede")}>
+      <div className="billing-radio-list" role="radiogroup" aria-label={t("billing.v3.plan.title")}>
+        {PLAN_ORDER.map((id) => {
+          const def = PLAN_CATALOG[id];
+          const checked = selected === id;
           return (
-            <article
-              key={plan}
-              className="billing-plan"
-              data-active={isCurrentPlan || undefined}
-              data-recommended={isRecommended || undefined}
-            >
-              <div className="billing-plan-head">
-                <span className="billing-plan-name">{display.label}</span>
-                {isCurrentPlan ? (
-                  <span className="billing-plan-badge billing-plan-badge--current">
-                    <Check size={11} strokeWidth={2.4} aria-hidden="true" />
-                    Current
-                  </span>
-                ) : isRecommended ? (
-                  <span className="billing-plan-badge">Recommended</span>
-                ) : null}
-              </div>
-
-              {/* A discounted plan leads with the price you actually pay
-                  and demotes the standard rate to a struck-through
-                  reference beside it. Free renders as $0 rather than the
-                  word "Free": the card is already named Free, and a word
-                  among numbers breaks the row.
-
-                  The term is welded to the number, never whispered under
-                  it. The discount this app can issue is a Stripe coupon
-                  created `duration=once` (see STRIPE_COUPON_GO_FIRST_MONTH)
-                  — it comes off the first invoice and renewals bill at the
-                  standard rate. So "$1" never appears without "first
-                  month" on the same line, and the renewal rate gets its
-                  own line directly beneath. A headline reading "$5" with
-                  the term buried is a price the billing system will not
-                  honour on the second invoice. */}
-              <div className="billing-plan-price">
-                <span className="billing-plan-price-row">
-                  <span className="billing-plan-amount">
-                    {formatters.currency.format(
-                      (introCents ?? display.monthlyPriceCents) / 100,
-                    )}
-                  </span>
-                  {introCents !== null ? (
-                    <>
-                      <span className="billing-visually-hidden">
-                        , down from{" "}
-                      </span>
-                      <s className="billing-plan-list-price">
-                        {formatters.currency.format(
-                          display.monthlyPriceCents / 100,
-                        )}
-                      </s>
-                      <span className="billing-plan-period">first month</span>
-                    </>
-                  ) : plan !== "free" ? (
-                    <span className="billing-plan-period">/month</span>
-                  ) : null}
+            <label key={id} className="billing-radio" data-checked={checked || undefined}>
+              <input type="radio" name={name} value={id} checked={checked} onChange={() => setSelected(id)} />
+              <span className="billing-radio-dot" aria-hidden="true" />
+              <span className="billing-radio-text">
+                <span className="billing-radio-label">
+                  {def.label}
+                  {id === plan ? <span className="billing-tag">{t("billing.v3.plan.current")}</span> : null}
                 </span>
-                {introCents !== null ? (
-                  <span className="billing-plan-terms">
-                    then{" "}
-                    {formatters.currency.format(
-                      display.monthlyPriceCents / 100,
-                    )}
-                    /month
-                  </span>
-                ) : null}
-              </div>
-
-              <p className="billing-plan-tagline">
-                {t(`billing.plans.${plan}.tagline`)}
-              </p>
-
-              <ul className="billing-plan-features">
-                {PLAN_FEATURE_MATRIX.filter((feature) =>
-                  feature.plans.includes(plan),
-                ).map((feature) => (
-                  <li key={feature.key}>
-                    <Check
-                      className="billing-plan-feature-icon"
-                      size={13}
-                      strokeWidth={2.2}
-                      aria-hidden="true"
-                    />
-                    <span>{t(feature.key)}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                type="button"
-                className={
-                  "pill-btn pill-btn--lg billing-plan-cta" +
-                  (isRecommended && !isDisabled ? " pill-btn--primary" : "")
-                }
-                onClick={handlePlanClick}
-                disabled={isDisabled}
-              >
-                {ctaLabel}
-              </button>
-            </article>
+                <span className="billing-radio-detail">{planIncludesLines(id, t, f).join(" · ")}</span>
+              </span>
+              <span className="billing-radio-price">{def.interval ? priceOf(id) : f.amount(0)}</span>
+            </label>
           );
         })}
-      </section>
-
-      <section className="billing-credit" aria-label="Extra usage credit">
-        {/* Copy and balance on the top line, the whole instrument on the
-            second: presets, amount and action read left-to-right as one
-            sentence instead of three stacked controls in a box. */}
-        <div className="billing-credit-head">
-          <div className="billing-credit-copy">
-            <h2 className="billing-section-title">Extra usage credit</h2>
-            <p className="billing-section-sub">
-              Spent automatically once your included monthly usage is gone, then
-              your plan resumes next month.
-            </p>
-          </div>
-          {creditStatus?.authenticated ? (
-            <div className="billing-credit-balance">
-              <span className="billing-label">Available</span>
-              <span className="billing-credit-balance-value">
-                {formatters.usd.format(creditStatus.balanceUsd)}
-              </span>
-            </div>
-          ) : null}
+      </div>
+      {action ? (
+        <div className="billing-plan-action">
+          <button
+            type="button"
+            className={`billing-btn ${action.danger ? "billing-btn--danger" : "billing-btn--primary"}`}
+            disabled={busy !== null}
+            onClick={action.onClick}
+          >
+            {busy === "checkout" || busy === "portal" ? t("billing.v3.opening") : action.label}
+          </button>
+          <span className="billing-row-hint">{action.hint}</span>
         </div>
+      ) : null}
+      {isPaid ? (
+        <div className="billing-rows">
+          <Row
+            label={status.cancelAtPeriodEnd ? t("billing.v3.plan.ends") : t("billing.v3.plan.renews")}
+            hint={
+              status.cancelAtPeriodEnd
+                ? t("billing.v3.plan.endsHint", { plan: PLAN_CATALOG[plan].label })
+                : t("billing.v3.plan.renewsHint", { price: priceOf(plan) })
+            }
+          >
+            <span className="billing-value">{periodEnd ?? "—"}</span>
+          </Row>
+          <Row label={t("billing.v3.plan.manage")} hint={t("billing.v3.plan.manageHint")}>
+            <button type="button" className="billing-btn" disabled={busy !== null} onClick={onPortal}>
+              {busy === "portal" ? t("billing.v3.opening") : t("billing.v3.plan.manageButton")}
+            </button>
+          </Row>
+        </div>
+      ) : null}
+    </Section>
+  );
+}
 
-        <div className="billing-credit-form">
-          {creditOptions ? (
-            <div
-              className="billing-credit-presets"
-              role="radiogroup"
-              aria-label="Preset amounts"
-            >
-              {creditOptions.presetAmountCents.map((amountCents) => {
-                const isSelected = creditSelectedPresetCents === amountCents;
+function CreditSection({
+  status,
+  f,
+  t,
+  busy,
+  onBuy,
+}: {
+  status: BillingStatus;
+  f: Formatters;
+  t: Translate;
+  busy: Busy;
+  onBuy: (amountCents: number) => void;
+}) {
+  const options = status.creditPurchase;
+  const [preset, setPreset] = useState<number | null>(options.presetAmountCents[1] ?? options.presetAmountCents[0] ?? null);
+  const [custom, setCustom] = useState("");
+  const [inputError, setInputError] = useState<string | null>(null);
+
+  const amountCents = (() => {
+    if (!custom.trim()) return preset;
+    const parsed = Number(custom.trim().replace(",", "."));
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed * 100) : null;
+  })();
+
+  const submit = () => {
+    if (amountCents === null) return setInputError(t("billing.v3.credit.invalid"));
+    if (amountCents < options.minAmountCents)
+      return setInputError(t("billing.v3.credit.min", { amount: f.usd(options.minAmountCents / 100) }));
+    if (amountCents > options.maxAmountCents)
+      return setInputError(t("billing.v3.credit.max", { amount: f.usd(options.maxAmountCents / 100) }));
+    setInputError(null);
+    onBuy(amountCents);
+  };
+
+  return (
+    <Section title={t("billing.v3.credit.title")} lede={t("billing.v3.credit.lede")}>
+      <div className="billing-rows">
+        <Row label={t("billing.v3.credit.balance")}>
+          <span className="billing-value billing-value--strong">{f.usd(status.credits.balanceUsd)}</span>
+        </Row>
+        <Row label={t("billing.v3.credit.add")} hint={t("billing.v3.credit.addHint")}>
+          <div className="billing-credit">
+            <div className="billing-segmented" role="radiogroup" aria-label={t("billing.v3.credit.add")}>
+              {options.presetAmountCents.map((cents) => {
+                const on = !custom.trim() && preset === cents;
                 return (
                   <button
-                    key={amountCents}
+                    key={cents}
                     type="button"
                     role="radio"
-                    aria-checked={isSelected}
-                    className="billing-credit-preset"
-                    data-active={isSelected || undefined}
-                    onClick={() => handleSelectCreditPreset(amountCents)}
-                    disabled={startingCredit}
+                    aria-checked={on}
+                    data-on={on || undefined}
+                    onClick={() => {
+                      setPreset(cents);
+                      setCustom("");
+                      setInputError(null);
+                    }}
                   >
-                    {formatters.currency.format(amountCents / 100)}
+                    {f.amount(cents / 100)}
                   </button>
                 );
               })}
             </div>
-          ) : null}
-
-          <label className="billing-credit-input-wrap">
-            <span className="billing-credit-input-prefix" aria-hidden="true">
-              $
-            </span>
-            <input
-              type="text"
-              inputMode="decimal"
-              className="billing-credit-input"
-              placeholder={
-                creditOptions
-                  ? `${creditOptions.minAmountCents / 100}–${creditOptions.maxAmountCents / 100}`
-                  : "Amount"
-              }
-              value={creditCustomAmount}
-              onChange={(event) => {
-                setCreditCustomAmount(event.target.value);
-                setCreditSelectedPresetCents(null);
-              }}
-              disabled={!creditOptions || startingCredit}
-              aria-label="Custom credit amount in dollars"
-            />
-          </label>
-          <button
-            type="button"
-            className="pill-btn pill-btn--lg pill-btn--primary billing-credit-submit"
-            onClick={() => void handleStartCreditCheckout()}
-            disabled={
-              !creditOptions || startingCredit || !creditCustomAmount.trim()
-            }
-          >
-            {startingCredit ? "Opening…" : "Add credit"}
-          </button>
-        </div>
-      </section>
-    </div>
+            <label className="billing-input-wrap">
+              <span aria-hidden="true">$</span>
+              <input
+                className="billing-input"
+                inputMode="decimal"
+                placeholder={t("billing.v3.credit.other")}
+                aria-label={t("billing.v3.credit.other")}
+                aria-invalid={inputError ? true : undefined}
+                value={custom}
+                onChange={(event) => {
+                  setCustom(event.target.value);
+                  setInputError(null);
+                }}
+              />
+            </label>
+            <button
+              type="button"
+              className="billing-btn billing-btn--primary"
+              disabled={busy !== null || amountCents === null}
+              onClick={submit}
+            >
+              {busy === "credit"
+                ? t("billing.v3.opening")
+                : amountCents
+                  ? t("billing.v3.credit.addAmount", { amount: f.usd(amountCents / 100) })
+                  : t("billing.v3.credit.add")}
+            </button>
+          </div>
+          {inputError ? <span className="billing-field-error">{inputError}</span> : null}
+        </Row>
+      </div>
+    </Section>
   );
 }
 

@@ -26,9 +26,9 @@ export default function OneChatPage() {
           title="Ask once. Keep talking."
           body={
             <>
-              One ongoing chat, with the work happening behind it — on Stella&apos;s models or yours. Running
-              several jobs at once in the background comes with <Link href="/pricing">Pro</Link>; other plans
-              work through one at a time.
+              One ongoing chat, with the work happening behind it — on Stella&apos;s models or yours. Agents run
+              on your computer on every plan, and <Link href="/pricing">paid plans</Link> run them in the cloud
+              too, several at once.
             </>
           }
           note="Free. No credit card, no trial."
@@ -172,11 +172,11 @@ export default function OneChatPage() {
         <div className={pg.copy}>
           <p className={pg.eyebrow}>Built in</p>
           <h2 id="built-in" className={pg.h2}>
-            Pictures, voice, and more — on Pro.
+            Pictures, voice, and more — on every paid plan.
           </h2>
           <p>
             Ask Stella to make an image, a video, a song, or a spoken reading, and she just does it. It runs on the
-            house models with nothing extra to wire up, and it comes with the <Link href="/pricing">Pro plan</Link>.
+            house models with nothing extra to wire up, and it comes with every <Link href="/pricing">paid plan</Link>.
           </p>
         </div>
         <MockStage className={styles.mediaStage}>

@@ -486,7 +486,7 @@
       "video_generation": "Generowanie wideo"
     },
     "capabilityRestriction": {
-      "genericDescription": "Ta funkcja jest częścią planu Stella Pro. Ulepsz plan, aby ją odblokować.",
+      "genericDescription": "Ta funkcja jest dostępna w każdym płatnym planie Stella. Zmień plan, aby ją odblokować.",
       "genericTitle": "Nie jest częścią Twojego planu",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Niedostępne",
@@ -495,22 +495,6 @@
       "unavailable": "{capability} nie jest teraz dostępne w żadnym planie.",
       "upgrade": "{capability} jest częścią planu Stella {plan}. Ulepsz plan, aby odblokować tę funkcję."
     },
-    "features": {
-      "assistant": "Osobisty asystent",
-      "codingAgent": "Agent programistyczny",
-      "dictationReadAloud": "Dyktowanie i czytanie na głos",
-      "multipleAgents": "Wielu agentów",
-      "research": "Badania i praca z wiedzą"
-    },
-    "freeAllowance": {
-      "caption": "Bezpłatnie na próbę.",
-      "exhaustedCta": "Ulepsz do Go",
-      "exhaustedDescription": "Ulepsz plan do Go, aby uzyskać 10× większe użycie.",
-      "exhaustedTitle": "Osiągnięto limit planu Free",
-      "label": "Użycie planu Free",
-      "remaining": "Bezpłatnie na próbę."
-    },
-    "heading": "Wybierz swój plan",
     "mobile": {
       "accessEnds": "Dostęp kończy się {date}",
       "alreadySubscribedTitle": "Masz już subskrypcję",
@@ -518,7 +502,6 @@
       "currentPlanLabel": "Bieżący plan",
       "errorRetry": "Spróbuj ponownie",
       "footnote": "Rozliczane przez Stella za pośrednictwem Stripe. Odnawia się co miesiąc do czasu anulowania; anuluj w dowolnej chwili.",
-      "introLine": "{introPrice} przez pierwszy miesiąc, potem {price}/mies.",
       "manage": "Zarządzaj subskrypcją",
       "manageWebNote": "Zarządzaj tą subskrypcją lub anuluj ją w Stella w internecie pod adresem stella.sh.",
       "pendingBody": "Dokończ płatność w przeglądarce. Twój plan zaktualizuje się tutaj automatycznie po potwierdzeniu płatności — nie trzeba ponownie uruchamiać.",
@@ -534,30 +517,96 @@
       "successBody": "Twoja subskrypcja jest aktywna. Korzystaj z wyższych limitów.",
       "successTitle": "Masz teraz Stella {plan}"
     },
-    "plans": {
-      "free": {
-        "tagline": "Bezpłatnie na próbę."
-      },
-      "go": {
-        "tagline": "10× większe użycie"
-      },
-      "pro": {
-        "tagline": "Najwyższe limity użycia do generowania multimediów i pracy wielu agentów"
-      }
-    },
-    "renewal": {
-      "accessEnds": "Dostęp kończy się {date}",
-      "lapseDescription": "Twój plan {plan} działa do {date}. Potem Stella przestanie działać — limit planu Free przyznawany jest raz, a Twój został już wykorzystany.",
-      "lapseTitle": "Stella przestanie działać, gdy skończy się Twój plan",
-      "nextLabel": "Następne odnowienie",
-      "pendingLabel": "Anulowanie w toku",
-      "renews": "Odnawia się {date}"
-    },
-    "subtitle": "Zacznij bezpłatnie. Ulepsz plan, gdy potrzebujesz więcej.",
     "upgradeDialog": {
       "cta": "Zaczynajmy",
       "description": "Dzięki za ulepszenie planu. Wyższy priorytet i większe limity działają już teraz — do dzieła.",
       "title": "Masz Stellę {plan}."
+    },
+    "v3": {
+      "opening": "Otwieranie…",
+      "signIn": {
+        "title": "Zaloguj się, aby zobaczyć swój plan",
+        "body": "Twój plan, wykorzystanie i dodatkowe środki należą do Twojego konta Stella."
+      },
+      "notice": {
+        "checkoutOpened": "Płatność otworzyła się w przeglądarce. Ta strona zaktualizuje się po zakończeniu płatności.",
+        "portalOpened": "Rozliczenia otworzyły się w przeglądarce. Zmiany pojawią się tu automatycznie.",
+        "checkoutFailed": "Nie udało się teraz rozpocząć płatności.",
+        "portalFailed": "Nie udało się teraz otworzyć rozliczeń."
+      },
+      "usage": {
+        "title": "Wykorzystanie",
+        "lede": "Jeden budżet płaci za wszystko, co Stella robi dla Ciebie.",
+        "ofMonth": "z {amount} w tym miesiącu",
+        "ofOneTime": "z {amount} na wypróbowanie Stelli",
+        "oneTimeNote": "Jednorazowo, nie odnawia się",
+        "of": "z {amount}",
+        "used": "Wykorzystano",
+        "held": "Zarezerwowane przez trwającą pracę",
+        "heldHint": "Odłożone, dopóki agenci i zadania multimedialne się nie zakończą. To, czego nie użyją, wraca.",
+        "rolling": "Najbliższe {hours} godz.",
+        "rollingHint": "Do {amount} w dowolnych {hours} godzinach.",
+        "weekly": "Ten tydzień",
+        "weeklyHint": "Do {amount} tygodniowo.",
+        "resets": "Odnowienie: {date}",
+        "startsNext": "Zaczyna się przy następnym użyciu",
+        "credit": "Dodatkowe środki",
+        "creditHint": "Używane, gdy budżet Twojego planu się wyczerpie.",
+        "available": "Dostępne teraz",
+        "availableHint": "Ile Stella może teraz wydać, łącznie ze środkami.",
+        "unlimited": "Bez limitu",
+        "outTitle": "Na razie wykorzystano cały limit",
+        "outBody": "Twój budżet odnowi się: {date}. Dodaj środki lub zmień plan na wyższy, aby kontynuować teraz.",
+        "outBodyNoDate": "Dodaj środki lub zmień plan na wyższy, aby kontynuować teraz.",
+        "freeOutTitle": "Wykorzystano darmowy limit",
+        "freeOutBody": "Wybierz plan lub dodaj środki, aby kontynuować.",
+        "creditTitle": "Korzystasz z dodatkowych środków",
+        "creditBody": "Limit Twojego planu jest wyczerpany do {date}. Do tego czasu środki pokrywają pracę Stelli.",
+        "upgradeTo": "Przejdź na {plan}"
+      },
+      "plan": {
+        "title": "Plan",
+        "lede": "Każdy plan uruchamia tę samą Stellę. Większe plany dają jej większy budżet i więcej zadań naraz.",
+        "current": "Obecny",
+        "perMonth": "{price}/mies.",
+        "checkout": "Przejdź do płatności · {price}",
+        "checkoutHint": "Płatność otworzy się w przeglądarce. Budżet zaczyna działać od razu.",
+        "upgrade": "Przejdź na {plan} · {price}",
+        "downgrade": "Zmień na niższy: {plan} · {price}",
+        "changeHint": "Potwierdzisz zmianę w przeglądarce.",
+        "cancel": "Anuluj plan",
+        "cancelHint": "Zachowasz {plan} do {date}, a potem przejdziesz na Free.",
+        "renews": "Odnawia się",
+        "renewsHint": "{price}, rozliczane co miesiąc przez Stripe.",
+        "ends": "Kończy się",
+        "endsHint": "{plan} działa do tego czasu. Wznów go w Zarządzaj rozliczeniami.",
+        "manage": "Płatności i faktury",
+        "manageHint": "Karta, faktury i anulowanie.",
+        "manageButton": "Zarządzaj rozliczeniami"
+      },
+      "includes": {
+        "oneTime": "{amount} na wypróbowanie Stelli, jednorazowo",
+        "monthly": "{amount} wykorzystania co miesiąc",
+        "local": "Agenci na Twoim komputerze",
+        "cloud": "Agenci w chmurze, {count} naraz",
+        "media": "Obrazy, wideo, muzyka i 3D"
+      },
+      "credit": {
+        "title": "Dodatkowe środki",
+        "lede": "Pozwalają Stelli działać dalej, gdy budżet planu się wyczerpie.",
+        "balance": "Saldo",
+        "add": "Dodaj środki",
+        "addHint": "Jednorazowa płatność przez Stripe. Bez subskrypcji.",
+        "addAmount": "Dodaj {amount}",
+        "other": "Inna kwota",
+        "invalid": "Wpisz kwotę w dolarach.",
+        "min": "Minimalna kwota to {amount}.",
+        "max": "Maksymalna kwota to {amount}."
+      },
+      "mobile": {
+        "usageRow": "Ten miesiąc",
+        "usageOneTime": "Darmowy limit"
+      }
     }
   },
   "chat": {

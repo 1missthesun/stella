@@ -476,7 +476,7 @@
       "video_generation": "Videógenerálás"
     },
     "capabilityRestriction": {
-      "genericDescription": "Ez a funkció a Stella Pro csomag része. Válts csomagot a feloldásához.",
+      "genericDescription": "Ez a funkció minden fizetős Stella-csomagban benne van. Válts nagyobb csomagra a feloldásához.",
       "genericTitle": "Nincs benne a csomagodban",
       "lockedBadge": "{plan}",
       "lockedBadgeGeneric": "Nem érhető el",
@@ -485,22 +485,6 @@
       "unavailable": "A(z) {capability} jelenleg egyik csomagban sem érhető el.",
       "upgrade": "A(z) {capability} a Stella {plan} csomag része. Válts csomagot a feloldásához."
     },
-    "features": {
-      "assistant": "Személyes asszisztens",
-      "codingAgent": "Kódoló ügynök",
-      "dictationReadAloud": "Diktálás és felolvasás",
-      "multipleAgents": "Több ügynök",
-      "research": "Kutatás és tudásmunka"
-    },
-    "freeAllowance": {
-      "caption": "Ingyenesen kipróbálható.",
-      "exhaustedCta": "Váltás a Go csomagra",
-      "exhaustedDescription": "Válts Go csomagra a 10× nagyobb használatért.",
-      "exhaustedTitle": "Elérted a Free csomag korlátját",
-      "label": "A Free csomag használata",
-      "remaining": "Ingyenesen kipróbálható."
-    },
-    "heading": "Válaszd ki a csomagodat",
     "mobile": {
       "accessEnds": "A hozzáférés lejár: {date}",
       "alreadySubscribedTitle": "Már van előfizetésed",
@@ -508,7 +492,6 @@
       "currentPlanLabel": "Jelenlegi csomag",
       "errorRetry": "Újra",
       "footnote": "A Stella számláz a Stripe-on keresztül. Lemondásig havonta megújul; bármikor lemondható.",
-      "introLine": "{introPrice} az első hónapban, utána {price}/hó",
       "manage": "Előfizetés kezelése",
       "manageWebNote": "Ezt az előfizetést a Stella webes felületén, a stella.sh címen kezelheted vagy mondhatod le.",
       "pendingBody": "Fejezd be a fizetést a böngészőben. A csomagod itt automatikusan frissül, amint a fizetés megerősítést nyer – nem kell újraindítani.",
@@ -524,30 +507,96 @@
       "successBody": "Az előfizetésed aktív. Élvezd a magasabb korlátokat.",
       "successTitle": "A Stella {plan} csomagot használod"
     },
-    "plans": {
-      "free": {
-        "tagline": "Ingyenesen kipróbálható."
-      },
-      "go": {
-        "tagline": "10× nagyobb használat"
-      },
-      "pro": {
-        "tagline": "A legmagasabb használati korlátok médiageneráláshoz és több ügynökhöz"
-      }
-    },
-    "renewal": {
-      "accessEnds": "A hozzáférés eddig tart: {date}",
-      "lapseDescription": "A(z) {plan} csomagod eddig tart: {date}. Utána a Stella leáll — a Free csomag kerete egyszeri, és a tiédet már elhasználtad.",
-      "lapseTitle": "A Stella leáll, amikor a csomagod lejár",
-      "nextLabel": "Következő megújítás",
-      "pendingLabel": "Lemondás folyamatban",
-      "renews": "Megújul: {date}"
-    },
-    "subtitle": "Kezdd ingyen. Válts magasabb csomagra, amikor többre van szükséged.",
     "upgradeDialog": {
       "cta": "Kezdés",
       "description": "Köszönjük a váltást. A magasabb prioritás és a megnövelt használat mostantól aktív — jó munkát.",
       "title": "A csomagod: Stella {plan}."
+    },
+    "v3": {
+      "opening": "Megnyitás…",
+      "signIn": {
+        "title": "Jelentkezz be a csomagod megtekintéséhez",
+        "body": "A csomagod, a használatod és az extra krediteid a Stella-fiókodhoz tartoznak."
+      },
+      "notice": {
+        "checkoutOpened": "A fizetés megnyílt a böngésződben. Ez frissül, amint a fizetés befejeződik.",
+        "portalOpened": "A számlázás megnyílt a böngésződben. A változások automatikusan megjelennek itt.",
+        "checkoutFailed": "A fizetést most nem sikerült elindítani.",
+        "portalFailed": "A számlázást most nem sikerült megnyitni."
+      },
+      "usage": {
+        "title": "Használat",
+        "lede": "Egy keret fizet mindenért, amit a Stella neked futtat.",
+        "ofMonth": "/ {amount} ebben a hónapban",
+        "ofOneTime": "/ {amount} a Stella kipróbálására",
+        "oneTimeNote": "Egyszeri, nem újul meg",
+        "of": "/ {amount}",
+        "used": "Felhasznált",
+        "held": "Futó munkára lefoglalva",
+        "heldHint": "Félretéve, amíg az ügynökök és a médiafeladatok befejeződnek. Amit nem használnak fel, visszajár.",
+        "rolling": "Következő {hours} óra",
+        "rollingHint": "Legfeljebb {amount} bármely {hours} órában.",
+        "weekly": "Ezen a héten",
+        "weeklyHint": "Legfeljebb {amount} hetente.",
+        "resets": "Megújul: {date}",
+        "startsNext": "A következő használattal indul",
+        "credit": "Extra kredit",
+        "creditHint": "Akkor használódik, amikor a csomagod kerete elfogy.",
+        "available": "Most elérhető",
+        "availableHint": "Amennyit a Stella most elkölthet, a kredittel együtt.",
+        "unlimited": "Korlátlan",
+        "outTitle": "Egyelőre elfogyott a kereted",
+        "outBody": "A kereted megújul: {date}. Adj hozzá kreditet vagy válts nagyobb csomagra, hogy most folytathasd.",
+        "outBodyNoDate": "Adj hozzá kreditet vagy válts nagyobb csomagra, hogy most folytathasd.",
+        "freeOutTitle": "Elhasználtad az ingyenes keretet",
+        "freeOutBody": "Válassz csomagot vagy adj hozzá kreditet a folytatáshoz.",
+        "creditTitle": "Extra kreditből fut",
+        "creditBody": "A csomagod korlátja {date}-ig elfogyott. Addig a kredit fedezi, amit a Stella csinál.",
+        "upgradeTo": "Váltás erre: {plan}"
+      },
+      "plan": {
+        "title": "Csomag",
+        "lede": "Minden csomag ugyanazt a Stellát futtatja. A nagyobb csomagok nagyobb keretet és több párhuzamos munkát adnak.",
+        "current": "Jelenlegi",
+        "perMonth": "{price}/hó",
+        "checkout": "Tovább a fizetéshez · {price}",
+        "checkoutHint": "A fizetés a böngésződben nyílik meg. A kereted azonnal indul.",
+        "upgrade": "Váltás erre: {plan} · {price}",
+        "downgrade": "Visszaváltás erre: {plan} · {price}",
+        "changeHint": "A változtatást a böngészőben erősíted meg.",
+        "cancel": "Csomag lemondása",
+        "cancelHint": "A(z) {plan} csomag {date}-ig marad, utána Free-re váltasz.",
+        "renews": "Megújul",
+        "renewsHint": "{price}, havonta számlázza a Stripe.",
+        "ends": "Lejár",
+        "endsHint": "A(z) {plan} addig aktív marad. A Számlázás kezelése résznél folytathatod.",
+        "manage": "Fizetés és számlák",
+        "manageHint": "Kártya, számlák és lemondás.",
+        "manageButton": "Számlázás kezelése"
+      },
+      "includes": {
+        "oneTime": "{amount} a Stella kipróbálására, egyszer",
+        "monthly": "{amount} használat havonta",
+        "local": "Ügynökök a számítógépeden",
+        "cloud": "Felhőügynökök, egyszerre {count}",
+        "media": "Kép, videó, zene és 3D"
+      },
+      "credit": {
+        "title": "Extra kredit",
+        "lede": "Tovább működteti a Stellát, amikor a csomagod kerete elfogy.",
+        "balance": "Egyenleg",
+        "add": "Kredit hozzáadása",
+        "addHint": "Egyszeri fizetés a Stripe-pal. Nincs előfizetés.",
+        "addAmount": "{amount} hozzáadása",
+        "other": "Más összeg",
+        "invalid": "Adj meg egy összeget dollárban.",
+        "min": "A minimum {amount}.",
+        "max": "A maximum {amount}."
+      },
+      "mobile": {
+        "usageRow": "Ebben a hónapban",
+        "usageOneTime": "Ingyenes használat"
+      }
     }
   },
   "chat": {

@@ -42,6 +42,10 @@ Options
   --no-fetch                  update: deploy this checkout as it is, without fetching
   --now                       update: skip the confirmation and the price-refresh wait
   --no-wait                   setup/pair: don't wait for a device to scan the code
+  --review [--days N]         pair: one code many devices can use for N days (1–90, default 30),
+                              for app store reviewers. Needs --enable-review once (redeploys)
+  --review --revoke           pair: cancel the review code and sign out every device that used it
+  --disable-review            pair: turn review codes off again (redeploys)
   --yes                       destroy/update: don't ask for confirmation
   --verbose                   Stream wrangler's output to the terminal
 
@@ -67,6 +71,7 @@ const VALUE_FLAGS = new Set([
   "ref",
   "cloud-agent-hours",
   "cloud-agent-concurrency",
+  "days",
 ]);
 const options = {};
 for (let i = 0; i < argv.length; i += 1) {
@@ -465,6 +470,7 @@ const buildConfigs = (state, { billing }) => {
     ADMIN_ACCESS_TEAM_DOMAIN: "off",
     ADMIN_ACCESS_AUD: "off",
     STELLA_OWNER_MODE: "1",
+    ...(state.reviewPairing?.enabled ? { STELLA_REVIEW_PAIRING: "1" } : {}),
     });
   if (state.caps?.monthlyHours !== undefined) vars.STELLA_CLOUD_AGENT_MONTHLY_HOURS = String(state.caps.monthlyHours);
   if (state.caps?.maxConcurrent !== undefined) vars.STELLA_CLOUD_AGENT_MAX_CONCURRENT = String(state.caps.maxConcurrent);
@@ -1022,10 +1028,15 @@ const deployCloudBuilder = async (state, file, secrets, release) => {
     secrets,
     label: "cloud-builder (backend + cloud agents; builds and uploads the sandbox image, first time 5–15 min)",
   });
-  const check = await run(nodeBin(), ["scripts/check-container-metadata.mjs", "--deployed", "--wrangler-config", file], {
-    cwd: path.join(ROOT, "workers", "cloud-builder"),
-    accountId: state.accountId,
-  });
+  let check;
+  for (let attempt = 1; attempt <= 6; attempt += 1) {
+    check = await run(nodeBin(), ["scripts/check-container-metadata.mjs", "--deployed", "--wrangler-config", file], {
+      cwd: path.join(ROOT, "workers", "cloud-builder"),
+      accountId: state.accountId,
+    });
+    if (check.status === 0 || !/could not be found|10007|100146/i.test(`${check.stderr}${check.stdout}`)) break;
+    await sleep(10_000);
+  }
   if (check.status !== 0) fail("containers", `The deployed backend has no container image: ${tail(check.stderr || check.stdout, 6)}`);
   emit("containers", "ok", "Sandbox image and code bundle are attached to the live version");
 };
@@ -1314,10 +1325,95 @@ const update = async () => {
   emit("update", "ready", `Your server runs ${discovered.version ?? release.version}.`, { url: state.urls.backend, version: discovered.version ?? release.version });
 };
 
+const prefixFlag = PREFIX === "stella" ? "" : ` --prefix ${PREFIX}`;
+
+const redeployForReview = async (state, enabled) => {
+  await preflight();
+  await ensureDocker();
+  state.reviewPairing = { ...(state.reviewPairing ?? {}), enabled, deployed: false };
+  writeState(state);
+  emit("review", "start", `${enabled ? "Turning review codes on" : "Turning review codes off"} (redeploys the server; cloud agent turns in progress stop)…`);
+  await ensureResources(state.accountId, state);
+  const release = await deployEverything(state, { first: false, waitForPrices: false });
+  await verify(state, release);
+  state.reviewPairing.deployed = enabled;
+  writeState(state);
+};
+
+const reviewPair = async (state) => {
+  const step = "review";
+  if (options.revoke) {
+    const pairingId = state.reviewPairing?.pairingId;
+    if (!pairingId) fail(step, "There's no review code on record for this server.");
+    const res = await admin(state, "POST", "/api/auth/device-pairing/cancel", { pairingId });
+    if (!res.ok) fail(step, `Couldn't revoke the review code (${res.status}): ${res.text.slice(0, 300)}`);
+    state.reviewPairing = { enabled: state.reviewPairing.enabled, deployed: state.reviewPairing.deployed };
+    writeState(state);
+    emit(step, "ready", `Review code revoked; ${res.json?.signedOut ?? 0} device(s) signed out.`, { signedOut: res.json?.signedOut ?? 0 });
+    return;
+  }
+  const days = options.days === undefined ? 30 : Number(options.days);
+  if (!Number.isInteger(days) || days < 1 || days > 90) fail(step, "--days must be a whole number from 1 to 90.");
+  if (options["enable-review"] && !state.reviewPairing?.deployed) await redeployForReview(state, true);
+  let res = await admin(state, "POST", "/api/auth/device-pairing/start", { review: true, days });
+  if (res.status === 403 && res.json?.code === "review_pairing_off") {
+    if (!options["enable-review"] && !(await confirm("Review codes are off on this server. Turn them on (redeploys the server)?"))) {
+      fail(step, `Review codes are off on this server. Run: bun scripts/selfhost.mjs pair --review --enable-review${prefixFlag} (it redeploys once).`);
+    }
+    await redeployForReview(state, true);
+    res = await admin(state, "POST", "/api/auth/device-pairing/start", { review: true, days });
+  }
+  if (res.ok && res.json?.pairingId && res.json.reusable !== true) {
+    await admin(state, "POST", "/api/auth/device-pairing/cancel", { pairingId: res.json.pairingId });
+    if (!options["enable-review"]) {
+      fail(step, `This server's version doesn't have review codes yet. Run: bun scripts/selfhost.mjs pair --review --enable-review${prefixFlag} (it updates the server once).`);
+    }
+    await redeployForReview(state, true);
+    res = await admin(state, "POST", "/api/auth/device-pairing/start", { review: true, days });
+  }
+  if (!res.ok || !res.json?.link || res.json.reusable !== true) fail(step, `Couldn't make a review code (${res.status}): ${res.text.slice(0, 300)}`);
+  const { pairingId, link, expiresAt } = res.json;
+  state.reviewPairing = { ...state.reviewPairing, enabled: true, pairingId, link, expiresAt };
+  writeState(state);
+  const qrFile = path.join(STATE_DIR, `review-${PREFIX}.svg`);
+  writeFileSync(qrFile, qrSvg(link), { mode: 0o600 });
+  const until = new Date(expiresAt).toISOString().slice(0, 10);
+  if (!JSON_MODE) {
+    console.log("");
+    console.log(qrTerminal(link));
+    console.log("");
+    console.log(`  Review code: every device that scans or opens it joins as the owner, until ${until}.`);
+    console.log(`  ${link}`);
+    console.log(`  Revoke it (signs every reviewer device out): bun scripts/selfhost.mjs pair --review --revoke${prefixFlag}`);
+    console.log("");
+  }
+  emit(step, "ready", `Review code ready: many devices can use it until ${until}. It is also saved in this computer's state file. Revoke with pair --review --revoke.`, {
+    url: link,
+    link,
+    expiresAt,
+    qrFile,
+    reusable: true,
+    backend: state.urls.backend,
+  });
+};
+
 const pair = async () => {
   const { state } = await requireState();
   if (!state?.adminSecret || !state.urls) {
-    fail("pair", `This computer has no admin key for ${PREFIX}. Run: bun scripts/selfhost.mjs recover${PREFIX === "stella" ? "" : ` --prefix ${PREFIX}`}`);
+    fail("pair", `This computer has no admin key for ${PREFIX}. Run: bun scripts/selfhost.mjs recover${prefixFlag}`);
+  }
+  if (options["disable-review"]) {
+    if (state.reviewPairing?.pairingId) {
+      await admin(state, "POST", "/api/auth/device-pairing/cancel", { pairingId: state.reviewPairing.pairingId });
+    }
+    state.reviewPairing = {};
+    await redeployForReview(state, false);
+    emit("review", "ready", "Review codes are off, and any review code was revoked.");
+    return;
+  }
+  if (options.review) {
+    await reviewPair(state);
+    return;
   }
   await mintPairing(state, { wait: !options["no-wait"] });
 };

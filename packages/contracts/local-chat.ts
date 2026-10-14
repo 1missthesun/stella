@@ -92,8 +92,6 @@ export type ThreadActivityRecord = {
   /** Stable grouping metadata owned by the durable runtime thread. */
   groupKey?: string;
   groupLabel?: string;
-  /** Native projections are inspectable but are not Stella-controlled. */
-  readOnly?: boolean;
   startedAt: number;
   completedAt?: number;
   result?: string;

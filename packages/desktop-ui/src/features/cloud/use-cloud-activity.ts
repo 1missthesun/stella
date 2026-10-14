@@ -51,9 +51,6 @@ export const cloudThreadToTask = (thread: CloudAgentThread): TaskItem => {
     agentType: thread.agentType || "general",
     ...(thread.parentThreadId ? { parentAgentId: thread.parentThreadId } : {}),
     source: "stella",
-    // Cloud activity has its own cancel/resume authority. Until those controls
-    // are integrated, local lifecycle actions must never target this row.
-    readOnly: true,
     status,
     startedAtMs: thread.createdAt,
     lastUpdatedAtMs: thread.updatedAt,
@@ -300,7 +297,6 @@ export const journalActivityTasks = (
       description: entry.title,
       agentType: entry.agentType ?? "general",
       source: "stella",
-      readOnly: true,
       status: entry.status,
       startedAtMs: entry.createdAtMs,
       lastUpdatedAtMs: entry.updatedAtMs,

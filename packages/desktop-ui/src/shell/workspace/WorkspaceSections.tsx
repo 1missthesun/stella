@@ -321,7 +321,6 @@ const TaskRow = memo(function TaskRow({
       ref={rowRef}
       data-status={task.status}
       data-source={task.source}
-      data-read-only={task.readOnly ? "true" : undefined}
       data-expanded={expanded ? "true" : undefined}
       title={label}
       data-continuous-animation={compactMotionActive ? "true" : undefined}

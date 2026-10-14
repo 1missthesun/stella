@@ -136,7 +136,7 @@ const recordsSignature = (records: ThreadActivityRecord[]): string =>
   records
     .map(
       (record) =>
-        `${record.threadId}\u0000${record.source}\u0000${record.readOnly ? 1 : 0}\u0000${record.parentAgentId ?? ""}\u0000${record.status}\u0000${record.attemptGeneration ?? 0}\u0000${record.recordRevision ?? 0}\u0000${record.updatedAt}\u0000${record.description}\u0000${record.rootRunId ?? ""}\u0000${JSON.stringify(record.modelConfigSnapshot ?? null)}\u0000${record.assistantMessagesUpdatedSequence ?? ""}\u0000${JSON.stringify(record.assistantMessages ?? [])}`,
+        `${record.threadId}\u0000${record.source}\u0000${record.parentAgentId ?? ""}\u0000${record.status}\u0000${record.attemptGeneration ?? 0}\u0000${record.recordRevision ?? 0}\u0000${record.updatedAt}\u0000${record.description}\u0000${record.rootRunId ?? ""}\u0000${JSON.stringify(record.modelConfigSnapshot ?? null)}\u0000${record.assistantMessagesUpdatedSequence ?? ""}\u0000${JSON.stringify(record.assistantMessages ?? [])}`,
     )
     .join("\n");
 
@@ -283,7 +283,6 @@ const recordVersionPayloadSignature = (record: ThreadActivityRecord): string =>
     parentAgentId: record.parentAgentId ?? null,
     groupKey: record.groupKey ?? null,
     groupLabel: record.groupLabel ?? null,
-    readOnly: record.readOnly ?? false,
     startedAt: record.startedAt,
     completedAt: record.completedAt ?? null,
     result: record.result ?? null,

@@ -105,7 +105,6 @@ export type TaskItem = {
    * passive projections: visible and inspectable, but never runnable through
    * Stella's lifecycle controls. */
   source: ThreadActivityRecord['source']
-  readOnly: boolean
   status: TaskLifecycleStatus
   /** Durable execution epoch for retry/resume deduplication. */
   attemptGeneration?: number
@@ -204,7 +203,6 @@ export function buildActivityTasks(
         description: record.description,
         agentType: record.agentType,
         source: record.source,
-        readOnly: record.source === 'claude-native' || record.readOnly === true,
         status,
         attemptGeneration:
           (latestAttemptOwns

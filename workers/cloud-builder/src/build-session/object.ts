@@ -180,6 +180,101 @@ export class BuildSessionObject extends DurableObject<Env> {
     this.ctx.storage,
   );
 
+  private readonly self: BuildSessionInternals = {
+    ctx: this.ctx,
+    env: this.env,
+    runningTurns: this.runningTurns,
+    appTurnExecutions: this.appTurnExecutions,
+    agentTurnExecutions: this.agentTurnExecutions,
+    builderFallbackRecoveries: this.builderFallbackRecoveries,
+    turnStateCheckpointRuns: this.turnStateCheckpointRuns,
+    exactTurnCancellations: this.exactTurnCancellations,
+    deleteTurnStoragePreservingExactCancellations: this.deleteTurnStoragePreservingExactCancellations.bind(this),
+    ownerGateFor: this.ownerGateFor.bind(this),
+    releaseOwnerGate: this.releaseOwnerGate.bind(this),
+    ownerEventBase: this.ownerEventBase.bind(this),
+    deliverOwnerEventsDurable: this.deliverOwnerEventsDurable.bind(this),
+    retryOwnerEventDebt: this.retryOwnerEventDebt.bind(this),
+    emitTurnEvent: this.emitTurnEvent.bind(this),
+    appendThreadTranscript: this.appendThreadTranscript.bind(this),
+    trackTurn: this.trackTurn.bind(this),
+    startAgentTurn: this.startAgentTurn.bind(this),
+    callOwnerFence: this.callOwnerFence.bind(this),
+    callOwnerTurnState: this.callOwnerTurnState.bind(this),
+    resolveAgentTurnState: this.resolveAgentTurnState.bind(this),
+    publishAgentTurnWorkspace: this.publishAgentTurnWorkspace.bind(this),
+    confirmAgentTurnStateRestore: this.confirmAgentTurnStateRestore.bind(this),
+    quiesceCurrentAgentSession: this.quiesceCurrentAgentSession.bind(this),
+    exactAgentExecutionMarker: this.exactAgentExecutionMarker.bind(this),
+    persistAgentExecutionMarker: this.persistAgentExecutionMarker.bind(this),
+    interruptAgentForBuilderFallback: this.interruptAgentForBuilderFallback.bind(this),
+    exactTurnStateCheckpointOperations: this.exactTurnStateCheckpointOperations.bind(this),
+    abortUnpublishedTurnStateOperation: this.abortUnpublishedTurnStateOperation.bind(this),
+    recoverAgentTurnAfterExecutorLoss: this.recoverAgentTurnAfterExecutorLoss.bind(this),
+    reconcileAgentCheckpointAfterQuiescence: this.reconcileAgentCheckpointAfterQuiescence.bind(this),
+    ensureBuilderFallbackTranscript: this.ensureBuilderFallbackTranscript.bind(this),
+    advanceBuilderFallback: this.advanceBuilderFallback.bind(this),
+    registerTurn: this.registerTurn.bind(this),
+    ownerFenceReceiptMatches: this.ownerFenceReceiptMatches.bind(this),
+    ownerFenceLeaseSlotKey: this.ownerFenceLeaseSlotKey.bind(this),
+    armOwnerFenceLeaseReconciliationAlarm: this.armOwnerFenceLeaseReconciliationAlarm.bind(this),
+    hasOwnerFenceLeaseRetirementDebt: this.hasOwnerFenceLeaseRetirementDebt.bind(this),
+    retryOwnerFenceLeaseRetirements: this.retryOwnerFenceLeaseRetirements.bind(this),
+    registerBuildOwnerFenceLease: this.registerBuildOwnerFenceLease.bind(this),
+    unregisterTurn: this.unregisterTurn.bind(this),
+    unregisterTurnLease: this.unregisterTurnLease.bind(this),
+    retireBuildOwnerFenceLease: this.retireBuildOwnerFenceLease.bind(this),
+    sweepNativeBackupDebt: this.sweepNativeBackupDebt.bind(this),
+    settleAgentTransientBackup: this.settleAgentTransientBackup.bind(this),
+    cleanupTransientWrites: this.cleanupTransientWrites.bind(this),
+    cleanupOwnerPurgedTurnStorage: this.cleanupOwnerPurgedTurnStorage.bind(this),
+    settleTerminalTransientWrites: this.settleTerminalTransientWrites.bind(this),
+    retireTerminalAppTurnStorage: this.retireTerminalAppTurnStorage.bind(this),
+    cancelForOwnerPurge: this.cancelForOwnerPurge.bind(this),
+    redeliverOrphan: this.redeliverOrphan.bind(this),
+    assertTurnWritable: this.assertTurnWritable.bind(this),
+    assertAgentTurnIdentity: this.assertAgentTurnIdentity.bind(this),
+    assertAppTurnIdentity: this.assertAppTurnIdentity.bind(this),
+    fetchCanonicalAgentHistory: this.fetchCanonicalAgentHistory.bind(this),
+    assertAgentExecutionActive: this.assertAgentExecutionActive.bind(this),
+    assertAppExecutionActive: this.assertAppExecutionActive.bind(this),
+    sandbox: this.sandbox.bind(this),
+    sandboxContainerRunning: this.sandboxContainerRunning.bind(this),
+    destroySandboxDurably: this.destroySandboxDurably.bind(this),
+    deliverExecutorLossTerminal: this.deliverExecutorLossTerminal.bind(this),
+    retryDueSandboxDestroyDebts: this.retryDueSandboxDestroyDebts.bind(this),
+    scheduleSandboxDestroyDebtAlarm: this.scheduleSandboxDestroyDebtAlarm.bind(this),
+    scheduleDurabilityAlarm: this.scheduleDurabilityAlarm.bind(this),
+    currentSandboxTarget: this.currentSandboxTarget.bind(this),
+    currentSandbox: this.currentSandbox.bind(this),
+    terminateCurrentAgentSession: this.terminateCurrentAgentSession.bind(this),
+    releaseAgentSessionResources: this.releaseAgentSessionResources.bind(this),
+    ownsExactTurn: this.ownsExactTurn.bind(this),
+    mutateExactTurn: this.mutateExactTurn.bind(this),
+    setExactTurnAlarm: this.setExactTurnAlarm.bind(this),
+    event: this.event.bind(this),
+    claimTerminalDecision: this.claimTerminalDecision.bind(this),
+    deliverTerminal: this.deliverTerminal.bind(this),
+    alarm: this.alarm.bind(this),
+    runScheduledTurnAlarm: this.runScheduledTurnAlarm.bind(this),
+    runAlarmWithLease: this.runAlarmWithLease.bind(this),
+    runAlarm: this.runAlarm.bind(this),
+    acknowledgeExactAgentTurnCancellation: this.acknowledgeExactAgentTurnCancellation.bind(this),
+    acknowledgeExactCancellationFromAlarm: this.acknowledgeExactCancellationFromAlarm.bind(this),
+    expireCurrentAgentTurn: this.expireCurrentAgentTurn.bind(this),
+    cancelExactAgentTurn: this.cancelExactAgentTurn.bind(this),
+    executeTurnStateCheckpoint: this.executeTurnStateCheckpoint.bind(this),
+    handleTurnBroker: this.handleTurnBroker.bind(this),
+    fetch: this.fetch.bind(this),
+    admitAgentTurnThroughOwnerGate: this.admitAgentTurnThroughOwnerGate.bind(this),
+    agentTurnAccepted: this.agentTurnAccepted.bind(this),
+    acceptAgentTurn: this.acceptAgentTurn.bind(this),
+    runAgentTurn: this.runAgentTurn.bind(this),
+    runContainerAgentTurn: this.runContainerAgentTurn.bind(this),
+    attachAgentWorld: this.attachAgentWorld.bind(this),
+    runAgentAttempt: this.runAgentAttempt.bind(this),
+  };
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
     configureThreadTranscriptCrypto(
@@ -188,16 +283,6 @@ export class BuildSessionObject extends DurableObject<Env> {
     );
   }
 
-  /**
-   * The structural view of this instance handed to every extracted module in
-   * `src/build-session/`. Every member stays `private`; the modules take
-   * `Pick<BuildSessionInternals, …>` of this surface instead.
-   *
-   * @see src/build-session/host.ts
-   */
-  private get self(): BuildSessionInternals {
-    return this as unknown as BuildSessionInternals;
-  }
 
   private deleteTurnStoragePreservingExactCancellations(
     expectedTurn?: TurnRequest,

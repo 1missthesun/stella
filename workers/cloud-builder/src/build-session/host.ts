@@ -1,16 +1,3 @@
-/**
- * The structural view of `BuildSession`'s internals that every extracted
- * module takes as its `host` argument.
- *
- * `ctx` and `env` are `protected` on `DurableObject` and every method on the
- * class is `private`, so `Pick<BuildSession, …>` cannot name them. Declaring
- * the surface once here — signatures copied verbatim from the class — and
- * casting once inside `BuildSession` (`private get self()`) keeps every member
- * private while letting the modules stay decoupled from each other.
- *
- * This file is types only: it must never be imported with a value import, or
- * esbuild would stop erasing it and couple every module back to `index.ts`.
- */
 import type { ExecutionSession } from "../sandbox-client.js";
 import type {
   TurnBrokerTurnStateCheckpointReceipt,
@@ -167,11 +154,6 @@ export interface BuildSessionInternals {
     error: string,
     input?: BuilderFallbackInput,
   ): Promise<TurnBrokerTurnStateCheckpointReceipt>;
-  syntheticBuilderFallbackMessages(
-    turn: TurnRequest,
-    message: string,
-    createdAt: number,
-  ): Array<{ ordinal: number; role: string; payloadJson: string }>;
   ensureBuilderFallbackTranscript(
     turn: TurnRequest,
     input?: BuilderFallbackInput & { error?: string },
@@ -245,7 +227,6 @@ export interface BuildSessionInternals {
     sandbox: ReturnType<BuildSessionInternals["sandbox"]>,
   ): Promise<boolean>;
   destroySandboxDurably(target: SandboxTarget, event: string): Promise<void>;
-  recordBuilderFallbackRetry(turn: TurnRequest): Promise<number>;
   deliverExecutorLossTerminal(
     turn: TurnRequest,
     text: { message: string; threadError: string },
@@ -264,10 +245,6 @@ export interface BuildSessionInternals {
     daemonDirectory: string;
     warm?: boolean;
   }): Promise<void>;
-  scheduleAppBuildPublicationRetry(
-    turn: TurnRequest,
-    error: unknown,
-  ): Promise<boolean>;
   ownsExactTurn(turn: TurnRequest): Promise<boolean>;
   mutateExactTurn(
     turn: TurnRequest,
@@ -292,14 +269,6 @@ export interface BuildSessionInternals {
     pendingInput: PendingTerminal,
     options?: { preservePendingTerminal?: boolean },
   ): Promise<boolean>;
-  agentCompletionText(
-    turn: TurnRequest,
-    completion: {
-      status: "completed" | "failed" | "canceled";
-      resultJson?: string;
-      errorMessage?: string;
-    },
-  ): Promise<string>;
   alarm(): Promise<void>;
   runScheduledTurnAlarm(): Promise<void>;
   runAlarmWithLease(turn: TurnRequest): Promise<void>;
@@ -316,8 +285,6 @@ export interface BuildSessionInternals {
     request: ExactTurnCancellationRequest,
     reason: string,
   ): Promise<Response>;
-  brokerFailure(status: number): Response;
-  brokerCheckpointPending(): Response;
   executeTurnStateCheckpoint(args: {
     turn: TurnRequest;
     operationKey: string;
@@ -325,12 +292,6 @@ export interface BuildSessionInternals {
       payload: TurnBrokerTurnStateCheckpointRequest;
     };
   }): Promise<TurnBrokerTurnStateCheckpointReceipt>;
-  handleBrokerLocalRequest(
-    turn: TurnRequest,
-    target: TurnBrokerTarget,
-    decoded: unknown,
-    signal: AbortSignal,
-  ): Promise<Response>;
   handleTurnBroker(request: Request): Promise<Response>;
   fetch(request: Request): Promise<Response>;
   admitAgentTurnThroughOwnerGate(
@@ -343,41 +304,12 @@ export interface BuildSessionInternals {
     replayed: boolean,
     extra?: Record<string, unknown>,
   ): Response;
-  projectAgentTurnStart(turn: TurnRequest): Promise<void>;
   acceptAgentTurn(turn: TurnRequest): Promise<Response>;
   runAgentTurn(
     turn: TurnRequest,
     sandboxId: string | undefined,
     execution: TurnExecutionContext,
   ): Promise<void>;
-  resolveAgentWorldRestore(
-    turn: TurnRequest,
-    execution: TurnExecutionContext,
-    history: AgentHistoryRow[],
-  ): Promise<{
-    turnStateWorkspaceRestore?: TurnStateWorkspaceHead;
-    turnStateThreadRestore?: TurnStateCandidate;
-    turnStateThreadRestoreConfirmationRequired: boolean;
-  }>;
-  prepareAgentBrokerHandoff(args: {
-    turn: TurnRequest;
-    session: ExecutionSession;
-    commandTimeoutMs: number;
-    workspaceRestored: boolean;
-  }): Promise<{
-    turnId: string;
-    attemptGeneration: number;
-    threadId: string;
-    prompt: string;
-    workspaceRestored: boolean;
-    turnBroker: { credentialsPath: string };
-    world: {
-      origin: string;
-      name: string;
-      capability: string;
-      fork?: string;
-    };
-  }>;
   runContainerAgentTurn(
     turn: TurnRequest,
     sandboxId: string,

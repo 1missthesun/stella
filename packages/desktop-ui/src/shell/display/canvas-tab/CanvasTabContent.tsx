@@ -1,5 +1,4 @@
 import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useRetainedSurfaceActive } from "@/ui/retained-surface";
 import { useDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
 import { DisplayFileSourceContext } from "@/shared/hooks/display-file-source";
 import { useCloudDriveHtml } from "@/features/cloud/use-cloud-drive-html";
@@ -187,40 +186,11 @@ const CanvasHeroFrameDocument = ({ item, frame, error, loading, limited = false,
         </div>) : null}
     </>);
 };
-const CanvasHeroFrame = ({ item, shown, }: {
-  item: CanvasHtmlItem;
-  shown: boolean;
-}) => {
-    const t = useT();
-    const [ready, setReady] = useState(false);
-    useEffect(() => {
-        if (!shown || ready)
-            return;
-        // A canvas can already be mounted in the hidden keep-alive host when a
-        // sidebar artifact is clicked. Starting its load (or replacing its
-        // iframe) during that click blocks Chromium's renderer before the
-        // panel gets a chance to paint. Wait for a frame of the open shell first;
-        // the keyed boundary below also makes a same-path overwrite start from
-        // this lightweight loading state instead of remounting with stale bytes.
-        let frame = requestAnimationFrame(() => {
-            frame = requestAnimationFrame(() => setReady(true));
-        });
-        return () => cancelAnimationFrame(frame);
-    }, [shown, ready]);
-    if (!ready) {
-        return (<CanvasIllustrationSpot label={<div className="canvas-tab__loading-label">
-            {t("shell.display.canvas.loading")}
-            <CanvasLoadingDots />
-          </div>}/>);
-    }
-    return <CanvasHeroFrameContent item={item}/>;
-};
 export const CanvasTabContent = ({ item }: { item: CanvasHtmlItem }) => {
-    const shown = useRetainedSurfaceActive();
     return (<div className="canvas-tab">
       <div className="canvas-tab__hero">
         <CanvasShareBar item={item}/>
-        <CanvasHeroFrame key={`${item.id}:${item.createdAt}`} item={item} shown={shown}/>
+        <CanvasHeroFrameContent key={`${item.id}:${item.createdAt}`} item={item}/>
       </div>
     </div>);
 };

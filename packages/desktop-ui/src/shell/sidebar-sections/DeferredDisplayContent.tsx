@@ -1,28 +1,21 @@
-/**
- * Defers a display surface's first render by two animation frames.
- *
- * The panel's open transition and a viewer's first paint used to compete for
- * the same frame — heavy viewers (canvas iframes, PDFs, media) would stall the
- * slide. Waiting two frames lets the transition start cleanly first.
- *
- * Extracted from `RightSidebar` so the four sidebar sections can share it.
- */
-
 import { useEffect, useState, type ReactNode } from "react";
+import { useRetainedSurfaceActive } from "@/ui/retained-surface";
 
 export const DeferredDisplayContent = ({
   render,
 }: {
   render: () => ReactNode;
 }) => {
-  const [ready, setReady] = useState(false);
+  const shown = useRetainedSurfaceActive();
+  const [painted, setPainted] = useState(false);
 
   useEffect(() => {
+    if (!shown || painted) return;
     let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(() => setReady(true));
+      frame = requestAnimationFrame(() => setPainted(true));
     });
     return () => cancelAnimationFrame(frame);
-  }, []);
+  }, [shown, painted]);
 
-  return ready ? render() : null;
+  return painted ? render() : null;
 };

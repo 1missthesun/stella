@@ -1,7 +1,7 @@
 export const SELF_HOST_MD = `# Run Stella on your own server
 
 > For AI agents setting up a self-hosted Stella for their user. Read this whole page before you start.
-> Stella's source: https://github.com/1missthesun/stella-v2 (MIT License). The script this page describes is \`scripts/selfhost.mjs\` in it.
+> Stella's source: https://github.com/1missthesun/stella (MIT License). The script this page describes is \`scripts/selfhost.mjs\` in it.
 
 A self-hosted Stella is the same Stella, with its server running on your user's own Cloudflare account instead of stella.sh. Conversations, files, memory and settings stay there. The phone and desktop apps connect to it by scanning a one-time code: there is no Stella account, no email and no password. Whoever has the Cloudflare login owns the server.
 
@@ -45,7 +45,7 @@ The script checks all of these and says what's missing. It installs its own depe
 ## 4. Run setup
 
 \`\`\`bash
-git clone https://github.com/1missthesun/stella-v2 stella-server
+git clone https://github.com/1missthesun/stella stella-server
 cd stella-server
 bun scripts/selfhost.mjs setup --json --name "Alex's Stella"
 \`\`\`
@@ -120,5 +120,5 @@ Add the same \`--prefix\` (and \`--account-id\`) to every command if you used on
 - **Updates:** Stella publishes server releases tagged \`server-YYYY.MM.DD\`. The apps keep working with a server up to about 90 days old; after that the phone app shows **Update your server**. Run \`update\` then.
 - **The computer that ran setup** holds the server's admin key in \`~/.config/stella-server/<account id>-<prefix>.json\` (readable only by the user). Anyone with that key can pair devices, so keep it private. Another computer with the Cloudflare login can always run \`recover\` instead. Logs of every run are in \`~/.config/stella-server/logs/\`.
 - **What it doesn't need from Stella:** the server never reports to stella.sh. Desktop telemetry is off for self-hosted servers. The official phone app still downloads its own app updates from Expo.
-- The longer manual guide, with every setting and optional provider: https://github.com/1missthesun/stella-v2/blob/master/SELF_HOSTING.md
+- The longer manual guide, with every setting and optional provider: https://github.com/1missthesun/stella/blob/master/SELF_HOSTING.md
 `;

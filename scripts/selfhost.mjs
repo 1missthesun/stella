@@ -380,7 +380,7 @@ const gitOut = (args) => {
 
 const releaseInfo = () => {
   const commit = gitOut(["rev-parse", "HEAD"]);
-  if (!commit) throw new Fatal(`${ROOT} is not a git checkout of Stella. Clone https://github.com/1missthesun/stella-v2 and run this from it.`);
+  if (!commit) throw new Fatal(`${ROOT} is not a git checkout of Stella. Clone https://github.com/1missthesun/stella and run this from it.`);
   const dirty = Boolean(gitOut(["status", "--porcelain", "--untracked-files=no"]));
   const tag = dirty ? null : gitOut(["describe", "--tags", "--exact-match", "--match", "server-*", "HEAD"]);
   return { commit, dirty, version: tag ?? `${commit.slice(0, 12)}${dirty ? " with local changes" : ""}` };

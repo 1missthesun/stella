@@ -878,9 +878,9 @@ app.get("/version", (c) => {
     versionTag: metadata?.tag ?? null,
     deployedAt: metadata?.timestamp ?? null,
     commit,
-    source: "https://github.com/1missthesun/stella-v2",
+    source: "https://github.com/1missthesun/stella",
     ...(commit
-      ? { commitUrl: `https://github.com/1missthesun/stella-v2/commit/${commit}` }
+      ? { commitUrl: `https://github.com/1missthesun/stella/commit/${commit}` }
       : {}),
   });
 });

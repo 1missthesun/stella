@@ -73,11 +73,11 @@ export function OpenSourceAct() {
       </h2>
       <a
         className={o.hot}
-        href="https://github.com/1missthesun/stella-v2"
+        href="https://github.com/1missthesun/stella"
         target="_blank"
         rel="noopener noreferrer"
       >
-        github.com/1missthesun/stella-v2
+        github.com/1missthesun/stella
       </a>
       <span className={o.license}>MIT</span>
     </section>

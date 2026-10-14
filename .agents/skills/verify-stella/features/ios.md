@@ -22,7 +22,7 @@ The iOS path builds and drives Stella on the iOS Simulator on the user's Mac wit
 
 Preconditions:
 
-- Run on the Mac from a stella-v2 checkout. The Mac has Xcode with an available iOS Simulator runtime, Bun under `~/.bun/bin`, and Node.
+- Run on the Mac from a Stella repo checkout (`stella-v2` folder). The Mac has Xcode with an available iOS Simulator runtime, Bun under `~/.bun/bin`, and Node.
 - `STELLA_ADMIN_API_SECRET` is exported or set in the gitignored `workers/cloud-builder/.dev.vars` of the checkout you run from. Only `sign-in` needs it.
 - Semantic input comes from XcodeBuildMCP (version `2.7.0` unless `STELLA_XCODEBUILDMCP_VERSION` moves it), over either of two interchangeable paths:
   - **MCP tools**, when the agent's harness loads the project-scoped server from `.codex/config.toml` (`scripts/xcodebuildmcp-stella-ios.sh`). Those tool names are snake_case: `session_set_defaults`, `snapshot_ui`, `wait_for_ui`, `tap`, `type_text`. After adding or changing that config, restart the task before expecting the tools to appear. If no XcodeBuildMCP tool is in your catalog, the harness simply did not load it; do not edit config or restart mid-run, use the CLI.

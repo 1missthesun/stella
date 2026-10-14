@@ -379,7 +379,7 @@ const SUMMARY = [
   "Key facts:",
   "- Price: Free plan $0, no credit card, no trial. Go $5/month (10x usage). Pro $15/month (highest limits, image/video/3D/voice generation, multiple agents in parallel).",
   "- Computer use: on macOS and Windows Stella sees the screen, clicks and types in your apps. On Linux it works with files, terminal and browser.",
-  "- Open source: MIT, [github.com/1missthesun/stella-v2](https://github.com/1missthesun/stella-v2). The desktop app runs from its own source and can redesign its own interface on request.",
+  "- Open source: MIT, [github.com/1missthesun/stella](https://github.com/1missthesun/stella). The desktop app runs from its own source and can redesign its own interface on request.",
   "- Models: Stella's own models by default, or Claude Code, a ChatGPT plan, your own API keys (Anthropic, OpenAI, Google, xAI, Moonshot, Z.AI, OpenRouter, GitHub Copilot) or local models.",
   "- Get it: https://stella.sh (desktop download), `curl -fsSL https://stella.sh/install.sh | sh` on Linux, iPhone and Android apps, or https://stella.sh/chat in a browser.",
   "- Self-hosting: Stella's server can run on your own Cloudflare account ($5/month Workers Paid plus usage, your own Claude or ChatGPT subscription for models). Agents: follow https://stella.sh/self-host.md.",

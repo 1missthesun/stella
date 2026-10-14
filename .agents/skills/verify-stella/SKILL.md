@@ -1,11 +1,11 @@
 ---
 name: verify-stella
-description: Prove a change to Stella itself works in the real product before calling it done. Use after changing Stella's desktop app, runtime, mobile app, or backend, or when asked to check, reproduce, or screenshot Stella behavior. Drives an isolated desktop Electron instance or the iOS Simulator app, each signed into a dev test account, and diagnoses cloud turns. Needs a stella-v2 checkout; iOS needs the Mac. Not for verifying the user's other apps or websites.
+description: Prove a change to Stella itself works in the real product before calling it done. Use after changing Stella's desktop app, runtime, mobile app, or backend, or when asked to check, reproduce, or screenshot Stella behavior. Drives an isolated desktop Electron instance or the iOS Simulator app, each signed into a dev test account, and diagnoses cloud turns. Needs a checkout of the Stella repo (1missthesun/stella, local folder stella-v2); iOS needs the Mac. Not for verifying the user's other apps or websites.
 ---
 
 # Verify Stella
 
-Run every command from the root of a stella-v2 checkout; paths below are relative to it. When this skill was loaded from `~/.stella/skills/verify-stella`, that folder links into the checkout it came from: `cd "$(dirname "$(realpath ~/.stella/skills/verify-stella/SKILL.md)")/../../.."`. To verify a draft or worktree instead, run the same paths from that tree.
+Run every command from the root of a Stella repo checkout (local folder `stella-v2`); paths below are relative to it. When this skill was loaded from `~/.stella/skills/verify-stella`, that folder links into the checkout it came from: `cd "$(dirname "$(realpath ~/.stella/skills/verify-stella/SKILL.md)")/../../.."`. To verify a draft or worktree instead, run the same paths from that tree.
 
 Establish whether the requested behavior works in the real product. Use your judgment to choose interactions, coverage, and evidence based on the change and what you observe. The feature map is product context and a collection of examples, not a required test suite.
 

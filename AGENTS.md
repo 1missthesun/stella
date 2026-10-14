@@ -1,4 +1,4 @@
-# Agent notes for stella-v2
+# Agent notes for Stella (github.com/1missthesun/stella; local checkouts keep the folder name stella-v2)
 
 ## Product overview
 
@@ -122,7 +122,7 @@ build signs into a test account with `control-stella-ios.sh sign-in`.
 - Wants a one-click Linux/Omarchy install path comparable to Windows, not a terminal-only flow.
 
 ## Learned Workspace Facts
-- Stella (this repo: stella-v2) is the user's Electron desktop product; it also has a mobile package.
+- Stella (this repo: github.com/1missthesun/stella, formerly stella-v2) is the user's Electron desktop product; it also has a mobile package.
 - Linux development targets Omarchy (Arch + Hyprland).
 - Desktop ships only through the native launchers (`launcher/{macos,windows,linux}`), which run the app from source; there is no electron-builder packaging or electron-updater.
 - Electron main vs renderer is not strictly bounded; heavy work pulled into the renderer is a known jank source.

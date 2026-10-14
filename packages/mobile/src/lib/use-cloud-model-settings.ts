@@ -328,6 +328,20 @@ export function useCloudModelSettings(active: boolean) {
     [engineModels, execution, selectEngineModel],
   );
 
+  // A self-hosted server without managed models can't run the "Stella"
+  // engine (the account default): move the chat to the Claude or ChatGPT
+  // subscription the owner connected, so turns don't fail.
+  useEffect(() => {
+    if (!loaded || loaded.execution.engine !== "stella") return;
+    if (currentServerFeatures().managedModels) return;
+    const target: ModelEngine | null = loaded.connectedProviders.includes("anthropic")
+      ? "anthropic"
+      : loaded.connectedProviders.includes("chatgpt")
+        ? "chatgpt"
+        : null;
+    if (target) selectEngine(target);
+  }, [loaded, selectEngine]);
+
   const selectEffort = useCallback(
     (next: CloudExecutionSelection["reasoningEffort"]) => {
       if (execution) void apply({ ...execution, reasoningEffort: next });

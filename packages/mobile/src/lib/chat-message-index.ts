@@ -63,7 +63,14 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 async function openDb(): Promise<SQLite.SQLiteDatabase> {
   const SQLite = await import("expo-sqlite");
-  const db = await SQLite.openDatabaseAsync(DB_NAME);
+  // expo-sqlite finalizes every statement on the connection before closing,
+  // FTS5's own internal ones included, which FTS5 then finalizes again while
+  // disconnecting: a native crash whenever the JS restarts (switching
+  // servers, an RTL language change). Our queries finalize their statements
+  // themselves, so skip that pass.
+  const db = await SQLite.openDatabaseAsync(DB_NAME, {
+    finalizeUnusedStatementsBeforeClosing: false,
+  });
   await db.execAsync(SCHEMA_SQL);
   const tokenizer = await db.getFirstAsync<{ value: string }>(
     "SELECT value FROM index_meta WHERE key = 'recall-tokenizer'",
@@ -77,17 +84,6 @@ async function openDb(): Promise<SQLite.SQLiteDatabase> {
     });
   }
   return db;
-}
-
-/**
- * Close the index before the JS restarts (switching servers): expo-sqlite
- * closing the FTS5 table itself during module teardown crashes natively.
- */
-export async function closeMessageIndexForReload(): Promise<void> {
-  const pending = dbPromise;
-  dbPromise = null;
-  const db = await pending?.catch(() => null);
-  await db?.closeAsync().catch(() => undefined);
 }
 
 function getDb(): Promise<SQLite.SQLiteDatabase> {

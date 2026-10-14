@@ -212,6 +212,7 @@ function Section({
           <Pressable
             key={index}
             accessibilityRole="link"
+            accessibilityLabel={row.item.text}
             testID="summary-link"
             onPress={() => onJump(link)}
             style={({ pressed }) => [styles.item, pressed && styles.itemPressed]}
@@ -235,6 +236,7 @@ function SummaryPage({
   maxHeight,
   onJump,
   onRetry,
+  hidden,
   styles,
   colors,
 }: {
@@ -244,21 +246,21 @@ function SummaryPage({
   maxHeight: number;
   onJump: (link: CatchUpLink) => void;
   onRetry: () => void;
+  /** Off-screen pages stay out of VoiceOver's way. */
+  hidden: boolean;
   styles: ReturnType<typeof makeStyles>;
   colors: Colors;
 }) {
   const t = useT();
+  const [tall, setTall] = useState(false);
   const empty =
     catchUp.done.length === 0 && catchUp.ongoing.length === 0 && catchUp.waiting.length === 0;
-  return (
-    <ScrollView
-      // A ScrollView shrinks by default; in the pager's row each page must
-      // stay exactly one pager wide or paging lands between pages.
-      style={{ width, maxHeight, flexGrow: 0, flexShrink: 0 }}
-      contentContainerStyle={styles.page}
-      showsVerticalScrollIndicator={false}
-      nestedScrollEnabled
-      testID="summary-page"
+  const body = (
+    <View
+      style={styles.page}
+      onLayout={(event) => {
+        if (!tall && event.nativeEvent.layout.height > maxHeight + 1) setTall(true);
+      }}
     >
       {catchUp.state === "pending" ? (
         <Text style={styles.status} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
@@ -286,7 +288,30 @@ function SummaryPage({
           <Section kind="done" items={catchUp.done} pageAt={catchUp.createdAt} onJump={onJump} styles={styles} colors={colors} />
         </View>
       )}
+    </View>
+  );
+  // Each page stays exactly one pager wide (no shrinking) or paging lands
+  // between pages. Only a page taller than the popover scrolls: inside the
+  // iOS popover's host, a scroll view hides its lines from VoiceOver.
+  const frame = { width, flexGrow: 0, flexShrink: 0 } as const;
+  const a11y = {
+    accessibilityElementsHidden: hidden,
+    importantForAccessibility: hidden ? ("no-hide-descendants" as const) : ("auto" as const),
+    testID: "summary-page",
+  };
+  return tall ? (
+    <ScrollView
+      style={[frame, { maxHeight }]}
+      showsVerticalScrollIndicator={false}
+      nestedScrollEnabled
+      {...a11y}
+    >
+      {body}
     </ScrollView>
+  ) : (
+    <View style={frame} {...a11y}>
+      {body}
+    </View>
   );
 }
 
@@ -454,7 +479,21 @@ export function SummaryPopover({
                     color={shown === 0 ? fadeHex(colors.textMuted, 0.4) : colors.text}
                   />
                 </Pressable>
-                <Text style={styles.progress} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+                <Text
+                  style={styles.progress}
+                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+                  // VoiceOver: swipe up or down here to change summary.
+                  accessible
+                  accessibilityRole="adjustable"
+                  accessibilityLabel={current ? formatWhen(locale, current.createdAt) : undefined}
+                  accessibilityValue={{ text: t("userAsk.question.progress", { current: shown + 1, total }) }}
+                  accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+                  onAccessibilityAction={(event) => {
+                    if (event.nativeEvent.actionName === "increment") goTo(indexRef.current + 1);
+                    if (event.nativeEvent.actionName === "decrement") goTo(indexRef.current - 1);
+                  }}
+                  testID="summary-progress"
+                >
                   {t("userAsk.question.progress", { current: shown + 1, total })}
                 </Text>
                 <Pressable
@@ -501,6 +540,7 @@ export function SummaryPopover({
                     close();
                   }}
                   onRetry={() => void request()}
+                  hidden={pageIndex !== shown}
                   styles={styles}
                   colors={colors}
                 />

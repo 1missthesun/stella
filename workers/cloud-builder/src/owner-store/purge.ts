@@ -105,6 +105,21 @@ const deleteThreadRows = (db: OwnerDb, jobs: OwnerJobs, conversationId: string):
   db.run("DELETE FROM agent_threads WHERE conversation_id = ?", conversationId);
 };
 
+/**
+ * A conversation's catch-ups (`domains/catch-ups.ts`), and any still being
+ * written. Kept here rather than imported: that domain imports conversations,
+ * which imports this file.
+ */
+const deleteConversationCatchUps = (db: OwnerDb, jobs: OwnerJobs, conversationId: string): void => {
+  for (const { catch_up_id } of db.all<{ catch_up_id: string }>(
+    "SELECT catch_up_id FROM catch_ups WHERE conversation_id = ? AND state = 'pending'",
+    conversationId,
+  )) {
+    jobs.cancel(`catchUps.generate:${catch_up_id}`);
+  }
+  db.run("DELETE FROM catch_ups WHERE conversation_id = ?", conversationId);
+};
+
 const runConversationPurge = async (ctx: OwnerContext, payload: unknown): Promise<void> => {
   const { conversationId } = payload as ConversationPurgeJob;
   if (typeof conversationId !== "string" || !conversationId) return;
@@ -113,6 +128,7 @@ const runConversationPurge = async (ctx: OwnerContext, payload: unknown): Promis
     throw new Error("The conversation's storage is not purged yet.");
   }
   deleteThreadRows(ctx.db, ctx.jobs, conversationId);
+  deleteConversationCatchUps(ctx.db, ctx.jobs, conversationId);
   // Keep the tombstone, without the user's words.
   ctx.db.run(
     `UPDATE conversations SET title = '', last_preview = NULL, last_role = NULL, activity = NULL

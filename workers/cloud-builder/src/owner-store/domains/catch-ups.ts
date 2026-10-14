@@ -52,7 +52,7 @@ const FIRST_MIN_MESSAGES = 20;
 /** Messages before the new ones, for context only. */
 const CONTEXT_MESSAGES = 6;
 const CONTEXT_MESSAGE_CHARS = 400;
-const MAX_ITEMS = 5;
+const MAX_ITEMS = 8;
 const ITEM_CHARS = 160;
 const MAX_LINKS = 2;
 
@@ -235,10 +235,11 @@ const SYSTEM_PROMPT = [
   `Call ${WRITE_TOOL} once with three lists:`,
   "- waiting: every question, approval or decision Stella or an agent put to the user that a later user message doesn't answer. Check each Stella message ending in a question; small questions count too.",
   "- ongoing: work still in progress (the running agents listed, and anything Stella said is under way).",
-  "- done: outcomes worth remembering: work that finished, decisions made, answers the user will act on.",
-  `At most ${MAX_ITEMS - 1} items per list, each one plain line of at most 12 words naming the specific thing (the feature, file, person, place). No filler.`,
-  "Merge related messages into one item. Each thing goes in one list only: an open question goes in waiting and nowhere else.",
-  "Leave out small talk and throwaway one-off answers (a conversion, a joke, a poem) unless nothing else happened. Fewer items is better; an empty list is fine.",
+  "- done: every outcome reported in the new messages: each task an agent or Stella finished, each booking, purchase, payment, delivery, fix or decision. Small ones count; one item per distinct outcome.",
+  "Before answering, go through the new messages one by one and make sure every Stella message reporting finished work, work under way, or a question appears in exactly one list. Never drop an outcome to keep a list short.",
+  `At most ${MAX_ITEMS} items per list; only when there are more, merge the closest ones. Each item is one plain line of at most 12 words naming the specific thing (the feature, file, person, place). No filler.`,
+  "Each thing goes in one list only: an open question goes in waiting and nowhere else.",
+  "Leave out only small talk and throwaway one-off answers to the user's own trivia (a sum, a conversion, a joke, a tip); reported work is never throwaway.",
   "Give each item the ids of the one or two messages that best show it (m ids for new messages, the p id for a carried item), most useful first; the user taps them to jump there.",
 ].join("\n");
 

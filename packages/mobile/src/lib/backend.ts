@@ -78,7 +78,8 @@ export function useBackendView<K extends ViewName>(
   view: K,
   args: ViewArgs<K> | "skip",
 ): { value: ViewResult<K> | undefined; error: BackendRequestError | undefined } {
-  const key = args === "skip" ? null : `${view}\u0000${stableStringify(args)}`;
+  const argsJson = args === "skip" ? null : stableStringify(args);
+  const key = argsJson === null ? null : `${view}\u0000${argsJson}`;
   const [state, setState] = useState<{
     key: string | null;
     value?: ViewResult<K>;
@@ -86,16 +87,14 @@ export function useBackendView<K extends ViewName>(
   }>({ key: null });
   useEffect(() => {
     setState({ key });
-    if (args === "skip" || key === null) return;
+    if (key === null || argsJson === null) return;
     return getBackendClient().watch(
       view,
-      args,
+      JSON.parse(argsJson) as ViewArgs<K>,
       (value) => setState({ key, value }),
       (error) => setState((previous) => ({ ...previous, key, error })),
     );
-    // `key` captures `args`.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, view]);
+  }, [key, view, argsJson]);
   const current = state.key === key ? state : { key };
   return { value: current.value, error: current.error };
 }

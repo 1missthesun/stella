@@ -238,10 +238,7 @@ function AuthenticatedLayout() {
       return;
     }
     primeCloudConversationAuthority(cloudIdentity);
-    // Keyed on the identity key: a refetched session object with the same
-    // identity must not restart (or even re-poke) the handshake.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cloudIdentityKey, session.isPending]);
+  }, [cloudIdentity, session.isPending]);
 
   useEffect(() => {
     let dispose: (() => void) | null = null;

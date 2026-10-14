@@ -201,16 +201,12 @@ export const useCloudConversationAuthority = (): CloudAuthorityHookState => {
     () => observeCloudConversationIdentity(session.data),
     [session.data],
   );
-  const identityKey = identity?.identityKey ?? null;
   const pending = session.isPending;
 
   useLayoutEffect(() => {
     if (pending || !identity) return;
     void authorityStore.ensure(identity);
-    // `identity` is derived from the key; re-running on every session object
-    // identity would only churn the (idempotent) ensure call.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identityKey, pending]);
+  }, [identity, pending]);
 
   const entry = useSyncExternalStore(
     authorityStore.subscribe,

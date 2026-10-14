@@ -187,32 +187,12 @@
 }
 
 .shell-topbar-window-controls {
-  box-sizing: border-box;
-  /* 3 × 24px buttons + 2 × 2px gaps + 2 × 8px padding. Pinned so the
-     cluster can collapse to width 0 when hidden (animating from `auto`
-     would not transition). */
-  width: 92px;
   height: 100%;
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 0 8px;
-  overflow: hidden;
   -webkit-app-region: no-drag;
-  transition:
-    opacity 320ms cubic-bezier(0.32, 0.72, 0.16, 1),
-    width 320ms cubic-bezier(0.32, 0.72, 0.16, 1),
-    padding 320ms cubic-bezier(0.32, 0.72, 0.16, 1),
-    margin 320ms cubic-bezier(0.32, 0.72, 0.16, 1);
-}
-
-.shell-topbar-window-controls[data-hidden="true"] {
-  width: 0;
-  padding-left: 0;
-  padding-right: 0;
-  margin-left: -6px;
-  opacity: 0;
-  pointer-events: none;
 }
 
 .shell-topbar-tabs {
@@ -536,26 +516,18 @@ body[data-display-expanding="true"] .shell-topbar-tablist {
 .session-content {
   scrollbar-width: none;
   overflow-anchor: none;
-  /* Top fade always — older history tapers under the title-bar region.
-   * Bottom fade is also always present so chat content tapers out toward the
-   * composer rather than ending on a hard edge.
-   *
-   * Follow settles at the literal end of content, so the bottom fade must not
-   * be longer than the list's bottom padding (`FULL_CHAT_CONTENT_STYLE` in
-   * `app/chat/ChatColumn.tsx`), or the resting last row lands inside it and
-   * reads as clipped. Keep the two in sync. */
   mask-image: linear-gradient(
     to bottom,
     transparent 0%,
     black 24px,
-    black calc(100% - 16px),
+    black calc(100% - var(--session-end-fade, 0px)),
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0%,
     black 24px,
-    black calc(100% - 16px),
+    black calc(100% - var(--session-end-fade, 0px)),
     transparent 100%
   );
   transition:

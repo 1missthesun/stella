@@ -79,10 +79,6 @@
   gap: 6px;
 }
 
-.chat-workspace-strip__list--tasks {
-  gap: 10px;
-}
-
 .chat-workspace-strip__task-row {
   min-width: 0;
 }

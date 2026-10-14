@@ -408,6 +408,17 @@ export const ChatTimeline = memo(function ChatTimeline({
     [extraTail],
   );
 
+  const endFade = contentContainerStyle?.paddingBottom ?? 0;
+  const listStyle = useMemo(
+    () =>
+      ({
+        height: "100%",
+        width: "100%",
+        "--session-end-fade": `${endFade}px`,
+      }) as CSSProperties,
+    [endFade],
+  );
+
   if (isLoadingHistory && rows.length === 0) {
     return (
       <div
@@ -473,7 +484,7 @@ export const ChatTimeline = memo(function ChatTimeline({
         ItemSeparatorComponent={ItemSeparator}
         className={className}
         contentContainerStyle={contentContainerStyle}
-        style={{ height: "100%", width: "100%" }}
+        style={listStyle}
       />
     </ReplyHandoffContext.Provider>
   );

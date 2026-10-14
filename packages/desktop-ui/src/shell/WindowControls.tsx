@@ -10,10 +10,8 @@ const MAXIMIZE_STATE_SYNC_DELAY_MS = 50;
 
 export const WindowControls = ({
   useWindowsIcons,
-  hidden,
 }: {
   useWindowsIcons: boolean;
-  hidden: boolean;
 }) => {
   const t = useT();
   const [isMaximized, setIsMaximized] = useState(false);
@@ -29,11 +27,7 @@ export const WindowControls = ({
   }, [updateMaximizedState]);
 
   return (
-    <div
-      className="shell-topbar-window-controls"
-      data-hidden={hidden ? "true" : undefined}
-      aria-hidden={hidden}
-    >
+    <div className="shell-topbar-window-controls">
       <button
         type="button"
         className="shell-topbar-wc-btn"

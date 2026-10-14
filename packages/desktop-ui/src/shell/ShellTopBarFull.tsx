@@ -92,7 +92,7 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: Shell
           </>
         ) : null}
         {isWin && !panelOpen ? (
-          <WindowControls useWindowsIcons hidden={false} />
+          <WindowControls useWindowsIcons />
         ) : null}
       </div>
     </header>

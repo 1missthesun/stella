@@ -1,6 +1,8 @@
 import {
+  createContext,
   memo,
   useCallback,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -86,14 +88,10 @@ const activityRowText = (row: ActivityRow): string =>
   getActivityRowSearchText(row);
 
 // ── Row enter / exit / reorder motion ───────────────────────────────
-//
-// Mirrors the 10px `gap` on `.chat-workspace-strip__list--tasks`: entering
-// and exiting rows animate a matching negative top margin alongside their
-// height so the flex gap they occupy opens and closes with them — otherwise
-// the list snaps by one gap width the instant the row unmounts.
-const LIST_GAP_PX = 10;
 
-const ROW_HIDDEN = { height: 0, opacity: 0, marginTop: -LIST_GAP_PX };
+const TaskListGapContext = createContext(0);
+
+const hiddenRow = (gap: number) => ({ height: 0, opacity: 0, marginTop: -gap });
 
 const ROW_ENTER = {
   height: "auto",
@@ -106,16 +104,14 @@ const ROW_ENTER = {
   },
 } as const;
 
-const ROW_EXIT = {
-  height: 0,
-  opacity: 0,
-  marginTop: -LIST_GAP_PX,
+const rowExit = (gap: number) => ({
+  ...hiddenRow(gap),
   transition: {
     height: { type: "spring", duration: 0.28, bounce: 0, delay: 0.05 },
     marginTop: { type: "spring", duration: 0.28, bounce: 0, delay: 0.05 },
     opacity: { duration: 0.14, ease: "easeOut" },
   },
-} as const;
+} as const);
 
 const ROW_REORDER_TRANSITION = {
   type: "spring",
@@ -123,16 +119,17 @@ const ROW_REORDER_TRANSITION = {
   bounce: 0,
 } as const;
 
-const ROW_EXIT_INSTANT = { ...ROW_HIDDEN, transition: { duration: 0 } };
-
 const useActivityRowMotionProps = (orderIndex: number) => {
   const reduceMotion = useReducedMotion();
+  const gap = useContext(TaskListGapContext);
   return {
     layout: reduceMotion ? (false as const) : ("position" as const),
     layoutDependency: orderIndex,
-    initial: reduceMotion ? false : ROW_HIDDEN,
+    initial: reduceMotion ? false : hiddenRow(gap),
     animate: ROW_ENTER,
-    exit: reduceMotion ? ROW_EXIT_INSTANT : ROW_EXIT,
+    exit: reduceMotion
+      ? { ...hiddenRow(gap), transition: { duration: 0 } }
+      : rowExit(gap),
     transition: ROW_REORDER_TRANSITION,
   };
 };
@@ -483,62 +480,69 @@ const TasksList = memo(function TasksList({
   onOpenFile: (entry: ConversationFileEntry) => void;
   nested?: boolean;
 }) {
+  const [gap, setGap] = useState(0);
+  const measureGap = useCallback((list: HTMLUListElement | null) => {
+    if (list) setGap(parseFloat(getComputedStyle(list).rowGap) || 0);
+  }, []);
   return (
-    <ul
-      className={`chat-workspace-strip__list chat-workspace-strip__list--tasks${
-        nested ? " chat-workspace-strip__group-members" : ""
-      }`}
-    >
-      {/* `initial={false}` keeps the first paint of an already-populated
-          list static — only rows that appear/leave/move afterwards animate. */}
-      <AnimatePresence initial={false}>
-        {rows.map((row, index) =>
-          row.kind === "task" ? (
-            <TaskRow
-              key={activityRowKey(row)}
-              task={row.task}
-              expanded={isTaskExpanded(row.task)}
-              onToggle={onToggleTask}
-              onSelect={onSelectTask}
-              files={agentFiles.get(row.task.id) ?? EMPTY_FILES}
-              onOpenFile={onOpenFile}
-              orderIndex={index}
-              isTopLevel={!nested}
-            />
-          ) : (
-            <TaskRow
-              key={activityRowKey(row)}
-              task={
-                row.hierarchy.status === row.hierarchy.owner.status
-                  ? row.hierarchy.owner
-                  : { ...row.hierarchy.owner, status: row.hierarchy.status }
-              }
-              expanded={isCompactTaskExpanded(row.hierarchy.owner)}
-              onToggle={onToggleTask}
-              onSelect={onSelectTask}
-              files={agentFiles.get(row.hierarchy.owner.id) ?? EMPTY_FILES}
-              onOpenFile={onOpenFile}
-              orderIndex={index}
-              isTopLevel={!nested}
-              compactChildren={row.hierarchy.children}
-              compactFailurePriority={row.hierarchy.owner.status === "running"}
-              childContent={
-                <TasksList
-                  rows={row.hierarchy.children}
-                  isTaskExpanded={isTaskExpanded}
-                  isCompactTaskExpanded={isCompactTaskExpanded}
-                  onToggleTask={onToggleTask}
-                  onSelectTask={onSelectTask}
-                  agentFiles={agentFiles}
-                  onOpenFile={onOpenFile}
-                  nested
-                />
-              }
-            />
-          ),
-        )}
-      </AnimatePresence>
-    </ul>
+    <TaskListGapContext value={gap}>
+      <ul
+        ref={measureGap}
+        className={`chat-workspace-strip__list chat-workspace-strip__list--tasks${
+          nested ? " chat-workspace-strip__group-members" : ""
+        }`}
+      >
+        {/* `initial={false}` keeps the first paint of an already-populated
+            list static — only rows that appear/leave/move afterwards animate. */}
+        <AnimatePresence initial={false}>
+          {rows.map((row, index) =>
+            row.kind === "task" ? (
+              <TaskRow
+                key={activityRowKey(row)}
+                task={row.task}
+                expanded={isTaskExpanded(row.task)}
+                onToggle={onToggleTask}
+                onSelect={onSelectTask}
+                files={agentFiles.get(row.task.id) ?? EMPTY_FILES}
+                onOpenFile={onOpenFile}
+                orderIndex={index}
+                isTopLevel={!nested}
+              />
+            ) : (
+              <TaskRow
+                key={activityRowKey(row)}
+                task={
+                  row.hierarchy.status === row.hierarchy.owner.status
+                    ? row.hierarchy.owner
+                    : { ...row.hierarchy.owner, status: row.hierarchy.status }
+                }
+                expanded={isCompactTaskExpanded(row.hierarchy.owner)}
+                onToggle={onToggleTask}
+                onSelect={onSelectTask}
+                files={agentFiles.get(row.hierarchy.owner.id) ?? EMPTY_FILES}
+                onOpenFile={onOpenFile}
+                orderIndex={index}
+                isTopLevel={!nested}
+                compactChildren={row.hierarchy.children}
+                compactFailurePriority={row.hierarchy.owner.status === "running"}
+                childContent={
+                  <TasksList
+                    rows={row.hierarchy.children}
+                    isTaskExpanded={isTaskExpanded}
+                    isCompactTaskExpanded={isCompactTaskExpanded}
+                    onToggleTask={onToggleTask}
+                    onSelectTask={onSelectTask}
+                    agentFiles={agentFiles}
+                    onOpenFile={onOpenFile}
+                    nested
+                  />
+                }
+              />
+            ),
+          )}
+        </AnimatePresence>
+      </ul>
+    </TaskListGapContext>
   );
 });
 

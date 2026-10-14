@@ -11,6 +11,7 @@ import {
   getNativeOAuthProviderSetupGroup,
   hasNativeOAuthProviderClientIdOverride,
   hasNativeOAuthProviderTemplate,
+  isNativeOAuthBlockedOnSelfHostedServer,
   isNativeOAuthLocalExecutionProductionReady,
   isNativeOAuthProviderConfigReady,
   type NativeOAuthProviderConfig,
@@ -490,6 +491,15 @@ const getNativeConnectorOAuthSetup = (
       connectable: true,
       oauthSetupStatus: "ready" as const,
       oauthSetupMessage: "Ready to connect.",
+      ...(setupGroup ? { oauthSetupGroup: setupGroup } : {}),
+    };
+  }
+  if (isNativeOAuthBlockedOnSelfHostedServer(config)) {
+    return {
+      connectable: false,
+      oauthSetupStatus: "missing_callback_bridge" as const,
+      oauthSetupMessage:
+        "This connection signs in through stella.sh, so it's off on your own server.",
       ...(setupGroup ? { oauthSetupGroup: setupGroup } : {}),
     };
   }

@@ -3363,6 +3363,18 @@ const BUILTIN_NATIVE_OAUTH: Record<string, NativeOAuthProviderConfig> = {
   },
 };
 
+/**
+ * A desktop on a self-hosted server never sends a sign-in through stella.sh:
+ * providers whose browser return link is Stella's website are off there.
+ */
+export const isNativeOAuthBlockedOnSelfHostedServer = (
+  config: NativeOAuthProviderConfig,
+): boolean =>
+  process.env.VITE_STELLA_SELF_HOSTED === "1" &&
+  config.flow === "authorization_code" &&
+  config.callbackMode === "external" &&
+  isHostedOAuthCallbackUrl(config.callbackUrl);
+
 export const isNativeOAuthProviderConfigReady = (
   id: string,
   config: NativeOAuthProviderConfig,
@@ -3375,6 +3387,7 @@ export const isNativeOAuthProviderConfigReady = (
   ) {
     return false;
   }
+  if (isNativeOAuthBlockedOnSelfHostedServer(config)) return false;
   const provider = (config.tokenExchange?.provider ?? id).trim().toLowerCase();
   if (
     config.flow === "authorization_code" &&

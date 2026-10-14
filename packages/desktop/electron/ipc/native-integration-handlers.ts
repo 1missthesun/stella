@@ -14,6 +14,7 @@ import {
 } from "@stella/runtime/kernel/connectors/catalog-cache";
 import {
   hasNativeOAuthProviderClientIdOverride,
+  isNativeOAuthBlockedOnSelfHostedServer,
   isNativeOAuthProviderConfigReady,
 } from "@stella/runtime/kernel/connectors/native-oauth-provider-config";
 import { loadConnectorAccessToken } from "@stella/runtime/kernel/connectors/oauth";
@@ -380,6 +381,11 @@ export const ensureNativeCredential = async (
           configuredOAuthProviders.externalCallback,
       })
     ) {
+      if (isNativeOAuthBlockedOnSelfHostedServer(config)) {
+        throw new Error(
+          `${entry.name} signs in through stella.sh, so it's off on your own server.`,
+        );
+      }
       if (config.tokenExchange?.type === "backend") {
         const tokenExchangeProvider = (config.tokenExchange.provider ?? id)
           .trim()

@@ -764,12 +764,24 @@ export function useChatScrollManagement({
 
       followApi.current = { followToEnd, followSend, cancel: stopLoop };
 
+      // Judge "was at the bottom" against the end before this growth: a long
+      // reply can land in one layout, so the distance after it says nothing
+      // about where the reader was.
+      let lastSeenEnd = Math.max(0, node.scrollHeight - node.clientHeight);
       const followContentGrowth = () => {
-        if (!attached || !followRef.current) return;
-        const distFromEnd =
-          attached.scrollHeight - attached.clientHeight - attached.scrollTop;
+        if (!attached) return;
+        const end = Math.max(0, attached.scrollHeight - attached.clientHeight);
+        const previousEnd = lastSeenEnd;
+        lastSeenEnd = end;
+        if (!followRef.current) return;
+        const distFromEnd = end - attached.scrollTop;
         if (distFromEnd <= 0) return;
-        if (!isAtBottomRef.current && distFromEnd > attached.clientHeight / 2) {
+        const distFromPreviousEnd = previousEnd - attached.scrollTop;
+        if (
+          !followRaf &&
+          !isAtBottomRef.current &&
+          distFromPreviousEnd > AT_BOTTOM_TOLERANCE_PX
+        ) {
           return;
         }
         followToEnd();
@@ -937,6 +949,7 @@ export function useChatScrollManagement({
         const height = attached.clientHeight;
         const shrunkBy = lastViewportHeight - height;
         lastViewportHeight = height;
+        lastSeenEnd = Math.max(0, attached.scrollHeight - height);
         if (shrunkBy <= 0) return;
         const maxScroll = Math.max(0, attached.scrollHeight - height);
         const gapBeforeShrink = Math.max(

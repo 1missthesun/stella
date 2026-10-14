@@ -60,6 +60,9 @@ import {
   TranscriptSearchIndex,
   collapseWhitespace,
   extractMessageText,
+  isContentlessSearchTable,
+  openSideText,
+  sealSideText,
   transcriptSearchDdl,
   transcriptSearchTextDdl,
 } from "./transcript-search.js";
@@ -136,7 +139,7 @@ const DDL = [
   `CREATE UNIQUE INDEX IF NOT EXISTS journal_writer_key ON journal(writer_key)`,
   `CREATE INDEX IF NOT EXISTS journal_turn ON journal(turn_id, seq)`,
   `CREATE INDEX IF NOT EXISTS journal_context ON journal(kind, model_skip, seq)`,
-  transcriptSearchDdl(),
+  transcriptSearchDdl(undefined, { contentless: true }),
   transcriptSearchTextDdl(),
   `CREATE TABLE IF NOT EXISTS turns (
      turn_id       TEXT PRIMARY KEY,
@@ -277,6 +280,7 @@ const MIGRATIONS: Array<{
   reindexArchivedSearch?: boolean;
   encryptJournalPayloads?: boolean;
   fullArchivedReindex?: boolean;
+  contentlessSearch?: boolean;
 }> = [
   {
     to: 2,
@@ -368,6 +372,15 @@ const MIGRATIONS: Array<{
     backfillTranscriptSearch: true,
     reindexArchivedSearch: true,
     fullArchivedReindex: true,
+  },
+  {
+    // The search index stops keeping a second copy of every message (under
+    // encryption, a keyed hash per word: ~4x the text) and its snippet text
+    // is stored deflated. Rahul's main conversation held 28.6 MB of the
+    // former against 6.4 MB of actual text (2026-10-13).
+    to: 12,
+    statements: [],
+    contentlessSearch: true,
   },
 ];
 
@@ -672,6 +685,7 @@ export class Journal {
       },
       encryptSideText: (text) =>
         this.ensureCrypto()?.encryptText(text) ?? null,
+      sealSideText: (text) => sealSideText(this.ensureCrypto(), text),
     });
   }
 
@@ -799,6 +813,9 @@ export class Journal {
         if (migration.backfillTranscriptSearch) {
           this.backfillTranscriptSearch();
         }
+        if (migration.contentlessSearch) {
+          this.migrateToContentlessSearch();
+        }
         if (migration.reindexArchivedSearch) reindexArchived = true;
         if (migration.fullArchivedReindex) fullArchivedReindex = true;
       }
@@ -815,6 +832,104 @@ export class Journal {
       );
     }
     this.ensureCrypto();
+  }
+
+  /**
+   * Migration 12: rebuild `journal_fts` contentless and store every snippet
+   * text deflated as a BLOB. Nothing searchable is lost: the new index is
+   * filled from the old one's own content (the same tokens, hashed or not),
+   * and without a key the old plaintext content becomes the side text first.
+   * One transaction, and safe to repeat if the version stamp never landed.
+   */
+  private migrateToContentlessSearch(): void {
+    const started = Date.now();
+    const crypto = this.ensureCrypto();
+    const SIDE_BATCH = 500;
+    this.transactionSync(() => {
+      const contentful = !isContentlessSearchTable(this.sql);
+      if (contentful && !crypto) {
+        // Plaintext index: its content column is the only copy of the text.
+        let after = -1;
+        for (;;) {
+          const rows = this.sql
+            .exec<{ seq: number; text: string | null }>(
+              `SELECT rowid AS seq, text FROM journal_fts WHERE rowid > ? ORDER BY rowid LIMIT ?`,
+              after,
+              SIDE_BATCH,
+            )
+            .toArray();
+          if (rows.length === 0) break;
+          for (const row of rows) {
+            if (row.text) {
+              this.sql.exec(
+                `INSERT INTO journal_fts_text (seq, enc_text) VALUES (?, ?)
+                 ON CONFLICT(seq) DO NOTHING`,
+                row.seq,
+                sealSideText(null, row.text),
+              );
+            }
+            after = row.seq;
+          }
+        }
+      }
+      // Older side texts (`enc1.` strings) become deflated BLOBs.
+      let after = -1;
+      let converted = 0;
+      for (;;) {
+        const rows = this.sql
+          .exec<{ seq: number; enc_text: SqlStorageValue }>(
+            `SELECT seq, enc_text FROM journal_fts_text WHERE seq > ? ORDER BY seq LIMIT ?`,
+            after,
+            SIDE_BATCH,
+          )
+          .toArray();
+        if (rows.length === 0) break;
+        for (const row of rows) {
+          after = row.seq;
+          if (typeof row.enc_text !== "string") continue;
+          let text: string;
+          try {
+            text = crypto ? crypto.decryptText(row.enc_text) : row.enc_text;
+          } catch {
+            continue;
+          }
+          this.sql.exec(
+            `UPDATE journal_fts_text SET enc_text = ? WHERE seq = ?`,
+            sealSideText(crypto, text),
+            row.seq,
+          );
+          converted += 1;
+        }
+      }
+      let moved = 0;
+      if (contentful) {
+        // Through a plain holding table, not `ALTER TABLE ... RENAME`: FTS5
+        // does not carry a contentless index's `_content` shadow table
+        // (its UNINDEXED columns) across a rename, and the renamed index
+        // then fails every write.
+        this.sql.exec(`DROP TABLE IF EXISTS journal_fts_moving`);
+        this.sql.exec(
+          `CREATE TABLE journal_fts_moving AS
+             SELECT rowid AS seq, text, turn_id, role, created_at FROM journal_fts`,
+        );
+        this.sql.exec(`DROP TABLE journal_fts`);
+        this.sql.exec(transcriptSearchDdl(undefined, { contentless: true }));
+        this.sql.exec(
+          `INSERT INTO journal_fts (rowid, text, turn_id, role, created_at)
+           SELECT seq, text, turn_id, role, created_at FROM journal_fts_moving`,
+        );
+        moved = this.sql
+          .exec<{ count: number }>(`SELECT COUNT(*) AS count FROM journal_fts_moving`)
+          .one().count;
+        this.sql.exec(`DROP TABLE journal_fts_moving`);
+      }
+      this.log("info", "journal_search_contentless", {
+        rebuilt: contentful,
+        moved,
+        sideTextsCompressed: converted,
+        ms: Date.now() - started,
+      });
+    });
   }
 
   /** Migration 11: encrypt every resident payload under the new DEK. */
@@ -1026,7 +1141,7 @@ export class Journal {
         snippet: string;
       }>(
         `SELECT rowid AS seq, role AS kind, turn_id, created_at,
-                ${crypto ? "''" : "snippet(journal_fts, 0, '[', ']', '…', 32)"} AS snippet
+                '' AS snippet
            FROM journal_fts
           WHERE ${where.join(" AND ")}
           ORDER BY ${options.order === "newest" ? "rowid DESC" : "rank"}
@@ -1040,24 +1155,25 @@ export class Journal {
       kind: row.kind,
       at: new Date(Number(row.created_at)).toISOString(),
       turnId: row.turn_id,
-      snippet: crypto ? this.searchSnippet(row.seq, text) : row.snippet,
+      snippet: this.searchSnippet(row.seq, text),
       archived: row.seq < floor,
     }));
   }
 
   private searchSnippet(seq: number, queryText: string): string {
     const crypto = this.ensureCrypto();
-    if (!crypto) return "";
     let text: string | null = null;
     const side = this.sql
-      .exec<{ enc_text: string }>(
+      .exec<{ enc_text: SqlStorageValue }>(
         `SELECT enc_text FROM journal_fts_text WHERE seq = ?`,
         seq,
       )
       .toArray()[0];
     if (side) {
       try {
-        text = crypto.decryptText(side.enc_text);
+        text = openSideText(crypto, side.enc_text, (stored) =>
+          crypto ? crypto.decryptText(stored) : stored,
+        );
       } catch {
         text = null;
       }

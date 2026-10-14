@@ -52,7 +52,7 @@ export type { MessageRole, TurnPhase };
  * 10 keeps the resident set's rows, bytes and tokens on `meta`; 11 encrypts
  * payloads under a per-conversation key and hashes the search index.
  */
-export const JOURNAL_SCHEMA_VERSION = 11;
+export const JOURNAL_SCHEMA_VERSION = 12;
 
 // ---------------------------------------------------------------------------
 // Residency / rollover

@@ -281,6 +281,12 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
           env: this.env,
           gatewayOrigin,
           journalStart: () => this.journalStart(),
+          archivedEntries: {
+            read: (piConversationId, options) =>
+              this.archive.readPiEntries(piConversationId, options),
+            has: (piConversationId, beforeId) =>
+              this.archive.hasArchivedPiEntries(piConversationId, beforeId),
+          },
           waitUntil: (work) => this.ctx.waitUntil(work),
           report: (error) =>
             log("error", "pi_runtime_report", { message: errorMessage(error) }),

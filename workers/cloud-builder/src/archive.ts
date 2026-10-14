@@ -40,6 +40,7 @@ import {
   type JournalRecord,
 } from "./conversation-types.js";
 import { sha256Hex } from "./hash.js";
+import { PiEntryArchive, type ArchivedPiEntry } from "./pi-entry-archive.js";
 import type {
   Journal,
   JournalRow,
@@ -142,7 +143,22 @@ export class ConversationArchive {
      * this epoch; undefined before any host compacted.
      */
     private readonly checkpointSeq: () => Promise<number | undefined>,
-  ) {}
+    /** The object's storage, where pi-durable keeps its tables beside the journal. */
+    storage?: DurableObjectStorage,
+  ) {
+    this.piEntries =
+      bucket && storage
+        ? new PiEntryArchive(
+            storage.sql,
+            storage,
+            bucket,
+            () => this.journal.ensureCrypto(),
+            log,
+          )
+        : null;
+  }
+
+  private readonly piEntries: PiEntryArchive | null;
 
   get available(): boolean {
     return this.bucket !== undefined;
@@ -261,7 +277,52 @@ export class ConversationArchive {
   async maybeRollover(now: number): Promise<void> {
     if (!this.bucket) return;
     if (this.sealed || this.journal.isDeleted()) return;
-    return this.track(this.rollover(now));
+    return this.track(
+      (async () => {
+        await this.rollover(now);
+        await this.archivePiEntries(now);
+      })(),
+    );
+  }
+
+  /**
+   * pi-durable's entries below every context, to R2 (`PiEntryArchive`). Same
+   * rules as a cut: after a terminal turn, fenced by the purge, and a failure
+   * leaves the object larger, not broken.
+   */
+  private async archivePiEntries(now: number): Promise<void> {
+    if (!this.piEntries) return;
+    try {
+      const prefix = await this.prefix();
+      if (!prefix) return;
+      await this.piEntries.prune(
+        prefix,
+        () => this.sealed || this.journal.isDeleted(),
+        now,
+      );
+    } catch (error) {
+      this.log("error", "pi_entries_archive_failed", {
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /** Every R2 object holding this conversation's archived pi entries. */
+  piEntryArchiveKeys(): string[] {
+    return this.piEntries?.allKeys() ?? [];
+  }
+
+  /** Archived pi entries of one pi conversation, oldest first (`PiEntryArchive.read`). */
+  async readPiEntries(
+    piConversationId: number,
+    options: { beforeId?: number; limit?: number } = {},
+  ): Promise<{ entries: ArchivedPiEntry[]; hasOlder: boolean }> {
+    if (!this.piEntries) return { entries: [], hasOlder: false };
+    return await this.piEntries.read(piConversationId, options);
+  }
+
+  hasArchivedPiEntries(piConversationId: number, beforeId?: number): boolean {
+    return this.piEntries?.hasArchived(piConversationId, beforeId) ?? false;
   }
 
   private async rollover(now: number): Promise<void> {

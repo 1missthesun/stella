@@ -37,6 +37,7 @@ import {
   isEvidenceThumbnailDrivePath,
 } from "@stella/contracts/chat-evidence-thumbnails";
 import { copyR2Object, presignR2Url, r2Signer, type R2Signer } from "../../r2-presign.js";
+import { R2_PROXY_MAX_PUT_BYTES } from "../../r2-proxy.js";
 import { sha256Hex } from "../../hash.js";
 import { array, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -491,6 +492,7 @@ const partitionWrite = (
 ): WriteVerdict => {
   const { plan, unlimited } = billingPlan(ctx);
   const quota = unlimited ? UNLIMITED_QUOTA : PLAN_QUOTAS[plan];
+  const proxied = !ctx.env.R2_ACCESS_KEY_ID?.trim() || !ctx.env.R2_SECRET_ACCESS_KEY?.trim();
   const planLabel = plan === "free" ? "Free" : plan;
   let { fileCount, totalBytes } = usage(ctx.db);
   const occurrences = new Map<string, number>();
@@ -509,6 +511,13 @@ const partitionWrite = (
       skipped.push({
         path: file.path,
         reason: `${file.path} is larger than the ${formatMb(quota.maxFileBytes)} per-file limit on your plan.`,
+      });
+      continue;
+    }
+    if (proxied && file.sizeBytes > R2_PROXY_MAX_PUT_BYTES) {
+      skipped.push({
+        path: file.path,
+        reason: `${file.path} is larger than ${formatMb(R2_PROXY_MAX_PUT_BYTES)}, the largest file this server takes without an R2 API token.`,
       });
       continue;
     }

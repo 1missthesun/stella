@@ -9,13 +9,19 @@
  * client-writable staging key.
  */
 
-export type R2Signer = {
+import { copyR2ProxyObject, presignR2ProxyUrl, r2ProxySigner, type R2ProxySigner } from "./r2-proxy.js";
+
+export type R2S3Signer = {
+  kind?: "s3";
   accessKeyId: string;
   secretAccessKey: string;
   /** S3 API origin, `https://<account>.r2.cloudflarestorage.com`. */
   endpoint: string;
   bucket: string;
 };
+
+/** S3 presigning with the R2 API token, or the Worker proxy without one (r2-proxy.ts). */
+export type R2Signer = R2S3Signer | R2ProxySigner;
 
 export const UNSIGNED_PAYLOAD = "UNSIGNED-PAYLOAD";
 /** SHA-256 of the empty body, for signed requests that carry none. */
@@ -91,7 +97,7 @@ const encodeR2PathSegment = (value: string, label: string): string => {
 
 /** `https://<endpoint>/<bucket>/<key>`, every segment encoded exactly once. */
 export const r2ObjectUrl = (
-  signer: Pick<R2Signer, "endpoint" | "bucket">,
+  signer: Pick<R2S3Signer, "endpoint" | "bucket">,
   key: string,
 ): URL => {
   let endpoint: URL;
@@ -146,7 +152,7 @@ const signingKey = async (
 };
 
 const signature = async (
-  signer: R2Signer,
+  signer: R2S3Signer,
   amzDate: string,
   canonicalRequest: string,
 ): Promise<{ scope: string; signature: string }> => {
@@ -171,7 +177,7 @@ const signature = async (
  * are signed alongside host, date and payload hash (lower-cased names).
  */
 export const signR2Request = async (
-  signer: R2Signer,
+  signer: R2S3Signer,
   args: {
     method: "PUT" | "DELETE" | "GET" | "HEAD";
     key: string;
@@ -234,6 +240,7 @@ export const presignR2Url = async (
   ) {
     throw new Error("Presigned R2 URL lifetime is out of range.");
   }
+  if (signer.kind === "proxy") return await presignR2ProxyUrl(signer, args);
   const url = r2ObjectUrl(signer, args.key);
   const amzDate = amzDateOf(args.now ?? Date.now());
   const scope = `${amzDate.slice(0, 8)}/${REGION}/${SERVICE}/aws4_request`;
@@ -272,6 +279,7 @@ export const r2Signer = (
   env: Pick<Cloudflare.Env, "R2_ACCESS_KEY_ID" | "R2_SECRET_ACCESS_KEY" | "R2_S3_ENDPOINT">,
   bucket: string | undefined,
 ): R2Signer | null => {
+  if (!env.R2_ACCESS_KEY_ID?.trim() || !env.R2_SECRET_ACCESS_KEY?.trim()) return r2ProxySigner(env, bucket);
   const accessKeyId = env.R2_ACCESS_KEY_ID?.trim();
   const secretAccessKey = env.R2_SECRET_ACCESS_KEY?.trim();
   const endpoint = env.R2_S3_ENDPOINT?.trim();
@@ -290,6 +298,7 @@ export const copyR2Object = async (
   signer: R2Signer,
   args: { from: string; to: string; signal?: AbortSignal; fetchImpl?: typeof fetch },
 ): Promise<void> => {
+  if (signer.kind === "proxy") return await copyR2ProxyObject(signer, args);
   const source = r2ObjectUrl(signer, args.from).pathname;
   const signed = await signR2Request(signer, {
     method: "PUT",

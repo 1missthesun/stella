@@ -1031,6 +1031,10 @@ app.get("/.well-known/stella", async (c) => {
   const { discoveryRoute } = await import("../selfhost/discovery.js");
   return await discoveryRoute(c.env as unknown as Cloudflare.Env);
 });
+app.all("/api/r2/:rest{.*}", async (c) => {
+  const { handleR2ProxyRoute } = await import("../r2-proxy.js");
+  return (await handleR2ProxyRoute(c.req.raw, c.env)) ?? json({ error: "Not found." }, 404);
+});
 app.all("/api/auth/device-pairing/:name", async (c) => {
   const { handleDevicePairingRoute } = await import("../selfhost/pairing.js");
   return await handleDevicePairingRoute(c.req.raw, c.env as unknown as Cloudflare.Env);

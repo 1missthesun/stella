@@ -812,9 +812,7 @@ export class BrowserProfileSessionCore {
         break;
       }
       case "browser.fill": {
-        // `sensitivity` is accepted for older callers and no longer gates
-        // anything: credential fields are fillable like any other.
-        const value = exactObject(params, ["selector", "value"], ["sensitivity"]);
+        const value = exactObject(params, ["selector", "value"]);
         if (typeof value.value !== "string" || value.value.length > 65_536) {
           throw new GatewayError("bad_request", 400);
         }

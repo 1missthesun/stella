@@ -173,7 +173,7 @@ const stop = () => {
 const launch = async () => {
   const mode = option("mode", "production");
   if (existsSync(pointerFile)) stop();
-  const result = harness(["session", "launch", "--replace", "--account", "anonymous"], {
+  const result = harness(["session", "launch", "--replace", "--account", "signed-in"], {
     STELLA_RENDERER_MODE: mode,
   });
   if (!result.ok) throw new Error(JSON.stringify(result.error));

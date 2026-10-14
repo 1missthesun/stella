@@ -7,7 +7,6 @@
 import { createRequire } from "node:module";
 import { spawn, spawnSync } from "node:child_process";
 import {
-  chmodSync,
   closeSync,
   existsSync,
   mkdirSync,
@@ -480,13 +479,14 @@ const runHomeEnvironment = (run) => {
  */
 const VERIFY_CLAUDE_CODE_MODEL = "haiku";
 
-const seedDataDir = (dataDir, { claudeCode = false } = {}) => {
+const seedDataDir = (dataDir, { claudeCode = false, firstRun = false } = {}) => {
   mkdirSync(dataDir, { recursive: true });
-  writeJson(path.join(dataDir, "ui-state.json"), {
-    "stella-onboarding-complete": "true",
-  });
+  writeJson(
+    path.join(dataDir, "ui-state.json"),
+    firstRun ? {} : { "stella-onboarding-complete": "true" },
+  );
   writeJson(path.join(dataDir, "preferences.json"), {
-    onboardingCompleted: true,
+    ...(firstRun ? {} : { onboardingCompleted: true }),
     ...(claudeCode
       ? {
           agentRuntimeEngine: "claude_code_local",
@@ -496,7 +496,12 @@ const seedDataDir = (dataDir, { claudeCode = false } = {}) => {
   });
 };
 
-const ACCOUNT_MODES = ["anonymous", "signed-in", "go", "pro"];
+/**
+ * `signed-out` boots with no account (Stella has no guest accounts, so the
+ * app shows onboarding or the sign-in screen); the others mint a dev test
+ * account on that plan.
+ */
+const ACCOUNT_MODES = ["signed-in", "signed-out", "go", "pro"];
 const TEST_ACCOUNT_EMAIL_DOMAIN = "test.stella.local";
 
 const DEV_BACKEND_URL = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
@@ -507,111 +512,12 @@ const resolveAdminApiSecret = adminApiSecret;
 const resolveSiteUrl = () =>
   (process.env.STELLA_BACKEND_URL?.trim() || DEV_BACKEND_URL).replace(/\/+$/, "");
 
-/**
- * One anonymous session per machine, kept for `--reuse`. A fresh profile
- * has no stored bearer, so without this every launch signs up a new
- * anonymous user on the dev deployment and the per-IP sybil counters fill
- * up within a handful of runs. The file holds a dev anonymous bearer only
- * and is owner-readable.
- */
-const ANONYMOUS_SESSION_PATH = path.join(
-  skillRoot,
-  ".run",
-  "anonymous-session.json",
-);
-
-const writeSecretJson = (filePath, value) => {
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`, {
-    mode: 0o600,
-  });
-  chmodSync(filePath, 0o600);
-};
 
 const authHeaders = (token) => ({
   accept: "application/json",
   "content-type": "application/json",
   ...(token ? { authorization: `Bearer ${token}` } : {}),
 });
-
-const sessionIsAlive = async (siteUrl, token) => {
-  try {
-    const response = await fetch(`${siteUrl}/api/auth/get-session`, {
-      headers: authHeaders(token),
-    });
-    if (!response.ok) return false;
-    const payload = await response.json().catch(() => null);
-    return Boolean(payload?.user?.id);
-  } catch {
-    return false;
-  }
-};
-
-const mintAnonymousSession = async (siteUrl) => {
-  let response;
-  try {
-    response = await fetch(`${siteUrl}/api/auth/sign-in/anonymous`, {
-      method: "POST",
-      headers: authHeaders(),
-      body: "{}",
-    });
-  } catch (error) {
-    fail(
-      `Anonymous sign-in request failed: ${error instanceof Error ? error.message : String(error)}`,
-      2,
-      { errorCode: "ANONYMOUS_SESSION_REQUEST_FAILED", retryable: true },
-    );
-  }
-  const token = response.headers.get("set-auth-token")?.trim() ?? "";
-  const payload = await response.json().catch(() => null);
-  if (!response.ok || !token || !payload?.user?.id) {
-    fail(
-      `Anonymous sign-in returned HTTP ${response.status}: ${payload?.error ?? payload?.message ?? "no session token"}`,
-      2,
-      {
-        errorCode: "ANONYMOUS_SESSION_MINT_FAILED",
-        recovery:
-          "Check that the backend at STELLA_BACKEND_URL is deployed and allows anonymous sign-in without a Turnstile token (dev leaves TURNSTILE_SECRET_KEY unset).",
-      },
-    );
-  }
-  return {
-    siteUrl,
-    token,
-    userId: payload.user.id,
-    createdAt: new Date().toISOString(),
-  };
-};
-
-/**
- * Return the saved anonymous session when it still verifies against this
- * backend; otherwise mint one and save it. `reused` tells the run record
- * which happened.
- */
-const ensureReusableAnonymousSession = async () => {
-  const siteUrl = resolveSiteUrl();
-  if (existsSync(ANONYMOUS_SESSION_PATH)) {
-    let saved = null;
-    try {
-      saved = readJson(ANONYMOUS_SESSION_PATH);
-    } catch {
-      saved = null;
-    }
-    if (
-      saved?.siteUrl === siteUrl &&
-      typeof saved.token === "string" &&
-      (await sessionIsAlive(siteUrl, saved.token))
-    ) {
-      return { session: saved, reused: true };
-    }
-    process.stderr.write(
-      "Saved anonymous session is missing, for another backend, or no longer valid; creating a new one.\n",
-    );
-  }
-  const session = await mintAnonymousSession(siteUrl);
-  writeSecretJson(ANONYMOUS_SESSION_PATH, session);
-  return { session, reused: false };
-};
 
 /**
  * Mint a signed-in (non-anonymous) test account on the dev deployment via
@@ -944,12 +850,9 @@ const cmdLaunch = async (options) => {
     await cmdStop({ silent: true });
   }
 
-  const accountMode = options.account ?? "anonymous";
+  const accountMode = options.account ?? "signed-in";
   if (!ACCOUNT_MODES.includes(accountMode))
     fail(`Unknown --account ${accountMode}. Use one of ${ACCOUNT_MODES.join(", ")}.`);
-
-  if (options.reuse && accountMode !== "anonymous")
-    fail("--reuse applies to anonymous launches only; test accounts are minted per run.");
 
   const modelGateway = options["model-gateway"] ? new URL(options["model-gateway"]).origin : null;
   const fakeMic = options["fake-mic"] ? path.resolve(options["fake-mic"]) : null;
@@ -978,14 +881,10 @@ const cmdLaunch = async (options) => {
   const runId = randomUUID().slice(0, 8);
   const runDir = path.join(skillRoot, ".run", runId);
   let minted = null;
-  let account = { mode: "anonymous", reused: false };
-  if (accountMode !== "anonymous") {
+  let account = { mode: "signed-out" };
+  if (accountMode !== "signed-out") {
     minted = await mintTestAccount(runId, accountMode);
     account = minted.account;
-  } else if (options.reuse) {
-    const { session, reused } = await ensureReusableAnonymousSession();
-    minted = { sessionToken: session.token };
-    account = { mode: "anonymous", reused, userId: session.userId };
   }
   const dataDir = path.join(runDir, "data");
   const userDataDir = path.join(
@@ -994,7 +893,10 @@ const cmdLaunch = async (options) => {
     "electron-user-data",
   );
   mkdirSync(userDataDir, { recursive: true });
-  seedDataDir(dataDir, { claudeCode: Boolean(claudeLogin) });
+  seedDataDir(dataDir, {
+    claudeCode: Boolean(claudeLogin),
+    firstRun: Boolean(options["first-run"]),
+  });
   const providerHomes = {
     CLAUDE_CONFIG_DIR: path.join(runDir, "provider-homes", "claude"),
     CODEX_HOME: path.join(runDir, "provider-homes", "codex"),
@@ -1117,11 +1019,8 @@ const cmdRelaunch = async () => {
   await stopPid(run.electronPid);
   const stoppedRuntime = await stopRunOwnedProcesses(run.runId);
   let minted = null;
-  if (run.account?.mode && run.account.mode !== "anonymous") {
+  if (run.account?.mode && run.account.mode !== "signed-out" && run.account.mode !== "anonymous") {
     minted = await mintTestAccount(run.runId, run.account.mode);
-  } else if (run.account?.reused !== undefined && run.account?.userId) {
-    const { session } = await ensureReusableAnonymousSession();
-    minted = { sessionToken: session.token };
   }
   run.cdpPort = await allocatePort();
   run.electronPid = null;

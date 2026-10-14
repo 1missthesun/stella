@@ -12,15 +12,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import * as SecureStore from "../../src/lib/secure-store";
 import * as AppleAuthentication from "expo-apple-authentication";
 import * as Crypto from "expo-crypto";
 import { useRouter } from "expo-router";
 import Svg, { Path } from "react-native-svg";
-import {
-  authClient,
-  MOBILE_SESSION_TOKEN_KEY,
-} from "../../src/lib/auth-client";
+import { authClient } from "../../src/lib/auth-client";
 import {
   claimSessionToken,
   generateClaimSecret,
@@ -185,11 +181,6 @@ export default function LoginScreen() {
 
     try {
       if (Platform.OS === "ios") {
-        // Apple echoes whatever string is passed as `nonce` into the
-        // identity token's `nonce` claim. better-auth verifies it with a
-        // literal string compare, so we must pass the SAME value to both
-        // sides. We use the SHA-256 hash of a random UUID so the raw value
-        // never traverses Apple's servers in the JWT.
         const rawNonce = Crypto.randomUUID();
         const hashedNonce = await Crypto.digestStringAsync(
           Crypto.CryptoDigestAlgorithm.SHA256,
@@ -308,17 +299,8 @@ export default function LoginScreen() {
               if (!token) {
                 throw new Error("Handoff could not be claimed.");
               }
-              await SecureStore.setItemAsync(MOBILE_SESSION_TOKEN_KEY, token);
+              await authClient.adoptSessionToken(token);
               claimSecretRef.current = null;
-              // Nudge useSession() to re-fetch now that a credential exists.
-              // The native bearer client's init hook attaches it to the
-              // request, and the server returns valid session data.
-              const store = (
-                authClient as unknown as {
-                  $store?: { notify: (s: string) => void };
-                }
-              ).$store;
-              store?.notify("$sessionSignal");
             } catch {
               setSubmitState({
                 type: "error",

@@ -219,7 +219,12 @@ export const nativeBearerClient = ({ scheme }: NativeAuthClientOptions) => {
       if (Platform.OS !== "web") {
         warmSessionFromCache(clientStore);
       }
-      return {};
+      return {
+        adoptSessionToken: async (sessionToken: string): Promise<void> => {
+          await SecureStore.setItemAsync(MOBILE_SESSION_TOKEN_KEY, sessionToken);
+          clientStore.notify("$sessionSignal");
+        },
+      };
     },
     fetchPlugins: [fetchPlugin],
   };

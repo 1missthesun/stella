@@ -73,6 +73,7 @@ import type {
 } from "../office-preview.js";
 import type { RuntimeVoiceOrchestratorConfig } from "../protocol/index.js";
 import type { ConversationFocusRoot } from "../reply-refs.js";
+import type { UiStateSnapshot } from "../ui-state.js";
 import type {
   UserAsk,
   UserAskAnswer,
@@ -1437,8 +1438,11 @@ export type IpcInvokeContract = {
   [IPC_PI_CHAT_REQUEST]: Invoke<[request: PiChatRequest], unknown>;
 };
 
+export type IpcSyncContract = {
+  [IPC_UI_STATE_KV_SNAPSHOT]: { req: []; res: UiStateSnapshot };
+};
+
 export type IpcSendContract = {
-  [IPC_UI_STATE_KV_SNAPSHOT]: [];
   [IPC_UI_STATE_KV_APPLY]: [changes: Record<string, string | null>];
   [IPC_UI_STATE_KV_CLEAR]: [];
   [IPC_DISPLAY_SET_SELECTED_DEVICE]: [deviceId: string | null];
@@ -1563,6 +1567,10 @@ export type IpcInvokeResult<C extends IpcInvokeChannel> =
 export type IpcSendChannel = keyof IpcSendContract;
 export type IpcSendArgs<C extends IpcSendChannel> = IpcSendContract[C];
 
+export type IpcSyncChannel = keyof IpcSyncContract;
+export type IpcSyncArgs<C extends IpcSyncChannel> = IpcSyncContract[C]["req"];
+export type IpcSyncResult<C extends IpcSyncChannel> = IpcSyncContract[C]["res"];
+
 export type IpcEventChannel = keyof IpcEventContract;
 export type IpcEventPayload<C extends IpcEventChannel> = IpcEventContract[C];
 
@@ -1572,11 +1580,10 @@ export type TypedIpcRenderer = {
     ...args: IpcInvokeArgs<C>
   ) => Promise<IpcInvokeResult<C>>;
   send: <C extends IpcSendChannel>(channel: C, ...args: IpcSendArgs<C>) => void;
-  /** Blocking send; main answers through `event.returnValue`, unchecked. */
-  sendSync: <C extends IpcSendChannel>(
+  sendSync: <C extends IpcSyncChannel>(
     channel: C,
-    ...args: IpcSendArgs<C>
-  ) => unknown;
+    ...args: IpcSyncArgs<C>
+  ) => IpcSyncResult<C>;
   on: <C extends IpcEventChannel>(
     channel: C,
     listener: (event: unknown, payload: IpcEventPayload<C>) => void,

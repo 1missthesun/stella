@@ -5,6 +5,9 @@ import type {
   IpcInvokeResult,
   IpcSendArgs,
   IpcSendChannel,
+  IpcSyncArgs,
+  IpcSyncChannel,
+  IpcSyncResult,
 } from "@stella/contracts/desktop/ipc-contract";
 
 export type IpcInvokeHandler<C extends IpcInvokeChannel> = (
@@ -35,6 +38,15 @@ export function onIpc<C extends IpcSendChannel>(
     channel,
     listener as (event: IpcMainEvent, ...args: unknown[]) => void,
   );
+}
+
+export function handleSyncIpc<C extends IpcSyncChannel>(
+  channel: C,
+  handler: (event: IpcMainEvent, ...args: IpcSyncArgs<C>) => IpcSyncResult<C>,
+): void {
+  ipcMain.on(channel, (event: IpcMainEvent, ...args: unknown[]) => {
+    event.returnValue = handler(event, ...(args as IpcSyncArgs<C>));
+  });
 }
 
 export function offIpc<C extends IpcSendChannel>(

@@ -59,8 +59,7 @@ contextBridge.exposeInMainWorld(
   "__stellaUiState",
   (() => {
     try {
-      const snapshot = ipc.sendSync(IPC_UI_STATE_KV_SNAPSHOT);
-      return snapshot && typeof snapshot === "object" ? snapshot : {};
+      return ipc.sendSync(IPC_UI_STATE_KV_SNAPSHOT);
     } catch {
       return {};
     }

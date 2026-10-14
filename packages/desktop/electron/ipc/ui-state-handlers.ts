@@ -19,7 +19,7 @@ import {
   applyUiStateLocaleChanges,
   bindUiStateLocale,
 } from "../services/i18n-service.js";
-import { onIpc } from "./typed-ipc.js";
+import { handleSyncIpc, onIpc } from "./typed-ipc.js";
 
 export type UiStateKvHandlersOptions = {
   stellaDataDirPath: string;
@@ -55,13 +55,11 @@ export const registerUiStateKvHandlers = (
     }
   };
 
-  onIpc(IPC_UI_STATE_KV_SNAPSHOT, (event) => {
-    if (!options.assertPrivilegedSender(event, IPC_UI_STATE_KV_SNAPSHOT)) {
-      event.returnValue = {};
-      return;
-    }
-    event.returnValue = store.snapshot();
-  });
+  handleSyncIpc(IPC_UI_STATE_KV_SNAPSHOT, (event) =>
+    options.assertPrivilegedSender(event, IPC_UI_STATE_KV_SNAPSHOT)
+      ? store.snapshot()
+      : {},
+  );
 
   onIpc(IPC_UI_STATE_KV_APPLY, (event, rawChanges: unknown) => {
     if (!options.assertPrivilegedSender(event, IPC_UI_STATE_KV_APPLY)) return;

@@ -50,6 +50,8 @@ const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   paddingBottom: 16,
 };
 
+const HOME_LEAVE_MS = 280;
+
 type StoreBackedComposerProps = Omit<
   ComponentProps<typeof Composer>,
   "message"
@@ -170,30 +172,15 @@ export const ChatColumn = memo(function ChatColumn({
     isNearBottom,
   });
 
-  /**
-   * Delay unmount of home content so the fade-out can play. Synchronous
-   * setState here is intentional — the fade-out timer needs immediate
-   * state to drive the leave animation; there's no external system to
-   * subscribe to.
-   */
   const [homeVisible, setHomeVisible] = useState(Boolean(showHomeContent));
-  const [homeLeaving, setHomeLeaving] = useState(false);
+  if (showHomeContent && !homeVisible) setHomeVisible(true);
+  const homeLeaving = homeVisible && !showHomeContent;
 
   useEffect(() => {
-    if (showHomeContent) {
-      setHomeLeaving(false);
-      setHomeVisible(true);
-    } else if (homeVisible) {
-      setHomeLeaving(true);
-      const timer = setTimeout(() => {
-        setHomeVisible(false);
-        setHomeLeaving(false);
-      }, 280);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showHomeContent]);
+    if (!homeLeaving) return;
+    const timer = setTimeout(() => setHomeVisible(false), HOME_LEAVE_MS);
+    return () => clearTimeout(timer);
+  }, [homeLeaving]);
 
   useReadAloud(messages);
 

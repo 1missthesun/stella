@@ -290,6 +290,7 @@ function ComposerImpl({
                 placeholder={placeholder}
                 value={message}
                 aria-autocomplete="list"
+                onFocus={dictation.prewarm}
                 aria-expanded={Boolean(modelMentionTrigger)}
                 aria-controls={
                   modelMentionTrigger

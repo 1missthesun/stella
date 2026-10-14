@@ -16,7 +16,7 @@ const SHARED_MIC_SPEECH_CAPTURE_CONSTRAINTS: MediaTrackConstraints = {
 
 export interface SharedMicrophoneLease {
   stream: MediaStream;
-  release: () => void;
+  release: (options?: { immediate?: boolean }) => void;
 }
 
 type SharedMicrophoneState = {
@@ -140,7 +140,7 @@ export async function acquireSharedMicrophone(): Promise<SharedMicrophoneLease> 
 
   return {
     stream,
-    release() {
+    release(options) {
       if (released) {
         return;
       }
@@ -148,9 +148,16 @@ export async function acquireSharedMicrophone(): Promise<SharedMicrophoneLease> 
 
       stopStream(stream);
       state.activeLeaseCount = Math.max(0, state.activeLeaseCount - 1);
-      if (state.activeLeaseCount === 0) {
-        scheduleRootRelease(state);
+      if (state.activeLeaseCount !== 0) {
+        return;
       }
+      if (options?.immediate && !state.keepWarm) {
+        clearReleaseTimer(state);
+        stopStream(state.rootStream);
+        state.rootStream = null;
+        return;
+      }
+      scheduleRootRelease(state);
     },
   };
 }

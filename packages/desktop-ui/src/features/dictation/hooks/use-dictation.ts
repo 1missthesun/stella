@@ -3,7 +3,7 @@ import {
   ensureDictationSuperFastWarm,
   DictationSession,
   isDictationSuperFastEnabled,
-  warmDictationMicrophone,
+  warmDictationAudio,
   type DictationSessionState,
 } from "@/features/dictation/services/dictation-session";
 import {
@@ -361,7 +361,7 @@ export const useDictation = ({
     if (route === "streaming") prewarmDictationSocket();
     else prewarmDictation();
     if (!disabledRef.current && route !== null && route !== "needs-key") {
-      warmDictationMicrophone();
+      warmDictationAudio();
     }
   }, []);
 

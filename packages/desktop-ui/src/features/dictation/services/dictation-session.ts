@@ -15,14 +15,13 @@ const TARGET_SAMPLE_RATE = 16_000;
 const PCM_WORKLET_NAME = "stella-dictation-pcm-capture";
 const PCM_WORKLET_FILE = "dictation-pcm-worklet.js";
 const DICTATION_SUPER_FAST_KEY = "stella-dictation-super-fast";
-const DICTATION_MIC_OPENED_KEY = "stella-dictation-mic-opened";
 const MAX_DICTATION_DURATION_MS = 15 * 60 * 1000;
 
 const LEVEL_EMIT_INTERVAL_MS = 80;
 
 const LEVEL_GAIN = 6;
 const PRE_ROLL_MS = 300;
-const INTENT_WARM_MS = 10_000;
+const WARM_CONTEXT_IDLE_MS = 60_000;
 
 export const resolveDictationPcmWorkletUrl = (rendererHref: string): string =>
   new URL(PCM_WORKLET_FILE, rendererHref).href;
@@ -50,6 +49,7 @@ export function setDictationSuperFastPreference(enabled: boolean): void {
 class DictationWarmCapture {
   private micLease: SharedMicrophoneLease | null = null;
   private audioContext: AudioContext | null = null;
+  private moduleReady: Promise<void> | null = null;
   private sourceNode: MediaStreamAudioSourceNode | null = null;
   private workletNode: AudioWorkletNode | null = null;
   private chunks: Int16Array[] = [];
@@ -57,6 +57,7 @@ class DictationWarmCapture {
   private startPromise: Promise<void> | null = null;
   private listener: ((frame: WorkletFrame) => void) | null = null;
   private pinned = false;
+  timings: Record<string, number> = {};
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
 
   async start(): Promise<void> {
@@ -78,10 +79,13 @@ class DictationWarmCapture {
   }
 
   warmForIntent(): void {
-    if (this.listener) return;
-    if (uiState.getItem(DICTATION_MIC_OPENED_KEY) !== "true") return;
-    this.scheduleIdleStop(INTENT_WARM_MS);
-    void this.start().catch(() => undefined);
+    if (this.listener || this.micLease) return;
+    try {
+      this.prepare();
+    } catch {
+      return;
+    }
+    this.scheduleIdleClose();
   }
 
   async attach(listener: (frame: WorkletFrame) => void): Promise<Int16Array[]> {
@@ -106,28 +110,57 @@ class DictationWarmCapture {
   }
 
   async stop(): Promise<void> {
-    this.clearIdle();
     const starting = this.startPromise;
     if (starting) await starting.catch(() => undefined);
     if (this.listener || this.pinned || this.startPromise) return;
     this.tearDownAudioPipeline();
-    const ctx = this.audioContext;
     const lease = this.micLease;
-    this.audioContext = null;
     this.micLease = null;
     this.chunks = [];
     this.totalSamples = 0;
-    lease?.release();
-    await ctx?.close().catch(() => undefined);
+    lease?.release({ immediate: true });
+    this.scheduleIdleClose();
   }
 
-  private scheduleIdleStop(ms: number): void {
+  private prepare(): { context: AudioContext; moduleReady: Promise<void> } {
+    if (this.audioContext && this.moduleReady && this.audioContext.state !== "closed") {
+      return { context: this.audioContext, moduleReady: this.moduleReady };
+    }
+    const t0 = performance.now();
+    const context = new AudioContext({ latencyHint: "interactive" });
+    this.timings.context = performance.now() - t0;
+    const moduleReady = context.audioWorklet
+      .addModule(resolveDictationPcmWorkletUrl(window.location.href))
+      .then(
+        () => {
+          this.timings.worklet = performance.now() - t0;
+        },
+        (error: unknown) => {
+          if (this.audioContext === context) this.closeContext();
+          throw error;
+        },
+      );
+    void moduleReady.catch(() => undefined);
+    this.audioContext = context;
+    this.moduleReady = moduleReady;
+    return { context, moduleReady };
+  }
+
+  private closeContext(): void {
+    const context = this.audioContext;
+    this.audioContext = null;
+    this.moduleReady = null;
+    void context?.close().catch(() => undefined);
+  }
+
+  private scheduleIdleClose(): void {
     this.clearIdle();
-    if (this.pinned) return;
+    if (this.pinned || this.listener || this.micLease) return;
     this.idleTimer = setTimeout(() => {
       this.idleTimer = null;
-      void this.stop();
-    }, ms);
+      if (this.pinned || this.listener || this.micLease || this.startPromise) return;
+      this.closeContext();
+    }, WARM_CONTEXT_IDLE_MS);
   }
 
   private clearIdle(): void {
@@ -137,21 +170,28 @@ class DictationWarmCapture {
 
   private async startInner(): Promise<void> {
     if (this.audioContext && this.micLease) return;
-    const ctx = new AudioContext();
-    const moduleReady = ctx.audioWorklet.addModule(
-      resolveDictationPcmWorkletUrl(window.location.href),
-    );
+    this.timings = {};
+    const t0 = performance.now();
+    const { context: ctx, moduleReady } = this.prepare();
     let lease: SharedMicrophoneLease;
     try {
-      [lease] = await Promise.all([acquireSharedMicrophone(), moduleReady]);
+      [lease] = await Promise.all([
+        acquireSharedMicrophone().then((value) => {
+          this.timings.getUserMedia = performance.now() - t0;
+          return value;
+        }),
+        moduleReady,
+        ctx.state === "suspended" ? ctx.resume() : Promise.resolve(),
+      ]);
     } catch (error) {
-      void moduleReady.catch(() => undefined);
-      await ctx.close().catch(() => undefined);
+      if (this.audioContext === ctx) this.closeContext();
       throw error;
     }
+    if (this.audioContext !== ctx) {
+      lease.release({ immediate: true });
+      throw new Error("Dictation audio was released while starting.");
+    }
     this.micLease = lease;
-    this.audioContext = ctx;
-    uiState.setItem(DICTATION_MIC_OPENED_KEY, "true");
 
     const source = ctx.createMediaStreamSource(lease.stream);
     this.sourceNode = source;
@@ -227,7 +267,7 @@ export async function ensureDictationSuperFastWarm(): Promise<void> {
   await setDictationSuperFastModeEnabled(true);
 }
 
-export function warmDictationMicrophone(): void {
+export function warmDictationAudio(): void {
   warmCapture.warmForIntent();
 }
 
@@ -247,6 +287,8 @@ export class DictationSession {
   private cancelled = false;
   private peakSinceLastEmit = 0;
   private levelEmitTimer: ReturnType<typeof setInterval> | null = null;
+  private pressedAt = 0;
+  private marks: Record<string, number> = {};
 
   isActive(): boolean {
     return this.state === "listening" || this.state === "transcribing";
@@ -257,6 +299,8 @@ export class DictationSession {
     options: { streaming?: boolean } = {},
   ): Promise<void> {
     if (this.isActive()) return;
+    this.pressedAt = performance.now();
+    this.marks = {};
     this.callbacks = callbacks;
     this.cancelled = false;
     this.streaming = options.streaming === true;
@@ -368,6 +412,15 @@ export class DictationSession {
   }
 
   private onFrame(frame: WorkletFrame): void {
+    if (import.meta.env.DEV && this.marks.firstFrame === undefined) {
+      this.marks.firstFrame = performance.now() - this.pressedAt;
+      const marks = this.marks;
+      setTimeout(() => {
+        console.info(
+          `[dictation] timing ${JSON.stringify({ ...warmCapture.timings, ...marks })}`,
+        );
+      }, 1500);
+    }
     if (frame.rms > this.peakSinceLastEmit) this.peakSinceLastEmit = frame.rms;
     this.capture(frame.pcm);
     if (this.recording.full && this.state === "listening") {
@@ -406,6 +459,7 @@ export class DictationSession {
     this.ingress = ingress;
     this.streamOpened = stream.open().then(
       () => {
+        this.marks.socket = performance.now() - this.pressedAt;
         if (this.stream !== stream || this.streamFailure) return;
         ingress.start();
       },

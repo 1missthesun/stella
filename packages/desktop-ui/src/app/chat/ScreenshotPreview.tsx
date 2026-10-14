@@ -35,7 +35,7 @@ export function ScreenshotPreviewOverlay({
       backdropStyle={{
         position: "fixed",
         inset: 0,
-        zIndex: 9000,
+        zIndex: "var(--layer-preview)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

@@ -1,6 +1,6 @@
 .ask-stella-selection-chip-group {
   position: fixed;
-  z-index: 1300;
+  z-index: var(--layer-selection-chip);
   display: flex;
   align-items: center;
   gap: 6px;

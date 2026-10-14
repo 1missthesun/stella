@@ -1,14 +1,14 @@
 [data-component="image-lightbox-overlay"] {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--layer-lightbox);
   background-color: rgba(0, 0, 0, 0.55);
 }
 
 [data-component="image-lightbox"] {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--layer-lightbox);
   display: flex;
   align-items: center;
   justify-content: center;

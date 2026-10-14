@@ -10,7 +10,7 @@ const PopoverContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
 >(
   (
-    { className, sideOffset = 4, children, style, forceMount, ...props },
+    { className, sideOffset = 4, children, forceMount, ...props },
     ref,
   ) => (
     <PopoverPrimitive.Portal forceMount={forceMount}>
@@ -20,7 +20,6 @@ const PopoverContent = React.forwardRef<
         forceMount={forceMount}
         data-component="popover-content"
         className={cn(className)}
-        style={{ ...style, zIndex: 9999 }}
         {...props}
       >
         {children}

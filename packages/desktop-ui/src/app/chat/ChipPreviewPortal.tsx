@@ -124,7 +124,7 @@ export function ChipPreviewPortal({
         position: "fixed",
         top: `${position.top}px`,
         left: `${position.left}px`,
-        zIndex: 9000,
+        zIndex: "var(--layer-preview)",
         opacity: position.measured ? 1 : 0,
         transform: position.measured
           ? "translateY(0)"

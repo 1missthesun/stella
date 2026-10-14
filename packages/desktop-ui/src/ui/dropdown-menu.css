@@ -8,10 +8,7 @@
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow: var(--shadow-overlay);
-  /* Sit above popovers (zIndex 9999) so Selects rendered inside a popover
-     — e.g. the model picker's "More options" runtime selectors — aren't
-     clipped behind the popover surface. */
-  z-index: 10000;
+  z-index: var(--layer-menu);
   max-height: var(--radix-dropdown-menu-content-available-height, calc(100vh - 24px));
   overflow-y: auto;
   overflow-x: hidden;

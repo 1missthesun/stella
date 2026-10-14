@@ -105,6 +105,17 @@
   --glass-blur: none;
   --panel-glass-bg: var(--panel-surface-bg-gradient), var(--card);
   --panel-glass-blur: none;
+  --overlay-surface-bg:
+    var(--panel-surface-bg-gradient), linear-gradient(var(--card), var(--card)),
+    var(--background);
+
+  --layer-dialog: 50;
+  --layer-lightbox: 60;
+  --layer-toast: 1000;
+  --layer-selection-chip: 1300;
+  --layer-preview: 9000;
+  --layer-popover: 9999;
+  --layer-menu: 10000;
 
   --panel-surface-bg-gradient: linear-gradient(
     to bottom,

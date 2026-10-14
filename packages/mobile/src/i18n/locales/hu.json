@@ -1032,7 +1032,6 @@
       "backLabel": "Vissza a Beállításokhoz",
       "chatgptBrowserWaiting": "Fejezd be a bejelentkezést a ChatGPT-be a böngésződben.",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "Alapértelmezett",
       "claudeNote": "Ha itt adsz hozzá fiókot, a Stella felhője az Anthropic saját oldalán jelentkezik be a Claude Code-ba. Minden számítógép a saját Claude Code-bejelentkezését használja.",
       "claudeSection": "Claude",
       "claudeSyncNote": "A teljes Claude Code-munkamenetek, az eszközök kimeneteivel együtt, szinkronizálódnak a Stella felhőjébe.",
@@ -2041,7 +2040,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "Itt: {place}",
-        "automatic": "Minden számítógép saját bejelentkezése",
+        "automatic": "Alapértelmezett",
         "automaticHint": "Azt a fiókot használja, amellyel a Claude Code az adott számítógépen már be van jelentkezve",
         "automaticToast": "Mostantól minden számítógép a saját Claude Code-bejelentkezését használja.",
         "chooseNote": "A kiválasztott fiókot az összes számítógépeden és a felhőben is használjuk.",

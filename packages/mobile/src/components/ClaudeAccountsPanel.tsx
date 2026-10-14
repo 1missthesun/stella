@@ -221,7 +221,7 @@ export function ClaudeAccountsPanel({
         {overview
           ? choiceRow(
               "automatic",
-              t("mobile.engineAccounts.claudeDefault"),
+              t(`${C}.automatic`),
               t(`${C}.automaticHint`),
               chosenId === null,
               () => choose(null),

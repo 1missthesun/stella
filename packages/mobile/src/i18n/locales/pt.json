@@ -1040,7 +1040,6 @@
       "backLabel": "Voltar aos Ajustes",
       "chatgptBrowserWaiting": "Termine de entrar no ChatGPT no seu navegador.",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "Padrão",
       "claudeNote": "Adicionar uma conta aqui conecta a nuvem da Stella ao Claude Code na própria página da Anthropic. Cada computador usa o próprio login do Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "As sessões completas do Claude Code, incluindo as saídas das ferramentas, são sincronizadas com a nuvem da Stella.",
@@ -2049,7 +2048,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "Em {place}",
-        "automatic": "O login de cada computador",
+        "automatic": "Padrão",
         "automaticHint": "Usa a conta já conectada no Claude Code de cada computador",
         "automaticToast": "Cada computador agora usa seu próprio login do Claude Code.",
         "chooseNote": "A conta que você escolher é usada em todos os seus computadores e na nuvem.",

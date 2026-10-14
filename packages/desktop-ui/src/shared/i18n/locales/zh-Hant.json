@@ -1024,7 +1024,6 @@
       "backLabel": "返回設定",
       "chatgptBrowserWaiting": "請在瀏覽器中完成 ChatGPT 登入。",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "預設",
       "claudeNote": "在此新增帳號會讓 Stella 的雲端在 Anthropic 自己的頁面上登入 Claude Code。每台電腦使用各自的 Claude Code 登入。",
       "claudeSection": "Claude",
       "claudeSyncNote": "完整的 Claude Code 工作階段（包括工具輸出）會同步到 Stella 的雲端。",
@@ -2033,7 +2032,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "在{place}上",
-        "automatic": "各電腦自己的登入",
+        "automatic": "預設",
         "automaticHint": "使用每台電腦上 Claude Code 已登入的帳號",
         "automaticToast": "現在每台電腦都使用自己的 Claude Code 登入。",
         "chooseNote": "你選擇的帳號會在你的所有電腦和雲端上使用。",

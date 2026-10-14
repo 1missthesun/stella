@@ -222,7 +222,7 @@ export function EngineAccountRow({
         ? `${row.plan.charAt(0).toUpperCase()}${row.plan.slice(1)}`
         : undefined;
     } else if (accounts.length > 0 || engines?.claude) {
-      label = t("mobile.engineAccounts.claudeDefault");
+      label = t("settings.engineAccounts.claude.automatic");
     } else {
       label = t("mobile.engineAccounts.connectClaude");
     }

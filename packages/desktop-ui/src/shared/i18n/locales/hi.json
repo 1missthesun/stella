@@ -1032,7 +1032,6 @@
       "backLabel": "सेटिंग्स पर वापस जाएं",
       "chatgptBrowserWaiting": "अपने ब्राउज़र में ChatGPT में साइन इन पूरा करें।",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "डिफ़ॉल्ट",
       "claudeNote": "यहां खाता जोड़ने से Stella का क्लाउड Anthropic के अपने पेज पर Claude Code में साइन इन होता है। हर कंप्यूटर अपना Claude Code साइन-इन इस्तेमाल करता है।",
       "claudeSection": "Claude",
       "claudeSyncNote": "पूरे Claude Code सत्र, टूल आउटपुट सहित, Stella के क्लाउड में सिंक होते हैं।",
@@ -2041,7 +2040,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "{place} पर",
-        "automatic": "हर कंप्यूटर का अपना लॉगिन",
+        "automatic": "डिफ़ॉल्ट",
         "automaticHint": "हर कंप्यूटर पर Claude Code में पहले से जो खाता साइन इन है, उसी का उपयोग करता है",
         "automaticToast": "अब हर कंप्यूटर अपने Claude Code लॉगिन का उपयोग करता है।",
         "chooseNote": "आप जो खाता चुनते हैं, उसका उपयोग आपके सभी कंप्यूटरों और क्लाउड में होता है।",

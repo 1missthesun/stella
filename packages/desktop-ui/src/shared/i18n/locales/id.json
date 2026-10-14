@@ -1024,7 +1024,6 @@
       "backLabel": "Kembali ke Pengaturan",
       "chatgptBrowserWaiting": "Selesaikan proses masuk ke ChatGPT di browser Anda.",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "Default",
       "claudeNote": "Menambahkan akun di sini membuat cloud Stella masuk ke Claude Code di halaman Anthropic sendiri. Setiap komputer menggunakan login Claude Code-nya sendiri.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Sesi Claude Code lengkap, termasuk output alat, disinkronkan ke cloud Stella.",
@@ -2033,7 +2032,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "Di {place}",
-        "automatic": "Login masing-masing komputer",
+        "automatic": "Default",
         "automaticHint": "Memakai akun yang sudah masuk di Claude Code pada tiap komputer",
         "automaticToast": "Setiap komputer kini memakai login Claude Code-nya sendiri.",
         "chooseNote": "Akun yang Anda pilih dipakai di semua komputer Anda dan di cloud.",

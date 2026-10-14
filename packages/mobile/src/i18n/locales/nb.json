@@ -1032,7 +1032,6 @@
       "backLabel": "Tilbake til Innstillinger",
       "chatgptBrowserWaiting": "Fullfør påloggingen til ChatGPT i nettleseren.",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "Standard",
       "claudeNote": "Når du legger til en konto her, logges Stellas sky på Claude Code på Anthropics egen side. Hver datamaskin bruker sin egen Claude Code-pålogging.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Hele Claude Code-økter, inkludert verktøyutdata, synkroniseres til Stellas sky.",
@@ -2041,7 +2040,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "På {place}",
-        "automatic": "Hver datamaskins egen pålogging",
+        "automatic": "Standard",
         "automaticHint": "Bruker kontoen Claude Code allerede er pålogget med på hver datamaskin",
         "automaticToast": "Hver datamaskin bruker nå sin egen Claude Code-pålogging.",
         "chooseNote": "Kontoen du velger, brukes på alle datamaskinene dine og i skyen.",

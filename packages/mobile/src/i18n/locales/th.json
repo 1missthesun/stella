@@ -1024,7 +1024,6 @@
       "backLabel": "กลับไปที่การตั้งค่า",
       "chatgptBrowserWaiting": "ลงชื่อเข้าใช้ ChatGPT ในเบราว์เซอร์ให้เสร็จ",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "ค่าเริ่มต้น",
       "claudeNote": "การเพิ่มบัญชีที่นี่จะให้คลาวด์ของ Stella ลงชื่อเข้าใช้ Claude Code ผ่านหน้าของ Anthropic เอง คอมพิวเตอร์แต่ละเครื่องใช้การลงชื่อเข้าใช้ Claude Code ของตัวเอง",
       "claudeSection": "Claude",
       "claudeSyncNote": "เซสชัน Claude Code ทั้งหมด รวมถึงผลลัพธ์ของเครื่องมือ จะซิงค์ไปยังคลาวด์ของ Stella",
@@ -2033,7 +2032,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "บน {place}",
-        "automatic": "การเข้าสู่ระบบของแต่ละเครื่อง",
+        "automatic": "ค่าเริ่มต้น",
         "automaticHint": "ใช้บัญชีที่ Claude Code ลงชื่อเข้าใช้อยู่แล้วบนคอมพิวเตอร์แต่ละเครื่อง",
         "automaticToast": "ตอนนี้คอมพิวเตอร์แต่ละเครื่องใช้การเข้าสู่ระบบ Claude Code ของตัวเองแล้ว",
         "chooseNote": "บัญชีที่คุณเลือกจะใช้บนคอมพิวเตอร์ทุกเครื่องของคุณและในคลาวด์",

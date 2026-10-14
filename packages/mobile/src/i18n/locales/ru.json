@@ -1048,7 +1048,6 @@
       "backLabel": "Назад к настройкам",
       "chatgptBrowserWaiting": "Завершите вход в ChatGPT в браузере.",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "По умолчанию",
       "claudeNote": "При добавлении аккаунта здесь облако Stella входит в Claude Code на собственной странице Anthropic. Каждый компьютер использует свой вход в Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Полные сессии Claude Code, включая вывод инструментов, синхронизируются с облаком Stella.",
@@ -2057,7 +2056,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "На: {place}",
-        "automatic": "Собственный вход каждого компьютера",
+        "automatic": "По умолчанию",
         "automaticHint": "Используется аккаунт, в который Claude Code уже вошёл на каждом компьютере",
         "automaticToast": "Теперь каждый компьютер использует собственный вход в Claude Code.",
         "chooseNote": "Выбранный аккаунт используется на всех ваших компьютерах и в облаке.",

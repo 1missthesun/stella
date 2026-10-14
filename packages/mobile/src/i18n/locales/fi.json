@@ -1032,7 +1032,6 @@
       "backLabel": "Takaisin asetuksiin",
       "chatgptBrowserWaiting": "Viimeistele kirjautuminen ChatGPT:hen selaimessasi.",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "Oletus",
       "claudeNote": "Kun lisäät tilin täällä, Stellan pilvi kirjautuu Claude Codeen Anthropicin omalla sivulla. Jokainen tietokone käyttää omaa Claude Code -kirjautumistaan.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Kokonaiset Claude Code -istunnot työkalujen tulosteineen synkronoidaan Stellan pilveen.",
@@ -2041,7 +2040,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "Kohteessa {place}",
-        "automatic": "Kunkin tietokoneen oma kirjautuminen",
+        "automatic": "Oletus",
         "automaticHint": "Käyttää tiliä, jolla Claude Code on jo kirjautunut kullakin tietokoneella",
         "automaticToast": "Jokainen tietokone käyttää nyt omaa Claude Code -kirjautumistaan.",
         "chooseNote": "Valitsemaasi tiliä käytetään kaikilla tietokoneillasi ja pilvessä.",

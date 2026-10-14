@@ -1032,7 +1032,6 @@
       "backLabel": "Πίσω στις Ρυθμίσεις",
       "chatgptBrowserWaiting": "Ολοκληρώστε τη σύνδεση στο ChatGPT στο πρόγραμμα περιήγησης.",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "Προεπιλογή",
       "claudeNote": "Η προσθήκη λογαριασμού εδώ συνδέει το cloud της Stella στο Claude Code μέσω της σελίδας της ίδιας της Anthropic. Κάθε υπολογιστής χρησιμοποιεί τη δική του σύνδεση στο Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Οι πλήρεις συνεδρίες του Claude Code, μαζί με τα αποτελέσματα των εργαλείων, συγχρονίζονται στο cloud της Stella.",
@@ -2041,7 +2040,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "Σε: {place}",
-        "automatic": "Η σύνδεση κάθε υπολογιστή",
+        "automatic": "Προεπιλογή",
         "automaticHint": "Χρησιμοποιεί τον λογαριασμό με τον οποίο είναι ήδη συνδεδεμένο το Claude Code σε κάθε υπολογιστή",
         "automaticToast": "Κάθε υπολογιστής χρησιμοποιεί πλέον τη δική του σύνδεση στο Claude Code.",
         "chooseNote": "Ο λογαριασμός που επιλέγετε χρησιμοποιείται σε όλους τους υπολογιστές σας και στο cloud.",

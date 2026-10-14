@@ -1040,7 +1040,6 @@
       "backLabel": "Înapoi la Setări",
       "chatgptBrowserWaiting": "Finalizează conectarea la ChatGPT în browser.",
       "chatgptSection": "ChatGPT",
-      "claudeDefault": "Implicit",
       "claudeNote": "Adăugarea unui cont aici conectează cloudul Stella la Claude Code pe pagina proprie a Anthropic. Fiecare computer își folosește propria conectare la Claude Code.",
       "claudeSection": "Claude",
       "claudeSyncNote": "Sesiunile Claude Code complete, inclusiv rezultatele instrumentelor, se sincronizează cu cloudul Stella.",
@@ -2049,7 +2048,7 @@
       "chatgptTitle": "ChatGPT",
       "claude": {
         "addOn": "Pe {place}",
-        "automatic": "Conectarea proprie a fiecărui computer",
+        "automatic": "Implicit",
         "automaticHint": "Folosește contul cu care Claude Code este deja conectat pe fiecare computer",
         "automaticToast": "Fiecare computer folosește acum propria conectare la Claude Code.",
         "chooseNote": "Contul pe care îl alegi este folosit pe toate computerele tale și în cloud.",

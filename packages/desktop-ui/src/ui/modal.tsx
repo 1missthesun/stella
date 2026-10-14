@@ -30,6 +30,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type CSSProperties,
   type ReactNode,
   type RefObject,
@@ -156,15 +157,14 @@ export function Modal({
     };
   }, [modal]);
 
+  const [openFocusRef] = useState(() => initialFocusRef);
   useEffect(() => {
     const panel = panelRef.current;
     if (!panel) return;
-    const explicit = initialFocusRef?.current;
+    const explicit = openFocusRef?.current;
     const target = explicit ?? getTabbableElements(panel)[0] ?? panel;
     target.focus({ preventScroll: true });
-    // Only on open: later re-renders must not yank focus back.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [openFocusRef]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
